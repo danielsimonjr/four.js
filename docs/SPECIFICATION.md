@@ -3,6 +3,10 @@
 > **Auto-extracted from the source PDF** (`four-js-specification.pdf`, 65 pages) for readability
 > and diffability. The **PDF in this folder is authoritative**; this Markdown is a convenience
 > rendering and may contain text-extraction artifacts. Do not treat wording here as normative.
+>
+> ⚠ **This specification has known internal defects** - duplicated part/section numbering and a
+> package-list contradiction. See [ERRATA.md](ERRATA.md) before relying on any cross-reference in
+> the section 45-67 range.
 
 ---
 
@@ -830,6 +834,9 @@ as ordinary nodes.
 Part VII - Complete Graphics, Rendering, Ap-
 plication, and Platform Architecture
 45. Application Model
+
+> **[Editorial note - not part of the source document]** Sections 45-67 are numbered TWICE in this
+> specification. This is the FIRST 45-67 range (graphics/rendering/application). See [ERRATA.md](ERRATA.md) E-2.
 The high-level Application object owns the default scene, renderer, time sys-
 tem, simulation scheduler, input routing, assets, diagnostics, cameras, and view-
 ports.
@@ -1894,6 +1901,10 @@ panel.add(new Four.Text({ text: "System Status" }), impulseButton);
 app.scene.add(cube, panel);
 app.start();
 Part VII - Package Architecture
+
+> **[Editorial note - not part of the source document]** This part is labelled `Part VII` in the
+> source, but an earlier part already carries that label, and section numbering restarts at 45 here.
+> This is the SECOND 45-67 range (packages/implementation). See [ERRATA.md](ERRATA.md) E-1 and E-2.
 45. Proposed Monorepo
 four.js/
 +-- packages/
