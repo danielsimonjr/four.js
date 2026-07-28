@@ -26,6 +26,11 @@ specification; until then, entries are grouped by date under **Unreleased**.
   `benchmarks/`, `tools/`, and `website/` gained purpose READMEs.
 
 #### Changed
+- `docs/SPECIFICATION.md` typeset for readability: all 96 code snippets and ASCII diagrams
+  fenced (`ts`/`json`/`text`) with indentation restored, `•` bullets converted to Markdown
+  lists, the §86 performance targets converted to a real table, and a parts table of
+  contents added. Word-for-word equivalence with the pre-typeset text was machine-verified
+  (7,257 words preserved exactly); no wording changed.
 - `docs/SPECIFICATION.md` rewritten as the **corrected working rendering** of the
   specification (by owner decision): the duplicated `Part VII` became `Part VIII` with later
   parts shifted to IX–XIII (E-1); the twice-assigned section range 45–67 renumbered +53 to
