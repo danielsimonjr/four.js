@@ -24,11 +24,12 @@ changes in `CHANGELOG.md`.
 ### Documentation
 - [ ] Optionally regenerate the specification PDF from the corrected `docs/SPECIFICATION.md`
       (the archived PDF still carries the old duplicate numbering)
-- [ ] Wrap code snippets in `docs/SPECIFICATION.md` in fenced code blocks (readability;
-      content itself is already corrected)
 
 ## Done
 
+- [x] 2026-07-28 — Typeset `SPECIFICATION.md`: 96 fenced code/diagram blocks (with restored
+      indentation), Markdown bullet lists, §86 performance table, parts TOC; word-for-word
+      equivalence machine-verified
 - [x] 2026-07-28 — Build out the directory tree from the spec: per-package `README.md` +
       `src/`/`tests/` for all 24 packages; `examples/` (§93 + flagship §118–119); `tests/`
       categories (§92); READMEs for `benchmarks/`, `tools/`, `website/`
