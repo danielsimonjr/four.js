@@ -26,44 +26,36 @@ License: MIT (`LICENSE`).
 
 | File | Role |
 |---|---|
-| `docs/four-js-specification.pdf` | **Authoritative** source (65 pages). Nothing in it has been altered. |
-| `docs/SPECIFICATION.md` | Auto-extracted Markdown rendering of the PDF (2,337 lines). Convenience only. |
-| `docs/ERRATA.md` | Known internal defects of the spec, plus checked-and-dismissed non-defects. |
+| `docs/SPECIFICATION.md` | **Corrected rendering — the working reference.** Parts I–XIII, sections 1–120, no duplicates; extraction artifacts repaired; Markdown headings added. |
+| `docs/four-js-specification.pdf` | Original source (65 pages), preserved unchanged. **Still contains the numbering defects** — translate its references via the errata map. |
+| `docs/ERRATA.md` | Correction log: the PDF's defects, how each was resolved, and the PDF→Markdown numbering map. |
 | `README.md` | Project summary; points at the spec and errata. |
 
-Extraction artifacts in `SPECIFICATION.md` such as `T agline`, `T arget`, `T ests`,
-`W orker-rendering`, `A void`, `AScene` are PDF kerning noise, **not errors** — do not "fix"
-quotes of the spec, and do not flag them as defects.
+## 3. Specification numbering — corrected; use the errata map for PDF references
 
-## 3. Specification errata — read before citing any section
+The PDF had three internal defects. All were **resolved in `SPECIFICATION.md`** by the
+author's decision (2026-07-28); `docs/ERRATA.md` is now a correction log:
 
-The spec has unresolved numbering defects, documented in `docs/ERRATA.md`:
+- **E-1 (resolved):** the PDF used `Part VII` for two different parts. The second occurrence
+  (*Package Architecture*) is now `Part VIII`, and later parts shifted by one — the PDF's
+  Parts VIII–XII are the Markdown's Parts IX–XIII.
+- **E-2 (resolved):** the PDF assigned section numbers 45–67 twice. The second range was
+  renumbered **+53** to §98–120: Package Architecture §98–102, Implementation Plan (Phases
+  0–10) §103–113, Public API Examples §114–117, Flagship Demonstrations §118–119, Revised
+  MVP §120. Plain "§N" citations now unambiguously mean `SPECIFICATION.md` numbering; when
+  citing the PDF, say so explicitly ("PDF §49, second range").
+- **E-3 (resolved):** the PDF's Solver Packages section contradicted the monorepo tree by
+  naming `physics-matter` and `physics-cannon`. The tree won: §102 (Solver Packages) now
+  lists only `@four/physics-rapier` and `@four/physics-box2d`. The scaffold contains
+  `physics-rapier`, `physics-box2d`, and `physics-soft` only — **do not add `physics-matter`
+  or `physics-cannon` directories** without a further spec amendment.
 
-- **E-1: two parts are both labelled `Part VII`.**
-  - First `Part VII` — *Complete Graphics, Rendering, Application, and Platform Architecture*
-    (§45 Application Model → §67 Clipping, Masks, and Stencils, continuing through §97).
-  - Second `Part VII` — *Package Architecture* (§45 Proposed Monorepo → §49 Solver Packages).
-  - All other part labels (`Part I` … `Part XII`) are unique and sequential.
-- **E-2 (most consequential): section numbers 45–67 are assigned twice.** The second
-  `Part VII` restarts numbering at 45, and `Part VIII – Implementation Plan` continues it
-  (§50–§60 = Phases 0–10), so bare references like "§49" or "§60" are ambiguous.
-  **Repository convention: always qualify citations in the 45–67 range by content**, e.g.
-  "§49 (Solver Packages)" vs. "§49 (Renderable Node Hierarchy)"; "§60 (Phase 10)" vs.
-  "§60 (Shader and Node-Material System)".
-- **E-3 (RESOLVED): scaffold follows the §45 (Proposed Monorepo) tree as written.**
-  §49 (Solver Packages) names `physics-matter` and `physics-cannon`, but the project owner
-  chose the monorepo tree, so the scaffold deliberately contains only `physics-rapier`,
-  `physics-box2d`, and `physics-soft`. **Do not add `physics-matter` or `physics-cannon`
-  directories** without an explicit decision to amend the specification.
-
-Non-defects already checked and dismissed (do not "rediscover" them): §65 exists (its title
-begins with a typographic quote: `65. "One Scene, Everything Moves"`); repeated low numbers
+Non-defects already checked and dismissed (do not "rediscover" them): §118 exists (its title
+begins with a typographic quote: `"One Scene, Everything Moves"`); repeated low numbers
 (1., 2., 3., …) inside sections are numbered *lists*, not sections.
 
-E-1 and E-2 are **unresolved and require the spec author's decision** — do not renumber the
-spec, edit the PDF, or resolve them unilaterally. The two editorial notes already embedded in
-`SPECIFICATION.md` (at the first `Part VII` §45 and at the second `Part VII`) are repository
-additions, clearly marked as not part of the source document.
+Do not edit the PDF, and do not reintroduce the old dual numbering when quoting it —
+translate PDF references through the ERRATA map instead.
 
 ## 4. Core concept and design principles
 
@@ -95,7 +87,7 @@ serialization, replay, debugging, reproducible simulation.
 Non-goals for the initial release (§5): industrial FEM, certified safety-critical simulation,
 CFD, CAD geometric kernel, full game editor, exact all-scale real-world simulation.
 
-The defining object model (Part XII): `Object → Transform / Appearance / Motion / Animation /
+The defining object model (Part XIII): `Object → Transform / Appearance / Motion / Animation /
 Physics / Interaction`. Promise: *"Create once. Position anywhere. Animate naturally. Simulate
 physically. Render everywhere."*
 
@@ -199,7 +191,7 @@ physically. Render everywhere."*
   never feed back into physics unless explicitly requested.
 - Camera motion (§44) uses the same timeline/constraint/motion systems as ordinary nodes.
 
-### First Part VII — Graphics, Rendering, Application, Platform (first §45–67, then §68–97)
+### Part VII — Graphics, Rendering, Application, Platform (§45–97)
 - **Application model** (§45): `Four.Application` owns scene, renderer, time, scheduler,
   input, assets, diagnostics, cameras, viewports; lifecycle `initialize/start/stop/pause/
   resume/step/resize/dispose`. Advanced users may construct systems independently — the
@@ -212,7 +204,7 @@ physically. Render everywhere."*
   XR extension point, shake).
 - Viewports (§48): camera → rect region + optional render target; split-screen, minimaps, CAD
   views, picture-in-picture, offscreen textures, portals.
-- Renderable hierarchy (§49, first range): `Renderable` (material, renderLayer, renderOrder,
+- Renderable hierarchy (§49): `Renderable` (material, renderLayer, renderOrder,
   depthMode, shadows, frustumCulled) → `Shape2D` (Circle, Ellipse, Rectangle,
   RoundedRectangle, Polygon, Polyline, Arc, Path), `Sprite`, `Text`, `Mesh`, `Line3D`,
   `PointCloud`, `ParticleSystem`, `CustomRenderable`.
@@ -232,7 +224,7 @@ physically. Render everywhere."*
   Physical/Shader/Node/Compute. Paints (§58): solid, linear/radial/conic gradients, patterns,
   procedural shaders, render-target textures; full `StrokeStyle`. `StandardMaterial` (§59) is
   glTF-compatible metallic-roughness.
-- **Node-material shader system** (§60, first range): backend-independent; compiles to WGSL
+- **Node-material shader system** (§60): backend-independent; compiles to WGSL
   (WebGPU) and GLSL ES (WebGL 2) with reduced Canvas/SVG fallbacks.
 - Renderer interface (§61); backends and capability tiers (§62): auto-selection prefers
   WebGPU → WebGL 2 → 2D backend; capability reporting; apps declare required/optional
@@ -243,9 +235,9 @@ physically. Render everywhere."*
 - Render pipeline stages (§64): traversal → visibility/layers → culling → render items →
   sorting → batching/instancing → command encoding → submission. Avoid per-node virtual calls
   in the hot path; compile renderables into compact render items.
-- Batching (§65, first range) is automatic but inspectable. Sort order (§66): layer →
+- Batching (§65) is automatic but inspectable. Sort order (§66): layer →
   opaque/transparent → pipeline/material → depth → explicit order.
-- Clipping/masks/stencils (§67, first range) including 3D clipping planes and engineering
+- Clipping/masks/stencils (§67) including 3D clipping planes and engineering
   section views.
 - Lighting (§68), shadows (§69), post-processing (§70).
 - **Unified 2D/3D picking** (§71): `hitTestMode = "bounds" | "geometry" | "pixel" | "gpu" |
@@ -287,10 +279,10 @@ physically. Render everywhere."*
 - §97 is a complete mixed-scene example (3D physics cube + billboard label + screen-space UI
   panel applying impulses) worth reading as the canonical "feel" of the API.
 
-### Second Part VII — Package Architecture (second §45–49)
+### Part VIII — Package Architecture (§98–102)
 See §7 below (package map).
 
-### Part VIII — Implementation Plan (second-range §50–60 = Phases 0–10)
+### Part IX — Implementation Plan (§103–113 = Phases 0–10)
 | Phase | Scope | Exit criterion |
 |---|---|---|
 | 0 | Root files: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`, `.github/workflows/ci.yml`, CONTRIBUTING, CODE_OF_CONDUCT, IMPLEMENTATION_PLAN, ROADMAP | Monorepo installs; packages compile; tests run; docs build; example starts |
@@ -305,21 +297,21 @@ See §7 below (package map).
 | 9 | Particle emitters, CPU + GPU compute simulation, force fields, trails | 100k simple particles at interactive rates |
 | 10 | Snapshots, input recording, replay, checksums, frame stepping, solver stats | A physics defect can be captured, replayed, inspected frame by frame |
 
-### Parts IX–XII
-- Part IX (§61–64, second range): canonical public API examples — animated circle, dynamic
+### Parts X–XIII
+- Part X (§114–117): canonical public API examples — animated circle, dynamic
   ball, motorized hinge, physics/animation blend with impact-triggered ragdoll.
-- Part X (§65–66, second range): flagship demos — *"One Scene, Everything Moves"* (success
+- Part XI (§118–119): flagship demos — *"One Scene, Everything Moves"* (success
   criterion: "one motion-capable engine, not a graphics library with physics bolted on") and
   the *Electric Motor Digital Twin* engineering demo (PID speed control, fault injection,
   torque overlays, replay).
-- Part XI (§67, second range): **Revised MVP** — Node/Group/Scene/Transform/cameras/layers;
+- Part XII (§120): **Revised MVP** — Node/Group/Scene/Transform/cameras/layers;
   clock + fixed-step + MotionComponent + path motion + interpolation; Tween/easing/Timeline/
   transform tracks; PhysicsWorld with 2D+3D descriptors, static/dynamic/kinematic bodies,
   basic colliders, gravity/forces/impulses, collision events, raycasts, **one solver
   adapter**, debug drawing; **WebGL 2 only**, 2D primitives, basic meshes, lighting, sprites,
   text; pointer events, 2D picking, 3D raycasting, dragging; tests, examples, API docs,
   benchmark harness, deterministic simulation tests.
-- Part XII: final design statement (object model + promise, quoted in §4 above).
+- Part XIII: final design statement (object model + promise, quoted in §4 above).
 
 ## 6. Toolchain, standards, and testing (spec §91–95)
 
@@ -354,7 +346,7 @@ where practical, maintainer approval).
 
 ## 7. Package map (`packages/`)
 
-All packages are `@four/`-scoped. The scaffold matches §45 (Proposed Monorepo) exactly —
+All packages are `@four/`-scoped. The scaffold matches §98 (Proposed Monorepo) exactly —
 24 packages plus the top-level dirs `examples/`, `benchmarks/`, `docs/`, `tests/`, `tools/`,
 `website/`.
 
@@ -363,10 +355,10 @@ All packages are `@four/`-scoped. The scaffold matches §45 (Proposed Monorepo) 
 | `core` | Foundation (EventEmitter, shared infrastructure) |
 | `math` | Vector2/3/4, Matrix3/4, Quaternion, Transform math |
 | `scene` | Node, Group, Scene, transforms, layers, queries |
-| `motion` | Clocks, fixed-step scheduler, MotionComponent, velocity/acceleration, kinematic controllers, path following, trajectories, spring motion, steering, interpolation, **transform authority** (§46, Motion Package) |
-| `animation` | Tweens, easing, timelines, clips, tracks, state machines, blend trees, skeletons, IK, physics-animation blending (§47, Animation Package) |
-| `physics` | **Stable public API**: body/collider descriptors, materials, constraints, joints, force fields, queries, event normalization, solver adapters, snapshots, units, debug data (§48, Physics Package) |
-| `physics-rapier`, `physics-box2d` | Solver adapters implementing the shared adapter interface, declaring capability differences (§49, Solver Packages). *No `physics-matter`/`physics-cannon` — see ERRATA E-3.* |
+| `motion` | Clocks, fixed-step scheduler, MotionComponent, velocity/acceleration, kinematic controllers, path following, trajectories, spring motion, steering, interpolation, **transform authority** (§99, Motion Package) |
+| `animation` | Tweens, easing, timelines, clips, tracks, state machines, blend trees, skeletons, IK, physics-animation blending (§100, Animation Package) |
+| `physics` | **Stable public API**: body/collider descriptors, materials, constraints, joints, force fields, queries, event normalization, solver adapters, snapshots, units, debug data (§101, Physics Package) |
+| `physics-rapier`, `physics-box2d` | Solver adapters implementing the shared adapter interface, declaring capability differences (§102, Solver Packages). *No `physics-matter`/`physics-cannon` — see ERRATA E-3.* |
 | `physics-soft` | Soft bodies and deformables (not a solver adapter) |
 | `particles` | Particle emitters and simulation |
 | `geometry` | 2D/3D geometry, tessellation targets |
@@ -390,15 +382,18 @@ concrete backend; `four` aggregates everything.
 
 1. **Don't fabricate tooling.** There is no build/lint/test today. If asked to "run the
    tests", explain the repo state instead of inventing commands.
-2. **The PDF is authoritative.** Never edit `SPECIFICATION.md` content except clearly-marked
-   editorial notes; never claim the Markdown overrides the PDF.
-3. **Cite ambiguous sections by content**, per ERRATA E-2 ("§49 (Solver Packages)"), and keep
-   `docs/ERRATA.md` updated if new spec defects are genuinely discovered (check its
-   "non-defects" list first).
+2. **`SPECIFICATION.md` is the working reference; the PDF is the unmodified original.** The
+   Markdown was corrected by author decision (parts I–XIII, sections 1–120) — don't edit the
+   PDF, and don't reintroduce its dual numbering. Substantive spec changes need an owner
+   decision, logged in `docs/ERRATA.md`.
+3. **Plain "§N" means `SPECIFICATION.md` numbering.** When citing the PDF, say so explicitly
+   and translate through the ERRATA numbering map (PDF second-range §45–67 = §98–120). Keep
+   `docs/ERRATA.md` updated if new defects are genuinely discovered (check its "non-defects"
+   list first).
 4. **Respect ERRATA E-3**: no `physics-matter`/`physics-cannon` packages without a spec
    amendment decision from the owner.
 5. **Match the scaffold to the spec.** New top-level directories or packages need a basis in
-   §45 (Proposed Monorepo) or an explicit owner decision (RFC/ADR per §95 once governance is
+   §98 (Proposed Monorepo) or an explicit owner decision (RFC/ADR per §95 once governance is
    live).
 6. **When implementing, follow the phase order** (Part VIII): math/scene/time before motion,
    motion before rendering, rendering before animation core, physics API + Rapier adapter

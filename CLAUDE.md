@@ -12,24 +12,21 @@ no build/test tooling yet.** Every `packages/*` directory holds just a `.gitkeep
 There are consequently no build, lint, or test commands to run today. When implementation
 begins, the spec (§91, Coding Standards and Toolchain) prescribes the baseline: strict
 TypeScript, ESM, pnpm workspace, Turborepo or Nx, Vitest, Playwright, ESLint, Prettier, Vite,
-and Changesets. Phase 0 of the implementation plan (Part VIII, §50) lists the exact root files
+and Changesets. Phase 0 of the implementation plan (Part IX, §103) lists the exact root files
 to create (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`,
 CI workflow).
 
-## The Specification — read ERRATA.md first
+## The Specification
 
-- `docs/four-js-specification.pdf` is the **authoritative** source (65 pages).
-- `docs/SPECIFICATION.md` is an auto-extracted rendering of it (kerning artifacts like
-  `T agline` are extraction noise, not errors).
-- `docs/ERRATA.md` documents known internal defects. Read it before trusting any
-  cross-reference in the section 45–67 range:
-  - **E-1/E-2:** two different parts are both labelled `Part VII`, and section numbers
-    **45–67 are assigned twice** (first range: graphics/rendering/application; second range:
-    package architecture and implementation plan). Always disambiguate citations by content,
-    e.g. "§49 (Solver Packages)" vs. "§49 (Renderable Node Hierarchy)".
-  - **E-3 (resolved):** the scaffold deliberately contains only `physics-rapier`,
-    `physics-box2d`, and `physics-soft`. Do **not** add `physics-matter` or `physics-cannon`
-    without a decision to amend the specification.
+- `docs/SPECIFICATION.md` is the **corrected rendering and the working reference**: parts
+  I–XIII, sections 1–120, no duplicate numbering, extraction artifacts repaired.
+- `docs/four-js-specification.pdf` is the unmodified original (65 pages). It **still
+  contains** the old defects (duplicate `Part VII`, section numbers 45–67 assigned twice) —
+  when reading the PDF, translate references via the numbering map in `docs/ERRATA.md`
+  (PDF second-range §45–67 = Markdown §98–120). Do not edit the PDF.
+- ERRATA E-3 (resolved): the scaffold deliberately contains only `physics-rapier`,
+  `physics-box2d`, and `physics-soft`, matching §102 (Solver Packages). Do **not** add
+  `physics-matter` or `physics-cannon` without a decision to amend the specification.
 
 ## Architecture (from the specification)
 
@@ -60,7 +57,7 @@ participate. Key cross-cutting designs to understand before implementing anythin
 
 ## Package layout
 
-`packages/` follows the monorepo tree in the second Part VII, §45 (Proposed Monorepo). All
+`packages/` follows the monorepo tree in Part VIII, §98 (Proposed Monorepo). All
 packages are `@four/`-scoped; `packages/four` is the umbrella package. Rough layering:
 
 - Foundation: `core`, `math`
@@ -71,7 +68,7 @@ packages are `@four/`-scoped; `packages/four` is the umbrella package. Rough lay
   `render-canvas`, `render-svg`
 - Application: `input`, `assets`, `text`, `ui`, `serialization`, `diagnostics`
 
-Implementation is planned in phases (Part VIII, §50–60): foundation → math/scene/time →
+Implementation is planned in phases (Part IX, §103–113): foundation → math/scene/time →
 motion → renderer → animation → physics adapter → joints → physics-animation blending →
-advanced motion → particles/GPU → replay/diagnostics. The MVP scope is defined in Part XI,
-§67 (MVP Requirements): WebGL 2 only, one solver adapter, basic 2D/3D primitives.
+advanced motion → particles/GPU → replay/diagnostics. The MVP scope is defined in Part XII,
+§120 (MVP Requirements): WebGL 2 only, one solver adapter, basic 2D/3D primitives.

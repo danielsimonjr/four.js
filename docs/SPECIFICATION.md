@@ -1,24 +1,25 @@
 # four.js - Complete Specification and Implementation Plan
 
-> **Auto-extracted from the source PDF** (`four-js-specification.pdf`, 65 pages) for readability
-> and diffability. The **PDF in this folder is authoritative**; this Markdown is a convenience
-> rendering and may contain text-extraction artifacts. Do not treat wording here as normative.
->
-> ⚠ **This specification has known internal defects** - duplicated part/section numbering and a
-> package-list contradiction. See [ERRATA.md](ERRATA.md) before relying on any cross-reference in
-> the section 45-67 range.
+> **Corrected rendering.** This Markdown was extracted from `four-js-specification.pdf`
+> (65 pages) and then corrected by decision of the specification's author: the duplicated
+> `Part VII` label, the twice-assigned section numbers 45-67, and the solver-package list
+> contradiction present in the PDF are resolved here, and text-extraction artifacts
+> (kerning splits, ligatures, mid-word line breaks) are repaired. Parts now run I-XIII and
+> sections 1-120 with no duplicates. **This file is the working reference for the
+> repository**; the PDF is preserved unchanged as the original source and retains the
+> defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
+> numbering map.
 
 ---
 
-four.js - Unified 2D, 3D, Motion, Animation, and
-Physics Framework
+four.js - Unified 2D, 3D, Motion, Animation, and Physics Framework
 Tagline: One scene. Every dimension. Everything moves.
 Status: Revised architectural specification and implementation plan
 Primary language: TypeScript
 Proposed license: MIT
 Target platforms: Web browsers, Web Workers, Node-compatible headless
 environments, and future native runtimes
-1. Vision
+### 1. Vision
 four.js is a unified JavaScript and TypeScript framework for building interactive
 applications that combine:
 • 2D graphics
@@ -45,7 +46,7 @@ The framework therefore treats the following as equally fundamental:
 3. Interaction - how an object receives input.
 4. Dynamics - how an object changes, moves, collides, and responds over
 time.
-2. Core Design Principle
+### 2. Core Design Principle
 Every visible, interactive, animated, or simulated entity is represented within
 one shared scene.
 Scene
@@ -59,19 +60,16 @@ Scene
 +-- 3D Models
 +-- User Interface
 A 2D circle, 3D mesh, text label, rigid body, spring, motor, particle emitter,
-animation controller, and sensor visualization can participate in the same appli-
-cation lifecycle.
-3. Four Architectural Pillars
+animation controller, and sensor visualization can participate in the same application lifecycle.
+### 3. Four Architectural Pillars
 four.js is organized around four coequal pillars.
 3.1 Scene
-The scene graph defines hierarchy, transforms, visibility, grouping, and owner-
-ship.
+The scene graph defines hierarchy, transforms, visibility, grouping, and ownership.
 3.2 Render
 The rendering system converts logical scene state into pixels through WebGPU,
 WebGL 2, Canvas 2D, SVG, or headless backends.
 3.3 Motion
-The motion system defines deterministic changes through time, including ani-
-mation, velocity, acceleration, trajectories, interpolation, procedural movement,
+The motion system defines deterministic changes through time, including animation, velocity, acceleration, trajectories, interpolation, procedural movement,
 and kinematic control.
 3.4 Physics
 The physics system models forces, mass, collisions, constraints, impulses, joints,
@@ -91,7 +89,7 @@ Motion and physics are related but not identical:
 • Dynamics derives motion from forces, mass, and constraints.
 four.js must support all four approaches and allow controlled blending between
 them.
-4. Goals
+### 4. Goals
 four.js shall:
 1. unify 2D and 3D objects under one scene graph;
 2. make animation and motion first-class engine systems;
@@ -107,7 +105,7 @@ animation;
 10. support worker-based and GPU-accelerated simulation;
 11. enable engineering and scientific applications, not only games;
 12. support serialization, replay, debugging, and reproducible simulation.
-5. Non-Goals
+### 5. Non-Goals
 The initial release shall not attempt to provide:
 • a complete industrial finite-element solver;
 • a certified safety-critical physics simulator;
@@ -116,8 +114,8 @@ The initial release shall not attempt to provide:
 • a full game editor;
 • exact real-world simulation across all scales.
 These may be supported by plugins or specialized solver integrations.
-Part I - Core Scene Architecture
-6. Unified Node Model
+## Part I - Core Scene Architecture
+### 6. Unified Node Model
 abstract class Node {
 readonly id: string;
 name: string;
@@ -141,9 +139,8 @@ Every node may optionally participate in:
 • layout;
 • audio;
 • serialization.
-The base Node should remain lightweight. Extended behavior should be at-
-tached through typed components or specialized subclasses.
-7. Transform System
+The base Node should remain lightweight. Extended behavior should be attached through typed components or specialized subclasses.
+### 7. Transform System
 Every node uses a common 3D transform representation.
 class Transform {
 position: Vector3;
@@ -167,7 +164,7 @@ The same transform hierarchy therefore supports:
 • planar diagrams in 3D;
 • physics bodies;
 • animated skeletons.
-8. Space Modes
+### 8. Space Modes
 type SpaceMode =
 | "world"
 | "screen"
@@ -178,8 +175,8 @@ type SpaceMode =
 Physics normally operates in world or local-plane space. Screen-space UI
 should not automatically participate in physical simulation unless explicitly
 mapped to a simulation plane.
-Part II - Time and Motion Architecture
-9. Clock and Time Domains
+## Part II - Time and Motion Architecture
+### 9. Clock and Time Domains
 four.js must distinguish multiple time concepts.
 interface TimeState {
 realTime: number;
@@ -201,7 +198,7 @@ Required time domains:
 app.time.scale = 0.25;
 app.time.paused = false;
 Individual systems may select a time source.
-10. Main Loop
+### 10. Main Loop
 The application loop shall separate simulation from rendering.
 app.on("fixedUpdate", ({ fixedDelta }) => {
 physics.step(fixedDelta);
@@ -229,7 +226,7 @@ This design provides:
 • pause and step controls;
 • slow motion;
 • simulation replay.
-11. Motion Components
+### 11. Motion Components
 A node may use a MotionComponent.
 interface MotionComponent {
 linearVelocity: Vector3;
@@ -249,7 +246,7 @@ linearVelocity: new Vector3(2, 0, 0),
 angularVelocity: new Vector3(0, 1, 0)
 });
 node.addComponent(motion);
-12. Kinematic Motion
+### 12. Kinematic Motion
 Kinematic controllers directly prescribe movement.
 interface KinematicController {
 moveTo(position: Vector3, options?: MoveOptions): void;
@@ -267,7 +264,7 @@ Required kinematic features:
 • camera rigs;
 • character controllers;
 • motion limits.
-13. Trajectory System
+### 13. Trajectory System
 interface Trajectory {
 samplePosition(time: number, out?: Vector3): Vector3;
 sampleVelocity(time: number, out?: Vector3): Vector3;
@@ -291,8 +288,8 @@ This is useful for:
 • projectile previews;
 • educational simulations;
 • animation paths.
-Part III - Animation Architecture
-14. Animation System Requirements
+## Part III - Animation Architecture
+### 14. Animation System Requirements
 four.js shall support:
 • property animation;
 • keyframe animation;
@@ -310,7 +307,7 @@ four.js shall support:
 • additive animation;
 • inverse kinematics;
 • physics-animation blending.
-15. Tween API
+### 15. Tween API
 Four.animate(node.position)
 .to({ x: 10, y: 5 }, 1000)
 .ease("cubic-out")
@@ -328,7 +325,7 @@ Required easing families:
 • bounce;
 • elastic;
 • spring.
-16. Timeline API
+### 16. Timeline API
 const timeline = new Four.Timeline();
 timeline
 .at(0, Four.tween(node.position, { x: 5 }, 800))
@@ -348,7 +345,7 @@ Timeline requirements:
 • pause and resume;
 • event callbacks;
 • deterministic evaluation.
-17. Animation Clips and Tracks
+### 17. Animation Clips and Tracks
 class AnimationClip {
 name: string;
 duration: number;
@@ -371,7 +368,7 @@ Interpolation modes:
 • cubic;
 • Hermite;
 • spherical linear interpolation for quaternions.
-18. Animation State Machines
+### 18. Animation State Machines
 const controller = new Four.AnimationController({
 states: {
 idle: idleClip,
@@ -393,7 +390,7 @@ State machine features:
 • transition interruption;
 • blend trees;
 • layered animation.
-19. Physics-Animation Blending
+### 19. Physics-Animation Blending
 A node may be:
 type MotionAuthority =
 | "animation"
@@ -415,8 +412,8 @@ Recommended rule:
 3. physics solves constraints and forces;
 4. final rendered pose is interpolated;
 5. optional blending combines animated and physical poses.
-Part IV - Physics Architecture
-20. Physics as a First-Class System
+## Part IV - Physics Architecture
+### 20. Physics as a First-Class System
 four.js should expose a stable, renderer-independent physics API.
 The core framework may use adapter-backed solvers, but users should not need
 to write solver-specific application code for common tasks.
@@ -425,7 +422,7 @@ dimension: "3d",
 gravity: new Vector3(0, -9.81, 0),
 solver: "auto"
 });
-21. Physics Dimensions
+### 21. Physics Dimensions
 type PhysicsDimension = "2d" | "3d";
 The API should be conceptually consistent across both dimensions.
 const world2D = new Four.PhysicsWorld({
@@ -436,9 +433,8 @@ const world3D = new Four.PhysicsWorld({
 dimension: "3d",
 gravity: new Vector3(0, -9.81, 0)
 });
-The internal solver may differ, but common operations should use parallel nam-
-ing and semantics.
-22. Body Types
+The internal solver may differ, but common operations should use parallel naming and semantics.
+### 22. Body Types
 type BodyType =
 | "static"
 | "dynamic"
@@ -452,7 +448,7 @@ Kinematic position
 Moves toward prescribed positions.
 Kinematic velocity
 Moves using prescribed velocity.
-23. Rigid Body
+### 23. Rigid Body
 class RigidBody {
 type: BodyType;
 mass: number;
@@ -471,7 +467,7 @@ applyTorque(torque: Vector3): void;
 applyImpulse(impulse: Vector3, point?: Vector3): void;
 applyAngularImpulse(impulse: Vector3): void;
 }
-24. Collider System
+### 24. Collider System
 interface Collider {
 shape: CollisionShape;
 offset: Transform;
@@ -501,7 +497,7 @@ Required collision shapes:
 • triangle mesh;
 • height field;
 • compound shape.
-25. Physics Materials
+### 25. Physics Materials
 class PhysicsMaterial {
 friction: number;
 restitution: number;
@@ -515,7 +511,7 @@ type CombineMode =
 | "minimum"
 | "maximum"
 | "multiply";
-26. Forces and Impulses
+### 26. Forces and Impulses
 Required force APIs:
 body.applyForce(force);
 body.applyForceAtPoint(force, worldPoint);
@@ -533,7 +529,7 @@ Force generators may include:
 • attractors;
 • repulsors;
 • custom fields.
-27. Force Fields
+### 27. Force Fields
 interface ForceField {
 sample(
 position: Vector3,
@@ -552,7 +548,7 @@ Built-in field types:
 • user-defined callback;
 • GPU field.
 Force fields should support volume-based inclusion and filtering.
-28. Constraints and Joints
+### 28. Constraints and Joints
 Required joint types:
 Shared concepts
 • fixed;
@@ -588,7 +584,7 @@ Constraint features:
 • break torque;
 • collision enable/disable;
 • solver iterations.
-29. Collision Events
+### 29. Collision Events
 body.on("collisionstart", event => {});
 body.on("collisionstay", event => {});
 body.on("collisionend", event => {});
@@ -604,7 +600,7 @@ contacts: ContactPoint[];
 relativeVelocity: Vector3;
 totalImpulse: Vector3;
 }
-30. Queries
+### 30. Queries
 Required physics queries:
 world.raycast(ray, options);
 world.shapeCast(shape, transform, direction, options);
@@ -620,7 +616,7 @@ Queries should support:
 • sorted hits;
 • sensor inclusion;
 • custom filters.
-31. Continuous Collision Detection
+### 31. Continuous Collision Detection
 Fast objects may tunnel through thin geometry. four.js shall provide optional
 continuous collision detection.
 body.continuousCollisionDetection = true;
@@ -629,7 +625,7 @@ type CCDMode =
 | "disabled"
 | "speculative"
 | "swept";
-32. Sleeping
+### 32. Sleeping
 Dynamic bodies at rest should sleep to improve performance.
 world.sleeping = {
 enabled: true,
@@ -638,7 +634,7 @@ angularThreshold: 0.01,
 timeThreshold: 0.5
 };
 Users should be able to wake bodies explicitly.
-33. Determinism
+### 33. Determinism
 four.js should define determinism tiers.
 type DeterminismLevel =
 | "none"
@@ -657,7 +653,7 @@ The engine should support:
 • replay;
 • rollback;
 • checksums.
-34. Physics Snapshots and Replay
+### 34. Physics Snapshots and Replay
 const snapshot = world.createSnapshot();
 world.restoreSnapshot(snapshot);
 Use cases:
@@ -674,7 +670,7 @@ A replay format should store:
 • random seed;
 • external inputs;
 • optional periodic snapshots.
-35. Soft Bodies and Deformables
+### 35. Soft Bodies and Deformables
 Soft-body support should be a later module.
 Potential features:
 • cloth;
@@ -686,7 +682,7 @@ Potential features:
 • shape matching.
 @four/physics-soft
 This should not block the core rigid-body MVP.
-36. Particles
+### 36. Particles
 Particles should support both visual-only and physically simulated modes.
 const emitter = new Four.ParticleEmitter({
 maxParticles: 100000,
@@ -706,7 +702,7 @@ Particle features:
 • trails;
 • attractors;
 • custom data channels.
-37. Physics Solver Adapter
+### 37. Physics Solver Adapter
 interface PhysicsSolverAdapter {
 readonly name: string;
 readonly capabilities: PhysicsCapabilities;
@@ -730,8 +726,8 @@ Potential adapters:
 • Ammo.js;
 • custom engineering solvers.
 The stable four.js API should sit above these adapters.
-Part V - Numerical Integration and Simulation
-38. Integrators
+## Part V - Numerical Integration and Simulation
+### 38. Integrators
 For built-in lightweight motion, four.js should provide:
 type Integrator =
 | "explicit-euler"
@@ -742,10 +738,9 @@ type Integrator =
 Recommended defaults:
 • semi-implicit Euler for simple real-time rigid motion;
 • velocity Verlet for conservative particle systems;
-• RK4 for small, smooth engineering demonstrations where accuracy mat-
-ters more than cost.
+• RK4 for small, smooth engineering demonstrations where accuracy matters more than cost.
 The full rigid-body solver adapter may use its own integration method.
-39. Simulation Systems
+### 39. Simulation Systems
 interface SimulationSystem {
 priority: number;
 initialize(context: SimulationContext): void;
@@ -765,7 +760,7 @@ Example system order:
 10. State snapshot
 11. Render interpolation
 The ordering must be explicit and configurable.
-40. Units
+### 40. Units
 four.js should not silently assume that one world unit is always one meter.
 interface UnitSystem {
 length: "meter" | "centimeter" | "millimeter" | "custom";
@@ -783,7 +778,7 @@ mass = kilogram
 time = second
 angle = radian
 Engineering applications must be able to declare and display units explicitly.
-41. Numerical Stability Guidance
+### 41. Numerical Stability Guidance
 The engine documentation should explain:
 • why very large mass ratios can destabilize solvers;
 • why extremely small or large world scales are problematic;
@@ -793,8 +788,8 @@ The engine documentation should explain:
 • how damping differs from friction;
 • how continuous collision detection affects performance.
 The diagnostics package should warn about suspicious values.
-Part VI - Rendering and Motion Synchronization
-42. Transform Authority
+## Part VI - Rendering and Motion Synchronization
+### 42. Transform Authority
 A transform may be controlled by:
 type TransformAuthority =
 | "manual"
@@ -807,7 +802,7 @@ The engine must prevent multiple systems from silently overwriting the same
 transform.
 node.transformAuthority = "physics";
 Conflicts should produce development warnings.
-43. Physics-to-Render Synchronization
+### 43. Physics-to-Render Synchronization
 Physics state updates at fixed intervals. Rendering may occur at a different
 rate.
 renderPosition = lerp(
@@ -818,7 +813,7 @@ interpolationAlpha
 Rotations should use quaternion spherical interpolation.
 The render transform should not feed back into the physics state unless explicitly
 requested.
-44. Camera Motion
+### 44. Camera Motion
 Cameras should support:
 • orbit control;
 • fly control;
@@ -831,15 +826,10 @@ Cameras should support:
 • physics attachment.
 Camera motion should use the same timeline, constraint, and motion systems
 as ordinary nodes.
-Part VII - Complete Graphics, Rendering, Ap-
-plication, and Platform Architecture
-45. Application Model
+## Part VII - Complete Graphics, Rendering, Application, and Platform Architecture
+### 45. Application Model
 
-> **[Editorial note - not part of the source document]** Sections 45-67 are numbered TWICE in this
-> specification. This is the FIRST 45-67 range (graphics/rendering/application). See [ERRATA.md](ERRATA.md) E-2.
-The high-level Application object owns the default scene, renderer, time sys-
-tem, simulation scheduler, input routing, assets, diagnostics, cameras, and view-
-ports.
+The high-level Application object owns the default scene, renderer, time system, simulation scheduler, input routing, assets, diagnostics, cameras, and viewports.
 const app = new Four.Application({
 canvas: document.querySelector("canvas"),
 renderer: "auto",
@@ -875,8 +865,8 @@ The application lifecycle shall expose:
 • dispose.
 The application must permit advanced users to construct and own these systems
 independently rather than requiring the convenience wrapper.
-46. Scene Queries, Layers, and Tags
-AScene provides indexed lookup by identifier, name, type, tag, component, and
+### 46. Scene Queries, Layers, and Tags
+A Scene provides indexed lookup by identifier, name, type, tag, component, and
 optional selector syntax.
 scene.findById("motor-01");
 scene.findByName("bearing");
@@ -891,9 +881,8 @@ Symbolic layers control:
 • post-processing inclusion;
 • editor-only objects;
 • debug visualization.
-Layers should compile to eﬀicient masks internally while preserving human-
-readable names in the public API and serialized scene files.
-47. Camera System
+Layers should compile to efficient masks internally while preserving human-readable names in the public API and serialized scene files.
+### 47. Camera System
 Required camera types:
 • PerspectiveCamera;
 • OrthographicCamera;
@@ -919,7 +908,7 @@ Camera rigs shall include:
 • spring arm;
 • stereo/XR extension point;
 • shake and impulse effects.
-48. Viewports and Render Surfaces
+### 48. Viewports and Render Surfaces
 A viewport maps one camera to a rectangular region and optional render target.
 interface Viewport {
 id: string;
@@ -944,7 +933,7 @@ Supported use cases:
 • offscreen textures;
 • mirrors and portals;
 • 3D model previews inside 2D UI.
-49. Renderable Node Hierarchy
+### 49. Renderable Node Hierarchy
 Renderable
 +-- Shape2D
 | +-- Circle
@@ -971,7 +960,7 @@ castShadow: boolean;
 receiveShadow: boolean;
 frustumCulled: boolean;
 }
-50. Native 2D Shape System
+### 50. Native 2D Shape System
 Required shape primitives:
 • circle;
 • ellipse;
@@ -1006,7 +995,7 @@ Shape requirements:
 • local and world bounds;
 • analytic hit testing where possible;
 • SVG import/export compatibility.
-51. Path Model
+### 51. Path Model
 const path = new Four.Path();
 path.moveTo(0, 0);
 path.lineTo(100, 0);
@@ -1034,9 +1023,8 @@ Required operations:
 Fill rules:
 • nonzero;
 • even-odd.
-52. Tessellation and Stroke Generation
-2D paths must be converted into GPU-ready geometry while retaining vector-
-level source data.
+### 52. Tessellation and Stroke Generation
+2D paths must be converted into GPU-ready geometry while retaining vector-level source data.
 The tessellation subsystem shall support:
 • concave polygons;
 • holes;
@@ -1047,9 +1035,8 @@ The tessellation subsystem shall support:
 • index-buffer reuse;
 • incremental rebuild of modified path segments;
 • optional compute-based tessellation in later releases.
-The tessellator shall be an isolated package with a stable interface so implemen-
-tations can be replaced without changing the scene API.
-53. Geometry Architecture
+The tessellator shall be an isolated package with a stable interface so implementations can be replaced without changing the scene API.
+### 53. Geometry Architecture
 abstract class Geometry implements Disposable {
 readonly id: string;
 version: number;
@@ -1088,7 +1075,7 @@ Standard attributes:
 • joints and weights;
 • instance transform;
 • custom typed attributes.
-54. Mesh, Instancing, and Level of Detail
+### 54. Mesh, Instancing, and Level of Detail
 class Mesh extends Renderable {
 geometry: Geometry3D;
 material: Material | Material[];
@@ -1106,7 +1093,7 @@ The engine shall support:
 • level-of-detail selection;
 • impostors and billboards;
 • geometry merging and batching tools.
-55. Sprite and Raster System
+### 55. Sprite and Raster System
 Sprites shall support:
 • screen-space and world-space sizing;
 • anchors and pivots;
@@ -1125,7 +1112,7 @@ anchor: Vector2;
 sizeMode: "pixels" | "world";
 billboardMode: "none" | "spherical" | "cylindrical";
 }
-56. Text and Typography
+### 56. Text and Typography
 Text is a core capability rather than a UI-only afterthought.
 Requirements:
 • Unicode;
@@ -1151,7 +1138,7 @@ fontWeight: 600,
 color: "#ffffff",
 space: "billboard"
 });
-57. Unified Material Model
+### 57. Unified Material Model
 Shared material properties:
 abstract class Material implements Disposable {
 opacity: number;
@@ -1177,7 +1164,7 @@ Material
 +-- ComputeMaterial
 The API unifies lifecycle and render state while preserving specialized 2D and
 3D properties.
-58. Paints, Fills, and Strokes
+### 58. Paints, Fills, and Strokes
 A shape paint may be:
 • solid color;
 • linear gradient;
@@ -1196,7 +1183,7 @@ miterLimit: number;
 dash?: number[];
 dashOffset?: number;
 }
-59. Physically Based Materials
+### 59. Physically Based Materials
 StandardMaterial shall implement a metallic-roughness workflow compatible
 with glTF conventions.
 const material = new Four.StandardMaterial({
@@ -1215,7 +1202,7 @@ Later physical extensions may include:
 • anisotropy;
 • subsurface approximation;
 • iridescence.
-60. Shader and Node-Material System
+### 60. Shader and Node-Material System
 Advanced users require a backend-independent shader model.
 const material = new Four.NodeMaterial();
 const albedo = material.texture(albedoTexture);
@@ -1234,7 +1221,7 @@ Shader features:
 • conditional variants;
 • reflection metadata;
 • source maps and readable compiler diagnostics.
-61. Renderer Interface
+### 61. Renderer Interface
 interface Renderer {
 readonly capabilities: RendererCapabilities;
 initialize(options: RendererOptions): Promise<void>;
@@ -1246,7 +1233,7 @@ readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
 dispose(): void;
 }
 The logical scene shall remain independent of the selected backend.
-62. Rendering Backends and Capability Tiers
+### 62. Rendering Backends and Capability Tiers
 Supported backends:
 1. WebGPU;
 2. WebGL 2;
@@ -1269,7 +1256,7 @@ Capability reporting shall include:
 • shader precision;
 • maximum uniforms and bindings.
 Applications may declare required and optional capabilities.
-63. Render Graph
+### 63. Render Graph
 Rendering shall be organized as a directed acyclic graph of passes and resources.
 Scene Preparation
 v
@@ -1301,7 +1288,7 @@ The graph shall manage:
 • pass enable/disable;
 • viewport-specific pipelines;
 • debug visualization.
-64. Render Preparation and Submission
+### 64. Render Preparation and Submission
 The renderer pipeline shall separate:
 1. scene traversal;
 2. visibility and layer filtering;
@@ -1311,9 +1298,9 @@ The renderer pipeline shall separate:
 6. batching and instancing;
 7. backend command encoding;
 8. GPU submission.
-A void per-node virtual calls in the final drawing hot path. Renderables should
+Avoid per-node virtual calls in the final drawing hot path. Renderables should
 compile into compact render items and backend-native pipelines.
-65. Batching and Instancing
+### 65. Batching and Instancing
 Automatic batching strategies:
 • sprite batching;
 • glyph batching;
@@ -1324,9 +1311,8 @@ Automatic batching strategies:
 • texture atlas grouping;
 • persistent mapped or staged buffers;
 • multi-draw/indirect draw where available.
-Batching shall be transparent to ordinary users but inspectable through diag-
-nostics.
-66. Ordering, Transparency, and Composition
+Batching shall be transparent to ordinary users but inspectable through diagnostics.
+### 66. Ordering, Transparency, and Composition
 Default sorting order:
 1. render layer;
 2. opaque versus transparent classification;
@@ -1342,7 +1328,7 @@ The engine must document limitations of transparent sorting and provide:
 • premultiplied and straight alpha policies.
 Screen-space UI normally renders after world content. World-space 2D geometry
 normally participates in depth testing.
-67. Clipping, Masks, and Stencils
+### 67. Clipping, Masks, and Stencils
 Required mechanisms:
 • rectangular scissor clipping;
 • path masks;
@@ -1354,7 +1340,7 @@ Required mechanisms:
 • section views for engineering models.
 Nested clipping must have defined behavior and diagnostics when backend limits
 are exceeded.
-68. Lighting
+### 68. Lighting
 Initial lights:
 • ambient;
 • hemisphere;
@@ -1375,7 +1361,7 @@ Lighting requirements:
 • tone mapping;
 • exposure;
 • clustered/forward-plus extension path for many lights.
-69. Shadows
+### 69. Shadows
 Required shadow features:
 • directional shadow maps;
 • point-light cubemap shadows;
@@ -1387,7 +1373,7 @@ Required shadow features:
 • transparent shadow masks;
 • contact-shadow extension;
 • shadow atlas management.
-70. Post-Processing
+### 70. Post-Processing
 The render graph shall support reusable effects:
 • tone mapping;
 • color grading;
@@ -1400,7 +1386,7 @@ The render graph shall support reusable effects:
 • distortion;
 • custom full-screen passes.
 Effects must be composable per viewport.
-71. Picking and Hit Testing
+### 71. Picking and Hit Testing
 One unified picking API shall cover 2D and 3D.
 Strategies:
 • analytic primitive testing;
@@ -1412,7 +1398,7 @@ Strategies:
 • custom callbacks.
 node.hitTestMode = "bounds" | "geometry" | "pixel" | "gpu" | "custom";
 The engine should select the cheapest valid method by default.
-72. Input and Event Propagation
+### 72. Input and Event Propagation
 Input sources:
 • mouse;
 • touch;
@@ -1426,7 +1412,7 @@ Capture -> Target -> Bubble
 Events include pointer enter/leave, down/up/move, click, double-click, wheel,
 drag, pinch, rotate, keyboard, focus, and blur.
 Pointer capture must be supported across mixed 2D/3D objects.
-73. Retained-Mode UI
+### 73. Retained-Mode UI
 The optional @four/ui package shall provide:
 • panel;
 • label;
@@ -1444,9 +1430,8 @@ The optional @four/ui package shall provide:
 • tooltip;
 • canvas view;
 • embedded 3D viewport.
-UI objects are scene nodes and therefore share animation, input, clipping, seri-
-alization, and diagnostics.
-74. Layout
+UI objects are scene nodes and therefore share animation, input, clipping, serialization, and diagnostics.
+### 74. Layout
 Required layout modes:
 • absolute;
 • stack;
@@ -1472,7 +1457,7 @@ Layout must support:
 • scroll extent;
 • device-pixel scaling;
 • right-to-left interfaces.
-75. Accessibility
+### 75. Accessibility
 The UI module shall provide an optional hidden DOM accessibility mirror.
 button.accessibility = {
 role: "button",
@@ -1490,14 +1475,14 @@ Requirements:
 • reduced-motion preference;
 • high-contrast theme hooks;
 • scalable text.
-76. Asset System
+### 76. Asset System
 const assets = await app.assets.load({
 robot: "/models/robot.glb",
 icon: "/images/icon.png",
 font: "/fonts/inter.woff2"
 });
 Supported initial formats:
-• PNG, JPEG, WebP, and A VIF where available;
+• PNG, JPEG, WebP, and AVIF where available;
 • SVG;
 • JSON;
 • glTF and GLB;
@@ -1517,7 +1502,7 @@ The asset manager shall support:
 • worker decoding;
 • hot reload in development;
 • content hashing.
-77. Texture System
+### 77. Texture System
 Texture requirements:
 • 2D, cube, array, and 3D textures where supported;
 • mipmaps;
@@ -1529,7 +1514,7 @@ Texture requirements:
 • video textures;
 • canvas and image-bitmap sources;
 • asynchronous upload and residency diagnostics.
-78. Model and Scene Loading
+### 78. Model and Scene Loading
 The glTF loader should support:
 • geometry;
 • materials;
@@ -1543,7 +1528,7 @@ The glTF loader should support:
 • user metadata.
 Loaded assets should be instantiated without sharing mutable transforms while
 safely sharing immutable geometry and textures.
-79. Serialization and Scene Format
+### 79. Serialization and Scene Format
 Human-readable scene files use:
 .four.json
 Binary packages may use:
@@ -1565,9 +1550,8 @@ Serialization goals:
 "children": []
 }
 }
-Physics state, animation state, and replay data must be separate optional sec-
-tions so static scene definitions remain clean.
-80. Scene Migration
+Physics state, animation state, and replay data must be separate optional sections so static scene definitions remain clean.
+### 80. Scene Migration
 Scene format versioning is independent from package semantic versioning.
 const migrated = Four.SceneMigrator.upgrade(oldScene, "2.0");
 Migrations must be:
@@ -1576,7 +1560,7 @@ Migrations must be:
 • deterministic;
 • capable of producing warnings for lossy changes;
 • composable across multiple versions.
-81. Plugin System
+### 81. Plugin System
 interface FourPlugin {
 name: string;
 version: string;
@@ -1596,7 +1580,7 @@ Plugin extension points:
 • serialization types;
 • compute workloads.
 Plugins shall declare dependencies and compatibility ranges.
-82. GPU Compute
+### 82. GPU Compute
 WebGPU compute is an advanced optional capability for:
 • particles;
 • image processing;
@@ -1612,7 +1596,7 @@ workgroups: [1024, 1, 1],
 bindings: { positions, velocities, parameters }
 });
 Basic graphics and physics functionality must not require compute support.
-83. Resource Lifecycle
+### 83. Resource Lifecycle
 GPU and solver resources shall be explicitly disposable.
 texture.dispose();
 geometry.dispose();
@@ -1628,7 +1612,7 @@ Development warnings:
 • detached nodes retaining listeners;
 • stale physics handles;
 • excessive per-frame allocations.
-84. Diagnostics and Developer Tools
+### 84. Diagnostics and Developer Tools
 Runtime statistics:
 app.stats.cpuFrameTime;
 app.stats.gpuFrameTime;
@@ -1658,7 +1642,7 @@ Debug overlays:
 • render graph;
 • UI layout boxes;
 • picking identifiers.
-85. Validation
+### 85. Validation
 Development builds shall detect:
 • NaN and infinite values;
 • singular transforms;
@@ -1673,7 +1657,7 @@ Development builds shall detect:
 • serialization version mismatches.
 Production builds may disable expensive validation while preserving essential
 safety checks.
-86. Performance Targets
+### 86. Performance Targets
 Initial engineering targets on suitable modern desktop hardware:
 Scenario Target
 Batched sprites 100,000 at 60 FPS
@@ -1688,7 +1672,7 @@ Active rigid bodies 5,000 simple bodies baseline
 Idle scene Near-zero unnecessary uploads and
 simulation work
 Targets are benchmark goals, not universal guarantees.
-87. Spatial Indexing and Culling
+### 87. Spatial Indexing and Culling
 Potential spatial structures:
 • dynamic AABB tree;
 • quadtree;
@@ -1698,11 +1682,11 @@ Potential spatial structures:
 • backend-provided physics broad phase.
 Systems may maintain specialized indices for rendering, picking, physics, and
 UI. The public scene graph must not be forced to mirror a spatial tree.
-88. Threading and Workers
+### 88. Threading and Workers
 Operating modes:
 Main-thread mode
 Input, simulation, and rendering occur on the browser main thread.
-W orker-rendering mode
+Worker-rendering mode
 The main thread owns DOM, accessibility, and input forwarding. A worker
 owns the scene, simulation, and OffscreenCanvas rendering.
 Split-simulation mode
@@ -1710,7 +1694,7 @@ Rendering stays on the main thread while simulation executes in a worker using
 transferable or shared state buffers.
 The MVP may begin on the main thread, but APIs and data structures should
 avoid assumptions that make worker migration impossible.
-89. Error Model
+### 89. Error Model
 class FourError extends Error {
 code: string;
 context?: Record<string, unknown>;
@@ -1724,9 +1708,8 @@ Example codes:
 • INVALID_SCENE_GRAPH;
 • PHYSICS_SOLVER_FAILED;
 • SERIALIZATION_VERSION_MISMATCH.
-Recoverable failures should be reportable through events and diagnostics with-
-out always terminating the application.
-90. Versioning and Compatibility
+Recoverable failures should be reportable through events and diagnostics without always terminating the application.
+### 90. Versioning and Compatibility
 The packages shall use semantic versioning.
 • patch: compatible defect correction;
 • minor: backward-compatible feature;
@@ -1737,7 +1720,7 @@ The project should publish compatibility tables for:
 • physics solver adapters;
 • scene format versions;
 • plugin API versions.
-91. Coding Standards and Toolchain
+### 91. Coding Standards and Toolchain
 Recommended baseline:
 • strict TypeScript;
 • ESM;
@@ -1759,7 +1742,7 @@ Requirements:
 • unit, integration, visual, and benchmark tests;
 • browser compatibility matrix;
 • changelog for public releases.
-92. Testing Strategy
+### 92. Testing Strategy
 Unit tests
 • vectors, matrices, and quaternions;
 • transforms;
@@ -1793,7 +1776,7 @@ Determinism tests
 Performance tests
 Track CPU time, GPU time, simulation time, draw calls, contacts, memory,
 allocations, and loading throughput.
-93. Documentation Plan
+### 93. Documentation Plan
 Documentation shall include:
 • installation and quick start;
 • first 2D scene;
@@ -1815,7 +1798,7 @@ Documentation shall include:
 • digital-twin guide.
 API documentation should be generated directly from TypeScript declarations,
 and every major feature should have a runnable example.
-94. Release Strategy
+### 94. Release Strategy
 • 0.1: math, scene, time, and basic WebGL rendering;
 • 0.2: native 2D shapes, sprites, text, and picking;
 • 0.3: 3D meshes, materials, lights, shadows, and mixed scenes;
@@ -1825,9 +1808,8 @@ and every major feature should have a runnable example.
 • 0.7: assets, glTF, serialization, UI, and accessibility;
 • 0.8: WebGPU preview, render graph, compute particles, and workers;
 • 0.9: optimization, conformance, API stabilization, and production trials;
-• 1.0: stable API, stable scene format, compatibility policy, full documen-
-tation.
-95. Governance
+• 1.0: stable API, stable scene format, compatibility policy, full documentation.
+### 95. Governance
 Initial governance may use a lead-maintainer model with delegated ownership
 for:
 • core and math;
@@ -1845,7 +1827,7 @@ Major architectural changes require an RFC or ADR containing:
 5. compatibility analysis;
 6. prototype or benchmark where practical;
 7. maintainer approval.
-96. Security and Untrusted Content
+### 96. Security and Untrusted Content
 Asset loaders and scene deserializers shall treat external content as untrusted.
 Requirements:
 • bounds checking;
@@ -1855,7 +1837,7 @@ Requirements:
 • safe shader/plugin boundaries;
 • cancellation and timeouts for expensive decoders;
 • documented content-security-policy behavior.
-97. Complete Mixed-Scene Example
+### 97. Complete Mixed-Scene Example
 import * as Four from "four";
 const app = new Four.Application({
 canvas: document.querySelector("#app"),
@@ -1900,12 +1882,9 @@ cube.getComponent(Four.RigidBody)?.applyImpulse(new Four.Vector3(0, 4, 0));
 panel.add(new Four.Text({ text: "System Status" }), impulseButton);
 app.scene.add(cube, panel);
 app.start();
-Part VII - Package Architecture
+## Part VIII - Package Architecture
 
-> **[Editorial note - not part of the source document]** This part is labelled `Part VII` in the
-> source, but an earlier part already carries that label, and section numbering restarts at 45 here.
-> This is the SECOND 45-67 range (packages/implementation). See [ERRATA.md](ERRATA.md) E-1 and E-2.
-45. Proposed Monorepo
+### 98. Proposed Monorepo
 four.js/
 +-- packages/
 | +-- core/
@@ -1938,7 +1917,7 @@ four.js/
 +-- tests/
 +-- tools/
 +-- website/
-46. Motion Package
+### 99. Motion Package
 @four/motion responsibilities:
 • clocks;
 • fixed-step scheduler;
@@ -1951,7 +1930,7 @@ four.js/
 • steering;
 • interpolation;
 • transform authority.
-47. Animation Package
+### 100. Animation Package
 @four/animation responsibilities:
 • tweens;
 • easing;
@@ -1963,7 +1942,7 @@ four.js/
 • skeletons;
 • inverse kinematics;
 • physics-animation blending.
-48. Physics Package
+### 101. Physics Package
 @four/physics responsibilities:
 • stable public API;
 • body and collider descriptors;
@@ -1977,15 +1956,13 @@ four.js/
 • snapshots;
 • units;
 • debug data.
-49. Solver Packages
+### 102. Solver Packages
 @four/physics-rapier
 @four/physics-box2d
-@four/physics-matter
-@four/physics-cannon
-Each solver package implements the shared adapter interface and declares ca-
-pability differences.
-Part VIII - Implementation Plan
-50. Phase 0 - Project Foundation
+Each solver package implements the shared adapter interface and declares capability differences.
+Additional adapters (for example Matter.js and Cannon-es, listed as potential adapters in §37) may be introduced as new solver packages by a future amendment; they are not part of the current package set defined in §98.
+## Part IX - Implementation Plan
+### 103. Phase 0 - Project Foundation
 Deliverables
 README.md
 LICENSE
@@ -2005,7 +1982,7 @@ Exit criteria
 • tests run;
 • documentation builds;
 • example application starts.
-51. Phase 1 - Math, Scene, and Time
+### 104. Phase 1 - Math, Scene, and Time
 Components
 • Vector2, Vector3, Vector4;
 • Matrix3 and Matrix4;
@@ -2019,7 +1996,7 @@ Components
 • TimeState;
 • fixed-step scheduler;
 • dirty transform propagation.
-T ests
+Tests
 • hierarchy insertion and removal;
 • cycle prevention;
 • matrix composition;
@@ -2029,7 +2006,7 @@ T ests
 • interpolation alpha.
 Exit criteria
 A scene graph can be deterministically stepped without a renderer.
-52. Phase 2 - Motion Foundation
+### 105. Phase 2 - Motion Foundation
 Components
 • MotionComponent;
 • velocity and acceleration integration;
@@ -2048,7 +2025,7 @@ A set of 2D and 3D objects move through:
 • damped spring motion.
 Exit criteria
 Motion is deterministic, renderer-independent, and unit tested.
-53. Phase 3 - Renderer Foundation
+### 106. Phase 3 - Renderer Foundation
 Components
 • renderer interface;
 • WebGL 2 backend;
@@ -2061,7 +2038,7 @@ Components
 • interpolation-aware rendering.
 Exit criteria
 Moving 2D and 3D primitives render smoothly despite fixed-step simulation.
-54. Phase 4 - Animation Core
+### 107. Phase 4 - Animation Core
 Components
 • Tween;
 • easing;
@@ -2074,7 +2051,7 @@ Components
 • deterministic evaluation.
 Exit criteria
 Any numeric, vector, quaternion, color, or transform property can be animated.
-55. Phase 5 - Physics API and First Solver Adapter
+### 108. Phase 5 - Physics API and First Solver Adapter
 Recommended first solver
 Use Rapier as the first 2D/3D adapter because it provides modern
 WebAssembly-based rigid-body physics and parallel conceptual coverage
@@ -2092,9 +2069,8 @@ Components
 • fixed-step integration;
 • debug drawing.
 Exit criteria
-A mixed 2D/3D demonstration supports gravity, collisions, impulses, and sen-
-sors through the common API.
-56. Phase 6 - Joints and Constraints
+A mixed 2D/3D demonstration supports gravity, collisions, impulses, and sensors through the common API.
+### 109. Phase 6 - Joints and Constraints
 Components
 • fixed joint;
 • distance joint;
@@ -2115,7 +2091,7 @@ An engineering mechanism containing:
 • limit switches.
 Exit criteria
 Constraints remain stable under expected real-time loads.
-57. Phase 7 - Physics-Animation Integration
+### 110. Phase 7 - Physics-Animation Integration
 Components
 • motion authority;
 • animation target poses;
@@ -2127,7 +2103,7 @@ Components
 Exit criteria
 A character or machine can move between animated, kinematic, and physical
 control without abrupt discontinuities.
-58. Phase 8 - Advanced Motion
+### 111. Phase 8 - Advanced Motion
 Components
 • steering;
 • flocking;
@@ -2145,7 +2121,7 @@ ki: 0.5,
 kd: 0.1,
 outputLimits: [-10, 10]
 });
-59. Phase 9 - Particles and GPU Motion
+### 112. Phase 9 - Particles and GPU Motion
 Components
 • particle emitter;
 • CPU particle simulation;
@@ -2157,7 +2133,7 @@ Components
 Exit criteria
 At least 100,000 simple particles can be simulated and rendered at interactive
 rates on suitable hardware.
-60. Phase 10 - Replay, Snapshots, and Diagnostics
+### 113. Phase 10 - Replay, Snapshots, and Diagnostics
 Components
 • physics snapshots;
 • input recording;
@@ -2172,8 +2148,8 @@ Components
 • solver statistics.
 Exit criteria
 A physics defect can be captured, replayed, and inspected frame by frame.
-Part IX - Public API Examples
-61. Basic Animated Object
+## Part X - Public API Examples
+### 114. Basic Animated Object
 import * as Four from "four";
 const app = new Four.Application({
 canvas: document.querySelector("canvas"),
@@ -2189,7 +2165,7 @@ Four.animate(circle.position)
 .ease("spring")
 .play();
 app.start();
-62. Dynamic Physics Object
+### 115. Dynamic Physics Object
 const ball = new Four.Mesh({
 geometry: new Four.SphereGeometry({ radius: 0.5 }),
 material: new Four.StandardMaterial({
@@ -2210,7 +2186,7 @@ friction: 0.3
 })
 );
 app.scene.add(ball);
-63. Motorized Hinge
+### 116. Motorized Hinge
 const hinge = new Four.HingeJoint({
 bodyA: frameBody,
 bodyB: rotorBody,
@@ -2223,7 +2199,7 @@ maxTorque: 100
 }
 });
 physicsWorld.addJoint(hinge);
-64. Physics and Animation Blend
+### 117. Physics and Animation Blend
 robot.motionAuthority = "blended";
 robot.animation.play("walk");
 robot.physicsWeight = 0.2;
@@ -2231,8 +2207,8 @@ robot.on("impact", () => {
 robot.physicsWeight = 1;
 robot.animationWeight = 0;
 });
-Part X - Flagship Demonstrations
-65. “One Scene, Everything Moves”
+## Part XI - Flagship Demonstrations
+### 118. “One Scene, Everything Moves”
 The first public demonstration should contain:
 • a rotating 3D cube;
 • a 2D vector orbit;
@@ -2247,8 +2223,8 @@ The first public demonstration should contain:
 Success criterion:
 It must feel like one motion-capable engine, not a graphics library
 with physics bolted on afterward.
-66. Engineering Demonstration
-Electric Motor Digital T win
+### 119. Engineering Demonstration
+Electric Motor Digital Twin
 Features:
 • 3D motor model;
 • animated rotor;
@@ -2264,8 +2240,8 @@ Features:
 • force and torque vector overlays.
 This example establishes four.js as useful for engineering, education, simulation,
 and digital twins.
-Part XI - Revised MVP
-67. MVP Requirements
+## Part XII - Revised MVP
+### 120. MVP Requirements
 The first meaningful release shall include:
 Scene
 • Node;
@@ -2311,13 +2287,13 @@ Interaction
 • 2D picking;
 • 3D ray casting;
 • dragging.
-T ooling
+Tooling
 • tests;
 • examples;
 • API documentation;
 • benchmark harness;
 • deterministic simulation tests.
-Part XII - Final Design Statement
+## Part XIII - Final Design Statement
 four.js should not merely answer:
 Where is this object, and how should it look?
 It must also answer:
@@ -2333,5 +2309,4 @@ Object
 +-- Physics
 +-- Interaction
 The defining promise is:
-Create once. Position anywhere. Animate naturally. Simulate phys-
-ically. Render everywhere.
+Create once. Position anywhere. Animate naturally. Simulate physically. Render everywhere.
