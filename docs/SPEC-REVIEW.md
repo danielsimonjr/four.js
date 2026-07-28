@@ -1,9 +1,15 @@
 # Specification Review — Proposed Improvements
 
 A technical review of [`SPECIFICATION.md`](SPECIFICATION.md) (parts I–XIII, §1–120), proposing
-improvements as numbered items **R-1 … R-35**. Nothing here has been applied to the
-specification: amending it is an owner decision (see `ERRATA.md` precedent). Each item cites
-the sections involved, states the problem, and proposes a concrete resolution.
+improvements as numbered items **R-1 … R-35**. Each item cites the sections involved, states
+the problem, and proposes a concrete resolution.
+
+> **Disposition (2026-07-28, owner-directed):** all 35 items were accepted and applied in
+> specification **revision 1.1** — see the Amendments table at the top of `SPECIFICATION.md`.
+> New material uses lettered sections (6a, 6b, 7a, 7b, 60a) and Appendices A–B so §1–120
+> numbering is unchanged. Two caveats: R-25's payload budget was set provisionally
+> (≤ 150 kB gzip, marked provisional in §86) pending owner confirmation, and R-32's
+> shall/should audit was applied only where revised text was already being touched.
 
 Citation convention: plain "§N" means `SPECIFICATION.md` numbering.
 

@@ -10,6 +10,13 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
+**Specification revision 1.1 — 2026-07-28**
+
+| Revision | Date | Summary |
+|---|---|---|
+| 1.0 | 2026-07-28 | Corrected rendering of the original PDF (ERRATA E-1/E-2/E-3 resolved, extraction artifacts repaired). |
+| 1.1 | 2026-07-28 | Technical revision applying [SPEC-REVIEW.md](SPEC-REVIEW.md) items R-1–R-35: contradictions resolved; component model, eventing, coordinate/math conventions, and the solver-adapter contract specified; scope of audio/networking settled; Appendices A (defaults) and B (glossary) added. New sections use letter suffixes (6a, 6b, 7a, 7b, 60a) so §1–120 numbering is unchanged. |
+
 ---
 
 <!-- toc -->
@@ -29,6 +36,8 @@
 - [Part XI - Flagship Demonstrations](#part-xi---flagship-demonstrations) (§118-119)
 - [Part XII - Revised MVP](#part-xii---revised-mvp) (§120)
 - [Part XIII - Final Design Statement](#part-xiii---final-design-statement)
+- [Appendix A - Normative Defaults](#appendix-a---normative-defaults)
+- [Appendix B - Glossary](#appendix-b---glossary)
 <!-- /toc -->
 
 four.js - Unified 2D, 3D, Motion, Animation, and Physics Framework
@@ -139,8 +148,17 @@ The initial release shall not attempt to provide:
 - a complete computational fluid-dynamics package;
 - a full CAD geometric kernel;
 - a full game editor;
+- an audio engine (the plugin system, §81, is the integration point for audio);
+- a networking or replication layer (the "network" transform authority, §42, and the
+snapshot and rollback facilities, §33-34, are enablers; transport and protocol belong
+to plugins);
 - exact real-world simulation across all scales.
 These may be supported by plugins or specialized solver integrations.
+Conformance language: the key words "must", "shall", "should", "may", and
+"recommended" in this specification are interpreted as in RFC 2119 / BCP 14.
+"Must" and "shall" denote hard requirements; "should" and "recommended" denote
+defaults that require documented justification to deviate from; "may" denotes a true
+option.
 ## Part I - Core Scene Architecture
 ### 6. Unified Node Model
 
@@ -171,6 +189,59 @@ Every node may optionally participate in:
 - audio;
 - serialization.
 The base Node should remain lightweight. Extended behavior should be attached through typed components or specialized subclasses.
+### 6a. Component Model
+Components attach typed behavior and state to nodes. Node gains:
+
+```ts
+interface Component {
+  readonly node: Node | null;
+  onAttach?(node: Node): void;
+  onDetach?(node: Node): void;
+  dispose?(): void;
+}
+abstract class Node {
+  addComponent<T extends Component>(component: T): T;
+  getComponent<T extends Component>(type: ComponentType<T>): T | undefined;
+  removeComponent(component: Component): boolean;
+}
+```
+
+Rules:
+- at most one component of a given type per node; adding a second replaces the first
+and emits a development warning;
+- components hold behavior and state, but per-frame work is driven by systems (§39)
+and the animation and physics packages - not by ad-hoc per-component callbacks in the
+hot path (§64);
+- lifecycle is explicit: `onAttach`, `onDetach`, `dispose`; detaching a node from the
+scene does not dispose its components;
+- `RigidBody` (§23), colliders (§24), and `MotionComponent` (§11) are components,
+not Node subclasses;
+- components serialize under registered type names (§79); plugins register theirs
+(§81);
+- components that write transforms are subject to transform authority (§42).
+### 6b. Eventing
+Nodes and the application expose one typed event API; `EventEmitter` (§104) is the
+shared implementation.
+
+```ts
+interface EventEmitter<EventMap> {
+  on<K extends keyof EventMap>(type: K, listener: (event: EventMap[K]) => void): () => void;
+  once<K extends keyof EventMap>(type: K, listener: (event: EventMap[K]) => void): () => void;
+  off<K extends keyof EventMap>(type: K, listener: (event: EventMap[K]) => void): void;
+}
+```
+
+Rules:
+- `on` returns an unsubscribe function; `once` removes the listener after one
+delivery;
+- listeners fire in registration order; listeners added or removed during dispatch
+take effect from the next dispatch; an event does not re-enter its own dispatch;
+- input events propagate through the scene graph in capture, target, and bubble
+phases (§72); all other events fire on their emitter only;
+- physics events (§29) dispatch after each fixed step, at step 8 of the §39 ordering,
+never during the solver step itself;
+- application events `fixedUpdate`, `update`, and `render` follow the main-loop
+contract of §10.
 ### 7. Transform System
 Every node uses a common 3D transform representation.
 
@@ -187,6 +258,16 @@ class Transform {
 }
 ```
 
+Transform semantics:
+- the local matrix composes as `T · Tp · R · S · Tp⁻¹` (translation, then rotation
+and scale about the pivot), so `pivot` affects rotation and scale but not `position`;
+- writing `localMatrix` directly requires `matrixAutoUpdate = false`; the user then
+owns the matrix, and position/rotation/scale are not back-derived from it;
+- world matrices update lazily: they are resolved once per frame before physics
+synchronization (§37) and before render-item generation (§64), and on demand for
+queries;
+- `version` increments on every local mutation so dependent systems can cache
+against it.
 Two-dimensional nodes normally use:
 
 ```ts
@@ -203,6 +284,27 @@ The same transform hierarchy therefore supports:
 - planar diagrams in 3D;
 - physics bodies;
 - animated skeletons.
+### 7a. Coordinate and Unit Conventions
+One set of conventions covers 2D, 3D, UI, and physics:
+- world space is right-handed with +Y up, for both 2D and 3D; a 2D scene is the XY
+plane of the same space (§7), so 2D gravity is `(0, -9.81)` (§21);
+- front faces wind counter-clockwise;
+- every API angle is radians; degree input and display are a formatting concern
+(§40);
+- backend NDC and depth-range differences (WebGPU versus WebGL 2) are absorbed by
+the projection matrix (§47) and never exposed to user code;
+- screen and viewport spaces (§8) use a top-left origin in logical pixels by
+default; `ScreenCamera` (§47) can select other origins;
+- the default unit system is meter, kilogram, second, radian (§40); every engine
+time is seconds (§9, §15-17, §45).
+### 7b. Math Type Conventions
+Math types (`Vector2/3/4`, `Quaternion`, `Matrix3/4`) follow one allocation policy:
+- instances are mutable; instance methods mutate in place and return `this` for
+chaining;
+- `clone()` and static factory variants allocate; nothing else on a hot path does;
+- sampling and query APIs accept an optional `out` parameter and return it (§13);
+- steady-state per-frame engine code must not allocate math objects; the diagnostics
+package flags violations (§83).
 ### 8. Space Modes
 
 ```ts
@@ -228,10 +330,14 @@ interface TimeState {
   renderTime: number;
   simulationTime: number;
   deltaTime: number;
+  unscaledDeltaTime: number;
   fixedDeltaTime: number;
+  timeScale: number;
+  paused: boolean;
   interpolationAlpha: number;
   frame: number;
   simulationStep: number;
+  droppedTime: number;
 }
 ```
 
@@ -249,6 +355,10 @@ app.time.paused = false;
 ```
 
 Individual systems may select a time source.
+`deltaTime` is scaled by `timeScale`; `unscaledDeltaTime` is not. Animation time is
+clip-local and lives on players and timelines (§16-17), not in the global
+`TimeState`. `droppedTime` accumulates simulation time discarded by the substep clamp
+(§10). All fields are seconds (§7a).
 ### 10. Main Loop
 The application loop shall separate simulation from rendering.
 
@@ -268,11 +378,18 @@ app.on("render", () => {
 Recommended accumulator algorithm:
 
 ```ts
-accumulator += elapsedRealTime;
-while (accumulator >= fixedDeltaTime) {
+accumulator += elapsedRealTime * timeScale;
+let steps = 0;
+while (accumulator >= fixedDeltaTime && steps < maximumSubSteps) {
   previousState.copy(currentState);
   simulate(fixedDeltaTime);
   accumulator -= fixedDeltaTime;
+  steps += 1;
+}
+if (accumulator >= fixedDeltaTime) {
+  // long frame: drop the excess so simulation cost stays bounded
+  droppedTime += accumulator - fixedDeltaTime;
+  accumulator = fixedDeltaTime;
 }
 alpha = accumulator / fixedDeltaTime;
 render(interpolate(previousState, currentState, alpha));
@@ -285,6 +402,12 @@ This design provides:
 - pause and step controls;
 - slow motion;
 - simulation replay.
+The substep clamp (`maximumSubSteps`, §45; default in Appendix A) bounds simulation
+work after long frames (background tabs, debugger pauses, GC hitches): excess
+accumulated time is dropped, so simulation time falls behind real time instead of
+entering a feedback spiral. Drops surface through `TimeState.droppedTime` (§9), a
+diagnostics warning (§84), and the replay record (§113). After clamping,
+`interpolationAlpha` remains in [0, 1].
 ### 11. Motion Components
 A node may use a MotionComponent.
 
@@ -346,6 +469,7 @@ interface Trajectory {
 }
 ```
 
+Trajectory `time` and `duration` are seconds (§7a).
 Built-in trajectories:
 - linear;
 - parabolic;
@@ -386,11 +510,13 @@ four.js shall support:
 
 ```ts
 Four.animate(node.position)
-  .to({ x: 10, y: 5 }, 1000)
+  .to({ x: 10, y: 5 }, 1.0)
   .ease("cubic-out")
   .play();
 ```
 
+Durations and times throughout the animation API are seconds, matching the
+engine-wide convention (§7a); nothing in four.js takes implicit milliseconds.
 Required easing families:
 - linear;
 - quadratic;
@@ -409,9 +535,9 @@ Required easing families:
 ```ts
 const timeline = new Four.Timeline();
 timeline
-  .at(0, Four.tween(node.position, { x: 5 }, 800))
-  .at(250, Four.tween(node, { opacity: 0.5 }, 500))
-  .at(1000, () => console.log("complete"));
+  .at(0, Four.tween(node.position, { x: 5 }, 0.8))
+  .at(0.25, Four.tween(node, { opacity: 0.5 }, 0.5))
+  .at(1.0, () => console.log("complete"));
 timeline.play();
 ```
 
@@ -428,6 +554,18 @@ Timeline requirements:
 - pause and resume;
 - event callbacks;
 - deterministic evaluation.
+Evaluation semantics:
+- value tracks are a pure function of timeline time: evaluating at time `t` always
+produces the same values, which is what scrubbing and deterministic evaluation
+require;
+- callbacks are event markers, not value tracks: they fire exactly once per forward
+crossing during playback; `seek` and scrubbing suppress them by default, with an
+opt-in per-marker replay-on-seek policy;
+- property bindings are typed property references; string-path convenience forms are
+resolved once, at creation time;
+- when two active tweens target the same property, the last-started tween wins and a
+development warning is emitted; tweens that write transforms additionally respect
+transform authority (§42).
 ### 17. Animation Clips and Tracks
 
 ```ts
@@ -439,6 +577,7 @@ class AnimationClip {
 }
 ```
 
+`duration` and track times are seconds (§7a).
 Track types:
 - scalar;
 - vector;
@@ -482,16 +621,8 @@ State machine features:
 - blend trees;
 - layered animation.
 ### 19. Physics-Animation Blending
-A node may be:
-
-```ts
-type MotionAuthority =
-  | "animation"
-  | "kinematic"
-  | "physics"
-  | "blended";
-```
-
+Which system moves a node is governed by its transform authority (§42). The
+`"blended"` authority selects the blending pipeline defined in this section.
 Examples:
 - animated door controlled by a timeline;
 - physically simulated door connected by a hinge;
@@ -499,7 +630,7 @@ Examples:
 - character with animated limbs and physically simulated ragdoll response.
 
 ```ts
-body.motionAuthority = "blended";
+body.transformAuthority = "blended";
 body.physicsWeight = 0.35;
 body.animationWeight = 0.65;
 ```
@@ -536,7 +667,7 @@ The API should be conceptually consistent across both dimensions.
 ```ts
 const world2D = new Four.PhysicsWorld({
     dimension: "2d",
-    gravity: new Vector2(0, 9.81)
+    gravity: new Vector2(0, -9.81)
 });
 const world3D = new Four.PhysicsWorld({
     dimension: "3d",
@@ -545,6 +676,11 @@ const world3D = new Four.PhysicsWorld({
 ```
 
 The internal solver may differ, but common operations should use parallel naming and semantics.
+Typing strategy: the public physics API is typed once, in 3D (`Vector3`,
+quaternions), for both dimensions. A `"2d"` world constrains motion to the XY plane
+and rotation to the Z axis - semantically a plane constraint - and accepts `Vector2`
+arguments as a convenience that widens to `Vector3` with `z = 0`. Both dimensions
+share the Y-up convention of §7a, so gravity is negative Y in 2D and 3D alike.
 ### 22. Body Types
 
 ```ts
@@ -569,7 +705,7 @@ Moves using prescribed velocity.
 class RigidBody {
   type: BodyType;
   mass: number;
-  inverseMass: number;
+  readonly inverseMass: number;
   centerOfMass: Vector3;
   inertiaTensor: Matrix3;
   linearVelocity: Vector3;
@@ -577,14 +713,29 @@ class RigidBody {
   linearDamping: number;
   angularDamping: number;
   gravityScale: number;
-  sleeping: boolean;
+  readonly sleeping: boolean;
   continuousCollisionDetection: boolean;
-  applyForce(force: Vector3, point?: Vector3): void;
+  wake(): void;
+  sleep(): void;
+  applyForce(force: Vector3): void;
+  applyForceAtPoint(force: Vector3, worldPoint: Vector3): void;
   applyTorque(torque: Vector3): void;
-  applyImpulse(impulse: Vector3, point?: Vector3): void;
+  applyImpulse(impulse: Vector3): void;
+  applyImpulseAtPoint(impulse: Vector3, worldPoint: Vector3): void;
   applyAngularImpulse(impulse: Vector3): void;
 }
 ```
+
+Mass and state rules:
+- `mass` is authoritative and settable; `inverseMass` is derived and read-only;
+- when `mass` is omitted it defaults to collider density times volume (§24-25); an
+explicit `mass` overrides density;
+- `mass` must be positive on dynamic bodies (validated, §85); non-simulated mass is
+expressed through the static and kinematic body types, never `mass = 0`;
+- `sleeping` is read-only state; `wake()` and `sleep()` are the explicit commands
+(§32);
+- in `"2d"` worlds, rotational inertia is the scalar Z-diagonal entry of
+`inertiaTensor`; the remaining entries are ignored (§21).
 
 ### 24. Collider System
 
@@ -654,6 +805,8 @@ body.applyImpulseAtPoint(impulse, worldPoint);
 body.applyAngularImpulse(angularImpulse);
 ```
 
+`worldPoint` is a world-space position. These signatures are the single canonical
+force API and match the `RigidBody` declaration in §23.
 Force generators may include:
 - gravity;
 - drag;
@@ -737,6 +890,9 @@ sensor.on("triggerenter", event => {});
 sensor.on("triggerexit", event => {});
 ```
 
+Collision and trigger events dispatch after each fixed step, per the eventing rules
+of §6b and the ordering of §39; adapters never invoke user callbacks during the
+solver step (§37).
 Collision event data:
 
 ```ts
@@ -771,6 +927,9 @@ Queries should support:
 - sorted hits;
 - sensor inclusion;
 - custom filters.
+In `"2d"` worlds the overlap queries operate in the XY plane (`overlapSphere` as a
+circle, `overlapBox` as a rectangle), preserving §21's parallel-naming rule without
+a second API surface.
 ### 31. Continuous Collision Detection
 Fast objects may tunnel through thin geometry. four.js shall provide optional
 continuous collision detection.
@@ -824,6 +983,23 @@ The engine should support:
 - replay;
 - rollback;
 - checksums.
+Tier definitions and known hazards:
+- `same-runtime`: identical results for the same build on the same JS engine, OS,
+and hardware. This is the initial target.
+- `same-platform`: additionally stable across runs and engine minor versions on one
+platform; this requires avoiding JS `Math` transcendentals in simulation paths
+(their results legally vary between engines), for example via a deterministic math
+kernel or WebAssembly.
+- `cross-platform`: additionally stable across OS and hardware; effectively the
+whole simulation path, including the solver, must run in deterministic WebAssembly
+or software floating point.
+Simulation code must iterate collections in insertion order and must not derive
+behavior from object-key enumeration or `Set`/`Map` ordering beyond insertion
+order. Event and callback dispatch order must be deterministic (§6b). Solver
+adapters declare their achievable tier in `PhysicsCapabilities` (§37).
+Checksum definition: unless configured otherwise, the per-step checksum is FNV-1a
+over each active body's transform and velocities, quantized to 1e-6, visited in
+body-creation order. The determinism tests of §92 compare these checksums.
 ### 34. Physics Snapshots and Replay
 
 ```ts
@@ -845,6 +1021,10 @@ A replay format should store:
 - random seed;
 - external inputs;
 - optional periodic snapshots.
+Snapshots are opaque adapter data: a snapshot is valid only for the same adapter,
+adapter version, and world configuration that produced it (§37). The replay format
+therefore records the adapter name and version, and a replay refuses to run against
+a different solver.
 ### 35. Soft Bodies and Deformables
 Soft-body support should be a later module.
 Potential features:
@@ -890,21 +1070,60 @@ Particle features:
 ```ts
 interface PhysicsSolverAdapter {
   readonly name: string;
+  readonly version: string;
   readonly capabilities: PhysicsCapabilities;
   initialize(options: PhysicsWorldOptions): Promise<void> | void;
   createBody(desc: RigidBodyDescriptor): PhysicsBodyHandle;
+  destroyBody(handle: PhysicsBodyHandle): void;
   createCollider(desc: ColliderDescriptor): PhysicsColliderHandle;
+  destroyCollider(handle: PhysicsColliderHandle): void;
   createJoint(desc: JointDescriptor): PhysicsJointHandle;
+  destroyJoint(handle: PhysicsJointHandle): void;
   step(delta: number): void;
-  syncToScene(): void;
-  syncFromScene(): void;
+  drainEvents(): PhysicsEvent[];
+  syncSceneToSolver(): void;
+  syncSolverToScene(): void;
   raycast(query: RaycastQuery): RaycastHit[];
+  shapeCast(query: ShapeCastQuery): ShapeCastHit[];
+  overlap(query: OverlapQuery): OverlapHit[];
+  pointQuery(query: PointQuery): PointHit[];
   createSnapshot?(): ArrayBuffer;
   restoreSnapshot?(snapshot: ArrayBuffer): void;
   dispose(): void;
 }
 ```
 
+Adapter contract:
+- `syncSceneToSolver` pushes scene-authored state into the solver (kinematic
+targets, teleports, property changes); `syncSolverToScene` publishes solved body
+transforms back to the scene. The physics package calls them around `step` per the
+§39 ordering, capturing previous transforms for render interpolation (§43) before
+`syncSolverToScene` overwrites them.
+- `drainEvents` returns the contact, trigger, and sleep events accumulated during
+the preceding `step`; the physics package normalizes them (§101) and dispatches
+them after the fixed step (§6b, §29). Adapters never invoke user callbacks
+directly.
+- The query methods implement the §30 query set; capability flags declare which are
+supported.
+
+```ts
+interface PhysicsCapabilities {
+  dimensions: PhysicsDimension[];
+  jointTypes: string[];
+  ccdModes: CCDMode[];
+  determinism: DeterminismLevel;
+  snapshots: boolean;
+  queries: {
+    raycast: boolean;
+    shapeCast: boolean;
+    overlap: boolean;
+    point: boolean;
+  };
+}
+```
+
+Capability declarations drive `solver: "auto"` selection (§20) and the
+compatibility tables of §90.
 Potential adapters:
 - Rapier 2D/3D;
 - Box2D;
@@ -991,6 +1210,13 @@ The engine documentation should explain:
 - how damping differs from friction;
 - how continuous collision detection affects performance.
 The diagnostics package should warn about suspicious values.
+Precision at scale: 32-bit float positions lose sub-millimeter fidelity beyond
+roughly 1e5 length units from the origin. Release 1.0 supports coordinates within
+that envelope, and validation (§85) warns beyond it. Camera-relative rendering
+(subtracting the eye position before matrix composition) is the reserved extension
+for larger worlds, and render-item generation (§64) must not preclude it.
+`TimeState.realTime` (§9) is a double and stays precise over multi-day sessions;
+long-running applications should prefer relative times.
 ## Part VI - Rendering and Motion Synchronization
 ### 42. Transform Authority
 A transform may be controlled by:
@@ -1001,6 +1227,7 @@ type TransformAuthority =
   | "animation"
   | "kinematic"
   | "physics"
+  | "blended"
   | "constraint"
   | "network";
 ```
@@ -1013,6 +1240,12 @@ node.transformAuthority = "physics";
 ```
 
 Conflicts should produce development warnings.
+Exactly one authority owns a node's transform at a time. `"blended"` designates the
+physics-animation blending pipeline of §19 as that single owner; blend weights vary
+inside the pipeline without changing ownership. A development warning fires whenever
+a system writes a transform it does not own. `"network"` marks externally replicated
+transforms and is an enabler only - transport and replication protocols are out of
+scope (§5).
 ### 43. Physics-to-Render Synchronization
 Physics state updates at fixed intervals. Rendering may occur at a different
 rate.
@@ -1042,6 +1275,13 @@ Cameras should support:
 Camera motion should use the same timeline, constraint, and motion systems
 as ordinary nodes.
 ## Part VII - Complete Graphics, Rendering, Application, and Platform Architecture
+Part VII groups its sections as follows: Application and Scene Services (§45-48),
+2D Vector Graphics (§49-52), Geometry, Materials, and Shading (§53-60a), Renderer
+Core (§61-67), Lighting and Post-Processing (§68-70), Interaction and UI (§71-75),
+Assets and Serialization (§76-81), Platform and Runtime (§82-90), Process and
+Quality (§91-96), Worked Example (§97).
+
+**Application and Scene Services (§45-§48)**
 ### 45. Application Model
 
 The high-level Application object owns the default scene, renderer, time system, simulation scheduler, input routing, assets, diagnostics, cameras, and viewports.
@@ -1057,6 +1297,9 @@ const app = new Four.Application({
 });
 await app.initialize();
 app.start();
+```
+
+```ts
 interface ApplicationOptions {
   canvas?: HTMLCanvasElement | OffscreenCanvas;
   renderer?: "auto" | "webgpu" | "webgl2" | "canvas2d" | "svg";
@@ -1067,6 +1310,7 @@ interface ApplicationOptions {
   alpha?: boolean;
   powerPreference?: "low-power" | "high-performance";
   autoResize?: boolean;
+  reducedMotion?: "auto" | boolean;
   fixedTimeStep?: number;
   maximumSubSteps?: number;
   physics?: PhysicsWorldOptions | false;
@@ -1164,6 +1408,8 @@ Supported use cases:
 - offscreen textures;
 - mirrors and portals;
 - 3D model previews inside 2D UI.
+
+**2D Vector Graphics (§49-§52)**
 ### 49. Renderable Node Hierarchy
 
 ```text
@@ -1281,7 +1527,9 @@ The tessellation subsystem shall support:
 - index-buffer reuse;
 - incremental rebuild of modified path segments;
 - optional compute-based tessellation in later releases.
-The tessellator shall be an isolated package with a stable interface so implementations can be replaced without changing the scene API.
+The tessellator shall be an isolated module of `@four/geometry` with a stable interface so implementations can be replaced without changing the scene API. (A dedicated package remains a possible future split; §98 stays authoritative for the package set.)
+
+**Geometry, Materials, and Shading (§53-§60a)**
 ### 53. Geometry Architecture
 
 ```ts
@@ -1506,6 +1754,20 @@ Shader features:
 - conditional variants;
 - reflection metadata;
 - source maps and readable compiler diagnostics.
+### 60a. Color Management
+The rendering pipeline is linear-light on the GPU backends:
+- color textures default to sRGB-encoded and are decoded to linear on sample; data
+maps (normal, roughness, occlusion) default to linear - both via the color-space
+metadata of §77;
+- lighting and blending run in linear space on WebGPU and WebGL 2;
+- the output transform - tone mapping (§68) followed by sRGB encoding - is the
+final render-graph pass (§63); render targets carry color-space metadata;
+- CSS-style color strings used throughout the API (§50, §59, §68) denote sRGB
+values;
+- the Canvas 2D and SVG backends operate sRGB-native; their divergence from
+linear-light results is documented under §62's capability tiers.
+
+**Renderer Core (§61-§67)**
 ### 61. Renderer Interface
 
 ```ts
@@ -1522,6 +1784,12 @@ interface Renderer {
 ```
 
 The logical scene shall remain independent of the selected backend.
+Device and context loss (WebGL context loss, WebGPU device loss) is a first-class
+event, not an error case. The renderer emits `contextlost` and `contextrestored`,
+re-creates engine-owned GPU resources (pipelines, internal buffers, render targets)
+on restore, and re-uploads user resources that retain CPU-side sources; resources
+without retained sources expose a documented re-upload hook. Error codes are defined
+in §89; the required integration test in §92.
 ### 62. Rendering Backends and Capability Tiers
 Supported backends:
 1. WebGPU;
@@ -1536,6 +1804,12 @@ renderer: "auto"
 
 Automatic selection should prefer WebGPU, then WebGL 2, then an appropriate
 2D backend.
+If WebGPU initialization fails at runtime under `"auto"`, selection falls back to
+WebGL 2 and emits a diagnostics event; an explicit `renderer: "webgpu"` fails fast
+with `RENDERER_INITIALIZATION_FAILED` (§89) rather than silently downgrading.
+Headless *simulation* - running the scene and physics with no renderer - is core
+behavior from Phase 1 (§104); the headless/software *rendering* tier above is the
+later extension.
 Capability reporting shall include:
 - maximum texture dimensions;
 - texture formats;
@@ -1640,6 +1914,8 @@ Required mechanisms:
 - section views for engineering models.
 Nested clipping must have defined behavior and diagnostics when backend limits
 are exceeded.
+
+**Lighting and Post-Processing (§68-§70)**
 ### 68. Lighting
 Initial lights:
 - ambient;
@@ -1690,6 +1966,8 @@ The render graph shall support reusable effects:
 - distortion;
 - custom full-screen passes.
 Effects must be composable per viewport.
+
+**Interaction and UI (§71-§75)**
 ### 71. Picking and Hit Testing
 One unified picking API shall cover 2D and 3D.
 Strategies:
@@ -1795,6 +2073,11 @@ Requirements:
 - reduced-motion preference;
 - high-contrast theme hooks;
 - scalable text.
+Reduced motion is an application-level policy (`reducedMotion`, §45): `"auto"`
+follows the platform preference and may be overridden. The UI module must honor it;
+non-UI animation consults it through the animation API on an opt-in basis (§14).
+
+**Assets and Serialization (§76-§81)**
 ### 76. Asset System
 
 ```ts
@@ -1887,6 +2170,15 @@ Serialization goals:
 ```
 
 Physics state, animation state, and replay data must be separate optional sections so static scene definitions remain clean.
+Identity and references:
+- node and resource ids are stable: they serialize with the scene, and
+deserialization restores them (the engine assigns ids only to newly created
+objects);
+- intra-file references (joint bodies, camera targets, parent links) are by id;
+- assets are referenced by logical key, resolved through a manifest that maps each
+key to a URL and content hash (§76);
+- components (§6a) serialize under registered type names; plugins register theirs
+(§81).
 ### 80. Scene Migration
 Scene format versioning is independent from package semantic versioning.
 
@@ -1924,6 +2216,8 @@ Plugin extension points:
 - serialization types;
 - compute workloads.
 Plugins shall declare dependencies and compatibility ranges.
+
+**Platform and Runtime (§82-§90)**
 ### 82. GPU Compute
 WebGPU compute is an advanced optional capability for:
 - particles;
@@ -2027,6 +2321,7 @@ Initial engineering targets on suitable modern desktop hardware:
 | GPU particles | 100,000+ |
 | Active rigid bodies | 5,000 simple bodies baseline |
 | Idle scene | Near-zero unnecessary uploads and simulation work |
+| Payload: minimal 2D application (core + math + scene + render-webgl) | 150 kB gzip or less (provisional) |
 
 Targets are benchmark goals, not universal guarantees.
 ### 87. Spatial Indexing and Culling
@@ -2051,6 +2346,10 @@ Rendering stays on the main thread while simulation executes in a worker using
 transferable or shared state buffers.
 The MVP may begin on the main thread, but APIs and data structures should
 avoid assumptions that make worker migration impossible.
+Split-simulation mode's shared state buffers require `SharedArrayBuffer`, which
+browsers gate behind cross-origin isolation (COOP/COEP headers). The engine must
+detect unavailability and fall back to transferable buffers, and the documentation
+(§93) must cover the deployment requirement.
 ### 89. Error Model
 
 ```ts
@@ -2066,6 +2365,8 @@ Example codes:
 - UNSUPPORTED_GPU_FEATURE;
 - ASSET_LOAD_FAILED;
 - SHADER_COMPILATION_FAILED;
+- CONTEXT_LOST;
+- DEVICE_LOST;
 - INVALID_SCENE_GRAPH;
 - PHYSICS_SOLVER_FAILED;
 - SERIALIZATION_VERSION_MISMATCH.
@@ -2081,6 +2382,8 @@ The project should publish compatibility tables for:
 - physics solver adapters;
 - scene format versions;
 - plugin API versions.
+
+**Process and Quality (§91-§96)**
 ### 91. Coding Standards and Toolchain
 Recommended baseline:
 - strict TypeScript;
@@ -2099,6 +2402,7 @@ Requirements:
 - no implicit any;
 - documented public APIs;
 - tree-shakable modules;
+- side-effect-free packages with subpath exports (§98);
 - package-boundary checks;
 - unit, integration, visual, and benchmark tests;
 - browser compatibility matrix;
@@ -2120,7 +2424,8 @@ Integration tests
 - picking across 2D and 3D;
 - asset loading plus materials;
 - animation-to-physics transitions;
-- UI focus and accessibility bridge.
+- UI focus and accessibility bridge;
+- renderer context loss and restore (§61).
 Visual regression tests
 - shape fills and strokes;
 - path joins and caps;
@@ -2130,10 +2435,15 @@ Visual regression tests
 - clipping;
 - mixed 2D/3D ordering;
 - debug overlays.
+Visual baselines are per backend (WebGPU, WebGL 2, Canvas 2D, SVG) and are compared
+with a perceptual-difference tolerance rather than exact pixels; a shared baseline
+across backends is a non-goal.
 Determinism tests
 - identical input stream produces identical checksums;
 - snapshot restoration reproduces subsequent states;
 - replay remains stable within the declared determinism tier.
+Determinism tests run headless - no renderer - and therefore do not depend on the
+software rendering tier of §62.
 Performance tests
 Track CPU time, GPU time, simulation time, draw calls, contacts, memory,
 allocations, and loading throughput.
@@ -2148,10 +2458,11 @@ Documentation shall include:
 - scene graph and transforms;
 - cameras and coordinate conversion;
 - materials and render graph;
-- motion authority;
+- transform authority;
 - fixed-step simulation;
 - collision filtering;
 - units and numerical stability;
+- worker deployment and cross-origin isolation (§88);
 - performance optimization;
 - custom shaders;
 - custom solver adapters;
@@ -2198,6 +2509,8 @@ Requirements:
 - safe shader/plugin boundaries;
 - cancellation and timeouts for expensive decoders;
 - documented content-security-policy behavior.
+
+**Worked Example (§97)**
 ### 97. Complete Mixed-Scene Example
 
 ```ts
@@ -2286,6 +2599,28 @@ four.js/
 +-- website/
 ```
 
+Responsibilities of the packages not detailed in §99-102:
+- `core`: application shell, eventing (§6b), component model (§6a), unit system
+(§40), plugin host (§81), error model (§89);
+- `math`: vectors, matrices, quaternions, curves, math conventions (§7b);
+- `scene`: nodes, transforms, layers, queries, space modes, serialization hooks;
+- `geometry`: 2D and 3D geometry, path model, tessellation module (§52);
+- `materials`: material families, paints, node materials, color management (§60a);
+- `render`: renderer interface, render graph, batching, capability tiers (§61-67);
+- `render-webgpu`, `render-webgl`, `render-canvas`, `render-svg`: backend
+implementations of the §61 interface;
+- `input`: input sources and event propagation (§72), picking front end (§71);
+- `assets`: loading, caching, glTF, textures (§76-78);
+- `text`: shaping, layout, SDF rendering (§56);
+- `ui`: retained-mode controls, layout, accessibility (§73-75);
+- `particles`: emitters, CPU and GPU simulation (§36, §112);
+- `serialization`: scene format and migration (§79-80);
+- `diagnostics`: statistics, overlays, validation (§84-85);
+- `four`: umbrella package re-exporting the others through side-effect-free subpath
+exports (`four/scene`, `four/physics`, ...) so tree-shaking works for umbrella users
+(§91).
+Camera rigs and controls (§12, §44, §47) live in `@four/motion` as kinematic
+controllers, with input bindings supplied through `@four/input`.
 ### 99. Motion Package
 @four/motion responsibilities:
 - clocks;
@@ -2323,7 +2658,8 @@ four.js/
 - event normalization;
 - solver adapters;
 - snapshots;
-- units;
+- unit application in simulation (the unit system itself lives in `@four/core`,
+§40);
 - debug data.
 ### 102. Solver Packages
 
@@ -2368,7 +2704,8 @@ Components
 - Node;
 - Group;
 - Scene;
-- EventEmitter;
+- component attachment model (§6a);
+- EventEmitter (§6b);
 - Clock;
 - TimeState;
 - fixed-step scheduler;
@@ -2470,7 +2807,7 @@ Exit criteria
 Constraints remain stable under expected real-time loads.
 ### 110. Phase 7 - Physics-Animation Integration
 Components
-- motion authority;
+- transform authority (§42);
 - animation target poses;
 - kinematic-to-dynamic transitions;
 - ragdoll activation;
@@ -2544,7 +2881,7 @@ const circle = new Four.Circle({
 });
 app.scene.add(circle);
 Four.animate(circle.position)
-  .to({ x: 500 }, 1500)
+  .to({ x: 500 }, 1.5)
   .ease("spring")
   .play();
 app.start();
@@ -2595,7 +2932,7 @@ physicsWorld.addJoint(hinge);
 ### 117. Physics and Animation Blend
 
 ```ts
-robot.motionAuthority = "blended";
+robot.transformAuthority = "blended";
 robot.animation.play("walk");
 robot.physicsWeight = 0.2;
 robot.on("impact", () => {
@@ -2711,5 +3048,47 @@ Object
 
 The defining promise is:
 Create once. Position anywhere. Animate naturally. Simulate physically. Render everywhere.
+## Appendix A - Normative Defaults
+Examples elsewhere in this specification are illustrative; this table is normative.
+
+| Setting | Default |
+|---|---|
+| `fixedTimeStep` | 1/60 s (§10, §45) |
+| `maximumSubSteps` | 5 (§10, §45) |
+| Gravity, 3D world | `(0, -9.81, 0)` m/s² (§20) |
+| Gravity, 2D world | `(0, -9.81)` m/s² (§21) |
+| Friction combine mode | `average` (§25) |
+| Restitution combine mode | `maximum` (§25) |
+| Sleeping | enabled; linear 0.01, angular 0.01, time 0.5 s (§32) |
+| Continuous collision detection | `disabled` (§31) |
+| `renderer: "auto"` order | WebGPU, then WebGL 2, then Canvas 2D (§62) |
+| Determinism target | `same-runtime` (§33) |
+| Unit system | meter / kilogram / second / radian (§40) |
+| Angle unit in APIs | radian (§7a) |
+| Time unit in APIs | second (§7a) |
+| `reducedMotion` | `"auto"` (§45, §75) |
+
+## Appendix B - Glossary
+- **Animation**: specification of how something *should* move over time (§3, §14).
+- **Kinematics**: moving objects directly, without solving forces (§3, §12).
+- **Dynamics**: motion derived from forces, mass, and constraints (§3, §20).
+- **Motion**: umbrella term for deterministic change through time - animation,
+kinematics, trajectories, procedural movement (§3).
+- **Component**: typed behavior and state attached to a node (§6a).
+- **Transform authority**: the single system permitted to write a node's transform
+(§42); `"blended"` selects the §19 pipeline.
+- **Fixed step / accumulator**: simulation advances in constant `fixedDeltaTime`
+increments, decoupled from the render rate (§10).
+- **Interpolation alpha**: fraction in [0, 1] of leftover accumulator time used to
+blend previous and current simulation states for rendering (§10, §43).
+- **Determinism tier**: declared reproducibility level - `none`, `same-runtime`,
+`same-platform`, `cross-platform` (§33).
+- **Sensor**: a collider that reports overlaps but exerts no forces (§24, §29).
+- **Solver adapter**: implementation of `PhysicsSolverAdapter` (§37) binding a
+concrete physics engine beneath the stable `@four/physics` API.
+- **Logical pixel**: device-independent pixel unit used by screen space and UI
+layout, scaled to physical pixels by `resolution` (§47, §74).
+- **World / local-plane space**: the spaces in which physics normally operates (§8);
+screen-space UI does not simulate unless mapped to a plane.
 
 
