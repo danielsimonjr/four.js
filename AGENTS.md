@@ -14,9 +14,12 @@ systems, and physics (rigid-body, soft-body, particles) in a single shared scene
 
 **Current state: scaffold + specification only. There is no implementation.**
 
-- Every directory under `packages/` contains only a `.gitkeep`.
-- There is no root `package.json`, no lockfile, no CI workflow, no tests, no build system.
-- `examples/`, `benchmarks/`, `tests/`, `tools/`, and `website/` are empty placeholders.
+- Every `packages/*` package holds a `README.md` (responsibilities + spec references) and
+  empty `src/` and `tests/` placeholders — no source code.
+- There is no root `package.json`, no lockfile, no CI workflow, no build system.
+- `examples/` (per §93 + flagship demos §118–119), `tests/` (`integration/`, `visual/`,
+  `determinism/` per §92), `benchmarks/`, `tools/`, and `website/` are structured
+  placeholders with READMEs but no content.
 - Consequently there are **no build, lint, or test commands** to run today. Do not invent or
   claim to run any.
 

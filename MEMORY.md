@@ -26,6 +26,11 @@ changes in `CHANGELOG.md`.
   and `physics-box2d` as solver packages. The PDF was left unmodified.
 - **2026-07-28 — PDF archived.** Original spec PDF moved to `docs/archive/`; the corrected
   Markdown is the working reference for the repository.
+- **2026-07-28 — Repository layout conventions.** Per package: `README.md` + `src/`
+  (strict TS, ESM) + `tests/` (unit tests colocated, §92). Cross-package suites live in
+  `tests/{integration,visual,determinism}/`; performance tests in `benchmarks/`. Examples
+  follow §93 naming (`first-*-scene`, `mixed-scene`) with flagship demos under
+  `examples/flagship/`. Still no `package.json`/toolchain — that remains Phase 0 (§103).
 - **Pre-existing (recorded in ERRATA E-3):** the scaffold follows the monorepo tree —
   `physics-matter` and `physics-cannon` are deliberately absent and must not be added without
   a spec amendment.

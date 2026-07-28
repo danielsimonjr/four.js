@@ -29,6 +29,9 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-07-28 — Build out the directory tree from the spec: per-package `README.md` +
+      `src/`/`tests/` for all 24 packages; `examples/` (§93 + flagship §118–119); `tests/`
+      categories (§92); READMEs for `benchmarks/`, `tools/`, `website/`
 - [x] 2026-07-28 — Move original spec PDF to `docs/archive/`; update all path references
 - [x] 2026-07-28 — Correct `SPECIFICATION.md` (E-1/E-2/E-3 resolved: parts I–XIII, sections
       1–120, solver-package list fixed, extraction artifacts repaired); rewrite `ERRATA.md`
