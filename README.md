@@ -15,10 +15,11 @@ MIT — see [LICENSE](LICENSE).
 
 ## Specification
 
-See [docs/SPECIFICATION.md](docs/SPECIFICATION.md). The authoritative source is
-[docs/four-js-specification.pdf](docs/four-js-specification.pdf); the Markdown is an
-auto-extracted, convenience rendering of it.
+See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) — a **corrected rendering** of the original
+[docs/archive/four-js-specification.pdf](docs/archive/four-js-specification.pdf) and the working reference for
+this repository (parts I–XIII, sections 1–120, no duplicates).
 
-The specification has **known internal defects** (duplicated part and section numbering, and a
-package-list contradiction). These are documented in [docs/ERRATA.md](docs/ERRATA.md) - read it
-before relying on any cross-reference in the section 45-67 range.
+The original PDF is preserved unchanged and still contains its known defects (duplicated part
+and section numbering, and a package-list contradiction). [docs/ERRATA.md](docs/ERRATA.md)
+documents those defects, how each was resolved, and the old-to-new numbering map for
+translating PDF references.
