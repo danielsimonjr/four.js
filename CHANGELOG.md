@@ -16,6 +16,9 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - `CLAUDE.md` — guidance for Claude Code sessions.
 - `TODO.md`, `CHANGELOG.md`, `MEMORY.md` — root tracking files.
 - `docs/archive/` — archive location for the original specification PDF.
+- `.claude/settings.json` — registers the `local-marketplace` plugin marketplace
+  (`danielsimonjr/skills` on GitHub) and enables three portable skill plugins as project
+  defaults: `rfl`, `dev-workflow`, `honest-claude`.
 - Directory tree built out from the specification: every `packages/*` package gained a
   `README.md` (responsibilities + spec references) plus `src/` and `tests/` placeholders;
   `examples/` gained the §93 quick-start examples and the two flagship demos (§118–119);
