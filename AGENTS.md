@@ -30,6 +30,9 @@ License: MIT (`LICENSE`).
 | `docs/archive/four-js-specification.pdf` | Original source (65 pages), archived unchanged. **Still contains the numbering defects** — translate its references via the errata map. |
 | `docs/ERRATA.md` | Correction log: the PDF's defects, how each was resolved, and the PDF→Markdown numbering map. |
 | `README.md` | Project summary; points at the spec and errata. |
+| `TODO.md` | Task tracker (root). Check it at session start; update it as work completes. |
+| `CHANGELOG.md` | Chronological log of notable repository changes (root). Add entries for substantive changes. |
+| `MEMORY.md` | Cross-session memory (root): decisions, standing facts, open questions, gotchas. Append, don't rewrite; supersede old decisions with dated entries. |
 
 ## 3. Specification numbering — corrected; use the errata map for PDF references
 
@@ -409,3 +412,6 @@ concrete backend; `four` aggregates everything.
     the assumption that 1 unit = 1 meter into APIs.
 11. **Security posture** (§96): treat scene files, assets, and any deserialized content as
     untrusted input.
+12. **Keep the tracking files current**: read `MEMORY.md` and `TODO.md` at the start of a
+    work session; record new decisions in `MEMORY.md`, task movement in `TODO.md`, and
+    substantive changes in `CHANGELOG.md` before finishing.
