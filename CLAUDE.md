@@ -16,6 +16,12 @@ and Changesets. Phase 0 of the implementation plan (Part IX, §103) lists the ex
 to create (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`,
 CI workflow).
 
+## Tracking files (root)
+
+Read `MEMORY.md` (decisions, standing facts, gotchas) and `TODO.md` (task tracker) at the
+start of a session. Before finishing: record new decisions in `MEMORY.md`, update `TODO.md`,
+and add substantive changes to `CHANGELOG.md`.
+
 ## The Specification
 
 - `docs/SPECIFICATION.md` is the **corrected rendering and the working reference**: parts
