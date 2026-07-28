@@ -46,6 +46,13 @@ changes in `CHANGELOG.md`.
   with WebGL 2 only (§120); toolchain baseline is strict TS + ESM + pnpm + Vitest +
   Playwright + ESLint + Prettier + Vite + Changesets (§91).
 
+- **2026-07-28 — Specification review recorded, not applied.** `docs/SPEC-REVIEW.md` proposes
+  improvements R-1…R-35 (P1 = internal contradictions, e.g. §23 vs §26 force signatures,
+  §19 vs §42 authority enums, §52 tessellator package missing from §98; P2 = underspecified
+  load-bearing designs, e.g. component model, event system, coordinate conventions, adapter
+  interface gaps; P3 = structural/editorial). Nothing has been applied to `SPECIFICATION.md` —
+  amendments remain owner decisions. Cite items as "R-N" (same style as ERRATA "E-N").
+
 ## Open questions
 
 - Turborepo vs. Nx for the monorepo task runner (§91 permits either).

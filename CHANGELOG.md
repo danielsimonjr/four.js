@@ -11,6 +11,10 @@ specification; until then, entries are grouped by date under **Unreleased**.
 ### 2026-07-28
 
 #### Added
+- `docs/SPEC-REVIEW.md` — technical review of `SPECIFICATION.md` proposing improvements
+  R-1…R-35 (contradictions, underspecified designs, missing topics, structure), with a
+  suggested disposition order keyed to the implementation phases. Proposals only; the
+  specification itself is unchanged.
 - `AGENTS.md` — detailed orientation for AI agents and new contributors (repo state,
   architecture reference, package map, implementation phases, guardrails).
 - `CLAUDE.md` — guidance for Claude Code sessions.

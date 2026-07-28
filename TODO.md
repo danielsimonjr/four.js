@@ -7,6 +7,9 @@ changes in `CHANGELOG.md`.
 ## Now
 
 - [ ] Decide when to start Phase 0 (§103, Project Foundation) — see backlog below.
+- [ ] Disposition the specification review (`docs/SPEC-REVIEW.md`, items R-1…R-35) — accept /
+      reject / defer each; P1 items (contradictions) and the "before Phase 1" batch first.
+      Accepted items amend `SPECIFICATION.md` by owner decision.
 
 ## Backlog
 
