@@ -16,6 +16,11 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - `CLAUDE.md` — guidance for Claude Code sessions.
 - `TODO.md`, `CHANGELOG.md`, `MEMORY.md` — root tracking files.
 - `docs/archive/` — archive location for the original specification PDF.
+- Directory tree built out from the specification: every `packages/*` package gained a
+  `README.md` (responsibilities + spec references) plus `src/` and `tests/` placeholders;
+  `examples/` gained the §93 quick-start examples and the two flagship demos (§118–119);
+  `tests/` gained `integration/`, `visual/`, and `determinism/` per the §92 taxonomy;
+  `benchmarks/`, `tools/`, and `website/` gained purpose READMEs.
 
 #### Changed
 - `docs/SPECIFICATION.md` rewritten as the **corrected working rendering** of the

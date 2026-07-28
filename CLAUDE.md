@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 four.js is a **proposed** unified JS/TS framework combining 2D/2.5D/3D graphics, animation,
 motion, and physics in one shared scene model. This repository currently contains **only the
 directory scaffold and the specification — there is no implementation, no `package.json`, and
-no build/test tooling yet.** Every `packages/*` directory holds just a `.gitkeep`.
+no build/test tooling yet.** Each `packages/*` package holds a `README.md` plus empty `src/`
+and `tests/` placeholders; unit tests are colocated per package, cross-package suites live in
+`tests/{integration,visual,determinism}/`, and performance tests in `benchmarks/`.
 
 There are consequently no build, lint, or test commands to run today. When implementation
 begins, the spec (§91, Coding Standards and Toolchain) prescribes the baseline: strict
