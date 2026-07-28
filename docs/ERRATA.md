@@ -1,6 +1,6 @@
 # Specification Errata and Correction Log
 
-[`four-js-specification.pdf`](four-js-specification.pdf) (65 pages) contains internal defects,
+[`archive/four-js-specification.pdf`](archive/four-js-specification.pdf) (65 pages) contains internal defects,
 recorded here as E-1, E-2, and E-3. **All three are now resolved in
 [`SPECIFICATION.md`](SPECIFICATION.md)**, which was corrected by decision of the specification's
 author (2026-07-28) and is the working reference for this repository. The PDF is preserved

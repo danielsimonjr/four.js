@@ -20,7 +20,7 @@ CI workflow).
 
 - `docs/SPECIFICATION.md` is the **corrected rendering and the working reference**: parts
   I–XIII, sections 1–120, no duplicate numbering, extraction artifacts repaired.
-- `docs/four-js-specification.pdf` is the unmodified original (65 pages). It **still
+- `docs/archive/four-js-specification.pdf` is the unmodified original (65 pages). It **still
   contains** the old defects (duplicate `Part VII`, section numbers 45–67 assigned twice) —
   when reading the PDF, translate references via the numbering map in `docs/ERRATA.md`
   (PDF second-range §45–67 = Markdown §98–120). Do not edit the PDF.

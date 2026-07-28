@@ -1,6 +1,6 @@
 # four.js - Complete Specification and Implementation Plan
 
-> **Corrected rendering.** This Markdown was extracted from `four-js-specification.pdf`
+> **Corrected rendering.** This Markdown was extracted from `archive/four-js-specification.pdf`
 > (65 pages) and then corrected by decision of the specification's author: the duplicated
 > `Part VII` label, the twice-assigned section numbers 45-67, and the solver-package list
 > contradiction present in the PDF are resolved here, and text-extraction artifacts

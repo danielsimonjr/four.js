@@ -16,7 +16,7 @@ MIT — see [LICENSE](LICENSE).
 ## Specification
 
 See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) — a **corrected rendering** of the original
-[docs/four-js-specification.pdf](docs/four-js-specification.pdf) and the working reference for
+[docs/archive/four-js-specification.pdf](docs/archive/four-js-specification.pdf) and the working reference for
 this repository (parts I–XIII, sections 1–120, no duplicates).
 
 The original PDF is preserved unchanged and still contains its known defects (duplicated part

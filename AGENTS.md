@@ -27,7 +27,7 @@ License: MIT (`LICENSE`).
 | File | Role |
 |---|---|
 | `docs/SPECIFICATION.md` | **Corrected rendering — the working reference.** Parts I–XIII, sections 1–120, no duplicates; extraction artifacts repaired; Markdown headings added. |
-| `docs/four-js-specification.pdf` | Original source (65 pages), preserved unchanged. **Still contains the numbering defects** — translate its references via the errata map. |
+| `docs/archive/four-js-specification.pdf` | Original source (65 pages), archived unchanged. **Still contains the numbering defects** — translate its references via the errata map. |
 | `docs/ERRATA.md` | Correction log: the PDF's defects, how each was resolved, and the PDF→Markdown numbering map. |
 | `README.md` | Project summary; points at the spec and errata. |
 
