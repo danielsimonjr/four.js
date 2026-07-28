@@ -26,6 +26,14 @@ changes in `CHANGELOG.md`.
   and `physics-box2d` as solver packages. The PDF was left unmodified.
 - **2026-07-28 — PDF archived.** Original spec PDF moved to `docs/archive/`; the corrected
   Markdown is the working reference for the repository.
+- **2026-07-28 — Plugin marketplace registered (owner decision).** `.claude/settings.json`
+  registers `local-marketplace` (GitHub `danielsimonjr/skills`, a **private** repo — sessions
+  need the owner's GitHub auth to clone it) and enables `rfl`, `dev-workflow`, and
+  `honest-claude` as project defaults. Machine-bound plugins from that marketplace (Windows
+  automation, Outlook, local symlink/junction sources, personal MCP servers) are deliberately
+  NOT project defaults — they belong in the owner's user-level settings. The settings file
+  was created by the owner directly; agent writes to `.claude/settings.json` are blocked by
+  the permission classifier in this environment.
 - **2026-07-28 — Repository layout conventions.** Per package: `README.md` + `src/`
   (strict TS, ESM) + `tests/` (unit tests colocated, §92). Cross-package suites live in
   `tests/{integration,visual,determinism}/`; performance tests in `benchmarks/`. Examples
