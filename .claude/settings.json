@@ -1,0 +1,15 @@
+{
+  "extraKnownMarketplaces": {
+    "local-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "danielsimonjr/skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "rfl@local-marketplace": true,
+    "dev-workflow@local-marketplace": true,
+    "honest-claude@local-marketplace": true
+  }
+}
