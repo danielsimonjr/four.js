@@ -46,6 +46,27 @@ changes in `CHANGELOG.md`.
   with WebGL 2 only (§120); toolchain baseline is strict TS + ESM + pnpm + Vitest +
   Playwright + ESLint + Prettier + Vite + Changesets (§91).
 
+- **2026-07-28 — Specification review recorded, not applied.** `docs/SPEC-REVIEW.md` proposes
+  improvements R-1…R-35 (P1 = internal contradictions, e.g. §23 vs §26 force signatures,
+  §19 vs §42 authority enums, §52 tessellator package missing from §98; P2 = underspecified
+  load-bearing designs, e.g. component model, event system, coordinate conventions, adapter
+  interface gaps; P3 = structural/editorial). Cite items as "R-N" (same style as ERRATA
+  "E-N"). *Superseded the same day by the revision-1.1 entry below.*
+- **2026-07-28 — Spec revision 1.1 applied (owner-directed).** All 35 review items applied to
+  `SPECIFICATION.md`; Amendments table added at the top of the spec. Key standing rules the
+  revision established: **§ numbering 1–120 is frozen** — new sections use letter suffixes
+  (now 6a Component Model, 6b Eventing, 7a Coordinate/Unit Conventions, 7b Math Conventions,
+  60a Color Management) and appendices (A Normative Defaults, B Glossary); world space is
+  right-handed **Y-up in both 2D and 3D** (2D gravity is negative Y); **all engine times are
+  seconds** (tween/timeline durations included — no milliseconds anywhere); the single
+  authority enum is `TransformAuthority` (§42, now includes `"blended"`; `MotionAuthority`
+  no longer exists); force APIs use explicit `…AtPoint` names; `RigidBody`/colliders are
+  *components* (§6a); the solver adapter contract (§37) includes destroy/query/drainEvents
+  methods and a defined `PhysicsCapabilities`. §86 payload budget (≤150 kB gzip) is
+  provisional pending owner confirmation. The `dev-workflow` plugin could not load in this
+  remote session (private `danielsimonjr/skills` marketplace repo is outside the session's
+  GitHub scope), so the revision was done inline.
+
 ## Open questions
 
 - Turborepo vs. Nx for the monorepo task runner (§91 permits either).

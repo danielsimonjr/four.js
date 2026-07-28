@@ -7,6 +7,8 @@ changes in `CHANGELOG.md`.
 ## Now
 
 - [ ] Decide when to start Phase 0 (§103, Project Foundation) — see backlog below.
+- [ ] Confirm the provisional payload budget in §86 (minimal 2D app ≤ 150 kB gzip) — set
+      during spec revision 1.1 (R-25); owner to confirm or adjust the number.
 
 ## Backlog
 
@@ -27,6 +29,9 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-07-28 — Disposition the specification review: all 35 items (R-1…R-35) accepted
+      and applied as `SPECIFICATION.md` revision 1.1 (lettered sections 6a/6b/7a/7b/60a,
+      Appendices A–B; §1–120 numbering unchanged)
 - [x] 2026-07-28 — Typeset `SPECIFICATION.md`: 96 fenced code/diagram blocks (with restored
       indentation), Markdown bullet lists, §86 performance table, parts TOC; word-for-word
       equivalence machine-verified
