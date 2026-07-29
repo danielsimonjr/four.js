@@ -325,7 +325,7 @@ See §7 below (package map).
 ### Part IX — Implementation Plan (§103–113 = Phases 0–10)
 | Phase | Scope | Exit criterion |
 |---|---|---|
-| 0 | Root files: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`, `.github/workflows/ci.yml`, CONTRIBUTING, CODE_OF_CONDUCT, IMPLEMENTATION_PLAN, ROADMAP | Monorepo installs; packages compile; tests run; docs build; example starts |
+| 0 | Root files: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`, `.github/workflows/ci.yml`, CONTRIBUTING, CODE_OF_CONDUCT, ROADMAP — plus the implementation plan, which lives at `docs/plans/IMPLEMENTATION_PLAN.md` (owner decision; §103 names the file without a path) | Monorepo installs; packages compile; tests run; docs build; example starts |
 | 1 | Vector2/3/4, Matrix3/4, Quaternion, Transform, Node, Group, Scene, component model (§6a), EventEmitter (§6b), Clock, TimeState, fixed-step scheduler, dirty transform propagation | Scene graph deterministically steps **without a renderer** |
 | 2 | MotionComponent, kinematic controller, paths, trajectories, spring motion, transform authority, interpolation buffers | Motion is deterministic, renderer-independent, unit tested |
 | 3 | Renderer interface, **WebGL 2 backend**, cameras, render list, buffers, shaders, textures, viewports, interpolation-aware rendering | Moving 2D/3D primitives render smoothly under fixed-step simulation |

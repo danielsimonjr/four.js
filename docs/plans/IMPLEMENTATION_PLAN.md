@@ -1,6 +1,6 @@
 # four.js Implementation Plan
 
-Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md)
+Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](../SPECIFICATION.md)
 (revision 1.3). This plan is **designed for subagent-driven execution**: an orchestrator
 session dispatches small, self-contained **work packets** to worker agents. Packets marked
 **[H]** are pre-decided and mechanical — a Haiku-class agent can execute them by following
