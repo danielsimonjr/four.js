@@ -87,9 +87,11 @@ changes in `CHANGELOG.md`.
     the §86 payload row from the first compilable package onward.
   - **API docs: TypeDoc** for generated reference docs (§93). API Extractor deferred;
     revisit before 1.0 if API-report/compat gating is wanted (§90).
-- **2026-07-29 — Implementation plan written for subagent execution.** Root
-  `IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103) structures all work as **work
-  packets** `WP-<phase>.<n>` with a fixed format (Depends/Reads/Files/Steps/Done). Packets
+- **2026-07-29 — Implementation plan written for subagent execution.**
+  `docs/plans/IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103; moved from the root to
+  `docs/plans/` by owner direction the same day — §103's deliverable list names the file
+  without a path, so this is a location choice, not a spec deviation) structures all work
+  as **work packets** `WP-<phase>.<n>` with a fixed format (Depends/Reads/Files/Steps/Done). Packets
   are tiered: **[H]** = mechanical, pre-decided, Haiku-executable; **[S]** = needs judgment,
   stronger model. Conventions in force: §1 ground rules go verbatim into every worker
   prompt; parallel packets need disjoint `Files` sets; two retries then escalate; a phase's

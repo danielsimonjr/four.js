@@ -10,7 +10,7 @@ changes in `CHANGELOG.md`.
 
 ## Backlog
 
-### Phase 0 — Project Foundation (§103) — now tracked as work packets in `IMPLEMENTATION_PLAN.md`
+### Phase 0 — Project Foundation (§103) — now tracked as work packets in `docs/plans/IMPLEMENTATION_PLAN.md`
 - [ ] WP-0.1–0.4 — root manifests, `tsconfig.base.json`, ESLint/Prettier, Turborepo
 - [ ] WP-0.5 — per-package `package.json` + build wiring, fan-out ×24
 - [ ] WP-0.6–0.7 — size-limit budget gate (§86) and `.github/workflows/ci.yml`
@@ -29,7 +29,7 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
-- [x] 2026-07-29 — Write `IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103): subagent-
+- [x] 2026-07-29 — Write `docs/plans/IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103): subagent-
       driven work packets WP-N.M with [H]/[S] model tiers, mechanical Done-checks,
       Phase 0–2 fully decomposed, Phases 3–10 rolling-wave; §98 directory tree verified
       complete (already built 2026-07-28)
