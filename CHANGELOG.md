@@ -10,6 +10,15 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-07-29
 
+#### Added
+- `IMPLEMENTATION_PLAN.md` — Phase 0 deliverable (§103), written for subagent-driven
+  execution: work packets `WP-N.M` with mechanical Done-checks and [H]aiku/[S]tronger model
+  tiers; §1 ground rules distilled from the spec's conventions (§6a/§6b/§7a/§7b, §33, §42);
+  Phase 0 (11 packets) and Phases 1–2 (19 packets) fully decomposed; Phases 3–10 held at
+  milestone level for rolling-wave decomposition; verification stack table (build/test/
+  lint/check-spec/size/determinism). Directory tree verified complete against §98 — no new
+  directories needed.
+
 #### Changed (spec revision 1.3)
 - `docs/SPECIFICATION.md` bumped to **revision 1.3** after a two-lens adversarial
   verification pass over the 1.1 material (16 unique findings, all fixed): world matrices

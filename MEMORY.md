@@ -87,6 +87,16 @@ changes in `CHANGELOG.md`.
     the §86 payload row from the first compilable package onward.
   - **API docs: TypeDoc** for generated reference docs (§93). API Extractor deferred;
     revisit before 1.0 if API-report/compat gating is wanted (§90).
+- **2026-07-29 — Implementation plan written for subagent execution.** Root
+  `IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103) structures all work as **work
+  packets** `WP-<phase>.<n>` with a fixed format (Depends/Reads/Files/Steps/Done). Packets
+  are tiered: **[H]** = mechanical, pre-decided, Haiku-executable; **[S]** = needs judgment,
+  stronger model. Conventions in force: §1 ground rules go verbatim into every worker
+  prompt; parallel packets need disjoint `Files` sets; two retries then escalate; a phase's
+  exit packet must pass before the next phase starts; Phases 0–2 are fully decomposed,
+  Phases 3–10 are deliberately rolling-wave (decomposed only when their predecessor exits
+  green). The §98 directory tree was verified complete — packets fill directories, never
+  create packages.
 - **2026-07-29 — Spec revision 1.3 (verification pass).** Two independent adversarial
   re-reads of the 1.1 material (time/physics-semantics lens and cross-reference lens)
   surfaced 16 unique findings — 7 confirmed, 9 plausible — all fixed in revision 1.3 (see
