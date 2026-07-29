@@ -10,6 +10,21 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-07-29
 
+#### Changed (spec revision 1.3)
+- `docs/SPECIFICATION.md` bumped to **revision 1.3** after a two-lens adversarial
+  verification pass over the 1.1 material (16 unique findings, all fixed): world matrices
+  resolve per fixed step, not per frame (§7); pause semantics defined (§10); the replay
+  format now records per-frame step counts and dropped time, and §10 cites §34 rather than
+  §113; §39 sensor update moved before collision-event dispatch (§6b now step 9);
+  previous-pose capture for interpolation defined in §37; collider density authoritative
+  over material density (§25); checksum visits existing bodies (incl. sleeping) in monotonic
+  body-id order (§33); local-plane→XY mapping stated (§21); marker behavior under
+  replay/snapshot-restore defined (§16); reduced motion added to §14; §40 unit options
+  restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); §97
+  field of view converted to radians; cameras/viewports assigned to `@four/scene` (§98,
+  package README updated); Part VII group renamed "Renderables and 2D Vector Graphics";
+  §6 audio marked plugin-provided.
+
 #### Added
 - `tools/check-spec.mjs` — mechanical consistency checker for `docs/SPECIFICATION.md`
   (section sequence with frozen 1–120 numbering, duplicates, fence balance, TOC/body

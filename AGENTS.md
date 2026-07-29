@@ -119,7 +119,8 @@ physically. Render everywhere."*
   `RigidBody`, colliders, and `MotionComponent` are components, not Node subclasses.
 - **Eventing** (§6b): one typed `EventEmitter` for nodes and the application; `on` returns
   an unsubscriber; input events propagate capture→target→bubble; physics events dispatch
-  after each fixed step (§39 step 8), never during the solver step.
+  after each fixed step (§39 step 9, following the sensor update), never during the solver
+  step.
 - **Conventions** (§7a/§7b): right-handed **Y-up world in both 2D and 3D** (2D gravity is
   negative Y); CCW front faces; radians in all APIs; **all engine times are seconds**;
   math types are mutable, in-place methods return `this`, hot paths take `out` parameters,

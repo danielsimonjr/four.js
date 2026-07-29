@@ -10,13 +10,14 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.2 — 2026-07-29**
+**Specification revision 1.3 — 2026-07-29**
 
 | Revision | Date | Summary |
 |---|---|---|
 | 1.0 | 2026-07-28 | Corrected rendering of the original PDF (ERRATA E-1/E-2/E-3 resolved, extraction artifacts repaired). |
 | 1.1 | 2026-07-28 | Technical revision applying [SPEC-REVIEW.md](SPEC-REVIEW.md) items R-1–R-35: contradictions resolved; component model, eventing, coordinate/math conventions, and the solver-adapter contract specified; scope of audio/networking settled; Appendices A (defaults) and B (glossary) added. New sections use letter suffixes (6a, 6b, 7a, 7b, 60a) so §1–120 numbering is unchanged. |
 | 1.2 | 2026-07-29 | §86 payload budget (minimal 2D application ≤ 150 kB gzip) confirmed by the owner; provisional marker removed. |
+| 1.3 | 2026-07-29 | Verification pass over the 1.1 material: world-matrix resolution per fixed step (§7); pause semantics (§10); replay records dropped time and step counts (§10, §34); §97 field of view in radians; §40 unit options restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); collider density authoritative over material density (§25); checksum order and "existing body" defined (§33); local-plane mapping in 2D worlds (§21); §39 sensor update moved before event dispatch; previous-pose capture defined (§37); marker behavior under replay/restore (§16); reduced motion in §14; cameras/viewports assigned to `@four/scene` (§98); §49–52 group renamed; §6 audio marked plugin-provided. |
 
 ---
 
@@ -187,7 +188,7 @@ Every node may optionally participate in:
 - input;
 - physics;
 - layout;
-- audio;
+- audio (via plugins, §81 - an audio engine is a non-goal, §5);
 - serialization.
 The base Node should remain lightweight. Extended behavior should be attached through typed components or specialized subclasses.
 ### 6a. Component Model
@@ -239,8 +240,9 @@ delivery;
 take effect from the next dispatch; an event does not re-enter its own dispatch;
 - input events propagate through the scene graph in capture, target, and bubble
 phases (§72); all other events fire on their emitter only;
-- physics events (§29) dispatch after each fixed step, at step 8 of the §39 ordering,
-never during the solver step itself;
+- physics events (§29) dispatch after each fixed step, at step 9 of the §39 ordering
+(after the sensor update that produces trigger transitions), never during the solver
+step itself;
 - application events `fixedUpdate`, `update`, and `render` follow the main-loop
 contract of §10.
 ### 7. Transform System
@@ -264,9 +266,9 @@ Transform semantics:
 and scale about the pivot), so `pivot` affects rotation and scale but not `position`;
 - writing `localMatrix` directly requires `matrixAutoUpdate = false`; the user then
 owns the matrix, and position/rotation/scale are not back-derived from it;
-- world matrices update lazily: they are resolved once per frame before physics
-synchronization (§37) and before render-item generation (§64), and on demand for
-queries;
+- world matrices update lazily: they are resolved before each physics
+synchronization point (once per fixed step, §37), before render-item generation
+(§64), and on demand for queries;
 - `version` increments on every local mutation so dependent systems can cache
 against it.
 Two-dimensional nodes normally use:
@@ -407,8 +409,12 @@ The substep clamp (`maximumSubSteps`, §45; default in Appendix A) bounds simula
 work after long frames (background tabs, debugger pauses, GC hitches): excess
 accumulated time is dropped, so simulation time falls behind real time instead of
 entering a feedback spiral. Drops surface through `TimeState.droppedTime` (§9), a
-diagnostics warning (§84), and the replay record (§113). After clamping,
-`interpolationAlpha` remains in [0, 1].
+diagnostics warning (§84), and the replay format (§34), which records per-frame
+executed step counts and dropped time. After clamping, `interpolationAlpha` remains
+in [0, 1].
+When `paused` is true, the accumulator stops accumulating and `deltaTime` is 0,
+while `unscaledDeltaTime`, `update`, and `render` continue. Pause is equivalent to
+`timeScale = 0` except that `timeScale` is preserved across pause and resume.
 ### 11. Motion Components
 A node may use a MotionComponent.
 
@@ -506,7 +512,9 @@ four.js shall support:
 - animation blending;
 - additive animation;
 - inverse kinematics;
-- physics-animation blending.
+- physics-animation blending;
+- reduced-motion consultation (the application-level `reducedMotion` policy, §45 and
+§75, exposed to animation code on an opt-in basis).
 ### 15. Tween API
 
 ```ts
@@ -566,7 +574,10 @@ opt-in per-marker replay-on-seek policy;
 resolved once, at creation time;
 - when two active tweens target the same property, the last-started tween wins and a
 development warning is emitted; tweens that write transforms additionally respect
-transform authority (§42).
+transform authority (§42);
+- replay (§34) re-executes playback, so markers re-fire exactly as in the original
+run; restoring a mid-timeline snapshot positions playback without re-firing markers
+already crossed.
 ### 17. Animation Clips and Tracks
 
 ```ts
@@ -682,6 +693,8 @@ quaternions), for both dimensions. A `"2d"` world constrains motion to the XY pl
 and rotation to the Z axis - semantically a plane constraint - and accepts `Vector2`
 arguments as a convenience that widens to `Vector3` with `z = 0`. Both dimensions
 share the Y-up convention of §7a, so gravity is negative Y in 2D and 3D alike.
+Nodes simulating in local-plane space (§8) use the plane's own 2D frame, which the
+engine maps to the world XY frame of the `"2d"` world.
 ### 22. Body Types
 
 ```ts
@@ -794,6 +807,10 @@ type CombineMode =
   | "multiply";
 ```
 
+`Collider.density` (§24) is authoritative for mass derivation (§23);
+`PhysicsMaterial.density` is a fallback used only when the collider does not set
+one.
+
 ### 26. Forces and Impulses
 Required force APIs:
 
@@ -825,7 +842,8 @@ interface ForceField {
   sample(
     position: Vector3,
     velocity: Vector3,
-    time: number
+    time: number,
+    out?: Vector3
   ): Vector3;
 }
 ```
@@ -999,8 +1017,10 @@ behavior from object-key enumeration or `Set`/`Map` ordering beyond insertion
 order. Event and callback dispatch order must be deterministic (§6b). Solver
 adapters declare their achievable tier in `PhysicsCapabilities` (§37).
 Checksum definition: unless configured otherwise, the per-step checksum is FNV-1a
-over each active body's transform and velocities, quantized to 1e-6, visited in
-body-creation order. The determinism tests of §92 compare these checksums.
+over each existing body's transform and velocities (sleeping bodies included),
+quantized to 1e-6, visited in ascending engine-assigned monotonic body id - an
+order well-defined across body destruction (§37) and preserved by snapshot restore
+(§34). The determinism tests of §92 compare these checksums.
 ### 34. Physics Snapshots and Replay
 
 ```ts
@@ -1020,7 +1040,8 @@ A replay format should store:
 - solver settings;
 - time step;
 - random seed;
-- external inputs;
+- external inputs, indexed by simulation step;
+- per-frame executed fixed-step counts and dropped time (§10);
 - optional periodic snapshots.
 Snapshots are opaque adapter data: a snapshot is valid only for the same adapter,
 adapter version, and world configuration that produced it (§37). The replay format
@@ -1098,8 +1119,10 @@ Adapter contract:
 - `syncSceneToSolver` pushes scene-authored state into the solver (kinematic
 targets, teleports, property changes); `syncSolverToScene` publishes solved body
 transforms back to the scene. The physics package calls them around `step` per the
-§39 ordering, capturing previous transforms for render interpolation (§43) before
-`syncSolverToScene` overwrites them.
+§39 ordering. The "previous" pose used for render interpolation (§43) is the
+solver's pre-step body state, retained by the physics package; interpolated render
+poses are presentation-only and are never captured as a previous pose or written
+back (§43).
 - `drainEvents` returns the contact, trigger, and sleep events accumulated during
 the preceding `step`; the physics package normalizes them (§101) and dispatches
 them after the fixed step (§6b, §29). Adapters never invoke user callbacks
@@ -1170,8 +1193,8 @@ Example system order:
 5. Force generation
 6. Physics solve
 7. Constraint solve
-8. Collision event dispatch
-9. Sensor update
+8. Sensor update
+9. Collision event dispatch
 10. State snapshot
 11. Render interpolation
 The ordering must be explicit and configurable.
@@ -1201,6 +1224,10 @@ angle = radian
 ```
 
 Engineering applications must be able to declare and display units explicitly.
+The `angle` and `time` selections govern display and authoring-input conversion
+only: the engine's internal representation and every API signature remain radians
+and seconds (§7a). The `scale` factors relate world units to SI for physics; they do
+not change API units.
 ### 41. Numerical Stability Guidance
 The engine documentation should explain:
 - why very large mass ratios can destabilize solvers;
@@ -1277,7 +1304,8 @@ Camera motion should use the same timeline, constraint, and motion systems
 as ordinary nodes.
 ## Part VII - Complete Graphics, Rendering, Application, and Platform Architecture
 Part VII groups its sections as follows: Application and Scene Services (§45-48),
-2D Vector Graphics (§49-52), Geometry, Materials, and Shading (§53-60a), Renderer
+Renderables and 2D Vector Graphics (§49-52), Geometry, Materials, and Shading
+(§53-60a), Renderer
 Core (§61-67), Lighting and Post-Processing (§68-70), Interaction and UI (§71-75),
 Assets and Serialization (§76-81), Platform and Runtime (§82-90), Process and
 Quality (§91-96), Worked Example (§97).
@@ -1410,7 +1438,7 @@ Supported use cases:
 - mirrors and portals;
 - 3D model previews inside 2D UI.
 
-**2D Vector Graphics (§49-§52)**
+**Renderables and 2D Vector Graphics (§49-§52)**
 ### 49. Renderable Node Hierarchy
 
 ```text
@@ -2524,7 +2552,7 @@ const app = new Four.Application({
 });
 await app.initialize();
 const camera = new Four.PerspectiveCamera({
-    fieldOfView: 60,
+    fieldOfView: Math.PI / 3,
     near: 0.1,
     far: 1000
 });
@@ -2604,7 +2632,8 @@ Responsibilities of the packages not detailed in §99-102:
 - `core`: application shell, eventing (§6b), component model (§6a), unit system
 (§40), plugin host (§81), error model (§89);
 - `math`: vectors, matrices, quaternions, curves, math conventions (§7b);
-- `scene`: nodes, transforms, layers, queries, space modes, serialization hooks;
+- `scene`: nodes, transforms, cameras (§47), viewports (§48), layers, queries, space
+modes, serialization hooks;
 - `geometry`: 2D and 3D geometry, path model, tessellation module (§52);
 - `materials`: material families, paints, node materials, color management (§60a);
 - `render`: renderer interface, render graph, batching, capability tiers (§61-67);

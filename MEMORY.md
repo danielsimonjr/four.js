@@ -87,6 +87,15 @@ changes in `CHANGELOG.md`.
     the §86 payload row from the first compilable package onward.
   - **API docs: TypeDoc** for generated reference docs (§93). API Extractor deferred;
     revisit before 1.0 if API-report/compat gating is wanted (§90).
+- **2026-07-29 — Spec revision 1.3 (verification pass).** Two independent adversarial
+  re-reads of the 1.1 material (time/physics-semantics lens and cross-reference lens)
+  surfaced 16 unique findings — 7 confirmed, 9 plausible — all fixed in revision 1.3 (see
+  the spec's amendments table and CHANGELOG). Notable standing corrections: world matrices
+  resolve **per fixed step**; §39 order is now …7 constraint solve, **8 sensor update,
+  9 collision event dispatch**…; `Collider.density` beats `PhysicsMaterial.density`;
+  checksums visit existing bodies (incl. sleeping) in monotonic body-id order; cameras and
+  viewports belong to `@four/scene` (rigs stay in `@four/motion`); §40's degree/millisecond
+  options are display/authoring conversion only.
 - **2026-07-29 — Scaffold docs synced to revision 1.2.** CLAUDE.md, AGENTS.md, README.md,
   ERRATA.md (scope note: amendments live in the spec's table, ERRATA covers only PDF
   defects), website/README.md, and the core/motion/physics/geometry package READMEs were
