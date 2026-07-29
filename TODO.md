@@ -10,17 +10,14 @@ changes in `CHANGELOG.md`.
 
 ## Backlog
 
-### Phase 0 — Project Foundation (§103)
-- [ ] Root `package.json` and `pnpm-workspace.yaml`
-- [ ] `tsconfig.base.json` (strict, ESM) and `eslint.config.js`
-- [ ] Turborepo wiring (decided 2026-07-29 — see MEMORY.md; Nx rejected)
-- [ ] `.github/workflows/ci.yml` — including a docs job running `tools/check-spec.mjs` and a
-      size-limit job gating the §86 payload budget (decided 2026-07-29)
-- [ ] `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
-- [ ] `IMPLEMENTATION_PLAN.md`, `ROADMAP.md`
-- [ ] Per-package `package.json` + build wiring for all 24 `@four/*` packages
-- [ ] Exit criteria: monorepo installs, all packages compile, tests run, docs build,
-      example application starts
+### Phase 0 — Project Foundation (§103) — now tracked as work packets in `IMPLEMENTATION_PLAN.md`
+- [ ] WP-0.1–0.4 — root manifests, `tsconfig.base.json`, ESLint/Prettier, Turborepo
+- [ ] WP-0.5 — per-package `package.json` + build wiring, fan-out ×24
+- [ ] WP-0.6–0.7 — size-limit budget gate (§86) and `.github/workflows/ci.yml`
+      (incl. `tools/check-spec.mjs` docs job)
+- [ ] WP-0.8–0.9 — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`
+- [ ] WP-0.10 — exit verification: monorepo installs, all packages compile, tests run,
+      docs build, example application starts
 
 ### Phase 5 (when it starts)
 - [ ] Pin exact `@dimforge/rapier2d`/`@dimforge/rapier3d` versions (strategy decided
@@ -32,6 +29,10 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-07-29 — Write `IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103): subagent-
+      driven work packets WP-N.M with [H]/[S] model tiers, mechanical Done-checks,
+      Phase 0–2 fully decomposed, Phases 3–10 rolling-wave; §98 directory tree verified
+      complete (already built 2026-07-28)
 - [x] 2026-07-29 — Confirm the §86 payload budget (minimal 2D app ≤ 150 kB gzip): owner
       confirmed; provisional marker removed (spec revision 1.2)
 - [x] 2026-07-28 — Disposition the specification review: all 35 items (R-1…R-35) accepted
