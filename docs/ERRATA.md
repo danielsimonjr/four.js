@@ -96,6 +96,14 @@ resolution described above.
 
 ---
 
+## Scope note: revisions vs. errata
+
+This file covers only the PDF's extraction/numbering defects and their resolution.
+Substantive amendments to the specification (revision 1.1 applying `SPEC-REVIEW.md` R-1–R-35,
+revision 1.2 confirming the §86 payload budget) are recorded in the **amendments table at the
+top of `SPECIFICATION.md`**, not here. The archived PDF is **frozen at the pre-1.0 text**: it
+predates all revisions in addition to carrying the defects above.
+
 ## Non-defects (checked and dismissed)
 
 Recorded so they are not "rediscovered" later:

@@ -13,17 +13,22 @@ changes in `CHANGELOG.md`.
 ### Phase 0 — Project Foundation (§103)
 - [ ] Root `package.json` and `pnpm-workspace.yaml`
 - [ ] `tsconfig.base.json` (strict, ESM) and `eslint.config.js`
-- [ ] Task runner choice: Turborepo or Nx (§91 allows either — needs a decision)
-- [ ] `.github/workflows/ci.yml`
+- [ ] Turborepo wiring (decided 2026-07-29 — see MEMORY.md; Nx rejected)
+- [ ] `.github/workflows/ci.yml` — including a docs job running `tools/check-spec.mjs` and a
+      size-limit job gating the §86 payload budget (decided 2026-07-29)
 - [ ] `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
 - [ ] `IMPLEMENTATION_PLAN.md`, `ROADMAP.md`
 - [ ] Per-package `package.json` + build wiring for all 24 `@four/*` packages
 - [ ] Exit criteria: monorepo installs, all packages compile, tests run, docs build,
       example application starts
 
+### Phase 5 (when it starts)
+- [ ] Pin exact `@dimforge/rapier2d`/`@dimforge/rapier3d` versions (strategy decided
+      2026-07-29 — see MEMORY.md)
+
 ### Documentation
-- [ ] Optionally regenerate the specification PDF from the corrected `docs/SPECIFICATION.md`
-      (the archived PDF still carries the old duplicate numbering)
+- [ ] Optionally regenerate the specification PDF from `docs/SPECIFICATION.md` (the archived
+      PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
 
