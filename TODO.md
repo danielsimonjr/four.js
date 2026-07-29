@@ -29,6 +29,9 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-07-29 — Stress-test the implementation plan (5 passes: Haiku dry-run,
+      executability, spec fidelity, Sonnet orchestration, Opus design; ~85 findings) and
+      apply all findings as plan revision 2 + spec revision 1.4 (§98 Application → `four`)
 - [x] 2026-07-29 — Write `docs/plans/IMPLEMENTATION_PLAN.md` (Phase 0 deliverable, §103): subagent-
       driven work packets WP-N.M with [H]/[S] model tiers, mechanical Done-checks,
       Phase 0–2 fully decomposed, Phases 3–10 rolling-wave; §98 directory tree verified

@@ -99,6 +99,26 @@ changes in `CHANGELOG.md`.
   Phases 3–10 are deliberately rolling-wave (decomposed only when their predecessor exits
   green). The §98 directory tree was verified complete — packets fill directories, never
   create packages.
+- **2026-07-29 — Implementation plan stress-tested; revision 2 written.** Five independent
+  passes (Haiku dry-run of WP-0.1 in a worktree — succeeded, logged 5 forced guesses;
+  executability review with empirical probes; spec-fidelity review; Sonnet orchestration
+  red-team; Opus technical-design red-team) produced ~85 findings, all applied in plan
+  revision 2. Standing outcomes: **toolchain pins are exact** (TypeScript 5.9.3 — never
+  7.x; eslint 9.39.5; typescript-eslint 8.65.0; vitest 3.2.7; turbo 2.10.7; full table in
+  plan §3.2, orchestrator-adjusts-only); **frozen dependency matrix** (plan §3.1, 6 waves);
+  build is **`tsc -b`** with `types`-first exports maps and `.js` relative-import suffixes;
+  design decisions **D1–D8** pre-decided (Node = single inheritance extending
+  EventEmitter, no mixins; `typeName`-keyed components; Transform dirty via math
+  change-hooks + `markDirty`; Application composition root in `four` (spec rev 1.4);
+  §39 system registry — nothing edits the scheduler; diagnostics checksum utility with
+  fresh-process golden-hash determinism tests; `out?`-optional allocation policy;
+  depth-range-parameterized projections, shortest-arc slerp). Orchestration now specifies:
+  per-packet orchestrator commits scoped to Files, orchestrator-only installs/lockfile,
+  worktree merge order, retry-with-failure-output then validate-the-Done-check escalation,
+  in-place packet revisions, independent second-agent review for [S] packets,
+  `WP-N.M-fixK` defect convention, orchestrator-owned tracking files, RFC gate for
+  rolling-wave API surfaces. **Spec revision 1.4** (found by this pass): §98 Application
+  composition root moved from `core` to `four`.
 - **2026-07-29 — Spec revision 1.3 (verification pass).** Two independent adversarial
   re-reads of the 1.1 material (time/physics-semantics lens and cross-reference lens)
   surfaced 16 unique findings — 7 confirmed, 9 plausible — all fixed in revision 1.3 (see
