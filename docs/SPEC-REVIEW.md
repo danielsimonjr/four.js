@@ -7,9 +7,10 @@ the problem, and proposes a concrete resolution.
 > **Disposition (2026-07-28, owner-directed):** all 35 items were accepted and applied in
 > specification **revision 1.1** — see the Amendments table at the top of `SPECIFICATION.md`.
 > New material uses lettered sections (6a, 6b, 7a, 7b, 60a) and Appendices A–B so §1–120
-> numbering is unchanged. Two caveats: R-25's payload budget was set provisionally
-> (≤ 150 kB gzip, marked provisional in §86) pending owner confirmation, and R-32's
-> shall/should audit was applied only where revised text was already being touched.
+> numbering is unchanged. R-25's payload budget (≤ 150 kB gzip, §86) was initially set
+> provisionally and **confirmed by the owner 2026-07-29** (revision 1.2). One remaining
+> caveat: R-32's shall/should audit was applied only where revised text was already being
+> touched.
 
 Citation convention: plain "§N" means `SPECIFICATION.md` numbering.
 

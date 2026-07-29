@@ -10,12 +10,13 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.1 — 2026-07-28**
+**Specification revision 1.2 — 2026-07-29**
 
 | Revision | Date | Summary |
 |---|---|---|
 | 1.0 | 2026-07-28 | Corrected rendering of the original PDF (ERRATA E-1/E-2/E-3 resolved, extraction artifacts repaired). |
 | 1.1 | 2026-07-28 | Technical revision applying [SPEC-REVIEW.md](SPEC-REVIEW.md) items R-1–R-35: contradictions resolved; component model, eventing, coordinate/math conventions, and the solver-adapter contract specified; scope of audio/networking settled; Appendices A (defaults) and B (glossary) added. New sections use letter suffixes (6a, 6b, 7a, 7b, 60a) so §1–120 numbering is unchanged. |
+| 1.2 | 2026-07-29 | §86 payload budget (minimal 2D application ≤ 150 kB gzip) confirmed by the owner; provisional marker removed. |
 
 ---
 
@@ -2321,7 +2322,7 @@ Initial engineering targets on suitable modern desktop hardware:
 | GPU particles | 100,000+ |
 | Active rigid bodies | 5,000 simple bodies baseline |
 | Idle scene | Near-zero unnecessary uploads and simulation work |
-| Payload: minimal 2D application (core + math + scene + render-webgl) | 150 kB gzip or less (provisional) |
+| Payload: minimal 2D application (core + math + scene + render-webgl) | 150 kB gzip or less |
 
 Targets are benchmark goals, not universal guarantees.
 ### 87. Spatial Indexing and Culling

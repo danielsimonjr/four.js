@@ -8,6 +8,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-07-29
+
+#### Changed
+- `docs/SPECIFICATION.md` bumped to **revision 1.2**: the §86 payload budget (minimal 2D
+  application ≤ 150 kB gzip) was confirmed by the owner and its provisional marker removed;
+  amendments table updated. `docs/SPEC-REVIEW.md` disposition note updated to match.
+
 ### 2026-07-28
 
 #### Added
