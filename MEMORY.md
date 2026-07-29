@@ -62,8 +62,8 @@ changes in `CHANGELOG.md`.
   authority enum is `TransformAuthority` (§42, now includes `"blended"`; `MotionAuthority`
   no longer exists); force APIs use explicit `…AtPoint` names; `RigidBody`/colliders are
   *components* (§6a); the solver adapter contract (§37) includes destroy/query/drainEvents
-  methods and a defined `PhysicsCapabilities`. §86 payload budget (≤150 kB gzip) is
-  provisional pending owner confirmation. The `dev-workflow` plugin could not load in this
+  methods and a defined `PhysicsCapabilities`. §86 payload budget (≤150 kB gzip) was
+  confirmed by the owner on 2026-07-29 (revision 1.2; no longer provisional). The `dev-workflow` plugin could not load in this
   remote session (private `danielsimonjr/skills` marketplace repo is outside the session's
   GitHub scope), so the revision was done inline.
 
