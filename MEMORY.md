@@ -9,9 +9,11 @@ changes in `CHANGELOG.md`.
 
 - The repository is **scaffold + specification only** — no implementation, no `package.json`,
   no tooling. There are no build/lint/test commands; don't invent any.
-- `docs/SPECIFICATION.md` is the corrected working reference (parts I–XIII, sections 1–120).
-  `docs/archive/four-js-specification.pdf` is the unmodified original and still contains the
-  old duplicate numbering — translate its references via the map in `docs/ERRATA.md`.
+- `docs/SPECIFICATION.md` is the working reference, currently **revision 1.2** (amendments
+  table at its top; § numbering 1–120 frozen, lettered sections for insertions).
+  `docs/archive/four-js-specification.pdf` is the unmodified original, frozen at the pre-1.0
+  text, and still contains the old duplicate numbering — translate its references via the map
+  in `docs/ERRATA.md`. Run `node tools/check-spec.mjs` after any spec edit.
 - Plain "§N" citations mean `SPECIFICATION.md` numbering. Cite the PDF explicitly when meant
   ("PDF §49, second range").
 - All 24 packages under `packages/` are `@four/`-scoped; `four` is the umbrella package.
@@ -67,15 +69,41 @@ changes in `CHANGELOG.md`.
   remote session (private `danielsimonjr/skills` marketplace repo is outside the session's
   GitHub scope), so the revision was done inline.
 
+- **2026-07-29 — Phase 0 toolchain decisions (proposed by Claude at owner direction to
+  "close the open decisions"; each overridable by a superseding entry before Phase 0
+  starts):**
+  - **Task runner: Turborepo** (§91 permitted either). Rationale: simpler config surface for
+    a pnpm workspace with uniform package shapes; no need for Nx's generator/plugin layer.
+    Revisit via RFC (§95) only if remote caching/constraints prove insufficient.
+  - **Browser/Node baseline** (feeds §90 compatibility tables): evergreen last-2 versions of
+    Chrome/Edge/Firefox and Safari ≥ 16.4; **WebGL 2 required** for the MVP (§120); WebGPU
+    is an optional tier. Node ≥ 20 (LTS) for tooling and headless simulation.
+  - **Rapier strategy** (§108): official `@dimforge/rapier2d` + `@dimforge/rapier3d` wasm
+    packages; the wasm loads asynchronously inside `PhysicsSolverAdapter.initialize()` (§37
+    permits a Promise); exact version pinned when Phase 5 starts (tracked in TODO). Solver
+    wasm is **outside** the §86 payload budget, which by its wording covers only
+    core + math + scene + render-webgl.
+  - **Budget enforcement**: a size-limit check in CI is a **Phase 0 deliverable**, gating
+    the §86 payload row from the first compilable package onward.
+  - **API docs: TypeDoc** for generated reference docs (§93). API Extractor deferred;
+    revisit before 1.0 if API-report/compat gating is wanted (§90).
+- **2026-07-29 — Scaffold docs synced to revision 1.2.** CLAUDE.md, AGENTS.md, README.md,
+  ERRATA.md (scope note: amendments live in the spec's table, ERRATA covers only PDF
+  defects), website/README.md, and the core/motion/physics/geometry package READMEs were
+  updated to match the revised spec (transform authority incl. `blended`, seconds, Y-up,
+  components, adapter contract, camera rigs in `@four/motion`, units in `@four/core`,
+  tessellation as a geometry module). `tools/check-spec.mjs` added as the mechanical spec
+  checker (future CI docs job).
+
 ## Open questions
 
-- Turborepo vs. Nx for the monorepo task runner (§91 permits either).
-- Whether/when to regenerate the PDF from the corrected Markdown.
+- Whether/when to regenerate the PDF from the corrected Markdown (it is now formally frozen
+  at the pre-1.0 text — regeneration is optional, not blocking).
 
 ## Gotchas
 
 - The ERRATA "non-defects" list exists so known false alarms aren't rediscovered: §118's
   title starts with a typographic quote (easy to miss in heading scans), and low repeated
   numbers (1., 2., 3., …) in the spec body are lists, not sections.
-- The spec body text is hard-wrapped plain text under Markdown headings; code snippets are
-  not yet fenced.
+- The spec body text is hard-wrapped plain text under Markdown headings; code snippets have
+  been fenced since 2026-07-28.

@@ -15,11 +15,13 @@ MIT — see [LICENSE](LICENSE).
 
 ## Specification
 
-See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) — a **corrected rendering** of the original
-[docs/archive/four-js-specification.pdf](docs/archive/four-js-specification.pdf) and the working reference for
-this repository (parts I–XIII, sections 1–120, no duplicates).
+See [docs/SPECIFICATION.md](docs/SPECIFICATION.md) — the working reference for this
+repository (parts I–XIII, sections 1–120 plus lettered insertions and appendices, no
+duplicates). It began as a **corrected rendering** of the original
+[docs/archive/four-js-specification.pdf](docs/archive/four-js-specification.pdf) and has since been amended;
+the amendments table at the top of the file records each revision (currently 1.2).
 
-The original PDF is preserved unchanged and still contains its known defects (duplicated part
-and section numbering, and a package-list contradiction). [docs/ERRATA.md](docs/ERRATA.md)
-documents those defects, how each was resolved, and the old-to-new numbering map for
-translating PDF references.
+The original PDF is preserved unchanged and **frozen at the pre-1.0 text**: it still contains
+its known defects (duplicated part and section numbering, and a package-list contradiction)
+and predates all revisions. [docs/ERRATA.md](docs/ERRATA.md) documents those defects, how
+each was resolved, and the old-to-new numbering map for translating PDF references.

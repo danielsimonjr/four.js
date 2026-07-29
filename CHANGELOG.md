@@ -10,7 +10,25 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-07-29
 
+#### Added
+- `tools/check-spec.mjs` — mechanical consistency checker for `docs/SPECIFICATION.md`
+  (section sequence with frozen 1–120 numbering, duplicates, fence balance, TOC/body
+  agreement, §-reference validity, banned pre-revision terms). Intended as the docs job of
+  the future Phase 0 CI workflow.
+- Phase 0 toolchain decisions recorded in `MEMORY.md` (proposed at owner direction,
+  overridable): Turborepo; evergreen browsers + Safari ≥ 16.4, WebGL 2 required, Node ≥ 20;
+  Rapier via `@dimforge/rapier2d`/`rapier3d` wasm loaded in `initialize()`, version pinned at
+  Phase 5, excluded from the §86 payload budget; size-limit CI gate as a Phase 0
+  deliverable; TypeDoc for API docs.
+
 #### Changed
+- Scaffold docs synced to specification revision 1.2: `CLAUDE.md`, `AGENTS.md`, `README.md`,
+  `docs/ERRATA.md` (scope note — amendments live in the spec's table; the archived PDF is
+  formally frozen at the pre-1.0 text), `website/README.md`, and the `core`/`motion`/
+  `physics`/`geometry` package READMEs (transform authority incl. `blended`, seconds
+  convention, Y-up in both dimensions, component model, revised adapter contract, camera
+  rigs in `@four/motion`, unit system in `@four/core`, tessellation as a geometry module).
+  Also fixed a pre-existing AGENTS.md error (phase order is Part IX, not VIII).
 - `docs/SPECIFICATION.md` bumped to **revision 1.2**: the §86 payload budget (minimal 2D
   application ≤ 150 kB gzip) was confirmed by the owner and its provisional marker removed;
   amendments table updated. `docs/SPEC-REVIEW.md` disposition note updated to match.
