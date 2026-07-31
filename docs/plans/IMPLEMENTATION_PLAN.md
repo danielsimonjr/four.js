@@ -267,7 +267,10 @@ Done: `pnpm install` exits 0 (orchestrator-run); lockfile present.
 
 **WP-0.2 [H] TypeScript base config** — Depends: WP-0.1. Files: `tsconfig.base.json`.
 Steps: paste §3.3 exactly.
-Done: `npx tsc --showConfig -p tsconfig.base.json | grep -i nodenext` exits 0.
+Done: `node -e "const c=require('./tsconfig.base.json').compilerOptions; process.exit(c.module==='NodeNext'&&c.moduleResolution==='NodeNext'&&c.strict===true&&c.composite===true?0:1)"`
+exits 0. *(Revised 2026-07-31: the original `tsc --showConfig` check hits TS18003 while the
+repo has no `.ts` files — a base config is only ever extended, never compiled directly.
+Found during execution; content requirement unchanged.)*
 
 **WP-0.3 [H] Turborepo pipeline** — Depends: WP-0.1. Files: `turbo.json`.
 Steps: tasks `build` (dependsOn `["^build"]`, outputs `["dist/**"]`), `test` (dependsOn
