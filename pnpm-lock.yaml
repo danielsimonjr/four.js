@@ -45,6 +45,43 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
 
+  packages/assets:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/core: {}
+
+  packages/geometry:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+
+  packages/materials:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+
+  packages/math: {}
+
+  packages/scene:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+
 packages:
 
   '@babel/runtime@7.29.7':
