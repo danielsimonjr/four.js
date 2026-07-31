@@ -17,6 +17,9 @@ importers:
       eslint:
         specifier: 9.39.5
         version: 9.39.5
+      four:
+        specifier: workspace:*
+        version: link:packages/four
       prettier:
         specifier: 3.9.6
         version: 3.9.6

@@ -23,6 +23,7 @@
     "@changesets/cli": "2.31.1",
     "@size-limit/preset-small-lib": "13.0.2",
     "eslint": "9.39.5",
+    "four": "workspace:*",
     "prettier": "3.9.6",
     "size-limit": "13.0.2",
     "turbo": "2.10.7",
