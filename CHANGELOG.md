@@ -10,6 +10,12 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-07-29
 
+#### Changed (spec revision 1.6)
+- npm publish names decided by the owner: umbrella `@danielsimonjr/fourjs`, sub-packages
+  `@danielsimonjr/fourjs-<name>`, published from the personal scope (no org claim or
+  dispute). §98 note updated; workspace names remain `four`/`@four/*`; TODO owner item
+  closed.
+
 #### Added (gap-closure pass)
 - `docs/POSITIONING.md` — outward-facing why-exist case: the integration-is-the-product
   bet, audience order (engineering/digital-twins first), migration story, demo-first

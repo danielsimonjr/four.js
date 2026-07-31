@@ -102,6 +102,13 @@ readable; never delete the pointer itself.
   Phases 3–10 are deliberately rolling-wave (decomposed only when their predecessor exits
   green). The §98 directory tree was verified complete — packets fill directories, never
   create packages.
+- **2026-07-29 — npm publish names decided (owner): `@danielsimonjr/fourjs`.** Spec
+  revision 1.6. Umbrella publishes as `@danielsimonjr/fourjs`, all other packages as
+  `@danielsimonjr/fourjs-<name>`, from the owner's personal npm scope — no org claim or
+  dispute needed (supersedes the `fourjs`/`@fourjs` fallback in the 1.5 note below).
+  Workspace names stay `four`/`@four/*`; the mechanical rename happens in the release
+  workflow at first publish (§94 0.1). Subpath exports (`@danielsimonjr/fourjs/scene`)
+  carry the §91 tree-shaking requirement.
 - **2026-07-29 — Gap-closure pass (spec 1.5, plan 2.1) after the "what else are we
   missing" review.** (1) **Naming:** npm `four` (0.0.1-a, unrelated) and `four-js` are
   occupied; `fourjs`/`@fourjs` were free 2026-07-29 (org pages bot-blocked — claiming needs

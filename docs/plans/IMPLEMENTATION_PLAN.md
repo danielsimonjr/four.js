@@ -148,9 +148,10 @@ worker) adjusts a pin and updates this table with a dated note.
 mode, Vite 8 example build, and size-limit all passed as one workspace. pnpm 10 blocks
 dependency build scripts by default — the root manifest allowlists `esbuild`
 (`"pnpm": { "onlyBuiltDependencies": ["esbuild"] }`).
-**Publish names (spec §98, rev 1.5):** npm `four` and `four-js` are occupied; `fourjs` /
-`@fourjs` were free 2026-07-29. Workspace names stay `four`/`@four/*`; the rename-or-
-dispute decision is owner-owned and due before release 0.1 (tracked in TODO.md).
+**Publish names (spec §98, rev 1.6 — decided):** umbrella `@danielsimonjr/fourjs`,
+sub-packages `@danielsimonjr/fourjs-<name>`, published from the owner's personal npm
+scope. Workspace names stay `four`/`@four/*`; the mechanical publish mapping is part of
+the release-workflow packet at first publish (§94, 0.1).
 
 ### 3.3 `tsconfig.base.json` (WP-0.2 pastes exactly this)
 

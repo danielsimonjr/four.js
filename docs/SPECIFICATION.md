@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.5 — 2026-07-29**
+**Specification revision 1.6 — 2026-07-29**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -20,6 +20,7 @@
 | 1.3 | 2026-07-29 | Verification pass over the 1.1 material: world-matrix resolution per fixed step (§7); pause semantics (§10); replay records dropped time and step counts (§10, §34); §97 field of view in radians; §40 unit options restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); collider density authoritative over material density (§25); checksum order and "existing body" defined (§33); local-plane mapping in 2D worlds (§21); §39 sensor update moved before event dispatch; previous-pose capture defined (§37); marker behavior under replay/restore (§16); reduced motion in §14; cameras/viewports assigned to `@four/scene` (§98); §49–52 group renamed; §6 audio marked plugin-provided. |
 | 1.4 | 2026-07-29 | §98: the §45 Application composition root moved from `core` to the `four` umbrella package — `core` owning the application shell would invert the dependency direction (§45's Application owns scene, renderer, scheduler, input, assets, diagnostics, all of which sit above `core`). Found by the implementation-plan stress test. |
 | 1.5 | 2026-07-29 | Gap-closure pass: Part IX never scheduled the §120 MVP's interaction/content/tooling scope — added §106a (Phase 3a: input, picking, sprites, MVP-tier text) and §113a (Phase 11: assets, serialization, UI, benchmark harness, documentation). §56 gains an MVP text tier (full shaping staged behind a shaping-engine decision). §98 gains a publish-names note (`four` and `four-js` are occupied on npm; `fourjs`/`@fourjs` free as of 2026-07-29). |
+| 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@four/*`. |
 
 ---
 
@@ -2657,12 +2658,14 @@ re-exporting the others through side-effect-free subpath exports (`four/scene`,
 `four/physics`, ...) so tree-shaking works for umbrella users (§91).
 Camera rigs and controls (§12, §44, §47) live in `@four/motion` as kinematic
 controllers, with input bindings supplied through `@four/input`.
-Publish names: the npm package name `four` is occupied by an unrelated package and
-`four-js` is also taken; `fourjs` and the `@fourjs` scope were unclaimed as of
-2026-07-29. In-repo workspace names remain `four`/`@four/*` as specified here. Before
-the first publish (§94, release 0.1) the owner either obtains `four`/`@four` (npm
-name dispute or organization claim) or the packages are mechanically renamed to
-`fourjs`/`@fourjs/*`.
+Publish names (decided by the owner, 2026-07-29): packages publish under the owner's
+personal npm scope — the umbrella is `@danielsimonjr/fourjs`, and the other packages
+follow `@danielsimonjr/fourjs-<name>` (for example `@danielsimonjr/fourjs-core`,
+`@danielsimonjr/fourjs-physics-rapier`). The npm names `four` and `four-js` are
+occupied by unrelated packages and are not pursued. In-repo workspace names remain
+`four`/`@four/*` as specified here; the publish mapping is applied mechanically at
+release time (§94, release 0.1). Subpath exports on the umbrella
+(`@danielsimonjr/fourjs/scene`, ...) preserve the §91 tree-shaking requirement.
 ### 99. Motion Package
 @four/motion responsibilities:
 - clocks;
