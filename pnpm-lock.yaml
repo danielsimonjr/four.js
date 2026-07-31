@@ -151,6 +151,24 @@ importers:
         specifier: workspace:*
         version: link:../scene
 
+  packages/physics-box2d:
+    dependencies:
+      '@four/physics':
+        specifier: workspace:*
+        version: link:../physics
+
+  packages/physics-rapier:
+    dependencies:
+      '@four/physics':
+        specifier: workspace:*
+        version: link:../physics
+
+  packages/physics-soft:
+    dependencies:
+      '@four/physics':
+        specifier: workspace:*
+        version: link:../physics
+
   packages/render:
     dependencies:
       '@four/core':
