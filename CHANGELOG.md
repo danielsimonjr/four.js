@@ -8,6 +8,20 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-07-31
+
+#### Added (Phase 0 — Project Foundation, §103; plan packets WP-0.1…WP-0.15)
+- Working monorepo: root manifests with the pinned §3.2 toolchain, `tsconfig.base.json`,
+  Turborepo pipeline, all 24 `@four/*`/`four` packages scaffolded per the §3.4 template
+  (split dev/build tsconfigs, `tsc -b`, types-first exports; umbrella with per-package
+  subpaths and a 23-package integration test), ESLint/Prettier config (type-checked,
+  determinism bans per §33, named-exports rule), Vite example (`examples/first-2d-scene`),
+  §86 size gate (425 B / 150 kB gzip), TypeDoc (`docs/api`), root vitest suite wiring,
+  GitHub Actions CI, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`.
+- Phase 0 exit verified independently: all gates green twice (cold + warm), zero defects.
+- Plan corrections discovered in execution (dated in place): WP-0.2 Done check, WP-0.4/0.5
+  Files lines, `pnpm run docs` builtin pitfall, `*.tsbuildinfo` gitignore, WP-0.7-fix1.
+
 ### 2026-07-29
 
 #### Changed (spec revision 1.6)

@@ -12,14 +12,12 @@ changes in `CHANGELOG.md`.
 
 ## Backlog
 
-### Phase 0 — Project Foundation (§103) — now tracked as work packets in `docs/plans/IMPLEMENTATION_PLAN.md`
-- [ ] WP-0.1–0.4 — root manifests, `tsconfig.base.json`, ESLint/Prettier, Turborepo
-- [ ] WP-0.5 — per-package `package.json` + build wiring, fan-out ×24
-- [ ] WP-0.6–0.7 — size-limit budget gate (§86) and `.github/workflows/ci.yml`
-      (incl. `tools/check-spec.mjs` docs job)
-- [ ] WP-0.8–0.9 — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`
-- [ ] WP-0.10 — exit verification: monorepo installs, all packages compile, tests run,
-      docs build, example application starts
+### Phase 1 — Math, Scene, and Time (§104) — IN PROGRESS via work packets WP-1.1…WP-1.14
+- [ ] WP-1.1–1.3 — math types (vectors, quaternion, matrices)
+- [ ] WP-1.4–1.6 — core (EventEmitter, component model, FourError/Disposable)
+- [ ] WP-1.7–1.10 — scene (Transform, Node/Group/Scene, world transforms) + scheduler
+- [ ] WP-1.11–1.13 — system registry, Application composition root, checksum utility
+- [ ] WP-1.14 — Phase 1 exit: deterministic headless stepping vs committed golden hash
 
 ### Later milestones (decided 2026-07-29)
 - [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
@@ -38,6 +36,9 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-07-31 — **Phase 0 complete** (§103): all 15 packets landed via Opus workers,
+      independent exit verifier GREEN with zero defects — 24-package monorepo installs,
+      compiles (cold+warm), tests, lints; docs/example/size/CI gates live
 - [x] 2026-07-29 — npm naming decided (owner): publish under `@danielsimonjr/fourjs` /
       `@danielsimonjr/fourjs-<name>` (spec revision 1.6); no org claim or dispute needed
 - [x] 2026-07-29 — Stress-test the implementation plan (5 passes: Haiku dry-run,

@@ -1,7 +1,7 @@
 # four.js Implementation Plan — revision 2.1
 
 Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](../SPECIFICATION.md)
-(revision 1.5). **Revision 2.1 (2026-07-29)** adds the "Phase −1" smoke-test corrections
+(current revision: see the spec's amendments table). **Revision 2.1 (2026-07-29)** adds the "Phase −1" smoke-test corrections
 (split dev/build tsconfigs, pnpm build-script allowance, validated ESLint config, example
 wiring — the full §3.2 pin set was installed and run together successfully), the spec-1.5
 phases 3a and 11, the publish-name caveat, CI supply-chain audit, and the visual-test GPU
@@ -291,7 +291,9 @@ Done (per package, after the wave's orchestrator install):
 `pnpm --filter @four/P run build && pnpm --filter @four/P run test` exits 0.
 
 **WP-0.5 [H] Umbrella package `four`** — Depends: all WP-0.4. Reads: §3.1, §3.4, §98.
-Files: `packages/four/{package.json,tsconfig.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+Files: `packages/four/{package.json,tsconfig.json,tsconfig.build.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+*(Files line corrected 2026-07-31: `tsconfig.build.json` was missing, same omission as
+WP-0.4's; noted by the Phase-0 exit verifier. The landed package is complete.)*
 Steps: §3.4 template, name `four`, deps = all 23; one `src/<p>.ts` re-export module per
 package (`export * from "@four/scene";`) plus matching subpath exports (§3.4); root
 `src/index.ts` uses **namespace re-exports** (`export * as core from "@four/core";`,

@@ -25,6 +25,20 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-07-31 — PHASE 0 CLOSED (exit verifier: GREEN, zero defects).** All 15 packets
+  executed by Opus workers under the plan's protocol; 24/24 packages scaffolded, building
+  (`tsc -b`, cold and warm), testing, linting; docs, example, size gate (425 B / 150 kB),
+  CI workflow, community files, ROADMAP all landed. Per-packet commits `WP-0.*` on the
+  working branch. **Findings folded back into the plan (dated in-place revisions):**
+  WP-0.2's original Done check was vacuous (TS18003 with no .ts files); WP-0.4/0.5 Files
+  lines omitted `tsconfig.build.json`; **`pnpm docs` without `run` is a pnpm builtin
+  no-op** — always `pnpm run docs` (CI updated); `*.tsbuildinfo` needed gitignoring;
+  root-level `.ts` files need `allowDefaultProject: "*.ts"` (WP-0.7-fix1); the umbrella's
+  root barrel uses namespace re-exports to avoid symbol collisions. Dormant-but-harmless:
+  turbo's `lint` task (root eslint is the gate); `test:suites` vacuous until WP-1.14.
+  Phase 1 dispatch begins with WP-1.1 (math vectors) and the batched core trio
+  (WP-1.4/1.5/1.6 — batched because all three edit core's `src/index.ts`).
+
 - **2026-07-28 — Spec corrected in place (owner decision).** E-1/E-2/E-3 from `ERRATA.md`
   resolved directly in `SPECIFICATION.md`: second `Part VII` → `Part VIII` (later parts
   IX–XIII); second §45–67 range renumbered +53 to §98–120; §102 lists only `physics-rapier`
