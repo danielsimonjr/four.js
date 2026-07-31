@@ -294,8 +294,10 @@ Done (per package, after the wave's orchestrator install):
 Files: `packages/four/{package.json,tsconfig.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
 Steps: §3.4 template, name `four`, deps = all 23; one `src/<p>.ts` re-export module per
 package (`export * from "@four/scene";`) plus matching subpath exports (§3.4); root
-`src/index.ts` re-exports all; smoke test imports `PACKAGE_NAME` **from every one of the
-23 packages via `four`'s subpaths** (the Phase-0 cross-package integration check).
+`src/index.ts` uses **namespace re-exports** (`export * as core from "@four/core";`,
+dashes camelCased) — flat `export *` of all packages would collide on shared symbol names
+*(refined 2026-07-31 at dispatch)*; smoke test imports `PACKAGE_NAME` **from every one of
+the 23 packages** (the Phase-0 cross-package integration check).
 Done: `pnpm --filter four run build && pnpm --filter four run test` exits 0.
 
 **WP-0.6 [H] Lockfile refresh (orchestrator)** — Depends: WP-0.5. Files: `pnpm-lock.yaml`.
