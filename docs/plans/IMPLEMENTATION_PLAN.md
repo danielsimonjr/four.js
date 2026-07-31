@@ -538,7 +538,9 @@ Steps: `TransformAuthority` enum (§42 incl. `blended`) + `node.transformAuthori
 live in `@four/scene` (the §42 API is on Node); motion systems check ownership before
 writing and emit the §42 dev warning (once per node per offending system) on conflict.
 Done: build+test green: single-owner writes pass; conflicting writer warns and does not
-write; `blended` reserved (throws `NOT_IMPLEMENTED` until Phase 7).
+write; `blended` reserved (throws `NOT_IMPLEMENTED` until Phase 7 — note: this code is not
+yet in `FourErrorCode`; WP-2.3's Files must include `packages/core/src/errors.ts` to add
+it, flagged by the WP-1.6 worker 2026-07-31).
 
 **WP-2.4 [H] Trajectories** — Depends: Phase 1. Reads: §13, D7, D8.
 Files: `packages/motion/src/trajectories.ts`, `src/index.ts`,
