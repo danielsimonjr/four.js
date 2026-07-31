@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+
+import { PACKAGE_NAME as coreName } from "@four/core";
+import { PACKAGE_NAME as mathName } from "@four/math";
+import { PACKAGE_NAME as sceneName } from "@four/scene";
+import { PACKAGE_NAME as geometryName } from "@four/geometry";
+import { PACKAGE_NAME as materialsName } from "@four/materials";
+import { PACKAGE_NAME as assetsName } from "@four/assets";
+import { PACKAGE_NAME as motionName } from "@four/motion";
+import { PACKAGE_NAME as inputName } from "@four/input";
+import { PACKAGE_NAME as serializationName } from "@four/serialization";
+import { PACKAGE_NAME as diagnosticsName } from "@four/diagnostics";
+import { PACKAGE_NAME as particlesName } from "@four/particles";
+import { PACKAGE_NAME as textName } from "@four/text";
+import { PACKAGE_NAME as renderName } from "@four/render";
+import { PACKAGE_NAME as animationName } from "@four/animation";
+import { PACKAGE_NAME as physicsName } from "@four/physics";
+import { PACKAGE_NAME as renderWebgpuName } from "@four/render-webgpu";
+import { PACKAGE_NAME as renderWebglName } from "@four/render-webgl";
+import { PACKAGE_NAME as renderCanvasName } from "@four/render-canvas";
+import { PACKAGE_NAME as renderSvgName } from "@four/render-svg";
+import { PACKAGE_NAME as uiName } from "@four/ui";
+import { PACKAGE_NAME as physicsRapierName } from "@four/physics-rapier";
+import { PACKAGE_NAME as physicsBox2dName } from "@four/physics-box2d";
+import { PACKAGE_NAME as physicsSoftName } from "@four/physics-soft";
+
+describe("four", () => {
+  it("resolves the package name of every workspace package", () => {
+    expect(coreName).toBe("@four/core");
+    expect(mathName).toBe("@four/math");
+    expect(sceneName).toBe("@four/scene");
+    expect(geometryName).toBe("@four/geometry");
+    expect(materialsName).toBe("@four/materials");
+    expect(assetsName).toBe("@four/assets");
+    expect(motionName).toBe("@four/motion");
+    expect(inputName).toBe("@four/input");
+    expect(serializationName).toBe("@four/serialization");
+    expect(diagnosticsName).toBe("@four/diagnostics");
+    expect(particlesName).toBe("@four/particles");
+    expect(textName).toBe("@four/text");
+    expect(renderName).toBe("@four/render");
+    expect(animationName).toBe("@four/animation");
+    expect(physicsName).toBe("@four/physics");
+    expect(renderWebgpuName).toBe("@four/render-webgpu");
+    expect(renderWebglName).toBe("@four/render-webgl");
+    expect(renderCanvasName).toBe("@four/render-canvas");
+    expect(renderSvgName).toBe("@four/render-svg");
+    expect(uiName).toBe("@four/ui");
+    expect(physicsRapierName).toBe("@four/physics-rapier");
+    expect(physicsBox2dName).toBe("@four/physics-box2d");
+    expect(physicsSoftName).toBe("@four/physics-soft");
+  });
+});

@@ -1,4 +1,4 @@
-# @four/four
+# four
 
 Umbrella package. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
 

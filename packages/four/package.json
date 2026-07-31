@@ -1,0 +1,105 @@
+{
+  "name": "four",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./core": { "types": "./dist/core.d.ts", "import": "./dist/core.js" },
+    "./math": { "types": "./dist/math.d.ts", "import": "./dist/math.js" },
+    "./scene": { "types": "./dist/scene.d.ts", "import": "./dist/scene.js" },
+    "./geometry": {
+      "types": "./dist/geometry.d.ts",
+      "import": "./dist/geometry.js"
+    },
+    "./materials": {
+      "types": "./dist/materials.d.ts",
+      "import": "./dist/materials.js"
+    },
+    "./assets": { "types": "./dist/assets.d.ts", "import": "./dist/assets.js" },
+    "./motion": { "types": "./dist/motion.d.ts", "import": "./dist/motion.js" },
+    "./input": { "types": "./dist/input.d.ts", "import": "./dist/input.js" },
+    "./serialization": {
+      "types": "./dist/serialization.d.ts",
+      "import": "./dist/serialization.js"
+    },
+    "./diagnostics": {
+      "types": "./dist/diagnostics.d.ts",
+      "import": "./dist/diagnostics.js"
+    },
+    "./particles": {
+      "types": "./dist/particles.d.ts",
+      "import": "./dist/particles.js"
+    },
+    "./text": { "types": "./dist/text.d.ts", "import": "./dist/text.js" },
+    "./render": { "types": "./dist/render.d.ts", "import": "./dist/render.js" },
+    "./animation": {
+      "types": "./dist/animation.d.ts",
+      "import": "./dist/animation.js"
+    },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
+    },
+    "./render-webgpu": {
+      "types": "./dist/render-webgpu.d.ts",
+      "import": "./dist/render-webgpu.js"
+    },
+    "./render-webgl": {
+      "types": "./dist/render-webgl.d.ts",
+      "import": "./dist/render-webgl.js"
+    },
+    "./render-canvas": {
+      "types": "./dist/render-canvas.d.ts",
+      "import": "./dist/render-canvas.js"
+    },
+    "./render-svg": {
+      "types": "./dist/render-svg.d.ts",
+      "import": "./dist/render-svg.js"
+    },
+    "./ui": { "types": "./dist/ui.d.ts", "import": "./dist/ui.js" },
+    "./physics-rapier": {
+      "types": "./dist/physics-rapier.d.ts",
+      "import": "./dist/physics-rapier.js"
+    },
+    "./physics-box2d": {
+      "types": "./dist/physics-box2d.d.ts",
+      "import": "./dist/physics-box2d.js"
+    },
+    "./physics-soft": {
+      "types": "./dist/physics-soft.d.ts",
+      "import": "./dist/physics-soft.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@four/core": "workspace:*",
+    "@four/math": "workspace:*",
+    "@four/scene": "workspace:*",
+    "@four/geometry": "workspace:*",
+    "@four/materials": "workspace:*",
+    "@four/assets": "workspace:*",
+    "@four/motion": "workspace:*",
+    "@four/input": "workspace:*",
+    "@four/serialization": "workspace:*",
+    "@four/diagnostics": "workspace:*",
+    "@four/particles": "workspace:*",
+    "@four/text": "workspace:*",
+    "@four/render": "workspace:*",
+    "@four/animation": "workspace:*",
+    "@four/physics": "workspace:*",
+    "@four/render-webgpu": "workspace:*",
+    "@four/render-webgl": "workspace:*",
+    "@four/render-canvas": "workspace:*",
+    "@four/render-svg": "workspace:*",
+    "@four/ui": "workspace:*",
+    "@four/physics-rapier": "workspace:*",
+    "@four/physics-box2d": "workspace:*",
+    "@four/physics-soft": "workspace:*"
+  }
+}

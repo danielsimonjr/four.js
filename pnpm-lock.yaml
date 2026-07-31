@@ -80,6 +80,78 @@ importers:
         specifier: workspace:*
         version: link:../scene
 
+  packages/four:
+    dependencies:
+      '@four/animation':
+        specifier: workspace:*
+        version: link:../animation
+      '@four/assets':
+        specifier: workspace:*
+        version: link:../assets
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
+      '@four/geometry':
+        specifier: workspace:*
+        version: link:../geometry
+      '@four/input':
+        specifier: workspace:*
+        version: link:../input
+      '@four/materials':
+        specifier: workspace:*
+        version: link:../materials
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/motion':
+        specifier: workspace:*
+        version: link:../motion
+      '@four/particles':
+        specifier: workspace:*
+        version: link:../particles
+      '@four/physics':
+        specifier: workspace:*
+        version: link:../physics
+      '@four/physics-box2d':
+        specifier: workspace:*
+        version: link:../physics-box2d
+      '@four/physics-rapier':
+        specifier: workspace:*
+        version: link:../physics-rapier
+      '@four/physics-soft':
+        specifier: workspace:*
+        version: link:../physics-soft
+      '@four/render':
+        specifier: workspace:*
+        version: link:../render
+      '@four/render-canvas':
+        specifier: workspace:*
+        version: link:../render-canvas
+      '@four/render-svg':
+        specifier: workspace:*
+        version: link:../render-svg
+      '@four/render-webgl':
+        specifier: workspace:*
+        version: link:../render-webgl
+      '@four/render-webgpu':
+        specifier: workspace:*
+        version: link:../render-webgpu
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+      '@four/serialization':
+        specifier: workspace:*
+        version: link:../serialization
+      '@four/text':
+        specifier: workspace:*
+        version: link:../text
+      '@four/ui':
+        specifier: workspace:*
+        version: link:../ui
+
   packages/geometry:
     dependencies:
       '@four/core':
