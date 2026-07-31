@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Build, test, and checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm turbo run test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check specification
+        run: pnpm check-spec
+
+      # `pnpm docs` without `run` is a pnpm builtin no-op; the build step above
+      # must precede this because TypeDoc reads the built reference chain.
+      - name: Build API docs
+        run: pnpm run docs
+
+      - name: Build example
+        run: pnpm example:build
+
+      - name: Check bundle size
+        run: pnpm size
+
+      - name: Cross-package test suites
+        run: pnpm test:suites
+
+      # Visibility only: unfixable advisories must not block the pipeline.
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
