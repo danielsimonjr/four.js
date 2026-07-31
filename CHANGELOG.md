@@ -10,6 +10,22 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-07-29
 
+#### Changed (plan revision 2 + spec revision 1.4)
+- `docs/plans/IMPLEMENTATION_PLAN.md` rewritten as **revision 2** after a five-way stress
+  test (Haiku dry-run + executability/spec-fidelity/orchestration/design reviews, ~85
+  findings): exact toolchain pins (TS 5.9.3, not 7.x), frozen 24-package dependency matrix
+  with dispatch waves, `tsc -b` build template with `types`-first exports and `.js` import
+  suffixes, design decisions D1–D8 (Node inheritance, component identity, Transform dirty
+  channel, Application in `four`, §39 system registry, checksum utility, out-policy,
+  projections/slerp), Phase 0 regrown to 15 packets (adds umbrella integration, lockfile
+  refresh, Vite example, TypeDoc, root suite wiring), Phase 1 to 14 (adds system registry,
+  Application, checksum utility), Phase 2 in full packet format with pinned constructors,
+  and a real orchestration protocol (per-packet commits, orchestrator-only installs,
+  retries/escalation, independent [S] review, fix-packet convention, RFC gate).
+- `docs/SPECIFICATION.md` bumped to **revision 1.4**: §98 Application composition root
+  moved from `core` to the `four` umbrella (dependency-direction inversion found by the
+  stress test); AGENTS.md package map updated.
+
 #### Added
 - `docs/plans/IMPLEMENTATION_PLAN.md` — Phase 0 deliverable (§103; created at the root,
   moved to `docs/plans/` the same day by owner direction), written for subagent-driven

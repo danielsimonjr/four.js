@@ -1,51 +1,55 @@
-# four.js Implementation Plan
+# four.js Implementation Plan — revision 2
 
 Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](../SPECIFICATION.md)
-(revision 1.3). This plan is **designed for subagent-driven execution**: an orchestrator
-session dispatches small, self-contained **work packets** to worker agents. Packets marked
-**[H]** are pre-decided and mechanical — a Haiku-class agent can execute them by following
-the steps; packets marked **[S]** need judgment (integration, test design, API surface) and
-should go to a stronger model. Every packet ends with a mechanical check; a packet is done
-only when its check passes.
+(revision 1.4). **Revision 2 (2026-07-29)** applies the findings of a five-way stress test
+(Haiku dry-run of WP-0.1; executability, spec-fidelity, orchestration, and technical-design
+adversarial reviews — ~85 findings): all versions and configs are now pinned, the build
+template is `tsc -b`-correct, the dependency matrix is explicit, Phase 2 is in full packet
+format, and the orchestration protocol covers git, retries, reviews, and governance.
 
-The §98 directory tree already exists and is verified (24 `@four/*` packages with
-`src/`+`tests/`, `examples/` incl. flagship demos, `tests/{integration,visual,determinism}/`,
-`benchmarks/`, `tools/`, `website/`). No packet creates package directories; packets fill
-them.
+**Execution model.** An orchestrator session dispatches small, self-contained **work
+packets** to worker agents. **[H]** packets are fully pre-decided and mechanical — a
+Haiku-class agent executes them by following steps (validated by dry run). **[S]** packets
+need judgment and go to a stronger model. A packet is done only when its `Done` commands
+pass. The §98 directory tree exists and is verified; packets fill directories, never create
+packages.
 
 ---
 
 ## 1. Ground rules (include verbatim in every worker prompt)
 
-Constraints from the specification. Violating any of these fails review, even if tests pass.
+1. **Conventions (§7a):** right-handed, **Y-up in both 2D and 3D** (2D gravity is negative
+   Y). All angles **radians**. All times **seconds** — durations too; nothing takes
+   milliseconds.
+2. **Math (§7b, D7):** math types are mutable; instance methods mutate in place and return
+   `this`. Result-producing methods take `out?`; when `out` is omitted they may allocate
+   (authoring convenience), but engine-internal per-frame code always passes `out`. Only
+   `clone()`/factories/omitted-`out` allocate.
+3. **Components (§6a, D1/D2):** one component per type per node; `RigidBody`, colliders,
+   `MotionComponent` are components (classes, not Node subclasses). Lifecycle
+   `onAttach`/`onDetach`/`dispose`.
+4. **Events (§6b):** `on` returns an unsubscriber; registration-order dispatch; physics
+   events dispatch after the fixed step (§39 step 9), never during it.
+5. **Determinism (§33):** no `Math.random`/`Date.now`/wall clock in simulation code —
+   inject time, use seeded RNG. Iterate collections in insertion order only.
+6. **Authority (§42):** exactly one system writes a node's transform; conflicts warn in dev
+   builds.
+7. **Toolchain (§91, §3.2):** strict TypeScript **5.9.x — never 7.x**, ESM only, named
+   exports only, pnpm workspace, Turborepo, Vitest, Node ≥ 20. Use only the §3.2 pinned
+   versions; never install or upgrade anything yourself.
+8. **Imports:** relative imports inside packages end in **`.js`** (NodeNext resolution),
+   e.g. `import { Vector3 } from "./vector3.js"` — even though the source file is `.ts`.
+   Cross-package imports use the bare package name (`@four/math`), never relative paths.
+9. **Dependency direction:** exactly the §3.1 matrix — never add or reverse an edge.
+10. **Frozen:** never edit `docs/SPECIFICATION.md`; never add packages (§98/E-3); § numbering
+    1–120 is frozen.
+11. **Scope:** touch only the files your packet's `Files` names. Never run `pnpm install`
+    or modify `pnpm-lock.yaml` (the orchestrator owns installs). If the packet seems to
+    require more, **stop and report** — do not improvise.
+12. **Honesty:** report every decision the packet forced you to guess, and every step you
+    could not complete. Do not commit; the orchestrator commits.
 
-1. **Conventions (§7a):** world is right-handed, **Y-up in both 2D and 3D** (2D gravity is
-   negative Y). All angles are **radians**. All times are **seconds** — durations too;
-   nothing takes milliseconds.
-2. **Math (§7b):** math types are mutable. Instance methods mutate in place and return
-   `this`. Only `clone()` and static factories allocate. Hot-path methods take an optional
-   `out` parameter and return it. Never allocate math objects in steady-state per-frame code.
-3. **Components (§6a):** one component per type per node. `RigidBody`, colliders, and
-   `MotionComponent` are components, not Node subclasses. Lifecycle: `onAttach` /
-   `onDetach` / `dispose`.
-4. **Events (§6b):** `on` returns an unsubscribe function. Listeners fire in registration
-   order. Physics events dispatch after the fixed step (§39 step 9), never during it.
-5. **Determinism (§33):** no `Math.random`, `Date.now`, or wall-clock reads in simulation
-   code — inject time, use the seeded RNG. Iterate collections in insertion order only.
-6. **Authority (§42):** exactly one system writes a node's transform; conflicts warn in
-   development builds.
-7. **Toolchain (§91 + MEMORY.md 2026-07-29):** strict TypeScript (no implicit `any`), ESM
-   only, named exports only, pnpm workspace, Turborepo, Vitest, TypeDoc. Node ≥ 20.
-8. **Dependency direction (AGENTS.md §7):** `math`/`core` at the bottom; `scene`, `motion`,
-   `animation` above; `physics` above `physics-*` adapters; `render` above `render-*`
-   backends; the logical scene never imports a concrete backend; `four` aggregates.
-9. **Do not edit `docs/SPECIFICATION.md`** (amendments are owner decisions), do not add
-   packages (§98 is frozen; see ERRATA E-3), do not add dependencies beyond a packet's
-   allowlist. § numbering 1–120 is frozen.
-10. Update nothing outside the files your packet names. If a packet seems to require more,
-    stop and report instead of improvising.
-
-## 2. Work-packet format
+## 2. Packet format and orchestration protocol
 
 ```
 WP-<phase>.<n> [H|S] <title>
@@ -53,270 +57,528 @@ Depends: <packet ids or ->
 Reads:   <files/§ to read first>
 Files:   <exact files to create or edit>
 Steps:   <numbered, imperative>
-Done:    <shell commands that must succeed, and what they must print>
+Done:    <shell commands that must succeed>
 ```
 
-Orchestration protocol:
-- Dispatch one packet per worker agent. Give the worker: §1 ground rules, the packet
-  verbatim, and nothing else to decide.
-- Packets with no dependency edge between them may run in parallel **only if their `Files`
-  sets are disjoint**; otherwise serialize or use worktree isolation.
-- On a failed `Done` check: return the failure output to the same worker, max two retries,
-  then escalate to the orchestrator.
-- After each phase: run the phase's exit packet, commit, push. Never start phase N+1 before
-  phase N's exit packet passes.
+**Dispatch.** One packet per worker: §1 verbatim + the packet verbatim. For **[S]** packets,
+`Reads` MUST include the source files produced by every packet in `Depends` — signatures
+come from real code, never guessed from spec prose.
+
+**Parallelism.** Packets may run concurrently only if (a) no dependency edge connects them,
+(b) their `Files` sets are disjoint, and (c) they sit in the same wave of the §3.1 matrix.
+When parallel workers share a package or directory, use worktrees: one branch per packet,
+merged **serially in Depends order by the orchestrator**; a merge conflict kicks the later
+packet back as a retry.
+
+**Installs and git.** Only the orchestrator runs `pnpm install` (once per wave, before Done
+checks that need it). One commit per packet, by the orchestrator, `git add` restricted to
+the packet's `Files` (plus the lockfile when the orchestrator refreshed it), message
+`WP-<id>: <title>`. Push at least once per phase.
+
+**Retries and escalation.** On a failed Done: reset the packet's `Files` to their
+pre-attempt state, re-dispatch to the same worker **with the failure output appended**; max
+two retries. On escalation the orchestrator first re-validates the Done check itself
+against the `Reads` sources (a wrong check is a plan bug, not a worker bug), then
+reassigns to a stronger model. Any packet the orchestrator revises is **edited in place in
+this file with a dated note before redispatch** — the plan stays the single source of truth.
+
+**Review.** Every **[S]** packet gets an independent second-agent review (diff against
+`Reads` + §1 ground rules) before its Done is accepted. [H] packets are covered by their
+mechanical checks plus phase-exit invariant tests.
+
+**Phase exits.** Exit packets verify and **fix nothing**: they file a defect list naming
+corrective packets `WP-<phase>.<n>-fix<k>`; the orchestrator dispatches fixes, then re-runs
+the exit packet. A phase is closed by: exit green → orchestrator updates
+`MEMORY.md`/`TODO.md`/`CHANGELOG.md` (workers never touch tracking files) and records every
+[S] packet's decided API surface in MEMORY.md → push. Never start phase N+1 before phase N
+closes.
+
+**Governance (rolling wave).** Phases 3–10 packets are written by the orchestrator when
+their predecessor phase closes — but any packet that fixes a **new cross-package API
+surface not already pinned by the spec or §3.5** requires owner sign-off (RFC/ADR per §95
+and AGENTS.md rule 5) before dispatch.
+
+## 3. Pinned technical decisions
+
+### 3.1 Package dependency matrix (frozen; WP-0.4 copies it verbatim)
+
+Direct workspace dependencies only (transitives implied). Wave = parallel dispatch group.
+
+| Wave | Package | Direct deps |
+|---|---|---|
+| 1 | `core` | — |
+| 1 | `math` | — |
+| 2 | `scene` | core, math |
+| 2 | `geometry` | core, math |
+| 2 | `materials` | core, math |
+| 2 | `assets` | core |
+| 3 | `motion` | core, math, scene |
+| 3 | `input` | core, math, scene |
+| 3 | `serialization` | core, math, scene |
+| 3 | `diagnostics` | core, math, scene |
+| 3 | `particles` | core, math, scene |
+| 3 | `text` | core, math, geometry |
+| 3 | `render` | core, math, scene, geometry, materials |
+| 4 | `animation` | core, math, scene, motion |
+| 4 | `physics` | core, math, scene, motion |
+| 4 | `render-webgpu` | core, math, render |
+| 4 | `render-webgl` | core, math, render |
+| 4 | `render-canvas` | core, math, render |
+| 4 | `render-svg` | core, math, render |
+| 4 | `ui` | core, math, scene, input, text |
+| 5 | `physics-rapier` | physics |
+| 5 | `physics-box2d` | physics |
+| 5 | `physics-soft` | physics |
+| 6 | `four` | all 23 above |
+
+### 3.2 Toolchain pins (verified against the registry 2026-07-29)
+
+`typescript@5.9.3` (NOT 7.x — the native rewrite is a different toolchain),
+`typescript-eslint@8.65.0`, `eslint@9.39.5`, `prettier@3.9.6`, `vitest@3.2.7`,
+`turbo@2.10.7`, `@changesets/cli@2.31.1`, `size-limit@13.0.2`,
+`@size-limit/preset-small-lib@13.0.2`, `vite@8.1.5`, `typedoc@0.28.20`, `yaml@2.9.0`.
+Exact pins, no ranges. If an install or peer conflict arises, **the orchestrator** (never a
+worker) adjusts a pin and updates this table with a dated note.
+
+### 3.3 `tsconfig.base.json` (WP-0.2 pastes exactly this)
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "composite": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "useDefineForClassFields": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+(`noUncheckedIndexedAccess` is deliberately off — indexed math hot paths; revisit pre-1.0.)
+
+### 3.4 Per-package template (WP-0.4 copies; only names/deps vary)
+
+`package.json` (name `@four/<P>`; the umbrella is plain `four`):
+
+```json
+{
+  "name": "@four/P",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "scripts": { "build": "tsc -b", "test": "vitest run --passWithNoTests" },
+  "dependencies": { "<each §3.1 dep>": "workspace:*" }
+}
+```
+
+`tsconfig.json`: `{ "extends": "../../tsconfig.base.json", "compilerOptions":
+{ "rootDir": "src", "outDir": "dist" }, "include": ["src"], "references":
+[<one per §3.1 dep, path "../<dep>">] }` — **build is `tsc -b`** (build mode; plain
+`tsc -p` ignores references and fails once real imports exist). Tests are excluded from the
+emitting project; the smoke test imports `../src/index.js` (Vite resolves it to the `.ts`
+source). The `four` package additionally exposes one subpath export per §3.1 package
+(`"./scene": { "types": "./dist/scene.d.ts", "import": "./dist/scene.js" }`, …) per §98/§91.
+
+### 3.5 Design decisions (D1–D8; pre-decided so no packet re-litigates them)
+
+- **D1 Node inheritance:** `abstract class Node extends EventEmitter<NodeEventMap>` —
+  single inheritance, **no TS mixins** (declaration-emit and generic-widening hazards).
+  Components live in an internal `ComponentRegistry` field; Node delegates
+  `addComponent/getComponent/removeComponent`.
+- **D2 Component identity:** components are classes carrying
+  `static readonly typeName: string`; `ComponentType<T> = { readonly typeName: string;
+  new (...args: never[]): T }`; registry keyed by `typeName` (also the §79 serialization
+  name). `MotionComponent` is a class implementing the §11 fields.
+- **D3 Transform dirty channel:** math mutating methods invoke an internal optional
+  `changed` hook; `Transform` installs hooks on its own `position`/`rotation`/`scale`/
+  `pivot` so `version` increments on method-based mutation (§7). Direct field writes
+  (`v.x = 1`) are legal only if followed by `transform.markDirty()`.
+- **D4 Loop ownership:** the `Application` composition root lives in the **`four`** package
+  (§98 rev 1.4; §45). `@four/motion`'s scheduler is an event-free `step(elapsedSeconds)`
+  state machine; Application drives it (rAF or manual stepping for headless) and re-emits
+  `fixedUpdate`/`update`/`render` (§6b/§10).
+- **D5 System ordering:** the §39 `SimulationSystem` priority registry is built in Phase 1
+  (WP-1.11); every later feature **registers a system** — nothing ever edits the scheduler.
+- **D6 Checksum utility:** `@four/diagnostics` provides FNV-1a over quantized floats:
+  `q = Math.round(x * 1e6)` encoded as two uint32 words (high/low of the 53-bit integer),
+  `-0` normalized to `+0`, `NaN` throws. Phase exits compare against **committed golden
+  hashes**, and the second determinism run executes in a **fresh process**.
+- **D7 `out` policy:** as ground rule 2. Methods with multiple outputs (e.g. `decompose`)
+  take required out objects.
+- **D8 Projections & slerp:** `perspective(fovYRadians, aspect, near, far, depthRange)` and
+  `orthographic(left, right, bottom, top, near, far, depthRange)` with
+  `depthRange: "negative-one-to-one" | "zero-to-one"`, default `"negative-one-to-one"`
+  (WebGL 2 MVP; WebGPU passes `"zero-to-one"`). Quaternion `slerp` takes the shortest arc
+  (negate one input when the dot product is negative).
 
 ---
 
-## 3. Phase 0 — Project Foundation (§103)
+## 4. Phase 0 — Project Foundation (§103)
 
-Exit criteria: monorepo installs; all packages compile; tests run; docs build; example
-application starts (a placeholder page is acceptable until Phase 3).
+Exit: monorepo installs; all packages compile; tests run; docs build; example app starts.
 
-**WP-0.1 [H] Root manifests**
-Depends: —
-Reads: §91, §103; MEMORY.md "2026-07-29 toolchain decisions"
-Files: `package.json`, `pnpm-workspace.yaml`, `.gitignore`, `.npmrc`
-Steps: 1. Root `package.json`: `"private": true`, `"type": "module"`,
-`"engines": { "node": ">=20" }`, `packageManager` pinned to current pnpm; scripts
-`build|test|lint|format|check-spec` (check-spec = `node tools/check-spec.mjs`); devDeps:
-`typescript`, `turbo`, `vitest`, `eslint`, `prettier`, `@changesets/cli`, `size-limit`.
-2. `pnpm-workspace.yaml` covering `packages/*`. 3. `.gitignore`: `node_modules`, `dist`,
-`coverage`, `.turbo`. 4. `.npmrc`: `engine-strict=true`.
-Done: `pnpm install` exits 0; `git status` shows a lockfile.
+**WP-0.1 [H] Root manifests** — Depends: —. Reads: §91, §103, §3.2.
+Files: `package.json`, `pnpm-workspace.yaml`, `.gitignore`, `.npmrc`.
+Steps: root `package.json`: `"name": "four.js-monorepo"`, `"private": true`,
+`"version": "0.0.0"`, `"license": "MIT"`, `"type": "module"`,
+`"engines": {"node": ">=20"}`, `"packageManager": "pnpm@10.33.0"`; **exact scripts**:
+`"build": "turbo run build"`, `"test": "turbo run test"`,
+`"test:suites": "vitest run --config vitest.suites.config.ts --passWithNoTests"`,
+`"lint": "eslint ."`, `"format": "prettier --write ."`,
+`"check-spec": "node tools/check-spec.mjs"`, `"docs": "typedoc"`,
+`"example:build": "vite build examples/first-2d-scene"`, `"size": "size-limit"`;
+devDependencies: every §3.2 pin exactly. `pnpm-workspace.yaml`: `packages: ["packages/*"]`.
+`.gitignore`: `node_modules`, `dist`, `coverage`, `.turbo`, `docs/api`,
+`examples/**/dist`, `.claude/worktrees`. `.npmrc`: `engine-strict=true`.
+Done: `pnpm install` exits 0 (orchestrator-run); lockfile present.
 
-**WP-0.2 [H] TypeScript base config**
-Depends: WP-0.1
-Reads: §91
-Files: `tsconfig.base.json`
-Steps: strict, `target`/`module`/`moduleResolution` for modern ESM (`ES2022`,
-`NodeNext`-compatible), `declaration: true`, `composite: true`, `isolatedModules`,
-`noImplicitAny`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`.
-Done: `npx tsc --showConfig -p tsconfig.base.json` exits 0.
+**WP-0.2 [H] TypeScript base config** — Depends: WP-0.1. Files: `tsconfig.base.json`.
+Steps: paste §3.3 exactly.
+Done: `npx tsc --showConfig -p tsconfig.base.json | grep -i nodenext` exits 0.
 
-**WP-0.3 [H] Lint and format config**
-Depends: WP-0.1
-Files: `eslint.config.js`, `.prettierrc.json`, `.prettierignore`
-Steps: flat ESLint config, typescript-eslint recommended-type-checked; forbid default
-exports and `Date.now`/`Math.random` outside `tests/`; Prettier with repo-wide defaults.
-Done: `pnpm lint` exits 0 on the current tree.
+**WP-0.3 [H] Turborepo pipeline** — Depends: WP-0.1. Files: `turbo.json`.
+Steps: tasks `build` (dependsOn `["^build"]`, outputs `["dist/**"]`), `test` (dependsOn
+`["build"]`), `lint` (no deps); local caching only.
+Done: `pnpm turbo run build --dry-run` exits 0 (package count asserted later, WP-0.15).
 
-**WP-0.4 [H] Turborepo pipeline**
-Depends: WP-0.1
-Files: `turbo.json`
-Steps: tasks `build` (dependsOn `^build`, outputs `dist/**`), `test` (dependsOn `build`),
-`lint`; enable local caching only.
-Done: `pnpm turbo run build --dry-run` lists all 24 packages.
-
-**WP-0.5 [H] Per-package scaffolding — fan-out ×24**
-Depends: WP-0.2, WP-0.4. Template packet; run once per package. Parallel-safe (disjoint
-files). Order/batch: `core math` → `scene motion animation physics geometry materials
-render input assets text serialization diagnostics particles` → `physics-rapier
-physics-box2d physics-soft render-webgpu render-webgl render-canvas render-svg ui four`.
-Reads: the package's `README.md`; §98 responsibilities; AGENTS.md dependency direction
+**WP-0.4 [H] Per-package scaffolding — fan-out ×23 (all except `four`)** —
+Depends: WP-0.2, WP-0.3. Reads: §3.1 (this package's row), §3.4, the package `README.md`.
 Files (per package P): `packages/P/package.json`, `packages/P/tsconfig.json`,
-`packages/P/src/index.ts`, `packages/P/tests/smoke.test.ts`
-Steps: 1. `package.json`: name `@four/P` (package `four` is plain `four`), `"type":
-"module"`, `"sideEffects": false`, exports map pointing at `dist/`, workspace deps **only
-downward** per the dependency direction, scripts `build: tsc -p tsconfig.json`,
-`test: vitest run`. 2. `tsconfig.json` extends `../../tsconfig.base.json`, `references` to
-its workspace deps, `outDir: dist`. 3. `src/index.ts`: export a `const PACKAGE_NAME =
-"@four/P"` placeholder (named export). 4. `tests/smoke.test.ts`: import from `../src/index.ts`,
-assert the name.
-Done: `pnpm --filter <name> build && pnpm --filter <name> test` exits 0.
+`packages/P/src/index.ts`, `packages/P/tests/smoke.test.ts`.
+Steps: instantiate §3.4 verbatim with P's name and §3.1 deps/references;
+`src/index.ts`: `export const PACKAGE_NAME = "@four/P";`; smoke test imports
+`../src/index.js` and asserts the name. Dispatch by §3.1 wave (waves 1→5); within a wave,
+parallel.
+Done (per package, after the wave's orchestrator install):
+`pnpm --filter @four/P run build && pnpm --filter @four/P run test` exits 0.
 
-**WP-0.6 [H] Size-limit budget gate**
-Depends: WP-0.5
-Reads: §86 payload row; MEMORY.md (Rapier wasm excluded)
-Files: `.size-limit.json`, root `package.json` (add `size` script)
-Steps: one entry: combined `core + math + scene + render-webgl` dist bundles, limit
-`150 kB` gzip. It passes trivially now; it exists to catch growth from the first real
-commit onward.
-Done: `pnpm size` exits 0.
+**WP-0.5 [H] Umbrella package `four`** — Depends: all WP-0.4. Reads: §3.1, §3.4, §98.
+Files: `packages/four/{package.json,tsconfig.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+Steps: §3.4 template, name `four`, deps = all 23; one `src/<p>.ts` re-export module per
+package (`export * from "@four/scene";`) plus matching subpath exports (§3.4); root
+`src/index.ts` re-exports all; smoke test imports `PACKAGE_NAME` **from every one of the
+23 packages via `four`'s subpaths** (the Phase-0 cross-package integration check).
+Done: `pnpm --filter four run build && pnpm --filter four run test` exits 0.
 
-**WP-0.7 [H] CI workflow**
-Depends: WP-0.5, WP-0.6
-Files: `.github/workflows/ci.yml`
-Steps: on push/PR: checkout, pnpm setup (Node 20), `pnpm install --frozen-lockfile`,
-`pnpm turbo run build test lint`, `node tools/check-spec.mjs`, `pnpm size`.
-Done: `npx yaml-lint .github/workflows/ci.yml` (or a node YAML parse one-liner) exits 0.
+**WP-0.6 [H] Lockfile refresh (orchestrator)** — Depends: WP-0.5. Files: `pnpm-lock.yaml`.
+Steps: `pnpm install`.
+Done: `pnpm install --frozen-lockfile` exits 0.
 
-**WP-0.8 [H] Community files**
-Depends: —
-Reads: §95
-Files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
-Steps: CONTRIBUTING: repo state, pnpm/turbo commands, packet workflow, RFC/ADR rule for
-architectural changes (§95), spec-amendment rule. CODE_OF_CONDUCT: Contributor Covenant 2.1.
-Done: both files exist; `pnpm lint` still exits 0.
+**WP-0.7 [H] Lint and format config** — Depends: WP-0.2, WP-0.6.
+Files: `eslint.config.js`, `.prettierrc.json`, `.prettierignore`.
+Steps: flat config using `typescript-eslint` `recommended-type-checked` with
+`projectService: true` and `allowDefaultProject` for root `*.js`/`*.mjs`/`tools/**`;
+forbid default exports; forbid `Date.now`/`Math.random` outside `tests/**`; ignore
+`dist`, `docs/api`. `.prettierrc.json`: `{}` (defaults).
+Done: `pnpm lint` exits 0.
 
-**WP-0.9 [H] ROADMAP.md**
-Depends: —
-Reads: §94, §120
-Files: `ROADMAP.md`
-Steps: table of releases 0.1–1.0 from §94 with one line each; MVP definition pointer to
-§120; note that dates are set per-release, not up front.
-Done: file exists; every §94 release listed exactly once.
+**WP-0.8 [H] Example placeholder (Vite)** — Depends: WP-0.6. Reads: §103, §93.
+Files: `examples/first-2d-scene/{index.html,main.ts,vite.config.ts}`.
+Steps: `main.ts` imports from `four/scene` and `four/math` subpaths and writes the imported
+`PACKAGE_NAME`s into the DOM; `vite.config.ts` minimal with outDir `dist`.
+Done: `pnpm example:build` exits 0 and emits `examples/first-2d-scene/dist/index.html`.
 
-**WP-0.10 [S] Phase 0 exit verification**
-Depends: all WP-0.*
-Steps: run the full matrix (`pnpm install`, `turbo run build test lint`, `check-spec`,
-`size`); fix nothing yourself — file a defect list per failing packet; update TODO.md
-(move Phase 0 items to Done) and CHANGELOG.md.
-Done: all commands exit 0 twice in a row (cache warm and cold: `turbo run --force`).
+**WP-0.9 [H] Payload budget gate** — Depends: WP-0.8. Reads: §86 payload row.
+Files: `.size-limit.json`.
+Steps: one entry: `{"path": "examples/first-2d-scene/dist/assets/*.js",
+"limit": "150 kB"}` (gzip is size-limit's default measure; the built example is the §86
+"minimal 2D application" proxy — solver wasm stays out per MEMORY 2026-07-29).
+Done: `pnpm build && pnpm example:build && pnpm size` exits 0.
+
+**WP-0.10 [H] TypeDoc** — Depends: WP-0.6. Files: `typedoc.json`.
+Steps: entry-point strategy `packages`, entry points `packages/*`, out `docs/api`.
+Done: `pnpm docs` exits 0 and `docs/api/index.html` exists.
+
+**WP-0.11 [H] Root test-suite wiring** — Depends: WP-0.6.
+Files: `vitest.suites.config.ts`, `package.json` (devDeps add: every `@four/*` as
+`workspace:*` — orchestrator refreshes lockfile after).
+Steps: vitest config with `include: ["tests/**/*.test.ts"]`.
+Done: `pnpm test:suites` exits 0 (passWithNoTests).
+
+**WP-0.12 [H] CI workflow** — Depends: WP-0.7–0.11.
+Files: `.github/workflows/ci.yml`.
+Steps: on push/PR to the default branch: checkout, pnpm/Node 20 setup,
+`pnpm install --frozen-lockfile`, `pnpm build`, `pnpm turbo run test`, `pnpm lint`,
+`pnpm check-spec`, `pnpm docs`, `pnpm example:build`, `pnpm size`, `pnpm test:suites`.
+Done: `node -e "const y=require('yaml'),f=require('fs');y.parse(f.readFileSync('.github/workflows/ci.yml','utf8'))"`
+exits 0.
+
+**WP-0.13 [H] Community files** — Depends: —. Reads: §95.
+Files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`.
+Steps: CONTRIBUTING: repo state, §2 packet workflow, RFC/ADR rule (§95), spec-amendment
+rule; CODE_OF_CONDUCT: Contributor Covenant 2.1.
+Done: `test -s CONTRIBUTING.md -a -s CODE_OF_CONDUCT.md` exits 0.
+
+**WP-0.14 [H] ROADMAP.md** — Depends: —. Reads: §94, §120. Files: `ROADMAP.md`.
+Steps: one line per §94 release 0.1–1.0; MVP pointer to §120; dates set per-release.
+Done: `node -e "const t=require('fs').readFileSync('ROADMAP.md','utf8');['0.1','0.2','0.3','0.4','0.5','0.6','0.7','0.8','0.9','1.0'].forEach(v=>{if(!t.includes(v))process.exit(1)})"`
+exits 0.
+
+**WP-0.15 [S] Phase 0 exit** — Depends: all WP-0.*.
+Steps: run the full matrix (`pnpm install --frozen-lockfile`; `pnpm build` — assert turbo
+reports 24 packages; `turbo run test`; `lint`; `check-spec`; `docs`; `example:build`;
+`size`; `test:suites`), warm and cold (`--force`). **Fix nothing** — file a defect list as
+`WP-0.<n>-fix<k>` packets.
+Done: all commands exit 0 twice; defect list empty.
 
 ---
 
-## 4. Phase 1 — Math, Scene, and Time (§104)
+## 5. Phase 1 — Math, Scene, and Time (§104)
 
-Exit criterion: a scene graph can be deterministically stepped without a renderer.
-All APIs below are already specified — workers implement, not design.
+Exit: a scene graph deterministically steps without a renderer. APIs are pinned by the spec
+and §3.5 — workers implement, not design. Every packet's `Files` includes its package's
+`src/index.ts` (add the new exports; never remove existing ones).
 
-**WP-1.1 [H] Vector2 / Vector3 / Vector4** — Depends: Phase 0. Reads: §7b, §104.
-Files: `packages/math/src/{vector2,vector3,vector4}.ts` + tests.
-Steps: mutable classes; `set/copy/clone/add/sub/scale/dot/lengthSq/length/normalize/lerp`;
-cross on Vector3; every method that produces a vector takes `out?` or mutates `this`
-(follow §7b exactly); no epsilon-free equality (provide `equalsApprox(v, eps)`).
-Done: `pnpm --filter @four/math test` green; no method allocates except `clone` (assert via
-test that reuses one scratch object and checks identity).
+**WP-1.1 [H] Vector2/3/4** — Depends: Phase 0. Reads: §7b, D3, D7.
+Files: `packages/math/src/{vector2,vector3,vector4,alloc-counter}.ts`, `src/index.ts`,
+`packages/math/tests/vectors.test.ts`.
+Steps: mutable classes with plain `x/y/z/w` fields; methods
+`set/copy/clone/add/sub/scale/dot/lengthSq/length/normalize/lerp/equalsApprox(v,eps)`
+(+`cross` on Vector3) per rule 2; each mutator calls the internal `changed` hook (D3);
+`alloc-counter.ts`: dev-mode module counter incremented in every constructor, exported for
+tests.
+Done: `pnpm --filter @four/math run build && pnpm --filter @four/math run test` green,
+including a test asserting **zero constructions** across 1000 chained ops on scratch
+objects (D6-style counter, not identity checks).
 
-**WP-1.2 [H] Quaternion** — Depends: WP-1.1. Files: `packages/math/src/quaternion.ts` + tests.
+**WP-1.2 [H] Quaternion** — Depends: WP-1.1.
+Files: `packages/math/src/quaternion.ts`, `src/index.ts`, `tests/quaternion.test.ts`.
 Steps: identity, `setFromAxisAngle` (radians), `multiply`, `conjugate`, `normalize`,
-`slerp` (§17/§43 requirement), `rotateVector3(v, out?)`.
-Done: package tests green incl. slerp endpoints/midpoint against known values.
+`slerp` (shortest arc per D8), `rotateVector3(v, out)` (`out` required — result is not
+`this`); `changed` hook on mutators.
+Done: package build+test green incl. slerp endpoint/midpoint values and shortest-arc sign
+case.
 
-**WP-1.3 [H] Matrix3 / Matrix4** — Depends: WP-1.1, WP-1.2.
-Files: `packages/math/src/{matrix3,matrix4}.ts` + tests.
-Steps: column-major storage; `identity/copy/clone/multiply/invert/determinant`;
-Matrix4 `compose(position, rotation, scale, pivot)` implementing §7's
-`T · Tp · R · S · Tp⁻¹`, `decompose` (no pivot recovery — document), `perspective` and
-`orthographic` helpers (§47; NDC differences live here per §7a).
-Done: tests green incl. compose/decompose round-trip and compose-vs-manual-multiply.
+**WP-1.3 [H] Matrix3/Matrix4** — Depends: WP-1.1, WP-1.2.
+Files: `packages/math/src/{matrix3,matrix4}.ts`, `src/index.ts`, `tests/matrices.test.ts`.
+Steps: column-major `Float64Array(9|16)` elements; `identity/copy/clone/multiply/invert/
+determinant`; `compose(position, rotation, scale, pivot)` = §7's `T·Tp·R·S·Tp⁻¹`;
+`decompose(outPosition, outRotation, outScale)` (documented: pivot not recovered; positive
+scale assumed); `perspective`/`orthographic` per D8.
+Done: build+test green incl.: compose-vs-**hand-constructed raw-number matrices** (not
+`multiply` chains); round-trip `decompose(compose(p,r,s,pivot=0))` ≡ inputs; both depth
+ranges of each projection helper against known values.
 
 **WP-1.4 [H] EventEmitter** — Depends: Phase 0. Reads: §6b.
-Files: `packages/core/src/events.ts` + tests.
-Steps: typed `EventEmitter<EventMap>` exactly as §6b: `on` returns unsubscriber; `once`;
-`off`; registration-order dispatch; mutations during dispatch take effect next dispatch; no
-re-entrant dispatch of the same event object.
-Done: tests green covering all five §6b rules.
+Files: `packages/core/src/events.ts`, `src/index.ts`, `tests/events.test.ts`.
+Steps: §6b interface plus `emit<K extends keyof EventMap>(type: K, event: EventMap[K]):
+void`.
+Done: build+test green covering the four emitter-local rules: unsubscribe-fn + `once`;
+registration order; add/remove during dispatch deferred to next dispatch; no re-entrant
+dispatch of the same event.
 
-**WP-1.5 [H] Component model** — Depends: Phase 0. Reads: §6a.
-Files: `packages/core/src/component.ts` + tests.
-Steps: `Component` interface (`node`, `onAttach?`, `onDetach?`, `dispose?`),
-`ComponentType<T>`, and a `ComponentHost` mixin implementing
-`addComponent/getComponent/removeComponent` with one-per-type + replace-warns semantics
-(§6a). Scene's Node will extend this in WP-1.8.
-Done: tests green: one-per-type, replacement warning, lifecycle order, detach ≠ dispose.
+**WP-1.5 [H] Component model** — Depends: Phase 0. Reads: §6a, D2.
+Files: `packages/core/src/component.ts`, `src/index.ts`, `tests/component.test.ts`.
+Steps: `Component` interface (`host: ComponentHost | null`, lifecycle per §6a);
+`ComponentType<T>` per D2 (`typeName`-keyed); `ComponentRegistry` class implementing
+add/get/remove with one-per-type + replace-warns (scene's Node delegates to it, D1).
+Done: build+test green: one-per-type, replacement warning, lifecycle order, detach ≠
+dispose.
 
 **WP-1.6 [H] FourError + Disposable** — Depends: Phase 0. Reads: §83, §89.
-Files: `packages/core/src/{errors,disposable}.ts` + tests.
-Steps: `FourError` (`code`, `context?`, `cause?`) and the §89 code list as a string union
-incl. `CONTEXT_LOST`/`DEVICE_LOST`; `Disposable` interface + `disposeAll` helper.
-Done: tests green.
+Files: `packages/core/src/{errors,disposable}.ts`, `src/index.ts`, `tests/errors.test.ts`.
+Steps: `FourError` (`code` from the §89 union incl. `CONTEXT_LOST`/`DEVICE_LOST`,
+`context?`, `cause?`); `Disposable` + `disposeAll`.
+Done: build+test green.
 
-**WP-1.7 [H] Transform** — Depends: WP-1.3. Reads: §7 (all semantics bullets).
-Files: `packages/scene/src/transform.ts` + tests.
-Steps: fields per §7; `version` increments on every local mutation; `matrixAutoUpdate =
-false` → user owns `localMatrix`, no TRS back-derivation; local compose via Matrix4
-`compose`.
-Done: tests green: pivot affects rotation/scale not position; version counting; manual
-matrix mode.
+**WP-1.7 [H] Transform** — Depends: WP-1.3. Reads: §7 (all bullets), D3.
+Files: `packages/scene/src/transform.ts`, `src/index.ts`, `tests/transform.test.ts`.
+Steps: §7 fields; installs D3 hooks on its own math members so `version` increments on
+method-based mutation; `markDirty()`; `matrixAutoUpdate=false` → user owns `localMatrix`,
+no back-derivation.
+Done: build+test green: pivot affects rotation/scale not position; version counts method
+mutations and `markDirty`; manual-matrix mode.
 
-**WP-1.8 [S] Node / Group / Scene** — Depends: WP-1.4, WP-1.5, WP-1.7. Reads: §6, §6a, §46.
-Files: `packages/scene/src/{node,group,scene}.ts` + tests.
-Steps: §6 API; parent/child with cycle prevention (§85 validation: adding an ancestor
-throws `INVALID_SCENE_GRAPH`); Node mixes in EventEmitter + ComponentHost; Scene provides
-`findById/Name/Tag/Component` (selector syntax `scene.query(...)` is **out of scope until
-Phase 7+**; leave unimplemented with a typed TODO).
-Done: tests green: hierarchy insert/remove, cycle prevention, id lookup, component lookup.
+**WP-1.8 [S] Node/Group/Scene** — Depends: WP-1.4, WP-1.5, WP-1.7.
+Reads: §6, §6a, §46, D1, D2 **+ the source files of WP-1.4/1.5/1.7**.
+Files: `packages/scene/src/{node,group,scene}.ts`, `src/index.ts`, `tests/scene.test.ts`.
+Steps: D1 — `abstract class Node extends EventEmitter<NodeEventMap>`, internal
+`ComponentRegistry`; §6 API; cycle prevention throws `INVALID_SCENE_GRAPH`; Scene
+`findById/Name/Tag/Type/Component` (§46; selector syntax deferred to Phase 7+).
+Done: build+test green: hierarchy ops, cycle prevention, all five lookups, component
+lifecycle through Node.
 
-**WP-1.9 [S] Clock, TimeState, fixed-step scheduler** — Depends: WP-1.4.
-Reads: §9, §10 **including the clamp and pause paragraphs**, Appendix A.
-Files: `packages/motion/src/{clock,scheduler}.ts` + tests.
-Steps: `TimeState` with all §9 fields; scheduler implements the §10 algorithm verbatim:
-`timeScale` on accumulation, `maximumSubSteps` clamp (default 5), excess → `droppedTime`,
-`paused` freezes accumulation and zeroes `deltaTime` while `unscaledDeltaTime` continues;
-emits `fixedUpdate`/`update`/`render` in order; time injected, never read from wall clock.
-Done: tests green: substep clamp drops time exactly as §10 code; alpha ∈ [0, 1]; pause vs
-`timeScale = 0` per §10; determinism: two runs with the same injected frame times produce
-identical `TimeState` sequences.
+**WP-1.9 [S] Clock + fixed-step scheduler** — Depends: WP-1.4.
+Reads: §9, §10 (clamp + pause paragraphs), Appendix A, D4 **+ WP-1.4 source**.
+Files: `packages/motion/src/{clock,scheduler}.ts`, `src/index.ts`,
+`tests/scheduler.test.ts`.
+Steps: `TimeState` with all §9 fields; **event-free** `Scheduler.step(elapsedSeconds)`
+implementing §10 verbatim (timeScale on accumulation; `maximumSubSteps` clamp default 5;
+excess → `droppedTime`; paused freezes accumulator, `deltaTime = 0`, `unscaledDeltaTime`
+continues); invokes injected callbacks `onFixedStep/onUpdate/onRender` in order (D4 — the
+Application re-emits these as events later).
+Done: build+test green: clamp drops exactly per §10; alpha ∈ [0,1]; pause ≡ `timeScale=0`
+except timeScale preserved; two runs with identical injected times → identical TimeState
+sequences.
 
-**WP-1.10 [S] Dirty world-transform propagation** — Depends: WP-1.8. Reads: §7 semantics.
-Files: `packages/scene/src/world-transforms.ts` (+ edits to `node.ts`) + tests.
-Steps: lazy resolve; explicit `resolveWorldTransforms(scene)` entry point called per fixed
-step and before render (per §7); on-demand resolve for single-node queries; version-based
-caching.
-Done: tests green: child world matrix updates when ancestor moves; untouched subtrees not
-recomputed (count resolutions); on-demand query correct mid-frame.
+**WP-1.10 [S] World-transform resolution** — Depends: WP-1.8.
+Reads: §7 semantics, WP-1.7/1.8 source.
+Files: `packages/scene/src/world-transforms.ts`, `src/index.ts`,
+`tests/world-transforms.test.ts`.
+Steps: lazy, version-cached `resolveWorldTransforms(scene)` (per fixed step + pre-render
+per §7) and on-demand single-node resolve.
+Done: build+test green: ancestor moves propagate; untouched subtrees not recomputed
+(resolution counter); mid-frame on-demand query correct.
 
-**WP-1.11 [S] Phase 1 exit test** — Depends: all WP-1.*.
-Files: `tests/determinism/phase1-headless-stepping.test.ts`
-Steps: build a 100-node scene with rotating transforms driven from `fixedUpdate`; run 1000
-fixed steps twice with identical injected times; hash all world matrices each step (FNV-1a,
-1e-6 quantization per §33).
-Done: identical hash sequences across runs; test wired into `pnpm test` at the root.
+**WP-1.11 [S] SimulationSystem registry** — Depends: WP-1.9. Reads: §39, D5 + WP-1.9 source.
+Files: `packages/motion/src/systems.ts`, `src/index.ts`, `tests/systems.test.ts`.
+Steps: `SimulationSystem` (§39 interface) + priority-ordered registry executed inside the
+scheduler's fixed step; priorities follow the §39 ordering (documented constants); nothing
+else ever edits the scheduler (D5).
+Done: build+test green: ordering respected, insertion-order stable within equal priority,
+dispose removes.
+
+**WP-1.12 [S] Application composition root** — Depends: WP-1.9, WP-1.10, WP-1.11.
+Reads: §45, §6b, §10, D4 + WP-1.9/1.10/1.11 source.
+Files: `packages/four/src/application.ts`, `src/index.ts`, `tests/application.test.ts`.
+Steps: minimal `Application` (§45 subset): owns a Scene, a Scheduler, the system registry;
+`initialize/start/stop/pause/resume/step/dispose`; emits `fixedUpdate`/`update`/`render`
+(§6b) from scheduler callbacks; manual `step(elapsed)` mode for headless (renderer arrives
+Phase 3).
+Done: build+test green: lifecycle transitions; events fire in §10 order; headless stepping
+drives `resolveWorldTransforms`.
+
+**WP-1.13 [H] Checksum utility** — Depends: Phase 0. Reads: §33, D6.
+Files: `packages/diagnostics/src/checksum.ts`, `src/index.ts`, `tests/checksum.test.ts`.
+Steps: D6 exactly (FNV-1a-32; quantize ×1e6, two-uint32 encoding, −0→+0, NaN throws);
+`hashFloats(iterable)` + incremental hasher.
+Done: build+test green incl. committed known-answer vectors and −0/NaN cases.
+
+**WP-1.14 [S] Phase 1 exit** — Depends: all WP-1.*.
+Files: `tests/determinism/phase1-headless-stepping.test.ts`,
+`tests/determinism/golden/phase1.json`.
+Steps: 100-node scene, transforms mutated from registered fixed-step systems, 1000 steps;
+hash all world matrices per step with `@four/diagnostics` (D6); run once in-process, once
+in a **fresh child process**; compare both against the committed golden hash. Fix nothing;
+defect list as `WP-1.<n>-fix<k>`.
+Done: `pnpm test:suites` green twice (warm/cold); golden file committed.
 
 ---
 
-## 5. Phase 2 — Motion Foundation (§105)
+## 6. Phase 2 — Motion Foundation (§105)
 
-Exit criterion: motion is deterministic, renderer-independent, unit tested.
-Same packet style; the orchestrator issues these when Phase 1's exit packet is green.
+Exit: motion is deterministic, renderer-independent, unit tested.
 
-- **WP-2.1 [H]** `MotionComponent` (§11) as a §6a component; fields only + integration in
-  the scheduler's fixed step using semi-implicit Euler (§38 default).
-- **WP-2.2 [H]** Integrator selection (§38): `explicit-euler`, `semi-implicit-euler`,
-  `velocity-verlet`, `rk2`, `rk4` as pure functions over (state, dt).
-- **WP-2.3 [S]** Transform authority (§42): the enum incl. `blended`, per-node owner,
-  dev-mode conflict warnings; wire `MotionComponent` writes through it.
-- **WP-2.4 [H]** Trajectories (§13): linear, circular, elliptical, parabolic, Bézier,
-  Catmull-Rom, ballistic, damped spring; `sample*` with `out?`; times in seconds.
-- **WP-2.5 [S]** Kinematic controller (§12): `moveTo/rotateTo/followPath` over trajectories;
-  authority = `kinematic`.
-- **WP-2.6 [H]** Spring motion (§13/§105): damped-spring utility used by trajectories and
-  controllers.
-- **WP-2.7 [S]** Interpolation buffers (§43): previous/current transform snapshots per node
-  keyed off the scheduler; `interpolate(alpha)` producing render poses that are never
-  written back (§37/§43).
-- **WP-2.8 [S]** Phase 2 exit test: the §105 demonstration set (constant velocity/
-  acceleration, circular, spline, damped spring) asserted against closed-form positions at
-  t = 1 s, plus a determinism double-run.
+**WP-2.1 [H] Integrator functions** — Depends: Phase 1. Reads: §38.
+Files: `packages/motion/src/integrators.ts`, `src/index.ts`, `tests/integrators.test.ts`.
+Steps: `type IntegratorState = { position: Vector3; velocity: Vector3 }`;
+`type IntegratorFn = (state: IntegratorState, acceleration: (s: IntegratorState,
+t: number, out: Vector3) => Vector3, t: number, dt: number) => void` (mutates state
+in place); implement the five §38 integrators under those exact names.
+Done: build+test green: constant-acceleration analytic check per integrator; energy drift
+ordering (explicit-euler > semi-implicit) on a spring.
+
+**WP-2.2 [H] MotionComponent** — Depends: WP-2.1. Reads: §11, D2, D5.
+Files: `packages/motion/src/motion-component.ts`, `src/index.ts`,
+`tests/motion-component.test.ts`.
+Steps: class per D2 with §11 fields; a `MotionSystem` (registered per D5, §39 kinematic
+slot) advances each component per fixed step with semi-implicit Euler (§38 default):
+`v += a·dt; v *= 1/(1 + damping·dt); clamp to maxSpeed; x += v·dt` (same shape for
+angular).
+Done: build+test green: analytic constant-velocity/acceleration positions at t = 1 s;
+damping halts drift; component add/remove via Node.
+
+**WP-2.3 [S] Transform authority** — Depends: WP-2.2.
+Reads: §42, §19, D1 + WP-1.8/2.2 source.
+Files: `packages/scene/src/authority.ts`, `packages/scene/src/index.ts`,
+`packages/motion/src/motion-component.ts` (enforcement), `tests/authority.test.ts`.
+Steps: `TransformAuthority` enum (§42 incl. `blended`) + `node.transformAuthority` field
+live in `@four/scene` (the §42 API is on Node); motion systems check ownership before
+writing and emit the §42 dev warning (once per node per offending system) on conflict.
+Done: build+test green: single-owner writes pass; conflicting writer warns and does not
+write; `blended` reserved (throws `NOT_IMPLEMENTED` until Phase 7).
+
+**WP-2.4 [H] Trajectories** — Depends: Phase 1. Reads: §13, D7, D8.
+Files: `packages/motion/src/trajectories.ts`, `src/index.ts`,
+`tests/trajectories.test.ts`.
+Steps: `Trajectory` interface per §13 (`out?` per D7). Pinned constructors —
+`LinearTrajectory({from, to, duration})`;
+`CircularTrajectory({center, radius, angularVelocity, phase = 0})` (XY plane, Y-up);
+`EllipticalTrajectory({center, radiusX, radiusY, angularVelocity, phase = 0})`;
+`ParabolicTrajectory({from, initialVelocity, acceleration})` (ballistic = alias with
+gravity default `(0,-9.81,0)`);
+`CubicBezierTrajectory({p0, p1, p2, p3, duration})`;
+`CatmullRomTrajectory({points, duration, alpha = 0.5})` (centripetal);
+`DampedSpringTrajectory({from, to, frequencyHz, dampingRatio})` (spring math lives here);
+`ParametricTrajectory({position: (t, out) => Vector3, duration})` (§13 "custom
+parametric"). Velocity/acceleration analytic where closed-form, else central difference
+(h = 1e-4 s, documented).
+Done: build+test green: each built-in checked at t = 0, t = duration/2 analytically;
+sampling allocates nothing when `out` passed (counter).
+
+**WP-2.5 [S] Kinematic controller** — Depends: WP-2.3, WP-2.4.
+Reads: §12 + WP-2.3/2.4 source.
+Files: `packages/motion/src/kinematic-controller.ts`, `src/index.ts`,
+`tests/kinematic.test.ts`.
+Steps: component (D2) with `moveTo/rotateTo/followPath` over trajectories; registers a
+system (D5); writes under `kinematic` authority.
+Done: build+test green: `moveTo` arrives within tolerance at duration; `followPath` tracks
+a circular trajectory; authority respected.
+
+**WP-2.6 [S] Interpolation buffers** — Depends: WP-2.2. Reads: §43, §37 (previous-pose
+sentence), D4 + WP-1.10/2.2 source.
+Files: `packages/scene/src/interpolation.ts`, `src/index.ts`,
+`tests/interpolation.test.ts`.
+Steps: the **single** previous/current pose store, scene-side (§37: one owner — physics
+will write into this same store in Phase 5); captured per fixed step post-systems;
+`computeRenderPose(node, alpha, out)` — positions lerp, **rotations slerp** (§43); render
+poses are presentation-only, never written back.
+Done: build+test green: alpha 0/0.5/1 poses correct; slerp used (non-linear midpoint
+rotation asserted); scene transforms untouched by interpolation.
+
+**WP-2.7 [S] Phase 2 exit** — Depends: all WP-2.*.
+Files: `tests/determinism/phase2-motion.test.ts`, `tests/determinism/golden/phase2.json`.
+Steps: the §105 demonstration set (constant velocity, constant acceleration, circular,
+spline, damped spring) asserted against closed-form positions at t = 1 s (constructors are
+pinned in WP-2.4, so values are derivable); fresh-process determinism double run vs
+committed golden hash. Fix nothing; `WP-2.<n>-fix<k>` defect list.
+Done: `pnpm test:suites` green twice; golden committed.
 
 ---
 
-## 6. Phases 3–10 — rolling-wave planning
+## 7. Phases 3–10 — rolling-wave planning
 
-Later phases depend on interfaces that Phases 0–2 will pin down. **Do not decompose them
-now.** When a phase's predecessor exit packet is green, the orchestrator writes that
-phase's packets using the same format, sized so each is one file-cluster with a mechanical
-check. Scope, spec anchors, and exit criteria are fixed already:
+Decomposed by the orchestrator only when the predecessor phase closes, in this packet
+format, under the §2 governance rule (owner RFC for new unpinned cross-package API
+surfaces). Scope and anchors are fixed; exits are spec-quoted except where noted.
 
-| Phase | Scope (spec) | Exit criterion | Likely packet seams |
+| Phase | Scope (spec) | Exit criterion | Notes / likely seams |
 |---|---|---|---|
-| 3 | Renderer interface, WebGL 2 backend, cameras, viewports (§61–62, §47–48, §106) | Moving 2D/3D primitives render smoothly under fixed-step simulation | interface / context+loss handling / camera projections / render list / buffers / interpolation-aware draw |
-| 4 | Tween, easing, Timeline, clips/tracks, bindings (§15–17, §107) | Any numeric/vector/quaternion/color/transform property animatable | easing table / tween core / timeline+markers (§16 semantics) / clip tracks / binding resolution |
-| 5 | Physics API + Rapier adapter (§20–32, §37, §108) | Mixed 2D/3D demo: gravity, collisions, impulses, sensors via common API | descriptors / world+body+collider API / adapter contract (§37 incl. drainEvents) / rapier2d + rapier3d wiring / event normalization / sync + interpolation capture |
-| 6 | Joints (§28, §109) | Constraints stable under real-time loads | per-joint-type packets / motors+limits / break thresholds |
-| 7 | Physics-animation blending (§19, §42, §110) | Animated↔kinematic↔physical without discontinuities | blended authority / pose pipeline / ragdoll transition |
-| 8 | Advanced motion (§111) | PID utility + steering demos | steering / IK / PID |
-| 9 | Particles CPU+GPU (§36, §112) | 100k particles interactive | emitter model / CPU sim / GPU compute path |
-| 10 | Replay, snapshots, diagnostics (§33–34, §113) | Capture → replay → frame-step a physics defect | snapshot API / replay format (§34 list) / checksums (§33 definition) / overlays |
-
-Standing rule for phases 5+: the §34/§33 formats (replay fields, checksum definition) are
-normative — packets cite them rather than inventing formats.
+| 3 | Renderer interface, WebGL 2 backend, cameras, viewports (§61–62, §47–48, §106) | Moving 2D/3D primitives render smoothly despite fixed-step simulation | interface / context-loss (§61) / projections (D8) / render list / buffers / interpolation-aware draw; camera+viewport types live in `@four/scene` (§98 rev 1.3); **revisit the size gate** — real example replaces placeholder |
+| 4 | Tween, easing, Timeline, clips/tracks, bindings (§15–17, §107) | Any numeric/vector/quaternion/color/transform property animatable | easing table / tween core / timeline+markers (§16 semantics incl. replay/restore) / tracks / binding resolution |
+| 5 | Physics API + Rapier adapter (§20–32, §37, §108) | Mixed 2D/3D demo: gravity, collisions, impulses, sensors via common API | descriptors / world API / §37 contract incl. `drainEvents` + capabilities / rapier2d+3d wasm (pins per MEMORY) / event normalization / sync into the WP-2.6 pose store; §33 checksum reuses WP-1.13 |
+| 6 | Joints (§28, §109) | Constraints remain stable under expected real-time loads | per-joint packets / motors+limits / break thresholds |
+| 7 | Physics-animation blending (§19, §42, §110) | Animated↔kinematic↔physical control without abrupt discontinuities | `blended` authority (unlocks WP-2.3's reserved value) / pose pipeline / ragdoll |
+| 8 | Advanced motion (§111) | **Plan-defined, owner to confirm** (§111 sets none): PID utility + steering demos pass analytic tests | steering / IK / PID |
+| 9 | Particles CPU+GPU (§36, §112) | ≥100k simple particles simulated and rendered at interactive rates on suitable hardware | emitter model / CPU sim / GPU compute path |
+| 10 | Replay, snapshots, diagnostics (§33–34, §113) | A physics defect can be captured, replayed, inspected frame by frame | snapshot API / §34 replay format (incl. step counts + dropped time) / §33 checksums via WP-1.13 / overlays |
 
 ---
 
-## 7. Verification stack (what "Done" means mechanically)
+## 8. Verification stack
 
 | Level | Command | Gate |
 |---|---|---|
-| Types | `pnpm turbo run build` | every packet |
-| Unit | `pnpm turbo run test` (Vitest) | every packet |
+| Types + emit | `pnpm build` (`tsc -b` via turbo) | every packet |
+| Unit | `pnpm turbo run test` | every packet |
+| Root suites | `pnpm test:suites` | phase exits |
 | Lint | `pnpm lint` | every packet |
-| Spec integrity | `node tools/check-spec.mjs` | any packet touching docs |
-| Payload | `pnpm size` (§86: ≤ 150 kB gzip, core+math+scene+render-webgl) | CI, from Phase 0 on |
-| Determinism | `tests/determinism/` double-run hash equality | phase exits from 1 on |
+| Spec integrity | `pnpm check-spec` | any docs-touching packet |
+| Docs | `pnpm docs` | Phase 0 on (CI) |
+| Example | `pnpm example:build` | Phase 0 on (CI) |
+| Payload (§86) | `pnpm size` — built example ≤ 150 kB gzip | Phase 0 on (CI) |
+| Determinism | fresh-process double run vs committed golden hash (D6) | phase exits from 1 on |
+| Independent review | second agent, diff vs Reads + §1 | every [S] packet |
 
-Escalation: a worker that cannot make its `Done` command pass within two retries reports
-the failing output and stops. The orchestrator either revises the packet or reassigns it
-to a stronger model. Workers never widen their own scope.
+Workers never widen scope, never install, never commit. When in doubt: stop and report.

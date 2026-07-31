@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.3 — 2026-07-29**
+**Specification revision 1.4 — 2026-07-29**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -18,6 +18,7 @@
 | 1.1 | 2026-07-28 | Technical revision applying [SPEC-REVIEW.md](SPEC-REVIEW.md) items R-1–R-35: contradictions resolved; component model, eventing, coordinate/math conventions, and the solver-adapter contract specified; scope of audio/networking settled; Appendices A (defaults) and B (glossary) added. New sections use letter suffixes (6a, 6b, 7a, 7b, 60a) so §1–120 numbering is unchanged. |
 | 1.2 | 2026-07-29 | §86 payload budget (minimal 2D application ≤ 150 kB gzip) confirmed by the owner; provisional marker removed. |
 | 1.3 | 2026-07-29 | Verification pass over the 1.1 material: world-matrix resolution per fixed step (§7); pause semantics (§10); replay records dropped time and step counts (§10, §34); §97 field of view in radians; §40 unit options restricted to display/authoring conversion; `ForceField.sample` gains `out` (§27); collider density authoritative over material density (§25); checksum order and "existing body" defined (§33); local-plane mapping in 2D worlds (§21); §39 sensor update moved before event dispatch; previous-pose capture defined (§37); marker behavior under replay/restore (§16); reduced motion in §14; cameras/viewports assigned to `@four/scene` (§98); §49–52 group renamed; §6 audio marked plugin-provided. |
+| 1.4 | 2026-07-29 | §98: the §45 Application composition root moved from `core` to the `four` umbrella package — `core` owning the application shell would invert the dependency direction (§45's Application owns scene, renderer, scheduler, input, assets, diagnostics, all of which sit above `core`). Found by the implementation-plan stress test. |
 
 ---
 
@@ -2629,8 +2630,8 @@ four.js/
 ```
 
 Responsibilities of the packages not detailed in §99-102:
-- `core`: application shell, eventing (§6b), component model (§6a), unit system
-(§40), plugin host (§81), error model (§89);
+- `core`: eventing (§6b), component model (§6a), unit system (§40), plugin host
+(§81), error model (§89), lifecycle primitives;
 - `math`: vectors, matrices, quaternions, curves, math conventions (§7b);
 - `scene`: nodes, transforms, cameras (§47), viewports (§48), layers, queries, space
 modes, serialization hooks;
@@ -2646,9 +2647,9 @@ implementations of the §61 interface;
 - `particles`: emitters, CPU and GPU simulation (§36, §112);
 - `serialization`: scene format and migration (§79-80);
 - `diagnostics`: statistics, overlays, validation (§84-85);
-- `four`: umbrella package re-exporting the others through side-effect-free subpath
-exports (`four/scene`, `four/physics`, ...) so tree-shaking works for umbrella users
-(§91).
+- `four`: umbrella package hosting the §45 `Application` composition root and
+re-exporting the others through side-effect-free subpath exports (`four/scene`,
+`four/physics`, ...) so tree-shaking works for umbrella users (§91).
 Camera rigs and controls (§12, §44, §47) live in `@four/motion` as kinematic
 controllers, with input bindings supplied through `@four/input`.
 ### 99. Motion Package

@@ -411,7 +411,7 @@ All packages are `@four/`-scoped. The scaffold matches §98 (Proposed Monorepo) 
 | `ui` | Retained-mode UI controls, layout, accessibility mirror |
 | `serialization` | `.four.json` / `.four` formats, migration |
 | `diagnostics` | Stats, debug overlays, validation warnings |
-| `four` | Umbrella package (the `import * as Four from "four"` surface) |
+| `four` | Umbrella package (the `import * as Four from "four"` surface); hosts the §45 `Application` composition root (rev 1.4) |
 
 Dependency direction to preserve: `math`/`core` at the bottom; `scene`, `motion`, `animation`
 above them; `physics` defines the API that `physics-*` adapters implement; `render` defines
