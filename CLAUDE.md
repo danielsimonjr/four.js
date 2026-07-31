@@ -26,7 +26,8 @@ and add substantive changes to `CHANGELOG.md`.
 
 ## The Specification
 
-- `docs/SPECIFICATION.md` is the **working reference**, currently **revision 1.2** (see the
+- `docs/SPECIFICATION.md` is the **working reference** — the current revision is whatever
+  tops the amendments table in the file itself; do not trust hardcoded numbers elsewhere (see the
   amendments table at its top): parts I–XIII, sections 1–120, no duplicate numbering.
   Revision 1.1 applied all 35 items from `docs/SPEC-REVIEW.md`; new material lives in
   lettered sections (**6a** Component Model, **6b** Eventing, **7a** Coordinate/Unit

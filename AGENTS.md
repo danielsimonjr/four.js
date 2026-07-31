@@ -29,7 +29,7 @@ License: MIT (`LICENSE`).
 
 | File | Role |
 |---|---|
-| `docs/SPECIFICATION.md` | **The working reference, currently revision 1.2** (amendments table at the top). Parts I–XIII, sections 1–120 plus lettered insertions (6a, 6b, 7a, 7b, 60a) and Appendices A–B; no duplicates. § numbering 1–120 is frozen — new sections use letter suffixes. |
+| `docs/SPECIFICATION.md` | **The working reference** — current revision is whatever tops the amendments table in the file (hardcoded revision numbers elsewhere go stale). Parts I–XIII, sections 1–120 plus lettered insertions (6a, 6b, 7a, 7b, 60a, 106a, 113a) and Appendices A–B; no duplicates. § numbering 1–120 is frozen — new sections use letter suffixes. |
 | `docs/SPEC-REVIEW.md` | Technical review R-1…R-35 that drove revision 1.1; header records the disposition (all applied). |
 | `docs/POSITIONING.md` | Outward-facing why-exist case, audience order, migration story, demo-first principle, stated risks. |
 | `docs/plans/IMPLEMENTATION_PLAN.md` | Work-packet plan (subagent-driven; stress-tested). |
@@ -70,8 +70,10 @@ translate PDF references through the ERRATA map instead.
 **Revisions beyond the PDF:** the specification was amended after the corrected rendering —
 revision 1.1 (2026-07-28) applied all 35 items of `docs/SPEC-REVIEW.md` (new sections 6a
 Component Model, 6b Eventing, 7a Coordinate/Unit Conventions, 7b Math Conventions, 60a Color
-Management; Appendices A Normative Defaults and B Glossary), and revision 1.2 (2026-07-29)
-confirmed the §86 payload budget. The archived PDF is **frozen at the pre-1.0 text** and
+Management; Appendices A Normative Defaults and B Glossary), followed by revisions 1.2–1.6
+(2026-07-29): payload budget confirmed, verification-pass fixes, Application root moved to
+`four`, MVP phases §106a/§113a added, publish names decided
+(`@danielsimonjr/fourjs`). The archived PDF is **frozen at the pre-1.0 text** and
 predates all of this. Amendments are recorded in the spec's own amendments table; ERRATA.md
 covers only the PDF's extraction defects. Run `node tools/check-spec.mjs` after any spec
 edit.
@@ -428,7 +430,7 @@ concrete backend; `four` aggregates everything.
 1. **Don't fabricate tooling.** There is no build/lint/test today. If asked to "run the
    tests", explain the repo state instead of inventing commands.
 2. **`SPECIFICATION.md` is the working reference; the PDF is the unmodified original.** The
-   Markdown was corrected and then revised by owner decision (currently revision 1.2) —
+   Markdown was corrected and then revised by owner decision (see the amendments table) —
    don't edit the PDF, and don't reintroduce its dual numbering. Substantive spec changes
    need an owner decision, recorded in the spec's **amendments table**; § numbering 1–120 is
    frozen (new sections use letter suffixes). `docs/ERRATA.md` covers only PDF extraction
