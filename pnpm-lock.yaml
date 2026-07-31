@@ -45,6 +45,21 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
 
+  packages/animation:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/motion':
+        specifier: workspace:*
+        version: link:../motion
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
   packages/assets:
     dependencies:
       '@four/core':
@@ -121,6 +136,21 @@ importers:
         specifier: workspace:*
         version: link:../scene
 
+  packages/physics:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/motion':
+        specifier: workspace:*
+        version: link:../motion
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
   packages/render:
     dependencies:
       '@four/core':
@@ -138,6 +168,54 @@ importers:
       '@four/scene':
         specifier: workspace:*
         version: link:../scene
+
+  packages/render-canvas:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/render':
+        specifier: workspace:*
+        version: link:../render
+
+  packages/render-svg:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/render':
+        specifier: workspace:*
+        version: link:../render
+
+  packages/render-webgl:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/render':
+        specifier: workspace:*
+        version: link:../render
+
+  packages/render-webgpu:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/render':
+        specifier: workspace:*
+        version: link:../render
 
   packages/scene:
     dependencies:
@@ -171,6 +249,24 @@ importers:
       '@four/math':
         specifier: workspace:*
         version: link:../math
+
+  packages/ui:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/input':
+        specifier: workspace:*
+        version: link:../input
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+      '@four/text':
+        specifier: workspace:*
+        version: link:../text
 
 packages:
 
