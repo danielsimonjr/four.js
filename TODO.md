@@ -6,7 +6,9 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Decide when to start Phase 0 (§103, Project Foundation) — see backlog below.
+- [ ] **Owner:** merge the open PR for `claude/specification-improvements-iug6pi` (spec
+      1.0→1.5, plan 2.1, doc sync, tooling) — Phase 0 starts from `main` after merge.
+- [ ] Decide when to start Phase 0 (§103, Project Foundation) — plan is dispatch-ready.
 
 ## Backlog
 
@@ -19,6 +21,13 @@ changes in `CHANGELOG.md`.
 - [ ] WP-0.10 — exit verification: monorepo installs, all packages compile, tests run,
       docs build, example application starts
 
+### Later milestones (decided 2026-07-29)
+- [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
+      `docs/POSITIONING.md`)
+- [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
+- [ ] First publish (§94 0.1): Changesets release workflow + apply the
+      `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
+
 ### Phase 5 (when it starts)
 - [ ] Pin exact `@dimforge/rapier2d`/`@dimforge/rapier3d` versions (strategy decided
       2026-07-29 — see MEMORY.md)
@@ -29,6 +38,8 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-07-29 — npm naming decided (owner): publish under `@danielsimonjr/fourjs` /
+      `@danielsimonjr/fourjs-<name>` (spec revision 1.6); no org claim or dispute needed
 - [x] 2026-07-29 — Stress-test the implementation plan (5 passes: Haiku dry-run,
       executability, spec fidelity, Sonnet orchestration, Opus design; ~85 findings) and
       apply all findings as plan revision 2 + spec revision 1.4 (§98 Application → `four`)

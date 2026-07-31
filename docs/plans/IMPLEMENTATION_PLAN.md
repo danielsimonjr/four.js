@@ -1,7 +1,11 @@
-# four.js Implementation Plan — revision 2
+# four.js Implementation Plan — revision 2.1
 
 Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](../SPECIFICATION.md)
-(revision 1.4). **Revision 2 (2026-07-29)** applies the findings of a five-way stress test
+(revision 1.5). **Revision 2.1 (2026-07-29)** adds the "Phase −1" smoke-test corrections
+(split dev/build tsconfigs, pnpm build-script allowance, validated ESLint config, example
+wiring — the full §3.2 pin set was installed and run together successfully), the spec-1.5
+phases 3a and 11, the publish-name caveat, CI supply-chain audit, and the visual-test GPU
+strategy. **Revision 2 (2026-07-29)** applied the findings of a five-way stress test
 (Haiku dry-run of WP-0.1; executability, spec-fidelity, orchestration, and technical-design
 adversarial reviews — ~85 findings): all versions and configs are now pinned, the build
 template is `tsc -b`-correct, the dependency matrix is explicit, Phase 2 is in full packet
@@ -139,6 +143,15 @@ Direct workspace dependencies only (transitives implied). Wave = parallel dispat
 `@size-limit/preset-small-lib@13.0.2`, `vite@8.1.5`, `typedoc@0.28.20`, `yaml@2.9.0`.
 Exact pins, no ranges. If an install or peer conflict arises, **the orchestrator** (never a
 worker) adjusts a pin and updates this table with a dated note.
+**Validated together 2026-07-29** by the Phase −1 smoke: install (no peer conflicts),
+`tsc -b` reference chain, cross-package Vitest, type-checked ESLint, TypeDoc packages
+mode, Vite 8 example build, and size-limit all passed as one workspace. pnpm 10 blocks
+dependency build scripts by default — the root manifest allowlists `esbuild`
+(`"pnpm": { "onlyBuiltDependencies": ["esbuild"] }`).
+**Publish names (spec §98, rev 1.6 — decided):** umbrella `@danielsimonjr/fourjs`,
+sub-packages `@danielsimonjr/fourjs-<name>`, published from the owner's personal npm
+scope. Workspace names stay `four`/`@four/*`; the mechanical publish mapping is part of
+the release-workflow packet at first publish (§94, 0.1).
 
 ### 3.3 `tsconfig.base.json` (WP-0.2 pastes exactly this)
 
@@ -182,13 +195,21 @@ worker) adjusts a pin and updates this table with a dated note.
 }
 ```
 
-`tsconfig.json`: `{ "extends": "../../tsconfig.base.json", "compilerOptions":
-{ "rootDir": "src", "outDir": "dist" }, "include": ["src"], "references":
-[<one per §3.1 dep, path "../<dep>">] }` — **build is `tsc -b`** (build mode; plain
-`tsc -p` ignores references and fails once real imports exist). Tests are excluded from the
-emitting project; the smoke test imports `../src/index.js` (Vite resolves it to the `.ts`
-source). The `four` package additionally exposes one subpath export per §3.1 package
-(`"./scene": { "types": "./dist/scene.d.ts", "import": "./dist/scene.js" }`, …) per §98/§91.
+Each package carries **two tsconfigs** (validated by the Phase −1 smoke — a single config
+cannot serve both declaration-emitting builds and type-checked linting of tests):
+
+- `tsconfig.json` (dev/lint/editor): `{ "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "composite": false, "declaration": false,
+  "declarationMap": false, "noEmit": true }, "include": ["src", "tests"] }`
+- `tsconfig.build.json` (emit): `{ "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist" }, "include": ["src"],
+  "references": [<one per §3.1 dep, path "../<dep>/tsconfig.build.json">] }`
+
+The build script is **`tsc -b tsconfig.build.json`** (build mode; plain `tsc -p` ignores
+references and fails once real imports exist). Tests import `../src/index.js` (Vitest
+resolves it to the `.ts` source). The `four` package additionally exposes one subpath
+export per §3.1 package (`"./scene": { "types": "./dist/scene.d.ts", "import":
+"./dist/scene.js" }`, …) per §98/§91.
 
 ### 3.5 Design decisions (D1–D8; pre-decided so no packet re-litigates them)
 
@@ -238,7 +259,8 @@ Steps: root `package.json`: `"name": "four.js-monorepo"`, `"private": true`,
 `"lint": "eslint ."`, `"format": "prettier --write ."`,
 `"check-spec": "node tools/check-spec.mjs"`, `"docs": "typedoc"`,
 `"example:build": "vite build examples/first-2d-scene"`, `"size": "size-limit"`;
-devDependencies: every §3.2 pin exactly. `pnpm-workspace.yaml`: `packages: ["packages/*"]`.
+devDependencies: every §3.2 pin exactly; `"pnpm": { "onlyBuiltDependencies":
+["esbuild"] }` (§3.2 note). `pnpm-workspace.yaml`: `packages: ["packages/*"]`.
 `.gitignore`: `node_modules`, `dist`, `coverage`, `.turbo`, `docs/api`,
 `examples/**/dist`, `.claude/worktrees`. `.npmrc`: `engine-strict=true`.
 Done: `pnpm install` exits 0 (orchestrator-run); lockfile present.
@@ -277,14 +299,17 @@ Done: `pnpm install --frozen-lockfile` exits 0.
 
 **WP-0.7 [H] Lint and format config** — Depends: WP-0.2, WP-0.6.
 Files: `eslint.config.js`, `.prettierrc.json`, `.prettierignore`.
-Steps: flat config using `typescript-eslint` `recommended-type-checked` with
-`projectService: true` and `allowDefaultProject` for root `*.js`/`*.mjs`/`tools/**`;
-forbid default exports; forbid `Date.now`/`Math.random` outside `tests/**`; ignore
-`dist`, `docs/api`. `.prettierrc.json`: `{}` (defaults).
+Steps: use the smoke-validated config verbatim: `tseslint.config(` ignores
+(`**/dist/**`, `**/node_modules/**`, `docs/**`), `...recommendedTypeChecked`,
+`projectService: { allowDefaultProject: ["*.js", "*.mjs"] }` +
+`tsconfigRootDir: import.meta.dirname`, a `disableTypeChecked` block for
+`**/*.js`/`**/*.mjs`, `no-restricted-properties` banning `Date.now`/`Math.random`
+(off under `**/tests/**`), plus a no-default-export rule. `.prettierrc.json`: `{}`.
 Done: `pnpm lint` exits 0.
 
 **WP-0.8 [H] Example placeholder (Vite)** — Depends: WP-0.6. Reads: §103, §93.
-Files: `examples/first-2d-scene/{index.html,main.ts,vite.config.ts}`.
+Files: `examples/first-2d-scene/{index.html,main.ts,vite.config.ts}`, root
+`package.json` (devDeps add `"four": "workspace:*"`; orchestrator reinstalls after).
 Steps: `main.ts` imports from `four/scene` and `four/math` subpaths and writes the imported
 `PACKAGE_NAME`s into the DOM; `vite.config.ts` minimal with outDir `dist`.
 Done: `pnpm example:build` exits 0 and emits `examples/first-2d-scene/dist/index.html`.
@@ -292,8 +317,9 @@ Done: `pnpm example:build` exits 0 and emits `examples/first-2d-scene/dist/index
 **WP-0.9 [H] Payload budget gate** — Depends: WP-0.8. Reads: §86 payload row.
 Files: `.size-limit.json`.
 Steps: one entry: `{"path": "examples/first-2d-scene/dist/assets/*.js",
-"limit": "150 kB"}` (gzip is size-limit's default measure; the built example is the §86
-"minimal 2D application" proxy — solver wasm stays out per MEMORY 2026-07-29).
+"limit": "150 kB", "gzip": true}` (§86 specifies gzip; the preset defaults to brotli).
+The built example is the §86 "minimal 2D application" proxy — solver wasm stays out per
+MEMORY 2026-07-29.
 Done: `pnpm build && pnpm example:build && pnpm size` exits 0.
 
 **WP-0.10 [H] TypeDoc** — Depends: WP-0.6. Files: `typedoc.json`.
@@ -310,7 +336,10 @@ Done: `pnpm test:suites` exits 0 (passWithNoTests).
 Files: `.github/workflows/ci.yml`.
 Steps: on push/PR to the default branch: checkout, pnpm/Node 20 setup,
 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm turbo run test`, `pnpm lint`,
-`pnpm check-spec`, `pnpm docs`, `pnpm example:build`, `pnpm size`, `pnpm test:suites`.
+`pnpm check-spec`, `pnpm docs`, `pnpm example:build`, `pnpm size`, `pnpm test:suites`,
+plus a supply-chain step `pnpm audit --audit-level=high` marked `continue-on-error: true`
+(visibility without blocking on unfixable advisories; §96 covers runtime content, this
+covers dependencies).
 Done: `node -e "const y=require('yaml'),f=require('fs');y.parse(f.readFileSync('.github/workflows/ci.yml','utf8'))"`
 exits 0.
 
@@ -555,7 +584,8 @@ surfaces). Scope and anchors are fixed; exits are spec-quoted except where noted
 
 | Phase | Scope (spec) | Exit criterion | Notes / likely seams |
 |---|---|---|---|
-| 3 | Renderer interface, WebGL 2 backend, cameras, viewports (§61–62, §47–48, §106) | Moving 2D/3D primitives render smoothly despite fixed-step simulation | interface / context-loss (§61) / projections (D8) / render list / buffers / interpolation-aware draw; camera+viewport types live in `@four/scene` (§98 rev 1.3); **revisit the size gate** — real example replaces placeholder |
+| 3 | Renderer interface, WebGL 2 backend, cameras, viewports (§61–62, §47–48, §106) | Moving 2D/3D primitives render smoothly despite fixed-step simulation | interface / context-loss (§61) / projections (D8) / render list / buffers / interpolation-aware draw; camera+viewport types live in `@four/scene` (§98 rev 1.3); **revisit the size gate** — real example replaces placeholder. **GPU in CI:** browser tests run Playwright against the pre-installed Chromium with SwiftShader (software GL) for WebGL 2; visual baselines are per-backend with perceptual tolerance (§92) |
+| 3a | Input, picking, dragging, sprites, MVP-tier text (§106a; §71–72, §55, §56 MVP tier) | Pointer events, picking, dragging, sprites, and labels work in a mixed 2D/3D example | input routing / picking strategies / sprite batching / SDF Latin text; Playwright setup lands here; **exit ships a public demo** (demo-first, TODO 2026-07-29) |
 | 4 | Tween, easing, Timeline, clips/tracks, bindings (§15–17, §107) | Any numeric/vector/quaternion/color/transform property animatable | easing table / tween core / timeline+markers (§16 semantics incl. replay/restore) / tracks / binding resolution |
 | 5 | Physics API + Rapier adapter (§20–32, §37, §108) | Mixed 2D/3D demo: gravity, collisions, impulses, sensors via common API | descriptors / world API / §37 contract incl. `drainEvents` + capabilities / rapier2d+3d wasm (pins per MEMORY) / event normalization / sync into the WP-2.6 pose store; §33 checksum reuses WP-1.13 |
 | 6 | Joints (§28, §109) | Constraints remain stable under expected real-time loads | per-joint packets / motors+limits / break thresholds |
@@ -563,6 +593,7 @@ surfaces). Scope and anchors are fixed; exits are spec-quoted except where noted
 | 8 | Advanced motion (§111) | **Plan-defined, owner to confirm** (§111 sets none): PID utility + steering demos pass analytic tests | steering / IK / PID |
 | 9 | Particles CPU+GPU (§36, §112) | ≥100k simple particles simulated and rendered at interactive rates on suitable hardware | emitter model / CPU sim / GPU compute path |
 | 10 | Replay, snapshots, diagnostics (§33–34, §113) | A physics defect can be captured, replayed, inspected frame by frame | snapshot API / §34 replay format (incl. step counts + dropped time) / §33 checksums via WP-1.13 / overlays |
+| 11 | Assets, serialization, UI, benchmark harness, docs (§113a; §73–80, §92–93) | Scene saves/reloads/benchmarks; §120 tooling list complete | asset manager / glTF / scene format + migration / UI MVP subset / `benchmarks/` harness against §86 / guides + website; release workflow (Changesets) lands at first publish per §94 0.1 |
 
 ---
 

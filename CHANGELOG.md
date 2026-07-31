@@ -10,6 +10,36 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-07-29
 
+#### Changed (spec revision 1.6)
+- npm publish names decided by the owner: umbrella `@danielsimonjr/fourjs`, sub-packages
+  `@danielsimonjr/fourjs-<name>`, published from the personal scope (no org claim or
+  dispute). §98 note updated; workspace names remain `four`/`@four/*`; TODO owner item
+  closed.
+
+#### Added (gap-closure pass)
+- `docs/POSITIONING.md` — outward-facing why-exist case: the integration-is-the-product
+  bet, audience order (engineering/digital-twins first), migration story, demo-first
+  principle, and plainly stated risks.
+- `docs/rfcs/` — RFC home (`README.md` process + `0000-template.md`), backing the §95 /
+  implementation-plan governance gate.
+
+#### Changed (spec revision 1.5 + plan revision 2.1)
+- `docs/SPECIFICATION.md` → **revision 1.5**: added §106a (Phase 3a — input, picking,
+  dragging, sprites, MVP-tier text) and §113a (Phase 11 — assets, serialization, UI,
+  benchmark harness, docs), closing the hole where Part IX never scheduled the §120 MVP's
+  interaction/content/tooling scope; §56 gains an MVP text tier (full shaping staged behind
+  a shaping-engine decision); §98 gains a publish-names note (npm `four`/`four-js`
+  occupied; `fourjs`/`@fourjs` free 2026-07-29). `tools/check-spec.mjs` allows the new
+  lettered sections.
+- `docs/plans/IMPLEMENTATION_PLAN.md` → **revision 2.1**: Phase −1 smoke ran the full
+  pinned toolchain together successfully; template corrected to split dev/build tsconfigs,
+  `pnpm.onlyBuiltDependencies`, validated ESLint config, example wiring, gzip size gate;
+  phase table gains 3a and 11 rows, the CI packet gains a non-blocking `pnpm audit` step,
+  and Phase 3 records the Playwright + SwiftShader GPU-in-CI strategy.
+- `MEMORY.md` — compaction convention added; naming/scope-cut/demo-first decisions
+  recorded. `TODO.md` — owner items: merge PR, secure npm names before 0.1; milestone
+  items for demo-first, shaping RFC, release workflow.
+
 #### Changed (plan revision 2 + spec revision 1.4)
 - `docs/plans/IMPLEMENTATION_PLAN.md` rewritten as **revision 2** after a five-way stress
   test (Haiku dry-run + executability/spec-fidelity/orchestration/design reviews, ~85

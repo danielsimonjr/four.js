@@ -3,7 +3,10 @@
 Persistent memory for agents and contributors working across sessions: decisions made, facts
 that are easy to lose, and conventions in force. Append new entries with a date; never silently
 rewrite a recorded decision — supersede it with a new entry. Tasks go in `TODO.md`; released
-changes in `CHANGELOG.md`.
+changes in `CHANGELOG.md`. **Compaction convention (2026-07-29):** at each phase close (see
+the implementation plan), the orchestrator may collapse superseded/expired entries into a
+one-line pointer at their original position ("superseded by <date> entry") so this file stays
+readable; never delete the pointer itself.
 
 ## Standing facts
 
@@ -99,6 +102,33 @@ changes in `CHANGELOG.md`.
   Phases 3–10 are deliberately rolling-wave (decomposed only when their predecessor exits
   green). The §98 directory tree was verified complete — packets fill directories, never
   create packages.
+- **2026-07-29 — npm publish names decided (owner): `@danielsimonjr/fourjs`.** Spec
+  revision 1.6. Umbrella publishes as `@danielsimonjr/fourjs`, all other packages as
+  `@danielsimonjr/fourjs-<name>`, from the owner's personal npm scope — no org claim or
+  dispute needed (supersedes the `fourjs`/`@fourjs` fallback in the 1.5 note below).
+  Workspace names stay `four`/`@four/*`; the mechanical rename happens in the release
+  workflow at first publish (§94 0.1). Subpath exports (`@danielsimonjr/fourjs/scene`)
+  carry the §91 tree-shaking requirement.
+- **2026-07-29 — Gap-closure pass (spec 1.5, plan 2.1) after the "what else are we
+  missing" review.** (1) **Naming:** npm `four` (0.0.1-a, unrelated) and `four-js` are
+  occupied; `fourjs`/`@fourjs` were free 2026-07-29 (org pages bot-blocked — claiming needs
+  the owner's npm account). Workspace names stay `four`/`@four/*`; rename-or-dispute is an
+  owner decision due before release 0.1 (TODO). (2) **MVP coverage hole closed:** Part IX
+  never scheduled §120's interaction/content/tooling scope — spec 1.5 adds §106a (Phase 3a:
+  input, picking, dragging, sprites, MVP-tier text) and §113a (Phase 11: assets,
+  serialization, UI, benchmark harness, docs); §56 gains an MVP text tier with full shaping
+  staged behind a shaping-engine RFC (HarfBuzz-wasm the likely route). (3) **Phase −1
+  smoke passed:** the full §3.2 pin set installed and ran together (build/test/lint/docs/
+  vite/size-limit); template corrections folded into plan 2.1 — split dev/build tsconfigs
+  per package, `pnpm.onlyBuiltDependencies: ["esbuild"]`, validated ESLint config, example
+  needs a root `four` workspace devDep, size-limit set to gzip. (4) **Process homes:**
+  `docs/rfcs/` created (template + process, backing the plan's RFC gate);
+  `docs/POSITIONING.md` states the why-exist case, audience order (engineering/digital-twin
+  first), migration story, demo-first principle (public demo ships at Phase 3a exit), and
+  plain-language risks; CI gains a non-blocking `pnpm audit` step; visual tests will run
+  Playwright + Chromium/SwiftShader in CI (plan Phase 3 note); MEMORY compaction convention
+  added to this file's header. Release (Changesets) workflow deliberately deferred to first
+  publish (§94 0.1).
 - **2026-07-29 — Implementation plan stress-tested; revision 2 written.** Five independent
   passes (Haiku dry-run of WP-0.1 in a worktree — succeeded, logged 5 forced guesses;
   executability review with empirical probes; spec-fidelity review; Sonnet orchestration

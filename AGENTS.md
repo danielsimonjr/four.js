@@ -31,6 +31,9 @@ License: MIT (`LICENSE`).
 |---|---|
 | `docs/SPECIFICATION.md` | **The working reference, currently revision 1.2** (amendments table at the top). Parts I–XIII, sections 1–120 plus lettered insertions (6a, 6b, 7a, 7b, 60a) and Appendices A–B; no duplicates. § numbering 1–120 is frozen — new sections use letter suffixes. |
 | `docs/SPEC-REVIEW.md` | Technical review R-1…R-35 that drove revision 1.1; header records the disposition (all applied). |
+| `docs/POSITIONING.md` | Outward-facing why-exist case, audience order, migration story, demo-first principle, stated risks. |
+| `docs/plans/IMPLEMENTATION_PLAN.md` | Work-packet plan (subagent-driven; stress-tested). |
+| `docs/rfcs/` | RFC/ADR home (§95 + plan governance gate): process README and template. |
 | `docs/archive/four-js-specification.pdf` | Original source (65 pages), archived unchanged. **Still contains the numbering defects** — translate its references via the errata map. |
 | `docs/ERRATA.md` | Correction log: the PDF's defects, how each was resolved, and the PDF→Markdown numbering map. |
 | `README.md` | Project summary; points at the spec and errata. |
@@ -333,9 +336,11 @@ See §7 below (package map).
 | 5 | PhysicsWorld, RigidBody, Collider, materials, forces, collision events, raycasts, sync, debug draw — **first adapter: Rapier** (modern WASM, covers 2D+3D) | Mixed 2D/3D demo with gravity, collisions, impulses, sensors via the common API |
 | 6 | Joints (fixed/distance/spring/hinge/slider/spherical), motors, limits, break thresholds | Constraints stable under real-time loads |
 | 7 | Transform authority (§42), kinematic↔dynamic transitions, ragdoll, blended poses, root motion | Animated↔kinematic↔physical control without discontinuities |
-| 8 | Steering, flocking, IK, trajectory prediction, spring-damper, **PID controller utility** | — |
+| 8 | Steering, flocking, IK, trajectory prediction, spring-damper, **PID controller utility** | — (plan-defined exit pending owner confirmation) |
 | 9 | Particle emitters, CPU + GPU compute simulation, force fields, trails | 100k simple particles at interactive rates |
 | 10 | Snapshots, input recording, replay, checksums, frame stepping, solver stats | A physics defect can be captured, replayed, inspected frame by frame |
+| 3a (§106a, rev 1.5) | Input routing, picking, dragging, sprites, MVP-tier text | Pointer events, picking, dragging, sprites, labels in a mixed 2D/3D example |
+| 11 (§113a, rev 1.5) | Assets/glTF, serialization+migration, UI MVP subset, benchmark harness, docs | Scene saves/reloads/benchmarks; §120 tooling complete |
 
 ### Parts X–XIII
 - Part X (§114–117): canonical public API examples — animated circle, dynamic
