@@ -11,6 +11,75 @@ importers:
       '@changesets/cli':
         specifier: 2.31.1
         version: 2.31.1
+      '@four/animation':
+        specifier: workspace:*
+        version: link:packages/animation
+      '@four/assets':
+        specifier: workspace:*
+        version: link:packages/assets
+      '@four/core':
+        specifier: workspace:*
+        version: link:packages/core
+      '@four/diagnostics':
+        specifier: workspace:*
+        version: link:packages/diagnostics
+      '@four/geometry':
+        specifier: workspace:*
+        version: link:packages/geometry
+      '@four/input':
+        specifier: workspace:*
+        version: link:packages/input
+      '@four/materials':
+        specifier: workspace:*
+        version: link:packages/materials
+      '@four/math':
+        specifier: workspace:*
+        version: link:packages/math
+      '@four/motion':
+        specifier: workspace:*
+        version: link:packages/motion
+      '@four/particles':
+        specifier: workspace:*
+        version: link:packages/particles
+      '@four/physics':
+        specifier: workspace:*
+        version: link:packages/physics
+      '@four/physics-box2d':
+        specifier: workspace:*
+        version: link:packages/physics-box2d
+      '@four/physics-rapier':
+        specifier: workspace:*
+        version: link:packages/physics-rapier
+      '@four/physics-soft':
+        specifier: workspace:*
+        version: link:packages/physics-soft
+      '@four/render':
+        specifier: workspace:*
+        version: link:packages/render
+      '@four/render-canvas':
+        specifier: workspace:*
+        version: link:packages/render-canvas
+      '@four/render-svg':
+        specifier: workspace:*
+        version: link:packages/render-svg
+      '@four/render-webgl':
+        specifier: workspace:*
+        version: link:packages/render-webgl
+      '@four/render-webgpu':
+        specifier: workspace:*
+        version: link:packages/render-webgpu
+      '@four/scene':
+        specifier: workspace:*
+        version: link:packages/scene
+      '@four/serialization':
+        specifier: workspace:*
+        version: link:packages/serialization
+      '@four/text':
+        specifier: workspace:*
+        version: link:packages/text
+      '@four/ui':
+        specifier: workspace:*
+        version: link:packages/ui
       '@size-limit/preset-small-lib':
         specifier: 13.0.2
         version: 13.0.2(size-limit@13.0.2)
