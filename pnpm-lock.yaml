@@ -53,6 +53,18 @@ importers:
 
   packages/core: {}
 
+  packages/diagnostics:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
   packages/geometry:
     dependencies:
       '@four/core':
@@ -61,6 +73,18 @@ importers:
       '@four/math':
         specifier: workspace:*
         version: link:../math
+
+  packages/input:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
 
   packages/materials:
     dependencies:
@@ -73,11 +97,77 @@ importers:
 
   packages/math: {}
 
+  packages/motion:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
+  packages/particles:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
+  packages/render:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/geometry':
+        specifier: workspace:*
+        version: link:../geometry
+      '@four/materials':
+        specifier: workspace:*
+        version: link:../materials
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
   packages/scene:
     dependencies:
       '@four/core':
         specifier: workspace:*
         version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+
+  packages/serialization:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
+      '@four/scene':
+        specifier: workspace:*
+        version: link:../scene
+
+  packages/text:
+    dependencies:
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/geometry':
+        specifier: workspace:*
+        version: link:../geometry
       '@four/math':
         specifier: workspace:*
         version: link:../math
