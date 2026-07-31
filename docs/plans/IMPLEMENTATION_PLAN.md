@@ -280,7 +280,9 @@ Done: `pnpm turbo run build --dry-run` exits 0 (package count asserted later, WP
 **WP-0.4 [H] Per-package scaffolding — fan-out ×23 (all except `four`)** —
 Depends: WP-0.2, WP-0.3. Reads: §3.1 (this package's row), §3.4, the package `README.md`.
 Files (per package P): `packages/P/package.json`, `packages/P/tsconfig.json`,
-`packages/P/src/index.ts`, `packages/P/tests/smoke.test.ts`.
+`packages/P/tsconfig.build.json`, `packages/P/src/index.ts`,
+`packages/P/tests/smoke.test.ts`. *(Files line corrected 2026-07-31: `tsconfig.build.json`
+was mandated by §3.4 but missing here; caught by the math-instance worker.)*
 Steps: instantiate §3.4 verbatim with P's name and §3.1 deps/references;
 `src/index.ts`: `export const PACKAGE_NAME = "@four/P";`; smoke test imports
 `../src/index.js` and asserts the name. Dispatch by §3.1 wave (waves 1→5); within a wave,
