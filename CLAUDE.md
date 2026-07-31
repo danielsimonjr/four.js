@@ -93,7 +93,10 @@ packages are `@four/`-scoped; `packages/four` is the umbrella package. Rough lay
   `render-canvas`, `render-svg`
 - Application: `input`, `assets`, `text`, `ui`, `serialization`, `diagnostics`
 
-Implementation is planned in phases (Part IX, §103–113): foundation → math/scene/time →
-motion → renderer → animation → physics adapter → joints → physics-animation blending →
-advanced motion → particles/GPU → replay/diagnostics. The MVP scope is defined in Part XII,
-§120 (MVP Requirements): WebGL 2 only, one solver adapter, basic 2D/3D primitives.
+Implementation is planned in phases (Part IX, §103–113a): foundation → math/scene/time →
+motion → renderer → **interaction/sprites/text (§106a)** → animation → physics adapter →
+joints → physics-animation blending → advanced motion → particles/GPU →
+replay/diagnostics → **assets/serialization/UI/tooling (§113a)**. The MVP scope is defined
+in Part XII, §120: WebGL 2 only, one solver adapter, basic 2D/3D primitives. The
+executable plan is `docs/plans/IMPLEMENTATION_PLAN.md` (work packets; stress-tested);
+`docs/POSITIONING.md` states why the project exists; `docs/rfcs/` hosts the RFC process.

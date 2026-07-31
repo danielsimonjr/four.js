@@ -6,7 +6,12 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Decide when to start Phase 0 (§103, Project Foundation) — see backlog below.
+- [ ] **Owner:** merge the open PR for `claude/specification-improvements-iug6pi` (spec
+      1.0→1.5, plan 2.1, doc sync, tooling) — Phase 0 starts from `main` after merge.
+- [ ] **Owner, before release 0.1:** secure npm names — claim the `@four` org / dispute
+      the dormant `four` package, or fall back to `fourjs`/`@fourjs` (free as of
+      2026-07-29; see spec §98 publish-names note). Needs the owner's npm account.
+- [ ] Decide when to start Phase 0 (§103, Project Foundation) — plan is dispatch-ready.
 
 ## Backlog
 
@@ -18,6 +23,12 @@ changes in `CHANGELOG.md`.
 - [ ] WP-0.8–0.9 — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`
 - [ ] WP-0.10 — exit verification: monorepo installs, all packages compile, tests run,
       docs build, example application starts
+
+### Later milestones (decided 2026-07-29)
+- [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
+      `docs/POSITIONING.md`)
+- [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
+- [ ] First publish (§94 0.1): Changesets release workflow + npm-name resolution above
 
 ### Phase 5 (when it starts)
 - [ ] Pin exact `@dimforge/rapier2d`/`@dimforge/rapier3d` versions (strategy decided
