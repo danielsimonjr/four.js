@@ -1,0 +1,18 @@
+{
+  "name": "@four/physics-box2d",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@four/physics": "workspace:*"
+  }
+}
