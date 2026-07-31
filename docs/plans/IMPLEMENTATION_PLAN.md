@@ -331,7 +331,9 @@ Done: `pnpm build && pnpm example:build && pnpm size` exits 0.
 
 **WP-0.10 [H] TypeDoc** — Depends: WP-0.6. Files: `typedoc.json`.
 Steps: entry-point strategy `packages`, entry points `packages/*`, out `docs/api`.
-Done: `pnpm docs` exits 0 and `docs/api/index.html` exists.
+Done: `pnpm run docs` exits 0 and `docs/api/index.html` exists. *(Revised 2026-07-31:
+`pnpm docs` without `run` is a pnpm builtin that exits 0 without invoking the script —
+vacuous check; caught by the WP-0.10 worker. `run docs` also requires a prior build.)*
 
 **WP-0.11 [H] Root test-suite wiring** — Depends: WP-0.6.
 Files: `vitest.suites.config.ts`, `package.json` (devDeps add: every `@four/*` as
@@ -343,7 +345,8 @@ Done: `pnpm test:suites` exits 0 (passWithNoTests).
 Files: `.github/workflows/ci.yml`.
 Steps: on push/PR to the default branch: checkout, pnpm/Node 20 setup,
 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm turbo run test`, `pnpm lint`,
-`pnpm check-spec`, `pnpm docs`, `pnpm example:build`, `pnpm size`, `pnpm test:suites`,
+`pnpm check-spec`, `pnpm run docs` (build must precede it; `pnpm docs` without `run` is a
+pnpm builtin no-op), `pnpm example:build`, `pnpm size`, `pnpm test:suites`,
 plus a supply-chain step `pnpm audit --audit-level=high` marked `continue-on-error: true`
 (visibility without blocking on unfixable advisories; §96 covers runtime content, this
 covers dependencies).
@@ -613,7 +616,7 @@ surfaces). Scope and anchors are fixed; exits are spec-quoted except where noted
 | Root suites | `pnpm test:suites` | phase exits |
 | Lint | `pnpm lint` | every packet |
 | Spec integrity | `pnpm check-spec` | any docs-touching packet |
-| Docs | `pnpm docs` | Phase 0 on (CI) |
+| Docs | `pnpm run docs` (after build; bare `pnpm docs` is a pnpm builtin no-op) | Phase 0 on (CI) |
 | Example | `pnpm example:build` | Phase 0 on (CI) |
 | Payload (§86) | `pnpm size` — built example ≤ 150 kB gzip | Phase 0 on (CI) |
 | Determinism | fresh-process double run vs committed golden hash (D6) | phase exits from 1 on |
