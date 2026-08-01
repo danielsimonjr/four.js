@@ -739,6 +739,91 @@ Dependencies: 4.0 ∥ 4.1 ∥ 4.2 (disjoint files); 4.3 ← 4.1+4.2; 4.4 ← 4.3
 (∥ 4.4, files disjoint, barrel untouched per P4-5); 4.6 ← 4.4+4.5; 4.7 ← 4.6;
 4.8 ← 4.7; 4.9 last.
 
+## 6d. Phase 5 — Physics API + Rapier Adapter (§108; decomposed 2026-08-01)
+
+Exit (§108): a mixed 2D/3D demonstration supports gravity, collisions, impulses, and
+sensors through the common API.
+
+Phase-level pinned decisions:
+
+- **P5-1 Rapier pins.** `@dimforge/rapier2d-compat@0.19.3` + `@dimforge/rapier3d-compat@0.19.3`
+  (registry-checked 2026-08-01). The `-compat` variants are official @dimforge builds with
+  base64-embedded wasm — they load in Node/vitest and bundlers alike with an async
+  `init()`, which §37's `initialize(): Promise<void> | void` was designed for. This
+  refines MEMORY 2026-07-29 ("official wasm packages") — dated note at phase close.
+  Solver wasm stays outside the §86 budget (per MEMORY); the physics example's size is
+  recorded but not gated.
+- **P5-2 System slot.** `PhysicsSystem` runs at the existing `PRIORITY_PHYSICS_SOLVE`
+  (600). Per §37/§39: syncSceneToSolver → step → syncSolverToScene → drainEvents →
+  normalize → dispatch AFTER the fixed step (§6b/§29, never during). The pre-step body
+  pose feeds the WP-2.6 PoseBuffer as "previous" for §43 interpolation. Solved transforms
+  write under `"physics"` authority (§42).
+- **P5-3 §21 typing.** Public API typed once in 3D (`Vector3`/`Quaternion`); a `"2d"`
+  world constrains motion to XY + rotation to Z and accepts `Vector2` convenience
+  arguments widening to `z = 0`. Y-up, gravity −Y in both.
+- **P5-4 Joints staged.** §108 lists no joints; Phase 6 owns them. Phase 5 ships the §37
+  `createJoint`/`destroyJoint` signatures with adapters throwing `NOT_IMPLEMENTED` and
+  `capabilities.jointTypes: []`.
+- **P5-5 Adapter injection.** `PhysicsWorld` takes a `PhysicsSolverAdapter` INSTANCE
+  (mirrors the renderer-instance decision); §20's `solver: "auto"` string selection joins
+  the §45 registry backlog item.
+- **P5-6 Shape tier.** Phase 5 ships 2D circle/rectangle/capsule/polygon and 3D
+  sphere/box/capsule; the remaining §24 shapes (polyline/chain/cylinder/cone/convex
+  hull/trimesh/heightfield/compound) are validated-out with clear errors and staged
+  (capability-declared). Rapier supports them — later packets widen the tier.
+- **P5-7 Example.** New `examples/physics-playground` (own vite build + browser spec)
+  demonstrates §108: one app stepping a `"3d"` world and a `"2d"` world through the one
+  API — gravity falls, collisions settle, click applies an impulse, a sensor zone
+  reacts. `first-2d-scene` and its §86 gate are untouched.
+
+Packets:
+
+- **WP-5.1 [S] Physics types + §37 contract** (`@four/physics`) — all §20–§34 public
+  types: dimension/body-type/CCD/determinism/combine unions, `RigidBodyDescriptor`,
+  `ColliderDescriptor` + the P5-6 shape unions, minimal `JointDescriptor` (P5-4),
+  `PhysicsMaterial` (§25 combine rules + density-fallback doc), §29 event payload
+  types + `PhysicsEvent` union, §30 query option/result types, `PhysicsCapabilities`,
+  `PhysicsSolverAdapter` (§37 verbatim shape), opaque handle types, §23/§85 validation
+  helpers (positive dynamic mass, shape parameter checks). Types + validators only; no
+  system. Starts the package barrel.
+- **WP-5.2 [S] RigidBody/Collider components + material** (`@four/physics`) — §6a
+  components: `RigidBody` (§23 fields incl. derived `inverseMass`, force/impulse
+  command queue applied at the next fixed step, `wake()`/`sleep()`, §29 typed events on
+  the component emitter), `Collider` (§24 fields, sensor flag, groups/mask),
+  `PhysicsMaterial` class; §25 combine + density fallback logic; mass-from-density
+  derivation (§23) for the P5-6 shapes.
+- **WP-5.3 [S] PhysicsWorld + PhysicsSystem + fake-adapter seam** (`@four/physics`) —
+  world lifecycle (component registration → adapter handles, monotonic body ids §33),
+  P5-2 fixed-step pipeline, pose-store integration, `"physics"` authority writes, §30
+  query surface with §21 2D semantics, §32 sleeping config, §33 checksum (FNV-1a via
+  @four/diagnostics, 1e-6, ascending body id), §34 snapshot passthrough with
+  adapter/version validity metadata; tests against a structural `FakeSolverAdapter`
+  (scripted events + recorded calls — the fake-GL pattern).
+- **WP-5.4 [S] Rapier adapter, 2D** (`@four/physics-rapier`) — P5-1 deps (package.json
+  edit; ORCHESTRATOR runs the install), shared init plumbing, 2D adapter: bodies,
+  colliders (P5-6 tier), step, EventQueue → §37 `drainEvents`, queries, snapshot via
+  Rapier serialization, honest `PhysicsCapabilities` (verify CCD-mode mapping against
+  Rapier docs and report); unit tests against real wasm.
+- **WP-5.5 [S] Rapier adapter, 3D** (`@four/physics-rapier`) — same contract for
+  rapier3d; shared code factored with the 2D adapter where honest.
+- **WP-5.6 [S] Cross-integration** — `@four/physics` + Rapier end-to-end in both
+  dimensions: gravity fall vs closed form (tolerance documented), restitution bounce,
+  impulses, sensors (enter/exit), raycast/overlap, §29 event normalization, §33
+  checksum repeatability in-process, §42 authority + pose interpolation seam.
+- **WP-5.7 [H] Physics example + umbrella** — `examples/physics-playground` per P5-7;
+  `four/physics` + `four/physics-rapier` umbrella subpaths verified; record bundle size
+  (not §86-gated, wasm outside budget).
+- **WP-5.8 [S] Phase 5 gates** — determinism golden phase5 (2D + 3D Rapier worlds,
+  1000 fixed steps, §33 checksums, in-process + fresh child process — same-runtime
+  tier), browser spec for the playground (fall/settle pixels, impulse reaction, sensor
+  reaction), suites/browser pickup.
+- **WP-5.9 [S] Phase 5 exit** — independent verifier: full matrix + physics gates +
+  coverage, §108 verdict, fix nothing.
+
+Dependencies: 5.1 → (5.2 ∥ 5.4); 5.3 ← 5.2; 5.5 ← 5.4; 5.6 ← 5.3 + 5.5; 5.7 ← 5.6;
+5.8 ← 5.7; 5.9 last. (5.2/5.3 live in `physics`, 5.4/5.5 in `physics-rapier` — different
+packages, so the pairs run in parallel without worktrees.)
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
