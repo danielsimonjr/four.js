@@ -4,12 +4,14 @@
  * Application code targets this package and never a solver directly (§20); a
  * concrete engine reaches it through `PhysicsSolverAdapter` (§37).
  *
- * This packet (WP-5.1) ships the **types and the pure functions**: the §20–§34
- * public vocabulary, the four §37 descriptors, the §24 shape unions,
- * `PhysicsMaterial` and the §25 combination rules, the §29 event payloads, the
- * §30 query records and their filter semantics, the §37 adapter contract, and
- * the §85 validators. The `RigidBody` and `Collider` components (§6a) arrive in
- * WP-5.2 and `PhysicsWorld`/`PhysicsSystem` in WP-5.3.
+ * WP-5.1 shipped the **types and the pure functions**: the §20–§34 public
+ * vocabulary, the four §37 descriptors, the §24 shape unions, `PhysicsMaterial`
+ * and the §25 combination rules, the §29 event payloads, the §30 query records
+ * and their filter semantics, the §37 adapter contract, and the §85 validators.
+ * WP-5.2 adds the two §6a components — `RigidBody` (§23, §26) and `Collider`
+ * (§24, §25) — which hold the authored state a user manipulates and produce the
+ * descriptors an adapter is built from. `PhysicsWorld` / `PhysicsSystem`, which
+ * register those components and drain their command buffers, arrive in WP-5.3.
  *
  * Named exports only, alphabetical within each module group.
  */
@@ -21,6 +23,12 @@ export type {
   PhysicsQueryCapabilities,
   PhysicsSolverAdapter,
 } from "./adapter.js";
+export type {
+  ColliderEventMap,
+  ColliderOptions,
+  ColliderTriggerEvent,
+} from "./collider.js";
+export { Collider } from "./collider.js";
 export type {
   ColliderDescriptor,
   JointDescriptor,
@@ -83,6 +91,16 @@ export {
   resolveQueryOptions,
   sortHitsByDistance,
 } from "./queries.js";
+export type {
+  PointLoad,
+  RigidBodyCollisionEvent,
+  RigidBodyCommands,
+  RigidBodyEventMap,
+  RigidBodySleepEvent,
+  SleepCommand,
+  TorqueInput,
+} from "./rigid-body.js";
+export { RigidBody } from "./rigid-body.js";
 export type {
   BoxShape,
   CapsuleShape,
