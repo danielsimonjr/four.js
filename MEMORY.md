@@ -25,6 +25,34 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 5 CLOSED (exit GREEN, zero defects; §108 criterion TRUE on three
+  axes: mixed-world integration test, playground demo + browser pixels, cross-process
+  determinism golden).** Nine packets + two fix packets. Key decisions/facts:
+  **SolverBodyAccess** (per-handle transform/velocity/force/kinematic accessors) is an
+  engine seam beyond §37's sketch, defined in `@four/physics` and mirrored
+  member-for-member by the adapters — future adapters (Box2D) must implement it and the
+  §90/§102 compatibility tables should name it. Rapier pinned `-compat@0.19.3` (base64
+  wasm, async init; NodeNext cannot resolve its .d.ts → a verified transcribed subset
+  lives in `physics-rapier/src/init.ts`, cleanup backlogged). Mass model: density-derived
+  by default (delegated to Rapier; WP-5.2-fix1's authoredness union rule — sticky flag OR
+  non-origin — keeps an unauthored origin centerOfMass out of descriptors); three
+  MassModes; inertia tensors diagonal-only (off-diagonal throws). Adapters own monotonic
+  never-reused ids (Rapier handles are unordered doubles) → §33 checksum order;
+  snapshot envelopes F4R2/F4R3 carry the id registry. collisionstay is adapter-derived
+  from a touching-pair map (Rapier has only start/stop); restitution combine forced Max
+  (Rapier default Average contradicts Appendix A); §32 sleep thresholds have NO Rapier
+  binding (only `enabled` maps — honest gap); §31 "speculative" = softCcdPrediction(1.0),
+  distance param backlogged. §33 FNV-1a duplicated in world.ts (matrix has no
+  physics→diagnostics edge; pinned against a reference impl). Verified: 2D and 3D solvers
+  bit-identical on mirrored scenarios (identical scenes hash identically across
+  dimensions — checksums include z/quaternion, so divergence must be authored into
+  tests). §21 z-plane rule shapes node structure (2D bodies must sit at z=0; visuals go
+  on child nodes). Rapier 0.19.3 surprises recorded in the WP-5.4/5.5 reports (world
+  retains gravity object; colliders query-invisible until next step; dt/4 substepping;
+  shapeCast ≤1 hit in 2D). Exit: 1,827 unit + 60 suite (first §92 integration suite) +
+  19 browser tests; physics 100/100/100/100, physics-rapier 97.99/96.94/100/97.99;
+  first-2d-scene still 30.19 kB gzip vs §86; playground 1.51 MB gzip (wasm, ungated per
+  MEMORY 2026-07-29).
 - **2026-08-01 — PHASE 4 CLOSED (exit GREEN, zero defects; §107 criterion TRUE per value
   kind with unit + golden + browser-pixel evidence).** Ten packets. API surface:
   34-key easing registry (§15 families, pinned constants incl. damped-spring closed form);

@@ -10,6 +10,30 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-01 (later)
 
+#### Added (Phase 5 — Physics API + Rapier Adapter, §108; packets WP-5.1…WP-5.9)
+- `@four/physics`: complete §20–§34 public API — types/shapes/descriptors/materials/
+  events/queries + the §37 `PhysicsSolverAdapter` contract with branded handles;
+  `RigidBody` + `Collider` components (§26 command buffers, §29 typed events,
+  density-derived mass per §23 restored by WP-5.2-fix1's authoredness rule);
+  `PhysicsWorld` + `PhysicsSystem` (priority 600; sync → step → publish under
+  "physics" authority → dispatch-after-step; §30 queries with §21 2D naming; §33
+  FNV-1a checksums; §34 snapshots with adapter validity metadata) and the
+  `SolverBodyAccess` per-handle seam — 281 tests, 100% coverage.
+- `@four/physics-rapier`: Rapier 2D + 3D adapters on pinned
+  `@dimforge/rapier{2d,3d}-compat@0.19.3` wasm — P5-6 shape tier, all four §22 body
+  types, sensors, adapter-derived collisionstay, monotonic id registries, snapshot
+  envelopes, honest capabilities (joints staged per P5-4) — 185 wasm-backed tests.
+- `tests/integration/physics-rapier.test.ts`: first §92 integration suite — 26 tests
+  proving gravity/collisions/impulses/sensors/queries/authority/interpolation/
+  checksum/snapshot-replay in both dimensions plus the §108 mixed-world shape.
+- `examples/physics-playground`: the §108 demonstration — 2D and 3D worlds side by
+  side, click impulses, sensor zones; 1.51 MB gzip (wasm; outside the §86 budget).
+- Gates (WP-5.8): phase5 determinism golden (600 steps, two worlds, §33 checksums,
+  cross-process, same-runtime tier stated) and a 4-test playground browser spec
+  (browser total 19; two Playwright webServers).
+- Phase 5 exit GREEN, zero defects: 1,827 unit tests, suites ×2 (60), browser ×2 (19),
+  coverage gate green repo-wide, first-2d-scene unchanged at 30.19 kB gzip vs §86.
+
 #### Added (Phase 4 — Animation Core, §107; packets WP-4.0…WP-4.9)
 - `@four/animation`: §15 easing (12 families × in/out/in-out, 34-key registry, pinned
   constants incl. a normalized damped-spring closed form); value adapters + property

@@ -6,11 +6,20 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 5 — Physics API + Rapier adapter (§20–32, §37, §108): rolling-wave
-      decomposition into plan §6d, then dispatch (descriptors, world API, §37 adapter
-      contract incl. drainEvents + capabilities, rapier2d+3d wasm pins per MEMORY
-      2026-07-29, event normalization, sync into the WP-2.6 pose store, §33 checksums
-      via WP-1.13).
+- [ ] Phase 6 — Joints (§28, §109): rolling-wave decomposition into plan §6e, then
+      dispatch (joint descriptors/classes, Rapier 2D+3D joint mapping, motors + limits,
+      break thresholds, the §109 engineering-mechanism demo; exit = constraints stable
+      under expected real-time loads).
+
+### Backlog additions (Phase 5, 2026-08-01)
+- [ ] Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a
+      toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
+- [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
+      heightfield/compound) — staged out by P5-6, widen in a later packet
+- [ ] §31 speculative-CCD prediction distance is a pinned constant (1.0) — needs a
+      descriptor field
+- [ ] Document SolverBodyAccess in the §90/§102 compatibility material when adapters
+      beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
 - [ ] Typedoc link warnings cleanup (34 total, 8 new from animation: ./clip.js#…,
@@ -40,16 +49,18 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + apply the
       `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
 
-### Phase 5 (when it starts)
-- [ ] Pin exact `@dimforge/rapier2d`/`@dimforge/rapier3d` versions (strategy decided
-      2026-07-29 — see MEMORY.md)
-
 ### Documentation
 - [ ] Optionally regenerate the specification PDF from `docs/SPECIFICATION.md` (the archived
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
 
+- [x] 2026-08-01 — **Phase 5 complete** (§108): 9 packets + 2 fixes, exit GREEN zero
+      defects — full physics API over the §37 adapter contract, Rapier 2D+3D on pinned
+      -compat@0.19.3 wasm, density-derived mass end-to-end, mixed 2D/3D proven by
+      integration tests, the physics-playground demo with browser-pixel evidence, and a
+      600-step cross-process determinism golden; 1,827 unit + 60 suite + 19 browser
+      tests; physics 100% coverage
 - [x] 2026-08-01 — **Phase 4 complete** (§107): 10 packets, exit GREEN zero defects —
       numeric/vector/quaternion/color/transform properties all animatable, proven at
       unit, determinism-golden (cross-process, marker steps pinned), and browser-pixel
