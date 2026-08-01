@@ -25,6 +25,24 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 3a CLOSED (exit GREEN; §106a criterion TRUE with browser input +
+  pixel evidence).** Seven packets: §71 picking (ray/AABB/oriented-box, +Y-up NDC), §72
+  subset pointer input (capture:-prefixed capture keys on the four propagating types only;
+  `NodeEventMap` augmentation via `declare module "@four/scene"`), DragManager (world-delta
+  handoff to app callbacks — @four/input never writes transforms), §55/§77 MVP textures +
+  sprites, §56 bitmap-tier text (6×12 font, 95 glyphs, base-32 rows; SDF staged), example
+  upgrade (click palettes + drag with the §42 untrack+authority handover pair), 5-test
+  browser interaction gate. Exit: 1,015 unit tests, 11 browser tests ×2, goldens untouched,
+  example 21.46 kB gzip; coverage 100% on input/text/render/materials, render-webgl 99.42%
+  (two defensive branches). **Advisory WP-3a.3-fix1:** §55 frame regions unimplemented —
+  sprites map whole textures, so labels cost one texture per glyph cell (already in TODO;
+  owner may record a spec-amendment deferral). **Exit-verifier notes adopted as chores:**
+  examples are typechecked by nothing in CI (verifier's manual `tsc --noEmit` clean today;
+  `typecheck:examples` chore queued for Phase 4), coverage ≥95% is review-enforced (no
+  vitest thresholds configured — tooling chore queued), example dist uses base "/" (fine for
+  root hosting + preview; subpath deploys need `--base`, a deployment-time flag).
+  "Ship the public demo" = demo-ready static artifact confirmed (index.html + hashed asset,
+  no dev-server references); actual deployment is the owner's step per POSITIONING.
 - **2026-08-01 — PHASE 3 CLOSED (exit GREEN, zero defects; §106 criterion met with
   browser-pixel evidence).** Nine packets: cameras/viewport (§47-48, D8 depth ranges),
   geometry/materials/renderable lite + render lists (WeakMap-keyed pools, §43 interpolated

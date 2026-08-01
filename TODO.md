@@ -6,12 +6,18 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 3a — Interaction, Sprites, Text MVP (§106a) NEXT: rolling-wave decomposition
-      (input routing §72, picking §71, dragging, sprite batching §55, SDF Latin text §56
-      tier, example upgrade; exit ships the public demo per POSITIONING).
+- [ ] Phase 4 — Animation (§15–17, §107): rolling-wave decomposition into plan §6c, then
+      dispatch packets (clips/tracks/keyframes, easing, tweens, timelines, AnimationMixer,
+      animation transform authority; all times seconds, clip-local animation time).
+
+### Chores (Phase 3a exit-verifier notes, 2026-08-01)
+- [ ] `typecheck:examples` script + CI step (examples are the sole downstream consumer of
+      the NodeEventMap augmentation and are currently typechecked by nothing)
+- [ ] Enforce coverage thresholds in tooling (vitest coverage thresholds ≥95%; today the
+      gate is review-only via exit verifiers)
 
 ### Backlog additions (Phase 3 exit findings)
-- [ ] §92 integration/visual test directories still empty — schedule with Phase 3a/11
+- [ ] §92 integration/visual test directories still empty — schedule with Phase 11
 - [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
       deferral recorded in MEMORY 2026-08-01)
 
@@ -20,8 +26,9 @@ changes in `CHANGELOG.md`.
 ### Later milestones (decided 2026-07-29)
 - [ ] Ergonomics decision before the §97 example: `Node.position/rotation/scale` aliases
       onto `transform.*` (flagged by the WP-3.1 worker — spec idiom `camera.position.set`)
-- [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
-      `docs/POSITIONING.md`)
+- [ ] Deploy the public interactive demo (demo-first principle, `docs/POSITIONING.md`) —
+      demo-ready static build confirmed at Phase 3a exit; deployment is the owner's step
+      (note: subpath hosting like GitHub Pages needs a `--base` flag at build time)
 - [ ] §55 frame regions + §65 sprite batching (evidence: the example labels cost one
       texture per glyph cell — WP-3a.5 header)
 - [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
@@ -38,6 +45,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-01 — **Phase 3a complete** (§106a): 7 packets, exit GREEN — pointer events,
+      picking, dragging, sprites, and text labels proven working together in the mixed
+      2D/3D example via real Chromium input + framebuffer assertions; 1,015 unit + 11
+      browser tests, coverage 100% on input/text/render/materials (render-webgl 99.42%),
+      demo-ready static build at 21.46 kB gzip
 - [x] 2026-08-01 — **Phase 3 complete** (§106): 9 packets, browser-verified rendering
       (SwiftShader gate caught a real rAF defect), interpolated draws proven at alpha 0.5,
       example at 14.88 kB gzip, coverage ≥95% everywhere
