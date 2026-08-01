@@ -39,13 +39,22 @@
 
 import { FourError, isFourError } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
-import { Renderable, type RenderItem, type Renderer } from "@four/render";
+import {
+  Renderable,
+  Sprite,
+  type RenderItem,
+  type Renderer,
+  type SpriteRenderItem,
+  type UnlitRenderItem,
+} from "@four/render";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   GL,
   GeometryCache,
   POSITION_ATTRIBUTE_LOCATION,
+  SpriteProgram,
+  TextureCache,
   UnlitProgram,
   WebglRenderer,
   type WebglCanvas,
@@ -61,7 +70,10 @@ import {
 type RenderView = Parameters<Renderer["render"]>[1][number];
 type RenderCamera = RenderView["camera"];
 type ItemGeometry = RenderItem["geometry"];
-type ItemMaterial = RenderItem["material"];
+/** The *unlit* half of the render item union — §57's `UnlitMaterial`. */
+type ItemMaterial = UnlitRenderItem["material"];
+type ItemSpriteMaterial = SpriteRenderItem["material"];
+type ItemTexture = ItemSpriteMaterial["texture"];
 type RenderInterpolation = NonNullable<Parameters<Renderer["render"]>[2]>;
 type RenderPoseBuffer = RenderInterpolation["poseBuffer"];
 type RenderNode = Parameters<Renderer["render"]>[0];
@@ -90,6 +102,8 @@ interface FakeGlOptions {
   allocatePrograms?: boolean;
   /** When false, `createVertexArray` returns null. Default true. */
   allocateVertexArrays?: boolean;
+  /** When false, `createTexture` returns null. Default true. */
+  allocateTextures?: boolean;
   /** When false, `createBuffer` returns null. Default true. */
   allocateBuffers?: boolean;
   /** When false, `getUniformLocation` returns null. Default true. */
@@ -104,8 +118,16 @@ interface FakeGlOptions {
 /** The double: `WebglContext` plus the recording surface the tests read. */
 interface FakeGl extends WebglContext {
   readonly calls: RecordedCall[];
-  /** Uniform handles by name, so uploads can be attributed. */
+  /**
+   * Uniform handles by name, from the **first** program that resolved each name
+   * — which is the unlit one, since the renderer builds it first. Uniform
+   * locations are per-program in real GL, so a name a second pipeline also
+   * declares (`viewProjection`, `model`) gets a *different* handle there; see
+   * {@link FakeGl.uniformsByProgram}.
+   */
   readonly uniformLocations: Map<string, object>;
+  /** Uniform handles by program, then by name — real GL's actual scoping. */
+  readonly uniformsByProgram: Map<object, Map<string, object>>;
   names(): string[];
   callsOf(name: string): RecordedCall[];
   countOf(name: string): number;
@@ -136,6 +158,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     allocateShaders = true,
     allocatePrograms = true,
     allocateVertexArrays = true,
+    allocateTextures = true,
     allocateBuffers = true,
     resolveUniforms = true,
     infoLog = "",
@@ -143,6 +166,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
   const calls: RecordedCall[] = [];
   const uniformLocations = new Map<string, object>();
+  const uniformsByProgram = new Map<object, Map<string, object>>();
   let handleCount = 0;
 
   const record = (name: string, ...args: unknown[]): void => {
@@ -156,6 +180,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
   const gl: FakeGl = {
     calls,
     uniformLocations,
+    uniformsByProgram,
     names: () => calls.map((call) => call.name),
     callsOf: (name) => calls.filter((call) => call.name === name),
     countOf: (name) => calls.filter((call) => call.name === name).length,
@@ -212,10 +237,18 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
       if (!resolveUniforms) {
         return null;
       }
-      let location = uniformLocations.get(name);
+      let perProgram = uniformsByProgram.get(program);
+      if (perProgram === undefined) {
+        perProgram = new Map<string, object>();
+        uniformsByProgram.set(program, perProgram);
+      }
+      let location = perProgram.get(name);
       if (location === undefined) {
         location = handle(`uniform:${name}`);
-        uniformLocations.set(name, location);
+        perProgram.set(name, location);
+        if (!uniformLocations.has(name)) {
+          uniformLocations.set(name, location);
+        }
       }
       return location;
     },
@@ -227,6 +260,50 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     uniform4fv(location, data) {
       record("uniform4fv", location, data);
+    },
+    uniform1i(location, value) {
+      record("uniform1i", location, value);
+    },
+
+    createTexture() {
+      record("createTexture");
+      return allocateTextures ? handle("texture") : null;
+    },
+    bindTexture(target, texture) {
+      record("bindTexture", target, texture);
+    },
+    texImage2D(
+      target,
+      level,
+      internalFormat,
+      width,
+      height,
+      border,
+      format,
+      type,
+      pixels,
+    ) {
+      record(
+        "texImage2D",
+        target,
+        level,
+        internalFormat,
+        width,
+        height,
+        border,
+        format,
+        type,
+        pixels,
+      );
+    },
+    texParameteri(target, pname, param) {
+      record("texParameteri", target, pname, param);
+    },
+    deleteTexture(texture) {
+      record("deleteTexture", texture);
+    },
+    activeTexture(unit) {
+      record("activeTexture", unit);
     },
 
     createBuffer() {
@@ -298,6 +375,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     clear(mask) {
       record("clear", mask);
+    },
+    blendFunc(sourceFactor, destinationFactor) {
+      record("blendFunc", sourceFactor, destinationFactor);
     },
     drawArrays(mode, first, count) {
       record("drawArrays", mode, first, count);
@@ -456,6 +536,79 @@ class TestMaterial {
   }
 }
 
+let nextTestTextureId = 0;
+
+/**
+ * A `Texture` reduced to the `SpriteTexture` read surface a backend sees (§77).
+ *
+ * The concrete class lives in `@four/render`, which *is* a dependency — but the
+ * cache is typed against `SpriteRenderItem["material"]["texture"]`, i.e. the
+ * structural contract, and a double is what proves the cache reads nothing
+ * outside it. It also makes the failure paths reachable: a real texture cannot
+ * be asked to report a version that never advanced.
+ */
+class TestTexture {
+  readonly id: string;
+
+  version = 0;
+
+  width: number;
+
+  height: number;
+
+  data: Uint8Array | null;
+
+  disposed = false;
+
+  constructor(width = 2, height = 2, data: Uint8Array | null = null) {
+    nextTestTextureId += 1;
+    this.id = `test-texture-${String(nextTestTextureId)}`;
+    this.width = width;
+    this.height = height;
+    this.data = data ?? new Uint8Array(width * height * 4);
+  }
+
+  /** §77's `markDirty()`: announce a texel edit the texture could not see. */
+  markDirty(): void {
+    this.version += 1;
+  }
+
+  /** §77's `dispose()`: drops the data and bumps the version. */
+  dispose(): void {
+    this.disposed = true;
+    this.data = null;
+    this.markDirty();
+  }
+
+  /**
+   * No cast is needed — the double satisfies the `SpriteTexture` contract
+   * structurally, which is the point of that contract. The accessor exists so
+   * the doubles all read the same way.
+   */
+  get asTexture(): ItemTexture {
+    return this;
+  }
+}
+
+/** A `SpriteMaterial` reduced to what the backend reads (§55, §57). */
+class TestSpriteMaterial {
+  readonly tint: [number, number, number, number];
+
+  texture: ItemTexture;
+
+  constructor(
+    texture: TestTexture = new TestTexture(),
+    tint: [number, number, number, number] = [1, 1, 1, 1],
+  ) {
+    this.texture = texture.asTexture;
+    this.tint = tint;
+  }
+
+  get asMaterial(): ItemSpriteMaterial {
+    return this as unknown as ItemSpriteMaterial;
+  }
+}
+
 /** A `Camera` reduced to what the backend reads and calls (§47). */
 class TestCamera {
   readonly projectionMatrix = new Matrix4();
@@ -559,6 +712,39 @@ function renderable(
   material: TestMaterial = new TestMaterial(),
 ): Renderable {
   return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+/**
+ * A real `Sprite` — `@four/render` is a dependency, and the quad it builds from
+ * its anchor and size is exactly what the `quad` uniform assertions are about.
+ * Only the material and the texture are doubles.
+ */
+function sprite(
+  material: TestSpriteMaterial = new TestSpriteMaterial(),
+  options?: ConstructorParameters<typeof Sprite>[1],
+): Sprite {
+  return new Sprite(material.asMaterial, options);
+}
+
+/**
+ * The sprite program's uniform handles, found by the one uniform name only it
+ * declares. Uniform locations are per-program (see {@link FakeGl}), so this is
+ * what distinguishes a sprite `model` upload from an unlit one.
+ */
+function spriteUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("tint")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the sprite program never resolved its uniforms");
+}
+
+/** Values uploaded to `location` by the recorded calls, in upload order. */
+function uploadsAt(gl: FakeGl, location: object | undefined): unknown[] {
+  return gl.calls
+    .filter((call) => call.args[0] === location)
+    .map((call) => call.args[call.args.length - 1]);
 }
 
 /**
@@ -1727,14 +1913,16 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
     expect(gl.calls).toHaveLength(0);
   });
 
-  it("re-creates the program and the fixed state on restore", async () => {
+  it("re-creates both programs and the fixed state on restore", async () => {
     const { renderer, gl, canvas } = await initialized();
     canvas.dispatch("webglcontextlost");
     gl.reset();
 
     canvas.dispatch("webglcontextrestored");
 
-    expect(gl.countOf("createProgram")).toBe(1);
+    // Unlit and sprite (WP-3a.3): §61 requires engine-owned GPU resources to be
+    // re-created before `contextrestored` is emitted, and both pipelines are.
+    expect(gl.countOf("createProgram")).toBe(2);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -1831,7 +2019,7 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 });
 
 describe("WebglRenderer — disposal (§83)", () => {
-  it("deletes the program and every vertex array", async () => {
+  it("deletes both programs and every vertex array", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     root.add(renderable(quadGeometry()), renderable(triangleGeometry()));
@@ -1840,7 +2028,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(gl.countOf("deleteProgram")).toBe(2);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -1864,7 +2052,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(gl.countOf("deleteProgram")).toBe(2);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -1920,5 +2108,492 @@ describe("WebglRenderer — disposal (§83)", () => {
     }
 
     expect(renderer.contextLost).toBe(false);
+  });
+});
+
+describe("SpriteProgram — compilation and linking (§55, §61, §89)", () => {
+  it("compiles both stages, links, and resolves the five uniforms", () => {
+    const gl = createFakeGl();
+
+    const program = SpriteProgram.create(gl);
+
+    expect(gl.countOf("createShader")).toBe(2);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["viewProjection", "model", "quad", "tint", "map"]);
+    expect(program.disposed).toBe(false);
+  });
+
+  it("emits GLSL ES 3.00 sources binding position at the shared location", () => {
+    const gl = createFakeGl();
+
+    SpriteProgram.create(gl);
+
+    const sources = gl.callsOf("shaderSource").map((call) => call.args[1]);
+    for (const source of sources) {
+      expect(String(source).startsWith("#version 300 es\n")).toBe(true);
+    }
+    // The same attribute slot the unlit pipeline uses, which is what lets one
+    // geometry cache serve both.
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(POSITION_ATTRIBUTE_LOCATION)}) in vec3 position`,
+    );
+    // uv is derived from the quad's local rect, not read from an attribute.
+    expect(String(sources[0])).toContain("uniform vec4 quad");
+    expect(String(sources[1])).toContain("texture(map, vUv) * tint");
+  });
+
+  it("fails with SHADER_COMPILATION_FAILED, naming the sprite pipeline", () => {
+    const error = thrown(() => {
+      SpriteProgram.create(createFakeGl({ compileStatus: false }));
+    });
+
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(error.context?.stage).toBe("vertex");
+    expect(error.message).toContain("sprite");
+  });
+
+  it("deletes the program when a uniform is missing from the link", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+
+    const error = thrown(() => {
+      SpriteProgram.create(gl);
+    });
+
+    expect(error.context?.uniform).toBe("viewProjection");
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("deletes the GL program once, idempotently", () => {
+    const gl = createFakeGl();
+    const program = SpriteProgram.create(gl);
+
+    program.dispose();
+    program.dispose();
+
+    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("TextureCache — textures keyed by id and version (§77, §61)", () => {
+  it("uploads RGBA8 texels with clamped, linearly filtered sampler state", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const data = new Uint8Array(2 * 3 * 4);
+    const texture = new TestTexture(2, 3, data);
+
+    const record = cache.acquire(texture.asTexture);
+
+    expect(record).not.toBeNull();
+    expect(gl.countOf("createTexture")).toBe(1);
+    expect(gl.callsOf("texImage2D")[0].args).toEqual([
+      GL.TEXTURE_2D,
+      0,
+      GL.RGBA8,
+      2,
+      3,
+      0,
+      GL.RGBA,
+      GL.UNSIGNED_BYTE,
+      Array.from(data),
+    ]);
+    expect(
+      gl.callsOf("texParameteri").map((call) => [call.args[1], call.args[2]]),
+    ).toEqual([
+      [GL.TEXTURE_MIN_FILTER, GL.LINEAR],
+      [GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
+      [GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
+    ]);
+    // Nothing left bound: an upload mid-frame must not displace the texture
+    // being drawn.
+    expect(gl.callsOf("bindTexture").at(-1)?.args).toEqual([
+      GL.TEXTURE_2D,
+      null,
+    ]);
+    expect(cache.size).toBe(1);
+  });
+
+  it("allocates zero-filled storage for a texture with no CPU-side data", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(4, 4);
+    texture.data = null;
+
+    cache.acquire(texture.asTexture);
+
+    expect(gl.callsOf("texImage2D")[0].args[8]).toBeNull();
+  });
+
+  it("returns the same record for an unchanged texture", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture();
+
+    const first = cache.acquire(texture.asTexture);
+    const second = cache.acquire(texture.asTexture);
+
+    expect(second).toBe(first);
+    expect(gl.countOf("createTexture")).toBe(1);
+  });
+
+  it("deletes and re-uploads when the version advances", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture();
+    cache.acquire(texture.asTexture);
+
+    texture.data![0] = 255;
+    texture.markDirty();
+    const record = cache.acquire(texture.asTexture);
+
+    expect(record?.version).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("createTexture")).toBe(2);
+    expect(cache.size).toBe(1);
+  });
+
+  it("drops a disposed texture and keeps no entry (§83)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture();
+    cache.acquire(texture.asTexture);
+
+    texture.dispose();
+
+    expect(cache.acquire(texture.asTexture)).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("createTexture")).toBe(1);
+    expect(cache.size).toBe(0);
+  });
+
+  it("returns null without an entry when GL will not allocate a texture", () => {
+    const gl = createFakeGl({ allocateTextures: false });
+    const cache = new TextureCache(gl);
+
+    expect(cache.acquire(new TestTexture().asTexture)).toBeNull();
+    expect(cache.size).toBe(0);
+  });
+
+  it("forgets every record without touching the context (§61 loss)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    cache.acquire(new TestTexture().asTexture);
+    gl.reset();
+
+    cache.forget();
+
+    expect(gl.calls).toHaveLength(0);
+    expect(cache.size).toBe(0);
+  });
+
+  it("deletes every texture on dispose, idempotently (§83)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    cache.acquire(new TestTexture().asTexture);
+    cache.acquire(new TestTexture().asTexture);
+    gl.reset();
+
+    cache.dispose();
+    cache.dispose();
+
+    expect(gl.countOf("deleteTexture")).toBe(2);
+    expect(cache.disposed).toBe(true);
+    expect(cache.size).toBe(0);
+  });
+});
+
+describe("WebglRenderer.render — sprites (§55, §66)", () => {
+  it("switches to the sprite pipeline, binds the sampler, and enables blending", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(sprite());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const names = gl.names();
+    // Unlit is the frame's starting state; the sprite run switches to the
+    // second pipeline once and switches blending on with it.
+    expect(gl.countOf("useProgram")).toBe(2);
+    expect(uploadsAt(gl, spriteUniforms(gl).get("map"))).toEqual([0]);
+    expect(gl.callsOf("activeTexture")[0].args).toEqual([GL.TEXTURE0]);
+    expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    // Ordering: program, then sampler, then a texture bind, then the draw.
+    const drawIndex = names.indexOf("drawElements");
+    expect(names.indexOf("useProgram")).toBeLessThan(
+      names.indexOf("uniform1i"),
+    );
+    expect(names.indexOf("uniform1i")).toBeLessThan(drawIndex);
+    const boundBeforeDraw = gl.calls
+      .slice(0, drawIndex)
+      .filter((call) => call.name === "bindTexture" && call.args[1] !== null);
+    expect(boundBeforeDraw).not.toHaveLength(0);
+  });
+
+  it("blends with straight alpha, and fixes the function once at initialize (§66)", async () => {
+    const { gl } = await initialized();
+
+    expect(gl.callsOf("blendFunc")[0].args).toEqual([
+      GL.SRC_ALPHA,
+      GL.ONE_MINUS_SRC_ALPHA,
+    ]);
+    // GL's initial state already has BLEND off, so nothing disables it here.
+    expect(gl.callsOf("disable").map((call) => call.args[0])).toEqual([
+      GL.CULL_FACE,
+    ]);
+  });
+
+  it("disables blending and unbinds the texture when the frame ends", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(sprite());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("disable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    expect(gl.callsOf("bindTexture").at(-1)?.args).toEqual([
+      GL.TEXTURE_2D,
+      null,
+    ]);
+  });
+
+  it("leaves the opaque unlit path untouched — no blending, one program", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("useProgram")).toBe(1);
+    expect(gl.countOf("enable")).toBe(0);
+    expect(gl.countOf("disable")).toBe(0);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("uniform1i")).toBe(0);
+  });
+
+  it("uploads the tint, and the quad's local rect the vertex stage maps uv from", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      sprite(new TestSpriteMaterial(new TestTexture(), [1, 0.5, 0, 0.25]), {
+        width: 4,
+        height: 2,
+        anchor: { x: 0, y: 0 },
+      }),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = spriteUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("tint"))).toEqual([[1, 0.5, 0, 0.25]]);
+    // anchor (0, 0) and 4 × 2 ⇒ the quad spans x ∈ [0, 4], y ∈ [0, 2].
+    expect(uploadsAt(gl, uniforms.get("quad"))).toEqual([[0, 0, 4, 2]]);
+  });
+
+  it("tracks the quad rect when the sprite is resized", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const node = sprite(new TestSpriteMaterial(), { width: 2, height: 2 });
+    root.add(node);
+    renderer.render(root, [createView(camera)]);
+
+    node.width = 6;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
+      [-3, -1, 6, 2],
+    ]);
+  });
+
+  it("uploads the sprite view-projection once per view, after switching to it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    camera.projectionMatrix.identity();
+    camera.viewMatrix.identity();
+    const root = createRoot();
+    root.add(sprite(), sprite());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = spriteUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("viewProjection"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(2);
+  });
+
+  it("uploads a sprite view-projection per view when there are two", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(sprite());
+    gl.reset();
+
+    renderer.render(root, [createView(camera), createView(new TestCamera())]);
+
+    expect(
+      uploadsAt(gl, spriteUniforms(gl).get("viewProjection")),
+    ).toHaveLength(2);
+  });
+
+  it("switches pipelines and blending back and forth for interleaved items", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // renderOrder decides the sequence: unlit, sprite, unlit.
+    const first = renderable(quadGeometry());
+    first.renderOrder = 0;
+    const middle = sprite(new TestSpriteMaterial(), { renderOrder: 1 });
+    const last = renderable(triangleGeometry());
+    last.renderOrder = 2;
+    root.add(first, middle, last);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The frame's opening `use` of the unlit pipeline, then two switches:
+    // unlit → sprite → unlit.
+    expect(gl.countOf("useProgram")).toBe(3);
+    expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    expect(gl.callsOf("disable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    const names = gl.names();
+    expect(names.indexOf("enable")).toBeLessThan(names.indexOf("disable"));
+    expect(gl.countOf("drawElements")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("uploads a texture once and reuses it across frames", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(sprite());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("createTexture")).toBe(1);
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("shares one GL texture between sprites that share a texture", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const root = createRoot();
+    root.add(
+      sprite(new TestSpriteMaterial(texture)),
+      sprite(new TestSpriteMaterial(texture)),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("createTexture")).toBe(1);
+    // Two from the single upload (bind, then unbind), one per draw, and the
+    // end-of-frame unbind.
+    expect(gl.countOf("bindTexture")).toBe(5);
+  });
+
+  it("re-uploads a texture whose version advanced between frames", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const root = createRoot();
+    root.add(sprite(new TestSpriteMaterial(texture)));
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    texture.data![0] = 255;
+    texture.markDirty();
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("createTexture")).toBe(1);
+  });
+
+  it("skips a sprite whose texture has been disposed (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const root = createRoot();
+    root.add(sprite(new TestSpriteMaterial(texture)));
+    texture.dispose();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(0);
+    // Never switched pipelines either: the skip happens before the switch.
+    expect(gl.countOf("useProgram")).toBe(1);
+    expect(gl.countOf("enable")).toBe(0);
+  });
+
+  it("skips a disposed sprite, whose quad has no vertices", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const node = sprite();
+    root.add(node);
+    node.dispose();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.countOf("createTexture")).toBe(0);
+  });
+
+  it("draws the §43 interpolated pose of a sprite like any other item", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const node = sprite();
+    root.add(node);
+    const poses = new TestPoseBuffer().track(
+      node,
+      new Vector3(0, 0, 0),
+      new Vector3(8, 0, 0),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 0.25));
+
+    const models = uploadsAt(gl, spriteUniforms(gl).get("model")) as number[][];
+    expect(models[0].slice(12, 15)).toEqual([2, 0, 0]);
+  });
+
+  it("forgets textures on context loss and re-uploads after restore (§61)", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const root = createRoot();
+    root.add(sprite());
+    renderer.render(root, [createView(camera)]);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    // A fresh upload, and no `deleteTexture` against the dead handle.
+    expect(gl.countOf("createTexture")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("deletes every GL texture on disposal (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(sprite(), sprite());
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    expect(gl.countOf("deleteTexture")).toBe(2);
   });
 });

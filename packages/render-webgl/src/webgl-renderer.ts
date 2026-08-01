@@ -39,7 +39,9 @@ import { Matrix4 } from "@four/math";
 import {
   buildInterpolatedRenderList,
   buildRenderList,
+  isSpriteItem,
   type RenderItem,
+  type RenderItemKind,
   type Renderer,
   type RendererCapabilities,
   type RendererEventMap,
@@ -47,7 +49,13 @@ import {
 } from "@four/render";
 
 import { GeometryCache } from "./gl-geometry.js";
-import { GL, UnlitProgram, type WebglContext } from "./gl-program.js";
+import {
+  GL,
+  SpriteProgram,
+  UnlitProgram,
+  type WebglContext,
+} from "./gl-program.js";
+import { TextureCache } from "./gl-texture.js";
 
 /**
  * The subtree root {@link WebglRenderer.render} draws, and the viewports it
@@ -183,6 +191,16 @@ const viewProjection = new Matrix4();
 const rect = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
+ * The texture unit the sprite pipeline samples from.
+ *
+ * Unit 0, permanently: this tier binds exactly one texture per draw, and §77's
+ * multi-texture materials (normal maps, masks, atlases plus data maps) are what
+ * will need a unit allocator. Naming the constant keeps the `activeTexture` call
+ * and the sampler upload from drifting apart.
+ */
+const SPRITE_TEXTURE_UNIT = 0;
+
+/**
  * Narrows `value` to a {@link WebglCanvas}, or throws
  * `RENDERER_INITIALIZATION_FAILED`.
  *
@@ -314,6 +332,40 @@ function resolveRect(
  *   confined to the viewport rectangle, and a `scissor` that is never enabled
  *   does not confine anything. Drawing is confined too, which is what stops a
  *   minimap's geometry from spilling into the main view.
+ * - **Blend function fixed to `SRC_ALPHA`/`ONE_MINUS_SRC_ALPHA`; blending itself
+ *   off.** §66 requires the engine to state its "premultiplied and straight
+ *   alpha policies": this tier is **straight alpha, not premultiplied**, on
+ *   every colour it touches — `UnlitMaterial.color`, `SpriteMaterial.tint`,
+ *   texel data, and `Viewport.clearColor` alike. The *function* never changes,
+ *   so it is set once; the *enable* is toggled around sprite runs, below.
+ *
+ * ## Two pipelines (§55, WP-3a.3)
+ *
+ * A render item says which pipeline draws it (`RenderItem.kind`), and this
+ * backend keeps both live:
+ *
+ * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested and opaque;
+ * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled.
+ *
+ * The unlit pipeline is the frame's starting and resting state: a scene with no
+ * sprites issues exactly the GL sequence it issued before sprites existed, down
+ * to the single `useProgram`. Blending is enabled when a run of sprites begins
+ * and disabled when it ends or the frame does, so an opaque draw never runs
+ * through a blend equation it did not ask for.
+ *
+ * Sprites are **not depth-sorted**: §66's key 2 (opaque versus transparent) and
+ * key 4 (depth) are both deferred with the material state that would drive them,
+ * so sprites draw in render-list order — layer, then explicit render order, then
+ * scene order — with depth testing and depth *writing* left on. That is correct
+ * for sprites that do not overlap, and for overlapping sprites an author orders
+ * with `renderOrder`; it is wrong for arbitrary unsorted overlapping
+ * transparency, which is the documented limitation §66 asks the engine to state
+ * and the sorting packet to fix.
+ *
+ * Textures are discovered from the render list and cached exactly as geometry
+ * is (`gl-texture.ts`), which is why §61's `createTexture` stays deferred — the
+ * argument is written out in that module's header and in `@four/render`'s
+ * `texture.ts`.
  *
  * ## Context loss (§61)
  *
@@ -321,10 +373,11 @@ function resolveRect(
  * browser never restores), and turned into a `contextlost` event; GPU handles
  * are dropped without being deleted, because they are already invalid.
  * `render` then returns silently until `webglcontextrestored` arrives, at which
- * point the program and the geometry cache are rebuilt, the fixed state and the
+ * point both programs and both caches are rebuilt, the fixed state and the
  * surface size are re-applied, capabilities are re-read, and `contextrestored`
  * is emitted — after the rebuild, so the first frame a listener triggers
- * already draws.
+ * already draws. Geometry and texture *content* re-uploads lazily from the
+ * CPU-side sources the application still holds, on the next draw that needs it.
  *
  * ## Lifecycle
  *
@@ -349,7 +402,11 @@ export class WebglRenderer implements Renderer {
 
   #program: UnlitProgram | null = null;
 
+  #spriteProgram: SpriteProgram | null = null;
+
   #geometries: GeometryCache | null = null;
+
+  #textures: TextureCache | null = null;
 
   #contextLost = false;
 
@@ -378,7 +435,9 @@ export class WebglRenderer implements Renderer {
     this.#contextLost = true;
     // Every handle died with the context: drop them, never delete them.
     this.#program = null;
+    this.#spriteProgram = null;
     this.#geometries?.forget();
+    this.#textures?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
 
@@ -391,8 +450,14 @@ export class WebglRenderer implements Renderer {
     // lost and `contextrestored` is not emitted — a half-restored renderer that
     // claimed to be ready would fail on the next draw instead, with no clue.
     this.#program = UnlitProgram.create(gl);
+    this.#spriteProgram = SpriteProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
+    this.#textures = new TextureCache(gl);
     this.#applyFixedState(gl);
+    // Textures are re-uploaded lazily from the CPU-side sources their `Texture`
+    // objects still retain — §61's "re-uploads user resources that retain
+    // CPU-side sources", done on the next draw rather than eagerly, because the
+    // cache cannot know which textures the next frame will actually use.
     this.#applySurfaceSize();
     this.#capabilities = readCapabilities(gl);
     this.#contextLost = false;
@@ -514,13 +579,20 @@ export class WebglRenderer implements Renderer {
       return;
     }
 
-    // Unreachable given the class invariant — a live context always has both —
-    // but the fields are nullable so that context loss can drop them, and the
-    // narrowing has to happen somewhere. Skipping the frame is the right
+    // Unreachable given the class invariant — a live context always has all
+    // four — but the fields are nullable so that context loss can drop them, and
+    // the narrowing has to happen somewhere. Skipping the frame is the right
     // behaviour if the invariant is ever broken: §61 forbids throwing here.
     const program = this.#program;
+    const spriteProgram = this.#spriteProgram;
     const geometries = this.#geometries;
-    if (program === null || geometries === null) {
+    const textures = this.#textures;
+    if (
+      program === null ||
+      spriteProgram === null ||
+      geometries === null ||
+      textures === null
+    ) {
       return;
     }
 
@@ -533,7 +605,12 @@ export class WebglRenderer implements Renderer {
             interpolation.alpha,
             renderList,
           );
+
+    // The unlit pipeline is the frame's starting state, so a scene with no
+    // sprites issues exactly the GL sequence it issued before sprites existed.
     program.use();
+    let activeKind: RenderItemKind = "unlit";
+    let blending = false;
 
     for (const view of views) {
       resolveRect(view, this.#bufferWidth, this.#bufferHeight);
@@ -557,15 +634,68 @@ export class WebglRenderer implements Renderer {
       const camera = view.camera;
       camera.updateViewMatrix();
       viewProjection.copy(camera.projectionMatrix).multiply(camera.viewMatrix);
+
+      // A uniform belongs to the program it was uploaded into, so the unlit
+      // pipeline has to be current before its view-projection is written — and
+      // the sprite pipeline needs its own copy, uploaded the first time it draws
+      // into this view and valid for the rest of it.
+      if (activeKind !== "unlit") {
+        program.use();
+        gl.disable(GL.BLEND);
+        blending = false;
+        activeKind = "unlit";
+      }
       program.setViewProjection(viewProjection);
+      let spriteViewUploaded = false;
 
       for (const item of items) {
         const record = geometries.acquire(item.geometry);
         if (record === null) {
           continue;
         }
-        program.setModel(item.worldMatrix);
-        program.setColor(item.material.color);
+
+        if (isSpriteItem(item)) {
+          const material = item.material;
+          const texture = textures.acquire(material.texture);
+          if (texture === null) {
+            continue;
+          }
+          if (activeKind !== "sprite") {
+            spriteProgram.use();
+            spriteProgram.setSampler(SPRITE_TEXTURE_UNIT);
+            gl.activeTexture(GL.TEXTURE0);
+            gl.enable(GL.BLEND);
+            blending = true;
+            activeKind = "sprite";
+          }
+          if (!spriteViewUploaded) {
+            spriteProgram.setViewProjection(viewProjection);
+            spriteViewUploaded = true;
+          }
+          // The quad's local rectangle, from which the vertex stage derives uv.
+          // `computeBounds()` is cached against the geometry's version, so this
+          // is a version comparison per draw, not a pass over the vertices.
+          const bounds = item.geometry.computeBounds();
+          spriteProgram.setModel(item.worldMatrix);
+          spriteProgram.setQuad(
+            bounds.min.x,
+            bounds.min.y,
+            bounds.max.x - bounds.min.x,
+            bounds.max.y - bounds.min.y,
+          );
+          spriteProgram.setTint(material.tint);
+          gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+        } else {
+          if (activeKind !== "unlit") {
+            program.use();
+            gl.disable(GL.BLEND);
+            blending = false;
+            activeKind = "unlit";
+          }
+          program.setModel(item.worldMatrix);
+          program.setColor(item.material.color);
+        }
+
         gl.bindVertexArray(record.vertexArray);
         if (record.indexType === null) {
           gl.drawArrays(record.mode, 0, record.count);
@@ -575,8 +705,13 @@ export class WebglRenderer implements Renderer {
       }
     }
 
-    // Leave no vertex array bound: the next thing to touch this context may not
-    // be this renderer (§61 allows several renderers over one application).
+    // Restore the fixed state the frame borrowed, and leave nothing bound: the
+    // next thing to touch this context may not be this renderer (§61 allows
+    // several renderers over one application).
+    if (blending) {
+      gl.disable(GL.BLEND);
+      gl.bindTexture(GL.TEXTURE_2D, null);
+    }
     gl.bindVertexArray(null);
   }
 
@@ -627,11 +762,15 @@ export class WebglRenderer implements Renderer {
 
     if (!this.#contextLost) {
       this.#program?.dispose();
+      this.#spriteProgram?.dispose();
       this.#geometries?.dispose();
+      this.#textures?.dispose();
     }
 
     this.#program = null;
+    this.#spriteProgram = null;
     this.#geometries = null;
+    this.#textures = null;
     this.#gl = null;
     this.#canvas = null;
     this.events.removeAllListeners();
@@ -667,14 +806,23 @@ export class WebglRenderer implements Renderer {
       );
     }
 
-    // The program is built before anything is stored, so a shader failure
+    // Both programs are built before anything is stored, so a shader failure
     // leaves the renderer uninitialized rather than half-initialized.
     const program = UnlitProgram.create(gl);
+    let spriteProgram: SpriteProgram;
+    try {
+      spriteProgram = SpriteProgram.create(gl);
+    } catch (error: unknown) {
+      program.dispose();
+      throw error;
+    }
 
     this.#canvas = canvas;
     this.#gl = gl;
     this.#program = program;
+    this.#spriteProgram = spriteProgram;
     this.#geometries = new GeometryCache(gl);
+    this.#textures = new TextureCache(gl);
     this.#capabilities = readCapabilities(gl);
     this.#applyFixedState(gl);
 
@@ -698,6 +846,10 @@ export class WebglRenderer implements Renderer {
     gl.frontFace(GL.CCW);
     gl.disable(GL.CULL_FACE);
     gl.enable(GL.SCISSOR_TEST);
+    // The blend *function* is fixed (§66 straight alpha); the blend *enable* is
+    // not — it is toggled around sprite runs by `render`. GL's initial state
+    // already has `BLEND` disabled, so nothing is disabled here.
+    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
   }
 
   /** Pushes the recorded drawing-buffer size onto the canvas. */
