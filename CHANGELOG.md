@@ -10,6 +10,26 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-01 (later)
 
+#### Added (Phase 3a — Interaction, Sprites, Text MVP, §106a; packets WP-3a.1…WP-3a.7)
+- `@four/input`: §71 picking (ray from +Y-up NDC, AABB + oriented-box tests), §72-subset
+  pointer routing with scene-graph propagation (`capture:`-prefixed capture-phase keys on
+  the four propagating types), `NodeEventMap` augmentation, DragManager (near-plane
+  unprojected world deltas handed to app callbacks; input never writes transforms) —
+  80 tests, 100% coverage.
+- `@four/render`/`@four/materials`/`@four/render-webgl`: §55/§77 MVP textures + sprite
+  quads (`kind: "sprite"` render items, SpriteMaterial/SpriteTexture contract, GL texture
+  uploads). §55 frame regions deferred (whole-texture mapping only; backlogged).
+- `@four/text`: §56 bitmap MVP tier — embedded 6×12 monospace font (95 printable ASCII,
+  base-32 row encoding), glyph atlas, text layout (Y-up baselines); SDF staged — 48 tests,
+  100% coverage.
+- Example upgrade: click-to-recolour palettes, pointer dragging with the §42
+  untrack + authority handover pair, per-glyph text label; 21.46 kB gzip vs the 150 kB
+  §86 gate.
+- Browser interaction gate (5 new Playwright tests, 11 total): real Chromium mouse input,
+  framebuffer-pixel assertions for click/miss/drag/tumble-resume/label ink/no-errors.
+- Phase 3a exit GREEN (§106a criterion TRUE): 1,015 unit tests, browser suite ×2, goldens
+  untouched, coverage ≥95% every touched package; demo-ready static build confirmed.
+
 #### Added (Phase 3 — Renderer Foundation, §106; packets WP-3.1…WP-3.9)
 - `@four/scene`: §47 cameras (D8 depth ranges) + §48 viewport. `@four/geometry`/
   `@four/materials`: BufferGeometry + primitives, UnlitMaterial. `@four/render`: §61

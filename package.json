@@ -12,6 +12,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:suites": "vitest run --config vitest.suites.config.ts --passWithNoTests",
+    "coverage": "pnpm -r --filter \"./packages/*\" exec vitest run --coverage --config ../../vitest.coverage.config.ts",
+    "typecheck:examples": "tsc --noEmit -p examples",
     "lint": "eslint .",
     "format": "prettier --write .",
     "check-spec": "node tools/check-spec.mjs",

@@ -43,6 +43,12 @@
         max-width: 100%;
         display: block;
         border-radius: 6px;
+        /*
+          The canvas handles its own pointer gestures (§72): without this a
+          touch drag would be swallowed by the browser's own panning and zoom
+          before `pointermove` ever reached the scene.
+        */
+        touch-action: none;
       }
     </style>
   </head>
@@ -50,9 +56,12 @@
     <main>
       <canvas id="scene" width="800" height="600"></canvas>
       <p>
-        four.js — scene, render and motion in one loop: an orbiting circle
-        (kinematic path following), a tumbling box (procedural motion), and a
-        static ground plane.
+        four.js — scene, render, motion and input in one loop: an orbiting
+        circle (kinematic path following), a tumbling box (procedural motion), a
+        static ground plane, and a label drawn from a bitmap glyph atlas.
+        <strong>Click</strong> the circle or the box to recolour it, or
+        <strong>drag</strong> the box — dragging hands its transform from the
+        motion system to your pointer and back again.
       </p>
     </main>
     <script type="module" src="/main.ts"></script>
