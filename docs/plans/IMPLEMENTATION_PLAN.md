@@ -143,6 +143,8 @@ Direct workspace dependencies only (transitives implied). Wave = parallel dispat
 `@size-limit/preset-small-lib@13.0.2`, `vite@8.1.5`, `typedoc@0.28.20`, `yaml@2.9.0`.
 Exact pins, no ranges. If an install or peer conflict arises, **the orchestrator** (never a
 worker) adjusts a pin and updates this table with a dated note.
+*(Added 2026-08-01 by the orchestrator: `@vitest/coverage-v8@3.2.7` — coverage measurement
+joins the phase-exit gates from Phase 1 on, per the session goal of ≥95% coverage.)*
 **Validated together 2026-07-29** by the Phase −1 smoke: install (no peer conflicts),
 `tsc -b` reference chain, cross-package Vitest, type-checked ESLint, TypeDoc packages
 mode, Vite 8 example build, and size-limit all passed as one workspace. pnpm 10 blocks
