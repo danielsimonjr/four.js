@@ -135,6 +135,11 @@ Direct workspace dependencies only (transitives implied). Wave = parallel dispat
 | 5 | `physics-soft` | physics |
 | 6 | `four` | all 23 above |
 
+*Dated note (2026-08-01, orchestrator):* `physics-rapier` additionally declares
+`@four/core` + `@four/math` directly (WP-5.4-fix1) — the adapter imports both
+(`FourError`, `Vector3`), and "transitives implied" should not hide a genuine direct
+import. No new edge: both were already transitively present via `physics`.
+
 ### 3.2 Toolchain pins (verified against the registry 2026-07-29)
 
 `typescript@5.9.3` (NOT 7.x — the native rewrite is a different toolchain),
