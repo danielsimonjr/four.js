@@ -113,7 +113,7 @@ describe("Application — lifecycle (§45)", () => {
     } catch (error) {
       expect(isFourError(error)).toBe(true);
       if (isFourError(error)) {
-        expect(error.code).toBe("RENDERER_INITIALIZATION_FAILED");
+        expect(error.code).toBe("INVALID_APPLICATION_STATE");
         expect(error.context).toMatchObject({
           method: "start",
           initialized: false,
@@ -142,7 +142,7 @@ describe("Application — lifecycle (§45)", () => {
     }
     expect(isFourError(caught)).toBe(true);
     if (isFourError(caught)) {
-      expect(caught.code).toBe("RENDERER_INITIALIZATION_FAILED");
+      expect(caught.code).toBe("INVALID_APPLICATION_STATE");
       expect(caught.context).toMatchObject({
         method: "step",
         initialized: true,

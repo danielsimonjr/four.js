@@ -137,26 +137,13 @@ export interface ApplicationOptions {
  * The §89 code every lifecycle-misuse failure of this class carries.
  *
  * §89 lists nine "example codes" and `@four/core` models them as a closed
- * union so a typo is a compile error; none of the nine names "the application
- * was used out of order", and `packages/core/src/errors.ts` is outside this
- * packet's scope (the same collision WP-1.9 hit, which chose the platform
- * `RangeError` for argument validation — not an option here, because a
- * lifecycle failure is an engine failure and §89 requires those to be
- * `FourError`s so diagnostics can report them).
- *
- * `RENDERER_INITIALIZATION_FAILED` is the union's only *initialization-order*
- * member and the one that becomes literally true in Phase 3, when
- * {@link Application.initialize} is what constructs the renderer: using the
- * application before `initialize()` resolved is precisely "the renderer was
- * never initialized". Until then the code is broader than its name, so every
- * throw carries a `context` naming the real state (`initialized`, `running`,
- * `disposed`, `method`) and a message that says what the caller did wrong.
- *
- * TODO(WP-1.12-fix1, §89): add `INVALID_APPLICATION_STATE` to `FourErrorCode`
- * in `@four/core` and switch these throws to it. That is a one-line change to a
- * file this packet may not touch.
+ * union so a typo is a compile error; `INVALID_APPLICATION_STATE` (added by
+ * WP-1.12-fix1) names "the application
+ * was used out of order" precisely. Every throw still carries a `context`
+ * naming the real state (`initialized`, `running`, `disposed`, `method`) and a
+ * message that says what the caller did wrong.
  */
-const LIFECYCLE_ERROR_CODE = "RENDERER_INITIALIZATION_FAILED";
+const LIFECYCLE_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 export class Application extends EventEmitter<ApplicationEventMap> {
   /**
