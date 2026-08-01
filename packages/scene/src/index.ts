@@ -6,6 +6,11 @@ export {
   TRANSFORM_AUTHORITIES,
   warnAuthorityConflict,
 } from "./authority.js";
+export type {
+  OrthographicCameraOptions,
+  PerspectiveCameraOptions,
+} from "./camera.js";
+export { Camera, OrthographicCamera, PerspectiveCamera } from "./camera.js";
 export { Group } from "./group.js";
 export type {
   PoseSnapshotSystem,
@@ -20,6 +25,8 @@ export type { NodeEventMap, NodeHierarchyEvent, NodeType } from "./node.js";
 export { Node } from "./node.js";
 export { Scene } from "./scene.js";
 export { Transform } from "./transform.js";
+export type { Viewport } from "./viewport.js";
+export { createFullscreenViewport } from "./viewport.js";
 export type { WorldTransformStats } from "./world-transforms.js";
 export {
   resolveWorldTransform,
