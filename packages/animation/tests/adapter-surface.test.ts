@@ -27,8 +27,13 @@ interface SurfaceCase<T> {
   readonly equals: (actual: T, expected: T) => void;
 }
 
-const surfaceCases: ReadonlyArray<SurfaceCase<never>> = [
-  {
+/** Erases the per-case value type so heterogeneous cases share one array. */
+function erased<T>(surfaceCase: SurfaceCase<T>): SurfaceCase<unknown> {
+  return surfaceCase as unknown as SurfaceCase<unknown>;
+}
+
+const surfaceCases: ReadonlyArray<SurfaceCase<unknown>> = [
+  erased({
     name: "vector2",
     adapter: vector2Adapter,
     a: () => new Vector2(1, 2),
@@ -38,8 +43,8 @@ const surfaceCases: ReadonlyArray<SurfaceCase<never>> = [
       expect(actual.x).toBe(expected.x);
       expect(actual.y).toBe(expected.y);
     },
-  },
-  {
+  }),
+  erased({
     name: "vector3",
     adapter: vector3Adapter,
     a: () => new Vector3(1, 2, 3),
@@ -50,8 +55,8 @@ const surfaceCases: ReadonlyArray<SurfaceCase<never>> = [
       expect(actual.y).toBe(expected.y);
       expect(actual.z).toBe(expected.z);
     },
-  },
-  {
+  }),
+  erased({
     name: "vector4",
     adapter: vector4Adapter,
     a: () => new Vector4(1, 2, 3, 4),
@@ -63,8 +68,8 @@ const surfaceCases: ReadonlyArray<SurfaceCase<never>> = [
       expect(actual.z).toBe(expected.z);
       expect(actual.w).toBe(expected.w);
     },
-  },
-  {
+  }),
+  erased({
     name: "quaternion",
     adapter: quaternionAdapter,
     a: () => new Quaternion(0, 0, 0, 1),
@@ -76,8 +81,8 @@ const surfaceCases: ReadonlyArray<SurfaceCase<never>> = [
       expect(actual.z).toBeCloseTo(expected.z, 12);
       expect(actual.w).toBeCloseTo(expected.w, 12);
     },
-  },
-  {
+  }),
+  erased({
     name: "color",
     adapter: colorAdapter,
     a: () => [0, 0.25, 0.5, 1] as ColorRGBA,
@@ -86,11 +91,11 @@ const surfaceCases: ReadonlyArray<SurfaceCase<never>> = [
     equals: (actual: ColorRGBA, expected: ColorRGBA) => {
       expect(actual).toEqual(expected);
     },
-  },
-] as ReadonlyArray<SurfaceCase<never>>;
+  }),
+];
 
 describe("adapter surface (clone/copy/lerp on every in-place kind)", () => {
-  for (const surface of surfaceCases as ReadonlyArray<SurfaceCase<unknown>>) {
+  for (const surface of surfaceCases) {
     it(`${surface.name}: clone is a distinct equal value`, () => {
       const original = surface.a();
       const cloned = surface.adapter.clone(original);

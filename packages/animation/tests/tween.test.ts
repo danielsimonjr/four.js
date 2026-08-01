@@ -6,7 +6,7 @@ import {
   resetConstructionCount,
 } from "@four/math";
 import { Group, Node } from "@four/scene";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 import { cubicOut } from "../src/easing.js";
 import { Tween, animate, tween } from "../src/tween.js";
@@ -32,7 +32,7 @@ function expectFourError(run: () => unknown, code: string): Error {
 }
 
 /** Silences and records `console.warn` for one test. */
-function spyOnWarn(): ReturnType<typeof vi.spyOn<Console, "warn">> {
+function spyOnWarn(): MockInstance<typeof console.warn> {
   return vi.spyOn(console, "warn").mockImplementation(() => undefined);
 }
 
