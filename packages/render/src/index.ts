@@ -5,6 +5,7 @@ export { buildInterpolatedRenderList, buildRenderList } from "./render-list.js";
 export type { RenderableOptions } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export type {
+  RenderInterpolation,
   Renderer,
   RendererBackend,
   RendererCapabilities,

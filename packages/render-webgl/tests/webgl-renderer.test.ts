@@ -38,7 +38,7 @@
  */
 
 import { FourError, isFourError } from "@four/core";
-import { Matrix4 } from "@four/math";
+import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import { Renderable, type RenderItem, type Renderer } from "@four/render";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -62,6 +62,9 @@ type RenderView = Parameters<Renderer["render"]>[1][number];
 type RenderCamera = RenderView["camera"];
 type ItemGeometry = RenderItem["geometry"];
 type ItemMaterial = RenderItem["material"];
+type RenderInterpolation = NonNullable<Parameters<Renderer["render"]>[2]>;
+type RenderPoseBuffer = RenderInterpolation["poseBuffer"];
+type RenderNode = Parameters<Renderer["render"]>[0];
 
 // ---------------------------------------------------------------------------
 // The fake GL context.
@@ -468,6 +471,71 @@ class TestCamera {
   get asCamera(): RenderCamera {
     return this as unknown as RenderCamera;
   }
+}
+
+/**
+ * A `PoseBuffer` reduced to the one method the interpolated render list calls
+ * (§43).
+ *
+ * `PoseBuffer` lives in `@four/scene`, outside this package's dependency
+ * matrix, so — like the camera, geometry, and material above — it is a double.
+ * The interpolation *arithmetic* under test is `@four/render`'s real
+ * `buildInterpolatedRenderList`; what this double supplies is the pair of poses
+ * a simulation would have captured, so the assertion is about which list the
+ * backend built and what it uploaded, not about lerp.
+ */
+class TestPoseBuffer {
+  /** Nodes this buffer claims to track, with the two poses §43 blends. */
+  readonly tracked = new Map<
+    RenderNode,
+    { readonly from: Vector3; readonly to: Vector3 }
+  >();
+
+  /** Alphas the render list asked about, in call order. */
+  readonly alphas: number[] = [];
+
+  track(node: RenderNode, from: Vector3, to: Vector3): this {
+    this.tracked.set(node, { from, to });
+    return this;
+  }
+
+  /** `PoseBuffer.computeRenderPose`: lerp position, leave rotation identity. */
+  computeRenderPose(
+    node: RenderNode,
+    alpha: number,
+    outPosition: Vector3,
+    outRotation: Quaternion,
+  ): boolean {
+    const entry = this.tracked.get(node);
+    if (entry === undefined) {
+      return false;
+    }
+    this.alphas.push(alpha);
+    outPosition.copy(entry.from).lerp(entry.to, alpha);
+    outRotation.identity();
+    return true;
+  }
+
+  get asPoseBuffer(): RenderPoseBuffer {
+    return this as unknown as RenderPoseBuffer;
+  }
+}
+
+/** The §43 argument `Application` passes to `render` each frame. */
+function interpolationAt(
+  poses: TestPoseBuffer,
+  alpha: number,
+): RenderInterpolation {
+  return { poseBuffer: poses.asPoseBuffer, alpha };
+}
+
+/** The model matrices uploaded by the last render, in upload order. */
+function modelUploads(gl: FakeGl): number[][] {
+  const model = gl.uniformLocations.get("model");
+  return gl
+    .callsOf("uniformMatrix4fv")
+    .filter((call) => call.args[0] === model)
+    .map((call) => call.args[2] as number[]);
 }
 
 /** Three vertices, one unindexed triangle. */
@@ -1433,6 +1501,133 @@ describe("WebglRenderer.render — uniforms and draws (§64, §57)", () => {
     expect(gl.countOf("drawElements")).toBe(2);
     expect(gl.countOf("drawArrays")).toBe(2);
     expect(gl.countOf("useProgram")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — §43 interpolated poses (WP-3.6)", () => {
+  /** A root with one drawable child; the root itself draws nothing. */
+  function interpolationScene(): { root: Renderable; child: Renderable } {
+    const root = createRoot();
+    const child = renderable(quadGeometry());
+    root.add(child);
+    return { root, child };
+  }
+
+  it("draws the render pose at alpha, not the resolved world matrix", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, child } = interpolationScene();
+    // The world matrix says one thing, the captured poses another: only the
+    // interpolated list can produce the alpha-blended answer.
+    child.transform.worldMatrix.fromArray([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -99, -99, -99, 1,
+    ]);
+    const poses = new TestPoseBuffer().track(
+      child,
+      new Vector3(0, 0, 0),
+      new Vector3(10, 0, 0),
+    );
+
+    gl.reset();
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 0));
+    const atZero = modelUploads(gl);
+
+    gl.reset();
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 1));
+    const atOne = modelUploads(gl);
+
+    gl.reset();
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 0.25));
+    const atQuarter = modelUploads(gl);
+
+    expect(atZero).toHaveLength(1);
+    expect(atOne).toHaveLength(1);
+    expect(atZero[0].slice(12, 15)).toEqual([0, 0, 0]);
+    expect(atOne[0].slice(12, 15)).toEqual([10, 0, 0]);
+    expect(atQuarter[0].slice(12, 15)).toEqual([2.5, 0, 0]);
+    // The point of §43: the same scene, a different alpha, a different frame.
+    expect(atZero[0]).not.toEqual(atOne[0]);
+  });
+
+  it("passes the frame's alpha through to the pose buffer unchanged", async () => {
+    const { renderer, camera } = await initialized();
+    const { root, child } = interpolationScene();
+    const poses = new TestPoseBuffer().track(
+      child,
+      new Vector3(0, 0, 0),
+      new Vector3(4, 0, 0),
+    );
+
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 0.75));
+
+    expect(poses.alphas).toEqual([0.75]);
+  });
+
+  it("uses the live local transform of a node the buffer does not track", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, child } = interpolationScene();
+    child.transform.position.set(1, 2, 3);
+    const poses = new TestPoseBuffer();
+
+    gl.reset();
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 0.5));
+
+    expect(poses.alphas).toEqual([]);
+    expect(modelUploads(gl)[0].slice(12, 15)).toEqual([1, 2, 3]);
+  });
+
+  it("never writes a render pose back into the scene (§42, §43)", async () => {
+    const { renderer, camera } = await initialized();
+    const { root, child } = interpolationScene();
+    const poses = new TestPoseBuffer().track(
+      child,
+      new Vector3(0, 0, 0),
+      new Vector3(10, 0, 0),
+    );
+    const version = child.transform.version;
+
+    renderer.render(root, [createView(camera)], interpolationAt(poses, 0.5));
+
+    const { x, y, z } = child.transform.position;
+    expect([x, y, z]).toEqual([0, 0, 0]);
+    expect(child.transform.version).toBe(version);
+  });
+
+  it("builds the ordinary render list when no interpolation is passed", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, child } = interpolationScene();
+    child.transform.worldMatrix.fromArray([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 7, 8, 9, 1,
+    ]);
+    const poses = new TestPoseBuffer().track(
+      child,
+      new Vector3(0, 0, 0),
+      new Vector3(10, 0, 0),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The resolved world matrix, and the buffer was never consulted: the
+    // non-interpolated path is a matter of omitting the argument, not of
+    // configuring the renderer.
+    expect(modelUploads(gl)[0].slice(12, 15)).toEqual([7, 8, 9]);
+    expect(poses.alphas).toEqual([]);
+  });
+
+  it("skips the frame while the context is lost, interpolation and all (§61)", async () => {
+    const { renderer, canvas, camera } = await initialized();
+    const { root, child } = interpolationScene();
+    const poses = new TestPoseBuffer().track(
+      child,
+      new Vector3(0, 0, 0),
+      new Vector3(10, 0, 0),
+    );
+    canvas.dispatch("webglcontextlost");
+
+    expect(() => {
+      renderer.render(root, [createView(camera)], interpolationAt(poses, 0.5));
+    }).not.toThrow();
+    expect(poses.alphas).toEqual([]);
   });
 });
 

@@ -6,6 +6,7 @@ import {
 } from "@four/core";
 import {
   PerspectiveCamera,
+  PoseBuffer,
   Scene,
   createFullscreenViewport,
   type Viewport,
@@ -14,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   NullRenderer,
+  type RenderInterpolation,
   type Renderer,
   type RendererCapabilities,
   type RendererEventMap,
@@ -48,6 +50,20 @@ describe("Renderer (§61) — interface conformance", () => {
     expect(typeof renderer.dispose).toBe("function");
     expect(renderer.events).toBeInstanceOf(EventEmitter);
     expect(renderer.capabilities).toBeTypeOf("object");
+  });
+
+  it("declares the §43 interpolation argument on the interface itself", () => {
+    // Called through the `Renderer` type, not through `NullRenderer`: if the
+    // third parameter lived only on the class, this would not compile — and a
+    // backend author reading the interface would never know to accept it.
+    const backend: NullRenderer = new NullRenderer();
+    const renderer: Renderer = backend;
+    const { scene, views } = fixture();
+    const poseBuffer = new PoseBuffer();
+
+    renderer.render(scene, views, { poseBuffer, alpha: 0.5 });
+
+    expect(backend.lastInterpolation).toEqual({ poseBuffer, alpha: 0.5 });
   });
 
   it("is a Disposable, so ownership helpers accept it (§83)", () => {
@@ -170,6 +186,35 @@ describe("NullRenderer — call recording", () => {
       resolution: 2,
     });
     expect(renderer.resizeCount).toBe(2);
+  });
+
+  it("records the §43 interpolation record a frame passed (not copied)", () => {
+    const { renderer, scene, views } = fixture();
+    const interpolation: RenderInterpolation = {
+      poseBuffer: new PoseBuffer(),
+      alpha: 0.25,
+    };
+
+    renderer.render(scene, views, interpolation);
+
+    expect(renderer.renderCount).toBe(1);
+    // Retained, not copied: `Application` reuses one record per frame (D7).
+    expect(renderer.lastInterpolation).toBe(interpolation);
+  });
+
+  it("records null for a render that passed no interpolation, clearing the last", () => {
+    const { renderer, scene, views } = fixture();
+
+    expect(renderer.lastInterpolation).toBeNull();
+    renderer.render(scene, views, { poseBuffer: new PoseBuffer(), alpha: 1 });
+    expect(renderer.lastInterpolation).not.toBeNull();
+
+    // A later non-interpolated frame must not leave the previous record
+    // standing, or a test would pass for the wrong reason.
+    renderer.render(scene, views);
+
+    expect(renderer.lastInterpolation).toBeNull();
+    expect(renderer.renderCount).toBe(2);
   });
 
   it("draws nothing — the scene is untouched by a render", () => {

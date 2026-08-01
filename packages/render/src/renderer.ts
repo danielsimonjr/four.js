@@ -46,6 +46,15 @@
  *   `devicePixelRatio`, which a headless caller does not have. Defaulting to
  *   `1` here keeps `resize(w, h)` meaningful in tests and Node (decision,
  *   WP-3.4). Passing a resolution explicitly is the browser path.
+ * - **`render` takes a third, optional {@link RenderInterpolation}
+ *   argument.** §61's signature is `render(scene, views)`, which has nowhere to
+ *   put §43's `interpolationAlpha` — and §43 is not optional behaviour: a
+ *   renderer that draws the raw fixed-step poses judders whenever the display
+ *   rate is not a multiple of the simulation rate. Passing the pose buffer and
+ *   the alpha *per call* rather than configuring them on the renderer keeps the
+ *   backend stateless about time, lets one renderer serve two applications, and
+ *   keeps the non-interpolated path (an editor preview, a single-step
+ *   screenshot) a matter of omitting an argument (decision, WP-3.6).
  *
  * ## Interface, not base class (§6b composition)
  *
@@ -66,7 +75,7 @@
 
 import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
-import type { Node, Viewport } from "@four/scene";
+import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
 /**
  * Which backend an implementation drives (§62).
@@ -176,6 +185,49 @@ export interface RendererEventMap {
    * response already draws normally.
    */
   contextrestored: { renderer: Renderer };
+}
+
+/**
+ * Where a frame's §43 render poses come from, and how far between the last two
+ * fixed steps it is (§10, §43).
+ *
+ * ```ts
+ * app.on("render", (time) => {
+ *   renderer.render(scene, views, { poseBuffer: poses, alpha: time.interpolationAlpha });
+ * });
+ * ```
+ *
+ * A backend given this record draws the **interpolated** pose of every node the
+ * buffer tracks — position lerped, rotation slerped — instead of the pose the
+ * last fixed step left behind; a backend given `undefined` draws the resolved
+ * world transforms (§7). Both are legitimate: the second is what a still frame,
+ * a picking pass, or a headless determinism run wants, because it is exactly
+ * the simulation state and nothing else.
+ *
+ * Nothing here is written to. §43's rule — "the render transform should not
+ * feed back into the physics state" — is the reason the pose buffer is passed
+ * as a *source* per frame rather than as something the renderer owns or
+ * updates; a renderer only ever calls `computeRenderPose` (decision, WP-3.6).
+ *
+ * **The record may be a per-frame scratch object.** `Application` reuses one
+ * (plan D7: the frame loop allocates nothing), so a backend must read
+ * `poseBuffer` and `alpha` during the `render` call and never retain the record
+ * itself — the same rule the views array and the pooled render items follow.
+ */
+export interface RenderInterpolation {
+  /**
+   * The engine's previous/current pose store (§37, §43) — one per application,
+   * owned by whoever captures into it.
+   */
+  readonly poseBuffer: PoseBuffer;
+
+  /**
+   * How far the frame sits between the previous and the current fixed step:
+   * `TimeState.interpolationAlpha` (§9, §10), in `[0, 1]`. `PoseBuffer` clamps
+   * it, so an out-of-range or non-finite value degrades to an endpoint rather
+   * than extrapolating a pose the simulation never produced.
+   */
+  readonly alpha: number;
 }
 
 /**
@@ -308,10 +360,31 @@ export interface Renderer extends Disposable {
    *   configurable `clearDepth` is deferred; the cleared value is the far plane.
    * - Clears are confined to the viewport rectangle, never the whole surface.
    *
+   * ### Interpolated poses (§43)
+   *
+   * With `interpolation` present the backend draws each node at its §43 render
+   * pose — the previous and current fixed-step poses blended at
+   * `interpolation.alpha`, positions lerped and rotations slerped — instead of
+   * at its resolved world transform. In `@four/render` terms that is
+   * {@link buildInterpolatedRenderList} rather than {@link buildRenderList},
+   * and it is what makes motion smooth when the display rate and the fixed
+   * simulation rate disagree (§10). Nodes the buffer does not track are drawn
+   * from their live transforms at every alpha, so a mixed scene needs no
+   * bookkeeping.
+   *
+   * With `interpolation` omitted the backend draws the resolved world
+   * transforms, which requires the caller to have run `resolveWorldTransforms`
+   * for the frame (§7, §64) — the interpolated path derives its matrices itself
+   * and does not.
+   *
    * Returns immediately if the context is lost (see the context-loss contract
    * above): never throws for that reason.
    */
-  render(root: Node, views: readonly Viewport[]): void;
+  render(
+    root: Node,
+    views: readonly Viewport[],
+    interpolation?: RenderInterpolation,
+  ): void;
 
   /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at
@@ -442,6 +515,15 @@ export class NullRenderer implements Renderer {
   /** Views of the most recent `render` (not copied); `null` before the first call. */
   lastViews: readonly Viewport[] | null = null;
 
+  /**
+   * The §43 interpolation record of the most recent `render` (**not copied**;
+   * callers reuse one per frame), or `null` when that call passed none — so a
+   * later non-interpolated frame clears the record rather than leaving the
+   * previous frame's standing, which would let a test pass for the wrong
+   * reason. `null` before the first call.
+   */
+  lastInterpolation: RenderInterpolation | null = null;
+
   /** Number of {@link NullRenderer.resize} calls. */
   resizeCount = 0;
 
@@ -470,12 +552,22 @@ export class NullRenderer implements Renderer {
     return Promise.resolve();
   }
 
-  /** Records `root` and `views`, and draws nothing. */
-  render(root: Node, views: readonly Viewport[]): void {
+  /**
+   * Records `root`, `views`, and the §43 `interpolation` record, and draws
+   * nothing. No pose is computed: the null backend has nothing to draw them
+   * into, and a test that wants the interpolated matrices asks
+   * {@link buildInterpolatedRenderList} for them directly.
+   */
+  render(
+    root: Node,
+    views: readonly Viewport[],
+    interpolation?: RenderInterpolation,
+  ): void {
     this.#assertUsable("render");
     this.renderCount += 1;
     this.lastRenderRoot = root;
     this.lastViews = views;
+    this.lastInterpolation = interpolation ?? null;
   }
 
   /** Records the requested size. `resolution` defaults to `1`. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { isFourError } from "@four/core";
+import { Quaternion, Vector3 } from "@four/math";
 import {
   DEFAULT_FIXED_DELTA_TIME,
   DEFAULT_MAXIMUM_SUB_STEPS,
@@ -11,9 +12,16 @@ import {
   type SimulationSystem,
   type TimeState,
 } from "@four/motion";
-import { Group, resolveWorldTransforms } from "@four/scene";
+import { NullRenderer } from "@four/render";
+import {
+  Group,
+  PerspectiveCamera,
+  createFullscreenViewport,
+  resolveWorldTransforms,
+  type Viewport,
+} from "@four/scene";
 
-import { Application } from "../src/application.js";
+import { Application, type ApplicationOptions } from "../src/application.js";
 
 const FIXED = DEFAULT_FIXED_DELTA_TIME;
 
@@ -473,6 +481,252 @@ describe("Application — dispose (§45, §83)", () => {
     }).toThrowError(/system dispose failed/);
     expect(app.disposed).toBe(true);
     expect(app.listenerCount("update")).toBe(0);
+  });
+});
+
+describe("Application — renderer integration (§45, §61, §43)", () => {
+  /** An application wired to a recording backend, with one full-screen view. */
+  async function renderedApplication(
+    options: Omit<ApplicationOptions, "renderer"> = {},
+  ): Promise<{
+    app: Application;
+    renderer: NullRenderer;
+    view: Viewport;
+  }> {
+    const renderer = new NullRenderer();
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const view = createFullscreenViewport(camera);
+    const app = new Application({ renderer, views: [view], ...options });
+    app.scene.add(camera);
+    await app.initialize();
+    app.start();
+    return { app, renderer, view };
+  }
+
+  it("is headless by default: no renderer, no views, no snapshot system", async () => {
+    const app = await startedApplication();
+
+    expect(app.renderer).toBeNull();
+    expect(app.views).toEqual([]);
+    expect(app.systems.size).toBe(0);
+    expect(app.poses.size).toBe(0);
+
+    // A frame still runs end to end; there is simply nothing to draw into.
+    const log: string[] = [];
+    traceEvents(app, log);
+    app.step(FIXED);
+    expect(log).toEqual(["fixedUpdate", "update", "render"]);
+  });
+
+  it("awaits renderer.initialize with the canvas, and only then is initialized", async () => {
+    const renderer = new NullRenderer();
+    const canvas = { id: "surface" };
+    const app = new Application({ renderer, canvas });
+
+    const pending = app.initialize();
+    // Nothing has happened yet: §45's initialization is asynchronous, so the
+    // backend is acquired on the microtask, not inside the call.
+    expect(renderer.initializeCount).toBe(0);
+    expect(app.initialized).toBe(false);
+
+    await pending;
+
+    expect(renderer.initializeCount).toBe(1);
+    expect(renderer.lastInitializeOptions).toEqual({ canvas });
+    expect(app.initialized).toBe(true);
+  });
+
+  it("initializes the backend exactly once for repeated calls", async () => {
+    const renderer = new NullRenderer();
+    const app = new Application({ renderer });
+
+    await Promise.all([app.initialize(), app.initialize()]);
+    await app.initialize();
+
+    expect(renderer.initializeCount).toBe(1);
+  });
+
+  it("rejects, and refuses to start, when the backend cannot initialize", async () => {
+    const failure = new Error("no GPU");
+    const renderer = new NullRenderer();
+    renderer.initialize = () => Promise.reject(failure);
+    const app = new Application({ renderer });
+
+    await expect(app.initialize()).rejects.toBe(failure);
+
+    expect(app.initialized).toBe(false);
+    expect(() => {
+      app.start();
+    }).toThrowError(/initialize/);
+  });
+
+  it("draws the scene, the views, and the §43 interpolation once per frame", async () => {
+    const { app, renderer, view } = await renderedApplication();
+
+    app.step(FIXED * 1.5);
+
+    expect(renderer.renderCount).toBe(1);
+    expect(renderer.lastRenderRoot).toBe(app.scene);
+    // The array itself, not a copy: §61's contract is that a backend reads it
+    // during the call.
+    expect(renderer.lastViews).toBe(app.views);
+    expect(renderer.lastViews).toEqual([view]);
+    expect(renderer.lastInterpolation?.poseBuffer).toBe(app.poses);
+    expect(renderer.lastInterpolation?.alpha).toBe(app.time.interpolationAlpha);
+    expect(app.time.interpolationAlpha).toBeCloseTo(0.5, 12);
+
+    app.step(FIXED);
+    expect(renderer.renderCount).toBe(2);
+  });
+
+  it("reuses one interpolation record, rewriting only its alpha (D7)", async () => {
+    const { app, renderer } = await renderedApplication();
+
+    app.step(FIXED * 1.25);
+    const first = renderer.lastInterpolation;
+    const firstAlpha = first?.alpha;
+    app.step(FIXED * 0.5);
+
+    expect(renderer.lastInterpolation).toBe(first);
+    expect(firstAlpha).toBeCloseTo(0.25, 12);
+    expect(renderer.lastInterpolation?.alpha).toBeCloseTo(0.75, 12);
+  });
+
+  it("draws after the render listeners, so a listener can set the frame up", async () => {
+    const { app, renderer, view } = await renderedApplication();
+    const order: string[] = [];
+    app.on("render", () => {
+      order.push(`listener:${String(renderer.renderCount)}`);
+      view.x = 0.25;
+    });
+
+    app.step(FIXED);
+
+    expect(order).toEqual(["listener:0"]);
+    expect(renderer.renderCount).toBe(1);
+    // The listener's edit is in the frame that was drawn, not the next one.
+    expect(renderer.lastViews?.[0].x).toBe(0.25);
+  });
+
+  it("draws nothing while the view list is empty (§61)", async () => {
+    const { app, renderer } = await renderedApplication({ views: [] });
+
+    app.step(FIXED);
+    expect(renderer.renderCount).toBe(0);
+
+    // Pushing a viewport is all it takes; nothing is re-initialized.
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    app.views.push(createFullscreenViewport(camera));
+    app.step(FIXED);
+    expect(renderer.renderCount).toBe(1);
+  });
+
+  it("copies the views option, so the author's array is not the app's", () => {
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const authored = [createFullscreenViewport(camera)];
+    const app = new Application({
+      renderer: new NullRenderer(),
+      views: authored,
+    });
+
+    authored.push(createFullscreenViewport(camera, "second"));
+
+    expect(app.views).toHaveLength(1);
+    expect(app.views).not.toBe(authored);
+  });
+
+  it("registers the §39 step-10 snapshot system and captures per fixed step", async () => {
+    const { app } = await renderedApplication();
+    const node = new Group();
+    app.scene.add(node);
+    app.poses.track(node);
+    expect(app.systems.size).toBe(1);
+
+    // A system (not a listener) moves the node, so the move happens before the
+    // capture at PRIORITY_SNAPSHOT.
+    app.systems.register(
+      new RecordingSystem("mover", [], PRIORITY_KINEMATICS, () => {
+        node.transform.position.x += 1;
+      }),
+    );
+    app.step(FIXED);
+    app.step(FIXED);
+
+    const position = new Vector3();
+    const rotation = new Quaternion();
+    expect(app.poses.computeRenderPose(node, 0, position, rotation)).toBe(true);
+    expect(position.x).toBe(1);
+    app.poses.computeRenderPose(node, 1, position, rotation);
+    expect(position.x).toBe(2);
+    app.poses.computeRenderPose(node, 0.5, position, rotation);
+    expect(position.x).toBe(1.5);
+    // §43: the render pose is presentation-only.
+    expect(node.transform.position.x).toBe(2);
+  });
+
+  it("tracks nothing on its own — interpolation is opt-in per node", async () => {
+    const { app } = await renderedApplication();
+    app.scene.add(new Group(), new Group());
+
+    app.step(FIXED);
+
+    expect(app.poses.size).toBe(0);
+  });
+
+  it("omits the interpolation argument when poseInterpolation is false", async () => {
+    const { app, renderer } = await renderedApplication({
+      poseInterpolation: false,
+    });
+
+    app.step(FIXED * 1.5);
+
+    expect(renderer.renderCount).toBe(1);
+    expect(renderer.lastInterpolation).toBeNull();
+    expect(app.systems.size).toBe(0);
+  });
+
+  it("captures poses without a renderer when poseInterpolation is true", async () => {
+    const app = new Application({ poseInterpolation: true });
+    await app.initialize();
+    app.start();
+    const node = new Group();
+    app.scene.add(node);
+    app.poses.track(node);
+
+    expect(app.renderer).toBeNull();
+    expect(app.systems.size).toBe(1);
+
+    node.transform.position.set(3, 0, 0);
+    app.step(FIXED);
+
+    const position = new Vector3();
+    const rotation = new Quaternion();
+    app.poses.computeRenderPose(node, 1, position, rotation);
+    expect(position.x).toBe(3);
+  });
+
+  it("does not dispose the renderer it was lent (§83)", async () => {
+    const { app, renderer } = await renderedApplication();
+    app.step(FIXED);
+
+    app.dispose();
+
+    expect(app.disposed).toBe(true);
+    expect(renderer.disposed).toBe(false);
+    // Still usable, and no longer driven by the disposed application.
+    expect(() => {
+      renderer.render(app.scene, app.views);
+    }).not.toThrow();
+    expect(renderer.renderCount).toBe(2);
+  });
+
+  it("stops drawing once disposed", async () => {
+    const { app, renderer } = await renderedApplication();
+    app.dispose();
+
+    app.scheduler.step(FIXED);
+
+    expect(renderer.renderCount).toBe(0);
   });
 });
 

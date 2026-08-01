@@ -3,13 +3,13 @@
  *
  * §45's Application "owns the default scene, renderer, time system, simulation
  * scheduler, input routing, assets, diagnostics, cameras, and viewports". This
- * is the **Phase 1 subset** of that object: the scene, the simulation
- * scheduler, and the §39 system registry, wired together and re-emitting the
- * §10 main-loop events. Renderer, input, assets, cameras, viewports, and
- * physics arrive with the phases that build them (§103); their `§45`
- * construction options are deliberately absent rather than accepted and
- * ignored, so a program that sets `renderer: "webgpu"` today fails to compile
- * instead of silently rendering nothing.
+ * is the current subset of that object: the scene, the simulation scheduler,
+ * the §39 system registry, the §48 viewport list, the §43 pose buffer, and —
+ * optionally — a §61 renderer, wired together and re-emitting the §10
+ * main-loop events. Input, assets, and physics arrive with the phases that
+ * build them (§103); their §45 construction options are deliberately absent
+ * rather than accepted and ignored, so a program that sets `physics: {…}`
+ * today fails to compile instead of silently simulating nothing.
  *
  * ## Why the composition root lives here
  *
@@ -30,13 +30,15 @@
  * app.step(elapsed)
  *   └─ scheduler.step(elapsed)                       §10 accumulator
  *        ├─ onFixedStep  ×N   systems.runFixedStep(time)   §39 priority order
+ *        │                      … incl. the pose snapshot  §39 step 10 / §43
  *        │                    emit("fixedUpdate", time)    §10 / §6b
  *        ├─ onUpdate          resolveWorldTransforms(scene) §7
  *        │                    emit("update", time)
  *        └─ onRender          emit("render", time)
+ *                             renderer.render(scene, views, interpolation) §61
  * ```
  *
- * Three consequences worth stating, because tests pin all of them:
+ * Four consequences worth stating, because tests pin all of them:
  *
  * 1. **Systems run before `fixedUpdate` listeners.** Registered systems are the
  *    engine's own simulation work (§39); an application listener observes the
@@ -52,16 +54,28 @@
  * 3. **`fixedUpdate` may fire zero or many times per `step`**, and `update` and
  *    `render` fire exactly once, always in that order — the §10 contract,
  *    inherited unchanged from the scheduler.
+ * 4. **The draw is the last thing in the frame**, after the `render`
+ *    listeners, so a listener can still move a camera or edit a viewport for
+ *    the frame being drawn (§45; see `onRender` below).
  *
  * ## Headless by construction
  *
- * There is no `requestAnimationFrame` driver in Phase 1 and no DOM reference
+ * There is still no `requestAnimationFrame` driver and no DOM reference
  * anywhere in this file: {@link Application.start} flips state, and the host
  * calls {@link Application.step} with the elapsed seconds it chooses. That is
  * what makes determinism (§33) and replay (§34) testable — feed two
  * applications the same sequence and they produce identical event traces — and
- * a browser driver is a thin addition on top (Phase 3, with the renderer that
- * needs it) rather than something this class has to be rescued from.
+ * a browser driver is a thin addition on top rather than something this class
+ * has to be rescued from.
+ *
+ * The renderer does not change that. It arrives as an *instance* the
+ * application author constructed (`renderer: new WebglRenderer()`), so this
+ * module imports no backend even as a type at runtime, and an application
+ * constructed without one behaves exactly as it did before renderers existed:
+ * no renderer, no viewport list to draw, no snapshot system registered, and
+ * an identical event trace (§33). Everything the renderer adds — the awaited
+ * `initialize`, the per-frame draw, the §43 pose capture — is conditional on
+ * that one option.
  */
 
 import { EventEmitter, FourError } from "@four/core";
@@ -74,10 +88,19 @@ import {
   type ReadonlyTimeState,
 } from "@four/motion";
 import {
+  PoseBuffer,
   Scene,
+  createSnapshotSystem,
   resolveWorldTransforms,
+  type Viewport,
   type WorldTransformStats,
 } from "@four/scene";
+// Type-only, and deliberately so: the emitted JavaScript of this module must
+// not import a renderer package. `four/application` is the headless
+// composition subpath (WP-2.7-fix2) — a program that never names a backend
+// must not pull one in, and a backend arrives here as an *instance* the
+// application author constructed (see `ApplicationOptions.renderer`).
+import type { Renderer } from "@four/render";
 
 /**
  * The §10 main-loop events, as §6b types them.
@@ -112,13 +135,19 @@ export interface ApplicationEventMap {
 }
 
 /**
- * The Phase 1 subset of §45's `ApplicationOptions`.
+ * The current subset of §45's `ApplicationOptions`.
  *
- * §45's full option set (`canvas`, `renderer`, `width`, `height`,
- * `resolution`, `antialias`, `alpha`, `powerPreference`, `autoResize`,
- * `reducedMotion`, `physics`) belongs to subsystems that do not exist yet; each
- * option is added by the packet that builds its subsystem. Omitted numeric
- * options take the Appendix A normative defaults.
+ * §45's remaining options (`width`, `height`, `resolution`, `antialias`,
+ * `alpha`, `powerPreference`, `autoResize`, `reducedMotion`, `physics`) belong
+ * to subsystems that do not exist yet; each option is added by the packet that
+ * builds its subsystem. Omitted numeric options take the Appendix A normative
+ * defaults.
+ *
+ * TODO(§62, renderer-selection packet): `width`/`height`/`resolution`/
+ * `antialias`/`alpha`/`powerPreference`/`autoResize` are surface and
+ * device-selection options. They belong with `Application.resize` and with the
+ * `"auto"` backend selection described on {@link ApplicationOptions.renderer};
+ * accepting them now would mean storing values no code reads.
  */
 export interface ApplicationOptions {
   /**
@@ -131,6 +160,87 @@ export interface ApplicationOptions {
   fixedTimeStep?: number;
   /** Maximum fixed steps per {@link Application.step} (§10, §45). Default 5 (Appendix A). */
   maximumSubSteps?: number;
+
+  /**
+   * The backend that draws the scene (§45, §61), or `false` (the default) for a
+   * headless application that draws nothing.
+   *
+   * **An instance, not a string** (decision, WP-3.6). §45 spells this option
+   * `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`, i.e. the application
+   * selects and constructs the backend. That form is deferred, for one
+   * concrete reason: resolving a string to a class means `four` importing every
+   * backend package at runtime, and every program — including the headless and
+   * determinism ones — would then carry a WebGL renderer it never uses. So the
+   * application author constructs the backend and hands it over:
+   *
+   * ```ts
+   * import { WebglRenderer } from "@four/render-webgl";
+   *
+   * const app = new Application({ renderer: new WebglRenderer(), canvas });
+   * app.views.push(createFullscreenViewport(camera));
+   * await app.initialize();          // awaits renderer.initialize({ canvas })
+   * app.start();
+   * ```
+   *
+   * TODO(§62, renderer-selection packet): add the §45 string form
+   * (`"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`) as a *widening* of
+   * this option, resolved through a registry a backend package opts into, so
+   * that `"auto"`'s capability-ordered fallback (§62) exists without `four`
+   * statically importing any backend. Passing an instance stays supported: §45
+   * requires the systems to be constructible and ownable independently.
+   *
+   * The application **initializes** the renderer (see
+   * {@link Application.initialize}) and **drives** it once per frame, but does
+   * not own it: {@link Application.dispose} leaves it alone (§83 — whoever
+   * created a resource disposes it).
+   */
+  renderer?: Renderer | false;
+
+  /**
+   * The drawing surface handed to the renderer as `initialize({ canvas })`
+   * (§45, §61).
+   *
+   * Typed `unknown` for the same reason `RendererOptions.canvas` is: this
+   * package compiles with no DOM lib, and each backend narrows and validates
+   * the value itself (the WebGL 2 backend rejects a non-canvas with
+   * `RENDERER_INITIALIZATION_FAILED`). Ignored when no renderer is configured.
+   */
+  canvas?: unknown;
+
+  /**
+   * The viewports drawn each frame, in order (§48). Copied into
+   * {@link Application.views}, which is mutable afterwards.
+   *
+   * Defaults to none — and an application with **no viewport draws nothing**
+   * (§61: an empty view list draws and clears nothing), because there is no
+   * camera the application could invent. Push a viewport before the first
+   * frame:
+   *
+   * ```ts
+   * app.views.push(createFullscreenViewport(camera));
+   * ```
+   */
+  views?: readonly Viewport[];
+
+  /**
+   * Whether the frame's draw uses §43 interpolated render poses. Defaults to
+   * `true` when a renderer is configured, `false` otherwise.
+   *
+   * When on, the application owns a {@link PoseBuffer} ({@link Application.poses}),
+   * registers the §39 step-10 snapshot system that captures into it, and passes
+   * `{ poseBuffer, alpha: time.interpolationAlpha }` to every
+   * `renderer.render` call. **Which nodes are interpolated is still opt-in**:
+   * the buffer tracks nothing until something calls `app.poses.track(node)`
+   * (from Phase 5 the physics adapter tracks its bodies), and an untracked node
+   * draws from its live transform. Tracking every node automatically would cost
+   * a copy per node per fixed step for scenery that never moves (decision,
+   * WP-3.6).
+   *
+   * Set it to `false` for a renderer that must draw exactly the simulation
+   * state — a screenshot at a known step, a visual regression baseline — and to
+   * `true` without a renderer to run the capture for a custom draw path.
+   */
+  poseInterpolation?: boolean;
 }
 
 /**
@@ -174,8 +284,54 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   readonly systems: SystemRegistry;
 
+  /**
+   * The backend this application draws with (§45, §61), or `null` when it is
+   * headless.
+   *
+   * Constructed by the application *author* and merely driven here — see
+   * {@link ApplicationOptions.renderer}. It is initialized by
+   * {@link Application.initialize}, called once per frame after the `render`
+   * event, and **not** disposed by {@link Application.dispose}.
+   */
+  readonly renderer: Renderer | null;
+
+  /**
+   * The viewports drawn each frame, in order (§48). Mutable: push, splice, and
+   * reorder it at any time; the next frame uses whatever it holds.
+   *
+   * Empty by default, and an empty list **draws and clears nothing** (§61).
+   * The array itself is handed to the renderer without being copied, so a
+   * backend must read it during the call (the `Renderer.render` contract).
+   */
+  readonly views: Viewport[] = [];
+
+  /**
+   * The engine's single previous/current pose store (§37, §43).
+   *
+   * Always present, and empty until something tracks a node —
+   * `app.poses.track(node)`. It is captured once per fixed step (§39 step 10)
+   * only when pose interpolation is on, which is the default whenever a
+   * renderer is configured; see {@link ApplicationOptions.poseInterpolation}.
+   * Not cleared by {@link Application.dispose}, for the reason the scene is not
+   * destroyed either: the buffer may outlive the application that stepped it.
+   */
+  readonly poses = new PoseBuffer();
+
   /** Undoes {@link SystemRegistry.attachToScheduler}; run once, by `dispose`. */
   readonly #detachSystems: Detach;
+
+  /** {@link ApplicationOptions.canvas}, held until `initialize` hands it over. */
+  readonly #canvas: unknown;
+
+  /** Whether the frame's draw passes §43 interpolation. See the option. */
+  readonly #poseInterpolation: boolean;
+
+  /**
+   * The §43 record handed to `renderer.render`, reused every frame with only
+   * `alpha` rewritten (plan D7: the loop allocates nothing). Safe because
+   * `Renderer.render` forbids a backend from retaining it.
+   */
+  readonly #interpolation: { poseBuffer: PoseBuffer; alpha: number };
 
   /** Reused stats object, so the per-frame resolve allocates nothing (D7). */
   readonly #worldTransformStats: WorldTransformStats = {
@@ -211,6 +367,28 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       maximumSubSteps: options.maximumSubSteps ?? DEFAULT_MAXIMUM_SUB_STEPS,
     });
     this.systems = new SystemRegistry();
+    this.renderer =
+      options.renderer === undefined || options.renderer === false
+        ? null
+        : options.renderer;
+    this.#canvas = options.canvas;
+    if (options.views !== undefined) {
+      // Copied, not aliased: `views` is the application's array from here on,
+      // so an author who keeps their own list does not accidentally share
+      // mutation with the frame loop (decision, WP-3.6).
+      this.views.push(...options.views);
+    }
+    this.#poseInterpolation =
+      options.poseInterpolation ?? this.renderer !== null;
+    this.#interpolation = { poseBuffer: this.poses, alpha: 0 };
+    if (this.#poseInterpolation) {
+      // §39 step 10, at the default `POSE_SNAPSHOT_PRIORITY`: after every
+      // system that moves a node, so the captured pose is the finished pose of
+      // the step (§43). Registered here rather than in `initialize` so that
+      // `app.systems` describes the application before it is initialized, and
+      // so a program that never initializes still tears down symmetrically.
+      this.systems.register(createSnapshotSystem(this.poses));
+    }
 
     // Composition of the fixed step (WP-1.12 decision). `attachToScheduler` is
     // D5's only sanctioned seam between the registry and the scheduler, so the
@@ -241,7 +419,15 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     };
 
     this.scheduler.onRender = (time) => {
+      // Listeners first, then the draw (decision, WP-3.6). §10's own example
+      // renders *from* the `render` listener, so the two orders are equally
+      // spec-conformant; drawing last is the useful one, because a listener is
+      // where an application moves its camera, updates a viewport rectangle,
+      // or toggles visibility for the frame — work that would otherwise land
+      // one frame late. Nothing in the frame depends on the reverse order: the
+      // renderer neither emits nor mutates scene state.
       this.emit("render", time);
+      this.#draw(time);
     };
   }
 
@@ -277,13 +463,19 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * Prepares the application for stepping (§45), asynchronously and exactly
    * once.
    *
-   * Phase 1 has nothing to await — no renderer, no GPU device, no solver — so
-   * this resolves immediately. It is async and it exists now because §45's
-   * usage is `await app.initialize(); app.start();` and because the backends
-   * that arrive later (renderer initialization §62, WASM solver loading §37,
-   * asset preloads §75) are genuinely asynchronous; making the call shape
-   * correct from the start means those phases add work inside this method
-   * instead of changing every program that uses the engine.
+   * With a renderer configured this awaits `renderer.initialize({ canvas })` —
+   * §61's context or device acquisition, which is genuinely asynchronous for
+   * WebGPU and may compile pipelines for any backend — and the application
+   * counts as initialized only once that resolves. A rejected renderer
+   * initialization therefore rejects this call, leaves `initialized` false, and
+   * leaves `start()` refusing to run: a program that failed to acquire a GPU
+   * should stop at the line that says so, not at the first frame (decision,
+   * WP-3.6). The rejection is remembered, so a retry needs a new application.
+   *
+   * With no renderer there is still nothing to await, and this resolves on the
+   * next microtask. It has always been async because §45's usage is
+   * `await app.initialize(); app.start();`, and the later subsystems (WASM
+   * solver loading §37, asset preloads §75) are asynchronous too.
    *
    * Idempotent: repeated or concurrent calls return the same promise and
    * initialize once.
@@ -293,7 +485,8 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   initialize(): Promise<void> {
     this.#assertNotDisposed("initialize");
-    this.#initialization ??= Promise.resolve().then(() => {
+    this.#initialization ??= Promise.resolve().then(async () => {
+      await this.renderer?.initialize({ canvas: this.#canvas });
       this.#initialized = true;
     });
     return this.#initialization;
@@ -407,10 +600,27 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    *
    * Idempotent and terminal — a disposed application cannot be initialized or
    * started again, and stepping it throws. The scene is deliberately **not**
-   * destroyed: `Node` has no `dispose` (nothing in Phase 1 holds a GPU or
-   * solver resource), and the scene may well outlive the application that was
-   * stepping it. The packet that gives nodes disposable resources owns that
+   * destroyed: `Node` has no `dispose` (nothing yet holds a GPU or solver
+   * resource on a node), and the scene may well outlive the application that
+   * was stepping it. The packet that gives nodes disposable resources owns that
    * decision (§83).
+   *
+   * **The renderer is not disposed either** (§83, decision WP-3.6). It arrives
+   * as an instance the application author constructed
+   * ({@link ApplicationOptions.renderer}), so the author disposes it —
+   * ownership follows construction, and an application that destroyed a
+   * renderer it was merely lent would break the perfectly ordinary case of one
+   * renderer outliving, or being shared between, applications. Disposing it is
+   * one line at the same call site:
+   *
+   * ```ts
+   * app.dispose();
+   * renderer.dispose();
+   * ```
+   *
+   * {@link Application.views} and {@link Application.poses} are left intact for
+   * the same reason the scene is; the snapshot system that captured into the
+   * buffer is disposed with every other registered system.
    *
    * The scheduler's callbacks are cleared *before* systems are disposed, so a
    * `dispose` that touches the scheduler cannot re-enter the loop or reach a
@@ -439,6 +649,29 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     } finally {
       this.removeAllListeners();
     }
+  }
+
+  /**
+   * The frame's draw (§45, §61), run after the `render` listeners.
+   *
+   * Two ways to draw nothing, both silent and both normal: no renderer
+   * (headless), and no viewport (§61 — an empty view list draws and clears
+   * nothing). Pose interpolation off is not one of them: it merely omits the
+   * third argument, so the backend draws the resolved world transforms (§7)
+   * instead of §43 render poses. Those matrices were resolved at the top of
+   * `onUpdate`, so either path draws a current frame.
+   */
+  #draw(time: ReadonlyTimeState): void {
+    const renderer = this.renderer;
+    if (renderer === null || this.views.length === 0) {
+      return;
+    }
+    if (!this.#poseInterpolation) {
+      renderer.render(this.scene, this.views);
+      return;
+    }
+    this.#interpolation.alpha = time.interpolationAlpha;
+    renderer.render(this.scene, this.views, this.#interpolation);
   }
 
   #assertNotDisposed(method: string): void {

@@ -37,6 +37,7 @@
 import { EventEmitter, FourError } from "@four/core";
 import { Matrix4 } from "@four/math";
 import {
+  buildInterpolatedRenderList,
   buildRenderList,
   type RenderItem,
   type Renderer,
@@ -63,6 +64,15 @@ type RenderRoot = Parameters<Renderer["render"]>[0];
 
 /** One viewport, derived as {@link RenderRoot} is. */
 type RenderView = Parameters<Renderer["render"]>[1][number];
+
+/**
+ * The §43 interpolation record, derived as {@link RenderRoot} is — the pose
+ * buffer it carries is `@four/scene`'s, named here only through the interface
+ * this class implements, so the frozen dependency matrix is untouched.
+ */
+type RenderInterpolationArgument = NonNullable<
+  Parameters<Renderer["render"]>[2]
+>;
 
 /**
  * The minimum a DOM event has to offer this backend: a way to stop the default
@@ -467,16 +477,38 @@ export class WebglRenderer implements Renderer {
    * depend on the camera, because §64 stage 3 (culling) is not implemented yet.
    * When culling lands, the build moves inside the view loop.
    *
-   * Nothing in the scene is mutated. World matrices are **not** resolved here —
-   * §7 and §64 make that a separate, earlier stage, and `Application` runs it
-   * before its `render` listeners.
+   * ## Interpolated poses (§43, WP-3.6)
+   *
+   * With `interpolation` present the list is built by
+   * `buildInterpolatedRenderList` instead of `buildRenderList`, so each item's
+   * model matrix is the node's §43 render pose at `interpolation.alpha` —
+   * position lerped, rotation slerped, composed through the hierarchy — rather
+   * than its resolved world matrix. That is the whole of this backend's part in
+   * §43: nothing else in the draw path changes, because the interpolated pose
+   * arrives as an ordinary `RenderItem.worldMatrix`.
+   *
+   * Which of the two lists is built is decided **per call**, from the argument:
+   * this class keeps no interpolation state, so the same renderer can draw an
+   * interpolated frame for the application and a raw one for a picking or
+   * screenshot pass without being reconfigured.
+   *
+   * Nothing in the scene is mutated — the interpolated path composes into
+   * pooled matrices and never writes a render pose back (§42, §43). World
+   * matrices are **not** resolved here: §7 and §64 make that a separate,
+   * earlier stage, and `Application` runs it before its `render` listeners.
+   * The interpolated path does not even need that pass, since it derives every
+   * matrix itself.
    *
    * Returns immediately and silently while the context is lost, and when
    * `views` is empty (which therefore also clears nothing) — §61 both times.
    * Throws only for programmer error: rendering before `initialize` or after
    * `dispose`.
    */
-  render(root: RenderRoot, views: readonly RenderView[]): void {
+  render(
+    root: RenderRoot,
+    views: readonly RenderView[],
+    interpolation?: RenderInterpolationArgument,
+  ): void {
     const gl = this.#requireContext("render");
     if (this.#contextLost || views.length === 0) {
       return;
@@ -492,7 +524,15 @@ export class WebglRenderer implements Renderer {
       return;
     }
 
-    const items = buildRenderList(root, renderList);
+    const items =
+      interpolation === undefined
+        ? buildRenderList(root, renderList)
+        : buildInterpolatedRenderList(
+            root,
+            interpolation.poseBuffer,
+            interpolation.alpha,
+            renderList,
+          );
     program.use();
 
     for (const view of views) {
