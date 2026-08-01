@@ -1,0 +1,231 @@
+/**
+ * Primitive geometry builders (§53) — the three shapes the §120 MVP needs.
+ *
+ * §53 lists eleven required 3D primitives (plane, box, sphere, cylinder, cone,
+ * capsule, torus, lathe, extrusion, tube, height field) and §50 lists the 2D
+ * shape family. This packet builds **box**, **plane**, and a 2D **circle**,
+ * which is the smallest set that exercises both dimensionalities end to end:
+ * a solid with six differently-oriented faces, a flat quad, and a fan-shaped
+ * 2D shape. The rest are later packets; adding them here would multiply the
+ * winding and attribute review surface without changing a single renderer path.
+ *
+ * ## Conventions (§7a)
+ *
+ * - The world is right-handed with **+Y up in both 2D and 3D**, so a 2D shape
+ *   is simply a shape in the XY plane of the same space (§7) — `planeGeometry`
+ *   and `circleGeometry2D` both lie in XY, facing +Z.
+ * - **Front faces wind counter-clockwise** when seen from the outside (a box)
+ *   or from +Z (the flat shapes). Every triangle emitted below is checked
+ *   against that rule in `tests/geometry.test.ts` by taking the sign of its
+ *   normal, not by re-reading the vertex list.
+ * - Every builder centres its shape on the node origin, so a node's transform
+ *   positions the shape's centre. Callers that want another anchor use
+ *   `Transform.pivot` (§7), which exists precisely so geometry does not have to
+ *   carry an origin convention.
+ *
+ * ## Attributes
+ *
+ * Positions only. Unlit colored geometry (§120) needs nothing else, and normals
+ * or uvs invented here would have to be re-generated the moment the geometry
+ * gains real vertex layouts — a box with per-face normals needs 24 vertices
+ * rather than 8, which is a decision for the packet that introduces lighting
+ * (§68), not this one. All three builders are therefore indexed and share
+ * vertices freely.
+ *
+ * Options are validated the way `BufferGeometry` validates its buffers: extents
+ * must be finite and positive, segment counts finite integers ≥ 3, and a
+ * violation throws `RangeError` (§85; see `buffer-geometry.ts` for why it is
+ * not a `FourError`).
+ */
+
+import { BufferGeometry } from "./buffer-geometry.js";
+import type { GeometryIndexArray } from "./buffer-geometry.js";
+
+/**
+ * Highest vertex count addressable by a `Uint16Array` index — 65 536 vertices
+ * means a maximum index of 65 535.
+ */
+const UINT16_VERTEX_LIMIT = 65536;
+
+/**
+ * Allocates the narrowest index array that can address `vertexCount` vertices.
+ * WebGL 2 accepts both element types, and the 16-bit form halves the upload for
+ * every primitive this packet builds.
+ */
+function createIndices(
+  indexCount: number,
+  vertexCount: number,
+): GeometryIndexArray {
+  return vertexCount <= UINT16_VERTEX_LIMIT
+    ? new Uint16Array(indexCount)
+    : new Uint32Array(indexCount);
+}
+
+/** Validates one extent (width/height/depth/radius). */
+function requirePositive(name: string, value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(
+      `${name} must be a finite positive number; got ${String(value)} (§85).`,
+    );
+  }
+  return value;
+}
+
+/** Options of {@link boxGeometry}. All extents default to 1. */
+export interface BoxGeometryOptions {
+  /** Size along X. */
+  width?: number;
+  /** Size along Y. */
+  height?: number;
+  /** Size along Z. */
+  depth?: number;
+}
+
+/** Options of {@link planeGeometry}. Both extents default to 1. */
+export interface PlaneGeometryOptions {
+  /** Size along X. */
+  width?: number;
+  /** Size along Y. */
+  height?: number;
+}
+
+/** Options of {@link circleGeometry2D}. */
+export interface CircleGeometry2DOptions {
+  /** Distance from the centre to the rim; defaults to 1. */
+  radius?: number;
+  /**
+   * Number of rim vertices, i.e. of triangles in the fan. Defaults to 32,
+   * which keeps a unit circle's silhouette error under about half a percent of
+   * its radius — smooth enough for MVP-tier 2D shapes at any reasonable
+   * on-screen size. Must be a finite integer ≥ 3.
+   */
+  segments?: number;
+}
+
+/**
+ * An axis-aligned box centred on the origin, as 8 shared vertices and 12
+ * counter-clockwise triangles (§53 "box").
+ *
+ * ```ts
+ * const geometry = boxGeometry({ width: 2, height: 1, depth: 1 });
+ * geometry.vertexCount; // 8
+ * geometry.drawCount;   // 36 indices
+ * ```
+ *
+ * Corners sit at `(±width/2, ±height/2, ±depth/2)`, so the box spans exactly
+ * the requested extents and its bounds are `[-half, +half]` per axis. Vertices
+ * are shared between faces — 8 rather than 24 — because this tier carries no
+ * per-face attributes to split them for (see the module header).
+ */
+export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
+  const hx = requirePositive("width", options.width ?? 1) / 2;
+  const hy = requirePositive("height", options.height ?? 1) / 2;
+  const hz = requirePositive("depth", options.depth ?? 1) / 2;
+
+  // Corner order: the -Z face 0..3 counter-clockwise seen from +Z, then the
+  // +Z face 4..7 directly in front of it. One vertex per line, index in the
+  // comment — the layout is the documentation, hence `prettier-ignore`.
+  // prettier-ignore
+  const positions = new Float32Array([
+    -hx, -hy, -hz, // 0
+     hx, -hy, -hz, // 1
+     hx,  hy, -hz, // 2
+    -hx,  hy, -hz, // 3
+    -hx, -hy,  hz, // 4
+     hx, -hy,  hz, // 5
+     hx,  hy,  hz, // 6
+    -hx,  hy,  hz, // 7
+  ]);
+
+  // Two triangles per face, each wound counter-clockwise as seen from outside
+  // the box (§7a) — verified in the tests by the sign of every face normal.
+  // prettier-ignore
+  const indices = new Uint16Array([
+    4, 5, 6,  4, 6, 7, // +Z (front)
+    1, 0, 3,  1, 3, 2, // -Z (back)
+    5, 1, 2,  5, 2, 6, // +X (right)
+    0, 4, 7,  0, 7, 3, // -X (left)
+    3, 7, 6,  3, 6, 2, // +Y (top)
+    0, 1, 5,  0, 5, 4, // -Y (bottom)
+  ]);
+
+  return new BufferGeometry({ positions, indices, mode: "triangles" });
+}
+
+/**
+ * A rectangle in the **XY plane** centred on the origin, facing +Z: 4 vertices,
+ * 2 counter-clockwise triangles (§53 "plane").
+ *
+ * XY rather than XZ is the whole point of §7a's "Y-up in both 2D and 3D": the
+ * same quad is a 2D sprite background, a world-space UI panel, and the ground
+ * of a side-on physics scene, and it never needs re-orienting between them.
+ * A floor in a 3D scene is this plane rotated -π/2 about X by its node's
+ * transform.
+ */
+export function planeGeometry(
+  options: PlaneGeometryOptions = {},
+): BufferGeometry {
+  const hw = requirePositive("width", options.width ?? 1) / 2;
+  const hh = requirePositive("height", options.height ?? 1) / 2;
+
+  // prettier-ignore
+  const positions = new Float32Array([
+    -hw, -hh, 0, // 0 bottom-left
+     hw, -hh, 0, // 1 bottom-right
+     hw,  hh, 0, // 2 top-right
+    -hw,  hh, 0, // 3 top-left
+  ]);
+  const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
+
+  return new BufferGeometry({ positions, indices, mode: "triangles" });
+}
+
+/**
+ * A filled circle in the **XY plane** centred on the origin, facing +Z (§50's
+ * `Circle`, built as §53 buffer geometry).
+ *
+ * The shape is a triangle fan — centre vertex plus `segments` rim vertices —
+ * but it is emitted as **indexed triangles**, not as a `TRIANGLE_FAN` draw:
+ * fans cannot be batched or instanced with other geometry (§65), are absent
+ * from several modern APIs, and would force the draw path to carry a second
+ * primitive topology for one shape. The vertex saving is kept (`segments + 1`
+ * vertices, not `3 * segments`); only the assembly is spelled out.
+ *
+ * Rim vertex `i` sits at angle `2πi / segments`, so vertices advance
+ * counter-clockwise from +X and every triangle `(centre, i, i + 1)` is wound
+ * counter-clockwise seen from +Z (§7a).
+ */
+export function circleGeometry2D(
+  options: CircleGeometry2DOptions = {},
+): BufferGeometry {
+  const radius = requirePositive("radius", options.radius ?? 1);
+  const segments = options.segments ?? 32;
+  if (!Number.isInteger(segments) || segments < 3) {
+    throw new RangeError(
+      `segments must be a finite integer of at least 3 (fewer cannot enclose ` +
+        `an area); got ${String(segments)} (§85).`,
+    );
+  }
+
+  const vertexCount = segments + 1;
+  const positions = new Float32Array(vertexCount * 3);
+  // positions[0..2] is the centre, already zero.
+  for (let i = 0; i < segments; i += 1) {
+    const angle = (2 * Math.PI * i) / segments;
+    const offset = (i + 1) * 3;
+    positions[offset] = radius * Math.cos(angle);
+    positions[offset + 1] = radius * Math.sin(angle);
+    positions[offset + 2] = 0;
+  }
+
+  const indices = createIndices(segments * 3, vertexCount);
+  for (let i = 0; i < segments; i += 1) {
+    const offset = i * 3;
+    indices[offset] = 0;
+    indices[offset + 1] = i + 1;
+    // Wraps the last triangle back onto the first rim vertex.
+    indices[offset + 2] = ((i + 1) % segments) + 1;
+  }
+
+  return new BufferGeometry({ positions, indices, mode: "triangles" });
+}
