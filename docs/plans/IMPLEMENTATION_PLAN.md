@@ -634,6 +634,35 @@ triggered. MVP tier: unlit colored geometry, WebGL 2 only, `"negative-one-to-one
   smooth motion under fixed-step (frame-delta assertions), coverage ≥95% on touched
   packages, §106 criterion verdict, defect list.
 
+## 6b. Phase 3a — Interaction, Sprites, and Text MVP (§106a; decomposed 2026-08-01)
+
+Exit: pointer events, picking, dragging, sprites, and text labels work in a mixed 2D/3D
+example — and the exit ships the demo-ready build (public deployment is an owner step).
+
+- **WP-3a.1 [S] Picking** (`@four/input`) — §71 bounds+analytic tier: camera ray from NDC
+  (unproject via inverse projection + camera world), plane/circle analytic hits (2D),
+  transformed-AABB hits from geometry bounds (3D), nearest-first ordering, `pick(scene,
+  camera, ndcX, ndcY)` returning hits with node/distance/point.
+- **WP-3a.2 [S] Pointer input + propagation + dragging** (`@four/input`) — §72 subset:
+  structural DOM pointer source, normalized events (down/up/move/click/enter/leave) with
+  NDC coords, capture→target→bubble through the scene graph (§6b input exception), pointer
+  capture, drag manager (§120: down on node → move deltas in world → up releases) writing
+  under `"manual"`-authority rules via a callback (no direct transform writes by input).
+- **WP-3a.3 [S] Textures + sprites** (`@four/render`, `@four/render-webgl`,
+  `@four/materials`) — minimal §55/§61 tier: `Texture` + `Renderer.createTexture`
+  (structural ImageBitmap-like source), `SpriteMaterial` (texture + tint), `Sprite`
+  renderable (anchor, world sizing), webgl textured-quad program + texture cache
+  (loss-aware like the VAO cache).
+- **WP-3a.4 [S] Text MVP** (`@four/text`) — §56 MVP tier: runtime glyph atlas via an
+  injected structural rasterizer (canvas-like), Latin subset, `Text` producing textured
+  quads through the sprite path; no shaping/bidi (staged per spec §56 note).
+- **WP-3a.5 [H] Example upgrade** — interactive: click recolors, drag moves, a live text
+  label; composes input+sprites+text.
+- **WP-3a.6 [S] Browser interaction gate** — Playwright: synthetic pointer events hit,
+  drag moves pixels, text renders legibly (pixel-region assertions).
+- **WP-3a.7 [S] Phase 3a exit** — independent verifier: full matrix + interaction gates,
+  coverage ≥95% on touched packages, demo-ready build artifact confirmed; §106a verdict.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
