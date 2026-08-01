@@ -792,6 +792,12 @@ Packets:
   the component emitter), `Collider` (§24 fields, sensor flag, groups/mask),
   `PhysicsMaterial` class; §25 combine + density fallback logic; mass-from-density
   derivation (§23) for the P5-6 shapes.
+  *Dated note (2026-08-01, orchestrator):* mass-from-density derivation (§23) is
+  **delegated to the solver** — Rapier derives mass from collider densities natively,
+  and duplicating a volume model in `@four/physics` risks disagreeing with it. The
+  WP-5.2 worker correctly stopped rather than improvise; `inverseMass` reads `NaN`
+  until the solver derives mass, and WP-5.3 refreshes the component's mass properties
+  from the adapter after registration.
 - **WP-5.3 [S] PhysicsWorld + PhysicsSystem + fake-adapter seam** (`@four/physics`) —
   world lifecycle (component registration → adapter handles, monotonic body ids §33),
   P5-2 fixed-step pipeline, pose-store integration, `"physics"` authority writes, §30
