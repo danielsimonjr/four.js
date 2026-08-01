@@ -20,11 +20,19 @@ export type {
   GlBuffer,
   GlProgramHandle,
   GlShader,
+  GlTexture,
   GlUniformLocation,
   GlVertexArray,
   WebglContext,
 } from "./gl-program.js";
-export { GL, POSITION_ATTRIBUTE_LOCATION, UnlitProgram } from "./gl-program.js";
+export {
+  GL,
+  POSITION_ATTRIBUTE_LOCATION,
+  SpriteProgram,
+  UnlitProgram,
+} from "./gl-program.js";
+export type { CacheableTexture, TextureRecord } from "./gl-texture.js";
+export { TextureCache } from "./gl-texture.js";
 export type {
   WebglCanvas,
   WebglContextAttributes,

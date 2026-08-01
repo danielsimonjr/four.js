@@ -51,20 +51,39 @@
 
 import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
-import type { UnlitMaterial } from "@four/materials";
+import type { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import type { Node, PoseBuffer } from "@four/scene";
 
 import { Renderable } from "./renderable.js";
+import { Sprite } from "./sprite.js";
 
 /**
- * One draw, in the compact form §64 asks for: no node reference, no virtual
- * calls, nothing the backend has to walk.
+ * Which pipeline a render item needs (§64 stage 7, §66 sort key 3).
+ *
+ * A backend cannot draw a textured quad with the flat-colour pipeline, so an
+ * item has to say which one it is. The discriminant is carried **on the item**
+ * rather than derived from the material's class at draw time, for the reason
+ * §64 gives for compact render items in the first place: the draw path must not
+ * make a virtual call, an `instanceof` check, or a property probe per object.
+ * It is also the field §66's key 3 ("pipeline/material compatibility") will sort
+ * on when batching (§65) lands (decision, WP-3a.3).
+ *
+ * A string union rather than an enum, matching `TransformAuthority`,
+ * `RendererBackend`, and `GeometryDrawMode`: it serializes, logs, and compares
+ * as itself.
+ */
+export type RenderItemKind = "unlit" | "sprite";
+
+/**
+ * The fields every render item carries, whatever pipeline draws it — one draw in
+ * the compact form §64 asks for: no node reference, no virtual calls, nothing
+ * the backend has to walk.
  *
  * Every field is a snapshot or a reference taken during list construction. The
- * item object itself is **pooled and rewritten** by the next build into the
- * same `out` array — see {@link buildRenderList}.
+ * item object itself is **pooled and rewritten** by the next build into the same
+ * `out` array — see {@link buildRenderList}.
  */
-export interface RenderItem {
+interface RenderItemBase {
   /**
    * World transform of the drawn node.
    *
@@ -77,18 +96,75 @@ export interface RenderItem {
   worldMatrix: Matrix4;
   /** Vertex data to draw (§53). */
   geometry: BufferGeometry;
+  /** §66 sort key 5, copied from the drawable node. */
+  renderOrder: number;
+  /** §66 sort key 1, copied from the drawable node. */
+  renderLayer: number;
+}
+
+/** A draw generated from a `Renderable` (§49) — flat colour, no texture. */
+export interface UnlitRenderItem extends RenderItemBase {
+  kind: "unlit";
   /** Surface appearance (§57). */
   material: UnlitMaterial;
-  /** §66 sort key 5, copied from the renderable. */
-  renderOrder: number;
-  /** §66 sort key 1, copied from the renderable. */
-  renderLayer: number;
+}
+
+/** A draw generated from a {@link Sprite} (§55) — one textured, tinted quad. */
+export interface SpriteRenderItem extends RenderItemBase {
+  kind: "sprite";
+  /** Surface appearance (§55, §57). */
+  material: SpriteMaterial;
+}
+
+/**
+ * One draw (§64), as a **discriminated union** on {@link RenderItemKind}.
+ *
+ * ```ts
+ * for (const item of buildRenderList(scene, out)) {
+ *   if (item.kind === "sprite") {
+ *     bind(item.material.texture);      // narrowed to SpriteMaterial
+ *   } else {
+ *     upload(item.material.color);      // narrowed to UnlitMaterial
+ *   }
+ * }
+ * ```
+ *
+ * A union rather than one interface with a widened `material` so that a backend
+ * gets the concrete material type from an ordinary `kind` check, with no cast
+ * and no `instanceof` on the draw path. The builders pay for that with **one**
+ * documented cast where the invariant is actually established — see
+ * {@link itemAt}.
+ */
+export type RenderItem = UnlitRenderItem | SpriteRenderItem;
+
+/**
+ * The pooled item as the builders write it: one mutable shape covering both
+ * union members, because a pooled object is rewritten field by field and
+ * TypeScript cannot track a union member across independent assignments.
+ *
+ * Not exported: outside this module an item is always a {@link RenderItem}, and
+ * the correlation between `kind` and `material` is an invariant the builders
+ * maintain rather than a contract callers may break.
+ */
+interface MutableRenderItem extends RenderItemBase {
+  kind: RenderItemKind;
+  material: UnlitMaterial | SpriteMaterial;
+}
+
+/** Narrows `item` to the textured-quad pipeline (§55). */
+export function isSpriteItem(item: RenderItem): item is SpriteRenderItem {
+  return item.kind === "sprite";
+}
+
+/** Narrows `item` to the flat-colour pipeline (§57's `UnlitMaterial`). */
+export function isUnlitItem(item: RenderItem): item is UnlitRenderItem {
+  return item.kind === "unlit";
 }
 
 /** Pooled backing store for one `out` array. */
 interface ListPool {
   /** Item objects, indexed by generation order (not by final sorted order). */
-  readonly items: RenderItem[];
+  readonly items: MutableRenderItem[];
   /**
    * World matrices for the interpolated builder, index-aligned with `items` and
    * grown only when that builder runs — {@link buildRenderList} never
@@ -117,13 +193,25 @@ function poolFor(out: RenderItem[]): ListPool {
 }
 
 /**
+ * The two node types that generate a render item today: §49's `Renderable` and
+ * §55's `Sprite`. They are siblings rather than parent and child only until
+ * §57's `Material` base lands — see `sprite.ts` for the whole argument.
+ */
+type Drawable = Renderable | Sprite;
+
+/**
  * Returns pooled item `index`, creating it (once, ever, for this `out` array)
  * seeded from `node`. Every field is overwritten by the caller immediately.
  */
-function itemAt(pool: ListPool, index: number, node: Renderable): RenderItem {
+function itemAt(
+  pool: ListPool,
+  index: number,
+  node: Drawable,
+): MutableRenderItem {
   let item = pool.items[index];
   if (item === undefined) {
     item = {
+      kind: node instanceof Sprite ? "sprite" : "unlit",
       worldMatrix: node.transform.worldMatrix,
       geometry: node.geometry,
       material: node.material,
@@ -259,8 +347,11 @@ function collect(
   }
 
   let next = count;
-  if (node instanceof Renderable) {
+  if (node instanceof Renderable || node instanceof Sprite) {
     const item = itemAt(pool, next, node);
+    item.kind = node instanceof Sprite ? "sprite" : "unlit";
+    // A sprite rebuilds its quad here if the anchor or the size moved; a
+    // renderable's geometry is whatever it was handed.
     item.geometry = node.geometry;
     item.material = node.material;
     item.renderLayer = node.renderLayer;
@@ -272,7 +363,12 @@ function collect(
       composeRenderPoseMatrix(node, poses, alpha, matrix);
       item.worldMatrix = matrix;
     }
-    out[next] = item;
+    // The one cast in the module, and the only place the `kind`/`material`
+    // correlation is established: both were just written from the same node, so
+    // a "sprite" item carries a `SpriteMaterial` and an "unlit" item an
+    // `UnlitMaterial` by construction. TypeScript cannot see that across two
+    // assignments to a pooled object — see `MutableRenderItem`.
+    out[next] = item as RenderItem;
     next += 1;
   }
 
