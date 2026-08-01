@@ -1,20 +1,25 @@
 /**
- * four.js — first 2D scene, and the interaction demo of §106a.
+ * four.js — first 2D scene, the interaction demo of §106a, and the authored
+ * animation of §107.
  *
  * The smallest program that shows three of the four pillars cooperating over
  * one scene graph:
  *
  * - **Scene** — every object below is a node in a single graph: the camera, the
- *   ground, the circle, the box, and the letters of the label. There is no
- *   separate "2D layer": the circle is a flat XY shape and the box is a solid,
- *   and they share the same right-handed, Y-up world (§7a).
+ *   ground, the circle, the box, the diamond, the vane, and the letters of the
+ *   label. There is no separate "2D layer": the circle is a flat XY shape and
+ *   the box is a solid, and they share the same right-handed, Y-up world (§7a).
  * - **Render** — one `WebglRenderer` draws that graph through one viewport
  *   (§48, §62). Nothing in the scene names WebGL; swapping the backend is a
  *   one-line change at this file's top.
- * - **Motion** — the circle follows a prescribed path (`KinematicController` +
- *   a §13 trajectory) while the box integrates an angular velocity
- *   (`MotionComponent`). Both are *components* attached to ordinary nodes
- *   (§6a), advanced by systems registered on the application (§39).
+ * - **Motion** — three different ways of moving something, side by side. The
+ *   circle follows a prescribed path (`KinematicController` + a §13
+ *   trajectory); the box integrates an angular velocity (`MotionComponent`);
+ *   the diamond and the vane are driven by *authored curves* — tweens, a clip,
+ *   and a timeline (§15–§17). All three are components or players advanced by
+ *   systems registered on the application (§39), and the §39 order runs
+ *   animation (priority 300) before kinematics (400), which is what §19's
+ *   blending pipeline will need in Phase 5.
  *
  * The fourth pillar, **Physics**, arrives in Phase 5 — and will attach to these
  * same nodes as one more component, under one more transform authority (§42).
@@ -30,13 +35,42 @@
  * - The **label** above the scene is real geometry, not DOM: a bitmap glyph
  *   atlas, laid out into quads, drawn as textured sprites in the same graph as
  *   everything else.
+ * - The **diamond** on the right and the **vane** on the left are not
+ *   interactive at all: they are running authored animation, and the section
+ *   below says exactly which kind.
+ *
+ * ## The authored cluster (§15, §16, §17 — the §107 exit criterion)
+ *
+ * Phase 4's exit asks for every §17 track value type to reach the screen. Two
+ * small shapes, deliberately off to the sides, carry one each:
+ *
+ * | kind           | what animates                        | who drives it       |
+ * | -------------- | ------------------------------------ | ------------------- |
+ * | **vector**     | the diamond's `transform.position`   | a yoyo `Tween`      |
+ * | **quaternion** | the vane's `transform.rotation`      | an `AnimationMixer` over a clip |
+ * | **color**      | the diamond's material RGBA          | a `Tween` on the `Timeline` |
+ * | **numeric**    | the vane's `transform.scale` x and y | a `Tween` on the `Timeline` |
+ *
+ * and one `Timeline` sequences the last two, with a marker (§16) at its "beat"
+ * label that steps the vane's colour through a palette. The vector tween moves
+ * a whole `Vector3` rather than two numbers — `to({ "transform.position": … })`,
+ * not `to({ x, y })` — so the value really is the §17 *vector* kind and not two
+ * scalar tracks wearing a costume. The quaternion track interpolates with
+ * `slerp` (three keys 120° apart, so every span takes the short way round).
+ *
+ * Both shapes declare `transformAuthority = "animation"` (§42) and neither is
+ * pickable or draggable: an animation owns their transforms outright, and a
+ * click-to-recolour would fight the colour tween's §16 property claim rather
+ * than demonstrate anything. The box and the circle are correspondingly *not*
+ * animated — they stay under `"kinematic"`, and the drag's authority handover
+ * below is unaffected.
  *
  * ## Fixed-step simulation, variable-rate rendering (§10, §43)
  *
  * The loop at the bottom feeds real elapsed seconds to `app.step(...)`. Inside,
  * simulation advances in fixed 1/60 s steps regardless of how fast the display
  * refreshes, and the frame is drawn from *interpolated* poses — which is why
- * `app.poses.track(...)` is called for the two moving nodes. On a 144 Hz screen
+ * `app.poses.track(...)` is called for every moving node. On a 144 Hz screen
  * that is what keeps the motion smooth instead of showing each simulation step
  * two or three times.
  *
@@ -77,11 +111,21 @@
  * paragraph is the evidence for why that backlog item exists.
  */
 
+import {
+  AnimationClip,
+  AnimationMixer,
+  AnimationSystem,
+  AnimationTrack,
+  Timeline,
+  animate,
+  quaternionAdapter,
+  tween,
+} from "four/animation";
 import { Application } from "four/application";
 import { boxGeometry, circleGeometry2D, planeGeometry } from "four/geometry";
 import { DragManager, PointerInput, type Pickable } from "four/input";
 import { SpriteMaterial, UnlitMaterial } from "four/materials";
-import { Vector3 } from "four/math";
+import { Quaternion, Vector3 } from "four/math";
 import {
   CircularTrajectory,
   KinematicController,
@@ -201,23 +245,89 @@ tumbler.addComponent(
 );
 app.scene.add(tumbler);
 
+// (4) and (5) the animated pair — see the header's "authored cluster" table.
+// Nothing here says what they do; the "authored animation" section below is
+// where the curves live, exactly as the two nodes above say nothing about how
+// the motion systems move them.
+
+/**
+ * The diamond's starting colour — and the rule every colour in this cluster,
+ * animated or not, obeys.
+ *
+ * The browser gate identifies the two interactive shapes by colour alone and
+ * scans the *whole* frame for them (`tests/browser/interaction.spec.ts`): a
+ * pixel is the orbiter when `red ≥ 180` and red beats blue by 90, and it is the
+ * box when it is bright and `blue + 20 ≥ red`. Every colour in this cluster
+ * therefore keeps `red ≤ 0.68` (173 of 255, so never the orbiter however it is
+ * antialiased) *and* a red-minus-blue gap above 110 (so never the box, and the
+ * gap is wide enough that a rim pixel blended down toward the background falls
+ * below the gate's brightness bar long before it falls below the 20 that would
+ * make it box-coloured). Warm, mid-bright, and unmistakable for either — the
+ * same discipline {@link ORBITER_COLORS} follows, one cluster further out
+ * (decision, WP-4.7).
+ */
+const BEACON_COLOR: [number, number, number, number] = [0.68, 0.42, 0.16, 1];
+
+/** Where the diamond's vector tween starts and ends, in world units. */
+const BEACON_X = 3.35;
+const BEACON_LOW_Y = 0.05;
+const BEACON_HIGH_Y = 1.7;
+
+// (4) A small diamond — `circleGeometry2D` with four segments *is* a diamond,
+// since rim vertex `i` sits at angle 2πi/4. It sits far to the right: the
+// orbiting disc sweeps the annulus 2 ± 0.45, so x = 3.35 is clear of it by more
+// than half a world unit, and the label's ink starts at y = 2.6, well above the
+// top of this shape's travel.
+const beacon = new Renderable(
+  circleGeometry2D({ radius: 0.22, segments: 4 }),
+  new UnlitMaterial({ color: BEACON_COLOR }),
+);
+beacon.name = "beacon";
+beacon.transform.position.set(BEACON_X, BEACON_LOW_Y, 0);
+// §42: an animation owns this transform, and the tween below writes as
+// `"animation"` — the two have to agree or the write is refused and warns.
+beacon.transformAuthority = "animation";
+app.scene.add(beacon);
+
+// (5) A triangle, three segments of the same primitive, on the opposite side —
+// equally clear of the orbit, of the box's corner, and of the ground's top edge
+// at y = -1.75. Its colour is `VANE_COLORS[0]` spelled out, because that array
+// belongs with the marker that steps through it and is declared further down.
+const vane = new Renderable(
+  circleGeometry2D({ radius: 0.26, segments: 3 }),
+  new UnlitMaterial({ color: [0.62, 0.3, 0.14, 1] }),
+);
+vane.name = "vane";
+vane.transform.position.set(-3.25, -0.75, 0);
+vane.transformAuthority = "animation";
+app.scene.add(vane);
+
 // --- systems (§39) ----------------------------------------------------------
 
 // Systems do the per-fixed-step work; components are just the state they read.
 // Registration order does not matter — the registry runs them by priority.
 const motionSystem = new MotionSystem();
 const kinematicSystem = new KinematicSystem();
+// §39 step 3, priority 300 — the registry runs it *before* `MotionSystem`
+// (step 4, priority 400) whatever order they are registered in, which is the
+// order §19's animation → kinematics → physics pipeline needs.
+const animationSystem = new AnimationSystem();
 app.systems.register(motionSystem);
 app.systems.register(kinematicSystem);
+app.systems.register(animationSystem);
 
 motionSystem.track(tumbler);
 kinematicSystem.track(orbiter);
 
-// Interpolate the two movers between simulation states when drawing (§43).
-// The ground never moves, so it is left untracked and simply draws from its
-// live transform.
+// Interpolate the movers between simulation states when drawing (§43). The
+// ground never moves, so it is left untracked and simply draws from its live
+// transform. The pose buffer carries position and rotation; the vane's animated
+// *scale* is read live from its transform by the render list, so a scale tween
+// steps at the fixed rate while its rotation still interpolates.
 app.poses.track(orbiter);
 app.poses.track(tumbler);
+app.poses.track(beacon);
+app.poses.track(vane);
 
 // --- picking and pointer events (§71, §72) ----------------------------------
 
@@ -352,6 +462,135 @@ drags.makeDraggable(tumbler);
 // resource *when it is finished with it*. A widget that comes and goes calls
 // `pointerInput.dispose()` / `drags.dispose()`; a demo that ends with the tab
 // does not.
+
+// --- authored animation (§15, §16, §17) -------------------------------------
+
+// (a) VECTOR. The diamond's whole `transform.position`, up and back forever.
+//
+// The animated property is the vector, not two scalars: `to({ x, y })` against
+// `beacon.transform.position` would bind two `number`s and run two independent
+// number tweens, while the path below binds the `Vector3` itself and drives it
+// through §17's vector kind. Naming the *node* as the target is also what lets
+// the tween find the node whose §42 authority gates it — a bare `Vector3` has
+// no back-reference to its owner, and would need `.authority(beacon)` spelled
+// out. Seconds, as everywhere (§7a): 2.2 s up, and `yoyo` walks the same curve
+// back rather than snapping to the start.
+animationSystem.track(
+  animate(beacon)
+    .to({ "transform.position": new Vector3(BEACON_X, BEACON_HIGH_Y, 0) }, 2.2)
+    .ease("sine-in-out")
+    .yoyo()
+    .repeat(Infinity)
+    .play(),
+);
+
+// (b) QUATERNION. One turn of the vane about +Z every three seconds, authored
+// as a §17 clip and played by a mixer.
+//
+// Three spans of 120° rather than one key at 0 and one at 2π: the quaternion
+// adapter interpolates with `slerp`, which always takes the short way round, so
+// a single 360° span would be a 0° span and the vane would not move at all.
+// Each key is a *rotation*, and `q(2π)` is the identity rotation again (its
+// components are negated, which is the same orientation), so the loop is
+// seamless.
+const SPIN_AXIS = new Vector3(0, 0, 1);
+const TURN_SECONDS = 3;
+const spin = new AnimationClip({
+  name: "vane-spin",
+  tracks: [
+    new AnimationTrack({
+      path: "transform.rotation",
+      adapter: quaternionAdapter,
+      times: [0, TURN_SECONDS / 3, (TURN_SECONDS * 2) / 3, TURN_SECONDS],
+      values: [
+        new Quaternion().setFromAxisAngle(SPIN_AXIS, 0),
+        new Quaternion().setFromAxisAngle(SPIN_AXIS, (Math.PI * 2) / 3),
+        new Quaternion().setFromAxisAngle(SPIN_AXIS, (Math.PI * 4) / 3),
+        new Quaternion().setFromAxisAngle(SPIN_AXIS, Math.PI * 2),
+      ],
+      interpolation: "linear",
+    }),
+  ],
+});
+// The mixer's target is a node, so its §42 authority is inferred; `loop` counts
+// total iterations (`Infinity` never ends), unlike `Tween.repeat`'s "extra
+// cycles". Tracking it is what makes something advance it (§39).
+animationSystem.track(new AnimationMixer(vane).play(spin, { loop: Infinity }));
+
+/** The colour the diamond's material pulses toward, and back from. */
+const BEACON_PULSE_COLOR: [number, number, number, number] = [
+  0.66, 0.6, 0.2, 1,
+];
+
+/**
+ * Colours the timeline's marker steps the vane through, obeying the gamut rule
+ * {@link BEACON_COLOR} states — warm, `red ≤ 0.68`, blue far below red.
+ */
+const VANE_COLORS: Palette = [
+  [0.62, 0.3, 0.14, 1],
+  [0.68, 0.46, 0.22, 1],
+  [0.58, 0.34, 0.1, 1],
+  [0.64, 0.24, 0.1, 1],
+];
+
+/** Which entry of {@link VANE_COLORS} the vane is wearing. */
+let beat = 0;
+
+/**
+ * The §16 marker: one discrete event on an otherwise continuous timeline.
+ *
+ * Markers are how a timeline does something that is not a value at a time —
+ * spawn a puff of dust, play a sound, change a palette — and this one steps the
+ * vane's colour on every loop, so the sequencing is visible rather than merely
+ * asserted. It fires during playback only: a `seek` past it stays silent unless
+ * the marker opts into replay, which is §16's rule and the reason scrubbing a
+ * timeline does not re-trigger its side effects.
+ */
+function advanceVaneColor(): void {
+  beat = (beat + 1) % VANE_COLORS.length;
+  const [red, green, blue, alpha] = VANE_COLORS[beat];
+  vane.material.setColor(red, green, blue, alpha);
+}
+
+// (c), (d) and (e). One `Timeline` sequences a colour tween and a numeric one
+// and fires the marker between them (§16).
+//
+// - **colour** — the diamond's material RGBA, animated *in place*: the tween
+//   writes through the existing four-tuple rather than replacing it, which is
+//   what keeps the reference the backend holds valid. `UnlitMaterial.version`
+//   does not advance (only `setColor`/`markDirty` bump it) and does not need
+//   to: the WebGL backend uploads `material.color` on every draw rather than
+//   caching it against the version, so an in-place edit is picked up the next
+//   frame. A material whose *pipeline* had to change with the colour would need
+//   the version, and this one does not (finding, WP-4.7).
+// - **numeric** — two scalars of the vane's scale, the plain `number` kind.
+//   Alpha would have been the more obvious non-transform number, but this tier
+//   enables `GL_BLEND` for sprites only, so an unlit material's alpha never
+//   reaches a blend equation and animating it would be invisible (finding,
+//   WP-4.7).
+//
+// Both children are handed over *unplayed* — `tween(...)` builds without
+// playing, and the timeline owns playback, so the §16 property claims are taken
+// when the timeline starts and released when it stops.
+const pulse = new Timeline()
+  .addLabel("beat", 2.2)
+  .at(
+    0,
+    tween(beacon.material, { color: BEACON_PULSE_COLOR }, 1.1)
+      .ease("sine-in-out")
+      .yoyo()
+      .repeat(1),
+  )
+  .at("beat", advanceVaneColor)
+  .at(
+    "beat",
+    tween(vane, { "transform.scale.x": 1.35, "transform.scale.y": 1.35 }, 0.55)
+      .ease("back-out")
+      .yoyo()
+      .repeat(1),
+  )
+  .loop(Infinity);
+animationSystem.track(pulse.play());
 
 // --- the label (§55, §56) ---------------------------------------------------
 
