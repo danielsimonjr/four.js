@@ -30,9 +30,11 @@ export {
   fromRapierVector2,
   packInteractionGroups,
   quaternionToAngleZ,
+  revoluteAxisSignZ,
   toRapierAngle,
   toRapierAngularScalar,
   toRapierBodyType,
+  toRapierJointAxis2d,
   toRapierVector2,
 } from "./conversions2d.js";
 export type { RapierVector2 } from "./conversions2d.js";

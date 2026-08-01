@@ -158,7 +158,9 @@ describe("capabilities and identity (§37)", () => {
     expect(adapter.name).toBe("rapier2d");
     expect(adapter.capabilities).toEqual({
       dimensions: ["2d"],
-      jointTypes: [],
+      // The plan P6-1 planar tier, landed by WP-6.2; `rapier2d-joints.test.ts`
+      // is where each of these is exercised against the wasm.
+      jointTypes: ["fixed", "spring", "revolute", "prismatic", "rope"],
       ccdModes: ["disabled", "speculative", "swept"],
       determinism: "same-runtime",
       snapshots: true,
@@ -1282,22 +1284,36 @@ describe("shapes (plan P5-6 tier)", () => {
   });
 });
 
-describe("joints (plan P5-4)", () => {
-  it("throws NOT_IMPLEMENTED from both joint entry points", async () => {
+describe("joints (§28, plan P6-1)", () => {
+  // The staged-out assertions this block used to hold — `createJoint` throwing
+  // `NOT_IMPLEMENTED` and an empty `jointTypes` — were retired by WP-6.2, which
+  // built the joints. `rapier2d-joints.test.ts` is the suite for them; what
+  // stays here is the seam between the two files.
+  it("mints a usable joint handle and declares the tier it built", async () => {
     const adapter = await createAdapter();
     const bodyA = adapter.createBody({ type: "dynamic" });
-    const bodyB = adapter.createBody({ type: "dynamic" });
-    try {
-      adapter.createJoint({ type: "fixed", bodyA, bodyB });
-      throw new Error("expected createJoint to throw");
-    } catch (error) {
-      expect(error).toBeInstanceOf(FourError);
-      expect((error as FourError).code).toBe("NOT_IMPLEMENTED");
-    }
-    expect(() => adapter.destroyJoint(undefined as never)).toThrowError(
-      /staged to Phase 6/u,
+    const bodyB = adapter.createBody({
+      type: "dynamic",
+      position: new Vector2(1, 0),
+    });
+    const joint = adapter.createJoint({ type: "fixed", bodyA, bodyB });
+    expect(adapter.getJointId(joint)).toBe(1);
+    expect(adapter.capabilities.jointTypes).toEqual([
+      "fixed",
+      "spring",
+      "revolute",
+      "prismatic",
+      "rope",
+    ]);
+    adapter.destroyJoint(joint);
+    // Destroyed once, and a handle from nowhere is rejected the same way a
+    // foreign body handle is.
+    expect(() => adapter.destroyJoint(joint)).toThrowError(
+      /Joint handle is not valid/u,
     );
-    expect(adapter.capabilities.jointTypes).toEqual([]);
+    expect(() => adapter.destroyJoint({} as never)).toThrowError(
+      /Joint handle is not valid/u,
+    );
     adapter.dispose();
   });
 });

@@ -76,6 +76,18 @@
  *   {@link rapier2dVersion} and {@link rapier3dVersion} answer `undefined`
  *   rather than a placeholder: this package never invents a version number for
  *   §34's snapshot validity key.
+ * - **Joints report no reaction and take no motor force limit** (verified
+ *   2026-08-01 for WP-6.2, in both the typings *and* the wasm). Enumerating
+ *   `Object.getOwnPropertyNames` on `ImpulseJoint.prototype`,
+ *   `UnitImpulseJoint.prototype`, and the live `RawImpulseJointSet` prototype
+ *   yields no member matching `/impuls|force|react|torque/`, and
+ *   `rapier_wasm2d_bg.wasm.d.ts` exports exactly 27 `rawimpulsejointset_*`
+ *   entry points, none of which is a reaction getter or a `max_force` setter.
+ *   Two consequences, both surfaced rather than papered over:
+ *   `Rapier2dAdapter.reportsJointReactions` is `false` (so `PhysicsWorld`
+ *   refuses a §28 break threshold on this solver instead of never enforcing
+ *   one), and a motor's `maxTorque`/`maxForce` cannot be a hard clamp — see
+ *   {@link RapierMotorModels}.
  */
 
 import * as RAPIER2D_UNTYPED from "@dimforge/rapier2d-compat";
@@ -253,6 +265,68 @@ export interface RapierColliderDesc {
   setActiveCollisionTypes(activeCollisionTypes: number): RapierColliderDesc;
 }
 
+/**
+ * `dynamics/impulse_joint.d.ts`: `MotorModel` — `AccelerationBased = 0`,
+ * `ForceBased = 1`.
+ *
+ * Measured at 0.19.3 on a disc pinned at its own centre of mass (WP-6.2): a
+ * `ForceBased` velocity motor exerts `effort = factor · (target − current)`
+ * — the factor is a damping coefficient in N·m·s/rad (or N·s/m) — while an
+ * `AccelerationBased` one produces `acceleration = factor · (target −
+ * current)`, i.e. the factor is in `1/s` and the body's inertia is divided
+ * out. `Rapier2dAdapter` uses `ForceBased`, because §28's motor is specified
+ * with a torque and a force.
+ */
+export interface RapierMotorModels {
+  readonly AccelerationBased: number;
+  readonly ForceBased: number;
+}
+
+/**
+ * `dynamics/impulse_joint.d.ts`: a `JointData` instance — opaque to this
+ * package, which only ever hands one straight back to `createImpulseJoint`.
+ */
+export type RapierJointData = object;
+
+/**
+ * `dynamics/impulse_joint.d.ts`: the members of `ImpulseJoint` this package
+ * calls — the surface every joint type has.
+ *
+ * `handle` is a packed `(index, generation)` pair reinterpreted as a float,
+ * exactly like a body handle (observed values include `5e-324`), and it **is**
+ * reused after a joint is removed. That is why `Rapier2dAdapter` keeps its own
+ * monotonic joint registry rather than ordering by this number (§33).
+ */
+export interface RapierImpulseJoint {
+  readonly handle: number;
+  isValid(): boolean;
+  contactsEnabled(): boolean;
+  setContactsEnabled(enabled: boolean): void;
+}
+
+/**
+ * `dynamics/impulse_joint.d.ts`: `UnitImpulseJoint` — the limit and motor
+ * surface, which only the **revolute** and **prismatic** joints have.
+ *
+ * `FixedImpulseJoint`, `RopeImpulseJoint`, and `SpringImpulseJoint` extend
+ * `ImpulseJoint` directly and carry none of these members (verified by
+ * enumerating the prototypes at 0.19.3), which is why `setJointLimits` and
+ * `setJointMotor` reject those types instead of silently doing nothing.
+ *
+ * `configureMotorVelocity(targetVelocity, factor)` is Rapier's own name for
+ * what §28 calls a velocity motor; see {@link RapierMotorModels} for what
+ * `factor` means. There is **no** motor force limit in these bindings — see the
+ * module header.
+ */
+export interface RapierUnitImpulseJoint extends RapierImpulseJoint {
+  limitsEnabled(): boolean;
+  limitsMin(): number;
+  limitsMax(): number;
+  setLimits(min: number, max: number): void;
+  configureMotorModel(model: number): void;
+  configureMotorVelocity(targetVelocity: number, factor: number): void;
+}
+
 /** `pipeline/event_queue.d.ts`: the members of `EventQueue` this package calls. */
 export interface RapierEventQueue {
   drainCollisionEvents(
@@ -303,10 +377,23 @@ export interface RapierWorld {
     desc: RapierColliderDesc,
     parent?: RapierRigidBody,
   ): RapierCollider;
+  createImpulseJoint(
+    params: RapierJointData,
+    parent1: RapierRigidBody,
+    parent2: RapierRigidBody,
+    wakeUp: boolean,
+  ): RapierImpulseJoint;
   getRigidBody(handle: number): RapierRigidBody;
   getCollider(handle: number): RapierCollider;
+  /**
+   * Upstream types this `ImpulseJoint`, but it returns `null` for a handle
+   * whose joint has been removed (verified at 0.19.3) — transcribed as it
+   * behaves, not as it is declared.
+   */
+  getImpulseJoint(handle: number): RapierImpulseJoint | null;
   removeRigidBody(body: RapierRigidBody): void;
   removeCollider(collider: RapierCollider, wakeUp: boolean): void;
+  removeImpulseJoint(joint: RapierImpulseJoint, wakeUp: boolean): void;
   castRayAndGetNormal(
     ray: RapierRay,
     maxToi: number,
@@ -375,6 +462,42 @@ export interface Rapier2dModule {
   readonly ActiveEvents: RapierActiveEvents;
   readonly ActiveCollisionTypes: RapierActiveCollisionTypes;
   readonly CoefficientCombineRule: RapierCoefficientCombineRules;
+  readonly MotorModel: RapierMotorModels;
+  /**
+   * `dynamics/impulse_joint.d.ts`: the five `JointData` factories the 2D build
+   * ships — there is **no** `spherical` here, which is what makes §28's ball
+   * joint a 3D-only type in this engine too (plan P6-1).
+   *
+   * `Rotation` is a scalar angle in 2D (`math.d.ts`), so `fixed` takes two
+   * numbers where the 3D build takes two quaternions. `revolute` takes **no
+   * axis**: a plane has exactly one rotational degree of freedom (§21).
+   */
+  readonly JointData: {
+    fixed(
+      anchor1: RapierVector,
+      frame1: number,
+      anchor2: RapierVector,
+      frame2: number,
+    ): RapierJointData;
+    revolute(anchor1: RapierVector, anchor2: RapierVector): RapierJointData;
+    prismatic(
+      anchor1: RapierVector,
+      anchor2: RapierVector,
+      axis: RapierVector,
+    ): RapierJointData;
+    rope(
+      length: number,
+      anchor1: RapierVector,
+      anchor2: RapierVector,
+    ): RapierJointData;
+    spring(
+      restLength: number,
+      stiffness: number,
+      damping: number,
+      anchor1: RapierVector,
+      anchor2: RapierVector,
+    ): RapierJointData;
+  };
   readonly World: {
     new (gravity: RapierVector): RapierWorld;
     restoreSnapshot(data: Uint8Array): RapierWorld;
