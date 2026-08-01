@@ -1,3 +1,5 @@
+// The umbrella package (§98): one namespace per workspace package, plus the
+// §45 composition root, which is the only API `four` owns rather than re-exports.
 export * as core from "@four/core";
 export * as math from "@four/math";
 export * as scene from "@four/scene";
@@ -21,3 +23,6 @@ export * as ui from "@four/ui";
 export * as physicsRapier from "@four/physics-rapier";
 export * as physicsBox2d from "@four/physics-box2d";
 export * as physicsSoft from "@four/physics-soft";
+
+export type { ApplicationEventMap, ApplicationOptions } from "./application.js";
+export { Application } from "./application.js";
