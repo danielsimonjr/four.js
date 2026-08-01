@@ -8,6 +8,9 @@
     "test": {
       "dependsOn": ["build"]
     },
-    "lint": {}
+    "lint": {},
+    "@four/scene#test": {
+      "dependsOn": ["build", "@four/motion#build"]
+    }
   }
 }

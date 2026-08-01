@@ -7,6 +7,15 @@ export {
   warnAuthorityConflict,
 } from "./authority.js";
 export { Group } from "./group.js";
+export type {
+  PoseSnapshotSystem,
+  SnapshotSystemOptions,
+} from "./interpolation.js";
+export {
+  POSE_SNAPSHOT_PRIORITY,
+  PoseBuffer,
+  createSnapshotSystem,
+} from "./interpolation.js";
 export type { NodeEventMap, NodeHierarchyEvent, NodeType } from "./node.js";
 export { Node } from "./node.js";
 export { Scene } from "./scene.js";
