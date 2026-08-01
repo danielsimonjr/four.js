@@ -840,6 +840,60 @@ Dependencies: 5.1 → (5.2 ∥ 5.4); 5.3 ← 5.2; 5.5 ← 5.4; 5.6 ← 5.3 + 5.5
 5.8 ← 5.7; 5.9 last. (5.2/5.3 live in `physics`, 5.4/5.5 in `physics-rapier` — different
 packages, so the pairs run in parallel without worktrees.)
 
+## 6e. Phase 6 — Joints and Constraints (§28, §109; decomposed 2026-08-01)
+
+Exit (§109): constraints remain stable under expected real-time loads — made measurable
+as: the §109 mechanism demo runs ≥3600 fixed steps with bounded positions, no NaN, joint
+constraint drift below documented tolerances, and the browser demo visibly stable.
+
+Phase-level pinned decisions:
+
+- **P6-1 Joint tier** (checked against installed rapier-compat 0.19.3 typings):
+  **fixed, revolute/hinge (motors + limits), prismatic/slider (motors + limits), rope,
+  spring** in both dimensions, **spherical/ball (limits)** in 3D. **Staged out with
+  loud validation errors:** `distance` (Rapier has no rigid distance joint — rope caps
+  max distance only; emulating with a stiff spring would misrepresent §28) and `gear`
+  (no Rapier support). `capabilities.jointTypes` lists exactly what each adapter ships.
+- **P6-2 Break thresholds** live at the `@four/physics` layer: the world monitors joint
+  reaction impulses each step and destroys joints exceeding `breakForce`/`breakTorque`,
+  emitting a `jointbreak` event — IF the adapter can report reaction impulses (workers
+  verify against 0.19.3; if unavailable, breakage is staged with a dated note, not
+  faked).
+- **P6-3 API shape** per §28's sketch: typed joint classes (`HingeJoint({bodyA, bodyB,
+  anchor, axis, limits, motor})`-style) over the §37 `JointDescriptor`; joints register
+  through the world (`world.addJoint(joint)`), not as node components (a joint spans
+  two bodies; §6a's one-per-node model does not fit it).
+- **P6-4 Demo**: a new `examples/mechanism` (§109 list: rotating shaft, hinge, slider,
+  spring, motor, limit switches) with its own vite build, third Playwright webServer,
+  and browser spec. The playground is untouched (its pixel gates stay valid).
+
+Packets:
+
+- **WP-6.1 [S] Joint API** (`@four/physics`) — full `JointDescriptor` discriminated
+  unions for the P6-1 tier (+ staged types rejected in validation with P6-1 cited),
+  §28 joint classes with limits/motor/spring params + break thresholds + collision
+  enable/disable, world.addJoint/removeJoint plumbing to adapter handles, `jointbreak`
+  event type, extended fake-adapter coverage.
+- **WP-6.2 [S] Rapier 2D joints** + **WP-6.3 [S] Rapier 3D joints**
+  (`@four/physics-rapier`, parallel after 6.1) — JointData mapping, motors
+  (targetVelocity/maxTorque → Rapier motor model — verify configureMotor* APIs),
+  limits, reaction-impulse reporting for P6-2 (verify; report honestly),
+  capabilities.jointTypes updated, wasm-backed tests incl. pendulum period vs closed
+  form and motor-driven steady state.
+- **WP-6.4 [S] Integration + breakage** — cross-package suite: hinge pendulum,
+  motorized shaft reaching commanded speed, slider with limits, spring
+  oscillation/damping vs closed form, rope constraint, spherical cone (3D), breakage
+  under load (per P6-2's verified mechanism), §33 checksums stable with joints, both
+  dimensions.
+- **WP-6.5 [H] Mechanism example** (P6-4) — §109's engineering mechanism composed from
+  the landed API; probe measurements seed WP-6.6.
+- **WP-6.6 [S] Phase 6 gates** — determinism golden phase6 (mechanism scenario,
+  cross-process) + mechanism browser spec (third webServer).
+- **WP-6.7 [S] Phase 6 exit** — independent verifier, §109 verdict per the measurable
+  criterion above, fix nothing.
+
+Dependencies: 6.1 → (6.2 ∥ 6.3); 6.4 ← 6.2 + 6.3; 6.5 ← 6.4; 6.6 ← 6.5; 6.7 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
