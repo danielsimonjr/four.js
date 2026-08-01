@@ -30,6 +30,15 @@
  * - **Rapier's motor gain saturates.** `maxTorque` values of 5 and 200 both
  *   converge to the same steady rate here; see `setJointMotor` for why the
  *   number is a strength coefficient rather than the ceiling §28 describes.
+ * - **A disabled motor is a gain of `1e-12`, not a gain of `0`** (WP-6.2-fix1).
+ *   Rapier cannot remove a motor, and `configureMotorVelocity(0, 0)` is its
+ *   *rigid* zero-velocity constraint: a bar turning at 3 rad/s drops to
+ *   `0.294 rad/s` in one step and to `5.9e-44 rad/s` within a second. The
+ *   `1e-12` gain is inert instead, and measurably so — a hinge and a slider
+ *   carrying it reproduce an unmotorized rig **bit for bit**, `max |Δ| = 0`
+ *   across position, angle, and both velocities, over 3600 steps and also over
+ *   600 steps continuing from a joint that had just been driven hard. The tests
+ *   below assert that equality rather than trusting this note.
  */
 
 import { FourError } from "@four/core";
@@ -145,6 +154,39 @@ function run(adapter: Rapier2dAdapter, steps: number): void {
   for (let i = 0; i < steps; i += 1) {
     adapter.step(DT);
   }
+}
+
+/**
+ * A body's whole planar state: `[x, y, angle, vx, vy, ω]`.
+ *
+ * Every component, not only the interesting one, because the motor tests below
+ * assert *bit-identical* trajectories — a claim that is only worth making about
+ * the complete state.
+ */
+function stateOf(
+  adapter: Rapier2dAdapter,
+  body: PhysicsBodyHandle,
+): readonly number[] {
+  adapter.getBodyTransform(body, position, rotation);
+  const x = position.x;
+  const y = position.y;
+  const angle = 2 * Math.atan2(rotation.z, rotation.w);
+  adapter.getBodyVelocities(body, linear, angular);
+  return [x, y, angle, linear.x, linear.y, angular.z];
+}
+
+/** {@link stateOf} sampled after each of `steps` steps. */
+function trajectoryOf(
+  adapter: Rapier2dAdapter,
+  body: PhysicsBodyHandle,
+  steps: number,
+): readonly (readonly number[])[] {
+  const samples: (readonly number[])[] = [];
+  for (let i = 0; i < steps; i += 1) {
+    run(adapter, 1);
+    samples.push(stateOf(adapter, body));
+  }
+  return samples;
 }
 
 /**
@@ -347,7 +389,7 @@ describe("revolute joints (§28 hinge)", () => {
     adapter.dispose();
   });
 
-  it("never configures a motor that arrives disabled", async () => {
+  it("drives nothing when the motor arrives disabled", async () => {
     const adapter = await createAdapter({ gravity: new Vector2(0, 0) });
     const { bar, joint } = pinnedBar(adapter, {
       motor: { enabled: false, targetVelocity: 3, maxTorque: 50 },
@@ -355,7 +397,10 @@ describe("revolute joints (§28 hinge)", () => {
     run(adapter, 120);
     expect(angularVelocityOf(adapter, bar)).toBeCloseTo(0, 6);
 
-    // Still disabled, still nothing to remove: the command is a no-op.
+    // Still disabled: the inert configuration is re-applied and still drives
+    // nothing. (A *rigid* zero motor would be indistinguishable here — the bar
+    // is at rest either way — which is why the next test compares trajectories
+    // rather than a single number.)
     adapter.setJointMotor(joint, {
       enabled: false,
       targetVelocity: 3,
@@ -366,28 +411,118 @@ describe("revolute joints (§28 hinge)", () => {
     adapter.dispose();
   });
 
-  it("refuses to disable a running motor rather than braking the joint", async () => {
+  it("makes a disabled motor indistinguishable from no motor at all", async () => {
+    // The measurement `INERT_MOTOR_GAIN` rests on, asserted rather than
+    // asserted about (WP-6.2-fix1): Rapier cannot remove a motor, so a disabled
+    // one is configured with a gain of 1e-12 — and a joint carrying it must
+    // follow *exactly* the trajectory of a joint that never had a motor, under
+    // load, in every component of the state. Measured against 2D 0.19.3:
+    // max |Δ| = 0 over 3600 steps. 600 steps are run here.
+    //
+    // Gravity is on, unlike the driving tests: a free hinge has to be doing
+    // something for "identical" to mean anything, and the bar swings.
+    const trajectory = async (
+      motorized: boolean,
+    ): Promise<readonly (readonly number[])[]> => {
+      const adapter = await createAdapter();
+      const { bar, joint } = pinnedBar(
+        adapter,
+        motorized
+          ? { motor: { enabled: false, targetVelocity: 3, maxTorque: 50 } }
+          : {},
+      );
+      if (motorized) {
+        adapter.setJointMotor(joint, {
+          enabled: false,
+          targetVelocity: 3,
+          maxEffort: 50,
+        });
+      }
+      const samples = trajectoryOf(adapter, bar, 600);
+      adapter.dispose();
+      return samples;
+    };
+    const disabled = await trajectory(true);
+    const never = await trajectory(false);
+    // The rig genuinely moves, so the equality below is not two rows of zeros.
+    expect(Math.abs(never[599]?.[2] ?? 0)).toBeGreaterThan(0.5);
+    expect(disabled).toEqual(never);
+  });
+
+  it("releases a running motor rather than braking the joint", async () => {
+    // Disabling a motor that *is* running is the case Rapier makes awkward:
+    // its only other spelling of "no motor", configureMotorVelocity(0, 0), is a
+    // rigid zero-velocity constraint that stops the bar dead (measured: 3 rad/s
+    // → 0.294 rad/s in one step, → 5.9e-44 rad/s within a second). The inert
+    // gain releases the axis instead, and this test pins both halves of that:
+    // the bar keeps its speed, and its continuation is *bit-identical* to a
+    // never-motorized control placed in the same state.
+    const adapter = await createAdapter({ gravity: new Vector2(0, 0) });
+    const { bar, joint } = pinnedBar(adapter, {
+      motor: { targetVelocity: 3, maxTorque: 50 },
+    });
+    run(adapter, 120);
+    expect(angularVelocityOf(adapter, bar)).toBeCloseTo(3, 2);
+
+    adapter.setJointMotor(joint, {
+      enabled: false,
+      targetVelocity: 3,
+      maxEffort: 50,
+    });
+    const released = stateOf(adapter, bar);
+
+    // The control never had a motor and is put into the released bar's exact
+    // state at the moment of the disable. The two histories differ — that is
+    // unavoidable, one of them ran a motor — so what is compared is what the
+    // claim is actually about: from the same state, the released joint and the
+    // free joint move the same way.
+    const control = await createAdapter({ gravity: new Vector2(0, 0) });
+    const free = pinnedBar(control);
+    control.setBodyTransform(
+      free.bar,
+      new Vector3(released[0] ?? 0, released[1] ?? 0, 0),
+      released[2] ?? 0,
+    );
+    control.setBodyVelocities(
+      free.bar,
+      new Vector3(released[3] ?? 0, released[4] ?? 0, 0),
+      released[5] ?? 0,
+    );
+
+    const releasedRun = trajectoryOf(adapter, bar, 600);
+    const freeRun = trajectoryOf(control, free.bar, 600);
+    // Not braked: one step after the disable the bar is still turning at the
+    // speed it had. A rigid zero motor would have taken it to ~0.29 rad/s.
+    expect(releasedRun[0]?.[5]).toBeCloseTo(3, 2);
+    expect(releasedRun).toEqual(freeRun);
+    // And it is coasting, not being held at a target: the hinge sheds a little
+    // speed to the solver over ten seconds (measured: 3.0 → 2.65 rad/s) instead
+    // of being driven back to 3.
+    expect(freeRun[599]?.[5]).toBeLessThan(2.9);
+    expect(freeRun[599]?.[5]).toBeGreaterThan(2.4);
+    adapter.dispose();
+    control.dispose();
+  });
+
+  it("treats a zero maxEffort as an inert motor, not a rigid brake", async () => {
+    // `maxEffort: 0` asks for a drive that exerts nothing, which is the same
+    // request as a disabled motor — and *not* what Rapier's zero gain does.
     const adapter = await createAdapter({ gravity: new Vector2(0, 0) });
     const { bar, joint } = pinnedBar(adapter, {
       motor: { targetVelocity: 3, maxTorque: 50 },
     });
     run(adapter, 120);
 
-    try {
-      adapter.setJointMotor(joint, {
-        enabled: false,
-        targetVelocity: 3,
-        maxEffort: 50,
-      });
-      throw new Error("expected the disable to be refused");
-    } catch (error) {
-      expect(error).toBeInstanceOf(FourError);
-      expect((error as FourError).code).toBe("NOT_IMPLEMENTED");
-      expect((error as FourError).message).toMatch(/rigid brake/u);
-    }
-    // The refusal changed nothing: the shaft is still turning.
+    adapter.setJointMotor(joint, {
+      enabled: true,
+      targetVelocity: 3,
+      maxEffort: 0,
+    });
     run(adapter, 60);
-    expect(angularVelocityOf(adapter, bar)).toBeCloseTo(3, 2);
+    // Coasting a second later (measured 2.9585 rad/s), where Rapier's own zero
+    // gain would have left 5.9e-44 rad/s.
+    expect(angularVelocityOf(adapter, bar)).toBeGreaterThan(2.9);
+    expect(angularVelocityOf(adapter, bar)).toBeLessThan(3);
     adapter.dispose();
   });
 
@@ -916,7 +1051,7 @@ describe("snapshots with joints (§34, envelope version 2)", () => {
     const meta = JSON.parse(
       new TextDecoder().decode(bytes.subarray(16, 16 + metaLength)),
     ) as {
-      joints: [number, number, string, number, number, number, boolean][];
+      joints: [number, number, string, number, number, number][];
     };
     // A Rapier joint handle is a packed `(generation, index)` pair read as a
     // double, so a *plausible-looking* integer like 999999 decodes to index 0

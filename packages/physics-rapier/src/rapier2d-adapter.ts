@@ -70,15 +70,19 @@
  *
  * The whole plan P6-1 planar tier is built — fixed, revolute, prismatic, rope,
  * spring — with limits and velocity motors on the two joints that have a driven
- * degree of freedom. Two limitations of Rapier 0.19.3's bindings are declared
- * rather than hidden, and both are verified against the wasm and not only the
- * typings:
+ * degree of freedom. Three awkward corners of Rapier 0.19.3's bindings are
+ * declared rather than hidden, and each is verified against the wasm and not
+ * only the typings:
  *
  * - **No joint reaction.** {@link Rapier2dAdapter.reportsJointReactions} is
  *   `false`, so `PhysicsWorld` refuses §28 break thresholds on this solver.
  * - **No motor force limit.** §28's `maxTorque`/`maxForce` becomes the motor's
  *   strength coefficient, not a ceiling — see
  *   {@link Rapier2dAdapter.setJointMotor} for exactly what it does mean.
+ * - **No way to remove a motor**, and a gain of `0` is Rapier's *rigid* motor
+ *   rather than its inert one. A disabled motor is therefore configured with
+ *   {@link INERT_MOTOR_GAIN}, measured bit-identical to a joint that never had
+ *   one — the same constant and the same answer `Rapier3dAdapter` gives.
  *
  * Joint handles, like body handles, are Rapier indices that get **reused** after
  * a removal, so the adapter keeps its own monotonic joint registry for §33's
@@ -195,6 +199,25 @@ const QUERY_SOLID = true;
 
 /** `castShape` reports a hit as soon as the shapes touch, not before (§30). */
 const SHAPE_CAST_TARGET_DISTANCE = 0;
+
+/**
+ * The motor gain that stands for "this motor exerts nothing" (WP-6.2-fix1).
+ *
+ * Rapier has no way to *remove* a motor once one has been configured, and a
+ * gain of exactly `0` is its **rigid** special case rather than its inert one:
+ * measured at 2D 0.19.3, `configureMotorVelocity(0, 0)` on a bar left turning
+ * at 3 rad/s drops it to 0.294 rad/s in one step and to 5.9e-44 rad/s within a
+ * second. This value is the inert end of the same dial, and it is *measured*
+ * rather than assumed: a hinge (and a slider) configured with
+ * `configureMotorVelocity(0, 1e-12)` follows a trajectory **bit-identical** —
+ * `max |Δ| = 0` across position, rotation, and both velocities, every step — to
+ * the same rig with no motor configured at all, over 3600 steps, and equally so
+ * after the joint has previously run a strong motor. It is used for a disabled
+ * motor and for one whose `maxEffort` is `0`, and it is the same constant and
+ * the same semantics `Rapier3dAdapter` uses, so the two adapters answer
+ * `setJointMotor({ enabled: false, … })` the same way.
+ */
+const INERT_MOTOR_GAIN = 1e-12;
 
 /**
  * The §28 joint types this adapter builds — every type plan P6-1 ships in a
@@ -374,12 +397,6 @@ interface JointRecord {
   bodyIdA: number;
   /** The {@link BodyRecord.id} of `bodyB`. */
   bodyIdB: number;
-  /**
-   * Whether a motor has ever been configured on this joint. Rapier cannot
-   * un-configure one, so this is what tells a *disable* command whether there
-   * is anything to disable — see `#applyJointMotor`.
-   */
-  motorConfigured: boolean;
   /** `false` once destroyed; a handle to a dead record is rejected. */
   alive: boolean;
 }
@@ -431,15 +448,16 @@ interface SnapshotMeta {
   ][];
   /**
    * Joints in insertion order: `[id, rapierHandle, type, axisSign, bodyIdA,
-   * bodyIdB, motorConfigured]` (envelope version 2).
+   * bodyIdB]` (envelope version 2).
    *
    * Only what Rapier cannot answer for itself is stored. The constraint, its
    * anchors, its limits, its motor, and its contact flag all live in Rapier's
    * own snapshot and come back with it (verified: a restored joint reports the
    * same `limitsMin`/`limitsMax` and `contactsEnabled`, and a run continued
-   * from a restore matches the original bit for bit) — `motorConfigured` is
-   * here because a restored joint keeps its motor, so a later *disable* must
-   * still know the motor is there.
+   * from a restore matches the original bit for bit). Whether a motor was ever
+   * configured is **not** recorded, because nothing needs to know: disabling a
+   * motor is the same command whether or not one is running (see
+   * `#applyJointMotor`).
    */
   readonly joints: readonly [
     number,
@@ -448,7 +466,6 @@ interface SnapshotMeta {
     1 | -1,
     number,
     number,
-    boolean,
   ][];
 }
 
@@ -1151,7 +1168,6 @@ export class Rapier2dAdapter
       axisSign,
       bodyIdA: bodyA.id,
       bodyIdB: bodyB.id,
-      motorConfigured: false,
       alive: true,
     };
     this.#nextJointId += 1;
@@ -1604,7 +1620,6 @@ export class Rapier2dAdapter
         record.axisSign,
         record.bodyIdA,
         record.bodyIdB,
-        record.motorConfigured,
       ]),
     };
     const metaBytes = new TextEncoder().encode(JSON.stringify(meta));
@@ -2031,8 +2046,26 @@ export class Rapier2dAdapter
    * enforce the ceiling, and this adapter will not simulate one it does not
    * have.
    *
-   * A disabled motor is configured as `(0, 0)` — a zero factor exerts nothing
-   * (measured: identical to a joint that was never given a motor).
+   * ## Disabling a motor (decision, WP-6.2-fix1)
+   *
+   * Rapier cannot *remove* a motor once one has been configured, and
+   * `configureMotorVelocity(0, 0)` is not the way to switch one off: a zero
+   * gain is Rapier's **rigid** zero-velocity constraint, a brake rather than a
+   * release (measured: a bar turning at 3 rad/s falls to 0.294 rad/s in one
+   * step and to 5.9e-44 rad/s within a second, where the same bar with no motor
+   * keeps turning). A motor that arrives disabled — or whose `maxEffort` is
+   * `0`, which asks for a drive that exerts nothing — is therefore configured
+   * with {@link INERT_MOTOR_GAIN} and a zero target, the setting measured to be
+   * **bit-identical** to a joint that never had a motor at all: `max |Δ| = 0`
+   * over 3600 steps on a hinge and a slider, and over 600 steps continuing from
+   * a joint that had just been running a strong motor. `Rapier3dAdapter` does
+   * the same thing with the same constant, so a disabled motor means one thing
+   * across this package.
+   *
+   * What that buys the caller: a running motor can be released, and the axis is
+   * then as free as an unmotorized one. What it does *not* do is restore the
+   * joint's pre-motor history — the body keeps whatever velocity the motor gave
+   * it and coasts from there, which is what releasing a drive means.
    */
   setJointMotor(handle: PhysicsJointHandle, motor: SolverJointMotor): void {
     this.#applyJointMotor(this.#requireJoint(handle), motor);
@@ -2200,44 +2233,35 @@ export class Rapier2dAdapter
   }
 
   /**
-   * Pushes a §28 motor into Rapier, or rejects the one command Rapier cannot
-   * carry out. See {@link Rapier2dAdapter.setJointMotor} for the effort
-   * mapping.
+   * Pushes a §28 motor into Rapier. See {@link Rapier2dAdapter.setJointMotor}
+   * for the effort mapping and for what disabling means here.
    *
-   * ## Disabling (decision, WP-6.2)
+   * ## Disabling (decision, WP-6.2-fix1)
    *
    * Rapier configures a motor **onto an axis** and offers no way to take it off
    * again: the JavaScript surface is four `configureMotor*` calls and no
-   * `disableMotor`. Worse, the obvious spelling of "off" is not off —
+   * `disableMotor`. The obvious spelling of "off" is not off —
    * `configureMotorVelocity(0, 0)` makes the motor a *rigid* zero-velocity
-   * constraint (measured: a bar left spinning at 5 rad/s stops dead in one
-   * step, while the same bar with no motor keeps turning). So:
+   * constraint, which brakes the joint instead of releasing it. So a motor that
+   * is disabled, or whose `maxEffort` is `0`, is configured with
+   * {@link INERT_MOTOR_GAIN} and a zero target: the one setting measured to be
+   * bit-identical to a joint that never had a motor, which is the only honest
+   * reading of "a disabled motor exerts nothing" on a solver that cannot remove
+   * one.
    *
-   * - a motor that arrives already disabled is simply **never configured**, and
-   *   the axis stays genuinely free;
-   * - disabling a motor that was configured **throws**, because neither
-   *   available spelling is honest — a zero gain brakes the joint, and an
-   *   almost-zero gain is a number this adapter would have invented.
+   * A rate is mirrored by {@link JointRecord.axisSign} for a `−Z` hinge (§21),
+   * exactly as a limit range is; the inert configuration has a zero rate, which
+   * needs no mirroring.
    */
   #applyJointMotor(record: JointRecord, motor: SolverJointMotor): void {
     const rapier = this.#requireRapier();
     const joint = this.#requireUnitJoint(record, "setJointMotor");
-    if (!motor.enabled) {
-      if (!record.motorConfigured) {
-        return;
-      }
-      throw new FourError(
-        "NOT_IMPLEMENTED",
-        `Rapier 0.19.3 cannot remove a joint motor once it has been configured, and its only spelling of a zero motor — configureMotorVelocity(0, 0) — is a rigid brake, not a released drive (measured 2026-08-01, WP-6.2). ${ADAPTER_NAME} therefore refuses to disable this ${record.type} joint's running motor rather than braking it silently (§28). Set targetVelocity to 0 if a brake is what you want, or remove and re-add the joint to release the axis.`,
-        { context: { adapter: ADAPTER_NAME, jointType: record.type } },
-      );
-    }
+    const driving = motor.enabled && motor.maxEffort > 0;
     joint.configureMotorModel(rapier.MotorModel.ForceBased);
     joint.configureMotorVelocity(
-      record.axisSign * motor.targetVelocity,
-      motor.maxEffort,
+      driving ? record.axisSign * motor.targetVelocity : 0,
+      driving ? motor.maxEffort : INERT_MOTOR_GAIN,
     );
-    record.motorConfigured = true;
   }
 
   /** The handle of a collider's owning body — every event and hit needs it. */
@@ -2600,7 +2624,6 @@ export class Rapier2dAdapter
       axisSign,
       bodyIdA,
       bodyIdB,
-      motorConfigured,
     ] of meta.joints) {
       const joint = world.getImpulseJoint(rapierHandle);
       if (joint === null) {
@@ -2619,7 +2642,6 @@ export class Rapier2dAdapter
         axisSign,
         bodyIdA,
         bodyIdB,
-        motorConfigured,
         alive: true,
       };
       record.rapierHandle = rapierHandle;
@@ -2628,7 +2650,6 @@ export class Rapier2dAdapter
       record.axisSign = axisSign;
       record.bodyIdA = bodyIdA;
       record.bodyIdB = bodyIdB;
-      record.motorConfigured = motorConfigured;
       record.alive = true;
       survivingJoints.set(id, record);
     }
