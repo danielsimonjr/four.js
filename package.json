@@ -17,6 +17,7 @@
     "check-spec": "node tools/check-spec.mjs",
     "docs": "typedoc",
     "example:build": "vite build examples/first-2d-scene",
+    "test:browser": "playwright test",
     "size": "size-limit"
   },
   "devDependencies": {

@@ -171,10 +171,16 @@ app.poses.track(tumbler);
  * Simulation itself never sees it — inside `app.step` the fixed-step
  * accumulator hands every system the same injected `fixedDeltaTime` (§10, §33).
  */
-let last = performance.now();
+// Seeded from the FIRST rAF timestamp, not performance.now(): rAF hands the
+// frame-start time, which can precede a now() taken moments earlier — a
+// negative first delta would make app.step throw and kill the loop
+// (WP-3.7-fix1, caught by the WP-3.8 browser gate).
+let last: number | null = null;
 
 function frame(now: number): void {
-  app.step((now - last) / 1000);
+  if (last !== null) {
+    app.step((now - last) / 1000);
+  }
   last = now;
   requestAnimationFrame(frame);
 }
@@ -184,7 +190,6 @@ async function main(): Promise<void> {
   // half-started application (§45).
   await app.initialize();
   app.start();
-  last = performance.now();
   requestAnimationFrame(frame);
 }
 

@@ -48,6 +48,16 @@ jobs:
       - name: Build example
         run: pnpm example:build
 
+      # CI runners ship no browsers, and this repository deliberately keeps
+      # browser downloads out of the local scripts: the dev sandbox already has
+      # Chromium (PLAYWRIGHT_BROWSERS_PATH), which playwright.config.ts finds.
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Runs against the example built above; SwiftShader supplies WebGL 2.
+      - name: Browser test
+        run: pnpm test:browser
+
       - name: Check bundle size
         run: pnpm size
 
