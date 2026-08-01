@@ -592,6 +592,48 @@ Done: `pnpm test:suites` green twice; golden committed.
 
 ---
 
+## 6a. Phase 3 — Renderer Foundation (§106; decomposed 2026-08-01 per §2 rolling wave)
+
+Exit: moving 2D and 3D primitives render smoothly despite fixed-step simulation.
+All surfaces spec-pinned (§47–48, §61–64, §49 subset, D8, rev-1.3 context-loss); no RFC
+triggered. MVP tier: unlit colored geometry, WebGL 2 only, `"negative-one-to-one"` depth.
+
+- **WP-3.1/3.2 [S] Cameras + Viewport** (`@four/scene`, batched: shared barrel) — §47
+  `Camera` abstract Node subclass (near/far/projection/inverseProjection/view matrices;
+  view = inverse world), `PerspectiveCamera` (fovY radians/aspect/near/far),
+  `OrthographicCamera`; projections via Matrix4 D8 helpers with `depthRange` argument at
+  update time; §48 `Viewport` (id, camera, rect, normalized?, clearColor) minimal. Tests vs
+  math ground truth incl. view = world⁻¹ under hierarchy.
+- **WP-3.3 [S] Geometry/material/renderable lite** (batched across `@four/geometry`,
+  `@four/materials`, `@four/render`) — `BufferGeometry` (positions Float32Array, optional
+  indices, bounds), `boxGeometry/planeGeometry/circleGeometry2D` builders;
+  `UnlitMaterial` (RGBA color); `Renderable` Node subclass (§49 subset: geometry, material,
+  renderLayer/renderOrder) + `buildRenderList(scene, camera)` (§64 subset → compact items)
+  with an interpolation-aware variant composing PoseBuffer local render poses down the
+  hierarchy (§43 application; documented O(n)).
+- **WP-3.4 [S] Renderer interface** (`@four/render`) — §61 interface verbatim + rev-1.3
+  context-loss contract (`contextlost`/`contextrestored` events, engine-resource
+  re-creation policy), `RendererCapabilities` minimal, shared clear/viewport semantics.
+- **WP-3.5 [S] WebGL 2 backend** (`@four/render-webgl`) — implements §61 for unlit colored
+  geometry: context acquisition, one shader pair, VAO per geometry (cached, disposed),
+  camera VP uniform, per-item model matrix, §48 viewport rects + clears, context-loss
+  wiring to the §61 events, `"negative-one-to-one"` depth. Unit-testable parts split from
+  GL calls (command building pure; GL layer thin) so coverage stays honest without a GPU.
+- **WP-3.6 [S] Application renderer integration** (`four`) — `renderer: "webgl2" | false`
+  + `canvas` options; `initialize()` constructs the backend (async per §45);
+  `render` event drives `renderer.render(scene, views)` with interpolation-aware lists;
+  optional rAF driver (`start` stays headless-safe; manual stepping unchanged).
+- **WP-3.7 [H] Real example** — `examples/first-2d-scene` becomes moving shapes
+  (MotionComponent + KinematicController) rendered via WebGL; the §86 size gate becomes
+  meaningful from here.
+- **WP-3.8 [S] Browser test** — Playwright against the pre-installed Chromium/SwiftShader:
+  example loads, canvas non-blank, animates (two frame grabs differ), zero console errors;
+  root `test:browser` script + CI step. (Orchestrator pin addition at dispatch:
+  `@playwright/test`.)
+- **WP-3.9 [S] Phase 3 exit** — independent verifier: full matrix + browser evidence of
+  smooth motion under fixed-step (frame-delta assertions), coverage ≥95% on touched
+  packages, §106 criterion verdict, defect list.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
