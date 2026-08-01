@@ -6,17 +6,12 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] **Owner:** merge the open PR for `claude/specification-improvements-iug6pi` (spec
-      1.0→1.5, plan 2.1, doc sync, tooling) — Phase 0 starts from `main` after merge.
-- [ ] Decide when to start Phase 0 (§103, Project Foundation) — plan is dispatch-ready.
+- [ ] Phase 3 — Renderer Foundation (§106) IN PROGRESS: WP-3.1/3.2 (cameras+viewport)
+      landed; WP-3.3 (geometry/material/render list) in flight; then renderer interface,
+      WebGL 2 backend, Application integration, real example, Playwright browser test,
+      exit (plan §6a).
 
 ## Backlog
-
-### Phase 3 — Renderer Foundation (§106; §61–62, §47–48) — NEXT: rolling-wave decomposition
-- [ ] Orchestrator: write WP-3.x packets (renderer interface w/ context-loss contract,
-      cameras+viewports in @four/scene, WebGL 2 backend, render list, interpolation-aware
-      draw; Playwright+SwiftShader per plan Phase-3 note; real example replaces placeholder,
-      size gate becomes meaningful)
 
 ### Later milestones (decided 2026-07-29)
 - [ ] Ergonomics decision before the §97 example: `Node.position/rotation/scale` aliases
