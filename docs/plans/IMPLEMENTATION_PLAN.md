@@ -810,6 +810,11 @@ Packets:
   @four/diagnostics, 1e-6, ascending body id), §34 snapshot passthrough with
   adapter/version validity metadata; tests against a structural `FakeSolverAdapter`
   (scripted events + recorded calls — the fake-GL pattern).
+  *Dated note (2026-08-01, orchestrator):* the §33 checksum could not "reuse WP-1.13"
+  as the §7 table suggested — the frozen §3.1 matrix gives `physics` no `diagnostics`
+  edge. Resolution: FNV-1a is re-implemented privately in `world.ts`, pinned
+  byte-for-byte against an independent reference implementation in its tests. Accepted
+  duplication; preferable to widening the dependency matrix for one hash function.
 - **WP-5.4 [S] Rapier adapter, 2D** (`@four/physics-rapier`) — P5-1 deps (package.json
   edit; ORCHESTRATOR runs the install), shared init plumbing, 2D adapter: bodies,
   colliders (P5-6 tier), step, EventQueue → §37 `drainEvents`, queries, snapshot via
