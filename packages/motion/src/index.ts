@@ -29,6 +29,17 @@ export {
   velocityVerlet,
 } from "./integrators.js";
 export type {
+  KinematicSystemOptions,
+  MoveOptions,
+  PathFollowOptions,
+  RotateOptions,
+} from "./kinematic-controller.js";
+export {
+  KINEMATIC_COMPLETION_TOLERANCE,
+  KinematicController,
+  KinematicSystem,
+} from "./kinematic-controller.js";
+export type {
   MotionComponentOptions,
   MotionSystemOptions,
 } from "./motion-component.js";
