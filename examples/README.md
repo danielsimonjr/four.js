@@ -1,10 +1,17 @@
 # Examples
 
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
-(§118–119). **Scaffold only — no implementation yet.** Every major feature should have a
-runnable example (§93).
+(§118–119). Every major feature should have a runnable example (§93). Entries below are
+implemented where noted; the rest are scaffold only.
 
-- [`first-2d-scene/`](first-2d-scene/) — First 2D scene (§93): shapes, fills, strokes.
+- [`first-2d-scene/`](first-2d-scene/) — **Implemented.** First 2D scene (§93) grown into
+  the interactive demo: shapes, motion, picking, dragging, text, animation
+  (`pnpm run example:build`).
+- [`physics-playground/`](physics-playground/) — **Implemented.** The §108 Phase 5 exit
+  demonstration: a 2D world and a 3D world stepping side by side through one API —
+  gravity, collisions, click impulses, sensor zones (`pnpm run playground:build`).
+  Fulfils the role sketched for `first-physics-scene/` (scaffold entry kept until the
+  owner retires it).
 - [`first-3d-scene/`](first-3d-scene/) — First 3D scene (§93): mesh, camera, lighting.
 - [`first-animated-scene/`](first-animated-scene/) — First animated scene (§93): tweens and a timeline.
 - [`first-physics-scene/`](first-physics-scene/) — First physics scene (§93): gravity, collisions, impulses.
