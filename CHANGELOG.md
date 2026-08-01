@@ -8,6 +8,25 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-01
+
+#### Added (Phase 1 — Math, Scene, and Time, §104; packets WP-1.1…WP-1.14)
+- `@four/math`: mutable Vector2/3/4, Quaternion (shortest-arc slerp), column-major
+  Matrix3/4 with §7 pivot compose, D8 projections, change-hooks, allocation counter —
+  154 tests incl. zero-allocation proofs.
+- `@four/core`: typed EventEmitter (§6b), typeName-keyed component model (§6a),
+  FourError (§89 + INVALID_APPLICATION_STATE) and Disposable — 57 tests.
+- `@four/scene`: Transform with the D3 dirty channel, Node/Group/Scene (D1 single
+  inheritance, §46 lookups, cycle prevention), version-cached world-transform resolver —
+  84 tests.
+- `@four/motion`: TimeState/Clock, the §10 fixed-step scheduler (clamp, droppedTime,
+  pause semantics), §39 SimulationSystem registry — 56 tests.
+- `@four/diagnostics`: D6 FNV-1a checksum with cross-checked immutable known-answer
+  vectors — 28 tests. `four`: §45 Application composition root (headless) — 25 tests.
+- Phase 1 exit (`tests/determinism/`): 100-node/1000-frame golden-digest scenario, green
+  in-process and in a fresh node process; coverage ≥95% statements in every package.
+  Tooling: `tests/tsconfig.json`, `@types/node`, `@vitest/coverage-v8`.
+
 ### 2026-07-31
 
 #### Added (Phase 0 — Project Foundation, §103; plan packets WP-0.1…WP-0.15)

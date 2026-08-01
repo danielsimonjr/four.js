@@ -25,6 +25,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 1 CLOSED (exit GREEN; §104 criterion met; coverage ≥95% everywhere).**
+  All 14 packets landed (Opus workers, per-packet commits): math (Vector2/3/4, Quaternion,
+  Matrix3/4 — 154 tests), core (EventEmitter, component model, FourError+Disposable — 57),
+  scene (Transform with D3 dirty channel, Node/Group/Scene, world-transform resolver — 84),
+  motion (Clock/TimeState, §10 scheduler, §39 system registry — 56), diagnostics (D6
+  checksum with independently cross-checked golden vectors — 28), four (Application root —
+  25), plus the WP-1.14 exit: 100-node/1000-frame determinism scenario with committed
+  golden digests, proven in-process AND in a fresh node process, with sensitivity evidence.
+  Coverage: math 98.9 / core 98.5 / scene 99.3 / motion 99.3 / diagnostics 100 /
+  application.ts 100 (% statements). **API decisions recorded from [S] packets:** registry
+  re-entrancy throws (protects §34 replay) while EventEmitter queues-and-defers; Node's
+  parent setter delegates to add/remove; world resolver's three-part staleness incl.
+  parent-identity (catches version-less reparenting); Application wraps
+  attachToScheduler's installed callback (registry first, then event), resolves world
+  transforms before update/render listeners; `INVALID_APPLICATION_STATE` added to
+  FourErrorCode (WP-1.12-fix1); @types/node@22 + tests/tsconfig.json (WP-1.14-fix1);
+  @vitest/coverage-v8 pin added — coverage joins phase-exit gates. Node 22 runs .ts
+  helpers natively (type-strip) — the determinism child process imports the same .ts
+  scenario file Vitest uses.
 - **2026-07-31 — PHASE 0 CLOSED (exit verifier: GREEN, zero defects).** All 15 packets
   executed by Opus workers under the plan's protocol; 24/24 packages scaffolded, building
   (`tsc -b`, cold and warm), testing, linting; docs, example, size gate (425 B / 150 kB),
