@@ -19,6 +19,8 @@ changes in `CHANGELOG.md`.
       size gate becomes meaningful)
 
 ### Later milestones (decided 2026-07-29)
+- [ ] Ergonomics decision before the §97 example: `Node.position/rotation/scale` aliases
+      onto `transform.*` (flagged by the WP-3.1 worker — spec idiom `camera.position.set`)
 - [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
       `docs/POSITIONING.md`)
 - [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
