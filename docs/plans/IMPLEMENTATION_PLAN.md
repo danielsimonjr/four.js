@@ -1,7 +1,7 @@
 # four.js Implementation Plan — revision 2.1
 
 Phase 0 deliverable per §103 of [`docs/SPECIFICATION.md`](../SPECIFICATION.md)
-(revision 1.5). **Revision 2.1 (2026-07-29)** adds the "Phase −1" smoke-test corrections
+(current revision: see the spec's amendments table). **Revision 2.1 (2026-07-29)** adds the "Phase −1" smoke-test corrections
 (split dev/build tsconfigs, pnpm build-script allowance, validated ESLint config, example
 wiring — the full §3.2 pin set was installed and run together successfully), the spec-1.5
 phases 3a and 11, the publish-name caveat, CI supply-chain audit, and the visual-test GPU
@@ -143,6 +143,8 @@ Direct workspace dependencies only (transitives implied). Wave = parallel dispat
 `@size-limit/preset-small-lib@13.0.2`, `vite@8.1.5`, `typedoc@0.28.20`, `yaml@2.9.0`.
 Exact pins, no ranges. If an install or peer conflict arises, **the orchestrator** (never a
 worker) adjusts a pin and updates this table with a dated note.
+*(Added 2026-08-01 by the orchestrator: `@vitest/coverage-v8@3.2.7` — coverage measurement
+joins the phase-exit gates from Phase 1 on, per the session goal of ≥95% coverage. Added 2026-08-01: `@playwright/test@1.57.0` for the WP-3.8 browser gate — the environment provides Chromium at PLAYWRIGHT_BROWSERS_PATH.)*
 **Validated together 2026-07-29** by the Phase −1 smoke: install (no peer conflicts),
 `tsc -b` reference chain, cross-package Vitest, type-checked ESLint, TypeDoc packages
 mode, Vite 8 example build, and size-limit all passed as one workspace. pnpm 10 blocks
@@ -267,7 +269,10 @@ Done: `pnpm install` exits 0 (orchestrator-run); lockfile present.
 
 **WP-0.2 [H] TypeScript base config** — Depends: WP-0.1. Files: `tsconfig.base.json`.
 Steps: paste §3.3 exactly.
-Done: `npx tsc --showConfig -p tsconfig.base.json | grep -i nodenext` exits 0.
+Done: `node -e "const c=require('./tsconfig.base.json').compilerOptions; process.exit(c.module==='NodeNext'&&c.moduleResolution==='NodeNext'&&c.strict===true&&c.composite===true?0:1)"`
+exits 0. *(Revised 2026-07-31: the original `tsc --showConfig` check hits TS18003 while the
+repo has no `.ts` files — a base config is only ever extended, never compiled directly.
+Found during execution; content requirement unchanged.)*
 
 **WP-0.3 [H] Turborepo pipeline** — Depends: WP-0.1. Files: `turbo.json`.
 Steps: tasks `build` (dependsOn `["^build"]`, outputs `["dist/**"]`), `test` (dependsOn
@@ -277,7 +282,9 @@ Done: `pnpm turbo run build --dry-run` exits 0 (package count asserted later, WP
 **WP-0.4 [H] Per-package scaffolding — fan-out ×23 (all except `four`)** —
 Depends: WP-0.2, WP-0.3. Reads: §3.1 (this package's row), §3.4, the package `README.md`.
 Files (per package P): `packages/P/package.json`, `packages/P/tsconfig.json`,
-`packages/P/src/index.ts`, `packages/P/tests/smoke.test.ts`.
+`packages/P/tsconfig.build.json`, `packages/P/src/index.ts`,
+`packages/P/tests/smoke.test.ts`. *(Files line corrected 2026-07-31: `tsconfig.build.json`
+was mandated by §3.4 but missing here; caught by the math-instance worker.)*
 Steps: instantiate §3.4 verbatim with P's name and §3.1 deps/references;
 `src/index.ts`: `export const PACKAGE_NAME = "@four/P";`; smoke test imports
 `../src/index.js` and asserts the name. Dispatch by §3.1 wave (waves 1→5); within a wave,
@@ -286,11 +293,15 @@ Done (per package, after the wave's orchestrator install):
 `pnpm --filter @four/P run build && pnpm --filter @four/P run test` exits 0.
 
 **WP-0.5 [H] Umbrella package `four`** — Depends: all WP-0.4. Reads: §3.1, §3.4, §98.
-Files: `packages/four/{package.json,tsconfig.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+Files: `packages/four/{package.json,tsconfig.json,tsconfig.build.json,src/index.ts,src/<p>.ts ×23,tests/smoke.test.ts}`.
+*(Files line corrected 2026-07-31: `tsconfig.build.json` was missing, same omission as
+WP-0.4's; noted by the Phase-0 exit verifier. The landed package is complete.)*
 Steps: §3.4 template, name `four`, deps = all 23; one `src/<p>.ts` re-export module per
 package (`export * from "@four/scene";`) plus matching subpath exports (§3.4); root
-`src/index.ts` re-exports all; smoke test imports `PACKAGE_NAME` **from every one of the
-23 packages via `four`'s subpaths** (the Phase-0 cross-package integration check).
+`src/index.ts` uses **namespace re-exports** (`export * as core from "@four/core";`,
+dashes camelCased) — flat `export *` of all packages would collide on shared symbol names
+*(refined 2026-07-31 at dispatch)*; smoke test imports `PACKAGE_NAME` **from every one of
+the 23 packages** (the Phase-0 cross-package integration check).
 Done: `pnpm --filter four run build && pnpm --filter four run test` exits 0.
 
 **WP-0.6 [H] Lockfile refresh (orchestrator)** — Depends: WP-0.5. Files: `pnpm-lock.yaml`.
@@ -324,7 +335,9 @@ Done: `pnpm build && pnpm example:build && pnpm size` exits 0.
 
 **WP-0.10 [H] TypeDoc** — Depends: WP-0.6. Files: `typedoc.json`.
 Steps: entry-point strategy `packages`, entry points `packages/*`, out `docs/api`.
-Done: `pnpm docs` exits 0 and `docs/api/index.html` exists.
+Done: `pnpm run docs` exits 0 and `docs/api/index.html` exists. *(Revised 2026-07-31:
+`pnpm docs` without `run` is a pnpm builtin that exits 0 without invoking the script —
+vacuous check; caught by the WP-0.10 worker. `run docs` also requires a prior build.)*
 
 **WP-0.11 [H] Root test-suite wiring** — Depends: WP-0.6.
 Files: `vitest.suites.config.ts`, `package.json` (devDeps add: every `@four/*` as
@@ -336,7 +349,8 @@ Done: `pnpm test:suites` exits 0 (passWithNoTests).
 Files: `.github/workflows/ci.yml`.
 Steps: on push/PR to the default branch: checkout, pnpm/Node 20 setup,
 `pnpm install --frozen-lockfile`, `pnpm build`, `pnpm turbo run test`, `pnpm lint`,
-`pnpm check-spec`, `pnpm docs`, `pnpm example:build`, `pnpm size`, `pnpm test:suites`,
+`pnpm check-spec`, `pnpm run docs` (build must precede it; `pnpm docs` without `run` is a
+pnpm builtin no-op), `pnpm example:build`, `pnpm size`, `pnpm test:suites`,
 plus a supply-chain step `pnpm audit --audit-level=high` marked `continue-on-error: true`
 (visibility without blocking on unfixable advisories; §96 covers runtime content, this
 covers dependencies).
@@ -526,7 +540,9 @@ Steps: `TransformAuthority` enum (§42 incl. `blended`) + `node.transformAuthori
 live in `@four/scene` (the §42 API is on Node); motion systems check ownership before
 writing and emit the §42 dev warning (once per node per offending system) on conflict.
 Done: build+test green: single-owner writes pass; conflicting writer warns and does not
-write; `blended` reserved (throws `NOT_IMPLEMENTED` until Phase 7).
+write; `blended` reserved (throws `NOT_IMPLEMENTED` until Phase 7 — note: this code is not
+yet in `FourErrorCode`; WP-2.3's Files must include `packages/core/src/errors.ts` to add
+it, flagged by the WP-1.6 worker 2026-07-31).
 
 **WP-2.4 [H] Trajectories** — Depends: Phase 1. Reads: §13, D7, D8.
 Files: `packages/motion/src/trajectories.ts`, `src/index.ts`,
@@ -576,6 +592,77 @@ Done: `pnpm test:suites` green twice; golden committed.
 
 ---
 
+## 6a. Phase 3 — Renderer Foundation (§106; decomposed 2026-08-01 per §2 rolling wave)
+
+Exit: moving 2D and 3D primitives render smoothly despite fixed-step simulation.
+All surfaces spec-pinned (§47–48, §61–64, §49 subset, D8, rev-1.3 context-loss); no RFC
+triggered. MVP tier: unlit colored geometry, WebGL 2 only, `"negative-one-to-one"` depth.
+
+- **WP-3.1/3.2 [S] Cameras + Viewport** (`@four/scene`, batched: shared barrel) — §47
+  `Camera` abstract Node subclass (near/far/projection/inverseProjection/view matrices;
+  view = inverse world), `PerspectiveCamera` (fovY radians/aspect/near/far),
+  `OrthographicCamera`; projections via Matrix4 D8 helpers with `depthRange` argument at
+  update time; §48 `Viewport` (id, camera, rect, normalized?, clearColor) minimal. Tests vs
+  math ground truth incl. view = world⁻¹ under hierarchy.
+- **WP-3.3 [S] Geometry/material/renderable lite** (batched across `@four/geometry`,
+  `@four/materials`, `@four/render`) — `BufferGeometry` (positions Float32Array, optional
+  indices, bounds), `boxGeometry/planeGeometry/circleGeometry2D` builders;
+  `UnlitMaterial` (RGBA color); `Renderable` Node subclass (§49 subset: geometry, material,
+  renderLayer/renderOrder) + `buildRenderList(scene, camera)` (§64 subset → compact items)
+  with an interpolation-aware variant composing PoseBuffer local render poses down the
+  hierarchy (§43 application; documented O(n)).
+- **WP-3.4 [S] Renderer interface** (`@four/render`) — §61 interface verbatim + rev-1.3
+  context-loss contract (`contextlost`/`contextrestored` events, engine-resource
+  re-creation policy), `RendererCapabilities` minimal, shared clear/viewport semantics.
+- **WP-3.5 [S] WebGL 2 backend** (`@four/render-webgl`) — implements §61 for unlit colored
+  geometry: context acquisition, one shader pair, VAO per geometry (cached, disposed),
+  camera VP uniform, per-item model matrix, §48 viewport rects + clears, context-loss
+  wiring to the §61 events, `"negative-one-to-one"` depth. Unit-testable parts split from
+  GL calls (command building pure; GL layer thin) so coverage stays honest without a GPU.
+- **WP-3.6 [S] Application renderer integration** (`four`) — `renderer: "webgl2" | false`
+  + `canvas` options; `initialize()` constructs the backend (async per §45);
+  `render` event drives `renderer.render(scene, views)` with interpolation-aware lists;
+  optional rAF driver (`start` stays headless-safe; manual stepping unchanged).
+- **WP-3.7 [H] Real example** — `examples/first-2d-scene` becomes moving shapes
+  (MotionComponent + KinematicController) rendered via WebGL; the §86 size gate becomes
+  meaningful from here.
+- **WP-3.8 [S] Browser test** — Playwright against the pre-installed Chromium/SwiftShader:
+  example loads, canvas non-blank, animates (two frame grabs differ), zero console errors;
+  root `test:browser` script + CI step. (Orchestrator pin addition at dispatch:
+  `@playwright/test`.)
+- **WP-3.9 [S] Phase 3 exit** — independent verifier: full matrix + browser evidence of
+  smooth motion under fixed-step (frame-delta assertions), coverage ≥95% on touched
+  packages, §106 criterion verdict, defect list.
+
+## 6b. Phase 3a — Interaction, Sprites, and Text MVP (§106a; decomposed 2026-08-01)
+
+Exit: pointer events, picking, dragging, sprites, and text labels work in a mixed 2D/3D
+example — and the exit ships the demo-ready build (public deployment is an owner step).
+
+- **WP-3a.1 [S] Picking** (`@four/input`) — §71 bounds+analytic tier: camera ray from NDC
+  (unproject via inverse projection + camera world), plane/circle analytic hits (2D),
+  transformed-AABB hits from geometry bounds (3D), nearest-first ordering, `pick(scene,
+  camera, ndcX, ndcY)` returning hits with node/distance/point.
+- **WP-3a.2 [S] Pointer input + propagation + dragging** (`@four/input`) — §72 subset:
+  structural DOM pointer source, normalized events (down/up/move/click/enter/leave) with
+  NDC coords, capture→target→bubble through the scene graph (§6b input exception), pointer
+  capture, drag manager (§120: down on node → move deltas in world → up releases) writing
+  under `"manual"`-authority rules via a callback (no direct transform writes by input).
+- **WP-3a.3 [S] Textures + sprites** (`@four/render`, `@four/render-webgl`,
+  `@four/materials`) — minimal §55/§61 tier: `Texture` + `Renderer.createTexture`
+  (structural ImageBitmap-like source), `SpriteMaterial` (texture + tint), `Sprite`
+  renderable (anchor, world sizing), webgl textured-quad program + texture cache
+  (loss-aware like the VAO cache).
+- **WP-3a.4 [S] Text MVP** (`@four/text`) — §56 MVP tier: runtime glyph atlas via an
+  injected structural rasterizer (canvas-like), Latin subset, `Text` producing textured
+  quads through the sprite path; no shaping/bidi (staged per spec §56 note).
+- **WP-3a.5 [H] Example upgrade** — interactive: click recolors, drag moves, a live text
+  label; composes input+sprites+text.
+- **WP-3a.6 [S] Browser interaction gate** — Playwright: synthetic pointer events hit,
+  drag moves pixels, text renders legibly (pixel-region assertions).
+- **WP-3a.7 [S] Phase 3a exit** — independent verifier: full matrix + interaction gates,
+  coverage ≥95% on touched packages, demo-ready build artifact confirmed; §106a verdict.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
@@ -606,7 +693,7 @@ surfaces). Scope and anchors are fixed; exits are spec-quoted except where noted
 | Root suites | `pnpm test:suites` | phase exits |
 | Lint | `pnpm lint` | every packet |
 | Spec integrity | `pnpm check-spec` | any docs-touching packet |
-| Docs | `pnpm docs` | Phase 0 on (CI) |
+| Docs | `pnpm run docs` (after build; bare `pnpm docs` is a pnpm builtin no-op) | Phase 0 on (CI) |
 | Example | `pnpm example:build` | Phase 0 on (CI) |
 | Payload (§86) | `pnpm size` — built example ≤ 150 kB gzip | Phase 0 on (CI) |
 | Determinism | fresh-process double run vs committed golden hash (D6) | phase exits from 1 on |

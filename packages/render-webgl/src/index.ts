@@ -1,0 +1,33 @@
+/**
+ * `@four/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier).
+ *
+ * The public surface is one class, {@link WebglRenderer}, which implements
+ * `@four/render`'s `Renderer`. Everything else exported here is exported
+ * because a *test*, a diagnostic, or a future second pipeline in this package
+ * needs it — `GL`, `WebglContext`, `UnlitProgram`, and `GeometryCache` are the
+ * seams that let the whole backend be unit-tested against a hand-rolled fake
+ * context with no GPU and no browser (see `tests/webgl-renderer.test.ts`).
+ *
+ * Applications select a backend at the edge (§62); nothing in `@four/scene`,
+ * `@four/motion`, or `@four/physics` may name anything in this package.
+ */
+
+export const PACKAGE_NAME = "@four/render-webgl";
+
+export type { CacheableGeometry, GeometryRecord } from "./gl-geometry.js";
+export { GeometryCache } from "./gl-geometry.js";
+export type {
+  GlBuffer,
+  GlProgramHandle,
+  GlShader,
+  GlUniformLocation,
+  GlVertexArray,
+  WebglContext,
+} from "./gl-program.js";
+export { GL, POSITION_ATTRIBUTE_LOCATION, UnlitProgram } from "./gl-program.js";
+export type {
+  WebglCanvas,
+  WebglContextAttributes,
+  WebglContextEventLike,
+} from "./webgl-renderer.js";
+export { WebglRenderer } from "./webgl-renderer.js";

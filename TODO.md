@@ -6,22 +6,20 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] **Owner:** merge the open PR for `claude/specification-improvements-iug6pi` (spec
-      1.0→1.5, plan 2.1, doc sync, tooling) — Phase 0 starts from `main` after merge.
-- [ ] Decide when to start Phase 0 (§103, Project Foundation) — plan is dispatch-ready.
+- [ ] Phase 3a — Interaction, Sprites, Text MVP (§106a) NEXT: rolling-wave decomposition
+      (input routing §72, picking §71, dragging, sprite batching §55, SDF Latin text §56
+      tier, example upgrade; exit ships the public demo per POSITIONING).
+
+### Backlog additions (Phase 3 exit findings)
+- [ ] §92 integration/visual test directories still empty — schedule with Phase 3a/11
+- [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
+      deferral recorded in MEMORY 2026-08-01)
 
 ## Backlog
 
-### Phase 0 — Project Foundation (§103) — now tracked as work packets in `docs/plans/IMPLEMENTATION_PLAN.md`
-- [ ] WP-0.1–0.4 — root manifests, `tsconfig.base.json`, ESLint/Prettier, Turborepo
-- [ ] WP-0.5 — per-package `package.json` + build wiring, fan-out ×24
-- [ ] WP-0.6–0.7 — size-limit budget gate (§86) and `.github/workflows/ci.yml`
-      (incl. `tools/check-spec.mjs` docs job)
-- [ ] WP-0.8–0.9 — `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`
-- [ ] WP-0.10 — exit verification: monorepo installs, all packages compile, tests run,
-      docs build, example application starts
-
 ### Later milestones (decided 2026-07-29)
+- [ ] Ergonomics decision before the §97 example: `Node.position/rotation/scale` aliases
+      onto `transform.*` (flagged by the WP-3.1 worker — spec idiom `camera.position.set`)
 - [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
       `docs/POSITIONING.md`)
 - [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
@@ -38,6 +36,18 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-01 — **Phase 3 complete** (§106): 9 packets, browser-verified rendering
+      (SwiftShader gate caught a real rAF defect), interpolated draws proven at alpha 0.5,
+      example at 14.88 kB gzip, coverage ≥95% everywhere
+- [x] 2026-08-01 — **Phase 2 complete** (§105): 7 packets, repo at 545 tests, coverage
+      ≥95% every package, demos verified against independently derived closed forms,
+      cross-process determinism vs goldens
+- [x] 2026-08-01 — **Phase 1 complete** (§104): 14 packets, 405 tests, coverage ≥95% every
+      package, deterministic headless stepping proven in-process + fresh-process against
+      committed golden digests
+- [x] 2026-07-31 — **Phase 0 complete** (§103): all 15 packets landed via Opus workers,
+      independent exit verifier GREEN with zero defects — 24-package monorepo installs,
+      compiles (cold+warm), tests, lints; docs/example/size/CI gates live
 - [x] 2026-07-29 — npm naming decided (owner): publish under `@danielsimonjr/fourjs` /
       `@danielsimonjr/fourjs-<name>` (spec revision 1.6); no org claim or dispute needed
 - [x] 2026-07-29 — Stress-test the implementation plan (5 passes: Haiku dry-run,

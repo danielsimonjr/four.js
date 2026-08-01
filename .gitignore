@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+.turbo
+docs/api
+examples/**/dist
+.claude/worktrees
+*.tsbuildinfo

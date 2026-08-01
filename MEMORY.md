@@ -25,6 +25,67 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 3 CLOSED (exit GREEN, zero defects; §106 criterion met with
+  browser-pixel evidence).** Nine packets: cameras/viewport (§47-48, D8 depth ranges),
+  geometry/materials/renderable lite + render lists (WeakMap-keyed pools, §43 interpolated
+  builder), §61 Renderer interface + NullRenderer, WebGL 2 backend (33-method structural GL
+  seam, fake-GL units, 99.66%), Application renderer integration (injected Renderer
+  INSTANCE, RenderInterpolation plumbing), real example (14.88 kB gzip vs 150 kB §86),
+  Playwright browser gate (ANGLE/SwiftShader pinned; caught a real rAF-seed defect =
+  WP-3.7-fix1), exit with centroid-tracked smoothness + a virtual-clock test proving
+  alpha-0.5 interpolated draws. **Deferral recorded (spec §45 departure):**
+  `ApplicationOptions.renderer` takes a Renderer instance, not §45's string union —
+  string/"auto" selection deferred to a §62 registry packet so `four` never imports
+  backends at runtime (payload evidence: 14.88 kB). Informational: §106 "textures" deferred
+  to §106a/§55 tier; tests/integration+visual still empty (§92 backlog);
+  four-package barrel coverage artifact persists (cosmetic). Repo: 813 unit tests +
+  17 suite + 6 browser.
+- **2026-08-01 — PHASE 2 CLOSED (exit GREEN; §105 criterion met; coverage ≥95% everywhere).**
+  Seven packets: five §38 integrators; MotionComponent+MotionSystem (pinned semi-implicit
+  formula, explicit track/untrack, parent-frame angular premultiply); eight §13 trajectories
+  (CR antisymmetric-tangent bug caught by symmetry tests); §42 TransformAuthority
+  (NOT_IMPLEMENTED added to FourErrorCode; refusals skip whole advance);
+  KinematicController (channel state machines, float-safe completion tolerance, refused
+  commands freeze); scene-side PoseBuffer (single §37 store, lerp/slerp, no write-back API,
+  turbo override orders scene#test after motion#build). Exit verified against independently
+  derived closed forms (Barry-Goldman, RK4 ODE, algebraic recurrence; worst dev 3.1e-13),
+  golden digests cross-process. Motion 200 tests / 99.63%, scene 114 / 99.55%. Fixes: CI
+  Node 20→22 (type-strip children); four/application subpath (renderer-free headless
+  composition). Repo: 545 tests. Next: Phase 3 rolling-wave decomposition (renderer
+  foundation §106 + §61-62, cameras §47 in @four/scene per spec rev 1.3).
+- **2026-08-01 — PHASE 1 CLOSED (exit GREEN; §104 criterion met; coverage ≥95% everywhere).**
+  All 14 packets landed (Opus workers, per-packet commits): math (Vector2/3/4, Quaternion,
+  Matrix3/4 — 154 tests), core (EventEmitter, component model, FourError+Disposable — 57),
+  scene (Transform with D3 dirty channel, Node/Group/Scene, world-transform resolver — 84),
+  motion (Clock/TimeState, §10 scheduler, §39 system registry — 56), diagnostics (D6
+  checksum with independently cross-checked golden vectors — 28), four (Application root —
+  25), plus the WP-1.14 exit: 100-node/1000-frame determinism scenario with committed
+  golden digests, proven in-process AND in a fresh node process, with sensitivity evidence.
+  Coverage: math 98.9 / core 98.5 / scene 99.3 / motion 99.3 / diagnostics 100 /
+  application.ts 100 (% statements). **API decisions recorded from [S] packets:** registry
+  re-entrancy throws (protects §34 replay) while EventEmitter queues-and-defers; Node's
+  parent setter delegates to add/remove; world resolver's three-part staleness incl.
+  parent-identity (catches version-less reparenting); Application wraps
+  attachToScheduler's installed callback (registry first, then event), resolves world
+  transforms before update/render listeners; `INVALID_APPLICATION_STATE` added to
+  FourErrorCode (WP-1.12-fix1); @types/node@22 + tests/tsconfig.json (WP-1.14-fix1);
+  @vitest/coverage-v8 pin added — coverage joins phase-exit gates. Node 22 runs .ts
+  helpers natively (type-strip) — the determinism child process imports the same .ts
+  scenario file Vitest uses.
+- **2026-07-31 — PHASE 0 CLOSED (exit verifier: GREEN, zero defects).** All 15 packets
+  executed by Opus workers under the plan's protocol; 24/24 packages scaffolded, building
+  (`tsc -b`, cold and warm), testing, linting; docs, example, size gate (425 B / 150 kB),
+  CI workflow, community files, ROADMAP all landed. Per-packet commits `WP-0.*` on the
+  working branch. **Findings folded back into the plan (dated in-place revisions):**
+  WP-0.2's original Done check was vacuous (TS18003 with no .ts files); WP-0.4/0.5 Files
+  lines omitted `tsconfig.build.json`; **`pnpm docs` without `run` is a pnpm builtin
+  no-op** — always `pnpm run docs` (CI updated); `*.tsbuildinfo` needed gitignoring;
+  root-level `.ts` files need `allowDefaultProject: "*.ts"` (WP-0.7-fix1); the umbrella's
+  root barrel uses namespace re-exports to avoid symbol collisions. Dormant-but-harmless:
+  turbo's `lint` task (root eslint is the gate); `test:suites` vacuous until WP-1.14.
+  Phase 1 dispatch begins with WP-1.1 (math vectors) and the batched core trio
+  (WP-1.4/1.5/1.6 — batched because all three edit core's `src/index.ts`).
+
 - **2026-07-28 — Spec corrected in place (owner decision).** E-1/E-2/E-3 from `ERRATA.md`
   resolved directly in `SPECIFICATION.md`: second `Part VII` → `Part VIII` (later parts
   IX–XIII); second §45–67 range renumbered +53 to §98–120; §102 lists only `physics-rapier`

@@ -1,0 +1,7 @@
+[
+  {
+    "path": "examples/first-2d-scene/dist/assets/*.js",
+    "limit": "150 kB",
+    "gzip": true
+  }
+]

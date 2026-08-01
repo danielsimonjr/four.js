@@ -8,6 +8,63 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-01 (later)
+
+#### Added (Phase 3 — Renderer Foundation, §106; packets WP-3.1…WP-3.9)
+- `@four/scene`: §47 cameras (D8 depth ranges) + §48 viewport. `@four/geometry`/
+  `@four/materials`: BufferGeometry + primitives, UnlitMaterial. `@four/render`: §61
+  Renderer interface (context-loss contract) + NullRenderer, render lists incl. the §43
+  interpolated builder. `@four/render-webgl`: WebGL 2 backend over a structural GL seam
+  (fake-GL unit tests, 90 tests). `four`: renderer integration with RenderInterpolation.
+- Real moving example (14.88 kB gzip vs the 150 kB §86 gate) + Playwright browser gate
+  (headless Chromium/SwiftShader; caught and fixed a real rAF-seed defect) + smoothness
+  exit spec proving interpolated draws between simulation states.
+- Phase 3 exit GREEN, zero defects; coverage ≥95% statements everywhere
+  (geometry/materials/render at 100%).
+
+### 2026-08-01
+
+#### Added (Phase 2 — Motion Foundation, §105; packets WP-2.1…WP-2.7)
+- `@four/motion`: five §38 integrators, MotionComponent + MotionSystem (pinned
+  semi-implicit update, §42 enforcement), eight §13 trajectories with pinned constructors,
+  KinematicController (moveTo/rotateTo/followPath, channel state machines) — 200 tests.
+- `@four/scene`: TransformAuthority (§42, `blended` reserved via NOT_IMPLEMENTED),
+  PoseBuffer interpolation store (§43/§37 single owner, no write-back) — 114 tests.
+- Phase 2 exit: §105 demos vs independently derived closed forms (worst deviation
+  3.1e-13), cross-process golden determinism; coverage ≥95% statements everywhere.
+- Fixes: CI Node 22 (type-strip test children), `four/application` subpath export.
+
+#### Added (Phase 1 — Math, Scene, and Time, §104; packets WP-1.1…WP-1.14)
+- `@four/math`: mutable Vector2/3/4, Quaternion (shortest-arc slerp), column-major
+  Matrix3/4 with §7 pivot compose, D8 projections, change-hooks, allocation counter —
+  154 tests incl. zero-allocation proofs.
+- `@four/core`: typed EventEmitter (§6b), typeName-keyed component model (§6a),
+  FourError (§89 + INVALID_APPLICATION_STATE) and Disposable — 57 tests.
+- `@four/scene`: Transform with the D3 dirty channel, Node/Group/Scene (D1 single
+  inheritance, §46 lookups, cycle prevention), version-cached world-transform resolver —
+  84 tests.
+- `@four/motion`: TimeState/Clock, the §10 fixed-step scheduler (clamp, droppedTime,
+  pause semantics), §39 SimulationSystem registry — 56 tests.
+- `@four/diagnostics`: D6 FNV-1a checksum with cross-checked immutable known-answer
+  vectors — 28 tests. `four`: §45 Application composition root (headless) — 25 tests.
+- Phase 1 exit (`tests/determinism/`): 100-node/1000-frame golden-digest scenario, green
+  in-process and in a fresh node process; coverage ≥95% statements in every package.
+  Tooling: `tests/tsconfig.json`, `@types/node`, `@vitest/coverage-v8`.
+
+### 2026-07-31
+
+#### Added (Phase 0 — Project Foundation, §103; plan packets WP-0.1…WP-0.15)
+- Working monorepo: root manifests with the pinned §3.2 toolchain, `tsconfig.base.json`,
+  Turborepo pipeline, all 24 `@four/*`/`four` packages scaffolded per the §3.4 template
+  (split dev/build tsconfigs, `tsc -b`, types-first exports; umbrella with per-package
+  subpaths and a 23-package integration test), ESLint/Prettier config (type-checked,
+  determinism bans per §33, named-exports rule), Vite example (`examples/first-2d-scene`),
+  §86 size gate (425 B / 150 kB gzip), TypeDoc (`docs/api`), root vitest suite wiring,
+  GitHub Actions CI, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `ROADMAP.md`.
+- Phase 0 exit verified independently: all gates green twice (cold + warm), zero defects.
+- Plan corrections discovered in execution (dated in place): WP-0.2 Done check, WP-0.4/0.5
+  Files lines, `pnpm run docs` builtin pitfall, `*.tsbuildinfo` gitignore, WP-0.7-fix1.
+
 ### 2026-07-29
 
 #### Changed (spec revision 1.6)

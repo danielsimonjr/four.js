@@ -26,7 +26,8 @@ and add substantive changes to `CHANGELOG.md`.
 
 ## The Specification
 
-- `docs/SPECIFICATION.md` is the **working reference**, currently **revision 1.2** (see the
+- `docs/SPECIFICATION.md` is the **working reference** — the current revision is whatever
+  tops the amendments table in the file itself; do not trust hardcoded numbers elsewhere (see the
   amendments table at its top): parts I–XIII, sections 1–120, no duplicate numbering.
   Revision 1.1 applied all 35 items from `docs/SPEC-REVIEW.md`; new material lives in
   lettered sections (**6a** Component Model, **6b** Eventing, **7a** Coordinate/Unit
@@ -35,7 +36,7 @@ and add substantive changes to `CHANGELOG.md`.
   letter suffixes; amendments are recorded in the spec's amendments table (owner decision).
 - `docs/archive/four-js-specification.pdf` is the unmodified original (65 pages), **frozen at
   the pre-1.0 text**. It still contains the old defects (duplicate `Part VII`, section
-  numbers 45–67 assigned twice) and predates revisions 1.1/1.2 — when reading the PDF,
+  numbers 45–67 assigned twice) and predates all revisions — when reading the PDF,
   translate references via the numbering map in `docs/ERRATA.md` (PDF second-range §45–67 =
   Markdown §98–120). Do not edit the PDF.
 - Run `node tools/check-spec.mjs` after editing the spec — it verifies section sequence,
