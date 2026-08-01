@@ -1,0 +1,8 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 2 exit criterion (§105) recorded on 2026-08-01 by WP-2.7 from an actual run of tests/determinism/helpers/phase2-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's motion is deterministic.",
+  "_scenario": "The §105 demonstration set — constant velocity, constant acceleration (damped), circular path, Catmull-Rom spline path, damped spring — one node each under \"kinematic\" transform authority (§42), advanced by MotionSystem + KinematicSystem + the §43 pose snapshot system on app.systems. fixedTimeStep 1/60, 600 clean injected frames (10 s, exactly one fixed step each, nothing dropped), FNV-1a per D6 over all six world matrices (five nodes plus the scene root) after every step.",
+  "_tier": "same-runtime (§33): the poses are computed with Math.cos/sin (circle, quaternion composition), Math.exp (spring), and ** (centripetal knots), whose last bits may legally differ between JS engines. The checksum itself is exact and cross-platform; only its inputs are runtime-bound.",
+  "summaryDigest": 681828337,
+  "firstStepDigest": 1505354239,
+  "lastStepDigest": 3969664449
+}
