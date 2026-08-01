@@ -663,6 +663,82 @@ example — and the exit ships the demo-ready build (public deployment is an own
 - **WP-3a.7 [S] Phase 3a exit** — independent verifier: full matrix + interaction gates,
   coverage ≥95% on touched packages, demo-ready build artifact confirmed; §106a verdict.
 
+## 6c. Phase 4 — Animation Core (§107; decomposed 2026-08-01)
+
+Exit (§107): any numeric, vector, quaternion, color, or transform property can be animated.
+
+Phase-level pinned decisions (so no packet re-litigates them):
+
+- **P4-1 Fixed-step animation.** `AnimationSystem` is a §39 simulation system advancing
+  tweens/timelines/mixers on the **fixed step** with the scaled simulation delta,
+  registered **before** `MotionSystem` (§19 pipeline order: animation pose → kinematic →
+  physics). Transform writes happen under `"animation"` authority (§42) and reach the
+  screen through the existing §43 pose interpolation; non-transform properties step at
+  the fixed rate (acceptable at 60 Hz; revisit if a variable-rate tier is ever needed).
+  Rationale: §16 deterministic evaluation, §34 replay, and the Phase 7 blend pipeline.
+- **P4-2 Color values.** The `color` tween/track type targets the materials-style mutable
+  RGBA 4-tuple (componentwise lerp, no clamping — §60a extended range); there is no Color
+  class (WP-3.3 decision).
+- **P4-3 Staging.** Morph-weight and skeletal-joint tracks (§17), state machines/blend
+  trees (§18), IK, and spring *simulation* beyond the §15 spring easing are **not** Phase 4
+  (§107 does not list them; they arrive with later phases). `AnimationClip.events` ships
+  now, with §16 marker semantics.
+- **P4-4 Facade.** `@four/animation` owns `animate()`/`tween()`/`Timeline`/clip types; the
+  `four` umbrella re-exports through its existing subpath pattern (`four/animation`).
+  §15's `Four.animate(...)` reads as the umbrella namespace import.
+- **P4-5 Barrel discipline.** WP-4.1/WP-4.2 run in parallel and do **not** touch
+  `src/index.ts` (tests import relatively); WP-4.3 assembles the barrel, later serial
+  packets extend it.
+
+Packets:
+
+- **WP-4.0 [S] Tooling chores (Phase 3a exit notes)** — `examples/tsconfig.json` +
+  root `typecheck:examples` script (`tsc --noEmit`, NodeNext, strict) wired into CI;
+  per-package vitest coverage via a shared config (v8 provider, `src/**/*.ts` include,
+  ≥95% thresholds on lines/statements/functions/branches) exposed as a root
+  `coverage` task so the gate is tooling-enforced, not review-enforced.
+- **WP-4.1 [S] Easing library** (`@four/animation`) — §15's 12 families with in/out/in-out
+  variants; string registry ("cubic-out"-style keys, bare "linear"); pinned documented
+  constants for back/elastic/spring parameters; pure `(t) => number` on [0,1] with exact
+  0→0/1→1 endpoints; closed-form value tests.
+- **WP-4.2 [S] Bindings + value adapters** (`@four/animation`) — §16 typed property
+  references; string-path convenience resolved once at creation (FourError on bad paths);
+  adapters: number, Vector2/3/4 (out-param lerp), Quaternion (shortest-arc slerp), RGBA
+  4-tuple, boolean/discrete (step); zero per-frame allocation after setup.
+- **WP-4.3 [S] Tween core** (`@four/animation`) — §15 builder API
+  (`animate(target).to(props, seconds).ease(name).play()` plus `from`/delay/repeat/yoyo/
+  speed/pause/resume/seek/stop); value evaluation a pure function of local time;
+  last-started-wins on a shared property with a dev warning (§16); transform targets
+  require `"animation"` authority — refusal warns and skips the whole write (WP-2.3
+  semantics). Assembles the package barrel (P4-5).
+- **WP-4.4 [S] Timeline** (`@four/animation`) — §16: `.at(time, tween | timeline |
+  callback)`, nesting, labels, markers (fire exactly once per forward crossing; seek/scrub
+  suppress by default with per-marker `replayOnSeek`), parallel tracks, sequencing, loop,
+  reverse, scrub, playback speed, pause/resume; mid-timeline restore positions playback
+  without re-firing crossed markers.
+- **WP-4.5 [S] Clips + tracks** (`@four/animation`) — §17: `AnimationClip { name, duration,
+  tracks, events }`; scalar/vector/quaternion/color/boolean/discrete/custom-property
+  tracks (morph + skeletal staged per P4-3); interpolation step/linear/cubic/Hermite +
+  slerp; binary-search keyframe sampling, pure in clip-local time (§9).
+- **WP-4.6 [S] Mixer + AnimationSystem** (`@four/animation`) — mixer resolves clip tracks
+  onto a target via WP-4.2 bindings; playback controls (play/pause/stop/speed/loop); clip
+  event markers with §16 crossing semantics; `AnimationSystem` per P4-1 (fixed step,
+  ordered before MotionSystem, `"animation"` authority, insertion-order updates,
+  auto-removal of finished items).
+- **WP-4.7 [H] Umbrella + example upgrade** — `four/animation` subpath + umbrella
+  re-export; the example gains §107-coverage animations (vector position tween,
+  quaternion slerp clip, color track on a material, numeric tween, one timeline with a
+  marker); §86 size gate stays ≤150 kB gzip.
+- **WP-4.8 [S] Animation gates** — `tests/determinism/` phase4 golden scenario (timeline +
+  mixer over 1000 fixed steps, digest in-process + fresh child process); browser spec
+  asserting animated motion/color in pixels; marker seek-suppression determinism test.
+- **WP-4.9 [S] Phase 4 exit** — independent verifier: full matrix + animation gates +
+  tooling-enforced coverage (WP-4.0), §107 verdict, fix nothing.
+
+Dependencies: 4.0 ∥ 4.1 ∥ 4.2 (disjoint files); 4.3 ← 4.1+4.2; 4.4 ← 4.3; 4.5 ← 4.2
+(∥ 4.4, files disjoint, barrel untouched per P4-5); 4.6 ← 4.4+4.5; 4.7 ← 4.6;
+4.8 ← 4.7; 4.9 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
