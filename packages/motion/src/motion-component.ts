@@ -101,13 +101,28 @@
  * skipped, and a node with zero velocity still bumps its version (the write is
  * unconditional — testing for a zero delta would cost more than the write).
  *
- * Transform authority (§42) is not checked here yet: the authority field and the
- * conflict warning arrive with WP-2.3, whose enforcement hooks into this file.
+ * ## Transform authority (§42, WP-2.3)
+ *
+ * The system writes as the `"kinematic"` authority, so it advances a tracked
+ * node only while `node.transformAuthority === "kinematic"`. A tracked node
+ * owned by anything else is **skipped** and reported once through
+ * `warnAuthorityConflict` (§42: exactly one system owns a transform; conflicts
+ * warn and the owner keeps the transform — see `@four/scene`'s `authority.ts`
+ * for why the refusal, not just the warning, is the enforcement).
+ *
+ * A skipped node's `MotionComponent` is not integrated either — not its
+ * velocity, not its damping (decision, WP-2.3). The alternative, integrating
+ * velocity while refusing only the position/rotation write, would let a refused
+ * body silently accumulate speed under gravity and then teleport the instant
+ * authority was granted; keeping the whole component frozen makes the refusal
+ * visible and reversible. Nodes default to `"manual"` (§42), so a node must be
+ * declared `node.transformAuthority = "kinematic"` before this system will move
+ * it.
  */
 
 import type { Component, ComponentHost } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
-import type { Node } from "@four/scene";
+import { warnAuthorityConflict, type Node } from "@four/scene";
 
 import {
   PRIORITY_KINEMATICS,
@@ -216,6 +231,13 @@ function copyOrZero(v: Vector3 | undefined): Vector3 {
   return v === undefined ? new Vector3() : new Vector3(v.x, v.y, v.z);
 }
 
+/**
+ * The §42 authority {@link MotionSystem} writes under. Module-private: a system
+ * declares which authority it *is*, and nothing outside this file needs to
+ * configure that.
+ */
+const MOTION_SYSTEM_AUTHORITY = "kinematic";
+
 /** Options for {@link MotionSystem}. */
 export interface MotionSystemOptions {
   /**
@@ -233,12 +255,14 @@ export interface MotionSystemOptions {
  * const system = new MotionSystem();
  * registry.register(system);
  * node.addComponent(new MotionComponent({ linearVelocity: new Vector3(2, 0, 0) }));
+ * node.transformAuthority = "kinematic"; // §42 — required, see below
  * system.track(node);
  * ```
  *
  * See the module documentation for the update rule, the angular-velocity
- * convention, and why tracking is explicit. Stepping allocates nothing: the two
- * quaternion temporaries are owned by the system and overwritten in place.
+ * convention, the §42 authority check, and why tracking is explicit. Stepping
+ * allocates nothing: the two quaternion temporaries are owned by the system and
+ * overwritten in place.
  */
 export class MotionSystem implements SimulationSystem {
   /** Execution order key (§39); default {@link PRIORITY_KINEMATICS}. */
@@ -308,6 +332,14 @@ export class MotionSystem implements SimulationSystem {
       }
       const motion = node.getComponent(MotionComponent);
       if (motion === undefined) {
+        continue;
+      }
+      // §42: this system writes as `kinematic`; anything else owns the
+      // transform, so the write is refused rather than silently applied. The
+      // component-lookup test comes first on purpose — a tracked node with no
+      // `MotionComponent` is not a writer at all and must not warn.
+      if (node.transformAuthority !== MOTION_SYSTEM_AUTHORITY) {
+        warnAuthorityConflict(node, MOTION_SYSTEM_AUTHORITY);
         continue;
       }
       this.#advance(node, motion, dt);

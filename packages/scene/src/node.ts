@@ -39,6 +39,10 @@ import {
   type ComponentType,
 } from "@four/core";
 
+import {
+  DEFAULT_TRANSFORM_AUTHORITY,
+  type TransformAuthority,
+} from "./authority.js";
 import { Transform } from "./transform.js";
 
 /**
@@ -138,6 +142,12 @@ export abstract class Node
 
   #parent: Node | null = null;
 
+  /**
+   * Backing store for {@link Node.transformAuthority}. Declared before the
+   * accessor pair reads it; `"manual"` per §42/{@link DEFAULT_TRANSFORM_AUTHORITY}.
+   */
+  #transformAuthority: TransformAuthority = DEFAULT_TRANSFORM_AUTHORITY;
+
   /** Insertion-ordered children; the array instance is never replaced. */
   readonly #children: Node[] = [];
 
@@ -181,6 +191,43 @@ export abstract class Node
    */
   get children(): readonly Node[] {
     return this.#children;
+  }
+
+  // --- Transform authority (§42) --------------------------------------------
+
+  /**
+   * Which system owns this node's transform (§42). Default `"manual"`.
+   *
+   * §42 spells this as a plain assignable field —
+   * `node.transformAuthority = "physics"` — and structurally it is exactly
+   * that: read it, write it, one value at a time. It is implemented as an
+   * accessor pair over a private field for one reason: `"blended"` is declared
+   * by §42 but implemented by §19's physics-animation pipeline, which is Phase
+   * 7 work. Assigning it therefore throws `FourError("NOT_IMPLEMENTED")` rather
+   * than leaving a node in a state no system knows how to drive; the reserved
+   * value stays visible in the type (and in `TRANSFORM_AUTHORITIES`) so
+   * nothing has to be renumbered when Phase 7 lands and the guard is deleted.
+   * Every other value assigns normally, and a rejected assignment leaves the
+   * previous authority in place.
+   *
+   * Enforcement lives in the writing systems (see `warnAuthorityConflict`), not
+   * here: `Node` records ownership, systems honour it.
+   */
+  get transformAuthority(): TransformAuthority {
+    return this.#transformAuthority;
+  }
+
+  set transformAuthority(value: TransformAuthority) {
+    if (value === "blended") {
+      throw new FourError(
+        "NOT_IMPLEMENTED",
+        'The "blended" transform authority selects the §19 ' +
+          "physics-animation blending pipeline, which is not implemented " +
+          "yet (Phase 7).",
+        { context: { node: this.id, authority: value } },
+      );
+    }
+    this.#transformAuthority = value;
   }
 
   /**

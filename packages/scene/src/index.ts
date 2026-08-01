@@ -1,5 +1,11 @@
 export const PACKAGE_NAME = "@four/scene";
 
+export type { TransformAuthority } from "./authority.js";
+export {
+  DEFAULT_TRANSFORM_AUTHORITY,
+  TRANSFORM_AUTHORITIES,
+  warnAuthorityConflict,
+} from "./authority.js";
 export { Group } from "./group.js";
 export type { NodeEventMap, NodeHierarchyEvent, NodeType } from "./node.js";
 export { Node } from "./node.js";

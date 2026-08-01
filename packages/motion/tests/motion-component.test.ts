@@ -4,8 +4,8 @@ import {
   constructionCount,
   resetConstructionCount,
 } from "@four/math";
-import { Group } from "@four/scene";
-import { describe, expect, it } from "vitest";
+import { Group, type TransformAuthority } from "@four/scene";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_FIXED_DELTA_TIME,
@@ -37,6 +37,9 @@ function scenario(
   step: (count?: number) => void;
 } {
   const node = new Group();
+  // §42: the system writes as `kinematic`, and nodes default to `manual`, so a
+  // node has to hand it the transform before it will be advanced.
+  node.transformAuthority = "kinematic";
   const motion = node.addComponent(new MotionComponent(options));
   const system = new MotionSystem();
   system.track(node);
@@ -255,6 +258,7 @@ describe("MotionSystem — angular motion (analytic)", () => {
     // rotation only if it were body-frame; here the composed rotation must equal
     // Rx · Ry, not Ry · Rx.
     const node = new Group();
+    node.transformAuthority = "kinematic";
     node.transform.rotation.setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
     node.addComponent(
       new MotionComponent({ angularVelocity: new Vector3(Math.PI / 2, 0, 0) }),
@@ -326,6 +330,8 @@ describe("MotionSystem — tracking and lifecycle", () => {
   it("advances only tracked nodes", () => {
     const tracked = new Group();
     const untracked = new Group();
+    tracked.transformAuthority = "kinematic";
+    untracked.transformAuthority = "kinematic";
     tracked.addComponent(
       new MotionComponent({ linearVelocity: new Vector3(1, 0, 0) }),
     );
@@ -341,6 +347,7 @@ describe("MotionSystem — tracking and lifecycle", () => {
 
   it("follows the component being added and removed via Node (§6a)", () => {
     const node = new Group();
+    node.transformAuthority = "kinematic";
     const system = new MotionSystem();
     system.track(node);
     const context = makeContext();
@@ -395,6 +402,7 @@ describe("MotionSystem — tracking and lifecycle", () => {
     const nodes = [new Group(), new Group(), new Group()];
     for (const [index, node] of nodes.entries()) {
       node.name = `n${String(index)}`;
+      node.transformAuthority = "kinematic";
       node.addComponent(new MotionComponent());
       node.transform.position.onChanged = () => {
         order.push(node.name);
@@ -410,6 +418,7 @@ describe("MotionSystem — tracking and lifecycle", () => {
     const system = new MotionSystem();
     expect(system.priority).toBe(PRIORITY_KINEMATICS);
     const node = new Group();
+    node.transformAuthority = "kinematic";
     node.addComponent(
       new MotionComponent({ linearVelocity: new Vector3(0, 2, 0) }),
     );
@@ -424,6 +433,132 @@ describe("MotionSystem — tracking and lifecycle", () => {
 
   it("accepts a custom priority", () => {
     expect(new MotionSystem({ priority: 42 }).priority).toBe(42);
+  });
+});
+
+describe("MotionSystem — transform authority (§42)", () => {
+  /** Silences and records `console.warn` for one test. */
+  function spyOnWarn() {
+    return vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** A tracked node with a moving component, at the given §42 authority. */
+  function tracked(authority: TransformAuthority): {
+    node: Group;
+    system: MotionSystem;
+    step: (count?: number) => void;
+  } {
+    const node = new Group();
+    node.transformAuthority = authority;
+    node.addComponent(
+      new MotionComponent({ linearVelocity: new Vector3(1, 0, 0) }),
+    );
+    const system = new MotionSystem();
+    system.track(node);
+    const context = makeContext();
+    return {
+      node,
+      system,
+      step: (count = 1) => {
+        for (let i = 0; i < count; i += 1) {
+          system.fixedUpdate(context);
+        }
+      },
+    };
+  }
+
+  it("moves a node whose authority is `kinematic`", () => {
+    const warn = spyOnWarn();
+    const { node, step } = tracked("kinematic");
+    step(60);
+    expect(node.transform.position.x).toBeCloseTo(1, 12);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("refuses to write a node owned by another authority, and warns once", () => {
+    const warn = spyOnWarn();
+    const { node, step } = tracked("manual");
+    step();
+    expect(node.transform.position.x).toBe(0);
+    expect(node.transform.version).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("§42");
+  });
+
+  it("warns once per node per writer, not once per step", () => {
+    const warn = spyOnWarn();
+    const { node, step } = tracked("physics");
+    step(120);
+    expect(node.transform.position.x).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns once for each conflicting node", () => {
+    const warn = spyOnWarn();
+    const system = new MotionSystem();
+    const nodes = [new Group(), new Group()];
+    for (const node of nodes) {
+      node.transformAuthority = "animation";
+      node.addComponent(
+        new MotionComponent({ linearVelocity: new Vector3(1, 0, 0) }),
+      );
+      system.track(node);
+    }
+    const context = makeContext();
+    system.fixedUpdate(context);
+    system.fixedUpdate(context);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(nodes.every((node) => node.transform.position.x === 0)).toBe(true);
+  });
+
+  it("freezes the whole component while the write is refused, and resumes on hand-off", () => {
+    const warn = spyOnWarn();
+    const node = new Group();
+    const motion = node.addComponent(
+      new MotionComponent({
+        linearVelocity: new Vector3(1, 0, 0),
+        linearAcceleration: new Vector3(2, 0, 0),
+      }),
+    );
+    const system = new MotionSystem();
+    system.track(node);
+    const context = makeContext();
+
+    for (let i = 0; i < 10; i += 1) {
+      system.fixedUpdate(context);
+    }
+    // Velocity is not integrated either, so nothing accumulates behind the
+    // refusal and no teleport is queued up.
+    expect(motion.linearVelocity.x).toBe(1);
+    expect(node.transform.position.x).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    node.transformAuthority = "kinematic";
+    system.fixedUpdate(context);
+    expect(motion.linearVelocity.x).toBeCloseTo(1 + 2 * DT, 15);
+    expect(node.transform.position.x).toBeCloseTo((1 + 2 * DT) * DT, 15);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not warn for a tracked node that has no MotionComponent", () => {
+    const warn = spyOnWarn();
+    const node = new Group(); // authority `manual`, no component
+    const system = new MotionSystem();
+    system.track(node);
+    system.fixedUpdate(makeContext());
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("does not warn for a disabled node (§6 skips it before the check)", () => {
+    const warn = spyOnWarn();
+    const { node, step } = tracked("manual");
+    node.enabled = false;
+    step(5);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
@@ -443,6 +578,7 @@ describe("MotionSystem — determinism and allocation (§33, §7b)", () => {
       new Vector3(-1, 0, 0.75),
     ];
     for (const [index, node] of nodes.entries()) {
+      node.transformAuthority = "kinematic";
       node.addComponent(
         new MotionComponent({
           linearVelocity: velocities[index],

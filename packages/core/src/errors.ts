@@ -26,7 +26,16 @@ export type FourErrorCode =
   | "INVALID_SCENE_GRAPH"
   | "INVALID_APPLICATION_STATE"
   | "PHYSICS_SOLVER_FAILED"
-  | "SERIALIZATION_VERSION_MISMATCH";
+  | "SERIALIZATION_VERSION_MISMATCH"
+  /**
+   * A named part of the public API exists but its behaviour lands in a later
+   * phase. Thrown at the point of use, never swallowed, so a reserved value can
+   * be spelled out in the types (and serialized, and documented) long before it
+   * does anything — the first case is `TransformAuthority`'s `"blended"` (§42),
+   * which selects the §19 physics-animation pipeline built in Phase 7
+   * (WP-2.3 addition, flagged by the WP-1.6 worker 2026-07-31).
+   */
+  | "NOT_IMPLEMENTED";
 
 /** Optional extras attached to a {@link FourError}. */
 export interface FourErrorOptions {
