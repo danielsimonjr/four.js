@@ -89,6 +89,9 @@ import { detectAdapter, type ColorRGBA, type ValueAdapter } from "./values.js";
  */
 const TWEEN_AUTHORITY: TransformAuthority = "animation";
 
+/** How a tween names itself in the §16 conflict warning. */
+const TWEEN_WRITER_KIND = "tween";
+
 /**
  * A value a tween can interpolate — every type `detectAdapter` recognizes.
  *
@@ -140,11 +143,13 @@ interface TweenEntry {
   /** The authored path, for diagnostics and the §16 conflict warning. */
   readonly path: string;
   /**
-   * The {@link propertyClaims} slot for this binding's owner, resolved once at
-   * play so claiming and releasing are a plain `Map` write with no lookup and
-   * no defensive branch.
+   * This tween's §16 claim on the property. {@link PropertyClaim.held} is what
+   * {@link Tween.#apply} tests: it is cleared when a later writer takes the slot
+   * (last-started-wins) and by {@link Tween.stop}, but *not* by completion — a
+   * finished tween has surrendered its registry slot yet can still be scrubbed
+   * (§16), which is what a `Timeline` needs from it.
    */
-  readonly claims: Map<string, Tween>;
+  readonly claim: PropertyClaim;
   /** Start value, captured at play (or supplied by {@link Tween.from}). */
   readonly start: unknown;
   /** End value, cloned so the caller may reuse or mutate what it passed in. */
@@ -155,13 +160,29 @@ interface TweenEntry {
   readonly isTransform: boolean;
   /** Whether a write here bypasses a plan-D3 change hook and must re-fire it. */
   readonly notifyChange: boolean;
+}
+
+/**
+ * One writer's live claim on one property (§16).
+ *
+ * The claim is the *object* stored in the registry, so a writer needs no
+ * back-reference from the registry to itself: losing a conflict is
+ * `held = false` on the claim the loser is already holding, which is also the
+ * flag its write path tests. That is why a `Tween` and an `AnimationMixer` can
+ * share one registry without either knowing the other's type.
+ */
+export interface PropertyClaim {
   /**
-   * Whether this tween may still write the property. Cleared when a later tween
-   * takes the slot (§16 last-started-wins) and by {@link Tween.stop}, but *not*
-   * by completion — a finished tween has surrendered its registry slot yet can
-   * still be scrubbed (§16), which is what a `Timeline` needs from it.
+   * What kind of writer holds it — `"tween"`, `"clip"` — named in the §16
+   * conflict warning so the message says which two writers collided.
    */
-  claimed: boolean;
+  readonly writerKind: string;
+
+  /**
+   * Whether the holder may still write the property. Cleared when a later
+   * writer claims the same slot, and by the holder's own `stop`.
+   */
+  held: boolean;
 }
 
 /**
@@ -174,11 +195,70 @@ interface TweenEntry {
  * `animate(node.transform.position).to({ x: 2 })` name one property through two
  * different paths, and both land on the same `(Vector3, "x")` slot.
  *
+ * **One registry for every animation writer.** Tweens and clip mixers claim
+ * here through {@link claimProperty}, so a tween and a mixer fighting over one
+ * property resolve by the same last-started-wins rule, with the same warning, as
+ * two tweens do. A second registry would have made §16's rule true only within a
+ * writer type, which is not what §16 says.
+ *
  * A `WeakMap` so the bookkeeping dies with the owner object and holds nothing
  * alive; the inner `Map` iterates in insertion order, though nothing here
  * depends on that beyond determinism hygiene (§33).
  */
-const propertyClaims = new WeakMap<object, Map<string, Tween>>();
+const propertyClaims = new WeakMap<object, Map<string, PropertyClaim>>();
+
+/**
+ * Records `claim` as the live claim on `owner[key]` (§16 last-started-wins),
+ * warning about and revoking whatever claim was there before.
+ *
+ * `path` is the authored path, used only in the warning. Module-internal: it is
+ * shared with `./mixer.js` and is deliberately absent from the package barrel.
+ */
+export function claimProperty(
+  owner: object,
+  key: string,
+  path: string,
+  claim: PropertyClaim,
+): void {
+  let slots = propertyClaims.get(owner);
+  if (slots === undefined) {
+    slots = new Map<string, PropertyClaim>();
+    propertyClaims.set(owner, slots);
+  }
+  const previous = slots.get(key);
+  if (previous !== undefined) {
+    console.warn(
+      `[four] Two animation writers target the property "${path}" of the same ` +
+        `object (a ${previous.writerKind}, then a ${claim.writerKind}); the ` +
+        "last-started tween wins (§16) and the earlier writer stops writing " +
+        "this property. Stop the earlier writer, or sequence the two on a " +
+        "Timeline, to silence this warning.",
+    );
+    previous.held = false;
+  }
+  slots.set(key, claim);
+  claim.held = true;
+}
+
+/**
+ * Frees the registry slot for `owner[key]` if `claim` still holds it, so a later
+ * writer can claim it without a §16 conflict warning.
+ *
+ * A slot already taken by someone else is left alone — deleting there would
+ * silently disown the current holder. {@link PropertyClaim.held} is *not*
+ * cleared: releasing the registry and giving up writing are different events
+ * (see {@link TweenEntry.claim}).
+ */
+export function releaseProperty(
+  owner: object,
+  key: string,
+  claim: PropertyClaim,
+): void {
+  const slots = propertyClaims.get(owner);
+  if (slots !== undefined && slots.get(key) === claim) {
+    slots.delete(key);
+  }
+}
 
 /** Throws the §89 error used for every malformed tween configuration. */
 function invalidTween(
@@ -206,8 +286,11 @@ function requireNonNegativeSeconds(value: number, what: string): number {
  * Deliberately an identity test over a fixed set rather than a walk up some
  * parent chain: math types carry no back-reference to their owner, so identity
  * is the only fact available, and it is exact.
+ *
+ * Module-internal, shared with `./mixer.js` so the two writers gate transform
+ * writes on exactly the same set of objects; not part of the package barrel.
  */
-function isTransformOwner(node: Node, owner: object): boolean {
+export function isTransformOwner(node: Node, owner: object): boolean {
   const { transform } = node;
   return (
     owner === transform ||
@@ -617,22 +700,16 @@ export class Tween {
       const isTransform =
         node !== undefined && isTransformOwner(node, binding.owner);
       hasTransformEntries = hasTransformEntries || isTransform;
-      let claims = propertyClaims.get(binding.owner);
-      if (claims === undefined) {
-        claims = new Map<string, Tween>();
-        propertyClaims.set(binding.owner, claims);
-      }
       entries.push({
         binding,
         adapter,
         path,
-        claims,
+        claim: { writerKind: TWEEN_WRITER_KIND, held: false },
         start: adapter.clone(startSource),
         end: adapter.clone(endValue),
         scratch: adapter.clone(startSource),
         isTransform,
         notifyChange: !adapter.mutatesInPlace,
-        claimed: false,
       });
     }
 
@@ -745,7 +822,7 @@ export class Tween {
     }
     this.#releaseRegistry();
     for (const entry of this.#entries) {
-      entry.claimed = false;
+      entry.claim.held = false;
     }
     this.#state = "stopped";
     return this;
@@ -781,47 +858,26 @@ export class Tween {
 
   /**
    * Claims every animated property (§16 last-started-wins), warning about and
-   * revoking any earlier tween's claim on the same slot.
+   * revoking any earlier writer's claim on the same slot.
    */
   #claimProperties(): void {
     for (const entry of this.#entries) {
-      const key = entry.binding.key;
-      const previous = entry.claims.get(key);
-      if (previous !== undefined) {
-        console.warn(
-          `[four] Two tweens animate the property "${entry.path}" of the same ` +
-            "object; the last-started tween wins (§16) and the earlier tween " +
-            "stops writing this property. Stop the earlier tween, or sequence " +
-            "the two on a Timeline, to silence this warning.",
-        );
-        previous.#revokeClaim(entry.binding.owner, key);
-      }
-      entry.claims.set(key, this);
-      entry.claimed = true;
-    }
-  }
-
-  /** Drops this tween's claim on one property (it lost a §16 conflict). */
-  #revokeClaim(owner: object, key: string): void {
-    for (const entry of this.#entries) {
-      if (entry.binding.owner === owner && entry.binding.key === key) {
-        entry.claimed = false;
-      }
+      claimProperty(
+        entry.binding.owner,
+        entry.binding.key,
+        entry.path,
+        entry.claim,
+      );
     }
   }
 
   /**
-   * Frees every registry slot this tween still owns, so a later tween can claim
-   * those properties without a §16 conflict warning. Entries whose slot has
-   * already been taken by someone else are left alone — deleting there would
-   * silently disown the current holder.
+   * Frees every registry slot this tween still owns, so a later writer can
+   * claim those properties without a §16 conflict warning.
    */
   #releaseRegistry(): void {
     for (const entry of this.#entries) {
-      const key = entry.binding.key;
-      if (entry.claims.get(key) === this) {
-        entry.claims.delete(key);
-      }
+      releaseProperty(entry.binding.owner, entry.binding.key, entry.claim);
     }
   }
 
@@ -886,7 +942,7 @@ export class Tween {
     const entries = this.#entries;
     for (let index = 0; index < entries.length; index += 1) {
       const entry = entries[index];
-      if (!entry.claimed || (entry.isTransform && !allowTransform)) {
+      if (!entry.claim.held || (entry.isTransform && !allowTransform)) {
         continue;
       }
       // Exact endpoints: `values.ts` does not promise `lerp(a, b, 1) === b`,

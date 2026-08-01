@@ -3,14 +3,33 @@
  *
  * Named exports only (plan §1 rule 7), listed explicitly rather than re-exported
  * with `export *` so the package's API is readable in one file and a new symbol
- * is a deliberate act. Later packets extend this barrel (P4-5): `Timeline`
- * (§16), clips and tracks (§17), and the mixer/`AnimationSystem` (P4-1).
+ * is a deliberate act (P4-5).
+ *
+ * Two symbols in `./tween.js` are deliberately **not** here: `claimProperty` and
+ * `releaseProperty`, the §16 conflict registry that `./mixer.js` shares with
+ * tweens, together with the `PropertyClaim` and `isTransformOwner` they need.
+ * They are cross-module plumbing inside this package, not API.
  */
 
 export const PACKAGE_NAME = "@four/animation";
 
+export type {
+  Advanceable,
+  AnimationPlaybackState,
+  AnimationSystemOptions,
+} from "./animation-system.js";
+export { AnimationSystem } from "./animation-system.js";
+
 export type { PropertyBinding } from "./binding.js";
 export { createBinding } from "./binding.js";
+
+export type {
+  AnimationClipOptions,
+  AnimationEvent,
+  AnimationEventVisitor,
+  TrackSampleSink,
+} from "./clip.js";
+export { AnimationClip } from "./clip.js";
 
 export type { EasingFunction, EasingName } from "./easing.js";
 export {
@@ -63,6 +82,13 @@ export {
 } from "./easing.js";
 
 export type {
+  AnimationEventListener,
+  MixerPlayOptions,
+  MixerState,
+} from "./mixer.js";
+export { AnimationMixer } from "./mixer.js";
+
+export type {
   TimelineChild,
   TimelineEntry,
   TimelineMarkerCallback,
@@ -70,6 +96,13 @@ export type {
   TimelineState,
 } from "./timeline.js";
 export { Timeline } from "./timeline.js";
+
+export type {
+  AnimationTrackLike,
+  AnimationTrackOptions,
+  InterpolationMode,
+} from "./track.js";
+export { AnimationTrack } from "./track.js";
 
 export type { TweenProperties, TweenState, TweenValue } from "./tween.js";
 export { Tween, animate, tween } from "./tween.js";
