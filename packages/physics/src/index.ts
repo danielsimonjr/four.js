@@ -23,6 +23,7 @@ export type {
   PhysicsQueryCapabilities,
   PhysicsSolverAdapter,
 } from "./adapter.js";
+export type { SolverBodyAccess } from "./body-access.js";
 export type {
   ColliderEventMap,
   ColliderOptions,
@@ -57,6 +58,8 @@ export type {
   TriggerPhase,
 } from "./events.js";
 export type { PhysicsMaterialOptions } from "./material.js";
+export type { PhysicsSystemOptions } from "./physics-system.js";
+export { PhysicsSystem } from "./physics-system.js";
 export {
   DEFAULT_DENSITY,
   DEFAULT_FRICTION,
@@ -153,3 +156,15 @@ export {
   validatePhysicsWorldOptions,
   validateRigidBodyDescriptor,
 } from "./validation.js";
+export type {
+  PhysicsSnapshot,
+  PhysicsWorldAdapter,
+  PhysicsWorldInit,
+  WorldOverlapHit,
+  WorldPhysicsEvent,
+  WorldPointHit,
+  WorldQueryHit,
+  WorldRaycastHit,
+  WorldShapeCastHit,
+} from "./world.js";
+export { PhysicsWorld } from "./world.js";
