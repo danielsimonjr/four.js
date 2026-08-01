@@ -144,7 +144,7 @@ Direct workspace dependencies only (transitives implied). Wave = parallel dispat
 Exact pins, no ranges. If an install or peer conflict arises, **the orchestrator** (never a
 worker) adjusts a pin and updates this table with a dated note.
 *(Added 2026-08-01 by the orchestrator: `@vitest/coverage-v8@3.2.7` — coverage measurement
-joins the phase-exit gates from Phase 1 on, per the session goal of ≥95% coverage.)*
+joins the phase-exit gates from Phase 1 on, per the session goal of ≥95% coverage. Added 2026-08-01: `@playwright/test@1.57.0` for the WP-3.8 browser gate — the environment provides Chromium at PLAYWRIGHT_BROWSERS_PATH.)*
 **Validated together 2026-07-29** by the Phase −1 smoke: install (no peer conflicts),
 `tsc -b` reference chain, cross-package Vitest, type-checked ESLint, TypeDoc packages
 mode, Vite 8 example build, and size-limit all passed as one workspace. pnpm 10 blocks

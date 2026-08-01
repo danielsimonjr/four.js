@@ -44,6 +44,7 @@
     "@four/serialization": "workspace:*",
     "@four/text": "workspace:*",
     "@four/ui": "workspace:*",
+    "@playwright/test": "1.57.0",
     "@size-limit/preset-small-lib": "13.0.2",
     "@types/node": "^22.20.1",
     "@vitest/coverage-v8": "3.2.7",
