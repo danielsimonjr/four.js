@@ -1,0 +1,20 @@
+{
+  // Type-checking-only project for the runnable examples. The examples are not
+  // workspace packages: they are consumers, and they import the umbrella
+  // package by its published specifier (`four/...`), which resolves through the
+  // workspace symlink to `packages/four/dist/*.d.ts`. `pnpm run build` must
+  // therefore run before `pnpm run typecheck:examples`.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    // Examples run in a browser: they touch `document`, `window`, and
+    // `HTMLCanvasElement`, none of which are in the default ES2022 lib.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/dist/**", "**/node_modules/**"]
+}

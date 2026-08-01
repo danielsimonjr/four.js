@@ -31,8 +31,21 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The examples are consumers, not workspace packages: they import the
+      # umbrella package by its published specifier, which resolves to
+      # `packages/four/dist/*.d.ts`. The build step above must therefore precede
+      # this one.
+      - name: Typecheck examples
+        run: pnpm run typecheck:examples
+
       - name: Test
         run: pnpm turbo run test
+
+      # Same unit tests, re-run per package under v8 instrumentation against the
+      # shared thresholds in vitest.coverage.config.ts. Kept separate so the
+      # plain `test` path above stays uninstrumented and fast.
+      - name: Unit test coverage thresholds
+        run: pnpm run coverage
 
       - name: Lint
         run: pnpm lint
