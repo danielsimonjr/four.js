@@ -12,6 +12,9 @@
  * (§24, §25) — which hold the authored state a user manipulates and produce the
  * descriptors an adapter is built from. `PhysicsWorld` / `PhysicsSystem`, which
  * register those components and drain their command buffers, arrive in WP-5.3.
+ * WP-6.1 adds §28's constraints: the `Joint` classes, the full
+ * `JointDescriptor` union of the plan P6-1 tier, the `SolverJointAccess` seam,
+ * and the world's `addJoint`/`removeJoint` with plan P6-2 break monitoring.
  *
  * Named exports only, alphabetical within each module group.
  */
@@ -23,7 +26,15 @@ export type {
   PhysicsQueryCapabilities,
   PhysicsSolverAdapter,
 } from "./adapter.js";
-export type { SolverBodyAccess } from "./body-access.js";
+export type {
+  SolverBodyAccess,
+  SolverJointAccess,
+  SolverJointMotor,
+} from "./body-access.js";
+export {
+  missingSolverJointAccess,
+  supportsSolverJointAccess,
+} from "./body-access.js";
 export type {
   ColliderEventMap,
   ColliderOptions,
@@ -31,15 +42,33 @@ export type {
 } from "./collider.js";
 export { Collider } from "./collider.js";
 export type {
+  AngularJointMotor,
   ColliderDescriptor,
+  FixedJointDescriptor,
   JointDescriptor,
+  JointDescriptorBase,
+  JointLimits,
   JointType,
+  LinearJointMotor,
   PhysicsWorldOptions,
+  PrismaticJointDescriptor,
+  RevoluteJointDescriptor,
   RigidBodyDescriptor,
+  RopeJointDescriptor,
+  ShippedJointType,
+  SphericalJointDescriptor,
+  SphericalJointLimits,
+  SpringJointDescriptor,
+  StagedJointType,
 } from "./descriptors.js";
 export {
   DEFAULT_GRAVITY_Y,
   JOINT_TYPES,
+  SHIPPED_JOINT_TYPES,
+  SHIPPED_JOINT_TYPES_2D,
+  SHIPPED_JOINT_TYPES_3D,
+  STAGED_JOINT_TYPES,
+  jointTypeSupportsDimension,
   resolveAngularVelocity,
   resolveGravity,
   resolveRotation,
@@ -50,6 +79,8 @@ export type {
   CollisionEvent,
   CollisionPhase,
   ContactPoint,
+  JointBreakEvent,
+  JointPhase,
   PhysicsEvent,
   PhysicsEventType,
   SleepEvent,
@@ -57,6 +88,32 @@ export type {
   TriggerEvent,
   TriggerPhase,
 } from "./events.js";
+export type {
+  HingeJointOptions,
+  JointBinding,
+  JointBreakPayload,
+  JointCommands,
+  JointEventMap,
+  JointOptions,
+  RopeJointOptions,
+  SliderJointOptions,
+  SphericalJointOptions,
+  SpringJointOptions,
+} from "./joints.js";
+export {
+  BallJoint,
+  FixedJoint,
+  HingeJoint,
+  Joint,
+  PrismaticJoint,
+  RevoluteJoint,
+  RopeJoint,
+  SliderJoint,
+  SphericalJoint,
+  SpringJoint,
+  worldAnchorToLocal,
+  worldAxisToLocal,
+} from "./joints.js";
 export type { PhysicsMaterialOptions } from "./material.js";
 export type { PhysicsSystemOptions } from "./physics-system.js";
 export { PhysicsSystem } from "./physics-system.js";
@@ -149,12 +206,17 @@ export {
   PHYSICS_DIMENSIONS,
 } from "./types.js";
 export {
+  validateAngularJointMotor,
   validateColliderDescriptor,
   validateInertiaTensor,
+  validateJointBreakThreshold,
   validateJointDescriptor,
+  validateJointLimits,
+  validateLinearJointMotor,
   validateMass,
   validatePhysicsWorldOptions,
   validateRigidBodyDescriptor,
+  validateSphericalJointLimits,
 } from "./validation.js";
 export type {
   PhysicsSnapshot,

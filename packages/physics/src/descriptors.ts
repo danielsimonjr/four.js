@@ -261,22 +261,192 @@ export const JOINT_TYPES = [
 ] as const satisfies readonly JointType[];
 
 /**
- * How a joint is created in a solver (§37 `createJoint`) — **minimal by
- * design** (plan P5-4).
+ * The joint types this phase actually ships (plan P6-1), which is what
+ * {@link JointDescriptor} can express.
  *
- * §108 lists no joints, so Phase 5 ships §37's `createJoint`/`destroyJoint`
- * signatures and the smallest descriptor those signatures can carry: what type,
- * between which two bodies, anchored where. Phase 6 (§109) owns the rest of
- * §28 — limits, motors, springs, damping, break force and torque, solver
- * iterations — and adds them as optional fields, which is a
- * backward-compatible change. Phase 5 adapters throw `NOT_IMPLEMENTED` from
- * `createJoint` and declare `capabilities.jointTypes: []`.
+ * §28 names nine types; {@link JOINT_TYPES} keeps that vocabulary because
+ * `PhysicsCapabilities.jointTypes` is `string[]` and an adapter may implement
+ * more than the engine builds. The *descriptor* union is narrower on purpose,
+ * exactly as `CollisionShape` is narrower than §24's shape list (plan P5-6):
+ *
+ * | §28 type          | Status                                              |
+ * | ----------------- | --------------------------------------------------- |
+ * | `fixed`           | ships, both dimensions                              |
+ * | `revolute`/hinge  | ships, both dimensions, with limits and a motor     |
+ * | `prismatic`/slider| ships, both dimensions, with limits and a motor     |
+ * | `rope`            | ships, both dimensions                              |
+ * | `spring`          | ships, both dimensions                              |
+ * | `spherical`/ball  | ships, **`"3d"` only** — a plane has no ball joint  |
+ * | `distance`        | **staged** (plan P6-1)                              |
+ * | `gear`            | **staged** (plan P6-1)                              |
+ * | `motorized`       | not a type here — see below                         |
+ *
+ * `distance` and `gear` are staged because no solver this repository ships can
+ * honour them: Rapier 0.19.3 has no rigid distance joint (its rope caps a
+ * *maximum* distance only, and emulating a rigid one with a very stiff spring
+ * would misrepresent §28) and no gear joint at all. They are absent from the
+ * union rather than present-and-rejected, so `{ type: "distance", … }` is a
+ * compile error; {@link validateJointDescriptor} also rejects them at runtime
+ * for JavaScript callers, citing plan P6-1.
+ *
+ * `motorized` is not a joint *type* in this API. §28 lists it beside the
+ * others, but a motor is a property of a joint that has a driven degree of
+ * freedom — which is what §28's own example shows, a `HingeJoint` carrying a
+ * `motor` record. It is therefore expressed as
+ * {@link RevoluteJointDescriptor.motor} and
+ * {@link PrismaticJointDescriptor.motor} (decision, WP-6.1).
  */
-export interface JointDescriptor {
-  /** Which §28 constraint this is. */
-  type: JointType;
+export type ShippedJointType =
+  "fixed" | "spring" | "revolute" | "prismatic" | "spherical" | "rope";
 
-  /** First constrained body. Must differ from {@link JointDescriptor.bodyB}. */
+/** Every {@link ShippedJointType}, in §28's order (plan P6-1). */
+export const SHIPPED_JOINT_TYPES = [
+  "fixed",
+  "spring",
+  "revolute",
+  "prismatic",
+  "spherical",
+  "rope",
+] as const satisfies readonly ShippedJointType[];
+
+/** The shipped types a `"2d"` world accepts: everything but `spherical` (P6-1). */
+export const SHIPPED_JOINT_TYPES_2D = [
+  "fixed",
+  "spring",
+  "revolute",
+  "prismatic",
+  "rope",
+] as const satisfies readonly ShippedJointType[];
+
+/** The shipped types a `"3d"` world accepts — all of them (plan P6-1). */
+export const SHIPPED_JOINT_TYPES_3D =
+  SHIPPED_JOINT_TYPES satisfies readonly ShippedJointType[];
+
+/** The §28 types staged out of this phase with a loud error (plan P6-1). */
+export type StagedJointType = "distance" | "gear";
+
+/** Every {@link StagedJointType}; see {@link ShippedJointType} for why. */
+export const STAGED_JOINT_TYPES = [
+  "distance",
+  "gear",
+] as const satisfies readonly StagedJointType[];
+
+/**
+ * Whether a shipped joint type may be used in a world of `dimension` (§21,
+ * §28, plan P6-1).
+ *
+ * Only `spherical` answers `false`, and only for `"2d"`: a ball joint's whole
+ * purpose is the two swing degrees of freedom a plane does not have, and in a
+ * plane it degenerates into the revolute joint that should have been asked for.
+ */
+export function jointTypeSupportsDimension(
+  type: ShippedJointType,
+  dimension: PhysicsDimension,
+): boolean {
+  const types: readonly ShippedJointType[] =
+    dimension === "2d" ? SHIPPED_JOINT_TYPES_2D : SHIPPED_JOINT_TYPES_3D;
+  return types.includes(type);
+}
+
+/**
+ * A driven degree of freedom's travel range (§28 "limits").
+ *
+ * Radians about the joint axis for a revolute joint, metres along it for a
+ * prismatic one — §7a's units in both cases, never degrees. `min` must be
+ * `<= max`; equal bounds lock the axis.
+ */
+export interface JointLimits {
+  /** Lower bound, in radians or metres. */
+  min: number;
+  /** Upper bound, in radians or metres. Must be `>= min`. */
+  max: number;
+}
+
+/**
+ * A velocity-driven motor on a revolute joint (§28's example, verbatim field
+ * names).
+ *
+ * The solver drives the joint's angle towards `targetVelocity` with at most
+ * `maxTorque` of effort. Position motors — a target *angle* with a stiffness
+ * and a damping, which Rapier also offers — are **staged** (WP-6.1,
+ * 2026-08-01): §28's example specifies a velocity motor, and a second motor
+ * model that only some solvers implement is worth its own decision.
+ */
+export interface AngularJointMotor {
+  /** Whether the motor drives the joint at all. Defaults to `true`. */
+  enabled?: boolean;
+  /** Target angular rate in radians per second (§7a). */
+  targetVelocity: number;
+  /** Largest torque the motor may apply, in newton-metres. Must be `>= 0`. */
+  maxTorque: number;
+}
+
+/**
+ * A velocity-driven motor on a prismatic joint — {@link AngularJointMotor}'s
+ * linear twin (§28).
+ */
+export interface LinearJointMotor {
+  /** Whether the motor drives the joint at all. Defaults to `true`. */
+  enabled?: boolean;
+  /** Target linear rate in metres per second (§7a). */
+  targetVelocity: number;
+  /** Largest force the motor may apply, in newtons. Must be `>= 0`. */
+  maxForce: number;
+}
+
+/**
+ * A ball joint's angular travel (§28 "limits"), as a swing cone with an
+ * optional twist range.
+ *
+ * ## Why a cone and not a box (decision, WP-6.1)
+ *
+ * A spherical joint leaves three rotational degrees of freedom, and solvers
+ * express limits on them very differently. Rapier 0.19.3's typed
+ * `SphericalImpulseJoint` exposes **no** limit API at all (it is not one of the
+ * `UnitImpulseJoint`s that carry `setLimits`); the only route there is a
+ * *generic* joint with per-axis angular limits. A per-axis "box" would leak
+ * that representation into the public API and would not be a shape any user
+ * asks for.
+ *
+ * A **cone half-angle** is what a shoulder, a universal joint, or a camera
+ * gimbal is actually specified with, and it maps onto per-axis limits by
+ * symmetry — an adapter builds it as `±coneAngle` on the two swing axes of
+ * {@link SphericalJointDescriptor.axis}. WP-6.3 verifies that against Rapier
+ * and reports honestly if it cannot be built; nothing at this layer fakes it.
+ */
+export interface SphericalJointLimits {
+  /**
+   * Largest angle, in radians, that {@link SphericalJointDescriptor.axis} may
+   * swing away from its rest direction. Must be in `(0, π]`.
+   */
+  coneAngle: number;
+
+  /**
+   * Optional twist range **about** the axis, in radians. Omitted means the
+   * twist is free.
+   */
+  twist?: JointLimits;
+}
+
+/**
+ * What every joint descriptor carries, whatever its type (§28, §37).
+ *
+ * ## Anchor space (decision, WP-6.1 — pinned)
+ *
+ * `anchorA` and `anchorB` are in the **local frame of their own body**, which
+ * is what §37's original descriptor already said and what every solver wants
+ * (Rapier's `JointData.*` anchors are body-local). The user-facing
+ * {@link Joint} classes take **world-space** anchors instead, because that is
+ * where §28's example puts them — the point in the scene where the hinge pin
+ * goes — and `PhysicsWorld.addJoint` converts world to local **once, at
+ * registration**, from each body's pose as the solver holds it at that moment.
+ * Descriptors are therefore pose-independent and replayable (§34); the class
+ * surface is the ergonomic one.
+ *
+ * An omitted anchor means the body's own origin.
+ */
+export interface JointDescriptorBase {
+  /** First constrained body. Must differ from {@link JointDescriptorBase.bodyB}. */
   bodyA: PhysicsBodyHandle;
 
   /** Second constrained body. */
@@ -294,7 +464,169 @@ export interface JointDescriptor {
    * bodies that overlap by construction.
    */
   collisionEnabled?: boolean;
+
+  /**
+   * Reaction force, in newtons, above which the joint breaks (§28 "break
+   * force"). Omitted means the joint never breaks under load.
+   *
+   * Enforced by `PhysicsWorld`, not by the solver (plan P6-2): the world reads
+   * the joint's reaction impulse after every fixed step, divides by the step
+   * delta, and destroys the joint when the magnitude *exceeds* this value —
+   * strictly, so a joint sitting exactly at its threshold survives. Requires an
+   * adapter that reports reactions (`SolverJointAccess.reportsJointReactions`);
+   * `addJoint` refuses a breakable joint on an adapter that does not, rather
+   * than accepting a threshold it can never enforce.
+   */
+  breakForce?: number;
+
+  /**
+   * Reaction torque, in newton-metres, above which the joint breaks (§28
+   * "break torque"). See {@link JointDescriptorBase.breakForce}; either
+   * threshold alone is enough to break the joint.
+   */
+  breakTorque?: number;
 }
+
+/**
+ * A weld: no relative motion at all (§28 "fixed"). Both dimensions.
+ *
+ * The bodies keep the relative pose they had when the joint was created, so
+ * pose them where they belong before registering it.
+ */
+export interface FixedJointDescriptor extends JointDescriptorBase {
+  type: "fixed";
+}
+
+/**
+ * A hinge: one rotational degree of freedom about
+ * {@link RevoluteJointDescriptor.axis} (§28 "revolute/hinge"). Both dimensions.
+ */
+export interface RevoluteJointDescriptor extends JointDescriptorBase {
+  type: "revolute";
+
+  /**
+   * Hinge axis in **`bodyA`'s local frame**, resolved from the world-space axis
+   * the {@link Joint} class was given (see {@link JointDescriptorBase}).
+   *
+   * Required in a `"3d"` world — a hinge with no axis is not a hinge. In a
+   * `"2d"` world the axis must be along ±Z, the plane's only rotational freedom
+   * (§21), and defaults to `+Z` when omitted.
+   */
+  axis?: Vector3Input;
+
+  /** Angular travel in radians, or free rotation when omitted (§28 "limits"). */
+  limits?: JointLimits;
+
+  /** Velocity motor about the axis, or none when omitted (§28 "motors"). */
+  motor?: AngularJointMotor;
+}
+
+/**
+ * A slider: one translational degree of freedom along
+ * {@link PrismaticJointDescriptor.axis} (§28 "prismatic/slider"). Both
+ * dimensions.
+ */
+export interface PrismaticJointDescriptor extends JointDescriptorBase {
+  type: "prismatic";
+
+  /**
+   * Slide axis in **`bodyA`'s local frame**. Required in both dimensions — a
+   * slider with no direction has nothing to slide along — and must lie **in**
+   * the XY plane in a `"2d"` world (§21), which is the mirror image of the
+   * revolute rule.
+   */
+  axis: Vector3Input;
+
+  /** Travel in metres, or unlimited when omitted (§28 "limits"). */
+  limits?: JointLimits;
+
+  /** Velocity motor along the axis, or none when omitted (§28 "motors"). */
+  motor?: LinearJointMotor;
+}
+
+/**
+ * A rope: the anchors may come no further apart than
+ * {@link RopeJointDescriptor.maxLength} (§28 "rope"). Both dimensions.
+ *
+ * Slack below that distance is unconstrained — a rope pulls and never pushes,
+ * which is exactly what distinguishes it from the staged `distance` joint.
+ */
+export interface RopeJointDescriptor extends JointDescriptorBase {
+  type: "rope";
+
+  /** Greatest distance between the anchors, in metres. Must be > 0. */
+  maxLength: number;
+}
+
+/**
+ * A spring-damper between the two anchors (§28 "spring", "damping"). Both
+ * dimensions.
+ *
+ * The restoring force is `stiffness * (distance - restLength)` opposed by
+ * `damping * closingSpeed`, which is the model every solver here implements;
+ * a spring constrains nothing rigidly, so it has neither limits nor a motor.
+ */
+export interface SpringJointDescriptor extends JointDescriptorBase {
+  type: "spring";
+
+  /** Distance at which the spring exerts no force, in metres. Must be >= 0. */
+  restLength: number;
+
+  /** Spring constant in newtons per metre. Must be > 0. */
+  stiffness: number;
+
+  /** Damping coefficient in newton-seconds per metre. Must be >= 0; 0 by default. */
+  damping?: number;
+}
+
+/**
+ * A ball joint: three rotational degrees of freedom about a shared point (§28
+ * "spherical/ball"). **`"3d"` only** (plan P6-1).
+ */
+export interface SphericalJointDescriptor extends JointDescriptorBase {
+  type: "spherical";
+
+  /**
+   * Reference axis of the swing cone in **`bodyA`'s local frame**, only
+   * meaningful when {@link SphericalJointDescriptor.limits} is present.
+   * Defaults to `+Y`, §7a's up.
+   */
+  axis?: Vector3Input;
+
+  /** Swing cone and optional twist, or free rotation when omitted. */
+  limits?: SphericalJointLimits;
+}
+
+/**
+ * How a joint is created in a solver (§37 `createJoint`) — the discriminated
+ * union of the plan P6-1 tier.
+ *
+ * ```ts
+ * const hinge: JointDescriptor = {
+ *   type: "revolute",
+ *   bodyA, bodyB,
+ *   axis: new Vector3(0, 0, 1),
+ *   limits: { min: -Math.PI / 2, max: Math.PI / 2 },
+ *   motor: { enabled: true, targetVelocity: 2, maxTorque: 50 },
+ * };
+ * ```
+ *
+ * Plain data, like every other descriptor here: no identity, no lifecycle, no
+ * solver state. The {@link Joint} classes of `joints.ts` hold the live state a
+ * user manipulates and produce these when they are registered with a world —
+ * the same split `RigidBody`/`RigidBodyDescriptor` already draws.
+ *
+ * Which types ship and which are staged is {@link ShippedJointType}; a value of
+ * this type is still not necessarily legal in a given world, because
+ * `spherical` is `"3d"` only ({@link jointTypeSupportsDimension}).
+ */
+export type JointDescriptor =
+  | FixedJointDescriptor
+  | RevoluteJointDescriptor
+  | PrismaticJointDescriptor
+  | RopeJointDescriptor
+  | SpringJointDescriptor
+  | SphericalJointDescriptor;
 
 /**
  * How a world is configured (§20, §21, §32, §33) — the argument to

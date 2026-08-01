@@ -466,6 +466,10 @@ describe("validateJointDescriptor (§28)", () => {
           type: "revolute",
           bodyA,
           bodyB,
+          // A hinge in a "3d" world must name its axis (§28, WP-6.1); only a
+          // "2d" world has a default. The rest of the §28 matrix lives in
+          // `joints.test.ts`.
+          axis: new Vector3(0, 0, 1),
           anchorA: new Vector2(0, 0),
           anchorB: new Vector3(0, 1, 0),
         },

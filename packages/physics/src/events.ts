@@ -63,7 +63,11 @@
 
 import type { Vector3 } from "@four/math";
 
-import type { PhysicsBodyHandle, PhysicsColliderHandle } from "./types.js";
+import type {
+  PhysicsBodyHandle,
+  PhysicsColliderHandle,
+  PhysicsJointHandle,
+} from "./types.js";
 
 /**
  * One point of contact inside a {@link CollisionEvent} (§29).
@@ -120,8 +124,16 @@ export type TriggerPhase = "triggerenter" | "triggerexit";
  */
 export type SleepPhase = "sleep" | "wake";
 
-/** Every physics event name (§29, §32, §37). */
-export type PhysicsEventType = CollisionPhase | TriggerPhase | SleepPhase;
+/**
+ * The one joint event name (§28 "break force", "break torque"; plan P6-2).
+ *
+ * A single name rather than a phase pair: a joint breaks once and is gone.
+ */
+export type JointPhase = "jointbreak";
+
+/** Every physics event name (§28, §29, §32, §37). */
+export type PhysicsEventType =
+  CollisionPhase | TriggerPhase | SleepPhase | JointPhase;
 
 /**
  * Two colliders began touching, kept touching, or stopped touching (§29).
@@ -222,7 +234,49 @@ export interface SleepEvent<TBody = PhysicsBodyHandle> {
 }
 
 /**
- * Everything `PhysicsSolverAdapter.drainEvents` can return (§37), discriminated
+ * A joint exceeded its break force or break torque and was destroyed (§28,
+ * plan P6-2).
+ *
+ * ## Who produces this (plan P6-2)
+ *
+ * `PhysicsWorld`, not the solver. Break thresholds live at the `@four/physics`
+ * layer: after each fixed step the world reads every breakable joint's reaction
+ * through `SolverJointAccess`, compares it against the thresholds, and destroys
+ * the joints that exceeded them — so the same threshold means the same thing on
+ * every adapter, including adapters whose solver has no breakage of its own.
+ * The event is queued with that step's contacts and dispatched afterwards
+ * (§6b, §39 step 9), on the {@link JointBreakEvent.joint} itself.
+ *
+ * The arm exists in {@link PhysicsEvent} rather than in a separate union so the
+ * world's queue stays one type; an adapter whose solver *does* break joints on
+ * its own may report it from `drainEvents`, and the world will retire the joint
+ * from its registry rather than destroy it a second time.
+ *
+ * ## The reported magnitudes
+ *
+ * Both are **magnitudes over the step that broke the joint**, converted from
+ * the solver's reaction impulses by dividing by the fixed delta: newtons for
+ * {@link JointBreakEvent.force}, newton-metres for
+ * {@link JointBreakEvent.torque}. At least one of them exceeded its threshold;
+ * the other is reported as measured, whatever it was.
+ */
+export interface JointBreakEvent<TJoint = PhysicsJointHandle> {
+  /** Always `"jointbreak"` (§28). */
+  readonly type: JointPhase;
+
+  /** The joint that broke. It is already destroyed when this is dispatched. */
+  readonly joint: TJoint;
+
+  /** Magnitude of the reaction force over the breaking step, in newtons. */
+  readonly force: number;
+
+  /** Magnitude of the reaction torque over the breaking step, in N·m. */
+  readonly torque: number;
+}
+
+/**
+ * Everything `PhysicsSolverAdapter.drainEvents` can return (§37), plus the
+ * `"jointbreak"` the world itself produces (§28, plan P6-2) — discriminated
  * by `type`.
  *
  * ```ts
@@ -242,7 +296,9 @@ export interface SleepEvent<TBody = PhysicsBodyHandle> {
 export type PhysicsEvent<
   TBody = PhysicsBodyHandle,
   TCollider = PhysicsColliderHandle,
+  TJoint = PhysicsJointHandle,
 > =
   | CollisionEvent<TBody, TCollider>
   | TriggerEvent<TBody, TCollider>
-  | SleepEvent<TBody>;
+  | SleepEvent<TBody>
+  | JointBreakEvent<TJoint>;
