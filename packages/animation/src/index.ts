@@ -62,6 +62,15 @@ export {
   springOut,
 } from "./easing.js";
 
+export type {
+  TimelineChild,
+  TimelineEntry,
+  TimelineMarkerCallback,
+  TimelineMarkerOptions,
+  TimelineState,
+} from "./timeline.js";
+export { Timeline } from "./timeline.js";
+
 export type { TweenProperties, TweenState, TweenValue } from "./tween.js";
 export { Tween, animate, tween } from "./tween.js";
 
