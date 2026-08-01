@@ -318,6 +318,12 @@ importers:
       '@dimforge/rapier3d-compat':
         specifier: 0.19.3
         version: 0.19.3
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
       '@four/physics':
         specifier: workspace:*
         version: link:../physics
