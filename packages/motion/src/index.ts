@@ -13,6 +13,26 @@ export {
   copyTimeState,
   createTimeState,
 } from "./clock.js";
+export type {
+  AccelerationFn,
+  Integrator,
+  IntegratorFn,
+  IntegratorState,
+} from "./integrators.js";
+export {
+  DEFAULT_INTEGRATOR,
+  INTEGRATORS,
+  explicitEuler,
+  rk2,
+  rk4,
+  semiImplicitEuler,
+  velocityVerlet,
+} from "./integrators.js";
+export type {
+  MotionComponentOptions,
+  MotionSystemOptions,
+} from "./motion-component.js";
+export { MotionComponent, MotionSystem } from "./motion-component.js";
 export type { SchedulerCallback, SchedulerOptions } from "./scheduler.js";
 export { Scheduler } from "./scheduler.js";
 export type {
@@ -36,3 +56,28 @@ export {
   PRIORITY_SNAPSHOT,
   SystemRegistry,
 } from "./systems.js";
+export type {
+  BallisticTrajectoryOptions,
+  CatmullRomTrajectoryOptions,
+  CircularTrajectoryOptions,
+  CubicBezierTrajectoryOptions,
+  DampedSpringTrajectoryOptions,
+  EllipticalTrajectoryOptions,
+  LinearTrajectoryOptions,
+  ParabolicTrajectoryOptions,
+  ParametricTrajectoryOptions,
+  Trajectory,
+} from "./trajectories.js";
+export {
+  BallisticTrajectory,
+  CENTRAL_DIFFERENCE_STEP,
+  CatmullRomTrajectory,
+  CircularTrajectory,
+  CubicBezierTrajectory,
+  DEFAULT_BALLISTIC_ACCELERATION_Y,
+  DampedSpringTrajectory,
+  EllipticalTrajectory,
+  LinearTrajectory,
+  ParabolicTrajectory,
+  ParametricTrajectory,
+} from "./trajectories.js";
