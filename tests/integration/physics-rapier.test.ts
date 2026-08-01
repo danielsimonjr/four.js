@@ -38,7 +38,8 @@
 
 import { FourError } from "@four/core";
 import { Vector3 } from "@four/math";
-import { RigidBody, type PhysicsWorld } from "@four/physics";
+import { Collider, RigidBody, type PhysicsWorld } from "@four/physics";
+import { Group } from "@four/scene";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -49,6 +50,7 @@ import {
   addGround,
   createRig,
   createWorld,
+  derivedBallMass,
   eventPhases,
   eventTypes,
   fallDistance,
@@ -113,33 +115,86 @@ describe("the §37 seam is dimension-independent (WP-5.5 verification)", () => {
 
 for (const kit of DIMENSION_KITS) {
   describe(`${kit.dimension} world on ${kit.adapterName}`, () => {
-    // --- known seam defect, found by this packet ---------------------------
+    // --- density-derived mass through the component API (§23, §25) ---------
 
-    it("KNOWN DEFECT: refuses a RigidBody with no authored mass (§23, §25)", async () => {
-      // TODO(WP-5.6 follow-up): **invert this expectation when the seam is
-      // fixed.** `RigidBody.toDescriptor()` (packages/physics/src/rigid-body.ts)
-      // always emits `centerOfMass`, because §23 makes it a live, always-present
-      // `Vector3` on the component; both Rapier adapters treat *any*
-      // `centerOfMass` as a mass distribution and reject one without an explicit
-      // `mass` (`resolveMassMode` in rapier{2,3}d-adapter.ts). The consequence
-      // is that §23's density-derived mass — the documented default, and the
-      // only path `Collider.density` feeds — is unreachable from the component
-      // API for every body type in both dimensions. The fix belongs in
-      // `@four/physics` (emit `centerOfMass` only when it was authored) or in
-      // the adapters (an origin centre of mass is not a distribution); neither
-      // file is this packet's to touch, so the behaviour is pinned here instead
-      // of being papered over silently. Every other case below authors a mass.
+    it("derives a massless RigidBody's mass from collider density (§23, §25)", async () => {
+      // The inverse of WP-5.6's "KNOWN DEFECT" case (fixed by WP-5.2-fix1).
+      // `RigidBody.toDescriptor()` used to emit `centerOfMass` unconditionally
+      // — §23 makes it a live, always-present `Vector3` on the component — and
+      // both Rapier adapters read *any* `centerOfMass` as an authored mass
+      // distribution and reject one without an explicit `mass`
+      // (`resolveMassMode`). That put §23's density-derived mass, the
+      // documented default and the only path `Collider.density` feeds, out of
+      // reach of the component API for every body type in both dimensions. The
+      // component now emits `centerOfMass` only when it was authored, so this
+      // registers — and every other case in this file goes down this same path,
+      // because the helpers no longer author a mass.
       const rig = await openRig();
       const world = await createWorld(rig, kit);
-      expect(() =>
-        addBall(world, kit, "dynamic", 0.5, {
-          name: "massless",
-          mass: null,
+      const radius = 0.5;
+      const ball = addBall(world, kit, "dynamic", radius, {
+        name: "density-derived",
+        position: new Vector3(0, 10, 0),
+      });
+
+      // The §23 mass the solver derived, read back onto the component at
+      // registration (WP-5.3's refresh). At `Collider`'s default density of 1
+      // a radius-0.5 ball weighs πr² = π/4 in 2D and 4/3·πr³ = π/6 in 3D, which
+      // is what `derivedBallMass` computes. Measured against the real wasm:
+      //   2d  0.7853981852531433 kg  vs  π/4 = 0.7853981633974483  (Δ 2.2e-8)
+      //   3d  0.5235987901687622 kg  vs  π/6 = 0.5235987755982988  (Δ 1.5e-8)
+      // The gap is float32 storage in the solver, hence the 1e-6 bound.
+      const expectedMass = derivedBallMass(kit.dimension, radius);
+      expect(ball.body.mass).toBeDefined();
+      expect(Math.abs((ball.body.mass ?? 0) - expectedMass)).toBeLessThan(1e-6);
+      expect(ball.body.mass ?? 0).toBeGreaterThan(0);
+      // §23: `inverseMass` is NaN while a dynamic mass is neither authored nor
+      // derived. It is finite here, which is the whole point. Measured:
+      // 1.2732395093040454 (2d) and 1.9098592639560683 (3d).
+      expect(Number.isFinite(ball.body.inverseMass)).toBe(true);
+      expect(Math.abs(ball.body.inverseMass - 1 / expectedMass)).toBeLessThan(
+        1e-5,
+      );
+
+      // Static bodies register too — the refusal was never a dynamic-body rule.
+      const ground = addGround(world, kit);
+      // Rapier derives a mass for a static body's colliders as well, so the
+      // WP-5.3 refresh publishes it: the ground slab is 40 × 1 (× 40) at
+      // density 1, i.e. 40 kg in 2D and 1600 kg in 3D — measured, and exactly
+      // the closed form. §23 still reports `inverseMass === 0`, because "does
+      // not respond to forces" is the body *type*, never a mass of zero.
+      expect(ground.body.mass).toBe(kit.dimension === "2d" ? 40 : 1600);
+      expect(ground.body.inverseMass).toBe(0);
+
+      // And gravity acts on the derived mass exactly as it does on an authored
+      // one: free fall is mass-independent, so the same closed form holds.
+      const steps = 30;
+      stepFrames(rig.app, steps);
+      expect(
+        Math.abs(ball.node.transform.position.y - (10 + fallDistance(steps))),
+      ).toBeLessThan(1e-5);
+      expect(
+        Math.abs(ball.body.linearVelocity.y - fallVelocity(steps)),
+      ).toBeLessThan(1e-4);
+      expect(ball.node.transform.position.y).toBeLessThan(10);
+    });
+
+    it("still demands the whole §23 mass triple for an authored distribution", async () => {
+      // The adapters are right to refuse half a distribution, and the fix did
+      // not weaken that: a centre of mass the *caller* authored still reaches
+      // the descriptor and is still rejected without a mass to distribute.
+      const rig = await openRig();
+      const world = await createWorld(rig, kit);
+      const node = new Group();
+      node.addComponent(
+        new RigidBody({
+          type: "dynamic",
+          centerOfMass: new Vector3(0.25, 0, 0),
         }),
-      ).toThrowError(/requires an explicit mass/u);
-      // Static bodies are refused for the same reason — it is not a
-      // dynamic-body rule.
-      expect(() => addGround(world, kit, { mass: null })).toThrowError(
+      );
+      node.addComponent(new Collider({ shape: kit.ball(0.5) }));
+
+      expect(() => world.addBody(node)).toThrowError(
         /requires an explicit mass/u,
       );
     });

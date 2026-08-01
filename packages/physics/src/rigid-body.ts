@@ -31,6 +31,13 @@
  * authoring action that takes effect at the next sync; reading one between
  * steps yields the last solved value.
  *
+ * The §23 mass triple is the exception: a body that never named a mass, a
+ * centre of mass, or an inertia tensor is asking the solver to derive all three
+ * from collider density and geometry (§23, §25), so
+ * {@link RigidBody.toDescriptor} omits what was never authored rather than
+ * presenting a default as an instruction. See
+ * {@link RigidBody.centerOfMassAuthored}.
+ *
  * ## Commands, not mutations (§26, §32)
  *
  * A force applied by user code cannot reach the solver at the moment of the
@@ -319,6 +326,13 @@ export class RigidBody
   /**
    * Centre of mass in the body's local frame (§23). Owned by the component and
    * never replaced — write into it. The origin by default.
+   *
+   * §23 makes this always present, which is *not* the same as always
+   * *authored*: a body that never mentioned a centre of mass is asking the
+   * solver to derive one from its colliders (§23, §25), and a body that placed
+   * one is overriding that derivation. {@link RigidBody.centerOfMassAuthored}
+   * is that distinction and {@link RigidBody.toDescriptor} emits the field only
+   * when it holds.
    */
   readonly centerOfMass: Vector3;
 
@@ -341,9 +355,16 @@ export class RigidBody
    * §23 declares this non-optional, but §23 also derives mass (and with it
    * inertia) from collider density when it is not authored — and "derive it"
    * and "the identity tensor" are different instructions. The component keeps
-   * them distinguishable; a solved body's tensor is published back here by
-   * `syncSolverToScene` (WP-5.3). In a `"2d"` world only the Z diagonal entry
-   * is used (§23).
+   * them distinguishable: `undefined` **is** this field's authored flag, which
+   * is why it needs no companion to
+   * {@link RigidBody.centerOfMassAuthored}. In a `"2d"` world only the Z
+   * diagonal entry is used (§23).
+   *
+   * For the same reason a future `syncSolverToScene` must **not** publish a
+   * solver-derived tensor back into this field (WP-5.2-fix1): doing so would
+   * turn a derivation into an authored mass distribution, which is exactly the
+   * defect {@link RigidBody.centerOfMassAuthored} exists to prevent. A derived
+   * tensor belongs in a separate read-only field.
    */
   inertiaTensor?: Matrix3;
 
@@ -390,6 +411,14 @@ export class RigidBody
   /** Backing store for {@link RigidBody.mass}; `undefined` means "derive it". */
   #mass?: number;
 
+  /**
+   * Whether a centre of mass was named by the constructor descriptor or by
+   * {@link RigidBody.markCenterOfMassAuthored} — the *sticky* half of
+   * {@link RigidBody.centerOfMassAuthored}, whose other half is "the vector is
+   * not at the origin".
+   */
+  #centerOfMassAuthored: boolean;
+
   /** Backing store for {@link RigidBody.ccdMode} (§31). */
   #ccdMode: CCDMode;
 
@@ -427,6 +456,7 @@ export class RigidBody
     this.#mass = descriptor.mass;
     this.#ccdMode = resolveCCDMode(descriptor);
 
+    this.#centerOfMassAuthored = descriptor.centerOfMass !== undefined;
     this.centerOfMass =
       descriptor.centerOfMass === undefined
         ? new Vector3()
@@ -511,6 +541,75 @@ export class RigidBody
       return 0;
     }
     return this.#mass === undefined ? Number.NaN : 1 / this.#mass;
+  }
+
+  /**
+   * Whether {@link RigidBody.centerOfMass} is an **authored mass
+   * distribution** rather than the always-present default §23 gives every body
+   * (WP-5.2-fix1).
+   *
+   * ## Why the distinction has to exist
+   *
+   * §23 derives a body's mass from collider density times volume whenever
+   * `mass` is not authored, and a solver derives the centre of mass and the
+   * rotational inertia from the same geometry in the same breath — mass,
+   * centre, and inertia are one triple. Naming any part of that triple means
+   * "do not derive it", so a component that reported its default origin as an
+   * authored centre would make the density-derived mass unreachable: an adapter
+   * asked for a distribution with no mass to distribute has nothing to do but
+   * refuse.
+   *
+   * ## The rule, and why it cannot silently drop what a caller asked for
+   *
+   * A centre of mass counts as authored when **either** holds:
+   *
+   * 1. the constructor descriptor carried `centerOfMass` (whatever its value,
+   *    including the origin), or {@link RigidBody.markCenterOfMassAuthored}
+   *    has been called — the sticky half;
+   * 2. {@link RigidBody.centerOfMass} is not at the origin right now — the
+   *    live half, which catches `body.centerOfMass.set(…)` after construction
+   *    without asking the caller to announce it.
+   *
+   * The union is what makes the omission safe. Rule 1 keeps an explicitly
+   * authored origin — the one value rule 2 cannot see — and rule 2 keeps every
+   * post-construction edit. The only state that is omitted is a centre that is
+   * at the origin *and* was never mentioned, which is precisely the state that
+   * carries no instruction. `-0` reads as the origin (`-0 !== 0` is `false`),
+   * and a non-finite component reads as authored, so §85 validation rejects it
+   * rather than the descriptor quietly losing it.
+   *
+   * The one case rule 2 alone would get wrong is "pin the centre to the origin
+   * even though the colliders sit off it", which is a real instruction that
+   * looks identical to the default. Authoring `centerOfMass` in the descriptor
+   * states it; {@link RigidBody.markCenterOfMassAuthored} states it after the
+   * fact.
+   */
+  get centerOfMassAuthored(): boolean {
+    if (this.#centerOfMassAuthored) {
+      return true;
+    }
+    const { x, y, z } = this.centerOfMass;
+    return x !== 0 || y !== 0 || z !== 0;
+  }
+
+  /**
+   * Declares {@link RigidBody.centerOfMass} an authored mass distribution from
+   * now on, so {@link RigidBody.toDescriptor} emits it even at the origin.
+   *
+   * The escape hatch for the one case the live half of
+   * {@link RigidBody.centerOfMassAuthored} cannot infer: a centre deliberately
+   * pinned to the body origin while the colliders sit elsewhere. One-way by
+   * design — nothing un-authors a distribution, because "forget what I asked
+   * for" is the silent data loss this whole mechanism exists to avoid. To go
+   * back to a derived centre, build a body whose descriptor omits
+   * `centerOfMass`.
+   *
+   * Remember that an authored distribution needs an authored {@link
+   * RigidBody.mass} as well: solvers set mass, centre, and inertia as one
+   * triple (§23), and an adapter is entitled to reject half of it.
+   */
+  markCenterOfMassAuthored(): void {
+    this.#centerOfMassAuthored = true;
   }
 
   // --- §31 continuous collision detection -----------------------------------
@@ -676,14 +775,19 @@ export class RigidBody
    *
    * A fresh record whose vectors and tensor are **references to this
    * component's live state**, not copies: the adapter reads them during
-   * `createBody` and must not retain them. `mass`, `inertiaTensor`, `position`,
-   * and `rotation` are present only when authored, so a descriptor that omitted
-   * them round-trips unchanged.
+   * `createBody` and must not retain them. `mass`, `centerOfMass`,
+   * `inertiaTensor`, `position`, and `rotation` are present only when authored,
+   * so a descriptor that omitted them round-trips unchanged.
+   *
+   * `centerOfMass` is the subtle one: §23 keeps it always present on the
+   * component, so emitting it unconditionally would tell every adapter that
+   * every body carries an authored mass distribution and make §23's
+   * density-derived mass unreachable (WP-5.2-fix1). It is emitted exactly when
+   * {@link RigidBody.centerOfMassAuthored} holds, which that property documents.
    */
   toDescriptor(): RigidBodyDescriptor {
     const descriptor: RigidBodyDescriptor = {
       type: this.#type,
-      centerOfMass: this.centerOfMass,
       linearVelocity: this.linearVelocity,
       angularVelocity: this.angularVelocity,
       linearDamping: this.linearDamping,
@@ -694,6 +798,9 @@ export class RigidBody
     };
     if (this.#mass !== undefined) {
       descriptor.mass = this.#mass;
+    }
+    if (this.centerOfMassAuthored) {
+      descriptor.centerOfMass = this.centerOfMass;
     }
     if (this.inertiaTensor !== undefined) {
       descriptor.inertiaTensor = this.inertiaTensor;

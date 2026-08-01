@@ -48,6 +48,7 @@ describe("RigidBody construction (§23)", () => {
     expect(body.type).toBe("dynamic");
     expect(body.mass).toBeUndefined();
     expect(body.centerOfMass).toEqual(new Vector3(0, 0, 0));
+    expect(body.centerOfMassAuthored).toBe(false);
     expect(body.linearVelocity).toEqual(new Vector3(0, 0, 0));
     expect(body.angularVelocity).toEqual(new Vector3(0, 0, 0));
     expect(body.inertiaTensor).toBeUndefined();
@@ -438,6 +439,9 @@ describe("RigidBody world registration (§21, §37)", () => {
     const body = new RigidBody({
       type: "dynamic",
       mass: 3,
+      // Authored, so the descriptor carries the whole §23 mass triple — which
+      // is the only shape in which an adapter accepts a distribution.
+      centerOfMass: new Vector3(0, 0.25, 0),
       inertiaTensor: inertia,
       position: new Vector2(1, 2),
       rotation: 0,
@@ -464,9 +468,21 @@ describe("RigidBody world registration (§21, §37)", () => {
   it("omits the fields that were never authored", () => {
     const descriptor = new RigidBody({ type: "static" }).toDescriptor();
     expect("mass" in descriptor).toBe(false);
+    expect("centerOfMass" in descriptor).toBe(false);
     expect("inertiaTensor" in descriptor).toBe(false);
     expect("position" in descriptor).toBe(false);
     expect("rotation" in descriptor).toBe(false);
+    // What is left is every §23 field that has a real default.
+    expect(Object.keys(descriptor).sort()).toEqual([
+      "angularDamping",
+      "angularVelocity",
+      "ccdMode",
+      "continuousCollisionDetection",
+      "gravityScale",
+      "linearDamping",
+      "linearVelocity",
+      "type",
+    ]);
   });
 
   it('accepts a planar body in a "2d" world and rejects an out-of-plane one', () => {
@@ -497,12 +513,121 @@ describe("RigidBody world registration (§21, §37)", () => {
     expect(error.message).toContain("centerOfMass.z");
   });
 
+  it("keeps an authored out-of-plane centre of mass checkable in 2d", () => {
+    // The omission must not create a validation hole: an unauthored centre is
+    // at the origin, which is planar, so nothing that a `"2d"` world would have
+    // rejected stops being rejected (§21, §85).
+    const body = new RigidBody({ type: "dynamic", mass: 1 });
+    expect(() => {
+      body.validateFor("2d");
+    }).not.toThrow();
+
+    body.centerOfMass.set(0, 0, 0.5);
+    const error = expectValidationError(() => {
+      body.validateFor("2d");
+    });
+    expect(error.message).toContain("centerOfMass.z");
+  });
+
   it("catches a body type corrupted after construction at registration", () => {
     const body = dynamicBody();
     body.type = "bogus" as RigidBodyDescriptor["type"];
     expectValidationError(() => {
       body.validateFor("3d");
     });
+  });
+});
+
+describe("RigidBody authored centre of mass (§23, §25; WP-5.2-fix1)", () => {
+  it("treats an unauthored origin centre as no mass distribution at all", () => {
+    // The defect this suite pins: `centerOfMass` is always present on the
+    // component (§23), so emitting it unconditionally told every adapter that
+    // every body carried an authored mass distribution — and a distribution
+    // with no mass is refused, which put §23's density-derived mass out of
+    // reach of the component API entirely.
+    const body = new RigidBody({ type: "dynamic" });
+    const descriptor = body.toDescriptor();
+
+    expect(body.centerOfMassAuthored).toBe(false);
+    expect("centerOfMass" in descriptor).toBe(false);
+    // …and the descriptor carries no mass either, which is what asks the
+    // solver to derive one from collider density times volume (§23, §25).
+    expect("mass" in descriptor).toBe(false);
+    expect("inertiaTensor" in descriptor).toBe(false);
+  });
+
+  it("keeps a descriptor-authored centre, even at the origin", () => {
+    // Rule 1, the sticky half: an explicit origin is a real instruction ("pin
+    // the centre to the body origin, whatever the colliders say") and is the
+    // one authored value the live half below cannot see.
+    const body = new RigidBody({
+      type: "dynamic",
+      mass: 2,
+      centerOfMass: new Vector3(0, 0, 0),
+    });
+
+    expect(body.centerOfMassAuthored).toBe(true);
+    expect(body.toDescriptor().centerOfMass).toBe(body.centerOfMass);
+  });
+
+  it("detects a centre moved after construction, with no announcement", () => {
+    // Rule 2, the live half: mutation is how §23 says a centre is written
+    // (`centerOfMass` is a live vector that is never replaced), so the check
+    // has to read the vector rather than trust a flag set at construction.
+    const body = new RigidBody({ type: "dynamic", mass: 2 });
+    expect(body.centerOfMassAuthored).toBe(false);
+
+    body.centerOfMass.set(0.25, 0, 0);
+    expect(body.centerOfMassAuthored).toBe(true);
+    expect(body.toDescriptor().centerOfMass).toBe(body.centerOfMass);
+
+    // And moving it back stops claiming a distribution: the value is once
+    // again indistinguishable from the default, so nothing is being asked for.
+    body.centerOfMass.set(0, 0, 0);
+    expect(body.centerOfMassAuthored).toBe(false);
+    expect("centerOfMass" in body.toDescriptor()).toBe(false);
+  });
+
+  it("reads -0 as the origin and a non-finite component as authored", () => {
+    const negativeZero = new RigidBody({ type: "dynamic", mass: 1 });
+    negativeZero.centerOfMass.set(-0, -0, -0);
+    expect(negativeZero.centerOfMassAuthored).toBe(false);
+
+    // Not silently dropped: emitting it is what lets §85 validation reject it.
+    const broken = new RigidBody({ type: "dynamic", mass: 1 });
+    broken.centerOfMass.set(Number.NaN, 0, 0);
+    expect(broken.centerOfMassAuthored).toBe(true);
+    expectValidationError(() => {
+      broken.validateFor("3d");
+    });
+  });
+
+  it("pins an origin centre on request, one way (markCenterOfMassAuthored)", () => {
+    const body = new RigidBody({ type: "dynamic", mass: 2 });
+    expect("centerOfMass" in body.toDescriptor()).toBe(false);
+
+    body.markCenterOfMassAuthored();
+
+    expect(body.centerOfMassAuthored).toBe(true);
+    expect(body.toDescriptor().centerOfMass).toBe(body.centerOfMass);
+    expect(body.centerOfMass).toEqual(new Vector3(0, 0, 0));
+    // One way: moving the vector around cannot un-author it.
+    body.centerOfMass.set(1, 0, 0);
+    body.centerOfMass.set(0, 0, 0);
+    expect(body.centerOfMassAuthored).toBe(true);
+  });
+
+  it("has no equivalent latent issue on inertiaTensor", () => {
+    // `inertiaTensor` is optional and starts `undefined`, so `undefined` is
+    // already its authored flag and `toDescriptor` already omitted it. This
+    // case exists so that giving it a non-`undefined` default later fails here
+    // rather than in an adapter.
+    const body = new RigidBody({ type: "dynamic", mass: 1 });
+    expect(body.inertiaTensor).toBeUndefined();
+    expect("inertiaTensor" in body.toDescriptor()).toBe(false);
+
+    body.inertiaTensor = new Matrix3();
+    expect(body.toDescriptor().inertiaTensor).toBe(body.inertiaTensor);
   });
 });
 

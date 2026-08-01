@@ -273,39 +273,50 @@ export interface BodyParts {
 }
 
 /**
- * The mass every body below is authored with, in kilograms — and the workaround
- * for a real seam defect this packet found (WP-5.6).
+ * Density in kg/m³ (3D) or kg/m² (2D) that a collider here is given when it
+ * names none — `@four/physics`'s `DEFAULT_DENSITY`, restated rather than
+ * imported so the expected masses below can be read next to the shapes that
+ * produce them (§24, §25).
  *
- * `RigidBody.toDescriptor()` emits `centerOfMass` **unconditionally** (§23 makes
- * it a live, always-present `Vector3` on the component, the origin by default),
- * and both Rapier adapters reject a descriptor that carries a mass
- * *distribution* without an explicit `mass`:
- *
- * ```text
- * "Rapier 2D sets mass, centre of mass, and rotational inertia as one triple,
- *  so centerOfMass or inertiaTensor requires an explicit mass as well (§23, §85)."
- * ```
- *
- * So today **no `RigidBody` component can be registered into a Rapier world
- * without an authored mass**, in either dimension and for every body type —
- * §23's density-derived mass is unreachable through the component API. The
- * defect and its one-line shape are pinned by
- * `../physics-rapier.test.ts`'s "known seam defect" case; until it is fixed
- * every builder here authors a mass, which is legal §23 input and leaves each
- * scenario's physics unchanged (the adapters' `"body"` mass mode simply makes
- * the authored value authoritative instead of deriving it from density).
+ * With it, a ball of radius `r` registered with **no authored mass** ends up
+ * with the §23 density-derived mass {@link derivedBallMass} computes.
  */
-export const DEFAULT_BODY_MASS = 1;
+export const DEFAULT_DENSITY = 1;
+
+/**
+ * The §23 mass a {@link addBall} with no authored mass ends up with, in
+ * kilograms: density times the ball's area in 2D and its volume in 3D.
+ *
+ * Not measured from the solver — derived from §23–§25 and then *checked*
+ * against the solver in `../physics-rapier.test.ts`, which is the point of the
+ * density path being reachable at all (WP-5.2-fix1).
+ */
+export function derivedBallMass(
+  dimension: PhysicsDimension,
+  radius: number,
+  density = DEFAULT_DENSITY,
+): number {
+  return dimension === "2d"
+    ? density * Math.PI * radius * radius
+    : (density * 4 * Math.PI * radius * radius * radius) / 3;
+}
 
 /** How {@link addBall} and {@link addSlab} author a body. */
 export interface BodyOptions {
   /** Node name, so an authority warning names something readable. */
   name?: string;
   /**
-   * Mass in kilograms (§23). Defaults to {@link DEFAULT_BODY_MASS}; pass `null`
-   * to author none, which is what the known-defect case does.
+   * Mass in kilograms (§23), or omitted — the default — to let the solver
+   * derive it from collider density times volume, which is §23's documented
+   * behaviour and the only path `Collider.density` feeds.
+   *
+   * Authored only where a case genuinely needs a *known* mass (the §26 impulse
+   * case, where `v = J/m` is the assertion). Every other body here goes down
+   * the derived path on purpose: that path was unreachable through the
+   * component API until WP-5.2-fix1, and exercising it is what keeps it
+   * reachable.
    */
-  mass?: number | null;
+  mass?: number;
   /** World position; Y is up in both dimensions (§7a). Defaults to the origin. */
   position?: Vector3;
   /** §24 restitution on the collider. */
@@ -389,10 +400,9 @@ function addBody(
   node.transformAuthority =
     options.authority ?? (type === "dynamic" ? "physics" : "manual");
 
-  const mass = options.mass === undefined ? DEFAULT_BODY_MASS : options.mass;
   const body = new RigidBody({
     type,
-    ...(mass === null ? {} : { mass }),
+    ...(options.mass === undefined ? {} : { mass: options.mass }),
   });
   node.addComponent(body);
   const collider = new Collider({
