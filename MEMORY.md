@@ -25,6 +25,32 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 4 CLOSED (exit GREEN, zero defects; §107 criterion TRUE per value
+  kind with unit + golden + browser-pixel evidence).** Ten packets. API surface:
+  34-key easing registry (§15 families, pinned constants incl. damped-spring closed form);
+  `ValueAdapter` with `mutatesInPlace` split (primitives return, references mutate `out`);
+  `PropertyBinding` (paths resolved once, in-place writes preserve identity + change
+  hooks); `Tween` builder (repeat = extra cycles) with a writer-agnostic last-started-wins
+  claim registry shared by tween AND mixer (internal exports, not in the barrel);
+  `Timeline` (elapsed-space markers, `(from, to]` crossing shared with clip events,
+  seek suppresses + per-marker/per-play replayOnSeek, loop = total iterations —
+  documented divergence from tween.repeat); `AnimationTrack`/`AnimationClip` (§17 shape;
+  cubic = motion's Catmull-Rom convention; quaternion linear = slerp, cubic/hermite
+  rejected; morph/skeletal staged per P4-3); `AnimationMixer` (`prepare()`+`play()`,
+  satisfies TimelineChild, seek in elapsed time); `AnimationSystem` (priority 300 <
+  MotionSystem 400, fixed scaled delta = `fixedDeltaTime` (timeScale already applied by
+  the accumulator), auto-untracks finished/stopped). **Renderer findings (WP-4.7):**
+  unlit draws run with GL_BLEND off (alpha animation invisible — §60a/blending backlog);
+  material color is read per draw (no version cache), so in-place tuple animation works.
+  **Frozen behavior:** the fixed-step accumulator's ULP drift fires boundary-sitting
+  markers one step late (step 199 not 198) — pinned in golden/phase4.json. WP-4.0 made
+  the ≥95% coverage gate tooling-enforced (package-level thresholds; per-file granularity
+  noted as a future hardening) + typecheck:examples in CI; barrel-wiring test took the
+  umbrella to truthful 100%. Exit: 1,363 unit + 26 suite + 15 browser tests, animation
+  100/100/100/100, example 30.19 kB gzip (21% of §86). Verifier notes adopted: §15's
+  `node.position` snippet is not copy-pasteable (scene has `node.transform.position` —
+  existing ergonomics backlog item); §17's slerp is folded into the quaternion adapter
+  rather than named as a mode; 8 new cosmetic typedoc link warnings (cleanup chore).
 - **2026-08-01 — PHASE 3a CLOSED (exit GREEN; §106a criterion TRUE with browser input +
   pixel evidence).** Seven packets: §71 picking (ray/AABB/oriented-box, +Y-up NDC), §72
   subset pointer input (capture:-prefixed capture keys on the four propagating types only;

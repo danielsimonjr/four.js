@@ -6,15 +6,20 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 4 — Animation (§15–17, §107): rolling-wave decomposition into plan §6c, then
-      dispatch packets (clips/tracks/keyframes, easing, tweens, timelines, AnimationMixer,
-      animation transform authority; all times seconds, clip-local animation time).
+- [ ] Phase 5 — Physics API + Rapier adapter (§20–32, §37, §108): rolling-wave
+      decomposition into plan §6d, then dispatch (descriptors, world API, §37 adapter
+      contract incl. drainEvents + capabilities, rapier2d+3d wasm pins per MEMORY
+      2026-07-29, event normalization, sync into the WP-2.6 pose store, §33 checksums
+      via WP-1.13).
 
-### Chores (Phase 3a exit-verifier notes, 2026-08-01)
-- [ ] `typecheck:examples` script + CI step (examples are the sole downstream consumer of
-      the NodeEventMap augmentation and are currently typechecked by nothing)
-- [ ] Enforce coverage thresholds in tooling (vitest coverage thresholds ≥95%; today the
-      gate is review-only via exit verifiers)
+### Chores (Phase 4 exit-verifier notes, 2026-08-01)
+- [ ] Typedoc link warnings cleanup (34 total, 8 new from animation: ./clip.js#…,
+      SPRING_NORMALIZATION, PRIORITY_ANIMATION_TARGETS) — cosmetic, batch with a tooling
+      packet
+- [ ] Coverage thresholds are package-level; consider per-file granularity so a weak file
+      can't hide behind a strong package average
+- [ ] Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is
+      invisible; schedule blending with §60a color management work
 
 ### Backlog additions (Phase 3 exit findings)
 - [ ] §92 integration/visual test directories still empty — schedule with Phase 11
@@ -45,6 +50,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-01 — **Phase 4 complete** (§107): 10 packets, exit GREEN zero defects —
+      numeric/vector/quaternion/color/transform properties all animatable, proven at
+      unit, determinism-golden (cross-process, marker steps pinned), and browser-pixel
+      layers; 1,363 unit + 26 suite + 15 browser tests; animation package 100% coverage;
+      coverage gate now tooling-enforced repo-wide; example 30.19 kB gzip
 - [x] 2026-08-01 — **Phase 3a complete** (§106a): 7 packets, exit GREEN — pointer events,
       picking, dragging, sprites, and text labels proven working together in the mixed
       2D/3D example via real Chromium input + framebuffer assertions; 1,015 unit + 11
