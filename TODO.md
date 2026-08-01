@@ -6,10 +6,14 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 3 — Renderer Foundation (§106) IN PROGRESS: WP-3.1/3.2 (cameras+viewport)
-      landed; WP-3.3 (geometry/material/render list) in flight; then renderer interface,
-      WebGL 2 backend, Application integration, real example, Playwright browser test,
-      exit (plan §6a).
+- [ ] Phase 3a — Interaction, Sprites, Text MVP (§106a) NEXT: rolling-wave decomposition
+      (input routing §72, picking §71, dragging, sprite batching §55, SDF Latin text §56
+      tier, example upgrade; exit ships the public demo per POSITIONING).
+
+### Backlog additions (Phase 3 exit findings)
+- [ ] §92 integration/visual test directories still empty — schedule with Phase 3a/11
+- [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
+      deferral recorded in MEMORY 2026-08-01)
 
 ## Backlog
 
@@ -32,6 +36,9 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-01 — **Phase 3 complete** (§106): 9 packets, browser-verified rendering
+      (SwiftShader gate caught a real rAF defect), interpolated draws proven at alpha 0.5,
+      example at 14.88 kB gzip, coverage ≥95% everywhere
 - [x] 2026-08-01 — **Phase 2 complete** (§105): 7 packets, repo at 545 tests, coverage
       ≥95% every package, demos verified against independently derived closed forms,
       cross-process determinism vs goldens

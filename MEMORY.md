@@ -25,6 +25,21 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 3 CLOSED (exit GREEN, zero defects; §106 criterion met with
+  browser-pixel evidence).** Nine packets: cameras/viewport (§47-48, D8 depth ranges),
+  geometry/materials/renderable lite + render lists (WeakMap-keyed pools, §43 interpolated
+  builder), §61 Renderer interface + NullRenderer, WebGL 2 backend (33-method structural GL
+  seam, fake-GL units, 99.66%), Application renderer integration (injected Renderer
+  INSTANCE, RenderInterpolation plumbing), real example (14.88 kB gzip vs 150 kB §86),
+  Playwright browser gate (ANGLE/SwiftShader pinned; caught a real rAF-seed defect =
+  WP-3.7-fix1), exit with centroid-tracked smoothness + a virtual-clock test proving
+  alpha-0.5 interpolated draws. **Deferral recorded (spec §45 departure):**
+  `ApplicationOptions.renderer` takes a Renderer instance, not §45's string union —
+  string/"auto" selection deferred to a §62 registry packet so `four` never imports
+  backends at runtime (payload evidence: 14.88 kB). Informational: §106 "textures" deferred
+  to §106a/§55 tier; tests/integration+visual still empty (§92 backlog);
+  four-package barrel coverage artifact persists (cosmetic). Repo: 813 unit tests +
+  17 suite + 6 browser.
 - **2026-08-01 — PHASE 2 CLOSED (exit GREEN; §105 criterion met; coverage ≥95% everywhere).**
   Seven packets: five §38 integrators; MotionComponent+MotionSystem (pinned semi-implicit
   formula, explicit track/untrack, parent-frame angular premultiply); eight §13 trajectories

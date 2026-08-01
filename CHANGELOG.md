@@ -8,6 +8,20 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-01 (later)
+
+#### Added (Phase 3 — Renderer Foundation, §106; packets WP-3.1…WP-3.9)
+- `@four/scene`: §47 cameras (D8 depth ranges) + §48 viewport. `@four/geometry`/
+  `@four/materials`: BufferGeometry + primitives, UnlitMaterial. `@four/render`: §61
+  Renderer interface (context-loss contract) + NullRenderer, render lists incl. the §43
+  interpolated builder. `@four/render-webgl`: WebGL 2 backend over a structural GL seam
+  (fake-GL unit tests, 90 tests). `four`: renderer integration with RenderInterpolation.
+- Real moving example (14.88 kB gzip vs the 150 kB §86 gate) + Playwright browser gate
+  (headless Chromium/SwiftShader; caught and fixed a real rAF-seed defect) + smoothness
+  exit spec proving interpolated draws between simulation states.
+- Phase 3 exit GREEN, zero defects; coverage ≥95% statements everywhere
+  (geometry/materials/render at 100%).
+
 ### 2026-08-01
 
 #### Added (Phase 2 — Motion Foundation, §105; packets WP-2.1…WP-2.7)
