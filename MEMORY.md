@@ -25,6 +25,19 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-01 — PHASE 2 CLOSED (exit GREEN; §105 criterion met; coverage ≥95% everywhere).**
+  Seven packets: five §38 integrators; MotionComponent+MotionSystem (pinned semi-implicit
+  formula, explicit track/untrack, parent-frame angular premultiply); eight §13 trajectories
+  (CR antisymmetric-tangent bug caught by symmetry tests); §42 TransformAuthority
+  (NOT_IMPLEMENTED added to FourErrorCode; refusals skip whole advance);
+  KinematicController (channel state machines, float-safe completion tolerance, refused
+  commands freeze); scene-side PoseBuffer (single §37 store, lerp/slerp, no write-back API,
+  turbo override orders scene#test after motion#build). Exit verified against independently
+  derived closed forms (Barry-Goldman, RK4 ODE, algebraic recurrence; worst dev 3.1e-13),
+  golden digests cross-process. Motion 200 tests / 99.63%, scene 114 / 99.55%. Fixes: CI
+  Node 20→22 (type-strip children); four/application subpath (renderer-free headless
+  composition). Repo: 545 tests. Next: Phase 3 rolling-wave decomposition (renderer
+  foundation §106 + §61-62, cameras §47 in @four/scene per spec rev 1.3).
 - **2026-08-01 — PHASE 1 CLOSED (exit GREEN; §104 criterion met; coverage ≥95% everywhere).**
   All 14 packets landed (Opus workers, per-packet commits): math (Vector2/3/4, Quaternion,
   Matrix3/4 — 154 tests), core (EventEmitter, component model, FourError+Disposable — 57),

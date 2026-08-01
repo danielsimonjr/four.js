@@ -10,6 +10,16 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-01
 
+#### Added (Phase 2 — Motion Foundation, §105; packets WP-2.1…WP-2.7)
+- `@four/motion`: five §38 integrators, MotionComponent + MotionSystem (pinned
+  semi-implicit update, §42 enforcement), eight §13 trajectories with pinned constructors,
+  KinematicController (moveTo/rotateTo/followPath, channel state machines) — 200 tests.
+- `@four/scene`: TransformAuthority (§42, `blended` reserved via NOT_IMPLEMENTED),
+  PoseBuffer interpolation store (§43/§37 single owner, no write-back) — 114 tests.
+- Phase 2 exit: §105 demos vs independently derived closed forms (worst deviation
+  3.1e-13), cross-process golden determinism; coverage ≥95% statements everywhere.
+- Fixes: CI Node 22 (type-strip test children), `four/application` subpath export.
+
 #### Added (Phase 1 — Math, Scene, and Time, §104; packets WP-1.1…WP-1.14)
 - `@four/math`: mutable Vector2/3/4, Quaternion (shortest-arc slerp), column-major
   Matrix3/4 with §7 pivot compose, D8 projections, change-hooks, allocation counter —

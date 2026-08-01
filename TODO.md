@@ -12,12 +12,11 @@ changes in `CHANGELOG.md`.
 
 ## Backlog
 
-### Phase 2 — Motion Foundation (§105) — IN PROGRESS via work packets WP-2.1…WP-2.7
-- [ ] WP-2.1/2.2/2.4 — integrators, MotionComponent+system, trajectories (batched: shared
-      motion barrel)
-- [ ] WP-2.3 — transform authority (§42; extends FourErrorCode with NOT_IMPLEMENTED)
-- [ ] WP-2.5/2.6 — kinematic controller, scene-side interpolation buffers
-- [ ] WP-2.7 — Phase 2 exit: §105 demos vs closed forms + fresh-process determinism
+### Phase 3 — Renderer Foundation (§106; §61–62, §47–48) — NEXT: rolling-wave decomposition
+- [ ] Orchestrator: write WP-3.x packets (renderer interface w/ context-loss contract,
+      cameras+viewports in @four/scene, WebGL 2 backend, render list, interpolation-aware
+      draw; Playwright+SwiftShader per plan Phase-3 note; real example replaces placeholder,
+      size gate becomes meaningful)
 
 ### Later milestones (decided 2026-07-29)
 - [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
@@ -36,6 +35,9 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-01 — **Phase 2 complete** (§105): 7 packets, repo at 545 tests, coverage
+      ≥95% every package, demos verified against independently derived closed forms,
+      cross-process determinism vs goldens
 - [x] 2026-08-01 — **Phase 1 complete** (§104): 14 packets, 405 tests, coverage ≥95% every
       package, deterministic headless stepping proven in-process + fresh-process against
       committed golden digests
