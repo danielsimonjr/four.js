@@ -22,6 +22,8 @@ changes in `CHANGELOG.md`.
       onto `transform.*` (flagged by the WP-3.1 worker — spec idiom `camera.position.set`)
 - [ ] Phase 3a exit: ship a public interactive demo (demo-first principle,
       `docs/POSITIONING.md`)
+- [ ] §55 frame regions + §65 sprite batching (evidence: the example labels cost one
+      texture per glyph cell — WP-3a.5 header)
 - [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
 - [ ] First publish (§94 0.1): Changesets release workflow + apply the
       `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
