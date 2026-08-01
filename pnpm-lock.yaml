@@ -312,6 +312,18 @@ importers:
 
   packages/physics-rapier:
     dependencies:
+      '@dimforge/rapier2d-compat':
+        specifier: 0.19.3
+        version: 0.19.3
+      '@dimforge/rapier3d-compat':
+        specifier: 0.19.3
+        version: 0.19.3
+      '@four/core':
+        specifier: workspace:*
+        version: link:../core
+      '@four/math':
+        specifier: workspace:*
+        version: link:../math
       '@four/physics':
         specifier: workspace:*
         version: link:../physics
@@ -524,6 +536,12 @@ packages:
 
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
+
+  '@dimforge/rapier2d-compat@0.19.3':
+    resolution: {integrity: sha512-5HZUgiSpu9Uba3He+4SCPVte3h2vgxcodkxWThRjd3X/zgq/Z4OyRUKpNEOsOR6AC+OfulPkkZ5asZGzRMpcwA==}
+
+  '@dimforge/rapier3d-compat@0.19.3':
+    resolution: {integrity: sha512-mMVdSj1PRTT108s9Swbu2GQOmHbn8kbJANRV5xfczL3s0T4vkgZAuoMRgvBzQcHanpKusbC0ZJj6z3mC3aj3vg==}
 
   '@emnapi/core@1.11.1':
     resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
@@ -2474,6 +2492,10 @@ snapshots:
       fs-extra: 7.0.1
       human-id: 4.2.0
       prettier: 2.8.8
+
+  '@dimforge/rapier2d-compat@0.19.3': {}
+
+  '@dimforge/rapier3d-compat@0.19.3': {}
 
   '@emnapi/core@1.11.1':
     dependencies:

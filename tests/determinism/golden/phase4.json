@@ -1,0 +1,11 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 4 exit criterion (§107) recorded on 2026-08-01 by WP-4.8 from an actual run of tests/determinism/helpers/phase4-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's authored animation is deterministic.",
+  "_scenario": "One §15 vector Tween (sine-in-out, yoyo, repeat(Infinity)) on a node's position; one §17 AnimationMixer over a three-track clip (cubic scalar on transform.scale.x, slerped quaternion on transform.rotation, linear colour on a ColorRGBA tuple) with two events and loop(3); one §16 Timeline (loop(2)) owning an unplayed child tween and a marker that increments a counter; and one MotionComponent node, so §39's animation (priority 300) → motion (400) order runs inside every fixed step. fixedTimeStep 1/60, 1000 clean injected frames (16.667 s, exactly one fixed step each, nothing dropped). FNV-1a per D6 with 1e-6 quantization over 21 values per step: beacon position (3), vane rotation (4), vane scale x (1), colour (4), pip y (1), drifter position (3) and rotation (4), and the marker counter (1).",
+  "_tier": "same-runtime (§33): the values are computed with Math.sin/Math.cos (sine-in-out and back-out easing, Quaternion.setFromAxisAngle) and Math.acos/Math.sin (Quaternion.slerp), whose last bits may legally differ between JS engines. No RNG and no clock is involved — every time in the run is an injected multiple of the fixed step. The checksum itself is exact and cross-platform; only its inputs are runtime-bound.",
+  "summaryDigest": 1635897512,
+  "firstStepDigest": 902969668,
+  "lastStepDigest": 3992348860,
+  "markerFireSteps": [66, 199],
+  "clipEventFireSteps": [45, 136, 226, 316, 406, 496],
+  "clipEventNames": ["spark", "chime", "spark", "chime", "spark", "chime"]
+}

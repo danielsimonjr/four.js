@@ -10,6 +10,30 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-01 (later)
 
+#### Added (Phase 4 — Animation Core, §107; packets WP-4.0…WP-4.9)
+- `@four/animation`: §15 easing (12 families × in/out/in-out, 34-key registry, pinned
+  constants incl. a normalized damped-spring closed form); value adapters + property
+  bindings (§16 resolved-once paths, in-place writes, zero-allocation hot paths);
+  `Tween` builder (§15 API, last-started-wins conflict registry shared with the mixer,
+  §42 authority gating with all-or-nothing transform writes); `Timeline` (§16 complete:
+  nesting, labels, markers with forward-crossing-once + seek suppression + replayOnSeek,
+  loop/reverse/scrub/speed); `AnimationTrack`/`AnimationClip` (§17 shape,
+  step/linear/cubic/Hermite + quaternion slerp, binary-search sampling);
+  `AnimationMixer` (clip playback with §16 event semantics); fixed-step
+  `AnimationSystem` at priority 300 — animation poses before kinematics (§19 order) —
+  324 tests, 100% coverage on all four metrics.
+- Tooling (WP-4.0): `typecheck:examples` (examples now typechecked in CI against built
+  d.ts) and a tooling-enforced repo-wide ≥95% coverage gate (`pnpm run coverage`,
+  package-level vitest thresholds, wired into CI); umbrella barrel-wiring test.
+- Example: beacon + vane animated cluster demonstrating every §107 value kind under a
+  looping timeline with a palette-stepping marker; 30.19 kB gzip vs the 150 kB §86 gate.
+- Gates (WP-4.8): phase4 determinism golden (21 quantities × 1000 fixed steps,
+  in-process + fresh-child-process digests, marker-fire steps pinned), marker
+  seek-suppression determinism test, and a 4-test browser animation spec (browser total
+  15) incl. a standing cluster-isolation invariant.
+- Phase 4 exit GREEN (§107 criterion TRUE): 1,363 unit tests, suites ×2 with goldens
+  byte-identical, browser ×2, coverage gate green, docs/spec checks clean.
+
 #### Added (Phase 3a — Interaction, Sprites, Text MVP, §106a; packets WP-3a.1…WP-3a.7)
 - `@four/input`: §71 picking (ray from +Y-up NDC, AABB + oriented-box tests), §72-subset
   pointer routing with scene-graph propagation (`capture:`-prefixed capture-phase keys on

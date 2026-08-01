@@ -19,6 +19,7 @@
     "check-spec": "node tools/check-spec.mjs",
     "docs": "typedoc",
     "example:build": "vite build examples/first-2d-scene",
+    "playground:build": "vite build examples/physics-playground",
     "test:browser": "playwright test",
     "size": "size-limit"
   },
