@@ -1,0 +1,9 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 1 exit criterion (§104) recorded on 2026-08-01 by WP-1.14 from an actual run of tests/determinism/helpers/phase1-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js steps a scene graph deterministically.",
+  "_scenario": "100 nodes (101 matrices incl. the scene root), fixedTimeStep 1/60, default maximumSubSteps 5, 1000 ragged injected frames (long 0.5 s frames at indices 249 and 749), seed 0x464F5552, FNV-1a per D6.",
+  "_tier": "same-runtime (§33): rotation uses Math.sin/Math.cos, whose results may legally differ between JS engines.",
+  "summaryDigest": 1237640328,
+  "firstStepDigest": 4123320956,
+  "step500Digest": 3069825178,
+  "lastStepDigest": 2179478362
+}
