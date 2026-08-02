@@ -10,6 +10,19 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-02
 
+#### Added (Phase 10 — Replay, Snapshots, Diagnostics, §33–34/§113; packets WP-10.1…WP-10.5)
+- `@four/diagnostics`: the §34 replay format (canonical serialization, strict base64,
+  adapter-validity refusal), `ReplayRecorder` + `ReplayPlayer` (host-supplied stepFn,
+  periodic-snapshot seeking, slow motion, verify hooks), and `DebugDrawBuffer` with
+  duck-typed providers (contacts/normals/impulses, velocities, origins, solver
+  statistics; COM/joint-anchor/force-vector display staged with dated seam-gap notes)
+  — 210 tests, 100% coverage.
+- End-to-end §113 proof on real Rapier: recording is non-perturbing; replay
+  bit-identical (240/240 checksums); seek costs ≤ snapshot interval; contact geometry
+  appears at exactly the recorded steps under frame stepping; slow-motion arithmetic
+  exact; the phase10 golden pins the recording bytes themselves cross-process.
+- Phase 10 exit GREEN, zero defects: 2,766 unit + 159 suite + 32 browser tests.
+
 #### Added (Phase 9 — Particles, §27/§36/§112; packets WP-9.1…WP-9.5)
 - `@four/particles`: SoA particle core (pool/emitter with seeded 4-draw spawn
   contract, plane collision, over-lifetime ramps), the §27 force-field set

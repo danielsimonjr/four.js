@@ -25,6 +25,30 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 10 CLOSED (exit GREEN, zero defects; §113 exit sentence TRUE:
+  record → bit-identical replay (240/240 checksums; stepChecksumDigest ===
+  replayChecksumDigest pinned in golden/phase10.json) → snapshot-seek (cost ≤
+  interval−1) → frame-by-frame inspection reading contact geometry at the exact
+  recorded steps → exact slow motion).** Five packets. Standing decisions: §34
+  envelope in @four/diagnostics (formatVersion 1 exact-match; canonical re-build
+  validation → encode(decode(t))===t, prototype-pollution-safe; strict canonical
+  base64, hand-rolled, RFC-vector-pinned); ReplayTarget duck-types PhysicsWorld
+  (applyInput OPTIONAL — apps wrap world+input-applier, PhysicsReplayTarget in
+  tests/integration/helpers/replay-scenarios.ts is the reference pattern; one code
+  path applies inputs live AND on replay); ReplayPlayer owns bookkeeping only, host
+  supplies stepFn (nothing type-checks the pairing — runtime signal via
+  verifyChecksum, deliberately tested); recording is non-perturbing (Rapier
+  takeSnapshot is a pure read — tested); DebugDrawBuffer 7-floats/vertex line list +
+  duck-typed providers; STAGED with dated notes + DEBUG_DRAW_STAGED export: COM
+  display (no seam accessor; Rapier localCom/worldCom exist — unblock verified),
+  joint-anchor/constraint viz (seam has no anchors), force vectors (channel is
+  write-only), per-segment-colored draw (needs vertex colors — "lines" GeometryDrawMode
+  → GL.LINES wiring exists but is undemonstrated; §118 flagship pickup). Known
+  boundary: §34 world-CONFIGURATION mismatch is not refused (name/version only —
+  pre-existing Phase 5 scope). Exit: 2,766 unit + 159 suite + 32 browser; diagnostics
+  210 tests at 100%. Verifier notes: all 24 package READMEs still say "scaffold only"
+  (sweep chore); 4 of 6 debug providers exercised via fakes only (one-line rig
+  extension would close it).
 - **2026-08-02 — PHASE 9 CLOSED (exit GREEN; the plan's honest §112 reading TRUE: 100k
   measured-and-recorded, one-draw-call batching asserted in fake-GL tests, browser demo
   at SwiftShader scale).** Five packets + doc fixes. Key facts: SoA Float32Array pools

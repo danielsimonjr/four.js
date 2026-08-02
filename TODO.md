@@ -6,11 +6,19 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 10 — Replay, snapshots, diagnostics (§33–34, §113): rolling-wave
-      decomposition into plan §6i, then dispatch (snapshot API over the §34 world
-      snapshots, §34 replay format incl. per-frame step counts + dropped time, §33
-      checksums via the landed utilities, diagnostics overlays; exit: a physics defect
-      can be captured, replayed, inspected frame by frame).
+- [ ] Phase 11 — Assets, serialization, UI, tooling (§113a; §73–80, §92–93): the FINAL
+      phase — decomposition into plan §6j, then dispatch (asset manager, scene
+      save/reload format + migration, UI MVP subset, benchmarks harness vs §86,
+      guides/docs; exit: scene saves/reloads/benchmarks; §120 tooling list complete;
+      release workflow at first publish per §94).
+
+### Backlog additions (Phase 10, 2026-08-02)
+- [ ] Package README sweep — all 24 still say "scaffold only" despite implementation
+- [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
+      vertex-color attribute needed for per-segment color) — §118 flagship pickup
+- [ ] Exercise the remaining 4 debug providers against the real Rapier rig (one line)
+- [ ] §34 world-configuration mismatch not refused on restore (name/version only)
+- [ ] getBodyCenterOfMass seam member (Rapier localCom/worldCom verified available)
 
 ### Backlog additions (Phase 9, 2026-08-02)
 - [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
@@ -87,6 +95,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 10 complete** (§113): 5 packets, exit GREEN zero defects —
+      §34 replay format with canonical serialization, ReplayRecorder/ReplayPlayer over
+      duck-typed targets, debug-draw providers with honestly-staged seam gaps, the
+      §113 exit proven end-to-end on Rapier (bit-identical replay, snapshot-seek,
+      frame stepping, slow motion); 2,766 unit + 159 suite + 32 browser tests
 - [x] 2026-08-02 — **Phase 9 complete** (§112): 5 packets — SoA particle core, §27
       fields, one-draw-call instanced rendering, ParticleSystem, 100k benchmark
       (16.5 ms/step recorded honestly on CI hardware with per-field cost attribution),
