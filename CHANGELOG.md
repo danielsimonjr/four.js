@@ -10,6 +10,28 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-02
 
+#### Added (Phase 7 — Physics-Animation Blending, §19/§42/§110; packets WP-7.1…WP-7.8)
+- `@four/scene`: `PoseTarget` component (animation-drivable target poses with
+  finite-difference history); the `"blended"` transform authority unlocked (§42's
+  reserved value, guarded since Phase 2).
+- `@four/physics`: §19 blend weights on `RigidBody`; in-place body retype
+  (`setBodyControlMode`) with velocity inheritance; the §19 pipeline inside
+  `PhysicsWorld.step` (unweighted kinematic feed → solve → weighted lerp/slerp
+  publish under `"blended"`, bit-identical at the weight extremes) plus
+  `createPoseTargetCaptureSystem` at priority 299; `SolverBodyAccess.setBodyType`
+  implemented on both Rapier adapters (verified in-place on live wasm).
+- `@four/animation`: root-motion MVP (loop-aware translation deltas from a designated
+  clip track; rotational staged; seek never accumulates).
+- Integration: §19's four examples end-to-end on Rapier (17 tests) — the ragdoll
+  cycle's kinematic→dynamic switch uses 6 ppm of its derived continuity bound.
+- `examples/blending` (fourth example site): a hanging chain cycling
+  ANIMATED→RAGDOLL→RECOVERING on click (675.9 kB gzip, wasm, outside §86).
+- Gates: phase7 determinism golden (600-step scripted mode cycle, cross-process;
+  switch steps pinned BELOW the wave's own per-step motion) + blending browser spec
+  (suites 124, browser 27, four webServers).
+- Phase 7 exit GREEN, zero defects: 2,176 unit tests, suites ×2, browser ×2,
+  coverage ≥95% everywhere (physics/animation at 100%), §86 gate at 30.92/150 kB.
+
 #### Added (Phase 6 — Joints and Constraints, §28/§109; packets WP-6.1…WP-6.7)
 - `@four/physics`: §28 joint classes (Fixed/Hinge/Slider/Rope/Spring/Spherical +
   Revolute/Prismatic/Ball aliases) over body-local descriptor unions; world-space

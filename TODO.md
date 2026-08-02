@@ -6,11 +6,16 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 7 — Physics-animation blending (§19, §42, §110): rolling-wave decomposition
-      into plan §6f, then dispatch (the reserved "blended" authority, animation pose →
-      kinematic modification → physics solve → interpolated render pose pipeline,
-      ragdoll-style handover; exit = animated↔kinematic↔physical control without
-      abrupt discontinuities).
+- [ ] Phase 8 — Advanced motion (§111): rolling-wave decomposition into plan §6g, then
+      dispatch. Exit is PLAN-DEFINED (§111 sets none; owner to confirm): PID utility +
+      steering demos pass analytic tests. Scope seams: steering / IK / PID.
+
+### Backlog additions (Phase 7, 2026-08-02)
+- [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
+- [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
+      against; solver bodies have no scale)
+- [ ] Capability-table note: Rapier derives kinematic velocity itself, so
+      inheritVelocityFrom is nearly a no-op there; other solvers may need it
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
 - [ ] §28 solver-iterations constraint feature is not exposed anywhere — Rapier offers
@@ -64,6 +69,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 7 complete** (§110): 8 packets + 1 fix, exit GREEN zero
+      defects — "blended" authority live with the §19 pipeline inside PhysicsWorld,
+      in-place retype + velocity inheritance, root-motion MVP, mode-cycle example;
+      both control switches measured below the animation's own per-step motion;
+      2,176 unit + 124 suite + 27 browser tests
 - [x] 2026-08-02 — **Phase 6 complete** (§109): 7 packets + 2 fixes — §28 joint tier
       shipped honestly against measured Rapier 0.19.3 behavior (breakage via the engine
       seam, refused where solvers can't report reactions; spherical without fake cone

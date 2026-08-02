@@ -933,6 +933,12 @@ Packets:
 - **WP-7.3 [S] BlendSystem** — P7-4 pipeline, "blended" authority writes, continuity
   clamps documented; fake-adapter tests.
 - **WP-7.4 [S] Root motion MVP** — P7-5 in the mixer; unit + determinism-safe tests.
+  *Dated note (2026-08-02, exit verifier, P7-4 structural amendment):* no separate
+  `BlendSystem` exists — the shipped design runs both blend halves inside
+  `PhysicsWorld.step` (pre-solve feed, post-solve publish, within the system at 600)
+  plus `createPoseTargetCaptureSystem` at 299, which the plan had not anticipated.
+  The §19 ordering guarantee is fully satisfied; recorded here so the plan stays
+  truthful about the shape.
   *Dated note (2026-08-02, orchestrator, P7-4 amendment):* the kinematic target feed is
   **unweighted** (WP-7.3): weighting both the feed and the publish would apply
   `animationWeight` twice — an unrequested low-pass filter — and for

@@ -25,6 +25,31 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 7 CLOSED (exit GREEN, zero defects; §110 criterion TRUE —
+  uniquely, both control switches cost LESS than the animation's own per-step motion:
+  activation 9.33 mm and retype 2.69 mm vs the wave's 14.63 mm, pinned in
+  golden/phase7.json; the chain re-locks onto its animation bit-identically two wave
+  periods after a ragdoll cycle).** Eight packets + one doc fix. Standing decisions:
+  `PoseTarget` lives in `@four/scene` (position+rotation MVP, no scale — backlog;
+  previous* history + capturePrevious); §19 weights on RigidBody (independent,
+  normalized at use, defaults 1/0, both-zero warns once and falls back physical);
+  transitions retype IN PLACE via SolverBodyAccess.setBodyType (Rapier verified both
+  dims — handle/id/colliders/mass survive); velocity inheritance = finite-differenced
+  PoseTarget history (world-frame quaternion delta, atan2 form); **no separate
+  BlendSystem** — feed and publish live inside PhysicsWorld.step, plus
+  createPoseTargetCaptureSystem at 299 (MUST be registered by applications using
+  blending/inheritance — an uncaptured animated target inherits ~30× inflated
+  velocity, WP-7.3-fix1); kinematic feed is UNWEIGHTED (weights apply once, at
+  publish); blending covers every §22 body type; missing-trio throws from the step;
+  weight extremes are bit-identical (Object.is-tested) to pure physics/pure target;
+  root motion = translation-only mixer option (rotational staged 2026-08-02, seek
+  never accumulates); "blended" authority unlocked (WP-2.3 guard removed). Rapier
+  note for capability tables: a driven kinematic-position body already carries
+  solver-derived velocity, so inheritVelocityFrom is nearly a no-op there (2.4e-7 m
+  / 0.5 s) — it matters on solvers that do not derive it. Exit: 2,176 unit + 124
+  suite + 27 browser tests (four webServers); scene 99.64, physics/animation 100%
+  coverage; first-2d-scene 30.72 kB gzip vs §86; blending example 675.9 kB (wasm,
+  ungated).
 - **2026-08-02 — PHASE 6 CLOSED (exit verdict: §109 criterion TRUE; one CI-wiring
   defect WP-6.6-fix1 landed by the orchestrator — build all three example sites before
   test:browser — after which the verifier's stated condition for GREEN holds; zero
