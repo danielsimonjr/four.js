@@ -49,7 +49,13 @@
  *
  * Path-planning adapters (§111 "path planning adapters") are staged pending an
  * adapter RFC. Iterative IK (CCD, FABRIK) is staged; the analytic two-bone
- * solver ships in `./ik.ts`.
+ * solver ships in `./ik.ts`. Robotic joint commands (§111) are likewise staged
+ * (2026-08-02, WP-8.3-fix1): plan P8-1 allowed a thin command mapping over the
+ * Phase 6 joint motors to ship as a utility, and the MAY was declined — the
+ * mapping is demonstrated end-to-end by the PID hinge scenario in
+ * `tests/integration/motion-advanced.test.ts` (PID output → `setMotor` on a
+ * §28 hinge) without a dedicated wrapper; §119's motor digital twin is the
+ * natural driver for shipping one.
  */
 
 import { Vector3 } from "@four/math";
