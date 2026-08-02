@@ -1074,6 +1074,50 @@ Packets:
 
 Dependencies: 9.1 → (9.2 ∥ 9.3); 9.4 ← 9.2+9.3; 9.5 last.
 
+## 6i. Phase 10 — Replay, Snapshots, and Diagnostics (§33–34, §113; decomposed
+2026-08-02)
+
+Exit (§113): a physics defect can be captured, replayed, and inspected frame by
+frame — made concrete: record a session (initial state + settings + seed + inputs by
+step + step counts/dropped time per §34), replay it to bit-identical §33 checksums,
+restore a mid-run snapshot and continue identically, and step/pause/slow-motion the
+replay while reading diagnostic data (§113's visualization list ships as DATA
+proveyors + a debug overlay MVP on the existing render path — full visual polish is
+§118 flagship territory).
+
+Pinned decisions:
+
+- **P10-1 Home.** Recording/replay in `@four/diagnostics` (deps core/math/scene —
+  NOTE: it cannot import physics/motion (same-wave); the recorder therefore records
+  through INTERFACES the app supplies (a `ReplayTarget` contract: checksum(),
+  createSnapshot(), restoreSnapshot(), applyInput(step, payload)) — PhysicsWorld
+  already satisfies the shape structurally (the established duck-type pattern);
+  document per the §6h precedent).
+- **P10-2 §34 format.** JSON envelope {formatVersion, adapterName/Version, seed?,
+  fixedDeltaTime, initialSnapshot (base64), inputs: [{step, payload}...], stepCounts/
+  droppedTime per frame, periodicSnapshots?: [{step, data}], finalChecksum}; replay
+  refuses mismatched adapter/version (§34).
+- **P10-3 Inspection.** A `ReplayPlayer` driving the scheduler manually: play/pause/
+  stepOnce/speed (slow motion = timeScale on the replay clock)/seekToStep (nearest
+  periodic snapshot + re-simulate); diagnostics overlay MVP = a DebugDrawSource
+  contract emitting line/point primitives (contacts, joint anchors, center-of-mass,
+  velocity vectors from SolverBodyAccess reads + §29 events; solver statistics as
+  data) rendered via a "debug-lines" render item OR reusing unlit geometry —
+  worker verifies what is honest; visualization completeness is data-first.
+- **P10-4 Gates.** Determinism golden phase10 (record → replay bit-identity,
+  cross-process); no new example site (the §113 exit is provable headless + the
+  existing five sites; a debug-overlay browser assertion MAY ride an existing spec if
+  cheap — worker reports).
+
+Packets: **WP-10.1 [S]** Recorder + §34 format + ReplayTarget contract
+(@four/diagnostics; fake-target unit tests). **WP-10.2 [S]** ReplayPlayer +
+inspection controls (+ integration with the real Application/scheduler).
+**WP-10.3 [S]** Debug-draw data providers + overlay MVP (render seam per P10-3).
+**WP-10.4 [S]** Integration + phase10 golden: record a Rapier scenario with scripted
+inputs → replay bit-identical → mid-run snapshot restore → frame-step inspection;
+the §113 exit demonstrated end-to-end. **WP-10.5 [S]** exit verifier.
+Dependencies: 10.1 → 10.2 ∥ 10.3; 10.4 ← both; 10.5 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
