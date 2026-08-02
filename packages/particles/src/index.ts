@@ -10,6 +10,31 @@ export {
   ParticleEmitter,
 } from "./emitter.js";
 export { ParticlePool } from "./pool.js";
+// --- WP-9.2: §27 force fields (begin) ---
+export type {
+  BoxFieldVolume,
+  FieldVolume,
+  RadialFieldOptions,
+  SphereFieldVolume,
+  TurbulenceFieldOptions,
+  VortexFieldOptions,
+} from "./fields.js";
+export {
+  DEFAULT_GRAVITY_Y,
+  DEFAULT_RADIAL_MIN_DISTANCE,
+  DEFAULT_TURBULENCE_AMPLITUDE,
+  DEFAULT_TURBULENCE_FREQUENCY,
+  DEFAULT_VORTEX_MIN_DISTANCE,
+  TURBULENCE_DIFFERENCE_CELLS,
+  dragField,
+  radialField,
+  turbulenceField,
+  uniformGravityField,
+  volumeField,
+  vortexField,
+  windField,
+} from "./fields.js";
+// --- WP-9.2: §27 force fields (end) ---
 export { SeededRandom } from "./random.js";
 export type {
   ParticleBurst,
