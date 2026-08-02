@@ -1,0 +1,53 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 6 exit criterion (§109) recorded on 2026-08-01 by WP-6.6 from an actual run of tests/determinism/helpers/phase6-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine or solver behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics, or a Rapier version bump) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's §28 joints are deterministic.",
+  "_scenario": "Two PhysicsWorlds — one \"2d\" on Rapier2dAdapter, one \"3d\" on Rapier3dAdapter, both with §32 sleeping off — tracked on ONE PhysicsSystem inside ONE Application, stepped 600 clean fixed frames of 1/60 s (10 s, exactly one fixed step each, nothing dropped). The \"2d\" world holds the examples/mechanism slider-crank: a motorised HingeJoint shaft at (-5.4, 0.6) driving a 0.85 m crank, a crank-pin hinge, a wrist-pin hinge, a SliderJoint carriage limited to ±0.95 m about the stroke centre x = -3, a SpringJoint (rest 3.4 m, k = 25 N/m, c = 0.8 N·s/m) to a static post at x = 0.4 — plus an independent RopeJoint load (maxLength 1.5 m) that starts slack. The \"3d\" world holds a motorised shaft hinged about +Y, a SphericalJoint pendulum pushed 1 N·s along +Z on step 1, and a 1 kg SliderJoint carriage (limits ±0.5 m, velocity motor) pulling on a SpringJoint to a post at x = 8. Scripted §28 reconfiguration at fixed steps: setMotor retarget on both shafts and a reversal of the 3D slider motor on step 120; setLimits on both sliders on step 220 (2D widened to ±1.2, 3D tightened to ±0.3, i.e. inside the carriage's present travel); enableMotor(false) on both shafts on step 300; a 0.001 N·m·s kick on the released 3D shaft on step 340; enableMotor(true) on step 400; removeJoint on step 500 (the 2D rope and the 3D spring). Nothing in either world can touch anything: static bodies carry no collider, jointed pairs have §28 collision disabled, and every other body is out of reach — so the §29 tallies below are all zero by construction and are recorded as the measurement of that claim. The per-step digest is the D6 FNV-1a hash of the pair (world2d.checksum(), world3d.checksum()) in that order — §33's own checksums are the digest inputs, not a re-derivation — and summaryDigest is the same hasher over all 600 per-step digests in step order. Every \"Micro\" field is an integer count of 1e-6 units: micrometres for a travel or a position, micro-radians per second for a rate.",
+  "_tier": "same-runtime (§33). Rapier is compiled WebAssembly, so its arithmetic does not vary with the host JS engine's Math library — but cross-platform determinism is NOT claimed here: values cross the JS/wasm boundary as f64 → f32, the wasm image is pinned per platform by the package manager, and §33's cross-platform tier requires evidence this suite does not gather. The checksum algorithm itself is exact and cross-platform; only its inputs are runtime-bound.",
+  "summaryDigest": 2569409851,
+  "firstStepDigest": 1228629108,
+  "lastStepDigest": 427444606,
+  "firstChecksum2d": 2211615618,
+  "lastChecksum2d": 581989908,
+  "firstChecksum3d": 3949598260,
+  "lastChecksum3d": 2495801650,
+  "jointsBefore2d": 6,
+  "jointsAfter2d": 5,
+  "jointsBefore3d": 4,
+  "jointsAfter3d": 3,
+  "switches2d": {
+    "leftHits": 12,
+    "rightHits": 11,
+    "minTravelMicro": -849352,
+    "maxTravelMicro": 851278
+  },
+  "switches3d": {
+    "leftHits": 1,
+    "rightHits": 1,
+    "minTravelMicro": -499755,
+    "maxTravelMicro": 499752
+  },
+  "lateTravelMax3dMicro": -278336,
+  "spin2d": {
+    "drivenMicro": 9039012,
+    "coastingMicro": -3356330,
+    "redrivenMicro": 8950732
+  },
+  "spin3d": {
+    "drivenMicro": 5000000,
+    "coastingMicro": 7307693,
+    "redrivenMicro": 5000000
+  },
+  "bobMaxZMicro": 314878,
+  "ropeLoadEndYMicro": -12433298,
+  "events2d": {
+    "collisionStartCount": 0,
+    "collisionEndCount": 0,
+    "sleepCount": 0,
+    "wakeCount": 0
+  },
+  "events3d": {
+    "collisionStartCount": 0,
+    "collisionEndCount": 0,
+    "sleepCount": 0,
+    "wakeCount": 0
+  }
+}

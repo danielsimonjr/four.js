@@ -8,7 +8,58 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-02
+
+#### Added (Phase 6 — Joints and Constraints, §28/§109; packets WP-6.1…WP-6.7)
+- `@four/physics`: §28 joint classes (Fixed/Hinge/Slider/Rope/Spring/Spherical +
+  Revolute/Prismatic/Ball aliases) over body-local descriptor unions; world-space
+  anchors converted once at `world.addJoint`; live limits/motors via command queues;
+  engine-level break monitoring with `jointbreak` events; `SolverJointAccess` seam;
+  distance/gear staged with P6-1-citing errors — 109 new tests, still 100% coverage.
+- `@four/physics-rapier`: joint mapping in both dimensions (2D five types, 3D six)
+  against measured 0.19.3 behavior — `reportsJointReactions: false` (no reaction API
+  exists; breakable joints refused rather than faked), motor efforts as documented
+  ForceBased gains, disabled motors as a measured-inert gain (bit-identical to
+  never-motored), spherical without non-cone "limits"; snapshot envelopes v2 with
+  joint tables — 96 new wasm-backed tests.
+- `tests/integration/physics-joints.test.ts`: 24 end-to-end tests incl. the §109
+  stability core (3600 steps, hinge drift 1.3e-5 m, zero rope slack/limit overshoot)
+  and breakage through the full Application pipeline on a scripted adapter.
+- `examples/mechanism`: the §109 slider-crank — motorized shaft, hinges, limited
+  slider with limit-switch lamps, spring buffer, click-to-coast motor and speed
+  plates (674 kB gzip, wasm, outside §86).
+- Gates: phase6 determinism golden (two jointed worlds, scripted §28 reconfiguration
+  incl. joint removal, cross-process) + mechanism browser spec (suites 95, browser 23,
+  three Playwright webServers).
+- Phase 6 exit: §109 TRUE; one CI-wiring defect found and fixed (WP-6.6-fix1 — CI now
+  builds all three example sites before the browser gate; the playground half predates
+  Phase 6) plus stable-API doc caveats for the motor-gain deviation.
+
 ### 2026-08-01 (later)
+
+#### Added (Phase 5 — Physics API + Rapier Adapter, §108; packets WP-5.1…WP-5.9)
+- `@four/physics`: complete §20–§34 public API — types/shapes/descriptors/materials/
+  events/queries + the §37 `PhysicsSolverAdapter` contract with branded handles;
+  `RigidBody` + `Collider` components (§26 command buffers, §29 typed events,
+  density-derived mass per §23 restored by WP-5.2-fix1's authoredness rule);
+  `PhysicsWorld` + `PhysicsSystem` (priority 600; sync → step → publish under
+  "physics" authority → dispatch-after-step; §30 queries with §21 2D naming; §33
+  FNV-1a checksums; §34 snapshots with adapter validity metadata) and the
+  `SolverBodyAccess` per-handle seam — 281 tests, 100% coverage.
+- `@four/physics-rapier`: Rapier 2D + 3D adapters on pinned
+  `@dimforge/rapier{2d,3d}-compat@0.19.3` wasm — P5-6 shape tier, all four §22 body
+  types, sensors, adapter-derived collisionstay, monotonic id registries, snapshot
+  envelopes, honest capabilities (joints staged per P5-4) — 185 wasm-backed tests.
+- `tests/integration/physics-rapier.test.ts`: first §92 integration suite — 26 tests
+  proving gravity/collisions/impulses/sensors/queries/authority/interpolation/
+  checksum/snapshot-replay in both dimensions plus the §108 mixed-world shape.
+- `examples/physics-playground`: the §108 demonstration — 2D and 3D worlds side by
+  side, click impulses, sensor zones; 1.51 MB gzip (wasm; outside the §86 budget).
+- Gates (WP-5.8): phase5 determinism golden (600 steps, two worlds, §33 checksums,
+  cross-process, same-runtime tier stated) and a 4-test playground browser spec
+  (browser total 19; two Playwright webServers).
+- Phase 5 exit GREEN, zero defects: 1,827 unit tests, suites ×2 (60), browser ×2 (19),
+  coverage gate green repo-wide, first-2d-scene unchanged at 30.19 kB gzip vs §86.
 
 #### Added (Phase 4 — Animation Core, §107; packets WP-4.0…WP-4.9)
 - `@four/animation`: §15 easing (12 families × in/out/in-out, 34-key registry, pinned

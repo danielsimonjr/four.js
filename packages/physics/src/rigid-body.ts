@@ -47,6 +47,15 @@
  * a flag rather than editing {@link RigidBody.sleeping}. See
  * {@link RigidBodyCommands} for the exact clearing semantics.
  *
+ * ## Blend weights (§19)
+ *
+ * {@link RigidBody.physicsWeight} and {@link RigidBody.animationWeight} are
+ * §19's two sliders, verbatim from its sketch. They are **engine state, not
+ * solver state**: no solver is told about them, {@link RigidBody.toDescriptor}
+ * does not carry them, and they change nothing until a node declares
+ * `"blended"` transform authority (§42) and the §19 blend system (WP-7.3) reads
+ * them. See {@link RigidBody.normalizedWeights}.
+ *
  * ## Events (§29, §32)
  *
  * `RigidBody` *is* an `EventEmitter` (§6b), so §29's `body.on("collisionstart",
@@ -65,7 +74,12 @@
  * dimension is known. `Vector2` arguments widen to `z = 0` everywhere (P5-3).
  */
 
-import { EventEmitter, type Component, type ComponentHost } from "@four/core";
+import {
+  EventEmitter,
+  FourError,
+  type Component,
+  type ComponentHost,
+} from "@four/core";
 import { Matrix3, Quaternion, Vector3 } from "@four/math";
 
 import type { Collider } from "./collider.js";
@@ -98,6 +112,59 @@ const WIDENING_DIMENSION: PhysicsDimension = "3d";
 
 /** Appendix A / §23: gravity applies unscaled unless a body says otherwise. */
 const DEFAULT_GRAVITY_SCALE = 1;
+
+/**
+ * §19 default: a body is fully physical and blends nothing.
+ *
+ * A plain `RigidBody` is a body the solver owns (§22, §42's `"physics"`
+ * authority), and §19's blend is opt-in — it happens only under `"blended"`
+ * authority. Defaulting to anything else would mean that merely attaching a
+ * body silently mixed some other system's pose into the solve, and the only
+ * other system in the mix produces nothing until a `PoseTarget` is animated:
+ * the blended pose of an unanimated target is the node's start pose, so a
+ * non-zero animation weight by default would pin every new body towards where
+ * it was created. `1 / 0` is therefore both the safe default and the one that
+ * makes `"physics"` and `"blended"` agree for a body nobody has blended yet.
+ */
+const DEFAULT_PHYSICS_WEIGHT = 1;
+
+/** §19 default: nothing is animated into the solve until asked. See {@link DEFAULT_PHYSICS_WEIGHT}. */
+const DEFAULT_ANIMATION_WEIGHT = 0;
+
+/**
+ * The §19 blend split, normalized: two fractions that sum to 1.
+ *
+ * Produced by {@link RigidBody.normalizedWeights}. A plain mutable record so it
+ * can be reused as an `out` parameter on a per-step path (§7b, plan D7).
+ */
+export interface BlendWeights {
+  /** Fraction of the final pose taken from the solver (§19). */
+  physics: number;
+  /** Fraction taken from the animated target pose (§19). */
+  animation: number;
+}
+
+/**
+ * §85's finiteness rule for a §19 blend weight, on assignment.
+ *
+ * Local to this module rather than added to `validation.ts` because a weight
+ * never reaches a descriptor: it is component-level engine state (see the
+ * module header), so there is no descriptor validator for this rule to belong
+ * to and nothing else to keep it consistent with.
+ *
+ * Zero is legal on either weight — a body may be fully physical or fully
+ * animated. Both zero at once is legal too, and is resolved (with a warning) at
+ * use; see {@link RigidBody.normalizedWeights} for why it is not rejected here.
+ */
+function validateBlendWeight(field: string, value: number): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `${field} must be a finite number >= 0; got ${String(value)} (§19, §85).`,
+      { context: { field, value } },
+    );
+  }
+}
 
 /**
  * A torque or angular impulse (§26), in the same two forms §23's angular
@@ -422,6 +489,19 @@ export class RigidBody
   /** Backing store for {@link RigidBody.ccdMode} (§31). */
   #ccdMode: CCDMode;
 
+  /** Backing store for {@link RigidBody.physicsWeight} (§19). */
+  #physicsWeight: number = DEFAULT_PHYSICS_WEIGHT;
+
+  /** Backing store for {@link RigidBody.animationWeight} (§19). */
+  #animationWeight: number = DEFAULT_ANIMATION_WEIGHT;
+
+  /**
+   * Whether the both-zero warning has already been emitted for this body — the
+   * §42-style once-per-subject suppression {@link RigidBody.normalizedWeights}
+   * documents. Sticky for the life of the body.
+   */
+  #zeroWeightsWarned = false;
+
   /** The §26 command buffers; see {@link RigidBodyCommands}. */
   readonly #commands: MutableRigidBodyCommands = {
     force: new Vector3(),
@@ -497,6 +577,20 @@ export class RigidBody
    * Which §22 simulation model this body follows (§23). Settable; the §23 mass
    * rule is re-checked against the new type, so promoting a zero-mass body to
    * `"dynamic"` fails here rather than in the solver.
+   *
+   * ## After registration, go through the world (plan P7-3)
+   *
+   * This setter changes the **component**. Once the body is registered with a
+   * `PhysicsWorld`, the solver is running a body of the type it was created
+   * with, and writing here alone would leave the two disagreeing about what is
+   * being simulated — the fixed-step pipeline would keep feeding the old model.
+   *
+   * `world.setBodyControlMode(node, type, options?)` is the call that changes
+   * both: it re-types the solver body **in place** (the id, the checksum order,
+   * the colliders, and the pose all survive), moves this property with it, and
+   * can seed the new velocities from an animated `PoseTarget` — §19's
+   * animated → kinematic → dynamic transitions. WP-5.3's rule that a re-typed
+   * body had to be removed and added again is superseded by it.
    */
   get type(): BodyType {
     return this.#type;
@@ -649,6 +743,140 @@ export class RigidBody
     }
   }
 
+  // --- §19 blend weights ----------------------------------------------------
+
+  /**
+   * How much of a `"blended"` node's final pose comes from the solver (§19),
+   * relative to {@link RigidBody.animationWeight}.
+   *
+   * §19's sketch verbatim:
+   *
+   * ```ts
+   * body.transformAuthority = "blended";
+   * body.physicsWeight = 0.35;
+   * body.animationWeight = 0.65;
+   * ```
+   *
+   * The two weights are **independent settables, normalized at use** — they are
+   * not required to sum to 1 and setting one never rewrites the other, so
+   * `0.35`/`0.65` and `35`/`65` describe the same blend and a fade can drive
+   * either slider alone. {@link RigidBody.normalizedWeights} is where the ratio
+   * becomes a pair of fractions.
+   *
+   * Defaults to {@link DEFAULT_PHYSICS_WEIGHT}; must be finite and `>= 0`
+   * (§85), checked on assignment. Inert under every authority except
+   * `"blended"` (§42).
+   */
+  get physicsWeight(): number {
+    return this.#physicsWeight;
+  }
+
+  set physicsWeight(value: number) {
+    validateBlendWeight("physicsWeight", value);
+    this.#physicsWeight = value;
+  }
+
+  /**
+   * How much of a `"blended"` node's final pose comes from the animated target
+   * pose — the `PoseTarget` on the node (§19, P7-1) — relative to
+   * {@link RigidBody.physicsWeight}. See that property for the whole contract.
+   *
+   * Defaults to {@link DEFAULT_ANIMATION_WEIGHT}: a body nobody has blended is
+   * fully physical.
+   */
+  get animationWeight(): number {
+    return this.#animationWeight;
+  }
+
+  set animationWeight(value: number) {
+    validateBlendWeight("animationWeight", value);
+    this.#animationWeight = value;
+  }
+
+  /**
+   * The two §19 weights as fractions that sum to 1, written into `out` and
+   * returned.
+   *
+   * ```ts
+   * const split = body.normalizedWeights(scratch); // per fixed step
+   * pose.position
+   *   .copy(solverPosition)
+   *   .scale(split.physics)
+   *   .add(targetScaled);
+   * ```
+   *
+   * Pass an `out` on a per-step path and the call allocates nothing (§7b, plan
+   * D7); omit it and one record is allocated per call.
+   *
+   * ## Both weights zero
+   *
+   * A body with `physicsWeight === 0` and `animationWeight === 0` has asked for
+   * a pose made of nothing, which has no answer. Rather than produce `NaN` — or
+   * a zero pose, which would teleport the node to the origin — this **falls
+   * back to fully physical** (`{ physics: 1, animation: 0 }`, the constructed
+   * default) and warns once per body via `console.warn`, the same development
+   * semantics `warnAuthorityConflict` uses in `@four/scene`: the first
+   * occurrence names the mistake and every repeat is suppressed, because a
+   * misconfigured body would otherwise print once per fixed step forever. The
+   * suppression is sticky for the life of the body — fixing the weights and
+   * zeroing them again warns no further.
+   *
+   * It is a warning and not a validation error because the state is reachable
+   * one legal assignment at a time (`physicsWeight = 0` while `animationWeight`
+   * is still 0 is the first half of every "fade to fully animated"), so
+   * rejecting it at the setter would reject the sequence rather than the
+   * mistake.
+   *
+   * Finiteness is guaranteed by the setters, so the only other arithmetic edge
+   * is two weights whose sum overflows to infinity; that case is rescaled by
+   * the larger weight so the ratio survives instead of collapsing to `0/0`.
+   */
+  normalizedWeights(
+    out: BlendWeights = { physics: 0, animation: 0 },
+  ): BlendWeights {
+    const physics = this.#physicsWeight;
+    const animation = this.#animationWeight;
+    const sum = physics + animation;
+
+    if (sum === 0) {
+      this.#warnZeroWeights();
+      out.physics = DEFAULT_PHYSICS_WEIGHT;
+      out.animation = DEFAULT_ANIMATION_WEIGHT;
+      return out;
+    }
+
+    if (sum === Number.POSITIVE_INFINITY) {
+      // Both weights are finite (the setters guarantee it) but their sum
+      // overflowed. The larger is finite by definition, so rescaling by it
+      // keeps the ratio and brings the sum back into range.
+      const scale = physics > animation ? physics : animation;
+      const scaledPhysics = physics / scale;
+      const scaledAnimation = animation / scale;
+      const scaledSum = scaledPhysics + scaledAnimation;
+      out.physics = scaledPhysics / scaledSum;
+      out.animation = scaledAnimation / scaledSum;
+      return out;
+    }
+
+    out.physics = physics / sum;
+    out.animation = animation / sum;
+    return out;
+  }
+
+  /** Emits the both-zero warning at most once per body. See {@link RigidBody.normalizedWeights}. */
+  #warnZeroWeights(): void {
+    if (this.#zeroWeightsWarned) {
+      return;
+    }
+    this.#zeroWeightsWarned = true;
+    console.warn(
+      "[four] A RigidBody has physicsWeight = 0 and animationWeight = 0, " +
+        "which describes no pose; falling back to fully physical " +
+        "(physicsWeight 1). Set one of the two weights above 0 (§19). " +
+        "Further occurrences on this body are suppressed.",
+    );
+  }
+
   // --- §26 forces and impulses, §32 sleep commands --------------------------
 
   /**
@@ -784,6 +1012,12 @@ export class RigidBody
    * every body carries an authored mass distribution and make §23's
    * density-derived mass unreachable (WP-5.2-fix1). It is emitted exactly when
    * {@link RigidBody.centerOfMassAuthored} holds, which that property documents.
+   *
+   * §19's {@link RigidBody.physicsWeight} and {@link RigidBody.animationWeight}
+   * are deliberately **absent**: a solver simulates a body, it does not blend
+   * one, and the blend happens entirely above the adapter (§37) after the solve
+   * (§19 step 5). Putting a weight in the descriptor would tell every adapter
+   * it had a say in something it never sees.
    */
   toDescriptor(): RigidBodyDescriptor {
     const descriptor: RigidBodyDescriptor = {

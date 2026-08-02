@@ -32,6 +32,7 @@
  * 1. per body, in registration order:
  *      resetForces → the §26 command buffer → the §32 sleep command → clear
  *      kinematic bodies: setNextKinematicTransform / setBodyVelocities
+ *    per joint, in registration order: queued §28 limit/motor changes
  * 2. adapter.syncSceneToSolver()      ← §37 call-order hook (may be a no-op)
  * 3. adapter.step(fixedDeltaTime)     ← §10: seconds, never milliseconds
  * 4. adapter.syncSolverToScene()      ← §37 call-order hook (may be a no-op)
@@ -39,10 +40,17 @@
  *      dynamic → node.transform under "physics" authority (§42)
  *      every body → RigidBody velocities, RigidBody.sleeping (§23, §32)
  * 6. adapter.drainEvents() → translated to component references and queued
- * 7. dispatchEvents() → §29 events on node emitters (§39 step 9, §6b)
+ * 7. per breakable joint, in registration order: reaction vs §28 thresholds →
+ *      destroy + queue "jointbreak" (plan P6-2)
+ * 8. dispatchEvents() → §29 events on node emitters (§39 step 9, §6b)
  * ```
  *
- * Step 7 is deliberately a separate call: §39 puts event dispatch after the
+ * Step 7 comes after step 6 because a break is the engine's *conclusion* from
+ * the solved step, not something that happened during it: the contacts of the
+ * step are queued first and the breaks that follow from them last, which is the
+ * order a listener reads them in.
+ *
+ * Step 8 is deliberately a separate call: §39 puts event dispatch after the
  * solve, and `PhysicsSystem` steps *every* world before dispatching any world's
  * events, so a listener that touches a second world always sees a world that has
  * finished its step. A listener may create bodies, destroy bodies, or step
@@ -76,15 +84,35 @@
 
 import { FourError } from "@four/core";
 import { Quaternion, Vector2, Vector3 } from "@four/math";
-import { warnAuthorityConflict, type Node, type PoseBuffer } from "@four/scene";
+import {
+  warnAuthorityConflict,
+  type Node,
+  type PoseBuffer,
+  type PoseTarget,
+} from "@four/scene";
 
 import type { PhysicsSolverAdapter } from "./adapter.js";
-import type { SolverBodyAccess } from "./body-access.js";
+import type { SolverBodyAccess, SolverJointAccess } from "./body-access.js";
+import {
+  missingSolverJointAccess,
+  supportsSolverJointAccess,
+} from "./body-access.js";
 import { Collider } from "./collider.js";
 import type { ColliderTriggerEvent } from "./collider.js";
 import type { PhysicsWorldOptions } from "./descriptors.js";
 import { resolveGravity, resolveSleepingConfig } from "./descriptors.js";
-import type { PhysicsEvent } from "./events.js";
+import type { JointBreakEvent, PhysicsEvent } from "./events.js";
+import type { Joint, JointBinding, JointBreakPayload } from "./joints.js";
+import {
+  bindJoint,
+  clearJointCommands,
+  readJointLimits,
+  readJointMotor,
+  setJointBroken,
+  unbindJoint,
+  worldAnchorToLocal,
+  worldAxisToLocal,
+} from "./joints.js";
 import type {
   OverlapQuery,
   PointQuery,
@@ -108,12 +136,17 @@ import type {
   PhysicsBodyHandle,
   PhysicsColliderHandle,
   PhysicsDimension,
+  PhysicsJointHandle,
   RotationInput,
   SleepingConfig,
   Vector3Input,
 } from "./types.js";
 import { DEFAULT_DETERMINISM_LEVEL, DETERMINISM_LEVELS } from "./types.js";
-import { validatePhysicsWorldOptions } from "./validation.js";
+import {
+  validateJointDescriptor,
+  validateMass,
+  validatePhysicsWorldOptions,
+} from "./validation.js";
 
 /** See the rest of the package: §89 has no physics-input code, so misuse is this. */
 const WORLD_ERROR_CODE = "INVALID_APPLICATION_STATE";
@@ -214,8 +247,12 @@ export interface WorldPointHit extends WorldQueryHit {
  * A §29 event as it reaches node listeners: the same payload the adapter
  * returned, with handles swapped for the §6a components (§101 "event
  * normalization").
+ *
+ * `"jointbreak"` (§28, plan P6-2) rides the same union with its handle swapped
+ * for the {@link Joint} — the world produces that one itself rather than
+ * translating it, but it is queued and dispatched with everything else.
  */
-export type WorldPhysicsEvent = PhysicsEvent<RigidBody, Collider>;
+export type WorldPhysicsEvent = PhysicsEvent<RigidBody, Collider, Joint>;
 
 /**
  * A solver snapshot plus the validity key §34 requires.
@@ -237,6 +274,47 @@ export interface PhysicsSnapshot {
   readonly data: ArrayBuffer;
 }
 
+/**
+ * How {@link PhysicsWorld.setBodyControlMode} performs a §19 control-mode
+ * transition (plan P7-3).
+ *
+ * Every field is optional: the bare call re-types the body, wakes it, and seeds
+ * nothing.
+ */
+export interface BodyControlModeOptions {
+  /**
+   * A `PoseTarget` (§19, plan P7-1) whose one-step history seeds the body's
+   * velocities as part of the switch — "the ragdoll keeps the motion the
+   * animation had".
+   *
+   * The component's `position`/`previousPosition` and
+   * `rotation`/`previousRotation` pair is finite-differenced over the fixed
+   * step; see {@link PhysicsWorld.setBodyControlMode} for the exact formula and
+   * for which target types accept it.
+   */
+  inheritVelocityFrom?: PoseTarget;
+
+  /**
+   * The fixed step, in seconds (§7a, §10), that the inherited difference is
+   * divided by.
+   *
+   * Omit it and the world uses the `deltaSeconds` of its **last**
+   * {@link PhysicsWorld.step}, which is the fixed delta the target history was
+   * actually captured across. It is only needed when no step has run yet — a
+   * body activated before the first step of the simulation — or when a caller
+   * knows the application's fixed delta better than the world does. Ignored
+   * entirely without {@link BodyControlModeOptions.inheritVelocityFrom}.
+   */
+  fixedDeltaSeconds?: number;
+
+  /**
+   * Whether the switch wakes a sleeping body (§32). Defaults to `true`, which
+   * is what activating a body means; pass `false` to re-type without disturbing
+   * the sleep state.
+   */
+  wake?: boolean;
+}
+
 /** One registered collider: the component, its handle, and its monotonic id. */
 interface ColliderRegistration {
   readonly collider: Collider;
@@ -252,19 +330,38 @@ interface BodyRegistration {
   readonly handle: PhysicsBodyHandle;
   readonly id: number;
   /**
-   * The §22 type at registration time.
+   * The §22 type the **solver** is currently running this body as.
    *
    * The pipeline branches on this rather than on the live `body.type` so that a
-   * type assigned after registration cannot desynchronize the engine from the
-   * solver: no §37 method re-types an existing solver body, so a component that
-   * changed type must be removed and added again (documented on
-   * {@link PhysicsWorld.addBody}).
+   * type assigned straight onto the component cannot desynchronize the engine
+   * from the solver: `body.type = "dynamic"` changes what the component says,
+   * not what the solver does. {@link PhysicsWorld.setBodyControlMode} is the one
+   * writer that moves both at once (plan P7-3), and it is what keeps this field
+   * equal to the solver's own type.
    */
-  readonly type: BodyType;
+  type: BodyType;
   /** Registered colliders in creation order; destroyed in reverse. */
   readonly colliders: ColliderRegistration[];
-  /** Whether the node was tracked in the §43 pose buffer by this registration. */
-  readonly tracked: boolean;
+  /**
+   * Whether the node is tracked in the §43 pose buffer by this registration.
+   *
+   * Tracked exactly while the body is dynamic (see
+   * {@link PhysicsWorld.addBody}), which is why
+   * {@link PhysicsWorld.setBodyControlMode} may flip it: a body re-typed away
+   * from `"dynamic"` is no longer a body the solver moves, and one re-typed
+   * into it is.
+   */
+  tracked: boolean;
+}
+
+/** One registered joint: the object, its handle, and its monotonic id (§28). */
+interface JointRegistration {
+  readonly joint: Joint;
+  readonly handle: PhysicsJointHandle;
+  readonly id: number;
+  /** The two body registrations, so removing a body can retire its joints. */
+  readonly bodyA: BodyRegistration;
+  readonly bodyB: BodyRegistration;
 }
 
 /**
@@ -351,8 +448,21 @@ export class PhysicsWorld {
   /** Registered bodies keyed by the adapter's monotonic id (§33, event mapping). */
   readonly #bodiesById = new Map<number, BodyRegistration>();
 
+  /**
+   * Registered bodies keyed by their `RigidBody` component — the lookup
+   * {@link PhysicsWorld.addJoint} needs, since §28's joints name components and
+   * not nodes.
+   */
+  readonly #bodiesByComponent = new Map<RigidBody, BodyRegistration>();
+
   /** Registered colliders keyed by the adapter's monotonic id. */
   readonly #collidersById = new Map<number, ColliderRegistration>();
+
+  /** Registered joints in **registration order** (§28, §33). */
+  readonly #jointsByJoint = new Map<Joint, JointRegistration>();
+
+  /** Registered joints keyed by the adapter's monotonic id (§33, event mapping). */
+  readonly #jointsById = new Map<number, JointRegistration>();
 
   /** Events drained from the last step, awaiting {@link PhysicsWorld.dispatchEvents}. */
   #queue: WorldPhysicsEvent[] = [];
@@ -371,6 +481,40 @@ export class PhysicsWorld {
   readonly #checksumLinear = new Vector3();
 
   readonly #checksumAngular = new Vector3();
+
+  /** Break-monitoring scratch, so the per-step joint pass allocates nothing. */
+  readonly #reactionLinear = new Vector3();
+
+  readonly #reactionAngular = new Vector3();
+
+  /**
+   * Velocity-inheritance scratch, so a §19 control-mode switch allocates
+   * nothing (§7b, D7). See {@link PhysicsWorld.setBodyControlMode}.
+   */
+  readonly #inheritedLinear = new Vector3();
+
+  readonly #inheritedAngular = new Vector3();
+
+  readonly #inheritedDelta = new Quaternion();
+
+  readonly #inheritedInverse = new Quaternion();
+
+  /**
+   * The `deltaSeconds` of the last {@link PhysicsWorld.step}, or `undefined`
+   * before the first one — the fixed step a `PoseTarget` history was captured
+   * across, and the default divisor of
+   * {@link PhysicsWorld.setBodyControlMode}'s finite difference.
+   *
+   * Remembered, never measured: nothing here reads a clock (§33).
+   */
+  #lastStepDelta: number | undefined;
+
+  /** Registration-time scratch for the world→local anchor conversion (§28). */
+  readonly #bindingPosition = new Vector3();
+
+  readonly #bindingRotation = new Quaternion();
+
+  readonly #bindingScratch = new Quaternion();
 
   /**
    * Builds a world for `init.adapter` and validates that the adapter can
@@ -579,8 +723,11 @@ export class PhysicsWorld {
    * leaves the component's `mass` alone, because §23 forbids expressing "does
    * not simulate" as a zero mass.
    *
-   * A `RigidBody` whose `type` changes after registration is **not** re-typed in
-   * the solver (§37 has no such call); remove it and add it again.
+   * Assigning `body.type` after registration changes the **component** and not
+   * the solver — the two would then disagree about what is being simulated. Use
+   * {@link PhysicsWorld.setBodyControlMode} to change a registered body's §22
+   * model: it re-types the solver body in place and moves the component with it
+   * (plan P7-3), and it is what §19's control-mode transitions go through.
    *
    * @returns the registered `RigidBody` component
    * @throws FourError if the world is not initialized, if `node` has no
@@ -653,6 +800,7 @@ export class PhysicsWorld {
 
     this.#bodiesByNode.set(node, registration);
     this.#bodiesById.set(id, registration);
+    this.#bodiesByComponent.set(body, registration);
     if (tracked) {
       this.#poses?.track(node);
     }
@@ -670,15 +818,24 @@ export class PhysicsWorld {
    * another world; only the solver objects and this world's bookkeeping go away.
    * Events already queued for the removed body are still dispatched — they
    * describe a step that happened.
+   *
+   * **Joints go first.** Any joint this world holds that names the removed body
+   * is destroyed before the body is (§83's ordering, and the only order that
+   * leaves no constraint pointing at a dead body). Those joints are *not*
+   * broken: {@link Joint.broken} means "exceeded its break threshold", and a
+   * body that was unregistered broke nothing — they are simply unregistered and
+   * may be added again once their bodies are.
    */
   removeBody(node: Node): boolean {
     const registration = this.#bodiesByNode.get(node);
     if (registration === undefined) {
       return false;
     }
+    this.#destroyJointsOf(registration);
     this.#destroyRegistration(registration);
     this.#bodiesByNode.delete(node);
     this.#bodiesById.delete(registration.id);
+    this.#bodiesByComponent.delete(registration.body);
     return true;
   }
 
@@ -690,6 +847,280 @@ export class PhysicsWorld {
   /** The `RigidBody` registered for `node`, or `undefined`. */
   getBody(node: Node): RigidBody | undefined {
     return this.#bodiesByNode.get(node)?.body;
+  }
+
+  /**
+   * Switches a registered body between §22's simulation models **in place** —
+   * §19's "move between animated, kinematic, and physical control" (§110, plan
+   * P7-3).
+   *
+   * ```ts
+   * // A door the animation drove, handed over to the solver when it is hit:
+   * world.setBodyControlMode(door, "dynamic", { inheritVelocityFrom: target });
+   * ```
+   *
+   * ## In place, and why that matters (§33)
+   *
+   * The body is **not** destroyed and re-created. It keeps its solver handle,
+   * its monotonic id, its position in the checksum's iteration order, its
+   * colliders, its mass properties, and its pose — all that changes is which of
+   * §22's models the solver runs it under, plus (optionally) its velocities.
+   * Two otherwise identical runs whose only difference is a mid-run switch
+   * therefore produce the same body set in the same order, which is what lets a
+   * control-mode change appear inside a §33 replay at all. Removing and
+   * re-adding the body would mint a fresh id and re-key every registry against
+   * it.
+   *
+   * ## What it updates
+   *
+   * 1. the solver, through `SolverBodyAccess.setBodyType`;
+   * 2. the `RigidBody` component's `type`, so `body.type` and `inverseMass`
+   *    report what is actually being simulated;
+   * 3. the registration's own record of the type, which is what the fixed-step
+   *    pipeline branches on — so the §22 kinematic feed and the §42 transform
+   *    write follow the **new** type from the very next step: a body switched to
+   *    `"kinematic-position"` starts being fed the node's transform as a target,
+   *    and one switched to `"dynamic"` starts publishing the solved pose;
+   * 4. §43 pose tracking, which follows dynamic-ness exactly as
+   *    {@link PhysicsWorld.addBody} sets it.
+   *
+   * ## §23's mass rule for the new type
+   *
+   * A `"dynamic"` body needs a mass, so a switch **to** `"dynamic"` is refused
+   * unless one is authored (`RigidBody.mass`) or derivable — that is, unless the
+   * solver already reports a positive mass for the body, which it does whenever
+   * the body carries a collider with a density (§23, §25). Activating a
+   * ragdoll limb that has no collider would otherwise produce a massless
+   * dynamic body: Rapier leaves such a body motionless (measured at 0.19.3),
+   * which is a silently wrong simulation rather than an error. An authored
+   * `mass` is re-validated against the new type as well, by the same
+   * `validateMass` the component's setter uses.
+   *
+   * Nothing is written to the solver until every check has passed (§85).
+   *
+   * ## Velocity inheritance (§19's ragdoll activation)
+   *
+   * With `inheritVelocityFrom`, the body's velocities are seeded from one fixed
+   * step of the target's own motion, so an activated body continues the
+   * animation's trajectory instead of dropping from rest:
+   *
+   * ```text
+   * dt      = the fixed step (see BodyControlModeOptions.fixedDeltaSeconds)
+   * linear  = (position − previousPosition) / dt                     [m/s]
+   *
+   * qDelta  = rotation · previousRotation⁻¹        (world-frame delta, unit)
+   * qDelta  ← −qDelta   when qDelta.w < 0          (shortest arc, plan D8)
+   * s       = |(qDelta.x, qDelta.y, qDelta.z)|     = |sin(θ/2)|
+   * θ       = 2 · atan2(s, qDelta.w)                                 [rad]
+   * angular = (qDelta.xyz / s) · (θ / dt)                            [rad/s]
+   *           = 0 when s = 0 (no rotation to differentiate)
+   * ```
+   *
+   * `atan2` and not `2·asin(s)`: the arcsine form loses the difference between
+   * a rotation and its supplement past a quarter turn per step, and `atan2`
+   * stays accurate for the small deltas one fixed step actually produces. The
+   * sign flip is the same shortest-arc rule `Quaternion.slerp` documents — `q`
+   * and `−q` are the same rotation, and only one of them is the short way
+   * round, so without it a target that crossed the quaternion sign boundary
+   * would inherit a spin of nearly `2π/dt` in the wrong direction.
+   *
+   * Left-multiplying by the inverse of the *previous* rotation puts the delta in
+   * the **world** frame, which is the frame §23's `angularVelocity` is stated in
+   * (`qDelta · previous = current`). In a `"2d"` world a pure-Z target produces
+   * an exactly pure-Z result — the Hamilton product's x and y terms cancel to
+   * zero — so §21's planar check passes without a fudge; a target carrying
+   * off-plane rotation is rejected by that check, as it should be.
+   *
+   * Inheritance is accepted only for `"dynamic"` and `"kinematic-velocity"`,
+   * the two types that *have* a velocity: a `"static"` or
+   * `"kinematic-position"` body ignores velocity entirely, so seeding one would
+   * be a command that silently does nothing.
+   *
+   * The seeded velocities are written through `setBodyVelocities`, so they are
+   * solver state immediately and are published back onto the component by the
+   * next step (§23). Allocates nothing.
+   *
+   * @returns the `RigidBody` now running under `type`
+   * @throws FourError if the world is not initialized, if `node` is not
+   * registered here, if §23's mass rule forbids the new type, if inheritance
+   * was asked for on a type that has no velocity, or if it was asked for with
+   * no usable fixed delta
+   */
+  setBodyControlMode(
+    node: Node,
+    type: BodyType,
+    options: BodyControlModeOptions = {},
+  ): RigidBody {
+    this.#requireReady();
+    const registration = this.#bodiesByNode.get(node);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `Node ${node.id} is not registered with this PhysicsWorld, so there is no solver body to re-type (§22, plan P7-3). Call world.addBody(node) first.`,
+        { context: { node: node.id, type } },
+      );
+    }
+
+    const body = registration.body;
+    validateMass(type, body.mass);
+    if (type === "dynamic") {
+      this.#requireMassForDynamic(registration);
+    }
+
+    const target = options.inheritVelocityFrom;
+    // Resolve the divisor *before* the solver is touched, so a switch that
+    // cannot seed its velocities is refused whole rather than half-applied.
+    const delta =
+      target === undefined ? 0 : this.#resolveInheritanceDelta(type, options);
+
+    const wake = options.wake ?? true;
+    this.#adapter.setBodyType(registration.handle, type, wake);
+    body.type = type;
+    registration.type = type;
+    this.#retrackPose(registration);
+
+    if (target !== undefined) {
+      this.#inheritVelocities(registration, target, delta, wake);
+    }
+    return body;
+  }
+
+  // --- §28 joints -----------------------------------------------------------
+
+  /**
+   * Whether this world's adapter implements the joint seam at all
+   * (`SolverJointAccess`, WP-6.1).
+   *
+   * `false` means {@link PhysicsWorld.addJoint} will throw: the adapter can
+   * create and destroy a joint handle (§37) but cannot be asked for a joint's
+   * id, its reaction, or its reconfiguration, so the engine has no way to
+   * register one. Detected structurally — see `supportsSolverJointAccess` for
+   * why that rather than a capability flag.
+   */
+  get supportsJoints(): boolean {
+    return supportsSolverJointAccess(this.#adapter);
+  }
+
+  /** How many joints are registered (§28). */
+  get jointCount(): number {
+    return this.#jointsByJoint.size;
+  }
+
+  /** The registered joints, in registration order (§28, §33). */
+  get joints(): IterableIterator<Joint> {
+    return this.#jointsByJoint.keys();
+  }
+
+  /**
+   * Registers a §28 joint with the solver (plan P6-3).
+   *
+   * ```ts
+   * world.addBody(wall);
+   * world.addBody(door);
+   * world.addJoint(
+   *   new HingeJoint({
+   *     bodyA: wall.getComponent(RigidBody)!,
+   *     bodyB: door.getComponent(RigidBody)!,
+   *     anchor: new Vector3(0, 1, 0),
+   *     axis: new Vector3(0, 1, 0),
+   *     limits: { min: 0, max: Math.PI / 2 },
+   *   }),
+   * );
+   * ```
+   *
+   * ## What happens here
+   *
+   * 1. The adapter is checked for the joint seam, and the joint for the things
+   *    only a world can check: both bodies registered **with this world**, the
+   *    joint not already registered, not broken, and — when it carries a break
+   *    threshold — an adapter that can actually report reactions (plan P6-2).
+   * 2. The joint's **world-space** anchors and axis are converted into each
+   *    body's local frame, from the pose the *solver* holds right now (§28; see
+   *    `joints.ts` for the convention and its two consequences).
+   * 3. The resulting descriptor is validated against §28 and the world's
+   *    dimension — which is where a staged type, a `spherical` in a `"2d"`
+   *    world, or an axis pointing out of the plane is rejected — and only then
+   *    handed to `createJoint`.
+   * 4. The joint is bound to the adapter's monotonic id and appended to the
+   *    registry, whose iteration order is registration order (§33).
+   *
+   * Nothing is created in the solver until every check has passed, so a
+   * rejected registration leaves no half-built constraint behind (§85).
+   *
+   * @returns the registered joint, for chaining
+   * @throws FourError if the world is not initialized, if the adapter has no
+   * joint seam, if either body is not registered here, if the joint is already
+   * registered or has broken, if a break threshold cannot be enforced, or if the
+   * descriptor is invalid for this dimension (§21, §28, §85)
+   */
+  addJoint(joint: Joint): Joint {
+    this.#requireReady();
+    const access = this.#requireJointAccess();
+
+    if (this.#jointsByJoint.has(joint)) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `This ${joint.type} joint is already registered with this PhysicsWorld (§28).`,
+        { context: { type: joint.type, id: joint.id } },
+      );
+    }
+    if (joint.broken) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `This ${joint.type} joint broke under load and cannot be registered again (§28, plan P6-2); construct a new joint.`,
+        { context: { type: joint.type } },
+      );
+    }
+
+    const bodyA = this.#requireRegisteredBody(joint, "bodyA", joint.bodyA);
+    const bodyB = this.#requireRegisteredBody(joint, "bodyB", joint.bodyB);
+
+    if (joint.breakable && !access.reportsJointReactions) {
+      throw new FourError(
+        "NOT_IMPLEMENTED",
+        `Adapter ${JSON.stringify(this.#adapter.name)} cannot report joint reactions (SolverJointAccess.reportsJointReactions is false), so a breakForce or breakTorque could never be enforced (§28, plan P6-2). Drop the thresholds or use an adapter that reports reactions — breakage is never faked.`,
+        { context: { adapter: this.#adapter.name, type: joint.type } },
+      );
+    }
+
+    const binding = this.#bindJointFrames(joint, bodyA, bodyB);
+    const descriptor = joint.toDescriptor(binding);
+    validateJointDescriptor(descriptor, this.#dimension);
+
+    const handle = this.#adapter.createJoint(descriptor);
+    const id = access.getJointId(handle);
+    const registration: JointRegistration = {
+      joint,
+      handle,
+      id,
+      bodyA,
+      bodyB,
+    };
+    this.#jointsByJoint.set(joint, registration);
+    this.#jointsById.set(id, registration);
+    bindJoint(joint, id);
+    return joint;
+  }
+
+  /**
+   * Removes a joint from the solver (§28, §83).
+   *
+   * Returns whether it was registered, so teardown paths may call it
+   * unconditionally. The joint object survives and can be registered again —
+   * removal is not breakage, and nothing about it is marked broken.
+   */
+  removeJoint(joint: Joint): boolean {
+    const registration = this.#jointsByJoint.get(joint);
+    if (registration === undefined) {
+      return false;
+    }
+    this.#retireJoint(registration, true);
+    return true;
+  }
+
+  /** Whether `joint` is registered with this world. */
+  hasJoint(joint: Joint): boolean {
+    return this.#jointsByJoint.has(joint);
   }
 
   // --- the fixed step -------------------------------------------------------
@@ -711,10 +1142,12 @@ export class PhysicsWorld {
    */
   step(deltaSeconds: number): void {
     this.#requireReady();
+    this.#lastStepDelta = deltaSeconds;
     for (const registration of this.#bodiesByNode.values()) {
       this.#applyCommands(registration);
       this.#feedKinematic(registration);
     }
+    this.#applyJointCommands();
     this.#adapter.syncSceneToSolver();
     this.#adapter.step(deltaSeconds);
     this.#adapter.syncSolverToScene();
@@ -722,6 +1155,7 @@ export class PhysicsWorld {
       this.#publishBody(registration);
     }
     this.#collectEvents();
+    this.#monitorJointBreakage(deltaSeconds);
   }
 
   /**
@@ -746,6 +1180,11 @@ export class PhysicsWorld {
    * 4. A sleep or wake event is emitted on the **body**. `RigidBody.sleeping`
    *    was already refreshed during the step, so a listener sees the state the
    *    event announces.
+   * 5. A `"jointbreak"` is emitted on the **joint** (§28, plan P6-2), which is
+   *    already destroyed and unregistered by then — a listener sees the joint in
+   *    its final state, and `joint.broken` is `true`. It is emitted on the joint
+   *    alone and not on the two bodies: §29's body event map is the collision
+   *    and sleep vocabulary, and a joint has its own emitter to subscribe to.
    *
    * The queue is handed over before the first callback runs, so a listener may
    * create bodies, remove bodies, or step another world without re-entering
@@ -775,6 +1214,11 @@ export class PhysicsWorld {
         case "triggerexit": {
           const trigger: ColliderTriggerEvent = event;
           trigger.sensor.emit(trigger.type, trigger);
+          break;
+        }
+        case "jointbreak": {
+          const broken: JointBreakPayload = event;
+          broken.joint.emit(broken.type, broken);
           break;
         }
         default: {
@@ -1049,26 +1493,39 @@ export class PhysicsWorld {
   }
 
   /**
-   * Destroys every registered body — colliders first, in reverse creation order
-   * — then disposes the adapter (§83).
+   * Destroys every registered joint, then every registered body — colliders
+   * first, all in reverse registration order — and finally disposes the adapter
+   * (§83).
+   *
+   * **Joints before bodies**, because a constraint refers to two bodies and
+   * nothing should be left pointing at a destroyed one; within each kind,
+   * reverse registration order, which is the mirror of how they were built.
    *
    * Idempotent and terminal: the world cannot be stepped or registered with
    * afterwards. Nodes are untracked from the pose buffer but their components
    * and transforms are left exactly as they were; the world owns the solver
-   * objects, not the scene.
+   * objects, not the scene. Joints are unregistered, not broken — disposal is
+   * not a §28 break.
    */
   dispose(): void {
     if (this.#disposed) {
       return;
     }
     this.#disposed = true;
+    const joints = [...this.#jointsByJoint.values()].reverse();
+    for (const registration of joints) {
+      this.#retireJoint(registration, true);
+    }
     const registrations = [...this.#bodiesByNode.values()].reverse();
     for (const registration of registrations) {
       this.#destroyRegistration(registration);
     }
     this.#bodiesByNode.clear();
     this.#bodiesById.clear();
+    this.#bodiesByComponent.clear();
     this.#collidersById.clear();
+    this.#jointsByJoint.clear();
+    this.#jointsById.clear();
     this.#queue = [];
     this.#adapter.dispose();
   }
@@ -1092,6 +1549,168 @@ export class PhysicsWorld {
     }
     for (const child of node.children) {
       this.#collectColliders(child, body, out);
+    }
+  }
+
+  /**
+   * §23's mass rule for a switch **to** `"dynamic"`: the body must have a mass,
+   * authored or derivable (plan P7-3). See
+   * {@link PhysicsWorld.setBodyControlMode}.
+   *
+   * Three ways to have one, checked in this order:
+   *
+   * 1. an **authored** positive `RigidBody.mass`;
+   * 2. a **positive mass the solver already reports**, which settles the
+   *    question outright;
+   * 3. at least one **registered collider**, which is what §23/§25 derive a
+   *    mass from (density × volume).
+   *
+   * The third exists because the second cannot be trusted to answer for a body
+   * that is not dynamic *yet*: a solver is entitled to report a non-dynamic
+   * body's mass as zero — the structural double does exactly that, and
+   * `addBody`'s own refresh is written around it — so a kinematic body about to
+   * be activated would be refused on a zero that means "not simulated", not "no
+   * mass". Asking after the switch instead would mean rejecting a body the
+   * solver had already been told to re-type.
+   *
+   * What is left uncovered is narrow and stated rather than hidden: a body
+   * whose only colliders carry an explicit `density: 0` passes this check and
+   * lands on whatever mass its solver then derives. §85 permits a zero density,
+   * so this rule cannot treat it as an error; the solver's own mass is the
+   * answer in that case.
+   */
+  #requireMassForDynamic(registration: BodyRegistration): void {
+    const authored = registration.body.mass;
+    if (authored !== undefined && authored > 0) {
+      return;
+    }
+    const derived = this.#adapter.getBodyMass(registration.handle);
+    if (Number.isFinite(derived) && derived > 0) {
+      return;
+    }
+    if (registration.colliders.length > 0) {
+      return;
+    }
+    throw new FourError(
+      WORLD_ERROR_CODE,
+      `Node ${registration.node.id} cannot become a "dynamic" body: it has no authored mass, the solver reports none, and it carries no collider to derive one from (§23, §25, plan P7-3). Give the RigidBody a positive mass, or give the body a collider with a density, before switching it to dynamic — a massless dynamic body does not move.`,
+      {
+        context: {
+          node: registration.node.id,
+          authored,
+          derived,
+          colliders: registration.colliders.length,
+        },
+      },
+    );
+  }
+
+  /**
+   * The fixed step a §19 velocity inheritance divides by, with the type check
+   * that makes the request meaningful (plan P7-3).
+   *
+   * See {@link PhysicsWorld.setBodyControlMode} for both rules.
+   */
+  #resolveInheritanceDelta(
+    type: BodyType,
+    options: BodyControlModeOptions,
+  ): number {
+    if (type !== "dynamic" && type !== "kinematic-velocity") {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `inheritVelocityFrom has no meaning for a ${JSON.stringify(type)} body, which carries no velocity (§22, §23). Only "dynamic" and "kinematic-velocity" bodies can inherit the target's motion; a "kinematic-position" body follows the target pose itself.`,
+        { context: { type } },
+      );
+    }
+    const delta = options.fixedDeltaSeconds ?? this.#lastStepDelta;
+    if (delta === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        "inheritVelocityFrom needs the fixed step to divide the target's one-step motion by, and this world has not stepped yet (§10, plan P7-3). Pass fixedDeltaSeconds, or switch the body's control mode after the first step.",
+        { context: { type } },
+      );
+    }
+    if (!Number.isFinite(delta) || delta <= 0) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `fixedDeltaSeconds must be a positive, finite number of seconds; got ${String(delta)} (§7a, §10, §85).`,
+        { context: { type, fixedDeltaSeconds: delta } },
+      );
+    }
+    return delta;
+  }
+
+  /**
+   * Seeds a re-typed body's velocities from one fixed step of `target`'s own
+   * motion (§19, plan P7-3).
+   *
+   * The formula, the frame, and the shortest-arc rule are documented on
+   * {@link PhysicsWorld.setBodyControlMode}; this is that formula and nothing
+   * else. Allocates nothing — every intermediate is world-owned scratch.
+   */
+  #inheritVelocities(
+    registration: BodyRegistration,
+    target: PoseTarget,
+    delta: number,
+    wake: boolean,
+  ): void {
+    const inverseDelta = 1 / delta;
+
+    const linear = this.#inheritedLinear;
+    linear
+      .copy(target.position)
+      .sub(target.previousPosition)
+      .scale(inverseDelta);
+
+    // qDelta = rotation · previousRotation⁻¹, the world-frame one-step delta.
+    const rotationDelta = this.#inheritedDelta;
+    const inverse = this.#inheritedInverse;
+    inverse.copy(target.previousRotation).conjugate();
+    rotationDelta.copy(target.rotation).multiply(inverse);
+
+    let { x, y, z, w } = rotationDelta;
+    if (w < 0) {
+      // `q` and `−q` are the same rotation; only one is the short way round.
+      x = -x;
+      y = -y;
+      z = -z;
+      w = -w;
+    }
+    const angular = this.#inheritedAngular;
+    const sinHalf = Math.sqrt(x * x + y * y + z * z);
+    if (sinHalf === 0) {
+      angular.set(0, 0, 0);
+    } else {
+      const rate = ((2 * Math.atan2(sinHalf, w)) / sinHalf) * inverseDelta;
+      angular.set(x * rate, y * rate, z * rate);
+    }
+
+    this.#adapter.setBodyVelocities(registration.handle, linear, angular, wake);
+  }
+
+  /**
+   * Brings §43 pose tracking back in line with the registration's current type
+   * after a switch (plan P7-3).
+   *
+   * {@link PhysicsWorld.addBody} tracks exactly the dynamic bodies, because
+   * those are the ones whose transform the solver writes and whose render pose
+   * is therefore interpolated; a body that stops being dynamic stops being one
+   * of those, and a body that becomes dynamic becomes one. A world with no pose
+   * buffer does nothing here.
+   */
+  #retrackPose(registration: BodyRegistration): void {
+    if (this.#poses === undefined) {
+      return;
+    }
+    const shouldTrack = registration.type === "dynamic";
+    if (shouldTrack === registration.tracked) {
+      return;
+    }
+    registration.tracked = shouldTrack;
+    if (shouldTrack) {
+      this.#poses.track(registration.node);
+    } else {
+      this.#poses.untrack(registration.node);
     }
   }
 
@@ -1300,6 +1919,31 @@ export class PhysicsWorld {
           otherBody: otherBody.body,
         };
       }
+      case "jointbreak": {
+        /*
+         * Breakage is the world's own (plan P6-2), so this arm is only reached
+         * when an adapter's solver broke a joint by itself. Treat the adapter
+         * as authoritative — the constraint is already gone on its side — and
+         * retire the registration **without** a second `destroyJoint`.
+         */
+        if (this.#jointsByJoint.size === 0) {
+          return undefined;
+        }
+        const registration = this.#jointsById.get(
+          this.#requireJointAccess().getJointId(event.joint),
+        );
+        if (registration === undefined) {
+          return undefined;
+        }
+        this.#retireJoint(registration, false);
+        setJointBroken(registration.joint);
+        return {
+          type: event.type,
+          joint: registration.joint,
+          force: event.force,
+          torque: event.torque,
+        };
+      }
       default: {
         const body = this.#bodyOf(event.body);
         if (body === undefined) {
@@ -1345,6 +1989,208 @@ export class PhysicsWorld {
   /** The registration behind a query hit, or `undefined` when unregistered. */
   #resolveHit(handle: PhysicsColliderHandle): ColliderRegistration | undefined {
     return this.#colliderOf(handle);
+  }
+
+  /**
+   * Pushes every joint's queued §28 reconfiguration into the solver, in
+   * registration order, and clears the queues.
+   *
+   * The joint half of step 1 of the pipeline. A joint nobody touched costs one
+   * boolean test: `limitsDirty` and `motorDirty` are only ever set by the
+   * setters, and `bindJoint` clears them at registration because the descriptor
+   * the solver was just built from already carried the current values.
+   */
+  #applyJointCommands(): void {
+    if (this.#jointsByJoint.size === 0) {
+      return;
+    }
+    const access = this.#requireJointAccess();
+    for (const registration of this.#jointsByJoint.values()) {
+      const joint = registration.joint;
+      const commands = joint.commands;
+      if (!commands.limitsDirty && !commands.motorDirty) {
+        continue;
+      }
+      if (commands.limitsDirty) {
+        const limits = readJointLimits(joint);
+        if (limits !== undefined) {
+          access.setJointLimits(registration.handle, limits.min, limits.max);
+        }
+      }
+      if (commands.motorDirty) {
+        const motor = readJointMotor(joint);
+        if (motor !== undefined) {
+          access.setJointMotor(registration.handle, motor);
+        }
+      }
+      clearJointCommands(joint);
+    }
+  }
+
+  /**
+   * Destroys every joint whose reaction exceeded its §28 break thresholds and
+   * queues a `"jointbreak"` for each (plan P6-2).
+   *
+   * Step 7 of the pipeline, so it reads the solver *after* the solve. The
+   * reaction arrives as the impulses the constraint applied during the step
+   * (`SolverJointAccess.getJointReaction`); dividing by `deltaSeconds` turns
+   * them into the newtons and newton-metres §28 states its thresholds in, which
+   * is the one place that conversion happens.
+   *
+   * The comparison is **strict**: a joint sitting exactly at its threshold
+   * survives, and only a load that exceeds it breaks the joint. Joints are
+   * visited in registration order and a broken one is destroyed immediately, so
+   * a step that overloads three joints breaks all three, each exactly once —
+   * the registry no longer holds them by the next step.
+   *
+   * Allocates nothing: the reaction vectors are world-owned scratch.
+   */
+  #monitorJointBreakage(deltaSeconds: number): void {
+    if (this.#jointsByJoint.size === 0) {
+      return;
+    }
+    const access = this.#requireJointAccess();
+    if (!access.reportsJointReactions) {
+      return;
+    }
+    const linear = this.#reactionLinear;
+    const angular = this.#reactionAngular;
+    // Snapshot first: a break mutates the registry while it is being walked.
+    const registrations = [...this.#jointsByJoint.values()];
+    for (const registration of registrations) {
+      const joint = registration.joint;
+      if (!joint.breakable) {
+        continue;
+      }
+      access.getJointReaction(registration.handle, linear, angular);
+      const force = deltaSeconds === 0 ? 0 : linear.length() / deltaSeconds;
+      const torque = deltaSeconds === 0 ? 0 : angular.length() / deltaSeconds;
+      const overForce =
+        joint.breakForce !== undefined && force > joint.breakForce;
+      const overTorque =
+        joint.breakTorque !== undefined && torque > joint.breakTorque;
+      if (!overForce && !overTorque) {
+        continue;
+      }
+      this.#retireJoint(registration, true);
+      setJointBroken(joint);
+      const event: JointBreakEvent<Joint> = {
+        type: "jointbreak",
+        joint,
+        force,
+        torque,
+      };
+      this.#queue.push(event);
+    }
+  }
+
+  /**
+   * Converts `joint`'s world-space anchors and axis into the two bodies' local
+   * frames, against the poses the solver holds right now (§28; see `joints.ts`
+   * for the convention).
+   *
+   * The vectors are freshly allocated per registration rather than taken from
+   * world scratch: the descriptor holds them by reference, and a shared buffer
+   * would rewrite the anchors of the joint registered before this one.
+   */
+  #bindJointFrames(
+    joint: Joint,
+    bodyA: BodyRegistration,
+    bodyB: BodyRegistration,
+  ): JointBinding {
+    const position = this.#bindingPosition;
+    const rotation = this.#bindingRotation;
+    const scratch = this.#bindingScratch;
+    const anchorA = new Vector3();
+    const anchorB = new Vector3();
+    const axis = new Vector3();
+
+    this.#adapter.getBodyTransform(bodyA.handle, position, rotation);
+    if (joint.anchorA !== undefined) {
+      worldAnchorToLocal(position, rotation, joint.anchorA, anchorA, scratch);
+    }
+    joint.worldAxis(this.#dimension, axis);
+    if (axis.lengthSq() > 0) {
+      worldAxisToLocal(rotation, axis, axis, scratch);
+    }
+
+    this.#adapter.getBodyTransform(bodyB.handle, position, rotation);
+    if (joint.anchorB !== undefined) {
+      worldAnchorToLocal(position, rotation, joint.anchorB, anchorB, scratch);
+    }
+
+    return { bodyA: bodyA.handle, bodyB: bodyB.handle, anchorA, anchorB, axis };
+  }
+
+  /**
+   * Drops one joint registration, optionally destroying the solver's constraint
+   * (§83).
+   *
+   * `destroy` is `false` only when the adapter has already removed the joint
+   * itself — see the `"jointbreak"` arm of {@link PhysicsWorld.dispatchEvents}'
+   * translation.
+   */
+  #retireJoint(registration: JointRegistration, destroy: boolean): void {
+    this.#jointsByJoint.delete(registration.joint);
+    this.#jointsById.delete(registration.id);
+    unbindJoint(registration.joint);
+    if (destroy) {
+      this.#adapter.destroyJoint(registration.handle);
+    }
+  }
+
+  /**
+   * Destroys every joint naming `body`, in reverse registration order, before
+   * the body itself goes away (§83). See {@link PhysicsWorld.removeBody}.
+   */
+  #destroyJointsOf(body: BodyRegistration): void {
+    if (this.#jointsByJoint.size === 0) {
+      return;
+    }
+    const registrations = [...this.#jointsByJoint.values()].reverse();
+    for (const registration of registrations) {
+      if (registration.bodyA === body || registration.bodyB === body) {
+        this.#retireJoint(registration, true);
+      }
+    }
+  }
+
+  /** The registration for `component`, or the §28 error naming what is missing. */
+  #requireRegisteredBody(
+    joint: Joint,
+    field: string,
+    component: RigidBody,
+  ): BodyRegistration {
+    const registration = this.#bodiesByComponent.get(component);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `A ${joint.type} joint's ${field} is not registered with this PhysicsWorld (§28). Call world.addBody(node) for both bodies before adding the joint that constrains them.`,
+        { context: { type: joint.type, field } },
+      );
+    }
+    return registration;
+  }
+
+  /**
+   * The adapter as a {@link SolverJointAccess}, or the error explaining what it
+   * is missing (WP-6.1).
+   *
+   * Structural detection, not a capability flag — `supportsSolverJointAccess`
+   * documents why. The check runs on every joint entry point rather than once at
+   * construction so that a world whose adapter has no joints is still perfectly
+   * usable for everything else, which is exactly the Phase 5 situation.
+   */
+  #requireJointAccess(): SolverJointAccess {
+    if (supportsSolverJointAccess(this.#adapter)) {
+      return this.#adapter;
+    }
+    const missing = missingSolverJointAccess(this.#adapter);
+    throw new FourError(
+      "NOT_IMPLEMENTED",
+      `Adapter ${JSON.stringify(this.#adapter.name)} does not implement SolverJointAccess and cannot carry §28 joints; it is missing ${missing.join(", ")} (§37, plan P6-1). Joints need more than §37's createJoint/destroyJoint: an id to order by (§33), a reaction to compare against break thresholds (plan P6-2), and live limit/motor reconfiguration.`,
+      { context: { adapter: this.#adapter.name, missing } },
+    );
   }
 
   /** Destroys one registration's solver objects, colliders first (§37, §83). */

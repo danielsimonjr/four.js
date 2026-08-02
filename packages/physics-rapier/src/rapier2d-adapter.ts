@@ -65,6 +65,28 @@
  *
  * `collisionstay` **is** emitted by this adapter, even though Rapier has no such
  * event — see {@link Rapier2dAdapter.step} for how and why.
+ *
+ * ## Joints (§28, WP-6.2)
+ *
+ * The whole plan P6-1 planar tier is built — fixed, revolute, prismatic, rope,
+ * spring — with limits and velocity motors on the two joints that have a driven
+ * degree of freedom. Three awkward corners of Rapier 0.19.3's bindings are
+ * declared rather than hidden, and each is verified against the wasm and not
+ * only the typings:
+ *
+ * - **No joint reaction.** {@link Rapier2dAdapter.reportsJointReactions} is
+ *   `false`, so `PhysicsWorld` refuses §28 break thresholds on this solver.
+ * - **No motor force limit.** §28's `maxTorque`/`maxForce` becomes the motor's
+ *   strength coefficient, not a ceiling — see
+ *   {@link Rapier2dAdapter.setJointMotor} for exactly what it does mean.
+ * - **No way to remove a motor**, and a gain of `0` is Rapier's *rigid* motor
+ *   rather than its inert one. A disabled motor is therefore configured with
+ *   {@link INERT_MOTOR_GAIN}, measured bit-identical to a joint that never had
+ *   one — the same constant and the same answer `Rapier3dAdapter` gives.
+ *
+ * Joint handles, like body handles, are Rapier indices that get **reused** after
+ * a removal, so the adapter keeps its own monotonic joint registry for §33's
+ * ordering and carries it through the snapshot envelope.
  */
 
 import { FourError } from "@four/core";
@@ -83,15 +105,20 @@ import {
   sortHitsByDistance,
   validateColliderDescriptor,
   validateCollisionShape,
+  validateJointDescriptor,
   validatePhysicsWorldOptions,
   validateRigidBodyDescriptor,
 } from "@four/physics";
 import type {
   AngularVelocityInput,
+  BodyType,
   CCDMode,
   ColliderDescriptor,
   ContactPoint,
   JointDescriptor,
+  ShippedJointType,
+  SolverJointAccess,
+  SolverJointMotor,
   OverlapHit,
   OverlapQuery,
   PhysicsBodyHandle,
@@ -123,9 +150,11 @@ import {
   fromRapierAngle,
   fromRapierVector2,
   packInteractionGroups,
+  revoluteAxisSignZ,
   toRapierAngle,
   toRapierAngularScalar,
   toRapierBodyType,
+  toRapierJointAxis2d,
   toRapierVector2,
 } from "./conversions2d.js";
 import type { RapierVector2 } from "./conversions2d.js";
@@ -135,8 +164,11 @@ import type {
   RapierCollider,
   RapierColliderDesc,
   RapierEventQueue,
+  RapierImpulseJoint,
+  RapierJointData,
   RapierRigidBody,
   RapierRigidBodyDesc,
+  RapierUnitImpulseJoint,
   RapierWorld,
 } from "./init.js";
 
@@ -170,12 +202,52 @@ const QUERY_SOLID = true;
 const SHAPE_CAST_TARGET_DISTANCE = 0;
 
 /**
+ * The motor gain that stands for "this motor exerts nothing" (WP-6.2-fix1).
+ *
+ * Rapier has no way to *remove* a motor once one has been configured, and a
+ * gain of exactly `0` is its **rigid** special case rather than its inert one:
+ * measured at 2D 0.19.3, `configureMotorVelocity(0, 0)` on a bar left turning
+ * at 3 rad/s drops it to 0.294 rad/s in one step and to 5.9e-44 rad/s within a
+ * second. This value is the inert end of the same dial, and it is *measured*
+ * rather than assumed: a hinge (and a slider) configured with
+ * `configureMotorVelocity(0, 1e-12)` follows a trajectory **bit-identical** —
+ * `max |Δ| = 0` across position, rotation, and both velocities, every step — to
+ * the same rig with no motor configured at all, over 3600 steps, and equally so
+ * after the joint has previously run a strong motor. It is used for a disabled
+ * motor and for one whose `maxEffort` is `0`, and it is the same constant and
+ * the same semantics `Rapier3dAdapter` uses, so the two adapters answer
+ * `setJointMotor({ enabled: false, … })` the same way.
+ */
+const INERT_MOTOR_GAIN = 1e-12;
+
+/**
+ * The §28 joint types this adapter builds — every type plan P6-1 ships in a
+ * plane, and nothing else (WP-6.2).
+ *
+ * `spherical` is absent because a plane has no ball joint (§21) *and* because
+ * Rapier's 2D `JointData` has no `spherical` factory; `distance` and `gear` are
+ * absent because plan P6-1 stages them out of this phase. The `satisfies` is
+ * the guard that keeps this list inside the engine's own vocabulary: a typo, or
+ * a type the engine does not define, fails to compile.
+ */
+const RAPIER_2D_JOINT_TYPES = [
+  "fixed",
+  "spring",
+  "revolute",
+  "prismatic",
+  "rope",
+] as const satisfies readonly ShippedJointType[];
+
+/**
  * What this adapter can actually do (§37), field by field:
  *
  * - `dimensions: ["2d"]` — this class wraps `@dimforge/rapier2d-compat`; the 3D
  *   build is a separate npm package and a separate adapter (WP-5.5).
- * - `jointTypes: []` — joints are staged to Phase 6 (plan P5-4);
- *   `createJoint`/`destroyJoint` throw `NOT_IMPLEMENTED`.
+ * - `jointTypes` — {@link RAPIER_2D_JOINT_TYPES}, the whole plan P6-1 planar
+ *   tier (WP-6.2). Motors and limits ride on the revolute and prismatic types;
+ *   §28 break thresholds do **not** work on this adapter, because Rapier
+ *   0.19.3 reports no joint reaction — see
+ *   {@link Rapier2dAdapter.reportsJointReactions}.
  * - `ccdModes` — all three. `"swept"` is Rapier's `RigidBodyDesc.setCcdEnabled`
  *   (motion clamping with `World.maxCcdSubsteps` substeps); `"speculative"` is
  *   `setSoftCcdPrediction` (predictive contacts, see
@@ -194,7 +266,7 @@ const SHAPE_CAST_TARGET_DISTANCE = 0;
  */
 const RAPIER_2D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
   dimensions: Object.freeze<PhysicsDimension[]>([ADAPTER_DIMENSION]),
-  jointTypes: Object.freeze<string[]>([]),
+  jointTypes: Object.freeze<string[]>([...RAPIER_2D_JOINT_TYPES]),
   ccdModes: Object.freeze<CCDMode[]>(["disabled", "speculative", "swept"]),
   determinism: "same-runtime",
   snapshots: true,
@@ -217,8 +289,14 @@ const SNAPSHOT_MAGIC = 0x32523446;
  * Version of the snapshot **envelope** (not of Rapier, and not of the physics
  * package). Bumped whenever the header or the metadata layout changes;
  * {@link Rapier2dAdapter.restoreSnapshot} refuses anything else.
+ *
+ * `2` (WP-6.2): the metadata grew a `joints` table and a `nextJointId`, so a
+ * version-`1` envelope would restore a world whose joints exist in Rapier but
+ * not in this adapter's registry — silently unreachable constraints. The header
+ * layout is unchanged; only the JSON payload gained fields, and the bump is
+ * what turns "quietly wrong" into `SERIALIZATION_VERSION_MISMATCH`.
  */
-const SNAPSHOT_FORMAT_VERSION = 1;
+const SNAPSHOT_FORMAT_VERSION = 2;
 
 /** Four `u32` fields: magic, format version, metadata length, Rapier length. */
 const SNAPSHOT_HEADER_BYTES = 16;
@@ -291,6 +369,39 @@ interface ColliderRecord {
   alive: boolean;
 }
 
+/**
+ * One joint in the adapter's registry (§28, WP-6.2). Handles are these records,
+ * cast, exactly as for bodies and colliders.
+ *
+ * Rapier's own joint handle is as unusable for §33 ordering as a body's — a
+ * packed non-integral double, **reused** once a joint is removed (measured:
+ * removing the second of four joints and creating a fifth returned the removed
+ * one's handle value). The monotonic {@link JointRecord.id} is what
+ * {@link Rapier2dAdapter.forEachJoint} iterates by.
+ */
+interface JointRecord {
+  /** Monotonic engine-assigned id — the §33 ordering key. Never reused. */
+  readonly id: number;
+  /** Rapier's own handle. Opaque, non-integral, and reused after removal. */
+  rapierHandle: number;
+  /** The live Rapier joint. Re-pointed by `restoreSnapshot`. */
+  joint: RapierImpulseJoint;
+  /** Which §28 type this is — what decides whether limits and motors exist. */
+  type: ShippedJointType;
+  /**
+   * `+1` or `-1`: the sign of a revolute joint's ±Z axis (§21). Limits and
+   * motor rates are mirrored by it, because Rapier 2D's revolute joint is
+   * always about +Z. Always `+1` for every other type.
+   */
+  axisSign: 1 | -1;
+  /** The {@link BodyRecord.id} of `bodyA` — a destroyed body retires its joints. */
+  bodyIdA: number;
+  /** The {@link BodyRecord.id} of `bodyB`. */
+  bodyIdB: number;
+  /** `false` once destroyed; a handle to a dead record is rejected. */
+  alive: boolean;
+}
+
 /** A collider pair currently touching, tracked so `collisionstay` can exist. */
 interface PairRecord {
   readonly a: ColliderRecord;
@@ -316,6 +427,8 @@ interface SnapshotMeta {
   readonly nextBodyId: number;
   /** Next monotonic collider id. */
   readonly nextColliderId: number;
+  /** Next monotonic joint id (§28, envelope version 2). */
+  readonly nextJointId: number;
   /** Bodies in insertion order: `[id, rapierHandle, sleeping, massMode, explicitMass, colliderCount]`. */
   readonly bodies: readonly [
     number,
@@ -331,6 +444,27 @@ interface SnapshotMeta {
     number,
     number,
     boolean,
+    number,
+    number,
+  ][];
+  /**
+   * Joints in insertion order: `[id, rapierHandle, type, axisSign, bodyIdA,
+   * bodyIdB]` (envelope version 2).
+   *
+   * Only what Rapier cannot answer for itself is stored. The constraint, its
+   * anchors, its limits, its motor, and its contact flag all live in Rapier's
+   * own snapshot and come back with it (verified: a restored joint reports the
+   * same `limitsMin`/`limitsMax` and `contactsEnabled`, and a run continued
+   * from a restore matches the original bit for bit). Whether a motor was ever
+   * configured is **not** recorded, because nothing needs to know: disabling a
+   * motor is the same command whether or not one is running (see
+   * `#applyJointMotor`).
+   */
+  readonly joints: readonly [
+    number,
+    number,
+    ShippedJointType,
+    1 | -1,
     number,
     number,
   ][];
@@ -441,6 +575,15 @@ export interface RapierBodyAccess {
     rotation?: RotationInput,
   ): void;
 
+  /**
+   * Re-types a live body in place (§22, plan P7-3) — Rapier's own
+   * `RigidBody.setBodyType`, which keeps the body's handle, its colliders, its
+   * pose, and its mass properties.
+   *
+   * `wake` defaults to `true`, like {@link RapierBodyAccess.setBodyTransform}'s.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake?: boolean): void;
+
   /** §32's explicit wake command. */
   wakeBody(handle: PhysicsBodyHandle): void;
 
@@ -500,12 +643,31 @@ export interface RapierBodyAccess {
  * One instance owns exactly one Rapier `World`. `initialize` may be called once;
  * `dispose` is idempotent and terminal.
  */
-export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
+export class Rapier2dAdapter
+  implements PhysicsSolverAdapter, RapierBodyAccess, SolverJointAccess
+{
   /** §37 `name`. */
   readonly name: string = ADAPTER_NAME;
 
   /** §37 `capabilities`. Readable before `initialize`, and frozen. */
   readonly capabilities: PhysicsCapabilities = RAPIER_2D_CAPABILITIES;
+
+  /**
+   * `false`: **Rapier 0.19.3 cannot report a joint's reaction** (`SolverJointAccess`,
+   * plan P6-2; verified 2026-08-01 for WP-6.2 against the installed typings
+   * *and* the wasm binary — see `init.ts`'s module header for the exact
+   * evidence).
+   *
+   * The consequence is deliberate and visible: `PhysicsWorld.addJoint` refuses
+   * a joint carrying a `breakForce` or a `breakTorque` on this adapter, with an
+   * error saying so, instead of accepting a threshold that could never fire.
+   * Nothing here estimates a reaction from the bodies' momentum change — that
+   * number would be indistinguishable from a real one and wrong.
+   *
+   * This flips to `true`, with no other API change, if a later Rapier exposes
+   * `ImpulseJoint::impulses()` through its JavaScript bindings.
+   */
+  readonly reportsJointReactions = false;
 
   #rapier: Rapier2dModule | undefined;
 
@@ -525,11 +687,16 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
 
   #nextColliderId = 1;
 
+  #nextJointId = 1;
+
   /** Live bodies keyed by monotonic id. `Map` iteration is insertion order. */
   readonly #bodies = new Map<number, BodyRecord>();
 
   /** Live colliders keyed by monotonic id. */
   readonly #colliders = new Map<number, ColliderRecord>();
+
+  /** Live joints keyed by monotonic id, in creation order (§28, §33). */
+  readonly #joints = new Map<number, JointRecord>();
 
   /** Reverse index for event handling: Rapier body handle → record. */
   readonly #bodiesByRapierHandle = new Map<number, BodyRecord>();
@@ -764,10 +931,17 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
   /**
    * Destroys a body and everything attached to it (§37).
    *
-   * Rapier removes the body's colliders with it, so their records are dropped
-   * here too, along with any contact pair they were part of. The monotonic id
-   * is *not* reused, which is what keeps
-   * {@link Rapier2dAdapter.forEachBody}'s order stable under destruction (§33).
+   * Rapier removes the body's colliders **and its joints** with it (verified:
+   * `impulseJoints.len()` drops and the joint's handle stops resolving), so
+   * their records are dropped here too, along with any contact pair those
+   * colliders were part of. The monotonic id is *not* reused, which is what
+   * keeps {@link Rapier2dAdapter.forEachBody}'s order stable under destruction
+   * (§33).
+   *
+   * `PhysicsWorld` destroys a body's joints itself before it removes the body
+   * (§83), so this path normally finds none; it exists because an adapter used
+   * directly must not be left holding handles to constraints Rapier has already
+   * freed.
    */
   destroyBody(handle: PhysicsBodyHandle): void {
     const world = this.#requireWorld();
@@ -776,6 +950,11 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
     for (const collider of [...this.#colliders.values()]) {
       if (collider.bodyId === record.id) {
         this.#forgetCollider(collider);
+      }
+    }
+    for (const joint of [...this.#joints.values()]) {
+      if (joint.bodyIdA === record.id || joint.bodyIdB === record.id) {
+        this.#forgetJoint(joint);
       }
     }
 
@@ -891,25 +1070,150 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
   }
 
   /**
-   * Staged to Phase 6 (plan P5-4): throws `NOT_IMPLEMENTED`, matching
-   * `capabilities.jointTypes: []`.
+   * Creates a joint (§37, §28, plan P6-1; WP-6.2).
+   *
+   * The descriptor's anchors are **body-local** by the time they arrive here —
+   * `PhysicsWorld.addJoint` converts the user's world-space anchors once, at
+   * registration — which is exactly the space Rapier's `JointData` factories
+   * want, so no frame conversion happens in this method.
+   *
+   * ## The five factories, and what each one is given
+   *
+   * | §28 type    | Rapier 2D call                                            |
+   * | ----------- | --------------------------------------------------------- |
+   * | `fixed`     | `JointData.fixed(a1, rotB − rotA, a2, 0)`                  |
+   * | `revolute`  | `JointData.revolute(a1, a2)` — a plane has no axis (§21)   |
+   * | `prismatic` | `JointData.prismatic(a1, a2, axis)`                        |
+   * | `rope`      | `JointData.rope(maxLength, a1, a2)`                        |
+   * | `spring`    | `JointData.spring(restLength, stiffness, damping, a1, a2)` |
+   *
+   * Two of those need explaining:
+   *
+   * - **The fixed joint's frames.** Rapier's fixed joint holds
+   *   `rotA + frame1 == rotB + frame2`, so passing two zeroes would *snap* the
+   *   bodies to a common orientation the moment the joint is created (measured:
+   *   a body at `0.7 rad` is dragged to `0`). §28 says the bodies keep the
+   *   relative pose they had, so `frame1` is the relative angle read out of the
+   *   solver right now and `frame2` is zero — which holds the pose instead of
+   *   changing it (measured: the same body stays at `0.7 rad`).
+   * - **The revolute joint's axis.** Rapier 2D's revolute factory takes none,
+   *   because §21 leaves one rotational degree of freedom. A descriptor may
+   *   still name `−Z`, and the sign is kept: it mirrors the joint's limits and
+   *   its motor rate rather than being dropped (see `revoluteAxisSignZ`).
+   *
+   * `collisionEnabled` maps to Rapier's `setContactsEnabled`, which is a real
+   * per-joint switch (measured: two overlapping boxes tied by a slack rope push
+   * each other apart with it on and stay overlapped with it off). Rapier's
+   * default is contacts **on**; §28's default is off, so this method always
+   * sets it explicitly.
+   *
+   * Limits and a motor are applied immediately after creation, through the same
+   * code path {@link Rapier2dAdapter.setJointLimits} and
+   * {@link Rapier2dAdapter.setJointMotor} use, so a joint created with a motor
+   * and a joint reconfigured into one cannot drift apart.
    */
   createJoint(desc: JointDescriptor): PhysicsJointHandle {
-    throw new FourError(
-      "NOT_IMPLEMENTED",
-      `Joints are staged to Phase 6 (§109, plan P5-4); Rapier2dAdapter declares capabilities.jointTypes: [] and cannot create a ${JSON.stringify(desc.type)} joint yet (§28, §37).`,
-      { context: { adapter: ADAPTER_NAME, jointType: desc.type } },
-    );
+    const world = this.#requireWorld();
+    const rapier = this.#requireRapier();
+    validateJointDescriptor(desc, ADAPTER_DIMENSION);
+    const bodyA = this.#requireBody(desc.bodyA);
+    const bodyB = this.#requireBody(desc.bodyB);
+
+    const anchorA = this.#jointAnchor("anchorA", desc.anchorA);
+    const anchorB = this.#jointAnchor("anchorB", desc.anchorB);
+    let axisSign: 1 | -1 = 1;
+    let data: RapierJointData;
+    switch (desc.type) {
+      case "fixed":
+        data = rapier.JointData.fixed(
+          anchorA,
+          bodyB.body.rotation() - bodyA.body.rotation(),
+          anchorB,
+          0,
+        );
+        break;
+      case "revolute":
+        axisSign = revoluteAxisSignZ(desc.axis);
+        data = rapier.JointData.revolute(anchorA, anchorB);
+        break;
+      case "prismatic":
+        data = rapier.JointData.prismatic(
+          anchorA,
+          anchorB,
+          toRapierJointAxis2d("axis", desc.axis, createRapierVector2()),
+        );
+        break;
+      case "rope":
+        data = rapier.JointData.rope(desc.maxLength, anchorA, anchorB);
+        break;
+      case "spring":
+        data = rapier.JointData.spring(
+          desc.restLength,
+          desc.stiffness,
+          desc.damping ?? 0,
+          anchorA,
+          anchorB,
+        );
+        break;
+      default:
+        // Unreachable through the typed union *and* through
+        // `validateJointDescriptor`, which rejects `spherical` in a `"2d"`
+        // world before this switch runs. Kept as a guard because a JavaScript
+        // caller can hand this method anything (§85).
+        throw new FourError(
+          ADAPTER_ERROR_CODE,
+          `Rapier2dAdapter builds ${RAPIER_2D_JOINT_TYPES.join(", ")} joints and not ${JSON.stringify((desc as JointDescriptor).type)} (§21, §28, plan P6-1). A ball joint's swing degrees of freedom do not exist in a plane; use a revolute joint.`,
+          { context: { adapter: ADAPTER_NAME, jointType: desc.type } },
+        );
+    }
+
+    const joint = world.createImpulseJoint(data, bodyA.body, bodyB.body, true);
+    joint.setContactsEnabled(desc.collisionEnabled ?? false);
+
+    const record: JointRecord = {
+      id: this.#nextJointId,
+      rapierHandle: joint.handle,
+      joint,
+      type: desc.type,
+      axisSign,
+      bodyIdA: bodyA.id,
+      bodyIdB: bodyB.id,
+      alive: true,
+    };
+    this.#nextJointId += 1;
+    this.#joints.set(record.id, record);
+
+    if (desc.type === "revolute" || desc.type === "prismatic") {
+      if (desc.limits !== undefined) {
+        this.#applyJointLimits(record, desc.limits.min, desc.limits.max);
+      }
+      if (desc.motor !== undefined) {
+        this.#applyJointMotor(record, {
+          enabled: desc.motor.enabled !== false,
+          targetVelocity: desc.motor.targetVelocity,
+          maxEffort:
+            desc.type === "revolute"
+              ? desc.motor.maxTorque
+              : desc.motor.maxForce,
+        });
+      }
+    }
+
+    return record as unknown as PhysicsJointHandle;
   }
 
-  /** Staged with {@link Rapier2dAdapter.createJoint}: throws `NOT_IMPLEMENTED`. */
+  /**
+   * Destroys a joint (§37, §28). The handle is rejected from then on.
+   *
+   * The two bodies are woken, because a constraint disappearing is a change
+   * they have to react to — a sleeping body still hanging from a joint that no
+   * longer exists would stay frozen in mid-air until something else touched it.
+   */
   destroyJoint(handle: PhysicsJointHandle): void {
-    void handle;
-    throw new FourError(
-      "NOT_IMPLEMENTED",
-      "Joints are staged to Phase 6 (§109, plan P5-4); Rapier2dAdapter never mints a joint handle, so there is none to destroy (§28, §37).",
-      { context: { adapter: ADAPTER_NAME } },
-    );
+    const world = this.#requireWorld();
+    const record = this.#requireJoint(handle);
+    world.removeImpulseJoint(record.joint, true);
+    this.#forgetJoint(record);
   }
 
   /**
@@ -1302,6 +1606,7 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
       version: this.#version,
       nextBodyId: this.#nextBodyId,
       nextColliderId: this.#nextColliderId,
+      nextJointId: this.#nextJointId,
       bodies: [...this.#bodies.values()].map((record) => [
         record.id,
         record.rapierHandle,
@@ -1317,6 +1622,14 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
         record.sensor,
         record.collisionGroups,
         record.collisionMask,
+      ]),
+      joints: [...this.#joints.values()].map((record) => [
+        record.id,
+        record.rapierHandle,
+        record.type,
+        record.axisSign,
+        record.bodyIdA,
+        record.bodyIdB,
       ]),
     };
     const metaBytes = new TextEncoder().encode(JSON.stringify(meta));
@@ -1351,6 +1664,13 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
    * `collisionstay` and `collisionend` keep working for pairs that were already
    * in contact when the snapshot was taken — Rapier will not re-report those as
    * *started*, so without this they would go silent.
+   *
+   * Joints are restored the same way as bodies (WP-6.2): Rapier's snapshot
+   * carries the constraints themselves — anchors, limits, motors, and the
+   * contact flag all come back with it, and a run continued from a restore
+   * matches the original exactly (measured) — while the envelope carries the
+   * monotonic ids, `−Z` axis signs, and body links that only this adapter
+   * knows.
    */
   restoreSnapshot(snapshot: ArrayBuffer): void {
     const rapier = this.#requireRapier();
@@ -1434,8 +1754,12 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
     for (const record of this.#colliders.values()) {
       record.alive = false;
     }
+    for (const record of this.#joints.values()) {
+      record.alive = false;
+    }
     this.#bodies.clear();
     this.#colliders.clear();
+    this.#joints.clear();
     this.#bodiesByRapierHandle.clear();
     this.#collidersByRapierHandle.clear();
     this.#activePairs.clear();
@@ -1593,6 +1917,26 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
     }
   }
 
+  /**
+   * @inheritDoc
+   *
+   * Rapier's `setBodyType(type, wakeUp)` takes `wakeUp` as a **required**
+   * argument, so the default is applied here rather than passed through.
+   *
+   * Nothing else is touched: measured at 0.19.3 (WP-7.2), the retype leaves the
+   * body's Rapier handle, its colliders, its pose, and its mass properties
+   * alone, which is what makes {@link Rapier2dAdapter.getBodyId} and
+   * {@link Rapier2dAdapter.forEachBody} — and with them §33's checksum order —
+   * survive a control-mode switch untouched. `record.sleeping` is deliberately
+   * *not* refreshed here: it is the previous-step snapshot §32's sleep/wake
+   * events are diffed against, so a wake caused by this call is reported by the
+   * next step like any other.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake = true): void {
+    const record = this.#requireBody(handle);
+    record.body.setBodyType(toRapierBodyType(type), wake);
+  }
+
   /** @inheritDoc */
   wakeBody(handle: PhysicsBodyHandle): void {
     this.#requireBody(handle).body.wakeUp();
@@ -1652,6 +1996,126 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
     this.#requireWorld();
     for (const record of this.#colliders.values()) {
       visit(record as unknown as PhysicsColliderHandle, record.id);
+    }
+  }
+
+  // ------------------------------------------------------- §28 joint accessors
+
+  /**
+   * Throws `NOT_IMPLEMENTED` — **Rapier 0.19.3 reports no joint reaction**
+   * (plan P6-2; verified 2026-08-01 for WP-6.2, in the typings and in the wasm
+   * exports alike, see `init.ts`).
+   *
+   * `PhysicsWorld` never calls this: it checks
+   * {@link Rapier2dAdapter.reportsJointReactions} first and refuses to register
+   * a breakable joint on an adapter that answers `false`. The method exists so
+   * the {@link SolverJointAccess} seam is structurally complete — and so a
+   * caller that reaches past the world gets an explanation rather than a
+   * plausible-looking zero vector.
+   */
+  getJointReaction(
+    handle: PhysicsJointHandle,
+    outLinear: Vector3,
+    outAngular: Vector3,
+  ): void {
+    this.#requireJoint(handle);
+    void outLinear;
+    void outAngular;
+    throw new FourError(
+      "NOT_IMPLEMENTED",
+      `Rapier 0.19.3 exposes no joint reaction through its JavaScript bindings (verified 2026-08-01: neither ImpulseJoint nor RawImpulseJointSet has an impulse, force, or reaction member), so ${ADAPTER_NAME} cannot report one and declares reportsJointReactions: false (§28, plan P6-2). §28 break thresholds need an adapter that reports reactions; nothing here estimates one.`,
+      { context: { adapter: ADAPTER_NAME } },
+    );
+  }
+
+  /**
+   * Reconfigures a revolute or prismatic joint's travel limits (§28
+   * "limits"), in radians or metres.
+   *
+   * A `−Z` revolute joint's range is mirrored to `[−max, −min]` before it
+   * reaches Rapier, which is the same range expressed about `+Z` — the only
+   * axis a plane has (§21).
+   *
+   * A fixed, rope, or spring joint has no limited degree of freedom to move:
+   * Rapier's `FixedImpulseJoint`, `RopeImpulseJoint`, and
+   * `SpringImpulseJoint` carry no `setLimits` at all, and this method throws
+   * rather than accepting a command it would have to drop.
+   */
+  setJointLimits(handle: PhysicsJointHandle, min: number, max: number): void {
+    this.#applyJointLimits(this.#requireJoint(handle), min, max);
+  }
+
+  /**
+   * Reconfigures a revolute or prismatic joint's velocity motor (§28
+   * "motors"), and the one place this adapter's honest limitation lives.
+   *
+   * ## `maxEffort` is a gain here, not a clamp (decision, WP-6.2)
+   *
+   * Rapier 0.19.3's JavaScript bindings expose **no motor force limit**: the
+   * whole motor surface is `configureMotorModel`, `configureMotorVelocity`,
+   * `configureMotorPosition`, and `configureMotor`, and none of them takes a
+   * maximum (verified against the wasm exports, not only the typings). What
+   * they do take is a `factor`, which a measurement pins down exactly: in
+   * Rapier's `ForceBased` model the motor exerts
+   *
+   * ```text
+   * effort = factor · (targetVelocity − currentVelocity)
+   * ```
+   *
+   * so `factor` is a damping coefficient in N·m·s/rad for a hinge and N·s/m for
+   * a slider. This adapter passes §28's `maxTorque`/`maxForce` as that factor,
+   * with `ForceBased` selected because §28 states the motor's strength as a
+   * torque and a force (the `AccelerationBased` model divides the driven body's
+   * inertia out, which would make the number mean something else again).
+   *
+   * The consequence, stated plainly: a bigger `maxTorque` is a stronger motor —
+   * the monotone relationship §28 intends, and enough for the motor to reach
+   * its commanded velocity — but it is **not** the hard ceiling §28 describes.
+   * The motor's effort equals `maxTorque` at one rad/s (or one m/s) of velocity
+   * error and exceeds it beyond that. No JavaScript-reachable Rapier API can
+   * enforce the ceiling, and this adapter will not simulate one it does not
+   * have.
+   *
+   * ## Disabling a motor (decision, WP-6.2-fix1)
+   *
+   * Rapier cannot *remove* a motor once one has been configured, and
+   * `configureMotorVelocity(0, 0)` is not the way to switch one off: a zero
+   * gain is Rapier's **rigid** zero-velocity constraint, a brake rather than a
+   * release (measured: a bar turning at 3 rad/s falls to 0.294 rad/s in one
+   * step and to 5.9e-44 rad/s within a second, where the same bar with no motor
+   * keeps turning). A motor that arrives disabled — or whose `maxEffort` is
+   * `0`, which asks for a drive that exerts nothing — is therefore configured
+   * with {@link INERT_MOTOR_GAIN} and a zero target, the setting measured to be
+   * **bit-identical** to a joint that never had a motor at all: `max |Δ| = 0`
+   * over 3600 steps on a hinge and a slider, and over 600 steps continuing from
+   * a joint that had just been running a strong motor. `Rapier3dAdapter` does
+   * the same thing with the same constant, so a disabled motor means one thing
+   * across this package.
+   *
+   * What that buys the caller: a running motor can be released, and the axis is
+   * then as free as an unmotorized one. What it does *not* do is restore the
+   * joint's pre-motor history — the body keeps whatever velocity the motor gave
+   * it and coasts from there, which is what releasing a drive means.
+   */
+  setJointMotor(handle: PhysicsJointHandle, motor: SolverJointMotor): void {
+    this.#applyJointMotor(this.#requireJoint(handle), motor);
+  }
+
+  /** @inheritDoc */
+  getJointId(handle: PhysicsJointHandle): number {
+    return this.#requireJoint(handle).id;
+  }
+
+  /**
+   * Visits every live joint in creation order, which is ascending
+   * {@link Rapier2dAdapter.getJointId} (§28, §33) — the joint counterpart of
+   * {@link Rapier2dAdapter.forEachBody}, and for the same reason: Rapier's own
+   * joint handles are reused after a removal and cannot order anything.
+   */
+  forEachJoint(visit: (handle: PhysicsJointHandle, id: number) => void): void {
+    this.#requireWorld();
+    for (const record of this.#joints.values()) {
+      visit(record as unknown as PhysicsJointHandle, record.id);
     }
   }
 
@@ -1724,6 +2188,110 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
       );
     }
     return record;
+  }
+
+  /** Joint counterpart of {@link Rapier2dAdapter.#requireBody} (§28). */
+  #requireJoint(handle: PhysicsJointHandle): JointRecord {
+    this.#requireWorld();
+    const record = handle as unknown as JointRecord;
+    if (!record.alive || this.#joints.get(record.id) !== record) {
+      throw new FourError(
+        ADAPTER_ERROR_CODE,
+        "Joint handle is not valid for this Rapier2dAdapter: it was destroyed, it went away with one of its bodies, or it was minted by another adapter (§28, §37).",
+        { context: { adapter: ADAPTER_NAME } },
+      );
+    }
+    return record;
+  }
+
+  /** Drops a joint record. Rapier's own removal is the caller's business. */
+  #forgetJoint(record: JointRecord): void {
+    record.alive = false;
+    this.#joints.delete(record.id);
+  }
+
+  /**
+   * Converts one optional body-local anchor into a **fresh** Rapier vector
+   * (§28). An omitted anchor is the body's own origin.
+   *
+   * Fresh rather than scratch because a `JointData` holds both anchors — and,
+   * for a prismatic joint, an axis — at the same time, and because joint
+   * creation is not a hot path; the scratch buffer is still used for the
+   * §21 plane check that {@link toRapierVector2} performs.
+   */
+  #jointAnchor(field: string, anchor: Vector3Input | undefined): RapierVector2 {
+    if (anchor === undefined) {
+      return createRapierVector2();
+    }
+    const converted = toRapierVector2(field, anchor, this.#scratchRapierA);
+    return { x: converted.x, y: converted.y };
+  }
+
+  /**
+   * The joint as one of Rapier's `UnitImpulseJoint`s, or the error naming the
+   * type that has no such degree of freedom. See
+   * {@link Rapier2dAdapter.setJointLimits}.
+   */
+  #requireUnitJoint(
+    record: JointRecord,
+    command: string,
+  ): RapierUnitImpulseJoint {
+    const joint = record.joint as RapierUnitImpulseJoint;
+    if (
+      typeof joint.setLimits !== "function" ||
+      typeof joint.configureMotorVelocity !== "function"
+    ) {
+      throw new FourError(
+        ADAPTER_ERROR_CODE,
+        `A ${record.type} joint has no driven degree of freedom, so ${command} cannot be applied to it (§28). Rapier gives limits and motors to revolute and prismatic joints only.`,
+        {
+          context: { adapter: ADAPTER_NAME, jointType: record.type, command },
+        },
+      );
+    }
+    return joint;
+  }
+
+  /** Pushes a §28 limit range into Rapier, mirrored for a `−Z` hinge. */
+  #applyJointLimits(record: JointRecord, min: number, max: number): void {
+    const joint = this.#requireUnitJoint(record, "setJointLimits");
+    if (record.axisSign > 0) {
+      joint.setLimits(min, max);
+    } else {
+      joint.setLimits(-max, -min);
+    }
+  }
+
+  /**
+   * Pushes a §28 motor into Rapier. See {@link Rapier2dAdapter.setJointMotor}
+   * for the effort mapping and for what disabling means here.
+   *
+   * ## Disabling (decision, WP-6.2-fix1)
+   *
+   * Rapier configures a motor **onto an axis** and offers no way to take it off
+   * again: the JavaScript surface is four `configureMotor*` calls and no
+   * `disableMotor`. The obvious spelling of "off" is not off —
+   * `configureMotorVelocity(0, 0)` makes the motor a *rigid* zero-velocity
+   * constraint, which brakes the joint instead of releasing it. So a motor that
+   * is disabled, or whose `maxEffort` is `0`, is configured with
+   * {@link INERT_MOTOR_GAIN} and a zero target: the one setting measured to be
+   * bit-identical to a joint that never had a motor, which is the only honest
+   * reading of "a disabled motor exerts nothing" on a solver that cannot remove
+   * one.
+   *
+   * A rate is mirrored by {@link JointRecord.axisSign} for a `−Z` hinge (§21),
+   * exactly as a limit range is; the inert configuration has a zero rate, which
+   * needs no mirroring.
+   */
+  #applyJointMotor(record: JointRecord, motor: SolverJointMotor): void {
+    const rapier = this.#requireRapier();
+    const joint = this.#requireUnitJoint(record, "setJointMotor");
+    const driving = motor.enabled && motor.maxEffort > 0;
+    joint.configureMotorModel(rapier.MotorModel.ForceBased);
+    joint.configureMotorVelocity(
+      driving ? record.axisSign * motor.targetVelocity : 0,
+      driving ? motor.maxEffort : INERT_MOTOR_GAIN,
+    );
   }
 
   /** The handle of a collider's owning body — every event and hit needs it. */
@@ -2078,6 +2646,44 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
       this.#collidersByRapierHandle.set(rapierHandle, record);
     }
 
+    const survivingJoints = new Map<number, JointRecord>();
+    for (const [
+      id,
+      rapierHandle,
+      type,
+      axisSign,
+      bodyIdA,
+      bodyIdB,
+    ] of meta.joints) {
+      const joint = world.getImpulseJoint(rapierHandle);
+      if (joint === null) {
+        throw new FourError(
+          ADAPTER_ERROR_CODE,
+          `Snapshot names a ${type} joint that the restored Rapier world does not contain (§34); the envelope and its Rapier bytes do not belong together.`,
+          { context: { adapter: ADAPTER_NAME, jointId: id } },
+        );
+      }
+      const existing = this.#joints.get(id);
+      const record: JointRecord = existing ?? {
+        id,
+        rapierHandle,
+        joint,
+        type,
+        axisSign,
+        bodyIdA,
+        bodyIdB,
+        alive: true,
+      };
+      record.rapierHandle = rapierHandle;
+      record.joint = joint;
+      record.type = type;
+      record.axisSign = axisSign;
+      record.bodyIdA = bodyIdA;
+      record.bodyIdB = bodyIdB;
+      record.alive = true;
+      survivingJoints.set(id, record);
+    }
+
     for (const record of this.#bodies.values()) {
       if (!survivingBodies.has(record.id)) {
         record.alive = false;
@@ -2085,6 +2691,11 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
     }
     for (const record of this.#colliders.values()) {
       if (!survivingColliders.has(record.id)) {
+        record.alive = false;
+      }
+    }
+    for (const record of this.#joints.values()) {
+      if (!survivingJoints.has(record.id)) {
         record.alive = false;
       }
     }
@@ -2097,8 +2708,13 @@ export class Rapier2dAdapter implements PhysicsSolverAdapter, RapierBodyAccess {
     for (const [id, record] of survivingColliders) {
       this.#colliders.set(id, record);
     }
+    this.#joints.clear();
+    for (const [id, record] of survivingJoints) {
+      this.#joints.set(id, record);
+    }
     this.#nextBodyId = meta.nextBodyId;
     this.#nextColliderId = meta.nextColliderId;
+    this.#nextJointId = meta.nextJointId;
   }
 
   /** Rebuilds the touching-pair set from a restored narrow phase. */

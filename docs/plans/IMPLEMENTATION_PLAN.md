@@ -840,6 +840,113 @@ Dependencies: 5.1 → (5.2 ∥ 5.4); 5.3 ← 5.2; 5.5 ← 5.4; 5.6 ← 5.3 + 5.5
 5.8 ← 5.7; 5.9 last. (5.2/5.3 live in `physics`, 5.4/5.5 in `physics-rapier` — different
 packages, so the pairs run in parallel without worktrees.)
 
+## 6e. Phase 6 — Joints and Constraints (§28, §109; decomposed 2026-08-01)
+
+Exit (§109): constraints remain stable under expected real-time loads — made measurable
+as: the §109 mechanism demo runs ≥3600 fixed steps with bounded positions, no NaN, joint
+constraint drift below documented tolerances, and the browser demo visibly stable.
+
+Phase-level pinned decisions:
+
+- **P6-1 Joint tier** (checked against installed rapier-compat 0.19.3 typings):
+  **fixed, revolute/hinge (motors + limits), prismatic/slider (motors + limits), rope,
+  spring** in both dimensions, **spherical/ball (limits)** in 3D. **Staged out with
+  loud validation errors:** `distance` (Rapier has no rigid distance joint — rope caps
+  max distance only; emulating with a stiff spring would misrepresent §28) and `gear`
+  (no Rapier support). `capabilities.jointTypes` lists exactly what each adapter ships.
+- **P6-2 Break thresholds** live at the `@four/physics` layer: the world monitors joint
+  reaction impulses each step and destroys joints exceeding `breakForce`/`breakTorque`,
+  emitting a `jointbreak` event — IF the adapter can report reaction impulses (workers
+  verify against 0.19.3; if unavailable, breakage is staged with a dated note, not
+  faked).
+- **P6-3 API shape** per §28's sketch: typed joint classes (`HingeJoint({bodyA, bodyB,
+  anchor, axis, limits, motor})`-style) over the §37 `JointDescriptor`; joints register
+  through the world (`world.addJoint(joint)`), not as node components (a joint spans
+  two bodies; §6a's one-per-node model does not fit it).
+- **P6-4 Demo**: a new `examples/mechanism` (§109 list: rotating shaft, hinge, slider,
+  spring, motor, limit switches) with its own vite build, third Playwright webServer,
+  and browser spec. The playground is untouched (its pixel gates stay valid).
+
+Packets:
+
+- **WP-6.1 [S] Joint API** (`@four/physics`) — full `JointDescriptor` discriminated
+  unions for the P6-1 tier (+ staged types rejected in validation with P6-1 cited),
+  §28 joint classes with limits/motor/spring params + break thresholds + collision
+  enable/disable, world.addJoint/removeJoint plumbing to adapter handles, `jointbreak`
+  event type, extended fake-adapter coverage.
+- **WP-6.2 [S] Rapier 2D joints** + **WP-6.3 [S] Rapier 3D joints**
+  (`@four/physics-rapier`, parallel after 6.1) — JointData mapping, motors
+  (targetVelocity/maxTorque → Rapier motor model — verify configureMotor* APIs),
+  limits, reaction-impulse reporting for P6-2 (verify; report honestly),
+  capabilities.jointTypes updated, wasm-backed tests incl. pendulum period vs closed
+  form and motor-driven steady state.
+- **WP-6.4 [S] Integration + breakage** — cross-package suite: hinge pendulum,
+  motorized shaft reaching commanded speed, slider with limits, spring
+  oscillation/damping vs closed form, rope constraint, spherical cone (3D), breakage
+  under load (per P6-2's verified mechanism), §33 checksums stable with joints, both
+  dimensions.
+- **WP-6.5 [H] Mechanism example** (P6-4) — §109's engineering mechanism composed from
+  the landed API; probe measurements seed WP-6.6.
+- **WP-6.6 [S] Phase 6 gates** — determinism golden phase6 (mechanism scenario,
+  cross-process) + mechanism browser spec (third webServer).
+- **WP-6.7 [S] Phase 6 exit** — independent verifier, §109 verdict per the measurable
+  criterion above, fix nothing.
+
+Dependencies: 6.1 → (6.2 ∥ 6.3); 6.4 ← 6.2 + 6.3; 6.5 ← 6.4; 6.6 ← 6.5; 6.7 last.
+
+## 6f. Phase 7 — Physics-Animation Blending (§19, §42, §110; decomposed 2026-08-02)
+
+Exit (§110): a character or machine can move between animated, kinematic, and physical
+control without abrupt discontinuities — made measurable as: across every control-mode
+switch in the integration scenarios, the per-step node displacement stays bounded by a
+documented continuity tolerance (no teleport step), plus the §19 pipeline order proven.
+
+Phase-level pinned decisions:
+
+- **P7-1 Pose targets.** Animation drives *target poses*, not owned transforms, under
+  `"blended"`: a `PoseTarget` component lives in `@four/scene` (position/rotation/
+  scale? — position+rotation MVP), bindable by tweens/mixers like any object. Neither
+  `animation` nor `physics` may import the other (§3.1) — scene is the shared home.
+- **P7-2 Weights.** §19 sketch verbatim: `physicsWeight`/`animationWeight` on
+  `RigidBody`, independent settables normalized at use (warn when both 0). Blend =
+  lerp(position)/slerp(rotation) of target pose vs solver pose.
+- **P7-3 Transitions.** Verify Rapier's runtime `setBodyType` (both dims); extend
+  `SolverBodyAccess` with `setBodyType(handle, type, wake)`; `world.setBodyControlMode`
+  retypes IN PLACE (ids/checksum order preserved) with optional velocity inheritance
+  from finite-differenced target-pose history (ragdoll activation).
+- **P7-4 Blend pipeline.** A `BlendSystem` in `@four/physics` at a priority after
+  PRIORITY_PHYSICS_SOLVE (§19 steps 1–5): before the solve it feeds targets to
+  kinematic bodies (animation-weighted); after it, for `"blended"` nodes, writes the
+  weighted combination of target and solver pose under the `"blended"` authority
+  (unlocking WP-2.3's reserved value). Render interpolation stays downstream (§43).
+- **P7-5 Root motion MVP** (`@four/animation`): a mixer `rootMotion` option extracting
+  per-step TRANSLATION deltas from a designated track onto a designated node;
+  rotational root motion staged with a dated note. Seek does not accumulate (§16).
+
+Packets:
+
+- **WP-7.1 [S] PoseTarget + weights** — `@four/scene` PoseTarget component;
+  `physicsWeight`/`animationWeight` on RigidBody (validation, §19 sketch); tween/mixer
+  binding proof.
+- **WP-7.2 [S] Retype + transitions** — SolverBodyAccess.setBodyType (verify Rapier
+  both dims; ids preserved), world.setBodyControlMode with velocity inheritance.
+- **WP-7.3 [S] BlendSystem** — P7-4 pipeline, "blended" authority writes, continuity
+  clamps documented; fake-adapter tests.
+- **WP-7.4 [S] Root motion MVP** — P7-5 in the mixer; unit + determinism-safe tests.
+- **WP-7.5 [S] Integration** — §19's four examples as scenarios (animated door,
+  hinged door, commanded arm, ragdoll character): full mode-cycle
+  animated→kinematic→dynamic→blended→animated with the continuity tolerance asserted
+  at every switch, both dims where types allow; §33 checksums with blending.
+- **WP-7.6 [H] Blending example** — new `examples/blending` (fourth webServer):
+  an arm/door scene cycling control modes on click; probe seeds WP-7.7.
+- **WP-7.7 [S] Phase 7 gates** — determinism golden phase7 (mode-cycling scenario,
+  cross-process) + blending browser spec.
+- **WP-7.8 [S] Phase 7 exit** — independent verifier, §110 verdict per the measurable
+  criterion, fix nothing.
+
+Dependencies: 7.1 → (7.2 ∥ 7.4); 7.3 ← 7.1+7.2; 7.5 ← 7.3+7.4; 7.6 ← 7.5; 7.7 ← 7.6;
+7.8 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet

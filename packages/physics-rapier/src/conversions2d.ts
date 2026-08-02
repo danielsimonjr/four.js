@@ -230,6 +230,74 @@ export function toRapierBodyType(type: BodyType): number {
 }
 
 /**
+ * The sign a §28 revolute joint's axis gives the plane's one rotational degree
+ * of freedom (§21, plan P6-1, WP-6.2).
+ *
+ * Rapier 2D's `JointData.revolute(anchor1, anchor2)` takes **no axis** — a
+ * plane turns about +Z and about nothing else — while the engine's
+ * `RevoluteJointDescriptor.axis` may name `±Z` (validation rejects everything
+ * else, and an omitted axis means `+Z`). The two are reconciled here rather
+ * than by dropping the sign: a hinge about **−Z** is the same pin with the
+ * positive sense reversed, so its limits and its motor are mirrored.
+ *
+ * ```ts
+ * revoluteAxisSignZ(undefined);                // +1 (the §21 default, +Z)
+ * revoluteAxisSignZ(new Vector3(0, 0, -2));    // -1
+ * ```
+ *
+ * A caller applies the sign as `[-max, -min]` to a limit range and as
+ * `-targetVelocity` to a motor rate — the mirror of the axis, not a
+ * reinterpretation of the numbers.
+ */
+export function revoluteAxisSignZ(axis: Vector3Input | undefined): 1 | -1 {
+  if (axis === undefined) {
+    return 1;
+  }
+  const z = "z" in axis ? axis.z : 0;
+  if (axis.x !== 0 || axis.y !== 0 || z === 0 || !Number.isFinite(z)) {
+    throw new FourError(
+      CONVERSION_ERROR_CODE,
+      `A "2d" world rotates about +Z only, so a revolute joint's axis must be along ±Z; got (${String(axis.x)}, ${String(axis.y)}, ${String(z)}) (§21, §28).`,
+      { context: { dimension: DIMENSION, field: "axis" } },
+    );
+  }
+  return z > 0 ? 1 : -1;
+}
+
+/**
+ * Writes a §28 joint axis into a Rapier 2D vector as a **unit** direction in
+ * the XY plane (§21, §85) — the form `JointData.prismatic` wants.
+ *
+ * Rapier normalizes the axis itself (measured: a prismatic joint built with
+ * `(3, 0)` and limits `±1` still stops at `x = ±1`, i.e. the limits are metres
+ * along the *normalized* axis), so normalizing here changes no simulation. It
+ * is done anyway because it makes that fact explicit at the boundary instead of
+ * leaving a reader to wonder whether `limits` are scaled by the axis length.
+ *
+ * The zero vector is rejected: it names no direction, and Rapier's own
+ * constructor answers `undefined` for it, which would surface much later as a
+ * confusing failure inside `createImpulseJoint`.
+ */
+export function toRapierJointAxis2d(
+  field: string,
+  value: Vector3Input,
+  out: RapierVector2,
+): RapierVector2 {
+  toRapierVector2(field, value, out);
+  const length = Math.hypot(out.x, out.y);
+  if (length === 0) {
+    throw new FourError(
+      CONVERSION_ERROR_CODE,
+      `${field} must be a non-zero direction in the XY plane (§21, §28, §85).`,
+      { context: { dimension: DIMENSION, field } },
+    );
+  }
+  out.x /= length;
+  out.y /= length;
+  return out;
+}
+
+/**
  * Packs §24's separate 32-bit `collisionGroups` and `collisionMask` into the
  * single `u32` Rapier calls `InteractionGroups`.
  *

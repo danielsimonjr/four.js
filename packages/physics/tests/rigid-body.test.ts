@@ -676,3 +676,186 @@ describe("RigidBody as a §6a component", () => {
     expect(seen).toEqual([]);
   });
 });
+
+describe("RigidBody blend weights (§19, P7-2)", () => {
+  it("defaults to fully physical: physicsWeight 1, animationWeight 0", () => {
+    const body = dynamicBody();
+
+    expect(body.physicsWeight).toBe(1);
+    expect(body.animationWeight).toBe(0);
+    expect(body.normalizedWeights()).toEqual({ physics: 1, animation: 0 });
+  });
+
+  it("takes §19's sketch verbatim", () => {
+    const body = dynamicBody();
+    body.physicsWeight = 0.35;
+    body.animationWeight = 0.65;
+
+    expect(body.physicsWeight).toBe(0.35);
+    expect(body.animationWeight).toBe(0.65);
+    const split = body.normalizedWeights();
+    expect(split.physics).toBeCloseTo(0.35, 12);
+    expect(split.animation).toBeCloseTo(0.65, 12);
+  });
+
+  it("keeps the two weights independent — setting one never rewrites the other", () => {
+    const body = dynamicBody();
+    body.animationWeight = 0.25;
+
+    expect(body.physicsWeight).toBe(1);
+    expect(body.animationWeight).toBe(0.25);
+  });
+
+  it("normalizes at use, so unnormalized weights describe the same blend", () => {
+    const a = dynamicBody();
+    a.physicsWeight = 0.35;
+    a.animationWeight = 0.65;
+    const b = dynamicBody();
+    b.physicsWeight = 35;
+    b.animationWeight = 65;
+
+    const first = a.normalizedWeights();
+    const second = b.normalizedWeights();
+    expect(second.physics).toBeCloseTo(first.physics, 12);
+    expect(second.animation).toBeCloseTo(first.animation, 12);
+    expect(second.physics + second.animation).toBeCloseTo(1, 12);
+  });
+
+  it("supports the two pure ends of the blend", () => {
+    const body = dynamicBody();
+
+    body.physicsWeight = 0;
+    body.animationWeight = 3;
+    expect(body.normalizedWeights()).toEqual({ physics: 0, animation: 1 });
+
+    body.physicsWeight = 3;
+    body.animationWeight = 0;
+    expect(body.normalizedWeights()).toEqual({ physics: 1, animation: 0 });
+  });
+
+  it("writes into an `out` record and allocates nothing on a per-step path", () => {
+    const body = dynamicBody();
+    body.physicsWeight = 1;
+    body.animationWeight = 3;
+    const out = { physics: 0, animation: 0 };
+
+    const returned = body.normalizedWeights(out);
+
+    expect(returned).toBe(out);
+    expect(out.physics).toBeCloseTo(0.25, 12);
+    expect(out.animation).toBeCloseTo(0.75, 12);
+  });
+
+  it("rejects negative and non-finite weights (§85)", () => {
+    const body = dynamicBody();
+
+    for (const bad of [-1, -0.001, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const error = expectValidationError(() => {
+        body.physicsWeight = bad;
+      });
+      expect(error.message).toContain("physicsWeight");
+      expectValidationError(() => {
+        body.animationWeight = bad;
+      });
+    }
+
+    // Nothing was applied by a rejected assignment.
+    expect(body.physicsWeight).toBe(1);
+    expect(body.animationWeight).toBe(0);
+  });
+
+  it("accepts zero on either weight", () => {
+    const body = dynamicBody();
+    body.physicsWeight = 0;
+    expect(body.physicsWeight).toBe(0);
+    body.animationWeight = 0;
+    expect(body.animationWeight).toBe(0);
+  });
+
+  it("falls back to fully physical when both weights are zero, warning once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = dynamicBody();
+    body.physicsWeight = 0;
+
+    expect(body.normalizedWeights()).toEqual({ physics: 1, animation: 0 });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("§19");
+
+    for (let i = 0; i < 10; i += 1) {
+      body.normalizedWeights();
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("suppresses the both-zero warning per body, not globally", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const first = dynamicBody();
+    const second = dynamicBody();
+    first.physicsWeight = 0;
+    second.physicsWeight = 0;
+
+    first.normalizedWeights();
+    second.normalizedWeights();
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it("keeps the suppression sticky once a body has warned", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = dynamicBody();
+    body.physicsWeight = 0;
+    body.normalizedWeights();
+
+    body.physicsWeight = 1;
+    expect(body.normalizedWeights()).toEqual({ physics: 1, animation: 0 });
+    body.physicsWeight = 0;
+    body.normalizedWeights();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("keeps the ratio when the two weights sum past Number.MAX_VALUE", () => {
+    const body = dynamicBody();
+    body.physicsWeight = Number.MAX_VALUE;
+    body.animationWeight = Number.MAX_VALUE;
+
+    const split = body.normalizedWeights();
+
+    expect(split.physics).toBeCloseTo(0.5, 12);
+    expect(split.animation).toBeCloseTo(0.5, 12);
+  });
+
+  it("keeps an asymmetric ratio through the same overflow", () => {
+    const body = dynamicBody();
+    body.physicsWeight = Number.MAX_VALUE;
+    body.animationWeight = Number.MAX_VALUE / 3;
+
+    const split = body.normalizedWeights();
+
+    expect(split.physics).toBeCloseTo(0.75, 12);
+    expect(split.animation).toBeCloseTo(0.25, 12);
+    expect(split.physics + split.animation).toBeCloseTo(1, 12);
+  });
+
+  it("keeps blend weights out of the solver descriptor (§37)", () => {
+    const body = dynamicBody();
+    body.physicsWeight = 0.35;
+    body.animationWeight = 0.65;
+
+    const descriptor = body.toDescriptor();
+
+    expect("physicsWeight" in descriptor).toBe(false);
+    expect("animationWeight" in descriptor).toBe(false);
+  });
+
+  it("is per body, not shared", () => {
+    const a = dynamicBody();
+    const b = dynamicBody();
+    a.animationWeight = 0.5;
+
+    expect(b.animationWeight).toBe(0);
+  });
+});

@@ -176,7 +176,14 @@ describe("capabilities and identity (§37)", () => {
     expect(adapter.name).toBe("rapier3d");
     expect(adapter.capabilities).toEqual({
       dimensions: ["3d"],
-      jointTypes: [],
+      jointTypes: [
+        "fixed",
+        "spring",
+        "revolute",
+        "prismatic",
+        "spherical",
+        "rope",
+      ],
       ccdModes: ["disabled", "speculative", "swept"],
       determinism: "same-runtime",
       snapshots: true,
@@ -1524,22 +1531,28 @@ describe("shapes (plan P5-6 3D tier)", () => {
   });
 });
 
-describe("joints (plan P5-4)", () => {
-  it("throws NOT_IMPLEMENTED from both joint entry points", async () => {
+describe("joints (plan P6-1)", () => {
+  // The joint surface itself is exercised in `rapier3d-joints.test.ts`
+  // (WP-6.3); this is only the hand-off from the WP-5.5 staging stub.
+  it("builds joints and declares the shipped types", async () => {
     const adapter = await createAdapter();
-    const bodyA = adapter.createBody({ type: "dynamic" });
-    const bodyB = adapter.createBody({ type: "dynamic" });
-    try {
-      adapter.createJoint({ type: "spherical", bodyA, bodyB });
-      throw new Error("expected createJoint to throw");
-    } catch (error) {
-      expect(error).toBeInstanceOf(FourError);
-      expect((error as FourError).code).toBe("NOT_IMPLEMENTED");
-    }
-    expect(() => adapter.destroyJoint(undefined as never)).toThrowError(
-      /staged to Phase 6/u,
-    );
-    expect(adapter.capabilities.jointTypes).toEqual([]);
+    const bodyA = adapter.createBody({ type: "static" });
+    const bodyB = adapter.createBody({
+      type: "dynamic",
+      position: new Vector3(1, 0, 0),
+    });
+    const joint = adapter.createJoint({ type: "spherical", bodyA, bodyB });
+    expect(adapter.getJointId(joint)).toBe(1);
+    expect(adapter.capabilities.jointTypes).toEqual([
+      "fixed",
+      "spring",
+      "revolute",
+      "prismatic",
+      "spherical",
+      "rope",
+    ]);
+    adapter.destroyJoint(joint);
+    expect(() => adapter.destroyJoint(joint)).toThrowError(FourError);
     adapter.dispose();
   });
 });

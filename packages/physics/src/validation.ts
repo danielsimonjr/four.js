@@ -41,12 +41,24 @@ import { FourError } from "@four/core";
 import type { Matrix3 } from "@four/math";
 
 import type {
+  AngularJointMotor,
   ColliderDescriptor,
   JointDescriptor,
+  JointLimits,
+  LinearJointMotor,
   PhysicsWorldOptions,
   RigidBodyDescriptor,
+  ShippedJointType,
+  SphericalJointLimits,
 } from "./descriptors.js";
-import { resolveGravity, resolveRotation } from "./descriptors.js";
+import {
+  JOINT_TYPES,
+  SHIPPED_JOINT_TYPES,
+  STAGED_JOINT_TYPES,
+  jointTypeSupportsDimension,
+  resolveGravity,
+  resolveRotation,
+} from "./descriptors.js";
 import { validateCollisionShape } from "./shapes.js";
 import type { BodyType, PhysicsDimension, Vector3Input } from "./types.js";
 import {
@@ -79,6 +91,17 @@ function requireNonNegative(field: string, value: number): void {
   requireFinite(field, value);
   if (value < 0) {
     fail(`${field} must be >= 0; got ${String(value)} (§85).`, {
+      field,
+      value,
+    });
+  }
+}
+
+/** §85: a parameter that must be strictly positive — a length, a stiffness. */
+function requirePositive(field: string, value: number): void {
+  requireFinite(field, value);
+  if (value <= 0) {
+    fail(`${field} must be > 0; got ${String(value)} (§85).`, {
       field,
       value,
     });
@@ -302,18 +325,192 @@ export function validateColliderDescriptor(
 }
 
 /**
- * Validates a joint descriptor against §28 and the world's dimension (§21).
+ * Validates a joint's travel limits (§28 "limits"): finite bounds with
+ * `min <= max`.
  *
- * Minimal, matching the minimal descriptor (plan P5-4): a joint's type is a
- * name the *adapter* has to recognize — `PhysicsCapabilities.jointTypes` is
- * `string[]` (§37) — so what is checked here is what the engine can check
- * without a solver: that the two bodies differ and that the anchors are
- * representable in the world's dimension.
+ * Exported because the `HingeJoint` and `SliderJoint` setters enforce the same
+ * rule on assignment, and there must be exactly one statement of it. Radians or
+ * metres depending on the joint; the rule is the same either way.
+ */
+export function validateJointLimits(field: string, limits: JointLimits): void {
+  requireFinite(`${field}.min`, limits.min);
+  requireFinite(`${field}.max`, limits.max);
+  if (limits.min > limits.max) {
+    fail(
+      `${field}.min must be <= ${field}.max; got [${String(limits.min)}, ${String(limits.max)}] (§28, §85). Equal bounds lock the axis.`,
+      { field, min: limits.min, max: limits.max },
+    );
+  }
+}
+
+/**
+ * Validates a ball joint's swing cone and optional twist (§28 "limits").
+ *
+ * The cone half-angle must be in `(0, π]`: zero would weld the swing — which
+ * is a fixed joint, not a limited ball joint — and more than π is not a cone.
+ */
+export function validateSphericalJointLimits(
+  field: string,
+  limits: SphericalJointLimits,
+): void {
+  requireFinite(`${field}.coneAngle`, limits.coneAngle);
+  if (limits.coneAngle <= 0 || limits.coneAngle > Math.PI) {
+    fail(
+      `${field}.coneAngle is a half-angle in radians and must be in (0, π]; got ${String(limits.coneAngle)} (§28, §85). Use a FixedJoint to remove the swing entirely.`,
+      { field: `${field}.coneAngle`, value: limits.coneAngle },
+    );
+  }
+  if (limits.twist !== undefined) {
+    validateJointLimits(`${field}.twist`, limits.twist);
+  }
+}
+
+/** Validates a revolute joint's velocity motor (§28 "motors"). */
+export function validateAngularJointMotor(
+  field: string,
+  motor: AngularJointMotor,
+): void {
+  requireFinite(`${field}.targetVelocity`, motor.targetVelocity);
+  requireNonNegative(`${field}.maxTorque`, motor.maxTorque);
+}
+
+/** Validates a prismatic joint's velocity motor (§28 "motors"). */
+export function validateLinearJointMotor(
+  field: string,
+  motor: LinearJointMotor,
+): void {
+  requireFinite(`${field}.targetVelocity`, motor.targetVelocity);
+  requireNonNegative(`${field}.maxForce`, motor.maxForce);
+}
+
+/**
+ * Validates a §28 break threshold: finite and **positive**.
+ *
+ * Zero is rejected rather than read as "breaks immediately": a joint that
+ * cannot survive its own creation is never what a caller meant, and omitting
+ * the threshold is how "never breaks" is expressed (plan P6-2).
+ */
+export function validateJointBreakThreshold(
+  field: string,
+  value: number,
+): void {
+  requireFinite(field, value);
+  if (value <= 0) {
+    fail(
+      `${field} must be positive; got ${String(value)} (§28, §85). Omit it for a joint that never breaks.`,
+      { field, value },
+    );
+  }
+}
+
+/**
+ * Rejects a §28 joint type this phase does not build, with the reason (plan
+ * P6-1).
+ *
+ * Three ways to fail, three different messages, because they need three
+ * different fixes: a *staged* type (`distance`, `gear`) is a type no solver
+ * here can honour; `motorized` is a type that exists as the `motor` field of
+ * another joint; anything else is not a §28 type at all.
+ */
+function failUnshippedJointType(type: string): never {
+  if (type === "motorized") {
+    fail(
+      'A "motorized" joint is not a type of its own: §28\'s own example drives a hinge through its `motor` field, so use a revolute or prismatic joint with `motor: { enabled, targetVelocity, maxTorque | maxForce }` (§28, plan P6-1).',
+      { field: "type", value: type },
+    );
+  }
+  if ((STAGED_JOINT_TYPES as readonly string[]).includes(type)) {
+    fail(
+      `Joint type ${JSON.stringify(type)} is staged and does not ship in this phase (plan P6-1): no solver here can honour it — Rapier has no rigid distance joint (its rope caps a maximum distance only) and no gear joint, and emulating either would misrepresent §28. This phase ships ${SHIPPED_JOINT_TYPES.join(", ")}.`,
+      { field: "type", value: type, staged: [...STAGED_JOINT_TYPES] },
+    );
+  }
+  fail(
+    `Unknown joint type ${JSON.stringify(type)}; §28 names ${JOINT_TYPES.join(", ")} and this phase ships ${SHIPPED_JOINT_TYPES.join(", ")} (plan P6-1).`,
+    { field: "type", value: type },
+  );
+}
+
+/**
+ * §21/§28: a joint axis must be a real direction, and the dimension decides
+ * which directions exist.
+ *
+ * In a `"2d"` world the two rules are mirror images: a **revolute** joint turns
+ * about the plane normal, so its axis must be along ±Z, while a **prismatic**
+ * joint slides *within* the plane, so its axis must have `z === 0`. In a `"3d"`
+ * world any non-zero direction will do — and the zero vector is precisely how a
+ * hinge that was never given an axis arrives here, which is why the message
+ * says so.
+ */
+function requireJointAxis(
+  type: ShippedJointType,
+  field: string,
+  value: Vector3Input,
+  dimension: PhysicsDimension,
+): void {
+  requireFinite(`${field}.x`, value.x);
+  requireFinite(`${field}.y`, value.y);
+  const z = "z" in value ? value.z : 0;
+  requireFinite(`${field}.z`, z);
+
+  if (dimension === "2d") {
+    if (type === "revolute") {
+      if (value.x !== 0 || value.y !== 0 || z === 0) {
+        fail(
+          `A "2d" world rotates about +Z only, so a revolute joint's ${field} must be along ±Z; got (${String(value.x)}, ${String(value.y)}, ${String(z)}) (§21, §28). Omit the axis to accept the default.`,
+          { field, dimension, type },
+        );
+      }
+      return;
+    }
+    if (z !== 0 || (value.x === 0 && value.y === 0)) {
+      fail(
+        `A "2d" world slides in the XY plane, so a prismatic joint's ${field} must be a non-zero direction with z = 0; got (${String(value.x)}, ${String(value.y)}, ${String(z)}) (§21, §28).`,
+        { field, dimension, type },
+      );
+    }
+    return;
+  }
+
+  if (value.x === 0 && value.y === 0 && z === 0) {
+    fail(
+      `A ${type} joint's ${field} must be a non-zero direction; got the zero vector (§28, §85). In a "3d" world the axis has no default — name the axis the joint turns or slides along.`,
+      { field, dimension, type },
+    );
+  }
+}
+
+/**
+ * Validates a joint descriptor against §28, plan P6-1's shipped tier, and the
+ * world's dimension (§21).
+ *
+ * Checked, in this order: the type ships at all (staged and unknown types fail
+ * loudly here, so a JavaScript caller cannot slip past the compile-time
+ * narrowing of `JointDescriptor`); the type is legal in this dimension
+ * (`spherical` is `"3d"` only); the two bodies differ; the anchors lie in the
+ * world's plane; the break thresholds are positive; and every parameter the
+ * specific type carries — axis direction, limit ordering, motor effort, rope
+ * length, spring constants, cone half-angle.
+ *
+ * Anchors and axes are in **body-local** space here — see `JointDescriptorBase`
+ * — because that is the space a descriptor is stated in; the world-space
+ * conversion happens before this is ever called.
  */
 export function validateJointDescriptor(
   desc: JointDescriptor,
   dimension: PhysicsDimension,
 ): void {
+  const type: string = desc.type;
+  if (!(SHIPPED_JOINT_TYPES as readonly string[]).includes(type)) {
+    failUnshippedJointType(type);
+  }
+  if (!jointTypeSupportsDimension(desc.type, dimension)) {
+    fail(
+      `A ${desc.type} joint is not valid in a "${dimension}" world (§21, §28, plan P6-1). A ball joint's swing degrees of freedom do not exist in a plane; use a revolute joint.`,
+      { field: "type", value: desc.type, dimension },
+    );
+  }
+
   if (desc.bodyA === desc.bodyB) {
     fail(
       "A joint must connect two different bodies; bodyA and bodyB are the same handle (§28).",
@@ -325,6 +522,62 @@ export function validateJointDescriptor(
   }
   if (desc.anchorB !== undefined) {
     requirePlanarVector("anchorB", desc.anchorB, dimension);
+  }
+  if (desc.breakForce !== undefined) {
+    validateJointBreakThreshold("breakForce", desc.breakForce);
+  }
+  if (desc.breakTorque !== undefined) {
+    validateJointBreakThreshold("breakTorque", desc.breakTorque);
+  }
+
+  switch (desc.type) {
+    case "fixed":
+      return;
+    case "revolute":
+      if (desc.axis === undefined) {
+        if (dimension === "3d") {
+          fail(
+            'A revolute joint in a "3d" world must name the axis it turns about (§28); only a "2d" world has a default (+Z, §21).',
+            { field: "axis", dimension },
+          );
+        }
+      } else {
+        requireJointAxis("revolute", "axis", desc.axis, dimension);
+      }
+      if (desc.limits !== undefined) {
+        validateJointLimits("limits", desc.limits);
+      }
+      if (desc.motor !== undefined) {
+        validateAngularJointMotor("motor", desc.motor);
+      }
+      return;
+    case "prismatic":
+      requireJointAxis("prismatic", "axis", desc.axis, dimension);
+      if (desc.limits !== undefined) {
+        validateJointLimits("limits", desc.limits);
+      }
+      if (desc.motor !== undefined) {
+        validateLinearJointMotor("motor", desc.motor);
+      }
+      return;
+    case "rope":
+      requirePositive("maxLength", desc.maxLength);
+      return;
+    case "spring":
+      requireNonNegative("restLength", desc.restLength);
+      requirePositive("stiffness", desc.stiffness);
+      if (desc.damping !== undefined) {
+        requireNonNegative("damping", desc.damping);
+      }
+      return;
+    default:
+      if (desc.axis !== undefined) {
+        requireJointAxis("spherical", "axis", desc.axis, dimension);
+      }
+      if (desc.limits !== undefined) {
+        validateSphericalJointLimits("limits", desc.limits);
+      }
+      return;
   }
 }
 

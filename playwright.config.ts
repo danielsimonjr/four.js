@@ -4,16 +4,37 @@ import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 /**
- * Playwright configuration for the browser gate (WP-3.8).
+ * Playwright configuration for the browser gates (WP-3.8, extended by WP-5.8
+ * and WP-6.6).
  *
- * The suite drives the built `examples/first-2d-scene` bundle in headless
- * Chromium and asserts the three things a renderer-phase exit needs from a real
- * browser: the page loads clean, the canvas is not blank, and it animates.
+ * The suite drives **three built example sites** in headless Chromium:
+ *
+ * | site | port | specs | what it gates |
+ * | ---- | ---- | ----- | ------------- |
+ * | `examples/first-2d-scene` | {@link PORT} | `example`, `smoothness`, `animation`, `interaction` | the page loads clean, the canvas is not blank, it animates smoothly, and the pointer reaches it (§106, §106a) |
+ * | `examples/physics-playground` | {@link PLAYGROUND_PORT} | `playground` | §108's mixed 2D/3D physics demo: gravity, collisions, impulses and sensors through one API |
+ * | `examples/mechanism` | {@link MECHANISM_PORT} | `mechanism` | §109's jointed mechanism: a motorised shaft, three hinges, a limited slider, a spring and two limit switches, stable under a real-time load and reconfigurable while running |
+ *
  * There are no golden images — SwiftShader rasterises slightly differently from
  * a GPU, so every assertion is a threshold, never a pixel match (§92).
  *
- * Run `pnpm example:build` first: the web server below serves the *built*
- * `examples/first-2d-scene/dist`, which is gitignored and may be absent.
+ * Run **all three** builds first: the web servers below serve the *built* `dist`
+ * directories, which are gitignored and may be absent.
+ *
+ * ```sh
+ * pnpm example:build      # examples/first-2d-scene/dist
+ * pnpm playground:build   # examples/physics-playground/dist
+ * pnpm mechanism:build    # examples/mechanism/dist
+ * pnpm test:browser
+ * ```
+ *
+ * `use.baseURL` stays the first site's, so every pre-existing spec keeps
+ * navigating with `page.goto("/")` unchanged; `playground.spec.ts` and
+ * `mechanism.spec.ts` name their own absolute URLs, and restate
+ * {@link PLAYGROUND_PORT} / {@link MECHANISM_PORT} for the reason the other
+ * specs restate the example's scene constants — a browser gate checks the built
+ * page from the outside, and a spec that imported this file would drag a second
+ * copy of the config into every worker.
  */
 
 /**
@@ -61,7 +82,29 @@ function findPreinstalledChromium(): string | undefined {
   return undefined;
 }
 
+/** Preview port for `examples/first-2d-scene` — the suite's `baseURL`. */
 const PORT = 4173;
+
+/**
+ * Preview port for `examples/physics-playground`.
+ *
+ * A second port rather than a second run: the two sites are independent Vite
+ * builds, `vite preview` serves exactly one `dist` each, and Playwright starts
+ * every entry of a `webServer` array before the first test. 4174 is the next
+ * free port above {@link PORT} and is restated verbatim in
+ * `tests/browser/playground.spec.ts`.
+ */
+const PLAYGROUND_PORT = 4174;
+
+/**
+ * Preview port for `examples/mechanism` — §109's demonstration.
+ *
+ * A third entry rather than a third run, for {@link PLAYGROUND_PORT}'s reason:
+ * `vite preview` serves exactly one `dist`, and Playwright starts every entry of
+ * a `webServer` array before the first test. 4175 is the next free port above
+ * the playground's and is restated verbatim in `tests/browser/mechanism.spec.ts`.
+ */
+const MECHANISM_PORT = 4175;
 
 export default defineConfig({
   testDir: "tests/browser",
@@ -87,13 +130,39 @@ export default defineConfig({
     },
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
-  webServer: {
-    command: `npx vite preview examples/first-2d-scene --port ${String(PORT)} --strictPort`,
-    url: `http://localhost:${String(PORT)}`,
-    // A stale server could be serving an older build than the one just built.
-    reuseExistingServer: false,
-    timeout: 60_000,
-    stdout: "ignore",
-    stderr: "pipe",
-  },
+  // All three sites are started before the first test and torn down after the
+  // last, so one `pnpm test:browser` run covers every spec in `testDir`. The
+  // entries use different ports, so they coexist rather than race for one.
+  webServer: [
+    {
+      command: `npx vite preview examples/first-2d-scene --port ${String(PORT)} --strictPort`,
+      url: `http://localhost:${String(PORT)}`,
+      // A stale server could be serving an older build than the one just built.
+      reuseExistingServer: false,
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/physics-playground --port ${String(PLAYGROUND_PORT)} --strictPort`,
+      url: `http://localhost:${String(PLAYGROUND_PORT)}`,
+      reuseExistingServer: false,
+      // The playground's bundle carries two Rapier wasm images and is ~4 MB, so
+      // the *first* request is slower than the example's; the server itself
+      // still starts in well under a second.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/mechanism --port ${String(MECHANISM_PORT)} --strictPort`,
+      url: `http://localhost:${String(MECHANISM_PORT)}`,
+      reuseExistingServer: false,
+      // One Rapier wasm image rather than two (the mechanism is a `"2d"` world),
+      // so this bundle is about half the playground's.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  ],
 });

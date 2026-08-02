@@ -124,9 +124,15 @@ export interface PhysicsCapabilities {
    * The §28 joint types this adapter implements, by name.
    *
    * `string` rather than the engine's `JointType` union, per §37 — an adapter
-   * may expose a solver-specific constraint the engine has no name for. Phase 5
-   * adapters declare `[]`: joints are staged to Phase 6 (plan P5-4), and
-   * `createJoint` throws `NOT_IMPLEMENTED` until then.
+   * may expose a solver-specific constraint the engine has no name for. An
+   * adapter declares exactly the `ShippedJointType`s it builds (plan P6-1);
+   * `[]` means `createJoint` throws `NOT_IMPLEMENTED`, which is where the two
+   * Rapier adapters stand until WP-6.2/6.3.
+   *
+   * This declaration is about *which* types an adapter builds. Whether the
+   * engine can talk to its joints at all — ids, reactions, live reconfiguration
+   * — is the separate `SolverJointAccess` seam, detected structurally rather
+   * than declared here, because §37 fixes this record's six fields.
    */
   readonly jointTypes: readonly string[];
 
@@ -217,14 +223,25 @@ export interface PhysicsSolverAdapter extends Disposable {
   /**
    * Creates a joint and returns its handle (§37, §28).
    *
-   * **Staged to Phase 6** (plan P5-4): the signature ships now so the interface
-   * is complete and implementors know what is coming, and Phase 5 adapters
-   * throw `FourError("NOT_IMPLEMENTED")` while declaring
-   * `capabilities.jointTypes: []`.
+   * `desc` is the full plan P6-1 discriminated union (WP-6.1); anchors and axes
+   * in it are **body-local**, already converted from the world-space frames the
+   * `Joint` classes are authored in. An adapter that does not build the type it
+   * is handed throws `FourError("NOT_IMPLEMENTED")` and declares that by
+   * leaving the type out of `capabilities.jointTypes`.
+   *
+   * An adapter with joints also implements `SolverJointAccess`, without which
+   * `PhysicsWorld.addJoint` refuses to register anything: §37's two methods mint
+   * and release a handle but cannot answer for the joint afterwards.
    */
   createJoint(desc: JointDescriptor): PhysicsJointHandle;
 
-  /** Destroys a joint (§37). Staged with {@link PhysicsSolverAdapter.createJoint}. */
+  /**
+   * Destroys a joint (§37). The handle is invalid afterwards.
+   *
+   * The physics package destroys a joint before either of its bodies and before
+   * disposal, so an adapter never has to guess what a constraint on a dead body
+   * means (§83).
+   */
   destroyJoint(handle: PhysicsJointHandle): void;
 
   /**

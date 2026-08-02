@@ -7,6 +7,10 @@ implemented where noted; the rest are scaffold only.
 - [`first-2d-scene/`](first-2d-scene/) — **Implemented.** First 2D scene (§93) grown into
   the interactive demo: shapes, motion, picking, dragging, text, animation
   (`pnpm run example:build`).
+- [`mechanism/`](mechanism/) — **Implemented.** The §109 Phase 6 demonstration: a
+  motor-driven slider–crank — rotating shaft, hinges, limited slider, spring buffer,
+  limit-switch lamps, click-to-coast motor with speed controls
+  (`pnpm run mechanism:build`).
 - [`physics-playground/`](physics-playground/) — **Implemented.** The §108 Phase 5 exit
   demonstration: a 2D world and a 3D world stepping side by side through one API —
   gravity, collisions, click impulses, sensor zones (`pnpm run playground:build`).

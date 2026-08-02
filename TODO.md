@@ -6,11 +6,29 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 5 — Physics API + Rapier adapter (§20–32, §37, §108): rolling-wave
-      decomposition into plan §6d, then dispatch (descriptors, world API, §37 adapter
-      contract incl. drainEvents + capabilities, rapier2d+3d wasm pins per MEMORY
-      2026-07-29, event normalization, sync into the WP-2.6 pose store, §33 checksums
-      via WP-1.13).
+- [ ] Phase 7 — Physics-animation blending (§19, §42, §110): rolling-wave decomposition
+      into plan §6f, then dispatch (the reserved "blended" authority, animation pose →
+      kinematic modification → physics solve → interpolated render pose pipeline,
+      ragdoll-style handover; exit = animated↔kinematic↔physical control without
+      abrupt discontinuities).
+
+### Backlog additions (Phase 6 exit, 2026-08-02)
+- [ ] §28 solver-iterations constraint feature is not exposed anywhere — Rapier offers
+      world-level `IntegrationParameters.numSolverIterations`; a world option is
+      plausible (recorded gap, not per-joint)
+- [ ] §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased
+      gain, not a hard ceiling (documented in the stable API docs); name it in the
+      §90/§102 capability tables when a capping adapter (Box2D) arrives
+
+### Backlog additions (Phase 5, 2026-08-01)
+- [ ] Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a
+      toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
+- [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
+      heightfield/compound) — staged out by P5-6, widen in a later packet
+- [ ] §31 speculative-CCD prediction distance is a pinned constant (1.0) — needs a
+      descriptor field
+- [ ] Document SolverBodyAccess in the §90/§102 compatibility material when adapters
+      beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
 - [ ] Typedoc link warnings cleanup (34 total, 8 new from animation: ./clip.js#…,
@@ -40,16 +58,24 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + apply the
       `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
 
-### Phase 5 (when it starts)
-- [ ] Pin exact `@dimforge/rapier2d`/`@dimforge/rapier3d` versions (strategy decided
-      2026-07-29 — see MEMORY.md)
-
 ### Documentation
 - [ ] Optionally regenerate the specification PDF from `docs/SPECIFICATION.md` (the archived
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 6 complete** (§109): 7 packets + 2 fixes — §28 joint tier
+      shipped honestly against measured Rapier 0.19.3 behavior (breakage via the engine
+      seam, refused where solvers can't report reactions; spherical without fake cone
+      limits), slider-crank mechanism demo, jointed determinism golden, mechanism
+      browser spec; 1,998 unit + 95 suite + 23 browser tests; §109 stability proven
+      over 3600 steps with drift ≤1.3e-5 m
+- [x] 2026-08-01 — **Phase 5 complete** (§108): 9 packets + 2 fixes, exit GREEN zero
+      defects — full physics API over the §37 adapter contract, Rapier 2D+3D on pinned
+      -compat@0.19.3 wasm, density-derived mass end-to-end, mixed 2D/3D proven by
+      integration tests, the physics-playground demo with browser-pixel evidence, and a
+      600-step cross-process determinism golden; 1,827 unit + 60 suite + 19 browser
+      tests; physics 100% coverage
 - [x] 2026-08-01 — **Phase 4 complete** (§107): 10 packets, exit GREEN zero defects —
       numeric/vector/quaternion/color/transform properties all animatable, proven at
       unit, determinism-golden (cross-process, marker steps pinned), and browser-pixel

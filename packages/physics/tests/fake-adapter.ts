@@ -23,6 +23,15 @@
  * It is deliberately **not exported from the package**: it is a test fixture,
  * not a shipped adapter, and `@four/physics` ships no solver (§20).
  *
+ * ## Two doubles, on purpose (WP-6.1)
+ *
+ * `FakeSolverAdapter` has **no joints**: its `createJoint` throws
+ * `NOT_IMPLEMENTED`, exactly as both Rapier adapters still do, and
+ * `supportsSolverJointAccess` answers `false` for it — which is what proves the
+ * world's structural seam detection. `FakeJointSolverAdapter` (bottom of this
+ * file) is the same double *with* `SolverJointAccess`, including scripted
+ * reaction impulses for the plan P6-2 break monitor.
+ *
  * ## Mass model
  *
  * `mass = descriptor.mass ?? Σ collider density` — every shape has unit volume
@@ -37,9 +46,12 @@ import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import type {
   AngularVelocityInput,
+  BodyType,
   CCDMode,
   ColliderDescriptor,
   JointDescriptor,
+  SolverJointAccess,
+  SolverJointMotor,
   OverlapHit,
   OverlapQuery,
   PhysicsBodyHandle,
@@ -94,6 +106,16 @@ export interface FakeBody {
   readonly torque: Vector3;
   /** The pending `"kinematic-position"` target, or `null`. */
   kinematicTarget: { position: Vector3; rotation: Quaternion } | null;
+  /**
+   * The §22 model the fake solver is currently running this body under.
+   *
+   * Seeded from `descriptor.type` and moved by
+   * {@link FakeSolverAdapter.setBodyType} (WP-7.2). The integrator branches on
+   * **this** and not on the descriptor, so a re-typed body starts behaving as
+   * its new type on the very next `step` — which is the behaviour
+   * `PhysicsWorld.setBodyControlMode` is asserted against.
+   */
+  type: BodyType;
   sleeping: boolean;
   mass: number;
   ccdMode: CCDMode;
@@ -267,6 +289,7 @@ export class FakeSolverAdapter
       force: new Vector3(),
       torque: new Vector3(),
       kinematicTarget: null,
+      type: desc.type,
       sleeping: false,
       mass: desc.mass ?? 0,
       ccdMode: desc.ccdMode ?? "disabled",
@@ -327,10 +350,11 @@ export class FakeSolverAdapter
     );
   }
 
-  destroyJoint(): void {
+  destroyJoint(handle: PhysicsJointHandle): void {
+    void handle;
     throw new FourError(
       "NOT_IMPLEMENTED",
-      "Joints are staged to Phase 6 (plan P5-4).",
+      "Joints are staged to Phase 6 (plan P5-4); FakeJointSolverAdapter is the double that has them.",
     );
   }
 
@@ -347,7 +371,7 @@ export class FakeSolverAdapter
     this.#record("step", undefined, delta);
     this.steps += 1;
     for (const body of this.bodies.values()) {
-      const type = body.descriptor.type;
+      const type = body.type;
       if (type === "kinematic-position") {
         const target = body.kinematicTarget;
         if (target !== null) {
@@ -642,6 +666,24 @@ export class FakeSolverAdapter
     );
   }
 
+  /**
+   * Re-types a body in place (§22, plan P7-3), keeping its id, its place in
+   * `bodies` — and therefore in {@link FakeSolverAdapter.forEachBody} — its
+   * colliders, its pose, and its velocities.
+   *
+   * `wake` defaults to `true` and clears {@link FakeBody.sleeping}, exactly as
+   * Rapier's own `setBodyType(type, wakeUp)` does; `false` leaves the §32 sleep
+   * state alone.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake = true): void {
+    const body = this.#requireBody(handle);
+    body.type = type;
+    if (wake) {
+      body.sleeping = false;
+    }
+    this.#record("setBodyType", body.id, type, wake);
+  }
+
   wakeBody(handle: PhysicsBodyHandle): void {
     const body = this.#requireBody(handle);
     body.sleeping = false;
@@ -667,7 +709,12 @@ export class FakeSolverAdapter
   getBodyMass(handle: PhysicsBodyHandle): number {
     const body = this.#requireBody(handle);
     this.#record("getBodyMass", body.id);
-    return body.descriptor.type === "dynamic" ? body.mass : 0;
+    // The **live** type, not the descriptor's: since WP-7.2 a body can be
+    // re-typed in place, and the descriptor stops describing it the moment it
+    // is. Reporting 0 for anything but a dynamic body is this double's own
+    // simplification (Rapier reports the collider-derived mass whatever the
+    // type) and is what `PhysicsWorld`'s mass refresh is written against.
+    return body.type === "dynamic" ? body.mass : 0;
   }
 
   getBodyId(handle: PhysicsBodyHandle): number {
@@ -734,5 +781,179 @@ export class FakeSolverAdapter
       );
     }
     return collider;
+  }
+}
+
+/** The live state of one fake joint — scriptable from a test (WP-6.1). */
+export interface FakeJoint {
+  readonly id: number;
+  readonly handle: PhysicsJointHandle;
+  readonly descriptor: JointDescriptor;
+  /**
+   * Reaction impulse in newton-seconds the next `getJointReaction` reports.
+   * Scripted by a test; the fake solves nothing, so nothing else writes it.
+   */
+  readonly reactionLinear: Vector3;
+  /** Reaction angular impulse in newton-metre-seconds. See `reactionLinear`. */
+  readonly reactionAngular: Vector3;
+  /** The last limits `setJointLimits` received, or `null`. */
+  limits: { min: number; max: number } | null;
+  /** The last motor `setJointMotor` received, or `null`. */
+  motor: SolverJointMotor | null;
+  alive: boolean;
+}
+
+/**
+ * `FakeSolverAdapter` plus the WP-6.1 joint seam — a structural
+ * `PhysicsSolverAdapter & SolverBodyAccess & SolverJointAccess`.
+ *
+ * Kept as a **subclass** rather than folded into `FakeSolverAdapter` for one
+ * reason: `PhysicsWorld` detects the joint seam *structurally*, so a double
+ * that lacks it is exactly what proves the detection works. `FakeSolverAdapter`
+ * stays the jointless Phase 5 adapter (its `createJoint` throws
+ * `NOT_IMPLEMENTED`, as both Rapier adapters still do) and this one is the
+ * Phase 6 adapter.
+ *
+ * Everything the world observes about a joint is real here: monotonic ids in
+ * creation order, `forEachJoint` in that order, destroyed handles rejected, and
+ * limits/motors recorded as the world pushes them. The one thing the fake
+ * cannot derive — the constraint reaction — is **scripted** through
+ * {@link FakeJointSolverAdapter.scriptJointReaction}, which is what lets a test
+ * drive the break monitor to an exact threshold.
+ */
+export class FakeJointSolverAdapter
+  extends FakeSolverAdapter
+  implements SolverJointAccess
+{
+  /** Whether reactions are reported at all (plan P6-2). Settable by a test. */
+  reportsJointReactions = true;
+
+  /** Live joints keyed by monotonic id; `Map` iteration is creation order. */
+  readonly joints = new Map<number, FakeJoint>();
+
+  #nextJointId = 1;
+
+  // --- test surface ---------------------------------------------------------
+
+  /** The live state of the joint with monotonic id `id`. */
+  joint(id: number): FakeJoint {
+    const joint = this.joints.get(id);
+    if (joint === undefined) {
+      throw new Error(`fake adapter has no joint ${String(id)}`);
+    }
+    return joint;
+  }
+
+  /**
+   * Scripts what the joint with id `id` will report as its reaction impulses
+   * until it is scripted again — newton-seconds and newton-metre-seconds, the
+   * units `SolverJointAccess.getJointReaction` is defined in.
+   */
+  scriptJointReaction(
+    id: number,
+    linear: Vector3Input,
+    angular: Vector3Input,
+  ): void {
+    const joint = this.joint(id);
+    widenToVector3(linear, joint.reactionLinear);
+    widenToVector3(angular, joint.reactionAngular);
+  }
+
+  // --- PhysicsSolverAdapter (§37) -------------------------------------------
+
+  override createJoint(desc: JointDescriptor): PhysicsJointHandle {
+    this.#requireBodyAlive(desc.bodyA);
+    this.#requireBodyAlive(desc.bodyB);
+    const id = this.#nextJointId;
+    this.#nextJointId += 1;
+    const handle = { id } as unknown as PhysicsJointHandle;
+    this.joints.set(id, {
+      id,
+      handle,
+      descriptor: desc,
+      reactionLinear: new Vector3(),
+      reactionAngular: new Vector3(),
+      limits: null,
+      motor: null,
+      alive: true,
+    });
+    this.#recordJoint("createJoint", id, desc.type);
+    return handle;
+  }
+
+  override destroyJoint(handle: PhysicsJointHandle): void {
+    const joint = this.#requireJoint(handle);
+    joint.alive = false;
+    this.joints.delete(joint.id);
+    this.#recordJoint("destroyJoint", joint.id);
+  }
+
+  // --- SolverJointAccess (WP-6.1) -------------------------------------------
+
+  getJointReaction(
+    handle: PhysicsJointHandle,
+    outLinear: Vector3,
+    outAngular: Vector3,
+  ): void {
+    const joint = this.#requireJoint(handle);
+    this.#recordJoint("getJointReaction", joint.id);
+    outLinear.copy(joint.reactionLinear);
+    outAngular.copy(joint.reactionAngular);
+  }
+
+  setJointLimits(handle: PhysicsJointHandle, min: number, max: number): void {
+    const joint = this.#requireJoint(handle);
+    joint.limits = { min, max };
+    this.#recordJoint("setJointLimits", joint.id, min, max);
+  }
+
+  setJointMotor(handle: PhysicsJointHandle, motor: SolverJointMotor): void {
+    const joint = this.#requireJoint(handle);
+    joint.motor = { ...motor };
+    this.#recordJoint("setJointMotor", joint.id, { ...motor });
+  }
+
+  getJointId(handle: PhysicsJointHandle): number {
+    return this.#requireJoint(handle).id;
+  }
+
+  forEachJoint(visit: (handle: PhysicsJointHandle, id: number) => void): void {
+    for (const joint of this.joints.values()) {
+      visit(joint.handle, joint.id);
+    }
+  }
+
+  override dispose(): void {
+    this.joints.clear();
+    super.dispose();
+  }
+
+  // --- internals ------------------------------------------------------------
+
+  #recordJoint(method: string, id: number, ...args: unknown[]): void {
+    this.calls.push({ method, id, args });
+  }
+
+  #requireJoint(handle: PhysicsJointHandle): FakeJoint {
+    const id = (handle as unknown as { id: number }).id;
+    const joint = this.joints.get(id);
+    if (joint === undefined || !joint.alive) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `fake adapter: joint handle ${String(id)} is foreign or destroyed (§37).`,
+      );
+    }
+    return joint;
+  }
+
+  #requireBodyAlive(handle: PhysicsBodyHandle): void {
+    const id = (handle as unknown as { id: number }).id;
+    const body = this.bodies.get(id);
+    if (body === undefined || !body.alive) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `fake adapter: joint body handle ${String(id)} is foreign or destroyed (§37).`,
+      );
+    }
   }
 }

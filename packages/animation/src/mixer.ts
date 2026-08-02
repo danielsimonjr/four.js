@@ -59,15 +59,26 @@
  * **every** transform write of that evaluation, never a partial pose, while
  * non-transform tracks keep animating.
  *
+ * ## Root motion (§19, plan P7-5)
+ *
+ * {@link MixerPlayOptions.rootMotion} turns one designated track from an
+ * absolute pose channel into a *locomotion* channel: the mixer stops writing its
+ * sampled values anywhere and instead adds their per-advance **difference** to a
+ * designated node's `transform.position`. That is what makes a walk cycle
+ * authored in place move a character, and what lets the same clip loop forever
+ * without teleporting back to the origin. See {@link MixerRootMotionOptions} for
+ * the loop-aware derivation; rotational root motion is staged (2026-08-02).
+ *
  * ## Allocation (§7b)
  *
  * {@link AnimationMixer.play} allocates: one binding, one scratch value, and one
- * claim per track. After that the advance path allocates nothing — the sample
- * sink and the event visitor are built once per mixer, and every track writes
- * through its own scratch.
+ * claim per track, plus six vectors when root motion is configured. After that
+ * the advance path allocates nothing — the sample sink and the event visitor are
+ * built once per mixer, and every track writes through its own scratch.
  */
 
 import { FourError } from "@four/core";
+import type { Vector3 } from "@four/math";
 import { Node, warnAuthorityConflict } from "@four/scene";
 import type { TransformAuthority } from "@four/scene";
 
@@ -129,6 +140,96 @@ export type AnimationEventListener = (
   index: number,
 ) => void;
 
+/**
+ * Root motion for one playback (§19, plan decision P7-5) — the MVP tier:
+ * **translation only**.
+ *
+ * The designated track is removed from normal per-track binding. Its path is
+ * never resolved against the mixer's target, its absolute values never write a
+ * bound property, and it needs no property to exist at all: `"rootMotion"` is a
+ * perfectly good path for a channel that exists only to be differenced. What the
+ * mixer does with it instead is add the *change* in its sampled value across
+ * each {@link AnimationMixer.advance} to
+ * `target.transform.position`.
+ *
+ * ## The loop-aware delta, derived
+ *
+ * Let `S(t)` be the track sampled at clip-local time `t`, `d` the clip duration,
+ * and let one advance move elapsed time from `a` to `b` (`a <= b`). Inside a
+ * single iteration the answer is the plain difference `S(l(b)) − S(l(a))`, where
+ * `l` is the clip-local time of an elapsed time.
+ *
+ * A wrap is where naive differencing fails: `l` jumps from `d` back to `0`, so
+ * `S(l(b)) − S(l(a))` would subtract a whole stride and teleport the node
+ * backwards. The honest quantity is the distance travelled *along* the clip, so
+ * the crossing is split at the seam — the motion left in the outgoing iteration
+ * plus the motion already made in the incoming one:
+ *
+ * ```text
+ * (S(d) − S(l(a)))  +  (S(l(b)) − S(0))
+ * ```
+ *
+ * An advance long enough to swallow whole iterations adds one full **stride**
+ * `S(d) − S(0)` for each of them, which generalizes both cases to
+ *
+ * ```text
+ * w = iteration(b) − iteration(a)                       // wraps crossed
+ * w = 0:  S(l(b)) − S(l(a))
+ * w > 0:  (S(d) − S(l(a))) + (w − 1)·(S(d) − S(0)) + (S(l(b)) − S(0))
+ * ```
+ *
+ * `iteration` and `l` are the mixer's own loop bookkeeping (the same functions
+ * that place the pose), so root motion wraps exactly when playback does — and,
+ * because the last iteration's end reads as `l = d` rather than `l = 0` of an
+ * iteration that does not exist, the advance that finishes a `loop(n)` playback
+ * contributes the full `n`-th stride.
+ *
+ * `S(l(a))`, `S(d)`, and `S(0)` are all held from the previous advance or frozen
+ * at play, so a step costs exactly one new sample and no allocation.
+ *
+ * ## What does *not* accumulate
+ *
+ * - {@link AnimationMixer.seek} applies no delta at all. It repositions the
+ *   left endpoint so the next advance differences from the sought time, and
+ *   nothing more: §16 makes evaluation a pure function of clip time, and a
+ *   scrub that also *moved* the character would make scrubbing back and forth
+ *   a source of displacement. A seek positions; only an advance locomotes.
+ * - A delta refused by §42 (see below) is **dropped**, not banked. The left
+ *   endpoint still advances, so authority granted mid-playback resumes from the
+ *   clip's current position rather than replaying the motion that was refused —
+ *   the same "never depended on the writes that were refused" property the pose
+ *   path has.
+ *
+ * ## Authority (§42)
+ *
+ * The write lands on {@link MixerRootMotionOptions.target}'s transform, so that
+ * node must be under `"animation"` authority — independently of whatever node
+ * gates the pose, which is often a different one (the pose animates a skeleton
+ * under a root the motion moves). A node that is not warns once (deduplicated by
+ * `warnAuthorityConflict`) and its deltas are skipped.
+ *
+ * ## Staged
+ *
+ * Rotational root motion — differencing a quaternion track and rotating the
+ * target — is **not implemented** (staged 2026-08-02, plan P7-5). A `rootMotion`
+ * naming a quaternion track throws `FourError("NOT_IMPLEMENTED")` rather than
+ * silently animating only half of the intended motion.
+ */
+export interface MixerRootMotionOptions {
+  /**
+   * Path of the clip track to difference, matched exactly against
+   * {@link ./track.js#AnimationTrackLike.path}. The clip must contain exactly
+   * one track with this path, and it must be a `vector3` track.
+   */
+  readonly trackPath: string;
+
+  /**
+   * The node the extracted translation moves. Written under §42 `"animation"`
+   * authority; needs no relationship to the mixer's target.
+   */
+  readonly target: Node;
+}
+
 /** Per-playback policy for {@link AnimationMixer.play}. */
 export interface MixerPlayOptions {
   /**
@@ -168,6 +269,15 @@ export interface MixerPlayOptions {
    * either way (crossing is a forward notion, §16).
    */
   readonly replayOnSeek?: boolean;
+
+  /**
+   * Extracts translation from one designated track and moves a node with it
+   * instead of writing it (§19, plan P7-5). See {@link MixerRootMotionOptions}
+   * for the semantics, the loop-aware derivation, and what is staged.
+   *
+   * Validated at {@link AnimationMixer.play}, where the clip's tracks are known.
+   */
+  readonly rootMotion?: MixerRootMotionOptions;
 }
 
 /** How one evaluation treats clip events. */
@@ -181,6 +291,8 @@ type EventMode =
 
 /** One bound track, resolved and claimed at {@link AnimationMixer.play}. */
 interface MixerEntry {
+  /** Discriminates {@link MixerSlot}: this track writes its samples. */
+  readonly rootMotion: false;
   /** Resolved property reference (§16), index-parallel with `clip.tracks`. */
   readonly binding: PropertyBinding;
   /** The authored track path, for diagnostics and the §16 conflict warning. */
@@ -193,6 +305,43 @@ interface MixerEntry {
   readonly notifyChange: boolean;
   /** This playback's §16 claim; `held` gates every write (see `./tween.js`). */
   readonly claim: PropertyClaim;
+}
+
+/**
+ * The slot of the {@link MixerRootMotionOptions.trackPath} track: bound to
+ * nothing, claiming nothing, writing nothing. It exists only to keep
+ * {@link AnimationMixer.#entries} index-parallel with `clip.tracks`, so the
+ * sample sink stays an indexed walk; its samples are discarded and the track is
+ * re-sampled by the root-motion path, which needs a time of its own.
+ */
+interface RootMotionSlot {
+  /** Discriminates {@link MixerSlot}. */
+  readonly rootMotion: true;
+  /** The authored track path, for diagnostics. */
+  readonly path: string;
+  /** Somewhere for the discarded pose sample to land. */
+  readonly scratch: unknown;
+}
+
+/** One clip track's slot in the mixer, index-parallel with `clip.tracks`. */
+type MixerSlot = MixerEntry | RootMotionSlot;
+
+/** Everything one root-motion playback needs, built once at play (§7b). */
+interface RootMotionState {
+  /** The designated track, already validated as `vector3`. */
+  readonly track: AnimationTrackLike;
+  /** The node this playback's translation deltas move. */
+  readonly target: Node;
+  /** `S(l(a))` — the sampled value at the current local time. Mutable state. */
+  readonly previous: Vector3;
+  /** `out` storage for the per-advance sample. */
+  readonly sample: Vector3;
+  /** The delta handed to `transform.position.add`. */
+  readonly delta: Vector3;
+  /** `S(0)`, frozen at play. */
+  readonly atStart: Vector3;
+  /** `S(duration)`, frozen at play. */
+  readonly atEnd: Vector3;
 }
 
 /** Throws the §89 error used for every malformed mixer configuration. */
@@ -212,6 +361,27 @@ function requireNonNegativeSeconds(value: number, what: string): number {
     );
   }
   return value;
+}
+
+/**
+ * Fresh `Vector3` storage shaped like `track`'s values, for a track whose
+ * adapter kind is `"vector3"`. Play-time only — the advance path never clones.
+ */
+function cloneTrackVector(track: AnimationTrackLike): Vector3 {
+  return track.adapter.clone(track.values[0]) as Vector3;
+}
+
+/**
+ * Samples a `vector3` track into `out` and returns the **effective** value,
+ * which is `out` for the built-in adapter and whatever a custom adapter of the
+ * same kind returns (see `./values.js` on the `mutatesInPlace` split).
+ */
+function sampleTrackVector(
+  track: AnimationTrackLike,
+  timeSeconds: number,
+  out: Vector3,
+): Vector3 {
+  return track.sample(timeSeconds, out) as Vector3;
 }
 
 /**
@@ -247,7 +417,13 @@ export class AnimationMixer {
   #clip: AnimationClip | undefined;
 
   /** Bound tracks, index-parallel with `clip.tracks`; empty until play. */
-  #entries: MixerEntry[] = [];
+  #entries: MixerSlot[] = [];
+
+  /** Root motion declared through {@link MixerPlayOptions.rootMotion}, if any. */
+  #declaredRootMotion: MixerRootMotionOptions | undefined;
+
+  /** Resolved root-motion runtime state; `undefined` when none is configured. */
+  #rootMotion: RootMotionState | undefined;
 
   /** Total iterations: `1` plays once, `Infinity` loops forever. */
   #iterations = 1;
@@ -300,7 +476,12 @@ export class AnimationMixer {
       _track: AnimationTrackLike,
       value: unknown,
     ): void => {
-      this.#write(this.#entries[trackIndex], value);
+      const slot = this.#entries[trackIndex];
+      // The root-motion track's absolute value is never written anywhere: only
+      // its per-advance difference is, by `#accumulateRootMotion`.
+      if (!slot.rootMotion) {
+        this.#write(slot, value);
+      }
     },
   };
 
@@ -417,6 +598,7 @@ export class AnimationMixer {
     this.#declaredNode = options.authority;
     this.#onEvent = options.onEvent;
     this.#replayOnSeek = options.replayOnSeek ?? false;
+    this.#declaredRootMotion = options.rootMotion;
     return this;
   }
 
@@ -464,9 +646,24 @@ export class AnimationMixer {
       this.#declaredNode ??
       (this.#target instanceof Node ? this.#target : undefined);
 
-    const entries: MixerEntry[] = [];
+    const rootMotionOptions = this.#declaredRootMotion;
+    const rootMotionIndex =
+      rootMotionOptions === undefined
+        ? -1
+        : this.#resolveRootMotionTrack(armed, rootMotionOptions);
+
+    const entries: MixerSlot[] = [];
     let hasTransformEntries = false;
-    for (const track of armed.tracks) {
+    for (let index = 0; index < armed.tracks.length; index += 1) {
+      const track = armed.tracks[index];
+      if (index === rootMotionIndex) {
+        entries.push({
+          rootMotion: true,
+          path: track.path,
+          scratch: cloneTrackVector(track),
+        });
+        continue;
+      }
       const adapter = track.adapter;
       const binding = createBinding(this.#target, track.path, adapter);
       this.#assertBindable(armed, track, binding);
@@ -474,6 +671,7 @@ export class AnimationMixer {
         node !== undefined && isTransformOwner(node, binding.owner);
       hasTransformEntries = hasTransformEntries || isTransform;
       entries.push({
+        rootMotion: false,
         binding,
         path: track.path,
         // Scratch, never a keyframe value: `clip.sampleAll` writes into it and
@@ -490,11 +688,21 @@ export class AnimationMixer {
     this.#authorityNode = hasTransformEntries ? node : undefined;
     this.#duration = armed.duration;
     for (const entry of entries) {
+      if (entry.rootMotion) {
+        continue;
+      }
       claimProperty(
         entry.binding.owner,
         entry.binding.key,
         entry.path,
         entry.claim,
+      );
+    }
+    if (rootMotionIndex >= 0) {
+      // `rootMotionOptions` is defined whenever an index was resolved.
+      this.#rootMotion = this.#buildRootMotion(
+        armed.tracks[rootMotionIndex],
+        (rootMotionOptions as MixerRootMotionOptions).target,
       );
     }
     this.#elapsed = 0;
@@ -536,7 +744,9 @@ export class AnimationMixer {
     }
     this.#releaseClaims();
     for (const entry of this.#entries) {
-      entry.claim.held = false;
+      if (!entry.rootMotion) {
+        entry.claim.held = false;
+      }
     }
     this.#state = "stopped";
     return this;
@@ -613,12 +823,16 @@ export class AnimationMixer {
       return this;
     }
     const total = this.totalDuration;
+    const from = this.#elapsed;
     let target = this.#elapsed + deltaSeconds * this.#speed;
     if (target >= total) {
       target = total;
       this.#finished = true;
     }
     this.#setElapsed(target, "play");
+    // After the pose: root motion is a displacement *of* the posed node, and a
+    // clip that also animates the same transform would otherwise overwrite it.
+    this.#accumulateRootMotion(from, target);
     if (this.#finished) {
       this.#state = "finished";
       this.#releaseClaims();
@@ -652,6 +866,9 @@ export class AnimationMixer {
    * what "restoring a mid-clip snapshot positions playback without re-firing
    * markers already crossed" needs.
    *
+   * Root motion (§19, P7-5) is repositioned and **not** applied: a seek moves
+   * the clip clock, never the character (see {@link MixerRootMotionOptions}).
+   *
    * @throws FourError `INVALID_APPLICATION_STATE` — the mixer has never been
    * played, or the time is negative or non-finite.
    */
@@ -668,6 +885,9 @@ export class AnimationMixer {
     const mode: EventMode = this.#state === "stopped" ? "silent" : "seek";
     const total = this.totalDuration;
     this.#setElapsed(timeSeconds > total ? total : timeSeconds, mode);
+    // Repositions root motion's left endpoint without applying anything: a seek
+    // positions, only an advance locomotes (P7-5, §16).
+    this.#repositionRootMotion();
     return this;
   }
 
@@ -705,6 +925,146 @@ export class AnimationMixer {
         },
       );
     }
+  }
+
+  /**
+   * Index of the {@link MixerRootMotionOptions.trackPath} track in `clip.tracks`
+   * (§19, P7-5).
+   *
+   * Everything that can be wrong with the designation is wrong *here*, at play,
+   * where the clip and the option are both in hand — not silently at the first
+   * advance. A path matching two tracks is rejected rather than resolved by a
+   * rule nobody would remember: a clip may legitimately carry two tracks on one
+   * path (the later wins, see `./clip.js`), but "which of them locomotes the
+   * character" has no defensible default.
+   */
+  #resolveRootMotionTrack(
+    clip: AnimationClip,
+    options: MixerRootMotionOptions,
+  ): number {
+    let found = -1;
+    for (let index = 0; index < clip.tracks.length; index += 1) {
+      if (clip.tracks[index].path !== options.trackPath) {
+        continue;
+      }
+      if (found >= 0) {
+        invalidMixer(
+          `Root motion names track "${options.trackPath}", but animation clip "${clip.name}" has more than one track on that path (indices ${String(found)} and ${String(index)}). Give the root-motion track a path of its own.`,
+          { clip: clip.name, path: options.trackPath, first: found, index },
+        );
+      }
+      found = index;
+    }
+    if (found < 0) {
+      invalidMixer(
+        `Root motion names track "${options.trackPath}", which animation clip "${clip.name}" does not have.`,
+        { clip: clip.name, path: options.trackPath },
+      );
+    }
+
+    const kind = clip.tracks[found].adapter.kind;
+    if (kind === "quaternion") {
+      throw new FourError(
+        "NOT_IMPLEMENTED",
+        `Root motion names the quaternion track "${options.trackPath}": rotational root motion is staged (2026-08-02, plan P7-5). The MVP extracts translation only — use a vector3 track.`,
+        { context: { clip: clip.name, path: options.trackPath, kind } },
+      );
+    }
+    if (kind !== "vector3") {
+      invalidMixer(
+        `Root motion names the ${kind} track "${options.trackPath}", but root motion extracts translation from a vector3 track (plan P7-5).`,
+        { clip: clip.name, path: options.trackPath, kind },
+      );
+    }
+    return found;
+  }
+
+  /**
+   * Freezes the constants of the loop-aware delta — `S(0)`, `S(duration)` — and
+   * seeds the left endpoint at clip time `0`, which is where
+   * {@link AnimationMixer.play} starts. Allocates the six vectors root motion
+   * ever uses (five here, one for the discarded pose sample).
+   */
+  #buildRootMotion(track: AnimationTrackLike, target: Node): RootMotionState {
+    const sample = cloneTrackVector(track);
+    const atStart = cloneTrackVector(track).copy(
+      sampleTrackVector(track, 0, sample),
+    );
+    const atEnd = cloneTrackVector(track).copy(
+      sampleTrackVector(track, this.#duration, sample),
+    );
+    return {
+      track,
+      target,
+      previous: cloneTrackVector(track).copy(atStart),
+      sample,
+      delta: cloneTrackVector(track),
+      atStart,
+      atEnd,
+    };
+  }
+
+  /**
+   * Adds the translation the clip travelled between `fromElapsed` and
+   * `toElapsed` to the root-motion target (§19, P7-5).
+   *
+   * The formula is {@link MixerRootMotionOptions}'s, using the mixer's own
+   * `#iterationAt`/`#localAt` so a wrap here is the same wrap the pose sees.
+   * §42 is enforced exactly as `#applyPose` enforces it — warn once, skip — and
+   * the left endpoint moves either way, so a refused delta is dropped rather
+   * than banked. Allocates nothing: one sample and component arithmetic.
+   */
+  #accumulateRootMotion(fromElapsed: number, toElapsed: number): void {
+    const root = this.#rootMotion;
+    if (root === undefined) {
+      return;
+    }
+    const previous = root.previous;
+    const sampled = sampleTrackVector(
+      root.track,
+      this.#localAt(toElapsed),
+      root.sample,
+    );
+    const wraps = this.#iterationAt(toElapsed) - this.#iterationAt(fromElapsed);
+    const delta = root.delta;
+    if (wraps <= 0) {
+      delta.set(
+        sampled.x - previous.x,
+        sampled.y - previous.y,
+        sampled.z - previous.z,
+      );
+    } else {
+      const strides = wraps - 1;
+      const start = root.atStart;
+      const end = root.atEnd;
+      delta.set(
+        end.x - previous.x + strides * (end.x - start.x) + sampled.x - start.x,
+        end.y - previous.y + strides * (end.y - start.y) + sampled.y - start.y,
+        end.z - previous.z + strides * (end.z - start.z) + sampled.z - start.z,
+      );
+    }
+    previous.copy(sampled);
+
+    const target = root.target;
+    if (target.transformAuthority !== MIXER_AUTHORITY) {
+      warnAuthorityConflict(target, MIXER_AUTHORITY);
+      return;
+    }
+    target.transform.position.add(delta);
+  }
+
+  /**
+   * Moves root motion's left endpoint to the current local time without
+   * applying anything — {@link AnimationMixer.seek}'s half of P7-5.
+   */
+  #repositionRootMotion(): void {
+    const root = this.#rootMotion;
+    if (root === undefined) {
+      return;
+    }
+    root.previous.copy(
+      sampleTrackVector(root.track, this.#localAt(this.#elapsed), root.sample),
+    );
   }
 
   /** Zero-based iteration index containing `elapsed`. */
@@ -836,7 +1196,9 @@ export class AnimationMixer {
   /** Frees every registry slot this mixer still owns (§16). */
   #releaseClaims(): void {
     for (const entry of this.#entries) {
-      releaseProperty(entry.binding.owner, entry.binding.key, entry.claim);
+      if (!entry.rootMotion) {
+        releaseProperty(entry.binding.owner, entry.binding.key, entry.claim);
+      }
     }
   }
 }

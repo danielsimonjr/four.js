@@ -23,6 +23,7 @@ export {
 } from "./interpolation.js";
 export type { NodeEventMap, NodeHierarchyEvent, NodeType } from "./node.js";
 export { Node } from "./node.js";
+export { PoseTarget } from "./pose-target.js";
 export { Scene } from "./scene.js";
 export { Transform } from "./transform.js";
 export type { Viewport } from "./viewport.js";
