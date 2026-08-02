@@ -1,0 +1,44 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 7 exit criterion (§110) recorded on 2026-08-02 by WP-7.7 from an actual run of tests/determinism/helpers/phase7-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine or solver behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics, or a Rapier version bump) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's §19 physics-animation blending is deterministic.",
+  "_scenario": "One PhysicsWorld — \"2d\" on Rapier2dAdapter, §32 sleeping left at its default (ON, as examples/blending leaves it) — tracked on ONE PhysicsSystem inside ONE Application that also registers an AnimationSystem (§39 step 3) and createPoseTargetCaptureSystem (§39 step 3 − 1), stepped 600 clean fixed frames of 1/60 s (10 s, exactly one fixed step each, nothing dropped, §43 pose interpolation off). The scene is examples/blending's, restated: a static anchor block at (-5.6, 1.8) with NO collider, a static ground slab whose top is y = -2.7, and a three-link chain of \"blended\" nodes (§42) each carrying the §19 trio — a RigidBody, a rectangle Collider of half extents (0.17, 0.8) offset one half-length down so the leaf hangs below its proximal joint, and a PoseTarget — hinged anchor→link0→link1→link2 by three §28 HingeJoints. Each link's PoseTarget is driven by an AnimationMixer playing a looping 48-key clip sampled from the chain's own forward kinematics: aᵢ(t) = π/2 + 0.18·sin(2πt/3.6 − i), so every hinge is satisfied exactly at every key. Scripted §19 mode cycle at fixed steps: ANIMATED (\"kinematic-position\", weights physics 0 / animation 1) for steps 1–149; setBodyControlMode(\"dynamic\", { inheritVelocityFrom }) on every link plus weights 1 / 0 on step 150 (switch 1, the ragdoll activation); RAGDOLL for steps 150–299; the §19 weight sweep on steps 300–389, one notch per step, BOTH weights written as (1 − w, w) with w = i/90 so the published animation share is exactly w; step 390 runs at w = 1 with the links still dynamic; setBodyControlMode(\"kinematic-position\") plus weights 0 / 1 on step 391 (switch 2); ANIMATED again for steps 391–600. The wave keeps playing throughout — the targets are never re-seeded from where the ragdoll landed — so the recovery is a genuine metres-wide crossfade, which is what maxTargetGapMicro and maxStepRecoveringMicro measure. The per-step digest is the D6 FNV-1a hash of world.checksum() followed by each link node's PUBLISHED pose (position x, y, z then rotation x, y, z, w, in registration order): §33's solver checksum alone cannot see §19's blend output, which is the whole subject of this phase. summaryDigest is the same hasher over all 600 per-step digests in step order. Every \"Micro\" field is an integer count of 1e-6 units: micrometres for a distance, micrometres per second for a speed, millionths for a §19 weight.",
+  "_tier": "same-runtime (§33). Rapier is compiled WebAssembly, so its arithmetic does not vary with the host JS engine's Math library, and §19's blend itself is plain IEEE-754 lerp/slerp — but cross-platform determinism is NOT claimed here: values cross the JS/wasm boundary as f64 → f32, the wasm image is pinned per platform by the package manager, and §33's cross-platform tier requires evidence this suite does not gather. The checksum algorithm itself is exact and cross-platform; only its inputs are runtime-bound.",
+  "summaryDigest": 41179286,
+  "firstStepDigest": 1489401518,
+  "lastStepDigest": 2715120617,
+  "firstChecksum": 2546499192,
+  "lastChecksum": 909551635,
+  "activationStep": 150,
+  "sweepFirstStep": 300,
+  "sweepLastStep": 389,
+  "retypeStep": 391,
+  "typeAfterActivation": "dynamic",
+  "typeAfterRetype": "kinematic-position",
+  "maxStepAnimatedMicro": 14626,
+  "maxStepRagdollMicro": 142765,
+  "maxStepRecoveringMicro": 112078,
+  "maxStepRekinematicMicro": 14626,
+  "entryStepActivationMicro": 9330,
+  "entryStepRetypeMicro": 2691,
+  "weightsAtSweepStart": {
+    "animationMicro": 11111,
+    "physicsMicro": 988889
+  },
+  "weightsAtSweepEnd": {
+    "animationMicro": 1000000,
+    "physicsMicro": 0
+  },
+  "weightStepMicro": 11111,
+  "inheritedSpeedAnchorMicro": 0,
+  "inheritedSpeedTipMicro": 683829,
+  "chainYBeforeActivationMicro": 1604191,
+  "chainYAtSweepStartMicro": 359992,
+  "chainYFinalMicro": 1547439,
+  "maxTargetGapMicro": 5548981,
+  "digestRepeatsAtTwoWavePeriods": 149,
+  "events": {
+    "collisionStartCount": 3,
+    "collisionEndCount": 3,
+    "sleepCount": 0,
+    "wakeCount": 0
+  }
+}
