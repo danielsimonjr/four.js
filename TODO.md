@@ -6,9 +6,19 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 8 — Advanced motion (§111): rolling-wave decomposition into plan §6g, then
-      dispatch. Exit is PLAN-DEFINED (§111 sets none; owner to confirm): PID utility +
-      steering demos pass analytic tests. Scope seams: steering / IK / PID.
+- [ ] Phase 9 — Particles (§36, §112): rolling-wave decomposition into plan §6h, then
+      dispatch (emitter model, CPU simulation, lifetimes/velocity distributions/forces,
+      color-size-over-lifetime; GPU compute path staged to the WebGPU tier — decide at
+      decomposition; exit: ≥100k simple particles at interactive rates on suitable
+      hardware — interpret honestly for CI).
+
+### Backlog additions (Phase 8, 2026-08-02)
+- [ ] Fold steering's private interceptTime into prediction's export (dated note in
+      steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      model first); path-planning adapters (RFC); robotic joint commands utility
+      (MAY declined — see prediction.ts staging note)
+- [ ] §111 sketch namespace: spec writes Four.PIDController; real path is
+      Four.motion.PIDController (pre-existing umbrella convention — spec-revisit note)
 
 ### Backlog additions (Phase 7, 2026-08-02)
 - [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
@@ -69,6 +79,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 8 complete** (§111): 5 packets + 1 doc fix — PID/spring-
+      damper/steering/RNG/prediction/IK in @four/motion, all six modules at 100%
+      coverage with genuinely independent analytic oracles; PID closes a real Rapier
+      hinge loop to exact setpoint; every declined §111 component staged with a dated
+      note; 2,359 unit + 131 suite + 27 browser tests
 - [x] 2026-08-02 — **Phase 7 complete** (§110): 8 packets + 1 fix, exit GREEN zero
       defects — "blended" authority live with the §19 pipeline inside PhysicsWorld,
       in-place retype + velocity inheritance, root-motion MVP, mode-cycle example;

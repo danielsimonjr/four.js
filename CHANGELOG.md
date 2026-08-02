@@ -10,6 +10,21 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-02
 
+#### Added (Phase 8 — Advanced Motion, §111; packets WP-8.1…WP-8.5)
+- `@four/motion`: `PIDController` (§111 sketch verbatim, anti-windup, derivative on
+  measurement), `SpringDamper` (exact matrix-exponential stepping), the Reynolds
+  steering set + flocking with a seeded xorshift128 RNG (BigInt-oracle-pinned),
+  ballistic/intercept trajectory prediction, and two-bone analytic IK — six new
+  modules, each at 100% coverage with independent analytic test oracles; declined
+  §111 components staged with dated notes.
+- Integration (7 suite tests): PID speed loop settling a real Rapier motorized hinge
+  to exact setpoint in both dimensions; spring-damped camera follow matching its
+  exact discrete transfer function to 3e-15; steering agents beside physics with
+  checksum-stream-identity proof; ballistic interception vs the substepped solver;
+  IK driving the §19 blend pipeline.
+- Phase 8 exit GREEN (plan-defined criterion, owner-to-confirm): 2,359 unit + 131
+  suite + 27 browser tests; coverage ≥95% everywhere.
+
 #### Added (Phase 7 — Physics-Animation Blending, §19/§42/§110; packets WP-7.1…WP-7.8)
 - `@four/scene`: `PoseTarget` component (animation-drivable target poses with
   finite-difference history); the `"blended"` transform authority unlocked (§42's

@@ -25,6 +25,26 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 8 CLOSED (exit GREEN; plan-defined criterion TRUE — §111 sets no
+  exit, the plan's "PID + steering pass analytic tests, demo composes with the stack"
+  stands owner-to-confirm).** Five packets + one doc fix, all in `@four/motion`.
+  Shipped: PIDController (§111 sketch verbatim; conditional-integration anti-windup,
+  bit-identical to naive while unsaturated; derivative-on-measurement default);
+  SpringDamper (exact ZOH matrix-exponential step, memoised per dt, unconditionally
+  stable; matched an independent scaling-and-squaring exponential to 1e-12); steering
+  (Reynolds set + flocking, acceleration out-params, brute-force neighbors —
+  spatial hash staged; the implicit 1 s⁻¹ gain documented); SeededRandom (xorshift128,
+  splitmix32 seeding, BigInt oracle known answers); prediction (ballistic + stable-
+  quadratic intercept); two-bone analytic IK (positions not angles — no bone-axis
+  convention pinned yet). Staged with dated notes: path-planning adapters (RFC),
+  CCD/FABRIK, spatial hash, spherical wander, robotic joint commands (MAY declined;
+  the PID→setMotor hinge scenario demonstrates the mapping). Integration facts: PID
+  actuation = targetVelocity cascade (maxTorque held; on Rapier it is the loop GAIN if
+  modulated); a velocity written after world.addBody reaches no solver (author it on
+  the descriptor); steering probes (12k overlapSphere calls) provably perturb no
+  solver state (checksum-stream identity). Exit: 2,359 unit + 131 suite + 27 browser;
+  motion 99.78% (all six new modules 100%); typedoc warnings now 74 (chore count
+  stale).
 - **2026-08-02 — PHASE 7 CLOSED (exit GREEN, zero defects; §110 criterion TRUE —
   uniquely, both control switches cost LESS than the animation's own per-step motion:
   activation 9.33 mm and retype 2.69 mm vs the wave's 14.63 mm, pinned in
