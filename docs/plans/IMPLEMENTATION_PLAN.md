@@ -1010,6 +1010,60 @@ Packets:
 
 Dependencies: 8.1 ∥ 8.2 ∥ 8.3 (disjoint files); 8.4 ← all three; 8.5 last.
 
+## 6h. Phase 9 — Particles (§27, §36, §112; decomposed 2026-08-02)
+
+Exit (§112): ≥100,000 simple particles simulated and rendered at interactive rates on
+suitable hardware — interpreted honestly for this environment: the CPU simulation
+must step 100k particles within a fixed-step budget measured and documented in a
+benchmark (not CI-gated on wall time; recorded numbers), and the renderer must draw
+them via a batched path (one draw call), with a browser demo proving interactive
+behavior at a size SwiftShader can sustain (documented; the 100k number measured
+headlessly and in the benchmark, not asserted in CI pixels).
+
+Phase-level pinned decisions:
+
+- **P9-1 Tier.** CPU simulation ships (SoA Float32Array pools, zero per-frame
+  allocation, seeded randomness only); **GPU compute simulation is STAGED** (dated:
+  requires the WebGPU backend, which is itself a stub tier — §62 backlog) with the
+  §36 "simulation: 'gpu'" option validated-out loudly. Collision options: MVP =
+  §36's plane/ground collision only ("depth-buffer" and full solver coupling staged).
+  Trails: MVP = position-history ribbon data (rendering via the sprite path; staged
+  if dishonest — worker reports).
+- **P9-2 Home.** `@four/particles` (deps core/math/scene per §3.1). Force fields
+  (§27's ForceField interface — sample(position, velocity, time, out)) ship in
+  particles as the §27 built-in set MVP (uniform gravity, drag, wind, vortex, radial,
+  turbulence via SeededRandom-driven curl noise — honest subset, report), reusable
+  by motion later.
+- **P9-3 Rendering.** A `ParticleRenderable` producing ONE batched render item
+  (instanced quads or a single dynamic geometry — worker verifies what the §61
+  renderer interface + webgl backend can honestly batch today; a new RenderItem kind
+  may be needed — that is a cross-package API surface: keep it minimal and report).
+- **P9-4 Determinism.** §36 emitters use SeededRandom; particle iteration insertion
+  order; a determinism golden pins a 100-particle scenario.
+
+Packets:
+
+- **WP-9.1 [S] Particle core** (`@four/particles`) — SoA pool, ParticleEmitter (§36
+  options subset: maxParticles, emission rate/burst, lifetime, velocity
+  distributions (seeded), color/size over lifetime curves), CPU integrator step,
+  plane collision, force-field application; zero-alloc; unit tests + closed forms.
+- **WP-9.2 [S] Force fields** (`@four/particles`) — §27 interface + built-in set
+  (P9-2), volume inclusion/filtering MVP; tests.
+- **WP-9.3 [S] Particle rendering** (`@four/render` + `@four/render-webgl` +
+  `@four/particles`) — P9-3 batched path; fake-GL tests + structural render-item
+  tests.
+- **WP-9.4 [S] Integration + benchmark + gates** — ParticleSystem into the §39 loop;
+  benchmarks/ harness measuring 100k CPU step time (recorded numbers, documented
+  hardware caveat); determinism golden phase9 (100-particle scenario, cross-process);
+  browser spec on a demo scene added to the playground OR a small fifth example
+  (worker decides honestly against the §86/webServer cost — report; playground
+  regions are gated, prefer a new tiny example page reusing the first-2d-scene
+  non-wasm pattern).
+- **WP-9.5 [S] Phase 9 exit** — independent verifier, the honest §112 reading above,
+  fix nothing.
+
+Dependencies: 9.1 → (9.2 ∥ 9.3); 9.4 ← 9.2+9.3; 9.5 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
