@@ -106,8 +106,13 @@
  * ```
  *
  * Forgetting it does not break the blend — the blend reads the target's
- * *current* pose — but it leaves every target's history flat, so a
- * `setBodyControlMode(..., { inheritVelocityFrom })` inherits zero velocity.
+ * *current* pose — but it leaves every target's history STALE at whatever
+ * `copyFrom` seeded, so `setBodyControlMode(..., { inheritVelocityFrom })`
+ * divides the target's TOTAL animated displacement by one fixed delta and
+ * inherits a wildly inflated velocity (measured: 60 m/s from a 2 m/s
+ * animation after half a second — WP-7.5). Zero is inherited only for a
+ * never-animated target. Register the capture system whenever inheritance
+ * is used.
  *
  * ## What the world does not own
  *
