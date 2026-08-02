@@ -39,6 +39,7 @@ import { Matrix4 } from "@four/math";
 import {
   buildInterpolatedRenderList,
   buildRenderList,
+  isParticlesItem,
   isSpriteItem,
   type RenderItem,
   type RenderItemKind,
@@ -50,11 +51,11 @@ import {
 
 import { GeometryCache } from "./gl-geometry.js";
 import {
-  GL,
-  SpriteProgram,
-  UnlitProgram,
-  type WebglContext,
-} from "./gl-program.js";
+  ParticleBatchCache,
+  ParticleProgram,
+  type ParticleGlContext,
+} from "./gl-particles.js";
+import { GL, SpriteProgram, UnlitProgram } from "./gl-program.js";
 import { TextureCache } from "./gl-texture.js";
 
 /**
@@ -169,6 +170,15 @@ const REQUIRED_CONTEXT_METHODS = [
   "drawArrays",
   "drawElements",
   "isContextLost",
+  // The particle pipeline's three (WP-9.3). All core WebGL 2 — the two
+  // instancing entry points WebGL 1 needed `ANGLE_instanced_arrays` for, plus
+  // `bufferSubData` — so a context that lacks them is not a WebGL 2 context,
+  // and this check is the one place that has to notice. See `gl-particles.ts`
+  // for why they are declared as an extension of `WebglContext` rather than in
+  // it.
+  "bufferSubData",
+  "vertexAttribDivisor",
+  "drawArraysInstanced",
 ] as const;
 
 /**
@@ -238,11 +248,12 @@ function requireCanvas(value: unknown): WebglCanvas {
 }
 
 /**
- * Narrows a `getContext` result to a {@link WebglContext}, or returns `null`
- * (the caller turns that into `RENDERER_INITIALIZATION_FAILED` with the reason
- * attached).
+ * Narrows a `getContext` result to a {@link ParticleGlContext} — i.e. a
+ * `WebglContext` plus the three instancing entry points the particle pipeline
+ * needs — or returns `null` (the caller turns that into
+ * `RENDERER_INITIALIZATION_FAILED` with the reason attached).
  */
-function asContext(value: unknown): WebglContext | null {
+function asContext(value: unknown): ParticleGlContext | null {
   if (typeof value !== "object" || value === null) {
     return null;
   }
@@ -252,11 +263,11 @@ function asContext(value: unknown): WebglContext | null {
       return null;
     }
   }
-  return value as WebglContext;
+  return value as ParticleGlContext;
 }
 
 /** Reads the §62 limits this tier can honestly report. */
-function readCapabilities(gl: WebglContext): RendererCapabilities {
+function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
   const maxTextureSize = gl.getParameter(GL.MAX_TEXTURE_SIZE);
   return Object.freeze({
     backend: "webgl2",
@@ -339,28 +350,31 @@ function resolveRect(
  *   texel data, and `Viewport.clearColor` alike. The *function* never changes,
  *   so it is set once; the *enable* is toggled around sprite runs, below.
  *
- * ## Two pipelines (§55, WP-3a.3)
+ * ## Three pipelines (§55, §36; WP-3a.3, WP-9.3)
  *
  * A render item says which pipeline draws it (`RenderItem.kind`), and this
- * backend keeps both live:
+ * backend keeps all three live:
  *
  * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested and opaque;
- * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled.
+ * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled;
+ * - **particles** — one `drawArraysInstanced` per §36 particle system,
+ *   screen-aligned quads coloured per instance, with `GL_BLEND` enabled
+ *   (`gl-particles.ts`).
  *
  * The unlit pipeline is the frame's starting and resting state: a scene with no
- * sprites issues exactly the GL sequence it issued before sprites existed, down
- * to the single `useProgram`. Blending is enabled when a run of sprites begins
- * and disabled when it ends or the frame does, so an opaque draw never runs
- * through a blend equation it did not ask for.
+ * sprites and no particles issues exactly the GL sequence it issued before
+ * either existed, down to the single `useProgram`. Blending is enabled when a
+ * run of transparent items begins and disabled when the frame ends, so an
+ * opaque draw never runs through a blend equation it did not ask for.
  *
- * Sprites are **not depth-sorted**: §66's key 2 (opaque versus transparent) and
- * key 4 (depth) are both deferred with the material state that would drive them,
- * so sprites draw in render-list order — layer, then explicit render order, then
- * scene order — with depth testing and depth *writing* left on. That is correct
- * for sprites that do not overlap, and for overlapping sprites an author orders
- * with `renderOrder`; it is wrong for arbitrary unsorted overlapping
- * transparency, which is the documented limitation §66 asks the engine to state
- * and the sorting packet to fix.
+ * Sprites and particles are **not depth-sorted**: §66's key 2 (opaque versus
+ * transparent) and key 4 (depth) are both deferred with the material state that
+ * would drive them, so they draw in render-list order — layer, then explicit
+ * render order, then scene order — with depth testing and depth *writing* left
+ * on. That is correct for content that does not overlap, and for overlapping
+ * content an author orders with `renderOrder`; it is wrong for arbitrary
+ * unsorted overlapping transparency, which is the documented limitation §66 asks
+ * the engine to state and the sorting packet to fix.
  *
  * Textures are discovered from the render list and cached exactly as geometry
  * is (`gl-texture.ts`), which is why §61's `createTexture` stays deferred — the
@@ -373,9 +387,9 @@ function resolveRect(
  * browser never restores), and turned into a `contextlost` event; GPU handles
  * are dropped without being deleted, because they are already invalid.
  * `render` then returns silently until `webglcontextrestored` arrives, at which
- * point both programs and both caches are rebuilt, the fixed state and the
- * surface size are re-applied, capabilities are re-read, and `contextrestored`
- * is emitted — after the rebuild, so the first frame a listener triggers
+ * point all three programs and all three caches are rebuilt, the fixed state and
+ * the surface size are re-applied, capabilities are re-read, and
+ * `contextrestored` is emitted — after the rebuild, so the first frame a listener triggers
  * already draws. Geometry and texture *content* re-uploads lazily from the
  * CPU-side sources the application still holds, on the next draw that needs it.
  *
@@ -398,15 +412,19 @@ export class WebglRenderer implements Renderer {
 
   #canvas: WebglCanvas | null = null;
 
-  #gl: WebglContext | null = null;
+  #gl: ParticleGlContext | null = null;
 
   #program: UnlitProgram | null = null;
 
   #spriteProgram: SpriteProgram | null = null;
 
+  #particleProgram: ParticleProgram | null = null;
+
   #geometries: GeometryCache | null = null;
 
   #textures: TextureCache | null = null;
+
+  #particleBatches: ParticleBatchCache | null = null;
 
   #contextLost = false;
 
@@ -436,8 +454,10 @@ export class WebglRenderer implements Renderer {
     // Every handle died with the context: drop them, never delete them.
     this.#program = null;
     this.#spriteProgram = null;
+    this.#particleProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
+    this.#particleBatches?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
 
@@ -451,8 +471,10 @@ export class WebglRenderer implements Renderer {
     // claimed to be ready would fail on the next draw instead, with no clue.
     this.#program = UnlitProgram.create(gl);
     this.#spriteProgram = SpriteProgram.create(gl);
+    this.#particleProgram = ParticleProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
+    this.#particleBatches = new ParticleBatchCache(gl);
     this.#applyFixedState(gl);
     // Textures are re-uploaded lazily from the CPU-side sources their `Texture`
     // objects still retain — §61's "re-uploads user resources that retain
@@ -585,13 +607,17 @@ export class WebglRenderer implements Renderer {
     // behaviour if the invariant is ever broken: §61 forbids throwing here.
     const program = this.#program;
     const spriteProgram = this.#spriteProgram;
+    const particleProgram = this.#particleProgram;
     const geometries = this.#geometries;
     const textures = this.#textures;
+    const particleBatches = this.#particleBatches;
     if (
       program === null ||
       spriteProgram === null ||
+      particleProgram === null ||
       geometries === null ||
-      textures === null
+      textures === null ||
+      particleBatches === null
     ) {
       return;
     }
@@ -611,6 +637,9 @@ export class WebglRenderer implements Renderer {
     program.use();
     let activeKind: RenderItemKind = "unlit";
     let blending = false;
+    // Whether a texture is bound to unit 0 — only the sprite path binds one, so
+    // a frame of particles and opaque geometry has nothing to unbind at the end.
+    let textureBound = false;
 
     for (const view of views) {
       resolveRect(view, this.#bufferWidth, this.#bufferHeight);
@@ -647,10 +676,48 @@ export class WebglRenderer implements Renderer {
       }
       program.setViewProjection(viewProjection);
       let spriteViewUploaded = false;
+      let particleViewUploaded = false;
 
       for (const item of items) {
         const record = geometries.acquire(item.geometry);
         if (record === null) {
+          continue;
+        }
+
+        if (isParticlesItem(item)) {
+          // §36's whole system, one instanced draw (plan P9-3). The geometry
+          // record is the *shared unit quad* every particle item points at, so
+          // the corner stream is uploaded once for the application and this
+          // system's own vertex array is built on top of that buffer.
+          if (item.count === 0) {
+            continue;
+          }
+          const batch = particleBatches.acquire(item, record.positionBuffer);
+          if (batch === null) {
+            continue;
+          }
+          if (activeKind !== "particles") {
+            particleProgram.use();
+            // Particles are transparent by construction (§36's colour ramp);
+            // the blend *function* was fixed at initialization to straight
+            // alpha (§66), so only the enable is toggled — see
+            // `gl-particles.ts` for the whole policy.
+            gl.enable(GL.BLEND);
+            blending = true;
+            activeKind = "particles";
+          }
+          if (!particleViewUploaded) {
+            // The billboard offset happens between the view and the projection,
+            // so this pipeline takes the two matrices separately rather than
+            // the premultiplied `viewProjection` the other two use.
+            particleProgram.setProjection(camera.projectionMatrix);
+            particleProgram.setView(camera.viewMatrix);
+            particleViewUploaded = true;
+          }
+          particleProgram.setModel(item.worldMatrix);
+          particleBatches.upload(batch, item);
+          gl.bindVertexArray(batch.vertexArray);
+          gl.drawArraysInstanced(record.mode, 0, record.count, item.count);
           continue;
         }
 
@@ -685,6 +752,7 @@ export class WebglRenderer implements Renderer {
           );
           spriteProgram.setTint(material.tint);
           gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+          textureBound = true;
         } else {
           if (activeKind !== "unlit") {
             program.use();
@@ -710,6 +778,8 @@ export class WebglRenderer implements Renderer {
     // several renderers over one application).
     if (blending) {
       gl.disable(GL.BLEND);
+    }
+    if (textureBound) {
       gl.bindTexture(GL.TEXTURE_2D, null);
     }
     gl.bindVertexArray(null);
@@ -763,14 +833,18 @@ export class WebglRenderer implements Renderer {
     if (!this.#contextLost) {
       this.#program?.dispose();
       this.#spriteProgram?.dispose();
+      this.#particleProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
+      this.#particleBatches?.dispose();
     }
 
     this.#program = null;
     this.#spriteProgram = null;
+    this.#particleProgram = null;
     this.#geometries = null;
     this.#textures = null;
+    this.#particleBatches = null;
     this.#gl = null;
     this.#canvas = null;
     this.events.removeAllListeners();
@@ -806,8 +880,9 @@ export class WebglRenderer implements Renderer {
       );
     }
 
-    // Both programs are built before anything is stored, so a shader failure
-    // leaves the renderer uninitialized rather than half-initialized.
+    // All three programs are built before anything is stored, so a shader
+    // failure leaves the renderer uninitialized rather than half-initialized —
+    // and each failure disposes the ones already built.
     const program = UnlitProgram.create(gl);
     let spriteProgram: SpriteProgram;
     try {
@@ -816,13 +891,23 @@ export class WebglRenderer implements Renderer {
       program.dispose();
       throw error;
     }
+    let particleProgram: ParticleProgram;
+    try {
+      particleProgram = ParticleProgram.create(gl);
+    } catch (error: unknown) {
+      spriteProgram.dispose();
+      program.dispose();
+      throw error;
+    }
 
     this.#canvas = canvas;
     this.#gl = gl;
     this.#program = program;
     this.#spriteProgram = spriteProgram;
+    this.#particleProgram = particleProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
+    this.#particleBatches = new ParticleBatchCache(gl);
     this.#capabilities = readCapabilities(gl);
     this.#applyFixedState(gl);
 
@@ -840,7 +925,7 @@ export class WebglRenderer implements Renderer {
   }
 
   /** The fixed GL state — see the class documentation for each choice. */
-  #applyFixedState(gl: WebglContext): void {
+  #applyFixedState(gl: ParticleGlContext): void {
     gl.enable(GL.DEPTH_TEST);
     gl.depthFunc(GL.LEQUAL);
     gl.frontFace(GL.CCW);
@@ -863,7 +948,7 @@ export class WebglRenderer implements Renderer {
   }
 
   /** Throws unless the renderer is usable and initialized. */
-  #requireContext(method: string): WebglContext {
+  #requireContext(method: string): ParticleGlContext {
     this.#assertUsable(method);
     const gl = this.#gl;
     if (gl === null) {

@@ -30,6 +30,22 @@
  *   (`BufferGeometry`, §53) the field belongs here; when `Mesh` and `Shape2D`
  *   land they narrow it rather than introduce it.
  *
+ * ## The family members that are *not* subclasses
+ *
+ * Two of §49's family have landed without extending this class, both for
+ * type-level reasons that are recorded where they bite:
+ *
+ * - **`Sprite`** (§55) extends `Node` directly because `material` cannot be
+ *   widened until §57's `Material` base exists — see `sprite.ts`.
+ * - **`ParticleSystem`** (§36) is not in this package at all. It lives in
+ *   `@four/particles`, which the frozen §3.1 dependency matrix forbids from
+ *   importing `@four/render`, so it is recognised by `buildRenderList` through
+ *   a **structural contract** instead of by inheritance — see `particles.ts`.
+ *
+ * Both are treated as first-class drawables by the render list, which tags every
+ * item with a `RenderItemKind` discriminant; neither costs the backend an
+ * `instanceof`.
+ *
  * Deferred with their features, not silently dropped: `depthMode` (needs the
  * §61 depth-state contract), `castShadow`/`receiveShadow` (§69), and
  * `frustumCulled` (§87 culling — the render list does no culling yet, so the
