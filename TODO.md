@@ -6,11 +6,22 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 11 — Assets, serialization, UI, tooling (§113a; §73–80, §92–93): the FINAL
-      phase — decomposition into plan §6j, then dispatch (asset manager, scene
-      save/reload format + migration, UI MVP subset, benchmarks harness vs §86,
-      guides/docs; exit: scene saves/reloads/benchmarks; §120 tooling list complete;
-      release workflow at first publish per §94).
+- [ ] **The implementation plan is COMPLETE (2026-08-02).** All 13 phase sections
+      (§103–§113a) built, tested, verified. What remains is post-plan work, in the
+      verifier's priority order:
+
+### Post-plan backlog (final exit verifier, 2026-08-02)
+- [ ] Package README sweep — all 24 still say "scaffold only" (shipping-false text)
+- [ ] UI browser proof — @four/ui has node-level §72 coverage only; no example app
+      imports it (the one WP-11.5 packet-intent shortfall)
+- [ ] Lighting (§120's single unshipped bullet — never scheduled to a phase; needs a
+      light type, lit shading path, AND normals in the vertex layouts; owner tier
+      decision first)
+- [ ] De-flake tests/browser/blending.spec.ts RECOVER (1 hard fail in 3 full runs;
+      retries: 0; Phase 7 wall-clock thresholds under SwiftShader)
+- [ ] §93 quick-start (root README is 27 lines) + the thirteen prose guides
+- [ ] First publish (§94 0.1): Changesets release workflow + the
+      @danielsimonjr/fourjs publish-name mapping — owner step
 
 ### Backlog additions (Phase 10, 2026-08-02)
 - [ ] Package README sweep — all 24 still say "scaffold only" despite implementation
@@ -95,6 +106,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 11 complete — THE PLAN IS DONE** (§113a): 5 packets, final
+      exit GREEN — serialization (byte-identical round trips + the proven §79/§34
+      boundary), assets, UI MVP, benchmark harness with committed records, the §120
+      audit (42/43 shipped-or-MVP, lighting staged); whole-plan audit clean; final
+      totals 2,971 unit + 172 suite + 32 browser tests, coverage ≥95% everywhere
 - [x] 2026-08-02 — **Phase 10 complete** (§113): 5 packets, exit GREEN zero defects —
       §34 replay format with canonical serialization, ReplayRecorder/ReplayPlayer over
       duck-typed targets, debug-draw providers with honestly-staged seam gaps, the

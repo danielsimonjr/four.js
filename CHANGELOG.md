@@ -10,6 +10,26 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-02
 
+#### Added (Phase 11 — Assets, Serialization, UI, Tooling, §113a; packets WP-11.1…WP-11.6 — THE FINAL PHASE)
+- `@four/serialization`: SceneDocument v1 with canonical validation, a
+  component-class-keyed serializer registry, §80 migrations — byte-identical
+  round trips; 84 tests, 100% coverage.
+- `@four/assets`: AssetManager (coalescing refcounted cache, disposal-aware image
+  wrapper) + JSON/text/binary/image loaders; glTF staged with a dated note — 33
+  tests, 100% coverage.
+- `@four/ui`: retained-mode Panel/Label/Button over a WidgetSkin visuals seam,
+  flex/stack/absolute layout, §72-driven state machines, focus management;
+  accessibility mirror + keyboard staged — 90 tests, 100% coverage.
+- `benchmarks/`: a shared harness + five suites (math, scene, physics, animation,
+  particles) with committed measured-not-gated records, and `docs/AUDIT-120.md`
+  (42/43 §120 bullets shipped-or-MVP; lighting the single dated staged absence).
+- Integration (13 tests): the §79/§34 boundary proven — contact-free scene saves
+  reload bit-identically for 200 further steps; in-contact saves diverge only via
+  unserialized solver warm-start state. Reference RigidBody/Collider serializers.
+- **Final exit GREEN. The implementation plan (§103–§113a) is complete**: 2,971 unit
+  + 172 suite + 32 browser tests; 24/24 packages; coverage ≥95% everywhere; §86 at
+  32.13/150 kB; docs 0 errors.
+
 #### Added (Phase 10 — Replay, Snapshots, Diagnostics, §33–34/§113; packets WP-10.1…WP-10.5)
 - `@four/diagnostics`: the §34 replay format (canonical serialization, strict base64,
   adapter-validity refusal), `ReplayRecorder` + `ReplayPlayer` (host-supplied stepFn,

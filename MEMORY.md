@@ -25,6 +25,35 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 11 CLOSED — THE IMPLEMENTATION PLAN IS COMPLETE (final exit
+  GREEN; §113a exit TRUE: saved, reloaded, benchmarked; §120 complete at 42/43
+  shipped-or-MVP with lighting the single dated staged absence — a traceable
+  scheduling gap, never assigned to any phase).** Five packets. Key surfaces:
+  @four/serialization (SceneDocument v1, canonical validation, ComponentSerializer
+  registry keyed by component CLASS, §80 migrations; byte-identical round trips;
+  known boundaries: unregistered components silently unsaved, restored ids can
+  collide with the live counter); @four/assets (AssetManager with coalescing
+  refcounted cache, ImageAsset disposal wrapper; glTF staged — needs §55 textures +
+  non-unlit materials); @four/ui (WidgetSkin seam: layout/state owned, visuals
+  app-supplied per the matrix; flex/stack/absolute layout; a11y mirror + keyboard
+  staged); benchmarks harness + five suites with committed records (findings:
+  contacts+events = ~88% of a physics step; clean scene pass only ~3× cheaper than
+  full recompute; recursion-limited scene depth ~8k); docs/AUDIT-120.md. THE §79/§34
+  BOUNDARY (WP-11.5): a contact-free save round-trips BIT-IDENTICALLY for 200
+  further steps; an in-contact save diverges only through solver warm-start state —
+  §34 snapshots carry that, §79 documents don't. Reference RigidBody/Collider
+  serializers live in tests/integration/helpers/roundtrip-scenarios.ts. Whole-plan
+  audit: all 13 phase sections (§103–§113a) decomposed, dispatched, closed, dated;
+  8 goldens 1:1 with determinism specs; §94 release workflow correctly owner-gated.
+  Final numbers: **2,971 unit / 172 suite / 32 browser tests; 24/24 build; coverage
+  ≥95% everywhere (Phase 11 packages 100%); §86 at 32.13/150 kB; docs 0 errors.**
+  Remaining backlog (priority order, verifier G-list): package README sweep (all 24
+  say "scaffold only"); UI browser proof (WP-11.5 substituted a node-level §72
+  assertion — the one packet-intent shortfall); lighting packet (owner tier
+  decision); de-flake blending.spec.ts RECOVER (1 hard fail in 3 full runs,
+  retries: 0 — Phase 7 wall-clock thresholds under SwiftShader); §93 quick-start +
+  prose guides (the guide half is thin — examples + doc-comments today); gotcha:
+  `pnpm size` is a pnpm builtin like `pnpm docs` — always `pnpm run size`.
 - **2026-08-02 — PHASE 10 CLOSED (exit GREEN, zero defects; §113 exit sentence TRUE:
   record → bit-identical replay (240/240 checksums; stepChecksumDigest ===
   replayChecksumDigest pinned in golden/phase10.json) → snapshot-seek (cost ≤
