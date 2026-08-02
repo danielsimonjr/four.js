@@ -377,7 +377,13 @@ export interface AngularJointMotor {
   enabled?: boolean;
   /** Target angular rate in radians per second (§7a). */
   targetVelocity: number;
-  /** Largest torque the motor may apply, in newton-metres. Must be `>= 0`. */
+  /**
+   * Largest torque the motor may apply, in newton-metres. Must be `>= 0`.
+   *
+   * Solver caveat: on the Rapier adapters this is a strength *gain*, not a
+   * hard ceiling — see {@link SolverJointMotor.maxEffort} for the recorded
+   * deviation and the reasoning.
+   */
   maxTorque: number;
 }
 
@@ -390,7 +396,12 @@ export interface LinearJointMotor {
   enabled?: boolean;
   /** Target linear rate in metres per second (§7a). */
   targetVelocity: number;
-  /** Largest force the motor may apply, in newtons. Must be `>= 0`. */
+  /**
+   * Largest force the motor may apply, in newtons. Must be `>= 0`.
+   *
+   * Solver caveat: on the Rapier adapters this is a strength *gain*, not a
+   * hard ceiling — see {@link SolverJointMotor.maxEffort}.
+   */
   maxForce: number;
 }
 

@@ -272,7 +272,16 @@ export interface SolverJointMotor {
   /** Target rate: radians per second, or metres per second (§7a). */
   readonly targetVelocity: number;
 
-  /** Largest effort the motor may apply: newton-metres, or newtons. `>= 0`. */
+  /**
+   * Largest effort the motor may apply: newton-metres, or newtons. `>= 0`.
+   *
+   * Solver caveat (recorded at the Phase 6 exit): Rapier 0.19.3 exposes no
+   * JS-reachable motor-force ceiling, so both Rapier adapters supply this as
+   * a `ForceBased` gain — effort ≈ `maxEffort · (target − current)` — which
+   * is monotone in strength but not §28's hard cap. Adapters that do cap
+   * (e.g. Box2D's `maxMotorTorque`) may honour it literally; see each
+   * adapter's `setJointMotor` documentation.
+   */
   readonly maxEffort: number;
 }
 

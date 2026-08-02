@@ -58,8 +58,17 @@ jobs:
       - name: Build API docs
         run: pnpm run docs
 
+      # All three example sites must be built: playwright.config.ts starts a
+      # vite preview server per example, and vite preview hard-errors on a
+      # missing dist (found at the Phase 6 exit, WP-6.6-fix1).
       - name: Build example
         run: pnpm example:build
+
+      - name: Build physics playground
+        run: pnpm playground:build
+
+      - name: Build mechanism example
+        run: pnpm mechanism:build
 
       # CI runners ship no browsers, and this repository deliberately keeps
       # browser downloads out of the local scripts: the dev sandbox already has
