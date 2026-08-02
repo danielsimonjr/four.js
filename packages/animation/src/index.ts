@@ -84,6 +84,7 @@ export {
 export type {
   AnimationEventListener,
   MixerPlayOptions,
+  MixerRootMotionOptions,
   MixerState,
 } from "./mixer.js";
 export { AnimationMixer } from "./mixer.js";
