@@ -1118,6 +1118,52 @@ inputs → replay bit-identical → mid-run snapshot restore → frame-step insp
 the §113 exit demonstrated end-to-end. **WP-10.5 [S]** exit verifier.
 Dependencies: 10.1 → 10.2 ∥ 10.3; 10.4 ← both; 10.5 last.
 
+## 6j. Phase 11 — Assets, Serialization, UI, and Tooling (§113a; decomposed 2026-08-02)
+
+Exit (§113a): a scene can be saved, reloaded, and benchmarked, and the §120 tooling
+list is complete — MVP tiers throughout; the website/guides half of §93 delivers as
+in-repo documentation (typedoc API reference already lives; a public website is a
+deployment/owner step per the POSITIONING precedent).
+
+Pinned decisions:
+
+- **P11-1 Serialization MVP** (`@four/serialization`, deps core/math/scene): a JSON
+  scene format {formatVersion, nodes (tree: id/name/transform/authority), components
+  by typeName with per-type serializers registered via a `ComponentSerializer`
+  registry (the §6a typeName registry is the natural key)} + §80 migration hooks
+  (formatVersion + registered migration steps). Physics/animation component
+  serializers live where the components live? NO — matrix forbids; the REGISTRY
+  pattern lets each package register its own serializer at app level; Phase 11 ships
+  the registry + scene/transform/PoseTarget serializers + ONE cross-package reference
+  registration (RigidBody/Collider) done at the tests/app layer. Round-trip
+  save→load→§33-checksum-relevant state equality is the gate.
+- **P11-2 Assets MVP** (`@four/assets`, deps core): AssetManager {load(url, loader),
+  cache, refcounts, dispose; structural fetch injection for testability}; loaders:
+  JSON, text, binary (ArrayBuffer), image (structural ImageBitmap-like — browser
+  gated). glTF (§76-78) is STAGED with a dated note (a real glTF pipeline needs the
+  §55 texture tier + materials beyond unlit — dishonest to ship as a stub).
+- **P11-3 UI MVP** (`@four/ui`, deps core/math/scene/input/text): retained-mode
+  Panel/Label/Button over the existing sprite/text path with §72 pointer routing;
+  accessibility MIRROR staged with a dated note (needs DOM integration policy).
+  Enough §73-75 to prove the layer composes; completeness staged.
+- **P11-4 Benchmarks** (`benchmarks/`): the harness pattern from particles-100k
+  generalized — a runner + per-suite scripts (math ops, scene propagation, physics
+  step, animation sampling) writing results JSON records (measured-not-gated); §86
+  table rows measured where honest.
+- **P11-5 §120 tooling list**: audit §120 against reality; anything unshipped gets a
+  dated staged note in the plan — the exit's "complete" reads as
+  "shipped-or-staged-with-note", consistent with every prior phase.
+
+Packets: **WP-11.1 [S]** serialization (P11-1). **WP-11.2 [S]** assets (P11-2).
+**WP-11.3 [S]** UI MVP (P11-3). **WP-11.4 [S]** benchmarks harness (P11-4) + §120
+audit doc (docs/AUDIT-120.md). **WP-11.5 [S]** integration: save→reload→checksum
+round trip on a Rapier scene + a UI browser assertion riding an existing spec or a
+tiny addition (worker reports). **WP-11.6 [S]** exit verifier (§113a verdict + a
+WHOLE-PLAN completion audit: every phase closed, every § component
+shipped-or-staged, tracking files coherent).
+Dependencies: 11.1 ∥ 11.2 ∥ 11.3 ∥ 11.4 (disjoint packages/dirs); 11.5 ← 11.1+11.3;
+11.6 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
