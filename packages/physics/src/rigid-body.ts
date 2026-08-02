@@ -577,6 +577,20 @@ export class RigidBody
    * Which §22 simulation model this body follows (§23). Settable; the §23 mass
    * rule is re-checked against the new type, so promoting a zero-mass body to
    * `"dynamic"` fails here rather than in the solver.
+   *
+   * ## After registration, go through the world (plan P7-3)
+   *
+   * This setter changes the **component**. Once the body is registered with a
+   * `PhysicsWorld`, the solver is running a body of the type it was created
+   * with, and writing here alone would leave the two disagreeing about what is
+   * being simulated — the fixed-step pipeline would keep feeding the old model.
+   *
+   * `world.setBodyControlMode(node, type, options?)` is the call that changes
+   * both: it re-types the solver body **in place** (the id, the checksum order,
+   * the colliders, and the pose all survive), moves this property with it, and
+   * can seed the new velocities from an animated `PoseTarget` — §19's
+   * animated → kinematic → dynamic transitions. WP-5.3's rule that a re-typed
+   * body had to be removed and added again is superseded by it.
    */
   get type(): BodyType {
     return this.#type;

@@ -219,6 +219,7 @@ import {
 } from "@four/physics";
 import type {
   AngularVelocityInput,
+  BodyType,
   CCDMode,
   ColliderDescriptor,
   ContactPoint,
@@ -1994,6 +1995,19 @@ export class Rapier3dAdapter
         ),
       );
     }
+  }
+
+  /**
+   * @inheritDoc
+   *
+   * The 3D build's `setBodyType(type, wakeUp)` behaves exactly like the 2D
+   * one's — same required `wakeUp`, same preserved handle, colliders, pose, and
+   * mass (verified separately against the 3D wasm, WP-7.2). See
+   * `Rapier2dAdapter.setBodyType` for why `record.sleeping` is left alone.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake = true): void {
+    const record = this.#requireBody(handle);
+    record.body.setBodyType(toRapierBodyType3d(type), wake);
   }
 
   /** @inheritDoc */

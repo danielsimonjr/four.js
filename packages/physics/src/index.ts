@@ -15,6 +15,9 @@
  * WP-6.1 adds §28's constraints: the `Joint` classes, the full
  * `JointDescriptor` union of the plan P6-1 tier, the `SolverJointAccess` seam,
  * and the world's `addJoint`/`removeJoint` with plan P6-2 break monitoring.
+ * WP-7.2 adds §19's control-mode transitions: `SolverBodyAccess.setBodyType`
+ * and `PhysicsWorld.setBodyControlMode`, which re-type a registered body in
+ * place with optional velocity inheritance from an animated `PoseTarget`.
  *
  * Named exports only, alphabetical within each module group.
  */
@@ -152,6 +155,7 @@ export {
   sortHitsByDistance,
 } from "./queries.js";
 export type {
+  BlendWeights,
   PointLoad,
   RigidBodyCollisionEvent,
   RigidBodyCommands,
@@ -219,6 +223,7 @@ export {
   validateSphericalJointLimits,
 } from "./validation.js";
 export type {
+  BodyControlModeOptions,
   PhysicsSnapshot,
   PhysicsWorldAdapter,
   PhysicsWorldInit,

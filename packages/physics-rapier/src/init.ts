@@ -88,6 +88,19 @@
  *   refuses a §28 break threshold on this solver instead of never enforcing
  *   one), and a motor's `maxTorque`/`maxForce` cannot be a hard clamp — see
  *   {@link RapierMotorModels}.
+ * - **Runtime re-typing works, in both builds** (verified 2026-08-02 for
+ *   WP-7.2, in the typings *and* the wasm). `RigidBody.prototype.setBodyType`
+ *   is a function of arity 2 — `(type: RigidBodyType, wakeUp: boolean)`, with
+ *   `wakeUp` **required** — and `RigidBodyType` carries the same four values in
+ *   both packages: `Dynamic = 0`, `Fixed = 1`, `KinematicPositionBased = 2`,
+ *   `KinematicVelocityBased = 3`. Measured across a retype: the body's Rapier
+ *   handle is unchanged, its colliders stay attached, its pose survives, and
+ *   `mass()` keeps reporting the collider-derived mass — so a body re-typed to
+ *   dynamic needs no mass recomputation. `wakeUp: false` leaves a sleeping body
+ *   asleep and `true` wakes it. A body re-typed to `Dynamic` with **no**
+ *   collider reports `mass() === 0` and then does not move at all, which is the
+ *   silently-wrong simulation `PhysicsWorld.setBodyControlMode` refuses up
+ *   front.
  */
 
 import * as RAPIER2D_UNTYPED from "@dimforge/rapier2d-compat";
@@ -182,6 +195,17 @@ export interface RapierRigidBody {
   linearDamping(): number;
   angularDamping(): number;
   bodyType(): number;
+  /**
+   * Re-types a live body (`setBodyType(type: RigidBodyType, wakeUp: boolean)`).
+   *
+   * Both arguments are **required** upstream — `wakeUp` is not optional, unlike
+   * the `wake` parameters of `SolverBodyAccess`, so the adapters always pass it
+   * explicitly. Verified against the installed 0.19.3 typings and the wasm
+   * (WP-7.2): the method exists on `RigidBody.prototype` with `length === 2` in
+   * both builds, and the retype preserves the body's Rapier handle, its
+   * colliders, its pose, and its mass.
+   */
+  setBodyType(type: number, wakeUp: boolean): void;
   isSleeping(): boolean;
   isCcdEnabled(): boolean;
   softCcdPrediction(): number;
@@ -707,6 +731,12 @@ export interface RapierRigidBody3d {
   linearDamping(): number;
   angularDamping(): number;
   bodyType(): number;
+  /**
+   * Re-types a live body — identical in shape and behaviour to the 2D build's
+   * {@link RapierRigidBody.setBodyType}, and verified separately against the
+   * installed 3D typings and wasm (WP-7.2) rather than assumed.
+   */
+  setBodyType(type: number, wakeUp: boolean): void;
   isSleeping(): boolean;
   isCcdEnabled(): boolean;
   softCcdPrediction(): number;

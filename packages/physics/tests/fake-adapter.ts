@@ -46,6 +46,7 @@ import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import type {
   AngularVelocityInput,
+  BodyType,
   CCDMode,
   ColliderDescriptor,
   JointDescriptor,
@@ -105,6 +106,16 @@ export interface FakeBody {
   readonly torque: Vector3;
   /** The pending `"kinematic-position"` target, or `null`. */
   kinematicTarget: { position: Vector3; rotation: Quaternion } | null;
+  /**
+   * The §22 model the fake solver is currently running this body under.
+   *
+   * Seeded from `descriptor.type` and moved by
+   * {@link FakeSolverAdapter.setBodyType} (WP-7.2). The integrator branches on
+   * **this** and not on the descriptor, so a re-typed body starts behaving as
+   * its new type on the very next `step` — which is the behaviour
+   * `PhysicsWorld.setBodyControlMode` is asserted against.
+   */
+  type: BodyType;
   sleeping: boolean;
   mass: number;
   ccdMode: CCDMode;
@@ -278,6 +289,7 @@ export class FakeSolverAdapter
       force: new Vector3(),
       torque: new Vector3(),
       kinematicTarget: null,
+      type: desc.type,
       sleeping: false,
       mass: desc.mass ?? 0,
       ccdMode: desc.ccdMode ?? "disabled",
@@ -359,7 +371,7 @@ export class FakeSolverAdapter
     this.#record("step", undefined, delta);
     this.steps += 1;
     for (const body of this.bodies.values()) {
-      const type = body.descriptor.type;
+      const type = body.type;
       if (type === "kinematic-position") {
         const target = body.kinematicTarget;
         if (target !== null) {
@@ -654,6 +666,24 @@ export class FakeSolverAdapter
     );
   }
 
+  /**
+   * Re-types a body in place (§22, plan P7-3), keeping its id, its place in
+   * `bodies` — and therefore in {@link FakeSolverAdapter.forEachBody} — its
+   * colliders, its pose, and its velocities.
+   *
+   * `wake` defaults to `true` and clears {@link FakeBody.sleeping}, exactly as
+   * Rapier's own `setBodyType(type, wakeUp)` does; `false` leaves the §32 sleep
+   * state alone.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake = true): void {
+    const body = this.#requireBody(handle);
+    body.type = type;
+    if (wake) {
+      body.sleeping = false;
+    }
+    this.#record("setBodyType", body.id, type, wake);
+  }
+
   wakeBody(handle: PhysicsBodyHandle): void {
     const body = this.#requireBody(handle);
     body.sleeping = false;
@@ -679,7 +709,12 @@ export class FakeSolverAdapter
   getBodyMass(handle: PhysicsBodyHandle): number {
     const body = this.#requireBody(handle);
     this.#record("getBodyMass", body.id);
-    return body.descriptor.type === "dynamic" ? body.mass : 0;
+    // The **live** type, not the descriptor's: since WP-7.2 a body can be
+    // re-typed in place, and the descriptor stops describing it the moment it
+    // is. Reporting 0 for anything but a dynamic body is this double's own
+    // simplification (Rapier reports the collider-derived mass whatever the
+    // type) and is what `PhysicsWorld`'s mass refresh is written against.
+    return body.type === "dynamic" ? body.mass : 0;
   }
 
   getBodyId(handle: PhysicsBodyHandle): number {

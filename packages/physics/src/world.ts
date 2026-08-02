@@ -84,7 +84,12 @@
 
 import { FourError } from "@four/core";
 import { Quaternion, Vector2, Vector3 } from "@four/math";
-import { warnAuthorityConflict, type Node, type PoseBuffer } from "@four/scene";
+import {
+  warnAuthorityConflict,
+  type Node,
+  type PoseBuffer,
+  type PoseTarget,
+} from "@four/scene";
 
 import type { PhysicsSolverAdapter } from "./adapter.js";
 import type { SolverBodyAccess, SolverJointAccess } from "./body-access.js";
@@ -139,6 +144,7 @@ import type {
 import { DEFAULT_DETERMINISM_LEVEL, DETERMINISM_LEVELS } from "./types.js";
 import {
   validateJointDescriptor,
+  validateMass,
   validatePhysicsWorldOptions,
 } from "./validation.js";
 
@@ -268,6 +274,47 @@ export interface PhysicsSnapshot {
   readonly data: ArrayBuffer;
 }
 
+/**
+ * How {@link PhysicsWorld.setBodyControlMode} performs a §19 control-mode
+ * transition (plan P7-3).
+ *
+ * Every field is optional: the bare call re-types the body, wakes it, and seeds
+ * nothing.
+ */
+export interface BodyControlModeOptions {
+  /**
+   * A `PoseTarget` (§19, plan P7-1) whose one-step history seeds the body's
+   * velocities as part of the switch — "the ragdoll keeps the motion the
+   * animation had".
+   *
+   * The component's `position`/`previousPosition` and
+   * `rotation`/`previousRotation` pair is finite-differenced over the fixed
+   * step; see {@link PhysicsWorld.setBodyControlMode} for the exact formula and
+   * for which target types accept it.
+   */
+  inheritVelocityFrom?: PoseTarget;
+
+  /**
+   * The fixed step, in seconds (§7a, §10), that the inherited difference is
+   * divided by.
+   *
+   * Omit it and the world uses the `deltaSeconds` of its **last**
+   * {@link PhysicsWorld.step}, which is the fixed delta the target history was
+   * actually captured across. It is only needed when no step has run yet — a
+   * body activated before the first step of the simulation — or when a caller
+   * knows the application's fixed delta better than the world does. Ignored
+   * entirely without {@link BodyControlModeOptions.inheritVelocityFrom}.
+   */
+  fixedDeltaSeconds?: number;
+
+  /**
+   * Whether the switch wakes a sleeping body (§32). Defaults to `true`, which
+   * is what activating a body means; pass `false` to re-type without disturbing
+   * the sleep state.
+   */
+  wake?: boolean;
+}
+
 /** One registered collider: the component, its handle, and its monotonic id. */
 interface ColliderRegistration {
   readonly collider: Collider;
@@ -283,19 +330,28 @@ interface BodyRegistration {
   readonly handle: PhysicsBodyHandle;
   readonly id: number;
   /**
-   * The §22 type at registration time.
+   * The §22 type the **solver** is currently running this body as.
    *
    * The pipeline branches on this rather than on the live `body.type` so that a
-   * type assigned after registration cannot desynchronize the engine from the
-   * solver: no §37 method re-types an existing solver body, so a component that
-   * changed type must be removed and added again (documented on
-   * {@link PhysicsWorld.addBody}).
+   * type assigned straight onto the component cannot desynchronize the engine
+   * from the solver: `body.type = "dynamic"` changes what the component says,
+   * not what the solver does. {@link PhysicsWorld.setBodyControlMode} is the one
+   * writer that moves both at once (plan P7-3), and it is what keeps this field
+   * equal to the solver's own type.
    */
-  readonly type: BodyType;
+  type: BodyType;
   /** Registered colliders in creation order; destroyed in reverse. */
   readonly colliders: ColliderRegistration[];
-  /** Whether the node was tracked in the §43 pose buffer by this registration. */
-  readonly tracked: boolean;
+  /**
+   * Whether the node is tracked in the §43 pose buffer by this registration.
+   *
+   * Tracked exactly while the body is dynamic (see
+   * {@link PhysicsWorld.addBody}), which is why
+   * {@link PhysicsWorld.setBodyControlMode} may flip it: a body re-typed away
+   * from `"dynamic"` is no longer a body the solver moves, and one re-typed
+   * into it is.
+   */
+  tracked: boolean;
 }
 
 /** One registered joint: the object, its handle, and its monotonic id (§28). */
@@ -430,6 +486,28 @@ export class PhysicsWorld {
   readonly #reactionLinear = new Vector3();
 
   readonly #reactionAngular = new Vector3();
+
+  /**
+   * Velocity-inheritance scratch, so a §19 control-mode switch allocates
+   * nothing (§7b, D7). See {@link PhysicsWorld.setBodyControlMode}.
+   */
+  readonly #inheritedLinear = new Vector3();
+
+  readonly #inheritedAngular = new Vector3();
+
+  readonly #inheritedDelta = new Quaternion();
+
+  readonly #inheritedInverse = new Quaternion();
+
+  /**
+   * The `deltaSeconds` of the last {@link PhysicsWorld.step}, or `undefined`
+   * before the first one — the fixed step a `PoseTarget` history was captured
+   * across, and the default divisor of
+   * {@link PhysicsWorld.setBodyControlMode}'s finite difference.
+   *
+   * Remembered, never measured: nothing here reads a clock (§33).
+   */
+  #lastStepDelta: number | undefined;
 
   /** Registration-time scratch for the world→local anchor conversion (§28). */
   readonly #bindingPosition = new Vector3();
@@ -645,8 +723,11 @@ export class PhysicsWorld {
    * leaves the component's `mass` alone, because §23 forbids expressing "does
    * not simulate" as a zero mass.
    *
-   * A `RigidBody` whose `type` changes after registration is **not** re-typed in
-   * the solver (§37 has no such call); remove it and add it again.
+   * Assigning `body.type` after registration changes the **component** and not
+   * the solver — the two would then disagree about what is being simulated. Use
+   * {@link PhysicsWorld.setBodyControlMode} to change a registered body's §22
+   * model: it re-types the solver body in place and moves the component with it
+   * (plan P7-3), and it is what §19's control-mode transitions go through.
    *
    * @returns the registered `RigidBody` component
    * @throws FourError if the world is not initialized, if `node` has no
@@ -766,6 +847,142 @@ export class PhysicsWorld {
   /** The `RigidBody` registered for `node`, or `undefined`. */
   getBody(node: Node): RigidBody | undefined {
     return this.#bodiesByNode.get(node)?.body;
+  }
+
+  /**
+   * Switches a registered body between §22's simulation models **in place** —
+   * §19's "move between animated, kinematic, and physical control" (§110, plan
+   * P7-3).
+   *
+   * ```ts
+   * // A door the animation drove, handed over to the solver when it is hit:
+   * world.setBodyControlMode(door, "dynamic", { inheritVelocityFrom: target });
+   * ```
+   *
+   * ## In place, and why that matters (§33)
+   *
+   * The body is **not** destroyed and re-created. It keeps its solver handle,
+   * its monotonic id, its position in the checksum's iteration order, its
+   * colliders, its mass properties, and its pose — all that changes is which of
+   * §22's models the solver runs it under, plus (optionally) its velocities.
+   * Two otherwise identical runs whose only difference is a mid-run switch
+   * therefore produce the same body set in the same order, which is what lets a
+   * control-mode change appear inside a §33 replay at all. Removing and
+   * re-adding the body would mint a fresh id and re-key every registry against
+   * it.
+   *
+   * ## What it updates
+   *
+   * 1. the solver, through `SolverBodyAccess.setBodyType`;
+   * 2. the `RigidBody` component's `type`, so `body.type` and `inverseMass`
+   *    report what is actually being simulated;
+   * 3. the registration's own record of the type, which is what the fixed-step
+   *    pipeline branches on — so the §22 kinematic feed and the §42 transform
+   *    write follow the **new** type from the very next step: a body switched to
+   *    `"kinematic-position"` starts being fed the node's transform as a target,
+   *    and one switched to `"dynamic"` starts publishing the solved pose;
+   * 4. §43 pose tracking, which follows dynamic-ness exactly as
+   *    {@link PhysicsWorld.addBody} sets it.
+   *
+   * ## §23's mass rule for the new type
+   *
+   * A `"dynamic"` body needs a mass, so a switch **to** `"dynamic"` is refused
+   * unless one is authored (`RigidBody.mass`) or derivable — that is, unless the
+   * solver already reports a positive mass for the body, which it does whenever
+   * the body carries a collider with a density (§23, §25). Activating a
+   * ragdoll limb that has no collider would otherwise produce a massless
+   * dynamic body: Rapier leaves such a body motionless (measured at 0.19.3),
+   * which is a silently wrong simulation rather than an error. An authored
+   * `mass` is re-validated against the new type as well, by the same
+   * `validateMass` the component's setter uses.
+   *
+   * Nothing is written to the solver until every check has passed (§85).
+   *
+   * ## Velocity inheritance (§19's ragdoll activation)
+   *
+   * With `inheritVelocityFrom`, the body's velocities are seeded from one fixed
+   * step of the target's own motion, so an activated body continues the
+   * animation's trajectory instead of dropping from rest:
+   *
+   * ```text
+   * dt      = the fixed step (see BodyControlModeOptions.fixedDeltaSeconds)
+   * linear  = (position − previousPosition) / dt                     [m/s]
+   *
+   * qDelta  = rotation · previousRotation⁻¹        (world-frame delta, unit)
+   * qDelta  ← −qDelta   when qDelta.w < 0          (shortest arc, plan D8)
+   * s       = |(qDelta.x, qDelta.y, qDelta.z)|     = |sin(θ/2)|
+   * θ       = 2 · atan2(s, qDelta.w)                                 [rad]
+   * angular = (qDelta.xyz / s) · (θ / dt)                            [rad/s]
+   *           = 0 when s = 0 (no rotation to differentiate)
+   * ```
+   *
+   * `atan2` and not `2·asin(s)`: the arcsine form loses the difference between
+   * a rotation and its supplement past a quarter turn per step, and `atan2`
+   * stays accurate for the small deltas one fixed step actually produces. The
+   * sign flip is the same shortest-arc rule `Quaternion.slerp` documents — `q`
+   * and `−q` are the same rotation, and only one of them is the short way
+   * round, so without it a target that crossed the quaternion sign boundary
+   * would inherit a spin of nearly `2π/dt` in the wrong direction.
+   *
+   * Left-multiplying by the inverse of the *previous* rotation puts the delta in
+   * the **world** frame, which is the frame §23's `angularVelocity` is stated in
+   * (`qDelta · previous = current`). In a `"2d"` world a pure-Z target produces
+   * an exactly pure-Z result — the Hamilton product's x and y terms cancel to
+   * zero — so §21's planar check passes without a fudge; a target carrying
+   * off-plane rotation is rejected by that check, as it should be.
+   *
+   * Inheritance is accepted only for `"dynamic"` and `"kinematic-velocity"`,
+   * the two types that *have* a velocity: a `"static"` or
+   * `"kinematic-position"` body ignores velocity entirely, so seeding one would
+   * be a command that silently does nothing.
+   *
+   * The seeded velocities are written through `setBodyVelocities`, so they are
+   * solver state immediately and are published back onto the component by the
+   * next step (§23). Allocates nothing.
+   *
+   * @returns the `RigidBody` now running under `type`
+   * @throws FourError if the world is not initialized, if `node` is not
+   * registered here, if §23's mass rule forbids the new type, if inheritance
+   * was asked for on a type that has no velocity, or if it was asked for with
+   * no usable fixed delta
+   */
+  setBodyControlMode(
+    node: Node,
+    type: BodyType,
+    options: BodyControlModeOptions = {},
+  ): RigidBody {
+    this.#requireReady();
+    const registration = this.#bodiesByNode.get(node);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `Node ${node.id} is not registered with this PhysicsWorld, so there is no solver body to re-type (§22, plan P7-3). Call world.addBody(node) first.`,
+        { context: { node: node.id, type } },
+      );
+    }
+
+    const body = registration.body;
+    validateMass(type, body.mass);
+    if (type === "dynamic") {
+      this.#requireMassForDynamic(registration);
+    }
+
+    const target = options.inheritVelocityFrom;
+    // Resolve the divisor *before* the solver is touched, so a switch that
+    // cannot seed its velocities is refused whole rather than half-applied.
+    const delta =
+      target === undefined ? 0 : this.#resolveInheritanceDelta(type, options);
+
+    const wake = options.wake ?? true;
+    this.#adapter.setBodyType(registration.handle, type, wake);
+    body.type = type;
+    registration.type = type;
+    this.#retrackPose(registration);
+
+    if (target !== undefined) {
+      this.#inheritVelocities(registration, target, delta, wake);
+    }
+    return body;
   }
 
   // --- §28 joints -----------------------------------------------------------
@@ -925,6 +1142,7 @@ export class PhysicsWorld {
    */
   step(deltaSeconds: number): void {
     this.#requireReady();
+    this.#lastStepDelta = deltaSeconds;
     for (const registration of this.#bodiesByNode.values()) {
       this.#applyCommands(registration);
       this.#feedKinematic(registration);
@@ -1331,6 +1549,168 @@ export class PhysicsWorld {
     }
     for (const child of node.children) {
       this.#collectColliders(child, body, out);
+    }
+  }
+
+  /**
+   * §23's mass rule for a switch **to** `"dynamic"`: the body must have a mass,
+   * authored or derivable (plan P7-3). See
+   * {@link PhysicsWorld.setBodyControlMode}.
+   *
+   * Three ways to have one, checked in this order:
+   *
+   * 1. an **authored** positive `RigidBody.mass`;
+   * 2. a **positive mass the solver already reports**, which settles the
+   *    question outright;
+   * 3. at least one **registered collider**, which is what §23/§25 derive a
+   *    mass from (density × volume).
+   *
+   * The third exists because the second cannot be trusted to answer for a body
+   * that is not dynamic *yet*: a solver is entitled to report a non-dynamic
+   * body's mass as zero — the structural double does exactly that, and
+   * `addBody`'s own refresh is written around it — so a kinematic body about to
+   * be activated would be refused on a zero that means "not simulated", not "no
+   * mass". Asking after the switch instead would mean rejecting a body the
+   * solver had already been told to re-type.
+   *
+   * What is left uncovered is narrow and stated rather than hidden: a body
+   * whose only colliders carry an explicit `density: 0` passes this check and
+   * lands on whatever mass its solver then derives. §85 permits a zero density,
+   * so this rule cannot treat it as an error; the solver's own mass is the
+   * answer in that case.
+   */
+  #requireMassForDynamic(registration: BodyRegistration): void {
+    const authored = registration.body.mass;
+    if (authored !== undefined && authored > 0) {
+      return;
+    }
+    const derived = this.#adapter.getBodyMass(registration.handle);
+    if (Number.isFinite(derived) && derived > 0) {
+      return;
+    }
+    if (registration.colliders.length > 0) {
+      return;
+    }
+    throw new FourError(
+      WORLD_ERROR_CODE,
+      `Node ${registration.node.id} cannot become a "dynamic" body: it has no authored mass, the solver reports none, and it carries no collider to derive one from (§23, §25, plan P7-3). Give the RigidBody a positive mass, or give the body a collider with a density, before switching it to dynamic — a massless dynamic body does not move.`,
+      {
+        context: {
+          node: registration.node.id,
+          authored,
+          derived,
+          colliders: registration.colliders.length,
+        },
+      },
+    );
+  }
+
+  /**
+   * The fixed step a §19 velocity inheritance divides by, with the type check
+   * that makes the request meaningful (plan P7-3).
+   *
+   * See {@link PhysicsWorld.setBodyControlMode} for both rules.
+   */
+  #resolveInheritanceDelta(
+    type: BodyType,
+    options: BodyControlModeOptions,
+  ): number {
+    if (type !== "dynamic" && type !== "kinematic-velocity") {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `inheritVelocityFrom has no meaning for a ${JSON.stringify(type)} body, which carries no velocity (§22, §23). Only "dynamic" and "kinematic-velocity" bodies can inherit the target's motion; a "kinematic-position" body follows the target pose itself.`,
+        { context: { type } },
+      );
+    }
+    const delta = options.fixedDeltaSeconds ?? this.#lastStepDelta;
+    if (delta === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        "inheritVelocityFrom needs the fixed step to divide the target's one-step motion by, and this world has not stepped yet (§10, plan P7-3). Pass fixedDeltaSeconds, or switch the body's control mode after the first step.",
+        { context: { type } },
+      );
+    }
+    if (!Number.isFinite(delta) || delta <= 0) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `fixedDeltaSeconds must be a positive, finite number of seconds; got ${String(delta)} (§7a, §10, §85).`,
+        { context: { type, fixedDeltaSeconds: delta } },
+      );
+    }
+    return delta;
+  }
+
+  /**
+   * Seeds a re-typed body's velocities from one fixed step of `target`'s own
+   * motion (§19, plan P7-3).
+   *
+   * The formula, the frame, and the shortest-arc rule are documented on
+   * {@link PhysicsWorld.setBodyControlMode}; this is that formula and nothing
+   * else. Allocates nothing — every intermediate is world-owned scratch.
+   */
+  #inheritVelocities(
+    registration: BodyRegistration,
+    target: PoseTarget,
+    delta: number,
+    wake: boolean,
+  ): void {
+    const inverseDelta = 1 / delta;
+
+    const linear = this.#inheritedLinear;
+    linear
+      .copy(target.position)
+      .sub(target.previousPosition)
+      .scale(inverseDelta);
+
+    // qDelta = rotation · previousRotation⁻¹, the world-frame one-step delta.
+    const rotationDelta = this.#inheritedDelta;
+    const inverse = this.#inheritedInverse;
+    inverse.copy(target.previousRotation).conjugate();
+    rotationDelta.copy(target.rotation).multiply(inverse);
+
+    let { x, y, z, w } = rotationDelta;
+    if (w < 0) {
+      // `q` and `−q` are the same rotation; only one is the short way round.
+      x = -x;
+      y = -y;
+      z = -z;
+      w = -w;
+    }
+    const angular = this.#inheritedAngular;
+    const sinHalf = Math.sqrt(x * x + y * y + z * z);
+    if (sinHalf === 0) {
+      angular.set(0, 0, 0);
+    } else {
+      const rate = ((2 * Math.atan2(sinHalf, w)) / sinHalf) * inverseDelta;
+      angular.set(x * rate, y * rate, z * rate);
+    }
+
+    this.#adapter.setBodyVelocities(registration.handle, linear, angular, wake);
+  }
+
+  /**
+   * Brings §43 pose tracking back in line with the registration's current type
+   * after a switch (plan P7-3).
+   *
+   * {@link PhysicsWorld.addBody} tracks exactly the dynamic bodies, because
+   * those are the ones whose transform the solver writes and whose render pose
+   * is therefore interpolated; a body that stops being dynamic stops being one
+   * of those, and a body that becomes dynamic becomes one. A world with no pose
+   * buffer does nothing here.
+   */
+  #retrackPose(registration: BodyRegistration): void {
+    if (this.#poses === undefined) {
+      return;
+    }
+    const shouldTrack = registration.type === "dynamic";
+    if (shouldTrack === registration.tracked) {
+      return;
+    }
+    registration.tracked = shouldTrack;
+    if (shouldTrack) {
+      this.#poses.track(registration.node);
+    } else {
+      this.#poses.untrack(registration.node);
     }
   }
 

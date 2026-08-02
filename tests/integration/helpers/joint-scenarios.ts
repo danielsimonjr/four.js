@@ -570,7 +570,8 @@ export function allFinite(values: readonly number[]): boolean {
 interface ScriptedBody {
   readonly id: number;
   readonly handle: PhysicsBodyHandle;
-  readonly type: RigidBodyDescriptor["type"];
+  /** Mutable since WP-7.2: `setBodyType` re-types a body in place (§22). */
+  type: RigidBodyDescriptor["type"];
   readonly position: Vector3;
   readonly rotation: Quaternion;
   readonly linear: Vector3;
@@ -943,6 +944,13 @@ export class ScriptedJointAdapter
     if (rotation !== undefined) {
       resolveRotation("3d", rotation, body.rotation);
     }
+  }
+
+  setBodyType(
+    handle: PhysicsBodyHandle,
+    type: RigidBodyDescriptor["type"],
+  ): void {
+    this.#requireBody(handle).type = type;
   }
 
   wakeBody(handle: PhysicsBodyHandle): void {

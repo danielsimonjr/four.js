@@ -111,6 +111,7 @@ import {
 } from "@four/physics";
 import type {
   AngularVelocityInput,
+  BodyType,
   CCDMode,
   ColliderDescriptor,
   ContactPoint,
@@ -573,6 +574,15 @@ export interface RapierBodyAccess {
     position: Vector3Input,
     rotation?: RotationInput,
   ): void;
+
+  /**
+   * Re-types a live body in place (§22, plan P7-3) — Rapier's own
+   * `RigidBody.setBodyType`, which keeps the body's handle, its colliders, its
+   * pose, and its mass properties.
+   *
+   * `wake` defaults to `true`, like {@link RapierBodyAccess.setBodyTransform}'s.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake?: boolean): void;
 
   /** §32's explicit wake command. */
   wakeBody(handle: PhysicsBodyHandle): void;
@@ -1905,6 +1915,26 @@ export class Rapier2dAdapter
         toRapierAngle(rotation, this.#scratchQuaternion),
       );
     }
+  }
+
+  /**
+   * @inheritDoc
+   *
+   * Rapier's `setBodyType(type, wakeUp)` takes `wakeUp` as a **required**
+   * argument, so the default is applied here rather than passed through.
+   *
+   * Nothing else is touched: measured at 0.19.3 (WP-7.2), the retype leaves the
+   * body's Rapier handle, its colliders, its pose, and its mass properties
+   * alone, which is what makes {@link Rapier2dAdapter.getBodyId} and
+   * {@link Rapier2dAdapter.forEachBody} — and with them §33's checksum order —
+   * survive a control-mode switch untouched. `record.sleeping` is deliberately
+   * *not* refreshed here: it is the previous-step snapshot §32's sleep/wake
+   * events are diffed against, so a wake caused by this call is reported by the
+   * next step like any other.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake = true): void {
+    const record = this.#requireBody(handle);
+    record.body.setBodyType(toRapierBodyType(type), wake);
   }
 
   /** @inheritDoc */

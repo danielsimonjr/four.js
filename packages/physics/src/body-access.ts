@@ -85,6 +85,7 @@ import type { Quaternion, Vector3 } from "@four/math";
 
 import type {
   AngularVelocityInput,
+  BodyType,
   CCDMode,
   PhysicsBodyHandle,
   PhysicsColliderHandle,
@@ -197,6 +198,45 @@ export interface SolverBodyAccess {
     position: Vector3Input,
     rotation?: RotationInput,
   ): void;
+
+  /**
+   * Re-types a body **in place** — §22's four simulation models, swapped on a
+   * body that already exists (plan P7-3).
+   *
+   * ## In place, and why that is the whole point
+   *
+   * The body keeps its handle, its monotonic {@link SolverBodyAccess.getBodyId}
+   * id, its position in {@link SolverBodyAccess.forEachBody}'s sequence, its
+   * colliders, and its mass properties. Nothing is destroyed and nothing is
+   * created, so §33's checksum stream is taken over the same bodies in the same
+   * order before and after the switch: two runs that differ only in *when* a
+   * body was re-typed still hash identically up to that step. Destroying and
+   * re-creating the body would append a new id and permute nothing but would
+   * still change the id set, which is exactly what §33 forbids a mid-run
+   * control-mode change from doing.
+   *
+   * ## What the solver keeps and what it drops
+   *
+   * The pose survives every transition — a body re-typed while falling is
+   * exactly where it was. Velocities are a solver's business: a body switched
+   * away from `"dynamic"` stops integrating, and a body switched *to*
+   * `"dynamic"` resumes from whatever velocity state it holds, which is usually
+   * zero. `PhysicsWorld.setBodyControlMode` is where §19's velocity inheritance
+   * seeds that (an activated ragdoll continues the motion its animation had),
+   * through {@link SolverBodyAccess.setBodyVelocities}; this method never
+   * invents a velocity of its own.
+   *
+   * ## `wake`
+   *
+   * `true` (the default, as on {@link SolverBodyAccess.setBodyTransform})
+   * wakes a sleeping body, so a body activated into `"dynamic"` starts
+   * simulating on the next step instead of staying asleep at the pose it fell
+   * asleep in. `false` leaves the §32 sleep state exactly as it was.
+   *
+   * Re-typing to the type the body already has is a legal no-op apart from
+   * `wake`.
+   */
+  setBodyType(handle: PhysicsBodyHandle, type: BodyType, wake?: boolean): void;
 
   /** §32's explicit wake command, queued by `RigidBody.wake()`. */
   wakeBody(handle: PhysicsBodyHandle): void;
