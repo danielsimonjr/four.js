@@ -1,0 +1,22 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 10 replay record (§33–34, §113, §92) recorded on 2026-08-02 by WP-10.4 from an actual run of tests/determinism/helpers/phase10-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means something changed: the simulation, the §34 document format, Rapier's snapshot encoding, or the replay path. Find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js can capture a session and replay it bit-identically.",
+  "_scenario": "One headless 2D Rapier world (rapier2d 0.19.3) under one PhysicsSystem in one Application: a static ground 16 units wide with its top surface at y = 0, and three dynamic circles of radius 0.3 and authored mass 1 kg (restitution 0.3, friction 0.5) dropped from y = 1.2, 2.1 and 3.0 at x = −1.5, 0 and 1.5. Four scripted §26 impulses are applied through RigidBody.applyImpulse — two at step 20 (ball-0 (0.6, 3.2, 0), ball-1 (−0.4, 2.0, 0)), one at step 75 (ball-2 (0.9, 4.0, 0)) and one at step 140 (ball-0 (−1.1, 1.5, 0)) — via the same ReplayTarget.applyInput the replay uses. fixedTimeStep 1/60, 240 clean injected frames (4 s, exactly one fixed step each, nothing dropped), seed 1337 recorded, periodic §34 snapshots every 30 steps. The run is recorded with ReplayRecorder, replayed into a FRESH world by ReplayPlayer (stepFn = one Application fixed step), and seeked to step 155 through the step-150 snapshot before playing on to the end. recordingDigest is the D6 digest of encodeReplayRecording()'s JSON text, byte by byte; stepChecksumDigest and replayChecksumDigest are the D6 digests of the two per-step §33 checksum streams and MUST be equal — that equality is what §113's exit means.",
+  "_tier": "same-runtime (§33): PhysicsWorld.checksum is exact and order-fixed, and Rapier is compiled WebAssembly whose arithmetic does not vary with the host JS engine — but the values cross the JS/wasm boundary as f64 → f32 conversions, the wasm image is pinned per platform by the package manager, and recordingDigest additionally depends on Rapier's World.takeSnapshot byte encoding. Cross-platform determinism is not claimed and this suite gathers no evidence for it.",
+  "recordingDigest": 2642391973,
+  "recordingLength": 46822,
+  "initialSnapshotDigest": 1920156871,
+  "stepChecksumDigest": 918181979,
+  "replayChecksumDigest": 918181979,
+  "seekTailDigest": 1952287517,
+  "firstStepChecksum": 4092512,
+  "lastStepChecksum": 2909168031,
+  "finalChecksum": 2909168031,
+  "adapterName": "rapier2d",
+  "adapterVersion": "0.19.3",
+  "inputCount": 4,
+  "frameCount": 240,
+  "snapshotCount": 8,
+  "firstContactStep": 36,
+  "contactStepCount": 198,
+  "totalContacts": 910
+}
