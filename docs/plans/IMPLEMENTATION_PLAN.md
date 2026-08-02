@@ -1052,6 +1052,16 @@ Packets:
 - **WP-9.3 [S] Particle rendering** (`@four/render` + `@four/render-webgl` +
   `@four/particles`) — P9-3 batched path; fake-GL tests + structural render-item
   tests.
+  *Dated note (2026-08-02, orchestrator, P9-3 governance):* `ParticleRenderable`
+  cannot subclass `Renderable` — the frozen §3.1 matrix gives `particles` only
+  core/math/scene, and `particles`/`render` share a wave. The shipped seam is a
+  duck-typed structural contract (`ParticleDrawable` declared in `@four/render`,
+  satisfied by `particles`' Node subclass; drift caught by tests, not the compiler —
+  same shape as `SolverBodyAccess`). Accepted as a cross-package surface; the module
+  header in `packages/render/src/particles.ts` carries the full rationale. Likewise
+  accepted: WP-9.1's reproducible-swap-remove reading of P9-4 "insertion order"
+  (layout is a deterministic function of history), and type-level absence as the
+  rejection tier for §36's `simulation:"gpu"`/`collisions:"depth-buffer"`.
 - **WP-9.4 [S] Integration + benchmark + gates** — ParticleSystem into the §39 loop;
   benchmarks/ harness measuring 100k CPU step time (recorded numbers, documented
   hardware caveat); determinism golden phase9 (100-particle scenario, cross-process);

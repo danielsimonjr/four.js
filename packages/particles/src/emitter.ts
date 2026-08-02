@@ -36,13 +36,17 @@
  * | forces                      | **ships** — gravity + §27 fields (WP-9.2 implements the fields) |
  * | colour and size over lifetime | **ships** — two-stop linear ramp            |
  * | collision                   | **MVP tier** — `collisionPlaneY` only         |
- * | GPU compute simulation      | staged (P9-1: needs the WebGPU backend, itself a §62 stub) |
- * | trails, attractors, custom data channels | staged / later packets           |
+ * | GPU compute simulation      | staged (2026-08-02, P9-1: needs the WebGPU backend, itself a §62 stub) |
+ * | trails, attractors, custom data channels | staged (2026-08-02, P9-1): trails need a per-particle position-history channel (a ring buffer per slot) plus a ribbon render path — neither the SoA pool nor the "particles" render item carries history, and shipping a one-sample "trail" would be a lie; attractors are expressible today as a negative-strength {@link ../fields.js radialField}; custom data channels want a pool-layout extension API |
  *
  * `simulation: "gpu"` and `collisions: "depth-buffer"` are **not accepted
- * options here** rather than accepted-and-ignored: an option that silently does
- * nothing is worse than one that does not exist yet. Rendering is WP-9.3;
- * nothing in this module draws, owns a node, or reads a clock.
+ * options** — their ABSENCE from `ParticleEmitterOptions` is the intended
+ * "loud" rejection tier (a TS caller gets an excess-property error;
+ * JSON-driven configuration arrives with Phase 11 serialization, which owns
+ * runtime validation). Recorded 2026-08-02 (WP-9.1-fix3): type-level absence
+ * is deliberate, not an oversight — an option that silently does nothing is
+ * worse than one that does not exist yet. Rendering is WP-9.3; nothing in
+ * this module draws, owns a node, or reads a clock.
  *
  * ## The step, in order (pinned, WP-9.1)
  *
