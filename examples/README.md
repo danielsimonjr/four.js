@@ -11,6 +11,11 @@ implemented where noted; the rest are scaffold only.
   chain cycling between animated, ragdoll and blended-recovery control on a click — pose
   targets, §19 weights, velocity inheritance, live continuity measurement
   (`pnpm run blending:build`).
+- [`particles-demo/`](particles-demo/) — **Implemented.** The §112 Phase 9 demonstration: a
+  seeded CPU particle fountain under §27 force fields (gravity, drag, vortex), bouncing off a
+  §36 collision plane, plus a click burst — each system drawn as one instanced draw call
+  (`pnpm run particles-demo:build`). Non-wasm and ~19 kB gzip; the 100 000-particle half of
+  §112 is measured headlessly by `benchmarks/particles-100k.mjs`.
 - [`mechanism/`](mechanism/) — **Implemented.** The §109 Phase 6 demonstration: a
   motor-driven slider–crank — rotating shaft, hinges, limited slider, spring buffer,
   limit-switch lamps, click-to-coast motor with speed controls

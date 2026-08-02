@@ -22,6 +22,7 @@
     "playground:build": "vite build examples/physics-playground",
     "mechanism:build": "vite build examples/mechanism",
     "blending:build": "vite build examples/blending",
+    "particles-demo:build": "vite build examples/particles-demo",
     "test:browser": "playwright test",
     "size": "size-limit"
   },

@@ -35,6 +35,22 @@ export {
   windField,
 } from "./fields.js";
 // --- WP-9.2: §27 force fields (end) ---
+// --- WP-9.3: batched particle rendering (begin) ---
+export type { ParticleRenderableOptions } from "./particle-renderable.js";
+export {
+  PARTICLE_INSTANCE_FLOATS,
+  ParticleRenderable,
+} from "./particle-renderable.js";
+// --- WP-9.3: batched particle rendering (end) ---
+// --- WP-9.4: §39 particle simulation system (begin) ---
+export type {
+  ParticleFixedUpdateContext,
+  ParticleStepTime,
+  ParticleSystemOptions,
+  SteppableEmitter,
+} from "./particle-system.js";
+export { PRIORITY_PARTICLES, ParticleSystem } from "./particle-system.js";
+// --- WP-9.4: §39 particle simulation system (end) ---
 export { SeededRandom } from "./random.js";
 export type {
   ParticleBurst,

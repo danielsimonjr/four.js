@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>four.js — Particles</title>
+    <style>
+      /* Minimal on purpose: the point of this page is the canvas. */
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0d0f14;
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        color: #9aa3b2;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      p {
+        margin: 0;
+        max-width: 800px;
+      }
+
+      /* The loading state is the same element, dimmed until the context is up. */
+      #status[data-state="loading"] {
+        color: #6c7486;
+        font-style: italic;
+      }
+
+      #status[data-state="error"] {
+        color: #d97070;
+      }
+
+      /*
+        The CSS size is the layout size; the drawing-buffer size is set from
+        JavaScript via `renderer.resize(...)`, so the scene stays crisp on
+        high-DPI displays. 800 x 600 is 100 CSS pixels per world unit over the
+        8 x 6 world units the orthographic camera shows.
+      */
+      #scene {
+        width: 800px;
+        height: 600px;
+        max-width: 100%;
+        display: block;
+        border-radius: 6px;
+        /*
+          The canvas handles its own pointer gestures (§72): without this a
+          touch tap would be swallowed by the browser's own panning and zoom
+          before `pointerdown` ever reached the page.
+        */
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <canvas id="scene" width="800" height="600"></canvas>
+      <p>
+        four.js — §36 particles: a seeded fountain of ~2 000 CPU-simulated
+        particles under gravity, drag and a vortex, bouncing off a collision
+        plane, drawn as <strong>one instanced draw call</strong>.
+        <strong>Click</strong> anywhere for a burst.
+      </p>
+      <p id="status" data-state="loading">starting…</p>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
