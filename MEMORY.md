@@ -25,6 +25,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 9 CLOSED (exit GREEN; the plan's honest §112 reading TRUE: 100k
+  measured-and-recorded, one-draw-call batching asserted in fake-GL tests, browser demo
+  at SwiftShader scale).** Five packets + doc fixes. Key facts: SoA Float32Array pools
+  with swap-remove (layout = deterministic function of history — the accepted P9-4
+  reading; literal insertion order NOT preserved); fixed 4-draws-per-spawn RNG
+  contract (dropped spawns burn none — capacity is part of the stream); SeededRandom
+  duplicated from motion (dated, hoist-to-core backlog); §27 fields as factories
+  (turbulence = bounded hash-value-noise curl, honestly NOT divergence-free; radial =
+  inverse-square, positive-outward); "particles" RenderItem: instanced quads, stride-8
+  interleaved, 6 GL calls/frame at any count, straight-alpha blending (first blended
+  non-sprite pass); ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED
+  cross-package contracts (matrix forbids the edges; drift caught by tests — plan §6h
+  dated note); PRIORITY_PARTICLES = 500. **Benchmark (recorded, NOT a 60fps claim):**
+  100k + 3 fields = 16.54 ms/step mean (99.2% of the 60 Hz budget; p95 over), on a
+  4-core CI Xeon; integrator alone 1.35 ms — each polymorphic §27 sample() call site
+  costs ~5.3 ms/100k; field batching is a scoped future optimization. Exit: 2,585 unit
+  + 138 suite + 32 browser tests (five example sites, five webServers); particles/
+  render 100%, render-webgl 99.83%; §86 gate 32.13 kB (grew +1.21 kB from the render
+  union — verified genuine); particles-demo 18.9 kB gzip non-wasm.
 - **2026-08-02 — PHASE 8 CLOSED (exit GREEN; plan-defined criterion TRUE — §111 sets no
   exit, the plan's "PID + steering pass analytic tests, demo composes with the stack"
   stands owner-to-confirm).** Five packets + one doc fix, all in `@four/motion`.

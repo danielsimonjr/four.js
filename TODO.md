@@ -6,11 +6,19 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 9 — Particles (§36, §112): rolling-wave decomposition into plan §6h, then
-      dispatch (emitter model, CPU simulation, lifetimes/velocity distributions/forces,
-      color-size-over-lifetime; GPU compute path staged to the WebGPU tier — decide at
-      decomposition; exit: ≥100k simple particles at interactive rates on suitable
-      hardware — interpret honestly for CI).
+- [ ] Phase 10 — Replay, snapshots, diagnostics (§33–34, §113): rolling-wave
+      decomposition into plan §6i, then dispatch (snapshot API over the §34 world
+      snapshots, §34 replay format incl. per-frame step counts + dropped time, §33
+      checksums via the landed utilities, diagnostics overlays; exit: a physics defect
+      can be captured, replayed, inspected frame by frame).
+
+### Backlog additions (Phase 9, 2026-08-02)
+- [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
+      is the scoped fix; benchmark attribution in benchmarks/results/)
+- [ ] Hoist SeededRandom to @four/core (two dated copies: motion, particles)
+- [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
+      GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+- [ ] .size-limit.json entry for examples/particles-demo (18.9 kB, suggested WP-9.4)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
@@ -79,6 +87,11 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 9 complete** (§112): 5 packets — SoA particle core, §27
+      fields, one-draw-call instanced rendering, ParticleSystem, 100k benchmark
+      (16.5 ms/step recorded honestly on CI hardware with per-field cost attribution),
+      phase9 determinism golden, particles-demo (fifth example site); 2,585 unit +
+      138 suite + 32 browser tests
 - [x] 2026-08-02 — **Phase 8 complete** (§111): 5 packets + 1 doc fix — PID/spring-
       damper/steering/RNG/prediction/IK in @four/motion, all six modules at 100%
       coverage with genuinely independent analytic oracles; PID closes a real Rapier

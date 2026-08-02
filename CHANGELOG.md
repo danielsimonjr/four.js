@@ -10,6 +10,22 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-02
 
+#### Added (Phase 9 — Particles, §27/§36/§112; packets WP-9.1…WP-9.5)
+- `@four/particles`: SoA particle core (pool/emitter with seeded 4-draw spawn
+  contract, plane collision, over-lifetime ramps), the §27 force-field set
+  (gravity/drag/wind/radial/vortex/bounded hash-noise turbulence/volumes), and a
+  `ParticleSystem` at priority 500 — 174 tests, 100% coverage.
+- Batched particle rendering: a new `"particles"` RenderItem drawn as instanced quads
+  (6 GL calls per frame at any count) with straight-alpha blending; duck-typed
+  cross-package contracts where the dependency matrix forbids edges (plan-noted).
+- `benchmarks/particles-100k.mjs` + committed results: 100k particles + 3 fields at
+  16.54 ms/step mean on CI hardware, with per-field cost attribution (integrator
+  1.35 ms; ~5.3 ms per polymorphic field) — recorded, not gated.
+- `examples/particles-demo` (fifth site, non-wasm, 18.9 kB gzip) + browser spec;
+  phase9 determinism golden (cross-process). Suites 138, browser 32.
+- Phase 9 exit GREEN per the plan's honest §112 reading; four doc-hygiene defects
+  fixed in-line (dated staging notes, plan-level governance note).
+
 #### Added (Phase 8 — Advanced Motion, §111; packets WP-8.1…WP-8.5)
 - `@four/motion`: `PIDController` (§111 sketch verbatim, anti-windup, derivative on
   measurement), `SpringDamper` (exact matrix-exponential stepping), the Reynolds
