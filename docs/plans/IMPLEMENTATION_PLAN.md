@@ -894,6 +894,59 @@ Packets:
 
 Dependencies: 6.1 → (6.2 ∥ 6.3); 6.4 ← 6.2 + 6.3; 6.5 ← 6.4; 6.6 ← 6.5; 6.7 last.
 
+## 6f. Phase 7 — Physics-Animation Blending (§19, §42, §110; decomposed 2026-08-02)
+
+Exit (§110): a character or machine can move between animated, kinematic, and physical
+control without abrupt discontinuities — made measurable as: across every control-mode
+switch in the integration scenarios, the per-step node displacement stays bounded by a
+documented continuity tolerance (no teleport step), plus the §19 pipeline order proven.
+
+Phase-level pinned decisions:
+
+- **P7-1 Pose targets.** Animation drives *target poses*, not owned transforms, under
+  `"blended"`: a `PoseTarget` component lives in `@four/scene` (position/rotation/
+  scale? — position+rotation MVP), bindable by tweens/mixers like any object. Neither
+  `animation` nor `physics` may import the other (§3.1) — scene is the shared home.
+- **P7-2 Weights.** §19 sketch verbatim: `physicsWeight`/`animationWeight` on
+  `RigidBody`, independent settables normalized at use (warn when both 0). Blend =
+  lerp(position)/slerp(rotation) of target pose vs solver pose.
+- **P7-3 Transitions.** Verify Rapier's runtime `setBodyType` (both dims); extend
+  `SolverBodyAccess` with `setBodyType(handle, type, wake)`; `world.setBodyControlMode`
+  retypes IN PLACE (ids/checksum order preserved) with optional velocity inheritance
+  from finite-differenced target-pose history (ragdoll activation).
+- **P7-4 Blend pipeline.** A `BlendSystem` in `@four/physics` at a priority after
+  PRIORITY_PHYSICS_SOLVE (§19 steps 1–5): before the solve it feeds targets to
+  kinematic bodies (animation-weighted); after it, for `"blended"` nodes, writes the
+  weighted combination of target and solver pose under the `"blended"` authority
+  (unlocking WP-2.3's reserved value). Render interpolation stays downstream (§43).
+- **P7-5 Root motion MVP** (`@four/animation`): a mixer `rootMotion` option extracting
+  per-step TRANSLATION deltas from a designated track onto a designated node;
+  rotational root motion staged with a dated note. Seek does not accumulate (§16).
+
+Packets:
+
+- **WP-7.1 [S] PoseTarget + weights** — `@four/scene` PoseTarget component;
+  `physicsWeight`/`animationWeight` on RigidBody (validation, §19 sketch); tween/mixer
+  binding proof.
+- **WP-7.2 [S] Retype + transitions** — SolverBodyAccess.setBodyType (verify Rapier
+  both dims; ids preserved), world.setBodyControlMode with velocity inheritance.
+- **WP-7.3 [S] BlendSystem** — P7-4 pipeline, "blended" authority writes, continuity
+  clamps documented; fake-adapter tests.
+- **WP-7.4 [S] Root motion MVP** — P7-5 in the mixer; unit + determinism-safe tests.
+- **WP-7.5 [S] Integration** — §19's four examples as scenarios (animated door,
+  hinged door, commanded arm, ragdoll character): full mode-cycle
+  animated→kinematic→dynamic→blended→animated with the continuity tolerance asserted
+  at every switch, both dims where types allow; §33 checksums with blending.
+- **WP-7.6 [H] Blending example** — new `examples/blending` (fourth webServer):
+  an arm/door scene cycling control modes on click; probe seeds WP-7.7.
+- **WP-7.7 [S] Phase 7 gates** — determinism golden phase7 (mode-cycling scenario,
+  cross-process) + blending browser spec.
+- **WP-7.8 [S] Phase 7 exit** — independent verifier, §110 verdict per the measurable
+  criterion, fix nothing.
+
+Dependencies: 7.1 → (7.2 ∥ 7.4); 7.3 ← 7.1+7.2; 7.5 ← 7.3+7.4; 7.6 ← 7.5; 7.7 ← 7.6;
+7.8 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
