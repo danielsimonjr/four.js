@@ -6,10 +6,19 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 6 — Joints (§28, §109): rolling-wave decomposition into plan §6e, then
-      dispatch (joint descriptors/classes, Rapier 2D+3D joint mapping, motors + limits,
-      break thresholds, the §109 engineering-mechanism demo; exit = constraints stable
-      under expected real-time loads).
+- [ ] Phase 7 — Physics-animation blending (§19, §42, §110): rolling-wave decomposition
+      into plan §6f, then dispatch (the reserved "blended" authority, animation pose →
+      kinematic modification → physics solve → interpolated render pose pipeline,
+      ragdoll-style handover; exit = animated↔kinematic↔physical control without
+      abrupt discontinuities).
+
+### Backlog additions (Phase 6 exit, 2026-08-02)
+- [ ] §28 solver-iterations constraint feature is not exposed anywhere — Rapier offers
+      world-level `IntegrationParameters.numSolverIterations`; a world option is
+      plausible (recorded gap, not per-joint)
+- [ ] §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased
+      gain, not a hard ceiling (documented in the stable API docs); name it in the
+      §90/§102 capability tables when a capping adapter (Box2D) arrives
 
 ### Backlog additions (Phase 5, 2026-08-01)
 - [ ] Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a
@@ -55,6 +64,12 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 6 complete** (§109): 7 packets + 2 fixes — §28 joint tier
+      shipped honestly against measured Rapier 0.19.3 behavior (breakage via the engine
+      seam, refused where solvers can't report reactions; spherical without fake cone
+      limits), slider-crank mechanism demo, jointed determinism golden, mechanism
+      browser spec; 1,998 unit + 95 suite + 23 browser tests; §109 stability proven
+      over 3600 steps with drift ≤1.3e-5 m
 - [x] 2026-08-01 — **Phase 5 complete** (§108): 9 packets + 2 fixes, exit GREEN zero
       defects — full physics API over the §37 adapter contract, Rapier 2D+3D on pinned
       -compat@0.19.3 wasm, density-derived mass end-to-end, mixed 2D/3D proven by

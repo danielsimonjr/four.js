@@ -25,6 +25,32 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 6 CLOSED (exit verdict: §109 criterion TRUE; one CI-wiring
+  defect WP-6.6-fix1 landed by the orchestrator — build all three example sites before
+  test:browser — after which the verifier's stated condition for GREEN holds; zero
+  engine defects).** Seven packets + two fixes. Standing decisions: joints register on
+  the WORLD (`world.addJoint`), not as §6a components (P6-3); anchors/axes authored in
+  world space, converted once at addJoint from live solver poses (pose before
+  jointing); limits + motors are live (command queues via `SolverJointAccess`
+  setJointLimits/setJointMotor); anchors/axis/rope/spring/cone/collisionEnabled frozen
+  post-registration (dated staging). `SolverJointAccess` joins SolverBodyAccess as
+  required engine surface beyond §37. **Rapier 0.19.3 facts (all measured):** no joint
+  reaction getters exist (typings + prototypes + wasm exports) → reportsJointReactions
+  false on both adapters, breakable joints refused, §28 breakage proven via scripted
+  adapters through the full Application pipeline; motor maxTorque/maxForce is a
+  ForceBased GAIN, not §28's hard cap (deviation recorded in the stable API docs with
+  cross-references; Box2D could honor a real cap — capability-table item); disabled
+  motor = INERT_MOTOR_GAIN 1e-12, measured bit-identical to never-motored over 3600
+  steps in BOTH dims (2D initially threw; unified by WP-6.2-fix1 after measurement);
+  spherical ships 3D-only WITHOUT limits (per-axis limits do not form a cone — ±0.3
+  rad limit lets a diagonal swing reach 1.1247 rad; limited descriptors refused
+  quoting the numbers); distance + gear staged loudly (P6-1); FixedJoint with no
+  anchor welds origins (documented trap); §28 solver-iterations feature not exposed
+  anywhere (recorded gap, TODO). Stability evidence: 3600-step mechanism, hinge
+  anchor drift 1.3e-5 m, rope slack 0, slider off-axis ≤1.6e-11, pendulum period
+  within 6e-5 of the amplitude-corrected closed form. Exit: 1,998 unit + 95 suite +
+  23 browser tests; physics 390 @ 100%, physics-rapier 248 @ 98.14/96.44/100/98.14;
+  mechanism example 674 kB gzip (wasm, ungated); first-2d-scene 30.19 kB vs §86.
 - **2026-08-01 — PHASE 5 CLOSED (exit GREEN, zero defects; §108 criterion TRUE on three
   axes: mixed-world integration test, playground demo + browser pixels, cross-process
   determinism golden).** Nine packets + two fix packets. Key decisions/facts:
