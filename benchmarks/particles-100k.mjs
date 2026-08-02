@@ -12,9 +12,17 @@
  * one draw call (`@four/render-webgl`'s instanced particle path, WP-9.3), and
  * the **CPU simulation** must step 100 000 particles inside a fixed-step budget
  * *measured and documented in a benchmark* — recorded numbers, deliberately not
- * gated on wall time in CI. This file is that benchmark. It is the first real
- * script in `benchmarks/`; the §92/§86 harness proper is Phase 11 (§113a), so
- * this is plain Node with no new dependencies and no framework.
+ * gated on wall time in CI. This file is that benchmark. It was the first real
+ * script in `benchmarks/` and was deliberately written without a framework.
+ *
+ * **WP-11.4 (plan §6j, P11-4) moved its plumbing into `./harness.mjs`** — the
+ * timing loop, the order statistics, the host block, the results writer and the
+ * report printer, all extracted from this file and now shared with the other
+ * four scripts in the suite. Nothing about what is measured changed, and the
+ * record's fields and their order are unchanged; only the run-to-run values
+ * move, as they always do. The measurement code that used to live here is the
+ * harness's, verbatim: the same nearest-rank quantiles, the same warm-up
+ * accounting, the same two-space JSON.
  *
  * ## What is measured
  *
@@ -47,13 +55,13 @@
  *
  * ## Wall clocks: measurement, never simulation (ground rule)
  *
- * `performance.now()` appears in this file and nowhere near a simulation. It is
- * a **measurement instrument**: nothing it returns is fed back into the engine,
- * and the simulation is driven by a constant injected {@link FIXED_DELTA_TIME},
- * exactly as `Application`'s fixed-step accumulator would (§10, §33). Remove
- * every timer here and the steps produce the identical pool. The same applies
- * to the ISO timestamp written into the result file — it dates the record, it
- * does not enter the run.
+ * `performance.now()` now lives in `./harness.mjs` and nowhere near a
+ * simulation. It is a **measurement instrument**: nothing it returns is fed
+ * back into the engine, and the simulation is driven by a constant injected
+ * {@link FIXED_DELTA_TIME}, exactly as `Application`'s fixed-step accumulator
+ * would (§10, §33). Remove every timer and the steps produce the identical
+ * pool. The same applies to the ISO timestamp written into the result file — it
+ * dates the record, it does not enter the run.
  *
  * Determinism is likewise not what this file tests;
  * `tests/determinism/phase9-particles.test.ts` does that. Here the seed is
@@ -87,12 +95,6 @@
  * fields the file carries.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { cpus, totalmem } from "node:os";
-import { dirname, join } from "node:path";
-import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
-
 import { Vector3 } from "@four/math";
 import {
   ParticleEmitter,
@@ -100,6 +102,15 @@ import {
   uniformGravityField,
   vortexField,
 } from "@four/particles";
+
+import {
+  hostRecord,
+  measure,
+  printReport,
+  round,
+  summarize,
+  writeResult,
+} from "./harness.mjs";
 
 /**
  * §112's number. The emitter is sized exactly here, and prefilled to exactly
@@ -147,13 +158,6 @@ const VORTEX_STRENGTH = 6;
 
 /** Gravity, §7a: Y-up in both 2D and 3D, so it is negative Y. */
 const GRAVITY = new Vector3(0, -9.81, 0);
-
-/** Where the JSON record is written, relative to this file. */
-const RESULTS_PATH = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "results",
-  "particles-100k.json",
-);
 
 /** Human-readable name of the headline field stack, for stdout and the record. */
 const FIELD_STACK = `uniformGravity(0,${GRAVITY.y},0) + drag(${DRAG_COEFFICIENT}) + vortex(origin,+Y,${VORTEX_STRENGTH})`;
@@ -222,72 +226,43 @@ function buildFullEmitter(fieldCount) {
 }
 
 /**
- * Steps `emitter` `steps` times from `startStep`, returning one duration in
- * milliseconds per step.
+ * Steps `emitter` through `warmupSteps` unmeasured and `measuredSteps` measured
+ * fixed steps, and returns the harness's two duration arrays.
  *
- * The clock is read immediately around `step` and nothing else happens inside
- * the loop: the durations array is preallocated, so the measurement does not
- * measure its own bookkeeping.
+ * The harness's index is globally monotonic across warm-up and measurement, so
+ * `(index + 1) · dt` is exactly the simulation time an uninterrupted run would
+ * reach — the warm-up is part of the simulation and only its timings are
+ * reported separately. `emitter.step` is the whole of the timed region.
  */
-function timeSteps(emitter, steps, startStep) {
-  const durations = new Float64Array(steps);
-  for (let i = 0; i < steps; i += 1) {
-    const time = (startStep + i + 1) * FIXED_DELTA_TIME;
-    const began = performance.now();
-    emitter.step(FIXED_DELTA_TIME, time);
-    durations[i] = performance.now() - began;
-  }
-  return durations;
-}
-
-/** Arithmetic mean of a `Float64Array`. */
-function mean(values) {
-  let total = 0;
-  for (let i = 0; i < values.length; i += 1) {
-    total += values[i];
-  }
-  return total / values.length;
-}
-
-/**
- * The `q`-quantile by **nearest rank** on the sorted copy — `p95` is "the 570th
- * of 600 slowest steps", an observed step time and not an interpolation between
- * two of them. Interpolating would invent a duration no step actually took.
- */
-function quantile(sorted, q) {
-  const rank = Math.ceil(q * sorted.length);
-  const index = Math.min(Math.max(rank, 1), sorted.length) - 1;
-  return sorted[index];
-}
-
-/** Rounds to `digits` decimals, so the record is readable and diffable. */
-function round(value, digits) {
-  const scale = 10 ** digits;
-  return Math.round(value * scale) / scale;
+function stepEmitter(emitter, warmupSteps, measuredSteps) {
+  return measure(
+    (index) => {
+      emitter.step(FIXED_DELTA_TIME, (index + 1) * FIXED_DELTA_TIME);
+    },
+    { warmupIterations: warmupSteps, measuredIterations: measuredSteps },
+  );
 }
 
 /** Runs one attribution variant and returns its median ms/step. */
 function attributionMedian(fieldCount) {
   const emitter = buildFullEmitter(fieldCount);
-  timeSteps(emitter, ATTRIBUTION_WARMUP_STEPS, 0);
-  const measured = timeSteps(
+  const { measured } = stepEmitter(
     emitter,
-    ATTRIBUTION_MEASURED_STEPS,
     ATTRIBUTION_WARMUP_STEPS,
+    ATTRIBUTION_MEASURED_STEPS,
   );
   if (emitter.particleCount !== PARTICLE_COUNT) {
     throw new Error(
       `benchmark invalid: the ${fieldCount}-field pool changed size during the run`,
     );
   }
-  return quantile(Float64Array.from(measured).sort(), 0.5);
+  return summarize(measured).medianMs;
 }
 
 // --- the headline run --------------------------------------------------------
 
 const emitter = buildFullEmitter(3);
-const warmup = timeSteps(emitter, WARMUP_STEPS, 0);
-const measured = timeSteps(emitter, MEASURED_STEPS, WARMUP_STEPS);
+const { warmup, measured } = stepEmitter(emitter, WARMUP_STEPS, MEASURED_STEPS);
 
 if (emitter.particleCount !== PARTICLE_COUNT) {
   throw new Error(
@@ -295,10 +270,10 @@ if (emitter.particleCount !== PARTICLE_COUNT) {
   );
 }
 
-const sorted = Float64Array.from(measured).sort();
-const meanMs = mean(measured);
-const p95Ms = quantile(sorted, 0.95);
-const medianMs = quantile(sorted, 0.5);
+const summary = summarize(measured);
+const meanMs = summary.meanMs;
+const p95Ms = summary.p95Ms;
+const medianMs = summary.medianMs;
 const particleStepsPerSecond = (PARTICLE_COUNT / meanMs) * 1000;
 
 // --- the attribution run -----------------------------------------------------
@@ -310,7 +285,7 @@ const perFieldMs = (twoFieldMs - integratorOnlyMs) / 2;
 
 // --- the record --------------------------------------------------------------
 
-const host = cpus();
+const host = hostRecord();
 const record = {
   _note:
     "Recorded measurement, not a gate. Nothing in CI asserts on these timings; see benchmarks/README.md and the header of benchmarks/particles-100k.mjs for how §112's 'suitable hardware' is interpreted (plan §6h) and why this host is not it.",
@@ -325,13 +300,13 @@ const record = {
   fields: FIELD_STACK,
   collision:
     "none (the plane-collision tier is exercised by the phase9 golden)",
-  warmupMeanMsPerStep: round(mean(warmup), 4),
+  warmupMeanMsPerStep: round(summarize(warmup).meanMs, 4),
   meanMsPerStep: round(meanMs, 4),
   medianMsPerStep: round(medianMs, 4),
   p95MsPerStep: round(p95Ms, 4),
-  p99MsPerStep: round(quantile(sorted, 0.99), 4),
-  minMsPerStep: round(sorted[0], 4),
-  maxMsPerStep: round(sorted[sorted.length - 1], 4),
+  p99MsPerStep: round(summary.p99Ms, 4),
+  minMsPerStep: round(summary.minMs, 4),
+  maxMsPerStep: round(summary.maxMs, 4),
   totalMeasuredMs: round(meanMs * MEASURED_STEPS, 2),
   meanFractionOfFixedStepBudget: round(meanMs / FIXED_STEP_BUDGET_MS, 4),
   p95FractionOfFixedStepBudget: round(p95Ms / FIXED_STEP_BUDGET_MS, 4),
@@ -343,47 +318,39 @@ const record = {
   twoFieldMedianMsPerStep: round(twoFieldMs, 4),
   threeFieldMedianMsPerStep: round(medianMs, 4),
   perFieldMedianMsPerStep: round(perFieldMs, 4),
-  hostNode: process.version,
-  hostPlatform: `${process.platform} ${process.arch}`,
-  hostCpuModel: host.length > 0 ? host[0].model : "unknown",
-  hostCpuCount: host.length,
-  hostTotalMemoryGb: round(totalmem() / 1024 ** 3, 1),
+  ...host,
   hostCaveat:
     "CI container, no GPU, shared host; run-to-run spread is large. CPU simulation only: no GL context, no upload, no draw. The rendering half of §112 is the single instanced draw call of @four/render-webgl, shown in examples/particles-demo.",
 };
 
-mkdirSync(dirname(RESULTS_PATH), { recursive: true });
-writeFileSync(RESULTS_PATH, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+const resultsPath = writeResult("particles-100k", record);
 
 const budgetVerdict =
   p95Ms <= FIXED_STEP_BUDGET_MS
     ? "inside the 60 Hz fixed-step budget at p95"
     : "over the 60 Hz fixed-step budget at p95 (recorded, not gated — see the header)";
 
-process.stdout.write(
-  [
-    `four.js — ${PARTICLE_COUNT.toLocaleString("en-US")} particles, CPU simulation (§112, plan §6h)`,
-    `  fields                  ${FIELD_STACK}`,
-    `  steps                   ${MEASURED_STEPS} measured, ${WARMUP_STEPS} warm-up (${record.warmupMeanMsPerStep} ms/step)`,
-    "",
-    `  mean                    ${record.meanMsPerStep} ms/step`,
-    `  median                  ${record.medianMsPerStep} ms/step`,
-    `  p95                     ${record.p95MsPerStep} ms/step`,
-    `  p99                     ${record.p99MsPerStep} ms/step`,
-    `  min / max               ${record.minMsPerStep} / ${record.maxMsPerStep} ms/step`,
-    "",
-    `  60 Hz budget            ${round(FIXED_STEP_BUDGET_MS, 3)} ms/step — mean uses ${round(record.meanFractionOfFixedStepBudget * 100, 1)}%, p95 ${round(record.p95FractionOfFixedStepBudget * 100, 1)}%`,
-    `  verdict                 ${budgetVerdict}`,
-    `  throughput              ${record.particleStepsPerSecond.toLocaleString("en-US")} particle-steps/s (${record.nanosecondsPerParticleStep} ns per particle per step)`,
-    "",
-    `  where it goes           integrator alone ${record.integratorOnlyMedianMsPerStep} ms/step; +1 field ${record.oneFieldMedianMsPerStep}; +2 ${record.twoFieldMedianMsPerStep}; +3 ${record.threeFieldMedianMsPerStep}`,
-    `                          ≈ ${record.perFieldMedianMsPerStep} ms per §27 field per ${PARTICLE_COUNT.toLocaleString("en-US")} particles (medians of ${ATTRIBUTION_MEASURED_STEPS} steps)`,
-    "",
-    `  host                    ${record.hostCpuModel} × ${record.hostCpuCount}, node ${record.hostNode}, ${record.hostPlatform}`,
-    "  caveat                  CI container, no GPU, shared host; CPU simulation only, nothing is drawn.",
-    '                          §112\'s "suitable hardware" is interpreted per plan §6h — recorded, never gated.',
-    "",
-    `  written                 ${RESULTS_PATH}`,
-    "",
-  ].join("\n"),
-);
+printReport([
+  `four.js — ${PARTICLE_COUNT.toLocaleString("en-US")} particles, CPU simulation (§112, plan §6h)`,
+  `  fields                  ${FIELD_STACK}`,
+  `  steps                   ${MEASURED_STEPS} measured, ${WARMUP_STEPS} warm-up (${record.warmupMeanMsPerStep} ms/step)`,
+  "",
+  `  mean                    ${record.meanMsPerStep} ms/step`,
+  `  median                  ${record.medianMsPerStep} ms/step`,
+  `  p95                     ${record.p95MsPerStep} ms/step`,
+  `  p99                     ${record.p99MsPerStep} ms/step`,
+  `  min / max               ${record.minMsPerStep} / ${record.maxMsPerStep} ms/step`,
+  "",
+  `  60 Hz budget            ${round(FIXED_STEP_BUDGET_MS, 3)} ms/step — mean uses ${round(record.meanFractionOfFixedStepBudget * 100, 1)}%, p95 ${round(record.p95FractionOfFixedStepBudget * 100, 1)}%`,
+  `  verdict                 ${budgetVerdict}`,
+  `  throughput              ${record.particleStepsPerSecond.toLocaleString("en-US")} particle-steps/s (${record.nanosecondsPerParticleStep} ns per particle per step)`,
+  "",
+  `  where it goes           integrator alone ${record.integratorOnlyMedianMsPerStep} ms/step; +1 field ${record.oneFieldMedianMsPerStep}; +2 ${record.twoFieldMedianMsPerStep}; +3 ${record.threeFieldMedianMsPerStep}`,
+  `                          ≈ ${record.perFieldMedianMsPerStep} ms per §27 field per ${PARTICLE_COUNT.toLocaleString("en-US")} particles (medians of ${ATTRIBUTION_MEASURED_STEPS} steps)`,
+  "",
+  `  host                    ${record.hostCpuModel} × ${record.hostCpuCount}, node ${record.hostNode}, ${record.hostPlatform}`,
+  "  caveat                  CI container, no GPU, shared host; CPU simulation only, nothing is drawn.",
+  '                          §112\'s "suitable hardware" is interpreted per plan §6h — recorded, never gated.',
+  "",
+  `  written                 ${resultsPath}`,
+]);
