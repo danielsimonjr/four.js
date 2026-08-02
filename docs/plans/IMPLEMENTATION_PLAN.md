@@ -960,6 +960,56 @@ Packets:
 Dependencies: 7.1 → (7.2 ∥ 7.4); 7.3 ← 7.1+7.2; 7.5 ← 7.3+7.4; 7.6 ← 7.5; 7.7 ← 7.6;
 7.8 last.
 
+## 6g. Phase 8 — Advanced Motion (§111; decomposed 2026-08-02)
+
+Exit (plan-defined; §111 sets none — owner to confirm, recorded since revision 2):
+the PID utility and steering behaviors pass analytic tests, and a demo scenario
+composes them with the existing motion/physics stack.
+
+Phase-level pinned decisions:
+
+- **P8-1 Tier.** Phase 8 ships: §111's **PID controller utility** (the §111 sketch
+  verbatim: kp/ki/kd, outputLimits, plus the standard anti-windup + derivative-on-
+  measurement decisions documented), **spring-damper controllers** (§13's damped
+  spring generalized to a controller form), **steering behaviors** (§12's classic
+  set: seek, flee, arrive, pursue, evade, wander(deterministic seeded), separation/
+  cohesion/alignment = flocking over a neighbor query), and **trajectory prediction**
+  (ballistic + constant-velocity lead, closed-form). **Staged with dated notes:**
+  path-planning adapters (needs an adapter RFC), full IK (two-bone analytic IK MAY
+  ship if it stays small — worker decides honestly; CCD/FABRIK staged), robotic
+  joint commands (§119's domain — a thin command mapping over Phase 6 motors MAY
+  ship as a utility if honest).
+- **P8-2 Home.** Everything lands in `@four/motion` (steering/PID/prediction are
+  motion utilities over core+math+scene; no new deps). Steering integrates as
+  forces/accelerations feeding MotionComponent or as target velocities — pinned:
+  steering outputs an ACCELERATION (out-param), applied by the caller (composable
+  with §38 integrators); a `SteeringAgent` convenience component MAY wrap it.
+- **P8-3 Determinism.** Wander uses the seeded RNG from @four/core (verify one
+  exists — else a small xorshift utility in motion with a documented seed contract);
+  flocking neighbor iteration in insertion order.
+
+Packets:
+
+- **WP-8.1 [S] PID + spring-damper controllers** (`@four/motion`) — §111 sketch
+  verbatim + anti-windup/derivative-on-measurement (documented decisions), reset(),
+  closed-form analytic tests (step response of a known plant vs discrete solution).
+- **WP-8.2 [S] Steering + flocking** (`@four/motion`) — P8-1 set, acceleration
+  out-params, seeded wander, neighbor-query interface (brute-force MVP, spatial
+  hash staged), analytic tests (arrive slows to zero at target; pursuit intercept
+  on a closed form; flock cohesion bounded).
+- **WP-8.3 [S] Trajectory prediction + optional two-bone IK** (`@four/motion`) —
+  ballistic/lead closed forms; two-bone IK only if honest (else staged note).
+- **WP-8.4 [S] Integration + demo scenario** — root suite: PID drives a §111-style
+  speed controller on a Phase 6 motorized hinge (closed-loop reaches setpoint;
+  analytic tolerance documented); steering agents in a bounded arena with physics
+  obstacles; determinism goldens NOT needed (no new solver state) — §33 checksum
+  stability with steering active asserted instead.
+- **WP-8.5 [S] Phase 8 exit** — independent verifier, plan-defined criterion,
+  fix nothing. (No new example site: §111 is engine-internal; the demo lives in the
+  suite. Owner may request a visual demo later — recorded.)
+
+Dependencies: 8.1 ∥ 8.2 ∥ 8.3 (disjoint files); 8.4 ← all three; 8.5 last.
+
 ## 7. Phases 3–10 — rolling-wave planning
 
 Decomposed by the orchestrator only when the predecessor phase closes, in this packet
