@@ -142,12 +142,6 @@ export abstract class Node
 
   #parent: Node | null = null;
 
-  /**
-   * Backing store for {@link Node.transformAuthority}. Declared before the
-   * accessor pair reads it; `"manual"` per §42/{@link DEFAULT_TRANSFORM_AUTHORITY}.
-   */
-  #transformAuthority: TransformAuthority = DEFAULT_TRANSFORM_AUTHORITY;
-
   /** Insertion-ordered children; the array instance is never replaced. */
   readonly #children: Node[] = [];
 
@@ -199,36 +193,26 @@ export abstract class Node
    * Which system owns this node's transform (§42). Default `"manual"`.
    *
    * §42 spells this as a plain assignable field —
-   * `node.transformAuthority = "physics"` — and structurally it is exactly
-   * that: read it, write it, one value at a time. It is implemented as an
-   * accessor pair over a private field for one reason: `"blended"` is declared
-   * by §42 but implemented by §19's physics-animation pipeline, which is Phase
-   * 7 work. Assigning it therefore throws `FourError("NOT_IMPLEMENTED")` rather
-   * than leaving a node in a state no system knows how to drive; the reserved
-   * value stays visible in the type (and in `TRANSFORM_AUTHORITIES`) so
-   * nothing has to be renumbered when Phase 7 lands and the guard is deleted.
-   * Every other value assigns normally, and a rejected assignment leaves the
-   * previous authority in place.
+   * `node.transformAuthority = "physics"` — and that is exactly what it is:
+   * read it, write it, one value at a time. **Every** value of
+   * {@link TransformAuthority} assigns, `"blended"` included: it was guarded
+   * by a `FourError("NOT_IMPLEMENTED")` between WP-2.3 and WP-7.3, because
+   * nothing implemented §19's physics-animation pipeline and a node claiming
+   * it would have been owned by a system that did not exist. `PhysicsWorld`
+   * now runs that pipeline (`@four/physics`, plan P7-4), so the guard is gone
+   * and the value means what §42 says it means.
+   *
+   * A `"blended"` node is driven by §19's pipeline, which needs two more things
+   * this field cannot check for — a `RigidBody` registered with a
+   * `PhysicsWorld` and a `PoseTarget` on the node. The first step that
+   * tries to blend a node with no target throws `FourError` naming it; see
+   * `PhysicsWorld.step`. Assigning the authority is never itself an error,
+   * exactly as `"kinematic"` on a node no controller drives is not.
    *
    * Enforcement lives in the writing systems (see `warnAuthorityConflict`), not
    * here: `Node` records ownership, systems honour it.
    */
-  get transformAuthority(): TransformAuthority {
-    return this.#transformAuthority;
-  }
-
-  set transformAuthority(value: TransformAuthority) {
-    if (value === "blended") {
-      throw new FourError(
-        "NOT_IMPLEMENTED",
-        'The "blended" transform authority selects the §19 ' +
-          "physics-animation blending pipeline, which is not implemented " +
-          "yet (Phase 7).",
-        { context: { node: this.id, authority: value } },
-      );
-    }
-    this.#transformAuthority = value;
-  }
+  transformAuthority: TransformAuthority = DEFAULT_TRANSFORM_AUTHORITY;
 
   /**
    * Attaches `nodes` as children, in argument order, appending each to the end

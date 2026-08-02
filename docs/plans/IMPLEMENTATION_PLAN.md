@@ -933,6 +933,13 @@ Packets:
 - **WP-7.3 [S] BlendSystem** — P7-4 pipeline, "blended" authority writes, continuity
   clamps documented; fake-adapter tests.
 - **WP-7.4 [S] Root motion MVP** — P7-5 in the mixer; unit + determinism-safe tests.
+  *Dated note (2026-08-02, orchestrator, P7-4 amendment):* the kinematic target feed is
+  **unweighted** (WP-7.3): weighting both the feed and the publish would apply
+  `animationWeight` twice — an unrequested low-pass filter — and for
+  `kinematic-position` bodies the solver pose equals the target regardless. Weights
+  apply once, at the publish blend. Also accepted: blending covers every §22 body type
+  under `"blended"` (a dynamic-only rule would freeze blended kinematic nodes), and the
+  missing-trio error throws from the step rather than warn-skipping.
 - **WP-7.5 [S] Integration** — §19's four examples as scenarios (animated door,
   hinged door, commanded arm, ragdoll character): full mode-cycle
   animated→kinematic→dynamic→blended→animated with the continuity tolerance asserted

@@ -1,4 +1,3 @@
-import { FourError, isFourError } from "@four/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -50,44 +49,47 @@ describe("TransformAuthority (§42)", () => {
     expect(b.transformAuthority).toBe("manual");
   });
 
-  it("accepts every authority except the reserved `blended`", () => {
+  it("accepts every authority, in any order", () => {
     const node = new Group();
     for (const authority of TRANSFORM_AUTHORITIES) {
-      if (authority === "blended") {
-        continue;
-      }
       node.transformAuthority = authority;
       expect(node.transformAuthority).toBe(authority);
     }
   });
 });
 
-describe("`blended` is reserved until Phase 7 (§42, §19)", () => {
-  it("throws NOT_IMPLEMENTED when assigned", () => {
+describe("`blended` is assignable since WP-7.3 (§42, §19)", () => {
+  it("assigns like every other authority, throwing nothing", () => {
     const node = new Group();
-    let thrown: unknown;
-    try {
-      node.transformAuthority = "blended";
-    } catch (error) {
-      thrown = error;
-    }
-    expect(isFourError(thrown)).toBe(true);
-    expect((thrown as FourError).code).toBe("NOT_IMPLEMENTED");
-    expect((thrown as FourError).message).toContain("§19");
-    expect((thrown as FourError).context).toEqual({
-      node: node.id,
-      authority: "blended",
-    });
-  });
-
-  it("leaves the previous authority in place", () => {
-    const node = new Group();
-    node.transformAuthority = "animation";
     expect(() => {
       node.transformAuthority = "blended";
-    }).toThrow(FourError);
+    }).not.toThrow();
+    expect(node.transformAuthority).toBe("blended");
+  });
+
+  it("is a plain field: assigning it back is not a special case", () => {
+    const node = new Group();
+    node.transformAuthority = "animation";
+    node.transformAuthority = "blended";
+    expect(node.transformAuthority).toBe("blended");
+    node.transformAuthority = "animation";
     expect(node.transformAuthority).toBe("animation");
   });
+
+  it("touches nothing else on the node", () => {
+    const node = new Group();
+    const version = node.transform.version;
+    node.transformAuthority = "blended";
+    expect(node.transform.version).toBe(version);
+  });
+
+  /*
+   * The trio §19 needs — "blended" authority, a RigidBody registered with a
+   * PhysicsWorld, and a PoseTarget — cannot be checked here: `@four/scene`
+   * knows nothing about worlds or bodies. `@four/physics`'s
+   * `tests/world-blend.test.ts` owns that enforcement, and this test only pins
+   * the half `Node` is responsible for: the value assigns.
+   */
 });
 
 describe("warnAuthorityConflict (§42 development warning)", () => {

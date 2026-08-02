@@ -18,6 +18,11 @@
  * WP-7.2 adds §19's control-mode transitions: `SolverBodyAccess.setBodyType`
  * and `PhysicsWorld.setBodyControlMode`, which re-type a registered body in
  * place with optional velocity inheritance from an animated `PoseTarget`.
+ * WP-7.3 adds §19's blend pipeline itself, under the `"blended"` transform
+ * authority (§42): the world feeds pose targets to kinematic bodies before the
+ * solve and writes the weighted target/solver pose after it, plus
+ * `createPoseTargetCaptureSystem` — the §39 step-3−1 system an application must
+ * register for the target history the blend's velocity inheritance reads.
  *
  * Named exports only, alphabetical within each module group.
  */
@@ -227,6 +232,7 @@ export type {
   PhysicsSnapshot,
   PhysicsWorldAdapter,
   PhysicsWorldInit,
+  PoseTargetCaptureSystemOptions,
   WorldOverlapHit,
   WorldPhysicsEvent,
   WorldPointHit,
@@ -234,4 +240,8 @@ export type {
   WorldRaycastHit,
   WorldShapeCastHit,
 } from "./world.js";
-export { PhysicsWorld } from "./world.js";
+export {
+  POSE_TARGET_CAPTURE_PRIORITY,
+  PhysicsWorld,
+  createPoseTargetCaptureSystem,
+} from "./world.js";
