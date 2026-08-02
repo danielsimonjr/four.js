@@ -7,8 +7,9 @@
  * `"blended"` authority (§42) the node's own `Transform` is owned by that
  * pipeline, so an animation clip or tween cannot write it: writing it would make
  * animation a second transform writer, exactly what §42 forbids. It writes
- * *this* component instead, and the blend system (WP-7.3) combines the target
- * with the solver pose and performs the single authoritative transform write.
+ * *this* component instead, and `PhysicsWorld`'s publish pass (WP-7.3) combines
+ * the target with the solver pose and performs the single authoritative
+ * transform write.
  *
  * ## Why this lives in `@four/scene` (plan P7-1)
  *
@@ -72,10 +73,16 @@
  *
  * ### Who calls `capturePrevious`
  *
- * Nothing in this packet. {@link PoseTarget.capturePrevious} is called **once
- * per fixed step, at the top of the step, before that step's animation writes**
- * — by the §19 blend system of WP-7.3, which owns the call site the same way
- * `createSnapshotSystem` owns `PoseBuffer.capture`.
+ * {@link PoseTarget.capturePrevious} is called **once per fixed step, at the
+ * top of the step, before that step's animation writes** — by
+ * `PhysicsWorld.capturePoseTargets` in `@four/physics` (WP-7.3), which the
+ * system `createPoseTargetCaptureSystem` runs at §39 step 3's priority minus
+ * one notch, the way `createSnapshotSystem` owns `PoseBuffer.capture`.
+ * Animation writes targets at §39 step 3 and the solve reads them at step 6, so
+ * the physics world's own step is far too late to capture: it would flatten the
+ * history the moment animation had written it, and every difference would read
+ * zero. That is why the capture is a separate system an application registers,
+ * and not a line inside `PhysicsWorld.step`.
  *
  * The capture is what makes the difference mean "one step": right after it
  * `previous === current`, so the difference is zero until this step's animation
@@ -105,10 +112,9 @@ import type { Transform } from "./transform.js";
  * const node = new Group();
  * const target = node.addComponent(new PoseTarget()).copyFrom(node.transform);
  *
- * target.position.set(0, 2, 0); // version += 1
- * target.capturePrevious();     // per fixed step, from the blend system
- * // node.transformAuthority = "blended" once WP-7.3 lands the blend system;
- * // the value is still reserved in `authority.ts` and throws today.
+ * node.transformAuthority = "blended"; // §42: §19's pipeline owns the transform
+ * target.position.set(0, 2, 0);        // version += 1
+ * target.capturePrevious();            // per fixed step, from the capture system
  * ```
  *
  * One per node (§6a). Holds authored state only — no per-frame work, no solver

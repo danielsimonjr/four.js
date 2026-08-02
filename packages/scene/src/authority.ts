@@ -63,8 +63,15 @@ import type { Node } from "./node.js";
  *   (`MotionSystem`, and the §12 controller of WP-2.5).
  * - `"physics"` — a solver drives it; the transform follows the rigid body.
  * - `"blended"` — the §19 physics-animation pipeline is the single owner; blend
- *   weights vary *inside* that pipeline without changing ownership. Reserved
- *   until Phase 7: assigning it throws `FourError("NOT_IMPLEMENTED")`.
+ *   weights vary *inside* that pipeline without changing ownership. Assignable
+ *   since WP-7.3, which built that pipeline into `PhysicsWorld`
+ *   (`@four/physics`, plan P7-4); between WP-2.3 and WP-7.3 assigning it threw
+ *   `FourError("NOT_IMPLEMENTED")`, because no system could have driven such a
+ *   node. A `"blended"` node needs two more things `@four/scene` cannot see: a
+ *   `RigidBody` registered with a `PhysicsWorld`, and a `PoseTarget` for
+ *   animation to write. The world raises the first step that finds the target
+ *   missing; a node registered with no world at all is simply a node nothing
+ *   drives, which is true of every authority whose system was never wired up.
  * - `"constraint"` — a constraint/IK solve owns the final pose.
  * - `"network"` — the transform is externally replicated. §42 makes this an
  *   enabler only; transport and replication protocols are out of scope (§5).

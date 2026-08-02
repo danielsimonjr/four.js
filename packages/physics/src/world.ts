@@ -32,12 +32,14 @@
  * 1. per body, in registration order:
  *      resetForces → the §26 command buffer → the §32 sleep command → clear
  *      kinematic bodies: setNextKinematicTransform / setBodyVelocities
+ *        ("blended" nodes feed the PoseTarget instead of the transform, §19)
  *    per joint, in registration order: queued §28 limit/motor changes
  * 2. adapter.syncSceneToSolver()      ← §37 call-order hook (may be a no-op)
  * 3. adapter.step(fixedDeltaTime)     ← §10: seconds, never milliseconds
  * 4. adapter.syncSolverToScene()      ← §37 call-order hook (may be a no-op)
  * 5. per body, in registration order:
- *      dynamic → node.transform under "physics" authority (§42)
+ *      "blended" → node.transform = blend(target pose, solver pose) (§19, §42)
+ *      dynamic   → node.transform under "physics" authority (§42)
  *      every body → RigidBody velocities, RigidBody.sleeping (§23, §32)
  * 6. adapter.drainEvents() → translated to component references and queued
  * 7. per breakable joint, in registration order: reaction vs §28 thresholds →
@@ -73,6 +75,40 @@
  * An application that drives a world without the snapshot system gets no
  * interpolation and should register `createSnapshotSystem(poses)`.
  *
+ * A `"blended"` node is tracked whatever its §22 body type, because the §19
+ * pipeline writes its transform every step; a `"physics"` node is tracked
+ * exactly while it is dynamic, as before. Tracking follows the node's live
+ * authority — it is re-evaluated in the publish pass, so flipping
+ * `transformAuthority` after registration is honoured from the next step.
+ *
+ * ## §19 blending, and the one system this package cannot register itself
+ *
+ * Under `"blended"` authority (§42) the world runs §19's pipeline for a node:
+ * before the solve it feeds the node's `PoseTarget` to a kinematic body, and
+ * after the solve it writes the weighted combination of that target and the
+ * solver's pose (see {@link PhysicsWorld.step}). It needs the trio — `"blended"`
+ * authority, a `RigidBody` registered here, and a `PoseTarget` on the node — and
+ * says so with a `FourError` naming the missing piece.
+ *
+ * §19's finite-difference history (`PoseTarget.previousPosition`, which
+ * `setBodyControlMode`'s velocity inheritance reads) needs
+ * `PoseTarget.capturePrevious` called **once per fixed step, before that step's
+ * animation writes**, which is *earlier* than the solve and therefore cannot
+ * happen inside {@link PhysicsWorld.step}. That call site is
+ * {@link PhysicsWorld.capturePoseTargets}, wrapped by
+ * {@link createPoseTargetCaptureSystem} — a second `SimulationSystem` the
+ * application must register alongside `PhysicsSystem`:
+ *
+ * ```ts
+ * const physics = new PhysicsSystem({ worlds: [world] });
+ * app.systems.register(createPoseTargetCaptureSystem(physics.worlds));
+ * app.systems.register(physics);
+ * ```
+ *
+ * Forgetting it does not break the blend — the blend reads the target's
+ * *current* pose — but it leaves every target's history flat, so a
+ * `setBodyControlMode(..., { inheritVelocityFrom })` inherits zero velocity.
+ *
  * ## What the world does not own
  *
  * The scheduler (§10: the accumulator and the sub-step clamp are the
@@ -85,10 +121,15 @@
 import { FourError } from "@four/core";
 import { Quaternion, Vector2, Vector3 } from "@four/math";
 import {
+  PRIORITY_ANIMATION_TARGETS,
+  type SimulationSystem,
+} from "@four/motion";
+import {
+  PoseTarget,
   warnAuthorityConflict,
   type Node,
   type PoseBuffer,
-  type PoseTarget,
+  type TransformAuthority,
 } from "@four/scene";
 
 import type { PhysicsSolverAdapter } from "./adapter.js";
@@ -121,6 +162,7 @@ import type {
   ShapeCastQuery,
 } from "./queries.js";
 import type {
+  BlendWeights,
   RigidBodyCollisionEvent,
   RigidBodySleepEvent,
 } from "./rigid-body.js";
@@ -153,6 +195,9 @@ const WORLD_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 /** The §42 authority a solver writes under. */
 const PHYSICS_AUTHORITY = "physics";
+
+/** The §42 authority §19's blend pipeline writes under (plan P7-4). */
+const BLENDED_AUTHORITY = "blended";
 
 /** Quantization grid of §33's checksum: values snap to multiples of 1e-6. */
 const QUANTIZATION_SCALE = 1e6;
@@ -198,8 +243,9 @@ export interface PhysicsWorldInit extends PhysicsWorldOptions {
 
   /**
    * The engine's previous/current pose store (§43). When given, the node of
-   * every dynamic body is tracked on registration and untracked on removal;
-   * see the module header for why the world never captures into it.
+   * every dynamic body — and of every `"blended"` node, whatever its §22 type
+   * — is tracked on registration and untracked on removal; see the module
+   * header for why the world never captures into it.
    */
   poses?: PoseBuffer;
 }
@@ -500,6 +546,19 @@ export class PhysicsWorld {
   readonly #inheritedInverse = new Quaternion();
 
   /**
+   * §19 blend scratch, so a blended step allocates nothing (§7b, D7): the
+   * solver's pose is read into these and combined with the target *in place*
+   * before one copy lands on the node, which also keeps plan D3's change hooks
+   * to one bump per member per step. See {@link PhysicsWorld.step}.
+   */
+  readonly #blendPosition = new Vector3();
+
+  readonly #blendRotation = new Quaternion();
+
+  /** Normalized §19 weight pair, reused per body per step. */
+  readonly #blendWeights: BlendWeights = { physics: 1, animation: 0 };
+
+  /**
    * The `deltaSeconds` of the last {@link PhysicsWorld.step}, or `undefined`
    * before the first one — the fixed step a `PoseTarget` history was captured
    * across, and the default divisor of
@@ -773,7 +832,9 @@ export class PhysicsWorld {
     const handle = this.#adapter.createBody(descriptor);
     const id = this.#adapter.getBodyId(handle);
 
-    const tracked = this.#poses !== undefined && body.type === "dynamic";
+    const tracked =
+      this.#poses !== undefined &&
+      shouldTrackPose(body.type, node.transformAuthority);
     const registration: BodyRegistration = {
       node,
       body,
@@ -1124,6 +1185,44 @@ export class PhysicsWorld {
   }
 
   // --- the fixed step -------------------------------------------------------
+
+  /**
+   * Shifts every registered body's `PoseTarget` history one fixed step forward
+   * — `PoseTarget.capturePrevious` for each, in registration order (§19, plan
+   * P7-4).
+   *
+   * ## Why this is not part of `step`
+   *
+   * The history is what `(position − previousPosition) / dt` differences into
+   * the velocity an activated ragdoll inherits (§19,
+   * {@link PhysicsWorld.setBodyControlMode}), so "previous" has to mean *the
+   * target one fixed step ago*. Capturing inside the step would run at §39 step
+   * 6, **after** step 3 has written this step's target: `previous` would become
+   * this step's pose and every difference would be zero. The capture therefore
+   * belongs before animation, which is a different slot in the §39 order and so
+   * a different system — {@link createPoseTargetCaptureSystem}, which is the
+   * call site and which an application must register (see the module header).
+   *
+   * ## Every registered body, not only the blended ones
+   *
+   * A target's history is read by velocity inheritance as well as by the blend,
+   * and inheritance is precisely what a body that is *not yet* blended or
+   * dynamic uses at the moment it is switched (§19's ragdoll activation). A body
+   * whose node carries no `PoseTarget` is skipped; nothing here validates the
+   * §19 trio, because a target with no blend is a perfectly ordinary thing to
+   * animate and the blend's own error is raised by the step that blends.
+   *
+   * Capturing bumps no version and touches no solver, so this is safe to call on
+   * a world that has not been initialized (a `PhysicsSystem` may well be
+   * registered before `initialize` resolves). Calling it twice in one fixed step
+   * collapses every difference to zero — see `PoseTarget.capturePrevious`.
+   * Allocates nothing.
+   */
+  capturePoseTargets(): void {
+    for (const registration of this.#bodiesByNode.values()) {
+      registration.node.getComponent(PoseTarget)?.capturePrevious();
+    }
+  }
 
   /**
    * Advances the simulation by exactly `deltaSeconds` (§10, §37, §39).
@@ -1689,20 +1788,28 @@ export class PhysicsWorld {
   }
 
   /**
-   * Brings §43 pose tracking back in line with the registration's current type
-   * after a switch (plan P7-3).
+   * Brings §43 pose tracking back in line with what currently moves the node
+   * (plan P7-3, plan P7-4).
    *
-   * {@link PhysicsWorld.addBody} tracks exactly the dynamic bodies, because
-   * those are the ones whose transform the solver writes and whose render pose
-   * is therefore interpolated; a body that stops being dynamic stops being one
-   * of those, and a body that becomes dynamic becomes one. A world with no pose
-   * buffer does nothing here.
+   * {@link PhysicsWorld.addBody} tracks exactly the nodes whose transform this
+   * world writes — the dynamic bodies, whose solved pose it publishes, plus the
+   * `"blended"` nodes, whose pose §19's pipeline writes whatever their §22 type
+   * is. A body that stops being one of those stops being tracked and one that
+   * becomes one starts.
+   *
+   * Called from {@link PhysicsWorld.setBodyControlMode} (the type changed) and
+   * from the publish pass of every step (the *authority* may have changed, and
+   * nothing tells the world when it does). A world with no pose buffer does
+   * nothing here.
    */
   #retrackPose(registration: BodyRegistration): void {
     if (this.#poses === undefined) {
       return;
     }
-    const shouldTrack = registration.type === "dynamic";
+    const shouldTrack = shouldTrackPose(
+      registration.type,
+      registration.node.transformAuthority,
+    );
     if (shouldTrack === registration.tracked) {
       return;
     }
@@ -1786,11 +1893,41 @@ export class PhysicsWorld {
    * pose is precisely what a kinematic body should follow (decision, WP-5.3;
    * the packet named `"kinematic"`/`"animation"`, and the wider rule is the same
    * rule stated by its one exclusion).
+   *
+   * ## `"blended"` feeds the target, not the transform (§19 steps 1–3)
+   *
+   * Under `"blended"` authority the node's transform is §19's *output* — the
+   * blend of the last step's target and solver poses — so feeding it back would
+   * be the same circularity the `"physics"` skip avoids, one step delayed. The
+   * `PoseTarget` is the input §19 step 1 names ("animation produces a target
+   * pose"), and it is what a kinematic body under this authority is driven to.
+   *
+   * The target is fed **unweighted**, deliberately: the §19 weights are applied
+   * exactly once, in the publish pass. Weighting the feed as well would apply
+   * `animationWeight` twice — the solver pose would already be part-way to the
+   * target and would then be blended towards it again — which is a low-pass
+   * filter nobody asked for, and this packet ships no hidden smoothing. It also
+   * makes the degenerate case honest: for a `"kinematic-position"` body the
+   * solver *is* the target, so every weight produces the target pose, which is
+   * the truth about a body that has no dynamics to contribute.
+   *
+   * (Plan P7-4 wrote "feeds targets to kinematic bodies (animation-weighted)";
+   * the deviation is this paragraph — WP-7.3.)
    */
   #feedKinematic(registration: BodyRegistration): void {
     const { type, node, handle, body } = registration;
     if (type === "kinematic-position") {
-      if (node.transformAuthority === PHYSICS_AUTHORITY) {
+      const authority = node.transformAuthority;
+      if (authority === BLENDED_AUTHORITY) {
+        const target = this.#requirePoseTarget(registration);
+        this.#adapter.setNextKinematicTransform(
+          handle,
+          target.position,
+          target.rotation,
+        );
+        return;
+      }
+      if (authority === PHYSICS_AUTHORITY) {
         return;
       }
       this.#adapter.setNextKinematicTransform(
@@ -1826,10 +1963,25 @@ export class PhysicsWorld {
    * `syncSolverToScene` refreshes these fields"), not a transform write, so §42
    * has nothing to say about them and leaving them stale would make the
    * component lie about the simulation (decision, WP-5.3).
+   *
+   * ## `"blended"` (§19 step 5, plan P7-4)
+   *
+   * A node under `"blended"` authority is written by `#publishBlended` instead,
+   * **without a warning** — the §19 pipeline is that node's single owner (§42),
+   * so this is the owner writing and not a second writer — and **whatever its
+   * §22 type is**: nothing else moves a `"blended"` node (animation writes its
+   * `PoseTarget`, not its transform), so a blended kinematic or static body
+   * whose transform this pass skipped would simply never move.
+   *
+   * Every other authority behaves exactly as it did before: a dynamic body
+   * writes under `"physics"` and warns-and-skips elsewhere, and a non-dynamic
+   * body writes no transform at all.
    */
   #publishBody(registration: BodyRegistration): void {
     const { node, body, handle, type } = registration;
-    if (type === "dynamic") {
+    if (node.transformAuthority === BLENDED_AUTHORITY) {
+      this.#publishBlended(registration);
+    } else if (type === "dynamic") {
       if (node.transformAuthority === PHYSICS_AUTHORITY) {
         this.#adapter.getBodyTransform(
           handle,
@@ -1846,6 +1998,88 @@ export class PhysicsWorld {
       body.angularVelocity,
     );
     setRigidBodySleeping(body, this.#adapter.isBodySleeping(handle));
+    this.#retrackPose(registration);
+  }
+
+  /**
+   * Writes §19's blended pose onto a `"blended"` node — step 5 of §19's
+   * pipeline, "optional blending combines animated and physical poses" (plan
+   * P7-4).
+   *
+   * ```text
+   * w        = body.normalizedWeights()          (§19's two sliders, summing to 1)
+   * position = lerp(solverPosition, targetPosition, w.animation)
+   * rotation = slerp(solverRotation, targetRotation, w.animation)   shortest arc
+   * ```
+   *
+   * `Quaternion.slerp` already takes the short way round an antipodal pair (it
+   * negates the far end when the dot product is negative, plan D8), so a target
+   * and a solver pose that describe the same rotation with opposite quaternion
+   * signs blend along the arc between them rather than the long way round.
+   *
+   * ## The two extremes are exact, by construction
+   *
+   * A weight pair of `1 / 0` runs the **same `getBodyTransform` call into the
+   * same destination** as the plain `"physics"` publish above, and `0 / 1`
+   * copies the target's own numbers; neither goes near the interpolators. That
+   * is not an optimization — it is the guarantee that switching a node between
+   * `"physics"` and a fully-physical `"blended"` changes nothing at all, bit for
+   * bit. `lerp(a, b, 0)` is `a + (b − a) · 0`, which is `a` for every finite `a`
+   * but turns `-0` into `+0`; `slerp(a, b, 0)` renormalizes and is not exact at
+   * all. Interpolating at the endpoints would therefore introduce a
+   * one-ulp-scale discontinuity exactly where §110 asks for none.
+   *
+   * Between the extremes the solver pose is read into scratch and combined
+   * **in place**, so the node's own vectors are written once each and plan D3's
+   * change hooks fire once each. Allocates nothing.
+   */
+  #publishBlended(registration: BodyRegistration): void {
+    const { node, body, handle } = registration;
+    const target = this.#requirePoseTarget(registration);
+    const weights = body.normalizedWeights(this.#blendWeights);
+    const { position, rotation } = node.transform;
+
+    if (weights.animation === 0) {
+      this.#adapter.getBodyTransform(handle, position, rotation);
+      return;
+    }
+    if (weights.physics === 0) {
+      position.copy(target.position);
+      rotation.copy(target.rotation);
+      return;
+    }
+
+    const blendedPosition = this.#blendPosition;
+    const blendedRotation = this.#blendRotation;
+    this.#adapter.getBodyTransform(handle, blendedPosition, blendedRotation);
+    position.copy(blendedPosition.lerp(target.position, weights.animation));
+    rotation.copy(blendedRotation.slerp(target.rotation, weights.animation));
+  }
+
+  /**
+   * The `PoseTarget` of a `"blended"` node, or the §19 error naming what the
+   * trio is missing (plan P7-4).
+   *
+   * §19's pipeline needs three things a node cannot declare in one place:
+   * `"blended"` authority (§42), a `RigidBody` registered with a world — which
+   * is given, since this is only ever reached from a registration — and the
+   * `PoseTarget` animation writes. The third is the one that can be absent, and
+   * it is absent silently: the node would simply be a body whose transform
+   * nothing writes. So it throws, at the first step that tried to blend it,
+   * naming the node and the missing component.
+   */
+  #requirePoseTarget(registration: BodyRegistration): PoseTarget {
+    const target = registration.node.getComponent(PoseTarget);
+    if (target === undefined) {
+      throw new FourError(
+        "INVALID_SCENE_GRAPH",
+        `Node ${registration.node.id} declares "blended" transform authority but has no PoseTarget component, so §19's pipeline has no animated pose to blend against (§19, §42, §6a). Attach one with node.addComponent(new PoseTarget().copyFrom(node.transform)), or choose another authority.`,
+        {
+          context: { node: registration.node.id, authority: BLENDED_AUTHORITY },
+        },
+      );
+    }
+    return target;
   }
 
   /**
@@ -2248,4 +2482,95 @@ export class PhysicsWorld {
 /** Whether an accumulated §26 command is empty, so the solver is left alone. */
 function isZero(value: Vector3): boolean {
   return value.x === 0 && value.y === 0 && value.z === 0;
+}
+
+/**
+ * Whether a world writes this node's transform every step, and therefore
+ * whether §43 should interpolate it (§42, §43; plan P7-4).
+ *
+ * Exactly the two cases the publish pass writes: a dynamic body under its
+ * solver, and a `"blended"` node under §19's pipeline whatever its §22 type.
+ */
+function shouldTrackPose(
+  type: BodyType,
+  authority: TransformAuthority,
+): boolean {
+  return type === "dynamic" || authority === BLENDED_AUTHORITY;
+}
+
+/**
+ * Priority of the system {@link createPoseTargetCaptureSystem} builds: one
+ * notch before §39 step 3, "animation target evaluation"
+ * (`PRIORITY_ANIMATION_TARGETS`).
+ *
+ * §19 step 1 is "animation produces a target pose", so every system that writes
+ * a `PoseTarget` runs at step 3 or later, and the history capture has to be the
+ * last thing before them: capture at step 3 − 1 and the whole of the §39 order
+ * from step 3 onwards is "this step's target motion". Registering a target
+ * writer *earlier* than this — anywhere in steps 1–2 — would have its write
+ * flattened by the capture, which is the one ordering mistake this constant
+ * exists to make nameable.
+ */
+export const POSE_TARGET_CAPTURE_PRIORITY = PRIORITY_ANIMATION_TARGETS - 1;
+
+/** Options for {@link createPoseTargetCaptureSystem}. */
+export interface PoseTargetCaptureSystemOptions {
+  /**
+   * Execution order key (§39). Defaults to
+   * {@link POSE_TARGET_CAPTURE_PRIORITY}. Read once, at registration, like
+   * every other system's priority.
+   */
+  priority?: number;
+}
+
+/**
+ * Builds the `SimulationSystem` that calls
+ * {@link PhysicsWorld.capturePoseTargets} on every world in `worlds`, once per
+ * fixed step, before §39 step 3 (plan D5: features register systems, nothing
+ * edits the scheduler; plan P7-4).
+ *
+ * ```ts
+ * const physics = new PhysicsSystem({ worlds: [world] });
+ * app.systems.register(createPoseTargetCaptureSystem(physics.worlds));
+ * app.systems.register(physics);
+ * ```
+ *
+ * `worlds` is **iterated every step, not copied**, so passing
+ * `PhysicsSystem.worlds` — the system's own live array — makes the capture
+ * follow `track`/`untrack` with nothing to keep in sync. A plain array literal
+ * works just as well for an application that steps its worlds itself.
+ *
+ * ## Register it, or lose the history
+ *
+ * This is the one part of §19's pipeline `PhysicsWorld` cannot run from inside
+ * its own step (see {@link PhysicsWorld.capturePoseTargets}), so it is the one
+ * part an application has to wire up. Without it every `PoseTarget` keeps
+ * `previous === current` forever: blending still works — it reads the target's
+ * current pose — but `setBodyControlMode`'s `inheritVelocityFrom` inherits zero
+ * velocity, which is §19's ragdoll dropping from rest instead of continuing the
+ * animation's motion.
+ *
+ * Returns a plain object rather than a class instance: it holds no state of its
+ * own beyond the two arguments, and `dispose` deliberately does nothing — the
+ * worlds outlive the system.
+ */
+export function createPoseTargetCaptureSystem(
+  worlds: Iterable<PhysicsWorld>,
+  options: PoseTargetCaptureSystemOptions = {},
+): SimulationSystem {
+  const priority = options.priority ?? POSE_TARGET_CAPTURE_PRIORITY;
+  return {
+    priority,
+    initialize(): void {
+      // Nothing to set up: the worlds are supplied and own their own state.
+    },
+    fixedUpdate(): void {
+      for (const world of worlds) {
+        world.capturePoseTargets();
+      }
+    },
+    dispose(): void {
+      // Deliberately empty; see the factory's documentation.
+    },
+  };
 }
