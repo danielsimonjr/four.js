@@ -7,6 +7,10 @@ implemented where noted; the rest are scaffold only.
 - [`first-2d-scene/`](first-2d-scene/) — **Implemented.** First 2D scene (§93) grown into
   the interactive demo: shapes, motion, picking, dragging, text, animation
   (`pnpm run example:build`).
+- [`blending/`](blending/) — **Implemented.** The §110 Phase 7 demonstration: an articulated
+  chain cycling between animated, ragdoll and blended-recovery control on a click — pose
+  targets, §19 weights, velocity inheritance, live continuity measurement
+  (`pnpm run blending:build`).
 - [`mechanism/`](mechanism/) — **Implemented.** The §109 Phase 6 demonstration: a
   motor-driven slider–crank — rotating shaft, hinges, limited slider, spring buffer,
   limit-switch lamps, click-to-coast motor with speed controls
