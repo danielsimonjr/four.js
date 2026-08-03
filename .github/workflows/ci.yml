@@ -61,14 +61,14 @@ jobs:
       # All three example sites must be built: playwright.config.ts starts a
       # vite preview server per example, and vite preview hard-errors on a
       # missing dist (found at the Phase 6 exit, WP-6.6-fix1).
-      - name: Build example
-        run: pnpm example:build
-
-      - name: Build physics playground
-        run: pnpm playground:build
-
-      - name: Build mechanism example
-        run: pnpm mechanism:build
+      # Builds EVERY example, because playwright.config.ts starts a `vite preview`
+      # for each entry of its webServer array and preview serves a prebuilt dist.
+      # This was three separate steps covering three of five examples; `blending`
+      # and `particles-demo` were added to the config in e6072ee without matching
+      # steps, so preview died with "The directory dist does not exist" and the
+      # browser job had been red ever since. One script = one place to update.
+      - name: Build examples
+        run: pnpm examples:build
 
       # CI runners ship no browsers, and this repository deliberately keeps
       # browser downloads out of the local scripts: the dev sandbox already has
