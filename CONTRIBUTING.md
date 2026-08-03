@@ -33,7 +33,7 @@ TypeScript). Root scripts, and the level each one gates (plan §8, "Verification
 |---|---|---|
 | `pnpm install --frozen-lockfile` | Install; never change the lockfile by hand | always |
 | `pnpm build` | `tsc -b` through Turborepo | every change |
-| `pnpm turbo run test` | Per-package unit tests (Vitest) | every change |
+| `pnpm test` | Per-package unit tests (Vitest) | every change |
 | `pnpm test:suites` | Root cross-package suites in `tests/` | phase exits |
 | `pnpm lint` | ESLint (type-checked) | every change |
 | `pnpm format` | Prettier write | as needed |
@@ -120,7 +120,7 @@ Amendments are an **owner decision**. When one is made:
 ## 6. Pull requests
 
 - Branch from the default branch; keep the change to one packet's worth of work.
-- Before opening a PR, run at minimum `pnpm build`, `pnpm turbo run test`, and
+- Before opening a PR, run at minimum `pnpm build`, `pnpm test`, and
   `pnpm lint`; add `pnpm check-spec` if you touched anything under `docs/`.
 - Describe which packet (or which spec section) the change implements, and call out
   anything you had to decide that the packet or spec did not pin down.

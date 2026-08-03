@@ -39,7 +39,7 @@ jobs:
         run: pnpm run typecheck:examples
 
       - name: Test
-        run: pnpm turbo run test
+        run: pnpm -r --workspace-concurrency=4 run test
 
       # Same unit tests, re-run per package under v8 instrumentation against the
       # shared thresholds in vitest.coverage.config.ts. Kept separate so the

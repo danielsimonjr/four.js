@@ -9,8 +9,8 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "turbo run build",
-    "test": "turbo run test",
+    "build": "pnpm -r --workspace-concurrency=4 run build",
+    "test": "pnpm -r --workspace-concurrency=4 run test",
     "test:suites": "vitest run --config vitest.suites.config.ts --passWithNoTests",
     "coverage": "pnpm -r --filter \"./packages/*\" exec vitest run --coverage --config ../../vitest.coverage.config.ts",
     "typecheck:examples": "tsc --noEmit -p examples",
@@ -59,7 +59,6 @@
     "four": "workspace:*",
     "prettier": "3.9.6",
     "size-limit": "13.0.2",
-    "turbo": "2.10.7",
     "typedoc": "0.28.20",
     "typescript": "5.9.3",
     "typescript-eslint": "8.65.0",
