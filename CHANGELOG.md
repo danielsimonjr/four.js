@@ -10,6 +10,92 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-02
 
+#### Added (Phase 11 — Assets, Serialization, UI, Tooling, §113a; packets WP-11.1…WP-11.6 — THE FINAL PHASE)
+- `@four/serialization`: SceneDocument v1 with canonical validation, a
+  component-class-keyed serializer registry, §80 migrations — byte-identical
+  round trips; 84 tests, 100% coverage.
+- `@four/assets`: AssetManager (coalescing refcounted cache, disposal-aware image
+  wrapper) + JSON/text/binary/image loaders; glTF staged with a dated note — 33
+  tests, 100% coverage.
+- `@four/ui`: retained-mode Panel/Label/Button over a WidgetSkin visuals seam,
+  flex/stack/absolute layout, §72-driven state machines, focus management;
+  accessibility mirror + keyboard staged — 90 tests, 100% coverage.
+- `benchmarks/`: a shared harness + five suites (math, scene, physics, animation,
+  particles) with committed measured-not-gated records, and `docs/AUDIT-120.md`
+  (42/43 §120 bullets shipped-or-MVP; lighting the single dated staged absence).
+- Integration (13 tests): the §79/§34 boundary proven — contact-free scene saves
+  reload bit-identically for 200 further steps; in-contact saves diverge only via
+  unserialized solver warm-start state. Reference RigidBody/Collider serializers.
+- **Final exit GREEN. The implementation plan (§103–§113a) is complete**: 2,971 unit
+  + 172 suite + 32 browser tests; 24/24 packages; coverage ≥95% everywhere; §86 at
+  32.13/150 kB; docs 0 errors.
+
+#### Added (Phase 10 — Replay, Snapshots, Diagnostics, §33–34/§113; packets WP-10.1…WP-10.5)
+- `@four/diagnostics`: the §34 replay format (canonical serialization, strict base64,
+  adapter-validity refusal), `ReplayRecorder` + `ReplayPlayer` (host-supplied stepFn,
+  periodic-snapshot seeking, slow motion, verify hooks), and `DebugDrawBuffer` with
+  duck-typed providers (contacts/normals/impulses, velocities, origins, solver
+  statistics; COM/joint-anchor/force-vector display staged with dated seam-gap notes)
+  — 210 tests, 100% coverage.
+- End-to-end §113 proof on real Rapier: recording is non-perturbing; replay
+  bit-identical (240/240 checksums); seek costs ≤ snapshot interval; contact geometry
+  appears at exactly the recorded steps under frame stepping; slow-motion arithmetic
+  exact; the phase10 golden pins the recording bytes themselves cross-process.
+- Phase 10 exit GREEN, zero defects: 2,766 unit + 159 suite + 32 browser tests.
+
+#### Added (Phase 9 — Particles, §27/§36/§112; packets WP-9.1…WP-9.5)
+- `@four/particles`: SoA particle core (pool/emitter with seeded 4-draw spawn
+  contract, plane collision, over-lifetime ramps), the §27 force-field set
+  (gravity/drag/wind/radial/vortex/bounded hash-noise turbulence/volumes), and a
+  `ParticleSystem` at priority 500 — 174 tests, 100% coverage.
+- Batched particle rendering: a new `"particles"` RenderItem drawn as instanced quads
+  (6 GL calls per frame at any count) with straight-alpha blending; duck-typed
+  cross-package contracts where the dependency matrix forbids edges (plan-noted).
+- `benchmarks/particles-100k.mjs` + committed results: 100k particles + 3 fields at
+  16.54 ms/step mean on CI hardware, with per-field cost attribution (integrator
+  1.35 ms; ~5.3 ms per polymorphic field) — recorded, not gated.
+- `examples/particles-demo` (fifth site, non-wasm, 18.9 kB gzip) + browser spec;
+  phase9 determinism golden (cross-process). Suites 138, browser 32.
+- Phase 9 exit GREEN per the plan's honest §112 reading; four doc-hygiene defects
+  fixed in-line (dated staging notes, plan-level governance note).
+
+#### Added (Phase 8 — Advanced Motion, §111; packets WP-8.1…WP-8.5)
+- `@four/motion`: `PIDController` (§111 sketch verbatim, anti-windup, derivative on
+  measurement), `SpringDamper` (exact matrix-exponential stepping), the Reynolds
+  steering set + flocking with a seeded xorshift128 RNG (BigInt-oracle-pinned),
+  ballistic/intercept trajectory prediction, and two-bone analytic IK — six new
+  modules, each at 100% coverage with independent analytic test oracles; declined
+  §111 components staged with dated notes.
+- Integration (7 suite tests): PID speed loop settling a real Rapier motorized hinge
+  to exact setpoint in both dimensions; spring-damped camera follow matching its
+  exact discrete transfer function to 3e-15; steering agents beside physics with
+  checksum-stream-identity proof; ballistic interception vs the substepped solver;
+  IK driving the §19 blend pipeline.
+- Phase 8 exit GREEN (plan-defined criterion, owner-to-confirm): 2,359 unit + 131
+  suite + 27 browser tests; coverage ≥95% everywhere.
+
+#### Added (Phase 7 — Physics-Animation Blending, §19/§42/§110; packets WP-7.1…WP-7.8)
+- `@four/scene`: `PoseTarget` component (animation-drivable target poses with
+  finite-difference history); the `"blended"` transform authority unlocked (§42's
+  reserved value, guarded since Phase 2).
+- `@four/physics`: §19 blend weights on `RigidBody`; in-place body retype
+  (`setBodyControlMode`) with velocity inheritance; the §19 pipeline inside
+  `PhysicsWorld.step` (unweighted kinematic feed → solve → weighted lerp/slerp
+  publish under `"blended"`, bit-identical at the weight extremes) plus
+  `createPoseTargetCaptureSystem` at priority 299; `SolverBodyAccess.setBodyType`
+  implemented on both Rapier adapters (verified in-place on live wasm).
+- `@four/animation`: root-motion MVP (loop-aware translation deltas from a designated
+  clip track; rotational staged; seek never accumulates).
+- Integration: §19's four examples end-to-end on Rapier (17 tests) — the ragdoll
+  cycle's kinematic→dynamic switch uses 6 ppm of its derived continuity bound.
+- `examples/blending` (fourth example site): a hanging chain cycling
+  ANIMATED→RAGDOLL→RECOVERING on click (675.9 kB gzip, wasm, outside §86).
+- Gates: phase7 determinism golden (600-step scripted mode cycle, cross-process;
+  switch steps pinned BELOW the wave's own per-step motion) + blending browser spec
+  (suites 124, browser 27, four webServers).
+- Phase 7 exit GREEN, zero defects: 2,176 unit tests, suites ×2, browser ×2,
+  coverage ≥95% everywhere (physics/animation at 100%), §86 gate at 30.92/150 kB.
+
 #### Added (Phase 6 — Joints and Constraints, §28/§109; packets WP-6.1…WP-6.7)
 - `@four/physics`: §28 joint classes (Fixed/Hinge/Slider/Rope/Spring/Spherical +
   Revolute/Prismatic/Ball aliases) over body-local descriptor unions; world-space

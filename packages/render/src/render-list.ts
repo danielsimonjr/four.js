@@ -8,6 +8,13 @@
  * independent half — and produces "compact render items" exactly as §64 asks,
  * so the drawing hot path never makes a virtual call on a node.
  *
+ * Three node kinds generate an item: §49's `Renderable`, §55's `Sprite`, and —
+ * structurally, never by inheritance — a §36 particle system, which contributes
+ * **one batched item for the whole system** (plan P9-3). The first two are
+ * siblings rather than parent and child only until §57's `Material` base lands
+ * (see `sprite.ts`); the third is a duck-typed contract because the frozen
+ * dependency matrix forbids an edge in either direction (see `particles.ts`).
+ *
  * Not here, and why:
  *
  * - **Culling (stage 3).** Frustum culling needs a camera and per-item world
@@ -15,7 +22,10 @@
  *   transformation belongs with §87's spatial index. Building it now would mean
  *   inventing both. Every visible renderable is therefore submitted.
  * - **Batching (stage 6).** §65 is a whole packet, and batching decisions
- *   depend on the backend's pipeline model (WP-3.5).
+ *   depend on the backend's pipeline model (WP-3.5). The one exception is a
+ *   particle system, which arrives *already* batched: one item carrying every
+ *   particle, because §112's 100 000-particle target is not reachable any other
+ *   way (plan P9-3, WP-9.3).
  * - **Encoding and submission (stages 7–8).** Backend work by definition; the
  *   render list is the handover point, and it deliberately contains no GL
  *   objects.
@@ -54,6 +64,7 @@ import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import type { Node, PoseBuffer } from "@four/scene";
 
+import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
 import { Sprite } from "./sprite.js";
 
@@ -72,7 +83,7 @@ import { Sprite } from "./sprite.js";
  * `RendererBackend`, and `GeometryDrawMode`: it serializes, logs, and compares
  * as itself.
  */
-export type RenderItemKind = "unlit" | "sprite";
+export type RenderItemKind = "unlit" | "sprite" | "particles";
 
 /**
  * The fields every render item carries, whatever pipeline draws it — one draw in
@@ -117,12 +128,58 @@ export interface SpriteRenderItem extends RenderItemBase {
 }
 
 /**
+ * A draw generated from a particle system (§36) — **one batched, instanced
+ * draw for the whole system**, whatever its particle count (§64 stage 6, plan
+ * P9-3).
+ *
+ * The contract, the interleaved instance layout, and the blending and
+ * billboarding a backend owes it live in `particles.ts`; read that module's
+ * header before implementing one. In this file the item is just the third arm
+ * of the union, and it differs from the other two in exactly two ways:
+ *
+ * - **`geometry` is the *instance* mesh**, not the drawn shape:
+ *   {@link particleQuadGeometry}'s shared unit quad, drawn `count` times.
+ *   Carrying it here rather than inventing a fourth item field is what lets a
+ *   backend's ordinary geometry cache upload it, once, like any other geometry.
+ * - **There is no material.** §36 puts colour on the particle, not on a shared
+ *   surface, so every particle carries its own straight-alpha RGBA in the
+ *   instance stream. The field is declared as `material?: undefined` rather
+ *   than omitted so that `item.material` stays *readable* on the union — a
+ *   backend or a test can ask any item for its material and get `undefined`
+ *   here, instead of failing to compile.
+ */
+export interface ParticleRenderItem extends RenderItemBase {
+  kind: "particles";
+
+  /**
+   * Stable identity of the emitting node (§6), for a backend to key this
+   * system's GPU buffers on — see `ParticleDrawable.id`.
+   */
+  id: string;
+
+  /** Live particles to draw; the instance count of the batched draw. */
+  count: number;
+
+  /**
+   * The emitting node's interleaved instance array (`particles.ts`), valid for
+   * `count × PARTICLE_INSTANCE_FLOATS` floats. Owned by the node and rewritten
+   * every frame: upload it during the call, never retain it.
+   */
+  instances: Float32Array;
+
+  /** Particles carry no material — see the interface documentation. */
+  material?: undefined;
+}
+
+/**
  * One draw (§64), as a **discriminated union** on {@link RenderItemKind}.
  *
  * ```ts
  * for (const item of buildRenderList(scene, out)) {
  *   if (item.kind === "sprite") {
  *     bind(item.material.texture);      // narrowed to SpriteMaterial
+ *   } else if (item.kind === "particles") {
+ *     upload(item.instances, item.count);
  *   } else {
  *     upload(item.material.color);      // narrowed to UnlitMaterial
  *   }
@@ -135,21 +192,38 @@ export interface SpriteRenderItem extends RenderItemBase {
  * documented cast where the invariant is actually established — see
  * {@link itemAt}.
  */
-export type RenderItem = UnlitRenderItem | SpriteRenderItem;
+export type RenderItem =
+  UnlitRenderItem | SpriteRenderItem | ParticleRenderItem;
 
 /**
- * The pooled item as the builders write it: one mutable shape covering both
- * union members, because a pooled object is rewritten field by field and
+ * The pooled item as the builders write it: one mutable shape covering every
+ * union member, because a pooled object is rewritten field by field and
  * TypeScript cannot track a union member across independent assignments.
  *
+ * Fields that belong to one arm are present on all of them here and carry
+ * harmless defaults for the others — `material` is `undefined` on a particle
+ * item, `count` is `0` and `instances` empty on the other two. The exported
+ * union is what hides them, which is why a caller never sees a sprite item
+ * offering a particle count.
+ *
  * Not exported: outside this module an item is always a {@link RenderItem}, and
- * the correlation between `kind` and `material` is an invariant the builders
- * maintain rather than a contract callers may break.
+ * the correlation between `kind` and the arm-specific fields is an invariant the
+ * builders maintain rather than a contract callers may break.
  */
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
-  material: UnlitMaterial | SpriteMaterial;
+  material?: UnlitMaterial | SpriteMaterial;
+  id: string;
+  count: number;
+  instances: Float32Array;
 }
+
+/**
+ * The `instances` a non-particle pooled item carries: shared, empty, never
+ * uploaded. One array for the whole module, so pooling a thousand items does
+ * not allocate a thousand empty buffers.
+ */
+const EMPTY_INSTANCES = new Float32Array(0);
 
 /** Narrows `item` to the textured-quad pipeline (§55). */
 export function isSpriteItem(item: RenderItem): item is SpriteRenderItem {
@@ -159,6 +233,11 @@ export function isSpriteItem(item: RenderItem): item is SpriteRenderItem {
 /** Narrows `item` to the flat-colour pipeline (§57's `UnlitMaterial`). */
 export function isUnlitItem(item: RenderItem): item is UnlitRenderItem {
   return item.kind === "unlit";
+}
+
+/** Narrows `item` to the batched particle pipeline (§36; see `particles.ts`). */
+export function isParticlesItem(item: RenderItem): item is ParticleRenderItem {
+  return item.kind === "particles";
 }
 
 /** Pooled backing store for one `out` array. */
@@ -193,30 +272,30 @@ function poolFor(out: RenderItem[]): ListPool {
 }
 
 /**
- * The two node types that generate a render item today: §49's `Renderable` and
- * §55's `Sprite`. They are siblings rather than parent and child only until
- * §57's `Material` base lands — see `sprite.ts` for the whole argument.
- */
-type Drawable = Renderable | Sprite;
-
-/**
  * Returns pooled item `index`, creating it (once, ever, for this `out` array)
- * seeded from `node`. Every field is overwritten by the caller immediately.
+ * from the two fields that have no meaningful default — a geometry and a
+ * matrix, both of which the caller has in hand. **Every field is overwritten by
+ * the caller immediately**, including these two; they are parameters only
+ * because `MutableRenderItem` cannot be constructed without them.
  */
 function itemAt(
   pool: ListPool,
   index: number,
-  node: Drawable,
+  geometry: BufferGeometry,
+  worldMatrix: Matrix4,
 ): MutableRenderItem {
   let item = pool.items[index];
   if (item === undefined) {
     item = {
-      kind: node instanceof Sprite ? "sprite" : "unlit",
-      worldMatrix: node.transform.worldMatrix,
-      geometry: node.geometry,
-      material: node.material,
-      renderOrder: node.renderOrder,
-      renderLayer: node.renderLayer,
+      kind: "unlit",
+      worldMatrix,
+      geometry,
+      material: undefined,
+      renderOrder: 0,
+      renderLayer: 0,
+      id: "",
+      count: 0,
+      instances: EMPTY_INSTANCES,
     };
     pool.items[index] = item;
   }
@@ -317,6 +396,32 @@ function composeRenderPoseMatrix(
 }
 
 /**
+ * Points `item.worldMatrix` at the right matrix for the frame: the node's own
+ * resolved one when the list is not interpolating, or a pooled matrix holding
+ * its §43 render pose when it is.
+ *
+ * Shared by every drawable kind, because §43 applies to a particle system's
+ * *transform* exactly as it does to a mesh's — only the particles inside it are
+ * not interpolated (see `particles.ts`).
+ */
+function writeWorldMatrix(
+  item: MutableRenderItem,
+  node: Node,
+  pool: ListPool,
+  index: number,
+  poses: PoseBuffer | null,
+  alpha: number,
+): void {
+  if (poses === null) {
+    item.worldMatrix = node.transform.worldMatrix;
+    return;
+  }
+  const matrix = matrixAt(pool, index);
+  composeRenderPoseMatrix(node, poses, alpha, matrix);
+  item.worldMatrix = matrix;
+}
+
+/**
  * Appends render items for `node`'s subtree to `out`, starting at index
  * `count`, and returns the new count. Depth-first in insertion order (§6).
  *
@@ -348,26 +453,43 @@ function collect(
 
   let next = count;
   if (node instanceof Renderable || node instanceof Sprite) {
-    const item = itemAt(pool, next, node);
-    item.kind = node instanceof Sprite ? "sprite" : "unlit";
     // A sprite rebuilds its quad here if the anchor or the size moved; a
     // renderable's geometry is whatever it was handed.
+    const item = itemAt(pool, next, node.geometry, node.transform.worldMatrix);
+    item.kind = node instanceof Sprite ? "sprite" : "unlit";
     item.geometry = node.geometry;
     item.material = node.material;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
-    if (poses === null) {
-      item.worldMatrix = node.transform.worldMatrix;
-    } else {
-      const matrix = matrixAt(pool, next);
-      composeRenderPoseMatrix(node, poses, alpha, matrix);
-      item.worldMatrix = matrix;
-    }
+    writeWorldMatrix(item, node, pool, next, poses, alpha);
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
     // a "sprite" item carries a `SpriteMaterial` and an "unlit" item an
     // `UnlitMaterial` by construction. TypeScript cannot see that across two
     // assignments to a pooled object — see `MutableRenderItem`.
+    out[next] = item as RenderItem;
+    next += 1;
+  } else if (isParticleDrawable(node)) {
+    // §36's whole system becomes **one** item (plan P9-3). The repack is the
+    // node's own work and happens here, at list-build time, so the uploaded
+    // arrays cannot be a step older than the item that points at them — see
+    // `particles.ts` for the layout and for why this costs one pass per build.
+    node.updateParticleInstances();
+    const quad = particleQuadGeometry();
+    const item = itemAt(pool, next, quad, node.transform.worldMatrix);
+    item.kind = "particles";
+    item.geometry = quad;
+    // Drop a material this pooled slot may have carried for a `Renderable` in
+    // an earlier frame: a particle item has none (§36), and keeping the
+    // reference would both mislead a reader and retain a material the scene may
+    // have discarded.
+    item.material = undefined;
+    item.id = node.id;
+    item.count = node.particleCount;
+    item.instances = node.particleInstances;
+    item.renderLayer = node.renderLayer;
+    item.renderOrder = node.renderOrder;
+    writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;
   }

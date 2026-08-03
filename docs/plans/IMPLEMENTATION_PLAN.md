@@ -933,6 +933,12 @@ Packets:
 - **WP-7.3 [S] BlendSystem** — P7-4 pipeline, "blended" authority writes, continuity
   clamps documented; fake-adapter tests.
 - **WP-7.4 [S] Root motion MVP** — P7-5 in the mixer; unit + determinism-safe tests.
+  *Dated note (2026-08-02, exit verifier, P7-4 structural amendment):* no separate
+  `BlendSystem` exists — the shipped design runs both blend halves inside
+  `PhysicsWorld.step` (pre-solve feed, post-solve publish, within the system at 600)
+  plus `createPoseTargetCaptureSystem` at 299, which the plan had not anticipated.
+  The §19 ordering guarantee is fully satisfied; recorded here so the plan stays
+  truthful about the shape.
   *Dated note (2026-08-02, orchestrator, P7-4 amendment):* the kinematic target feed is
   **unweighted** (WP-7.3): weighting both the feed and the publish would apply
   `animationWeight` twice — an unrequested low-pass filter — and for
@@ -953,6 +959,210 @@ Packets:
 
 Dependencies: 7.1 → (7.2 ∥ 7.4); 7.3 ← 7.1+7.2; 7.5 ← 7.3+7.4; 7.6 ← 7.5; 7.7 ← 7.6;
 7.8 last.
+
+## 6g. Phase 8 — Advanced Motion (§111; decomposed 2026-08-02)
+
+Exit (plan-defined; §111 sets none — owner to confirm, recorded since revision 2):
+the PID utility and steering behaviors pass analytic tests, and a demo scenario
+composes them with the existing motion/physics stack.
+
+Phase-level pinned decisions:
+
+- **P8-1 Tier.** Phase 8 ships: §111's **PID controller utility** (the §111 sketch
+  verbatim: kp/ki/kd, outputLimits, plus the standard anti-windup + derivative-on-
+  measurement decisions documented), **spring-damper controllers** (§13's damped
+  spring generalized to a controller form), **steering behaviors** (§12's classic
+  set: seek, flee, arrive, pursue, evade, wander(deterministic seeded), separation/
+  cohesion/alignment = flocking over a neighbor query), and **trajectory prediction**
+  (ballistic + constant-velocity lead, closed-form). **Staged with dated notes:**
+  path-planning adapters (needs an adapter RFC), full IK (two-bone analytic IK MAY
+  ship if it stays small — worker decides honestly; CCD/FABRIK staged), robotic
+  joint commands (§119's domain — a thin command mapping over Phase 6 motors MAY
+  ship as a utility if honest).
+- **P8-2 Home.** Everything lands in `@four/motion` (steering/PID/prediction are
+  motion utilities over core+math+scene; no new deps). Steering integrates as
+  forces/accelerations feeding MotionComponent or as target velocities — pinned:
+  steering outputs an ACCELERATION (out-param), applied by the caller (composable
+  with §38 integrators); a `SteeringAgent` convenience component MAY wrap it.
+- **P8-3 Determinism.** Wander uses the seeded RNG from @four/core (verify one
+  exists — else a small xorshift utility in motion with a documented seed contract);
+  flocking neighbor iteration in insertion order.
+
+Packets:
+
+- **WP-8.1 [S] PID + spring-damper controllers** (`@four/motion`) — §111 sketch
+  verbatim + anti-windup/derivative-on-measurement (documented decisions), reset(),
+  closed-form analytic tests (step response of a known plant vs discrete solution).
+- **WP-8.2 [S] Steering + flocking** (`@four/motion`) — P8-1 set, acceleration
+  out-params, seeded wander, neighbor-query interface (brute-force MVP, spatial
+  hash staged), analytic tests (arrive slows to zero at target; pursuit intercept
+  on a closed form; flock cohesion bounded).
+- **WP-8.3 [S] Trajectory prediction + optional two-bone IK** (`@four/motion`) —
+  ballistic/lead closed forms; two-bone IK only if honest (else staged note).
+- **WP-8.4 [S] Integration + demo scenario** — root suite: PID drives a §111-style
+  speed controller on a Phase 6 motorized hinge (closed-loop reaches setpoint;
+  analytic tolerance documented); steering agents in a bounded arena with physics
+  obstacles; determinism goldens NOT needed (no new solver state) — §33 checksum
+  stability with steering active asserted instead.
+- **WP-8.5 [S] Phase 8 exit** — independent verifier, plan-defined criterion,
+  fix nothing. (No new example site: §111 is engine-internal; the demo lives in the
+  suite. Owner may request a visual demo later — recorded.)
+
+Dependencies: 8.1 ∥ 8.2 ∥ 8.3 (disjoint files); 8.4 ← all three; 8.5 last.
+
+## 6h. Phase 9 — Particles (§27, §36, §112; decomposed 2026-08-02)
+
+Exit (§112): ≥100,000 simple particles simulated and rendered at interactive rates on
+suitable hardware — interpreted honestly for this environment: the CPU simulation
+must step 100k particles within a fixed-step budget measured and documented in a
+benchmark (not CI-gated on wall time; recorded numbers), and the renderer must draw
+them via a batched path (one draw call), with a browser demo proving interactive
+behavior at a size SwiftShader can sustain (documented; the 100k number measured
+headlessly and in the benchmark, not asserted in CI pixels).
+
+Phase-level pinned decisions:
+
+- **P9-1 Tier.** CPU simulation ships (SoA Float32Array pools, zero per-frame
+  allocation, seeded randomness only); **GPU compute simulation is STAGED** (dated:
+  requires the WebGPU backend, which is itself a stub tier — §62 backlog) with the
+  §36 "simulation: 'gpu'" option validated-out loudly. Collision options: MVP =
+  §36's plane/ground collision only ("depth-buffer" and full solver coupling staged).
+  Trails: MVP = position-history ribbon data (rendering via the sprite path; staged
+  if dishonest — worker reports).
+- **P9-2 Home.** `@four/particles` (deps core/math/scene per §3.1). Force fields
+  (§27's ForceField interface — sample(position, velocity, time, out)) ship in
+  particles as the §27 built-in set MVP (uniform gravity, drag, wind, vortex, radial,
+  turbulence via SeededRandom-driven curl noise — honest subset, report), reusable
+  by motion later.
+- **P9-3 Rendering.** A `ParticleRenderable` producing ONE batched render item
+  (instanced quads or a single dynamic geometry — worker verifies what the §61
+  renderer interface + webgl backend can honestly batch today; a new RenderItem kind
+  may be needed — that is a cross-package API surface: keep it minimal and report).
+- **P9-4 Determinism.** §36 emitters use SeededRandom; particle iteration insertion
+  order; a determinism golden pins a 100-particle scenario.
+
+Packets:
+
+- **WP-9.1 [S] Particle core** (`@four/particles`) — SoA pool, ParticleEmitter (§36
+  options subset: maxParticles, emission rate/burst, lifetime, velocity
+  distributions (seeded), color/size over lifetime curves), CPU integrator step,
+  plane collision, force-field application; zero-alloc; unit tests + closed forms.
+- **WP-9.2 [S] Force fields** (`@four/particles`) — §27 interface + built-in set
+  (P9-2), volume inclusion/filtering MVP; tests.
+- **WP-9.3 [S] Particle rendering** (`@four/render` + `@four/render-webgl` +
+  `@four/particles`) — P9-3 batched path; fake-GL tests + structural render-item
+  tests.
+  *Dated note (2026-08-02, orchestrator, P9-3 governance):* `ParticleRenderable`
+  cannot subclass `Renderable` — the frozen §3.1 matrix gives `particles` only
+  core/math/scene, and `particles`/`render` share a wave. The shipped seam is a
+  duck-typed structural contract (`ParticleDrawable` declared in `@four/render`,
+  satisfied by `particles`' Node subclass; drift caught by tests, not the compiler —
+  same shape as `SolverBodyAccess`). Accepted as a cross-package surface; the module
+  header in `packages/render/src/particles.ts` carries the full rationale. Likewise
+  accepted: WP-9.1's reproducible-swap-remove reading of P9-4 "insertion order"
+  (layout is a deterministic function of history), and type-level absence as the
+  rejection tier for §36's `simulation:"gpu"`/`collisions:"depth-buffer"`.
+- **WP-9.4 [S] Integration + benchmark + gates** — ParticleSystem into the §39 loop;
+  benchmarks/ harness measuring 100k CPU step time (recorded numbers, documented
+  hardware caveat); determinism golden phase9 (100-particle scenario, cross-process);
+  browser spec on a demo scene added to the playground OR a small fifth example
+  (worker decides honestly against the §86/webServer cost — report; playground
+  regions are gated, prefer a new tiny example page reusing the first-2d-scene
+  non-wasm pattern).
+- **WP-9.5 [S] Phase 9 exit** — independent verifier, the honest §112 reading above,
+  fix nothing.
+
+Dependencies: 9.1 → (9.2 ∥ 9.3); 9.4 ← 9.2+9.3; 9.5 last.
+
+## 6i. Phase 10 — Replay, Snapshots, and Diagnostics (§33–34, §113; decomposed
+2026-08-02)
+
+Exit (§113): a physics defect can be captured, replayed, and inspected frame by
+frame — made concrete: record a session (initial state + settings + seed + inputs by
+step + step counts/dropped time per §34), replay it to bit-identical §33 checksums,
+restore a mid-run snapshot and continue identically, and step/pause/slow-motion the
+replay while reading diagnostic data (§113's visualization list ships as DATA
+proveyors + a debug overlay MVP on the existing render path — full visual polish is
+§118 flagship territory).
+
+Pinned decisions:
+
+- **P10-1 Home.** Recording/replay in `@four/diagnostics` (deps core/math/scene —
+  NOTE: it cannot import physics/motion (same-wave); the recorder therefore records
+  through INTERFACES the app supplies (a `ReplayTarget` contract: checksum(),
+  createSnapshot(), restoreSnapshot(), applyInput(step, payload)) — PhysicsWorld
+  already satisfies the shape structurally (the established duck-type pattern);
+  document per the §6h precedent).
+- **P10-2 §34 format.** JSON envelope {formatVersion, adapterName/Version, seed?,
+  fixedDeltaTime, initialSnapshot (base64), inputs: [{step, payload}...], stepCounts/
+  droppedTime per frame, periodicSnapshots?: [{step, data}], finalChecksum}; replay
+  refuses mismatched adapter/version (§34).
+- **P10-3 Inspection.** A `ReplayPlayer` driving the scheduler manually: play/pause/
+  stepOnce/speed (slow motion = timeScale on the replay clock)/seekToStep (nearest
+  periodic snapshot + re-simulate); diagnostics overlay MVP = a DebugDrawSource
+  contract emitting line/point primitives (contacts, joint anchors, center-of-mass,
+  velocity vectors from SolverBodyAccess reads + §29 events; solver statistics as
+  data) rendered via a "debug-lines" render item OR reusing unlit geometry —
+  worker verifies what is honest; visualization completeness is data-first.
+- **P10-4 Gates.** Determinism golden phase10 (record → replay bit-identity,
+  cross-process); no new example site (the §113 exit is provable headless + the
+  existing five sites; a debug-overlay browser assertion MAY ride an existing spec if
+  cheap — worker reports).
+
+Packets: **WP-10.1 [S]** Recorder + §34 format + ReplayTarget contract
+(@four/diagnostics; fake-target unit tests). **WP-10.2 [S]** ReplayPlayer +
+inspection controls (+ integration with the real Application/scheduler).
+**WP-10.3 [S]** Debug-draw data providers + overlay MVP (render seam per P10-3).
+**WP-10.4 [S]** Integration + phase10 golden: record a Rapier scenario with scripted
+inputs → replay bit-identical → mid-run snapshot restore → frame-step inspection;
+the §113 exit demonstrated end-to-end. **WP-10.5 [S]** exit verifier.
+Dependencies: 10.1 → 10.2 ∥ 10.3; 10.4 ← both; 10.5 last.
+
+## 6j. Phase 11 — Assets, Serialization, UI, and Tooling (§113a; decomposed 2026-08-02)
+
+Exit (§113a): a scene can be saved, reloaded, and benchmarked, and the §120 tooling
+list is complete — MVP tiers throughout; the website/guides half of §93 delivers as
+in-repo documentation (typedoc API reference already lives; a public website is a
+deployment/owner step per the POSITIONING precedent).
+
+Pinned decisions:
+
+- **P11-1 Serialization MVP** (`@four/serialization`, deps core/math/scene): a JSON
+  scene format {formatVersion, nodes (tree: id/name/transform/authority), components
+  by typeName with per-type serializers registered via a `ComponentSerializer`
+  registry (the §6a typeName registry is the natural key)} + §80 migration hooks
+  (formatVersion + registered migration steps). Physics/animation component
+  serializers live where the components live? NO — matrix forbids; the REGISTRY
+  pattern lets each package register its own serializer at app level; Phase 11 ships
+  the registry + scene/transform/PoseTarget serializers + ONE cross-package reference
+  registration (RigidBody/Collider) done at the tests/app layer. Round-trip
+  save→load→§33-checksum-relevant state equality is the gate.
+- **P11-2 Assets MVP** (`@four/assets`, deps core): AssetManager {load(url, loader),
+  cache, refcounts, dispose; structural fetch injection for testability}; loaders:
+  JSON, text, binary (ArrayBuffer), image (structural ImageBitmap-like — browser
+  gated). glTF (§76-78) is STAGED with a dated note (a real glTF pipeline needs the
+  §55 texture tier + materials beyond unlit — dishonest to ship as a stub).
+- **P11-3 UI MVP** (`@four/ui`, deps core/math/scene/input/text): retained-mode
+  Panel/Label/Button over the existing sprite/text path with §72 pointer routing;
+  accessibility MIRROR staged with a dated note (needs DOM integration policy).
+  Enough §73-75 to prove the layer composes; completeness staged.
+- **P11-4 Benchmarks** (`benchmarks/`): the harness pattern from particles-100k
+  generalized — a runner + per-suite scripts (math ops, scene propagation, physics
+  step, animation sampling) writing results JSON records (measured-not-gated); §86
+  table rows measured where honest.
+- **P11-5 §120 tooling list**: audit §120 against reality; anything unshipped gets a
+  dated staged note in the plan — the exit's "complete" reads as
+  "shipped-or-staged-with-note", consistent with every prior phase.
+
+Packets: **WP-11.1 [S]** serialization (P11-1). **WP-11.2 [S]** assets (P11-2).
+**WP-11.3 [S]** UI MVP (P11-3). **WP-11.4 [S]** benchmarks harness (P11-4) + §120
+audit doc (docs/AUDIT-120.md). **WP-11.5 [S]** integration: save→reload→checksum
+round trip on a Rapier scene + a UI browser assertion riding an existing spec or a
+tiny addition (worker reports). **WP-11.6 [S]** exit verifier (§113a verdict + a
+WHOLE-PLAN completion audit: every phase closed, every § component
+shipped-or-staged, tracking files coherent).
+Dependencies: 11.1 ∥ 11.2 ∥ 11.3 ∥ 11.4 (disjoint packages/dirs); 11.5 ← 11.1+11.3;
+11.6 last.
 
 ## 7. Phases 3–10 — rolling-wave planning
 

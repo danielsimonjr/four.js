@@ -4,37 +4,42 @@ import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 /**
- * Playwright configuration for the browser gates (WP-3.8, extended by WP-5.8
- * and WP-6.6).
+ * Playwright configuration for the browser gates (WP-3.8, extended by WP-5.8,
+ * WP-6.6, WP-7.7 and WP-9.4).
  *
- * The suite drives **three built example sites** in headless Chromium:
+ * The suite drives **five built example sites** in headless Chromium:
  *
  * | site | port | specs | what it gates |
  * | ---- | ---- | ----- | ------------- |
  * | `examples/first-2d-scene` | {@link PORT} | `example`, `smoothness`, `animation`, `interaction` | the page loads clean, the canvas is not blank, it animates smoothly, and the pointer reaches it (§106, §106a) |
  * | `examples/physics-playground` | {@link PLAYGROUND_PORT} | `playground` | §108's mixed 2D/3D physics demo: gravity, collisions, impulses and sensors through one API |
  * | `examples/mechanism` | {@link MECHANISM_PORT} | `mechanism` | §109's jointed mechanism: a motorised shaft, three hinges, a limited slider, a spring and two limit switches, stable under a real-time load and reconfigurable while running |
+ * | `examples/blending` | {@link BLENDING_PORT} | `blending` | §110's physics-animation blending: an animated chain handed to the solver as a ragdoll and blended back onto its animation, without abrupt discontinuities |
+ * | `examples/particles-demo` | {@link PARTICLES_PORT} | `particles` | §112's particle demonstration: a seeded CPU fountain under §27 fields bouncing off a collision plane, plus a click burst, each drawn as one instanced draw call |
  *
  * There are no golden images — SwiftShader rasterises slightly differently from
  * a GPU, so every assertion is a threshold, never a pixel match (§92).
  *
- * Run **all three** builds first: the web servers below serve the *built* `dist`
+ * Run **all five** builds first: the web servers below serve the *built* `dist`
  * directories, which are gitignored and may be absent.
  *
  * ```sh
- * pnpm example:build      # examples/first-2d-scene/dist
- * pnpm playground:build   # examples/physics-playground/dist
- * pnpm mechanism:build    # examples/mechanism/dist
+ * pnpm example:build          # examples/first-2d-scene/dist
+ * pnpm playground:build       # examples/physics-playground/dist
+ * pnpm mechanism:build        # examples/mechanism/dist
+ * pnpm blending:build         # examples/blending/dist
+ * pnpm particles-demo:build   # examples/particles-demo/dist
  * pnpm test:browser
  * ```
  *
  * `use.baseURL` stays the first site's, so every pre-existing spec keeps
- * navigating with `page.goto("/")` unchanged; `playground.spec.ts` and
- * `mechanism.spec.ts` name their own absolute URLs, and restate
- * {@link PLAYGROUND_PORT} / {@link MECHANISM_PORT} for the reason the other
- * specs restate the example's scene constants — a browser gate checks the built
- * page from the outside, and a spec that imported this file would drag a second
- * copy of the config into every worker.
+ * navigating with `page.goto("/")` unchanged; `playground.spec.ts`,
+ * `mechanism.spec.ts`, `blending.spec.ts` and `particles.spec.ts` name their own
+ * absolute URLs, and restate {@link PLAYGROUND_PORT} / {@link MECHANISM_PORT} /
+ * {@link BLENDING_PORT} / {@link PARTICLES_PORT} for the reason the other specs restate the example's
+ * scene constants — a browser gate checks the built page from the outside, and
+ * a spec that imported this file would drag a second copy of the config into
+ * every worker.
  */
 
 /**
@@ -106,6 +111,32 @@ const PLAYGROUND_PORT = 4174;
  */
 const MECHANISM_PORT = 4175;
 
+/**
+ * Preview port for `examples/blending` — §110's demonstration.
+ *
+ * A fourth entry rather than a fourth run, for {@link PLAYGROUND_PORT}'s reason:
+ * `vite preview` serves exactly one `dist`, and Playwright starts every entry of
+ * a `webServer` array before the first test. 4176 is the next free port above
+ * the mechanism's and is restated verbatim in `tests/browser/blending.spec.ts`.
+ */
+const BLENDING_PORT = 4176;
+
+/**
+ * Preview port for `examples/particles-demo` — §112's demonstration.
+ *
+ * A fifth entry rather than a fifth run, for {@link PLAYGROUND_PORT}'s reason:
+ * `vite preview` serves exactly one `dist`, and Playwright starts every entry of
+ * a `webServer` array before the first test. 4177 is the next free port above
+ * the blending demo's and is restated verbatim in
+ * `tests/browser/particles.spec.ts`.
+ *
+ * This site is the cheap tier deliberately (plan §6h): it carries no physics
+ * package and therefore no WebAssembly image, so it bundles to ~20 kB gzip —
+ * the `first-2d-scene` order of magnitude, not the playground's ~670 kB. A fifth
+ * server is only worth its §86 cost if the site it serves is small.
+ */
+const PARTICLES_PORT = 4177;
+
 export default defineConfig({
   testDir: "tests/browser",
   // Failure artifacts (traces, error context) live inside the already-ignored
@@ -130,7 +161,7 @@ export default defineConfig({
     },
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
-  // All three sites are started before the first test and torn down after the
+  // All five sites are started before the first test and torn down after the
   // last, so one `pnpm test:browser` run covers every spec in `testDir`. The
   // entries use different ports, so they coexist rather than race for one.
   webServer: [
@@ -160,6 +191,27 @@ export default defineConfig({
       reuseExistingServer: false,
       // One Rapier wasm image rather than two (the mechanism is a `"2d"` world),
       // so this bundle is about half the playground's.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/blending --port ${String(BLENDING_PORT)} --strictPort`,
+      url: `http://localhost:${String(BLENDING_PORT)}`,
+      reuseExistingServer: false,
+      // One Rapier wasm image, like the mechanism's: `examples/blending` is a
+      // single `"2d"` world, plus the animation package the other examples that
+      // animate already pull in.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/particles-demo --port ${String(PARTICLES_PORT)} --strictPort`,
+      url: `http://localhost:${String(PARTICLES_PORT)}`,
+      reuseExistingServer: false,
+      // No wasm at all: this bundle is ~20 kB gzip, so the first request is the
+      // fastest of the five. The generous timeout is kept for uniformity.
       timeout: 60_000,
       stdout: "ignore",
       stderr: "pipe",

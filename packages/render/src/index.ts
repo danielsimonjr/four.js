@@ -1,6 +1,16 @@
 export const PACKAGE_NAME = "@four/render";
 
+export type { ParticleDrawable } from "./particles.js";
+export {
+  PARTICLE_COLOR_OFFSET,
+  PARTICLE_INSTANCE_FLOATS,
+  PARTICLE_POSITION_OFFSET,
+  PARTICLE_SIZE_OFFSET,
+  isParticleDrawable,
+  particleQuadGeometry,
+} from "./particles.js";
 export type {
+  ParticleRenderItem,
   RenderItem,
   RenderItemKind,
   SpriteRenderItem,
@@ -9,6 +19,7 @@ export type {
 export {
   buildInterpolatedRenderList,
   buildRenderList,
+  isParticlesItem,
   isSpriteItem,
   isUnlitItem,
 } from "./render-list.js";

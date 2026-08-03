@@ -6,11 +6,53 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] Phase 7 — Physics-animation blending (§19, §42, §110): rolling-wave decomposition
-      into plan §6f, then dispatch (the reserved "blended" authority, animation pose →
-      kinematic modification → physics solve → interpolated render pose pipeline,
-      ragdoll-style handover; exit = animated↔kinematic↔physical control without
-      abrupt discontinuities).
+- [ ] **The implementation plan is COMPLETE (2026-08-02).** All 13 phase sections
+      (§103–§113a) built, tested, verified. What remains is post-plan work, in the
+      verifier's priority order:
+
+### Post-plan backlog (final exit verifier, 2026-08-02)
+- [ ] Package README sweep — all 24 still say "scaffold only" (shipping-false text)
+- [ ] UI browser proof — @four/ui has node-level §72 coverage only; no example app
+      imports it (the one WP-11.5 packet-intent shortfall)
+- [ ] Lighting (§120's single unshipped bullet — never scheduled to a phase; needs a
+      light type, lit shading path, AND normals in the vertex layouts; owner tier
+      decision first)
+- [ ] De-flake tests/browser/blending.spec.ts RECOVER (1 hard fail in 3 full runs;
+      retries: 0; Phase 7 wall-clock thresholds under SwiftShader)
+- [ ] §93 quick-start (root README is 27 lines) + the thirteen prose guides
+- [ ] First publish (§94 0.1): Changesets release workflow + the
+      @danielsimonjr/fourjs publish-name mapping — owner step
+
+### Backlog additions (Phase 10, 2026-08-02)
+- [ ] Package README sweep — all 24 still say "scaffold only" despite implementation
+- [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
+      vertex-color attribute needed for per-segment color) — §118 flagship pickup
+- [ ] Exercise the remaining 4 debug providers against the real Rapier rig (one line)
+- [ ] §34 world-configuration mismatch not refused on restore (name/version only)
+- [ ] getBodyCenterOfMass seam member (Rapier localCom/worldCom verified available)
+
+### Backlog additions (Phase 9, 2026-08-02)
+- [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
+      is the scoped fix; benchmark attribution in benchmarks/results/)
+- [ ] Hoist SeededRandom to @four/core (two dated copies: motion, particles)
+- [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
+      GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+- [ ] .size-limit.json entry for examples/particles-demo (18.9 kB, suggested WP-9.4)
+
+### Backlog additions (Phase 8, 2026-08-02)
+- [ ] Fold steering's private interceptTime into prediction's export (dated note in
+      steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      model first); path-planning adapters (RFC); robotic joint commands utility
+      (MAY declined — see prediction.ts staging note)
+- [ ] §111 sketch namespace: spec writes Four.PIDController; real path is
+      Four.motion.PIDController (pre-existing umbrella convention — spec-revisit note)
+
+### Backlog additions (Phase 7, 2026-08-02)
+- [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
+- [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
+      against; solver bodies have no scale)
+- [ ] Capability-table note: Rapier derives kinematic velocity itself, so
+      inheritVelocityFrom is nearly a no-op there; other solvers may need it
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
 - [ ] §28 solver-iterations constraint feature is not exposed anywhere — Rapier offers
@@ -64,6 +106,31 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-02 — **Phase 11 complete — THE PLAN IS DONE** (§113a): 5 packets, final
+      exit GREEN — serialization (byte-identical round trips + the proven §79/§34
+      boundary), assets, UI MVP, benchmark harness with committed records, the §120
+      audit (42/43 shipped-or-MVP, lighting staged); whole-plan audit clean; final
+      totals 2,971 unit + 172 suite + 32 browser tests, coverage ≥95% everywhere
+- [x] 2026-08-02 — **Phase 10 complete** (§113): 5 packets, exit GREEN zero defects —
+      §34 replay format with canonical serialization, ReplayRecorder/ReplayPlayer over
+      duck-typed targets, debug-draw providers with honestly-staged seam gaps, the
+      §113 exit proven end-to-end on Rapier (bit-identical replay, snapshot-seek,
+      frame stepping, slow motion); 2,766 unit + 159 suite + 32 browser tests
+- [x] 2026-08-02 — **Phase 9 complete** (§112): 5 packets — SoA particle core, §27
+      fields, one-draw-call instanced rendering, ParticleSystem, 100k benchmark
+      (16.5 ms/step recorded honestly on CI hardware with per-field cost attribution),
+      phase9 determinism golden, particles-demo (fifth example site); 2,585 unit +
+      138 suite + 32 browser tests
+- [x] 2026-08-02 — **Phase 8 complete** (§111): 5 packets + 1 doc fix — PID/spring-
+      damper/steering/RNG/prediction/IK in @four/motion, all six modules at 100%
+      coverage with genuinely independent analytic oracles; PID closes a real Rapier
+      hinge loop to exact setpoint; every declined §111 component staged with a dated
+      note; 2,359 unit + 131 suite + 27 browser tests
+- [x] 2026-08-02 — **Phase 7 complete** (§110): 8 packets + 1 fix, exit GREEN zero
+      defects — "blended" authority live with the §19 pipeline inside PhysicsWorld,
+      in-place retype + velocity inheritance, root-motion MVP, mode-cycle example;
+      both control switches measured below the animation's own per-step motion;
+      2,176 unit + 124 suite + 27 browser tests
 - [x] 2026-08-02 — **Phase 6 complete** (§109): 7 packets + 2 fixes — §28 joint tier
       shipped honestly against measured Rapier 0.19.3 behavior (breakage via the engine
       seam, refused where solvers can't report reactions; spherical without fake cone

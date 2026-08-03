@@ -40,8 +40,11 @@
 import { FourError, isFourError } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import {
+  PARTICLE_INSTANCE_FLOATS,
   Renderable,
   Sprite,
+  particleQuadGeometry,
+  type ParticleRenderItem,
   type RenderItem,
   type Renderer,
   type SpriteRenderItem,
@@ -52,13 +55,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   GL,
   GeometryCache,
+  PARTICLE_ATTRIBUTE_LOCATIONS,
+  PARTICLE_GL,
   POSITION_ATTRIBUTE_LOCATION,
+  ParticleBatchCache,
+  ParticleProgram,
   SpriteProgram,
   TextureCache,
   UnlitProgram,
   WebglRenderer,
+  type ParticleGlContext,
   type WebglCanvas,
-  type WebglContext,
   type WebglContextAttributes,
   type WebglContextEventLike,
 } from "../src/index.js";
@@ -115,8 +122,16 @@ interface FakeGlOptions {
   infoLog?: string | null;
 }
 
-/** The double: `WebglContext` plus the recording surface the tests read. */
-interface FakeGl extends WebglContext {
+/**
+ * The double: the backend's whole GL surface plus the recording the tests read.
+ *
+ * Typed against {@link ParticleGlContext} — `WebglContext` plus the three
+ * instancing entry points `gl-particles.ts` adds (WP-9.3) — because that union
+ * is what the renderer narrows its context to, and a fake that implemented only
+ * the smaller half would be rejected at `initialize` exactly as a WebGL 1
+ * context is.
+ */
+interface FakeGl extends ParticleGlContext {
   readonly calls: RecordedCall[];
   /**
    * Uniform handles by name, from the **first** program that resolved each name
@@ -316,6 +331,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     bufferData(target, data, usage) {
       record("bufferData", target, data, usage);
     },
+    bufferSubData(target, dstByteOffset, data, srcOffset, length) {
+      record("bufferSubData", target, dstByteOffset, data, srcOffset, length);
+    },
     deleteBuffer(buffer) {
       record("deleteBuffer", buffer);
     },
@@ -332,6 +350,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     enableVertexAttribArray(index) {
       record("enableVertexAttribArray", index);
+    },
+    vertexAttribDivisor(index, divisor) {
+      record("vertexAttribDivisor", index, divisor);
     },
     vertexAttribPointer(index, size, type, normalized, stride, offset) {
       record(
@@ -381,6 +402,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     drawArrays(mode, first, count) {
       record("drawArrays", mode, first, count);
+    },
+    drawArraysInstanced(mode, first, count, instanceCount) {
+      record("drawArraysInstanced", mode, first, count, instanceCount);
     },
     drawElements(mode, count, type, offset) {
       record("drawElements", mode, count, type, offset);
@@ -1303,7 +1327,7 @@ describe("GeometryCache — vertex arrays keyed by id and version (§53, §64)",
     let created = 0;
     const gl = createFakeGl();
     const base = gl.createBuffer.bind(gl);
-    gl.createBuffer = (): ReturnType<WebglContext["createBuffer"]> => {
+    gl.createBuffer = (): ReturnType<ParticleGlContext["createBuffer"]> => {
       created += 1;
       const buffer = base();
       return created === 1 ? buffer : null;
@@ -1913,16 +1937,17 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
     expect(gl.calls).toHaveLength(0);
   });
 
-  it("re-creates both programs and the fixed state on restore", async () => {
+  it("re-creates every program and the fixed state on restore", async () => {
     const { renderer, gl, canvas } = await initialized();
     canvas.dispatch("webglcontextlost");
     gl.reset();
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit and sprite (WP-3a.3): §61 requires engine-owned GPU resources to be
-    // re-created before `contextrestored` is emitted, and both pipelines are.
-    expect(gl.countOf("createProgram")).toBe(2);
+    // Unlit, sprite (WP-3a.3), and particles (WP-9.3): §61 requires engine-owned
+    // GPU resources to be re-created before `contextrestored` is emitted, and
+    // every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(3);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2019,7 +2044,7 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 });
 
 describe("WebglRenderer — disposal (§83)", () => {
-  it("deletes both programs and every vertex array", async () => {
+  it("deletes every program and every vertex array", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     root.add(renderable(quadGeometry()), renderable(triangleGeometry()));
@@ -2028,7 +2053,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(2);
+    expect(gl.countOf("deleteProgram")).toBe(3);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2052,7 +2077,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(2);
+    expect(gl.countOf("deleteProgram")).toBe(3);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -2595,5 +2620,740 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     renderer.dispose();
 
     expect(gl.countOf("deleteTexture")).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Particles (§36, §64 stage 6, plan P9-3).
+//
+// The emitting node is a double for the same reason the camera and the pose
+// buffer are: `@four/particles`' `ParticleRenderable` is outside this package's
+// dependency matrix — and, by design, outside `@four/render`'s too. What
+// `buildRenderList` recognises is the *structural* `ParticleDrawable` contract,
+// so a double implementing that contract is not a shortcut here: it is the
+// contract, exercised exactly as the real class will be.
+// ---------------------------------------------------------------------------
+
+let nextTestParticlesId = 0;
+
+/**
+ * A particle system node reduced to what the render list reads: §6's traversal
+ * flags plus `@four/render`'s `ParticleDrawable` contract.
+ *
+ * The instance array is filled with recognisable values — particle `i` sits at
+ * `(i, i + 0.5, 0)` with size `i + 1` and colour `(i, 0, 0, 0.5)` — so an
+ * upload assertion can name the floats it expects.
+ */
+class TestParticles {
+  readonly isParticleDrawable = true;
+
+  readonly id: string;
+
+  readonly parent = null;
+
+  readonly children: unknown[] = [];
+
+  visible = true;
+
+  enabled = true;
+
+  renderLayer = 0;
+
+  renderOrder = 0;
+
+  particleCount: number;
+
+  readonly particleInstances: Float32Array;
+
+  /** Calls to `updateParticleInstances`, which the render list owes exactly one per build. */
+  updateCalls = 0;
+
+  /** A `Transform` reduced to what the two render-list paths touch (§7, §43). */
+  readonly transform = {
+    worldMatrix: new Matrix4(),
+    localMatrix: new Matrix4(),
+    scale: new Vector3(1, 1, 1),
+    pivot: new Vector3(),
+    updateLocalMatrix(): void {
+      // Nothing to recompose: the double's local matrix is written directly.
+    },
+  };
+
+  constructor(capacity: number, count = capacity) {
+    nextTestParticlesId += 1;
+    this.id = `test-particles-${String(nextTestParticlesId)}`;
+    this.particleInstances = new Float32Array(
+      capacity * PARTICLE_INSTANCE_FLOATS,
+    );
+    this.particleCount = count;
+    for (let i = 0; i < capacity; i += 1) {
+      const base = i * PARTICLE_INSTANCE_FLOATS;
+      this.particleInstances[base] = i;
+      this.particleInstances[base + 1] = i + 0.5;
+      this.particleInstances[base + 2] = 0;
+      this.particleInstances[base + 3] = i + 1;
+      this.particleInstances[base + 4] = i;
+      this.particleInstances[base + 7] = 0.5;
+    }
+  }
+
+  updateParticleInstances(): void {
+    this.updateCalls += 1;
+  }
+
+  get asNode(): RenderNode {
+    return this as unknown as RenderNode;
+  }
+}
+
+/**
+ * A container node reduced to §6's traversal surface, so a test can put a
+ * particle double and a real `Renderable` under one root.
+ *
+ * `Group` lives in `@four/scene` (outside the matrix) and `createRoot`'s
+ * `Renderable` cannot adopt a double, since `Node.add` takes a real node.
+ */
+class TestGroup {
+  visible = true;
+
+  enabled = true;
+
+  readonly parent = null;
+
+  readonly children: unknown[] = [];
+
+  add(...nodes: { asNode: RenderNode }[]): this {
+    for (const node of nodes) {
+      this.children.push(node.asNode);
+    }
+    return this;
+  }
+
+  addRenderables(...nodes: (Renderable | Sprite)[]): this {
+    this.children.push(...nodes);
+    return this;
+  }
+
+  get asNode(): RenderNode {
+    return this as unknown as RenderNode;
+  }
+}
+
+/** The particle program's uniform handles, found by the one name only it declares. */
+function particleUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("projection")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the particle program never resolved its uniforms");
+}
+
+/** A render item as `buildRenderList` writes it, for the cache's direct tests. */
+function particleItem(
+  instances: Float32Array,
+  count: number,
+  id = "item-particles",
+): ParticleRenderItem {
+  return {
+    kind: "particles",
+    id,
+    count,
+    instances,
+    worldMatrix: new Matrix4(),
+    geometry: particleQuadGeometry(),
+    renderLayer: 0,
+    renderOrder: 0,
+  };
+}
+
+describe("ParticleProgram — compilation and linking (§36, §61, §89)", () => {
+  it("compiles both stages, links, and resolves the three uniforms", () => {
+    const gl = createFakeGl();
+
+    const program = ParticleProgram.create(gl);
+
+    expect(gl.callsOf("createShader").map((call) => call.args[0])).toEqual([
+      GL.VERTEX_SHADER,
+      GL.FRAGMENT_SHADER,
+    ]);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["projection", "view", "model"]);
+    expect(program.disposed).toBe(false);
+  });
+
+  it("emits GLSL ES 3.00 sources binding the corner and instance attributes", () => {
+    const gl = createFakeGl();
+
+    ParticleProgram.create(gl);
+
+    const [vertex, fragment] = gl
+      .callsOf("shaderSource")
+      .map((call) => call.args[1] as string);
+    expect(vertex.startsWith("#version 300 es")).toBe(true);
+    expect(vertex).toContain(
+      `layout(location = ${String(PARTICLE_ATTRIBUTE_LOCATIONS.corner)}) in vec3 corner;`,
+    );
+    expect(vertex).toContain(
+      `layout(location = ${String(PARTICLE_ATTRIBUTE_LOCATIONS.instancePosition)}) in vec3 instancePosition;`,
+    );
+    expect(vertex).toContain(
+      `layout(location = ${String(PARTICLE_ATTRIBUTE_LOCATIONS.instanceSize)}) in float instanceSize;`,
+    );
+    expect(vertex).toContain(
+      `layout(location = ${String(PARTICLE_ATTRIBUTE_LOCATIONS.instanceColor)}) in vec4 instanceColor;`,
+    );
+    // The billboard: offset in view space, then project (WP-9.3).
+    expect(vertex).toContain("center.xy += corner.xy * instanceSize;");
+    expect(vertex).toContain("gl_Position = projection * center;");
+    expect(fragment.startsWith("#version 300 es")).toBe(true);
+    expect(fragment).toContain("fragColor = vColor;");
+  });
+
+  it("fails with SHADER_COMPILATION_FAILED, naming the particle pipeline", () => {
+    const gl = createFakeGl({ compileStatus: false, infoLog: "bad" });
+
+    const error = thrown(() => {
+      ParticleProgram.create(gl);
+    });
+
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(error.context?.stage).toBe("vertex");
+    expect(error.context?.log).toBe("bad");
+  });
+
+  it("deletes the vertex shader when the fragment stage fails", () => {
+    const gl = createFakeGl();
+    let compiled = 0;
+    gl.getShaderParameter = (): boolean => {
+      compiled += 1;
+      return compiled === 1;
+    };
+
+    const error = thrown(() => {
+      ParticleProgram.create(gl);
+    });
+
+    expect(error.context?.stage).toBe("fragment");
+    expect(gl.countOf("deleteShader")).toBe(2);
+    expect(gl.countOf("createProgram")).toBe(0);
+  });
+
+  it("throws when GL will not allocate a shader or a program object", () => {
+    const noShaders = thrown(() => {
+      ParticleProgram.create(createFakeGl({ allocateShaders: false }));
+    });
+    const noPrograms = thrown(() => {
+      ParticleProgram.create(createFakeGl({ allocatePrograms: false }));
+    });
+
+    expect(noShaders.context?.stage).toBe("vertex");
+    expect(noPrograms.context?.stage).toBe("link");
+  });
+
+  it("throws SHADER_COMPILATION_FAILED when linking fails, and deletes the program", () => {
+    const gl = createFakeGl({ linkStatus: false, infoLog: "link error" });
+
+    const error = thrown(() => {
+      ParticleProgram.create(gl);
+    });
+
+    expect(error.context?.stage).toBe("link");
+    expect(error.context?.log).toBe("link error");
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("reports an empty log when the driver returns null from either getter", () => {
+    const compileError = thrown(() => {
+      ParticleProgram.create(
+        createFakeGl({ compileStatus: false, infoLog: null }),
+      );
+    });
+    const linkError = thrown(() => {
+      ParticleProgram.create(
+        createFakeGl({ linkStatus: false, infoLog: null }),
+      );
+    });
+
+    expect(compileError.context?.log).toBe("");
+    expect(linkError.context?.log).toBe("");
+  });
+
+  it("deletes the program when a uniform is missing from the link", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+
+    const error = thrown(() => {
+      ParticleProgram.create(gl);
+    });
+
+    expect(error.context?.uniform).toBe("projection");
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("uploads the projection, view, and model matrices it is given", () => {
+    const gl = createFakeGl();
+    const program = ParticleProgram.create(gl);
+    const uniforms = particleUniforms(gl);
+    const model = new Matrix4();
+    model.elements[12] = 7;
+
+    program.use();
+    program.setProjection(new Matrix4());
+    program.setView(new Matrix4());
+    program.setModel(model);
+
+    expect(uploadsAt(gl, uniforms.get("model"))[0]).toEqual([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 7, 0, 0, 1,
+    ]);
+    expect(uploadsAt(gl, uniforms.get("projection"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("view"))).toHaveLength(1);
+  });
+
+  it("deletes the GL program once, idempotently", () => {
+    const gl = createFakeGl();
+    const program = ParticleProgram.create(gl);
+
+    program.dispose();
+    program.dispose();
+
+    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("ParticleBatchCache — one vertex array per system (§61, §64)", () => {
+  const cornerBuffer = { kind: "corner" };
+
+  it("builds the corner and instance attributes with the documented divisors", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    const item = particleItem(
+      new Float32Array(4 * PARTICLE_INSTANCE_FLOATS),
+      4,
+    );
+
+    const record = cache.acquire(item, cornerBuffer);
+
+    expect(record).not.toBeNull();
+    expect(cache.size).toBe(1);
+    // Corner stream from the shared quad, then the interleaved instance stream.
+    const pointers = gl.callsOf("vertexAttribPointer").map((call) => call.args);
+    expect(pointers).toEqual([
+      [PARTICLE_ATTRIBUTE_LOCATIONS.corner, 3, GL.FLOAT, false, 0, 0],
+      [
+        PARTICLE_ATTRIBUTE_LOCATIONS.instancePosition,
+        3,
+        GL.FLOAT,
+        false,
+        32,
+        0,
+      ],
+      [PARTICLE_ATTRIBUTE_LOCATIONS.instanceSize, 1, GL.FLOAT, false, 32, 12],
+      [PARTICLE_ATTRIBUTE_LOCATIONS.instanceColor, 4, GL.FLOAT, false, 32, 16],
+    ]);
+    expect(gl.callsOf("vertexAttribDivisor").map((call) => call.args)).toEqual([
+      [PARTICLE_ATTRIBUTE_LOCATIONS.instancePosition, 1],
+      [PARTICLE_ATTRIBUTE_LOCATIONS.instanceSize, 1],
+      [PARTICLE_ATTRIBUTE_LOCATIONS.instanceColor, 1],
+    ]);
+  });
+
+  it("allocates the instance buffer once, at full capacity, as DYNAMIC_DRAW", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    const item = particleItem(
+      new Float32Array(4 * PARTICLE_INSTANCE_FLOATS),
+      1,
+    );
+
+    cache.acquire(item, cornerBuffer);
+
+    const [call] = gl.callsOf("bufferData");
+    expect(call.args[0]).toBe(GL.ARRAY_BUFFER);
+    expect((call.args[1] as number[]).length).toBe(32);
+    expect(call.args[2]).toBe(PARTICLE_GL.DYNAMIC_DRAW);
+    // …and the vertex array is left unbound, with no stale ARRAY_BUFFER binding.
+    expect(gl.callsOf("bindVertexArray").at(-1)?.args[0]).toBeNull();
+    expect(gl.callsOf("bindBuffer").at(-1)?.args[1]).toBeNull();
+  });
+
+  it("returns the same record for an unchanged system", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    const item = particleItem(
+      new Float32Array(2 * PARTICLE_INSTANCE_FLOATS),
+      2,
+    );
+
+    const first = cache.acquire(item, cornerBuffer);
+    gl.reset();
+    const second = cache.acquire(item, cornerBuffer);
+
+    expect(second).toBe(first);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+  });
+
+  it("rebuilds when the capacity or the shared corner buffer changes", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    const small = particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 1);
+    const grown = particleItem(
+      new Float32Array(2 * PARTICLE_INSTANCE_FLOATS),
+      2,
+    );
+
+    const first = cache.acquire(small, cornerBuffer);
+    const afterGrowth = cache.acquire(grown, cornerBuffer);
+    const afterRebuiltQuad = cache.acquire(grown, { kind: "corner-2" });
+
+    expect(afterGrowth).not.toBe(first);
+    expect(afterRebuiltQuad).not.toBe(afterGrowth);
+    expect(cache.size).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(2);
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+
+  it("returns null without an entry for a system with no capacity", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+
+    expect(
+      cache.acquire(particleItem(new Float32Array(0), 0), cornerBuffer),
+    ).toBeNull();
+    expect(cache.size).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+  });
+
+  it("returns null when GL will not allocate a vertex array or a buffer", () => {
+    const item = particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 1);
+    const noArrays = new ParticleBatchCache(
+      createFakeGl({ allocateVertexArrays: false }),
+    );
+    const bufferless = createFakeGl({ allocateBuffers: false });
+    const noBuffers = new ParticleBatchCache(bufferless);
+
+    expect(noArrays.acquire(item, cornerBuffer)).toBeNull();
+    expect(noBuffers.acquire(item, cornerBuffer)).toBeNull();
+    // The vertex array it had already created is released, not leaked.
+    expect(bufferless.countOf("deleteVertexArray")).toBe(1);
+  });
+
+  it("uploads only the live prefix, and nothing at all for an empty system", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    const instances = new Float32Array(4 * PARTICLE_INSTANCE_FLOATS);
+    instances[0] = 3;
+    const item = particleItem(instances, 2);
+    const record = cache.acquire(item, cornerBuffer);
+    gl.reset();
+
+    cache.upload(record!, item);
+    cache.upload(record!, particleItem(instances, 0));
+
+    const [call] = gl.callsOf("bufferSubData");
+    expect(gl.countOf("bufferSubData")).toBe(1);
+    expect(call.args[0]).toBe(GL.ARRAY_BUFFER);
+    expect(call.args[1]).toBe(0);
+    expect((call.args[2] as number[])[0]).toBe(3);
+    expect(call.args[3]).toBe(0);
+    expect(call.args[4]).toBe(2 * PARTICLE_INSTANCE_FLOATS);
+  });
+
+  it("forgets every record without touching the context (§61 loss)", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    cache.acquire(
+      particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 1),
+      cornerBuffer,
+    );
+    gl.reset();
+
+    cache.forget();
+
+    expect(cache.size).toBe(0);
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("deletes every vertex array and buffer on dispose, idempotently (§83)", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleBatchCache(gl);
+    cache.acquire(
+      particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 1, "a"),
+      cornerBuffer,
+    );
+    cache.acquire(
+      particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 1, "b"),
+      cornerBuffer,
+    );
+    gl.reset();
+
+    cache.dispose();
+    cache.dispose();
+
+    expect(cache.disposed).toBe(true);
+    expect(cache.size).toBe(0);
+    expect(gl.countOf("deleteVertexArray")).toBe(2);
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+});
+
+describe("WebglRenderer.render — particles (§36, §112, plan P9-3)", () => {
+  it("draws the whole system in ONE instanced call, and no per-particle draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(1000, 250);
+    gl.reset();
+
+    renderer.render(particles.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
+    // Six vertices of the shared, non-indexed unit quad; one instance per live
+    // particle.
+    expect(gl.callsOf("drawArraysInstanced")[0].args).toEqual([
+      GL.TRIANGLES,
+      0,
+      6,
+      250,
+    ]);
+    expect(particles.updateCalls).toBe(1);
+  });
+
+  it("uploads count × stride floats out of the node's own array, once per frame", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(8, 3);
+    const views = [createView(camera)];
+    renderer.render(particles.asNode, views);
+    gl.reset();
+
+    renderer.render(particles.asNode, views);
+    renderer.render(particles.asNode, views);
+
+    const uploads = gl.callsOf("bufferSubData");
+    expect(uploads).toHaveLength(2);
+    expect(uploads[0].args[4]).toBe(3 * PARTICLE_INSTANCE_FLOATS);
+    // Particle 1 of the double: centre (1, 1.5, 0), size 2, colour (1,0,0,0.5).
+    expect((uploads[0].args[2] as number[]).slice(8, 16)).toEqual([
+      1, 1.5, 0, 2, 1, 0, 0, 0.5,
+    ]);
+    // Warm: no new GL objects, no re-allocation of the instance buffer.
+    expect(gl.countOf("createBuffer")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+    expect(gl.countOf("bufferData")).toBe(0);
+  });
+
+  it("enables blending for the particle pass and restores the frame state", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(4);
+    gl.reset();
+
+    renderer.render(particles.asNode, [createView(camera)]);
+
+    const names = gl.names();
+    expect(
+      gl.callsOf("enable").map((call) => call.args[0] as number),
+    ).toContain(GL.BLEND);
+    expect(names.indexOf("enable")).toBeLessThan(
+      names.indexOf("drawArraysInstanced"),
+    );
+    expect(gl.callsOf("disable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    expect(names.lastIndexOf("disable")).toBeGreaterThan(
+      names.indexOf("drawArraysInstanced"),
+    );
+    // Nothing textured ran, so nothing is unbound from the texture unit.
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.callsOf("bindVertexArray").at(-1)?.args[0]).toBeNull();
+  });
+
+  it("uploads the camera's projection and view separately, once per view", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new TestGroup().add(
+      new TestParticles(2),
+      new TestParticles(2),
+    );
+    gl.reset();
+
+    renderer.render(root.asNode, [createView(camera)]);
+
+    const uniforms = particleUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("projection"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("view"))).toHaveLength(1);
+    // …but one model matrix per system.
+    expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(2);
+    expect(gl.countOf("drawArraysInstanced")).toBe(2);
+  });
+
+  it("switches pipelines back and forth for interleaved items", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new TestGroup();
+    root.addRenderables(renderable(triangleGeometry()));
+    root.add(new TestParticles(2));
+    root.addRenderables(renderable(triangleGeometry()));
+    gl.reset();
+
+    renderer.render(root.asNode, [createView(camera)]);
+
+    // unlit (frame start) → particles → unlit, with blending following.
+    expect(gl.countOf("useProgram")).toBe(3);
+    expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    expect(gl.callsOf("disable").map((call) => call.args[0])).toEqual([
+      GL.BLEND,
+    ]);
+    expect(gl.names().indexOf("disable")).toBeLessThan(
+      gl.names().lastIndexOf("drawArrays"),
+    );
+  });
+
+  it("shares the corner quad between systems and gives each its own instance buffer", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new TestGroup().add(
+      new TestParticles(2),
+      new TestParticles(2),
+    );
+    gl.reset();
+
+    renderer.render(root.asNode, [createView(camera)]);
+
+    // One vertex array + buffer for the shared quad, then one of each per system.
+    expect(gl.countOf("createVertexArray")).toBe(3);
+    expect(gl.countOf("createBuffer")).toBe(3);
+    const staticUploads = gl
+      .callsOf("bufferData")
+      .filter((call) => call.args[2] === GL.STATIC_DRAW);
+    expect(staticUploads).toHaveLength(1);
+    expect((staticUploads[0].args[1] as number[]).length).toBe(18);
+  });
+
+  it("skips a system with no live particles, without allocating GPU state", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const empty = new TestParticles(16, 0);
+    gl.reset();
+
+    renderer.render(empty.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(1); // the shared quad only
+    expect(gl.countOf("bufferSubData")).toBe(0);
+    expect(gl.countOf("useProgram")).toBe(1); // the unlit resting state
+  });
+
+  it("skips a system whose instance buffer GL will not allocate", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(2);
+    // The shared quad gets its buffer; the instance stream does not.
+    let buffers = 0;
+    gl.createBuffer = (): ReturnType<ParticleGlContext["createBuffer"]> => {
+      buffers += 1;
+      return buffers <= 1 ? { kind: "buffer" } : null;
+    };
+    gl.reset();
+
+    renderer.render(particles.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+    expect(gl.countOf("bufferSubData")).toBe(0);
+    // The frame carries on rather than throwing (§61).
+    expect(renderer.contextLost).toBe(false);
+  });
+
+  it("skips a system when even the shared quad will not upload", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(2);
+    gl.createVertexArray = () => null;
+    gl.reset();
+
+    renderer.render(particles.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+  });
+
+  it("disposes the programs it already built when a later one fails to compile", async () => {
+    // Six shader stages are compiled in pipeline order: unlit, sprite,
+    // particles. Failing the fifth fails the particle pipeline and must leave
+    // no GL program behind (§61, §83).
+    const failAfter = (stages: number) => {
+      const gl = createFakeGl();
+      let compiled = 0;
+      gl.getShaderParameter = (): boolean => {
+        compiled += 1;
+        return compiled <= stages;
+      };
+      return gl;
+    };
+
+    const spriteFailed = failAfter(2);
+    const particlesFailed = failAfter(4);
+    const spriteError = await rejection(
+      new WebglRenderer().initialize({ canvas: new TestCanvas(spriteFailed) }),
+    );
+    const particleError = await rejection(
+      new WebglRenderer().initialize({
+        canvas: new TestCanvas(particlesFailed),
+      }),
+    );
+
+    expect(spriteError.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(spriteFailed.countOf("deleteProgram")).toBe(1);
+    expect(particleError.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(particlesFailed.countOf("deleteProgram")).toBe(2);
+  });
+
+  it("draws the §43 interpolated pose of a particle system", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(2);
+    const poses = new TestPoseBuffer().track(
+      particles.asNode,
+      new Vector3(0, 0, 0),
+      new Vector3(4, 0, 0),
+    );
+    gl.reset();
+
+    renderer.render(
+      particles.asNode,
+      [createView(camera)],
+      interpolationAt(poses, 0.25),
+    );
+
+    const model = uploadsAt(
+      gl,
+      particleUniforms(gl).get("model"),
+    )[0] as number[];
+    expect(model[12]).toBeCloseTo(1, 12);
+    expect(poses.alphas).toEqual([0.25]);
+  });
+
+  it("re-creates the batch after a context loss and restore (§61)", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const particles = new TestParticles(2);
+    const views = [createView(camera)];
+    renderer.render(particles.asNode, views);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(particles.asNode, views);
+
+    // Fresh handles, and no delete against the dead ones.
+    expect(gl.countOf("createVertexArray")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+  });
+
+  it("deletes the particle vertex array and instance buffer on disposal (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.render(new TestParticles(2).asNode, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // The shared quad's array and buffers, plus this system's pair.
+    expect(gl.countOf("deleteVertexArray")).toBe(2);
+    expect(gl.countOf("deleteBuffer")).toBe(2);
   });
 });

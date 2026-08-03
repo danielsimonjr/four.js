@@ -1,0 +1,339 @@
+/**
+ * `ParticleRenderable` (§36, §49, plan P9-3) — the scene node that puts a
+ * {@link ParticleEmitter}'s pool on screen as **one batched draw**.
+ *
+ * ```ts
+ * const particles = new ParticleRenderable(
+ *   new ParticleEmitter({ maxParticles: 10000, emissionRate: 500, … }),
+ * );
+ * scene.add(particles);
+ *
+ * // per fixed step (§10):
+ * particles.emitter.step(1 / 60, simulationTime);
+ * // per rendered frame: buildRenderList picks the node up and emits one item.
+ * ```
+ *
+ * ## What it is, and what it deliberately is not
+ *
+ * §49 lists `ParticleSystem` among the `Renderable` subclasses, and that is
+ * where this class belongs. It **cannot extend `Renderable`**, and the reason is
+ * a hard constraint rather than a preference: the frozen §3.1 dependency matrix
+ * gives `@four/particles` exactly `core`, `math`, and `scene`. `Renderable`,
+ * `RenderItem`, `BufferGeometry`, and every material live in packages this one
+ * may not import — the matrix is a plan ground rule ("never add or reverse an
+ * edge"), and `particles` and `render` sit in the *same* dispatch wave, so an
+ * edge between them is not merely undeclared but ordering-illegal.
+ *
+ * So this class extends `@four/scene`'s `Node` and implements
+ * `@four/render`'s **structural** `ParticleDrawable` contract — the brand, the
+ * two sort keys, the count, the instance array, and the repack method. Read
+ * `@four/render`'s `src/particles.ts` for the contract, the interleaved layout,
+ * the blending policy, and the §43 statement; this file implements them and does
+ * not restate the arguments.
+ *
+ * **Nothing type-checks the two declarations against each other** (neither
+ * package can see the other). `tests/particle-renderable.test.ts` pins the shape
+ * member by member, and `@four/render-webgl`'s suite pins the layout from the
+ * other side. When a later revision lets particles depend on render, this class
+ * re-parents onto `Renderable`, `implements ParticleDrawable` becomes literal,
+ * and nothing else changes. (Decision, WP-9.3 — reported to the orchestrator.)
+ *
+ * ## Ownership
+ *
+ * The renderable **owns its instance array** — one `Float32Array` of
+ * `capacity × PARTICLE_INSTANCE_FLOATS`, allocated in the constructor and
+ * rewritten in place forever after. It does **not** own the emitter's pool, does
+ * not step the simulation (the §39 loop does), and has no `dispose()`: there is
+ * no GPU resource and no external subscription here, and the array dies with the
+ * node.
+ *
+ * ## Allocation (§7b, plan D7)
+ *
+ * {@link ParticleRenderable.updateParticleInstances} and
+ * {@link ParticleRenderable.computeBounds} allocate **nothing** — no typed
+ * arrays, no math objects, no iterators. Both read the pool's channel arrays
+ * directly rather than through `ParticlePool`'s accessors, which is the pattern
+ * `pool.ts` documents for hot loops (the accessors validate every index; at
+ * 100 000 particles that is 100 000 range checks per frame for an invariant the
+ * loop bound already guarantees).
+ *
+ * ## The ramp evaluation is the pool's, to the bit
+ *
+ * Size and colour are stored as start/end pairs plus age (§36 "color and size
+ * over lifetime"), and the drawn value is the ramp at the particle's normalized
+ * age. This module evaluates it in exactly the form `ParticlePool.getSize` and
+ * `ParticlePool.getColor` use — `start + (end − start) · t`, with `t` from the
+ * same clamped `age / lifetime` and the same non-positive-lifetime rule — so
+ * what is drawn is bit-identical to what the pool reports. The tests assert that
+ * against the pool's own accessors rather than against a re-derivation.
+ */
+
+import type { Vector3 } from "@four/math";
+import { Node } from "@four/scene";
+
+import type { ParticleEmitter } from "./emitter.js";
+
+/**
+ * Floats per particle in {@link ParticleRenderable.particleInstances}: centre
+ * (3) + current size (1) + current straight-alpha RGBA (4).
+ *
+ * **A deliberate duplicate** of `@four/render`'s `PARTICLE_INSTANCE_FLOATS`,
+ * which is the normative definition. The dependency matrix forbids importing it
+ * (see the module header), so the value is restated here, exported so a caller
+ * can size or slice the array without guessing, and pinned by the tests on both
+ * sides.
+ */
+export const PARTICLE_INSTANCE_FLOATS = 8;
+
+/** Components per particle in `ParticlePool.positions` / `velocities`. */
+const VECTOR_STRIDE = 3;
+
+/** Components per particle in `ParticlePool.sizes` (start, end). */
+const SIZE_STRIDE = 2;
+
+/** Components per particle in `ParticlePool.colors` (RGBA start, RGBA end). */
+const COLOR_STRIDE = 8;
+
+/**
+ * `age / lifetime` clamped to `[0, 1]`, matching `ParticlePool.getNormalizedAge`
+ * exactly — including its rule that a non-positive lifetime reports `1` rather
+ * than `Infinity` or `NaN`.
+ */
+function normalizedAge(age: number, lifetime: number): number {
+  if (!(lifetime > 0)) {
+    return 1;
+  }
+  const t = age / lifetime;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+
+/** Optional construction arguments of {@link ParticleRenderable}. */
+export interface ParticleRenderableOptions {
+  /** Initial {@link ParticleRenderable.renderLayer}; defaults to 0. */
+  renderLayer?: number;
+  /** Initial {@link ParticleRenderable.renderOrder}; defaults to 0. */
+  renderOrder?: number;
+}
+
+/**
+ * A scene node drawing one {@link ParticleEmitter}'s live particles (§36, §49).
+ *
+ * Particle positions are in **this node's local space** — the emitter simulates
+ * in whatever frame its options were authored in, and the node's world transform
+ * places the result, so a particle system can be parented, moved, and rotated
+ * like anything else. (Simulating in local space is what makes a moving emitter
+ * carry its particles with it; a world-space "trail behind the emitter" effect
+ * is authored by leaving the node at the origin and moving the emitter's spawn
+ * position, and a first-class `simulationSpace` option is **staged** — §36 names
+ * one and nothing in the MVP tier reads it.)
+ *
+ * Visibility follows §6 through `Node`: `visible = false` or `enabled = false`
+ * removes this node — and its subtree — from the render list.
+ */
+export class ParticleRenderable extends Node {
+  /**
+   * The `@four/render` `ParticleDrawable` brand. `readonly` and a literal, so
+   * the property's type is `true` and the structural contract is satisfied
+   * exactly; see the module header for why this is a brand and not a base
+   * class.
+   */
+  readonly isParticleDrawable = true;
+
+  /**
+   * The simulation this node draws. Public because the application steps it
+   * (`renderable.emitter.step(dt, time)`) and inspects it; the node never steps
+   * it and never writes to the pool.
+   */
+  readonly emitter: ParticleEmitter;
+
+  /**
+   * Symbolic drawing group (§46, §66 sort key 1) — the render list's primary
+   * key, identical in meaning to `Renderable.renderLayer`.
+   */
+  renderLayer = 0;
+
+  /**
+   * Explicit ordering within a layer (§66 sort key 5). Lower draws first; ties
+   * keep scene-graph order.
+   *
+   * Particles are blended, and §66's transparency sorting (key 2) is deferred
+   * with the material state that would drive it, so this — and sibling order —
+   * is the control an author has over what draws on top of what. The same
+   * documented limitation the sprite tier carries.
+   */
+  renderOrder = 0;
+
+  /** The owned upload array; see the module header. Never reallocated. */
+  readonly #instances: Float32Array;
+
+  /** Particles written by the last {@link ParticleRenderable.updateParticleInstances}. */
+  #count = 0;
+
+  /**
+   * Builds a renderable for `emitter`. The emitter is required and is not
+   * defaulted: a particle system without a simulation draws nothing, and
+   * inventing one here would hide the mistake behind an empty node rather than
+   * a type error (the rule `Renderable` and `Sprite` follow).
+   *
+   * Allocates the instance array for the emitter's full `maxParticles` budget —
+   * `capacity × 8` floats, 32 bytes per particle, so §112's 100 000-particle
+   * budget costs 3.2 MB. This is the only allocation the class performs, ever.
+   */
+  constructor(
+    emitter: ParticleEmitter,
+    options: ParticleRenderableOptions = {},
+  ) {
+    super();
+    this.emitter = emitter;
+    this.renderLayer = options.renderLayer ?? 0;
+    this.renderOrder = options.renderOrder ?? 0;
+    this.#instances = new Float32Array(
+      emitter.pool.capacity * PARTICLE_INSTANCE_FLOATS,
+    );
+  }
+
+  /**
+   * Live particles in the last repack — the instance count of the batched draw.
+   *
+   * Valid only after {@link ParticleRenderable.updateParticleInstances}; it is
+   * `0` on a node that has never been rendered, whatever the pool holds.
+   */
+  get particleCount(): number {
+    return this.#count;
+  }
+
+  /**
+   * The interleaved instance array, valid for
+   * `particleCount × PARTICLE_INSTANCE_FLOATS` floats.
+   *
+   * The array instance is stable for the lifetime of the node — a backend may
+   * key a GPU buffer on it, and it is the same object every frame — but its
+   * *contents* belong to the last repack. Do not mutate it.
+   */
+  get particleInstances(): Float32Array {
+    return this.#instances;
+  }
+
+  /**
+   * Repacks the pool's live particles into {@link particleInstances} and
+   * updates {@link particleCount} (§36's ramps evaluated, per the module
+   * header).
+   *
+   * Called by `@four/render`'s `buildRenderList` once per build; calling it by
+   * hand is harmless and idempotent between simulation steps. One pass over the
+   * live particles, `O(count)`, no allocation, no branch per channel.
+   *
+   * Slots past `aliveCount` are left exactly as they were: they are stale by
+   * definition and never uploaded, and zeroing them would turn a 100-particle
+   * frame on a 100 000-particle budget into a 3.2 MB memset.
+   */
+  updateParticleInstances(): void {
+    const pool = this.emitter.pool;
+    const count = pool.aliveCount;
+    const positions = pool.positions;
+    const ages = pool.ages;
+    const lifetimes = pool.lifetimes;
+    const sizes = pool.sizes;
+    const colors = pool.colors;
+    const out = this.#instances;
+
+    for (let i = 0; i < count; i += 1) {
+      const t = normalizedAge(ages[i], lifetimes[i]);
+      const source = i * VECTOR_STRIDE;
+      const sizeBase = i * SIZE_STRIDE;
+      const colorBase = i * COLOR_STRIDE;
+      const target = i * PARTICLE_INSTANCE_FLOATS;
+
+      out[target] = positions[source];
+      out[target + 1] = positions[source + 1];
+      out[target + 2] = positions[source + 2];
+
+      const startSize = sizes[sizeBase];
+      out[target + 3] = startSize + (sizes[sizeBase + 1] - startSize) * t;
+
+      const r = colors[colorBase];
+      const g = colors[colorBase + 1];
+      const b = colors[colorBase + 2];
+      const a = colors[colorBase + 3];
+      out[target + 4] = r + (colors[colorBase + 4] - r) * t;
+      out[target + 5] = g + (colors[colorBase + 5] - g) * t;
+      out[target + 6] = b + (colors[colorBase + 6] - b) * t;
+      out[target + 7] = a + (colors[colorBase + 7] - a) * t;
+    }
+
+    this.#count = count;
+  }
+
+  /**
+   * Writes this system's **local-space** axis-aligned bounding box into `outMin`
+   * and `outMax`, and returns whether there was anything to bound.
+   *
+   * Returns `false` — leaving both vectors untouched — when no particle is
+   * alive. An empty system has no honest box: reporting the degenerate box at
+   * the node's origin would make an empty emitter look like a point-sized object
+   * sitting at the origin to a future culling or picking pass, which is a
+   * different claim from "nothing here" (decision, WP-9.3).
+   *
+   * The box covers the **drawn quads**, not just the particle centres: each
+   * particle is a screen-aligned quad of its current size, which from any camera
+   * angle reaches at most `size / 2` from its centre in every direction, so the
+   * centre box is expanded by half the largest current size. That is exact for
+   * the worst-case orientation and conservative for every other — the honest
+   * bound for a billboard, whose true extent depends on a camera this node does
+   * not know about.
+   *
+   * Computed **on demand, from the current pool** — a second `O(count)` pass,
+   * not a by-product of the repack. Nothing calls it per frame yet (§64's
+   * culling stage is not implemented), and pinning the bounds to the last
+   * repack would make them silently stale for a caller that stepped the
+   * simulation since. Allocates nothing.
+   */
+  computeBounds(outMin: Vector3, outMax: Vector3): boolean {
+    const pool = this.emitter.pool;
+    const count = pool.aliveCount;
+    if (count === 0) {
+      return false;
+    }
+
+    const positions = pool.positions;
+    const ages = pool.ages;
+    const lifetimes = pool.lifetimes;
+    const sizes = pool.sizes;
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let minZ = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    let maxZ = Number.NEGATIVE_INFINITY;
+    let maxSize = 0;
+
+    for (let i = 0; i < count; i += 1) {
+      const base = i * VECTOR_STRIDE;
+      const x = positions[base];
+      const y = positions[base + 1];
+      const z = positions[base + 2];
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (z < minZ) minZ = z;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+      if (z > maxZ) maxZ = z;
+
+      const sizeBase = i * SIZE_STRIDE;
+      const startSize = sizes[sizeBase];
+      const size =
+        startSize +
+        (sizes[sizeBase + 1] - startSize) *
+          normalizedAge(ages[i], lifetimes[i]);
+      if (size > maxSize) {
+        maxSize = size;
+      }
+    }
+
+    const half = maxSize / 2;
+    outMin.set(minX - half, minY - half, minZ - half);
+    outMax.set(maxX + half, maxY + half, maxZ + half);
+    return true;
+  }
+}

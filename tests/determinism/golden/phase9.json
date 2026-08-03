@@ -1,0 +1,13 @@
+{
+  "_warning": "IMMUTABLE. These digests are the Phase 9 determinism record (§112, §36, §33) recorded on 2026-08-02 by WP-9.4 from an actual run of tests/determinism/helpers/phase9-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's particle simulation is deterministic.",
+  "_scenario": "One §36 ParticleEmitter (maxParticles 100, seed 1337, a 40-particle burst at t=0 plus 90 particles/s, lifetimes 0.8–2 s, a 0.55 rad cone at 2–5 units/s, size and RGBA ramps) under four §27 fields applied in declaration order — uniform gravity (0,−9.81,0), linear drag 0.4, a vortex about +Y (strength 3, minDistance 0.25) and a seeded turbulence field (seed 4242, amplitude 2.5, frequency 0.8) — bouncing off §36's collision plane at y = −1.5 with restitution 0.45. The emitter is stepped by a ParticleSystem registered on the Application's §39 registry at priority 500; a ParticleRenderable repacks the instance array every step. fixedTimeStep 1/60, 600 clean injected frames (10 s, exactly one fixed step each, nothing dropped). FNV-1a per D6 with 1e-6 quantization over the whole live pool after every step: the live count plus each particle's position (3), velocity (3), age, lifetime, size endpoints (2) and colour endpoints (8), in slot order. The pool saturates, so 213 of 940 spawns are dropped — which is what pins maxParticles as part of the determinism contract.",
+  "_tier": "same-runtime (§33): the seeded stream, the ascending-index iteration, the swap-remove compaction, the field summation order and the checksum are all exact and cross-platform, but the inputs are runtime-bound — the spawn cone calls Math.cos/Math.sin, the vortex and turbulence fields call Math.sqrt/Math.floor, and every pool channel is a Float32Array.",
+  "summaryDigest": 2771748796,
+  "firstStepDigest": 1186789636,
+  "lastStepDigest": 3616560274,
+  "emittedCount": 727,
+  "droppedCount": 213,
+  "finalAliveCount": 100,
+  "bounceCount": 395,
+  "peakAliveCount": 100
+}

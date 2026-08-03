@@ -25,6 +25,123 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-02 — PHASE 11 CLOSED — THE IMPLEMENTATION PLAN IS COMPLETE (final exit
+  GREEN; §113a exit TRUE: saved, reloaded, benchmarked; §120 complete at 42/43
+  shipped-or-MVP with lighting the single dated staged absence — a traceable
+  scheduling gap, never assigned to any phase).** Five packets. Key surfaces:
+  @four/serialization (SceneDocument v1, canonical validation, ComponentSerializer
+  registry keyed by component CLASS, §80 migrations; byte-identical round trips;
+  known boundaries: unregistered components silently unsaved, restored ids can
+  collide with the live counter); @four/assets (AssetManager with coalescing
+  refcounted cache, ImageAsset disposal wrapper; glTF staged — needs §55 textures +
+  non-unlit materials); @four/ui (WidgetSkin seam: layout/state owned, visuals
+  app-supplied per the matrix; flex/stack/absolute layout; a11y mirror + keyboard
+  staged); benchmarks harness + five suites with committed records (findings:
+  contacts+events = ~88% of a physics step; clean scene pass only ~3× cheaper than
+  full recompute; recursion-limited scene depth ~8k); docs/AUDIT-120.md. THE §79/§34
+  BOUNDARY (WP-11.5): a contact-free save round-trips BIT-IDENTICALLY for 200
+  further steps; an in-contact save diverges only through solver warm-start state —
+  §34 snapshots carry that, §79 documents don't. Reference RigidBody/Collider
+  serializers live in tests/integration/helpers/roundtrip-scenarios.ts. Whole-plan
+  audit: all 13 phase sections (§103–§113a) decomposed, dispatched, closed, dated;
+  8 goldens 1:1 with determinism specs; §94 release workflow correctly owner-gated.
+  Final numbers: **2,971 unit / 172 suite / 32 browser tests; 24/24 build; coverage
+  ≥95% everywhere (Phase 11 packages 100%); §86 at 32.13/150 kB; docs 0 errors.**
+  Remaining backlog (priority order, verifier G-list): package README sweep (all 24
+  say "scaffold only"); UI browser proof (WP-11.5 substituted a node-level §72
+  assertion — the one packet-intent shortfall); lighting packet (owner tier
+  decision); de-flake blending.spec.ts RECOVER (1 hard fail in 3 full runs,
+  retries: 0 — Phase 7 wall-clock thresholds under SwiftShader); §93 quick-start +
+  prose guides (the guide half is thin — examples + doc-comments today); gotcha:
+  `pnpm size` is a pnpm builtin like `pnpm docs` — always `pnpm run size`.
+- **2026-08-02 — PHASE 10 CLOSED (exit GREEN, zero defects; §113 exit sentence TRUE:
+  record → bit-identical replay (240/240 checksums; stepChecksumDigest ===
+  replayChecksumDigest pinned in golden/phase10.json) → snapshot-seek (cost ≤
+  interval−1) → frame-by-frame inspection reading contact geometry at the exact
+  recorded steps → exact slow motion).** Five packets. Standing decisions: §34
+  envelope in @four/diagnostics (formatVersion 1 exact-match; canonical re-build
+  validation → encode(decode(t))===t, prototype-pollution-safe; strict canonical
+  base64, hand-rolled, RFC-vector-pinned); ReplayTarget duck-types PhysicsWorld
+  (applyInput OPTIONAL — apps wrap world+input-applier, PhysicsReplayTarget in
+  tests/integration/helpers/replay-scenarios.ts is the reference pattern; one code
+  path applies inputs live AND on replay); ReplayPlayer owns bookkeeping only, host
+  supplies stepFn (nothing type-checks the pairing — runtime signal via
+  verifyChecksum, deliberately tested); recording is non-perturbing (Rapier
+  takeSnapshot is a pure read — tested); DebugDrawBuffer 7-floats/vertex line list +
+  duck-typed providers; STAGED with dated notes + DEBUG_DRAW_STAGED export: COM
+  display (no seam accessor; Rapier localCom/worldCom exist — unblock verified),
+  joint-anchor/constraint viz (seam has no anchors), force vectors (channel is
+  write-only), per-segment-colored draw (needs vertex colors — "lines" GeometryDrawMode
+  → GL.LINES wiring exists but is undemonstrated; §118 flagship pickup). Known
+  boundary: §34 world-CONFIGURATION mismatch is not refused (name/version only —
+  pre-existing Phase 5 scope). Exit: 2,766 unit + 159 suite + 32 browser; diagnostics
+  210 tests at 100%. Verifier notes: all 24 package READMEs still say "scaffold only"
+  (sweep chore); 4 of 6 debug providers exercised via fakes only (one-line rig
+  extension would close it).
+- **2026-08-02 — PHASE 9 CLOSED (exit GREEN; the plan's honest §112 reading TRUE: 100k
+  measured-and-recorded, one-draw-call batching asserted in fake-GL tests, browser demo
+  at SwiftShader scale).** Five packets + doc fixes. Key facts: SoA Float32Array pools
+  with swap-remove (layout = deterministic function of history — the accepted P9-4
+  reading; literal insertion order NOT preserved); fixed 4-draws-per-spawn RNG
+  contract (dropped spawns burn none — capacity is part of the stream); SeededRandom
+  duplicated from motion (dated, hoist-to-core backlog); §27 fields as factories
+  (turbulence = bounded hash-value-noise curl, honestly NOT divergence-free; radial =
+  inverse-square, positive-outward); "particles" RenderItem: instanced quads, stride-8
+  interleaved, 6 GL calls/frame at any count, straight-alpha blending (first blended
+  non-sprite pass); ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED
+  cross-package contracts (matrix forbids the edges; drift caught by tests — plan §6h
+  dated note); PRIORITY_PARTICLES = 500. **Benchmark (recorded, NOT a 60fps claim):**
+  100k + 3 fields = 16.54 ms/step mean (99.2% of the 60 Hz budget; p95 over), on a
+  4-core CI Xeon; integrator alone 1.35 ms — each polymorphic §27 sample() call site
+  costs ~5.3 ms/100k; field batching is a scoped future optimization. Exit: 2,585 unit
+  + 138 suite + 32 browser tests (five example sites, five webServers); particles/
+  render 100%, render-webgl 99.83%; §86 gate 32.13 kB (grew +1.21 kB from the render
+  union — verified genuine); particles-demo 18.9 kB gzip non-wasm.
+- **2026-08-02 — PHASE 8 CLOSED (exit GREEN; plan-defined criterion TRUE — §111 sets no
+  exit, the plan's "PID + steering pass analytic tests, demo composes with the stack"
+  stands owner-to-confirm).** Five packets + one doc fix, all in `@four/motion`.
+  Shipped: PIDController (§111 sketch verbatim; conditional-integration anti-windup,
+  bit-identical to naive while unsaturated; derivative-on-measurement default);
+  SpringDamper (exact ZOH matrix-exponential step, memoised per dt, unconditionally
+  stable; matched an independent scaling-and-squaring exponential to 1e-12); steering
+  (Reynolds set + flocking, acceleration out-params, brute-force neighbors —
+  spatial hash staged; the implicit 1 s⁻¹ gain documented); SeededRandom (xorshift128,
+  splitmix32 seeding, BigInt oracle known answers); prediction (ballistic + stable-
+  quadratic intercept); two-bone analytic IK (positions not angles — no bone-axis
+  convention pinned yet). Staged with dated notes: path-planning adapters (RFC),
+  CCD/FABRIK, spatial hash, spherical wander, robotic joint commands (MAY declined;
+  the PID→setMotor hinge scenario demonstrates the mapping). Integration facts: PID
+  actuation = targetVelocity cascade (maxTorque held; on Rapier it is the loop GAIN if
+  modulated); a velocity written after world.addBody reaches no solver (author it on
+  the descriptor); steering probes (12k overlapSphere calls) provably perturb no
+  solver state (checksum-stream identity). Exit: 2,359 unit + 131 suite + 27 browser;
+  motion 99.78% (all six new modules 100%); typedoc warnings now 74 (chore count
+  stale).
+- **2026-08-02 — PHASE 7 CLOSED (exit GREEN, zero defects; §110 criterion TRUE —
+  uniquely, both control switches cost LESS than the animation's own per-step motion:
+  activation 9.33 mm and retype 2.69 mm vs the wave's 14.63 mm, pinned in
+  golden/phase7.json; the chain re-locks onto its animation bit-identically two wave
+  periods after a ragdoll cycle).** Eight packets + one doc fix. Standing decisions:
+  `PoseTarget` lives in `@four/scene` (position+rotation MVP, no scale — backlog;
+  previous* history + capturePrevious); §19 weights on RigidBody (independent,
+  normalized at use, defaults 1/0, both-zero warns once and falls back physical);
+  transitions retype IN PLACE via SolverBodyAccess.setBodyType (Rapier verified both
+  dims — handle/id/colliders/mass survive); velocity inheritance = finite-differenced
+  PoseTarget history (world-frame quaternion delta, atan2 form); **no separate
+  BlendSystem** — feed and publish live inside PhysicsWorld.step, plus
+  createPoseTargetCaptureSystem at 299 (MUST be registered by applications using
+  blending/inheritance — an uncaptured animated target inherits ~30× inflated
+  velocity, WP-7.3-fix1); kinematic feed is UNWEIGHTED (weights apply once, at
+  publish); blending covers every §22 body type; missing-trio throws from the step;
+  weight extremes are bit-identical (Object.is-tested) to pure physics/pure target;
+  root motion = translation-only mixer option (rotational staged 2026-08-02, seek
+  never accumulates); "blended" authority unlocked (WP-2.3 guard removed). Rapier
+  note for capability tables: a driven kinematic-position body already carries
+  solver-derived velocity, so inheritVelocityFrom is nearly a no-op there (2.4e-7 m
+  / 0.5 s) — it matters on solvers that do not derive it. Exit: 2,176 unit + 124
+  suite + 27 browser tests (four webServers); scene 99.64, physics/animation 100%
+  coverage; first-2d-scene 30.72 kB gzip vs §86; blending example 675.9 kB (wasm,
+  ungated).
 - **2026-08-02 — PHASE 6 CLOSED (exit verdict: §109 criterion TRUE; one CI-wiring
   defect WP-6.6-fix1 landed by the orchestrator — build all three example sites before
   test:browser — after which the verifier's stated condition for GREEN holds; zero

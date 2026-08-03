@@ -13,6 +13,8 @@ export {
   copyTimeState,
   createTimeState,
 } from "./clock.js";
+export type { TwoBoneIKSolution } from "./ik.js";
+export { createTwoBoneIKSolution, solveTwoBoneIK } from "./ik.js";
 export type {
   AccelerationFn,
   Integrator,
@@ -44,8 +46,48 @@ export type {
   MotionSystemOptions,
 } from "./motion-component.js";
 export { MotionComponent, MotionSystem } from "./motion-component.js";
+export type { PIDControllerOptions, PIDDerivativeSource } from "./pid.js";
+export { DEFAULT_PID_OUTPUT_LIMITS, PIDController } from "./pid.js";
+export {
+  ballisticApexHeight,
+  ballisticTimeOfFlightToPlane,
+  ballisticTimeToApex,
+  interceptPoint,
+  interceptTime,
+  predictBallistic,
+  predictLinear,
+} from "./prediction.js";
+export { SeededRandom } from "./random.js";
 export type { SchedulerCallback, SchedulerOptions } from "./scheduler.js";
 export { Scheduler } from "./scheduler.js";
+export type {
+  SpringDamperCoefficientOptions,
+  SpringDamperFrequencyOptions,
+  SpringDamperOptions,
+  SpringDamperResult,
+  SpringDamperVector3Result,
+} from "./spring-damper.js";
+export { SpringDamper } from "./spring-damper.js";
+export type {
+  SteeringAgentOptions,
+  SteeringContext,
+  SteeringNeighbor,
+  WanderStateOptions,
+} from "./steering.js";
+export {
+  SteeringAgent,
+  WanderState,
+  alignment,
+  arrive,
+  cohesion,
+  evade,
+  flee,
+  pursue,
+  seek,
+  separation,
+  truncate,
+  wander,
+} from "./steering.js";
 export type {
   Detach,
   FixedUpdateContext,
