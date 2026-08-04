@@ -1,5 +1,9 @@
 export const PACKAGE_NAME = "@four/core";
 
+export { DEFAULT_GRAVITY_Y } from "./conventions.js";
+export type { JsonValue } from "./json.js";
+export { cloneJsonValue } from "./json.js";
+export { SeededRandom } from "./random.js";
 export type {
   Component,
   ComponentHost,

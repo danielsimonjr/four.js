@@ -83,6 +83,7 @@
  * exact.
  */
 
+import { DEFAULT_GRAVITY_Y } from "@four/core";
 import { Vector3 } from "@four/math";
 
 import { SeededRandom } from "./random.js";
@@ -93,10 +94,11 @@ import type { ParticleForceField } from "./types.js";
  * {@link uniformGravityField}. Appendix A pins `(0, −9.81, 0)` for 3D and
  * `(0, −9.81)` for 2D — the same vector, because §7a puts +Y up in both.
  *
- * The same number as `@four/physics`'s `DEFAULT_GRAVITY_Y`, duplicated rather
- * than imported: §3.1 gives `@four/particles` no physics dependency.
+ * `@four/core`'s constant, re-exported (hoisted 2026-08-04; it was duplicated
+ * from `@four/physics` while §3.1's missing edge left nothing shared to
+ * import).
  */
-export const DEFAULT_GRAVITY_Y = -9.81;
+export { DEFAULT_GRAVITY_Y } from "@four/core";
 
 /**
  * Distance floor of {@link radialField} when `minDistance` is omitted, in world

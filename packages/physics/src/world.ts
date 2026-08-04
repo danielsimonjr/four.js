@@ -144,7 +144,10 @@ import {
   supportsSolverJointAccess,
 } from "./body-access.js";
 import { Collider } from "./collider.js";
-import type { ColliderTriggerEvent } from "./collider.js";
+import type {
+  ColliderTriggerEvent,
+  RigidBodyCollisionEvent,
+} from "./collider.js";
 import type { PhysicsWorldOptions } from "./descriptors.js";
 import { resolveGravity, resolveSleepingConfig } from "./descriptors.js";
 import type { JointBreakEvent, PhysicsEvent } from "./events.js";
@@ -166,11 +169,7 @@ import type {
   RaycastQuery,
   ShapeCastQuery,
 } from "./queries.js";
-import type {
-  BlendWeights,
-  RigidBodyCollisionEvent,
-  RigidBodySleepEvent,
-} from "./rigid-body.js";
+import type { BlendWeights, RigidBodySleepEvent } from "./rigid-body.js";
 import {
   RigidBody,
   clearRigidBodyCommands,

@@ -39,7 +39,13 @@
  * safe either way, but the contract is stated once for all adapters.
  */
 
-import { Quaternion, Vector2, Vector3, Vector4 } from "@four/math";
+import {
+  Quaternion,
+  Vector2,
+  Vector3,
+  Vector4,
+  type ColorRGBA,
+} from "@four/math";
 
 /**
  * Discriminator of {@link ValueAdapter}. Mirrors §17's track value types
@@ -61,23 +67,18 @@ export type ValueKind =
 
 /**
  * Straight (non-premultiplied) RGBA as a mutable 4-tuple — the materials-side
- * color convention (plan P4-2).
+ * color convention (plan P4-2): `@four/math`'s {@link ColorRGBA}, re-exported.
  *
- * Declared here rather than imported: `@four/animation` may not depend on
- * `@four/materials` (plan §3.1), so the type is described structurally. It is
- * identical to `ColorRGBA` in `@four/materials`, and values pass between the
- * two without conversion.
+ * Originally declared here structurally because `@four/animation` may not
+ * depend on `@four/materials` (plan §3.1); the 2026-08-04 hoist moved the one
+ * definition into `@four/math`, below both, so values keep passing between
+ * the two packages without conversion.
  *
  * Components are **not clamped** anywhere in this module: §60a's pipeline is
  * linear-light with extended range, and clamping would silently rewrite
  * authored data mid-tween.
  */
-export type ColorRGBA = [
-  red: number,
-  green: number,
-  blue: number,
-  alpha: number,
-];
+export type { ColorRGBA } from "@four/math";
 
 /**
  * How one value type is duplicated, assigned, and interpolated.

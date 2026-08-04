@@ -23,13 +23,6 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
-### Backlog additions (tools integration, 2026-08-04)
-- [ ] Consolidate the 5 baselined TRUE_DUPLICATE names (docs/Architecture/
-      duplicate-baseline.json): cloneJsonValue + JsonValue (diagnostics/serialization),
-      DEFAULT_GRAVITY_Y (particles/physics), SeededRandom (= the existing Phase 9
-      hoist-to-core item), ColorRGBA (animation/materials); shrink the baseline via
-      gen-duplicate-baseline.mjs as each lands
-
 ### Backlog additions (Phase 10, 2026-08-02)
 - [ ] Package README sweep — all 24 still say "scaffold only" despite implementation
 - [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
@@ -41,7 +34,6 @@ changes in `CHANGELOG.md`.
 ### Backlog additions (Phase 9, 2026-08-02)
 - [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
       is the scoped fix; benchmark attribution in benchmarks/results/)
-- [ ] Hoist SeededRandom to @four/core (two dated copies: motion, particles)
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
       GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 - [ ] .size-limit.json entry for examples/particles-demo (18.9 kB, suggested WP-9.4)
@@ -113,6 +105,13 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-04 — **Zero-findings sweep** (owner-directed): consolidated all 5
+      baselined TRUE_DUPLICATE names (SeededRandom → core, JsonValue/cloneJsonValue →
+      core with the __proto__ strengthening, DEFAULT_GRAVITY_Y → core, ColorRGBA →
+      math; includes the Phase 9 "hoist SeededRandom" item), broke both type-only
+      import cycles (AuthorityNode structural seam; RigidBodyEventMap declaration
+      merging), un-exported physics-rapier's 21 in-file-only transcribed interfaces;
+      every docs/Architecture report now 0, duplicate baseline empty, all gates green
 - [x] 2026-08-02 — **Phase 11 complete — THE PLAN IS DONE** (§113a): 5 packets, final
       exit GREEN — serialization (byte-identical round trips + the proven §79/§34
       boundary), assets, UI MVP, benchmark harness with committed records, the §120

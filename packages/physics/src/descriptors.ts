@@ -43,7 +43,7 @@
  * degrees.
  */
 
-import { FourError } from "@four/core";
+import { DEFAULT_GRAVITY_Y, FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import type { Matrix3 } from "@four/math";
 import type { Transform } from "@four/scene";
@@ -68,9 +68,11 @@ const DESCRIPTOR_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 /**
  * Appendix A: gravity is `(0, -9.81, 0)` m/s² in a 3D world and `(0, -9.81)` in
- * a 2D one — the same vector, because §7a puts +Y up in both.
+ * a 2D one — the same vector, because §7a puts +Y up in both. `@four/core`'s
+ * constant (hoisted 2026-08-04 — `@four/particles` needs the same number and
+ * §3.1 has no edge between the two), re-exported.
  */
-export const DEFAULT_GRAVITY_Y = -9.81;
+export { DEFAULT_GRAVITY_Y } from "@four/core";
 
 /**
  * How a body is created in a solver (§37 `createBody`), carrying §23's state

@@ -8,6 +8,59 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-04 (later)
+
+#### Changed — every dependency-graph finding resolved: 0 duplicates, 0 cycles, 0 unused exports
+
+Owner-directed sweep ("resolve all issues the tools report; defer nothing"):
+every issue in `docs/Architecture/` is now zero, and the gates hold it there.
+
+- **All 5 baselined TRUE_DUPLICATE names consolidated** —
+  `duplicate-baseline.json` re-seeded to empty:
+  - `SeededRandom` → `@four/core` (`core/src/random.ts`, the WP-8.2 original
+    verbatim; both copies carried this exact hoist as their dated plan).
+    `@four/motion` and `@four/particles` re-export it; streams are unchanged
+    for every seed. Motion's known-answer tests moved to `core/tests/`;
+    particles' independent BigInt-oracle suite stays put and still pins
+    stream identity.
+  - `JsonValue` + `cloneJsonValue` → `@four/core` (`core/src/json.ts`),
+    keeping `@four/serialization`'s `__proto__` refusal — the strengthening
+    both files' notes wanted shared. Behavior change in `@four/diagnostics`:
+    a recorded payload with a `__proto__` own key is now refused with a
+    `TypeError` instead of silently re-parenting the copy (the original
+    contradicted its own "never carry a `__proto__` into the player"
+    contract at the payload level). New `core/tests/json.test.ts` covers
+    every branch; diagnostics/serialization re-export both names.
+  - `DEFAULT_GRAVITY_Y` → `@four/core` (`core/src/conventions.ts`, the
+    Appendix A normative default); `@four/physics` and `@four/particles`
+    re-export.
+  - `ColorRGBA` → `@four/math` (`math/src/color.ts`, the value-type home
+    below both consumers); `@four/animation` and `@four/materials`
+    re-export.
+- **Both type-only import cycles broken** (graph now reports 0 of any kind):
+  - `scene/authority.ts ⇄ scene/node.ts`: `warnAuthorityConflict` now takes
+    a structural `AuthorityNode` (id, name, transformAuthority — the slice it
+    reads) instead of importing `Node`; every `Node` satisfies it, callers
+    unchanged. `AuthorityNode` is exported from the barrel.
+  - `physics/collider.ts ⇄ physics/rigid-body.ts`: `RigidBodyCollisionEvent`
+    moved to `collider.ts`, and the three §29 collision keys of
+    `RigidBodyEventMap` are merged in from there by declaration merging
+    (the `@four/input` → `NodeEventMap` pattern); `rigid-body.ts` keeps the
+    two §32 sleep keys and no longer imports `Collider`. The `@four/physics`
+    public surface is unchanged.
+- **All 21 "potentially unused exports" resolved**: the transcribed Rapier
+  type subset in `physics-rapier/src/init.ts` had 21 interfaces exported but
+  referenced only in-file — now plain (un-exported) interfaces.
+- TypeDoc: 123 warnings vs 125 before the sweep (the merged-interface
+  augmentation deliberately carries a plain comment, not a doc comment —
+  TypeDoc warns when two declarations of one merged interface are both
+  documented).
+- Verified green end-to-end: 24/24 build, 2,985 unit tests (core 91,
+  incl. the moved RNG pins and the new JSON suite), coverage thresholds
+  ≥95% everywhere, lint, check-spec, suites 174, browser 32, size gate
+  32.13 kB unchanged, `graph` + `graph:check` + `graph:duplicates` +
+  `graph:test` all green.
+
 ### 2026-08-04
 
 #### Added — duplicate-symbol gate (`pnpm graph:duplicates`) — CDG/QDG integration complete

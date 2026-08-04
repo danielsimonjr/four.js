@@ -59,24 +59,22 @@
  * produce. Step indices are non-negative safe integers.
  */
 
-import { FourError } from "@four/core";
+import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
 
 /**
- * Any value JSON can carry, losslessly.
+ * Any value JSON can carry, losslessly — `@four/core`'s {@link JsonValue},
+ * re-exported so the replay format keeps naming its own payload type.
  *
- * Recorded input payloads and metadata are typed with this rather than
- * `unknown`: a replay document is JSON, so a payload that cannot survive
- * `JSON.stringify` unchanged (a `Date`, a `Map`, `undefined`, a function, `NaN`)
- * is not recordable, and it is better to say so in the type than to discover it
- * as a silent `null` in a golden file.
+ * This module's definition was the original; `@four/serialization` transcribed
+ * it (no §3.1 edge runs between the two packages) and both carried dated
+ * hoist-to-core notes until the 2026-08-04 hoist landed. Recorded input
+ * payloads and metadata are typed with this rather than `unknown`: a replay
+ * document is JSON, so a payload that cannot survive `JSON.stringify`
+ * unchanged (a `Date`, a `Map`, `undefined`, a function, `NaN`) is not
+ * recordable, and it is better to say so in the type than to discover it as a
+ * silent `null` in a golden file.
  */
-export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
+export type { JsonValue } from "@four/core";
 
 /**
  * The format version this build writes and is willing to read.
@@ -331,7 +329,8 @@ export function decodeBase64(text: string): ArrayBuffer {
 // --- JSON payloads ----------------------------------------------------------
 
 /**
- * Validates a value as JSON and returns a deep-frozen copy of it.
+ * Validates a value as JSON and returns a deep-frozen copy of it —
+ * `@four/core`'s {@link cloneJsonValue}, re-exported.
  *
  * Recorded payloads are copied rather than referenced because the caller
  * usually hands over the same mutable object every frame; a recording that kept
@@ -342,83 +341,14 @@ export function decodeBase64(text: string): ArrayBuffer {
  * cycle throws far from the call site that caused it. Each of those is a
  * {@link TypeError} here, at the `recordInput` that introduced it.
  *
- * `-0` is normalized to `0`, matching both `JSON.stringify` and the §33
- * checksum's treatment of the two zeros.
- *
- * @param value the value to validate and copy
- * @param path a dotted path used in error messages, e.g. `"payload"`
- * @returns a frozen deep copy
- * @throws TypeError if the value is not representable JSON
+ * The shared implementation carries `@four/serialization`'s `__proto__`
+ * strengthening (the 2026-08-04 hoist): a payload with a `__proto__` own key
+ * is now refused with a `TypeError` instead of being silently mis-copied into
+ * the fresh object's prototype — this module's original would have re-parented
+ * the copy, contradicting its own "never carry a `__proto__` into the player"
+ * contract at the payload level.
  */
-export function cloneJsonValue(value: unknown, path = "value"): JsonValue {
-  return cloneJson(value, path, new Set<object>());
-}
-
-function cloneJson(
-  value: unknown,
-  path: string,
-  ancestors: Set<object>,
-): JsonValue {
-  if (value === null) {
-    return null;
-  }
-  switch (typeof value) {
-    case "boolean":
-    case "string":
-      return value;
-    case "number":
-      if (!Number.isFinite(value)) {
-        throw new TypeError(
-          `${path} is ${String(value)}, which JSON cannot represent (it would round-trip as null).`,
-        );
-      }
-      return value === 0 ? 0 : value;
-    case "object":
-      break;
-    default:
-      throw new TypeError(
-        `${path} is a ${typeof value}, which JSON cannot represent.`,
-      );
-  }
-  // Narrowed to a non-null object by the switch above.
-  const object = value;
-  if (ancestors.has(object)) {
-    throw new TypeError(`${path} is a circular reference.`);
-  }
-  ancestors.add(object);
-  try {
-    if (Array.isArray(object)) {
-      const source = object as readonly unknown[];
-      const copy: JsonValue[] = [];
-      for (let i = 0; i < source.length; i += 1) {
-        copy.push(cloneJson(source[i], `${path}[${String(i)}]`, ancestors));
-      }
-      return Object.freeze(copy);
-    }
-    const prototype = Object.getPrototypeOf(object) as object | null;
-    if (prototype !== Object.prototype && prototype !== null) {
-      throw new TypeError(
-        `${path} is ${Object.prototype.toString.call(object)}, not a plain object; JSON cannot represent it losslessly.`,
-      );
-    }
-    const source = object as Record<string, unknown>;
-    const copy: Record<string, JsonValue> = {};
-    // Own enumerable string keys in insertion order (plan §1) — the same set
-    // and order `JSON.stringify` would emit.
-    for (const key of Object.keys(source)) {
-      const entry = source[key];
-      if (entry === undefined) {
-        throw new TypeError(
-          `${path}.${key} is undefined; JSON would drop the key.`,
-        );
-      }
-      copy[key] = cloneJson(entry, `${path}.${key}`, ancestors);
-    }
-    return Object.freeze(copy);
-  } finally {
-    ancestors.delete(object);
-  }
-}
+export { cloneJsonValue } from "@four/core";
 
 // --- document validation ----------------------------------------------------
 

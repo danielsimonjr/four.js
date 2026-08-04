@@ -48,13 +48,13 @@ The codebase is organized into the following modules:
 
 - **packages/animation**: 10 files
 - **packages/assets**: 3 files
-- **packages/core**: 5 files
+- **packages/core**: 8 files
 - **packages/diagnostics**: 6 files
 - **packages/four**: 25 files
 - **packages/geometry**: 3 files
 - **packages/input**: 5 files
 - **packages/materials**: 3 files
-- **packages/math**: 8 files
+- **packages/math**: 9 files
 - **packages/motion**: 14 files
 - **packages/particles**: 8 files
 - **packages/physics**: 15 files
@@ -80,15 +80,15 @@ The codebase is organized into the following modules:
 |---------|------------|----------------|-----------------|
 | `@four/animation` (`packages/animation/`) | `@four/motion`, `@four/core`, `@four/math`, `@four/scene` | 10 | 0 |
 | `@four/assets` (`packages/assets/`) | `@four/core` | 3 | 0 |
-| `@four/core` (`packages/core/`) | (none) | 5 | 0 |
+| `@four/core` (`packages/core/`) | (none) | 8 | 0 |
 | `@four/diagnostics` (`packages/diagnostics/`) | `@four/math`, `@four/core` | 6 | 0 |
 | `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/motion`, `@four/scene`, `@four/render`, `@four/assets`, `@four/diagnostics`, `@four/geometry`, `@four/input`, `@four/materials`, `@four/math`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/physics`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/serialization`, `@four/text`, `@four/ui` | 25 | 0 |
 | `@four/geometry` (`packages/geometry/`) | `@four/core`, `@four/math` | 3 | 0 |
 | `@four/input` (`packages/input/`) | `@four/core`, `@four/math`, `@four/scene` | 5 | 0 |
-| `@four/materials` (`packages/materials/`) | `@four/core` | 3 | 0 |
-| `@four/math` (`packages/math/`) | (none) | 8 | 0 |
+| `@four/materials` (`packages/materials/`) | `@four/core`, `@four/math` | 3 | 0 |
+| `@four/math` (`packages/math/`) | (none) | 9 | 0 |
 | `@four/motion` (`packages/motion/`) | `@four/math`, `@four/core`, `@four/scene` | 14 | 0 |
-| `@four/particles` (`packages/particles/`) | `@four/math`, `@four/scene` | 8 | 0 |
+| `@four/particles` (`packages/particles/`) | `@four/math`, `@four/core`, `@four/scene` | 8 | 0 |
 | `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 15 | 0 |
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
 | `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/core`, `@four/math`, `@four/physics` | 6 | 0 |
@@ -167,10 +167,12 @@ graph LR
     P6 --> P8
     P6 --> P20
     P7 --> P2
+    P7 --> P8
     P9 --> P8
     P9 --> P2
     P9 --> P20
     P10 --> P8
+    P10 --> P2
     P10 --> P20
     P11 --> P2
     P11 --> P8
@@ -390,13 +392,15 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Quaternion, Vector2, Vector3, Vector4` |
+| `@four/math` | `Quaternion, Vector2, Vector3, Vector4, ColorRGBA` |
+| `@four/math` | `ColorRGBA` |
 
 **Exports:**
 - Interfaces: `ValueAdapter`
-- Types: `ValueKind`, `ColorRGBA`
+- Types: `ValueKind`
 - Functions: `discreteAdapterFor`, `detectAdapter`
 - Constants: `numberAdapter`, `vector2Adapter`, `vector3Adapter`, `vector4Adapter`, `quaternionAdapter`, `colorAdapter`, `booleanAdapter`, `discreteAdapter`
+- Re-exports: `ColorRGBA`
 
 ---
 
@@ -468,6 +472,13 @@ graph LR
 
 ---
 
+### `packages/core/src/conventions.ts` - Normative default constants shared across pillars (Appendix A, §7a).
+
+**Exports:**
+- Constants: `DEFAULT_GRAVITY_Y`
+
+---
+
 ### `packages/core/src/disposable.ts` - Explicit disposal (§83).
 
 **Exports:**
@@ -494,15 +505,19 @@ graph LR
 
 ---
 
-### `packages/core/src/index.ts` - Package entry point for @four/core (re-exports 14 symbols)
+### `packages/core/src/index.ts` - Package entry point for @four/core (re-exports 18 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./conventions.js` | `DEFAULT_GRAVITY_Y` | Re-export |
+| `./json.js` | `cloneJsonValue` | Re-export |
+| `./random.js` | `SeededRandom` | Re-export |
 | `./component.js` | `ComponentRegistry` | Re-export |
 | `./disposable.js` | `disposeAll` | Re-export |
 | `./errors.js` | `FourError, isFourError` | Re-export |
 | `./events.js` | `EventEmitter` | Re-export |
+| `./json.js` | `JsonValue` | Re-export (type-only) |
 | `./component.js` | `Component, ComponentHost, ComponentHostBinding, ComponentType` | Re-export (type-only) |
 | `./disposable.js` | `Disposable` | Re-export (type-only) |
 | `./errors.js` | `FourErrorCode, FourErrorOptions` | Re-export (type-only) |
@@ -510,7 +525,22 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `ComponentRegistry`, `disposeAll`, `FourError`, `isFourError`, `EventEmitter`, `Component`, `ComponentHost`, `ComponentHostBinding`, `ComponentType`, `Disposable`, `FourErrorCode`, `FourErrorOptions`, `EventListener`, `Unsubscribe`
+- Re-exports: `DEFAULT_GRAVITY_Y`, `cloneJsonValue`, `SeededRandom`, `ComponentRegistry`, `disposeAll`, `FourError`, `isFourError`, `EventEmitter`, `JsonValue`, `Component`, `ComponentHost`, `ComponentHostBinding`, `ComponentType`, `Disposable`, `FourErrorCode`, `FourErrorOptions`, `EventListener`, `Unsubscribe`
+
+---
+
+### `packages/core/src/json.ts` - JSON value typing and validation shared by every document format (§34, §79).
+
+**Exports:**
+- Types: `JsonValue`
+- Functions: `cloneJsonValue`
+
+---
+
+### `packages/core/src/random.ts` - Seeded pseudo-random numbers for deterministic engine code (§33, plan P8-3).
+
+**Exports:**
+- Classes: `SeededRandom`
 
 ---
 
@@ -587,13 +617,15 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@four/core` | `FourError, cloneJsonValue, JsonValue` |
+| `@four/core` | `cloneJsonValue` |
+| `@four/core` | `JsonValue` |
 
 **Exports:**
 - Interfaces: `ReplayInputRecord`, `ReplayFrameRecord`, `ReplaySnapshotRecord`, `ReplayAdapterIdentity`, `ReplayRecording`
-- Types: `JsonValue`
-- Functions: `encodeBase64`, `decodeBase64`, `cloneJsonValue`, `validateReplayRecording`, `encodeReplayRecording`, `decodeReplayRecording`, `assertReplayCompatible`, `isReplayCompatible`
+- Functions: `encodeBase64`, `decodeBase64`, `validateReplayRecording`, `encodeReplayRecording`, `decodeReplayRecording`, `assertReplayCompatible`, `isReplayCompatible`
 - Constants: `REPLAY_FORMAT_VERSION`
+- Re-exports: `cloneJsonValue`, `JsonValue`
 
 ---
 
@@ -1120,11 +1152,13 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/core` | `Disposable` |
+| `@four/math` | `ColorRGBA` |
+| `@four/math` | `ColorRGBA` |
 
 **Exports:**
 - Classes: `UnlitMaterial`
 - Interfaces: `UnlitMaterialOptions`
-- Types: `ColorRGBA`
+- Re-exports: `ColorRGBA`
 
 ---
 
@@ -1139,7 +1173,14 @@ graph LR
 
 ---
 
-### `packages/math/src/index.ts` - Package entry point for @four/math (re-exports 9 symbols)
+### `packages/math/src/color.ts` - The color value type shared by materials and animation (§60a, plan P4-2).
+
+**Exports:**
+- Types: `ColorRGBA`
+
+---
+
+### `packages/math/src/index.ts` - Package entry point for @four/math (re-exports 10 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1151,11 +1192,12 @@ graph LR
 | `./vector2.js` | `Vector2` | Re-export |
 | `./vector3.js` | `Vector3` | Re-export |
 | `./vector4.js` | `Vector4` | Re-export |
+| `./color.js` | `ColorRGBA` | Re-export (type-only) |
 | `./matrix4.js` | `DepthRange` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `constructionCount`, `resetConstructionCount`, `Matrix3`, `Matrix4`, `Quaternion`, `Vector2`, `Vector3`, `Vector4`, `DepthRange`
+- Re-exports: `constructionCount`, `resetConstructionCount`, `Matrix3`, `Matrix4`, `Quaternion`, `Vector2`, `Vector3`, `Vector4`, `ColorRGBA`, `DepthRange`
 
 ---
 
@@ -1375,10 +1417,15 @@ graph LR
 
 ---
 
-### `packages/motion/src/random.ts` - Seeded pseudo-random numbers for deterministic motion (§33, plan P8-3).
+### `packages/motion/src/random.ts` - `SeededRandom`'s original home (WP-8.2), now a re-export of `@four/core`.
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `SeededRandom` |
 
 **Exports:**
-- Classes: `SeededRandom`
+- Re-exports: `SeededRandom`
 
 ---
 
@@ -1489,7 +1536,9 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
+| `@four/core` | `DEFAULT_GRAVITY_Y` |
 | `@four/math` | `Vector3` |
+| `@four/core` | `DEFAULT_GRAVITY_Y` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1501,7 +1550,8 @@ graph LR
 - Interfaces: `RadialFieldOptions`, `VortexFieldOptions`, `TurbulenceFieldOptions`, `SphereFieldVolume`, `BoxFieldVolume`
 - Types: `FieldVolume`
 - Functions: `uniformGravityField`, `dragField`, `windField`, `radialField`, `vortexField`, `turbulenceField`, `volumeField`
-- Constants: `DEFAULT_GRAVITY_Y`, `DEFAULT_RADIAL_MIN_DISTANCE`, `DEFAULT_VORTEX_MIN_DISTANCE`, `DEFAULT_TURBULENCE_FREQUENCY`, `DEFAULT_TURBULENCE_AMPLITUDE`, `TURBULENCE_DIFFERENCE_CELLS`
+- Constants: `DEFAULT_RADIAL_MIN_DISTANCE`, `DEFAULT_VORTEX_MIN_DISTANCE`, `DEFAULT_TURBULENCE_FREQUENCY`, `DEFAULT_TURBULENCE_AMPLITUDE`, `TURBULENCE_DIFFERENCE_CELLS`
+- Re-exports: `DEFAULT_GRAVITY_Y`
 
 ---
 
@@ -1569,10 +1619,15 @@ graph LR
 
 ---
 
-### `packages/particles/src/random.ts` - Seeded pseudo-random numbers for deterministic particles (§33, §36, plan
+### `packages/particles/src/random.ts` - `SeededRandom` for particles — a re-export of `@four/core`.
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `SeededRandom` |
 
 **Exports:**
-- Classes: `SeededRandom`
+- Re-exports: `SeededRandom`
 
 ---
 
@@ -1642,7 +1697,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./descriptors.js` | `ColliderDescriptor` | Import (type-only) |
-| `./events.js` | `TriggerEvent` | Import (type-only) |
+| `./events.js` | `CollisionEvent, TriggerEvent` | Import (type-only) |
 | `./material.js` | `PhysicsMaterial` | Import (type-only) |
 | `./material.js` | `DEFAULT_FRICTION, DEFAULT_RESTITUTION, resolveDensity` | Import |
 | `./queries.js` | `ALL_COLLISION_GROUPS` | Import |
@@ -1655,7 +1710,7 @@ graph LR
 **Exports:**
 - Classes: `Collider`
 - Interfaces: `ColliderEventMap`
-- Types: `ColliderOptions`, `ColliderTriggerEvent`
+- Types: `ColliderOptions`, `ColliderTriggerEvent`, `RigidBodyCollisionEvent`
 
 ---
 
@@ -1664,10 +1719,11 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@four/core` | `DEFAULT_GRAVITY_Y, FourError` |
 | `@four/math` | `Quaternion, Vector3` |
 | `@four/math` | `Matrix3` |
 | `@four/scene` | `Transform` |
+| `@four/core` | `DEFAULT_GRAVITY_Y` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1681,7 +1737,8 @@ graph LR
 - Interfaces: `RigidBodyDescriptor`, `ColliderDescriptor`, `JointLimits`, `AngularJointMotor`, `LinearJointMotor`, `SphericalJointLimits`, `JointDescriptorBase`, `FixedJointDescriptor`, `RevoluteJointDescriptor`, `PrismaticJointDescriptor`, `RopeJointDescriptor`, `SpringJointDescriptor`, `SphericalJointDescriptor`, `PhysicsWorldOptions`
 - Types: `JointType`, `ShippedJointType`, `StagedJointType`, `JointDescriptor`
 - Functions: `jointTypeSupportsDimension`, `widenToVector3`, `resolveGravity`, `resolveRotation`, `resolveAngularVelocity`, `resolveSleepingConfig`
-- Constants: `DEFAULT_GRAVITY_Y`, `JOINT_TYPES`, `SHIPPED_JOINT_TYPES`, `SHIPPED_JOINT_TYPES_2D`, `SHIPPED_JOINT_TYPES_3D`, `STAGED_JOINT_TYPES`
+- Constants: `JOINT_TYPES`, `SHIPPED_JOINT_TYPES`, `SHIPPED_JOINT_TYPES_2D`, `SHIPPED_JOINT_TYPES_3D`, `STAGED_JOINT_TYPES`
+- Re-exports: `DEFAULT_GRAVITY_Y`
 
 ---
 
@@ -1722,21 +1779,21 @@ graph LR
 | `./world.js` | `POSE_TARGET_CAPTURE_PRIORITY, PhysicsWorld, createPoseTargetCaptureSystem` | Re-export |
 | `./adapter.js` | `PhysicsCapabilities, PhysicsQueryCapabilities, PhysicsSolverAdapter` | Re-export (type-only) |
 | `./body-access.js` | `SolverBodyAccess, SolverJointAccess, SolverJointMotor` | Re-export (type-only) |
-| `./collider.js` | `ColliderEventMap, ColliderOptions, ColliderTriggerEvent` | Re-export (type-only) |
+| `./collider.js` | `ColliderEventMap, ColliderOptions, ColliderTriggerEvent, RigidBodyCollisionEvent` | Re-export (type-only) |
 | `./descriptors.js` | `AngularJointMotor, ColliderDescriptor, FixedJointDescriptor, JointDescriptor, JointDescriptorBase, JointLimits, JointType, LinearJointMotor, PhysicsWorldOptions, PrismaticJointDescriptor, RevoluteJointDescriptor, RigidBodyDescriptor, RopeJointDescriptor, ShippedJointType, SphericalJointDescriptor, SphericalJointLimits, SpringJointDescriptor, StagedJointType` | Re-export (type-only) |
 | `./events.js` | `CollisionEvent, CollisionPhase, ContactPoint, JointBreakEvent, JointPhase, PhysicsEvent, PhysicsEventType, SleepEvent, SleepPhase, TriggerEvent, TriggerPhase` | Re-export (type-only) |
 | `./joints.js` | `HingeJointOptions, JointBinding, JointBreakPayload, JointCommands, JointEventMap, JointOptions, RopeJointOptions, SliderJointOptions, SphericalJointOptions, SpringJointOptions` | Re-export (type-only) |
 | `./material.js` | `PhysicsMaterialOptions` | Re-export (type-only) |
 | `./physics-system.js` | `PhysicsSystemOptions` | Re-export (type-only) |
 | `./queries.js` | `OverlapHit, OverlapQuery, PointHit, PointQuery, QueryCandidate, QueryFilter, QueryHit, QueryHitMode, QueryOptions, RaycastHit, RaycastQuery, ResolvedQueryOptions, ShapeCastHit, ShapeCastQuery` | Re-export (type-only) |
-| `./rigid-body.js` | `BlendWeights, PointLoad, RigidBodyCollisionEvent, RigidBodyCommands, RigidBodyEventMap, RigidBodySleepEvent, SleepCommand, TorqueInput` | Re-export (type-only) |
+| `./rigid-body.js` | `BlendWeights, PointLoad, RigidBodyCommands, RigidBodyEventMap, RigidBodySleepEvent, SleepCommand, TorqueInput` | Re-export (type-only) |
 | `./shapes.js` | `BoxShape, CapsuleShape, CircleShape, CollisionShape, CollisionShape2D, CollisionShape3D, CollisionShapeType, PolygonShape, RectangleShape, SphereShape` | Re-export (type-only) |
 | `./types.js` | `AngularVelocityInput, BodyType, CCDMode, CombineMode, DeterminismLevel, PhysicsBodyHandle, PhysicsColliderHandle, PhysicsDimension, PhysicsHandle, PhysicsJointHandle, RotationInput, SleepingConfig, Vector3Input` | Re-export (type-only) |
 | `./world.js` | `BodyControlModeOptions, PhysicsSnapshot, PhysicsWorldAdapter, PhysicsWorldInit, PoseTargetCaptureSystemOptions, WorldOverlapHit, WorldPhysicsEvent, WorldPointHit, WorldQueryHit, WorldRaycastHit, WorldShapeCastHit` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `missingSolverJointAccess`, `supportsSolverJointAccess`, `Collider`, `DEFAULT_GRAVITY_Y`, `JOINT_TYPES`, `SHIPPED_JOINT_TYPES`, `SHIPPED_JOINT_TYPES_2D`, `SHIPPED_JOINT_TYPES_3D`, `STAGED_JOINT_TYPES`, `jointTypeSupportsDimension`, `resolveAngularVelocity`, `resolveGravity`, `resolveRotation`, `resolveSleepingConfig`, `widenToVector3`, `BallJoint`, `FixedJoint`, `HingeJoint`, `Joint`, `PrismaticJoint`, `RevoluteJoint`, `RopeJoint`, `SliderJoint`, `SphericalJoint`, `SpringJoint`, `worldAnchorToLocal`, `worldAxisToLocal`, `PhysicsSystem`, `DEFAULT_DENSITY`, `DEFAULT_FRICTION`, `DEFAULT_FRICTION_COMBINE_MODE`, `DEFAULT_RESTITUTION`, `DEFAULT_RESTITUTION_COMBINE_MODE`, `PhysicsMaterial`, `combineFriction`, `combineRestitution`, `combineValues`, `resolveDensity`, `ALL_COLLISION_GROUPS`, `passesQueryFilter`, `resolveQueryOptions`, `sortHitsByDistance`, `RigidBody`, `COLLISION_SHAPE_TYPES_2D`, `COLLISION_SHAPE_TYPES_3D`, `shapeSupportsDimension`, `validateCollisionShape`, `BODY_TYPES`, `CCD_MODES`, `COMBINE_MODES`, `DEFAULT_CCD_MODE`, `DEFAULT_DETERMINISM_LEVEL`, `DEFAULT_ENABLED_CCD_MODE`, `DEFAULT_SLEEPING_CONFIG`, `DETERMINISM_LEVELS`, `PHYSICS_DIMENSIONS`, `validateAngularJointMotor`, `validateColliderDescriptor`, `validateInertiaTensor`, `validateJointBreakThreshold`, `validateJointDescriptor`, `validateJointLimits`, `validateLinearJointMotor`, `validateMass`, `validatePhysicsWorldOptions`, `validateRigidBodyDescriptor`, `validateSphericalJointLimits`, `POSE_TARGET_CAPTURE_PRIORITY`, `PhysicsWorld`, `createPoseTargetCaptureSystem`, `PhysicsCapabilities`, `PhysicsQueryCapabilities`, `PhysicsSolverAdapter`, `SolverBodyAccess`, `SolverJointAccess`, `SolverJointMotor`, `ColliderEventMap`, `ColliderOptions`, `ColliderTriggerEvent`, `AngularJointMotor`, `ColliderDescriptor`, `FixedJointDescriptor`, `JointDescriptor`, `JointDescriptorBase`, `JointLimits`, `JointType`, `LinearJointMotor`, `PhysicsWorldOptions`, `PrismaticJointDescriptor`, `RevoluteJointDescriptor`, `RigidBodyDescriptor`, `RopeJointDescriptor`, `ShippedJointType`, `SphericalJointDescriptor`, `SphericalJointLimits`, `SpringJointDescriptor`, `StagedJointType`, `CollisionEvent`, `CollisionPhase`, `ContactPoint`, `JointBreakEvent`, `JointPhase`, `PhysicsEvent`, `PhysicsEventType`, `SleepEvent`, `SleepPhase`, `TriggerEvent`, `TriggerPhase`, `HingeJointOptions`, `JointBinding`, `JointBreakPayload`, `JointCommands`, `JointEventMap`, `JointOptions`, `RopeJointOptions`, `SliderJointOptions`, `SphericalJointOptions`, `SpringJointOptions`, `PhysicsMaterialOptions`, `PhysicsSystemOptions`, `OverlapHit`, `OverlapQuery`, `PointHit`, `PointQuery`, `QueryCandidate`, `QueryFilter`, `QueryHit`, `QueryHitMode`, `QueryOptions`, `RaycastHit`, `RaycastQuery`, `ResolvedQueryOptions`, `ShapeCastHit`, `ShapeCastQuery`, `BlendWeights`, `PointLoad`, `RigidBodyCollisionEvent`, `RigidBodyCommands`, `RigidBodyEventMap`, `RigidBodySleepEvent`, `SleepCommand`, `TorqueInput`, `BoxShape`, `CapsuleShape`, `CircleShape`, `CollisionShape`, `CollisionShape2D`, `CollisionShape3D`, `CollisionShapeType`, `PolygonShape`, `RectangleShape`, `SphereShape`, `AngularVelocityInput`, `BodyType`, `CCDMode`, `CombineMode`, `DeterminismLevel`, `PhysicsBodyHandle`, `PhysicsColliderHandle`, `PhysicsDimension`, `PhysicsHandle`, `PhysicsJointHandle`, `RotationInput`, `SleepingConfig`, `Vector3Input`, `BodyControlModeOptions`, `PhysicsSnapshot`, `PhysicsWorldAdapter`, `PhysicsWorldInit`, `PoseTargetCaptureSystemOptions`, `WorldOverlapHit`, `WorldPhysicsEvent`, `WorldPointHit`, `WorldQueryHit`, `WorldRaycastHit`, `WorldShapeCastHit`
+- Re-exports: `missingSolverJointAccess`, `supportsSolverJointAccess`, `Collider`, `DEFAULT_GRAVITY_Y`, `JOINT_TYPES`, `SHIPPED_JOINT_TYPES`, `SHIPPED_JOINT_TYPES_2D`, `SHIPPED_JOINT_TYPES_3D`, `STAGED_JOINT_TYPES`, `jointTypeSupportsDimension`, `resolveAngularVelocity`, `resolveGravity`, `resolveRotation`, `resolveSleepingConfig`, `widenToVector3`, `BallJoint`, `FixedJoint`, `HingeJoint`, `Joint`, `PrismaticJoint`, `RevoluteJoint`, `RopeJoint`, `SliderJoint`, `SphericalJoint`, `SpringJoint`, `worldAnchorToLocal`, `worldAxisToLocal`, `PhysicsSystem`, `DEFAULT_DENSITY`, `DEFAULT_FRICTION`, `DEFAULT_FRICTION_COMBINE_MODE`, `DEFAULT_RESTITUTION`, `DEFAULT_RESTITUTION_COMBINE_MODE`, `PhysicsMaterial`, `combineFriction`, `combineRestitution`, `combineValues`, `resolveDensity`, `ALL_COLLISION_GROUPS`, `passesQueryFilter`, `resolveQueryOptions`, `sortHitsByDistance`, `RigidBody`, `COLLISION_SHAPE_TYPES_2D`, `COLLISION_SHAPE_TYPES_3D`, `shapeSupportsDimension`, `validateCollisionShape`, `BODY_TYPES`, `CCD_MODES`, `COMBINE_MODES`, `DEFAULT_CCD_MODE`, `DEFAULT_DETERMINISM_LEVEL`, `DEFAULT_ENABLED_CCD_MODE`, `DEFAULT_SLEEPING_CONFIG`, `DETERMINISM_LEVELS`, `PHYSICS_DIMENSIONS`, `validateAngularJointMotor`, `validateColliderDescriptor`, `validateInertiaTensor`, `validateJointBreakThreshold`, `validateJointDescriptor`, `validateJointLimits`, `validateLinearJointMotor`, `validateMass`, `validatePhysicsWorldOptions`, `validateRigidBodyDescriptor`, `validateSphericalJointLimits`, `POSE_TARGET_CAPTURE_PRIORITY`, `PhysicsWorld`, `createPoseTargetCaptureSystem`, `PhysicsCapabilities`, `PhysicsQueryCapabilities`, `PhysicsSolverAdapter`, `SolverBodyAccess`, `SolverJointAccess`, `SolverJointMotor`, `ColliderEventMap`, `ColliderOptions`, `ColliderTriggerEvent`, `RigidBodyCollisionEvent`, `AngularJointMotor`, `ColliderDescriptor`, `FixedJointDescriptor`, `JointDescriptor`, `JointDescriptorBase`, `JointLimits`, `JointType`, `LinearJointMotor`, `PhysicsWorldOptions`, `PrismaticJointDescriptor`, `RevoluteJointDescriptor`, `RigidBodyDescriptor`, `RopeJointDescriptor`, `ShippedJointType`, `SphericalJointDescriptor`, `SphericalJointLimits`, `SpringJointDescriptor`, `StagedJointType`, `CollisionEvent`, `CollisionPhase`, `ContactPoint`, `JointBreakEvent`, `JointPhase`, `PhysicsEvent`, `PhysicsEventType`, `SleepEvent`, `SleepPhase`, `TriggerEvent`, `TriggerPhase`, `HingeJointOptions`, `JointBinding`, `JointBreakPayload`, `JointCommands`, `JointEventMap`, `JointOptions`, `RopeJointOptions`, `SliderJointOptions`, `SphericalJointOptions`, `SpringJointOptions`, `PhysicsMaterialOptions`, `PhysicsSystemOptions`, `OverlapHit`, `OverlapQuery`, `PointHit`, `PointQuery`, `QueryCandidate`, `QueryFilter`, `QueryHit`, `QueryHitMode`, `QueryOptions`, `RaycastHit`, `RaycastQuery`, `ResolvedQueryOptions`, `ShapeCastHit`, `ShapeCastQuery`, `BlendWeights`, `PointLoad`, `RigidBodyCommands`, `RigidBodyEventMap`, `RigidBodySleepEvent`, `SleepCommand`, `TorqueInput`, `BoxShape`, `CapsuleShape`, `CircleShape`, `CollisionShape`, `CollisionShape2D`, `CollisionShape3D`, `CollisionShapeType`, `PolygonShape`, `RectangleShape`, `SphereShape`, `AngularVelocityInput`, `BodyType`, `CCDMode`, `CombineMode`, `DeterminismLevel`, `PhysicsBodyHandle`, `PhysicsColliderHandle`, `PhysicsDimension`, `PhysicsHandle`, `PhysicsJointHandle`, `RotationInput`, `SleepingConfig`, `Vector3Input`, `BodyControlModeOptions`, `PhysicsSnapshot`, `PhysicsWorldAdapter`, `PhysicsWorldInit`, `PoseTargetCaptureSystemOptions`, `WorldOverlapHit`, `WorldPhysicsEvent`, `WorldPointHit`, `WorldQueryHit`, `WorldRaycastHit`, `WorldShapeCastHit`
 
 ---
 
@@ -1839,10 +1896,9 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
-| `./collider.js` | `Collider` | Import (type-only) |
 | `./descriptors.js` | `RigidBodyDescriptor` | Import (type-only) |
 | `./descriptors.js` | `resolveAngularVelocity, resolveRotation, widenToVector3` | Import |
-| `./events.js` | `CollisionEvent, SleepEvent` | Import (type-only) |
+| `./events.js` | `SleepEvent` | Import (type-only) |
 | `./types.js` | `BodyType, CCDMode, PhysicsDimension, Vector3Input` | Import (type-only) |
 | `./types.js` | `DEFAULT_CCD_MODE, DEFAULT_ENABLED_CCD_MODE` | Import |
 | `./validation.js` | `validateMass, validateRigidBodyDescriptor` | Import |
@@ -1850,7 +1906,7 @@ graph LR
 **Exports:**
 - Classes: `RigidBody`
 - Interfaces: `BlendWeights`, `PointLoad`, `RigidBodyCommands`, `RigidBodyEventMap`
-- Types: `TorqueInput`, `SleepCommand`, `RigidBodyCollisionEvent`, `RigidBodySleepEvent`
+- Types: `TorqueInput`, `SleepCommand`, `RigidBodySleepEvent`
 - Functions: `clearRigidBodyCommands`, `setRigidBodySleeping`
 
 ---
@@ -1929,14 +1985,14 @@ graph LR
 | `./body-access.js` | `SolverBodyAccess, SolverJointAccess` | Import (type-only) |
 | `./body-access.js` | `missingSolverJointAccess, supportsSolverJointAccess` | Import |
 | `./collider.js` | `Collider` | Import |
-| `./collider.js` | `ColliderTriggerEvent` | Import (type-only) |
+| `./collider.js` | `ColliderTriggerEvent, RigidBodyCollisionEvent` | Import (type-only) |
 | `./descriptors.js` | `PhysicsWorldOptions` | Import (type-only) |
 | `./descriptors.js` | `resolveGravity, resolveSleepingConfig` | Import |
 | `./events.js` | `JointBreakEvent, PhysicsEvent` | Import (type-only) |
 | `./joints.js` | `Joint, JointBinding, JointBreakPayload` | Import (type-only) |
 | `./joints.js` | `bindJoint, clearJointCommands, readJointLimits, readJointMotor, setJointBroken, unbindJoint, worldAnchorToLocal, worldAxisToLocal` | Import |
 | `./queries.js` | `OverlapQuery, PointQuery, QueryOptions, RaycastQuery, ShapeCastQuery` | Import (type-only) |
-| `./rigid-body.js` | `BlendWeights, RigidBodyCollisionEvent, RigidBodySleepEvent` | Import (type-only) |
+| `./rigid-body.js` | `BlendWeights, RigidBodySleepEvent` | Import (type-only) |
 | `./rigid-body.js` | `RigidBody, clearRigidBodyCommands, setRigidBodySleeping` | Import |
 | `./shapes.js` | `CollisionShape` | Import (type-only) |
 | `./types.js` | `BodyType, DeterminismLevel, PhysicsBodyHandle, PhysicsColliderHandle, PhysicsDimension, PhysicsJointHandle, RotationInput, SleepingConfig, Vector3Input` | Import (type-only) |
@@ -2043,7 +2099,7 @@ graph LR
 | `@dimforge/rapier3d-compat` | `* as RAPIER3D_UNTYPED` |
 
 **Exports:**
-- Interfaces: `RapierVector`, `RapierRigidBodyTypes`, `RapierActiveEvents`, `RapierActiveCollisionTypes`, `RapierCoefficientCombineRules`, `RapierPointProjection`, `RapierRay`, `RapierRayColliderIntersection`, `RapierColliderShapeCastHit`, `RapierRigidBody`, `RapierRigidBodyDesc`, `RapierCollider`, `RapierColliderDesc`, `RapierMotorModels`, `RapierImpulseJoint`, `RapierUnitImpulseJoint`, `RapierEventQueue`, `RapierContactManifold`, `RapierNarrowPhase`, `RapierWorld`, `Rapier2dModule`, `RapierVector3`, `RapierRotation3`, `RapierRigidBodyTypes3d`, `RapierActiveEvents3d`, `RapierActiveCollisionTypes3d`, `RapierCoefficientCombineRules3d`, `RapierPointProjection3d`, `RapierRay3d`, `RapierRayColliderIntersection3d`, `RapierColliderShapeCastHit3d`, `RapierRigidBody3d`, `RapierRigidBodyDesc3d`, `RapierCollider3d`, `RapierColliderDesc3d`, `RapierEventQueue3d`, `RapierContactManifold3d`, `RapierNarrowPhase3d`, `RapierWorld3d`, `Rapier3dModule`
+- Interfaces: `RapierVector`, `RapierRigidBody`, `RapierRigidBodyDesc`, `RapierCollider`, `RapierColliderDesc`, `RapierImpulseJoint`, `RapierUnitImpulseJoint`, `RapierEventQueue`, `RapierWorld`, `Rapier2dModule`, `RapierVector3`, `RapierRotation3`, `RapierRigidBody3d`, `RapierRigidBodyDesc3d`, `RapierCollider3d`, `RapierColliderDesc3d`, `RapierEventQueue3d`, `RapierWorld3d`, `Rapier3dModule`
 - Types: `RapierShape`, `RapierJointData`, `RapierShape3d`
 - Functions: `initializeRapier2d`, `rapier2dModule`, `rapier2dVersion`, `initializeRapier3d`, `rapier3dModule`, `rapier3dVersion`
 - Constants: `RAPIER_2D`, `RAPIER_3D`
@@ -2400,12 +2456,8 @@ graph LR
 
 ### `packages/scene/src/authority.ts` - Transform authority (§42).
 
-**Internal Dependencies:**
-| File | Imports | Type |
-|------|---------|------|
-| `./node.js` | `Node` | Import (type-only) |
-
 **Exports:**
+- Interfaces: `AuthorityNode`
 - Types: `TransformAuthority`
 - Functions: `warnAuthorityConflict`
 - Constants: `TRANSFORM_AUTHORITIES`, `DEFAULT_TRANSFORM_AUTHORITY`
@@ -2443,7 +2495,7 @@ graph LR
 
 ---
 
-### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 27 symbols)
+### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 28 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2458,7 +2510,7 @@ graph LR
 | `./transform.js` | `Transform` | Re-export |
 | `./viewport.js` | `createFullscreenViewport` | Re-export |
 | `./world-transforms.js` | `resolveWorldTransform, resolveWorldTransforms` | Re-export |
-| `./authority.js` | `TransformAuthority` | Re-export (type-only) |
+| `./authority.js` | `AuthorityNode, TransformAuthority` | Re-export (type-only) |
 | `./camera.js` | `OrthographicCameraOptions, PerspectiveCameraOptions` | Re-export (type-only) |
 | `./interpolation.js` | `PoseSnapshotSystem, SnapshotSystemOptions` | Re-export (type-only) |
 | `./node.js` | `NodeEventMap, NodeHierarchyEvent, NodeType` | Re-export (type-only) |
@@ -2467,7 +2519,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DEFAULT_TRANSFORM_AUTHORITY`, `TRANSFORM_AUTHORITIES`, `warnAuthorityConflict`, `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Group`, `POSE_SNAPSHOT_PRIORITY`, `PoseBuffer`, `createSnapshotSystem`, `Node`, `PoseTarget`, `Scene`, `Transform`, `createFullscreenViewport`, `resolveWorldTransform`, `resolveWorldTransforms`, `TransformAuthority`, `OrthographicCameraOptions`, `PerspectiveCameraOptions`, `PoseSnapshotSystem`, `SnapshotSystemOptions`, `NodeEventMap`, `NodeHierarchyEvent`, `NodeType`, `Viewport`, `WorldTransformStats`
+- Re-exports: `DEFAULT_TRANSFORM_AUTHORITY`, `TRANSFORM_AUTHORITIES`, `warnAuthorityConflict`, `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Group`, `POSE_SNAPSHOT_PRIORITY`, `PoseBuffer`, `createSnapshotSystem`, `Node`, `PoseTarget`, `Scene`, `Transform`, `createFullscreenViewport`, `resolveWorldTransform`, `resolveWorldTransforms`, `AuthorityNode`, `TransformAuthority`, `OrthographicCameraOptions`, `PerspectiveCameraOptions`, `PoseSnapshotSystem`, `SnapshotSystemOptions`, `NodeEventMap`, `NodeHierarchyEvent`, `NodeType`, `Viewport`, `WorldTransformStats`
 
 ---
 
@@ -2598,14 +2650,17 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
+| `@four/core` | `FourError, cloneJsonValue, JsonValue` |
 | `@four/scene` | `DEFAULT_TRANSFORM_AUTHORITY, TRANSFORM_AUTHORITIES, TransformAuthority` |
+| `@four/core` | `cloneJsonValue` |
+| `@four/core` | `JsonValue` |
 
 **Exports:**
 - Interfaces: `Vector3Document`, `QuaternionDocument`, `TransformDocument`, `ComponentDocument`, `SceneNodeDocument`, `SceneDocument`
-- Types: `JsonValue`, `JsonObject`
-- Functions: `cloneJsonValue`, `validateVector3Document`, `validateQuaternionDocument`, `isJsonArray`, `isJsonObject`, `asJsonObject`, `validateSceneDocument`, `encodeSceneDocument`, `decodeSceneDocument`
+- Types: `JsonObject`
+- Functions: `validateVector3Document`, `validateQuaternionDocument`, `isJsonArray`, `isJsonObject`, `asJsonObject`, `validateSceneDocument`, `encodeSceneDocument`, `decodeSceneDocument`
 - Constants: `SCENE_FORMAT_VERSION`
+- Re-exports: `cloneJsonValue`, `JsonValue`
 
 ---
 
@@ -2838,16 +2893,17 @@ graph LR
 | `packages/motion/src/index` | 13 files | 0 files |
 | `packages/physics/src/types` | 0 files | 13 files |
 | `packages/physics/src/world` | 11 files | 2 files |
-| `packages/physics/src/collider` | 8 files | 3 files |
+| `packages/physics/src/collider` | 8 files | 2 files |
 | `packages/physics/src/descriptors` | 3 files | 7 files |
 | `packages/scene/src/index` | 10 files | 0 files |
 | `packages/animation/src/index` | 9 files | 0 files |
-| `packages/physics/src/rigid-body` | 5 files | 4 files |
-| `packages/scene/src/node` | 2 files | 7 files |
+| `packages/math/src/index` | 8 files | 0 files |
 | `packages/physics/src/joints` | 6 files | 2 files |
+| `packages/physics/src/rigid-body` | 4 files | 4 files |
 | `packages/physics/src/validation` | 3 files | 5 files |
+| `packages/scene/src/node` | 2 files | 6 files |
+| `packages/core/src/index` | 7 files | 0 files |
 | `packages/math/src/alloc-counter` | 0 files | 7 files |
-| `packages/math/src/index` | 7 files | 0 files |
 | `packages/particles/src/index` | 7 files | 0 files |
 | `packages/physics/src/events` | 1 file | 6 files |
 | `packages/physics/src/shapes` | 1 file | 6 files |
@@ -2867,7 +2923,6 @@ graph LR
 | `packages/render-webgl/src/webgl-renderer` | 4 files | 1 file |
 | `packages/animation/src/binding` | 1 file | 3 files |
 | `packages/animation/src/track` | 1 file | 3 files |
-| `packages/core/src/index` | 4 files | 0 files |
 | `packages/input/src/drag` | 3 files | 1 file |
 | `packages/input/src/index` | 4 files | 0 files |
 | `packages/input/src/pointer-input` | 2 files | 2 files |
@@ -2880,18 +2935,7 @@ graph LR
 <a id="circular-dependency-analysis"></a>
 ## Circular Dependency Analysis
 
-**2 circular dependencies detected:**
-
-- **Runtime cycles**: 0 (require attention)
-- **Type-only cycles**: 2 (safe, no runtime impact)
-
-### Type-Only Circular Dependencies
-
-These cycles only involve type imports and are safe (erased at runtime):
-
-- packages/physics/src/collider.ts -> packages/physics/src/rigid-body.ts -> packages/physics/src/collider.ts
-- packages/scene/src/authority.ts -> packages/scene/src/node.ts -> packages/scene/src/authority.ts
-
+**No circular dependencies detected.**
 ---
 
 <a id="visual-dependency-graph"></a>
@@ -2920,187 +2964,191 @@ graph TD
 
     subgraph Packages/core
         N13[component]
-        N14[disposable]
-        N15[errors]
-        N16[events]
-        N17[index]
+        N14[conventions]
+        N15[disposable]
+        N16[errors]
+        N17[events]
+        N18[index]
+        N19[json]
+        N20[random]
     end
 
     subgraph Packages/diagnostics
-        N18[checksum]
-        N19[debug-draw]
-        N20[index]
-        N21[recorder]
-        N22[replay-format]
-        N23[replay-player]
+        N21[checksum]
+        N22[debug-draw]
+        N23[index]
+        N24[recorder]
+        N25[replay-format]
+        N26[replay-player]
     end
 
     subgraph Packages/four
-        N24[animation]
-        N25[application]
-        N26[assets]
-        N27[core]
-        N28[diagnostics]
-        N29[geometry]
-        N30[index]
-        N31[input]
-        N32[materials]
-        N33[math]
-        N34[...15 more]
+        N27[animation]
+        N28[application]
+        N29[assets]
+        N30[core]
+        N31[diagnostics]
+        N32[geometry]
+        N33[index]
+        N34[input]
+        N35[materials]
+        N36[math]
+        N37[...15 more]
     end
 
     subgraph Packages/geometry
-        N35[buffer-geometry]
-        N36[index]
-        N37[primitives]
+        N38[buffer-geometry]
+        N39[index]
+        N40[primitives]
     end
 
     subgraph Packages/input
-        N38[drag]
-        N39[index]
-        N40[pick]
-        N41[pointer-events]
-        N42[pointer-input]
+        N41[drag]
+        N42[index]
+        N43[pick]
+        N44[pointer-events]
+        N45[pointer-input]
     end
 
     subgraph Packages/materials
-        N43[index]
-        N44[sprite-material]
-        N45[unlit-material]
+        N46[index]
+        N47[sprite-material]
+        N48[unlit-material]
     end
 
     subgraph Packages/math
-        N46[alloc-counter]
-        N47[index]
-        N48[matrix3]
-        N49[matrix4]
-        N50[quaternion]
-        N51[vector2]
-        N52[vector3]
-        N53[vector4]
+        N49[alloc-counter]
+        N50[color]
+        N51[index]
+        N52[matrix3]
+        N53[matrix4]
+        N54[quaternion]
+        N55[vector2]
+        N56[vector3]
+        N57[vector4]
     end
 
     subgraph Packages/motion
-        N54[clock]
-        N55[ik]
-        N56[index]
-        N57[integrators]
-        N58[kinematic-controller]
-        N59[motion-component]
-        N60[pid]
-        N61[prediction]
-        N62[random]
-        N63[scheduler]
-        N64[...4 more]
+        N58[clock]
+        N59[ik]
+        N60[index]
+        N61[integrators]
+        N62[kinematic-controller]
+        N63[motion-component]
+        N64[pid]
+        N65[prediction]
+        N66[random]
+        N67[scheduler]
+        N68[...4 more]
     end
 
     subgraph Packages/particles
-        N65[emitter]
-        N66[fields]
-        N67[index]
-        N68[particle-renderable]
-        N69[particle-system]
-        N70[pool]
-        N71[random]
-        N72[types]
+        N69[emitter]
+        N70[fields]
+        N71[index]
+        N72[particle-renderable]
+        N73[particle-system]
+        N74[pool]
+        N75[random]
+        N76[types]
     end
 
     subgraph Packages/physics
-        N73[adapter]
-        N74[body-access]
-        N75[collider]
-        N76[descriptors]
-        N77[events]
-        N78[index]
-        N79[joints]
-        N80[material]
-        N81[physics-system]
-        N82[queries]
-        N83[...5 more]
+        N77[adapter]
+        N78[body-access]
+        N79[collider]
+        N80[descriptors]
+        N81[events]
+        N82[index]
+        N83[joints]
+        N84[material]
+        N85[physics-system]
+        N86[queries]
+        N87[...5 more]
     end
 
     subgraph Packages/physics-box2d
-        N84[index]
+        N88[index]
     end
 
     subgraph Packages/physics-rapier
-        N85[conversions2d]
-        N86[conversions3d]
-        N87[index]
-        N88[init]
-        N89[rapier2d-adapter]
-        N90[rapier3d-adapter]
+        N89[conversions2d]
+        N90[conversions3d]
+        N91[index]
+        N92[init]
+        N93[rapier2d-adapter]
+        N94[rapier3d-adapter]
     end
 
     subgraph Packages/physics-soft
-        N91[index]
+        N95[index]
     end
 
     subgraph Packages/render
-        N92[index]
-        N93[particles]
-        N94[render-list]
-        N95[renderable]
-        N96[renderer]
-        N97[sprite]
-        N98[texture]
+        N96[index]
+        N97[particles]
+        N98[render-list]
+        N99[renderable]
+        N100[renderer]
+        N101[sprite]
+        N102[texture]
     end
 
     subgraph Packages/render-canvas
-        N99[index]
+        N103[index]
     end
 
     subgraph Packages/render-svg
-        N100[index]
+        N104[index]
     end
 
     subgraph Packages/render-webgl
-        N101[gl-geometry]
-        N102[gl-particles]
-        N103[gl-program]
-        N104[gl-texture]
-        N105[index]
-        N106[webgl-renderer]
+        N105[gl-geometry]
+        N106[gl-particles]
+        N107[gl-program]
+        N108[gl-texture]
+        N109[index]
+        N110[webgl-renderer]
     end
 
     subgraph Packages/render-webgpu
-        N107[index]
+        N111[index]
     end
 
     subgraph Packages/scene
-        N108[authority]
-        N109[camera]
-        N110[group]
-        N111[index]
-        N112[interpolation]
-        N113[node]
-        N114[pose-target]
-        N115[scene]
-        N116[transform]
-        N117[viewport]
-        N118[...1 more]
+        N112[authority]
+        N113[camera]
+        N114[group]
+        N115[index]
+        N116[interpolation]
+        N117[node]
+        N118[pose-target]
+        N119[scene]
+        N120[transform]
+        N121[viewport]
+        N122[...1 more]
     end
 
     subgraph Packages/serialization
-        N119[format]
-        N120[index]
-        N121[migration]
-        N122[serializer]
+        N123[format]
+        N124[index]
+        N125[migration]
+        N126[serializer]
     end
 
     subgraph Packages/text
-        N123[bitmap-font]
-        N124[glyph-atlas]
-        N125[index]
-        N126[text-layout]
+        N127[bitmap-font]
+        N128[glyph-atlas]
+        N129[index]
+        N130[text-layout]
     end
 
     subgraph Packages/ui
-        N127[button]
-        N128[index]
-        N129[label]
-        N130[panel]
-        N131[widget]
+        N131[button]
+        N132[index]
+        N133[label]
+        N134[panel]
+        N135[widget]
     end
 
     N1 --> N9
@@ -3126,58 +3174,58 @@ graph TD
     N11 --> N10
     N11 --> N12
     N12 --> N10
-    N13 --> N15
-    N17 --> N13
-    N17 --> N14
-    N17 --> N15
-    N17 --> N16
-    N20 --> N18
-    N20 --> N21
-    N20 --> N22
-    N20 --> N23
-    N20 --> N19
-    N21 --> N22
+    N13 --> N16
+    N18 --> N14
+    N18 --> N19
+    N18 --> N20
+    N18 --> N13
+    N18 --> N15
+    N18 --> N16
+    N18 --> N17
     N23 --> N21
+    N23 --> N24
+    N23 --> N25
+    N23 --> N26
     N23 --> N22
-    N30 --> N25
-    N36 --> N35
-    N36 --> N37
-    N37 --> N35
-    N38 --> N40
-    N38 --> N41
-    N38 --> N42
+    N24 --> N25
+    N26 --> N24
+    N26 --> N25
+    N33 --> N28
     N39 --> N38
     N39 --> N40
-    N39 --> N41
-    N39 --> N42
-    N42 --> N40
+    N40 --> N38
+    N41 --> N43
+    N41 --> N44
+    N41 --> N45
     N42 --> N41
-    N43 --> N44
-    N43 --> N45
-    N44 --> N45
-    N47 --> N46
+    N42 --> N43
+    N42 --> N44
+    N42 --> N45
+    N45 --> N43
+    N45 --> N44
+    N46 --> N47
+    N46 --> N48
     N47 --> N48
-    N47 --> N49
-    N47 --> N50
-    N47 --> N51
-    N47 --> N52
-    N47 --> N53
-    N48 --> N46
-    N49 --> N46
-    N49 --> N50
-    N49 --> N52
-    N50 --> N46
-    N50 --> N52
-    N51 --> N46
-    N52 --> N46
-    N53 --> N46
-    N56 --> N54
-    N56 --> N55
-    N56 --> N57
-    N56 --> N58
-    N56 --> N59
-    N56 --> N60
-    N56 --> N61
+    N51 --> N49
+    N51 --> N52
+    N51 --> N53
+    N51 --> N54
+    N51 --> N55
+    N51 --> N56
+    N51 --> N57
+    N51 --> N50
+    N52 --> N49
+    N53 --> N49
+    N53 --> N54
+    N53 --> N56
+    N54 --> N49
+    N54 --> N56
+    N55 --> N49
+    N56 --> N49
+    N57 --> N49
+    N60 --> N58
+    N60 --> N59
+    N60 --> N61
 ```
 
 ---
@@ -3187,19 +3235,19 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 153 |
+| Total TypeScript Files | 157 |
 | Total Modules | 24 |
-| Total Lines of Code | 55398 |
-| Total Exports | 1198 |
-| Total Re-exports | 782 |
-| Total Classes | 89 |
-| Total Interfaces | 287 |
-| Total Functions | 177 |
+| Total Lines of Code | 55214 |
+| Total Exports | 1211 |
+| Total Re-exports | 798 |
+| Total Classes | 88 |
+| Total Interfaces | 267 |
+| Total Functions | 176 |
 | Total Type Guards | 10 |
 | Total Enums | 0 |
 | Type-only Imports | 167 |
 | Runtime Circular Deps | 0 |
-| Type-only Circular Deps | 2 |
+| Type-only Circular Deps | 0 |
 
 ---
 

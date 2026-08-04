@@ -122,7 +122,7 @@ export interface RapierVector {
  * Transcribed values: `Dynamic = 0`, `Fixed = 1`, `KinematicPositionBased = 2`,
  * `KinematicVelocityBased = 3`.
  */
-export interface RapierRigidBodyTypes {
+interface RapierRigidBodyTypes {
   readonly Dynamic: number;
   readonly Fixed: number;
   readonly KinematicPositionBased: number;
@@ -130,20 +130,20 @@ export interface RapierRigidBodyTypes {
 }
 
 /** `pipeline/event_queue.d.ts`: `ActiveEvents` (`NONE`, `COLLISION_EVENTS`, `CONTACT_FORCE_EVENTS`). */
-export interface RapierActiveEvents {
+interface RapierActiveEvents {
   readonly NONE: number;
   readonly COLLISION_EVENTS: number;
   readonly CONTACT_FORCE_EVENTS: number;
 }
 
 /** `geometry/collider.d.ts`: `ActiveCollisionTypes` — only `DEFAULT` and `ALL` are used. */
-export interface RapierActiveCollisionTypes {
+interface RapierActiveCollisionTypes {
   readonly DEFAULT: number;
   readonly ALL: number;
 }
 
 /** `dynamics/coefficient_combine_rule.d.ts`: `Average = 0`, `Min = 1`, `Multiply = 2`, `Max = 3`. */
-export interface RapierCoefficientCombineRules {
+interface RapierCoefficientCombineRules {
   readonly Average: number;
   readonly Min: number;
   readonly Multiply: number;
@@ -154,26 +154,26 @@ export interface RapierCoefficientCombineRules {
 export type RapierShape = object;
 
 /** `geometry/point.d.ts`: `PointProjection` / `PointColliderProjection`. */
-export interface RapierPointProjection {
+interface RapierPointProjection {
   readonly point: RapierVector;
   readonly isInside: boolean;
 }
 
 /** `geometry/ray.d.ts`: `Ray`. */
-export interface RapierRay {
+interface RapierRay {
   readonly origin: RapierVector;
   readonly dir: RapierVector;
 }
 
 /** `geometry/ray.d.ts`: `RayColliderIntersection` (a hit plus its normal). */
-export interface RapierRayColliderIntersection {
+interface RapierRayColliderIntersection {
   readonly collider: RapierCollider;
   readonly timeOfImpact: number;
   readonly normal: RapierVector;
 }
 
 /** `geometry/toi.d.ts`: `ColliderShapeCastHit`. `time_of_impact` is snake_case upstream. */
-export interface RapierColliderShapeCastHit {
+interface RapierColliderShapeCastHit {
   readonly collider: RapierCollider;
   readonly time_of_impact: number;
   readonly witness1: RapierVector;
@@ -301,7 +301,7 @@ export interface RapierColliderDesc {
  * out. `Rapier2dAdapter` uses `ForceBased`, because §28's motor is specified
  * with a torque and a force.
  */
-export interface RapierMotorModels {
+interface RapierMotorModels {
   readonly AccelerationBased: number;
   readonly ForceBased: number;
 }
@@ -361,7 +361,7 @@ export interface RapierEventQueue {
 }
 
 /** `geometry/narrow_phase.d.ts`: `TempContactManifold`, the §29 contact source. */
-export interface RapierContactManifold {
+interface RapierContactManifold {
   normal(): RapierVector;
   numContacts(): number;
   localContactPoint1(index: number): RapierVector | null;
@@ -371,7 +371,7 @@ export interface RapierContactManifold {
 }
 
 /** `geometry/narrow_phase.d.ts`: the members of `NarrowPhase` this package calls. */
-export interface RapierNarrowPhase {
+interface RapierNarrowPhase {
   contactPair(
     collider1: number,
     collider2: number,
@@ -645,7 +645,7 @@ export interface RapierRotation3 {
  * `KinematicVelocityBased = 3` — the same four values, in the same order, as the
  * 2D build (verified against the installed 3D `.d.ts`, not assumed).
  */
-export interface RapierRigidBodyTypes3d {
+interface RapierRigidBodyTypes3d {
   readonly Dynamic: number;
   readonly Fixed: number;
   readonly KinematicPositionBased: number;
@@ -653,7 +653,7 @@ export interface RapierRigidBodyTypes3d {
 }
 
 /** `pipeline/event_queue.d.ts`: `ActiveEvents` (`NONE = 0`, `COLLISION_EVENTS = 1`, `CONTACT_FORCE_EVENTS = 2`). */
-export interface RapierActiveEvents3d {
+interface RapierActiveEvents3d {
   readonly NONE: number;
   readonly COLLISION_EVENTS: number;
   readonly CONTACT_FORCE_EVENTS: number;
@@ -665,13 +665,13 @@ export interface RapierActiveEvents3d {
  * excludes the kinematic-vs-fixed pair exactly as it does in 2D (verified: a
  * fixed sensor sees a kinematic body only once `ALL` is set).
  */
-export interface RapierActiveCollisionTypes3d {
+interface RapierActiveCollisionTypes3d {
   readonly DEFAULT: number;
   readonly ALL: number;
 }
 
 /** `dynamics/coefficient_combine_rule.d.ts`: `Average = 0`, `Min = 1`, `Multiply = 2`, `Max = 3`. */
-export interface RapierCoefficientCombineRules3d {
+interface RapierCoefficientCombineRules3d {
   readonly Average: number;
   readonly Min: number;
   readonly Multiply: number;
@@ -682,26 +682,26 @@ export interface RapierCoefficientCombineRules3d {
 export type RapierShape3d = object;
 
 /** `geometry/point.d.ts`: `PointProjection` / `PointColliderProjection`. */
-export interface RapierPointProjection3d {
+interface RapierPointProjection3d {
   readonly point: RapierVector3;
   readonly isInside: boolean;
 }
 
 /** `geometry/ray.d.ts`: `Ray`. */
-export interface RapierRay3d {
+interface RapierRay3d {
   readonly origin: RapierVector3;
   readonly dir: RapierVector3;
 }
 
 /** `geometry/ray.d.ts`: `RayColliderIntersection` (a hit plus its normal). */
-export interface RapierRayColliderIntersection3d {
+interface RapierRayColliderIntersection3d {
   readonly collider: RapierCollider3d;
   readonly timeOfImpact: number;
   readonly normal: RapierVector3;
 }
 
 /** `geometry/toi.d.ts`: `ColliderShapeCastHit`. `time_of_impact` is snake_case upstream. */
-export interface RapierColliderShapeCastHit3d {
+interface RapierColliderShapeCastHit3d {
   readonly collider: RapierCollider3d;
   readonly time_of_impact: number;
   readonly witness1: RapierVector3;
@@ -838,7 +838,7 @@ export interface RapierEventQueue3d {
 }
 
 /** `geometry/narrow_phase.d.ts`: `TempContactManifold`, the §29 contact source. */
-export interface RapierContactManifold3d {
+interface RapierContactManifold3d {
   normal(): RapierVector3;
   numContacts(): number;
   localContactPoint1(index: number): RapierVector3 | null;
@@ -848,7 +848,7 @@ export interface RapierContactManifold3d {
 }
 
 /** `geometry/narrow_phase.d.ts`: the members of `NarrowPhase` this package calls. */
-export interface RapierNarrowPhase3d {
+interface RapierNarrowPhase3d {
   contactPair(
     collider1: number,
     collider2: number,

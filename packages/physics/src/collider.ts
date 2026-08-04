@@ -85,7 +85,7 @@ import {
 import { Node, Transform } from "@four/scene";
 
 import type { ColliderDescriptor } from "./descriptors.js";
-import type { TriggerEvent } from "./events.js";
+import type { CollisionEvent, TriggerEvent } from "./events.js";
 import type { PhysicsMaterial } from "./material.js";
 import {
   DEFAULT_FRICTION,
@@ -132,6 +132,34 @@ function impliedDimension(shape: CollisionShape): PhysicsDimension {
 
 /** §29's trigger payload as it reaches a sensor's listeners. */
 export type ColliderTriggerEvent = TriggerEvent<RigidBody, Collider>;
+
+/**
+ * §29's collision payload as it reaches a node's listeners.
+ *
+ * Declared here rather than in `rigid-body.ts` — where the emitting class
+ * lives — because the alias names {@link Collider}, and a type import of it
+ * from `rigid-body.ts` would close an import cycle (this module already
+ * imports {@link RigidBody} at runtime to resolve {@link Collider.body}).
+ * The augmentation below merges the three collision names into
+ * `RigidBodyEventMap`, so the body's emitter surface is unchanged.
+ */
+export type RigidBodyCollisionEvent = CollisionEvent<RigidBody, Collider>;
+
+declare module "./rigid-body.js" {
+  // The three §29 collision names of `RigidBodyEventMap`, merged in from
+  // collider.ts (see `RigidBodyCollisionEvent` above for why they are declared
+  // here). Deliberately NOT a doc comment: TypeDoc warns when two declarations
+  // of one merged interface both carry one, and `rigid-body.ts`'s declaration
+  // is the documented one.
+  interface RigidBodyEventMap {
+    /** Two colliders began touching (§29). */
+    collisionstart: RigidBodyCollisionEvent;
+    /** Two colliders are still touching (§29). */
+    collisionstay: RigidBodyCollisionEvent;
+    /** Two colliders stopped touching (§29); `contacts` is empty. */
+    collisionend: RigidBodyCollisionEvent;
+  }
+}
 
 /**
  * What a {@link Collider} emits (§29) — the two sensor names. Collision events

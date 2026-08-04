@@ -56,7 +56,7 @@
  * those units.
  */
 
-import { FourError } from "@four/core";
+import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
 import {
   DEFAULT_TRANSFORM_AUTHORITY,
   TRANSFORM_AUTHORITIES,
@@ -64,16 +64,15 @@ import {
 } from "@four/scene";
 
 /**
- * Any value JSON can carry, losslessly.
+ * Any value JSON can carry, losslessly — `@four/core`'s {@link JsonValue},
+ * re-exported so this format keeps naming its own payload type.
  *
- * **Transcribed, not imported.** `@four/diagnostics` declares the same type for
- * the §34 replay document, and its `cloneJsonValue` is the precedent this
- * module's validation follows — but the dependency matrix (plan §3.1) puts
- * `@four/serialization` above `core`, `math`, and `scene` only, and
- * `@four/diagnostics` sits beside it rather than beneath it. Copying twelve
- * lines is the honest cost of that boundary; hoisting one `JsonValue` into
- * `@four/core` is the fix, and it needs an owner decision because it widens a
- * published package's surface (backlog, 2026-08-02).
+ * This module originally *transcribed* the type (and `cloneJsonValue`) from
+ * `@four/diagnostics` — the §3.1 matrix has no serialization → diagnostics
+ * edge — with a dated note naming the hoist into `@four/core` as the fix.
+ * That hoist landed 2026-08-04, taking this module's `__proto__`
+ * strengthening with it, so the shared definition below both packages is
+ * exactly what this file shipped.
  *
  * Component payloads and node metadata are typed with this rather than
  * `unknown`: a scene file is JSON, so a value that cannot survive
@@ -81,13 +80,7 @@ import {
  * is not serializable, and it is better to say so in the type than to discover
  * it as a silent `null` after a reload.
  */
-export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
+export type { JsonValue } from "@four/core";
 
 /** A JSON object — the shape of component payloads and node metadata. */
 export type JsonObject = { readonly [key: string]: JsonValue };
@@ -218,101 +211,17 @@ export interface SceneDocument {
 // --- JSON payloads ----------------------------------------------------------
 
 /**
- * Validates a value as JSON and returns a deep-frozen copy of it.
+ * Validates a value as JSON and returns a deep-frozen copy of it —
+ * `@four/core`'s {@link cloneJsonValue}, re-exported.
  *
- * Transcribed from `@four/diagnostics`'s `cloneJsonValue` (see {@link JsonValue}
- * for why it is a copy) with one deliberate strengthening: a `__proto__` own key
- * is **refused** rather than copied. `JSON.parse` makes `__proto__` an ordinary
- * own property, and copying it with `copy[key] = …` would run the inherited
- * setter and re-parent the fresh object instead of storing a key — silently
- * losing the value and handing the rest of the engine an object with a
- * surprising prototype. Nothing legitimate needs that key, so the document
- * refuses it and every consumer downstream (`instantiateScene`'s metadata copy
- * in particular) can assign keys without a guard.
- *
- * Values are copied rather than referenced because a caller usually hands over a
- * live object; a document that kept the reference would not be a snapshot.
- * `-0` is normalized to `0`.
- *
- * @param value the value to validate and copy
- * @param path a dotted path used in error messages, e.g. `"metadata"`
- * @returns a frozen deep copy
- * @throws TypeError if the value is not representable JSON
+ * The `__proto__` refusal this module added over the diagnostics original
+ * (`JSON.parse` makes `__proto__` an ordinary own property, and copying it
+ * with `copy[key] = …` would re-parent the fresh object instead of storing a
+ * key) went into the shared implementation with the 2026-08-04 hoist, so
+ * every consumer downstream (`instantiateScene`'s metadata copy in
+ * particular) can still assign keys without a guard.
  */
-export function cloneJsonValue(value: unknown, path = "value"): JsonValue {
-  return cloneJson(value, path, new Set<object>());
-}
-
-function cloneJson(
-  value: unknown,
-  path: string,
-  ancestors: Set<object>,
-): JsonValue {
-  if (value === null) {
-    return null;
-  }
-  switch (typeof value) {
-    case "boolean":
-    case "string":
-      return value;
-    case "number":
-      if (!Number.isFinite(value)) {
-        throw new TypeError(
-          `${path} is ${String(value)}, which JSON cannot represent (it would round-trip as null).`,
-        );
-      }
-      return value === 0 ? 0 : value;
-    case "object":
-      break;
-    default:
-      throw new TypeError(
-        `${path} is a ${typeof value}, which JSON cannot represent.`,
-      );
-  }
-  // Narrowed to a non-null object by the switch above.
-  const object = value;
-  if (ancestors.has(object)) {
-    throw new TypeError(`${path} is a circular reference.`);
-  }
-  ancestors.add(object);
-  try {
-    if (Array.isArray(object)) {
-      const source = object as readonly unknown[];
-      const copy: JsonValue[] = [];
-      for (let i = 0; i < source.length; i += 1) {
-        copy.push(cloneJson(source[i], `${path}[${String(i)}]`, ancestors));
-      }
-      return Object.freeze(copy);
-    }
-    const prototype = Object.getPrototypeOf(object) as object | null;
-    if (prototype !== Object.prototype && prototype !== null) {
-      throw new TypeError(
-        `${path} is ${Object.prototype.toString.call(object)}, not a plain object; JSON cannot represent it losslessly.`,
-      );
-    }
-    const source = object as Record<string, unknown>;
-    const copy: Record<string, JsonValue> = {};
-    // Own enumerable string keys in insertion order (plan §1) — the same set
-    // and order `JSON.stringify` would emit.
-    for (const key of Object.keys(source)) {
-      if (key === "__proto__") {
-        throw new TypeError(
-          `${path} has a "__proto__" key, which no scene document may carry (it would re-parent the object it was copied into).`,
-        );
-      }
-      const entry = source[key];
-      if (entry === undefined) {
-        throw new TypeError(
-          `${path}.${key} is undefined; JSON would drop the key.`,
-        );
-      }
-      copy[key] = cloneJson(entry, `${path}.${key}`, ancestors);
-    }
-    return Object.freeze(copy);
-  } finally {
-    ancestors.delete(object);
-  }
-}
+export { cloneJsonValue } from "@four/core";
 
 // --- primitive validators ---------------------------------------------------
 

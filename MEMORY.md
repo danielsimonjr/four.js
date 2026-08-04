@@ -25,6 +25,30 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-04 (later) — ZERO-FINDINGS SWEEP (owner-directed: "resolve all issues the
+  tools report; defer nothing"): all 5 baselined duplicates consolidated, both type-only
+  cycles broken, all 21 unused exports resolved; every docs/Architecture report is now 0
+  and duplicate-baseline.json is empty.** Standing homes: `SeededRandom` →
+  `@four/core/src/random.ts` (WP-8.2 original verbatim; motion/particles re-export;
+  streams bit-identical, motion's known-answer suite moved to core, particles'
+  BigInt-oracle suite still pins stream identity); `JsonValue`+`cloneJsonValue` →
+  `core/src/json.ts` carrying serialization's `__proto__` refusal — this is the "owner
+  decision" the serialization module note was waiting on, and it CHANGES diagnostics
+  behavior: a payload with a `__proto__` own key is now refused with TypeError instead of
+  silently re-parenting the copy; `DEFAULT_GRAVITY_Y` → `core/src/conventions.ts`;
+  `ColorRGBA` → `math/src/color.ts`. Cycle breaks: scene's `warnAuthorityConflict` takes
+  structural `AuthorityNode` (exported from the barrel; every Node satisfies it);
+  physics' `RigidBodyCollisionEvent` lives in `collider.ts` and the three §29 collision
+  keys merge into `RigidBodyEventMap` via `declare module "./rigid-body.js"` declaration
+  merging (the @four/input→NodeEventMap pattern) — public surface unchanged, but the
+  type's DECLARING file moved (deep-importers of `../src/rigid-body.js` must use
+  `../src/collider.js`). physics-rapier's 21 transcribed-subset interfaces are no longer
+  exported (in-file type contracts only). Gotchas: (1) the interface-merging
+  augmentation must NOT carry a doc comment — TypeDoc emits "multiple declarations with
+  a comment" once per package that re-exports the map (12 warnings); (2) typedoc
+  baseline is now 123 warnings (was 125). Verified: 24/24 build, 2,985 unit, coverage
+  ≥95% everywhere (core 99.01 with new json.test.ts at 100%), suites 174, browser 32,
+  size 32.13 kB unchanged, all four graph gates + check-spec green.
 - **2026-08-04 — Dependency-graph tooling (CDG/QDG) fully integrated; duplicate-symbol
   gate wired.** Context (2026-08-03, recorded in CHANGELOG but not here until now): the
   MathTS dependency-graph tools were vendored under `tools/` — `pnpm graph` (CDG full
