@@ -96,9 +96,9 @@ changes in `CHANGELOG.md`.
       vertex attribute in @four/geometry (box now 24 verts with per-face normals, plane
       +Z; 2D shapes stay unlit), `"lit"` render-item kind + duck-typed `collectSceneLights`
       in @four/render, `LitProgram` (Lambert + ambient) + normal-stream upload in
-      @four/render-webgl. Unlit path untouched — all 32 browser specs and pixel goldens
-      pass; 3,034 unit + 174 suite tests; touched packages ≥97% coverage; §86 gate
-      33.26/150 kB; docs warnings 126 (unchanged). Wider §68/§69/§59/§60a scope staged
+      @four/render-webgl. Unlit path untouched — every browser spec and pixel golden
+      passes; merged tree: 3,077 unit + 174 suite + 38 browser/visual tests, coverage
+      ≥95% everywhere, TypeDoc 0 warnings, §86 gate 33.28/150 kB. Wider §68/§69/§59/§60a scope staged
       with dated notes (see backlog and docs/AUDIT-120.md S-5)
 - [x] 2026-08-04 — **Zero-findings sweep** (owner-directed): consolidated all 5
       baselined TRUE_DUPLICATE names (SeededRandom → core, JsonValue/cloneJsonValue →

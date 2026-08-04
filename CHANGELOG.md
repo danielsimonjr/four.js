@@ -34,9 +34,11 @@ note where its design will land (§69, §59, §60a; see `docs/AUDIT-120.md` S-5)
   stream at fixed attribute location 1, `uniform3fv` added to the GL seam.
 
 The unlit path is untouched — a scene with no lit items issues the same GL call
-sequence as before, and all 32 browser specs and pixel goldens pass unchanged.
-3,034 unit + 174 suite tests; touched packages at 97–100% coverage; payload gate
-33.26/150 kB; §120 audit amended to 43/43 shipped-or-MVP.
+sequence as before, and every browser spec and pixel golden passes unchanged.
+On the merged tree (this packet landed alongside the backlog burn-down below):
+3,077 unit + 174 suite + 38 browser/visual tests, coverage ≥95% everywhere,
+TypeDoc 0 warnings, payload gate 33.28/150 kB; §120 audit amended to 43/43
+shipped-or-MVP.
 
 ### 2026-08-04 (backlog burn-down)
 

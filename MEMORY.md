@@ -60,11 +60,13 @@ readable; never delete the pointer itself.
   the GL seam (now 34 methods) and to REQUIRED_CONTEXT_METHODS (fail-fast, not
   discriminating). Unlit path byte-identical: a scene with no lit items issues the same
   GL sequence as before (only init/restore gain the fourth program build); all 32
-  browser specs + pixel goldens pass unchanged. Exit numbers: 3,034 unit + 174 suite +
-  32 browser; coverage geometry/materials 100%, scene 99.66 (light.ts 100), render 99.63
-  (lights.ts 97.36 — two defensive branches), render-webgl 99.5 (gl-program/gl-geometry
-  100); §86 gate 33.26/150 kB (+1.13 kB, genuine); docs warnings 126 (baseline held —
-  two new private-symbol `{@link}`s were demoted to backticks). Staged with dated notes
+  browser specs + pixel goldens pass unchanged. Exit numbers (worktree; merged-tree
+  verification below): coverage geometry/materials 100%, scene 99.66 (light.ts 100),
+  render 99.63 (lights.ts 97.36 — two defensive branches), render-webgl 99.5
+  (gl-program/gl-geometry 100); §86 gate 33.28/150 kB (+1.13 kB, genuine). Merged with
+  the same-day backlog burn-down: 3,077 unit + 174 suite + 38 browser/visual tests,
+  TypeDoc 0 warnings (the packet's two new private-symbol `{@link}`s were demoted to
+  backticks pre-merge). Staged with dated notes
   (2026-08-04): point/spot/hemisphere/area + multi-light (uniform arrays / §68 clustered
   path), shadows §69 (castShadow deliberately NOT accepted-and-ignored), §59
   StandardMaterial/PBR, §60a color strings + tone mapping, light layers, per-material
