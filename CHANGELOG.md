@@ -10,6 +10,24 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-08-03
 
+#### Fixed — `Lint` was red in CI since bfa0cb9
+
+Two separate causes, both introduced by earlier commits in this same effort and
+neither caught because CI was not checked after pushing:
+
+- `tests/integration/examples-build-coverage.test.ts` (added in bfa0cb9) used
+  four `!` non-null assertions that `@typescript-eslint/no-unnecessary-type-assertion`
+  rejects — the types were already narrowed. Removed; the guard still passes and
+  still fails on build/preview drift.
+- The vendored `tools/create-dependency-graph/**` and `tools/query-dependency-graph/**`
+  are now eslint-ignored. They come from MathTS and are kept byte-identical with
+  the copies in llm-wiki, so restyling them here would guarantee the two copies
+  drift. They are verified by being run (`pnpm graph`) and by QDG's own unit
+  tests (`pnpm graph:test`), not by this repo's lint config.
+
+`pnpm lint` is green again, along with build, test, typecheck:examples,
+check-spec, graph, graph:check and graph:test.
+
 #### Added — dependency-graph tooling (CDG + QDG) wired into the build
 
 Vendored the MathTS dependency-graph tools under `tools/` and integrated them as

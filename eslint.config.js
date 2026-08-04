@@ -7,6 +7,12 @@ export default tseslint.config(
       "**/node_modules/**",
       "docs/**",
       "**/*.tsbuildinfo",
+      // Vendored from MathTS and kept byte-identical with the copy in llm-wiki, so
+      // it is not ours to restyle — reformatting it here would guarantee the two
+      // copies drift. It carries its own tsconfig and is verified by running it
+      // (`pnpm graph`) plus QDG's unit tests (`pnpm graph:test`), not by this config.
+      "tools/create-dependency-graph/**",
+      "tools/query-dependency-graph/**",
     ],
   },
   ...tseslint.configs.recommendedTypeChecked,
