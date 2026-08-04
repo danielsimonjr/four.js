@@ -30,6 +30,26 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   pnpm graph
   ```
 
+  CDG's directory also carries the **duplicate-symbol gate**:
+
+  ```sh
+  pnpm graph:duplicates            # CI gate — fails on NEW TRUE_DUPLICATE names
+  ```
+
+  `check-duplicates.mjs` reads `docs/Architecture/duplicate-symbols.json` (fresh after
+  `pnpm graph`; the script's `--no-regen` flag skips its own re-parse) and fails if any
+  `TRUE_DUPLICATE` name exists beyond `docs/Architecture/duplicate-baseline.json` — the
+  accepted, shrinking consolidation backlog (seeded 2026-08-04: `cloneJsonValue`,
+  `DEFAULT_GRAVITY_Y`, `SeededRandom`, `ColorRGBA`, `JsonValue`). Legitimately-independent
+  duplicates are instead *allowlisted* in `duplicate-allowlist.json` with a reason
+  (four.js entries: per-package `PACKAGE_NAME`; `PARTICLE_INSTANCE_FLOATS`, a deliberate
+  duck-typed contract because the dependency matrix forbids the particles↔render edge).
+  After consolidating a baselined name, shrink the baseline with:
+
+  ```sh
+  node tools/create-dependency-graph/gen-duplicate-baseline.mjs
+  ```
+
 - `query-dependency-graph/` (**QDG**) — read-only consumer of CDG's JSON. Answers
   structural questions without re-parsing, and emits `dependency-reverse.json` +
   `node-safety.json`.
@@ -63,3 +83,8 @@ single package and the scan found zero files. `readWorkspacePatterns()` now also
 `pnpm-workspace.yaml`'s `packages:` list (and yarn's `{ packages: [...] }` object form),
 dropping pnpm's negated globs rather than treating them as literal directory names. Keep
 this copy in sync with `llm-wiki/tools/`, which carries the same fix.
+
+The byte-identity rule covers the tool **code** only. `duplicate-allowlist.json` is
+per-repo *data* (it ships with MathTS's entries, which are inert here because their file
+paths never match) — four.js appends its own entries to it and the two copies are expected
+to differ. Likewise `docs/Architecture/duplicate-baseline.json` is generated per repo.

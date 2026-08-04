@@ -57,11 +57,14 @@ jobs:
       # parse; `graph:check` then asserts every browser-facing `.` entry stays free
       # of node: builtins. four.js targets the browser, so a node: import reaching a
       # package's main entry is a shipping bug, and it is invisible to tsc and to
-      # unit tests running under Node.
+      # unit tests running under Node. `graph:duplicates` reads the report `graph`
+      # just regenerated (hence --no-regen in the script) and fails on any
+      # TRUE_DUPLICATE symbol name beyond docs/Architecture/duplicate-baseline.json.
       - name: Check architecture invariants (dependency graph)
         run: |
           pnpm graph
           pnpm graph:check
+          pnpm graph:duplicates
           pnpm graph:test
 
       # `pnpm docs` without `run` is a pnpm builtin no-op; the build step above

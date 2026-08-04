@@ -25,6 +25,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-04 — Dependency-graph tooling (CDG/QDG) fully integrated; duplicate-symbol
+  gate wired.** Context (2026-08-03, recorded in CHANGELOG but not here until now): the
+  MathTS dependency-graph tools were vendored under `tools/` — `pnpm graph` (CDG full
+  parse → committed `docs/Architecture/`), `pnpm graph:query`/`graph:check`/`graph:test`
+  (QDG), with `graph:check` a CI gate (no `node:` builtin may reach a browser-facing `.`
+  entry; 24/24 pass); turbo was replaced by `pnpm -r --workspace-concurrency=4` the same
+  day; the vendored tool **code** is eslint-ignored and kept byte-identical with
+  `llm-wiki/tools/`. Today's decision closes the last gap: `pnpm graph:duplicates`
+  (CDG's `check-duplicates.mjs --no-regen`, reading the report `pnpm graph` regenerates)
+  joins the CI architecture-invariants step and fails on any TRUE_DUPLICATE symbol name
+  beyond `docs/Architecture/duplicate-baseline.json`. Split applied: **allowlist** (=
+  legitimately independent forever, per-repo *data* exempt from the byte-identity rule) got
+  per-package `PACKAGE_NAME` and `PARTICLE_INSTANCE_FLOATS` (deliberate duck-typed
+  contract, matrix forbids the particles↔render edge — Phase 9 entry below); **baseline**
+  (= accepted shrinking backlog, re-seed via `gen-duplicate-baseline.mjs` after
+  consolidating) holds `cloneJsonValue`, `JsonValue`, `DEFAULT_GRAVITY_Y`, `SeededRandom`
+  (the dated hoist-to-core item), `ColorRGBA`. Gotcha: `duplicate-allowlist.json` is
+  hand-formatted — do not round-trip it through `JSON.stringify` (rewraps 500+ lines);
+  append entries textually.
 - **2026-08-02 — PHASE 11 CLOSED — THE IMPLEMENTATION PLAN IS COMPLETE (final exit
   GREEN; §113a exit TRUE: saved, reloaded, benchmarked; §120 complete at 42/43
   shipped-or-MVP with lighting the single dated staged absence — a traceable

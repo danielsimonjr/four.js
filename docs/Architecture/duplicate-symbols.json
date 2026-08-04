@@ -2,13 +2,13 @@
   "generated": "2026-08-04",
   "note": "This report groups names by OWN definition, not by call graph, then classifies each flagged name (see DupEntryTag): TRUE_DUPLICATE (the actionable merge targets), DISPATCH_VARIANT (>=2 mathTyped(...) registrations of the same public name — distinct dispatch surfaces, Bucket C delegation candidates, not copy-paste bodies), ALIAS_DELEGATION (a const-alias forward to an imported symbol, not an independent body — excluded once fewer than 2 real bodies remain), and ALLOWLISTED (matches duplicate-allowlist.json: hot-path is* guards, AssemblyScript mirrors, per-package VERSION strings). NOT detected: same-file typed-dispatch overload polymorphism for different argument shapes within one registration — a human still triages TRUE_DUPLICATE entries using the defining files + public flags before merging anything.",
   "summary": {
-    "runtimeDuplicates": 5,
+    "runtimeDuplicates": 3,
     "typeDuplicates": 2,
     "runtimeByTag": {
-      "TRUE_DUPLICATE": 5,
+      "TRUE_DUPLICATE": 3,
       "DISPATCH_VARIANT": 0,
       "ALIAS_DELEGATION": 0,
-      "ALLOWLISTED": 0
+      "ALLOWLISTED": 2
     },
     "typeByTag": {
       "TRUE_DUPLICATE": 2,
@@ -18,152 +18,6 @@
     }
   },
   "runtime": [
-    {
-      "name": "PACKAGE_NAME",
-      "category": "constant",
-      "definers": [
-        {
-          "file": "packages/animation/src/index.ts",
-          "package": "@four/animation",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/assets/src/index.ts",
-          "package": "@four/assets",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/core/src/index.ts",
-          "package": "@four/core",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/diagnostics/src/index.ts",
-          "package": "@four/diagnostics",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/geometry/src/index.ts",
-          "package": "@four/geometry",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/input/src/index.ts",
-          "package": "@four/input",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/materials/src/index.ts",
-          "package": "@four/materials",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/math/src/index.ts",
-          "package": "@four/math",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/motion/src/index.ts",
-          "package": "@four/motion",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/particles/src/index.ts",
-          "package": "@four/particles",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/physics-box2d/src/index.ts",
-          "package": "@four/physics-box2d",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/physics-rapier/src/index.ts",
-          "package": "@four/physics-rapier",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/physics-soft/src/index.ts",
-          "package": "@four/physics-soft",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/physics/src/index.ts",
-          "package": "@four/physics",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/render-canvas/src/index.ts",
-          "package": "@four/render-canvas",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/render-svg/src/index.ts",
-          "package": "@four/render-svg",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/render-webgl/src/index.ts",
-          "package": "@four/render-webgl",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/render-webgpu/src/index.ts",
-          "package": "@four/render-webgpu",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/render/src/index.ts",
-          "package": "@four/render",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/scene/src/index.ts",
-          "package": "@four/scene",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/serialization/src/index.ts",
-          "package": "@four/serialization",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/text/src/index.ts",
-          "package": "@four/text",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/ui/src/index.ts",
-          "package": "@four/ui",
-          "public": true,
-          "tag": "PLAIN"
-        }
-      ],
-      "canonicalHint": "AMBIGUOUS",
-      "tag": "TRUE_DUPLICATE"
-    },
     {
       "name": "cloneJsonValue",
       "category": "function",
@@ -205,26 +59,6 @@
       "tag": "TRUE_DUPLICATE"
     },
     {
-      "name": "PARTICLE_INSTANCE_FLOATS",
-      "category": "constant",
-      "definers": [
-        {
-          "file": "packages/particles/src/particle-renderable.ts",
-          "package": "@four/particles",
-          "public": true,
-          "tag": "PLAIN"
-        },
-        {
-          "file": "packages/render/src/particles.ts",
-          "package": "@four/render",
-          "public": true,
-          "tag": "PLAIN"
-        }
-      ],
-      "canonicalHint": "AMBIGUOUS",
-      "tag": "TRUE_DUPLICATE"
-    },
-    {
       "name": "SeededRandom",
       "category": "class",
       "definers": [
@@ -243,6 +77,197 @@
       ],
       "canonicalHint": "AMBIGUOUS",
       "tag": "TRUE_DUPLICATE"
+    },
+    {
+      "name": "PACKAGE_NAME",
+      "category": "constant",
+      "definers": [
+        {
+          "file": "packages/animation/src/index.ts",
+          "package": "@four/animation",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/assets/src/index.ts",
+          "package": "@four/assets",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/core/src/index.ts",
+          "package": "@four/core",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/diagnostics/src/index.ts",
+          "package": "@four/diagnostics",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/geometry/src/index.ts",
+          "package": "@four/geometry",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/input/src/index.ts",
+          "package": "@four/input",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/materials/src/index.ts",
+          "package": "@four/materials",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/math/src/index.ts",
+          "package": "@four/math",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/motion/src/index.ts",
+          "package": "@four/motion",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/particles/src/index.ts",
+          "package": "@four/particles",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/physics-box2d/src/index.ts",
+          "package": "@four/physics-box2d",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/physics-rapier/src/index.ts",
+          "package": "@four/physics-rapier",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/physics-soft/src/index.ts",
+          "package": "@four/physics-soft",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/physics/src/index.ts",
+          "package": "@four/physics",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/render-canvas/src/index.ts",
+          "package": "@four/render-canvas",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/render-svg/src/index.ts",
+          "package": "@four/render-svg",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/render-webgl/src/index.ts",
+          "package": "@four/render-webgl",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/render-webgpu/src/index.ts",
+          "package": "@four/render-webgpu",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/render/src/index.ts",
+          "package": "@four/render",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/scene/src/index.ts",
+          "package": "@four/scene",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/serialization/src/index.ts",
+          "package": "@four/serialization",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/text/src/index.ts",
+          "package": "@four/text",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/ui/src/index.ts",
+          "package": "@four/ui",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "ALLOWLISTED"
+    },
+    {
+      "name": "PARTICLE_INSTANCE_FLOATS",
+      "category": "constant",
+      "definers": [
+        {
+          "file": "packages/particles/src/particle-renderable.ts",
+          "package": "@four/particles",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride independently and the shared tests catch drift. 2026-08-04 gate wiring."
+        },
+        {
+          "file": "packages/render/src/particles.ts",
+          "package": "@four/render",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride independently and the shared tests catch drift. 2026-08-04 gate wiring."
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "ALLOWLISTED"
     }
   ],
   "types": [

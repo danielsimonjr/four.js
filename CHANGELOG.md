@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-04
+
+#### Added — duplicate-symbol gate (`pnpm graph:duplicates`) — CDG/QDG integration complete
+
+The last unwired piece of the vendored dependency-graph toolkit,
+`tools/create-dependency-graph/check-duplicates.mjs`, is now a script and a CI
+gate. It reads the `duplicate-symbols.json` that `pnpm graph` regenerates
+(`--no-regen`, matching the repo's graph-generates/`graph:*`-consumes
+convention) and fails on any `TRUE_DUPLICATE` symbol name beyond
+`docs/Architecture/duplicate-baseline.json`, so new copy-paste duplicates
+cannot accumulate while the accepted backlog shrinks deliberately.
+
+- Baseline seeded with the 5 current TRUE_DUPLICATE names, all pre-recorded
+  backlog: `cloneJsonValue` + `JsonValue` (diagnostics/serialization — no
+  matrix edge between them), `DEFAULT_GRAVITY_Y` (particles/physics),
+  `SeededRandom` (the dated Phase 9 hoist-to-core item), `ColorRGBA`
+  (animation/materials).
+- Two four.js entries added to `duplicate-allowlist.json` for
+  legitimately-independent names that must never be "consolidated":
+  per-package `PACKAGE_NAME` (23 packages, the analog of MathTS's per-package
+  `VERSION`) and `PARTICLE_INSTANCE_FLOATS` (deliberate duck-typed contract;
+  the dependency matrix forbids the particles↔render edge — MEMORY
+  2026-08-02, Phase 9). The allowlist is per-repo **data**, exempt from the
+  vendored-code byte-identity rule with llm-wiki (noted in `tools/README.md`);
+  MathTS's entries stay in place, inert, so code diffs against llm-wiki stay
+  clean.
+- CI runs `pnpm graph:duplicates` inside the architecture-invariants step,
+  right after `pnpm graph`.
+- Re-seed after consolidating a name:
+  `node tools/create-dependency-graph/gen-duplicate-baseline.mjs`.
+
 ### 2026-08-03
 
 #### Fixed — `Lint` was red in CI since bfa0cb9
