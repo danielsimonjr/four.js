@@ -1,0 +1,17 @@
+{
+  "name": "query-dependency-graph",
+  "version": "1.0.0",
+  "description": "Query surface + derived reports over the create-dependency-graph output (reverse-dependency index, node:-safety, is-public, cycles). Read-only consumer of docs/Architecture/dependency-graph.json.",
+  "type": "module",
+  "bin": {
+    "query-dependency-graph": "./query-dependency-graph.mjs"
+  },
+  "scripts": {
+    "start": "node query-dependency-graph.mjs",
+    "test": "node --test query-dependency-graph.test.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}

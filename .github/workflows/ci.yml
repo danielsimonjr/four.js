@@ -53,6 +53,17 @@ jobs:
       - name: Check specification
         run: pnpm check-spec
 
+      # Architecture invariants. `graph` regenerates docs/Architecture from a full
+      # parse; `graph:check` then asserts every browser-facing `.` entry stays free
+      # of node: builtins. four.js targets the browser, so a node: import reaching a
+      # package's main entry is a shipping bug, and it is invisible to tsc and to
+      # unit tests running under Node.
+      - name: Check architecture invariants (dependency graph)
+        run: |
+          pnpm graph
+          pnpm graph:check
+          pnpm graph:test
+
       # `pnpm docs` without `run` is a pnpm builtin no-op; the build step above
       # must precede this because TypeDoc reads the built reference chain.
       - name: Build API docs

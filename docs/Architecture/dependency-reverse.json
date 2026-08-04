@@ -1,0 +1,452 @@
+{
+  "generated": "2026-08-04",
+  "dependents": {
+    "packages/animation/src/values.ts": [
+      "packages/animation/src/binding.ts",
+      "packages/animation/src/index.ts",
+      "packages/animation/src/mixer.ts",
+      "packages/animation/src/track.ts",
+      "packages/animation/src/tween.ts"
+    ],
+    "packages/animation/src/track.ts": [
+      "packages/animation/src/clip.ts",
+      "packages/animation/src/index.ts",
+      "packages/animation/src/mixer.ts"
+    ],
+    "packages/animation/src/animation-system.ts": [
+      "packages/animation/src/index.ts"
+    ],
+    "packages/animation/src/binding.ts": [
+      "packages/animation/src/index.ts",
+      "packages/animation/src/mixer.ts",
+      "packages/animation/src/tween.ts"
+    ],
+    "packages/animation/src/clip.ts": [
+      "packages/animation/src/index.ts",
+      "packages/animation/src/mixer.ts"
+    ],
+    "packages/animation/src/easing.ts": [
+      "packages/animation/src/index.ts",
+      "packages/animation/src/tween.ts"
+    ],
+    "packages/animation/src/mixer.ts": [
+      "packages/animation/src/index.ts"
+    ],
+    "packages/animation/src/timeline.ts": [
+      "packages/animation/src/index.ts"
+    ],
+    "packages/animation/src/tween.ts": [
+      "packages/animation/src/index.ts",
+      "packages/animation/src/mixer.ts"
+    ],
+    "packages/assets/src/asset-manager.ts": [
+      "packages/assets/src/index.ts",
+      "packages/assets/src/loaders.ts"
+    ],
+    "packages/assets/src/loaders.ts": [
+      "packages/assets/src/index.ts"
+    ],
+    "packages/core/src/errors.ts": [
+      "packages/core/src/component.ts",
+      "packages/core/src/index.ts"
+    ],
+    "packages/core/src/component.ts": [
+      "packages/core/src/index.ts"
+    ],
+    "packages/core/src/disposable.ts": [
+      "packages/core/src/index.ts"
+    ],
+    "packages/core/src/events.ts": [
+      "packages/core/src/index.ts"
+    ],
+    "packages/diagnostics/src/checksum.ts": [
+      "packages/diagnostics/src/index.ts"
+    ],
+    "packages/diagnostics/src/recorder.ts": [
+      "packages/diagnostics/src/index.ts",
+      "packages/diagnostics/src/replay-player.ts"
+    ],
+    "packages/diagnostics/src/replay-format.ts": [
+      "packages/diagnostics/src/index.ts",
+      "packages/diagnostics/src/recorder.ts",
+      "packages/diagnostics/src/replay-player.ts"
+    ],
+    "packages/diagnostics/src/replay-player.ts": [
+      "packages/diagnostics/src/index.ts"
+    ],
+    "packages/diagnostics/src/debug-draw.ts": [
+      "packages/diagnostics/src/index.ts"
+    ],
+    "packages/four/src/application.ts": [
+      "packages/four/src/index.ts"
+    ],
+    "packages/geometry/src/buffer-geometry.ts": [
+      "packages/geometry/src/index.ts",
+      "packages/geometry/src/primitives.ts"
+    ],
+    "packages/geometry/src/primitives.ts": [
+      "packages/geometry/src/index.ts"
+    ],
+    "packages/input/src/pick.ts": [
+      "packages/input/src/drag.ts",
+      "packages/input/src/index.ts",
+      "packages/input/src/pointer-input.ts"
+    ],
+    "packages/input/src/pointer-events.ts": [
+      "packages/input/src/drag.ts",
+      "packages/input/src/index.ts",
+      "packages/input/src/pointer-input.ts"
+    ],
+    "packages/input/src/pointer-input.ts": [
+      "packages/input/src/drag.ts",
+      "packages/input/src/index.ts"
+    ],
+    "packages/input/src/drag.ts": [
+      "packages/input/src/index.ts"
+    ],
+    "packages/materials/src/sprite-material.ts": [
+      "packages/materials/src/index.ts"
+    ],
+    "packages/materials/src/unlit-material.ts": [
+      "packages/materials/src/index.ts",
+      "packages/materials/src/sprite-material.ts"
+    ],
+    "packages/math/src/alloc-counter.ts": [
+      "packages/math/src/index.ts",
+      "packages/math/src/matrix3.ts",
+      "packages/math/src/matrix4.ts",
+      "packages/math/src/quaternion.ts",
+      "packages/math/src/vector2.ts",
+      "packages/math/src/vector3.ts",
+      "packages/math/src/vector4.ts"
+    ],
+    "packages/math/src/matrix3.ts": [
+      "packages/math/src/index.ts"
+    ],
+    "packages/math/src/matrix4.ts": [
+      "packages/math/src/index.ts"
+    ],
+    "packages/math/src/quaternion.ts": [
+      "packages/math/src/index.ts",
+      "packages/math/src/matrix4.ts"
+    ],
+    "packages/math/src/vector2.ts": [
+      "packages/math/src/index.ts"
+    ],
+    "packages/math/src/vector3.ts": [
+      "packages/math/src/index.ts",
+      "packages/math/src/matrix4.ts",
+      "packages/math/src/quaternion.ts"
+    ],
+    "packages/math/src/vector4.ts": [
+      "packages/math/src/index.ts"
+    ],
+    "packages/motion/src/clock.ts": [
+      "packages/motion/src/index.ts",
+      "packages/motion/src/scheduler.ts",
+      "packages/motion/src/systems.ts"
+    ],
+    "packages/motion/src/ik.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/integrators.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/kinematic-controller.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/motion-component.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/pid.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/prediction.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/random.ts": [
+      "packages/motion/src/index.ts",
+      "packages/motion/src/steering.ts"
+    ],
+    "packages/motion/src/scheduler.ts": [
+      "packages/motion/src/index.ts",
+      "packages/motion/src/systems.ts"
+    ],
+    "packages/motion/src/spring-damper.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/steering.ts": [
+      "packages/motion/src/index.ts"
+    ],
+    "packages/motion/src/systems.ts": [
+      "packages/motion/src/index.ts",
+      "packages/motion/src/kinematic-controller.ts",
+      "packages/motion/src/motion-component.ts"
+    ],
+    "packages/motion/src/trajectories.ts": [
+      "packages/motion/src/index.ts",
+      "packages/motion/src/kinematic-controller.ts"
+    ],
+    "packages/particles/src/pool.ts": [
+      "packages/particles/src/emitter.ts",
+      "packages/particles/src/index.ts"
+    ],
+    "packages/particles/src/random.ts": [
+      "packages/particles/src/emitter.ts",
+      "packages/particles/src/fields.ts",
+      "packages/particles/src/index.ts"
+    ],
+    "packages/particles/src/types.ts": [
+      "packages/particles/src/emitter.ts",
+      "packages/particles/src/fields.ts",
+      "packages/particles/src/index.ts"
+    ],
+    "packages/particles/src/emitter.ts": [
+      "packages/particles/src/index.ts",
+      "packages/particles/src/particle-renderable.ts"
+    ],
+    "packages/particles/src/fields.ts": [
+      "packages/particles/src/index.ts"
+    ],
+    "packages/particles/src/particle-renderable.ts": [
+      "packages/particles/src/index.ts"
+    ],
+    "packages/particles/src/particle-system.ts": [
+      "packages/particles/src/index.ts"
+    ],
+    "packages/physics/src/descriptors.ts": [
+      "packages/physics/src/adapter.ts",
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/joints.ts",
+      "packages/physics/src/rigid-body.ts",
+      "packages/physics/src/validation.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/events.ts": [
+      "packages/physics/src/adapter.ts",
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/joints.ts",
+      "packages/physics/src/rigid-body.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/queries.ts": [
+      "packages/physics/src/adapter.ts",
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/types.ts": [
+      "packages/physics/src/adapter.ts",
+      "packages/physics/src/body-access.ts",
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/descriptors.ts",
+      "packages/physics/src/events.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/joints.ts",
+      "packages/physics/src/material.ts",
+      "packages/physics/src/queries.ts",
+      "packages/physics/src/rigid-body.ts",
+      "packages/physics/src/shapes.ts",
+      "packages/physics/src/validation.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/material.ts": [
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/descriptors.ts",
+      "packages/physics/src/index.ts"
+    ],
+    "packages/physics/src/rigid-body.ts": [
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/joints.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/shapes.ts": [
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/descriptors.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/queries.ts",
+      "packages/physics/src/validation.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/validation.ts": [
+      "packages/physics/src/collider.ts",
+      "packages/physics/src/index.ts",
+      "packages/physics/src/joints.ts",
+      "packages/physics/src/rigid-body.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/body-access.ts": [
+      "packages/physics/src/index.ts",
+      "packages/physics/src/joints.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/collider.ts": [
+      "packages/physics/src/index.ts",
+      "packages/physics/src/rigid-body.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/joints.ts": [
+      "packages/physics/src/index.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics/src/physics-system.ts": [
+      "packages/physics/src/index.ts"
+    ],
+    "packages/physics/src/world.ts": [
+      "packages/physics/src/index.ts",
+      "packages/physics/src/physics-system.ts"
+    ],
+    "packages/physics/src/adapter.ts": [
+      "packages/physics/src/index.ts",
+      "packages/physics/src/world.ts"
+    ],
+    "packages/physics-rapier/src/init.ts": [
+      "packages/physics-rapier/src/conversions2d.ts",
+      "packages/physics-rapier/src/conversions3d.ts",
+      "packages/physics-rapier/src/index.ts",
+      "packages/physics-rapier/src/rapier2d-adapter.ts",
+      "packages/physics-rapier/src/rapier3d-adapter.ts"
+    ],
+    "packages/physics-rapier/src/conversions2d.ts": [
+      "packages/physics-rapier/src/index.ts",
+      "packages/physics-rapier/src/rapier2d-adapter.ts"
+    ],
+    "packages/physics-rapier/src/conversions3d.ts": [
+      "packages/physics-rapier/src/index.ts",
+      "packages/physics-rapier/src/rapier3d-adapter.ts"
+    ],
+    "packages/physics-rapier/src/rapier2d-adapter.ts": [
+      "packages/physics-rapier/src/index.ts",
+      "packages/physics-rapier/src/rapier3d-adapter.ts"
+    ],
+    "packages/physics-rapier/src/rapier3d-adapter.ts": [
+      "packages/physics-rapier/src/index.ts"
+    ],
+    "packages/render/src/particles.ts": [
+      "packages/render/src/index.ts",
+      "packages/render/src/render-list.ts"
+    ],
+    "packages/render/src/render-list.ts": [
+      "packages/render/src/index.ts"
+    ],
+    "packages/render/src/renderable.ts": [
+      "packages/render/src/index.ts",
+      "packages/render/src/render-list.ts"
+    ],
+    "packages/render/src/renderer.ts": [
+      "packages/render/src/index.ts"
+    ],
+    "packages/render/src/sprite.ts": [
+      "packages/render/src/index.ts",
+      "packages/render/src/render-list.ts"
+    ],
+    "packages/render/src/texture.ts": [
+      "packages/render/src/index.ts"
+    ],
+    "packages/render-webgl/src/gl-program.ts": [
+      "packages/render-webgl/src/gl-geometry.ts",
+      "packages/render-webgl/src/gl-particles.ts",
+      "packages/render-webgl/src/gl-texture.ts",
+      "packages/render-webgl/src/index.ts",
+      "packages/render-webgl/src/webgl-renderer.ts"
+    ],
+    "packages/render-webgl/src/gl-geometry.ts": [
+      "packages/render-webgl/src/index.ts",
+      "packages/render-webgl/src/webgl-renderer.ts"
+    ],
+    "packages/render-webgl/src/gl-particles.ts": [
+      "packages/render-webgl/src/index.ts",
+      "packages/render-webgl/src/webgl-renderer.ts"
+    ],
+    "packages/render-webgl/src/gl-texture.ts": [
+      "packages/render-webgl/src/index.ts",
+      "packages/render-webgl/src/webgl-renderer.ts"
+    ],
+    "packages/render-webgl/src/webgl-renderer.ts": [
+      "packages/render-webgl/src/index.ts"
+    ],
+    "packages/scene/src/node.ts": [
+      "packages/scene/src/authority.ts",
+      "packages/scene/src/camera.ts",
+      "packages/scene/src/group.ts",
+      "packages/scene/src/index.ts",
+      "packages/scene/src/interpolation.ts",
+      "packages/scene/src/scene.ts",
+      "packages/scene/src/world-transforms.ts"
+    ],
+    "packages/scene/src/world-transforms.ts": [
+      "packages/scene/src/camera.ts",
+      "packages/scene/src/index.ts"
+    ],
+    "packages/scene/src/authority.ts": [
+      "packages/scene/src/index.ts",
+      "packages/scene/src/node.ts"
+    ],
+    "packages/scene/src/camera.ts": [
+      "packages/scene/src/index.ts",
+      "packages/scene/src/viewport.ts"
+    ],
+    "packages/scene/src/group.ts": [
+      "packages/scene/src/index.ts"
+    ],
+    "packages/scene/src/interpolation.ts": [
+      "packages/scene/src/index.ts"
+    ],
+    "packages/scene/src/pose-target.ts": [
+      "packages/scene/src/index.ts"
+    ],
+    "packages/scene/src/scene.ts": [
+      "packages/scene/src/index.ts"
+    ],
+    "packages/scene/src/transform.ts": [
+      "packages/scene/src/index.ts",
+      "packages/scene/src/node.ts",
+      "packages/scene/src/pose-target.ts",
+      "packages/scene/src/world-transforms.ts"
+    ],
+    "packages/scene/src/viewport.ts": [
+      "packages/scene/src/index.ts"
+    ],
+    "packages/serialization/src/format.ts": [
+      "packages/serialization/src/index.ts",
+      "packages/serialization/src/migration.ts",
+      "packages/serialization/src/serializer.ts"
+    ],
+    "packages/serialization/src/migration.ts": [
+      "packages/serialization/src/index.ts"
+    ],
+    "packages/serialization/src/serializer.ts": [
+      "packages/serialization/src/index.ts"
+    ],
+    "packages/text/src/bitmap-font.ts": [
+      "packages/text/src/glyph-atlas.ts",
+      "packages/text/src/index.ts"
+    ],
+    "packages/text/src/glyph-atlas.ts": [
+      "packages/text/src/index.ts",
+      "packages/text/src/text-layout.ts"
+    ],
+    "packages/text/src/text-layout.ts": [
+      "packages/text/src/index.ts"
+    ],
+    "packages/ui/src/panel.ts": [
+      "packages/ui/src/button.ts",
+      "packages/ui/src/index.ts"
+    ],
+    "packages/ui/src/widget.ts": [
+      "packages/ui/src/button.ts",
+      "packages/ui/src/index.ts",
+      "packages/ui/src/label.ts",
+      "packages/ui/src/panel.ts"
+    ],
+    "packages/ui/src/button.ts": [
+      "packages/ui/src/index.ts"
+    ],
+    "packages/ui/src/label.ts": [
+      "packages/ui/src/index.ts"
+    ]
+  }
+}

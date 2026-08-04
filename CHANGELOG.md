@@ -8,6 +8,53 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-03
+
+#### Added — dependency-graph tooling (CDG + QDG) wired into the build
+
+Vendored the MathTS dependency-graph tools under `tools/` and integrated them as
+real scripts plus a CI gate, rather than leaving them as loose files.
+
+- `pnpm graph` — CDG, the full-parse generator. Writes `docs/Architecture/`:
+  dependency graph (JSON/YAML/Markdown), file inventory, package export
+  surfaces, duplicate symbols, and unused/dormant analysis.
+- `pnpm graph:query` — QDG emits `dependency-reverse.json` and
+  `node-safety.json` from CDG's JSON without re-parsing the codebase.
+- `pnpm graph:check` — **new CI gate.** Asserts every package's `.` (main) entry
+  is free of `node:` builtins.
+- `pnpm graph:test` — QDG's own unit tests (6 cases).
+
+`docs/Architecture/` is committed on purpose: QDG and any agent read that JSON
+instead of re-running the heavy parse, so it has to be in the tree to be useful.
+
+First run is clean across all **24 workspace packages** — 318 files, 1198 exports,
+**0 runtime circular dependencies** (2 type-only, which are safe), 0 orphaned
+files, and no `node:` leaks. The census self-check passes: 318 files counted
+equals an independent maximal repo walk.
+
+The `graph:check` gate earns its place because a `node:` import reaching a
+browser-facing entry is invisible to both `tsc` and the unit tests — those run
+under Node, where `node:` resolves happily — and only fails once the package is
+loaded in a browser. The gate starts green, so it catches the first regression
+rather than documenting an existing mess.
+
+**Upstream fix required to make CDG work here.** It discovered workspaces only
+from `package.json`'s `workspaces` field. pnpm does not use that field, so
+four.js looked like a single package and the scan reported "Found 0 TypeScript
+files". `readWorkspacePatterns()` now also reads `pnpm-workspace.yaml`'s
+`packages:` list, plus yarn's `{ packages: [...] }` object form, and drops
+pnpm's negated globs (`!packages/legacy`) rather than treating them as literal
+directory names. The same fix is mirrored in `llm-wiki/tools/`.
+
+#### Removed — the last `turbo.exe` on disk
+
+`turbo` left `pnpm-lock.yaml` when the build scripts were converted on
+2026-08-02, but `node_modules/.pnpm/@turbo+windows-64@2.10.7/.../turbo.exe` was
+still present locally. Nothing referenced it — not `package.json`, not
+`pnpm-workspace.yaml`, not CI — so it was pure leftover from the build that
+bugchecked the machine. Removed; the workspace still builds 24/24.
+
+
 ### 2026-08-02
 
 #### Added (Phase 11 — Assets, Serialization, UI, Tooling, §113a; packets WP-11.1…WP-11.6 — THE FINAL PHASE)
