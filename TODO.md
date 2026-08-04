@@ -14,9 +14,16 @@ changes in `CHANGELOG.md`.
 - [ ] Package README sweep — all 24 still say "scaffold only" (shipping-false text)
 - [ ] UI browser proof — @four/ui has node-level §72 coverage only; no example app
       imports it (the one WP-11.5 packet-intent shortfall)
-- [ ] Lighting (§120's single unshipped bullet — never scheduled to a phase; needs a
-      light type, lit shading path, AND normals in the vertex layouts; owner tier
-      decision first)
+- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
+      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69),
+      §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
+      strings on lights, light layers; hoist the lit shader's per-vertex
+      inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a
+      Matrix3 utility (dated note in gl-program.ts)
+- [ ] Spec-revisit note (2026-08-04): §57's material family list has no `LitMaterial`
+      member — the MVP lit tier added one below §59's StandardMaterial; record it in a
+      spec amendment (letter-suffix rule) or fold it into the §57 revision that lands
+      the abstract Material base
 - [ ] De-flake tests/browser/blending.spec.ts RECOVER (1 hard fail in 3 full runs;
       retries: 0; Phase 7 wall-clock thresholds under SwiftShader)
 - [ ] §93 quick-start (root README is 27 lines) + the thirteen prose guides
@@ -106,6 +113,16 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-04 — **Lighting MVP shipped** (§120's last unshipped bullet; owner-directed,
+      minimal tier): `DirectionalLight` node + `Scene.ambientLight` in @four/scene (§68),
+      `LitMaterial` + `kind` discriminants in @four/materials (§57), optional `normals`
+      vertex attribute in @four/geometry (box now 24 verts with per-face normals, plane
+      +Z; 2D shapes stay unlit), `"lit"` render-item kind + duck-typed `collectSceneLights`
+      in @four/render, `LitProgram` (Lambert + ambient) + normal-stream upload in
+      @four/render-webgl. Unlit path untouched — all 32 browser specs and pixel goldens
+      pass; 3,034 unit + 174 suite tests; touched packages ≥97% coverage; §86 gate
+      33.26/150 kB; docs warnings 126 (unchanged). Wider §68/§69/§59/§60a scope staged
+      with dated notes (see backlog and docs/AUDIT-120.md S-5)
 - [x] 2026-08-02 — **Phase 11 complete — THE PLAN IS DONE** (§113a): 5 packets, final
       exit GREEN — serialization (byte-identical round trips + the proven §79/§34
       boundary), assets, UI MVP, benchmark harness with committed records, the §120

@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-04",
-    "totalFiles": 153,
+    "totalFiles": 156,
     "totalModules": 24,
-    "totalExports": 1198
+    "totalExports": 1221
   },
   "entryPoints": [
     {
@@ -2847,10 +2847,17 @@
     },
     "packages/materials": {
       "packages/materials/src/index.ts": {
-        "description": "Package entry point for @four/materials (re-exports 6 symbols)",
+        "description": "Package entry point for @four/materials (re-exports 8 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./lit-material.js",
+            "imports": [
+              "LitMaterial"
+            ],
+            "reExport": true
+          },
           {
             "file": "./sprite-material.js",
             "imports": [
@@ -2864,6 +2871,14 @@
               "UnlitMaterial"
             ],
             "reExport": true
+          },
+          {
+            "file": "./lit-material.js",
+            "imports": [
+              "LitMaterialOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
           },
           {
             "file": "./sprite-material.js",
@@ -2886,17 +2901,21 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "LitMaterial",
           "SpriteMaterial",
           "UnlitMaterial",
           "PACKAGE_NAME",
+          "LitMaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
           "ColorRGBA",
           "UnlitMaterialOptions"
         ],
         "reExported": [
+          "LitMaterial",
           "SpriteMaterial",
           "UnlitMaterial",
+          "LitMaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
           "ColorRGBA",
@@ -2904,6 +2923,38 @@
         ],
         "constants": [
           "PACKAGE_NAME"
+        ]
+      },
+      "packages/materials/src/lit-material.ts": {
+        "description": "`LitMaterial` (§57, §68, §120) — one RGBA color that responds to lights.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./unlit-material.js",
+            "imports": [
+              "ColorRGBA"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Disposable"
+            ]
+          }
+        ],
+        "exports": [
+          "LitMaterial"
+        ],
+        "classes": [
+          "LitMaterial"
+        ],
+        "interfaces": [
+          "LitMaterialOptions"
         ]
       },
       "packages/materials/src/sprite-material.ts": {
@@ -7354,10 +7405,19 @@
     },
     "packages/render": {
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 31 symbols)",
+        "description": "Package entry point for @four/render (re-exports 39 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./lights.js",
+            "imports": [
+              "collectSceneLights",
+              "createSceneLights",
+              "isDirectionalLightSource"
+            ],
+            "reExport": true
+          },
           {
             "file": "./particles.js",
             "imports": [
@@ -7375,6 +7435,7 @@
             "imports": [
               "buildInterpolatedRenderList",
               "buildRenderList",
+              "isLitItem",
               "isParticlesItem",
               "isSpriteItem",
               "isUnlitItem"
@@ -7410,6 +7471,16 @@
             "reExport": true
           },
           {
+            "file": "./lights.js",
+            "imports": [
+              "AmbientLightSource",
+              "DirectionalLightSource",
+              "SceneLights"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./particles.js",
             "imports": [
               "ParticleDrawable"
@@ -7420,6 +7491,7 @@
           {
             "file": "./render-list.js",
             "imports": [
+              "LitRenderItem",
               "ParticleRenderItem",
               "RenderItem",
               "RenderItemKind",
@@ -7470,6 +7542,9 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "collectSceneLights",
+          "createSceneLights",
+          "isDirectionalLightSource",
           "PARTICLE_COLOR_OFFSET",
           "PARTICLE_INSTANCE_FLOATS",
           "PARTICLE_POSITION_OFFSET",
@@ -7478,6 +7553,7 @@
           "particleQuadGeometry",
           "buildInterpolatedRenderList",
           "buildRenderList",
+          "isLitItem",
           "isParticlesItem",
           "isSpriteItem",
           "isUnlitItem",
@@ -7486,7 +7562,11 @@
           "Sprite",
           "Texture",
           "PACKAGE_NAME",
+          "AmbientLightSource",
+          "DirectionalLightSource",
+          "SceneLights",
           "ParticleDrawable",
+          "LitRenderItem",
           "ParticleRenderItem",
           "RenderItem",
           "RenderItemKind",
@@ -7504,6 +7584,9 @@
           "TextureSource"
         ],
         "reExported": [
+          "collectSceneLights",
+          "createSceneLights",
+          "isDirectionalLightSource",
           "PARTICLE_COLOR_OFFSET",
           "PARTICLE_INSTANCE_FLOATS",
           "PARTICLE_POSITION_OFFSET",
@@ -7512,6 +7595,7 @@
           "particleQuadGeometry",
           "buildInterpolatedRenderList",
           "buildRenderList",
+          "isLitItem",
           "isParticlesItem",
           "isSpriteItem",
           "isUnlitItem",
@@ -7519,7 +7603,11 @@
           "NullRenderer",
           "Sprite",
           "Texture",
+          "AmbientLightSource",
+          "DirectionalLightSource",
+          "SceneLights",
           "ParticleDrawable",
+          "LitRenderItem",
           "ParticleRenderItem",
           "RenderItem",
           "RenderItemKind",
@@ -7538,6 +7626,43 @@
         ],
         "constants": [
           "PACKAGE_NAME"
+        ]
+      },
+      "packages/render/src/lights.ts": {
+        "description": "Light collection (§68, §64) — scene graph in, one flat light state out.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "isDirectionalLightSource",
+          "createSceneLights",
+          "collectSceneLights"
+        ],
+        "interfaces": [
+          "DirectionalLightSource",
+          "AmbientLightSource",
+          "SceneLights"
+        ],
+        "functions": [
+          "isDirectionalLightSource",
+          "createSceneLights",
+          "collectSceneLights"
         ]
       },
       "packages/render/src/particles.ts": {
@@ -7622,6 +7747,7 @@
             "package": "@four/materials",
             "directory": "packages/materials",
             "imports": [
+              "LitMaterial",
               "SpriteMaterial",
               "UnlitMaterial"
             ]
@@ -7638,18 +7764,21 @@
         "exports": [
           "isSpriteItem",
           "isUnlitItem",
+          "isLitItem",
           "isParticlesItem",
           "buildRenderList",
           "buildInterpolatedRenderList"
         ],
         "interfaces": [
           "UnlitRenderItem",
+          "LitRenderItem",
           "SpriteRenderItem",
           "ParticleRenderItem"
         ],
         "functions": [
           "isSpriteItem",
           "isUnlitItem",
+          "isLitItem",
           "isParticlesItem",
           "buildRenderList",
           "buildInterpolatedRenderList"
@@ -7672,6 +7801,7 @@
             "package": "@four/materials",
             "directory": "packages/materials",
             "imports": [
+              "LitMaterial",
               "UnlitMaterial"
             ]
           },
@@ -7863,6 +7993,7 @@
             "file": "./gl-program.js",
             "imports": [
               "GL",
+              "NORMAL_ATTRIBUTE_LOCATION",
               "POSITION_ATTRIBUTE_LOCATION",
               "WebglContext"
             ]
@@ -7979,26 +8110,31 @@
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
-              "Matrix4"
+              "Matrix4",
+              "Vector3"
             ]
           }
         ],
         "exports": [
           "GL",
           "POSITION_ATTRIBUTE_LOCATION",
+          "NORMAL_ATTRIBUTE_LOCATION",
           "UnlitProgram",
-          "SpriteProgram"
+          "SpriteProgram",
+          "LitProgram"
         ],
         "classes": [
           "UnlitProgram",
-          "SpriteProgram"
+          "SpriteProgram",
+          "LitProgram"
         ],
         "interfaces": [
           "WebglContext"
         ],
         "constants": [
           "GL",
-          "POSITION_ATTRIBUTE_LOCATION"
+          "POSITION_ATTRIBUTE_LOCATION",
+          "NORMAL_ATTRIBUTE_LOCATION"
         ]
       },
       "packages/render-webgl/src/gl-texture.ts": {
@@ -8060,6 +8196,8 @@
             "file": "./gl-program.js",
             "imports": [
               "GL",
+              "LitProgram",
+              "NORMAL_ATTRIBUTE_LOCATION",
               "POSITION_ATTRIBUTE_LOCATION",
               "SpriteProgram",
               "UnlitProgram"
@@ -8140,6 +8278,8 @@
           "ParticleBatchCache",
           "ParticleProgram",
           "GL",
+          "LitProgram",
+          "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
           "SpriteProgram",
           "UnlitProgram",
@@ -8170,6 +8310,8 @@
           "ParticleBatchCache",
           "ParticleProgram",
           "GL",
+          "LitProgram",
+          "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
           "SpriteProgram",
           "UnlitProgram",
@@ -8219,6 +8361,7 @@
             "file": "./gl-program.js",
             "imports": [
               "GL",
+              "LitProgram",
               "SpriteProgram",
               "UnlitProgram"
             ]
@@ -8252,6 +8395,9 @@
             "imports": [
               "buildInterpolatedRenderList",
               "buildRenderList",
+              "collectSceneLights",
+              "createSceneLights",
+              "isLitItem",
               "isParticlesItem",
               "isSpriteItem",
               "RenderItem",
@@ -8381,7 +8527,7 @@
         ]
       },
       "packages/scene/src/index.ts": {
-        "description": "Package entry point for @four/scene (re-exports 27 symbols)",
+        "description": "Package entry point for @four/scene (re-exports 30 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -8407,6 +8553,13 @@
             "file": "./group.js",
             "imports": [
               "Group"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./light.js",
+            "imports": [
+              "DirectionalLight"
             ],
             "reExport": true
           },
@@ -8480,6 +8633,15 @@
             "typeOnly": true
           },
           {
+            "file": "./light.js",
+            "imports": [
+              "ColorRGB",
+              "DirectionalLightOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./interpolation.js",
             "imports": [
               "PoseSnapshotSystem",
@@ -8524,6 +8686,7 @@
           "OrthographicCamera",
           "PerspectiveCamera",
           "Group",
+          "DirectionalLight",
           "POSE_SNAPSHOT_PRIORITY",
           "PoseBuffer",
           "createSnapshotSystem",
@@ -8538,6 +8701,8 @@
           "TransformAuthority",
           "OrthographicCameraOptions",
           "PerspectiveCameraOptions",
+          "ColorRGB",
+          "DirectionalLightOptions",
           "PoseSnapshotSystem",
           "SnapshotSystemOptions",
           "NodeEventMap",
@@ -8554,6 +8719,7 @@
           "OrthographicCamera",
           "PerspectiveCamera",
           "Group",
+          "DirectionalLight",
           "POSE_SNAPSHOT_PRIORITY",
           "PoseBuffer",
           "createSnapshotSystem",
@@ -8567,6 +8733,8 @@
           "TransformAuthority",
           "OrthographicCameraOptions",
           "PerspectiveCameraOptions",
+          "ColorRGB",
+          "DirectionalLightOptions",
           "PoseSnapshotSystem",
           "SnapshotSystemOptions",
           "NodeEventMap",
@@ -8619,6 +8787,43 @@
         ],
         "constants": [
           "POSE_SNAPSHOT_PRIORITY"
+        ]
+      },
+      "packages/scene/src/light.ts": {
+        "description": "Lights (§68) — the MVP tier: one directional light node.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./node.js",
+            "imports": [
+              "Node"
+            ]
+          },
+          {
+            "file": "./world-transforms.js",
+            "imports": [
+              "resolveWorldTransform"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          }
+        ],
+        "exports": [
+          "DirectionalLight"
+        ],
+        "classes": [
+          "DirectionalLight"
+        ],
+        "interfaces": [
+          "DirectionalLightOptions"
         ]
       },
       "packages/scene/src/node.ts": {
@@ -8703,6 +8908,13 @@
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./light.js",
+            "imports": [
+              "ColorRGB"
+            ],
+            "typeOnly": true
+          },
           {
             "file": "./node.js",
             "imports": [
@@ -9820,6 +10032,7 @@
         "name": "Packages/materials",
         "files": [
           "packages/materials/src/index.ts",
+          "packages/materials/src/lit-material.ts",
           "packages/materials/src/sprite-material.ts",
           "packages/materials/src/unlit-material.ts"
         ]
@@ -9916,6 +10129,7 @@
         "name": "Packages/render",
         "files": [
           "packages/render/src/index.ts",
+          "packages/render/src/lights.ts",
           "packages/render/src/particles.ts",
           "packages/render/src/render-list.ts",
           "packages/render/src/renderable.ts",
@@ -9961,6 +10175,7 @@
           "packages/scene/src/group.ts",
           "packages/scene/src/index.ts",
           "packages/scene/src/interpolation.ts",
+          "packages/scene/src/light.ts",
           "packages/scene/src/node.ts",
           "packages/scene/src/pose-target.ts",
           "packages/scene/src/scene.ts",
@@ -10000,18 +10215,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 153,
+    "totalTypeScriptFiles": 156,
     "totalModules": 24,
-    "totalLinesOfCode": 55398,
-    "totalExports": 1198,
-    "totalClasses": 89,
-    "totalInterfaces": 287,
-    "totalFunctions": 177,
-    "totalTypeGuards": 10,
+    "totalLinesOfCode": 56614,
+    "totalExports": 1221,
+    "totalClasses": 92,
+    "totalInterfaces": 293,
+    "totalFunctions": 181,
+    "totalTypeGuards": 12,
     "totalEnums": 0,
-    "totalConstants": 173,
-    "totalReExports": 782,
-    "totalTypeOnlyImports": 167,
+    "totalConstants": 174,
+    "totalReExports": 797,
+    "totalTypeOnlyImports": 172,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,
