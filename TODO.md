@@ -23,6 +23,13 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Backlog additions (tools integration, 2026-08-04)
+- [ ] Consolidate the 5 baselined TRUE_DUPLICATE names (docs/Architecture/
+      duplicate-baseline.json): cloneJsonValue + JsonValue (diagnostics/serialization),
+      DEFAULT_GRAVITY_Y (particles/physics), SeededRandom (= the existing Phase 9
+      hoist-to-core item), ColorRGBA (animation/materials); shrink the baseline via
+      gen-duplicate-baseline.mjs as each lands
+
 ### Backlog additions (Phase 10, 2026-08-02)
 - [ ] Package README sweep — all 24 still say "scaffold only" despite implementation
 - [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;

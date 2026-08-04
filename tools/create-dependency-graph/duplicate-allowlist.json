@@ -594,6 +594,16 @@
       "names": ["substitute"],
       "filesGlob": ["functions/src/typed/factorization/kronecker.ts"],
       "reason": "same name, different function (distinct-by-domain): functions/src/typed/factorization/kronecker.ts's substitute(p: MultiPoly, bases): IntPoly performs Kronecker substitution xₖ↦x^{bₖ}, collapsing a multivariate bigint poly to its univariate image; functions/src/typed/algebra.ts's substitute (left canonical) is the CAS string/AST variable substitution. Surfaced as TRUE_DUPLICATE only once factor() wired the Layer-2 engine into the live graph (2026-07-20). 2026-07 factorization Layer-2 slice."
+    },
+    {
+      "names": ["PACKAGE_NAME"],
+      "filesGlob": ["packages/**"],
+      "reason": "four.js: per-package identity constant — every @four/* package's src/index.ts exports its own PACKAGE_NAME string, the direct analog of MathTS's per-package VERSION entries above. Legitimately independent by construction; consolidating would invert the layering (everything would have to import one package for its own name). 2026-08-04 gate wiring."
+    },
+    {
+      "names": ["PARTICLE_INSTANCE_FLOATS"],
+      "filesGlob": ["packages/particles/src/particle-renderable.ts", "packages/render/src/particles.ts"],
+      "reason": "four.js: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride independently and the shared tests catch drift. 2026-08-04 gate wiring."
     }
   ]
 }

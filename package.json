@@ -19,6 +19,7 @@
     "format": "prettier --write .",
     "graph": "tsx tools/create-dependency-graph/create-dependency-graph.ts --root=.",
     "graph:check": "node tools/query-dependency-graph/query-dependency-graph.mjs --check-browser-safety",
+    "graph:duplicates": "node tools/create-dependency-graph/check-duplicates.mjs --no-regen",
     "graph:query": "node tools/query-dependency-graph/query-dependency-graph.mjs --emit",
     "graph:test": "node --test tools/query-dependency-graph/query-dependency-graph.test.mjs",
     "lint": "eslint .",
