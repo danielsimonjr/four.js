@@ -6,7 +6,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 323
+**Total files**: 329
 
 ## Disposition counts
 
@@ -16,27 +16,27 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 152 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 156 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
-| `config` | 8 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
-| `example` | 5 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **323** | |
+| `config` | 9 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
+| `example` | 6 | An `examples/` or `docs/` reference/illustration source. |
+| **Total** | **329** | |
 
 ## Per-area counts
 
 | Area | Files |
 | --- | --: |
-| `config` | 8 |
-| `examples` | 5 |
+| `config` | 9 |
+| `examples` | 6 |
 | `src` | 157 |
-| `tests` | 152 |
+| `tests` | 156 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 51 |
+| `(root)` | 55 |
 | `@four/animation` | 23 |
 | `@four/assets` | 6 |
 | `@four/core` | 14 |
@@ -49,14 +49,14 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@four/particles` | 15 |
 | `@four/physics` | 30 |
 | `@four/physics-box2d` | 2 |
-| `@four/physics-rapier` | 14 |
+| `@four/physics-rapier` | 15 |
 | `@four/physics-soft` | 2 |
 | `@four/render` | 12 |
 | `@four/render-canvas` | 2 |
 | `@four/render-svg` | 2 |
 | `@four/render-webgl` | 8 |
 | `@four/render-webgpu` | 2 |
-| `@four/scene` | 19 |
+| `@four/scene` | 20 |
 | `@four/serialization` | 8 |
 | `@four/text` | 6 |
 | `@four/ui` | 10 |
@@ -76,6 +76,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `examples/particles-demo/vite.config.ts` | (root) | config | config |
 | `examples/physics-playground/main.ts` | (root) | examples | example |
 | `examples/physics-playground/vite.config.ts` | (root) | config | config |
+| `examples/ui-demo/main.ts` | (root) | examples | example |
+| `examples/ui-demo/vite.config.ts` | (root) | config | config |
 | `packages/animation/src/animation-system.ts` | @four/animation | src | reachable |
 | `packages/animation/src/binding.ts` | @four/animation | src | reachable |
 | `packages/animation/src/clip.ts` | @four/animation | src | reachable |
@@ -242,6 +244,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/physics-rapier/tests/conversions2d.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/conversions3d.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-retype.test.ts` | @four/physics-rapier | tests | test |
+| `packages/physics-rapier/tests/rapier-world-tuning.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier2d-adapter.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier2d-joints.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier3d-adapter.test.ts` | @four/physics-rapier | tests | test |
@@ -319,6 +322,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/scene/tests/authority.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/camera.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/interpolation.test.ts` | @four/scene | tests | test |
+| `packages/scene/tests/node.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/pose-target.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/scene.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/smoke.test.ts` | @four/scene | tests | test |
@@ -357,6 +361,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/particles.spec.ts` | (root) | tests | test |
 | `tests/browser/playground.spec.ts` | (root) | tests | test |
 | `tests/browser/smoothness.spec.ts` | (root) | tests | test |
+| `tests/browser/ui.spec.ts` | (root) | tests | test |
 | `tests/determinism/helpers/phase1-scenario.ts` | (root) | tests | test |
 | `tests/determinism/helpers/phase10-scenario.ts` | (root) | tests | test |
 | `tests/determinism/helpers/phase2-scenario.ts` | (root) | tests | test |
@@ -386,6 +391,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/physics-rapier.test.ts` | (root) | tests | test |
 | `tests/integration/physics-replay.test.ts` | (root) | tests | test |
 | `tests/integration/scene-roundtrip.test.ts` | (root) | tests | test |
+| `tests/visual/ui-demo.spec.ts` | (root) | tests | test |
 | `tools/create-dependency-graph/create-dependency-graph.ts` | (root) | tools | tool |
 | `vitest.coverage.config.ts` | (root) | config | config |
 | `vitest.suites.config.ts` | (root) | config | config |

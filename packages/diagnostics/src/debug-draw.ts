@@ -138,11 +138,13 @@
  *
  * ## What the seams cannot answer (staged, 2026-08-02)
  *
- * Three items of §113's list are not obtainable through the seams as they exist,
- * and are staged with a dated note rather than approximated:
- * centre-of-mass display, constraint (joint anchor) visualization, and applied
- * force vectors. See {@link DEBUG_DRAW_STAGED} for the per-item reason, what
- * ships instead, and what would unblock each.
+ * Two items of §113's list are not obtainable through the seams as they exist,
+ * and are staged with a dated note rather than approximated: constraint (joint
+ * anchor) visualization and applied force vectors. See
+ * {@link DEBUG_DRAW_STAGED} for the per-item reason, what ships instead, and
+ * what would unblock each. Centre-of-mass display was staged with them and
+ * unstaged 2026-08-04, when `SolverBodyAccess` grew `getBodyCenterOfMass` —
+ * it ships as {@link collectCentersOfMass}.
  */
 
 import { Quaternion, Vector3 } from "@four/math";
@@ -192,6 +194,8 @@ export const DEBUG_DRAW_DEFAULT_COLORS = {
   angularVelocity: [1, 0.5, 0, 1] as DebugColor,
   /** Body transform origins — cyan (see {@link collectBodyOrigins}). */
   origin: [0, 1, 1, 1] as DebugColor,
+  /** Centres of mass — white (see {@link collectCentersOfMass}). */
+  centerOfMass: [1, 1, 1, 1] as DebugColor,
   /** Contact points — red. */
   contact: [1, 0, 0, 1] as DebugColor,
   /** Contact normals — green. */
@@ -804,20 +808,14 @@ export interface CollectBodyOriginsOptions {
  * A cross at every body's **transform origin** — three segments per body, in
  * ascending body id.
  *
- * ## This is not the centre of mass (staged, 2026-08-02)
+ * ## This is not the centre of mass
  *
- * §113 asks for "center-of-mass display" and this function deliberately does not
- * claim to be it. `SolverBodyAccess` (verified member by member,
- * `packages/physics/src/body-access.ts`) exposes `getBodyTransform`,
- * `getBodyMass`, `getBodyVelocities`, `isBodySleeping`, `getBodyCcdMode`,
- * `getBodyId`, `forEachBody`, and the collider trio — **no centre-of-mass
- * accessor of any kind**. The two coincide only for a body whose colliders are
- * symmetric about its origin, so drawing the origin and labelling it "centre of
- * mass" would be wrong exactly when it matters: an off-centre or compound body,
- * which is when a developer goes looking for the marker. The origin is what is
- * honestly readable, so the origin is what ships, under its own name.
- *
- * See {@link DEBUG_DRAW_STAGED} for what would unblock the real thing.
+ * §113's "center-of-mass display" is {@link collectCentersOfMass}; the two
+ * markers coincide only for a body whose colliders are symmetric about its
+ * origin. (From 2026-08-02 to 2026-08-04 the seam had no centre-of-mass
+ * accessor and this origin cross was the recorded honest substitute; the
+ * `getBodyCenterOfMass` member unstaged the real thing.) Draw both to see
+ * exactly how far a compound body's mass sits from its authored origin.
  *
  * Returns the number of segments appended (`3` per drawn body).
  */
@@ -838,6 +836,74 @@ export function collectBodyOrigins<THandle, TColliderHandle>(
       return;
     }
     access.getBodyTransform(handle, scratchPosition, scratchRotation);
+    buffer.addCross(scratchPosition, size, sleeping ? sleepingColor : color);
+    added += 3;
+  });
+  return added;
+}
+
+/**
+ * {@link DebugBodyAccess} plus the centre-of-mass read —
+ * `SolverBodyAccess.getBodyCenterOfMass`, transcribed 2026-08-04 (the member
+ * whose absence staged §113's centre-of-mass display from 2026-08-02, see the
+ * module header). Kept as an extension rather than a sixth member on
+ * {@link DebugBodyAccess} so every existing five-member source keeps
+ * satisfying the base seam unchanged; only {@link collectCentersOfMass}
+ * requires this one.
+ */
+export interface DebugCenterOfMassAccess<
+  THandle = unknown,
+  TColliderHandle = unknown,
+> extends DebugBodyAccess<THandle, TColliderHandle> {
+  /** World-space centre of mass (§25), as the solver resolved it. */
+  getBodyCenterOfMass(handle: THandle, out: Vector3): void;
+}
+
+/** Options for {@link collectCentersOfMass}. */
+export interface CollectCentersOfMassOptions {
+  /** Cross arm half-length in world units. Defaults to `0.1`. */
+  size?: number;
+
+  /** Colour. Defaults to {@link DEBUG_DRAW_DEFAULT_COLORS}. */
+  color?: DebugColor;
+
+  /** Skip bodies the solver reports asleep (§32). Defaults to `false`. */
+  skipSleeping?: boolean;
+
+  /** Colour for sleeping bodies, when they are not skipped. Defaults to `color`. */
+  sleepingColor?: DebugColor;
+}
+
+/**
+ * §113's centre-of-mass display: a cross at every body's **world-space centre
+ * of mass** — three segments per body, in ascending body id.
+ *
+ * This is the marker {@link collectBodyOrigins} deliberately is not: the
+ * solver's resolved centre of mass, collider offsets, densities and authored
+ * overrides included, read through
+ * `SolverBodyAccess.getBodyCenterOfMass` (the member that unstaged this
+ * provider, 2026-08-04). For an off-centre or compound body the two crosses
+ * visibly separate, which is precisely the situation the marker exists for.
+ *
+ * Returns the number of segments appended (`3` per drawn body).
+ */
+export function collectCentersOfMass<THandle, TColliderHandle>(
+  access: DebugCenterOfMassAccess<THandle, TColliderHandle>,
+  buffer: DebugDrawBuffer,
+  options: CollectCentersOfMassOptions = {},
+): number {
+  const size = requirePositiveOption("size", options.size ?? 0.1);
+  const color = options.color ?? DEBUG_DRAW_DEFAULT_COLORS.centerOfMass;
+  const sleepingColor = options.sleepingColor ?? color;
+  const skipSleeping = options.skipSleeping ?? false;
+  const needsSleepState = skipSleeping || options.sleepingColor !== undefined;
+  let added = 0;
+  access.forEachBody((handle) => {
+    const sleeping = needsSleepState ? access.isBodySleeping(handle) : false;
+    if (skipSleeping && sleeping) {
+      return;
+    }
+    access.getBodyCenterOfMass(handle, scratchPosition);
     buffer.addCross(scratchPosition, size, sleeping ? sleepingColor : color);
     added += 3;
   });
@@ -1140,25 +1206,6 @@ export interface StagedVisualization {
  * entries are asserted by `tests/debug-draw.test.ts`.
  */
 export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
-  Object.freeze({
-    id: "center-of-mass",
-    specItem: "center-of-mass display (§113)",
-    reason:
-      "SolverBodyAccess (packages/physics/src/body-access.ts) exposes " +
-      "getBodyTransform, getBodyMass, getBodyVelocities, isBodySleeping, " +
-      "getBodyCcdMode, getBodyId, forEachBody and the collider trio — no " +
-      "centre-of-mass accessor. The centre of mass differs from the transform " +
-      "origin for any off-centre or compound body, which is exactly when the " +
-      "marker matters, so it cannot be approximated by the origin.",
-    shippedInstead: "collectBodyOrigins — a cross at the transform origin",
-    unblockedBy:
-      "a getBodyCenterOfMass(handle, outWorld) member on SolverBodyAccess, " +
-      "implemented by each adapter — Rapier can serve it today: " +
-      "@dimforge/rapier2d-compat 0.19.3's dynamics/rigid_body.d.ts declares " +
-      "RigidBody.localCom() and RigidBody.worldCom() (verified against the " +
-      "installed typings, WP-10.3) — then a collectCentersOfMass provider here.",
-    staged: "2026-08-02",
-  }),
   Object.freeze({
     id: "joint-anchors",
     specItem: "constraint visualization (§113)",

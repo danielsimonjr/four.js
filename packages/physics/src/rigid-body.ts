@@ -127,7 +127,7 @@ const DEFAULT_GRAVITY_SCALE = 1;
  */
 const DEFAULT_PHYSICS_WEIGHT = 1;
 
-/** §19 default: nothing is animated into the solve until asked. See {@link DEFAULT_PHYSICS_WEIGHT}. */
+/** §19 default: nothing is animated into the solve until asked. See `DEFAULT_PHYSICS_WEIGHT`. */
 const DEFAULT_ANIMATION_WEIGHT = 0;
 
 /**
@@ -761,7 +761,7 @@ export class RigidBody
    * either slider alone. {@link RigidBody.normalizedWeights} is where the ratio
    * becomes a pair of fractions.
    *
-   * Defaults to {@link DEFAULT_PHYSICS_WEIGHT}; must be finite and `>= 0`
+   * Defaults to `DEFAULT_PHYSICS_WEIGHT`; must be finite and `>= 0`
    * (§85), checked on assignment. Inert under every authority except
    * `"blended"` (§42).
    */
@@ -779,7 +779,7 @@ export class RigidBody
    * pose — the `PoseTarget` on the node (§19, P7-1) — relative to
    * {@link RigidBody.physicsWeight}. See that property for the whole contract.
    *
-   * Defaults to {@link DEFAULT_ANIMATION_WEIGHT}: a body nobody has blended is
+   * Defaults to `DEFAULT_ANIMATION_WEIGHT`: a body nobody has blended is
    * fully physical.
    */
   get animationWeight(): number {

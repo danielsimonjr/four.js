@@ -1,12 +1,21 @@
 # @four/assets
 
-Asset system. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
+Asset system. Part of [four.js](../../README.md).
 
-Declarative asset loading with deduplication, caching, reference counting, streaming, worker decoding, and hot reload; loaders for images, glTF/GLB, fonts; the texture system.
+Implements the MVP tier of §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 11 (§113a).
 
-Specification: §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
+## What's here
 
-## Layout
+- **`AssetManager`** — deduplicating, reference-counted cache over an injectable `fetch` (`FetchLike`); concurrent requests for the same URL coalesce into one load, and releasing the last reference disposes the asset.
+- **Loaders** — `textLoader`, `jsonLoader`, `binaryLoader`, and `createImageLoader` (over an injectable `ImageDecodeLike`); `AssetLoader` is the contract a custom loader implements.
+- **`ImageAsset`** — disposal wrapper around a decoded image (`ImageBitmapLike`).
 
-- `src/` — implementation (strict TypeScript, ESM)
-- `tests/` — unit tests (Vitest), colocated per package (§92)
+## Staged / not yet implemented
+
+- glTF/GLB loading (§78) — staged with dated notes in `src/loaders.ts`; it needs the §55 texture tier and non-unlit materials, which do not exist yet.
+- The texture system (§77).
+- Streaming, worker decoding, and hot reload.
+
+Unit tests are colocated in `tests/` per §92.
+
+Workspace name `@four/assets`; publishes as `@danielsimonjr/fourjs-assets`.

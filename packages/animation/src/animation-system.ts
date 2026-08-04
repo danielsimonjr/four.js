@@ -92,7 +92,7 @@ export interface Advanceable {
 /** Options for {@link AnimationSystem}. */
 export interface AnimationSystemOptions {
   /**
-   * Execution order key (§39). Default {@link PRIORITY_ANIMATION_TARGETS} —
+   * Execution order key (§39). Default {@link @four/motion!PRIORITY_ANIMATION_TARGETS | PRIORITY_ANIMATION_TARGETS} —
    * step 3, "animation target evaluation", which is below `MotionSystem`'s
    * step 4 as P4-1 requires. Read once, at registration.
    */
@@ -140,7 +140,7 @@ export interface AnimationSystemOptions {
  * Track and untrack outside the step if that distinction matters.
  */
 export class AnimationSystem implements SimulationSystem {
-  /** Execution order key (§39); default {@link PRIORITY_ANIMATION_TARGETS}. */
+  /** Execution order key (§39); default {@link @four/motion!PRIORITY_ANIMATION_TARGETS | PRIORITY_ANIMATION_TARGETS}. */
   priority: number;
 
   /** Tracked players in insertion order (§33: deterministic iteration). */

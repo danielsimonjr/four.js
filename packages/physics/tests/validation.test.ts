@@ -358,6 +358,58 @@ describe("validateRigidBodyDescriptor (§22, §23, §31)", () => {
     ).toContain("continuousCollisionDetection is false");
   });
 
+  it("accepts a positive ccdPredictionDistance on a speculative body (§31)", () => {
+    expect(() => {
+      validateRigidBodyDescriptor(
+        {
+          type: "dynamic",
+          ccdMode: "speculative",
+          ccdPredictionDistance: 2.5,
+        },
+        "3d",
+      );
+    }).not.toThrow();
+  });
+
+  it("rejects a non-positive or non-finite ccdPredictionDistance (§85)", () => {
+    for (const distance of [0, -1, Number.NaN, Infinity]) {
+      expect(
+        expectFourError(() => {
+          validateRigidBodyDescriptor(
+            {
+              type: "dynamic",
+              ccdMode: "speculative",
+              ccdPredictionDistance: distance,
+            },
+            "3d",
+          );
+        }).message,
+      ).toContain("ccdPredictionDistance");
+    }
+  });
+
+  it("rejects a ccdPredictionDistance whose resolved mode is not speculative (§31)", () => {
+    // Explicit non-speculative modes, and the two resolutions that land on
+    // "disabled"/"swept" without naming a mode (§23's switch alone resolves
+    // to DEFAULT_ENABLED_CCD_MODE = "swept").
+    const cases: Partial<RigidBodyDescriptor>[] = [
+      { ccdMode: "swept" },
+      { ccdMode: "disabled" },
+      {},
+      { continuousCollisionDetection: true },
+    ];
+    for (const extra of cases) {
+      expect(
+        expectFourError(() => {
+          validateRigidBodyDescriptor(
+            { type: "dynamic", ccdPredictionDistance: 1, ...extra },
+            "3d",
+          );
+        }).message,
+      ).toContain("not speculative");
+    }
+  });
+
   it("accepts the consistent CCD combinations", () => {
     expect(() => {
       validateRigidBodyDescriptor(
@@ -522,6 +574,26 @@ describe("validatePhysicsWorldOptions (§21, §32, §33, §85)", () => {
     expect(() => {
       validatePhysicsWorldOptions({ dimension: "3d" });
     }).not.toThrow();
+  });
+
+  it("accepts a positive integer solverIterations (§28)", () => {
+    expect(() => {
+      validatePhysicsWorldOptions({ dimension: "2d", solverIterations: 1 });
+      validatePhysicsWorldOptions({ dimension: "3d", solverIterations: 16 });
+    }).not.toThrow();
+  });
+
+  it("rejects a solverIterations that is not a positive integer (§85)", () => {
+    for (const iterations of [0, -4, 2.5, Number.NaN, Infinity]) {
+      expect(
+        expectFourError(() => {
+          validatePhysicsWorldOptions({
+            dimension: "2d",
+            solverIterations: iterations,
+          });
+        }).message,
+      ).toContain("solverIterations");
+    }
   });
 
   it("rejects an unknown dimension (§85)", () => {

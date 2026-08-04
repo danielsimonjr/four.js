@@ -61,6 +61,7 @@
  */
 
 import { FourError } from "@four/core";
+import { solverJointStatistics } from "@four/diagnostics";
 import { Vector3 } from "@four/math";
 import { FixedJoint, HingeJoint, SphericalJoint } from "@four/physics";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -134,6 +135,12 @@ for (const kit of DIMENSION_KITS) {
       expect(world.jointCount).toBe(1);
       expect(pendulum.joint.registered).toBe(true);
       expect(pendulum.joint.type).toBe("revolute");
+      // §113's joint statistics against the live jointed adapter (2026-08-04
+      // — the last debug provider previously exercised via fakes only). Both
+      // Rapier adapters honestly declare reportsJointReactions false.
+      const jointStats = solverJointStatistics(world.adapter);
+      expect(jointStats.jointCount).toBe(1);
+      expect(jointStats.reportsJointReactions).toBe(false);
 
       // 50 seconds of swing, timed by the interpolated zero crossings of x —
       // which is ~25 half-periods, so the mean interval is accurate to far

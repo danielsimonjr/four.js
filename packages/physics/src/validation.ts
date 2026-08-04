@@ -64,6 +64,7 @@ import type { BodyType, PhysicsDimension, Vector3Input } from "./types.js";
 import {
   BODY_TYPES,
   CCD_MODES,
+  DEFAULT_ENABLED_CCD_MODE,
   DETERMINISM_LEVELS,
   PHYSICS_DIMENSIONS,
 } from "./types.js";
@@ -284,6 +285,30 @@ export function validateRigidBodyDescriptor(
       fail(
         `continuousCollisionDetection is false but ccdMode is ${JSON.stringify(desc.ccdMode)} (§23, §31). Drop one of the two rather than leaving the engine to guess which you meant.`,
         { field: "ccdMode", value: desc.ccdMode },
+      );
+    }
+  }
+
+  if (desc.ccdPredictionDistance !== undefined) {
+    const distance = desc.ccdPredictionDistance;
+    if (!Number.isFinite(distance) || distance <= 0) {
+      fail(
+        `ccdPredictionDistance must be a positive finite distance in world units (§31); got ${String(distance)} (§85).`,
+        { field: "ccdPredictionDistance", value: distance },
+      );
+    }
+    // The distance parameterizes speculative contact generation and nothing
+    // else, so giving it with any other resolved mode is the same class of
+    // contradiction as the switch/mode conflict above.
+    const speculative =
+      desc.ccdMode === "speculative" ||
+      (desc.ccdMode === undefined &&
+        desc.continuousCollisionDetection === true &&
+        DEFAULT_ENABLED_CCD_MODE === "speculative");
+    if (!speculative) {
+      fail(
+        `ccdPredictionDistance only parameterizes "speculative" CCD, but the resolved mode is not speculative (§31). Set ccdMode: "speculative", or drop the distance.`,
+        { field: "ccdPredictionDistance", value: distance },
       );
     }
   }
@@ -612,6 +637,16 @@ export function validatePhysicsWorldOptions(
       fail(
         `Unknown determinism level ${JSON.stringify(options.determinism)}; expected one of ${DETERMINISM_LEVELS.join(", ")} (§33).`,
         { field: "determinism", value: options.determinism },
+      );
+    }
+  }
+
+  if (options.solverIterations !== undefined) {
+    const iterations = options.solverIterations;
+    if (!Number.isSafeInteger(iterations) || iterations < 1) {
+      fail(
+        `solverIterations must be a positive integer (§28 "solver iterations" is a per-step count); got ${String(iterations)} (§85).`,
+        { field: "solverIterations", value: iterations },
       );
     }
   }

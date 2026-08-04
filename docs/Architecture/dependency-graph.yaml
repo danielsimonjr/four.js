@@ -4,7 +4,7 @@ metadata:
   lastUpdated: "2026-08-04"
   totalFiles: 157
   totalModules: 24
-  totalExports: 1211
+  totalExports: 1216
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -1139,6 +1139,7 @@ modules:
         - DEBUG_DRAW_STAGED
         - collectBodyVelocities
         - collectBodyOrigins
+        - collectCentersOfMass
         - collectContactPoints
         - collectContactImpulses
         - solverStatistics
@@ -1156,6 +1157,8 @@ modules:
         - DebugPhysicsEventLike
         - CollectBodyVelocitiesOptions
         - CollectBodyOriginsOptions
+        - DebugCenterOfMassAccess
+        - CollectCentersOfMassOptions
         - CollectContactPointsOptions
         - CollectContactImpulsesOptions
         - SolverStatistics
@@ -1164,6 +1167,7 @@ modules:
       functions:
         - collectBodyVelocities
         - collectBodyOrigins
+        - collectCentersOfMass
         - collectContactPoints
         - collectContactImpulses
         - solverStatistics
@@ -1217,6 +1221,7 @@ modules:
             - DebugDrawBuffer
             - collectBodyOrigins
             - collectBodyVelocities
+            - collectCentersOfMass
             - collectContactImpulses
             - collectContactPoints
             - solverJointStatistics
@@ -1255,9 +1260,11 @@ modules:
           imports:
             - CollectBodyOriginsOptions
             - CollectBodyVelocitiesOptions
+            - CollectCentersOfMassOptions
             - CollectContactImpulsesOptions
             - CollectContactPointsOptions
             - DebugBodyAccess
+            - DebugCenterOfMassAccess
             - DebugCollisionEventLike
             - DebugColor
             - DebugContactPoint
@@ -1295,6 +1302,7 @@ modules:
         - DebugDrawBuffer
         - collectBodyOrigins
         - collectBodyVelocities
+        - collectCentersOfMass
         - collectContactImpulses
         - collectContactPoints
         - solverJointStatistics
@@ -1315,9 +1323,11 @@ modules:
         - ReplayStepListener
         - CollectBodyOriginsOptions
         - CollectBodyVelocitiesOptions
+        - CollectCentersOfMassOptions
         - CollectContactImpulsesOptions
         - CollectContactPointsOptions
         - DebugBodyAccess
+        - DebugCenterOfMassAccess
         - DebugCollisionEventLike
         - DebugColor
         - DebugContactPoint
@@ -1352,6 +1362,7 @@ modules:
         - DebugDrawBuffer
         - collectBodyOrigins
         - collectBodyVelocities
+        - collectCentersOfMass
         - collectContactImpulses
         - collectContactPoints
         - solverJointStatistics
@@ -1371,9 +1382,11 @@ modules:
         - ReplayStepListener
         - CollectBodyOriginsOptions
         - CollectBodyVelocitiesOptions
+        - CollectCentersOfMassOptions
         - CollectContactImpulsesOptions
         - CollectContactPointsOptions
         - DebugBodyAccess
+        - DebugCenterOfMassAccess
         - DebugCollisionEventLike
         - DebugColor
         - DebugContactPoint
@@ -4165,6 +4178,7 @@ modules:
           imports:
             - BodyControlModeOptions
             - PhysicsSnapshot
+            - PhysicsSnapshotConfiguration
             - PhysicsWorldAdapter
             - PhysicsWorldInit
             - PoseTargetCaptureSystemOptions
@@ -4346,6 +4360,7 @@ modules:
         - Vector3Input
         - BodyControlModeOptions
         - PhysicsSnapshot
+        - PhysicsSnapshotConfiguration
         - PhysicsWorldAdapter
         - PhysicsWorldInit
         - PoseTargetCaptureSystemOptions
@@ -4523,6 +4538,7 @@ modules:
         - Vector3Input
         - BodyControlModeOptions
         - PhysicsSnapshot
+        - PhysicsSnapshotConfiguration
         - PhysicsWorldAdapter
         - PhysicsWorldInit
         - PoseTargetCaptureSystemOptions
@@ -4926,6 +4942,7 @@ modules:
           imports:
             - BODY_TYPES
             - CCD_MODES
+            - DEFAULT_ENABLED_CCD_MODE
             - DETERMINISM_LEVELS
             - PHYSICS_DIMENSIONS
       workspaceDependencies:
@@ -5096,6 +5113,7 @@ modules:
         - WorldShapeCastHit
         - WorldPointHit
         - PhysicsSnapshot
+        - PhysicsSnapshotConfiguration
         - BodyControlModeOptions
         - PoseTargetCaptureSystemOptions
       functions:
@@ -6625,6 +6643,11 @@ modules:
             - Component
             - ComponentHost
             - ComponentType
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Quaternion
+            - Vector3
       exports: []
       interfaces:
         - NodeHierarchyEvent
@@ -7638,15 +7661,15 @@ dependencyGraph:
 statistics:
   totalTypeScriptFiles: 157
   totalModules: 24
-  totalLinesOfCode: 55214
-  totalExports: 1211
+  totalLinesOfCode: 55559
+  totalExports: 1216
   totalClasses: 88
-  totalInterfaces: 267
-  totalFunctions: 176
+  totalInterfaces: 270
+  totalFunctions: 177
   totalTypeGuards: 10
   totalEnums: 0
   totalConstants: 172
-  totalReExports: 798
+  totalReExports: 802
   totalTypeOnlyImports: 167
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 0

@@ -209,6 +209,12 @@ export interface RapierRigidBody {
   isSleeping(): boolean;
   isCcdEnabled(): boolean;
   softCcdPrediction(): number;
+  /**
+   * World-space centre of mass (`worldCom(): Vector`). Declared at
+   * `dynamics/rigid_body.d.ts` line 262 of the installed 0.19.3 typings
+   * (verified WP-10.3); serves `SolverBodyAccess.getBodyCenterOfMass`.
+   */
+  worldCom(): RapierVector;
   velocityAtPoint(point: RapierVector): RapierVector;
   setTranslation(translation: RapierVector, wakeUp: boolean): void;
   setRotation(angle: number, wakeUp: boolean): void;
@@ -391,7 +397,13 @@ interface RapierNarrowPhase {
 /** `pipeline/world.d.ts`: the members of `World` this package calls. */
 export interface RapierWorld {
   timestep: number;
-  readonly numSolverIterations: number;
+  /**
+   * Constraint-solver iterations per step; upstream declares both the getter
+   * (line 123) and the setter (line 132), so this is writable — assigned once
+   * at `initialize` when `PhysicsWorldOptions.solverIterations` is present
+   * (§28, 2026-08-04).
+   */
+  numSolverIterations: number;
   readonly narrowPhase: RapierNarrowPhase;
   free(): void;
   step(eventQueue?: RapierEventQueue): void;
@@ -740,6 +752,12 @@ export interface RapierRigidBody3d {
   isSleeping(): boolean;
   isCcdEnabled(): boolean;
   softCcdPrediction(): number;
+  /**
+   * World-space centre of mass (`worldCom(): Vector`), as in the 2D build —
+   * verified separately against the installed 3D typings (WP-10.3); serves
+   * `SolverBodyAccess.getBodyCenterOfMass`.
+   */
+  worldCom(): RapierVector3;
   velocityAtPoint(point: RapierVector3): RapierVector3;
   setTranslation(translation: RapierVector3, wakeUp: boolean): void;
   setRotation(rotation: RapierRotation3, wakeUp: boolean): void;
@@ -868,7 +886,8 @@ interface RapierNarrowPhase3d {
 /** `pipeline/world.d.ts`: the members of `World` this package calls. */
 export interface RapierWorld3d {
   timestep: number;
-  readonly numSolverIterations: number;
+  /** Writable, as in the 2D build — see {@link RapierWorld.numSolverIterations}. */
+  numSolverIterations: number;
   readonly narrowPhase: RapierNarrowPhase3d;
   free(): void;
   step(eventQueue?: RapierEventQueue3d): void;

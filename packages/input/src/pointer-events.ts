@@ -233,11 +233,12 @@ const CAPTURE_KEYS = {
 export const CAPTURE_KEY_PREFIX = "capture:";
 
 declare module "@four/scene" {
-  /**
-   * Pointer events (§72), merged into the one node event map (§6b) by
-   * declaration merging — see this module's documentation for why this is the
-   * widening mechanism and why the capture phase gets its own keys.
-   */
+  // Pointer events (§72), merged into the one node event map (§6b) by
+  // declaration merging — see this module's documentation for why this is the
+  // widening mechanism and why the capture phase gets its own keys.
+  // Deliberately NOT a doc comment: TypeDoc warns when two declarations of one
+  // merged interface both carry one, and `@four/scene`'s declaration is the
+  // documented one.
   interface NodeEventMap {
     /** Pointer pressed. Capture, target, bubble. */
     pointerdown: ScenePointerEvent;

@@ -218,7 +218,7 @@ export type AnimationEventListener = (
 export interface MixerRootMotionOptions {
   /**
    * Path of the clip track to difference, matched exactly against
-   * {@link ./track.js#AnimationTrackLike.path}. The clip must contain exactly
+   * {@link AnimationTrackLike.path}. The clip must contain exactly
    * one track with this path, and it must be a `vector3` track.
    */
   readonly trackPath: string;

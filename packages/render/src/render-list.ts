@@ -190,7 +190,7 @@ export interface ParticleRenderItem extends RenderItemBase {
  * gets the concrete material type from an ordinary `kind` check, with no cast
  * and no `instanceof` on the draw path. The builders pay for that with **one**
  * documented cast where the invariant is actually established — see
- * {@link itemAt}.
+ * `itemAt`.
  */
 export type RenderItem =
   UnlitRenderItem | SpriteRenderItem | ParticleRenderItem;
@@ -568,7 +568,7 @@ export function buildRenderList(root: Node, out: RenderItem[]): RenderItem[] {
  * Identical to {@link buildRenderList} in traversal, filtering, sorting, and
  * pooling; the one difference is each item's `worldMatrix`, which is a pooled
  * matrix holding the world transform composed from interpolated local poses
- * root-first (see {@link composeRenderPoseMatrix}) instead of a reference to
+ * root-first (see `composeRenderPoseMatrix`) instead of a reference to
  * the node's resolved world matrix. This is §43's fix for rendering faster than
  * the simulation steps: at `alpha = 0` every item matches the previous captured
  * pose, at `alpha = 1` the current one, and in between position lerps and

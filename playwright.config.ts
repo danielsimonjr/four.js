@@ -5,9 +5,9 @@ import { defineConfig } from "@playwright/test";
 
 /**
  * Playwright configuration for the browser gates (WP-3.8, extended by WP-5.8,
- * WP-6.6, WP-7.7 and WP-9.4).
+ * WP-6.6, WP-7.7, WP-9.4 and the post-plan UI proof).
  *
- * The suite drives **five built example sites** in headless Chromium:
+ * The suite drives **six built example sites** in headless Chromium:
  *
  * | site | port | specs | what it gates |
  * | ---- | ---- | ----- | ------------- |
@@ -16,11 +16,12 @@ import { defineConfig } from "@playwright/test";
  * | `examples/mechanism` | {@link MECHANISM_PORT} | `mechanism` | §109's jointed mechanism: a motorised shaft, three hinges, a limited slider, a spring and two limit switches, stable under a real-time load and reconfigurable while running |
  * | `examples/blending` | {@link BLENDING_PORT} | `blending` | §110's physics-animation blending: an animated chain handed to the solver as a ragdoll and blended back onto its animation, without abrupt discontinuities |
  * | `examples/particles-demo` | {@link PARTICLES_PORT} | `particles` | §112's particle demonstration: a seeded CPU fountain under §27 fields bouncing off a collision plane, plus a click burst, each drawn as one instanced draw call |
+ * | `examples/ui-demo` | {@link UI_PORT} | `ui` | §73–§75's retained-mode UI: a `@four/ui` panel of buttons and labels laid out by the package, skinned by the application, driven by real pointer and keyboard input (the WP-11.5 packet-intent closure) |
  *
  * There are no golden images — SwiftShader rasterises slightly differently from
  * a GPU, so every assertion is a threshold, never a pixel match (§92).
  *
- * Run **all five** builds first: the web servers below serve the *built* `dist`
+ * Run **all six** builds first: the web servers below serve the *built* `dist`
  * directories, which are gitignored and may be absent.
  *
  * ```sh
@@ -29,14 +30,16 @@ import { defineConfig } from "@playwright/test";
  * pnpm mechanism:build        # examples/mechanism/dist
  * pnpm blending:build         # examples/blending/dist
  * pnpm particles-demo:build   # examples/particles-demo/dist
+ * pnpm ui-demo:build          # examples/ui-demo/dist
  * pnpm test:browser
  * ```
  *
  * `use.baseURL` stays the first site's, so every pre-existing spec keeps
  * navigating with `page.goto("/")` unchanged; `playground.spec.ts`,
- * `mechanism.spec.ts`, `blending.spec.ts` and `particles.spec.ts` name their own
- * absolute URLs, and restate {@link PLAYGROUND_PORT} / {@link MECHANISM_PORT} /
- * {@link BLENDING_PORT} / {@link PARTICLES_PORT} for the reason the other specs restate the example's
+ * `mechanism.spec.ts`, `blending.spec.ts`, `particles.spec.ts` and `ui.spec.ts`
+ * name their own absolute URLs, and restate {@link PLAYGROUND_PORT} /
+ * {@link MECHANISM_PORT} / {@link BLENDING_PORT} / {@link PARTICLES_PORT} /
+ * {@link UI_PORT} for the reason the other specs restate the example's
  * scene constants — a browser gate checks the built page from the outside, and
  * a spec that imported this file would drag a second copy of the config into
  * every worker.
@@ -137,6 +140,20 @@ const BLENDING_PORT = 4176;
  */
 const PARTICLES_PORT = 4177;
 
+/**
+ * Preview port for `examples/ui-demo` — the §73–§75 UI demonstration.
+ *
+ * A sixth entry rather than a sixth run, for {@link PLAYGROUND_PORT}'s reason:
+ * `vite preview` serves exactly one `dist`, and Playwright starts every entry of
+ * a `webServer` array before the first test. 4178 is the next free port above
+ * the particles demo's and is restated verbatim in `tests/browser/ui.spec.ts`.
+ *
+ * Like the particles demo, this site is the cheap tier: no physics package, no
+ * WebAssembly image — `ui`, `input`, `text`, `scene` and the WebGL backend
+ * bundle to ~25 kB gzip.
+ */
+const UI_PORT = 4178;
+
 export default defineConfig({
   testDir: "tests/browser",
   // Failure artifacts (traces, error context) live inside the already-ignored
@@ -160,8 +177,26 @@ export default defineConfig({
       args: ["--use-gl=angle", "--use-angle=swiftshader"],
     },
   },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
-  // All five sites are started before the first test and torn down after the
+  projects: [
+    {
+      name: "chromium",
+      testDir: "tests/browser",
+      use: { browserName: "chromium" },
+    },
+    // §92's visual category (seeded 2026-08-04): golden-image comparison of
+    // pages that are static at rest, compared SwiftShader-to-SwiftShader —
+    // the launch args below force that rasteriser everywhere, so the
+    // "no golden images" doctrine above (about SwiftShader-vs-GPU drift)
+    // does not apply to this project. Goldens live next to the specs and are
+    // committed; refresh with `npx playwright test --project visual
+    // --update-snapshots` after reviewing the failure diff.
+    {
+      name: "visual",
+      testDir: "tests/visual",
+      use: { browserName: "chromium" },
+    },
+  ],
+  // All six sites are started before the first test and torn down after the
   // last, so one `pnpm test:browser` run covers every spec in `testDir`. The
   // entries use different ports, so they coexist rather than race for one.
   webServer: [
@@ -211,7 +246,16 @@ export default defineConfig({
       url: `http://localhost:${String(PARTICLES_PORT)}`,
       reuseExistingServer: false,
       // No wasm at all: this bundle is ~20 kB gzip, so the first request is the
-      // fastest of the five. The generous timeout is kept for uniformity.
+      // fastest of the six. The generous timeout is kept for uniformity.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/ui-demo --port ${String(UI_PORT)} --strictPort`,
+      url: `http://localhost:${String(UI_PORT)}`,
+      reuseExistingServer: false,
+      // The particles demo's tier: no wasm, ~25 kB gzip of JavaScript.
       timeout: 60_000,
       stdout: "ignore",
       stderr: "pipe",

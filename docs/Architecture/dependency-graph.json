@@ -5,7 +5,7 @@
     "lastUpdated": "2026-08-04",
     "totalFiles": 157,
     "totalModules": 24,
-    "totalExports": 1211
+    "totalExports": 1216
   },
   "entryPoints": [
     {
@@ -1502,6 +1502,7 @@
           "DEBUG_DRAW_STAGED",
           "collectBodyVelocities",
           "collectBodyOrigins",
+          "collectCentersOfMass",
           "collectContactPoints",
           "collectContactImpulses",
           "solverStatistics",
@@ -1521,6 +1522,8 @@
           "DebugPhysicsEventLike",
           "CollectBodyVelocitiesOptions",
           "CollectBodyOriginsOptions",
+          "DebugCenterOfMassAccess",
+          "CollectCentersOfMassOptions",
           "CollectContactPointsOptions",
           "CollectContactImpulsesOptions",
           "SolverStatistics",
@@ -1530,6 +1533,7 @@
         "functions": [
           "collectBodyVelocities",
           "collectBodyOrigins",
+          "collectCentersOfMass",
           "collectContactPoints",
           "collectContactImpulses",
           "solverStatistics",
@@ -1599,6 +1603,7 @@
               "DebugDrawBuffer",
               "collectBodyOrigins",
               "collectBodyVelocities",
+              "collectCentersOfMass",
               "collectContactImpulses",
               "collectContactPoints",
               "solverJointStatistics",
@@ -1652,9 +1657,11 @@
             "imports": [
               "CollectBodyOriginsOptions",
               "CollectBodyVelocitiesOptions",
+              "CollectCentersOfMassOptions",
               "CollectContactImpulsesOptions",
               "CollectContactPointsOptions",
               "DebugBodyAccess",
+              "DebugCenterOfMassAccess",
               "DebugCollisionEventLike",
               "DebugColor",
               "DebugContactPoint",
@@ -1695,6 +1702,7 @@
           "DebugDrawBuffer",
           "collectBodyOrigins",
           "collectBodyVelocities",
+          "collectCentersOfMass",
           "collectContactImpulses",
           "collectContactPoints",
           "solverJointStatistics",
@@ -1715,9 +1723,11 @@
           "ReplayStepListener",
           "CollectBodyOriginsOptions",
           "CollectBodyVelocitiesOptions",
+          "CollectCentersOfMassOptions",
           "CollectContactImpulsesOptions",
           "CollectContactPointsOptions",
           "DebugBodyAccess",
+          "DebugCenterOfMassAccess",
           "DebugCollisionEventLike",
           "DebugColor",
           "DebugContactPoint",
@@ -1753,6 +1763,7 @@
           "DebugDrawBuffer",
           "collectBodyOrigins",
           "collectBodyVelocities",
+          "collectCentersOfMass",
           "collectContactImpulses",
           "collectContactPoints",
           "solverJointStatistics",
@@ -1772,9 +1783,11 @@
           "ReplayStepListener",
           "CollectBodyOriginsOptions",
           "CollectBodyVelocitiesOptions",
+          "CollectCentersOfMassOptions",
           "CollectContactImpulsesOptions",
           "CollectContactPointsOptions",
           "DebugBodyAccess",
+          "DebugCenterOfMassAccess",
           "DebugCollisionEventLike",
           "DebugColor",
           "DebugContactPoint",
@@ -5570,6 +5583,7 @@
             "imports": [
               "BodyControlModeOptions",
               "PhysicsSnapshot",
+              "PhysicsSnapshotConfiguration",
               "PhysicsWorldAdapter",
               "PhysicsWorldInit",
               "PoseTargetCaptureSystemOptions",
@@ -5754,6 +5768,7 @@
           "Vector3Input",
           "BodyControlModeOptions",
           "PhysicsSnapshot",
+          "PhysicsSnapshotConfiguration",
           "PhysicsWorldAdapter",
           "PhysicsWorldInit",
           "PoseTargetCaptureSystemOptions",
@@ -5932,6 +5947,7 @@
           "Vector3Input",
           "BodyControlModeOptions",
           "PhysicsSnapshot",
+          "PhysicsSnapshotConfiguration",
           "PhysicsWorldAdapter",
           "PhysicsWorldInit",
           "PoseTargetCaptureSystemOptions",
@@ -6486,6 +6502,7 @@
             "imports": [
               "BODY_TYPES",
               "CCD_MODES",
+              "DEFAULT_ENABLED_CCD_MODE",
               "DETERMINISM_LEVELS",
               "PHYSICS_DIMENSIONS"
             ]
@@ -6736,6 +6753,7 @@
           "WorldShapeCastHit",
           "WorldPointHit",
           "PhysicsSnapshot",
+          "PhysicsSnapshotConfiguration",
           "BodyControlModeOptions",
           "PoseTargetCaptureSystemOptions"
         ],
@@ -8808,6 +8826,14 @@
               "ComponentHost",
               "ComponentType"
             ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Quaternion",
+              "Vector3"
+            ]
           }
         ],
         "exports": [],
@@ -10171,15 +10197,15 @@
   "statistics": {
     "totalTypeScriptFiles": 157,
     "totalModules": 24,
-    "totalLinesOfCode": 55214,
-    "totalExports": 1211,
+    "totalLinesOfCode": 55559,
+    "totalExports": 1216,
     "totalClasses": 88,
-    "totalInterfaces": 267,
-    "totalFunctions": 176,
+    "totalInterfaces": 270,
+    "totalFunctions": 177,
     "totalTypeGuards": 10,
     "totalEnums": 0,
     "totalConstants": 172,
-    "totalReExports": 798,
+    "totalReExports": 802,
     "totalTypeOnlyImports": 167,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 0,

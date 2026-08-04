@@ -567,7 +567,7 @@ export class UnlitProgram implements Disposable {
   /**
    * Compiles and links the unlit program on `gl`.
    *
-   * Throws a {@link FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
+   * Throws a {@link @four/core!FourError | FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
    * the driver's info log in `context.log` when any stage fails to compile,
    * when linking fails, when GL refuses to allocate an object, or when a
    * uniform this backend wrote is missing from the linked program. Shader
@@ -676,7 +676,7 @@ export class UnlitProgram implements Disposable {
  * declare the position stream at the fixed
  * {@link POSITION_ATTRIBUTE_LOCATION}, which is what "a second pipeline reuses
  * these vertex arrays unchanged" in that module's header was written for. See
- * {@link SPRITE_VERTEX_SHADER_SOURCE} for why there is no uv attribute.
+ * `SPRITE_VERTEX_SHADER_SOURCE` for why there is no uv attribute.
  *
  * Owns its GL objects and nothing else — the texture it samples belongs to
  * `gl-texture.ts`'s cache, and the renderer re-creates this program on context
@@ -721,7 +721,7 @@ export class SpriteProgram implements Disposable {
    * Compiles and links the sprite program on `gl`.
    *
    * Fails exactly as {@link UnlitProgram.create} does — see it, and
-   * {@link createLinkedProgram}, for the contract; the messages name `"sprite"` instead
+   * `createLinkedProgram`, for the contract; the messages name `"sprite"` instead
    * of `"unlit"` and the §89 code is the same.
    */
   static create(gl: WebglContext): SpriteProgram {
@@ -795,7 +795,7 @@ export class SpriteProgram implements Disposable {
   /**
    * Uploads the quad's local rectangle — `(minX, minY, width, height)` — from
    * which the vertex stage derives uv. See
-   * {@link SPRITE_VERTEX_SHADER_SOURCE}.
+   * `SPRITE_VERTEX_SHADER_SOURCE`.
    */
   setQuad(minX: number, minY: number, width: number, height: number): void {
     colorScratch[0] = minX;

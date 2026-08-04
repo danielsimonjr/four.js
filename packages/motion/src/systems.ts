@@ -80,7 +80,7 @@ export const PRIORITY_SNAPSHOT = 1000;
 /**
  * Step 11 of the §39 order: render interpolation.
  *
- * Interpolation reads {@link ReadonlyTimeState.interpolationAlpha} and never
+ * Interpolation reads {@link ReadonlyTimeState}'s `interpolationAlpha` and never
  * writes simulation state back (§42).
  */
 export const PRIORITY_RENDER_INTERPOLATION = 1100;

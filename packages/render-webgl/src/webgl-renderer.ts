@@ -515,7 +515,7 @@ export class WebglRenderer implements Renderer {
    * program, sets the fixed GL state, and wires the context-loss events (§61,
    * §45).
    *
-   * Rejects with a {@link FourError} carrying `RENDERER_INITIALIZATION_FAILED`
+   * Rejects with a {@link @four/core!FourError | FourError} carrying `RENDERER_INITIALIZATION_FAILED`
    * when there is no canvas, when the canvas will not give up a `"webgl2"`
    * context (an older browser, a blocked GPU, a context already taken by
    * another API), or when what it gives back is not a WebGL 2 context; and with

@@ -200,7 +200,7 @@ export class Quaternion {
    * interpolation. The result then travels the short way round, and at `t = 1`
    * equals `-target` — the same rotation as `target`, with opposite components.
    *
-   * Nearly parallel inputs (dot above {@link SLERP_LINEAR_THRESHOLD}, 0.9995)
+   * Nearly parallel inputs (dot above `SLERP_LINEAR_THRESHOLD`, 0.9995)
    * fall back to normalized linear interpolation, which avoids dividing by
    * `sin(theta)` as `theta` goes to zero. See that constant for the error
    * bound.

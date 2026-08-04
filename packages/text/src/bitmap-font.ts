@@ -324,7 +324,7 @@ export interface BitmapFontOptions {
 
   /**
    * {@link BitmapFont.glyphWidth}; 1…5. Capped at five because one base-32
-   * digit is five bits — see {@link MAX_GLYPH_WIDTH}.
+   * digit is five bits — see `MAX_GLYPH_WIDTH`.
    */
   glyphWidth: number;
 

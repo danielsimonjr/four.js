@@ -1,12 +1,11 @@
 # @four/render-canvas
 
-Canvas 2D backend. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
+Canvas 2D backend — **interface reserved; not yet implemented.** Part of [four.js](../../README.md).
 
-Canvas 2D rendering backend for 2D scenes and fallback rendering.
+Reserved for the Canvas 2D rendering backend (2D scenes and fallback rendering) per §62 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md). The §120 MVP renders with WebGL 2 only (`@four/render-webgl`).
 
-Specification: §62 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
+The package exists in the workspace so the §98 monorepo tree stays accurate. The barrel currently exports only `PACKAGE_NAME`, and `tests/` holds a single smoke test. When implemented, it will provide a `Renderer` implementation over `@four/render`'s backend-independent interface.
 
-## Layout
+Unit tests are colocated in `tests/` per §92.
 
-- `src/` — implementation (strict TypeScript, ESM)
-- `tests/` — unit tests (Vitest), colocated per package (§92)
+Workspace name `@four/render-canvas`; publishes as `@danielsimonjr/fourjs-render-canvas`.

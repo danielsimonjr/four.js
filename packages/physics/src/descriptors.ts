@@ -162,6 +162,22 @@ export interface RigidBodyDescriptor {
    *   a contradiction, rejected rather than silently resolved.
    */
   ccdMode?: CCDMode;
+
+  /**
+   * Prediction distance for `"speculative"` CCD, in world units (§31).
+   *
+   * How far ahead of the body speculative contacts are generated. Larger
+   * catches faster or thinner tunnelling cases at more broad-phase cost.
+   * Omitted means the adapter's documented default (`1` on both Rapier
+   * adapters — the WP-5.4 pinned constant this field was recorded to
+   * replace; field added 2026-08-04). Only meaningful when the resolved CCD
+   * mode is `"speculative"`; giving it alongside any other resolved mode is
+   * a contradiction and is rejected (§85), exactly as the switch/mode
+   * contradiction above is.
+   *
+   * A positive finite number.
+   */
+  ccdPredictionDistance?: number;
 }
 
 /**
@@ -679,6 +695,24 @@ export interface PhysicsWorldOptions {
    * that at construction (WP-5.3).
    */
   determinism?: DeterminismLevel;
+
+  /**
+   * Constraint-solver iterations per step (§28 "solver iterations") — a
+   * **world-level** accuracy/cost dial, closing the gap recorded at the Phase
+   * 6 exit ("§28 solver-iterations feature not exposed anywhere",
+   * 2026-08-02; closed 2026-08-04).
+   *
+   * World-level and not per-joint because that is what solvers actually
+   * offer: Rapier 0.19.3 exposes exactly `World.numSolverIterations`
+   * (default `4` — more iterations, stiffer joints and stacks, linearly more
+   * cost). Omitted means the solver's own default, so existing worlds —
+   * and every recorded §33/§34 checksum and replay — are untouched.
+   * Setting it is checksum-affecting, exactly like changing gravity: two
+   * runs must use the same value to reproduce.
+   *
+   * A positive integer; validated at construction (§85).
+   */
+  solverIterations?: number;
 }
 
 /** Reads the `z` of a {@link Vector3Input}: `0` for the two-component form. */

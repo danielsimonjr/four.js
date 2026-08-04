@@ -706,6 +706,16 @@ export class FakeSolverAdapter
     return this.#requireBody(handle).ccdMode;
   }
 
+  getBodyCenterOfMass(handle: PhysicsBodyHandle, out: Vector3): void {
+    const body = this.#requireBody(handle);
+    this.#record("getBodyCenterOfMass", body.id);
+    // This double's simplification: uniform bodies whose centre of mass sits
+    // at the transform origin. Off-centre mass is a solver derivation (Rapier
+    // reads it from collider layout); what the engine contract needs proven
+    // here is the out-parameter write and the handle discipline.
+    out.copy(body.position);
+  }
+
   getBodyMass(handle: PhysicsBodyHandle): number {
     const body = this.#requireBody(handle);
     this.#record("getBodyMass", body.id);

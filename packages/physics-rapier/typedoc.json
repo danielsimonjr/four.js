@@ -1,0 +1,25 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "intentionallyNotExported": [
+    "RapierActiveCollisionTypes",
+    "RapierActiveCollisionTypes3d",
+    "RapierActiveEvents",
+    "RapierActiveEvents3d",
+    "RapierCoefficientCombineRules",
+    "RapierCoefficientCombineRules3d",
+    "RapierColliderDesc",
+    "RapierColliderDesc3d",
+    "RapierEventQueue",
+    "RapierEventQueue3d",
+    "RapierMotorModels",
+    "RapierRay",
+    "RapierRay3d",
+    "RapierRigidBodyDesc",
+    "RapierRigidBodyDesc3d",
+    "RapierRigidBodyTypes",
+    "RapierRigidBodyTypes3d",
+    "RapierVector",
+    "RapierWorld",
+    "RapierWorld3d"
+  ]
+}

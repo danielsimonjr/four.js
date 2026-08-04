@@ -3,5 +3,15 @@
     "path": "examples/first-2d-scene/dist/assets/*.js",
     "limit": "150 kB",
     "gzip": true
+  },
+  {
+    "path": "examples/particles-demo/dist/assets/*.js",
+    "limit": "25 kB",
+    "gzip": true
+  },
+  {
+    "path": "examples/ui-demo/dist/assets/*.js",
+    "limit": "30 kB",
+    "gzip": true
   }
 ]

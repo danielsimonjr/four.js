@@ -25,6 +25,42 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-04 (backlog burn-down, owner-directed "implement all your suggestions and
+  more").** Landed in one batch: (1) **README truth** — all 24 package READMEs rewritten
+  against `package-export-surfaces.json` (the five placeholder packages honestly say
+  "interface reserved; not yet implemented"); root README rewritten with the §93
+  quick-start (every identifier verified against the real API). (2) **De-flake** —
+  blending RECOVER's sweep clock now starts BEFORE the click (the old placement started
+  it after a SwiftShader screenshot that could eat 500+ ms of the 1.5 s sweep — the
+  recorded 1-in-3 fail); collapse wait → `expect.poll`; 3/3 local runs green.
+  (3) **UI browser proof** (closes the WP-11.5 shortfall) — `examples/ui-demo` (panel/
+  buttons/labels, app-supplied WidgetSkins, §72 pointer + staged-seam keyboard hosting,
+  25 kB gzip) + `tests/browser/ui.spec.ts` (4 tests, sixth webServer, port 4178);
+  `.size-limit.json` gains particles-demo (19.36/25 kB) and ui-demo (25/30 kB).
+  (4) **§92 visual category seeded** — `tests/visual/ui-demo.spec.ts`, a second
+  Playwright project (`visual`), committed SwiftShader-to-SwiftShader pixel goldens
+  (the browser suite's "no goldens" doctrine is about SwiftShader-vs-GPU and does not
+  apply; animated sites need a deterministic stepping hook first — recorded next step).
+  (5) **Node.position/rotation/scale alias getters** (the §15/§97 idiom; getter-only,
+  returns the LIVE transform members so change-hooks fire; WP-3.1 flag resolved).
+  (6) **getBodyCenterOfMass** on SolverBodyAccess (+ both Rapier adapters via
+  `worldCom()`, fakes, scripted adapters) and **collectCentersOfMass** in diagnostics —
+  the center-of-mass DEBUG_DRAW_STAGED entry is unstaged; all seven debug providers now
+  run against LIVE Rapier (replay rig runs origins/velocities/COM/impulses per step;
+  the jointed pendulum asserts solverJointStatistics) — the "fakes only" verifier note
+  is closed. (7) **§28 solverIterations** world option → Rapier
+  `World.numSolverIterations` (proven behaviourally: 1 vs 4 diverge on a stack;
+  explicit 4 bit-identical to omitted, so recorded checksums stand). (8) **§31
+  ccdPredictionDistance** descriptor field replaces the WP-5.4 pinned 1 m constant
+  (proven at the boundary: 0.001 m tunnels a thin wall at 200 m/s, 10 m catches it;
+  contradiction with a non-speculative resolved mode is refused). (9) **§34
+  world-configuration refusal** — PhysicsSnapshot gains optional
+  `PhysicsSnapshotConfiguration` (dimension, resolved gravity, resolved sleeping,
+  determinism, solverIterations-if-set); restore refuses field-by-field when present;
+  absent = pre-existing envelopes and §34 replay documents (which record adapter
+  identity only) restore exactly as before. Gotcha: the visual goldens live in
+  `tests/visual/*-snapshots/` and refresh with
+  `npx playwright test --project visual --update-snapshots` — review the diff first.
 - **2026-08-04 (later) — ZERO-FINDINGS SWEEP (owner-directed: "resolve all issues the
   tools report; defer nothing"): all 5 baselined duplicates consolidated, both type-only
   cycles broken, all 21 unused exports resolved; every docs/Architecture report is now 0

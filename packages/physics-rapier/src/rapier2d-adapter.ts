@@ -81,7 +81,7 @@
  *   {@link Rapier2dAdapter.setJointMotor} for exactly what it does mean.
  * - **No way to remove a motor**, and a gain of `0` is Rapier's *rigid* motor
  *   rather than its inert one. A disabled motor is therefore configured with
- *   {@link INERT_MOTOR_GAIN}, measured bit-identical to a joint that never had
+ *   `INERT_MOTOR_GAIN`, measured bit-identical to a joint that never had
  *   one — the same constant and the same answer `Rapier3dAdapter` gives.
  *
  * Joint handles, like body handles, are Rapier indices that get **reused** after
@@ -182,16 +182,16 @@ const ADAPTER_NAME = "rapier2d";
 const ADAPTER_DIMENSION = "2d";
 
 /**
- * Prediction distance, in world units, used for `"speculative"` CCD (§31).
+ * Default prediction distance, in world units, for `"speculative"` CCD (§31).
  *
  * Rapier's soft-CCD *is* speculative contact generation — "predictive
  * constraints instead of shape-cast and substeps", in its own words — but it is
  * parameterized by a distance, and §31's `CCDMode` carries no parameter. One
  * metre is the adapter's choice: generous enough to catch the
  * slow-but-thin and moderately fast cases soft-CCD exists for, small enough that
- * the broad-phase cost stays bounded in a metre-scale world (§40). A later
- * packet that widens `RigidBodyDescriptor` with a prediction distance should
- * replace this constant with the descriptor's value (decision, WP-5.4).
+ * the broad-phase cost stays bounded in a metre-scale world (§40). Since
+ * 2026-08-04 this is only the **default**: WP-5.4's recorded follow-up landed
+ * as `RigidBodyDescriptor.ccdPredictionDistance`, which overrides it per body.
  */
 const SOFT_CCD_PREDICTION_DISTANCE = 1;
 
@@ -339,7 +339,7 @@ interface BodyRecord {
   body: RapierRigidBody;
   /** Last observed `isSleeping()`, for §32's sleep/wake transitions. */
   sleeping: boolean;
-  /** How this body's mass is composed. See {@link MassMode}. */
+  /** How this body's mass is composed. See `MassMode`. */
   massMode: MassMode;
   /** The §23 `mass`, when one was given. */
   explicitMass: number;
@@ -603,6 +603,12 @@ export interface RapierBodyAccess {
   /** The body's mass in kilograms, as the solver computed it (§23, §25). */
   getBodyMass(handle: PhysicsBodyHandle): number;
 
+  /**
+   * World-space centre of mass into `out` (§25); `out.z` is `0` in this planar
+   * build. Served by Rapier's `RigidBody.worldCom()`.
+   */
+  getBodyCenterOfMass(handle: PhysicsBodyHandle, out: Vector3): void;
+
   /** The monotonic id §33's checksum orders by. */
   getBodyId(handle: PhysicsBodyHandle): number;
 
@@ -806,6 +812,12 @@ export class Rapier2dAdapter
     // every step (verified at 0.19.3), so handing it a reused buffer would let
     // the next position conversion silently rewrite the world's gravity.
     this.#world = new rapier.World({ x: gravity.x, y: gravity.y });
+    if (options.solverIterations !== undefined) {
+      // §28 solver iterations, world-level (2026-08-04). Applied once, before
+      // any body exists; Rapier's own default (4) stands when omitted, so
+      // recorded checksums and replays are untouched.
+      this.#world.numSolverIterations = options.solverIterations;
+    }
     this.#eventQueue = new rapier.EventQueue(true);
   }
 
@@ -825,7 +837,7 @@ export class Rapier2dAdapter
    * density-1 collider yields mass 6, and on a body with only zero-density
    * colliders yields mass 5 with **zero rotational inertia** (both measured at
    * 0.19.3). §23 says `mass` is authoritative, so the adapter resolves one of
-   * three {@link MassMode}s here and every `createCollider` on this body honours
+   * three `MassMode`s here and every `createCollider` on this body honours
    * it. In particular, an explicit `mass` with no inertia tensor is carried by
    * the body's *first* collider through `ColliderDesc.setMass`, which gives the
    * requested mass **and** a geometry-derived inertia.
@@ -884,7 +896,9 @@ export class Rapier2dAdapter
     if (ccdMode === "swept") {
       rigidBodyDesc.setCcdEnabled(true);
     } else if (ccdMode === "speculative") {
-      rigidBodyDesc.setSoftCcdPrediction(SOFT_CCD_PREDICTION_DISTANCE);
+      rigidBodyDesc.setSoftCcdPrediction(
+        desc.ccdPredictionDistance ?? SOFT_CCD_PREDICTION_DISTANCE,
+      );
     }
 
     const massMode = resolveMassMode(desc);
@@ -1918,7 +1932,9 @@ export class Rapier2dAdapter
   }
 
   /**
-   * @inheritDoc
+   * Re-types a live body in place — `SolverBodyAccess.setBodyType`'s contract,
+   * §22/plan P7-3 (a documented own summary rather than `@inheritDoc`, which
+   * cannot carry additional paragraphs).
    *
    * Rapier's `setBodyType(type, wakeUp)` takes `wakeUp` as a **required**
    * argument, so the default is applied here rather than passed through.
@@ -1964,6 +1980,12 @@ export class Rapier2dAdapter
   /** @inheritDoc */
   getBodyMass(handle: PhysicsBodyHandle): number {
     return this.#requireBody(handle).body.mass();
+  }
+
+  /** @inheritDoc */
+  getBodyCenterOfMass(handle: PhysicsBodyHandle, out: Vector3): void {
+    const com = this.#requireBody(handle).body.worldCom();
+    out.set(com.x, com.y, 0);
   }
 
   /** @inheritDoc */
@@ -2085,7 +2107,7 @@ export class Rapier2dAdapter
    * step and to 5.9e-44 rad/s within a second, where the same bar with no motor
    * keeps turning). A motor that arrives disabled — or whose `maxEffort` is
    * `0`, which asks for a drive that exerts nothing — is therefore configured
-   * with {@link INERT_MOTOR_GAIN} and a zero target, the setting measured to be
+   * with `INERT_MOTOR_GAIN` and a zero target, the setting measured to be
    * **bit-identical** to a joint that never had a motor at all: `max |Δ| = 0`
    * over 3600 steps on a hinge and a slider, and over 600 steps continuing from
    * a joint that had just been running a strong motor. `Rapier3dAdapter` does
@@ -2274,7 +2296,7 @@ export class Rapier2dAdapter
    * `configureMotorVelocity(0, 0)` makes the motor a *rigid* zero-velocity
    * constraint, which brakes the joint instead of releasing it. So a motor that
    * is disabled, or whose `maxEffort` is `0`, is configured with
-   * {@link INERT_MOTOR_GAIN} and a zero target: the one setting measured to be
+   * `INERT_MOTOR_GAIN` and a zero target: the one setting measured to be
    * bit-identical to a joint that never had a motor, which is the only honest
    * reading of "a disabled motor exerts nothing" on a solver that cannot remove
    * one.
@@ -2778,7 +2800,7 @@ function resolveCcdMode(desc: RigidBodyDescriptor): CCDMode {
     : "disabled";
 }
 
-/** Chooses the {@link MassMode} for a body from its §23 descriptor. */
+/** Chooses the `MassMode` for a body from its §23 descriptor. */
 function resolveMassMode(desc: RigidBodyDescriptor): MassMode {
   const hasDistribution =
     desc.centerOfMass !== undefined || desc.inertiaTensor !== undefined;
@@ -2796,7 +2818,7 @@ function resolveMassMode(desc: RigidBodyDescriptor): MassMode {
 }
 
 /**
- * Applies the body's {@link MassMode} to a collider descriptor (§23, §25).
+ * Applies the body's `MassMode` to a collider descriptor (§23, §25).
  *
  * `Collider.density` is authoritative over `PhysicsMaterial.density` — that rule
  * is `resolveDensity`'s, reused here so the adapter cannot drift from it.

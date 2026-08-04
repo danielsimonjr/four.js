@@ -322,6 +322,42 @@ export interface PhysicsSnapshot {
   readonly adapterVersion: string;
   /** The adapter's opaque bytes (§34). */
   readonly data: ArrayBuffer;
+  /**
+   * The world configuration the bytes were captured under (2026-08-04 —
+   * closing the recorded Phase 5 gap "world-configuration mismatch is not
+   * refused; name/version only").
+   *
+   * Optional because two legitimate producers cannot supply it: snapshots
+   * decoded from the §34 replay document (whose format records adapter
+   * identity, not world configuration) and captures made before the field
+   * existed. When present, {@link PhysicsWorld.restoreSnapshot} refuses a
+   * mismatch field by field; when absent, the name/version check is the whole
+   * §34 guarantee, exactly as before.
+   */
+  readonly configuration?: PhysicsSnapshotConfiguration;
+}
+
+/**
+ * The world configuration recorded in a {@link PhysicsSnapshot} (§34).
+ *
+ * Every field here changes what stepping the restored bytes produces, so a
+ * mismatch means the restored run is **not** a continuation of the captured
+ * one — the §33/§34 promise — even though the adapter would deserialize the
+ * bytes without complaint. Gravity is the resolved 3-tuple, sleeping the
+ * resolved §32 record (Appendix A defaults filled in), so two worlds that
+ * spell the same configuration differently still compare equal.
+ */
+export interface PhysicsSnapshotConfiguration {
+  /** `"2d"` or `"3d"` (§21). */
+  readonly dimension: PhysicsDimension;
+  /** Resolved world gravity, m/s² (§21, Appendix A). */
+  readonly gravity: readonly [number, number, number];
+  /** Resolved §32 sleeping configuration. */
+  readonly sleeping: SleepingConfig;
+  /** The §33 tier the world asked for. */
+  readonly determinism: DeterminismLevel;
+  /** §28 solver iterations, when the world set them (absent = solver default). */
+  readonly solverIterations?: number;
 }
 
 /**
@@ -641,6 +677,7 @@ export class PhysicsWorld {
       gravity: this.#gravity,
       sleeping: this.#sleeping,
       determinism,
+      solverIterations: init.solverIterations,
     });
   }
 
@@ -1538,6 +1575,15 @@ export class PhysicsWorld {
       adapterName: this.#adapter.name,
       adapterVersion: this.#adapter.version,
       data: this.#adapter.createSnapshot(),
+      configuration: {
+        dimension: this.#dimension,
+        gravity: [this.#gravity.x, this.#gravity.y, this.#gravity.z],
+        sleeping: { ...this.#sleeping },
+        determinism: this.#determinism,
+        ...(this.#options.solverIterations !== undefined && {
+          solverIterations: this.#options.solverIterations,
+        }),
+      },
     };
   }
 
@@ -1592,7 +1638,59 @@ export class PhysicsWorld {
         },
       );
     }
+    if (snapshot.configuration !== undefined) {
+      this.#refuseConfigurationMismatch(snapshot.configuration);
+    }
     this.#adapter.restoreSnapshot(snapshot.data);
+  }
+
+  /**
+   * The §34 world-configuration check of {@link PhysicsWorld.restoreSnapshot}
+   * (2026-08-04): every field of a present {@link PhysicsSnapshotConfiguration}
+   * must match this world's resolved configuration, or the restored bytes
+   * would step under different rules than they were captured under and the
+   * run would silently stop being a continuation.
+   */
+  #refuseConfigurationMismatch(
+    configuration: PhysicsSnapshotConfiguration,
+  ): void {
+    const mismatch = (field: string, expected: unknown, found: unknown): never => {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `Snapshot was captured under a different world configuration: ${field} was ${JSON.stringify(found)} at capture and is ${JSON.stringify(expected)} here. Stepping the restored state under different rules is not a continuation of the captured run (§34); rebuild the world with the captured configuration, or capture a fresh snapshot.`,
+        { context: { field, expected, found } },
+      );
+    };
+    if (configuration.dimension !== this.#dimension) {
+      mismatch("dimension", this.#dimension, configuration.dimension);
+    }
+    const [gx, gy, gz] = configuration.gravity;
+    if (gx !== this.#gravity.x || gy !== this.#gravity.y || gz !== this.#gravity.z) {
+      mismatch(
+        "gravity",
+        [this.#gravity.x, this.#gravity.y, this.#gravity.z],
+        configuration.gravity,
+      );
+    }
+    if (configuration.determinism !== this.#determinism) {
+      mismatch("determinism", this.#determinism, configuration.determinism);
+    }
+    if (configuration.solverIterations !== this.#options.solverIterations) {
+      mismatch(
+        "solverIterations",
+        this.#options.solverIterations,
+        configuration.solverIterations,
+      );
+    }
+    const sleeping = configuration.sleeping;
+    if (
+      sleeping.enabled !== this.#sleeping.enabled ||
+      sleeping.linearThreshold !== this.#sleeping.linearThreshold ||
+      sleeping.angularThreshold !== this.#sleeping.angularThreshold ||
+      sleeping.timeThreshold !== this.#sleeping.timeThreshold
+    ) {
+      mismatch("sleeping", { ...this.#sleeping }, { ...sleeping });
+    }
   }
 
   /**

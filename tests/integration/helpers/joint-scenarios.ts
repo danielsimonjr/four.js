@@ -976,6 +976,11 @@ export class ScriptedJointAdapter
     return body.type === "dynamic" ? body.mass : 0;
   }
 
+  getBodyCenterOfMass(handle: PhysicsBodyHandle, out: Vector3): void {
+    // Uniform-body simplification, as in FakeSolverAdapter: origin = COM.
+    out.copy(this.#requireBody(handle).position);
+  }
+
   getBodyId(handle: PhysicsBodyHandle): number {
     return this.#requireBody(handle).id;
   }
