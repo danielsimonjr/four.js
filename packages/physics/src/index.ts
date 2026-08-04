@@ -47,6 +47,7 @@ export type {
   ColliderEventMap,
   ColliderOptions,
   ColliderTriggerEvent,
+  RigidBodyCollisionEvent,
 } from "./collider.js";
 export { Collider } from "./collider.js";
 export type {
@@ -162,7 +163,6 @@ export {
 export type {
   BlendWeights,
   PointLoad,
-  RigidBodyCollisionEvent,
   RigidBodyCommands,
   RigidBodyEventMap,
   RigidBodySleepEvent,

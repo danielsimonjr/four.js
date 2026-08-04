@@ -82,14 +82,13 @@ import {
 } from "@four/core";
 import { Matrix3, Quaternion, Vector3 } from "@four/math";
 
-import type { Collider } from "./collider.js";
 import type { RigidBodyDescriptor } from "./descriptors.js";
 import {
   resolveAngularVelocity,
   resolveRotation,
   widenToVector3,
 } from "./descriptors.js";
-import type { CollisionEvent, SleepEvent } from "./events.js";
+import type { SleepEvent } from "./events.js";
 import type {
   BodyType,
   CCDMode,
@@ -285,9 +284,6 @@ interface RigidBodySleepBinding {
   sleeping: boolean;
 }
 
-/** §29's collision payload as it reaches a node's listeners. */
-export type RigidBodyCollisionEvent = CollisionEvent<RigidBody, Collider>;
-
 /** §32's sleep-state payload as it reaches a node's listeners. */
 export type RigidBodySleepEvent = SleepEvent<RigidBody>;
 
@@ -296,16 +292,18 @@ export type RigidBodySleepEvent = SleepEvent<RigidBody>;
  * minus the two trigger names, which belong to the sensor collider
  * (`ColliderEventMap`).
  *
+ * Declared here with the two §32 sleep names; `collider.ts` merges the three
+ * §29 collision names in (declaration merging). Their payload,
+ * `RigidBodyCollisionEvent`, names `Collider`, and importing that type here —
+ * even type-only — would close an import cycle: `collider.ts` already imports
+ * {@link RigidBody} at runtime to resolve `Collider.body`. Everywhere the
+ * package is consumed the five keys read as one interface, exactly as
+ * `@four/input`'s pointer names merge into `NodeEventMap`.
+ *
  * Emission is package-internal (see the module header): `PhysicsSystem`
  * dispatches these after the fixed step, never during it (§6b, §39 step 9).
  */
 export interface RigidBodyEventMap {
-  /** Two colliders began touching (§29). */
-  collisionstart: RigidBodyCollisionEvent;
-  /** Two colliders are still touching (§29). */
-  collisionstay: RigidBodyCollisionEvent;
-  /** Two colliders stopped touching (§29); `contacts` is empty. */
-  collisionend: RigidBodyCollisionEvent;
   /** This body stopped simulating (§32). */
   sleep: RigidBodySleepEvent;
   /** This body resumed simulating (§32). */

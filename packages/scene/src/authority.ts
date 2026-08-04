@@ -7,7 +7,7 @@
  * for that ownership ({@link TransformAuthority}) and the enforcement primitive
  * every writing system shares ({@link warnAuthorityConflict}); the field itself
  * lives on `Node` (§42 writes `node.transformAuthority = "physics"`), see
- * {@link Node.transformAuthority}.
+ * `Node.transformAuthority`.
  *
  * ## What enforcement means here (decision, WP-2.3)
  *
@@ -50,7 +50,24 @@
  * warning is in `@four/core`.
  */
 
-import type { Node } from "./node.js";
+/**
+ * The slice of `Node` this module reads — identity for the warning text plus
+ * the owning {@link TransformAuthority} (§42).
+ *
+ * Structural rather than `import type { Node }` on purpose: `node.ts` imports
+ * this module at runtime (for {@link DEFAULT_TRANSFORM_AUTHORITY}), so naming
+ * the class here — even type-only — would close an import cycle between the
+ * two files. Every `Node` satisfies this shape, and TypeScript's structural
+ * typing means callers pass their nodes exactly as before.
+ */
+export interface AuthorityNode {
+  /** `Node.id` — stable identity for the warning and its suppression. */
+  readonly id: string;
+  /** `Node.name` — empty when unnamed; used only to label the warning. */
+  readonly name: string;
+  /** `Node.transformAuthority` — the §42 owner being violated. */
+  readonly transformAuthority: TransformAuthority;
+}
 
 /**
  * Which system owns a node's transform (§42).
@@ -116,7 +133,7 @@ export const DEFAULT_TRANSFORM_AUTHORITY: TransformAuthority = "manual";
  * goes away takes its suppression record with it, and `Set` values so the
  * per-writer granularity survives.
  */
-const warnedWriters = new WeakMap<Node, Set<TransformAuthority>>();
+const warnedWriters = new WeakMap<AuthorityNode, Set<TransformAuthority>>();
 
 /**
  * Reports that `writer` tried to write the transform of `node`, which it does
@@ -134,7 +151,7 @@ const warnedWriters = new WeakMap<Node, Set<TransformAuthority>>();
  * ```
  */
 export function warnAuthorityConflict(
-  node: Node,
+  node: AuthorityNode,
   writer: TransformAuthority,
 ): boolean {
   let warned = warnedWriters.get(node);

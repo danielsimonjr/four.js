@@ -44,21 +44,20 @@
  */
 
 import type { Disposable } from "@four/core";
+import type { ColorRGBA } from "@four/math";
 
 /**
- * Straight (non-premultiplied) RGBA, each component nominally in 0…1.
+ * Straight (non-premultiplied) RGBA, each component nominally in 0…1 —
+ * `@four/math`'s {@link ColorRGBA}, re-exported (hoisted 2026-08-04;
+ * `@four/animation` tweens the same tuple and §3.1 has no edge between the
+ * two packages).
  *
  * A mutable 4-tuple rather than a `Vector4`: a color is not a geometric vector
  * (adding two colors is not a transform, and none of `Vector4`'s dot/normalize
  * surface means anything here), and a plain array uploads to
  * `uniform4fv`/`Float32Array.set` without an adapter.
  */
-export type ColorRGBA = [
-  red: number,
-  green: number,
-  blue: number,
-  alpha: number,
-];
+export type { ColorRGBA } from "@four/math";
 
 /** Construction arguments of {@link UnlitMaterial}. */
 export interface UnlitMaterialOptions {

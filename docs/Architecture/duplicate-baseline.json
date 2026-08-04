@@ -1,28 +1,6 @@
 {
   "generated": "2026-08-04",
   "note": "The in-progress dedup campaign backlog: TRUE_DUPLICATE names accepted as of `generated`. `npm run check:duplicates` fails only on NEW TRUE_DUPLICATE names beyond this set — as names are consolidated, re-run this generator to shrink the baseline. Not auto-run; a human re-seeds it deliberately after reviewing what changed.",
-  "runtime": {
-    "cloneJsonValue": [
-      "packages/diagnostics/src/replay-format.ts",
-      "packages/serialization/src/format.ts"
-    ],
-    "DEFAULT_GRAVITY_Y": [
-      "packages/particles/src/fields.ts",
-      "packages/physics/src/descriptors.ts"
-    ],
-    "SeededRandom": [
-      "packages/motion/src/random.ts",
-      "packages/particles/src/random.ts"
-    ]
-  },
-  "types": {
-    "ColorRGBA": [
-      "packages/animation/src/values.ts",
-      "packages/materials/src/unlit-material.ts"
-    ],
-    "JsonValue": [
-      "packages/diagnostics/src/replay-format.ts",
-      "packages/serialization/src/format.ts"
-    ]
-  }
+  "runtime": {},
+  "types": {}
 }

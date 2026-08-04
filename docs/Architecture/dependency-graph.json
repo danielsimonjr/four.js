@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-04",
-    "totalFiles": 153,
+    "totalFiles": 157,
     "totalModules": 24,
-    "totalExports": 1198
+    "totalExports": 1211
   },
   "entryPoints": [
     {
@@ -1004,7 +1004,15 @@
               "Quaternion",
               "Vector2",
               "Vector3",
-              "Vector4"
+              "Vector4",
+              "ColorRGBA"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGBA"
             ]
           }
         ],
@@ -1018,7 +1026,11 @@
           "booleanAdapter",
           "discreteAdapter",
           "discreteAdapterFor",
-          "detectAdapter"
+          "detectAdapter",
+          "ColorRGBA"
+        ],
+        "reExported": [
+          "ColorRGBA"
         ],
         "interfaces": [
           "ValueAdapter"
@@ -1211,6 +1223,19 @@
           "ComponentHostBinding"
         ]
       },
+      "packages/core/src/conventions.ts": {
+        "description": "Normative default constants shared across pillars (Appendix A, §7a).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "DEFAULT_GRAVITY_Y"
+        ],
+        "constants": [
+          "DEFAULT_GRAVITY_Y"
+        ]
+      },
       "packages/core/src/disposable.ts": {
         "description": "Explicit disposal (§83).",
         "externalDependencies": [],
@@ -1261,10 +1286,31 @@
         ]
       },
       "packages/core/src/index.ts": {
-        "description": "Package entry point for @four/core (re-exports 14 symbols)",
+        "description": "Package entry point for @four/core (re-exports 18 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./conventions.js",
+            "imports": [
+              "DEFAULT_GRAVITY_Y"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./json.js",
+            "imports": [
+              "cloneJsonValue"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./random.js",
+            "imports": [
+              "SeededRandom"
+            ],
+            "reExport": true
+          },
           {
             "file": "./component.js",
             "imports": [
@@ -1293,6 +1339,14 @@
               "EventEmitter"
             ],
             "reExport": true
+          },
+          {
+            "file": "./json.js",
+            "imports": [
+              "JsonValue"
+            ],
+            "reExport": true,
+            "typeOnly": true
           },
           {
             "file": "./component.js",
@@ -1334,12 +1388,16 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "DEFAULT_GRAVITY_Y",
+          "cloneJsonValue",
+          "SeededRandom",
           "ComponentRegistry",
           "disposeAll",
           "FourError",
           "isFourError",
           "EventEmitter",
           "PACKAGE_NAME",
+          "JsonValue",
           "Component",
           "ComponentHost",
           "ComponentHostBinding",
@@ -1351,11 +1409,15 @@
           "Unsubscribe"
         ],
         "reExported": [
+          "DEFAULT_GRAVITY_Y",
+          "cloneJsonValue",
+          "SeededRandom",
           "ComponentRegistry",
           "disposeAll",
           "FourError",
           "isFourError",
           "EventEmitter",
+          "JsonValue",
           "Component",
           "ComponentHost",
           "ComponentHostBinding",
@@ -1368,6 +1430,32 @@
         ],
         "constants": [
           "PACKAGE_NAME"
+        ]
+      },
+      "packages/core/src/json.ts": {
+        "description": "JSON value typing and validation shared by every document format (§34, §79).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "cloneJsonValue"
+        ],
+        "functions": [
+          "cloneJsonValue"
+        ]
+      },
+      "packages/core/src/random.ts": {
+        "description": "Seeded pseudo-random numbers for deterministic engine code (§33, plan P8-3).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "SeededRandom"
+        ],
+        "classes": [
+          "SeededRandom"
         ]
       }
     },
@@ -1753,20 +1841,41 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
-              "FourError"
+              "FourError",
+              "cloneJsonValue",
+              "JsonValue"
+            ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "cloneJsonValue"
+            ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "JsonValue"
             ]
           }
         ],
         "exports": [
+          "cloneJsonValue",
           "REPLAY_FORMAT_VERSION",
           "encodeBase64",
           "decodeBase64",
-          "cloneJsonValue",
           "validateReplayRecording",
           "encodeReplayRecording",
           "decodeReplayRecording",
           "assertReplayCompatible",
-          "isReplayCompatible"
+          "isReplayCompatible",
+          "JsonValue"
+        ],
+        "reExported": [
+          "cloneJsonValue",
+          "JsonValue"
         ],
         "interfaces": [
           "ReplayInputRecord",
@@ -1778,7 +1887,6 @@
         "functions": [
           "encodeBase64",
           "decodeBase64",
-          "cloneJsonValue",
           "validateReplayRecording",
           "encodeReplayRecording",
           "decodeReplayRecording",
@@ -2951,10 +3059,28 @@
             "imports": [
               "Disposable"
             ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGBA"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGBA"
+            ]
           }
         ],
         "exports": [
-          "UnlitMaterial"
+          "UnlitMaterial",
+          "ColorRGBA"
+        ],
+        "reExported": [
+          "ColorRGBA"
         ],
         "classes": [
           "UnlitMaterial"
@@ -2982,8 +3108,16 @@
           "resetConstructionCount"
         ]
       },
+      "packages/math/src/color.ts": {
+        "description": "The color value type shared by materials and animation (§60a, plan P4-2).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": []
+      },
       "packages/math/src/index.ts": {
-        "description": "Package entry point for @four/math (re-exports 9 symbols)",
+        "description": "Package entry point for @four/math (re-exports 10 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -3038,6 +3172,14 @@
             "reExport": true
           },
           {
+            "file": "./color.js",
+            "imports": [
+              "ColorRGBA"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./matrix4.js",
             "imports": [
               "DepthRange"
@@ -3057,6 +3199,7 @@
           "Vector3",
           "Vector4",
           "PACKAGE_NAME",
+          "ColorRGBA",
           "DepthRange"
         ],
         "reExported": [
@@ -3068,6 +3211,7 @@
           "Vector2",
           "Vector3",
           "Vector4",
+          "ColorRGBA",
           "DepthRange"
         ],
         "constants": [
@@ -3977,15 +4121,23 @@
         ]
       },
       "packages/motion/src/random.ts": {
-        "description": "Seeded pseudo-random numbers for deterministic motion (§33, plan P8-3).",
+        "description": "`SeededRandom`'s original home (WP-8.2), now a re-export of `@four/core`.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
-        "workspaceDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "SeededRandom"
+            ]
+          }
+        ],
         "exports": [
           "SeededRandom"
         ],
-        "classes": [
+        "reExported": [
           "SeededRandom"
         ]
       },
@@ -4300,10 +4452,24 @@
         ],
         "workspaceDependencies": [
           {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEFAULT_GRAVITY_Y"
+            ]
+          },
+          {
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
               "Vector3"
+            ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEFAULT_GRAVITY_Y"
             ]
           }
         ],
@@ -4322,6 +4488,9 @@
           "turbulenceField",
           "volumeField"
         ],
+        "reExported": [
+          "DEFAULT_GRAVITY_Y"
+        ],
         "interfaces": [
           "RadialFieldOptions",
           "VortexFieldOptions",
@@ -4339,7 +4508,6 @@
           "volumeField"
         ],
         "constants": [
-          "DEFAULT_GRAVITY_Y",
           "DEFAULT_RADIAL_MIN_DISTANCE",
           "DEFAULT_VORTEX_MIN_DISTANCE",
           "DEFAULT_TURBULENCE_FREQUENCY",
@@ -4649,15 +4817,23 @@
         ]
       },
       "packages/particles/src/random.ts": {
-        "description": "Seeded pseudo-random numbers for deterministic particles (§33, §36, plan",
+        "description": "`SeededRandom` for particles — a re-export of `@four/core`.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
-        "workspaceDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "SeededRandom"
+            ]
+          }
+        ],
         "exports": [
           "SeededRandom"
         ],
-        "classes": [
+        "reExported": [
           "SeededRandom"
         ]
       },
@@ -4810,6 +4986,7 @@
           {
             "file": "./events.js",
             "imports": [
+              "CollisionEvent",
               "TriggerEvent"
             ],
             "typeOnly": true
@@ -4946,6 +5123,7 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
+              "DEFAULT_GRAVITY_Y",
               "FourError"
             ]
           },
@@ -4970,6 +5148,13 @@
             "imports": [
               "Transform"
             ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEFAULT_GRAVITY_Y"
+            ]
           }
         ],
         "exports": [
@@ -4985,6 +5170,9 @@
           "resolveRotation",
           "resolveAngularVelocity",
           "resolveSleepingConfig"
+        ],
+        "reExported": [
+          "DEFAULT_GRAVITY_Y"
         ],
         "interfaces": [
           "RigidBodyDescriptor",
@@ -5011,7 +5199,6 @@
           "resolveSleepingConfig"
         ],
         "constants": [
-          "DEFAULT_GRAVITY_Y",
           "JOINT_TYPES",
           "SHIPPED_JOINT_TYPES",
           "SHIPPED_JOINT_TYPES_2D",
@@ -5224,7 +5411,8 @@
             "imports": [
               "ColliderEventMap",
               "ColliderOptions",
-              "ColliderTriggerEvent"
+              "ColliderTriggerEvent",
+              "RigidBodyCollisionEvent"
             ],
             "reExport": true,
             "typeOnly": true
@@ -5331,7 +5519,6 @@
             "imports": [
               "BlendWeights",
               "PointLoad",
-              "RigidBodyCollisionEvent",
               "RigidBodyCommands",
               "RigidBodyEventMap",
               "RigidBodySleepEvent",
@@ -5479,6 +5666,7 @@
           "ColliderEventMap",
           "ColliderOptions",
           "ColliderTriggerEvent",
+          "RigidBodyCollisionEvent",
           "AngularJointMotor",
           "ColliderDescriptor",
           "FixedJointDescriptor",
@@ -5536,7 +5724,6 @@
           "ShapeCastQuery",
           "BlendWeights",
           "PointLoad",
-          "RigidBodyCollisionEvent",
           "RigidBodyCommands",
           "RigidBodyEventMap",
           "RigidBodySleepEvent",
@@ -5657,6 +5844,7 @@
           "ColliderEventMap",
           "ColliderOptions",
           "ColliderTriggerEvent",
+          "RigidBodyCollisionEvent",
           "AngularJointMotor",
           "ColliderDescriptor",
           "FixedJointDescriptor",
@@ -5714,7 +5902,6 @@
           "ShapeCastQuery",
           "BlendWeights",
           "PointLoad",
-          "RigidBodyCollisionEvent",
           "RigidBodyCommands",
           "RigidBodyEventMap",
           "RigidBodySleepEvent",
@@ -6064,13 +6251,6 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
-            "file": "./collider.js",
-            "imports": [
-              "Collider"
-            ],
-            "typeOnly": true
-          },
-          {
             "file": "./descriptors.js",
             "imports": [
               "RigidBodyDescriptor"
@@ -6088,7 +6268,6 @@
           {
             "file": "./events.js",
             "imports": [
-              "CollisionEvent",
               "SleepEvent"
             ],
             "typeOnly": true
@@ -6391,7 +6570,8 @@
           {
             "file": "./collider.js",
             "imports": [
-              "ColliderTriggerEvent"
+              "ColliderTriggerEvent",
+              "RigidBodyCollisionEvent"
             ],
             "typeOnly": true
           },
@@ -6454,7 +6634,6 @@
             "file": "./rigid-body.js",
             "imports": [
               "BlendWeights",
-              "RigidBodyCollisionEvent",
               "RigidBodySleepEvent"
             ],
             "typeOnly": true
@@ -7010,43 +7189,22 @@
         ],
         "interfaces": [
           "RapierVector",
-          "RapierRigidBodyTypes",
-          "RapierActiveEvents",
-          "RapierActiveCollisionTypes",
-          "RapierCoefficientCombineRules",
-          "RapierPointProjection",
-          "RapierRay",
-          "RapierRayColliderIntersection",
-          "RapierColliderShapeCastHit",
           "RapierRigidBody",
           "RapierRigidBodyDesc",
           "RapierCollider",
           "RapierColliderDesc",
-          "RapierMotorModels",
           "RapierImpulseJoint",
           "RapierUnitImpulseJoint",
           "RapierEventQueue",
-          "RapierContactManifold",
-          "RapierNarrowPhase",
           "RapierWorld",
           "Rapier2dModule",
           "RapierVector3",
           "RapierRotation3",
-          "RapierRigidBodyTypes3d",
-          "RapierActiveEvents3d",
-          "RapierActiveCollisionTypes3d",
-          "RapierCoefficientCombineRules3d",
-          "RapierPointProjection3d",
-          "RapierRay3d",
-          "RapierRayColliderIntersection3d",
-          "RapierColliderShapeCastHit3d",
           "RapierRigidBody3d",
           "RapierRigidBodyDesc3d",
           "RapierCollider3d",
           "RapierColliderDesc3d",
           "RapierEventQueue3d",
-          "RapierContactManifold3d",
-          "RapierNarrowPhase3d",
           "RapierWorld3d",
           "Rapier3dModule"
         ],
@@ -8296,20 +8454,15 @@
         "description": "Transform authority (§42).",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [
-          {
-            "file": "./node.js",
-            "imports": [
-              "Node"
-            ],
-            "typeOnly": true
-          }
-        ],
+        "internalDependencies": [],
         "workspaceDependencies": [],
         "exports": [
           "TRANSFORM_AUTHORITIES",
           "DEFAULT_TRANSFORM_AUTHORITY",
           "warnAuthorityConflict"
+        ],
+        "interfaces": [
+          "AuthorityNode"
         ],
         "functions": [
           "warnAuthorityConflict"
@@ -8381,7 +8534,7 @@
         ]
       },
       "packages/scene/src/index.ts": {
-        "description": "Package entry point for @four/scene (re-exports 27 symbols)",
+        "description": "Package entry point for @four/scene (re-exports 28 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -8465,6 +8618,7 @@
           {
             "file": "./authority.js",
             "imports": [
+              "AuthorityNode",
               "TransformAuthority"
             ],
             "reExport": true,
@@ -8535,6 +8689,7 @@
           "resolveWorldTransform",
           "resolveWorldTransforms",
           "PACKAGE_NAME",
+          "AuthorityNode",
           "TransformAuthority",
           "OrthographicCameraOptions",
           "PerspectiveCameraOptions",
@@ -8564,6 +8719,7 @@
           "createFullscreenViewport",
           "resolveWorldTransform",
           "resolveWorldTransforms",
+          "AuthorityNode",
           "TransformAuthority",
           "OrthographicCameraOptions",
           "PerspectiveCameraOptions",
@@ -8828,7 +8984,9 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
-              "FourError"
+              "FourError",
+              "cloneJsonValue",
+              "JsonValue"
             ]
           },
           {
@@ -8839,11 +8997,25 @@
               "TRANSFORM_AUTHORITIES",
               "TransformAuthority"
             ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "cloneJsonValue"
+            ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "JsonValue"
+            ]
           }
         ],
         "exports": [
-          "SCENE_FORMAT_VERSION",
           "cloneJsonValue",
+          "SCENE_FORMAT_VERSION",
           "validateVector3Document",
           "validateQuaternionDocument",
           "isJsonArray",
@@ -8851,7 +9023,12 @@
           "asJsonObject",
           "validateSceneDocument",
           "encodeSceneDocument",
-          "decodeSceneDocument"
+          "decodeSceneDocument",
+          "JsonValue"
+        ],
+        "reExported": [
+          "cloneJsonValue",
+          "JsonValue"
         ],
         "interfaces": [
           "Vector3Document",
@@ -8862,7 +9039,6 @@
           "SceneDocument"
         ],
         "functions": [
-          "cloneJsonValue",
           "validateVector3Document",
           "validateQuaternionDocument",
           "isJsonArray",
@@ -9707,21 +9883,10 @@
   "dependencyGraph": {
     "circularDependencies": {
       "runtime": [],
-      "typeOnly": [
-        [
-          "packages/physics/src/collider.ts",
-          "packages/physics/src/rigid-body.ts",
-          "packages/physics/src/collider.ts"
-        ],
-        [
-          "packages/scene/src/authority.ts",
-          "packages/scene/src/node.ts",
-          "packages/scene/src/authority.ts"
-        ]
-      ],
-      "total": 2,
+      "typeOnly": [],
+      "total": 0,
       "runtimeCount": 0,
-      "typeOnlyCount": 2
+      "typeOnlyCount": 0
     },
     "layers": [
       {
@@ -9751,10 +9916,13 @@
         "name": "Packages/core",
         "files": [
           "packages/core/src/component.ts",
+          "packages/core/src/conventions.ts",
           "packages/core/src/disposable.ts",
           "packages/core/src/errors.ts",
           "packages/core/src/events.ts",
-          "packages/core/src/index.ts"
+          "packages/core/src/index.ts",
+          "packages/core/src/json.ts",
+          "packages/core/src/random.ts"
         ]
       },
       {
@@ -9828,6 +9996,7 @@
         "name": "Packages/math",
         "files": [
           "packages/math/src/alloc-counter.ts",
+          "packages/math/src/color.ts",
           "packages/math/src/index.ts",
           "packages/math/src/matrix3.ts",
           "packages/math/src/matrix4.ts",
@@ -10000,21 +10169,21 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 153,
+    "totalTypeScriptFiles": 157,
     "totalModules": 24,
-    "totalLinesOfCode": 55398,
-    "totalExports": 1198,
-    "totalClasses": 89,
-    "totalInterfaces": 287,
-    "totalFunctions": 177,
+    "totalLinesOfCode": 55214,
+    "totalExports": 1211,
+    "totalClasses": 88,
+    "totalInterfaces": 267,
+    "totalFunctions": 176,
     "totalTypeGuards": 10,
     "totalEnums": 0,
-    "totalConstants": 173,
-    "totalReExports": 782,
+    "totalConstants": 172,
+    "totalReExports": 798,
     "totalTypeOnlyImports": 167,
     "runtimeCircularDeps": 0,
-    "typeOnlyCircularDeps": 2,
+    "typeOnlyCircularDeps": 0,
     "unusedFilesCount": 0,
-    "unusedExportsCount": 21
+    "unusedExportsCount": 0
   }
 }

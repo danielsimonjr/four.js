@@ -50,6 +50,15 @@
       "packages/core/src/component.ts",
       "packages/core/src/index.ts"
     ],
+    "packages/core/src/conventions.ts": [
+      "packages/core/src/index.ts"
+    ],
+    "packages/core/src/json.ts": [
+      "packages/core/src/index.ts"
+    ],
+    "packages/core/src/random.ts": [
+      "packages/core/src/index.ts"
+    ],
     "packages/core/src/component.ts": [
       "packages/core/src/index.ts"
     ],
@@ -139,6 +148,9 @@
       "packages/math/src/quaternion.ts"
     ],
     "packages/math/src/vector4.ts": [
+      "packages/math/src/index.ts"
+    ],
+    "packages/math/src/color.ts": [
       "packages/math/src/index.ts"
     ],
     "packages/motion/src/clock.ts": [
@@ -285,7 +297,6 @@
     ],
     "packages/physics/src/collider.ts": [
       "packages/physics/src/index.ts",
-      "packages/physics/src/rigid-body.ts",
       "packages/physics/src/world.ts"
     ],
     "packages/physics/src/joints.ts": [
@@ -369,7 +380,6 @@
       "packages/render-webgl/src/index.ts"
     ],
     "packages/scene/src/node.ts": [
-      "packages/scene/src/authority.ts",
       "packages/scene/src/camera.ts",
       "packages/scene/src/group.ts",
       "packages/scene/src/index.ts",

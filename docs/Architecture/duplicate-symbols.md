@@ -10,31 +10,27 @@ Names that are OWN-DEFINED (not merely re-exported) by >= 2 distinct files acros
 
 | Category | Count |
 | --- | --: |
-| **TRUE_DUPLICATE** (actionable) | 3 |
+| **TRUE_DUPLICATE** (actionable) | 0 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
 | ALLOWLISTED | 2 |
-| _Total flagged names_ | 5 |
+| _Total flagged names_ | 2 |
 
 ## Summary — types (interface/type/enum)
 
 | Category | Count |
 | --- | --: |
-| **TRUE_DUPLICATE** (actionable) | 2 |
+| **TRUE_DUPLICATE** (actionable) | 0 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
 | ALLOWLISTED | 0 |
-| _Total flagged names_ | 2 |
+| _Total flagged names_ | 0 |
 
 ## Runtime duplicates
 
 ### TRUE_DUPLICATE — actionable merge targets
 
-| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
-| --- | --- | --- | --- |
-| `cloneJsonValue` | function | `packages/diagnostics/src/replay-format.ts` (@four/diagnostics, public, PLAIN)<br>`packages/serialization/src/format.ts` (@four/serialization, public, PLAIN) | **AMBIGUOUS** |
-| `DEFAULT_GRAVITY_Y` | constant | `packages/particles/src/fields.ts` (@four/particles, public, PLAIN)<br>`packages/physics/src/descriptors.ts` (@four/physics, public, PLAIN) | **AMBIGUOUS** |
-| `SeededRandom` | class | `packages/motion/src/random.ts` (@four/motion, public, PLAIN)<br>`packages/particles/src/random.ts` (@four/particles, public, PLAIN) | **AMBIGUOUS** |
+_None._
 
 ### DISPATCH_VARIANT — distinct public typed-dispatch surfaces (Bucket C candidates)
 
@@ -55,10 +51,7 @@ _None._
 
 ### TRUE_DUPLICATE
 
-| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
-| --- | --- | --- | --- |
-| `ColorRGBA` | type | `packages/animation/src/values.ts` (@four/animation, public, PLAIN)<br>`packages/materials/src/unlit-material.ts` (@four/materials, public, PLAIN) | **AMBIGUOUS** |
-| `JsonValue` | type | `packages/diagnostics/src/replay-format.ts` (@four/diagnostics, public, PLAIN)<br>`packages/serialization/src/format.ts` (@four/serialization, public, PLAIN) | **AMBIGUOUS** |
+_None._
 
 ### DISPATCH_VARIANT
 

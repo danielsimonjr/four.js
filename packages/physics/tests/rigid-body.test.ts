@@ -14,7 +14,7 @@ import { MotionComponent } from "@four/motion";
 
 import { Collider } from "../src/collider.js";
 import type { RigidBodyDescriptor } from "../src/descriptors.js";
-import type { RigidBodyCollisionEvent } from "../src/rigid-body.js";
+import type { RigidBodyCollisionEvent } from "../src/collider.js";
 import {
   RigidBody,
   clearRigidBodyCommands,

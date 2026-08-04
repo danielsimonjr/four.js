@@ -116,11 +116,13 @@
       "textLoader"
     ],
     "packages/core": [
+      "cloneJsonValue",
       "Component",
       "ComponentHost",
       "ComponentHostBinding",
       "ComponentRegistry",
       "ComponentType",
+      "DEFAULT_GRAVITY_Y",
       "Disposable",
       "disposeAll",
       "EventEmitter",
@@ -129,7 +131,9 @@
       "FourErrorCode",
       "FourErrorOptions",
       "isFourError",
+      "JsonValue",
       "PACKAGE_NAME",
+      "SeededRandom",
       "Unsubscribe"
     ],
     "packages/diagnostics": [
@@ -243,6 +247,7 @@
       "UnlitMaterialOptions"
     ],
     "packages/math": [
+      "ColorRGBA",
       "constructionCount",
       "DepthRange",
       "Matrix3",
@@ -724,6 +729,7 @@
       "PACKAGE_NAME"
     ],
     "packages/scene": [
+      "AuthorityNode",
       "Camera",
       "createFullscreenViewport",
       "createSnapshotSystem",

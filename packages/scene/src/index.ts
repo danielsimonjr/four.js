@@ -1,6 +1,6 @@
 export const PACKAGE_NAME = "@four/scene";
 
-export type { TransformAuthority } from "./authority.js";
+export type { AuthorityNode, TransformAuthority } from "./authority.js";
 export {
   DEFAULT_TRANSFORM_AUTHORITY,
   TRANSFORM_AUTHORITIES,

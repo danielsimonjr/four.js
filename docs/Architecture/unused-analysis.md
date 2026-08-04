@@ -8,9 +8,9 @@
 - **Dormant files** (runtime code on disk, unreachable from any entry/build root): 0
   - **Orphaned (reachable from nothing — delete/wire candidates)**: 0
   - **Test-only (exercised by a test, ships nothing)**: 0
-- **Potentially unused exports**: 21
+- **Potentially unused exports**: 0
   - **Unreferenced anywhere (deletion candidates)**: 0
-  - **Referenced in-module (type contracts / helpers backing live exports)**: 21
+  - **Referenced in-module (type contracts / helpers backing live exports)**: 0
 
 ## Dormant Files — Orphaned (delete/wire candidates)
 
@@ -45,28 +45,4 @@ parser can't see (dynamic access, docs examples, published-API contract) before 
 Not imported cross-file, but referenced within their own module — they type or
 support exports that ARE used, so they cannot be deleted in isolation. Mostly
 interfaces typing live guards and per-package API completeness, not rot.
-
-### `packages/physics-rapier/src/init.ts`
-
-- `RapierRigidBodyTypes` (interface) — 1 in-file ref
-- `RapierActiveEvents` (interface) — 1 in-file ref
-- `RapierActiveCollisionTypes` (interface) — 1 in-file ref
-- `RapierCoefficientCombineRules` (interface) — 1 in-file ref
-- `RapierPointProjection` (interface) — 1 in-file ref
-- `RapierRay` (interface) — 3 in-file refs
-- `RapierRayColliderIntersection` (interface) — 2 in-file refs
-- `RapierColliderShapeCastHit` (interface) — 1 in-file ref
-- `RapierMotorModels` (interface) — 3 in-file refs
-- `RapierContactManifold` (interface) — 1 in-file ref
-- `RapierNarrowPhase` (interface) — 1 in-file ref
-- `RapierRigidBodyTypes3d` (interface) — 1 in-file ref
-- `RapierActiveEvents3d` (interface) — 1 in-file ref
-- `RapierActiveCollisionTypes3d` (interface) — 1 in-file ref
-- `RapierCoefficientCombineRules3d` (interface) — 1 in-file ref
-- `RapierPointProjection3d` (interface) — 1 in-file ref
-- `RapierRay3d` (interface) — 3 in-file refs
-- `RapierRayColliderIntersection3d` (interface) — 2 in-file refs
-- `RapierColliderShapeCastHit3d` (interface) — 1 in-file ref
-- `RapierContactManifold3d` (interface) — 1 in-file ref
-- `RapierNarrowPhase3d` (interface) — 1 in-file ref
 
