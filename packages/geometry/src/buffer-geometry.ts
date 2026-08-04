@@ -5,13 +5,23 @@
  * §53 describes a family (`Geometry2D`, `Geometry3D`, `IndexedGeometry`,
  * `ProceduralGeometry`, …) over an abstract base with `id`, `version`,
  * `bounds`, `computeBounds()`, `clone()`, and `dispose()`. This packet
- * implements exactly one concrete member of it — positions, optional indices,
- * a draw mode — because that is what the §120 MVP renders (unlit colored
- * primitives, WebGL 2). The rest of the family, the standard attribute set
- * (normals, tangents, uv, joints/weights, instance transforms), and `clone()`
- * are deliberately absent rather than sketched: each of them pins a public
- * layout that the WebGL backend and the §79 scene format both have to agree
- * with, and none of them is needed to draw a box.
+ * implements exactly one concrete member of it — positions, an optional
+ * per-vertex `normals` attribute, optional indices, a draw mode — because that
+ * is what the §120 MVP renders (unlit and Lambert-lit colored primitives,
+ * WebGL 2). The rest of the family, the rest of the standard attribute set
+ * (tangents, uv, joints/weights, instance transforms), and `clone()` are
+ * deliberately absent rather than sketched: each of them pins a public layout
+ * that the WebGL backend and the §79 scene format both have to agree with, and
+ * none of them is needed to draw a box.
+ *
+ * `normals` joined the layout with the §68 lighting packet (2026-08-04): a lit
+ * surface (§120 "lighting") cannot be shaded without per-vertex normals, and
+ * §53's own attribute list names them first. The attribute is **optional** —
+ * 2D shapes stay position-only and unlit — and, when present, index-aligned
+ * with `positions`: `normals[3 * i]` is vertex `i`'s normal x. Unit length is
+ * the author's contract, not validated here (§85 checks finiteness only; the
+ * lit pipeline normalizes after interpolation anyway, and re-checking length
+ * per component would reject legitimately denormalized authored data).
  *
  * ## Version, not events
  *
@@ -100,6 +110,13 @@ export interface BufferGeometryOptions {
    */
   positions: Float32Array;
   /**
+   * Optional per-vertex normals as xyz triplets, index-aligned with
+   * `positions` (§53, §68). Length must equal `positions.length` and every
+   * value must be finite (§85). Unit length is the author's contract — see the
+   * module header.
+   */
+  normals?: Float32Array;
+  /**
    * Optional index buffer. Every entry must be a valid vertex index and the
    * length must be a multiple of the mode's primitive size (§85).
    */
@@ -130,11 +147,12 @@ function primitiveSize(mode: GeometryDrawMode): number {
 }
 
 /**
- * Runs the §85 checks for one (positions, indices, mode) triple. Throws on the
- * first violation; returns nothing.
+ * Runs the §85 checks for one (positions, normals, indices, mode) quadruple.
+ * Throws on the first violation; returns nothing.
  */
 function validate(
   positions: Float32Array,
+  normals: Float32Array | undefined,
   indices: GeometryIndexArray | undefined,
   mode: GeometryDrawMode,
 ): void {
@@ -150,6 +168,25 @@ function validate(
         `Geometry position ${String(i)} is ${String(positions[i])}; positions ` +
           "must be finite (§85: NaN and infinite values).",
       );
+    }
+  }
+
+  if (normals !== undefined) {
+    if (normals.length !== positions.length) {
+      throw new RangeError(
+        `Geometry normals must be index-aligned with positions — one xyz ` +
+          `triplet per vertex — so their length must be ` +
+          `${String(positions.length)}; got ${String(normals.length)} ` +
+          "(§53, §68).",
+      );
+    }
+    for (let i = 0; i < normals.length; i += 1) {
+      if (!Number.isFinite(normals[i])) {
+        throw new RangeError(
+          `Geometry normal ${String(i)} is ${String(normals[i])}; normals ` +
+            "must be finite (§85: NaN and infinite values).",
+        );
+      }
     }
   }
 
@@ -208,6 +245,8 @@ export class BufferGeometry implements Disposable {
 
   #positions: Float32Array;
 
+  #normals: Float32Array | undefined;
+
   #indices: GeometryIndexArray | undefined;
 
   #mode: GeometryDrawMode;
@@ -234,8 +273,9 @@ export class BufferGeometry implements Disposable {
 
   constructor(options: BufferGeometryOptions) {
     const mode = options.mode ?? "triangles";
-    validate(options.positions, options.indices, mode);
+    validate(options.positions, options.normals, options.indices, mode);
     this.#positions = options.positions;
+    this.#normals = options.normals;
     this.#indices = options.indices;
     this.#mode = mode;
   }
@@ -255,8 +295,31 @@ export class BufferGeometry implements Disposable {
   }
 
   set positions(value: Float32Array) {
-    validate(value, this.#indices, this.#mode);
+    validate(value, this.#normals, this.#indices, this.#mode);
     this.#positions = value;
+    this.markDirty();
+  }
+
+  /**
+   * Optional per-vertex normals, or `undefined` for an attribute-free layout
+   * (§53, §68). Held by reference, like {@link BufferGeometry.positions}, and
+   * subject to the same rules: assigning validates (index-aligned with
+   * positions, finite, §85) and bumps the version; in-place edits need
+   * {@link BufferGeometry.markDirty}. Assigning `undefined` drops the
+   * attribute — the geometry draws unlit-only from then on (a lit draw of a
+   * normal-less geometry shades from its ambient term alone; see
+   * `@four/render-webgl`).
+   *
+   * Replacing `positions` with an array of a different vertex count while
+   * normals are present therefore throws: drop or replace the normals first.
+   */
+  get normals(): Float32Array | undefined {
+    return this.#normals;
+  }
+
+  set normals(value: Float32Array | undefined) {
+    validate(this.#positions, value, this.#indices, this.#mode);
+    this.#normals = value;
     this.markDirty();
   }
 
@@ -271,7 +334,7 @@ export class BufferGeometry implements Disposable {
   }
 
   set indices(value: GeometryIndexArray | undefined) {
-    validate(this.#positions, value, this.#mode);
+    validate(this.#positions, this.#normals, value, this.#mode);
     this.#indices = value;
     this.markDirty();
   }
@@ -286,7 +349,7 @@ export class BufferGeometry implements Disposable {
   }
 
   set mode(value: GeometryDrawMode) {
-    validate(this.#positions, this.#indices, value);
+    validate(this.#positions, this.#normals, this.#indices, value);
     this.#mode = value;
     this.markDirty();
   }
@@ -394,8 +457,8 @@ export class BufferGeometry implements Disposable {
   /**
    * Releases this geometry's CPU-side data (§83). Idempotent.
    *
-   * The typed arrays are dropped — `positions` becomes empty and `indices`
-   * becomes `undefined` — so a large mesh's memory is reclaimable the moment
+   * The typed arrays are dropped — `positions` becomes empty, `normals` and
+   * `indices` become `undefined` — so a large mesh's memory is reclaimable the moment
    * its owner is done with it, and the version is bumped so any backend cache
    * keyed on it re-reads (and finds nothing to draw). Nothing throws
    * afterwards: {@link BufferGeometry.disposed} is the flag renderers and the
@@ -411,6 +474,7 @@ export class BufferGeometry implements Disposable {
     }
     this.#disposed = true;
     this.#positions = EMPTY_POSITIONS;
+    this.#normals = undefined;
     this.#indices = undefined;
     this.markDirty();
   }

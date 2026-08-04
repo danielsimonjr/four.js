@@ -230,6 +230,7 @@ export {
 export type {
   BodyControlModeOptions,
   PhysicsSnapshot,
+  PhysicsSnapshotConfiguration,
   PhysicsWorldAdapter,
   PhysicsWorldInit,
   PoseTargetCaptureSystemOptions,

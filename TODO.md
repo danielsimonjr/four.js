@@ -11,39 +11,28 @@ changes in `CHANGELOG.md`.
       verifier's priority order:
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
-- [ ] Package README sweep — all 24 still say "scaffold only" (shipping-false text)
-- [ ] UI browser proof — @four/ui has node-level §72 coverage only; no example app
-      imports it (the one WP-11.5 packet-intent shortfall)
-- [ ] Lighting (§120's single unshipped bullet — never scheduled to a phase; needs a
-      light type, lit shading path, AND normals in the vertex layouts; owner tier
-      decision first)
-- [ ] De-flake tests/browser/blending.spec.ts RECOVER (1 hard fail in 3 full runs;
-      retries: 0; Phase 7 wall-clock thresholds under SwiftShader)
-- [ ] §93 quick-start (root README is 27 lines) + the thirteen prose guides
+- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
+      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69),
+      §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
+      strings on lights, light layers; hoist the lit shader's per-vertex
+      inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a
+      Matrix3 utility (dated note in gl-program.ts)
+- [ ] Spec-revisit note (2026-08-04): §57's material family list has no `LitMaterial`
+      member — the MVP lit tier added one below §59's StandardMaterial; record it in a
+      spec amendment (letter-suffix rule) or fold it into the §57 revision that lands
+      the abstract Material base
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
-### Backlog additions (tools integration, 2026-08-04)
-- [ ] Consolidate the 5 baselined TRUE_DUPLICATE names (docs/Architecture/
-      duplicate-baseline.json): cloneJsonValue + JsonValue (diagnostics/serialization),
-      DEFAULT_GRAVITY_Y (particles/physics), SeededRandom (= the existing Phase 9
-      hoist-to-core item), ColorRGBA (animation/materials); shrink the baseline via
-      gen-duplicate-baseline.mjs as each lands
-
 ### Backlog additions (Phase 10, 2026-08-02)
-- [ ] Package README sweep — all 24 still say "scaffold only" despite implementation
 - [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
       vertex-color attribute needed for per-segment color) — §118 flagship pickup
-- [ ] Exercise the remaining 4 debug providers against the real Rapier rig (one line)
-- [ ] §34 world-configuration mismatch not refused on restore (name/version only)
-- [ ] getBodyCenterOfMass seam member (Rapier localCom/worldCom verified available)
 
 ### Backlog additions (Phase 9, 2026-08-02)
 - [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
       is the scoped fix; benchmark attribution in benchmarks/results/)
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
       GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
-- [ ] .size-limit.json entry for examples/particles-demo (18.9 kB, suggested WP-9.4)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
@@ -61,9 +50,6 @@ changes in `CHANGELOG.md`.
       inheritVelocityFrom is nearly a no-op there; other solvers may need it
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
-- [ ] §28 solver-iterations constraint feature is not exposed anywhere — Rapier offers
-      world-level `IntegrationParameters.numSolverIterations`; a world option is
-      plausible (recorded gap, not per-joint)
 - [ ] §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased
       gain, not a hard ceiling (documented in the stable API docs); name it in the
       §90/§102 capability tables when a capping adapter (Box2D) arrives
@@ -73,30 +59,22 @@ changes in `CHANGELOG.md`.
       toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
 - [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
       heightfield/compound) — staged out by P5-6, widen in a later packet
-- [ ] §31 speculative-CCD prediction distance is a pinned constant (1.0) — needs a
-      descriptor field
 - [ ] Document SolverBodyAccess in the §90/§102 compatibility material when adapters
       beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
-- [ ] Typedoc link warnings cleanup (34 total, 8 new from animation: ./clip.js#…,
-      SPRING_NORMALIZATION, PRIORITY_ANIMATION_TARGETS) — cosmetic, batch with a tooling
-      packet
 - [ ] Coverage thresholds are package-level; consider per-file granularity so a weak file
       can't hide behind a strong package average
 - [ ] Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is
       invisible; schedule blending with §60a color management work
 
 ### Backlog additions (Phase 3 exit findings)
-- [ ] §92 integration/visual test directories still empty — schedule with Phase 11
 - [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
       deferral recorded in MEMORY 2026-08-01)
 
 ## Backlog
 
 ### Later milestones (decided 2026-07-29)
-- [ ] Ergonomics decision before the §97 example: `Node.position/rotation/scale` aliases
-      onto `transform.*` (flagged by the WP-3.1 worker — spec idiom `camera.position.set`)
 - [ ] Deploy the public interactive demo (demo-first principle, `docs/POSITIONING.md`) —
       demo-ready static build confirmed at Phase 3a exit; deployment is the owner's step
       (note: subpath hosting like GitHub Pages needs a `--base` flag at build time)
@@ -112,6 +90,16 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-04 — **Lighting MVP shipped** (§120's last unshipped bullet; owner-directed,
+      minimal tier): `DirectionalLight` node + `Scene.ambientLight` in @four/scene (§68),
+      `LitMaterial` + `kind` discriminants in @four/materials (§57), optional `normals`
+      vertex attribute in @four/geometry (box now 24 verts with per-face normals, plane
+      +Z; 2D shapes stay unlit), `"lit"` render-item kind + duck-typed `collectSceneLights`
+      in @four/render, `LitProgram` (Lambert + ambient) + normal-stream upload in
+      @four/render-webgl. Unlit path untouched — every browser spec and pixel golden
+      passes; merged tree: 3,077 unit + 174 suite + 38 browser/visual tests, coverage
+      ≥95% everywhere, TypeDoc 0 warnings, §86 gate 33.28/150 kB. Wider §68/§69/§59/§60a scope staged
+      with dated notes (see backlog and docs/AUDIT-120.md S-5)
 - [x] 2026-08-04 — **Zero-findings sweep** (owner-directed): consolidated all 5
       baselined TRUE_DUPLICATE names (SeededRandom → core, JsonValue/cloneJsonValue →
       core with the __proto__ strengthening, DEFAULT_GRAVITY_Y → core, ColorRGBA →

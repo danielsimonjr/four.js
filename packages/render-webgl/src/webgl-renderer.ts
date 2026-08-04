@@ -39,6 +39,9 @@ import { Matrix4 } from "@four/math";
 import {
   buildInterpolatedRenderList,
   buildRenderList,
+  collectSceneLights,
+  createSceneLights,
+  isLitItem,
   isParticlesItem,
   isSpriteItem,
   type RenderItem,
@@ -55,7 +58,7 @@ import {
   ParticleProgram,
   type ParticleGlContext,
 } from "./gl-particles.js";
-import { GL, SpriteProgram, UnlitProgram } from "./gl-program.js";
+import { GL, LitProgram, SpriteProgram, UnlitProgram } from "./gl-program.js";
 import { TextureCache } from "./gl-texture.js";
 
 /**
@@ -179,6 +182,12 @@ const REQUIRED_CONTEXT_METHODS = [
   "bufferSubData",
   "vertexAttribDivisor",
   "drawArraysInstanced",
+  // The lit pipeline's one (§68, 2026-08-04): its light uniforms are vec3s.
+  // Core WebGL 1 *and* 2, so it discriminates nothing — it is here so an
+  // incomplete stub fails fast at initialize rather than at the first lit
+  // draw, the same courtesy the check extends to every other entry point the
+  // backend cannot draw without.
+  "uniform3fv",
 ] as const;
 
 /**
@@ -196,6 +205,14 @@ const renderList: RenderItem[] = [];
 
 /** Scratch for `projection * view`; see {@link renderList} for the policy. */
 const viewProjection = new Matrix4();
+
+/**
+ * The frame's collected lighting (§68), module-owned and reused exactly as
+ * {@link renderList} is, and safe for the same reason: `render` collects and
+ * consumes it synchronously. Only refreshed for frames that contain a lit
+ * item, so a scene that never lights never pays the collection walk.
+ */
+const sceneLights = createSceneLights();
 
 /** Resolved viewport rectangle in drawing-buffer pixels, reused per view. */
 const rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -350,12 +367,17 @@ function resolveRect(
  *   texel data, and `Viewport.clearColor` alike. The *function* never changes,
  *   so it is set once; the *enable* is toggled around sprite runs, below.
  *
- * ## Three pipelines (§55, §36; WP-3a.3, WP-9.3)
+ * ## Four pipelines (§55, §36, §68; WP-3a.3, WP-9.3, lighting 2026-08-04)
  *
  * A render item says which pipeline draws it (`RenderItem.kind`), and this
- * backend keeps all three live:
+ * backend keeps all four live:
  *
  * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested and opaque;
+ * - **lit** — Lambert diffuse under §68's directional light plus the scene
+ *   ambient term, depth-tested and opaque like unlit, blending off. The
+ *   frame's lights are collected once per `render` call (`collectSceneLights`,
+ *   `@four/render`) — and only for frames whose list actually contains a lit
+ *   item, so unlit scenes never pay the walk;
  * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled;
  * - **particles** — one `drawArraysInstanced` per §36 particle system,
  *   screen-aligned quads coloured per instance, with `GL_BLEND` enabled
@@ -387,7 +409,7 @@ function resolveRect(
  * browser never restores), and turned into a `contextlost` event; GPU handles
  * are dropped without being deleted, because they are already invalid.
  * `render` then returns silently until `webglcontextrestored` arrives, at which
- * point all three programs and all three caches are rebuilt, the fixed state and
+ * point all four programs and all three caches are rebuilt, the fixed state and
  * the surface size are re-applied, capabilities are re-read, and
  * `contextrestored` is emitted — after the rebuild, so the first frame a listener triggers
  * already draws. Geometry and texture *content* re-uploads lazily from the
@@ -419,6 +441,8 @@ export class WebglRenderer implements Renderer {
   #spriteProgram: SpriteProgram | null = null;
 
   #particleProgram: ParticleProgram | null = null;
+
+  #litProgram: LitProgram | null = null;
 
   #geometries: GeometryCache | null = null;
 
@@ -455,6 +479,7 @@ export class WebglRenderer implements Renderer {
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#litProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
     this.#particleBatches?.forget();
@@ -472,6 +497,7 @@ export class WebglRenderer implements Renderer {
     this.#program = UnlitProgram.create(gl);
     this.#spriteProgram = SpriteProgram.create(gl);
     this.#particleProgram = ParticleProgram.create(gl);
+    this.#litProgram = LitProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
@@ -515,7 +541,7 @@ export class WebglRenderer implements Renderer {
    * program, sets the fixed GL state, and wires the context-loss events (§61,
    * §45).
    *
-   * Rejects with a {@link FourError} carrying `RENDERER_INITIALIZATION_FAILED`
+   * Rejects with a {@link @four/core!FourError | FourError} carrying `RENDERER_INITIALIZATION_FAILED`
    * when there is no canvas, when the canvas will not give up a `"webgl2"`
    * context (an older browser, a blocked GPU, a context already taken by
    * another API), or when what it gives back is not a WebGL 2 context; and with
@@ -602,12 +628,14 @@ export class WebglRenderer implements Renderer {
     }
 
     // Unreachable given the class invariant — a live context always has all
-    // four — but the fields are nullable so that context loss can drop them, and
-    // the narrowing has to happen somewhere. Skipping the frame is the right
-    // behaviour if the invariant is ever broken: §61 forbids throwing here.
+    // of these — but the fields are nullable so that context loss can drop
+    // them, and the narrowing has to happen somewhere. Skipping the frame is
+    // the right behaviour if the invariant is ever broken: §61 forbids
+    // throwing here.
     const program = this.#program;
     const spriteProgram = this.#spriteProgram;
     const particleProgram = this.#particleProgram;
+    const litProgram = this.#litProgram;
     const geometries = this.#geometries;
     const textures = this.#textures;
     const particleBatches = this.#particleBatches;
@@ -615,6 +643,7 @@ export class WebglRenderer implements Renderer {
       program === null ||
       spriteProgram === null ||
       particleProgram === null ||
+      litProgram === null ||
       geometries === null ||
       textures === null ||
       particleBatches === null
@@ -631,6 +660,21 @@ export class WebglRenderer implements Renderer {
             interpolation.alpha,
             renderList,
           );
+
+    // The frame's lights (§68), collected only when something will be shaded
+    // by them: one `kind` comparison per item decides, so a scene with no lit
+    // materials adds nothing to its frame but this loop. Collected once per
+    // call, not per view — lights are frame state, like the render list.
+    let hasLitItems = false;
+    for (const item of items) {
+      if (item.kind === "lit") {
+        hasLitItems = true;
+        break;
+      }
+    }
+    if (hasLitItems) {
+      collectSceneLights(root, sceneLights);
+    }
 
     // The unlit pipeline is the frame's starting state, so a scene with no
     // sprites issues exactly the GL sequence it issued before sprites existed.
@@ -677,6 +721,7 @@ export class WebglRenderer implements Renderer {
       program.setViewProjection(viewProjection);
       let spriteViewUploaded = false;
       let particleViewUploaded = false;
+      let litViewUploaded = false;
 
       for (const item of items) {
         const record = geometries.acquire(item.geometry);
@@ -753,6 +798,33 @@ export class WebglRenderer implements Renderer {
           spriteProgram.setTint(material.tint);
           gl.bindTexture(GL.TEXTURE_2D, texture.texture);
           textureBound = true;
+        } else if (isLitItem(item)) {
+          // The Lambert-lit pipeline (§68): opaque and depth-tested exactly
+          // like unlit — blending off on the way in, mirroring the unlit
+          // switch below.
+          if (activeKind !== "lit") {
+            litProgram.use();
+            gl.disable(GL.BLEND);
+            blending = false;
+            activeKind = "lit";
+          }
+          if (!litViewUploaded) {
+            // The view-projection and the frame's lights, once per view —
+            // uniforms live in the program object, so they hold for every lit
+            // draw into this view even if other pipelines run in between. The
+            // lights were collected before the view loop; a frame with no
+            // directional light uploads black `lightColor`, which zeroes the
+            // Lambert term in the shader (no variants, no branch here).
+            litProgram.setViewProjection(viewProjection);
+            litProgram.setAmbientLight(sceneLights.ambientColor);
+            litProgram.setDirectionalLight(
+              sceneLights.direction,
+              sceneLights.directionalColor,
+            );
+            litViewUploaded = true;
+          }
+          litProgram.setModel(item.worldMatrix);
+          litProgram.setColor(item.material.color);
         } else {
           if (activeKind !== "unlit") {
             program.use();
@@ -834,6 +906,7 @@ export class WebglRenderer implements Renderer {
       this.#program?.dispose();
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
+      this.#litProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#particleBatches?.dispose();
@@ -842,6 +915,7 @@ export class WebglRenderer implements Renderer {
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#litProgram = null;
     this.#geometries = null;
     this.#textures = null;
     this.#particleBatches = null;
@@ -880,7 +954,7 @@ export class WebglRenderer implements Renderer {
       );
     }
 
-    // All three programs are built before anything is stored, so a shader
+    // All four programs are built before anything is stored, so a shader
     // failure leaves the renderer uninitialized rather than half-initialized —
     // and each failure disposes the ones already built.
     const program = UnlitProgram.create(gl);
@@ -899,12 +973,22 @@ export class WebglRenderer implements Renderer {
       program.dispose();
       throw error;
     }
+    let litProgram: LitProgram;
+    try {
+      litProgram = LitProgram.create(gl);
+    } catch (error: unknown) {
+      particleProgram.dispose();
+      spriteProgram.dispose();
+      program.dispose();
+      throw error;
+    }
 
     this.#canvas = canvas;
     this.#gl = gl;
     this.#program = program;
     this.#spriteProgram = spriteProgram;
     this.#particleProgram = particleProgram;
+    this.#litProgram = litProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);

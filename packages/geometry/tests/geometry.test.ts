@@ -197,6 +197,88 @@ describe("BufferGeometry", () => {
     });
   });
 
+  describe("normals (§53, §68)", () => {
+    /** One unit +Z normal per triangle() vertex. */
+    function triangleNormals(): Float32Array {
+      return new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    }
+
+    it("are optional and default to undefined", () => {
+      const geometry = new BufferGeometry({ positions: triangle() });
+      expect(geometry.normals).toBeUndefined();
+    });
+
+    it("are accepted at construction and held by reference", () => {
+      const normals = triangleNormals();
+      const geometry = new BufferGeometry({
+        positions: triangle(),
+        normals,
+      });
+      expect(geometry.normals).toBe(normals);
+      expect(geometry.version).toBe(0);
+    });
+
+    it("rejects normals that are not index-aligned with positions", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            normals: new Float32Array([0, 0, 1]),
+          }),
+      ).toThrow(/index-aligned/);
+    });
+
+    it("rejects non-finite normals", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            normals: new Float32Array([0, 0, 1, 0, Number.NaN, 1, 0, 0, 1]),
+          }),
+      ).toThrow(/must be finite/);
+    });
+
+    it("validates and bumps the version through the setter", () => {
+      const geometry = new BufferGeometry({ positions: triangle() });
+
+      geometry.normals = triangleNormals();
+      expect(geometry.version).toBe(1);
+
+      // Dropping the attribute is legal and versioned.
+      geometry.normals = undefined;
+      expect(geometry.normals).toBeUndefined();
+      expect(geometry.version).toBe(2);
+
+      // A misaligned assignment throws and leaves the geometry untouched.
+      expect(() => {
+        geometry.normals = new Float32Array([0, 0, 1]);
+      }).toThrow(RangeError);
+      expect(geometry.version).toBe(2);
+    });
+
+    it("pins positions and normals to the same vertex count", () => {
+      const geometry = new BufferGeometry({
+        positions: triangle(),
+        normals: triangleNormals(),
+      });
+
+      // Replacing positions with a different vertex count while normals are
+      // present must throw — drop the normals first.
+      expect(() => {
+        geometry.positions = new Float32Array([
+          0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 0, 0, 2, 1, 0,
+        ]);
+      }).toThrow(/index-aligned/);
+      expect(geometry.vertexCount).toBe(3);
+
+      geometry.normals = undefined;
+      geometry.positions = new Float32Array([
+        0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 0, 0, 2, 1, 0,
+      ]);
+      expect(geometry.vertexCount).toBe(6);
+    });
+  });
+
   describe("bounds", () => {
     it("computes the axis-aligned box of the positions", () => {
       const geometry = new BufferGeometry({
@@ -243,6 +325,7 @@ describe("BufferGeometry", () => {
       geometry.dispose();
       expect(geometry.disposed).toBe(true);
       expect(geometry.positions.length).toBe(0);
+      expect(geometry.normals).toBeUndefined();
       expect(geometry.indices).toBeUndefined();
       expect(geometry.drawCount).toBe(0);
       expect(geometry.version).toBe(version + 1);
@@ -254,10 +337,12 @@ describe("BufferGeometry", () => {
 });
 
 describe("boxGeometry", () => {
-  it("builds a unit box from 8 shared vertices and 12 triangles", () => {
+  it("builds a unit box from 24 per-face vertices and 12 triangles (§68)", () => {
     const geometry = boxGeometry();
 
-    expect(geometry.vertexCount).toBe(8);
+    // 4 vertices per face: corners split so each carries its face's normal
+    // (the trade the lighting packet made, 2026-08-04).
+    expect(geometry.vertexCount).toBe(24);
     expect(geometry.drawCount).toBe(36);
     expect(geometry.mode).toBe("triangles");
     expect(geometry.indices).toBeInstanceOf(Uint16Array);
@@ -267,6 +352,34 @@ describe("boxGeometry", () => {
       -0.5, -0.5, -0.5,
     ]);
     expect([bounds.max.x, bounds.max.y, bounds.max.z]).toEqual([0.5, 0.5, 0.5]);
+  });
+
+  it("gives every vertex its face's outward unit normal (§68)", () => {
+    const geometry = boxGeometry({ width: 2, height: 3, depth: 4 });
+    const normals = geometry.normals;
+    expect(normals).toBeDefined();
+    expect(normals?.length).toBe(geometry.positions.length);
+
+    // Independently derive each vertex's expected normal from its position:
+    // a box vertex normal is axis-aligned, so it is the axis on which the
+    // authored geometric normal — recomputed here per face from positions —
+    // says the face lies.
+    for (let f = 0; f < faceCount(geometry); f += 1) {
+      const [a, b, c] = face(geometry, f);
+      const n = faceNormal(a, b, c);
+      const magnitude = Math.hypot(n.x, n.y, n.z);
+      const indices = geometry.indices ?? new Uint16Array(0);
+      for (const vertex of [
+        indices[f * 3],
+        indices[f * 3 + 1],
+        indices[f * 3 + 2],
+      ]) {
+        const offset = vertex * 3;
+        expect(normals?.[offset]).toBeCloseTo(n.x / magnitude, 12);
+        expect(normals?.[offset + 1]).toBeCloseTo(n.y / magnitude, 12);
+        expect(normals?.[offset + 2]).toBeCloseTo(n.z / magnitude, 12);
+      }
+    }
   });
 
   it("honours per-axis extents and stays centred on the origin", () => {
@@ -356,6 +469,18 @@ describe("planeGeometry", () => {
     expect(area).toBeCloseTo(8, 12);
   });
 
+  it("carries a +Z unit normal on every vertex (§68)", () => {
+    const geometry = planeGeometry({ width: 4, height: 2 });
+    const normals = geometry.normals;
+    expect(normals).toBeDefined();
+    expect(normals?.length).toBe(geometry.positions.length);
+    for (let i = 0; i < (normals?.length ?? 0); i += 3) {
+      expect([normals?.[i], normals?.[i + 1], normals?.[i + 2]]).toEqual([
+        0, 0, 1,
+      ]);
+    }
+  });
+
   it("defaults to a unit quad", () => {
     const bounds = planeGeometry().computeBounds();
     expect([bounds.min.x, bounds.min.y]).toEqual([-0.5, -0.5]);
@@ -422,6 +547,10 @@ describe("circleGeometry2D", () => {
     for (const index of indices ?? []) {
       expect(index).toBeLessThan(geometry.vertexCount);
     }
+  });
+
+  it("stays position-only — 2D shapes are unlit (§120, 2026-08-04)", () => {
+    expect(circleGeometry2D().normals).toBeUndefined();
   });
 
   it("widens the index type when 16 bits cannot address every vertex", () => {

@@ -1,12 +1,24 @@
 # @four/core
 
-Shared foundation infrastructure. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
+Shared foundation infrastructure — the dependency-free base of every other package. Part of [four.js](../../README.md).
 
-EventEmitter and the eventing rules (§6b), the component model (§6a), disposal/lifecycle interfaces (`Disposable`, ownership tracking), the unit system (§40), the plugin host (§81), the `FourError` error model, and validation hooks used by every other package.
+Implements §6a (component model), §6b (eventing), and the §83/§85 error model from [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 1 (§104), with later hoists of shared utilities.
 
-Specification: §6, §6a, §6b, §40, §81, §83, §85, §89 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
+## What's here
 
-## Layout
+- **`EventEmitter`** — the one typed emitter API used by nodes and the application (§6b); re-entrant emissions queue and defer.
+- **Component model (§6a)** — `Component`, `ComponentType`, `ComponentHost`, and `ComponentRegistry`; one component per type per host.
+- **Errors** — `FourError` / `FourErrorCode` / `isFourError` (§83, §85).
+- **Lifecycle** — `Disposable` and `disposeAll`.
+- **`SeededRandom`** — xorshift128 with splitmix32 seeding; the deterministic RNG the §33–34 machinery relies on (`@four/motion` and `@four/particles` re-export it).
+- **JSON utilities** — `JsonValue` and `cloneJsonValue` (refuses payloads carrying a `__proto__` own key).
+- **`DEFAULT_GRAVITY_Y`** — the shared gravity convention (§7a: right-handed Y-up world; gravity is negative Y in both 2D and 3D).
 
-- `src/` — implementation (strict TypeScript, ESM)
-- `tests/` — unit tests (Vitest), colocated per package (§92)
+## Staged / not yet implemented
+
+- The unit system (§40) as an API — degree/millisecond options are display/authoring conversion only (spec rev 1.3); engine times are seconds and angles radians throughout.
+- The plugin host (§81).
+
+Unit tests are colocated in `tests/` per §92.
+
+Workspace name `@four/core`; publishes as `@danielsimonjr/fourjs-core`.

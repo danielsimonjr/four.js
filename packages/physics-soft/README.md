@@ -1,12 +1,11 @@
 # @four/physics-soft
 
-Soft bodies and deformables. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
+Soft bodies and deformables — **interface reserved; not yet implemented.** Part of [four.js](../../README.md).
 
-Soft-body and deformable simulation (cloth, rope, pressure/volume models). Not a solver adapter — see ERRATA E-3.
+Reserved for soft-body and deformable simulation (cloth, rope, pressure/volume models) per §35 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md). It is not a solver adapter — see ERRATA E-3; the §102 solver packages are `physics-rapier` and `physics-box2d`.
 
-Specification: §35 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
+The package exists in the workspace so the §98 monorepo tree stays accurate. The barrel currently exports only `PACKAGE_NAME`, and `tests/` holds a single smoke test. No implementation phase has been scheduled for §35 yet.
 
-## Layout
+Unit tests are colocated in `tests/` per §92.
 
-- `src/` — implementation (strict TypeScript, ESM)
-- `tests/` — unit tests (Vitest), colocated per package (§92)
+Workspace name `@four/physics-soft`; publishes as `@danielsimonjr/fourjs-physics-soft`.

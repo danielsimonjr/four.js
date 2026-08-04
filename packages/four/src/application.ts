@@ -271,7 +271,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    *
    * Its three callbacks belong to this class — reassigning
    * `scheduler.onFixedStep`, `onUpdate`, or `onRender` unwires the application
-   * (register a {@link SimulationSystem} or an event listener instead, D5).
+   * (register a {@link @four/motion!SimulationSystem | SimulationSystem} or an event listener instead, D5).
    */
   readonly scheduler: Scheduler;
 

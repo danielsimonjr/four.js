@@ -666,8 +666,8 @@ export class AnimationTrack<T> implements AnimationTrackLike {
 }
 
 /**
- * A track with its value type erased — what {@link
- * ./clip.js#AnimationClip} stores and what the mixer consumes.
+ * A track with its value type erased — what {@link AnimationClip} stores and
+ * what the mixer consumes.
  *
  * A clip's tracks are heterogeneous (a position track next to a color track
  * next to a Boolean track), so the array element type cannot name one `T`. This

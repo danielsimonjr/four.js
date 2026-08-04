@@ -376,7 +376,7 @@ export interface WidgetSkin {
 
 /** Construction options shared by every widget. */
 export interface UIWidgetOptions {
-  /** {@link Node.name}. */
+  /** {@link Node#name}. */
   name?: string;
   /** {@link Node.visible}. */
   visible?: boolean;
@@ -417,17 +417,19 @@ export interface UIWidgetOptions {
 }
 
 declare module "@four/scene" {
-  /**
-   * UI events, merged into the one node event map (§6b) by declaration
-   * merging — the mechanism `@four/scene` documents on `NodeEventMap` and
-   * `@four/input` established for §72.
-   *
-   * `focus` and `blur` take §72's own names, because §72 lists them among the
-   * input events every node may receive and a later keyboard or DOM-mirror
-   * focus source must be able to emit exactly these keys. The two events this
-   * package *invents* — there is no §73–§75 name for either — are prefixed
-   * `ui`, so `@four/ui` squats no generic key it has no spec claim to.
-   */
+  // UI events, merged into the one node event map (§6b) by declaration
+  // merging — the mechanism `@four/scene` documents on `NodeEventMap` and
+  // `@four/input` established for §72.
+  //
+  // `focus` and `blur` take §72's own names, because §72 lists them among the
+  // input events every node may receive and a later keyboard or DOM-mirror
+  // focus source must be able to emit exactly these keys. The two events this
+  // package *invents* — there is no §73–§75 name for either — are prefixed
+  // `ui`, so `@four/ui` squats no generic key it has no spec claim to.
+  //
+  // Deliberately NOT a doc comment: TypeDoc warns when two declarations of one
+  // merged interface both carry one, and `@four/scene`'s declaration is the
+  // documented one.
   interface NodeEventMap {
     /** Hover, press, focus, or disabled state changed. Emitter only. */
     uistatechange: WidgetStateChangeEvent;

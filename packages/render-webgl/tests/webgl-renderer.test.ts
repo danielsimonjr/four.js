@@ -44,6 +44,7 @@ import {
   Renderable,
   Sprite,
   particleQuadGeometry,
+  type LitRenderItem,
   type ParticleRenderItem,
   type RenderItem,
   type Renderer,
@@ -55,6 +56,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   GL,
   GeometryCache,
+  LitProgram,
+  NORMAL_ATTRIBUTE_LOCATION,
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
   POSITION_ATTRIBUTE_LOCATION,
@@ -79,6 +82,8 @@ type RenderCamera = RenderView["camera"];
 type ItemGeometry = RenderItem["geometry"];
 /** The *unlit* half of the render item union — §57's `UnlitMaterial`. */
 type ItemMaterial = UnlitRenderItem["material"];
+/** The *lit* arm — §57's `LitMaterial` (§68, 2026-08-04). */
+type ItemLitMaterial = LitRenderItem["material"];
 type ItemSpriteMaterial = SpriteRenderItem["material"];
 type ItemTexture = ItemSpriteMaterial["texture"];
 type RenderInterpolation = NonNullable<Parameters<Renderer["render"]>[2]>;
@@ -275,6 +280,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     uniform4fv(location, data) {
       record("uniform4fv", location, data);
+    },
+    uniform3fv(location, data) {
+      record("uniform3fv", location, data);
     },
     uniform1i(location, value) {
       record("uniform1i", location, value);
@@ -508,6 +516,9 @@ class TestGeometry {
 
   positions: Float32Array;
 
+  /** Optional per-vertex normal stream (§53, §68) — undefined by default. */
+  normals: Float32Array | undefined;
+
   indices: Uint16Array | Uint32Array | undefined;
 
   mode: "triangles" | "lines" = "triangles";
@@ -516,12 +527,14 @@ class TestGeometry {
     positions: Float32Array,
     indices?: Uint16Array | Uint32Array,
     mode: "triangles" | "lines" = "triangles",
+    normals?: Float32Array,
   ) {
     nextTestGeometryId += 1;
     this.id = `test-geometry-${String(nextTestGeometryId)}`;
     this.positions = positions;
     this.indices = indices;
     this.mode = mode;
+    this.normals = normals;
   }
 
   get drawCount(): number {
@@ -538,6 +551,7 @@ class TestGeometry {
   /** §53's `dispose()`: empties the arrays and bumps the version. */
   dispose(): void {
     this.positions = new Float32Array(0);
+    this.normals = undefined;
     this.indices = undefined;
     this.markDirty();
   }
@@ -557,6 +571,27 @@ class TestMaterial {
 
   get asMaterial(): ItemMaterial {
     return this as unknown as ItemMaterial;
+  }
+}
+
+/**
+ * A `LitMaterial` reduced to what the backend reads (§57, §68): the `kind`
+ * discriminant the render list branches on, and the color the lit pipeline
+ * uploads. That the discriminant is a plain readable property — not an
+ * `instanceof` — is exactly what makes this double possible; see
+ * `@four/render`'s `lights.ts` header.
+ */
+class TestLitMaterial {
+  readonly kind = "lit" as const;
+
+  readonly color: [number, number, number, number];
+
+  constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
+    this.color = color;
+  }
+
+  get asMaterial(): ItemLitMaterial {
+    return this as unknown as ItemLitMaterial;
   }
 }
 
@@ -781,6 +816,77 @@ function uploadsAt(gl: FakeGl, location: object | undefined): unknown[] {
  */
 function createRoot(): Renderable {
   return renderable(new TestGeometry(new Float32Array(0)));
+}
+
+/**
+ * A directional light double (§68): the structural
+ * `DirectionalLightSource` contract from `@four/render`'s `lights.ts`,
+ * carried by a container node (see {@link createRoot} for why the node base
+ * is an empty `Renderable` — `DirectionalLight` itself lives in
+ * `@four/scene`, outside this package's dependency matrix). The empty
+ * geometry keeps it from contributing any draw of its own.
+ */
+class TestLight extends Renderable {
+  readonly isDirectionalLight = true as const;
+
+  readonly color: [number, number, number];
+
+  intensity: number;
+
+  /** Written into `out` by {@link TestLight.getWorldDirection}. */
+  direction: [number, number, number];
+
+  /** How many times the renderer asked for the direction. */
+  directionReads = 0;
+
+  constructor(
+    color: [number, number, number] = [1, 1, 1],
+    intensity = 1,
+    direction: [number, number, number] = [0, 0, -1],
+  ) {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    this.color = color;
+    this.intensity = intensity;
+    this.direction = direction;
+  }
+
+  getWorldDirection(out: Vector3): Vector3 {
+    this.directionReads += 1;
+    return out.set(this.direction[0], this.direction[1], this.direction[2]);
+  }
+}
+
+/**
+ * A render root carrying the scene ambient term (§68): the structural
+ * `AmbientLightSource` contract `Scene.ambientLight` satisfies, on the same
+ * empty-geometry container {@link createRoot} builds.
+ */
+class AmbientRoot extends Renderable {
+  readonly ambientLight: [number, number, number];
+
+  constructor(ambient: [number, number, number] = [0, 0, 0]) {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    this.ambientLight = ambient;
+  }
+}
+
+/**
+ * The lit program's uniform handles, found by a uniform name only it declares
+ * — the sprite-program lookup's pattern (see {@link spriteUniforms}).
+ */
+function litUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("ambientLight")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the lit program never resolved its uniforms");
 }
 
 function createView(
@@ -1944,10 +2050,10 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), and particles (WP-9.3): §61 requires engine-owned
-    // GPU resources to be re-created before `contextrestored` is emitted, and
-    // every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(3);
+    // Unlit, sprite (WP-3a.3), particles (WP-9.3), and lit (§68, 2026-08-04):
+    // §61 requires engine-owned GPU resources to be re-created before
+    // `contextrestored` is emitted, and every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(4);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2053,7 +2159,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(3);
+    expect(gl.countOf("deleteProgram")).toBe(4);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2077,7 +2183,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(3);
+    expect(gl.countOf("deleteProgram")).toBe(4);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -3355,5 +3461,365 @@ describe("WebglRenderer.render — particles (§36, §112, plan P9-3)", () => {
     // The shared quad's array and buffers, plus this system's pair.
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The lit pipeline (§57 LitMaterial, §68, §120 "lighting" — 2026-08-04).
+// ---------------------------------------------------------------------------
+
+/** Three vertices, one unindexed triangle, +Z normals on every vertex. */
+function litTriangleGeometry(): TestGeometry {
+  return new TestGeometry(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    undefined,
+    "triangles",
+    new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+  );
+}
+
+function litRenderable(
+  geometry: TestGeometry = litTriangleGeometry(),
+  material: TestLitMaterial = new TestLitMaterial(),
+): Renderable {
+  return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
+  it("compiles both stages, links, and resolves the six uniforms", () => {
+    const gl = createFakeGl();
+
+    const program = LitProgram.create(gl);
+
+    expect(gl.countOf("createShader")).toBe(2);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual([
+      "viewProjection",
+      "model",
+      "color",
+      "ambientLight",
+      "lightDirection",
+      "lightColor",
+    ]);
+    expect(program.disposed).toBe(false);
+  });
+
+  it("declares both attribute streams at the fixed locations", () => {
+    const gl = createFakeGl();
+
+    LitProgram.create(gl);
+
+    const sources = gl.callsOf("shaderSource").map((call) => call.args[1]);
+    for (const source of sources) {
+      expect(String(source).startsWith("#version 300 es\n")).toBe(true);
+    }
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(POSITION_ATTRIBUTE_LOCATION)}) in vec3 position;`,
+    );
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(NORMAL_ATTRIBUTE_LOCATION)}) in vec3 normal;`,
+    );
+    expect(String(sources[1])).toContain("uniform vec3 ambientLight;");
+    expect(String(sources[1])).toContain("uniform vec3 lightDirection;");
+    expect(String(sources[1])).toContain("uniform vec3 lightColor;");
+  });
+
+  it("uploads the light uniforms as vec3s out of copied scratch", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+
+    const ambient: [number, number, number] = [0.25, 0.5, 0.75];
+    program.setAmbientLight(ambient);
+    program.setDirectionalLight(new Vector3(0, -1, 0), [2, 1, 0.5]);
+
+    const uploads = gl.callsOf("uniform3fv");
+    expect(uploads.map((call) => call.args[1])).toEqual([
+      [0.25, 0.5, 0.75],
+      [0, -1, 0],
+      [2, 1, 0.5],
+    ]);
+    // Scratch is copied at upload time: mutating the source afterwards must
+    // not rewrite what was recorded (the snapshot proves the copy).
+    ambient[0] = 1;
+    expect(gl.callsOf("uniform3fv")[0].args[1]).toEqual([0.25, 0.5, 0.75]);
+  });
+
+  it("throws SHADER_COMPILATION_FAILED and cleans up exactly as the unlit program does", () => {
+    const failed = createFakeGl({ compileStatus: false });
+    const error = thrown(() => {
+      LitProgram.create(failed);
+    });
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(error.context?.stage).toBe("vertex");
+
+    const unresolved = createFakeGl({ resolveUniforms: false });
+    const uniformError = thrown(() => {
+      LitProgram.create(unresolved);
+    });
+    expect(uniformError.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(unresolved.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("deletes the GL program once, idempotently", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+
+    program.dispose();
+    program.dispose();
+
+    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("GeometryCache — the normal stream (§53, §68)", () => {
+  it("uploads normals into the same vertex array at the fixed second location", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    const geometry = litTriangleGeometry();
+
+    const record = cache.acquire(geometry.asGeometry);
+
+    expect(record).not.toBeNull();
+    expect(record?.normalBuffer).not.toBeNull();
+    // One vertex array; two buffers — positions and normals.
+    expect(gl.countOf("createVertexArray")).toBe(1);
+    expect(gl.countOf("createBuffer")).toBe(2);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, NORMAL_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      NORMAL_ATTRIBUTE_LOCATION,
+      3,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    // The normals themselves went up.
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([
+      0, 0, 1, 0, 0, 1, 0, 0, 1,
+    ]);
+  });
+
+  it("leaves the normal slot untouched for position-only geometry", () => {
+    const gl = createFakeGl();
+    const record = new GeometryCache(gl).acquire(triangleGeometry().asGeometry);
+
+    expect(record?.normalBuffer).toBeNull();
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION]);
+  });
+
+  it("deletes the normal buffer when a stale version re-uploads (§53)", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    const geometry = litTriangleGeometry();
+    cache.acquire(geometry.asGeometry);
+    gl.reset();
+
+    geometry.markDirty();
+    cache.acquire(geometry.asGeometry);
+
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    // Both attribute buffers of the stale record.
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+
+  it("cleans up the position buffer when GL refuses the normal buffer", () => {
+    const gl = createFakeGl();
+    let buffers = 0;
+    const base = gl.createBuffer.bind(gl);
+    gl.createBuffer = (): object | null => {
+      buffers += 1;
+      return buffers === 2 ? null : base();
+    };
+    const cache = new GeometryCache(gl);
+
+    expect(cache.acquire(litTriangleGeometry().asGeometry)).toBeNull();
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(cache.size).toBe(0);
+  });
+
+  it("cleans up both attribute buffers when GL refuses the index buffer", () => {
+    const gl = createFakeGl();
+    let buffers = 0;
+    const base = gl.createBuffer.bind(gl);
+    gl.createBuffer = (): object | null => {
+      buffers += 1;
+      return buffers === 3 ? null : base();
+    };
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      new Uint16Array([0, 1, 2]),
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    );
+
+    expect(new GeometryCache(gl).acquire(geometry.asGeometry)).toBeNull();
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — lit surfaces (§68, §120)", () => {
+  it("draws a lit item through the lit pipeline with the frame's lights", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.25, 0.5, 0.75]);
+    const light = new TestLight([1, 0.5, 0.25], 2, [0, -1, 0]);
+    const material = new TestLitMaterial([1, 0, 0, 1]);
+    root.add(light, litRenderable(litTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = litUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("ambientLight"))).toEqual([
+      [0.25, 0.5, 0.75],
+    ]);
+    expect(uploadsAt(gl, uniforms.get("lightDirection"))).toEqual([[0, -1, 0]]);
+    // color × intensity, premultiplied on the CPU (SceneLights).
+    expect(uploadsAt(gl, uniforms.get("lightColor"))).toEqual([[2, 1, 0.5]]);
+    expect(uploadsAt(gl, uniforms.get("color"))).toEqual([[1, 0, 0, 1]]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // The frame starts on the unlit program and switches once.
+    expect(gl.countOf("useProgram")).toBe(2);
+    // Lit surfaces are opaque: blending never turns on.
+    expect(
+      gl.callsOf("enable").filter((call) => call.args[0] === GL.BLEND),
+    ).toHaveLength(0);
+  });
+
+  it("uploads the documented no-light state when no directional light exists", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(litRenderable());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = litUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("ambientLight"))).toEqual([[0, 0, 0]]);
+    expect(uploadsAt(gl, uniforms.get("lightDirection"))).toEqual([[0, 0, -1]]);
+    expect(uploadsAt(gl, uniforms.get("lightColor"))).toEqual([[0, 0, 0]]);
+    // The draw still happens — an unlit-black surface is the scene author's
+    // statement, not an error.
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("ignores a light in a hidden subtree, like the render list ignores its draws", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const arm = createRoot();
+    arm.visible = false;
+    arm.add(new TestLight([1, 1, 1], 5, [0, -1, 0]));
+    root.add(arm, litRenderable());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, litUniforms(gl).get("lightColor"))).toEqual([
+      [0, 0, 0],
+    ]);
+  });
+
+  it("collects lights only for frames that contain a lit item", async () => {
+    const { renderer, camera } = await initialized();
+    const root = createRoot();
+    const light = new TestLight();
+    root.add(light, renderable(triangleGeometry()));
+
+    renderer.render(root, [createView(camera)]);
+    // An unlit frame never asked the light for anything.
+    expect(light.directionReads).toBe(0);
+
+    root.add(litRenderable());
+    renderer.render(root, [createView(camera)]);
+    expect(light.directionReads).toBe(1);
+  });
+
+  it("uploads the lit view state once per view, per view", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(new TestLight(), litRenderable(), litRenderable());
+    gl.reset();
+
+    renderer.render(root, [
+      createView(camera, { id: "a", width: 0.5 }),
+      createView(camera, { id: "b", x: 0.5, width: 0.5 }),
+    ]);
+
+    const uniforms = litUniforms(gl);
+    // Two views × one upload each — not one per draw, not one per frame.
+    expect(uploadsAt(gl, uniforms.get("ambientLight"))).toHaveLength(2);
+    expect(uploadsAt(gl, uniforms.get("lightDirection"))).toHaveLength(2);
+    // Two views × two draws.
+    expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(4);
+    expect(gl.countOf("drawArrays")).toBe(4);
+  });
+
+  it("switches back to the unlit program after a lit run", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const lit = litRenderable();
+    lit.renderOrder = 0;
+    const unlit = renderable(triangleGeometry());
+    unlit.renderOrder = 1;
+    root.add(lit, unlit);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Frame start (unlit), the lit run, back to unlit.
+    expect(gl.countOf("useProgram")).toBe(3);
+    expect(gl.countOf("drawArrays")).toBe(2);
+    expect(
+      gl.callsOf("enable").filter((call) => call.args[0] === GL.BLEND),
+    ).toHaveLength(0);
+  });
+
+  it("disables blending when a lit item follows a sprite", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const first = sprite();
+    first.renderOrder = 0;
+    const second = litRenderable();
+    second.renderOrder = 1;
+    root.add(first, second);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const names = gl.names();
+    const blendOn = names.indexOf("enable");
+    const blendOff = names.lastIndexOf("disable");
+    expect(gl.callsOf("enable")[0].args[0]).toBe(GL.BLEND);
+    // The lit switch turns blending off before the lit draw runs.
+    expect(blendOn).toBeLessThan(blendOff);
+    // The sprite's indexed quad, then the lit triangle.
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("shades a normal-less geometry through the lit pipeline without a normal stream", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // A lit material on a position-only geometry: draws, reads the attribute
+    // default at the normal slot, and the shader's zero-length guard makes it
+    // ambient-only — never a crash, never a NaN.
+    root.add(litRenderable(triangleGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION]);
   });
 });

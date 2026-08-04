@@ -153,7 +153,7 @@
  *    2.91 rad/s with a gain of `0`, against 2.99 with a gain of `0.1`), which is
  *    the opposite of what a zero effort cap means. A disabled motor, or one
  *    whose `maxEffort` is `0`, is therefore configured with
- *    {@link INERT_MOTOR_GAIN} instead — a gain small enough that the motorized
+ *    `INERT_MOTOR_GAIN` instead — a gain small enough that the motorized
  *    arm's trajectory is *bit-identical* to the same arm with no motor at all
  *    (verified). That is the only honest reading of "a disabled motor exerts
  *    nothing", because Rapier has no way to *remove* a motor once one is set.
@@ -297,9 +297,10 @@ const ADAPTER_DIMENSION = "3d";
  * adapter's choice, matching the 2D adapter's so the two dimensions behave the
  * same for the same descriptor: generous enough for the slow-but-thin and
  * moderately fast cases soft-CCD exists for, small enough that the broad-phase
- * cost stays bounded in a metre-scale world (§40). A later packet that widens
- * `RigidBodyDescriptor` with a prediction distance should replace this constant
- * with the descriptor's value (decision, WP-5.4, carried into WP-5.5).
+ * cost stays bounded in a metre-scale world (§40). Since 2026-08-04 this is
+ * only the **default**: WP-5.4's recorded follow-up (carried into WP-5.5)
+ * landed as `RigidBodyDescriptor.ccdPredictionDistance`, which overrides it
+ * per body.
  */
 const SOFT_CCD_PREDICTION_DISTANCE = 1;
 
@@ -589,7 +590,7 @@ interface BodyRecord {
   body: RapierRigidBody3d;
   /** Last observed `isSleeping()`, for §32's sleep/wake transitions. */
   sleeping: boolean;
-  /** How this body's mass is composed. See {@link MassMode}. */
+  /** How this body's mass is composed. See `MassMode`. */
   massMode: MassMode;
   /** The §23 `mass`, when one was given. */
   explicitMass: number;
@@ -884,6 +885,10 @@ export class Rapier3dAdapter
       y: gravity.y,
       z: gravity.z,
     });
+    if (options.solverIterations !== undefined) {
+      // §28 solver iterations, world-level (2026-08-04) — see the 2D adapter.
+      this.#world.numSolverIterations = options.solverIterations;
+    }
     this.#eventQueue = new rapier.EventQueue(true);
   }
 
@@ -901,7 +906,7 @@ export class Rapier3dAdapter
    * Rapier composes a body's mass additively, so an explicit `mass` cannot
    * simply be handed to `RigidBodyDesc`: additional mass is *added to* whatever
    * the colliders contribute. §23 says `mass` is authoritative, so the adapter
-   * resolves one of three {@link MassMode}s here and every `createCollider` on
+   * resolves one of three `MassMode`s here and every `createCollider` on
    * this body honours it. In particular, an explicit `mass` with no inertia
    * tensor is carried by the body's *first* collider through
    * `ColliderDesc.setMass`, which gives the requested mass **and** a
@@ -977,7 +982,9 @@ export class Rapier3dAdapter
     if (ccdMode === "swept") {
       rigidBodyDesc.setCcdEnabled(true);
     } else if (ccdMode === "speculative") {
-      rigidBodyDesc.setSoftCcdPrediction(SOFT_CCD_PREDICTION_DISTANCE);
+      rigidBodyDesc.setSoftCcdPrediction(
+        desc.ccdPredictionDistance ?? SOFT_CCD_PREDICTION_DISTANCE,
+      );
     }
 
     const massMode = resolveMassMode(desc);
@@ -1998,7 +2005,9 @@ export class Rapier3dAdapter
   }
 
   /**
-   * @inheritDoc
+   * Re-types a live body in place — `SolverBodyAccess.setBodyType`'s contract
+   * (a documented own summary rather than `@inheritDoc`, which cannot carry
+   * additional paragraphs).
    *
    * The 3D build's `setBodyType(type, wakeUp)` behaves exactly like the 2D
    * one's — same required `wakeUp`, same preserved handle, colliders, pose, and
@@ -2037,6 +2046,12 @@ export class Rapier3dAdapter
   /** @inheritDoc */
   getBodyMass(handle: PhysicsBodyHandle): number {
     return this.#requireBody(handle).body.mass();
+  }
+
+  /** @inheritDoc */
+  getBodyCenterOfMass(handle: PhysicsBodyHandle, out: Vector3): void {
+    const com = this.#requireBody(handle).body.worldCom();
+    out.set(com.x, com.y, com.z);
   }
 
   /** @inheritDoc */
@@ -2138,7 +2153,7 @@ export class Rapier3dAdapter
    * body's inertia.
    *
    * A motor that is disabled, or whose `maxEffort` is `0`, is configured with
-   * {@link INERT_MOTOR_GAIN} and a zero target instead of being removed —
+   * `INERT_MOTOR_GAIN` and a zero target instead of being removed —
    * Rapier cannot remove a motor, and a gain of exactly `0` is its *rigid* case
    * rather than its inert one. The inert gain reproduces an unmotorized joint
    * bit for bit (measured).
@@ -2856,7 +2871,7 @@ function resolveCcdMode(desc: RigidBodyDescriptor): CCDMode {
     : "disabled";
 }
 
-/** Chooses the {@link MassMode} for a body from its §23 descriptor. */
+/** Chooses the `MassMode` for a body from its §23 descriptor. */
 function resolveMassMode(desc: RigidBodyDescriptor): MassMode {
   const hasDistribution =
     desc.centerOfMass !== undefined || desc.inertiaTensor !== undefined;
@@ -2874,7 +2889,7 @@ function resolveMassMode(desc: RigidBodyDescriptor): MassMode {
 }
 
 /**
- * Applies the body's {@link MassMode} to a collider descriptor (§23, §25).
+ * Applies the body's `MassMode` to a collider descriptor (§23, §25).
  *
  * `Collider.density` is authoritative over `PhysicsMaterial.density` — that rule
  * is `resolveDensity`'s, reused here so the adapter cannot drift from it.

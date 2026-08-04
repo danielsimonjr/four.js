@@ -180,7 +180,7 @@ export class SpriteMaterial implements Disposable {
    * Stable identity, assigned at construction from a monotonic counter and
    * formatted `sprite-material-<n>`. Unique within a process, ascending in
    * construction order, never reused — §33 forbids random or clock-derived
-   * identity. See {@link assignSpriteMaterialId} for why the prefix differs
+   * identity. See `assignSpriteMaterialId` for why the prefix differs
    * from `UnlitMaterial`'s.
    */
   readonly id: string = assignSpriteMaterialId();

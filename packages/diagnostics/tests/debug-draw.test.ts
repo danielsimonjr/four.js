@@ -37,6 +37,7 @@ import {
   DEFAULT_DEBUG_BUFFER_CAPACITY,
   DebugDrawBuffer,
   type DebugBodyAccess,
+  type DebugCenterOfMassAccess,
   type DebugColor,
   type DebugJointAccess,
   type DebugPhysicsEventLike,
@@ -44,6 +45,7 @@ import {
   type SolverStatistics,
   collectBodyOrigins,
   collectBodyVelocities,
+  collectCentersOfMass,
   collectContactImpulses,
   collectContactPoints,
   solverJointStatistics,
@@ -83,6 +85,7 @@ interface MirroredSolverBodyAccess {
     outAngular: Vector3,
   ): void;
   isBodySleeping(handle: MirrorBodyHandle): boolean;
+  getBodyCenterOfMass(handle: MirrorBodyHandle, out: Vector3): void;
   forEachBody(visit: (handle: MirrorBodyHandle, id: number) => void): void;
   forEachCollider(
     visit: (handle: MirrorColliderHandle, id: number) => void,
@@ -104,6 +107,8 @@ interface ScriptedBody {
   readonly linear: readonly [number, number, number];
   readonly angular: readonly [number, number, number];
   readonly sleeping: boolean;
+  /** World-space centre of mass; defaults to `position` (a uniform body). */
+  readonly com: readonly [number, number, number];
 }
 
 function scriptBody(
@@ -112,6 +117,7 @@ function scriptBody(
   linear: readonly [number, number, number],
   angular: readonly [number, number, number] = [0, 0, 0],
   sleeping = false,
+  com: readonly [number, number, number] = position,
 ): ScriptedBody {
   return {
     handle: { __mirror: "body" },
@@ -120,6 +126,7 @@ function scriptBody(
     linear,
     angular,
     sleeping,
+    com,
   };
 }
 
@@ -129,7 +136,7 @@ function scriptBody(
  * constructs no math objects (it writes into the `out` parameters it is given).
  */
 class FakeBodyAccess implements MirroredSolverBodyAccess {
-  readonly reads = { transform: 0, velocities: 0, sleeping: 0 };
+  readonly reads = { transform: 0, velocities: 0, sleeping: 0, com: 0 };
 
   constructor(
     private readonly bodies: readonly ScriptedBody[],
@@ -178,6 +185,14 @@ class FakeBodyAccess implements MirroredSolverBodyAccess {
   isBodySleeping(handle: MirrorBodyHandle): boolean {
     this.reads.sleeping += 1;
     return this.#find(handle).sleeping;
+  }
+
+  getBodyCenterOfMass(handle: MirrorBodyHandle, out: Vector3): void {
+    this.reads.com += 1;
+    const body = this.#find(handle);
+    out.x = body.com[0];
+    out.y = body.com[1];
+    out.z = body.com[2];
   }
 
   forEachBody(visit: (handle: MirrorBodyHandle, id: number) => void): void {
@@ -518,6 +533,9 @@ describe("duck-typed seams", () => {
     expect(typeof access.getBodyVelocities).toBe("function");
     expect(typeof access.isBodySleeping).toBe("function");
     expect(typeof access.forEachCollider).toBe("function");
+    // Same assertion for the centre-of-mass extension (2026-08-04).
+    const comAccess: DebugCenterOfMassAccess<MirrorBodyHandle> = mirrored;
+    expect(typeof comAccess.getBodyCenterOfMass).toBe("function");
   });
 
   it("accepts a SolverJointAccess-shaped object", () => {
@@ -692,6 +710,81 @@ describe("collectBodyOrigins", () => {
     expect(added).toBe(3);
     expect(decode(buffer)[0].from).toEqual([0, 0, 0]);
     expect(decode(buffer)[1].from).toEqual([1, -1, 0]);
+  });
+});
+
+describe("collectCentersOfMass", () => {
+  it("crosses the centre of mass, not the origin, for an off-centre body", () => {
+    const buffer = new DebugDrawBuffer();
+    const added = collectCentersOfMass(
+      new FakeBodyAccess([
+        scriptBody(1, [2, 0, 0], [0, 0, 0], [0, 0, 0], false, [2.5, 0.25, 0]),
+      ]),
+      buffer,
+      { size: 1, color: RED },
+    );
+
+    expect(added).toBe(3);
+    expect(decode(buffer).map((segment) => [segment.from, segment.to])).toEqual(
+      [
+        [
+          [1.5, 0.25, 0],
+          [3.5, 0.25, 0],
+        ],
+        [
+          [2.5, -0.75, 0],
+          [2.5, 1.25, 0],
+        ],
+        [
+          [2.5, 0.25, -1],
+          [2.5, 0.25, 1],
+        ],
+      ],
+    );
+  });
+
+  it("defaults to a 0.1 half-extent and the centre-of-mass colour", () => {
+    const buffer = new DebugDrawBuffer();
+    collectCentersOfMass(
+      new FakeBodyAccess([scriptBody(1, [0, 0, 0], [0, 0, 0])]),
+      buffer,
+    );
+    const [xArm] = decode(buffer);
+    expect(xArm.from[0]).toBeCloseTo(-0.1, 6);
+    expect(xArm.colorFrom).toEqual([...DEBUG_DRAW_DEFAULT_COLORS.centerOfMass]);
+  });
+
+  it("colours sleeping bodies separately when a sleeping colour is given", () => {
+    const buffer = new DebugDrawBuffer();
+    const access = new FakeBodyAccess([
+      scriptBody(1, [0, 0, 0], [0, 0, 0]),
+      scriptBody(2, [1, 0, 0], [0, 0, 0], [0, 0, 0], true),
+    ]);
+    collectCentersOfMass(access, buffer, {
+      size: 1,
+      color: RED,
+      sleepingColor: BLUE,
+    });
+
+    const segments = decode(buffer);
+    expect(segments).toHaveLength(6);
+    expect(segments[0].colorFrom).toEqual([1, 0, 0, 1]);
+    expect(segments[3].colorFrom).toEqual([0, 0, 1, 1]);
+  });
+
+  it("skips sleeping bodies on request, without reading their centre", () => {
+    const buffer = new DebugDrawBuffer();
+    const access = new FakeBodyAccess([
+      scriptBody(1, [0, 0, 0], [0, 0, 0], [0, 0, 0], true),
+      scriptBody(2, [1, 0, 0], [0, 0, 0], [0, 0, 0], false, [1.5, 0, 0]),
+    ]);
+    const added = collectCentersOfMass(access, buffer, {
+      size: 1,
+      skipSleeping: true,
+    });
+    expect(added).toBe(3);
+    expect(access.reads.com).toBe(1);
+    expect(decode(buffer)[0].from).toEqual([0.5, 0, 0]);
   });
 });
 
@@ -979,6 +1072,7 @@ describe("allocation (§7b, plan D7)", () => {
       buffer.clear();
       collectBodyVelocities(access, buffer, { includeAngular: true });
       collectBodyOrigins(access, buffer);
+      collectCentersOfMass(access, buffer);
       collectContactPoints(events, buffer);
       collectContactImpulses(events, buffer);
       solverStatistics(access, stats);
@@ -1000,9 +1094,8 @@ describe("allocation (§7b, plan D7)", () => {
 // --- staged visualizations --------------------------------------------------
 
 describe("DEBUG_DRAW_STAGED", () => {
-  it("lists the four items this packet did not implement, dated", () => {
+  it("lists the three items still staged, dated (centre-of-mass unstaged 2026-08-04)", () => {
     expect(DEBUG_DRAW_STAGED.map((entry) => entry.id)).toEqual([
-      "center-of-mass",
       "joint-anchors",
       "applied-force-vectors",
       "per-segment-colored-draw",
@@ -1020,11 +1113,8 @@ describe("DEBUG_DRAW_STAGED", () => {
     expect(Object.isFrozen(DEBUG_DRAW_STAGED[0])).toBe(true);
   });
 
-  it("names the honest substitute for the three physics items", () => {
+  it("names the honest substitute for the two physics items", () => {
     const byId = new Map(DEBUG_DRAW_STAGED.map((entry) => [entry.id, entry]));
-    expect(byId.get("center-of-mass")?.shippedInstead).toContain(
-      "collectBodyOrigins",
-    );
     expect(byId.get("joint-anchors")?.shippedInstead).toContain(
       "solverJointStatistics",
     );

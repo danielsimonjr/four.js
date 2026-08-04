@@ -7,6 +7,10 @@ export default tseslint.config(
       "**/node_modules/**",
       "docs/**",
       "**/*.tsbuildinfo",
+      // Agent worktrees (already gitignored): each is a full second checkout of
+      // the repository, and linting one from here means unresolvable project
+      // service references and double-linting everything it contains.
+      ".claude/worktrees/**",
       // Vendored from MathTS and kept byte-identical with the copy in llm-wiki, so
       // it is not ours to restyle — reformatting it here would guarantee the two
       // copies drift. It carries its own tsconfig and is verified by running it

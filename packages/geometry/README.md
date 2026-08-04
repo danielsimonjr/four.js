@@ -1,12 +1,19 @@
 # @four/geometry
 
-Geometry and tessellation. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
+Geometry primitives and buffers. Part of [four.js](../../README.md).
 
-2D shape primitives, the path model (Bézier, arcs, Boolean ops), tessellation and stroke generation (an isolated, replaceable tessellator *module* of this package per §52), 3D primitives, and buffer/indexed/procedural geometry.
+Implements the MVP tier of §50–53 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 3 (§106). Coordinates follow the §7a right-handed Y-up convention.
 
-Specification: §50–53 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
+## What's here
 
-## Layout
+- **`BufferGeometry`** — positions, optional index (`GeometryIndexArray`), draw mode (`GeometryDrawMode`, including `"lines"`), and bounds (`GeometryBounds`).
+- **Primitive factories** — `boxGeometry`, `planeGeometry`, and `circleGeometry2D`, each with an options type.
 
-- `src/` — implementation (strict TypeScript, ESM)
-- `tests/` — unit tests (Vitest), colocated per package (§92)
+## Staged / not yet implemented
+
+- The path model (Bézier curves, arcs, Boolean operations) and tessellation / stroke generation — §52's isolated, replaceable tessellator module.
+- Further 3D primitives and procedural geometry beyond the three factories above.
+
+Unit tests are colocated in `tests/` per §92.
+
+Workspace name `@four/geometry`; publishes as `@danielsimonjr/fourjs-geometry`.

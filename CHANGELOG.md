@@ -8,6 +8,109 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-04 (lighting)
+
+#### Added — Lighting MVP (§68, §120's last unshipped bullet; owner-directed tier)
+
+The minimal defensible tier: one directional light, Lambert diffuse plus a scene
+ambient term. No shadows, no point/spot lights, no PBR — each staged with a dated
+note where its design will land (§69, §59, §60a; see `docs/AUDIT-120.md` S-5).
+
+- `@four/scene`: `DirectionalLight` node (color + intensity, shines along its node's
+  −Z world axis — the camera look convention; `getWorldDirection(out)` resolves on
+  demand) and `Scene.ambientLight`, §68's "ambient" as a scene-wide term.
+- `@four/materials`: `LitMaterial` mirroring `UnlitMaterial` (color-only, same §60a
+  no-color-space/no-clamp stance); both surface materials now carry a `kind`
+  pipeline discriminant.
+- `@four/geometry`: optional `normals` vertex attribute on `BufferGeometry`
+  (index-aligned with positions, §85-validated); `boxGeometry` now emits 24
+  vertices with per-face normals (same 12 triangles), `planeGeometry` +Z normals;
+  2D shapes stay position-only and unlit.
+- `@four/render`: `"lit"` render-item kind chosen from `material.kind`;
+  backend-independent `collectSceneLights` with duck-typed light discovery
+  (first light in scene-graph order; render-list-identical visibility pruning).
+- `@four/render-webgl`: fourth GL program (`LitProgram`; normal matrix derived
+  in-shader, no-light frames upload black and need no shader variant), normal
+  stream at fixed attribute location 1, `uniform3fv` added to the GL seam.
+
+The unlit path is untouched — a scene with no lit items issues the same GL call
+sequence as before, and every browser spec and pixel golden passes unchanged.
+On the merged tree (this packet landed alongside the backlog burn-down below):
+3,077 unit + 174 suite + 38 browser/visual tests, coverage ≥95% everywhere,
+TypeDoc 0 warnings, payload gate 33.28/150 kB; §120 audit amended to 43/43
+shipped-or-MVP.
+
+### 2026-08-04 (backlog burn-down)
+
+Owner-directed: implement the recorded backlog, deferring nothing. One batch:
+
+#### Added
+- **UI browser proof** — `examples/ui-demo` (a `@four/ui` panel of buttons and
+  labels, app-supplied `WidgetSkin`s, real pointer + keyboard interaction,
+  25 kB gzip) and `tests/browser/ui.spec.ts` (4 tests). Closes the plan's one
+  recorded packet-intent shortfall (WP-11.5). `.size-limit.json` gains the
+  missing particles-demo entry (19.36/25 kB) and ui-demo (25/30 kB).
+- **§92 visual regression category seeded** — `tests/visual/ui-demo.spec.ts`
+  under a new Playwright `visual` project with committed
+  SwiftShader-to-SwiftShader pixel goldens (2 tests; stability verified across
+  repeated runs). The browser suite's "no golden images" doctrine concerns
+  SwiftShader-vs-GPU drift and does not apply to same-rasteriser comparison.
+- **`Node.position` / `Node.rotation` / `Node.scale`** alias getters onto the
+  live `transform.*` members — the §15/§97 idiom (`camera.position.set(0, 2, 8)`)
+  now works; 11 new scene tests.
+- **`SolverBodyAccess.getBodyCenterOfMass`** (+ both Rapier adapters via
+  `RigidBody.worldCom()`, the fake and scripted adapters) and diagnostics'
+  **`collectCentersOfMass`** provider — §113's centre-of-mass display, unstaged
+  from `DEBUG_DRAW_STAGED`. All seven debug providers now run against a live
+  Rapier adapter in the integration suites (previously 4 of 6 were
+  fake-exercised only).
+- **`PhysicsWorldOptions.solverIterations`** (§28) → Rapier's
+  `World.numSolverIterations`, proven behaviourally: 1 vs 4 iterations diverge
+  on a contact stack; an explicit 4 is bit-identical to omitting the option,
+  so every recorded checksum and replay stands.
+- **`RigidBodyDescriptor.ccdPredictionDistance`** (§31) replaces the WP-5.4
+  pinned 1 m speculative-CCD constant per body, proven at the boundary it
+  controls (0.001 m tunnels a thin wall at 200 m/s; 10 m catches it);
+  contradictory non-speculative use is refused.
+- **§34 world-configuration refusal** — `PhysicsSnapshot` gains an optional
+  `configuration` record (dimension, resolved gravity, resolved sleeping,
+  determinism, solverIterations-if-set); `restoreSnapshot` refuses a mismatch
+  field by field. Absent configuration (pre-existing envelopes, §34 replay
+  documents) restores exactly as before.
+
+#### Added — documentation
+- **The thirteen §93 prose guides** (`docs/guides/`, + index): §93's own list,
+  one file per item, every code sample cross-checked against
+  `docs/Architecture/package-export-surfaces.json` and the source doc
+  comments; staged/unshipped surfaces stated honestly (custom shaders, §40
+  units record, workers, lighting). 1,853 lines.
+
+#### Fixed — tooling and docs hygiene
+- **TypeDoc: 123 warnings → 0.** Stale links repointed, unexported-symbol
+  links backticked, cross-package links qualified for the umbrella
+  conversion, declaration-merging comments demoted on the augmenting side
+  (`NodeEventMap`, `RigidBodyEventMap`), `@inheritDoc` blocks that carried
+  extra paragraphs rewritten as own summaries, `TypeError` mapped to MDN via
+  `externalSymbolLinkMappings`, and `physics-rapier`'s transcribed `Rapier*`
+  types declared `intentionallyNotExported` in a package-level typedoc.json.
+- `eslint` no longer descends into `.claude/worktrees/**` (agent worktrees
+  are full second checkouts; linting one from the root produces phantom
+  project-service errors).
+
+#### Fixed
+- **`blending.spec.ts` RECOVER de-flaked** (1-in-3 hard fail, recorded since
+  Phase 11): the sweep clock started *after* a SwiftShader screenshot that
+  could swallow 500+ ms of the 1.5 s sweep, tripping the ≥1 s lower bound. The
+  clock now starts before the click that starts the sweep (a strict superset
+  of the sweep interval — deterministic), and the collapse wait is a poll
+  rather than a fixed pause.
+- **All 24 package READMEs** rewritten truthfully (they still said "scaffold
+  only"); key exports verified against `docs/Architecture/`; the five
+  placeholder packages (box2d, soft, webgpu, canvas, svg) now say "interface
+  reserved; not yet implemented". Root README rewritten with the §93
+  quick-start, examples table, and dev-commands reference — every identifier
+  in the snippet checked against the real API.
+
 ### 2026-08-04 (later)
 
 #### Changed — every dependency-graph finding resolved: 0 duplicates, 0 cycles, 0 unused exports

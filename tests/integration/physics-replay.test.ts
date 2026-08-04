@@ -422,7 +422,22 @@ describe("Phase 10: record → replay → seek → frame-step (§33–34, §113)
           // …and the overlay drew exactly the geometry it implies: a cross at
           // `pointOnA` (3 segments) plus the contact normal (1), per contact.
           expect(frame.segments).toBe(frame.contacts * SEGMENTS_PER_CONTACT);
-          expect(frame.lineCount).toBe(frame.segments);
+          // The remaining providers, against the same live Rapier adapter
+          // (2026-08-04 — previously exercised via fakes only): one impulse
+          // vector per contact, a three-segment cross per body at the origin
+          // AND at the solver's centre of mass (uniform balls: the two crosses
+          // coincide, the reads are still real), one velocity vector per body.
+          expect(frame.impulseSegments).toBe(frame.contacts);
+          expect(frame.originSegments).toBe(3 * BODY_COUNT);
+          expect(frame.comSegments).toBe(3 * BODY_COUNT);
+          expect(frame.velocitySegments).toBe(BODY_COUNT);
+          expect(frame.lineCount).toBe(
+            frame.segments +
+              frame.impulseSegments +
+              frame.originSegments +
+              frame.comSegments +
+              frame.velocitySegments,
+          );
           // §113 solver statistics, per step, from the same seam.
           expect(frame.statistics.bodyCount).toBe(BODY_COUNT);
           expect(frame.statistics.colliderCount).toBe(BODY_COUNT);

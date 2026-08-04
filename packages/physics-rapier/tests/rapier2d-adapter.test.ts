@@ -541,6 +541,32 @@ describe("mass composition (§23, §25)", () => {
     adapter.dispose();
   });
 
+  it("reads the world-space centre of mass through the seam (§25, 2026-08-04)", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({
+      type: "dynamic",
+      position: new Vector2(3, 1),
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+      // Structural `Transform` stand-in, as in the offset test below.
+      offset: {
+        position: new Vector3(1, 0, 0),
+        rotation: new Quaternion(),
+      } as unknown as NonNullable<ColliderDescriptor["offset"]>,
+    });
+    const com = new Vector3();
+    adapter.getBodyCenterOfMass(body, com);
+    // Rapier derives the centre of mass from the collider layout: one circle
+    // offset +1 in x puts it at origin.x + 1 — visibly NOT the transform
+    // origin, which is exactly what the seam member exists to report.
+    expect(com.x).toBeCloseTo(4, 5);
+    expect(com.y).toBeCloseTo(1, 5);
+    expect(com.z).toBe(0);
+    adapter.dispose();
+  });
+
   it("carries mass on the body when an inertia tensor is given", async () => {
     const adapter = await createAdapter();
     const inertiaTensor = new Matrix3();

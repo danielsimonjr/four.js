@@ -61,7 +61,11 @@
 
 import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
-import type { SpriteMaterial, UnlitMaterial } from "@four/materials";
+import type {
+  LitMaterial,
+  SpriteMaterial,
+  UnlitMaterial,
+} from "@four/materials";
 import type { Node, PoseBuffer } from "@four/scene";
 
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
@@ -82,8 +86,13 @@ import { Sprite } from "./sprite.js";
  * A string union rather than an enum, matching `TransformAuthority`,
  * `RendererBackend`, and `GeometryDrawMode`: it serializes, logs, and compares
  * as itself.
+ *
+ * `"lit"` joined with the §68 lighting packet (2026-08-04): a `Renderable`
+ * generates `"unlit"` or `"lit"` according to its material's own `kind`
+ * discriminant (§57) — a material property, not a node property, because
+ * which pipeline shades a surface is exactly what a material *is*.
  */
-export type RenderItemKind = "unlit" | "sprite" | "particles";
+export type RenderItemKind = "unlit" | "lit" | "sprite" | "particles";
 
 /**
  * The fields every render item carries, whatever pipeline draws it — one draw in
@@ -118,6 +127,19 @@ export interface UnlitRenderItem extends RenderItemBase {
   kind: "unlit";
   /** Surface appearance (§57). */
   material: UnlitMaterial;
+}
+
+/**
+ * A draw generated from a `Renderable` carrying a `LitMaterial` (§49, §57,
+ * §68) — Lambert diffuse plus the scene ambient term. The item is the draw
+ * only; the lights it is shaded by travel separately, in the frame's
+ * `SceneLights` record (`lights.ts`), because they are per-frame state shared
+ * by every lit item, not per-draw state.
+ */
+export interface LitRenderItem extends RenderItemBase {
+  kind: "lit";
+  /** Surface appearance (§57, §68). */
+  material: LitMaterial;
 }
 
 /** A draw generated from a {@link Sprite} (§55) — one textured, tinted quad. */
@@ -190,10 +212,10 @@ export interface ParticleRenderItem extends RenderItemBase {
  * gets the concrete material type from an ordinary `kind` check, with no cast
  * and no `instanceof` on the draw path. The builders pay for that with **one**
  * documented cast where the invariant is actually established — see
- * {@link itemAt}.
+ * `itemAt`.
  */
 export type RenderItem =
-  UnlitRenderItem | SpriteRenderItem | ParticleRenderItem;
+  UnlitRenderItem | LitRenderItem | SpriteRenderItem | ParticleRenderItem;
 
 /**
  * The pooled item as the builders write it: one mutable shape covering every
@@ -212,7 +234,7 @@ export type RenderItem =
  */
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
-  material?: UnlitMaterial | SpriteMaterial;
+  material?: UnlitMaterial | LitMaterial | SpriteMaterial;
   id: string;
   count: number;
   instances: Float32Array;
@@ -233,6 +255,11 @@ export function isSpriteItem(item: RenderItem): item is SpriteRenderItem {
 /** Narrows `item` to the flat-colour pipeline (§57's `UnlitMaterial`). */
 export function isUnlitItem(item: RenderItem): item is UnlitRenderItem {
   return item.kind === "unlit";
+}
+
+/** Narrows `item` to the Lambert-lit pipeline (§57's `LitMaterial`, §68). */
+export function isLitItem(item: RenderItem): item is LitRenderItem {
+  return item.kind === "lit";
 }
 
 /** Narrows `item` to the batched particle pipeline (§36; see `particles.ts`). */
@@ -456,7 +483,16 @@ function collect(
     // A sprite rebuilds its quad here if the anchor or the size moved; a
     // renderable's geometry is whatever it was handed.
     const item = itemAt(pool, next, node.geometry, node.transform.worldMatrix);
-    item.kind = node instanceof Sprite ? "sprite" : "unlit";
+    // A sprite is its own pipeline; a renderable's pipeline is its material's
+    // `kind` discriminant (§57, §68) — one property load, with `"unlit"` as
+    // the fallback so a structurally-typed material double that predates the
+    // discriminant keeps drawing flat-coloured rather than vanishing.
+    item.kind =
+      node instanceof Sprite
+        ? "sprite"
+        : node.material.kind === "lit"
+          ? "lit"
+          : "unlit";
     item.geometry = node.geometry;
     item.material = node.material;
     item.renderLayer = node.renderLayer;
@@ -464,9 +500,10 @@ function collect(
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
-    // a "sprite" item carries a `SpriteMaterial` and an "unlit" item an
-    // `UnlitMaterial` by construction. TypeScript cannot see that across two
-    // assignments to a pooled object — see `MutableRenderItem`.
+    // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
+    // and an "unlit" item an `UnlitMaterial` by construction. TypeScript cannot
+    // see that across two assignments to a pooled object — see
+    // `MutableRenderItem`.
     out[next] = item as RenderItem;
     next += 1;
   } else if (isParticleDrawable(node)) {
@@ -568,7 +605,7 @@ export function buildRenderList(root: Node, out: RenderItem[]): RenderItem[] {
  * Identical to {@link buildRenderList} in traversal, filtering, sorting, and
  * pooling; the one difference is each item's `worldMatrix`, which is a pooled
  * matrix holding the world transform composed from interpolated local poses
- * root-first (see {@link composeRenderPoseMatrix}) instead of a reference to
+ * root-first (see `composeRenderPoseMatrix`) instead of a reference to
  * the node's resolved world matrix. This is §43's fix for rendering faster than
  * the simulation steps: at `alpha = 0` every item matches the previous captured
  * pose, at `alpha = 1` the current one, and in between position lerps and

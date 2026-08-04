@@ -502,7 +502,7 @@ export const elasticInOut: EasingFunction = (t) => {
  *
  * A real spring only reaches its rest position asymptotically: at `t = 1` the
  * raw response still has `E(1) = e^(−σ) ≈ 0.9 %` of the range left to travel.
- * Dividing the whole curve by `1 − e^(−σ)` ({@link SPRING_NORMALIZATION})
+ * Dividing the whole curve by `1 − e^(−σ)` (`SPRING_NORMALIZATION`)
  * removes that residue exactly, so the eased value lands on its target instead
  * of stopping 0.9 % short — the difference between a tween that arrives and one
  * that does not. The shape is otherwise unchanged (a 0.9 % uniform stretch).

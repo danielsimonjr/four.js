@@ -440,8 +440,13 @@ const RECOVERY_TIMEOUT_MS = 15_000;
  */
 const RECOVERY_MINIMUM_MS = 1000;
 
-/** Milliseconds to let the chain collapse before asking it to recover. */
-const COLLAPSE_MS = 2500;
+/**
+ * Milliseconds allowed for the chain to collapse onto the floor before the
+ * recovery is requested. A ceiling for `expect.poll`, not a fixed wait: the
+ * fall takes ~1 s of simulation, and polling stops the moment the centroid
+ * crosses the floor line.
+ */
+const COLLAPSE_TIMEOUT_MS = 10_000;
 
 /**
  * Largest per-fixed-step link displacement, in metres, that either control-mode
@@ -979,22 +984,31 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     await waitForRunning(page);
     const rect = await cssRectOf(canvas);
 
-    // Into the ragdoll, and let it collapse onto the floor.
+    // Into the ragdoll, and let it collapse onto the floor. Polled rather than
+    // a fixed wait: under SwiftShader CPU contention a fixed pause can catch
+    // the chain mid-fall, and the assertion needs "it got there", not "it got
+    // there on schedule".
     await clickWorldPoint(page, rect, PLATE_POINT);
     await expect(status).toHaveAttribute("data-mode", "ragdoll");
-    await page.waitForTimeout(COLLAPSE_MS);
-    const fallen = brightCentroid(await grab(canvas), SCENE_REGION);
-    expect(
-      fallen.y,
-      "the chain never left the wave band, so there is nothing to recover from",
-    ).toBeLessThan(RAGDOLL_FLOOR_Y);
+    await expect
+      .poll(async () => brightCentroid(await grab(canvas), SCENE_REGION).y, {
+        message:
+          "the chain never left the wave band, so there is nothing to recover from",
+        timeout: COLLAPSE_TIMEOUT_MS,
+      })
+      .toBeLessThan(RAGDOLL_FLOOR_Y);
     const cyclesBefore = await readNumber(page, "cycles");
 
-    // §19's second switch: the weight sweep, then the re-type.
+    // §19's second switch: the weight sweep, then the re-type. The clock
+    // starts BEFORE the click that starts the sweep: the click→"animated"
+    // interval is then a strict superset of the 1.5 s sweep, so the
+    // RECOVERY_MINIMUM_MS lower bound below is deterministic. (It used to
+    // start after `expectPlate`, whose SwiftShader screenshot could swallow
+    // 500+ ms of the sweep — the recorded 1-in-3 hard fail of this spec.)
+    const sweepStartedAt = Date.now();
     await clickWorldPoint(page, rect, PLATE_POINT);
     await expect(status).toHaveAttribute("data-mode", "recovering");
     await expectPlate(canvas, PLATE_RECOVERING_RGB, "recovering");
-    const sweepStartedAt = Date.now();
 
     await expect(status).toHaveAttribute("data-mode", "animated", {
       timeout: RECOVERY_TIMEOUT_MS,

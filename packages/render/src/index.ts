@@ -1,5 +1,15 @@
 export const PACKAGE_NAME = "@four/render";
 
+export type {
+  AmbientLightSource,
+  DirectionalLightSource,
+  SceneLights,
+} from "./lights.js";
+export {
+  collectSceneLights,
+  createSceneLights,
+  isDirectionalLightSource,
+} from "./lights.js";
 export type { ParticleDrawable } from "./particles.js";
 export {
   PARTICLE_COLOR_OFFSET,
@@ -10,6 +20,7 @@ export {
   particleQuadGeometry,
 } from "./particles.js";
 export type {
+  LitRenderItem,
   ParticleRenderItem,
   RenderItem,
   RenderItemKind,
@@ -19,6 +30,7 @@ export type {
 export {
   buildInterpolatedRenderList,
   buildRenderList,
+  isLitItem,
   isParticlesItem,
   isSpriteItem,
   isUnlitItem,

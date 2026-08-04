@@ -2,5 +2,13 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPointStrategy": "packages",
   "entryPoints": ["packages/*"],
-  "out": "docs/api"
+  "out": "docs/api",
+  "externalSymbolLinkMappings": {
+    "typescript": {
+      "TypeError": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypeError"
+    },
+    "global": {
+      "TypeError": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypeError"
+    }
+  }
 }

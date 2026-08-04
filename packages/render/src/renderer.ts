@@ -173,7 +173,7 @@ export interface RendererEventMap {
    *
    * Emitted **after** the renderer has marked itself lost, so a listener
    * observing the renderer sees the lost state. Not an error: nothing is
-   * thrown, no {@link FourError} is raised, and the application keeps running.
+   * thrown, no {@link @four/core!FourError | FourError} is raised, and the application keeps running.
    */
   contextlost: { renderer: Renderer };
 
@@ -316,7 +316,7 @@ export interface Renderer extends Disposable {
    *
    * Asynchronous because WebGPU adapter/device acquisition is (§45's
    * `await app.initialize()`), and because a backend may compile pipelines
-   * up front. Rejects with a {@link FourError} carrying
+   * up front. Rejects with a {@link @four/core!FourError | FourError} carrying
    * `RENDERER_INITIALIZATION_FAILED` (§62, §89) when the backend cannot start —
    * explicitly, rather than silently downgrading; backend *selection* and its
    * `"auto"` fallback are the application's job (§62), not an individual
@@ -479,7 +479,7 @@ const LIFECYCLE_ERROR_CODE = "INVALID_APPLICATION_STATE";
  * ## Lifecycle
  *
  * `dispose()` is idempotent and **terminal**, and every other method throws a
- * {@link FourError} with `INVALID_APPLICATION_STATE` afterwards — the same
+ * {@link @four/core!FourError | FourError} with `INVALID_APPLICATION_STATE` afterwards — the same
  * contract `Application` uses (§45, §83). A silent no-op after disposal would
  * let a test record zero calls and pass for the wrong reason (decision,
  * WP-3.4). Note the deliberate asymmetry with a *lost context*, which is

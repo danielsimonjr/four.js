@@ -15,7 +15,7 @@
     "coverage": "pnpm -r --filter \"./packages/*\" exec vitest run --coverage --config ../../vitest.coverage.config.ts",
     "docs": "typedoc",
     "example:build": "vite build examples/first-2d-scene",
-    "examples:build": "pnpm example:build && pnpm playground:build && pnpm mechanism:build && pnpm blending:build && pnpm particles-demo:build",
+    "examples:build": "pnpm example:build && pnpm playground:build && pnpm mechanism:build && pnpm blending:build && pnpm particles-demo:build && pnpm ui-demo:build",
     "format": "prettier --write .",
     "graph": "tsx tools/create-dependency-graph/create-dependency-graph.ts --root=.",
     "graph:check": "node tools/query-dependency-graph/query-dependency-graph.mjs --check-browser-safety",
@@ -30,7 +30,8 @@
     "test": "pnpm -r --workspace-concurrency=4 run test",
     "test:browser": "playwright test",
     "test:suites": "vitest run --config vitest.suites.config.ts --passWithNoTests",
-    "typecheck:examples": "tsc --noEmit -p examples"
+    "typecheck:examples": "tsc --noEmit -p examples",
+    "ui-demo:build": "vite build examples/ui-demo"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",

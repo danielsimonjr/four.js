@@ -335,7 +335,7 @@ function isColorTuple(value: unknown): value is ColorRGBA {
 /**
  * Picks the adapter for a value by inspecting its structure. Returns
  * `undefined` when no adapter fits, so callers decide whether that is an error
- * ({@link ./binding.js} throws) or a reason to fall back.
+ * ({@link createBinding} throws) or a reason to fall back.
  *
  * Detection is by `instanceof` for the math classes and by `typeof` for the
  * primitives. Two deliberate exclusions:

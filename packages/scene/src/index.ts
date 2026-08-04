@@ -12,6 +12,8 @@ export type {
 } from "./camera.js";
 export { Camera, OrthographicCamera, PerspectiveCamera } from "./camera.js";
 export { Group } from "./group.js";
+export type { ColorRGB, DirectionalLightOptions } from "./light.js";
+export { DirectionalLight } from "./light.js";
 export type {
   PoseSnapshotSystem,
   SnapshotSystemOptions,

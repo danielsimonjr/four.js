@@ -20,6 +20,7 @@ import type {
 } from "../src/index.js";
 import {
   Collider,
+  DEFAULT_SLEEPING_CONFIG,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
@@ -1263,6 +1264,102 @@ describe("PhysicsWorld §34 snapshots", () => {
       world.restoreSnapshot({ ...snapshot, adapterVersion: "0.0.1" }),
     );
     expect(error.message).toContain("version");
+  });
+
+  it("records the world configuration in the envelope (§34, 2026-08-04)", async () => {
+    const { world } = await readyWorld({ gravity: new Vector2(0, -10) });
+    const snapshot = world.createSnapshot();
+
+    expect(snapshot.configuration).toEqual({
+      dimension: "2d",
+      gravity: [0, -10, 0],
+      sleeping: {
+        enabled: true,
+        linearThreshold: DEFAULT_SLEEPING_CONFIG.linearThreshold,
+        angularThreshold: DEFAULT_SLEEPING_CONFIG.angularThreshold,
+        timeThreshold: DEFAULT_SLEEPING_CONFIG.timeThreshold,
+      },
+      determinism: "same-runtime",
+    });
+    // The solver-iterations key is present only when the world set it.
+    expect("solverIterations" in (snapshot.configuration ?? {})).toBe(false);
+
+    const tuned = await readyWorld({ solverIterations: 2 });
+    const tunedSnapshot = tuned.world.createSnapshot();
+    expect(tunedSnapshot.configuration?.solverIterations).toBe(2);
+    // Matching configuration round-trips: same world, same rules.
+    expect(() => {
+      tuned.world.restoreSnapshot(tunedSnapshot);
+    }).not.toThrow();
+  });
+
+  it("refuses a snapshot captured under a different configuration (§34)", async () => {
+    const { world } = await readyWorld({ gravity: new Vector2(0, -10) });
+    const snapshot = world.createSnapshot();
+    const configuration = snapshot.configuration;
+    if (configuration === undefined) {
+      throw new Error("expected a configuration in the envelope");
+    }
+
+    const gravityError = expectFourError(() =>
+      world.restoreSnapshot({
+        ...snapshot,
+        configuration: { ...configuration, gravity: [0, -9.81, 0] },
+      }),
+    );
+    expect(gravityError.message).toContain("gravity");
+    expect(gravityError.message).toContain("not a continuation");
+
+    const iterationsError = expectFourError(() =>
+      world.restoreSnapshot({
+        ...snapshot,
+        configuration: { ...configuration, solverIterations: 8 },
+      }),
+    );
+    expect(iterationsError.message).toContain("solverIterations");
+
+    const sleepingError = expectFourError(() =>
+      world.restoreSnapshot({
+        ...snapshot,
+        configuration: {
+          ...configuration,
+          sleeping: { ...configuration.sleeping, timeThreshold: 99 },
+        },
+      }),
+    );
+    expect(sleepingError.message).toContain("sleeping");
+
+    const dimensionError = expectFourError(() =>
+      world.restoreSnapshot({
+        ...snapshot,
+        configuration: { ...configuration, dimension: "3d" },
+      }),
+    );
+    expect(dimensionError.message).toContain("dimension");
+
+    const determinismError = expectFourError(() =>
+      world.restoreSnapshot({
+        ...snapshot,
+        configuration: { ...configuration, determinism: "none" },
+      }),
+    );
+    expect(determinismError.message).toContain("determinism");
+  });
+
+  it("tolerates a configuration-less snapshot: the pre-2026-08-04 envelope and the §34 replay document carry none", async () => {
+    const { world } = await readyWorld();
+    world.step(0.5);
+    const snapshot = world.createSnapshot();
+    const captured = world.checksum();
+    world.step(0.5);
+
+    const bare = {
+      adapterName: snapshot.adapterName,
+      adapterVersion: snapshot.adapterVersion,
+      data: snapshot.data,
+    };
+    expect(() => world.restoreSnapshot(bare)).not.toThrow();
+    expect(world.checksum()).toBe(captured);
   });
 
   it("refuses both calls when the adapter declares no snapshots (§37)", async () => {

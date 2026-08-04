@@ -268,6 +268,22 @@ export interface SolverBodyAccess {
    */
   getBodyMass(handle: PhysicsBodyHandle): number;
 
+  /**
+   * Reads the body's **world-space** centre of mass into `out` (§25).
+   *
+   * As the solver holds it after mass-property resolution — collider offsets,
+   * densities, and authored overrides included — not a re-derivation. The
+   * centre of mass differs from the transform origin for any off-centre or
+   * compound body, which is exactly when a caller wants it: §113's
+   * centre-of-mass display was staged on the absence of this member
+   * (`DEBUG_DRAW_STAGED`, 2026-08-02) and unblocked by it (2026-08-04).
+   *
+   * In a `"2d"` world `out.z` is `0` (§21). Rapier serves this directly
+   * (`RigidBody.worldCom()`, verified against the installed 0.19.3 typings,
+   * WP-10.3).
+   */
+  getBodyCenterOfMass(handle: PhysicsBodyHandle, out: Vector3): void;
+
   /** The monotonic id §33's checksum orders by. */
   getBodyId(handle: PhysicsBodyHandle): number;
 

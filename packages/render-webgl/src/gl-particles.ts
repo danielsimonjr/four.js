@@ -355,7 +355,7 @@ export class ParticleProgram implements Disposable {
   /**
    * Compiles and links the particle program on `gl`.
    *
-   * Throws a {@link FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
+   * Throws a {@link @four/core!FourError | FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with
    * the driver's info log in `context.log` when a stage fails to compile, when
    * linking fails, when GL refuses to allocate an object, or when a uniform this
    * backend wrote is missing from the linked program — the contract

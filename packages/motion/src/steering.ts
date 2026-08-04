@@ -142,7 +142,7 @@ export interface SteeringContext extends SteeringNeighbor {
  * This is the public form of the clamp every behaviour applies. The behaviours
  * do not call it: they clamp the scalars they are about to write, which keeps
  * `out` to a single write (see the module note on allocation), and
- * {@link writeTruncated} is that shared scalar form.
+ * `writeTruncated` is that shared scalar form.
  */
 export function truncate(vector: Vector3, maxLength: number): Vector3 {
   if (maxLength <= 0) {

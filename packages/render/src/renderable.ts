@@ -62,7 +62,7 @@
  */
 
 import type { BufferGeometry } from "@four/geometry";
-import type { UnlitMaterial } from "@four/materials";
+import type { LitMaterial, UnlitMaterial } from "@four/materials";
 import { Node } from "@four/scene";
 
 /** Optional construction arguments of {@link Renderable}. */
@@ -90,8 +90,16 @@ export class Renderable extends Node {
   /** Vertex data to draw (§53). Shared, not owned — see the module header. */
   geometry: BufferGeometry;
 
-  /** Surface appearance (§57). Shared, not owned — see the module header. */
-  material: UnlitMaterial;
+  /**
+   * Surface appearance (§57). Shared, not owned — see the module header.
+   *
+   * A two-member union since the §68 lighting packet (2026-08-04): the
+   * material's own `kind` discriminant decides whether the node draws through
+   * the unlit or the lit pipeline (see `render-list.ts`). Still not §57's
+   * full `Material | Material[]` — the abstract base and multi-material
+   * submeshes remain deferred as before.
+   */
+  material: UnlitMaterial | LitMaterial;
 
   /**
    * Symbolic drawing group (§46, §66 sort key 1). The primary sort key of the
@@ -117,7 +125,7 @@ export class Renderable extends Node {
    */
   constructor(
     geometry: BufferGeometry,
-    material: UnlitMaterial,
+    material: UnlitMaterial | LitMaterial,
     options: RenderableOptions = {},
   ) {
     super();

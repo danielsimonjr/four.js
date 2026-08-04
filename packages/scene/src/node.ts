@@ -38,6 +38,7 @@ import {
   type ComponentHost,
   type ComponentType,
 } from "@four/core";
+import type { Quaternion, Vector3 } from "@four/math";
 
 import {
   DEFAULT_TRANSFORM_AUTHORITY,
@@ -185,6 +186,57 @@ export abstract class Node
    */
   get children(): readonly Node[] {
     return this.#children;
+  }
+
+  // --- Transform aliases (§15/§97 idiom) ------------------------------------
+
+  /**
+   * Alias for `this.transform.position` — the same live {@link Vector3}, never
+   * a copy, so `node.position.set(1, 2, 3)` and
+   * `node.transform.position.set(1, 2, 3)` are one and the same write and both
+   * run the transform's change hook (plan D3: the version bumps, dependent
+   * caches invalidate).
+   *
+   * The spec writes this spelling throughout — `Four.animate(node.position)`
+   * (§15), `camera.position.set(0, 2, 6)` and `label.position.set(0, 1.2, 0)`
+   * (§97) — while `Transform` is where the value actually lives (§7). This
+   * getter makes both spellings work, resolving the WP-3.1 ergonomics flag
+   * (TODO: `Node.position/rotation/scale` aliases onto `transform.*`).
+   *
+   * Getter only, deliberately: `Transform.position` is a `readonly` property
+   * holding a mutable vector — replacing the instance would silently drop the
+   * change hook — and the alias mirrors exactly that contract. Assignment
+   * (`node.position = v`) is not the API; write *into* the vector with
+   * `.set(...)` / `.copy(...)`.
+   *
+   * Transform authority (§42) is unmoved by the spelling: a write through this
+   * alias is a write to the node's transform, and a system that is not the
+   * node's {@link Node.transformAuthority} must not make it either way.
+   */
+  get position(): Vector3 {
+    return this.transform.position;
+  }
+
+  /**
+   * Alias for `this.transform.rotation` — the same live {@link Quaternion},
+   * never a copy. Radians semantics per §7a; getter only, for the reasons
+   * documented on {@link Node.position} (mutate via quaternion methods, never
+   * by assignment). Writes through it bump the transform version exactly as
+   * `transform.rotation` writes do, and §42 authority applies unchanged.
+   */
+  get rotation(): Quaternion {
+    return this.transform.rotation;
+  }
+
+  /**
+   * Alias for `this.transform.scale` — the same live {@link Vector3}, never a
+   * copy. Getter only, for the reasons documented on {@link Node.position}
+   * (mutate via `.set(...)` / `.copy(...)`, never by assignment). Writes
+   * through it bump the transform version exactly as `transform.scale` writes
+   * do, and §42 authority applies unchanged.
+   */
+  get scale(): Vector3 {
+    return this.transform.scale;
   }
 
   // --- Transform authority (§42) --------------------------------------------

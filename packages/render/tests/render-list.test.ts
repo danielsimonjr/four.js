@@ -6,7 +6,7 @@ import {
   constructionCount,
   resetConstructionCount,
 } from "@four/math";
-import { UnlitMaterial } from "@four/materials";
+import { LitMaterial, UnlitMaterial } from "@four/materials";
 import {
   Group,
   PoseBuffer,
@@ -20,6 +20,8 @@ import {
   Renderable,
   buildInterpolatedRenderList,
   buildRenderList,
+  isLitItem,
+  isUnlitItem,
   type RenderItem,
 } from "../src/index.js";
 
@@ -119,6 +121,50 @@ describe("buildRenderList", () => {
     expect(item.geometry).toBe(node.geometry);
     expect(item.renderLayer).toBe(3);
     expect(item.renderOrder).toBe(7);
+  });
+
+  describe("pipeline kinds (§57, §68)", () => {
+    it('tags an UnlitMaterial renderable "unlit"', () => {
+      const scene = new Scene();
+      scene.add(renderable("a"));
+
+      const [item] = buildRenderList(scene, []);
+      expect(item.kind).toBe("unlit");
+      expect(isUnlitItem(item)).toBe(true);
+      expect(isLitItem(item)).toBe(false);
+    });
+
+    it('tags a LitMaterial renderable "lit" and carries its material', () => {
+      const scene = new Scene();
+      const material = new LitMaterial({ color: [1, 0, 0, 1] });
+      const node = new Renderable(boxGeometry(), material);
+      scene.add(node);
+
+      const [item] = buildRenderList(scene, []);
+      expect(item.kind).toBe("lit");
+      expect(isLitItem(item)).toBe(true);
+      expect(isUnlitItem(item)).toBe(false);
+      if (isLitItem(item)) {
+        // The guard narrows to LitRenderItem, so `material` is the
+        // LitMaterial itself — no cast on the consumer side.
+        expect(item.material).toBe(material);
+      }
+    });
+
+    it("re-tags a pooled slot when the material family changes", () => {
+      const scene = new Scene();
+      const node = new Renderable(planeGeometry(), new UnlitMaterial());
+      scene.add(node);
+      const out: RenderItem[] = [];
+
+      expect(buildRenderList(scene, out)[0].kind).toBe("unlit");
+
+      node.material = new LitMaterial();
+      expect(buildRenderList(scene, out)[0].kind).toBe("lit");
+
+      node.material = new UnlitMaterial();
+      expect(buildRenderList(scene, out)[0].kind).toBe("unlit");
+    });
   });
 
   it("references the node's own world matrix, resolved by the caller (§7)", () => {

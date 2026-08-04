@@ -118,7 +118,7 @@ export interface TextLayout {
    * One quad per **drawn** glyph, in reading order, line by line.
    *
    * Blank glyphs — the space, and anything else a font marks
-   * {@link import("./bitmap-font.js").BitmapGlyph.blank} — advance the pen but
+   * {@link BitmapGlyph.blank} — advance the pen but
    * emit no quad: a fully transparent rectangle costs a draw call and a blend
    * and contributes nothing. So `quads.length` is *not* the string's length, and
    * a caller mapping quads back to characters must track that itself.

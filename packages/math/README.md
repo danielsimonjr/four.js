@@ -1,12 +1,21 @@
 # @four/math
 
-Math primitives. Part of [four.js](../../README.md) — **scaffold only; no implementation yet.**
+Math primitives. Part of [four.js](../../README.md).
 
-Vector2/3/4, Matrix3, Matrix4, Quaternion, and Transform math. First implemented in Phase 1 (§104).
+Implements §7 and the §7b math conventions of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); shipped in Phase 1 (§104). Mutable types with `out`-parameter hot paths (`out?` optional-allocation policy), radians everywhere, right-handed Y-up.
 
-Specification: §7, §104 in [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md).
+## What's here
 
-## Layout
+- **Vectors** — `Vector2`, `Vector3`, `Vector4`.
+- **`Quaternion`** — with shortest-arc slerp (decision D8).
+- **Matrices** — `Matrix3` and `Matrix4`, including depth-range-parameterized projections (`DepthRange`).
+- **`ColorRGBA`** — the shared color tuple type used by materials, animation, and particles.
+- **Allocation counter** — `constructionCount` / `resetConstructionCount` / `noteConstruction`, the test hook that keeps hot paths allocation-free.
 
-- `src/` — implementation (strict TypeScript, ESM)
-- `tests/` — unit tests (Vitest), colocated per package (§92)
+## Notes
+
+- `Transform` (position/rotation/scale with the dirty channel) lives in `@four/scene`, not here.
+
+Unit tests are colocated in `tests/` per §92.
+
+Workspace name `@four/math`; publishes as `@danielsimonjr/fourjs-math`.

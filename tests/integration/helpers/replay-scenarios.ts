@@ -69,6 +69,10 @@
 import {
   DebugDrawBuffer,
   ReplayRecorder,
+  collectBodyOrigins,
+  collectBodyVelocities,
+  collectCentersOfMass,
+  collectContactImpulses,
   collectContactPoints,
   solverStatistics,
   type JsonValue,
@@ -720,7 +724,15 @@ export interface InspectedStep {
   readonly contacts: number;
   /** Segments {@link collectContactPoints} appended for them. */
   readonly segments: number;
-  /** {@link DebugDrawBuffer.lineCount} after the collection. */
+  /** Segments {@link collectContactImpulses} appended (one per contact). */
+  readonly impulseSegments: number;
+  /** Segments {@link collectBodyOrigins} appended (three per body). */
+  readonly originSegments: number;
+  /** Segments {@link collectCentersOfMass} appended (three per body). */
+  readonly comSegments: number;
+  /** Segments {@link collectBodyVelocities} appended (one per body). */
+  readonly velocitySegments: number;
+  /** {@link DebugDrawBuffer.lineCount} after all collections. */
   readonly lineCount: number;
   /** The §33 checksum after the step. */
   readonly checksum: number;
@@ -750,11 +762,25 @@ export function inspectStep(
   const events = rig.drainEvents();
   buffer.clear();
   const segments = collectContactPoints(events, buffer);
+  // Every remaining body-level provider runs against the same live Rapier
+  // adapter (recorded Phase 10 verifier note: these were exercised via fakes
+  // only). `skipZero: false` keeps the impulse count = contact count even for
+  // a resting contact whose normal impulse rounds to zero.
+  const impulseSegments = collectContactImpulses(events, buffer, {
+    skipZero: false,
+  });
+  const originSegments = collectBodyOrigins(rig.world.adapter, buffer);
+  const comSegments = collectCentersOfMass(rig.world.adapter, buffer);
+  const velocitySegments = collectBodyVelocities(rig.world.adapter, buffer);
   solverStatistics(rig.world.adapter, statistics);
   return {
     step,
     contacts: countContacts(events),
     segments,
+    impulseSegments,
+    originSegments,
+    comSegments,
+    velocitySegments,
     lineCount: buffer.lineCount,
     checksum: rig.world.checksum(),
     statistics: { ...statistics },
