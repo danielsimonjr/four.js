@@ -25,6 +25,50 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-04 — LIGHTING MVP SHIPPED (owner-directed; §120 now 43/43 shipped-or-MVP —
+  AUDIT-120 amended).** Tier: ONE directional light, Lambert diffuse + scene ambient,
+  nothing else — §68's smallest honest slice. Standing decisions: `DirectionalLight`
+  lives in `@four/scene` (mirrors the rev-1.3 cameras placement; a light is a node),
+  shines along its node's **−Z world axis** (camera look convention; direction read via
+  `getWorldDirection(out)`, resolve-on-demand like `Camera.updateViewMatrix`; degenerate
+  scale → zero vector → lights nothing); §68's "ambient" is `Scene.ambientLight`, a
+  scene-wide RGB term (default black), NOT an AmbientLight node (dated staging note in
+  light.ts); light discovery in `@four/render` (`collectSceneLights`) is **duck-typed**
+  (`isDirectionalLight` brand + ambient duck-read off the root) even though the
+  render→scene edge exists — `instanceof` would be unfakeable in render-webgl's
+  doubles-only tests; unlike the particle contract, drift IS type-pinned (render's tests
+  assign the real classes to the contracts). First light in scene-graph DFS order wins
+  (§33-deterministic); light collection runs only for frames whose list contains a lit
+  item; lights are NOT §43-interpolated (same trade as particle positions, dated).
+  Materials: `LitMaterial` mirrors `UnlitMaterial` member-for-member (color-only, §60a
+  no-color-space/no-clamp stance); both carry a NEW `readonly kind` discriminant
+  ("unlit"/"lit") — the render list picks the pipeline from `material.kind` with an
+  "unlit" fallback, no instanceof (SpriteMaterial gets a kind only when it joins a
+  discriminated union). NOTE: §57's family list has no LitMaterial — spec-revisit item
+  in TODO. Geometry: optional `normals` attribute on BufferGeometry (index-aligned,
+  finite-validated, unit length is the author's contract); `boxGeometry` went 8→24
+  vertices (per-face normals — same 12 triangles, unlit rendering identical);
+  `planeGeometry` +Z normals; circle/2D stay position-only (unlit tier). WebGL:
+  `NORMAL_ATTRIBUTE_LOCATION = 1` (VAO-scoped, no clash with particle instance slots);
+  fourth program `LitProgram` (uniforms viewProjection/model/color + vec3
+  ambientLight/lightDirection/lightColor; lightColor premultiplied by intensity CPU-side
+  — black when no light, so one shader, no variants); normal matrix =
+  `transpose(inverse(mat3(model)))` **in the vertex shader** (GLSL ES 3.00 builtins;
+  hoist-to-uniform staged until math has a Matrix3 utility); fragment guards zero-length
+  normals → a normal-less geometry under LitMaterial shades ambient-only (never NaN);
+  lit runs are opaque (blend disabled on switch, mirroring unlit); `uniform3fv` added to
+  the GL seam (now 34 methods) and to REQUIRED_CONTEXT_METHODS (fail-fast, not
+  discriminating). Unlit path byte-identical: a scene with no lit items issues the same
+  GL sequence as before (only init/restore gain the fourth program build); all 32
+  browser specs + pixel goldens pass unchanged. Exit numbers: 3,034 unit + 174 suite +
+  32 browser; coverage geometry/materials 100%, scene 99.66 (light.ts 100), render 99.63
+  (lights.ts 97.36 — two defensive branches), render-webgl 99.5 (gl-program/gl-geometry
+  100); §86 gate 33.26/150 kB (+1.13 kB, genuine); docs warnings 126 (baseline held —
+  two new private-symbol `{@link}`s were demoted to backticks). Staged with dated notes
+  (2026-08-04): point/spot/hemisphere/area + multi-light (uniform arrays / §68 clustered
+  path), shadows §69 (castShadow deliberately NOT accepted-and-ignored), §59
+  StandardMaterial/PBR, §60a color strings + tone mapping, light layers, per-material
+  specular/emissive/maps.
 - **2026-08-04 (backlog burn-down, owner-directed "implement all your suggestions and
   more").** Landed in one batch: (1) **README truth** — all 24 package READMEs rewritten
   against `package-export-surfaces.json` (the five placeholder packages honestly say

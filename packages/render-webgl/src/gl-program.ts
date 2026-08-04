@@ -14,6 +14,11 @@
  *    a uv derived from the quad's local rectangle, one texture sample times a
  *    tint (WP-3a.3). Both pipelines bind the position stream at the same fixed
  *    attribute location, so `gl-geometry.ts`'s vertex arrays serve both.
+ * 4. **{@link LitProgram}** — §68's Lambert-lit surface (§120 "lighting",
+ *    2026-08-04): positions plus the optional normal stream at a second fixed
+ *    location, one directional light plus the scene ambient term as uniforms.
+ *    The same vertex arrays again — a geometry without normals binds nothing
+ *    at the normal slot and shades from its ambient term alone.
  *
  * ## Why a hand-written context type instead of `WebGL2RenderingContext`
  *
@@ -42,7 +47,7 @@
  */
 
 import { FourError, type Disposable } from "@four/core";
-import type { Matrix4 } from "@four/math";
+import type { Matrix4, Vector3 } from "@four/math";
 
 /**
  * The WebGL 2 / OpenGL ES 3.0 enumerants this package uses, by their normative
@@ -179,6 +184,7 @@ export interface WebglContext {
     data: Float32Array,
   ): void;
   uniform4fv(location: GlUniformLocation, data: Float32Array): void;
+  uniform3fv(location: GlUniformLocation, data: Float32Array): void;
   uniform1i(location: GlUniformLocation, value: number): void;
 
   // --- Textures (`gl-texture.ts`) ---
@@ -255,6 +261,19 @@ export interface WebglContext {
  * a second pipeline reuse them unchanged.
  */
 export const POSITION_ATTRIBUTE_LOCATION = 0;
+
+/**
+ * Vertex attribute slot the optional normal stream is bound to (§53, §68) —
+ * fixed by `layout(location = 1)` exactly as the position slot is, and for the
+ * same reasons. Location 1 collides with nothing: the particle pipeline's
+ * instance attributes live in its own vertex arrays (attribute bindings are
+ * VAO state), and `gl-geometry.ts`'s arrays bind this slot only when the
+ * geometry carries normals. A program that does not declare the slot (unlit,
+ * sprite) simply ignores an enabled stream; the lit program run over a
+ * geometry that never enabled it reads GL's constant default `(0, 0, 0, 1)`,
+ * which the lit fragment stage treats as "no normal — ambient only".
+ */
+export const NORMAL_ATTRIBUTE_LOCATION = 1;
 
 /**
  * The MVP vertex stage: object space → clip space, nothing else.
@@ -368,6 +387,80 @@ void main() {
 `;
 
 /**
+ * The lit vertex stage (§68): object space → clip space, plus the world-space
+ * normal the fragment stage shades with.
+ *
+ * The normal is transformed by the **inverse transpose** of the model
+ * matrix's upper 3×3 — the standard fix for non-uniform scale, under which
+ * the plain 3×3 would bend normals off their surfaces. GLSL ES 3.00 has
+ * `inverse()` and `transpose()` built in, so the matrix is derived in the
+ * shader per vertex rather than uploaded per draw; staged with a dated note
+ * (2026-08-04): when `@four/math`'s `Matrix3` grows a normal-matrix utility,
+ * hoisting this to a per-draw uniform saves the per-vertex inversion. MVP
+ * vertex counts make the difference unmeasurable, and the shader route needs
+ * no new upload path or math surface today.
+ */
+const LIT_VERTEX_SHADER_SOURCE = `#version 300 es
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec3 normal;
+
+uniform mat4 viewProjection;
+uniform mat4 model;
+
+out vec3 vNormal;
+
+void main() {
+  vNormal = transpose(inverse(mat3(model))) * normal;
+  gl_Position = viewProjection * model * vec4(position, 1.0);
+}
+`;
+
+/**
+ * The lit fragment stage (§57 `LitMaterial`, §68, §60a): Lambert diffuse under
+ * one directional light, plus the scene ambient term.
+ *
+ * ```text
+ * fragColor.rgb = color.rgb * (ambientLight + lightColor * max(dot(N, -L), 0))
+ * fragColor.a   = color.a
+ * ```
+ *
+ * - `lightDirection` is the **direction the light travels** (world space,
+ *   unit), so the surface term is `dot(N, -L)`; `lightColor` arrives
+ *   premultiplied by intensity (`SceneLights.directionalColor`), and a
+ *   no-light frame uploads black, which zeroes the Lambert term — one shader,
+ *   no variants.
+ * - The interpolated normal is re-normalized, guarded against zero length: a
+ *   geometry with no normal stream reads the attribute default `(0, 0, 0, 1)`,
+ *   whose xyz would turn `normalize()` into NaN — the guard turns it into
+ *   "ambient only" instead, the documented shading of a normal-less lit draw.
+ * - Lambert is one-sided: a face lit from behind gets `dot ≤ 0`, i.e. ambient
+ *   only. With back-face culling off (see `webgl-renderer.ts`) that is the
+ *   physically honest look for a plane's back.
+ * - Straight alpha, linear-light arithmetic on plain 0…1 numbers; §60a's
+ *   transfer functions and tone mapping are a later packet, as everywhere.
+ */
+const LIT_FRAGMENT_SHADER_SOURCE = `#version 300 es
+precision highp float;
+
+uniform vec4 color;
+uniform vec3 ambientLight;
+uniform vec3 lightDirection;
+uniform vec3 lightColor;
+
+in vec3 vNormal;
+
+out vec4 fragColor;
+
+void main() {
+  float len = length(vNormal);
+  float diffuse = len > 0.0
+    ? max(dot(vNormal / len, -lightDirection), 0.0)
+    : 0.0;
+  fragColor = vec4(color.rgb * (ambientLight + lightColor * diffuse), color.a);
+}
+`;
+
+/**
  * Scratch for matrix uploads.
  *
  * `Matrix4.elements` is a `Float64Array` (the engine computes in doubles);
@@ -381,6 +474,9 @@ const matrixScratch = new Float32Array(16);
 
 /** Scratch for {@link UnlitProgram.setColor}; see {@link matrixScratch}. */
 const colorScratch = new Float32Array(4);
+
+/** Scratch for the lit pipeline's `vec3` uploads; see {@link matrixScratch}. */
+const vec3Scratch = new Float32Array(3);
 
 /**
  * Compiles one shader stage, or throws.
@@ -816,6 +912,194 @@ export class SpriteProgram implements Disposable {
     colorScratch[2] = tint[2];
     colorScratch[3] = tint[3];
     this.#gl.uniform4fv(this.#tintLocation, colorScratch);
+  }
+
+  /**
+   * Deletes the GL program (§83). Idempotent.
+   *
+   * **Only call this on a live context** — see {@link UnlitProgram.dispose}.
+   */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#gl.deleteProgram(this.#program);
+  }
+}
+
+/**
+ * The Lambert-lit pipeline (§57 `LitMaterial`, §68, §120 "lighting") — added
+ * by the lighting packet, 2026-08-04.
+ *
+ * ```ts
+ * const program = LitProgram.create(gl);
+ * program.use();
+ * program.setViewProjection(viewProjection);          // once per viewport
+ * program.setAmbientLight(lights.ambientColor);       // once per viewport
+ * program.setDirectionalLight(
+ *   lights.direction,                                 // once per viewport
+ *   lights.directionalColor,
+ * );
+ * program.setModel(item.worldMatrix);                 // once per draw
+ * program.setColor(item.material.color);
+ * ```
+ *
+ * It shares `gl-geometry.ts`'s vertex arrays with the other pipelines: the
+ * position stream sits at the fixed {@link POSITION_ATTRIBUTE_LOCATION} and
+ * the normal stream — when the geometry has one — at the fixed
+ * {@link NORMAL_ATTRIBUTE_LOCATION}, so one geometry cache serves all four
+ * programs. Light uniforms are per *frame* state uploaded per viewport (they
+ * live in the program object, exactly like the view-projection): one
+ * directional light plus the scene ambient, the §120 tier — multi-light,
+ * shadows (§69), and tone mapping (§60a) are staged where `@four/scene`'s
+ * `light.ts` records.
+ *
+ * Owns its GL objects and nothing else; the renderer re-creates it on context
+ * restore exactly as it re-creates the unlit one (§61).
+ */
+export class LitProgram implements Disposable {
+  readonly #gl: WebglContext;
+
+  readonly #program: GlProgramHandle;
+
+  readonly #viewProjectionLocation: GlUniformLocation;
+
+  readonly #modelLocation: GlUniformLocation;
+
+  readonly #colorLocation: GlUniformLocation;
+
+  readonly #ambientLightLocation: GlUniformLocation;
+
+  readonly #lightDirectionLocation: GlUniformLocation;
+
+  readonly #lightColorLocation: GlUniformLocation;
+
+  #disposed = false;
+
+  private constructor(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    viewProjectionLocation: GlUniformLocation,
+    modelLocation: GlUniformLocation,
+    colorLocation: GlUniformLocation,
+    ambientLightLocation: GlUniformLocation,
+    lightDirectionLocation: GlUniformLocation,
+    lightColorLocation: GlUniformLocation,
+  ) {
+    this.#gl = gl;
+    this.#program = program;
+    this.#viewProjectionLocation = viewProjectionLocation;
+    this.#modelLocation = modelLocation;
+    this.#colorLocation = colorLocation;
+    this.#ambientLightLocation = ambientLightLocation;
+    this.#lightDirectionLocation = lightDirectionLocation;
+    this.#lightColorLocation = lightColorLocation;
+  }
+
+  /**
+   * Compiles and links the lit program on `gl`.
+   *
+   * Fails exactly as {@link UnlitProgram.create} does — see it for the
+   * contract; the messages name `"lit"` and the §89 code is the same.
+   */
+  static create(gl: WebglContext): LitProgram {
+    const program = createLinkedProgram(
+      gl,
+      "lit",
+      LIT_VERTEX_SHADER_SOURCE,
+      LIT_FRAGMENT_SHADER_SOURCE,
+    );
+    try {
+      return new LitProgram(
+        gl,
+        program,
+        requireUniform(gl, program, "viewProjection", "lit"),
+        requireUniform(gl, program, "model", "lit"),
+        requireUniform(gl, program, "color", "lit"),
+        requireUniform(gl, program, "ambientLight", "lit"),
+        requireUniform(gl, program, "lightDirection", "lit"),
+        requireUniform(gl, program, "lightColor", "lit"),
+      );
+    } catch (error: unknown) {
+      gl.deleteProgram(program);
+      throw error;
+    }
+  }
+
+  /** Whether {@link LitProgram.dispose} has run. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  /** Makes this the current program. Call before any upload below. */
+  use(): void {
+    this.#gl.useProgram(this.#program);
+  }
+
+  /**
+   * Uploads `projection * view` for the viewport being drawn. Column-major, so
+   * `transpose` is false — the engine's `Matrix4` layout is already GL's (§7b).
+   */
+  setViewProjection(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(
+      this.#viewProjectionLocation,
+      false,
+      matrixScratch,
+    );
+  }
+
+  /** Uploads one render item's world matrix. See {@link setViewProjection}. */
+  setModel(matrix: Matrix4): void {
+    matrixScratch.set(matrix.elements);
+    this.#gl.uniformMatrix4fv(this.#modelLocation, false, matrixScratch);
+  }
+
+  /**
+   * Uploads a straight-alpha, linear-light RGBA colour (§57, §60a) — the
+   * material's base color. Accepts the material's own live array; the values
+   * are copied into scratch, so the material keeps ownership of its array.
+   */
+  setColor(color: readonly [number, number, number, number]): void {
+    colorScratch[0] = color[0];
+    colorScratch[1] = color[1];
+    colorScratch[2] = color[2];
+    colorScratch[3] = color[3];
+    this.#gl.uniform4fv(this.#colorLocation, colorScratch);
+  }
+
+  /**
+   * Uploads the scene ambient term (§68), straight RGB. Accepts the
+   * `SceneLights` record's own live array — copied into scratch, as every
+   * upload here is.
+   */
+  setAmbientLight(color: readonly [number, number, number]): void {
+    vec3Scratch[0] = color[0];
+    vec3Scratch[1] = color[1];
+    vec3Scratch[2] = color[2];
+    this.#gl.uniform3fv(this.#ambientLightLocation, vec3Scratch);
+  }
+
+  /**
+   * Uploads the directional light (§68): the world-space unit vector the
+   * light **travels along** (`SceneLights.direction` — the fragment stage
+   * negates it for the surface term) and its color premultiplied by intensity
+   * (`SceneLights.directionalColor`). A frame with no directional light
+   * uploads black, which zeroes the Lambert term — see the fragment source.
+   */
+  setDirectionalLight(
+    direction: Vector3,
+    color: readonly [number, number, number],
+  ): void {
+    vec3Scratch[0] = direction.x;
+    vec3Scratch[1] = direction.y;
+    vec3Scratch[2] = direction.z;
+    this.#gl.uniform3fv(this.#lightDirectionLocation, vec3Scratch);
+    vec3Scratch[0] = color[0];
+    vec3Scratch[1] = color[1];
+    vec3Scratch[2] = color[2];
+    this.#gl.uniform3fv(this.#lightColorLocation, vec3Scratch);
   }
 
   /**

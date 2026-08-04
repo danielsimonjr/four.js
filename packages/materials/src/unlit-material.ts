@@ -105,6 +105,17 @@ function requireFinite(name: string, value: number): number {
  */
 export class UnlitMaterial implements Disposable {
   /**
+   * Pipeline discriminant (§57, §64), introduced with the §68 lighting packet
+   * (2026-08-04): with two surface-material families (`UnlitMaterial`,
+   * `LitMaterial`) sharing `Renderable.material`, the render-list builder
+   * needs one property load — not an `instanceof`, which a structurally-typed
+   * material double could never satisfy — to pick the item's pipeline. A
+   * literal string, mirroring `RenderItemKind`. `SpriteMaterial` gains one
+   * when it joins a material union that needs discriminating.
+   */
+  readonly kind = "unlit" as const;
+
+  /**
    * Stable identity (§57 inherits §83's resource model), assigned at
    * construction from a monotonic counter and formatted `material-<n>`. Unique
    * within a process, ascending in construction order, never reused.

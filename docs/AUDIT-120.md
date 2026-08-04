@@ -4,6 +4,11 @@
 (Phase 11 in progress; WP-11.1 serialization and WP-11.2 assets committed, WP-11.3 UI and
 WP-11.4 benchmarks landing with this document).
 
+**Amended 2026-08-04:** the lighting packet landed (owner-directed; see S-5 for the tier),
+so the one **staged** row moved to **shipped (MVP tier)**. The verdict table and the
+rendering table below reflect the amendment; S-5 keeps the original staging record and
+carries the shipped note.
+
 This is the exit artefact of **plan §6j, P11-5**: _"audit §120 against reality; anything
 unshipped gets a dated staged note — the exit's 'complete' reads as
 'shipped-or-staged-with-note', consistent with every prior phase."_ §113a closes Phase 11
@@ -20,13 +25,14 @@ to build anything; the staged lines below are dated statements of absence, which
 |                                                                                     |  items |       |
 | ----------------------------------------------------------------------------------- | -----: | ----- |
 | **Shipped** — implemented, exported, and covered by tests                           | **37** | of 43 |
-| **Shipped at a pinned MVP tier** — usable, with a §-level widening staged and dated |  **5** | of 43 |
-| **Staged** — not shipped; dated line below                                          |  **1** | of 43 |
+| **Shipped at a pinned MVP tier** — usable, with a §-level widening staged and dated |  **6** | of 43 |
+| **Staged** — not shipped; dated line below                                          |  **0** | of 43 |
 
-**42 of §120's 43 items ship.** The one that does not is **rendering → lighting**, and it
-was never scheduled: Phase 3's pinned MVP tier is _"unlit colored geometry, WebGL 2 only"_
-(plan §6a) and no later phase widened it. That is a real hole in the §120 MVP and it is
-recorded as such below rather than argued away.
+**43 of §120's 43 items ship** (since the 2026-08-04 lighting packet; 42 of 43 at the
+original 2026-08-02 audit). Lighting was the one never-scheduled item — Phase 3's pinned
+MVP tier was _"unlit colored geometry, WebGL 2 only"_ (plan §6a) and no later phase widened
+it until the owner directed the lighting packet; it now ships at the pinned tier S-5
+records (one directional light, Lambert + scene ambient).
 
 Counting note: the 43 items are §120's own bullets, one row each, in §120's order. Rows
 are not weighted — "Node" and "one solver adapter" count the same — so the totals are a
@@ -98,7 +104,7 @@ coverage census, not a measure of effort or of risk.
 | WebGL 2         | shipped            | `packages/render-webgl/src/webgl-renderer.ts`; `tests/browser/*.spec.ts` under Chromium/SwiftShader              | §62; the other four backends are scaffolds, per §120's "WebGL 2 only"                                       |
 | 2D primitives   | shipped (MVP tier) | `packages/geometry/src/primitives.ts` (`circleGeometry2D`, `planeGeometry`), `packages/render/src/sprite.ts`     | §50's shape catalogue and §51's `Path` are staged — see **S-4**                                             |
 | basic 3D meshes | shipped            | `packages/geometry/src/primitives.ts` (`boxGeometry`), `buffer-geometry.ts`, `packages/render/src/renderable.ts` | §53–54                                                                                                      |
-| **lighting**    | **staged**         | —                                                                                                                | **not shipped** — see **S-5**                                                                               |
+| lighting        | shipped (MVP tier) | `packages/scene/src/light.ts`, `packages/materials/src/lit-material.ts`, `packages/render/src/lights.ts`, `packages/render-webgl/src/gl-program.ts` (`LitProgram`) | §68's MVP tier (2026-08-04): one directional light + scene ambient, Lambert. Widening staged — see **S-5** |
 | sprites         | shipped            | `packages/render/src/sprite.ts`, `packages/materials/src/sprite-material.ts`                                     | §55; batched                                                                                                |
 | text            | shipped (MVP tier) | `packages/text/src/{bitmap-font,glyph-atlas,text-layout}.ts`                                                     | §56's MVP tier: a built-in 6 × 12 bitmap ASCII face, atlas and layout. Shaping and SDF staged — see **S-6** |
 
@@ -159,7 +165,23 @@ simplify, offset, boolean operations) together with §52's stroke generation —
 dashes, stroke alignment. Phase 3's pinned MVP tier is unlit colored geometry and no phase
 scheduled §50–52; a tessellation packet is the natural home.
 
-**S-5 — Lighting. Staged 2026-08-02. This is the one §120 item that does not ship.**
+**S-5 — Lighting. Staged 2026-08-02; shipped at the MVP tier 2026-08-04
+(owner-directed).** The tier decision the last paragraph below asked for was made: **one
+directional light with Lambert shading plus a scene ambient term** — the small packet, not
+§59's PBR. What shipped: `DirectionalLight` in `@four/scene` (a node, like cameras; −Z
+world-axis direction; `Scene.ambientLight` carries §68's "ambient" as a scene-wide term);
+`LitMaterial` in `@four/materials` (color-only, mirroring `UnlitMaterial`, with a `kind`
+pipeline discriminant on both); an optional `normals` vertex attribute on `BufferGeometry`
+with per-face normals generated by `boxGeometry` (now 24 vertices) and `planeGeometry`
+(2D shapes stay unlit and position-only); a backend-independent `collectSceneLights` in
+`@four/render` plus the `"lit"` render-item kind; and a fourth GL program (`LitProgram`)
+in `@four/render-webgl`. Still staged, dated 2026-08-04 in `packages/scene/src/light.ts`:
+point/spot/hemisphere/area lights and multi-light (needs uniform arrays and §68's
+clustered path), shadows (§69), §59 PBR / `StandardMaterial`, §60a color management and
+tone mapping, CSS color strings on lights, and light layers. The original staging record
+follows, kept for the audit trail.
+
+**(Original text, superseded 2026-08-04:)**
 `@four/materials` publishes `UnlitMaterial` and `SpriteMaterial` and nothing else: there
 is no light type, no light list on the scene, no lit shading path in
 `@four/render-webgl`, and no §59 PBR tier. The cause is traceable and is not an oversight

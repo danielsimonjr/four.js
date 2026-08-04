@@ -34,6 +34,8 @@ export type {
 } from "./gl-program.js";
 export {
   GL,
+  LitProgram,
+  NORMAL_ATTRIBUTE_LOCATION,
   POSITION_ATTRIBUTE_LOCATION,
   SpriteProgram,
   UnlitProgram,

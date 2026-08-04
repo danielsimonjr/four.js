@@ -8,6 +8,36 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-04 (lighting)
+
+#### Added — Lighting MVP (§68, §120's last unshipped bullet; owner-directed tier)
+
+The minimal defensible tier: one directional light, Lambert diffuse plus a scene
+ambient term. No shadows, no point/spot lights, no PBR — each staged with a dated
+note where its design will land (§69, §59, §60a; see `docs/AUDIT-120.md` S-5).
+
+- `@four/scene`: `DirectionalLight` node (color + intensity, shines along its node's
+  −Z world axis — the camera look convention; `getWorldDirection(out)` resolves on
+  demand) and `Scene.ambientLight`, §68's "ambient" as a scene-wide term.
+- `@four/materials`: `LitMaterial` mirroring `UnlitMaterial` (color-only, same §60a
+  no-color-space/no-clamp stance); both surface materials now carry a `kind`
+  pipeline discriminant.
+- `@four/geometry`: optional `normals` vertex attribute on `BufferGeometry`
+  (index-aligned with positions, §85-validated); `boxGeometry` now emits 24
+  vertices with per-face normals (same 12 triangles), `planeGeometry` +Z normals;
+  2D shapes stay position-only and unlit.
+- `@four/render`: `"lit"` render-item kind chosen from `material.kind`;
+  backend-independent `collectSceneLights` with duck-typed light discovery
+  (first light in scene-graph order; render-list-identical visibility pruning).
+- `@four/render-webgl`: fourth GL program (`LitProgram`; normal matrix derived
+  in-shader, no-light frames upload black and need no shader variant), normal
+  stream at fixed attribute location 1, `uniform3fv` added to the GL seam.
+
+The unlit path is untouched — a scene with no lit items issues the same GL call
+sequence as before, and all 32 browser specs and pixel goldens pass unchanged.
+3,034 unit + 174 suite tests; touched packages at 97–100% coverage; payload gate
+33.26/150 kB; §120 audit amended to 43/43 shipped-or-MVP.
+
 ### 2026-08-04 (backlog burn-down)
 
 Owner-directed: implement the recorded backlog, deferring nothing. One batch:

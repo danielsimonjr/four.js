@@ -36,6 +36,7 @@
 
 import type { Component, ComponentType } from "@four/core";
 
+import type { ColorRGB } from "./light.js";
 import { Node, type NodeType } from "./node.js";
 
 /**
@@ -59,6 +60,26 @@ function findFirst(
 }
 
 export class Scene extends Node {
+  /**
+   * The scene ambient term (§68's "ambient" light, 2026-08-04): straight RGB
+   * added to every lit surface's illumination before the directional
+   * contribution, uniformly, from every direction. Black by default — an
+   * unconfigured scene adds no light, so a `LitMaterial` with no lights
+   * renders black rather than secretly unlit.
+   *
+   * A scene-wide value rather than an `AmbientLight` node — see
+   * `light.ts`'s module header for the staging note. The array instance is
+   * `readonly` — write *into* it (`scene.ambientLight[0] = 0.2`), as with
+   * every color the renderer may hold a reference to. Components are plain
+   * 0…1 numbers with no color space attached (§60a deferral) and are not
+   * validated: like `Transform`'s math members, per-frame scene state trades
+   * write-time checks for the §85 development-build diagnostics to come.
+   *
+   * Only lit materials see it; unlit rendering ignores lighting entirely
+   * (§57).
+   */
+  readonly ambientLight: ColorRGB = [0, 0, 0];
+
   // TODO(§46, Phase 7+): selector syntax —
   //   `query(selector: string): Node | null` / `queryAll(selector: string)`
   // parsing `"Mesh.dynamic[visible=true]"` (type . tag [attribute = value]).

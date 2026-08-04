@@ -11,6 +11,16 @@ changes in `CHANGELOG.md`.
       verifier's priority order:
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
+- [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
+      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69),
+      §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
+      strings on lights, light layers; hoist the lit shader's per-vertex
+      inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a
+      Matrix3 utility (dated note in gl-program.ts)
+- [ ] Spec-revisit note (2026-08-04): §57's material family list has no `LitMaterial`
+      member — the MVP lit tier added one below §59's StandardMaterial; record it in a
+      spec amendment (letter-suffix rule) or fold it into the §57 revision that lands
+      the abstract Material base
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
@@ -80,6 +90,16 @@ changes in `CHANGELOG.md`.
 
 ## Done
 
+- [x] 2026-08-04 — **Lighting MVP shipped** (§120's last unshipped bullet; owner-directed,
+      minimal tier): `DirectionalLight` node + `Scene.ambientLight` in @four/scene (§68),
+      `LitMaterial` + `kind` discriminants in @four/materials (§57), optional `normals`
+      vertex attribute in @four/geometry (box now 24 verts with per-face normals, plane
+      +Z; 2D shapes stay unlit), `"lit"` render-item kind + duck-typed `collectSceneLights`
+      in @four/render, `LitProgram` (Lambert + ambient) + normal-stream upload in
+      @four/render-webgl. Unlit path untouched — all 32 browser specs and pixel goldens
+      pass; 3,034 unit + 174 suite tests; touched packages ≥97% coverage; §86 gate
+      33.26/150 kB; docs warnings 126 (unchanged). Wider §68/§69/§59/§60a scope staged
+      with dated notes (see backlog and docs/AUDIT-120.md S-5)
 - [x] 2026-08-04 — **Zero-findings sweep** (owner-directed): consolidated all 5
       baselined TRUE_DUPLICATE names (SeededRandom → core, JsonValue/cloneJsonValue →
       core with the __proto__ strengthening, DEFAULT_GRAVITY_Y → core, ColorRGBA →

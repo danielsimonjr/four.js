@@ -11,7 +11,9 @@
  *
  * ## What one entry holds
  *
- * A vertex array object plus the one or two buffers it references, and the
+ * A vertex array object plus the one to three buffers it references —
+ * positions, the optional normal stream (§68, 2026-08-04), the optional index
+ * buffer — and the
  * three numbers the draw call needs (mode, element count, index type). Binding
  * a VAO restores the whole attribute *and* element-array binding state in one
  * call, so the per-draw cost in `webgl-renderer.ts` is `bindVertexArray` plus
@@ -52,6 +54,7 @@ import type { RenderItem } from "@four/render";
 
 import {
   GL,
+  NORMAL_ATTRIBUTE_LOCATION,
   POSITION_ATTRIBUTE_LOCATION,
   type WebglContext,
 } from "./gl-program.js";
@@ -76,6 +79,15 @@ export interface GeometryRecord {
 
   /** Buffer backing the position attribute. */
   readonly positionBuffer: GlBuffer;
+
+  /**
+   * Buffer backing the optional normal attribute (§53, §68), or `null` for a
+   * position-only geometry. Bound at the fixed `NORMAL_ATTRIBUTE_LOCATION`
+   * inside the vertex array, so the lit pipeline reads it with no extra
+   * per-draw call — and the unlit pipeline, which declares no normal input,
+   * ignores it for free.
+   */
+  readonly normalBuffer: GlBuffer | null;
 
   /** Index buffer, or `null` for a non-indexed geometry. */
   readonly indexBuffer: GlBuffer | null;
@@ -232,11 +244,25 @@ export class GeometryCache {
       return null;
     }
 
+    const normals = geometry.normals;
+    let normalBuffer: GlBuffer | null = null;
+    if (normals !== undefined) {
+      normalBuffer = gl.createBuffer();
+      if (normalBuffer === null) {
+        gl.deleteBuffer(positionBuffer);
+        gl.deleteVertexArray(vertexArray);
+        return null;
+      }
+    }
+
     const indices = geometry.indices;
     let indexBuffer: GlBuffer | null = null;
     if (indices !== undefined) {
       indexBuffer = gl.createBuffer();
       if (indexBuffer === null) {
+        if (normalBuffer !== null) {
+          gl.deleteBuffer(normalBuffer);
+        }
         gl.deleteBuffer(positionBuffer);
         gl.deleteVertexArray(vertexArray);
         return null;
@@ -257,6 +283,24 @@ export class GeometryCache {
       0,
     );
 
+    // The optional normal stream (§53, §68): its own buffer at the second
+    // fixed slot. `vertexAttribPointer` captures the *current* ARRAY_BUFFER
+    // binding into the vertex array, so rebinding here does not disturb the
+    // position attribute recorded above.
+    if (normals !== undefined && normalBuffer !== null) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, normalBuffer);
+      gl.bufferData(GL.ARRAY_BUFFER, normals, GL.STATIC_DRAW);
+      gl.enableVertexAttribArray(NORMAL_ATTRIBUTE_LOCATION);
+      gl.vertexAttribPointer(
+        NORMAL_ATTRIBUTE_LOCATION,
+        3,
+        GL.FLOAT,
+        false,
+        0,
+        0,
+      );
+    }
+
     if (indices !== undefined && indexBuffer !== null) {
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
       gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW);
@@ -268,6 +312,7 @@ export class GeometryCache {
     return {
       vertexArray,
       positionBuffer,
+      normalBuffer,
       indexBuffer,
       version: geometry.version,
       mode: glMode(geometry.mode),
@@ -281,6 +326,9 @@ export class GeometryCache {
     const gl = this.#gl;
     gl.deleteVertexArray(record.vertexArray);
     gl.deleteBuffer(record.positionBuffer);
+    if (record.normalBuffer !== null) {
+      gl.deleteBuffer(record.normalBuffer);
+    }
     if (record.indexBuffer !== null) {
       gl.deleteBuffer(record.indexBuffer);
     }

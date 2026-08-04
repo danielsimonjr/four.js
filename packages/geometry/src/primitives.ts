@@ -25,12 +25,15 @@
  *
  * ## Attributes
  *
- * Positions only. Unlit colored geometry (§120) needs nothing else, and normals
- * or uvs invented here would have to be re-generated the moment the geometry
- * gains real vertex layouts — a box with per-face normals needs 24 vertices
- * rather than 8, which is a decision for the packet that introduces lighting
- * (§68), not this one. All three builders are therefore indexed and share
- * vertices freely.
+ * The **3D** builders emit positions *and* per-vertex normals — the §68
+ * lighting packet (2026-08-04) is the packet the original position-only note
+ * here deferred to, and it made the deferred call: a box with per-face normals
+ * carries 24 vertices rather than 8, because a corner shared by three faces
+ * has three different normals and an indexed vertex can hold only one. The
+ * **2D** builder (`circleGeometry2D`) stays position-only: 2D shapes are
+ * unlit in the §120 tier, and a normal on a flat shape that never lights
+ * would be dead weight in every upload. Uvs, tangents, and the rest of §53's
+ * attribute set remain with the packets that need them.
  *
  * Options are validated the way `BufferGeometry` validates its buffers: extents
  * must be finite and positive, segment counts finite integers ≥ 3, and a
@@ -103,53 +106,86 @@ export interface CircleGeometry2DOptions {
 }
 
 /**
- * An axis-aligned box centred on the origin, as 8 shared vertices and 12
- * counter-clockwise triangles (§53 "box").
+ * An axis-aligned box centred on the origin, as 24 vertices — four per face,
+ * each carrying that face's outward normal — and 12 counter-clockwise
+ * triangles (§53 "box", §68).
  *
  * ```ts
  * const geometry = boxGeometry({ width: 2, height: 1, depth: 1 });
- * geometry.vertexCount; // 8
+ * geometry.vertexCount; // 24 — 4 per face; corners split for per-face normals
  * geometry.drawCount;   // 36 indices
  * ```
  *
  * Corners sit at `(±width/2, ±height/2, ±depth/2)`, so the box spans exactly
- * the requested extents and its bounds are `[-half, +half]` per axis. Vertices
- * are shared between faces — 8 rather than 24 — because this tier carries no
- * per-face attributes to split them for (see the module header).
+ * the requested extents and its bounds are `[-half, +half]` per axis. Until
+ * the §68 lighting packet (2026-08-04) the builder shared 8 corner vertices;
+ * a corner belongs to three faces with three different normals, so a lit box
+ * needs the split — exactly the trade the original attribute note predicted.
+ * The triangles drawn are the same 12, so unlit rendering is unchanged.
  */
 export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
   const hx = requirePositive("width", options.width ?? 1) / 2;
   const hy = requirePositive("height", options.height ?? 1) / 2;
   const hz = requirePositive("depth", options.depth ?? 1) / 2;
 
-  // Corner order: the -Z face 0..3 counter-clockwise seen from +Z, then the
-  // +Z face 4..7 directly in front of it. One vertex per line, index in the
+  // Face order +Z, -Z, +X, -X, +Y, -Y; each face's four corners are listed
+  // counter-clockwise as seen from outside the box (§7a) — verified in the
+  // tests by the sign of every face normal. One vertex per line, index in the
   // comment — the layout is the documentation, hence `prettier-ignore`.
   // prettier-ignore
   const positions = new Float32Array([
-    -hx, -hy, -hz, // 0
-     hx, -hy, -hz, // 1
-     hx,  hy, -hz, // 2
-    -hx,  hy, -hz, // 3
-    -hx, -hy,  hz, // 4
-     hx, -hy,  hz, // 5
-     hx,  hy,  hz, // 6
-    -hx,  hy,  hz, // 7
+    -hx, -hy,  hz, //  0  +Z (front)
+     hx, -hy,  hz, //  1
+     hx,  hy,  hz, //  2
+    -hx,  hy,  hz, //  3
+     hx, -hy, -hz, //  4  -Z (back)
+    -hx, -hy, -hz, //  5
+    -hx,  hy, -hz, //  6
+     hx,  hy, -hz, //  7
+     hx, -hy,  hz, //  8  +X (right)
+     hx, -hy, -hz, //  9
+     hx,  hy, -hz, // 10
+     hx,  hy,  hz, // 11
+    -hx, -hy, -hz, // 12  -X (left)
+    -hx, -hy,  hz, // 13
+    -hx,  hy,  hz, // 14
+    -hx,  hy, -hz, // 15
+    -hx,  hy,  hz, // 16  +Y (top)
+     hx,  hy,  hz, // 17
+     hx,  hy, -hz, // 18
+    -hx,  hy, -hz, // 19
+    -hx, -hy, -hz, // 20  -Y (bottom)
+     hx, -hy, -hz, // 21
+     hx, -hy,  hz, // 22
+    -hx, -hy,  hz, // 23
   ]);
 
-  // Two triangles per face, each wound counter-clockwise as seen from outside
-  // the box (§7a) — verified in the tests by the sign of every face normal.
+  // The face's outward unit normal, repeated for its four vertices (§68).
   // prettier-ignore
-  const indices = new Uint16Array([
-    4, 5, 6,  4, 6, 7, // +Z (front)
-    1, 0, 3,  1, 3, 2, // -Z (back)
-    5, 1, 2,  5, 2, 6, // +X (right)
-    0, 4, 7,  0, 7, 3, // -X (left)
-    3, 7, 6,  3, 6, 2, // +Y (top)
-    0, 1, 5,  0, 5, 4, // -Y (bottom)
+  const normals = new Float32Array([
+     0,  0,  1,   0,  0,  1,   0,  0,  1,   0,  0,  1, // +Z
+     0,  0, -1,   0,  0, -1,   0,  0, -1,   0,  0, -1, // -Z
+     1,  0,  0,   1,  0,  0,   1,  0,  0,   1,  0,  0, // +X
+    -1,  0,  0,  -1,  0,  0,  -1,  0,  0,  -1,  0,  0, // -X
+     0,  1,  0,   0,  1,  0,   0,  1,  0,   0,  1,  0, // +Y
+     0, -1,  0,   0, -1,  0,   0, -1,  0,   0, -1,  0, // -Y
   ]);
 
-  return new BufferGeometry({ positions, indices, mode: "triangles" });
+  // Two triangles per face over its four corners: (0, 1, 2) and (0, 2, 3)
+  // within the face, offset by the face's base vertex.
+  const indices = new Uint16Array(36);
+  for (let face = 0; face < 6; face += 1) {
+    const base = face * 4;
+    const offset = face * 6;
+    indices[offset] = base;
+    indices[offset + 1] = base + 1;
+    indices[offset + 2] = base + 2;
+    indices[offset + 3] = base;
+    indices[offset + 4] = base + 2;
+    indices[offset + 5] = base + 3;
+  }
+
+  return new BufferGeometry({ positions, normals, indices, mode: "triangles" });
 }
 
 /**
@@ -161,6 +197,12 @@ export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
  * of a side-on physics scene, and it never needs re-orienting between them.
  * A floor in a 3D scene is this plane rotated -π/2 about X by its node's
  * transform.
+ *
+ * Every vertex carries the `+Z` normal the plane faces (§68, 2026-08-04) —
+ * the node's transform reorients it with the plane, so the rotated floor
+ * above lights from `+Y` as expected. The back side is a legitimate view
+ * (back-face culling is off, see `@four/render-webgl`) but Lambert-dark:
+ * a face lit from behind receives its ambient term only.
  */
 export function planeGeometry(
   options: PlaneGeometryOptions = {},
@@ -175,9 +217,13 @@ export function planeGeometry(
      hw,  hh, 0, // 2 top-right
     -hw,  hh, 0, // 3 top-left
   ]);
+  // prettier-ignore
+  const normals = new Float32Array([
+    0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
+  ]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
 
-  return new BufferGeometry({ positions, indices, mode: "triangles" });
+  return new BufferGeometry({ positions, normals, indices, mode: "triangles" });
 }
 
 /**
