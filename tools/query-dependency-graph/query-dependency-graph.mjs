@@ -166,9 +166,29 @@ function symbolUsers(symbol, fileEntries) {
   return out;
 }
 
+/**
+ * Directory holding `docs/Architecture/` — i.e. the root CDG was run against.
+ *
+ * Defaults to two levels above this script, which is right when the tool sits at
+ * `<repo>/tools/query-dependency-graph` and CDG ran on the repo root. That does not
+ * hold everywhere: llm-wiki keeps the tools at the repo root but its TypeScript lives
+ * in `pipeline/` and `memory/`, so the graph lands in `<pkg>/docs/Architecture`.
+ * `--root=<path>` points the query surface at that package. CDG already takes the
+ * same flag; this keeps the pair symmetric.
+ *
+ * Mutates `argv`, removing the flag so it is never read as a command.
+ */
+export function resolveRoot(argv, scriptDir) {
+  const i = argv.findIndex((a) => a.startsWith('--root='));
+  if (i === -1) return resolve(scriptDir, '..', '..');
+  const [flag] = argv.splice(i, 1);
+  return resolve(flag.slice('--root='.length));
+}
+
 function main() {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-  const [cmd, ...args] = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  const root = resolveRoot(argv, dirname(fileURLToPath(import.meta.url)));
+  const [cmd, ...args] = argv;
   const { graph, surfaces, fileEntries, forward } = loadData(root);
 
   if (!cmd || cmd === '--emit') {

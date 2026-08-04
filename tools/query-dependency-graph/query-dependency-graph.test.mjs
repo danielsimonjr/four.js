@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 import {
+  resolveRoot,
   resolveSpec,
   buildForward,
   invert,
@@ -80,4 +82,30 @@ test('browserSafePackages = main entries minus Node runtimes (workbook)', () => 
   assert.ok(bsp.includes('packages/typed-function'));
   assert.ok(!bsp.includes('workbook')); // Node runtime excluded
   assert.ok(!bsp.includes('plot/src/render-file')); // non-main entry not a package
+});
+
+// --root lets the tool point at a package that is not the directory two levels
+// above the script. llm-wiki keeps CDG/QDG at the repo root but its TypeScript
+// lives in pipeline/ and memory/, so the graph is written to <pkg>/docs/Architecture
+// rather than <repo>/docs/Architecture.
+test('resolveRoot: defaults to two levels above the script directory', () => {
+  const dir = resolve('/repo/tools/query-dependency-graph');
+  assert.equal(resolveRoot([], dir), resolve('/repo'));
+});
+
+test('resolveRoot: --root=<path> overrides the default', () => {
+  const dir = resolve('/repo/tools/query-dependency-graph');
+  assert.equal(resolveRoot(['--root=/elsewhere/pipeline'], dir), resolve('/elsewhere/pipeline'));
+});
+
+test('resolveRoot: a relative --root resolves against cwd', () => {
+  const dir = resolve('/repo/tools/query-dependency-graph');
+  assert.equal(resolveRoot(['--root=pipeline'], dir), resolve(process.cwd(), 'pipeline'));
+});
+
+test('resolveRoot: --root is consumed, not left to be read as a command', () => {
+  const dir = resolve('/repo/tools/query-dependency-graph');
+  const argv = ['--root=/x', 'cycles'];
+  resolveRoot(argv, dir);
+  assert.deepEqual(argv.filter((a) => !a.startsWith('--root=')), ['cycles']);
 });

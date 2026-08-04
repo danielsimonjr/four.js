@@ -27,6 +27,13 @@ real scripts plus a CI gate, rather than leaving them as loose files.
 `docs/Architecture/` is committed on purpose: QDG and any agent read that JSON
 instead of re-running the heavy parse, so it has to be in the tree to be useful.
 
+QDG also gained `--root=<path>` (written test-first in llm-wiki, mirrored here so
+the two vendored copies stay byte-identical). It previously resolved
+`docs/Architecture/` from its own location two levels up, which is correct for
+four.js but breaks wherever the tools do not sit directly above the scanned root.
+The flag mirrors the one CDG already had, and is consumed so it is never misread
+as a command. QDG's suite goes 6 -> 10 tests.
+
 First run is clean across all **24 workspace packages** — 318 files, 1198 exports,
 **0 runtime circular dependencies** (2 type-only, which are safe), 0 orphaned
 files, and no `node:` leaks. The census self-check passes: 318 files counted
