@@ -487,6 +487,9 @@ export class RigidBody
   /** Backing store for {@link RigidBody.ccdMode} (§31). */
   #ccdMode: CCDMode;
 
+  /** Backing store for {@link RigidBody.ccdPredictionDistance} (§31). */
+  #ccdPredictionDistance: number | undefined;
+
   /** Backing store for {@link RigidBody.physicsWeight} (§19). */
   #physicsWeight: number = DEFAULT_PHYSICS_WEIGHT;
 
@@ -533,6 +536,7 @@ export class RigidBody
     this.#type = descriptor.type;
     this.#mass = descriptor.mass;
     this.#ccdMode = resolveCCDMode(descriptor);
+    this.#ccdPredictionDistance = descriptor.ccdPredictionDistance;
 
     this.#centerOfMassAuthored = descriptor.centerOfMass !== undefined;
     this.centerOfMass =
@@ -718,6 +722,22 @@ export class RigidBody
 
   set ccdMode(value: CCDMode) {
     this.#ccdMode = value;
+  }
+
+  /**
+   * §31's `"speculative"` prediction distance, in world units, when authored —
+   * `undefined` means the adapter's documented default (1 m on both Rapier
+   * adapters). Carried by the component so `world.addBody`'s rebuilt
+   * descriptor delivers it to the solver (2026-08-05 review fix: the
+   * constructor validated and accepted the field, then `toDescriptor()`
+   * silently dropped it, so the authored distance never reached the adapter
+   * on the component path).
+   *
+   * Read-only, like the shape of a collider: the distance is applied at
+   * `createBody` and Rapier offers no post-creation re-tune through the seam.
+   */
+  get ccdPredictionDistance(): number | undefined {
+    return this.#ccdPredictionDistance;
   }
 
   /**
@@ -1030,6 +1050,16 @@ export class RigidBody
     };
     if (this.#mass !== undefined) {
       descriptor.mass = this.#mass;
+    }
+    // Emitted only while the mode is still speculative: the §85 validation
+    // this descriptor faces again in validateFor rejects the distance with
+    // any other resolved mode, and a body retyped away from "speculative"
+    // (via the ccdMode setter) has no use for it.
+    if (
+      this.#ccdPredictionDistance !== undefined &&
+      this.#ccdMode === "speculative"
+    ) {
+      descriptor.ccdPredictionDistance = this.#ccdPredictionDistance;
     }
     if (this.centerOfMassAuthored) {
       descriptor.centerOfMass = this.centerOfMass;

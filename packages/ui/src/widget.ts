@@ -623,11 +623,29 @@ export abstract class UIWidget extends Node implements Disposable {
       this.on("pointerleave", () => {
         this.#handleLeave();
       }),
-      this.on("pointerdown", () => {
-        this.#handleDown();
+      // Down/up mutate widget STATE only on the event's target (2026-08-04
+      // review fix): these two types bubble (§72), and reacting on the bubble
+      // path left ancestors stuck — `pointerleave` is target-only and a
+      // release over empty space dispatches nothing, so an ancestor's
+      // `pressed` had no clearing path (and a focusable ancestor stole the
+      // target's focus in the same dispatch). Application listeners on
+      // ancestors still observe both events; only the state reaction is
+      // target-scoped, which is exactly what `pressed`'s doc contract ("a
+      // pointer is pressed on THIS widget") says.
+      this.on("pointerdown", (event) => {
+        if (event.target === this) this.#handleDown();
       }),
-      this.on("pointerup", () => {
-        this.#handleUp();
+      this.on("pointerup", (event) => {
+        if (event.target === this) this.#handleUp();
+      }),
+      // Focus does not survive reparenting (2026-08-04 review fix): the
+      // focus-owner registry is keyed by scope ROOT, captured at focus time.
+      // A widget focused in one tree (or while detached) and then added
+      // elsewhere would leave that record stale — two focused widgets under
+      // one root, the module's one-per-scope invariant broken. Mirroring the
+      // DOM (moving an element blurs it), attachment drops the focus.
+      this.on("added", () => {
+        if (this.#focused) this.blur();
       }),
     );
 

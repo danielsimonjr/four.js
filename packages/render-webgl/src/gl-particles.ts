@@ -10,7 +10,8 @@
  * of drawing a system is a `bufferSubData` of `count × 32` bytes plus five GL
  * calls, whatever `count` is.
  *
- * Three things live here, for the same reason `gl-program.ts` holds three:
+ * Three things live here, grouped for the reason `gl-program.ts`'s header
+ * gives:
  *
  * 1. **{@link ParticleGlContext}** — the WebGL 2 entry points *only* the
  *    particle path calls, layered on `WebglContext` (see "Why the context type
@@ -51,18 +52,19 @@
  * `WebglContext` is that module's written-down GL budget, and the particle path
  * needs three entry points outside it: `bufferSubData`, `vertexAttribDivisor`,
  * and `drawArraysInstanced`. They belong in `WebglContext` — but `gl-program.ts`
- * is outside this packet's file set (plan §1 rule 11: touch only your packet's
+ * was outside this packet's file set (plan §1 rule 11: touch only your packet's
  * files), so they are declared as an **extension interface** the renderer
  * narrows to once, at initialization, through the same structural check that
  * accepts the context in the first place. The effect on a caller is nil: a real
  * `WebGL2RenderingContext` satisfies both, and the test fake implements both.
  * **Folding {@link ParticleGlContext} back into `WebglContext` is a mechanical
- * follow-up** (reported to the orchestrator).
+ * follow-up** (reported to the orchestrator) — it widens the exported
+ * `WebglContext` contract, so it is not done as a drive-by.
  *
- * The same rule explains the small amount of duplication below:
- * `gl-program.ts`'s `compileStage`, `createLinkedProgram`, `requireUniform`, and
- * matrix scratch are module-private, so this module carries its own. Hoisting
- * them into a shared helper is part of the same follow-up.
+ * The program-building helpers this module once duplicated for the same reason
+ * (`createLinkedProgram`, `requireUniform`, and the matrix scratch) were
+ * consolidated back into `gl-program.ts` on 2026-08-05; the GL call sequences
+ * and error messages are unchanged, as the fake-GL suite pins.
  *
  * ## Blending (§66, decision WP-9.3)
  *
@@ -87,7 +89,7 @@
  *   which is not in this backend's GL budget.
  */
 
-import { FourError, type Disposable } from "@four/core";
+import type { Disposable } from "@four/core";
 import type { Matrix4 } from "@four/math";
 import {
   PARTICLE_COLOR_OFFSET,
@@ -100,9 +102,11 @@ import {
 import {
   GL,
   POSITION_ATTRIBUTE_LOCATION,
+  createLinkedProgram,
+  matrixScratch,
+  requireUniform,
   type GlBuffer,
   type GlProgramHandle,
-  type GlShader,
   type GlUniformLocation,
   type GlVertexArray,
   type WebglContext,
@@ -255,64 +259,8 @@ void main() {
 `;
 
 /**
- * Scratch for matrix uploads — one buffer for this module, reused by every
- * upload. See `gl-program.ts`'s `matrixScratch` for the argument; this is the
- * duplicate the module header names.
- */
-const matrixScratch = new Float32Array(16);
-
-/** Compiles one shader stage, or throws. Mirrors `gl-program.ts`'s helper. */
-function compileStage(
-  gl: WebglContext,
-  type: number,
-  source: string,
-  stageName: string,
-): GlShader {
-  const shader = gl.createShader(type);
-  if (shader === null) {
-    throw new FourError(
-      "SHADER_COMPILATION_FAILED",
-      `WebGL 2 could not allocate the ${stageName} shader object (§61).`,
-      { context: { stage: stageName } },
-    );
-  }
-
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, GL.COMPILE_STATUS)) {
-    const log = gl.getShaderInfoLog(shader) ?? "";
-    gl.deleteShader(shader);
-    throw new FourError(
-      "SHADER_COMPILATION_FAILED",
-      `The particle ${stageName} shader failed to compile (§61, §89).`,
-      { context: { stage: stageName, log, source } },
-    );
-  }
-
-  return shader;
-}
-
-/** Looks a uniform up, or throws. Mirrors `gl-program.ts`'s helper. */
-function requireUniform(
-  gl: WebglContext,
-  program: GlProgramHandle,
-  name: string,
-): GlUniformLocation {
-  const location = gl.getUniformLocation(program, name);
-  if (location === null) {
-    throw new FourError(
-      "SHADER_COMPILATION_FAILED",
-      `The particle program has no active uniform "${name}"; the linked ` +
-        "program is not the one this backend wrote (§61).",
-      { context: { uniform: name } },
-    );
-  }
-  return location;
-}
-
-/**
- * The instanced particle pipeline (§36) — this backend's third and last program
- * in the §112 tier.
+ * The instanced particle pipeline (§36) — the program the §112 tier added to
+ * this backend (WP-9.3).
  *
  * ```ts
  * const program = ParticleProgram.create(gl);
@@ -363,62 +311,19 @@ export class ParticleProgram implements Disposable {
    * the message. Shader objects are deleted on every path.
    */
   static create(gl: WebglContext): ParticleProgram {
-    const vertexShader = compileStage(
+    const program = createLinkedProgram(
       gl,
-      GL.VERTEX_SHADER,
+      "particle",
       PARTICLE_VERTEX_SHADER_SOURCE,
-      "vertex",
+      PARTICLE_FRAGMENT_SHADER_SOURCE,
     );
-
-    let fragmentShader: GlShader;
-    try {
-      fragmentShader = compileStage(
-        gl,
-        GL.FRAGMENT_SHADER,
-        PARTICLE_FRAGMENT_SHADER_SOURCE,
-        "fragment",
-      );
-    } catch (error: unknown) {
-      gl.deleteShader(vertexShader);
-      throw error;
-    }
-
-    let program: GlProgramHandle;
-    try {
-      const created = gl.createProgram();
-      if (created === null) {
-        throw new FourError(
-          "SHADER_COMPILATION_FAILED",
-          "WebGL 2 could not allocate the particle program object (§61).",
-          { context: { stage: "link" } },
-        );
-      }
-      program = created;
-
-      gl.attachShader(program, vertexShader);
-      gl.attachShader(program, fragmentShader);
-      gl.linkProgram(program);
-      if (!gl.getProgramParameter(program, GL.LINK_STATUS)) {
-        const log = gl.getProgramInfoLog(program) ?? "";
-        gl.deleteProgram(program);
-        throw new FourError(
-          "SHADER_COMPILATION_FAILED",
-          "The particle program failed to link (§61, §89).",
-          { context: { stage: "link", log } },
-        );
-      }
-    } finally {
-      gl.deleteShader(vertexShader);
-      gl.deleteShader(fragmentShader);
-    }
-
     try {
       return new ParticleProgram(
         gl,
         program,
-        requireUniform(gl, program, "projection"),
-        requireUniform(gl, program, "view"),
-        requireUniform(gl, program, "model"),
+        requireUniform(gl, program, "projection", "particle"),
+        requireUniform(gl, program, "view", "particle"),
+        requireUniform(gl, program, "model", "particle"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);

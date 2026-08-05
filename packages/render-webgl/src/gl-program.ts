@@ -2,7 +2,7 @@
  * The WebGL 2 surface this backend uses, and the pipelines it draws with
  * (§61, §62, §120, §106a).
  *
- * Three things live here because they are the same decision seen from three
+ * Four things live here because they are the same decision seen from four
  * sides:
  *
  * 1. **{@link WebglContext}** — a structural description of *exactly* the GL
@@ -84,7 +84,7 @@ export const GL = {
   CULL_FACE: 0x0b44,
   /** `GL_DEPTH_TEST`. */
   DEPTH_TEST: 0x0b71,
-  /** `GL_BLEND` — enabled around sprite draws only; see `webgl-renderer.ts`. */
+  /** `GL_BLEND` — enabled around sprite and particle passes; see `webgl-renderer.ts`. */
   BLEND: 0x0be2,
   /** `GL_SCISSOR_TEST` — enabled for the lifetime of the renderer. */
   SCISSOR_TEST: 0x0c11,
@@ -465,12 +465,12 @@ void main() {
  *
  * `Matrix4.elements` is a `Float64Array` (the engine computes in doubles);
  * `uniformMatrix4fv` wants 32-bit floats. One module-level buffer, reused by
- * every upload of every program, keeps the per-draw cost to a 16-element
- * `set()` and allocates nothing per frame (plan D7). Safe to share because
- * uploads are synchronous: the data is consumed by the GL call before the next
- * `set()` can happen.
+ * every upload of every program — including `gl-particles.ts`'s, which imports
+ * it — keeps the per-draw cost to a 16-element `set()` and allocates nothing
+ * per frame (plan D7). Safe to share because uploads are synchronous: the data
+ * is consumed by the GL call before the next `set()` can happen.
  */
-const matrixScratch = new Float32Array(16);
+export const matrixScratch = new Float32Array(16);
 
 /** Scratch for {@link UnlitProgram.setColor}; see {@link matrixScratch}. */
 const colorScratch = new Float32Array(4);
@@ -523,8 +523,9 @@ function compileStage(
 
 /**
  * Compiles both stages and links them into a program, or throws — the half of
- * {@link UnlitProgram.create} and {@link SpriteProgram.create} that is identical
- * for every pipeline.
+ * every pipeline's `create` ({@link UnlitProgram}, {@link SpriteProgram},
+ * {@link LitProgram}, and `gl-particles.ts`'s `ParticleProgram`) that is
+ * identical for all of them.
  *
  * Throws a {@link FourError} carrying `SHADER_COMPILATION_FAILED` (§89) with the
  * driver's info log in `context.log` when a stage fails to compile, when linking
@@ -538,7 +539,7 @@ function compileStage(
  * reference-counted by the program, so deleting them frees the compiler-side
  * objects and leaves the linked program intact, which is the standard GL idiom.
  */
-function createLinkedProgram(
+export function createLinkedProgram(
   gl: WebglContext,
   label: string,
   vertexSource: string,
@@ -597,7 +598,7 @@ function createLinkedProgram(
 }
 
 /** Looks a uniform up, or throws — see {@link UnlitProgram.create}. */
-function requireUniform(
+export function requireUniform(
   gl: WebglContext,
   program: GlProgramHandle,
   name: string,

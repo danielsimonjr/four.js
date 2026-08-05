@@ -3,9 +3,9 @@
  *
  * §120 fixes the MVP tier as *"WebGL 2 only, one solver adapter, basic 2D/3D
  * primitives"*, and §62 lists WebGL 2 as backend 2 of 5. {@link WebglRenderer}
- * implements `@four/render`'s `Renderer` for that tier: unlit colored geometry,
- * one shader pair, one vertex array per geometry, `"negative-one-to-one"` clip
- * depth (plan D8).
+ * implements `@four/render`'s `Renderer` for that tier and its later additions:
+ * four pipelines (unlit, lit, sprite, particles — see the class documentation),
+ * one vertex array per geometry, `"negative-one-to-one"` clip depth (plan D8).
  *
  * The normative clear and viewport semantics live on `Renderer.render`'s
  * documentation in `@four/render`, not here — they are shared by every backend

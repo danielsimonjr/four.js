@@ -429,12 +429,35 @@ describe("the §72 interaction state machine", () => {
     expect(widget.hovered).toBe(false);
   });
 
-  it("receives events that bubble from a child (§72)", () => {
+  it("observes bubbled events without reacting to them (§72, 2026-08-04)", () => {
+    // Down/up state reactions are target-only: `pointerleave` is target-only
+    // and a release over empty space dispatches nothing, so an ancestor that
+    // set `pressed` from a bubbled down had no clearing path — it stuck
+    // pressed forever. The ancestor still RECEIVES the bubbled event for its
+    // own listeners; it just no longer mutates its widget state.
     const widget = new TestWidget();
     const child = new Group();
     widget.add(child);
+    let observed = 0;
+    widget.on("pointerdown", () => {
+      observed += 1;
+    });
     dispatch("pointerdown", child);
-    expect(widget.pressed).toBe(true);
+    expect(observed).toBe(1);
+    expect(widget.pressed).toBe(false);
+    expect(widget.focused).toBe(false);
+  });
+
+  it("drops focus when reparented into a (possibly different) scope (2026-08-04)", () => {
+    const widget = new TestWidget({ focusable: true });
+    widget.focus();
+    expect(widget.focused).toBe(true);
+    const root = new Group();
+    root.add(widget);
+    // The focus-owner registry is keyed by scope root, captured at focus
+    // time; surviving the move would leave that record stale and allow two
+    // focused widgets under one root. Mirrors the DOM: moving blurs.
+    expect(widget.focused).toBe(false);
   });
 
   it("ignores pointers when non-interactive, disabled, or not enabled", () => {

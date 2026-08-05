@@ -50,8 +50,9 @@ function findFirst(
   if (predicate(root)) {
     return root;
   }
-  for (const child of root.children) {
-    const found = findFirst(child, predicate);
+  const children = root.children;
+  for (let i = 0; i < children.length; i += 1) {
+    const found = findFirst(children[i], predicate);
     if (found !== null) {
       return found;
     }
