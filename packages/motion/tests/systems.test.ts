@@ -275,22 +275,24 @@ describe("SystemRegistry registration lifecycle (§39)", () => {
     expect(registry.size).toBe(1);
   });
 
-  it("disposes every system in reverse registration order on registry dispose", () => {
+  it("disposes every system in reverse registry (priority) order on registry dispose", () => {
     const log: Log = [];
     const registry = new SystemRegistry();
+    // Registered high-priority-first so registration order and priority order
+    // disagree: dispose order follows descending *priority*, not registration.
+    const last = new RecordingSystem("last", PRIORITY_SNAPSHOT, log);
     const first = new RecordingSystem("first", PRIORITY_INPUT, log);
-    const second = new RecordingSystem("second", PRIORITY_SNAPSHOT, log);
+    registry.register(last);
     registry.register(first);
-    registry.register(second);
     log.length = 0;
 
     registry.dispose();
 
-    expect(log).toEqual(["second:dispose", "first:dispose"]);
+    expect(log).toEqual(["last:dispose", "first:dispose"]);
     expect(registry.size).toBe(0);
     registry.runFixedStep(timeAt(1));
     expect(first.fixedUpdateCount).toBe(0);
-    expect(second.fixedUpdateCount).toBe(0);
+    expect(last.fixedUpdateCount).toBe(0);
   });
 });
 

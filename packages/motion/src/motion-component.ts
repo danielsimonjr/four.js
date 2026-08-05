@@ -202,10 +202,12 @@ export class MotionComponent implements Component {
   maxAngularSpeed?: number;
 
   constructor(options: MotionComponentOptions = {}) {
-    this.linearVelocity = copyOrZero(options.linearVelocity);
-    this.angularVelocity = copyOrZero(options.angularVelocity);
-    this.linearAcceleration = copyOrZero(options.linearAcceleration);
-    this.angularAcceleration = copyOrZero(options.angularAcceleration);
+    this.linearVelocity = options.linearVelocity?.clone() ?? new Vector3();
+    this.angularVelocity = options.angularVelocity?.clone() ?? new Vector3();
+    this.linearAcceleration =
+      options.linearAcceleration?.clone() ?? new Vector3();
+    this.angularAcceleration =
+      options.angularAcceleration?.clone() ?? new Vector3();
     this.damping = options.damping ?? 0;
     this.angularDamping = options.angularDamping ?? 0;
     if (options.maxSpeed !== undefined) {
@@ -224,11 +226,6 @@ export class MotionComponent implements Component {
     this.angularAcceleration.set(0, 0, 0);
     return this;
   }
-}
-
-/** A fresh vector holding `v`'s components, or the zero vector. */
-function copyOrZero(v: Vector3 | undefined): Vector3 {
-  return v === undefined ? new Vector3() : new Vector3(v.x, v.y, v.z);
 }
 
 /**

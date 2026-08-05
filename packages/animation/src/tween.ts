@@ -268,8 +268,14 @@ function invalidTween(
   throw new FourError("INVALID_APPLICATION_STATE", message, { context });
 }
 
-/** Rejects anything that is not a finite number `>= 0`. */
-function requireNonNegativeSeconds(value: number, what: string): number {
+/**
+ * Rejects anything that is not a finite number `>= 0`.
+ *
+ * Module-internal, shared with `./timeline.js` and `./mixer.js` — every §16
+ * player validates its seconds identically (§7a) — and deliberately absent
+ * from the package barrel, like {@link claimProperty}.
+ */
+export function requireNonNegativeSeconds(value: number, what: string): number {
   if (!Number.isFinite(value) || value < 0) {
     invalidTween(
       `${what} must be a finite number of seconds >= 0 (§7a: all times are seconds); received ${String(value)}.`,

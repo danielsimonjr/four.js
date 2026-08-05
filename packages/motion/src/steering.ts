@@ -247,6 +247,29 @@ export function seek(
 }
 
 /**
+ * Flee the point `(tx, ty, tz)` at full speed. The scalar core of {@link flee}
+ * and {@link evade}, mirroring {@link seekPoint}.
+ */
+function fleePoint(
+  context: SteeringContext,
+  tx: number,
+  ty: number,
+  tz: number,
+  out: Vector3,
+): Vector3 {
+  const { position, maxSpeed } = context;
+  const ox = position.x - tx;
+  const oy = position.y - ty;
+  const oz = position.z - tz;
+  const distanceSquared = ox * ox + oy * oy + oz * oz;
+  if (distanceSquared === 0) {
+    return steerTowardVelocity(context, 0, 0, 0, out);
+  }
+  const scale = maxSpeed / Math.sqrt(distanceSquared);
+  return steerTowardVelocity(context, ox * scale, oy * scale, oz * scale, out);
+}
+
+/**
  * **Flee** (§12): move directly away from `target` at `maxSpeed`.
  *
  * ```text
@@ -266,16 +289,7 @@ export function flee(
   target: Vector3,
   out: Vector3,
 ): Vector3 {
-  const { position, maxSpeed } = context;
-  const ox = position.x - target.x;
-  const oy = position.y - target.y;
-  const oz = position.z - target.z;
-  const distanceSquared = ox * ox + oy * oy + oz * oz;
-  if (distanceSquared === 0) {
-    return steerTowardVelocity(context, 0, 0, 0, out);
-  }
-  const scale = maxSpeed / Math.sqrt(distanceSquared);
-  return steerTowardVelocity(context, ox * scale, oy * scale, oz * scale, out);
+  return fleePoint(context, target.x, target.y, target.z, out);
 }
 
 /**
@@ -349,9 +363,14 @@ export function arrive(
  * same quadratic with the same stable root pairing. The two differ only in the
  * no-solution policy — that one returns `NaN` so a caller can refuse the shot,
  * this one falls back to the heuristic horizon so a pursuer always has
- * *somewhere* to steer. The packets were written in parallel; folding this
- * helper into that function (steering supplying the fallback where the result is
- * `NaN`) is a mechanical follow-up (2026-08-02, WP-8.2).
+ * *somewhere* to steer. The packets were written in parallel; a 2026-08-02
+ * note called folding this helper into that function "mechanical", but a
+ * 2026-08-05 review found it is not quite: that function *throws* on the
+ * negative/NaN speeds this hot path deliberately lets propagate, its
+ * `a = b = c = 0` case returns `0` where this one degrades to the heuristic,
+ * and its root filter admits an overflowed `+Infinity` root that this one
+ * rejects — so the duplication stands until those policies are worth
+ * reconciling.
  */
 function interceptTime(
   context: SteeringContext,
@@ -436,16 +455,13 @@ export function evade(
   out: Vector3,
 ): Vector3 {
   const t = interceptTime(context, targetPosition, targetVelocity);
-  const { position, maxSpeed } = context;
-  const ox = position.x - (targetPosition.x + targetVelocity.x * t);
-  const oy = position.y - (targetPosition.y + targetVelocity.y * t);
-  const oz = position.z - (targetPosition.z + targetVelocity.z * t);
-  const distanceSquared = ox * ox + oy * oy + oz * oz;
-  if (distanceSquared === 0) {
-    return steerTowardVelocity(context, 0, 0, 0, out);
-  }
-  const scale = maxSpeed / Math.sqrt(distanceSquared);
-  return steerTowardVelocity(context, ox * scale, oy * scale, oz * scale, out);
+  return fleePoint(
+    context,
+    targetPosition.x + targetVelocity.x * t,
+    targetPosition.y + targetVelocity.y * t,
+    targetPosition.z + targetVelocity.z * t,
+    out,
+  );
 }
 
 /** `2π`, for wrapping the wander angle. */
@@ -817,8 +833,8 @@ export class SteeringAgent implements SteeringContext {
   readonly #blend = new Vector3();
 
   constructor(options: SteeringAgentOptions = {}) {
-    this.position = copyOrZero(options.position);
-    this.velocity = copyOrZero(options.velocity);
+    this.position = options.position?.clone() ?? new Vector3();
+    this.velocity = options.velocity?.clone() ?? new Vector3();
     this.maxSpeed = options.maxSpeed ?? 1;
     this.maxAcceleration = options.maxAcceleration ?? 1;
   }
@@ -878,9 +894,4 @@ export class SteeringAgent implements SteeringContext {
     );
     return this;
   }
-}
-
-/** A fresh vector holding `v`'s components, or the zero vector. */
-function copyOrZero(v: Vector3 | undefined): Vector3 {
-  return v === undefined ? new Vector3() : new Vector3(v.x, v.y, v.z);
 }
