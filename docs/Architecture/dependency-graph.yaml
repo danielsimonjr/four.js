@@ -1,10 +1,10 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-04"
-  totalFiles: 160
+  lastUpdated: "2026-08-05"
+  totalFiles: 161
   totalModules: 24
-  totalExports: 1239
+  totalExports: 1244
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -623,6 +623,7 @@ modules:
             - claimProperty
             - isTransformOwner
             - releaseProperty
+            - requireNonNegativeSeconds
             - PropertyClaim
         - file: ./values.js
           imports:
@@ -657,7 +658,10 @@ modules:
       description: Timelines (§16).
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./tween.js
+          imports:
+            - requireNonNegativeSeconds
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -742,6 +746,7 @@ modules:
       exports:
         - claimProperty
         - releaseProperty
+        - requireNonNegativeSeconds
         - isTransformOwner
         - animate
         - tween
@@ -754,6 +759,7 @@ modules:
       functions:
         - claimProperty
         - releaseProperty
+        - requireNonNegativeSeconds
         - isTransformOwner
         - animate
         - tween
@@ -5165,6 +5171,25 @@ modules:
       constants:
         - PACKAGE_NAME
   packages/physics-rapier:
+    packages/physics-rapier/src/ccd.ts:
+      description: The §31 CCD-mode resolution both Rapier adapters share.
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/physics"
+          directory: packages/physics
+          imports:
+            - DEFAULT_ENABLED_CCD_MODE
+        - package: "@four/physics"
+          directory: packages/physics
+          imports:
+            - CCDMode
+            - RigidBodyDescriptor
+      exports:
+        - resolveCcdMode
+      functions:
+        - resolveCcdMode
     packages/physics-rapier/src/conversions2d.ts:
       description: The §21/P5-3 mapping between the engine's 3D-typed physics API and Rapier's
       externalDependencies: []
@@ -5531,6 +5556,9 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./ccd.js
+          imports:
+            - resolveCcdMode
         - file: ./conversions2d.js
           imports:
             - createRapierColliderDesc
@@ -5579,7 +5607,6 @@ modules:
           directory: packages/physics
           imports:
             - ALL_COLLISION_GROUPS
-            - DEFAULT_ENABLED_CCD_MODE
             - DEFAULT_FRICTION
             - DEFAULT_RESTITUTION
             - DETERMINISM_LEVELS
@@ -5639,6 +5666,9 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./ccd.js
+          imports:
+            - resolveCcdMode
         - file: ./conversions3d.js
           imports:
             - createRapierColliderDesc3d
@@ -5687,7 +5717,6 @@ modules:
           directory: packages/physics
           imports:
             - ALL_COLLISION_GROUPS
-            - DEFAULT_ENABLED_CCD_MODE
             - DEFAULT_FRICTION
             - DEFAULT_RESTITUTION
             - DETERMINISM_LEVELS
@@ -6206,9 +6235,11 @@ modules:
           imports:
             - GL
             - POSITION_ATTRIBUTE_LOCATION
+            - createLinkedProgram
+            - matrixScratch
+            - requireUniform
             - GlBuffer
             - GlProgramHandle
-            - GlShader
             - GlUniformLocation
             - GlVertexArray
             - WebglContext
@@ -6216,7 +6247,6 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
-            - FourError
             - Disposable
         - package: "@four/math"
           directory: packages/math
@@ -6264,6 +6294,9 @@ modules:
         - GL
         - POSITION_ATTRIBUTE_LOCATION
         - NORMAL_ATTRIBUTE_LOCATION
+        - matrixScratch
+        - createLinkedProgram
+        - requireUniform
         - UnlitProgram
         - SpriteProgram
         - LitProgram
@@ -6273,10 +6306,14 @@ modules:
         - LitProgram
       interfaces:
         - WebglContext
+      functions:
+        - createLinkedProgram
+        - requireUniform
       constants:
         - GL
         - POSITION_ATTRIBUTE_LOCATION
         - NORMAL_ATTRIBUTE_LOCATION
+        - matrixScratch
     packages/render-webgl/src/gl-texture.ts:
       description: "GPU-side textures for the WebGL 2 backend: one `WebGLTexture` per"
       externalDependencies: []
@@ -7745,6 +7782,7 @@ dependencyGraph:
         - packages/physics-box2d/src/index.ts
     - name: Packages/physics-rapier
       files:
+        - packages/physics-rapier/src/ccd.ts
         - packages/physics-rapier/src/conversions2d.ts
         - packages/physics-rapier/src/conversions3d.ts
         - packages/physics-rapier/src/index.ts
@@ -7815,16 +7853,16 @@ dependencyGraph:
         - packages/ui/src/panel.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 160
+  totalTypeScriptFiles: 161
   totalModules: 24
-  totalLinesOfCode: 56775
-  totalExports: 1239
+  totalLinesOfCode: 56760
+  totalExports: 1244
   totalClasses: 91
   totalInterfaces: 276
-  totalFunctions: 181
+  totalFunctions: 185
   totalTypeGuards: 12
   totalEnums: 0
-  totalConstants: 173
+  totalConstants: 174
   totalReExports: 817
   totalTypeOnlyImports: 172
   runtimeCircularDeps: 0

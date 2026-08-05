@@ -1,6 +1,6 @@
 # four.js-monorepo - Dependency Graph
 
-**Version**: 0.0.0 | **Last Updated**: 2026-08-04
+**Version**: 0.0.0 | **Last Updated**: 2026-08-05
 
 This document provides a comprehensive dependency graph of all files, components, imports, functions, and variables in the codebase.
 
@@ -59,7 +59,7 @@ The codebase is organized into the following modules:
 - **packages/particles**: 8 files
 - **packages/physics**: 15 files
 - **packages/physics-box2d**: 1 file
-- **packages/physics-rapier**: 6 files
+- **packages/physics-rapier**: 7 files
 - **packages/physics-soft**: 1 file
 - **packages/render**: 8 files
 - **packages/render-canvas**: 1 file
@@ -91,7 +91,7 @@ The codebase is organized into the following modules:
 | `@four/particles` (`packages/particles/`) | `@four/math`, `@four/core`, `@four/scene` | 8 | 0 |
 | `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 15 | 0 |
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
-| `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/core`, `@four/math`, `@four/physics` | 6 | 0 |
+| `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/physics`, `@four/core`, `@four/math` | 7 | 0 |
 | `@four/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
 | `@four/render` (`packages/render/`) | `@four/math`, `@four/scene`, `@four/geometry`, `@four/materials`, `@four/core` | 8 | 0 |
 | `@four/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
@@ -178,9 +178,9 @@ graph LR
     P11 --> P8
     P11 --> P20
     P11 --> P9
+    P13 --> P11
     P13 --> P2
     P13 --> P8
-    P13 --> P11
     P15 --> P8
     P15 --> P20
     P15 --> P5
@@ -318,7 +318,7 @@ graph LR
 | `./binding.js` | `createBinding, PropertyBinding` | Import |
 | `./clip.js` | `AnimationClip, AnimationEvent, TrackSampleSink` | Import (type-only) |
 | `./track.js` | `AnimationTrackLike` | Import (type-only) |
-| `./tween.js` | `claimProperty, isTransformOwner, releaseProperty, PropertyClaim` | Import |
+| `./tween.js` | `claimProperty, isTransformOwner, releaseProperty, requireNonNegativeSeconds, PropertyClaim` | Import |
 | `./values.js` | `detectAdapter, ValueAdapter` | Import |
 
 **Exports:**
@@ -334,6 +334,11 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/core` | `FourError` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./tween.js` | `requireNonNegativeSeconds` | Import |
 
 **Exports:**
 - Classes: `Timeline`
@@ -383,7 +388,7 @@ graph LR
 - Classes: `Tween`
 - Interfaces: `TweenProperties`, `PropertyClaim`
 - Types: `TweenValue`, `TweenState`
-- Functions: `claimProperty`, `releaseProperty`, `isTransformOwner`, `animate`, `tween`
+- Functions: `claimProperty`, `releaseProperty`, `requireNonNegativeSeconds`, `isTransformOwner`, `animate`, `tween`
 
 ---
 
@@ -2043,6 +2048,19 @@ graph LR
 
 ## Packages/physics rapier Dependencies
 
+### `packages/physics-rapier/src/ccd.ts` - The §31 CCD-mode resolution both Rapier adapters share.
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/physics` | `DEFAULT_ENABLED_CCD_MODE` |
+| `@four/physics` | `CCDMode, RigidBodyDescriptor` |
+
+**Exports:**
+- Functions: `resolveCcdMode`
+
+---
+
 ### `packages/physics-rapier/src/conversions2d.ts` - The §21/P5-3 mapping between the engine's 3D-typed physics API and Rapier's
 
 **Workspace Dependencies:**
@@ -2133,12 +2151,13 @@ graph LR
 |---------|--------|
 | `@four/core` | `FourError` |
 | `@four/math` | `Quaternion, Vector3` |
-| `@four/physics` | `ALL_COLLISION_GROUPS, DEFAULT_ENABLED_CCD_MODE, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateCollisionShape, validateJointDescriptor, validatePhysicsWorldOptions, validateRigidBodyDescriptor` |
+| `@four/physics` | `ALL_COLLISION_GROUPS, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateCollisionShape, validateJointDescriptor, validatePhysicsWorldOptions, validateRigidBodyDescriptor` |
 | `@four/physics` | `AngularVelocityInput, BodyType, CCDMode, ColliderDescriptor, ContactPoint, JointDescriptor, ShippedJointType, SolverJointAccess, SolverJointMotor, OverlapHit, OverlapQuery, PhysicsBodyHandle, PhysicsCapabilities, PhysicsColliderHandle, PhysicsDimension, PhysicsEvent, PhysicsJointHandle, PhysicsSolverAdapter, PhysicsWorldOptions, PointHit, PointQuery, QueryCandidate, RaycastHit, RaycastQuery, ResolvedQueryOptions, RigidBodyDescriptor, RotationInput, ShapeCastHit, ShapeCastQuery, SleepingConfig, Vector3Input` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./ccd.js` | `resolveCcdMode` | Import |
 | `./conversions2d.js` | `createRapierColliderDesc, createRapierShape, createRapierVector2, fromRapierAngle, fromRapierVector2, packInteractionGroups, revoluteAxisSignZ, toRapierAngle, toRapierAngularScalar, toRapierBodyType, toRapierJointAxis2d, toRapierVector2` | Import |
 | `./conversions2d.js` | `RapierVector2` | Import (type-only) |
 | `./init.js` | `initializeRapier2d` | Import |
@@ -2157,12 +2176,13 @@ graph LR
 |---------|--------|
 | `@four/core` | `FourError` |
 | `@four/math` | `Quaternion, Vector3` |
-| `@four/physics` | `ALL_COLLISION_GROUPS, DEFAULT_ENABLED_CCD_MODE, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateCollisionShape, validateJointDescriptor, validatePhysicsWorldOptions, validateRigidBodyDescriptor` |
+| `@four/physics` | `ALL_COLLISION_GROUPS, DEFAULT_FRICTION, DEFAULT_RESTITUTION, DETERMINISM_LEVELS, passesQueryFilter, resolveDensity, resolveGravity, resolveQueryOptions, resolveSleepingConfig, sortHitsByDistance, validateColliderDescriptor, validateCollisionShape, validateJointDescriptor, validatePhysicsWorldOptions, validateRigidBodyDescriptor` |
 | `@four/physics` | `AngularVelocityInput, BodyType, CCDMode, ColliderDescriptor, ContactPoint, JointDescriptor, OverlapHit, OverlapQuery, PhysicsBodyHandle, PhysicsCapabilities, PhysicsColliderHandle, PhysicsDimension, PhysicsEvent, PhysicsJointHandle, PhysicsSolverAdapter, PhysicsWorldOptions, PointHit, PointQuery, QueryCandidate, RaycastHit, RaycastQuery, ResolvedQueryOptions, RigidBodyDescriptor, RotationInput, ShapeCastHit, ShapeCastQuery, ShippedJointType, SleepingConfig, SolverJointAccess, SolverJointMotor, Vector3Input` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./ccd.js` | `resolveCcdMode` | Import |
 | `./conversions3d.js` | `createRapierColliderDesc3d, createRapierRotation3, createRapierShape3d, createRapierVector3, fromRapierRotation3, fromRapierVector3, packInteractionGroups3d, rotateVectorByRotation3, toPrincipalInertia3d, toRapierAngularVector3, toRapierBodyType3d, toRapierRotation3, toRapierVector3` | Import |
 | `./init.js` | `initializeRapier3d` | Import |
 | `./init.js` | `Rapier3dModule, RapierCollider3d, RapierColliderDesc3d, RapierEventQueue3d, RapierRigidBody3d, RapierRigidBodyDesc3d, RapierRotation3, RapierVector3, RapierWorld3d` | Import (type-only) |
@@ -2379,14 +2399,14 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError, Disposable` |
+| `@four/core` | `Disposable` |
 | `@four/math` | `Matrix4` |
 | `@four/render` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_SIZE_OFFSET, ParticleRenderItem` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
-| `./gl-program.js` | `GL, POSITION_ATTRIBUTE_LOCATION, GlBuffer, GlProgramHandle, GlShader, GlUniformLocation, GlVertexArray, WebglContext` | Import |
+| `./gl-program.js` | `GL, POSITION_ATTRIBUTE_LOCATION, createLinkedProgram, matrixScratch, requireUniform, GlBuffer, GlProgramHandle, GlUniformLocation, GlVertexArray, WebglContext` | Import |
 
 **Exports:**
 - Classes: `ParticleProgram`, `ParticleBatchCache`
@@ -2407,7 +2427,8 @@ graph LR
 - Classes: `UnlitProgram`, `SpriteProgram`, `LitProgram`
 - Interfaces: `WebglContext`
 - Types: `GlShader`, `GlProgramHandle`, `GlBuffer`, `GlVertexArray`, `GlUniformLocation`, `GlTexture`
-- Constants: `GL`, `POSITION_ATTRIBUTE_LOCATION`, `NORMAL_ATTRIBUTE_LOCATION`
+- Functions: `createLinkedProgram`, `requireUniform`
+- Constants: `GL`, `POSITION_ATTRIBUTE_LOCATION`, `NORMAL_ATTRIBUTE_LOCATION`, `matrixScratch`
 
 ---
 
@@ -2969,15 +2990,17 @@ graph LR
 | `packages/physics/src/shapes` | 1 file | 6 files |
 | `packages/render/src/index` | 7 files | 0 files |
 | `packages/animation/src/mixer` | 5 files | 1 file |
+| `packages/animation/src/tween` | 3 files | 3 files |
 | `packages/physics/src/adapter` | 4 files | 2 files |
 | `packages/physics/src/queries` | 2 files | 4 files |
-| `packages/animation/src/tween` | 3 files | 2 files |
 | `packages/animation/src/values` | 0 files | 5 files |
 | `packages/diagnostics/src/index` | 5 files | 0 files |
 | `packages/motion/src/systems` | 2 files | 3 files |
 | `packages/particles/src/emitter` | 3 files | 2 files |
 | `packages/physics-rapier/src/index` | 5 files | 0 files |
 | `packages/physics-rapier/src/init` | 0 files | 5 files |
+| `packages/physics-rapier/src/rapier2d-adapter` | 3 files | 2 files |
+| `packages/physics-rapier/src/rapier3d-adapter` | 4 files | 1 file |
 | `packages/render-webgl/src/gl-program` | 0 files | 5 files |
 | `packages/render-webgl/src/index` | 5 files | 0 files |
 | `packages/render-webgl/src/webgl-renderer` | 4 files | 1 file |
@@ -2987,8 +3010,6 @@ graph LR
 | `packages/input/src/drag` | 3 files | 1 file |
 | `packages/input/src/index` | 4 files | 0 files |
 | `packages/input/src/pointer-input` | 2 files | 2 files |
-| `packages/math/src/matrix4` | 3 files | 1 file |
-| `packages/math/src/quaternion` | 2 files | 2 files |
 
 ---
 
@@ -3133,84 +3154,85 @@ graph TD
     end
 
     subgraph Packages/physics-rapier
-        N90[conversions2d]
-        N91[conversions3d]
-        N92[index]
-        N93[init]
-        N94[rapier2d-adapter]
-        N95[rapier3d-adapter]
+        N90[ccd]
+        N91[conversions2d]
+        N92[conversions3d]
+        N93[index]
+        N94[init]
+        N95[rapier2d-adapter]
+        N96[rapier3d-adapter]
     end
 
     subgraph Packages/physics-soft
-        N96[index]
+        N97[index]
     end
 
     subgraph Packages/render
-        N97[index]
-        N98[lights]
-        N99[particles]
-        N100[render-list]
-        N101[renderable]
-        N102[renderer]
-        N103[sprite]
-        N104[texture]
+        N98[index]
+        N99[lights]
+        N100[particles]
+        N101[render-list]
+        N102[renderable]
+        N103[renderer]
+        N104[sprite]
+        N105[texture]
     end
 
     subgraph Packages/render-canvas
-        N105[index]
-    end
-
-    subgraph Packages/render-svg
         N106[index]
     end
 
+    subgraph Packages/render-svg
+        N107[index]
+    end
+
     subgraph Packages/render-webgl
-        N107[gl-geometry]
-        N108[gl-particles]
-        N109[gl-program]
-        N110[gl-texture]
-        N111[index]
-        N112[webgl-renderer]
+        N108[gl-geometry]
+        N109[gl-particles]
+        N110[gl-program]
+        N111[gl-texture]
+        N112[index]
+        N113[webgl-renderer]
     end
 
     subgraph Packages/render-webgpu
-        N113[index]
+        N114[index]
     end
 
     subgraph Packages/scene
-        N114[authority]
-        N115[camera]
-        N116[group]
-        N117[index]
-        N118[interpolation]
-        N119[light]
-        N120[node]
-        N121[pose-target]
-        N122[scene]
-        N123[transform]
-        N124[...2 more]
+        N115[authority]
+        N116[camera]
+        N117[group]
+        N118[index]
+        N119[interpolation]
+        N120[light]
+        N121[node]
+        N122[pose-target]
+        N123[scene]
+        N124[transform]
+        N125[...2 more]
     end
 
     subgraph Packages/serialization
-        N125[format]
-        N126[index]
-        N127[migration]
-        N128[serializer]
+        N126[format]
+        N127[index]
+        N128[migration]
+        N129[serializer]
     end
 
     subgraph Packages/text
-        N129[bitmap-font]
-        N130[glyph-atlas]
-        N131[index]
-        N132[text-layout]
+        N130[bitmap-font]
+        N131[glyph-atlas]
+        N132[index]
+        N133[text-layout]
     end
 
     subgraph Packages/ui
-        N133[button]
-        N134[index]
-        N135[label]
-        N136[panel]
-        N137[widget]
+        N134[button]
+        N135[index]
+        N136[label]
+        N137[panel]
+        N138[widget]
     end
 
     N1 --> N9
@@ -3229,6 +3251,7 @@ graph TD
     N5 --> N7
     N5 --> N8
     N5 --> N9
+    N6 --> N8
     N7 --> N9
     N8 --> N1
     N8 --> N3
@@ -3287,7 +3310,6 @@ graph TD
     N56 --> N50
     N57 --> N50
     N58 --> N50
-    N61 --> N59
 ```
 
 ---
@@ -3297,14 +3319,14 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 160 |
+| Total TypeScript Files | 161 |
 | Total Modules | 24 |
-| Total Lines of Code | 56775 |
-| Total Exports | 1239 |
+| Total Lines of Code | 56760 |
+| Total Exports | 1244 |
 | Total Re-exports | 817 |
 | Total Classes | 91 |
 | Total Interfaces | 276 |
-| Total Functions | 181 |
+| Total Functions | 185 |
 | Total Type Guards | 12 |
 | Total Enums | 0 |
 | Type-only Imports | 172 |
@@ -3313,5 +3335,5 @@ graph TD
 
 ---
 
-*Last Updated*: 2026-08-04
+*Last Updated*: 2026-08-05
 *Version*: 0.0.0
