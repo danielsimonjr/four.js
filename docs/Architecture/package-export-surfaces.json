@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-04",
+  "generated": "2026-08-05",
   "surfaces": {
     "packages/animation": [
       "Advanceable",
@@ -73,6 +73,7 @@
       "quinticInOut",
       "quinticOut",
       "releaseProperty",
+      "requireNonNegativeSeconds",
       "resolveEasing",
       "sineIn",
       "sineInOut",
@@ -645,6 +646,7 @@
       "RapierRotation3",
       "RapierVector2",
       "RapierVector3",
+      "resolveCcdMode",
       "revoluteAxisSignZ",
       "rotateVectorByRotation3",
       "toPrincipalInertia3d",
@@ -712,6 +714,7 @@
     "packages/render-webgl": [
       "CacheableGeometry",
       "CacheableTexture",
+      "createLinkedProgram",
       "GeometryCache",
       "GeometryRecord",
       "GL",
@@ -722,6 +725,7 @@
       "GlUniformLocation",
       "GlVertexArray",
       "LitProgram",
+      "matrixScratch",
       "NORMAL_ATTRIBUTE_LOCATION",
       "PACKAGE_NAME",
       "PARTICLE_ATTRIBUTE_LOCATIONS",
@@ -731,6 +735,7 @@
       "ParticleGlContext",
       "ParticleProgram",
       "POSITION_ATTRIBUTE_LOCATION",
+      "requireUniform",
       "SpriteProgram",
       "TextureCache",
       "TextureRecord",

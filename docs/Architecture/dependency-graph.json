@@ -2,10 +2,10 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-04",
-    "totalFiles": 160,
+    "lastUpdated": "2026-08-05",
+    "totalFiles": 161,
     "totalModules": 24,
-    "totalExports": 1239
+    "totalExports": 1244
   },
   "entryPoints": [
     {
@@ -783,6 +783,7 @@
               "claimProperty",
               "isTransformOwner",
               "releaseProperty",
+              "requireNonNegativeSeconds",
               "PropertyClaim"
             ]
           },
@@ -840,7 +841,14 @@
         "description": "Timelines (§16).",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./tween.js",
+            "imports": [
+              "requireNonNegativeSeconds"
+            ]
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -971,6 +979,7 @@
         "exports": [
           "claimProperty",
           "releaseProperty",
+          "requireNonNegativeSeconds",
           "isTransformOwner",
           "animate",
           "tween",
@@ -986,6 +995,7 @@
         "functions": [
           "claimProperty",
           "releaseProperty",
+          "requireNonNegativeSeconds",
           "isTransformOwner",
           "animate",
           "tween"
@@ -6832,6 +6842,35 @@
       }
     },
     "packages/physics-rapier": {
+      "packages/physics-rapier/src/ccd.ts": {
+        "description": "The §31 CCD-mode resolution both Rapier adapters share.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/physics",
+            "directory": "packages/physics",
+            "imports": [
+              "DEFAULT_ENABLED_CCD_MODE"
+            ]
+          },
+          {
+            "package": "@four/physics",
+            "directory": "packages/physics",
+            "imports": [
+              "CCDMode",
+              "RigidBodyDescriptor"
+            ]
+          }
+        ],
+        "exports": [
+          "resolveCcdMode"
+        ],
+        "functions": [
+          "resolveCcdMode"
+        ]
+      },
       "packages/physics-rapier/src/conversions2d.ts": {
         "description": "The §21/P5-3 mapping between the engine's 3D-typed physics API and Rapier's",
         "externalDependencies": [],
@@ -7296,6 +7335,12 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./ccd.js",
+            "imports": [
+              "resolveCcdMode"
+            ]
+          },
+          {
             "file": "./conversions2d.js",
             "imports": [
               "createRapierColliderDesc",
@@ -7363,7 +7408,6 @@
             "directory": "packages/physics",
             "imports": [
               "ALL_COLLISION_GROUPS",
-              "DEFAULT_ENABLED_CCD_MODE",
               "DEFAULT_FRICTION",
               "DEFAULT_RESTITUTION",
               "DETERMINISM_LEVELS",
@@ -7434,6 +7478,12 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./ccd.js",
+            "imports": [
+              "resolveCcdMode"
+            ]
+          },
+          {
             "file": "./conversions3d.js",
             "imports": [
               "createRapierColliderDesc3d",
@@ -7501,7 +7551,6 @@
             "directory": "packages/physics",
             "imports": [
               "ALL_COLLISION_GROUPS",
-              "DEFAULT_ENABLED_CCD_MODE",
               "DEFAULT_FRICTION",
               "DEFAULT_RESTITUTION",
               "DETERMINISM_LEVELS",
@@ -8212,9 +8261,11 @@
             "imports": [
               "GL",
               "POSITION_ATTRIBUTE_LOCATION",
+              "createLinkedProgram",
+              "matrixScratch",
+              "requireUniform",
               "GlBuffer",
               "GlProgramHandle",
-              "GlShader",
               "GlUniformLocation",
               "GlVertexArray",
               "WebglContext"
@@ -8226,7 +8277,6 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
-              "FourError",
               "Disposable"
             ]
           },
@@ -8295,6 +8345,9 @@
           "GL",
           "POSITION_ATTRIBUTE_LOCATION",
           "NORMAL_ATTRIBUTE_LOCATION",
+          "matrixScratch",
+          "createLinkedProgram",
+          "requireUniform",
           "UnlitProgram",
           "SpriteProgram",
           "LitProgram"
@@ -8307,10 +8360,15 @@
         "interfaces": [
           "WebglContext"
         ],
+        "functions": [
+          "createLinkedProgram",
+          "requireUniform"
+        ],
         "constants": [
           "GL",
           "POSITION_ATTRIBUTE_LOCATION",
-          "NORMAL_ATTRIBUTE_LOCATION"
+          "NORMAL_ATTRIBUTE_LOCATION",
+          "matrixScratch"
         ]
       },
       "packages/render-webgl/src/gl-texture.ts": {
@@ -10306,6 +10364,7 @@
       {
         "name": "Packages/physics-rapier",
         "files": [
+          "packages/physics-rapier/src/ccd.ts",
           "packages/physics-rapier/src/conversions2d.ts",
           "packages/physics-rapier/src/conversions3d.ts",
           "packages/physics-rapier/src/index.ts",
@@ -10410,16 +10469,16 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 160,
+    "totalTypeScriptFiles": 161,
     "totalModules": 24,
-    "totalLinesOfCode": 56775,
-    "totalExports": 1239,
+    "totalLinesOfCode": 56760,
+    "totalExports": 1244,
     "totalClasses": 91,
     "totalInterfaces": 276,
-    "totalFunctions": 181,
+    "totalFunctions": 185,
     "totalTypeGuards": 12,
     "totalEnums": 0,
-    "totalConstants": 173,
+    "totalConstants": 174,
     "totalReExports": 817,
     "totalTypeOnlyImports": 172,
     "runtimeCircularDeps": 0,

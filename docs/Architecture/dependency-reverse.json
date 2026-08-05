@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-04",
+  "generated": "2026-08-05",
   "dependents": {
     "packages/animation/src/values.ts": [
       "packages/animation/src/binding.ts",
@@ -37,7 +37,8 @@
     ],
     "packages/animation/src/tween.ts": [
       "packages/animation/src/index.ts",
-      "packages/animation/src/mixer.ts"
+      "packages/animation/src/mixer.ts",
+      "packages/animation/src/timeline.ts"
     ],
     "packages/assets/src/asset-manager.ts": [
       "packages/assets/src/index.ts",
@@ -113,11 +114,15 @@
     "packages/input/src/drag.ts": [
       "packages/input/src/index.ts"
     ],
+    "packages/materials/src/lit-material.ts": [
+      "packages/materials/src/index.ts"
+    ],
     "packages/materials/src/sprite-material.ts": [
       "packages/materials/src/index.ts"
     ],
     "packages/materials/src/unlit-material.ts": [
       "packages/materials/src/index.ts",
+      "packages/materials/src/lit-material.ts",
       "packages/materials/src/sprite-material.ts"
     ],
     "packages/math/src/alloc-counter.ts": [
@@ -336,6 +341,13 @@
     "packages/physics-rapier/src/rapier3d-adapter.ts": [
       "packages/physics-rapier/src/index.ts"
     ],
+    "packages/physics-rapier/src/ccd.ts": [
+      "packages/physics-rapier/src/rapier2d-adapter.ts",
+      "packages/physics-rapier/src/rapier3d-adapter.ts"
+    ],
+    "packages/render/src/lights.ts": [
+      "packages/render/src/index.ts"
+    ],
     "packages/render/src/particles.ts": [
       "packages/render/src/index.ts",
       "packages/render/src/render-list.ts"
@@ -384,12 +396,14 @@
       "packages/scene/src/group.ts",
       "packages/scene/src/index.ts",
       "packages/scene/src/interpolation.ts",
+      "packages/scene/src/light.ts",
       "packages/scene/src/scene.ts",
       "packages/scene/src/world-transforms.ts"
     ],
     "packages/scene/src/world-transforms.ts": [
       "packages/scene/src/camera.ts",
-      "packages/scene/src/index.ts"
+      "packages/scene/src/index.ts",
+      "packages/scene/src/light.ts"
     ],
     "packages/scene/src/authority.ts": [
       "packages/scene/src/index.ts",
@@ -401,6 +415,10 @@
     ],
     "packages/scene/src/group.ts": [
       "packages/scene/src/index.ts"
+    ],
+    "packages/scene/src/light.ts": [
+      "packages/scene/src/index.ts",
+      "packages/scene/src/scene.ts"
     ],
     "packages/scene/src/interpolation.ts": [
       "packages/scene/src/index.ts"

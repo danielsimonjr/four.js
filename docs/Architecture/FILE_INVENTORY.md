@@ -1,18 +1,18 @@
 # Complete File Inventory
 
-**Generated**: 2026-08-04 (by tools/create-dependency-graph)
+**Generated**: 2026-08-05 (by tools/create-dependency-graph)
 
 Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-root cross-package `tests/`, `tools/`, build/test `*.config.ts`, `examples/`, and `docs/` reference sources — tagged with a disposition. A completeness census: no `.ts` may be silently missing. The self-check gate (`verifyFileCensus`) does a MAXIMAL, location-agnostic repo walk (broader than this census’s enumerated discovery) and HARD-FAILS `npm run docs:deps` if any `.ts` on disk is unaccounted, or if any `orphan` exists.
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 334
+**Total files**: 335
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 112 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 113 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
@@ -20,7 +20,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 9 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 6 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **334** | |
+| **Total** | **335** | |
 
 ## Per-area counts
 
@@ -28,7 +28,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 9 |
 | `examples` | 6 |
-| `src` | 160 |
+| `src` | 161 |
 | `tests` | 158 |
 | `tools` | 1 |
 
@@ -49,7 +49,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@four/particles` | 15 |
 | `@four/physics` | 30 |
 | `@four/physics-box2d` | 2 |
-| `@four/physics-rapier` | 15 |
+| `@four/physics-rapier` | 16 |
 | `@four/physics-soft` | 2 |
 | `@four/render` | 14 |
 | `@four/render-canvas` | 2 |
@@ -236,6 +236,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/particles/tests/smoke.test.ts` | @four/particles | tests | test |
 | `packages/physics-box2d/src/index.ts` | @four/physics-box2d | src | build-entry |
 | `packages/physics-box2d/tests/smoke.test.ts` | @four/physics-box2d | tests | test |
+| `packages/physics-rapier/src/ccd.ts` | @four/physics-rapier | src | reachable |
 | `packages/physics-rapier/src/conversions2d.ts` | @four/physics-rapier | src | reachable |
 | `packages/physics-rapier/src/conversions3d.ts` | @four/physics-rapier | src | reachable |
 | `packages/physics-rapier/src/index.ts` | @four/physics-rapier | src | build-entry |
