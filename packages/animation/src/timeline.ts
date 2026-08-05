@@ -70,6 +70,8 @@
 
 import { FourError } from "@four/core";
 
+import { requireNonNegativeSeconds } from "./tween.js";
+
 /**
  * The cursor value that means "before the start of an iteration".
  *
@@ -176,17 +178,6 @@ function invalidTimeline(
   context: Record<string, unknown>,
 ): never {
   throw new FourError("INVALID_APPLICATION_STATE", message, { context });
-}
-
-/** Rejects anything that is not a finite number `>= 0` (§7a: seconds). */
-function requireNonNegativeSeconds(value: number, what: string): number {
-  if (!Number.isFinite(value) || value < 0) {
-    invalidTimeline(
-      `${what} must be a finite number of seconds >= 0 (§7a: all times are seconds); received ${String(value)}.`,
-      { value },
-    );
-  }
-  return value;
 }
 
 /**
@@ -784,7 +775,12 @@ export class Timeline {
       if (mode !== "silent") {
         // Rewinding to the very start re-arms markers at time 0, exactly as
         // play() does; any other position is its own exclusive lower bound.
-        this.#cursor = target === 0 ? CURSOR_BEFORE_START : target;
+        // `from > 0` distinguishes a real rewind from a zero-delta advance at
+        // position 0 (2026-08-05 review fix): the cursor sits AT 0 right
+        // after the time-0 markers fire, and re-arming on a no-move advance
+        // made the next forward step fire them a second time, violating
+        // §16's once-per-forward-crossing rule.
+        this.#cursor = target === 0 && from > 0 ? CURSOR_BEFORE_START : target;
       }
       return;
     }

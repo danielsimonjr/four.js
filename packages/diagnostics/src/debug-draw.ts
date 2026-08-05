@@ -1251,10 +1251,12 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
     id: "per-segment-colored-draw",
     specItem: "the overlay render path (plan P10-3)",
     reason:
-      "BufferGeometry stores positions and indices only, and UnlitMaterial is " +
-      "one flat RGBA per draw, so a single draw cannot colour segments " +
-      'individually. RenderItemKind is "unlit" | "sprite" | "particles"; ' +
-      "packages/render/** is outside this packet's file list.",
+      "BufferGeometry stores positions, indices and (since the 2026-08-04 " +
+      "lighting packet) normals — still no per-vertex colour — and " +
+      "UnlitMaterial is one flat RGBA per draw, so a single draw cannot " +
+      'colour segments individually. RenderItemKind is "unlit" | "sprite" | ' +
+      '"particles" | "lit", none of which reads a colour attribute; ' +
+      "packages/render/** was outside the staging packet's file list.",
     shippedInstead:
       'one draw per colour — a "lines" BufferGeometry plus UnlitMaterial fed ' +
       "by writePositions (one buffer per category) or " +

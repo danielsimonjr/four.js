@@ -93,7 +93,6 @@ import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import {
   ALL_COLLISION_GROUPS,
-  DEFAULT_ENABLED_CCD_MODE,
   DEFAULT_FRICTION,
   DEFAULT_RESTITUTION,
   DETERMINISM_LEVELS,
@@ -143,6 +142,7 @@ import type {
   Vector3Input,
 } from "@four/physics";
 
+import { resolveCcdMode } from "./ccd.js";
 import {
   createRapierColliderDesc,
   createRapierShape,
@@ -1601,7 +1601,7 @@ export class Rapier2dAdapter
    *
    * ```text
    * offset  0  u32  magic            0x32523446 ("F4R2", little-endian)
-   * offset  4  u32  format version   1
+   * offset  4  u32  format version   2  (joint registry added, WP-6.2)
    * offset  8  u32  metadata length  in bytes
    * offset 12  u32  Rapier length    in bytes
    * offset 16  …    metadata         UTF-8 JSON (SnapshotMeta)
@@ -2780,24 +2780,6 @@ export class Rapier2dAdapter
       this.#activePairs.set(key, { a, b, trigger: a.sensor || b.sensor });
     }
   }
-}
-
-/**
- * Reconciles §23's `continuousCollisionDetection` switch with §31's mode.
- *
- * `RigidBodyDescriptor.ccdMode` documents the table this implements, and
- * `validateRigidBodyDescriptor` has already rejected the one contradictory
- * combination (`false` plus a non-`"disabled"` mode). An explicit mode wins
- * whenever one is given; otherwise the boolean selects
- * `DEFAULT_ENABLED_CCD_MODE`.
- */
-function resolveCcdMode(desc: RigidBodyDescriptor): CCDMode {
-  if (desc.ccdMode !== undefined) {
-    return desc.ccdMode;
-  }
-  return desc.continuousCollisionDetection === true
-    ? DEFAULT_ENABLED_CCD_MODE
-    : "disabled";
 }
 
 /** Chooses the `MassMode` for a body from its §23 descriptor. */

@@ -327,9 +327,11 @@ export class SystemRegistry {
 
   /**
    * Unregisters every system, calling each `dispose` once, in **reverse
-   * registration order** — teardown mirrors construction, as `disposeAll`
-   * (§83) does for resources. A `dispose` that throws does not stop the rest;
-   * the first thrown value is re-thrown afterwards.
+   * registry order** — descending priority, with equal priorities disposed in
+   * reverse registration order — so teardown mirrors the §39 execution order,
+   * as `disposeAll` (§83) mirrors construction for resources. A `dispose` that
+   * throws does not stop the rest; the first thrown value is re-thrown
+   * afterwards.
    */
   dispose(): void {
     const entries = this.#entries.slice().reverse();

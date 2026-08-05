@@ -210,9 +210,7 @@ export function createChecksum(): Checksum {
  * @throws RangeError on a `NaN`, infinite, or out-of-range value
  */
 export function hashFloats(xs: Iterable<number>): number {
-  let state = FNV_OFFSET_BASIS >>> 0;
-  for (const x of xs) {
-    state = absorbQuantized(state, quantize(x));
-  }
-  return state >>> 0;
+  const checksum = createChecksum();
+  checksum.addFloats(xs);
+  return checksum.digest();
 }

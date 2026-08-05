@@ -19,14 +19,17 @@
  *   `Material` base.
  * - That base does not exist. WP-3.3 deliberately did not introduce it (every
  *   field of it is render state whose meaning the backend packet fixes), and so
- *   `Renderable.material` is narrowed to `UnlitMaterial` — a class with private
- *   fields, hence nominally typed.
+ *   `Renderable.material` is narrowed to the concrete surface materials —
+ *   `UnlitMaterial` alone at WP-3a.3; `UnlitMaterial | LitMaterial` since the
+ *   2026-08-04 lighting packet — classes with private fields, hence nominally
+ *   typed.
  * - A subclass may not re-declare an inherited property with an unrelated type.
- *   `Sprite extends Renderable` would therefore have to carry an
- *   `UnlitMaterial`, which cannot name a texture.
+ *   `Sprite extends Renderable` would therefore have to carry a surface
+ *   material, which cannot name a texture.
  *
- * Widening `Renderable.material` is the §57 `Material`-base packet's job, not
- * this one's — doing it here would pin the base's shape from the outside. So
+ * Replacing that union with §57's abstract base is the `Material`-base
+ * packet's job, not this one's — doing it here would pin the base's shape
+ * from the outside. So
  * {@link Sprite} extends `Node` directly and re-declares the four `Renderable`
  * members it needs (`geometry`, `material`, `renderLayer`, `renderOrder`).
  * `buildRenderList` treats the two side by side and tags each item with a

@@ -305,6 +305,20 @@ describe("Timeline — markers fire once per forward crossing (§16)", () => {
     expect(log.fired).toEqual(["at-from", "at-to"]);
   });
 
+  it("does not re-fire time-0 markers after a zero-delta advance (2026-08-05)", () => {
+    // The no-move branch's start re-arm is for real rewinds only: with the
+    // cursor sitting AT 0 right after the time-0 markers fired, a zero-delta
+    // advance used to reset it, and the next forward step fired them again.
+    const log = recorder();
+    const subject = new Timeline().at(0, log.mark("zero")).play();
+
+    subject.advance(0);
+    expect(log.fired).toEqual(["zero"]);
+    subject.advance(0);
+    subject.advance(0.25);
+    expect(log.fired).toEqual(["zero"]);
+  });
+
   it("fires a marker at time 0 on the first advance, not at play", () => {
     const log = recorder();
     const subject = new Timeline()

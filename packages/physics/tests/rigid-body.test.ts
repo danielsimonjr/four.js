@@ -211,6 +211,30 @@ describe("RigidBody mass rules (§23)", () => {
 });
 
 describe("RigidBody continuous collision detection (§23, §31)", () => {
+  it("carries ccdPredictionDistance through toDescriptor (2026-08-05 review fix)", () => {
+    // The constructor validated and accepted the field but toDescriptor()
+    // dropped it, so the authored distance never reached the adapter on the
+    // component path and the 1 m default silently stood in.
+    const body = new RigidBody({
+      type: "dynamic",
+      ccdMode: "speculative",
+      ccdPredictionDistance: 0.05,
+    });
+    expect(body.ccdPredictionDistance).toBe(0.05);
+    expect(body.toDescriptor().ccdPredictionDistance).toBe(0.05);
+
+    // Never authored: absent from the descriptor (adapter default applies).
+    expect(
+      new RigidBody({ type: "dynamic", ccdMode: "speculative" }).toDescriptor()
+        .ccdPredictionDistance,
+    ).toBeUndefined();
+
+    // Retyped away from "speculative": the distance is withheld, so the
+    // emitted descriptor stays §85-consistent (validateFor re-validates it).
+    body.ccdMode = "swept";
+    expect(body.toDescriptor().ccdPredictionDistance).toBeUndefined();
+  });
+
   it("reconciles the §23 switch with the §31 mode at construction", () => {
     expect(new RigidBody({ type: "dynamic" }).ccdMode).toBe("disabled");
     expect(

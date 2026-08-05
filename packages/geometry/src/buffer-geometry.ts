@@ -385,9 +385,9 @@ export class BufferGeometry implements Disposable {
 
   /**
    * Announces a mutation the geometry could not see — an in-place write into
-   * `positions` or `indices`. Bumps {@link BufferGeometry.version} by one,
-   * which invalidates the cached bounds and every backend buffer keyed on the
-   * version.
+   * `positions`, `normals`, or `indices`. Bumps {@link BufferGeometry.version}
+   * by one, which invalidates the cached bounds and every backend buffer keyed
+   * on the version.
    *
    * Calling it after a setter is harmless, only wasteful: the version advances
    * again and the bounds recompute once more.

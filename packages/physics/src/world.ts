@@ -1389,7 +1389,7 @@ export class PhysicsWorld {
     this.#requireQuery("raycast");
     const hits: WorldRaycastHit[] = [];
     for (const hit of this.#adapter.raycast(query)) {
-      const target = this.#resolveHit(hit.collider);
+      const target = this.#colliderOf(hit.collider);
       if (target !== undefined) {
         hits.push({
           collider: target.collider,
@@ -1408,7 +1408,7 @@ export class PhysicsWorld {
     this.#requireQuery("shapeCast");
     const hits: WorldShapeCastHit[] = [];
     for (const hit of this.#adapter.shapeCast(query)) {
-      const target = this.#resolveHit(hit.collider);
+      const target = this.#colliderOf(hit.collider);
       if (target !== undefined) {
         hits.push({
           collider: target.collider,
@@ -1476,7 +1476,7 @@ export class PhysicsWorld {
     const query: PointQuery = { ...options, point };
     const hits: WorldPointHit[] = [];
     for (const hit of this.#adapter.pointQuery(query)) {
-      const target = this.#resolveHit(hit.collider);
+      const target = this.#colliderOf(hit.collider);
       if (target !== undefined) {
         hits.push({
           collider: target.collider,
@@ -2314,17 +2314,12 @@ export class PhysicsWorld {
     }
     const hits: WorldOverlapHit[] = [];
     for (const hit of this.#adapter.overlap(query)) {
-      const target = this.#resolveHit(hit.collider);
+      const target = this.#colliderOf(hit.collider);
       if (target !== undefined) {
         hits.push({ collider: target.collider, body: target.body.body });
       }
     }
     return hits;
-  }
-
-  /** The registration behind a query hit, or `undefined` when unregistered. */
-  #resolveHit(handle: PhysicsColliderHandle): ColliderRegistration | undefined {
-    return this.#colliderOf(handle);
   }
 
   /**

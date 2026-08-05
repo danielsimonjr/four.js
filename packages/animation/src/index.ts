@@ -5,9 +5,10 @@
  * with `export *` so the package's API is readable in one file and a new symbol
  * is a deliberate act (P4-5).
  *
- * Two symbols in `./tween.js` are deliberately **not** here: `claimProperty` and
- * `releaseProperty`, the §16 conflict registry that `./mixer.js` shares with
- * tweens, together with the `PropertyClaim` and `isTransformOwner` they need.
+ * A few symbols in `./tween.js` are deliberately **not** here: `claimProperty`
+ * and `releaseProperty`, the §16 conflict registry that `./mixer.js` shares
+ * with tweens, together with the `PropertyClaim` and `isTransformOwner` they
+ * need, and the shared `requireNonNegativeSeconds` seconds validator (§7a).
  * They are cross-module plumbing inside this package, not API.
  */
 

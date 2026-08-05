@@ -381,6 +381,18 @@ describe("AnimationMixer — clip events (§16 crossing semantics)", () => {
     expect(indices).toEqual([0]);
   });
 
+  it("does not re-fire the time-0 event after a zero-delta advance (2026-08-05)", () => {
+    // Same defect class as Timeline's: the no-move branch re-armed the
+    // crossing cursor on a zero-delta advance at position 0, so the next
+    // forward step fired the time-0 event a second time.
+    const { mixer, fired } = scenario();
+    mixer.advance(0);
+    expect(fired).toEqual(["start"]);
+    mixer.advance(0);
+    mixer.advance(0.05);
+    expect(fired).toEqual(["start"]);
+  });
+
   it("fires each event exactly once per forward crossing", () => {
     const { mixer, fired } = scenario();
 

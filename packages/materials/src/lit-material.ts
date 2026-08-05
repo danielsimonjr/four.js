@@ -148,10 +148,16 @@ export class LitMaterial implements Disposable {
    * current alpha, for the reason `UnlitMaterial.setColor` documents.
    */
   setColor(red: number, green: number, blue: number, alpha = 1): this {
-    this.color[0] = requireFinite("red", red);
-    this.color[1] = requireFinite("green", green);
-    this.color[2] = requireFinite("blue", blue);
-    this.color[3] = requireFinite("alpha", alpha);
+    // Validate before the first write — see UnlitMaterial.setColor (the
+    // 2026-08-04 torn-state review fix, applied to all three materials).
+    const validRed = requireFinite("red", red);
+    const validGreen = requireFinite("green", green);
+    const validBlue = requireFinite("blue", blue);
+    const validAlpha = requireFinite("alpha", alpha);
+    this.color[0] = validRed;
+    this.color[1] = validGreen;
+    this.color[2] = validBlue;
+    this.color[3] = validAlpha;
     this.markDirty();
     return this;
   }

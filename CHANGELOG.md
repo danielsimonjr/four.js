@@ -8,6 +8,29 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-05 — team code review + simplification sweep
+
+Owner-directed: a five-agent review of all 24 packages, applying
+behavior-preserving simplifications along the way. Confirmed bugs, all fixed
+with regression tests: torn material color state on rejected `setColor`/
+`setTint` (all three materials now validate before writing); UI ancestors
+stuck `pressed` forever via bubbled downs (state reactions are target-only
+now; ancestors still observe events) and focus surviving reparenting into a
+stale scope (attachment blurs, as in the DOM); `RigidBody` silently dropping
+`ccdPredictionDistance` on the component path; the adapters' CCD resolver
+diverging from the pinned WP-5.2 table for `true` + `"disabled"`; time-0
+marker/event double-fire on zero-delta advance in `Timeline` and
+`AnimationMixer`. Simplifications: shared `resolveCcdMode` (physics-rapier),
+render-webgl program machinery consolidated (~120 lines, GL sequence
+byte-identical), `requireNonNegativeSeconds` de-triplicated, `hashFloats`
+now composes the checksum primitives, assorted allocation and doc-truth
+cleanups. PLAUSIBLE findings recorded for follow-up: pointer-state map
+growth over dead pointer ids; first-collider mass loss on direct-adapter
+collider destruction; 3D joint-registry mismatch not detected on corrupt
+§34 envelopes. Verified: 3,083 unit + 174 suite + 38 browser/visual tests,
+coverage gates ≥95% everywhere (physics/diagnostics/animation/materials/ui
+at 100%), determinism goldens bit-exact, lint, TypeDoc 0 warnings.
+
 ### 2026-08-04 (lighting)
 
 #### Added — Lighting MVP (§68, §120's last unshipped bullet; owner-directed tier)
