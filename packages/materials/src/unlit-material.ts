@@ -172,10 +172,19 @@ export class UnlitMaterial implements Disposable {
    * times.
    */
   setColor(red: number, green: number, blue: number, alpha = 1): this {
-    this.color[0] = requireFinite("red", red);
-    this.color[1] = requireFinite("green", green);
-    this.color[2] = requireFinite("blue", blue);
-    this.color[3] = requireFinite("alpha", alpha);
+    // Validate every component before the first array write (2026-08-04
+    // review fix): writing as we validate left a rejected call's material
+    // torn — partially rewritten with no version bump, so backends kept the
+    // old color while CPU readers saw the mix. A throw now leaves the color
+    // exactly as it was, matching the constructor's atomicity.
+    const validRed = requireFinite("red", red);
+    const validGreen = requireFinite("green", green);
+    const validBlue = requireFinite("blue", blue);
+    const validAlpha = requireFinite("alpha", alpha);
+    this.color[0] = validRed;
+    this.color[1] = validGreen;
+    this.color[2] = validBlue;
+    this.color[3] = validAlpha;
     this.markDirty();
     return this;
   }

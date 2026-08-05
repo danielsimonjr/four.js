@@ -92,9 +92,13 @@ describe("UnlitMaterial", () => {
     ).toThrow(/must be finite/);
 
     const material = new UnlitMaterial();
-    expect(() => material.setColor(0, 0, Number.NaN)).toThrow(RangeError);
+    expect(() => material.setColor(0.2, 0.3, Number.NaN)).toThrow(RangeError);
     expect(() => material.setColor(0, 0, 0, Number.NaN)).toThrow(RangeError);
     expect(material.version).toBe(0);
+    // A rejected call is atomic (2026-08-04 review fix): nothing was written,
+    // so the color is not torn — previously `[0.2, 0.3, 1, 1]` survived the
+    // throw while the version stayed 0, splitting backend and CPU views.
+    expect(material.color).toEqual([1, 1, 1, 1]);
   });
 
   it("disposes once, keeps the color, and bumps the version (§83)", () => {

@@ -265,10 +265,16 @@ export class SpriteMaterial implements Disposable {
    * the same call mean different things at different times.
    */
   setTint(red: number, green: number, blue: number, alpha = 1): this {
-    this.tint[0] = requireFinite("red", red);
-    this.tint[1] = requireFinite("green", green);
-    this.tint[2] = requireFinite("blue", blue);
-    this.tint[3] = requireFinite("alpha", alpha);
+    // Validate before the first write — see UnlitMaterial.setColor (the
+    // 2026-08-04 torn-state review fix, applied to all three materials).
+    const validRed = requireFinite("red", red);
+    const validGreen = requireFinite("green", green);
+    const validBlue = requireFinite("blue", blue);
+    const validAlpha = requireFinite("alpha", alpha);
+    this.tint[0] = validRed;
+    this.tint[1] = validGreen;
+    this.tint[2] = validBlue;
+    this.tint[3] = validAlpha;
     this.markDirty();
     return this;
   }
