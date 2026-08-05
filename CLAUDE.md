@@ -4,19 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository State
 
-four.js is a **proposed** unified JS/TS framework combining 2D/2.5D/3D graphics, animation,
-motion, and physics in one shared scene model. This repository currently contains **only the
-directory scaffold and the specification — there is no implementation, no `package.json`, and
-no build/test tooling yet.** Each `packages/*` package holds a `README.md` plus empty `src/`
-and `tests/` placeholders; unit tests are colocated per package, cross-package suites live in
-`tests/{integration,visual,determinism}/`, and performance tests in `benchmarks/`.
+four.js is a unified JS/TS framework combining 2D/2.5D/3D graphics, animation, motion, and
+physics in one shared scene model. **The implementation plan (§103–§113a) is complete**
+(2026-08-02; this section was stale "scaffold only" text until 2026-08-05): all 24
+`packages/*` packages build, test, and lint — ~3,000 unit tests with a tooling-enforced
+≥95% per-package coverage gate, cross-package suites in `tests/{integration,determinism}/`,
+Playwright browser gates in `tests/browser/`, pixel-golden visual tests in `tests/visual/`,
+and performance records in `benchmarks/`. Five packages are deliberate reserved stubs
+(`physics-box2d`, `physics-soft`, `render-webgpu`, `render-canvas`, `render-svg`).
 
-There are consequently no build, lint, or test commands to run today. When implementation
-begins, the spec (§91, Coding Standards and Toolchain) prescribes the baseline: strict
-TypeScript, ESM, pnpm workspace, Turborepo or Nx, Vitest, Playwright, ESLint, Prettier, Vite,
-and Changesets. Phase 0 of the implementation plan (Part IX, §103) lists the exact root files
-to create (`package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`,
-CI workflow).
+Toolchain (§91, pins in plan §3.2): strict TypeScript, ESM with `.js` import suffixes, pnpm
+workspace (`pnpm -r` replaced Turborepo 2026-08-03), Vitest, Playwright, ESLint, Prettier,
+Vite, TypeDoc, Changesets. Common commands: `pnpm build`, `pnpm test`, `pnpm test:suites`,
+`pnpm test:browser`, `pnpm lint`, `pnpm run coverage`, `pnpm run docs` (always with `run`),
+`pnpm graph` + `graph:check`/`graph:duplicates`, `pnpm check-spec`, `pnpm run size`.
+Architecture orientation lives in `docs/Architecture/` (OVERVIEW, ARCHITECTURE, COMPONENTS,
+DATAFLOW, API, TEST_COVERAGE + the generated dependency-graph reports).
 
 ## Tracking files (root)
 

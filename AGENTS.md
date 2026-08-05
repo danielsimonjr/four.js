@@ -8,20 +8,24 @@ the detailed reference.
 
 ## 1. What this repository is
 
-four.js — "One scene. Every dimension. Everything moves." — is a **proposed** unified
+four.js — "One scene. Every dimension. Everything moves." — is a unified
 JavaScript/TypeScript framework combining 2D, 2.5D, and 3D graphics with animation, motion
-systems, and physics (rigid-body, soft-body, particles) in a single shared scene model.
+systems, and physics (rigid-body and particles shipped; soft-body reserved) in a single
+shared scene model.
 
-**Current state: scaffold + specification only. There is no implementation.**
+**Current state: fully implemented** (implementation plan §103–§113a complete 2026-08-02;
+this block said "scaffold only" until 2026-08-05 — it predated Phase 0).
 
-- Every `packages/*` package holds a `README.md` (responsibilities + spec references) and
-  empty `src/` and `tests/` placeholders — no source code.
-- There is no root `package.json`, no lockfile, no CI workflow, no build system.
-- `examples/` (per §93 + flagship demos §118–119), `tests/` (`integration/`, `visual/`,
-  `determinism/` per §92), `benchmarks/`, `tools/`, and `website/` are structured
-  placeholders with READMEs but no content.
-- Consequently there are **no build, lint, or test commands** to run today. Do not invent or
-  claim to run any.
+- All 24 `packages/*` packages carry real source and colocated tests (~3,000 unit tests,
+  ≥95% per-package coverage enforced); five are deliberate reserved stubs
+  (`physics-box2d`, `physics-soft`, `render-webgpu`, `render-canvas`, `render-svg`).
+- Root `package.json` + pnpm workspace + CI workflow exist; `tests/{integration,
+  determinism}/` hold cross-package suites, `tests/browser/` the Playwright gates,
+  `tests/visual/` pixel goldens, `benchmarks/` committed performance records, and six
+  `examples/` sites build and are browser-tested.
+- Common commands: `pnpm build` / `test` / `test:suites` / `test:browser` / `lint` /
+  `run coverage` / `run docs` / `graph` / `check-spec` / `run size`. See
+  `docs/Architecture/OVERVIEW.md` for orientation.
 
 License: MIT (`LICENSE`).
 

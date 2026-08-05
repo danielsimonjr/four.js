@@ -10,9 +10,12 @@ readable; never delete the pointer itself.
 
 ## Standing facts
 
-- The repository is **scaffold + specification only** — no implementation, no `package.json`,
-  no tooling. There are no build/lint/test commands; don't invent any.
-- `docs/SPECIFICATION.md` is the working reference, currently **revision 1.2** (amendments
+- The repository is **fully implemented** (implementation plan complete 2026-08-02; this
+  bullet said "scaffold only" until 2026-08-05 — it predated Phase 0): 24 packages build,
+  test (~3,000 unit + suites + browser/visual), and lint, with ≥95% coverage gates. Five
+  packages are deliberate reserved stubs (physics-box2d/soft, render-webgpu/canvas/svg).
+- `docs/SPECIFICATION.md` is the working reference — the current revision is whatever tops
+  its amendments table (1.6 as of 2026-07-29; this bullet froze at "1.2") (amendments
   table at its top; § numbering 1–120 frozen, lettered sections for insertions).
   `docs/archive/four-js-specification.pdf` is the unmodified original, frozen at the pre-1.0
   text, and still contains the old duplicate numbering — translate its references via the map
