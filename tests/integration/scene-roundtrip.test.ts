@@ -7,10 +7,11 @@
  * 1. **`@four/serialization` × `@four/physics` × `@four/physics-rapier`.** The
  *    P11-1 gate is "round-trip save → load → §33-checksum-relevant state
  *    equality", and it cannot be met inside `@four/serialization`, which may not
- *    name `RigidBody` (plan §3.1). `helpers/roundtrip-scenarios.ts` performs the
- *    one cross-package registration P11-1 assigns to this layer and holds the
- *    reference serializers applications copy; this file is what proves they
- *    work.
+ *    name `RigidBody` (plan §3.1). Since 2026-08-06 (`PH-17`) the serializers
+ *    are **shipped** — `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` from
+ *    `@four/physics`, registered by the umbrella's
+ *    `registerPhysicsSerializers()` — and `helpers/roundtrip-scenarios.ts`
+ *    holds only the scenario. This file is what proves the shipped pair works.
  * 2. **The §79 / §34 line.** Saving a *scene* is not snapshotting a
  *    *simulation*, and the difference is measurable: the same scene reloads
  *    bit-identically when the solver holds no contacts, and parts from the run
@@ -41,7 +42,7 @@ import {
   buildPropagationPath,
   dispatchPointerEvent,
 } from "@four/input";
-import { Collider, RigidBody } from "@four/physics";
+import { Collider, RIGID_BODY_SERIALIZER, RigidBody } from "@four/physics";
 import { Group, Node, Scene } from "@four/scene";
 import {
   ComponentSerializerRegistry,
@@ -69,7 +70,6 @@ import {
   CONTACT_RELOAD_POSITION_TOLERANCE,
   CONTACT_RELOAD_VELOCITY_TOLERANCE,
   CONTROL_STEPS,
-  RIGID_BODY_SERIALIZER,
   SAVE_STEP,
   SIM_ROOT_NAME,
   createRoundtripRig,
@@ -348,6 +348,61 @@ describe("scene round trip (§79, §113a)", () => {
       ),
     ).toBe(-1);
     expectStatesIdentical(run.final, expected.states);
+  }, 30_000);
+
+  it("saves and reloads a physics scene through registerSceneNodeTypes alone (PH-17)", async () => {
+    // The closing half of PH-17, and the one path an application actually
+    // takes: no hand-written registry, no `{ unknownComponents: "skip" }`, no
+    // serializer copied out of a test helper — one umbrella call that knows
+    // `RigidBody` and `Collider` because `@four/physics` ships their
+    // serializers and this package registers them.
+    //
+    // Saved contact-free (see the §79/§34 boundary above), so the claim is the
+    // strongest one a §79 document can make: the reloaded world reproduces the
+    // control's §33 checksum stream *element by element*, through every later
+    // collision and bounce.
+    const expected = await control();
+    const io = registerSceneNodeTypes();
+    expect(io.components.has(RigidBody.typeName)).toBe(true);
+    expect(io.components.has(Collider.typeName)).toBe(true);
+
+    const original = await createRoundtripRig();
+    let text: string;
+    let saved: readonly BodyState[];
+    try {
+      stepChecksums(original, CONTACT_FREE_SAVE_STEP);
+      saved = readBodyStates(original);
+      text = encodeSceneDocument(
+        serializeScene(original.root, io.components, io.write),
+      );
+    } finally {
+      original.dispose();
+    }
+
+    // Every body node carries both components; the widget node-type pair the
+    // same call installs simply never matches a `Group` and stays out of the way.
+    const document = decodeSceneDocument(text);
+    expect(document.nodes[0].type).toBe("group");
+    for (const child of document.nodes[0].children ?? []) {
+      expect((child.components ?? []).map((entry) => entry.type)).toEqual([
+        "rigid-body",
+        "collider",
+      ]);
+    }
+
+    const reloaded = await loadRoundtripRig(
+      instantiateScene(document, io.components, io.read),
+    );
+    try {
+      expect(reloaded.nodes).toHaveLength(BODY_COUNT);
+      expectStatesIdentical(readBodyStates(reloaded), saved);
+      expect(
+        stepChecksums(reloaded, CONTROL_STEPS - CONTACT_FREE_SAVE_STEP),
+      ).toEqual([...expected.checksums.slice(CONTACT_FREE_SAVE_STEP)]);
+      expectStatesIdentical(readBodyStates(reloaded), expected.states);
+    } finally {
+      reloaded.dispose();
+    }
   }, 30_000);
 
   it("re-triggers the reloaded sensor exactly as the control did (§24, §29)", async () => {

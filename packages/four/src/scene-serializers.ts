@@ -36,20 +36,19 @@
  *
  * Covered: the three §73 widgets (`Panel`, `Label`, `Button`) with their §74
  * box model and layout, their interaction flags, and their §75 accessibility
- * record; and `MotionComponent` (§11), through the serializer `@four/motion`
- * itself exports.
+ * record; `MotionComponent` (§11), through the serializer `@four/motion` itself
+ * exports; and `RigidBody` and `Collider` (§23–§25), through the pair
+ * `@four/physics` exports (`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`,
+ * 2026-08-06 — the `PH-17` remainder). All three packages declare their
+ * serializers against the same structural `ComponentSerializer` shape, so
+ * registering them here adds no §3.1 edge anywhere.
  *
- * **Not covered: `RigidBody` and `Collider` (§21–§24).** Their serializers
- * belong in `@four/physics`, which owns them and which is the package
- * `PH-17`'s closure plan names — `RIGID_BODY_SERIALIZER` and
- * `COLLIDER_SERIALIZER`, declared against the same structural
- * `ComponentSerializer` shape `@four/motion` uses here so no new §3.1 edge is
- * needed. They are absent because this change could not touch that package;
- * that is the follow-up, and until it lands a scene carrying physics components
- * must pass `{ unknownComponents: "skip" }` to save at all — which is now a
- * loud, deliberate opt-in rather than the silent drop it used to be (A-15).
+ * A scene carrying physics components therefore saves and reloads through this
+ * one call, with no `{ unknownComponents: "skip" }` opt-out and nothing dropped
+ * — see {@link registerPhysicsSerializers} for what a physics document does and
+ * does not carry.
  *
- * Camera, light, sprite and renderable node types are likewise absent (A-16):
+ * Camera, light, sprite and renderable node types are still absent (A-16):
  * the seam they need is the same one used below, so they are additions to this
  * file rather than to any format.
  *
@@ -65,6 +64,12 @@
 
 import type { JsonValue } from "@four/core";
 import { MOTION_COMPONENT_SERIALIZER, MotionComponent } from "@four/motion";
+import {
+  COLLIDER_SERIALIZER,
+  Collider,
+  RIGID_BODY_SERIALIZER,
+  RigidBody,
+} from "@four/physics";
 import { restoreNodeId, type Node } from "@four/scene";
 import {
   ComponentSerializerRegistry,
@@ -124,7 +129,8 @@ export interface SceneNodeTypeSupport {
 export interface SceneSerializationSupport extends SceneNodeTypeSupport {
   /**
    * The component serializers, seeded with `PoseTarget` (from
-   * `@four/serialization`) and `MotionComponent` (§11).
+   * `@four/serialization`), `MotionComponent` (§11), and the two physics
+   * components — `RigidBody` (§23) and `Collider` (§24).
    *
    * A fresh registry per call, never a shared singleton — registries are
    * mutable, and two applications registering their own component types must
@@ -446,6 +452,51 @@ export function registerUISerializers(
 }
 
 /**
+ * Registers the two §6a physics components on `components` and returns it
+ * (§23–§25, §79, PH-17 — 2026-08-06).
+ *
+ * ```ts
+ * import { registerPhysicsSerializers } from "four";
+ * import { createDefaultComponentSerializers } from "@four/serialization";
+ *
+ * const components = registerPhysicsSerializers(createDefaultComponentSerializers());
+ * ```
+ *
+ * Separated from {@link registerSceneNodeTypes} because a headless simulation
+ * has physics and no widgets, and pulling `@four/ui` and `@four/text` into its
+ * bundle to save a scene would be a real cost for nothing (§91's tree-shaking
+ * requirement on the umbrella). {@link registerSceneNodeTypes} calls this, so an
+ * application that wants everything still makes one call.
+ *
+ * The serializers themselves live in `@four/physics` — this function only
+ * performs the registration, which is the one act neither that package nor
+ * `@four/serialization` may perform alone. What a physics document carries (the
+ * authored state, never the solve) is documented there; the boundary worth
+ * repeating here is that **reloading a scene is not restoring a simulation**.
+ * Registering a reloaded node with a world is a separate, explicit step:
+ *
+ * ```ts
+ * const root = instantiateScene(decodeSceneDocument(text), io.components, io.read);
+ * for (const node of bodyNodes(root)) world.addBody(node);
+ * ```
+ *
+ * and a save taken while the solver held contacts reloads to the same *scene*,
+ * not to the same *solve* — the §79/§34 line `tests/integration` measures.
+ *
+ * @param components the registry to register on; returned for chaining
+ * @throws FourError `INVALID_APPLICATION_STATE` if either type name is already
+ * registered — `ComponentSerializerRegistry.register` refuses duplicates, so
+ * calling this twice on one registry is an error rather than a silent overwrite.
+ */
+export function registerPhysicsSerializers(
+  components: ComponentSerializerRegistry,
+): ComponentSerializerRegistry {
+  return components
+    .register(RigidBody, RIGID_BODY_SERIALIZER)
+    .register(Collider, COLLIDER_SERIALIZER);
+}
+
+/**
  * Everything a §79 round trip of an engine-authored scene needs: the component
  * serializers, the node-type writer, and the node factory (A-14, PH-17).
  *
@@ -474,6 +525,7 @@ export function registerSceneNodeTypes(
 ): SceneSerializationSupport {
   const components = createDefaultComponentSerializers();
   components.register(MotionComponent, MOTION_COMPONENT_SERIALIZER);
+  registerPhysicsSerializers(components);
   return { components, ...registerUISerializers(options) };
 }
 

@@ -14,8 +14,11 @@
 import { isFourError } from "@four/core";
 import { MotionComponent } from "@four/motion";
 import { Vector3 } from "@four/math";
+import { Collider, RigidBody } from "@four/physics";
 import { Group, Scene } from "@four/scene";
 import {
+  ComponentSerializerRegistry,
+  createDefaultComponentSerializers,
   decodeSceneDocument,
   encodeSceneDocument,
   instantiateScene,
@@ -29,6 +32,7 @@ import {
   BUTTON_NODE_TYPE,
   LABEL_NODE_TYPE,
   PANEL_NODE_TYPE,
+  registerPhysicsSerializers,
   registerSceneNodeTypes,
   registerUISerializers,
 } from "../src/scene-serializers.js";
@@ -321,6 +325,55 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     ).not.toThrow();
   });
 
+  it("round-trips a RigidBody and a Collider through one call (PH-17)", () => {
+    // The physics half of PH-17, closed 2026-08-06: `@four/physics` owns the
+    // serializers and this package performs the registration neither it nor
+    // `@four/serialization` may perform alone. Before this, a scene carrying
+    // physics components needed `{ unknownComponents: "skip" }` to save at all.
+    const io = registerSceneNodeTypes();
+    const root = new Group();
+    root.addComponent(
+      new RigidBody({
+        type: "dynamic",
+        mass: 3,
+        linearVelocity: new Vector3(0, -2, 0),
+        linearDamping: 0.2,
+      }),
+    );
+    root.addComponent(
+      new Collider({
+        shape: { type: "sphere", radius: 0.5 },
+        restitution: 0.4,
+        sensor: true,
+      }),
+    );
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const body = reloaded.getComponent(RigidBody);
+    expect(body).toBeInstanceOf(RigidBody);
+    expect(body?.type).toBe("dynamic");
+    expect(body?.mass).toBe(3);
+    expect(body?.linearDamping).toBe(0.2);
+    expect(body?.linearVelocity.equalsApprox(new Vector3(0, -2, 0), 0)).toBe(
+      true,
+    );
+
+    const collider = reloaded.getComponent(Collider);
+    expect(collider).toBeInstanceOf(Collider);
+    expect(collider?.shape).toEqual({ type: "sphere", radius: 0.5 });
+    expect(collider?.restitution).toBe(0.4);
+    expect(collider?.sensor).toBe(true);
+    // The §24 association is rebuilt by the hierarchy, not by the document.
+    expect(collider?.body).toBe(body);
+  });
+
   it("hands out a fresh registry per call", () => {
     const first = registerSceneNodeTypes().components;
     const second = registerSceneNodeTypes().components;
@@ -328,6 +381,39 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(first).not.toBe(second);
     expect(first.has(MotionComponent.typeName)).toBe(true);
     expect(second.has(MotionComponent.typeName)).toBe(true);
+    expect(first.has(RigidBody.typeName)).toBe(true);
+    expect(first.has(Collider.typeName)).toBe(true);
+  });
+});
+
+describe("registerPhysicsSerializers (PH-17)", () => {
+  it("registers both components without pulling in the UI node types", () => {
+    const components = registerPhysicsSerializers(
+      createDefaultComponentSerializers(),
+    );
+
+    expect(components.has(RigidBody.typeName)).toBe(true);
+    expect(components.has(Collider.typeName)).toBe(true);
+    // The registry it was handed, returned for chaining — not a copy.
+    expect(
+      registerPhysicsSerializers(new ComponentSerializerRegistry()).size,
+    ).toBe(2);
+  });
+
+  it("refuses to register twice on one registry, rather than overwriting", () => {
+    const components = registerPhysicsSerializers(
+      createDefaultComponentSerializers(),
+    );
+
+    let thrown: unknown;
+    try {
+      registerPhysicsSerializers(components);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isFourError(thrown) && thrown.code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
   });
 });
 

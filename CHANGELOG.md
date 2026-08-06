@@ -8,6 +8,49 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-06 — PH-17 remainder: shipped `RigidBody` / `Collider` serializers
+
+Closes the follow-up the wave-1 entry below records as "deliberately not done". The §79
+component serializers for the two physics components now ship from the package that owns
+them, so a scene carrying physics saves and reloads through one umbrella call instead of
+through a serializer copied out of a test helper.
+
+#### Added
+
+- **`RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER` from `@four/physics` (PH-17, §23–§25,
+  §79)** — with `serializeCollisionShape` / `deserializeCollisionShape` and the
+  `RigidBodyDocument` / `ColliderDocument` / `PhysicsMaterialDocument` shapes. Declared
+  against `ComponentSerializerShape`, the structural transcription `@four/motion` already
+  exports, **imported over the existing `physics → motion` edge** — so registering them into
+  `@four/serialization`'s registry needs no cast and adds no §3.1 edge, and the repository
+  holds one transcription rather than two that can drift. The same honest cost applies:
+  nothing type-checks it against `ComponentSerializer`, so a transcribed-mirror assignability
+  test asserts it, as `@four/motion`'s suite does.
+- **`registerPhysicsSerializers()` on the umbrella `four` package** — registers both on a
+  caller's registry and returns it. `registerSceneNodeTypes()` calls it, so one call now
+  covers the §73 widgets, `MotionComponent`, `RigidBody`, and `Collider`; it stays separate
+  so a headless simulation need not pull `@four/ui` and `@four/text` into its bundle (§91).
+
+#### Changed
+
+- **A physics scene no longer needs `{ unknownComponents: "skip" }` to save.** That opt-in
+  was the loud-but-lossy stopgap the A-15 change left in place for physics components.
+- **§25's fallback chain survives as a chain.** The WP-11.5 reference serializer wrote
+  `effectiveFriction` / `effectiveRestitution` / `effectiveDensity`, pinning today's defaults
+  into every document; the shipped one writes the §24 fields **as authored** and the
+  `PhysicsMaterial` by value, so the same chain re-resolves to the same numbers on load and a
+  later change to `DEFAULT_FRICTION` moves reloaded scenes exactly as it moves saved ones.
+  A material round-trips by value, not by identity — two colliders sharing one material
+  reload with one each, because sharing is a §79 _resource_ relationship.
+- `RigidBody` documents also carry what the reference dropped: the §23 inertia tensor, the
+  §37 initial pose (which outranks the node transform at `addBody`), and §31's
+  `ccdPredictionDistance` — each written exactly when `toDescriptor()` emits it, so `mass`
+  and `centerOfMass` stay absent for a body that asked the solver to derive them.
+- `tests/integration/helpers/roundtrip-scenarios.ts` lost its ~400 lines of duplicate
+  serializers and now calls the shipped registration; `scene-roundtrip.test.ts` gains a case
+  proving a contact-free save reloads **bit-identically** — the control's §33 checksum stream
+  element by element — through `registerSceneNodeTypes()` alone.
+
 ### 2026-08-06 — gap-closure wave 1 (A-7, A-9, A-14/PH-17, A-15, A-17, PH-6)
 
 Six verified gaps from `docs/GAP ANALYSIS v0.md` closed, each with regression tests. Three
@@ -25,7 +68,7 @@ contradicted.
   deleted when the pointer ends. A 10 000-gesture regression test asserts
   `trackedPointerCount === 0` throughout.
 - **A component with no registered serializer is refused on save instead of silently dropped
-  (A-15, §79, §6a).** The writer walked the *serializer* registry and probed each registered
+  (A-15, §79, §6a).** The writer walked the _serializer_ registry and probed each registered
   class, because `Node` offered no enumeration — so an unregistered component was unsaved and
   the omission could not be detected. `Node.components` (a four-line getter forwarding §6a's
   registry, which had exposed the iterator all along) closed it; `serializeScene` now throws
@@ -33,7 +76,7 @@ contradicted.
   `unknownComponents: "skip"`. **Output ordering is unchanged** — the walk is over the node,
   the emission over the registry — so every byte-identical round-trip test still holds.
 - **A restored node id can no longer be re-issued to a node built after the load (A-17,
-  §79).** `NodeOptions.id` restores an id at construction *and reserves it* against
+  §79).** `NodeOptions.id` restores an id at construction _and reserves it_ against
   `@four/scene`'s monotonic counter; `restoreNodeId` moved into `@four/scene` (the module
   that owns the field) for the `nodeFactory` path that cannot use the constructor, and
   `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.

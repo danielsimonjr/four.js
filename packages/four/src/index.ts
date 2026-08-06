@@ -40,6 +40,7 @@ export {
   BUTTON_NODE_TYPE,
   LABEL_NODE_TYPE,
   PANEL_NODE_TYPE,
+  registerPhysicsSerializers,
   registerSceneNodeTypes,
   registerUISerializers,
   restoreNodeId,

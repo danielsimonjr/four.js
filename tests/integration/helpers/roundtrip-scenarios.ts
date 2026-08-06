@@ -1,23 +1,27 @@
 /**
  * The Phase 11 save → reload rig (plan §6j, WP-11.5; §79–§80, §113a) — one
- * headless 2D Rapier scenario, plus **the reference `RigidBody` / `Collider`
- * `ComponentSerializer`s an application is meant to copy**.
+ * headless 2D Rapier scenario, driven through the **shipped** `RigidBody` /
+ * `Collider` component serializers.
  *
  * `@four/serialization` may depend on `core`, `math`, and `scene` only (plan
  * §3.1), so it can never name `RigidBody` or `Collider`: §79's answer is a
  * registry each package — or, when the matrix forbids even that, the
  * application wiring them together — registers its own serializers into. P11-1
- * pinned Phase 11's single cross-package registration to *this* layer, so this
- * file is where that registration lives, and it is written to be copied.
+ * pinned Phase 11's single cross-package registration to *this* layer, and from
+ * WP-11.5 until 2026-08-06 this file also held the two **reference
+ * serializers** an application was meant to copy out of it.
+ *
+ * It no longer does. `PH-17` shipped them: `@four/physics` exports
+ * `RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER`, and the umbrella package's
+ * `registerPhysicsSerializers()` performs the registration — which is what
+ * {@link createRoundtripSerializers} now calls. The duplicates that used to
+ * live here are deleted rather than kept in sync: a test-local copy of shipped
+ * behaviour is a test that passes while the product is broken.
  *
  * ## The pattern
  *
- * A component serializer is two functions over one `JsonValue`:
- *
  * ```ts
- * const registry = createDefaultComponentSerializers()
- *   .register(RigidBody, RIGID_BODY_SERIALIZER)
- *   .register(Collider, COLLIDER_SERIALIZER);
+ * const registry = registerPhysicsSerializers(createDefaultComponentSerializers());
  *
  * const document = serializeScene(simRoot, registry);   // §79 write
  * const reloaded = instantiateScene(document, registry); // §79 read
@@ -25,34 +29,25 @@
  * ```
  *
  * `register` takes the component **class** (the `static readonly typeName` is
- * the document key, §6a/§79), not an instance and not a string. The writer
- * probes each registered class with `node.getComponent(type)`, so a component
- * whose class was never registered is **silently unsaved** — the known boundary
- * `serializer.ts` records, and the reason both classes are registered together
- * below rather than left to a caller to remember.
- *
- * Both serializers write **`toDescriptor()`-derived JSON**: the §37 descriptor
- * is already the canonical "everything a solver needs to rebuild this" record,
- * so deriving the document from it means the two can never drift, and a field
- * added to §23/§24 shows up as a compile error here rather than as state that
- * quietly stops being saved.
+ * the document key, §6a/§79), not an instance and not a string — and a
+ * component whose class is not registered is *refused* at save time rather than
+ * silently dropped (A-15, 2026-08-06), which is why both are registered
+ * together by one function rather than left to a caller to remember.
  *
  * ## What round-trips, and what is world-registration state
  *
+ * The authoritative table is `@four/physics`'s `serializers.ts` header. What
+ * matters to *this* suite:
+ *
  * | state | round-trips? |
  * | --- | --- |
- * | §23 body type, damping, gravity scale, §31 CCD mode | yes |
- * | §23 linear/angular velocity (solver-refreshed, §42) | yes — re-seeded through the descriptor |
- * | §23 mass, centre of mass (when authored) | yes, with the caveat below |
- * | §19 physics/animation blend weights | yes (engine state, absent from the descriptor by design) |
+ * | §22/§23/§31 body state, §19 blend weights | yes |
+ * | §23 mass and centre of mass | yes, **only when authored** — see below |
  * | node pose, authority, name, tags, metadata | yes (`@four/scene`'s own serializer) |
  * | §24 shape, offset, sensor flag, groups, mask | yes |
- * | §25 friction / restitution / density | yes, as **effective** numbers |
- * | §25 shared `PhysicsMaterial` identity | **no** — a resource reference (§79 resource ids), not component state |
- * | §32 `sleeping` | **no** — solver state; a reloaded body starts awake |
+ * | §25 friction / restitution / density | yes, **as authored**; the fallback chain re-resolves on load |
+ * | §32 `sleeping` | recorded as diagnostics, never applied — a reloaded body starts awake |
  * | solver handles, body ids, contact manifolds, warm-start impulses | **no** — that is §34's snapshot, not §79's document |
- *
- * Three of those deserve their own paragraph.
  *
  * **Mass authoredness survives registration (corrected 2026-08-06).**
  * `PhysicsWorld.addBody` finishes by reading `getBodyMass` back onto the
@@ -72,20 +67,6 @@
  * behaviour-preserving (the reloaded masses are still bit-identical to the
  * save's, which this suite asserts) *and* authoring-preserving: a reloaded body
  * whose collider is later scaled follows it, exactly as the saved one did.
- *
- * **§25's fallback chain is resolved on the way out.**
- * `Collider.toDescriptor` emits `effectiveFriction` / `effectiveRestitution` /
- * `effectiveDensity`, so a collider that named none of the three saves the
- * defaults it was resolving to and reloads with them pinned. Again
- * behaviour-preserving, not authoring-preserving; a serializer that wanted the
- * latter would read the optional `collider.friction` fields directly and accept
- * that a later change to `DEFAULT_FRICTION` moves the reloaded simulation.
- *
- * **Sleep is not saved (§32, §34).** A `sleeping` flag is solver state, and
- * §79 keeps simulation state out of a scene document ("physics state, animation
- * state, and replay data must be separate optional sections"). It is recorded
- * in the document as *diagnostics* — see {@link RigidBodyDocument.sleeping} —
- * and deliberately not applied on load.
  *
  * ## The §79 / §34 line (the finding this rig exists to make)
  *
@@ -119,31 +100,21 @@
  * by `Application.step(DT)` with a constant, injected delta.
  */
 
-import { FourError } from "@four/core";
 import { Quaternion, Vector2, Vector3 } from "@four/math";
 import {
   Collider,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
-  type BodyType,
-  type CCDMode,
   type CollisionShape,
-  type PhysicsBodyHandle,
 } from "@four/physics";
 import { Rapier2dAdapter } from "@four/physics-rapier";
-import { Group, Node, Transform } from "@four/scene";
+import { Group, Node } from "@four/scene";
 import {
   ComponentSerializerRegistry,
-  asJsonObject,
   createDefaultComponentSerializers,
-  isJsonArray,
-  validateQuaternionDocument,
-  validateVector3Document,
-  type ComponentSerializer,
-  type JsonObject,
-  type JsonValue,
 } from "@four/serialization";
+import { registerPhysicsSerializers } from "four";
 import { Application } from "four/application";
 
 // ---------------------------------------------------------------------------
@@ -251,425 +222,22 @@ export const BODY_COUNT = 2 + BALLS.length;
 /** Name of the `Group` that roots the serialized subtree. */
 export const SIM_ROOT_NAME = "sim-root";
 
-// ---------------------------------------------------------------------------
-// Shape documents (§24)
-// ---------------------------------------------------------------------------
-
-/** Reads a required number field, naming the path §85-style. */
-function requireNumber(record: JsonObject, key: string, path: string): number {
-  const value = record[key];
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new TypeError(
-      `${path}.${key} must be a finite number, got ${JSON.stringify(value)}.`,
-    );
-  }
-  return value;
-}
-
-/** Reads a required string field. */
-function requireString(record: JsonObject, key: string, path: string): string {
-  const value = record[key];
-  if (typeof value !== "string") {
-    throw new TypeError(
-      `${path}.${key} must be a string, got ${JSON.stringify(value)}.`,
-    );
-  }
-  return value;
-}
-
-/** A `Vector3` as the three numbers `validateVector3Document` reads back. */
-function vector3Json(v: Vector3): JsonObject {
-  return { x: v.x, y: v.y, z: v.z };
-}
-
-/** A `Quaternion` as the four numbers `validateQuaternionDocument` reads back. */
-function quaternionJson(q: Quaternion): JsonObject {
-  return { x: q.x, y: q.y, z: q.z, w: q.w };
-}
-
-/** A `Vector2` (a §24 2D half-extent or polygon vertex) as two numbers. */
-function vector2Json(v: Vector2): JsonObject {
-  return { x: v.x, y: v.y };
-}
-
-/** Reads a `{x, y}` pair back into a fresh `Vector2`. */
-function readVector2(value: JsonValue, path: string): Vector2 {
-  const record = asJsonObject(value, path);
-  return new Vector2(
-    requireNumber(record, "x", path),
-    requireNumber(record, "y", path),
-  );
-}
-
-/**
- * A §24 collision shape as JSON — every shape this build ships, discriminated
- * by the same `type` tag the union uses.
- *
- * Written as an exhaustive `switch` so that adding a shape to `CollisionShape`
- * fails to compile here (`shape` narrows to `never` in the default branch)
- * instead of silently saving a shape as an unreadable `{}`.
- */
-export function serializeCollisionShape(shape: CollisionShape): JsonObject {
-  switch (shape.type) {
-    case "circle":
-    case "sphere":
-      return { type: shape.type, radius: shape.radius };
-    case "rectangle":
-      return { type: shape.type, halfExtents: vector2Json(shape.halfExtents) };
-    case "box":
-      return { type: shape.type, halfExtents: vector3Json(shape.halfExtents) };
-    case "capsule":
-      return {
-        type: shape.type,
-        radius: shape.radius,
-        halfHeight: shape.halfHeight,
-      };
-    case "polygon":
-      return {
-        type: shape.type,
-        vertices: shape.vertices.map((vertex) => vector2Json(vertex)),
-      };
-    default: {
-      const unreachable: never = shape;
-      throw new FourError(
-        "NOT_IMPLEMENTED",
-        `This reference serializer has no document form for collision shape ${JSON.stringify(unreachable)} (§24, §79).`,
-      );
-    }
-  }
-}
-
-/** Rebuilds a §24 collision shape from {@link serializeCollisionShape}'s form. */
-export function deserializeCollisionShape(
-  value: JsonValue,
-  path = "shape",
-): CollisionShape {
-  const record = asJsonObject(value, path);
-  const type = requireString(record, "type", path);
-  switch (type) {
-    case "circle":
-      return { type: "circle", radius: requireNumber(record, "radius", path) };
-    case "sphere":
-      return { type: "sphere", radius: requireNumber(record, "radius", path) };
-    case "rectangle":
-      return {
-        type: "rectangle",
-        halfExtents: readVector2(record.halfExtents, `${path}.halfExtents`),
-      };
-    case "box": {
-      const extents = validateVector3Document(
-        record.halfExtents,
-        `${path}.halfExtents`,
-      );
-      return {
-        type: "box",
-        halfExtents: new Vector3(extents.x, extents.y, extents.z),
-      };
-    }
-    case "capsule":
-      return {
-        type: "capsule",
-        radius: requireNumber(record, "radius", path),
-        halfHeight: requireNumber(record, "halfHeight", path),
-      };
-    case "polygon": {
-      const vertices = record.vertices;
-      if (!isJsonArray(vertices)) {
-        throw new TypeError(`${path}.vertices must be an array.`);
-      }
-      return {
-        type: "polygon",
-        vertices: vertices.map((vertex, index) =>
-          readVector2(vertex, `${path}.vertices[${String(index)}]`),
-        ),
-      };
-    }
-    default:
-      throw new TypeError(
-        `${path}.type is ${JSON.stringify(type)}, which is not a §24 collision shape this build ships.`,
-      );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The reference component serializers (§79, plan P11-1)
-// ---------------------------------------------------------------------------
-
-/** The §22 body types, for narrowing a document string back to `BodyType`. */
-const BODY_TYPES: readonly BodyType[] = [
-  "dynamic",
-  "static",
-  "kinematic-position",
-  "kinematic-velocity",
-];
-
-/** The §31 CCD modes. */
-const CCD_MODES: readonly CCDMode[] = ["disabled", "speculative", "swept"];
-
-/**
- * The document a {@link RIGID_BODY_SERIALIZER} writes — named so a reader can
- * see the shape without decoding the two functions below.
- *
- * Every field but {@link RigidBodyDocument.sleeping} is restored on load; see
- * the module header's table for why that one is not.
- */
-export interface RigidBodyDocument {
-  /** §22 simulation model. */
-  readonly type: BodyType;
-  /** Kilograms (§23), absent when the body has none — see the module header. */
-  readonly mass?: number;
-  /** Present only when {@link RigidBody.centerOfMassAuthored} holds (§23). */
-  readonly centerOfMass?: JsonObject;
-  /** Metres per second (§23), read back from the solver every step. */
-  readonly linearVelocity: JsonObject;
-  /** Radians per second (§23); only Z is meaningful in a `"2d"` world (§21). */
-  readonly angularVelocity: JsonObject;
-  /** §23 linear damping coefficient. */
-  readonly linearDamping: number;
-  /** §23 angular damping coefficient. */
-  readonly angularDamping: number;
-  /** §23 multiplier on world gravity. */
-  readonly gravityScale: number;
-  /** §31 continuous-collision method. */
-  readonly ccdMode: CCDMode;
-  /** §19 solver share of a `"blended"` pose. */
-  readonly physicsWeight: number;
-  /** §19 animated share of a `"blended"` pose. */
-  readonly animationWeight: number;
-  /**
-   * §32 sleep state **as diagnostics only**.
-   *
-   * Recorded so a saved document says whether the body was simulating, and
-   * deliberately *not* applied on load: sleep is solver state (§34), and
-   * `RigidBody.sleeping` is read-only precisely because only a solver report may
-   * change it (§23, §32).
-   */
-  readonly sleeping: boolean;
-}
-
-/** Narrows a document string to a §22 {@link BodyType}. */
-function readBodyType(record: JsonObject, path: string): BodyType {
-  const value = requireString(record, "type", path);
-  for (const type of BODY_TYPES) {
-    if (type === value) {
-      return type;
-    }
-  }
-  throw new TypeError(
-    `${path}.type is ${JSON.stringify(value)}, which is not a §22 body type.`,
-  );
-}
-
-/** Narrows a document string to a §31 {@link CCDMode}. */
-function readCCDMode(record: JsonObject, path: string): CCDMode {
-  const value = record.ccdMode;
-  if (value === undefined) {
-    return "disabled";
-  }
-  for (const mode of CCD_MODES) {
-    if (mode === value) {
-      return mode;
-    }
-  }
-  throw new TypeError(
-    `${path}.ccdMode is ${JSON.stringify(value)}, which is not a §31 CCD mode.`,
-  );
-}
-
-/**
- * The reference `RigidBody` serializer (§23, §79) — copy this.
- *
- * The write side is `toDescriptor()` turned into JSON: the §37 descriptor is
- * exactly "what a solver needs to rebuild this body", so a field added to §23
- * appears here as a type error rather than as state that quietly stops being
- * saved. The two things the descriptor deliberately omits are added back
- * explicitly — §19's blend weights (engine state, never a solver's business)
- * and §32's sleep flag (diagnostics; see {@link RigidBodyDocument.sleeping}).
- *
- * The read side reconstructs the component: the deserializer builds it, and
- * `instantiateScene` attaches it. Re-registering the node with a world
- * (`world.addBody`) is a separate, explicit step — a document is a scene, not a
- * simulation (§79).
- */
-export const RIGID_BODY_SERIALIZER: ComponentSerializer<RigidBody> = {
-  serialize(body: RigidBody): JsonValue {
-    const descriptor = body.toDescriptor();
-    const document: Record<string, JsonValue> = {
-      type: descriptor.type,
-      linearVelocity: vector3Json(body.linearVelocity),
-      angularVelocity: vector3Json(body.angularVelocity),
-      linearDamping: descriptor.linearDamping ?? 0,
-      angularDamping: descriptor.angularDamping ?? 0,
-      gravityScale: descriptor.gravityScale ?? 1,
-      ccdMode: descriptor.ccdMode ?? "disabled",
-      physicsWeight: body.physicsWeight,
-      animationWeight: body.animationWeight,
-      sleeping: body.sleeping,
-    };
-    if (descriptor.mass !== undefined) {
-      document.mass = descriptor.mass;
-    }
-    // Emitted exactly when §23's mass distribution was *authored*; emitting the
-    // always-present default would make the density-derived mass unreachable
-    // (see `RigidBody.centerOfMassAuthored`).
-    if (descriptor.centerOfMass !== undefined) {
-      document.centerOfMass = vector3Json(body.centerOfMass);
-    }
-    return document;
-  },
-
-  deserialize(data: JsonValue): RigidBody {
-    const path = "rigid-body";
-    const record = asJsonObject(data, path);
-    const type = readBodyType(record, path);
-    const linear = validateVector3Document(
-      record.linearVelocity,
-      `${path}.linearVelocity`,
-    );
-    const angular = validateVector3Document(
-      record.angularVelocity,
-      `${path}.angularVelocity`,
-    );
-
-    const body = new RigidBody({
-      type,
-      ...(record.mass === undefined
-        ? {}
-        : { mass: requireNumber(record, "mass", path) }),
-      ...(record.centerOfMass === undefined
-        ? {}
-        : {
-            centerOfMass: ((): Vector3 => {
-              const center = validateVector3Document(
-                record.centerOfMass,
-                `${path}.centerOfMass`,
-              );
-              return new Vector3(center.x, center.y, center.z);
-            })(),
-          }),
-      linearVelocity: new Vector3(linear.x, linear.y, linear.z),
-      angularVelocity: new Vector3(angular.x, angular.y, angular.z),
-      linearDamping: requireNumber(record, "linearDamping", path),
-      angularDamping: requireNumber(record, "angularDamping", path),
-      gravityScale: requireNumber(record, "gravityScale", path),
-      ccdMode: readCCDMode(record, path),
-    });
-    body.physicsWeight = requireNumber(record, "physicsWeight", path);
-    body.animationWeight = requireNumber(record, "animationWeight", path);
-    // `sleeping` is deliberately not applied: see RigidBodyDocument.sleeping.
-    return body;
-  },
-};
-
-/**
- * Stand-in body handle for {@link Collider.toDescriptor}, which requires one
- * (§37: a collider always belongs to a body) and whose §24 fields never read it.
- *
- * A solver handle is world-registration state — the very thing a §79 document
- * must not carry — so the reference serializer mints a sentinel rather than
- * pretending to save one. `Collider`'s own `validateFor` does exactly this for
- * exactly this reason. The sentinel never leaves this module.
- */
-const UNRESOLVED_BODY = {} as PhysicsBodyHandle;
-
-/**
- * The document a {@link COLLIDER_SERIALIZER} writes.
- *
- * `friction`, `restitution`, and `density` are the **effective** §25 values, not
- * the optional authored fields — see the module header for what that costs.
- */
-export interface ColliderDocument {
-  /** §24 geometry, in {@link serializeCollisionShape}'s form. */
-  readonly shape: JsonObject;
-  /** §24 offset position in the body's local frame. */
-  readonly offsetPosition: JsonObject;
-  /** §24 offset rotation. */
-  readonly offsetRotation: JsonObject;
-  /** §25 effective Coulomb friction. */
-  readonly friction: number;
-  /** §25 effective restitution. */
-  readonly restitution: number;
-  /** §25 effective density, in kg/m³ (3D) or kg/m² (2D). */
-  readonly density: number;
-  /** §24 sensor flag — a sensor reports overlaps and exerts no force. */
-  readonly sensor: boolean;
-  /** §24 bit set of the groups this collider belongs to. */
-  readonly collisionGroups: number;
-  /** §24 bit set of the groups it collides with. */
-  readonly collisionMask: number;
-}
-
-/**
- * The reference `Collider` serializer (§24, §25, §79) — copy this.
- *
- * Derived from `toDescriptor(body)` for the same reason the body's is: it is the
- * canonical record, and §25's fallback chain has already been resolved in it
- * exactly once. The body handle it demands is a sentinel — see
- * {@link UNRESOLVED_BODY}.
- *
- * The collider's *body* is not saved and does not need to be: `Collider.body`
- * resolves lazily from the scene graph (own node first, then ancestors), so
- * rebuilding the hierarchy rebuilds the association.
- */
-export const COLLIDER_SERIALIZER: ComponentSerializer<Collider> = {
-  serialize(collider: Collider): JsonValue {
-    const descriptor = collider.toDescriptor(UNRESOLVED_BODY);
-    return {
-      shape: serializeCollisionShape(descriptor.shape),
-      offsetPosition: vector3Json(collider.offset.position),
-      offsetRotation: quaternionJson(collider.offset.rotation),
-      friction: descriptor.friction ?? 0,
-      restitution: descriptor.restitution ?? 0,
-      density: descriptor.density ?? 0,
-      sensor: descriptor.sensor ?? false,
-      collisionGroups: descriptor.collisionGroups ?? 0,
-      collisionMask: descriptor.collisionMask ?? 0,
-    };
-  },
-
-  deserialize(data: JsonValue): Collider {
-    const path = "collider";
-    const record = asJsonObject(data, path);
-    const offset = new Transform();
-    const position = validateVector3Document(
-      record.offsetPosition,
-      `${path}.offsetPosition`,
-    );
-    offset.position.set(position.x, position.y, position.z);
-    const rotation = validateQuaternionDocument(
-      record.offsetRotation,
-      `${path}.offsetRotation`,
-    );
-    offset.rotation.set(rotation.x, rotation.y, rotation.z, rotation.w);
-
-    const sensor = record.sensor;
-    if (typeof sensor !== "boolean") {
-      throw new TypeError(`${path}.sensor must be a boolean.`);
-    }
-    return new Collider({
-      shape: deserializeCollisionShape(record.shape, `${path}.shape`),
-      offset,
-      friction: requireNumber(record, "friction", path),
-      restitution: requireNumber(record, "restitution", path),
-      density: requireNumber(record, "density", path),
-      sensor,
-      collisionGroups: requireNumber(record, "collisionGroups", path),
-      collisionMask: requireNumber(record, "collisionMask", path),
-    });
-  },
-};
-
 /**
  * The registry this suite saves and loads with: `@four/serialization`'s own
- * (`PoseTarget`) plus the two physics components (§79, plan P11-1).
+ * (`PoseTarget`) plus the two physics components (§79, plan P11-1, PH-17).
+ *
+ * The **shipped** registration, not a copy of it: `registerPhysicsSerializers`
+ * is the umbrella function an application calls, so a defect in either shipped
+ * serializer fails this suite instead of hiding behind a test-local duplicate.
+ * `registerSceneNodeTypes()` is the same registration plus the §73 widgets and
+ * `MotionComponent`; this scenario has neither, and keeping the UI packages out
+ * of its import graph keeps it a physics test.
  *
  * A fresh instance per call — registries are mutable and `register` refuses a
  * duplicate `typeName`, so a shared singleton would make two tests collide.
  */
 export function createRoundtripSerializers(): ComponentSerializerRegistry {
-  return createDefaultComponentSerializers()
-    .register(RigidBody, RIGID_BODY_SERIALIZER)
-    .register(Collider, COLLIDER_SERIALIZER);
+  return registerPhysicsSerializers(createDefaultComponentSerializers());
 }
 
 // ---------------------------------------------------------------------------
