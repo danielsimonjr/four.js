@@ -21,8 +21,11 @@
  * The class deliberately mirrors `UnlitMaterial` member for member — id,
  * version counter, `setColor`, `markDirty`, `dispose` — so the two read as the
  * §57 siblings they are; see that module's headers for the reasoning behind
- * each convention. The one structural addition is {@link LitMaterial.kind},
- * the pipeline discriminant both siblings now carry.
+ * each convention. Since 2026-08-06 the mirroring is literal: both extend
+ * §57's abstract {@link Material}, which owns the id, the version counter,
+ * `markDirty`, `dispose`, and the six shared render-state fields (`opacity`,
+ * `transparent`, `blendMode`, `depthTest`, `depthWrite`, `colorWrite`). What
+ * is left here is the lit colour and the {@link LitMaterial.kind} discriminant.
  *
  * ## Color space (§60a)
  *
@@ -37,12 +40,14 @@
  * non-finite components are rejected (§85).
  */
 
-import type { Disposable } from "@four/core";
-
+import { Material, type MaterialOptions } from "./material.js";
 import type { ColorRGBA } from "./unlit-material.js";
 
-/** Construction arguments of {@link LitMaterial}. */
-export interface LitMaterialOptions {
+/**
+ * Construction arguments of {@link LitMaterial} — its own colour, plus §57's
+ * shared render state from {@link MaterialOptions}.
+ */
+export interface LitMaterialOptions extends MaterialOptions {
   /**
    * Initial color, copied into the material's own array. Defaults to opaque
    * white `[1, 1, 1, 1]`, so an untinted material shows the lighting alone.
@@ -51,18 +56,11 @@ export interface LitMaterialOptions {
 }
 
 /**
- * Source of lit-material ids. Monotonic and process-wide — §33 forbids random
- * or clock-derived identity. A separate counter from `UnlitMaterial`'s (that
- * one is module-private); the `lit-material-<n>` prefix keeps the two id
- * spaces from colliding.
+ * The prefix this family member's ids carry. The counter behind it is the
+ * family-wide one in `material.ts` — one counter, one prefix per member, so
+ * two members can never mint a colliding cache key (§33).
  */
-let nextLitMaterialId = 1;
-
-function assignLitMaterialId(): string {
-  const id = `lit-material-${String(nextLitMaterialId)}`;
-  nextLitMaterialId += 1;
-  return id;
-}
+const ID_PREFIX = "lit-material";
 
 /** Rejects non-finite color components (§85). */
 function requireFinite(name: string, value: number): number {
@@ -94,31 +92,21 @@ function requireFinite(name: string, value: number): number {
  * Materials are **shared, not owned by nodes**: any number of `Renderable`s may
  * point at one, and disposing it is the job of whoever created it (§83).
  */
-export class LitMaterial implements Disposable {
+export class LitMaterial extends Material {
   /** Pipeline discriminant (§57, §64) — see `UnlitMaterial.kind`. */
   readonly kind = "lit" as const;
-
-  /**
-   * Stable identity (§57 inherits §83's resource model), formatted
-   * `lit-material-<n>` — unique within a process, ascending in construction
-   * order, never reused.
-   */
-  readonly id: string = assignLitMaterialId();
 
   /**
    * Straight RGBA in 0…1; opaque white by default. The array instance is
    * `readonly` — write *into* it — for the reason `UnlitMaterial.color`
    * documents: a backend may keep a reference to it. Use
    * {@link LitMaterial.setColor}, or write components directly and call
-   * {@link LitMaterial.markDirty}.
+   * {@link Material.markDirty}.
    */
   readonly color: ColorRGBA;
 
-  #version = 0;
-
-  #disposed = false;
-
   constructor(options: LitMaterialOptions = {}) {
+    super(ID_PREFIX, options);
     const color = options.color ?? [1, 1, 1, 1];
     this.color = [
       requireFinite("red", color[0]),
@@ -129,21 +117,7 @@ export class LitMaterial implements Disposable {
   }
 
   /**
-   * Counter incremented on every mutation. Backends cache uniform uploads
-   * against it; treat it as opaque and compare for inequality, exactly like
-   * `UnlitMaterial.version`. Monotonic, never wraps in a realistic session.
-   */
-  get version(): number {
-    return this.#version;
-  }
-
-  /** Whether {@link LitMaterial.dispose} has run. */
-  get disposed(): boolean {
-    return this.#disposed;
-  }
-
-  /**
-   * Writes the color and bumps {@link LitMaterial.version} once. Returns
+   * Writes the color and bumps {@link Material.version} once. Returns
    * `this` for chaining (§7b). `alpha` defaults to `1` rather than to the
    * current alpha, for the reason `UnlitMaterial.setColor` documents.
    */
@@ -160,28 +134,5 @@ export class LitMaterial implements Disposable {
     this.color[3] = validAlpha;
     this.markDirty();
     return this;
-  }
-
-  /**
-   * Announces a mutation the material could not see — a direct write into
-   * {@link LitMaterial.color}. Bumps the version by one. Calling it after
-   * `setColor` is harmless, only wasteful.
-   */
-  markDirty(): void {
-    this.#version += 1;
-  }
-
-  /**
-   * Releases this material (§83). Idempotent. Marks
-   * {@link LitMaterial.disposed} and bumps the version — nothing GPU-side to
-   * free from here, and the color array is kept, for the reasons
-   * `UnlitMaterial.dispose` documents.
-   */
-  dispose(): void {
-    if (this.#disposed) {
-      return;
-    }
-    this.#disposed = true;
-    this.markDirty();
   }
 }

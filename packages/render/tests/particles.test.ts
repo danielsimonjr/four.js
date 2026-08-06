@@ -207,6 +207,11 @@ describe("buildRenderList — particles (§64, plan P9-3)", () => {
 
     expect(item.renderLayer).toBe(3);
     expect(item.renderOrder).toBe(-2);
+    // §66 key 2: §36 carries no material to declare `transparent`, and the
+    // pipeline blends by construction, so the item classifies **opaque** —
+    // which is what keeps a particle scene in the order it drew in before the
+    // key existed (2026-08-06).
+    expect(item.transparent).toBe(false);
   });
 
   it("repacks exactly once per build, before the item is read", () => {

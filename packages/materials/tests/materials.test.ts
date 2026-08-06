@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   LitMaterial,
+  Material,
   SpriteMaterial,
   UnlitMaterial,
+  type MaterialOptions,
   type SpriteTexture,
 } from "../src/index.js";
 
@@ -362,5 +364,143 @@ describe("SpriteMaterial", () => {
 
     material.dispose();
     expect(material.version).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §57's abstract base (`material.ts`, 2026-08-06) — the render state every
+// family member shares, and the defaults that make it a no-op for scenes
+// authored before it existed.
+// ---------------------------------------------------------------------------
+
+/**
+ * The three shipped family members, each built with its own required
+ * arguments, so every assertion below runs against all of them: §57 puts this
+ * state on the *base*, and a subclass that forgot to pass its options through
+ * would be a silent hole in that promise.
+ */
+const familyMembers: readonly {
+  readonly name: string;
+  readonly make: (options?: MaterialOptions) => Material;
+}[] = [
+  { name: "UnlitMaterial", make: (options) => new UnlitMaterial(options) },
+  { name: "LitMaterial", make: (options) => new LitMaterial(options) },
+  {
+    name: "SpriteMaterial",
+    make: (options) =>
+      new SpriteMaterial({ texture: fakeTexture(), ...options }),
+  },
+];
+
+describe("Material — §57's shared render state", () => {
+  for (const { name, make } of familyMembers) {
+    describe(name, () => {
+      it("defaults to the state the backend drew with before the base existed", () => {
+        const material = make();
+
+        expect(material.opacity).toBe(1);
+        expect(material.transparent).toBe(false);
+        expect(material.blendMode).toBe("normal");
+        expect(material.depthTest).toBe(true);
+        expect(material.depthWrite).toBe(true);
+        expect(material.colorWrite).toBe(true);
+      });
+
+      it("takes every §57 field from its options", () => {
+        const material = make({
+          opacity: 0.25,
+          transparent: true,
+          blendMode: "additive",
+          depthTest: false,
+          depthWrite: false,
+          colorWrite: false,
+        });
+
+        expect(material.opacity).toBe(0.25);
+        expect(material.transparent).toBe(true);
+        expect(material.blendMode).toBe("additive");
+        expect(material.depthTest).toBe(false);
+        expect(material.depthWrite).toBe(false);
+        expect(material.colorWrite).toBe(false);
+      });
+
+      it("rejects a non-finite opacity (§85)", () => {
+        expect(() => make({ opacity: Number.NaN })).toThrow(RangeError);
+        expect(() => make({ opacity: Number.POSITIVE_INFINITY })).toThrow(
+          RangeError,
+        );
+      });
+
+      it("does not bump the version for a render-state write", () => {
+        const material = make();
+
+        material.opacity = 0.5;
+        material.transparent = true;
+        material.blendMode = "multiply";
+        material.depthWrite = false;
+
+        // Render state is read per draw, never cached — there is nothing to
+        // invalidate, so nothing is announced (see `material.ts`).
+        expect(material.version).toBe(0);
+      });
+
+      it("is a Material, and disposes through the base (§83)", () => {
+        const material = make();
+
+        expect(material).toBeInstanceOf(Material);
+        material.dispose();
+        material.dispose();
+
+        expect(material.disposed).toBe(true);
+        expect(material.version).toBe(1);
+      });
+    });
+  }
+
+  it("mints ids from one counter, behind one prefix per family member", () => {
+    const unlit = new UnlitMaterial();
+    const lit = new LitMaterial();
+    const sprite = new SpriteMaterial({ texture: fakeTexture() });
+
+    expect(unlit.id).toMatch(/^material-\d+$/);
+    expect(lit.id).toMatch(/^lit-material-\d+$/);
+    expect(sprite.id).toMatch(/^sprite-material-\d+$/);
+
+    // One counter: three consecutive constructions take three consecutive
+    // ordinals, whatever family member each one is. Distinct prefixes are what
+    // keep the ids themselves from colliding (§33, §83 cache keys).
+    const ordinal = (material: Material): number =>
+      Number(material.id.slice(material.id.lastIndexOf("-") + 1));
+    expect(ordinal(lit)).toBe(ordinal(unlit) + 1);
+    expect(ordinal(sprite)).toBe(ordinal(lit) + 1);
+  });
+
+  it("gives each family member the pipeline discriminant a render list reads", () => {
+    expect(new UnlitMaterial().kind).toBe("unlit");
+    expect(new LitMaterial().kind).toBe("lit");
+    expect(new SpriteMaterial({ texture: fakeTexture() }).kind).toBe("sprite");
+  });
+
+  it("accepts a consumer's own family member, with no edit to this package", () => {
+    // The extensibility R-12 was about: a fourth material, declared outside
+    // `@four/materials`, carrying the shared state and its own discriminant.
+    class GlowMaterial extends Material {
+      readonly kind = "glow" as const;
+
+      constructor(options: MaterialOptions = {}) {
+        super("glow-material", {
+          transparent: true,
+          blendMode: "additive",
+          ...options,
+        });
+      }
+    }
+
+    const material = new GlowMaterial();
+    expect(material.id).toMatch(/^glow-material-\d+$/);
+    expect(material.kind).toBe("glow");
+    expect(material.transparent).toBe(true);
+    expect(material.blendMode).toBe("additive");
+    expect(new GlowMaterial({ blendMode: "screen" }).blendMode).toBe("screen");
   });
 });

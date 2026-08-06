@@ -19,10 +19,18 @@
  * for now, and widens to `Material | Material[]` (§49) when the base lands. The
  * deferral is deliberate and reported as a WP-3.3 decision.
  *
+ * **The base landed on 2026-08-06** (`material.ts`), and this class is now one
+ * of its subclasses: `id`, `version`, `markDirty`, `dispose`, and §57's six
+ * render-state fields (`opacity`, `transparent`, `blendMode`, `depthTest`,
+ * `depthWrite`, `colorWrite`) all live on {@link Material} and are documented
+ * there. What is left here is the one thing that is `UnlitMaterial`'s own: a
+ * flat RGBA colour. Every inherited default reproduces this class's previous
+ * behaviour exactly — see {@link Material}'s header.
+ *
  * ## Version, not events
  *
  * Backends cache uniform uploads and pipeline state per material, keyed on
- * {@link UnlitMaterial.version} — the same contract `BufferGeometry.version`
+ * {@link Material.version} — the same contract `BufferGeometry.version`
  * and `Transform.version` offer. {@link UnlitMaterial.setColor} bumps it;
  * writing a component in place does not, and must be announced:
  *
@@ -31,6 +39,16 @@
  * material.color[3] = 0.5;     // in-place edit — invisible to the material
  * material.markDirty();        // announce it: version += 1
  * ```
+ *
+ * ## Alpha is drawn now (§66, R-11)
+ *
+ * `color[3]` was a **dead field** until 2026-08-06: the backend disabled
+ * blending for this pipeline unconditionally, so an animated alpha was a
+ * silent no-op. It is live from the moment a material asks for it —
+ * `new UnlitMaterial({ color: [1, 0, 0, 0.5], transparent: true })` blends, and
+ * so does `material.opacity = 0.5` on a `transparent` material. An *opaque*
+ * material still writes its alpha unblended, which is what every scene
+ * authored before the flag existed did.
  *
  * ## Color space (§60a)
  *
@@ -43,8 +61,9 @@
  * need to carry — but non-finite components are rejected (§85).
  */
 
-import type { Disposable } from "@four/core";
 import type { ColorRGBA } from "@four/math";
+
+import { Material, type MaterialOptions } from "./material.js";
 
 /**
  * Straight (non-premultiplied) RGBA, each component nominally in 0…1 —
@@ -59,8 +78,11 @@ import type { ColorRGBA } from "@four/math";
  */
 export type { ColorRGBA } from "@four/math";
 
-/** Construction arguments of {@link UnlitMaterial}. */
-export interface UnlitMaterialOptions {
+/**
+ * Construction arguments of {@link UnlitMaterial} — its own colour, plus §57's
+ * shared render state from {@link MaterialOptions}.
+ */
+export interface UnlitMaterialOptions extends MaterialOptions {
   /**
    * Initial color, copied into the material's own array. Defaults to opaque
    * white `[1, 1, 1, 1]`, so an untinted material multiplies to no change.
@@ -69,16 +91,12 @@ export interface UnlitMaterialOptions {
 }
 
 /**
- * Source of material ids. Monotonic and process-wide, like `Node`'s and
- * `BufferGeometry`'s — §33 forbids random or clock-derived identity.
+ * The prefix this family member's ids carry; the counter behind it is the
+ * family-wide one in `material.ts`. `material-<n>` rather than
+ * `unlit-material-<n>` because that is the id space this class has minted since
+ * WP-3.3 and ids appear in backend cache keys and diagnostics.
  */
-let nextMaterialId = 1;
-
-function assignMaterialId(): string {
-  const id = `material-${String(nextMaterialId)}`;
-  nextMaterialId += 1;
-  return id;
-}
+const ID_PREFIX = "material";
 
 /** Rejects non-finite color components (§85). */
 function requireFinite(name: string, value: number): number {
@@ -103,24 +121,17 @@ function requireFinite(name: string, value: number): number {
  * Materials are **shared, not owned by nodes**: any number of `Renderable`s may
  * point at one, and disposing it is the job of whoever created it (§83).
  */
-export class UnlitMaterial implements Disposable {
+export class UnlitMaterial extends Material {
   /**
    * Pipeline discriminant (§57, §64), introduced with the §68 lighting packet
    * (2026-08-04): with two surface-material families (`UnlitMaterial`,
    * `LitMaterial`) sharing `Renderable.material`, the render-list builder
    * needs one property load — not an `instanceof`, which a structurally-typed
    * material double could never satisfy — to pick the item's pipeline. A
-   * literal string, mirroring `RenderItemKind`. `SpriteMaterial` gains one
-   * when it joins a material union that needs discriminating.
+   * literal string, mirroring `RenderItemKind`; §57's {@link Material} base
+   * declares it abstract, and every family member answers it.
    */
   readonly kind = "unlit" as const;
-
-  /**
-   * Stable identity (§57 inherits §83's resource model), assigned at
-   * construction from a monotonic counter and formatted `material-<n>`. Unique
-   * within a process, ascending in construction order, never reused.
-   */
-  readonly id: string = assignMaterialId();
 
   /**
    * Straight RGBA in 0…1; opaque white by default.
@@ -129,15 +140,12 @@ export class UnlitMaterial implements Disposable {
    * `Transform`'s math members are: a backend may keep a reference to it, and
    * replacing the array wholesale would leave that reference pointing at the
    * old color forever. Use {@link UnlitMaterial.setColor}, or write components
-   * directly and call {@link UnlitMaterial.markDirty}.
+   * directly and call {@link Material.markDirty}.
    */
   readonly color: ColorRGBA;
 
-  #version = 0;
-
-  #disposed = false;
-
   constructor(options: UnlitMaterialOptions = {}) {
+    super(ID_PREFIX, options);
     const color = options.color ?? [1, 1, 1, 1];
     this.color = [
       requireFinite("red", color[0]),
@@ -148,21 +156,7 @@ export class UnlitMaterial implements Disposable {
   }
 
   /**
-   * Counter incremented on every mutation. Backends cache uniform uploads
-   * against it; treat it as opaque and compare for inequality, exactly like
-   * `Transform.version`. Monotonic, never wraps in a realistic session.
-   */
-  get version(): number {
-    return this.#version;
-  }
-
-  /** Whether {@link UnlitMaterial.dispose} has run. */
-  get disposed(): boolean {
-    return this.#disposed;
-  }
-
-  /**
-   * Writes the color and bumps {@link UnlitMaterial.version} once. Returns
+   * Writes the color and bumps {@link Material.version} once. Returns
    * `this` for chaining, following the math types' mutate-and-return convention
    * (§7b).
    *
@@ -187,33 +181,5 @@ export class UnlitMaterial implements Disposable {
     this.color[3] = validAlpha;
     this.markDirty();
     return this;
-  }
-
-  /**
-   * Announces a mutation the material could not see — a direct write into
-   * {@link UnlitMaterial.color}. Bumps the version by one. Calling it after
-   * `setColor` is harmless, only wasteful.
-   */
-  markDirty(): void {
-    this.#version += 1;
-  }
-
-  /**
-   * Releases this material (§83). Idempotent.
-   *
-   * There is nothing GPU-side to free from here — the backend owns the pipeline
-   * and uniform buffers built from this material and drops them when it sees
-   * the material disposed — so this marks {@link UnlitMaterial.disposed} and
-   * bumps the version, which is what invalidates those backend caches. The
-   * color array is kept: it is four numbers, and clearing it would turn a
-   * use-after-dispose bug into a silently black frame instead of a diagnosable
-   * one (§83's "disposed resources still in use" warning).
-   */
-  dispose(): void {
-    if (this.#disposed) {
-      return;
-    }
-    this.#disposed = true;
-    this.markDirty();
   }
 }

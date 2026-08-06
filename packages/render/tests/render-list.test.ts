@@ -91,6 +91,31 @@ describe("Renderable", () => {
     expect(node.renderLayer).toBe(2);
     expect(node.renderOrder).toBe(-1);
   });
+
+  it("lets the geometry be replaced, and draws the new one", () => {
+    const scene = new Scene();
+    const node = new Renderable(boxGeometry(), new UnlitMaterial());
+    scene.add(node);
+
+    // `geometry` is an accessor pair since §55's `Sprite` began overriding it
+    // (2026-08-06); assigning behaves exactly as the plain field did.
+    const replacement = planeGeometry();
+    node.geometry = replacement;
+
+    expect(node.geometry).toBe(replacement);
+    expect(buildRenderList(scene, [])[0].geometry).toBe(replacement);
+  });
+
+  it("carries a material of any §57 family member, chosen by its kind", () => {
+    // The R-12 widening: the class is generic in its material, so a family
+    // member declared outside this package needs no edit here.
+    const lit: Renderable<LitMaterial> = new Renderable(
+      planeGeometry(),
+      new LitMaterial(),
+    );
+
+    expect(lit.material.kind).toBe("lit");
+  });
 });
 
 describe("buildRenderList", () => {
@@ -153,7 +178,13 @@ describe("buildRenderList", () => {
 
     it("re-tags a pooled slot when the material family changes", () => {
       const scene = new Scene();
-      const node = new Renderable(planeGeometry(), new UnlitMaterial());
+      // Annotated rather than inferred: `Renderable` is generic in its material
+      // (§57's base), so `new Renderable(g, new UnlitMaterial())` infers the
+      // narrow `Renderable<UnlitMaterial>` — and this test swaps families.
+      const node: Renderable = new Renderable(
+        planeGeometry(),
+        new UnlitMaterial(),
+      );
       scene.add(node);
       const out: RenderItem[] = [];
 
@@ -276,6 +307,104 @@ describe("buildRenderList", () => {
         "b",
         "d",
       ]);
+    });
+  });
+
+  // §66 key 2 (2026-08-06). The compatibility property is asserted first,
+  // because it is the reason the key could land at all.
+  describe("opaque before transparent (§66 key 2)", () => {
+    /** A renderable whose material declares §57's `transparent`. */
+    function blended(
+      name: string,
+      options?: { layer?: number; order?: number },
+    ): Renderable {
+      const node = new Renderable(
+        planeGeometry(),
+        new UnlitMaterial({ transparent: true }),
+        {
+          renderLayer: options?.layer ?? 0,
+          renderOrder: options?.order ?? 0,
+        },
+      );
+      node.name = name;
+      return node;
+    }
+
+    it("changes nothing for a scene that declares no transparency", () => {
+      const scene = new Scene();
+      scene.add(renderable("a"), renderable("b"), renderable("c"));
+
+      // Every item classifies opaque, the key compares equal, and the stable
+      // sort leaves scene order alone — the property the pixel goldens pin.
+      expect(names(buildRenderList(scene, []), scene)).toEqual(["a", "b", "c"]);
+    });
+
+    it("draws opaque items before transparent ones inside a layer", () => {
+      const scene = new Scene();
+      scene.add(blended("glass"), renderable("wall"));
+
+      expect(names(buildRenderList(scene, []), scene)).toEqual([
+        "wall",
+        "glass",
+      ]);
+    });
+
+    it("leaves an already-correct scene in the order it was authored", () => {
+      const scene = new Scene();
+      scene.add(renderable("wall"), blended("glass"));
+
+      // The back-to-front authoring §66 documents as the pre-key workaround
+      // keeps working: the key agrees with it rather than permuting it.
+      expect(names(buildRenderList(scene, []), scene)).toEqual([
+        "wall",
+        "glass",
+      ]);
+    });
+
+    it("outranks explicit render order, and is outranked by the layer", () => {
+      const scene = new Scene();
+      scene.add(
+        blended("glass", { order: -100 }),
+        renderable("wall", { order: 100 }),
+        // A transparent item in an earlier layer still draws first: key 1
+        // outranks key 2, which is the escape hatch for a glow behind a mask.
+        blended("backdrop", { layer: -1 }),
+      );
+
+      expect(names(buildRenderList(scene, []), scene)).toEqual([
+        "backdrop",
+        "wall",
+        "glass",
+      ]);
+    });
+
+    it("keeps render order and scene order inside each group", () => {
+      const scene = new Scene();
+      scene.add(
+        blended("glass-late", { order: 1 }),
+        blended("glass-early", { order: 0 }),
+        renderable("wall-late", { order: 1 }),
+        renderable("wall-early", { order: 0 }),
+      );
+
+      expect(names(buildRenderList(scene, []), scene)).toEqual([
+        "wall-early",
+        "wall-late",
+        "glass-early",
+        "glass-late",
+      ]);
+    });
+
+    it("snapshots the flag onto the item, and re-reads it every build", () => {
+      const scene = new Scene();
+      const node = blended("glass");
+      scene.add(node);
+      const out: RenderItem[] = [];
+
+      expect(buildRenderList(scene, out)[0].transparent).toBe(true);
+
+      node.material.transparent = false;
+      expect(buildRenderList(scene, out)[0].transparent).toBe(false);
     });
   });
 

@@ -9,33 +9,37 @@
  * anchored, tinted textured quad** — and names the rest as deferred rather than
  * sketching it.
  *
- * ## Departure from §55's `class Sprite extends Renderable` (decision, WP-3a.3)
+ * ## §55's `class Sprite extends Renderable`, as of 2026-08-06
  *
  * §55 writes `class Sprite extends Renderable`, and that is where this class
- * belongs. It cannot go there **yet**, and the reason is worth stating exactly,
- * because it is a temporary type-level obstacle and not a design disagreement:
+ * now is. It could not go there at WP-3a.3, and the obstacle is worth keeping
+ * on the record because it was a type-level one and not a design disagreement:
  *
  * - §49's `Renderable.material` is `Material | Material[]`, over §57's abstract
  *   `Material` base.
- * - That base does not exist. WP-3.3 deliberately did not introduce it (every
+ * - That base did not exist. WP-3.3 deliberately did not introduce it (every
  *   field of it is render state whose meaning the backend packet fixes), and so
- *   `Renderable.material` is narrowed to the concrete surface materials —
- *   `UnlitMaterial` alone at WP-3a.3; `UnlitMaterial | LitMaterial` since the
+ *   `Renderable.material` was narrowed to the concrete surface materials —
+ *   `UnlitMaterial` alone at WP-3a.3; `UnlitMaterial | LitMaterial` after the
  *   2026-08-04 lighting packet — classes with private fields, hence nominally
  *   typed.
  * - A subclass may not re-declare an inherited property with an unrelated type.
- *   `Sprite extends Renderable` would therefore have to carry a surface
+ *   `Sprite extends Renderable` would therefore have had to carry a surface
  *   material, which cannot name a texture.
  *
- * Replacing that union with §57's abstract base is the `Material`-base
- * packet's job, not this one's — doing it here would pin the base's shape
- * from the outside. So
- * {@link Sprite} extends `Node` directly and re-declares the four `Renderable`
- * members it needs (`geometry`, `material`, `renderLayer`, `renderOrder`).
- * `buildRenderList` treats the two side by side and tags each item with a
- * `RenderItemKind` discriminant, so the render list, the sort, and every backend see
- * one uniform stream of draws. When §57's base lands, this class re-parents onto
- * `Renderable`, deletes those four declarations, and nothing else changes.
+ * The base landed with the render-state packet that could say what its fields
+ * mean, `Renderable` became generic in its material (`Renderable<M extends
+ * Material>`, defaulting to the surface pair), and this class is a
+ * `Renderable<SpriteMaterial>` — the mechanical change this note predicted.
+ * The three re-declared members it carried (`material`, `renderLayer`,
+ * `renderOrder`) are gone, inherited instead; `geometry` stays as an
+ * **override**, because a sprite derives its quad rather than being handed one
+ * (see below).
+ *
+ * `buildRenderList` still tags each item with a `RenderItemKind` discriminant
+ * read off the *material*, so the render list, the sort, and every backend see
+ * one uniform stream of draws — and the list no longer needs a second
+ * `instanceof` to recognise a sprite.
  *
  * ## The quad, and who owns it
  *
@@ -72,19 +76,28 @@
  * the material or the item. `billboardMode` — needs the camera inside the model
  * transform, i.e. a per-view render list, which arrives with §87 culling.
  * Nine-slice, per-instance data, alpha masks, and sprite animation clips each
- * need either a second geometry path or §65 batching. Transparency **sorting**
- * (§66 key 2) is likewise deferred: sprites draw in render-list order with
- * straight-alpha blending, which is correct for the non-overlapping and
- * back-to-front-authored cases and documented as a limitation on the backend.
+ * need either a second geometry path or §65 batching.
+ *
+ * Transparency **sorting** (§66 key 2) arrived on 2026-08-06 and a sprite opts
+ * into it like any other drawable, by declaring `transparent: true` on its
+ * material. A sprite that does not still draws in render-list order with
+ * straight-alpha blending — the pipeline blends by construction — which is
+ * correct for the non-overlapping and back-to-front-authored cases and remains
+ * documented as a limitation on the backend.
  */
 
 import type { Disposable } from "@four/core";
 import { BufferGeometry } from "@four/geometry";
 import { Vector2 } from "@four/math";
 import type { SpriteMaterial } from "@four/materials";
-import { Node } from "@four/scene";
 
-/** Optional construction arguments of {@link Sprite}. */
+import { Renderable } from "./renderable.js";
+
+/**
+ * Optional construction arguments of {@link Sprite} — the quad's own size and
+ * anchor, plus the two `RenderableOptions` fields every drawable takes, spelled
+ * out here so the sprite's own options read as one list.
+ */
 export interface SpriteOptions {
   /** Initial {@link Sprite.width} in world units; defaults to 1. */
   width?: number;
@@ -168,10 +181,7 @@ function requireFinite(name: string, value: number): number {
  * node's own rotation and scale turn about. A sprite that should spin about its
  * bottom-left corner sets `anchor` to `(0, 0)` and leaves the pivot alone.
  */
-export class Sprite extends Node implements Disposable {
-  /** Surface appearance (§55, §57). Shared, not owned — see the module header. */
-  material: SpriteMaterial;
-
+export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
   /**
    * The point of the quad that sits on the node origin, in quad-relative units;
    * `(0.5, 0.5)` (centre) by default. See the class documentation.
@@ -183,32 +193,19 @@ export class Sprite extends Node implements Disposable {
    */
   readonly anchor: Vector2;
 
-  /**
-   * Symbolic drawing group (§46, §66 sort key 1) — the render list's primary
-   * key. Identical in meaning to `Renderable.renderLayer`; see that class for
-   * why it is a plain number for now.
-   */
-  renderLayer = 0;
-
-  /**
-   * Explicit ordering within a layer (§66 sort key 5). Lower draws first; ties
-   * keep scene-graph order.
-   *
-   * With transparency sorting deferred (§66 key 2), this is the control an
-   * author has over which sprite draws on top of which — that, and sibling
-   * order.
-   */
-  renderOrder = 0;
-
   #width: number;
 
   #height: number;
 
   /**
-   * The owned quad. Created once, rewritten in place; see the module header for
-   * why the id is stable across resizes.
+   * The owned quad, kept privately as well as in the inherited `geometry` slot.
+   * Created once, rewritten in place; see the module header for why the id is
+   * stable across resizes.
+   *
+   * The private reference exists so {@link Sprite.geometry}'s override and the
+   * rebuild never read through the accessor they are overriding.
    */
-  readonly #geometry: BufferGeometry;
+  readonly #quad: BufferGeometry;
 
   /** Whether the quad's positions still match the anchor and the size. */
   #quadStale = true;
@@ -219,10 +216,22 @@ export class Sprite extends Node implements Disposable {
    * Builds a sprite for `material`. The material is required: a sprite without
    * one draws nothing, and defaulting it would hide the mistake behind an
    * invisible node rather than a type error — the rule `Renderable` follows.
+   *
+   * The quad is built **before** `super()`, because `Renderable`'s constructor
+   * takes the geometry: a sprite owns its geometry rather than being handed
+   * one, so it hands its own to the base and keeps the reference.
    */
   constructor(material: SpriteMaterial, options: SpriteOptions = {}) {
-    super();
-    this.material = material;
+    const quad = new BufferGeometry({
+      positions: new Float32Array(QUAD_VERTEX_COUNT * 3),
+      indices: QUAD_INDICES.slice(),
+      mode: "triangles",
+    });
+    super(quad, material, {
+      renderLayer: options.renderLayer ?? 0,
+      renderOrder: options.renderOrder ?? 0,
+    });
+    this.#quad = quad;
     this.#width = requirePositive("width", options.width ?? 1);
     this.#height = requirePositive("height", options.height ?? 1);
     const anchor = options.anchor ?? { x: 0.5, y: 0.5 };
@@ -230,13 +239,6 @@ export class Sprite extends Node implements Disposable {
       requireFinite("x", anchor.x),
       requireFinite("y", anchor.y),
     );
-    this.renderLayer = options.renderLayer ?? 0;
-    this.renderOrder = options.renderOrder ?? 0;
-    this.#geometry = new BufferGeometry({
-      positions: new Float32Array(QUAD_VERTEX_COUNT * 3),
-      indices: QUAD_INDICES.slice(),
-      mode: "triangles",
-    });
   }
 
   /**
@@ -269,12 +271,17 @@ export class Sprite extends Node implements Disposable {
    * Owned by the sprite — do not dispose it yourself, and do not hand it to a
    * `Renderable`, which would then draw a quad that changes under it. Reading it
    * is cheap: the rebuild is skipped unless something moved.
+   *
+   * Overrides `Renderable.geometry` with a **read-only** accessor: a sprite
+   * derives its geometry from its anchor and size, so there is nothing sensible
+   * to assign, and the base's setter is deliberately not inherited (the base
+   * constructor writes its own backing field, so the quad still reaches it).
    */
-  get geometry(): BufferGeometry {
+  override get geometry(): BufferGeometry {
     if (this.#quadStale) {
       this.#rebuildQuad();
     }
-    return this.#geometry;
+    return this.#quad;
   }
 
   /** Whether {@link Sprite.dispose} has run. */
@@ -315,7 +322,7 @@ export class Sprite extends Node implements Disposable {
       return;
     }
     this.#disposed = true;
-    this.#geometry.dispose();
+    this.#quad.dispose();
   }
 
   /**
@@ -353,7 +360,7 @@ export class Sprite extends Node implements Disposable {
     const y0 = 0 - this.anchor.y * this.#height;
     const y1 = y0 + this.#height;
 
-    const positions = this.#geometry.positions;
+    const positions = this.#quad.positions;
     // prettier-ignore
     positions.set([
       x0, y0, 0, // 0 bottom-left
@@ -361,6 +368,6 @@ export class Sprite extends Node implements Disposable {
       x1, y1, 0, // 2 top-right
       x0, y1, 0, // 3 top-left
     ]);
-    this.#geometry.markDirty();
+    this.#quad.markDirty();
   }
 }

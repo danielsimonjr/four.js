@@ -408,6 +408,12 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     blendFunc(sourceFactor, destinationFactor) {
       record("blendFunc", sourceFactor, destinationFactor);
     },
+    depthMask(enabled) {
+      record("depthMask", enabled);
+    },
+    colorMask(red, green, blue, alpha) {
+      record("colorMask", red, green, blue, alpha);
+    },
     drawArrays(mode, first, count) {
       record("drawArrays", mode, first, count);
     },
@@ -561,9 +567,28 @@ class TestGeometry {
   }
 }
 
-/** An `UnlitMaterial` reduced to what the backend reads (§57). */
+/**
+ * An `UnlitMaterial` reduced to what the backend reads (§57).
+ *
+ * §57's six render-state fields are **optional and unset by default**, which is
+ * deliberate: a material double that predates them is exactly the case the
+ * backend has to keep drawing unchanged, so the default double proves the
+ * compatibility claim and a test that wants blending sets the field it needs.
+ */
 class TestMaterial {
   readonly color: [number, number, number, number];
+
+  transparent?: boolean;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  depthTest?: boolean;
+
+  depthWrite?: boolean;
+
+  colorWrite?: boolean;
+
+  opacity?: number;
 
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
@@ -649,8 +674,19 @@ class TestTexture {
   }
 }
 
-/** A `SpriteMaterial` reduced to what the backend reads (§55, §57). */
+/**
+ * A `SpriteMaterial` reduced to what the backend reads (§55, §57).
+ *
+ * The `kind` discriminant is part of that surface since §57's `Material` base
+ * landed (2026-08-06): the render list picks an item's pipeline from the
+ * *material*, not from the node's class, so a sprite material that does not
+ * declare itself would be drawn flat-coloured — which is precisely the
+ * documented fallback, and precisely wrong for a double that claims to be a
+ * sprite material.
+ */
 class TestSpriteMaterial {
+  readonly kind = "sprite" as const;
+
   readonly tint: [number, number, number, number];
 
   texture: ItemTexture;
@@ -2870,6 +2906,10 @@ function particleItem(
     geometry: particleQuadGeometry(),
     renderLayer: 0,
     renderOrder: 0,
+    // §66 key 2, as `buildRenderList` writes it for a particle system: the
+    // pipeline blends by construction but the item classifies opaque, so the
+    // sort leaves particle scenes in the order they were authored in.
+    transparent: false,
   };
 }
 
@@ -3821,5 +3861,308 @@ describe("WebglRenderer.render — lit surfaces (§68, §120)", () => {
     expect(
       gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
     ).toEqual([POSITION_ATTRIBUTE_LOCATION]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §57 material render state (R-11, 2026-08-06).
+//
+// The claim under test is two-sided: state a material declares reaches GL, and
+// state it does *not* declare costs the frame nothing at all — the second half
+// is what keeps every scene authored before §57's base rendering byte for byte
+// as it did.
+// ---------------------------------------------------------------------------
+
+/** A renderable whose unlit material carries the given §57 state. */
+function stateful(
+  state: Partial<TestMaterial>,
+  color: [number, number, number, number] = [1, 1, 1, 1],
+): Renderable {
+  const material = new TestMaterial(color);
+  Object.assign(material, state);
+  return new Renderable(triangleGeometry().asGeometry, material.asMaterial);
+}
+
+/** GL capability toggles recorded this frame, in call order. */
+function toggles(gl: FakeGl): [string, unknown][] {
+  return gl.calls
+    .filter((call) => call.name === "enable" || call.name === "disable")
+    .map((call) => [call.name, call.args[0]]);
+}
+
+describe("WebglRenderer.render — §57 render state (R-11)", () => {
+  it("costs nothing for a material that declares none of it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The compatibility guarantee, asserted as the absence of every call the
+    // state could have made.
+    expect(gl.countOf("enable")).toBe(0);
+    expect(gl.countOf("disable")).toBe(0);
+    expect(gl.countOf("depthMask")).toBe(0);
+    expect(gl.countOf("colorMask")).toBe(0);
+    expect(gl.countOf("blendFunc")).toBe(0);
+  });
+
+  it("blends a transparent unlit item, and stops when the frame ends", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ transparent: true }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const names = gl.names();
+    expect(toggles(gl)).toEqual([
+      ["enable", GL.BLEND],
+      ["disable", GL.BLEND],
+    ]);
+    expect(names.indexOf("enable")).toBeLessThan(names.indexOf("drawArrays"));
+    expect(names.lastIndexOf("disable")).toBeGreaterThan(
+      names.indexOf("drawArrays"),
+    );
+    // The function was fixed at initialization and is still straight alpha.
+    expect(gl.countOf("blendFunc")).toBe(0);
+  });
+
+  it("blends a transparent lit item — the alpha that used to be dead", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestLitMaterial([1, 0, 0, 0.5]);
+    const node = new Renderable(
+      litTriangleGeometry().asGeometry,
+      material.asMaterial,
+    );
+    (material as { transparent?: boolean }).transparent = true;
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(toggles(gl)).toEqual([
+      ["enable", GL.BLEND],
+      ["disable", GL.BLEND],
+    ]);
+    expect(uploadsAt(gl, litUniforms(gl).get("color"))).toEqual([
+      [1, 0, 0, 0.5],
+    ]);
+  });
+
+  it("switches blending off between a transparent and an opaque item", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Layers, not render order: §66 key 2 outranks key 5, so a transparent
+    // item can only precede an opaque one from an earlier layer — which is
+    // exactly the case that makes the backend switch blending back off
+    // mid-frame.
+    const glass = stateful({ transparent: true });
+    glass.renderLayer = 0;
+    const wall = renderable(triangleGeometry());
+    wall.renderLayer = 1;
+    root.add(glass, wall);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // One enable, one disable — and the disable lands before the second draw,
+    // not at the end of the frame.
+    expect(toggles(gl)).toEqual([
+      ["enable", GL.BLEND],
+      ["disable", GL.BLEND],
+    ]);
+    expect(gl.names().indexOf("disable")).toBeLessThan(
+      gl.names().lastIndexOf("drawArrays"),
+    );
+    // Both draws ran through the one unlit program.
+    expect(gl.countOf("useProgram")).toBe(1);
+  });
+
+  it("maps each blend mode onto its GL function, and restores it", async () => {
+    const cases: [string, [number, number]][] = [
+      ["additive", [GL.SRC_ALPHA, GL.ONE]],
+      ["multiply", [GL.DST_COLOR, GL.ZERO]],
+      ["screen", [GL.ONE, GL.ONE_MINUS_SRC_COLOR]],
+    ];
+    for (const [mode, factors] of cases) {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(
+        stateful({
+          transparent: true,
+          blendMode: mode as TestMaterial["blendMode"],
+        }),
+      );
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+
+      expect(gl.callsOf("blendFunc").map((call) => call.args)).toEqual([
+        factors,
+        // Restored to straight alpha before returning: the function outlives
+        // the enable, and the next frame starts from the fixed state.
+        [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
+      ]);
+    }
+  });
+
+  it("issues one blendFunc for a run of items sharing a mode", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      stateful({ transparent: true, blendMode: "additive" }),
+      stateful({ transparent: true, blendMode: "additive" }),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Once for the run, once to restore.
+    expect(gl.countOf("blendFunc")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(2);
+  });
+
+  it("leaves the blend function alone for an opaque material that names one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ blendMode: "additive" }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // A mode on a material that does not blend has nothing to change.
+    expect(gl.countOf("blendFunc")).toBe(0);
+    expect(gl.countOf("enable")).toBe(0);
+  });
+
+  it("honours a sprite material's blend mode, which blends either way", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const material = new TestSpriteMaterial();
+    (material as { blendMode?: string }).blendMode = "additive";
+    const root = createRoot();
+    root.add(sprite(material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("blendFunc")[0].args).toEqual([GL.SRC_ALPHA, GL.ONE]);
+    expect(
+      gl.callsOf("enable").map((call) => call.args[0] as number),
+    ).toContain(GL.BLEND);
+  });
+
+  it("maps depthTest, depthWrite, and colorWrite onto GL, and restores them", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      stateful({ depthTest: false, depthWrite: false, colorWrite: false }),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(toggles(gl)).toEqual([
+      ["disable", GL.DEPTH_TEST],
+      ["enable", GL.DEPTH_TEST],
+    ]);
+    expect(gl.callsOf("depthMask").map((call) => call.args[0])).toEqual([
+      false,
+      true,
+    ]);
+    expect(gl.callsOf("colorMask").map((call) => call.args)).toEqual([
+      [false, false, false, false],
+      [true, true, true, true],
+    ]);
+    const names = gl.names();
+    expect(names.indexOf("depthMask")).toBeLessThan(
+      names.indexOf("drawArrays"),
+    );
+    expect(names.lastIndexOf("depthMask")).toBeGreaterThan(
+      names.indexOf("drawArrays"),
+    );
+  });
+
+  it("puts the depth and colour masks back before the next view clears", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ depthWrite: false, colorWrite: false }));
+    gl.reset();
+
+    renderer.render(root, [
+      createView(camera),
+      createView(camera, { clearColor: [0, 0, 0, 1] }),
+    ]);
+
+    // §61's clear is masked by both, so a view following a masked draw would
+    // clear nothing: the second view restores them before its `clear`.
+    const names = gl.names();
+    const secondClear = names.lastIndexOf("clear");
+    const restoreDepth = gl.calls.findIndex(
+      (call, index) =>
+        call.name === "depthMask" &&
+        call.args[0] === true &&
+        index < secondClear,
+    );
+    expect(restoreDepth).toBeGreaterThan(-1);
+    expect(restoreDepth).toBeLessThan(secondClear);
+  });
+
+  it("restores the depth mask a particle system does not declare", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const masked = stateful({ depthWrite: false });
+    masked.renderOrder = 0;
+    const particles = new TestParticles(2);
+    particles.renderOrder = 1;
+    const root = new TestGroup().addRenderables(masked).add(particles);
+    gl.reset();
+
+    renderer.render(root.asNode, [createView(camera)]);
+
+    // §36 carries no material, so it draws with §57's defaults: the mask the
+    // previous item turned off is back on before the instanced draw.
+    const names = gl.names();
+    const restore = gl.calls.findIndex(
+      (call) => call.name === "depthMask" && call.args[0] === true,
+    );
+    expect(restore).toBeGreaterThan(-1);
+    expect(restore).toBeLessThan(names.indexOf("drawArraysInstanced"));
+  });
+
+  it("multiplies opacity into the uploaded alpha, and leaves the material alone", async () => {
+    const { renderer, gl, camera } = await initialized();
+    // Values exact in binary, so the assertion is about the multiply and not
+    // about float32 rounding: 0.75 × 0.5 = 0.375.
+    const material = new TestMaterial([1, 0.5, 0, 0.75]);
+    material.opacity = 0.5;
+    const root = createRoot();
+    root.add(
+      new Renderable(triangleGeometry().asGeometry, material.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uploads = uploadsAt(gl, gl.uniformLocations.get("color"));
+    expect(uploads).toEqual([[1, 0.5, 0, 0.375]]);
+    // The material's own array is untouched — the scale happens in scratch.
+    expect(material.color).toEqual([1, 0.5, 0, 0.75]);
+  });
+
+  it("scales a sprite tint by opacity too", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const material = new TestSpriteMaterial(new TestTexture(), [1, 1, 1, 0.5]);
+    (material as { opacity?: number }).opacity = 0.5;
+    const root = createRoot();
+    root.add(sprite(material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, spriteUniforms(gl).get("tint"))).toEqual([
+      [1, 1, 1, 0.25],
+    ]);
   });
 });
