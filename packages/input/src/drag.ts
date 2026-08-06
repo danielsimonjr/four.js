@@ -187,6 +187,17 @@ export class DragManager {
       node.on("pointerup", (event) => {
         this.#finish(node, event.pointerId);
       }),
+      // A cancelled pointer ends the drag exactly as a release does
+      // (2026-08-06, A-9). It has to: `pointercancel` is the *only* event a
+      // gesture the system took away will ever get, so a manager that listened
+      // for `pointerup` alone would keep the drag — and its pointer capture —
+      // alive forever. `onDragEnd` still runs, because the application's
+      // authority hand-back (§42) is owed whether or not the gesture completed;
+      // a caller that must tell a cancel from a release listens for
+      // `pointercancel` itself.
+      node.on("pointercancel", (event) => {
+        this.#finish(node, event.pointerId);
+      }),
       // Belt and braces: a capture suppresses hover changes, so a leave during
       // a drag should be impossible — but a drag whose capture was released
       // out from under it must still end rather than follow the pointer.

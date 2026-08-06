@@ -140,7 +140,16 @@ describe("Phase 10: record → replay → seek → frame-step (§33–34, §113)
 
     test("the §34 document carries what P10-2 says it carries", () => {
       const recording = recorded.recording;
-      expect(recording.formatVersion).toBe(1);
+      // Version 2 since 2026-08-06 (PH-6): a `PhysicsWorld` reports a world
+      // configuration, so the document carries §34's "solver settings" and
+      // declares the lowest version that can express them. A recording whose
+      // target reports none is still a version-1 document.
+      expect(recording.formatVersion).toBe(2);
+      expect(recording.worldConfiguration).toMatchObject({
+        dimension: "2d",
+        gravity: [0, -9.81, 0],
+        determinism: "same-runtime",
+      });
       expect(recording.adapterName).toBe("rapier2d");
       expect(recording.adapterVersion.length).toBeGreaterThan(0);
       expect(recording.seed).toBe(SEED);

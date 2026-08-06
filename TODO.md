@@ -25,6 +25,30 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Gap-closure wave 1 (2026-08-06) — follow-ups left open
+
+Closed this wave, with tests: `A-7` (`Application.resize`), `A-9` (`PointerInput` dead-pointer
+leak + `pointercancel`), `A-15` (unregistered components no longer dropped on save), `A-17`
+(restored ids reserve against the counter; duplicate-id refusal), `A-14`/`PH-17` **partially**
+(`MOTION_COMPONENT_SERIALIZER`, `registerSceneNodeTypes()`/`registerUISerializers()`), `PH-6`
+(§34 `worldConfiguration`). What they left behind:
+
+- [ ] **PH-17 remainder:** `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` exported from
+      `@four/physics`, typed against the same structural `ComponentSerializer` shape
+      `@four/motion` now uses (no new §3.1 edge), then registered by
+      `registerSceneNodeTypes()`. Until they land, a scene carrying physics components needs
+      `{ unknownComponents: "skip" }` to save — a loud opt-in now, not a silent drop
+- [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
+      now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
+      Widening that structural interface would let the mouse keep its hover across a click
+- [ ] **A-16 remainder:** `SceneNodeDocument.data` / `SerializeSceneOptions.nodeDataOf` now
+      exist and the three §73 widgets use them; `Renderable`, `Sprite`, both cameras and
+      `DirectionalLight` still have no node-type pair. They are additions to
+      `packages/four/src/scene-serializers.ts`, not to any format
+- [ ] **A-6 remainder:** `application.ts`'s header note is now a dated post-plan note, but
+      `app.input` / `app.assets` / `app.diagnostics` / `app.stats` / `app.physics` and
+      `autoResize`/`reducedMotion` are still absent
+
 ### Backlog additions (doc-truth sweep, 2026-08-05)
 
 - [ ] The §93/§118–119 examples do not exist (`docs/AUDIT-120.md` **S-8**):

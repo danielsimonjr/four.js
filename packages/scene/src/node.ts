@@ -97,10 +97,92 @@ export type NodeType<T extends Node> = abstract new (...args: never[]) => T;
  */
 let nextNodeId = 1;
 
-function assignNodeId(): string {
-  const id = `node-${String(nextNodeId)}`;
+/** The shape of an engine-assigned id: `node-` and a decimal counter value. */
+const ENGINE_NODE_ID = /^node-(\d+)$/;
+
+/**
+ * Records that `id` is taken, so the counter never issues it again (§79,
+ * 2026-08-06 A-17).
+ *
+ * §79 requires a deserialized node to keep the id it was saved with, and the
+ * ids this module issues are `node-<n>` — so a load can hand back ids the
+ * counter has not reached yet, and the *next* node constructed in that process
+ * would be given one a loaded node already holds. `Scene.findById` would then
+ * return whichever came first in traversal order, silently. Restoring into a
+ * fresh process was always safe (the counter starts below every id it ever
+ * issued); the in-process reload — an editor, a level restart, a replay seek —
+ * is exactly the case a scene format exists to serve, and it was not.
+ *
+ * So every restored id is inspected: one shaped like an engine id advances the
+ * counter past it, and one shaped like anything else (an application's own
+ * `"player"`, a GUID) is left alone, because it can never collide with a
+ * generated id in the first place. This is collision **avoidance**, not
+ * detection — a document may still name the same id twice, which
+ * `instantiateScene` refuses separately.
+ */
+function reserveNodeId(id: string): void {
+  const match = ENGINE_NODE_ID.exec(id);
+  if (match === null) {
+    return;
+  }
+  const value = Number(match[1]);
+  if (Number.isSafeInteger(value) && value >= nextNodeId) {
+    nextNodeId = value + 1;
+  }
+}
+
+function assignNodeId(id?: string): string {
+  if (id !== undefined) {
+    reserveNodeId(id);
+    return id;
+  }
+  const assigned = `node-${String(nextNodeId)}`;
   nextNodeId += 1;
-  return id;
+  return assigned;
+}
+
+/**
+ * Construction options every node accepts (§6).
+ *
+ * Subclass option interfaces extend this, so `id` is available wherever a node
+ * is constructed; a subclass whose constructor takes no options at all
+ * inherits `Node`'s signature and accepts it unchanged.
+ */
+export interface NodeOptions {
+  /**
+   * The node's {@link Node.id}, for a node being **restored** rather than
+   * created (§79: "the engine assigns ids only to newly created objects").
+   *
+   * Omit it — which is what every ordinary construction does — and the engine
+   * assigns the next counter value. Supply one and it is used verbatim *and*
+   * reserved, so no later node can be given the same id (2026-08-06, A-17).
+   * Ids are opaque strings: the format does not require them to look like the
+   * engine's own.
+   */
+  readonly id?: string;
+}
+
+/**
+ * Writes a restored id onto an already-constructed node (§79, 2026-08-06
+ * A-17) — the seam for a `nodeFactory` that built the node itself and so could
+ * not pass {@link NodeOptions.id} to a constructor.
+ *
+ * Prefer the constructor option: it is checked, it needs no mutation of a
+ * `readonly` field, and it is available to every node class. This function
+ * exists because `@four/serialization`'s `nodeFactory` contract lets an
+ * application construct its own classes with no id parameter at all, and §79
+ * still requires those nodes to reload under their saved ids.
+ *
+ * It lives **here**, in the module that owns the field, rather than in the
+ * package that needs it: `Node.id` is `readonly` in the type system and an
+ * ordinary writable own property at runtime (a class field under
+ * `useDefineForClassFields`), so writing it is a cast — and a cast at a foreign
+ * class's field is exactly what a package boundary should not contain. The id
+ * is reserved on the way through, so the counter cannot re-issue it.
+ */
+export function restoreNodeId(node: Node, id: string): void {
+  reserveNodeId(id);
+  (node as unknown as { id: string }).id = id;
 }
 
 export abstract class Node
@@ -114,11 +196,12 @@ export abstract class Node
    *
    * `readonly`, as §6 requires. §79 additionally requires that a *deserialized*
    * node keep the id it was saved with ("the engine assigns ids only to newly
-   * created objects"); that restore path needs a construction-time id and is
-   * deliberately not invented here — it belongs to the serialization packet,
-   * which will widen the constructor.
+   * created objects"): pass {@link NodeOptions.id} to restore one, which also
+   * reserves it against the counter (2026-08-06, A-17 — the note that used to
+   * stand here deferred this to the serialization packet, which shipped without
+   * it).
    */
-  readonly id: string = assignNodeId();
+  readonly id: string;
 
   /** Human-readable name (§6); not unique and not an identity. Empty by default. */
   name = "";
@@ -151,6 +234,21 @@ export abstract class Node
    * host, so `component.host` — §6a's `Component.node` — is this node.
    */
   readonly #components: ComponentRegistry = new ComponentRegistry(this);
+
+  /**
+   * Constructs a node (§6).
+   *
+   * The only base-class option is {@link NodeOptions.id}, and it is only for
+   * restoring a saved node — everything else about a node is a field you assign
+   * afterwards, which is what keeps `class Group extends Node {}` a complete
+   * class. Subclasses that take options of their own extend
+   * {@link NodeOptions} and pass the whole object up, so `new Sprite({ id })`
+   * works for the same reason `new Group({ id })` does.
+   */
+  constructor(options: NodeOptions = {}) {
+    super();
+    this.id = assignNodeId(options.id);
+  }
 
   /**
    * This node's parent, or `null` when it is a root (§6).
@@ -352,6 +450,30 @@ export abstract class Node
   }
 
   // --- Components (§6a, ComponentHost) -------------------------------------
+
+  /**
+   * The components attached to this node, in attach order (§6a, 2026-08-06
+   * A-15).
+   *
+   * A live iterator over the registry's own map, so reading it allocates
+   * nothing and reflects the node's current state; do not attach or detach
+   * while iterating (the underlying `Map` would be mutated mid-walk). Copy it
+   * first — `[...node.components]` — for a snapshot.
+   *
+   * Enumeration exists for §79. Without it a serializer cannot walk what a node
+   * *has*; it can only probe for what it knows about, and a component whose
+   * type has no registered serializer is then dropped from the document with
+   * nobody able to notice — a save that silently loses state, which is the one
+   * failure mode that design could not warn about. `@four/serialization` walks
+   * this getter and refuses an unserializable component by name.
+   *
+   * `ComponentHost` (§6a, `@four/core`) does not declare it: the host contract
+   * is what a *component* sees of its owner, and a component enumerating its
+   * siblings is not something §6a sanctions.
+   */
+  get components(): IterableIterator<Component> {
+    return this.#components.components;
+  }
 
   /**
    * Attaches `component` to this node (§6a), replacing any component of the

@@ -4,12 +4,20 @@
  * §45's Application "owns the default scene, renderer, time system, simulation
  * scheduler, input routing, assets, diagnostics, cameras, and viewports". This
  * is the current subset of that object: the scene, the simulation scheduler,
- * the §39 system registry, the §48 viewport list, the §43 pose buffer, and —
- * optionally — a §61 renderer, wired together and re-emitting the §10
- * main-loop events. Input, assets, and physics arrive with the phases that
- * build them (§103); their §45 construction options are deliberately absent
- * rather than accepted and ignored, so a program that sets `physics: {…}`
- * today fails to compile instead of silently simulating nothing.
+ * the §39 system registry, the §48 viewport list, the §43 pose buffer, the
+ * surface size ({@link Application.resize}), and — optionally — a §61 renderer,
+ * wired together and re-emitting the §10 main-loop events.
+ *
+ * **`app.input`, `app.assets`, `app.diagnostics`, `app.stats` and `app.physics`
+ * are still absent, and that is now a gap rather than a schedule** (2026-08-06,
+ * A-6). The note that stood here said they "arrive with the phases that build
+ * them (§103)"; those phases have all landed — Phase 11 built `@four/assets`,
+ * `@four/ui` and `@four/serialization` and wired none of them in — so the
+ * sentence pointed at a future that no longer exists. What remains true is the
+ * reason the options are absent rather than accepted and ignored: a program
+ * that sets `physics: {…}` today fails to compile instead of silently
+ * simulating nothing. Every example still hand-wires `PointerInput` and
+ * `AssetManager`; closing that is A-6's own packet.
  *
  * ## Why the composition root lives here
  *
@@ -87,7 +95,9 @@ import {
   type Detach,
   type ReadonlyTimeState,
 } from "@four/motion";
+import type { DepthRange } from "@four/math";
 import {
+  PerspectiveCamera,
   PoseBuffer,
   Scene,
   createSnapshotSystem,
@@ -137,17 +147,19 @@ export interface ApplicationEventMap {
 /**
  * The current subset of §45's `ApplicationOptions`.
  *
- * §45's remaining options (`width`, `height`, `resolution`, `antialias`,
- * `alpha`, `powerPreference`, `autoResize`, `reducedMotion`, `physics`) belong
- * to subsystems that do not exist yet; each option is added by the packet that
- * builds its subsystem. Omitted numeric options take the Appendix A normative
- * defaults.
+ * §45's remaining options (`antialias`, `alpha`, `powerPreference`,
+ * `autoResize`, `reducedMotion`, `physics`) belong to subsystems that do not
+ * exist yet; each option is added by the packet that builds its subsystem.
+ * Omitted numeric options take the Appendix A normative defaults.
  *
- * TODO(§62, renderer-selection packet): `width`/`height`/`resolution`/
- * `antialias`/`alpha`/`powerPreference`/`autoResize` are surface and
- * device-selection options. They belong with `Application.resize` and with the
- * `"auto"` backend selection described on {@link ApplicationOptions.renderer};
- * accepting them now would mean storing values no code reads.
+ * TODO(§62, renderer-selection packet): `antialias`/`alpha`/`powerPreference`
+ * are device-selection options that only a backend constructor can honour, and
+ * they belong with the `"auto"` backend selection described on
+ * {@link ApplicationOptions.renderer}; accepting them now would mean storing
+ * values no code reads. `autoResize` needs a `ResizeObserver` on a canvas the
+ * host owns, so it arrives as an injected observer factory — the discipline
+ * `PointerInput` uses for `PointerSurface` — rather than as a DOM reference in
+ * this file.
  */
 export interface ApplicationOptions {
   /**
@@ -208,6 +220,40 @@ export interface ApplicationOptions {
   canvas?: unknown;
 
   /**
+   * Initial surface width in **logical** pixels (§45), applied through
+   * {@link Application.resize} at construction.
+   *
+   * Defaults to `0` together with `height`, which means "no size has been
+   * declared": nothing is forwarded to the renderer and no camera aspect is
+   * touched until the first `resize` call. A renderer configured but never
+   * resized keeps whatever size its own `initialize` established, exactly as
+   * before this option existed.
+   */
+  width?: number;
+
+  /** Initial surface height in logical pixels (§45). See {@link ApplicationOptions.width}. */
+  height?: number;
+
+  /**
+   * Device pixels per logical pixel (§45, §61) — `devicePixelRatio` in a
+   * browser. Default `1`.
+   */
+  resolution?: number;
+
+  /**
+   * Clip-space depth convention the projections this application recomputes are
+   * written with (plan D8).
+   *
+   * {@link Application.resize} rebuilds the projection of any perspective camera
+   * filling the surface, and §47 makes that an *explicit* recomputation whose
+   * depth convention belongs to the renderer, not to the camera. Defaults to
+   * `"negative-one-to-one"`, matching `Camera.updateProjectionMatrix` and the
+   * WebGL 2 MVP (§120); a WebGPU application passes `"zero-to-one"`, exactly as
+   * it does to `PointerInput`.
+   */
+  depthRange?: DepthRange;
+
+  /**
    * The viewports drawn each frame, in order (§48). Copied into
    * {@link Application.views}, which is mutable afterwards.
    *
@@ -254,6 +300,24 @@ export interface ApplicationOptions {
  * message that says what the caller did wrong.
  */
 const LIFECYCLE_ERROR_CODE = "INVALID_APPLICATION_STATE";
+
+/**
+ * Whether `view` covers the whole drawing surface — a normalized `(0, 0, 1, 1)`
+ * rectangle, which is what `createFullscreenViewport` builds (§48).
+ *
+ * Deliberately exact rather than approximate: a viewport that is *nearly*
+ * full-surface is a deliberate inset, and silently treating it as full-surface
+ * would give its camera the surface's aspect rather than its own.
+ */
+function isFullSurface(view: Viewport): boolean {
+  return (
+    view.normalized === true &&
+    view.x === 0 &&
+    view.y === 0 &&
+    view.width === 1 &&
+    view.height === 1
+  );
+}
 
 export class Application extends EventEmitter<ApplicationEventMap> {
   /**
@@ -326,6 +390,16 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   /** Whether the frame's draw passes §43 interpolation. See the option. */
   readonly #poseInterpolation: boolean;
 
+  /** Clip-space depth convention `resize` recomputes projections with (D8). */
+  readonly #depthRange: DepthRange | undefined;
+
+  /** Surface size in logical pixels; `0 × 0` until `resize` (or the options) set it. */
+  #surfaceWidth = 0;
+  #surfaceHeight = 0;
+
+  /** Device pixels per logical pixel, as last given to `resize`. */
+  #resolution = 1;
+
   /**
    * The §43 record handed to `renderer.render`, reused every frame with only
    * `alpha` rewritten (plan D7: the loop allocates nothing). Safe because
@@ -378,6 +452,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // mutation with the frame loop (decision, WP-3.6).
       this.views.push(...options.views);
     }
+    this.#depthRange = options.depthRange;
     this.#poseInterpolation =
       options.poseInterpolation ?? this.renderer !== null;
     this.#interpolation = { poseBuffer: this.poses, alpha: 0 };
@@ -429,6 +504,17 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       this.emit("render", time);
       this.#draw(time);
     };
+
+    // Last, so the resize sees the final viewport list and the constructed
+    // renderer. Both dimensions or neither: a surface with one of them is not a
+    // surface, and forwarding a half-declared `0 × h` would blank a canvas the
+    // host had already sized.
+    if (options.resolution !== undefined) {
+      this.#resolution = options.resolution;
+    }
+    if (options.width !== undefined && options.height !== undefined) {
+      this.resize(options.width, options.height, options.resolution);
+    }
   }
 
   /** Whether {@link Application.initialize} has completed. */
@@ -591,6 +677,124 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       this.scheduler.step(elapsedSeconds);
     } finally {
       this.#stepping = false;
+    }
+  }
+
+  /**
+   * The surface width in logical pixels, as last given to
+   * {@link Application.resize}. `0` before any resize.
+   */
+  get width(): number {
+    return this.#surfaceWidth;
+  }
+
+  /** The surface height in logical pixels. See {@link Application.width}. */
+  get height(): number {
+    return this.#surfaceHeight;
+  }
+
+  /**
+   * Device pixels per logical pixel, as last given to
+   * {@link Application.resize}. `1` until one is supplied.
+   */
+  get resolution(): number {
+    return this.#resolution;
+  }
+
+  /**
+   * Resizes the drawing surface (§45's eighth lifecycle method, 2026-08-06
+   * A-7).
+   *
+   * Three things happen, in this order:
+   *
+   * 1. the size is **recorded** ({@link Application.width} /
+   *    {@link Application.height} / {@link Application.resolution}), so a
+   *    headless application still knows how big it is;
+   * 2. the renderer is told — `renderer.resize(width, height, resolution)`,
+   *    which makes the drawing buffer `width · resolution` × `height ·
+   *    resolution` device pixels and re-resolves every normalized viewport
+   *    rectangle (§61);
+   * 3. every **full-surface** viewport whose camera is a
+   *    {@link PerspectiveCamera} has its `aspect` set to `width / height` and
+   *    its projection rebuilt.
+   *
+   * **Why this class updates cameras and the renderer does not.** §61 is
+   * explicit that "a camera's `aspect` is the application's to set, because only
+   * the application knows which camera belongs to which viewport" — and this
+   * class is exactly that knowledge: {@link Application.views} is the mapping.
+   * §47 keeps projection recomputation explicit, so the rebuild is a call to
+   * `updateProjectionMatrix`, made with {@link ApplicationOptions.depthRange}.
+   *
+   * **Full-surface** means `normalized` with the rectangle `(0, 0, 1, 1)` —
+   * what `createFullscreenViewport` builds. A partial viewport is left alone
+   * because its aspect is its rectangle's, not the surface's, and the rectangle
+   * may be in pixels the application maintains itself; an orthographic camera
+   * is left alone because its extent is an authoring decision (how much world
+   * to show), not a consequence of the window size.
+   * Two viewports sharing one camera update it twice with the same value, which
+   * is idempotent.
+   *
+   * **Headless is a no-op for step 2 only.** With no renderer the size is still
+   * recorded and the cameras are still updated: a headless application that
+   * feeds a custom draw path or takes a screenshot needs both, and "no
+   * renderer" is not "no surface".
+   *
+   * Legal at any point in the lifecycle, including before `initialize` and
+   * while stopped — a window resizes whether or not a frame is running. Not
+   * legal after `dispose`.
+   *
+   * @param width surface width in logical pixels; finite and `>= 0`
+   * @param height surface height in logical pixels; finite and `>= 0`
+   * @param resolution device pixels per logical pixel; finite and `> 0`.
+   * Defaults to the current value, so `app.resize(w, h)` after
+   * `app.resize(w, h, 2)` keeps the 2× buffer rather than silently halving it.
+   * @throws FourError if the application has been disposed
+   * @throws RangeError if any argument is out of range
+   */
+  resize(width: number, height: number, resolution?: number): void {
+    this.#assertNotDisposed("resize");
+    if (!Number.isFinite(width) || width < 0) {
+      throw new RangeError(
+        `Application.resize width must be a finite number of logical pixels >= 0 (got ${String(width)}).`,
+      );
+    }
+    if (!Number.isFinite(height) || height < 0) {
+      throw new RangeError(
+        `Application.resize height must be a finite number of logical pixels >= 0 (got ${String(height)}).`,
+      );
+    }
+    if (
+      resolution !== undefined &&
+      (!Number.isFinite(resolution) || resolution <= 0)
+    ) {
+      throw new RangeError(
+        `Application.resize resolution must be a finite number of device pixels per logical pixel > 0 (got ${String(resolution)}).`,
+      );
+    }
+
+    this.#surfaceWidth = width;
+    this.#surfaceHeight = height;
+    if (resolution !== undefined) {
+      this.#resolution = resolution;
+    }
+
+    this.renderer?.resize(width, height, this.#resolution);
+
+    if (width <= 0 || height <= 0) {
+      // A degenerate surface has no aspect ratio; writing `NaN` or `Infinity`
+      // into a projection would poison every matrix derived from it.
+      return;
+    }
+    const aspect = width / height;
+    for (const view of this.views) {
+      if (!isFullSurface(view)) {
+        continue;
+      }
+      const camera = view.camera;
+      if (camera instanceof PerspectiveCamera) {
+        camera.aspect = aspect;
+        camera.updateProjectionMatrix(this.#depthRange);
+      }
     }
   }
 

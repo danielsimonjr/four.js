@@ -28,6 +28,61 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-06 — GAP-CLOSURE WAVE 1 (A-7, A-9, A-14/PH-17 partial, A-15, A-17, PH-6).**
+  Six `docs/GAP ANALYSIS v0.md` items closed, each with regression tests. Decisions worth
+  keeping:
+  - **A-9 (`PointerInput` leak).** Per-pointer state is now deleted on `pointerup` *and* on
+    the new `pointercancel`; `pointercancel` joined `PropagatingPointerEventType` (and
+    `DragManager` ends a drag on it). **Known behaviour change:** because
+    `SurfacePointerEvent` carries no `pointerType`, a mouse release now also fires
+    `pointerleave` and the next move re-fires `pointerenter`. That is right for touch/pen
+    (the contact ceased to exist) and a regression for the mouse; retaining a mouse's hover
+    needs `pointerType` on that structural interface and is left to the packet that widens
+    it. `PointerInput.trackedPointerCount` was added so the leak stays testable.
+  - **A-15 (silent component drop on save).** `Node.components` forwards §6a's registry;
+    `serializeComponents` walks the node and emits in *registry* order, so output ordering —
+    and therefore every byte-identical golden — is unchanged. Unserializable components now
+    throw `INVALID_APPLICATION_STATE`; `SerializeSceneOptions.unknownComponents: "skip"`
+    mirrors the read side.
+  - **A-17 (id collisions).** `NodeOptions.id` restores an id at construction and *reserves*
+    it against the module counter; `restoreNodeId` moved from `@four/serialization` (where it
+    cast a foreign class's `readonly` field) into `@four/scene`, which owns the field, for the
+    `nodeFactory` path that cannot use the constructor. `instantiateScene` refuses a document
+    that produces one id twice with `INVALID_SCENE_GRAPH`.
+  - **§79 node data (enabling change for A-14).** `SceneNodeDocument.data` + the
+    `SerializeSceneOptions.nodeDataOf` writer carry one opaque JSON value per node — the seam
+    A-16 records as missing, and the only place a widget's box model could go without
+    polluting §6's user `metadata`. Absent unless a writer produces one, so every document
+    written before it encodes byte for byte as before; `SCENE_FORMAT_VERSION` is unmoved.
+  - **A-14/PH-17 (partial).** `MOTION_COMPONENT_SERIALIZER` ships from `@four/motion` against
+    a structural `ComponentSerializerShape` (no new §3.1 edge, the `ParticleDrawable` pattern);
+    `registerSceneNodeTypes()` / `registerUISerializers()` ship from the umbrella `four`
+    package, which is the only place allowed to see `ui` + `serialization`. **`RigidBody` and
+    `Collider` serializers are the follow-up** — they belong in `@four/physics`, which this
+    change could not touch.
+  - **PH-6 (§34 world configuration).** `ReplayRecording.worldConfiguration` carries §34's
+    "solver settings", captured off `ReplaySnapshot.configuration` at `begin` and re-attached
+    by `ReplayPlayer.#snapshotAt`, so `PhysicsWorld.restoreSnapshot`'s field-by-field refusal
+    finally fires on the replay path. **Versioning rule: a document declares the lowest
+    version that can express its content** — `2` with a configuration, `1` without — so
+    `REPLAY_FORMAT_VERSION` is 2, `SUPPORTED_REPLAY_FORMAT_VERSIONS` is `[1, 2]`, and every
+    existing version-1 recording still validates *and re-encodes byte for byte*.
+  - **The phase-10 golden was amended, envelope only, with proof.** `recordingDigest`
+    2642391973 → 1754656889 and `recordingLength` 46822 → 47008 (+186 bytes); *nothing else
+    moved* — `initialSnapshotDigest`, both checksum-stream digests, `seekTailDigest`, the
+    first/last/final checksums and every contact count are bit-identical to the 2026-08-02
+    record. The claim was proved, not assumed: re-running the scenario with the capture
+    neutralized (a wrapper dropping `ReplaySnapshot.configuration`) reproduces the old digest
+    and length exactly. The golden carries that proof in a new `_amended` field, and gained
+    `formatVersion` / `worldConfigurationKeys` so the §34 configuration is now pinned too.
+  - **`Application.resize(width, height, resolution?)` (A-7).** Records the size, forwards to
+    `renderer.resize`, and updates the `aspect` + projection of perspective cameras on
+    *full-surface* viewports only (`normalized` `(0,0,1,1)`) — §61 says the aspect is the
+    application's to set and this class is the only thing that knows the viewport→camera
+    mapping. `ApplicationOptions` gained `width`/`height`/`resolution` and a `depthRange`
+    (D8) for the projection rebuild. Orthographic extents and partial viewports are left
+    alone, deliberately.
+
 - **2026-08-05 — DOC-TRUTH GATE (`tools/check-docs.mjs`, `pnpm check-docs`, wired into CI
   next to `check-spec`).** A sweep found prose claims that were false when written and
   survived for months, because prose has no type checker: `ROADMAP.md` still said "nothing
@@ -186,8 +241,9 @@ readable; never delete the pointer itself.
   scheduling gap, never assigned to any phase).** Five packets. Key surfaces:
   @four/serialization (SceneDocument v1, canonical validation, ComponentSerializer
   registry keyed by component CLASS, §80 migrations; byte-identical round trips;
-  known boundaries: unregistered components silently unsaved, restored ids can
-  collide with the live counter); @four/assets (AssetManager with coalescing
+  known boundaries as of Phase 11 — unregistered components silently unsaved, restored
+  ids can collide with the live counter — **both closed 2026-08-06, see the A-15/A-17
+  entry above**); @four/assets (AssetManager with coalescing
   refcounted cache, ImageAsset disposal wrapper; glTF staged — needs §55 textures +
   non-unlit materials); @four/ui (WidgetSkin seam: layout/state owned, visuals
   app-supplied per the matrix; flex/stack/absolute layout; a11y mirror + keyboard

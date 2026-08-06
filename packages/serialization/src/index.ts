@@ -56,6 +56,7 @@ export type {
   ComponentSerializer,
   InstantiateSceneOptions,
   SerializeSceneOptions,
+  UnknownComponentPolicy,
 } from "./serializer.js";
 export {
   ComponentSerializerRegistry,

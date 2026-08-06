@@ -15,6 +15,7 @@ import {
 import { NullRenderer } from "@four/render";
 import {
   Group,
+  OrthographicCamera,
   PerspectiveCamera,
   createFullscreenViewport,
   resolveWorldTransforms,
@@ -781,5 +782,249 @@ describe("Application — determinism (§33)", () => {
 
     expect(first).toEqual(second);
     expect(first.length).toBeGreaterThan(elapsed.length * 2);
+  });
+});
+
+/**
+ * A-7 (2026-08-06): §45 lists eight lifecycle methods and seven shipped. The
+ * eighth — `resize` — is where the surface size and the cameras that depend on
+ * it are reconciled, which is the one part of a resize no renderer can do for
+ * itself (§61: "a camera's `aspect` is the application's to set").
+ */
+describe("Application — resize (§45, §61, §47)", () => {
+  it("records the size, and reports 0 × 0 at 1× before any resize", () => {
+    const app = new Application();
+
+    expect(app.width).toBe(0);
+    expect(app.height).toBe(0);
+    expect(app.resolution).toBe(1);
+
+    app.resize(800, 600, 2);
+
+    expect(app.width).toBe(800);
+    expect(app.height).toBe(600);
+    expect(app.resolution).toBe(2);
+  });
+
+  it("forwards to the renderer, resolution included", () => {
+    const renderer = new NullRenderer();
+    const app = new Application({ renderer });
+
+    app.resize(1280, 720, 1.5);
+
+    expect(renderer.resizeCount).toBe(1);
+    expect(renderer.lastResize).toEqual({
+      width: 1280,
+      height: 720,
+      resolution: 1.5,
+    });
+  });
+
+  it("keeps the previous resolution when the argument is omitted", () => {
+    const renderer = new NullRenderer();
+    const app = new Application({ renderer });
+
+    app.resize(800, 600, 3);
+    app.resize(400, 300);
+
+    expect(app.resolution).toBe(3);
+    expect(renderer.lastResize).toEqual({
+      width: 400,
+      height: 300,
+      resolution: 3,
+    });
+  });
+
+  it("is a renderer no-op when headless, and still records the size", () => {
+    const app = new Application();
+
+    expect(() => {
+      app.resize(640, 480);
+    }).not.toThrow();
+    expect(app.width).toBe(640);
+    expect(app.height).toBe(480);
+  });
+
+  it("updates a full-surface perspective camera's aspect and projection", () => {
+    const camera = new PerspectiveCamera({ fieldOfView: Math.PI / 3 });
+    const app = new Application({ views: [createFullscreenViewport(camera)] });
+    const before = camera.projectionMatrix.elements.slice();
+
+    app.resize(1600, 800);
+
+    expect(camera.aspect).toBe(2);
+    expect([...camera.projectionMatrix.elements]).not.toEqual([...before]);
+    // The inverse is rebuilt with it (§47), so unprojection stays consistent.
+    expect(camera.inverseProjectionMatrix.elements[0]).toBeCloseTo(
+      1 / camera.projectionMatrix.elements[0],
+      12,
+    );
+  });
+
+  it("leaves a partial viewport's camera alone", () => {
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const view: Viewport = {
+      id: "inset",
+      camera,
+      x: 0,
+      y: 0,
+      width: 0.5,
+      height: 1,
+      normalized: true,
+    };
+    const app = new Application({ views: [view] });
+
+    app.resize(1600, 800);
+
+    expect(camera.aspect).toBe(1);
+  });
+
+  it("leaves a pixel-rectangle viewport's camera alone", () => {
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const app = new Application({
+      views: [{ id: "fixed", camera, x: 0, y: 0, width: 1, height: 1 }],
+    });
+
+    app.resize(1600, 800);
+
+    expect(camera.aspect).toBe(1);
+  });
+
+  it("leaves an orthographic camera's extent alone", () => {
+    const camera = new OrthographicCamera({
+      left: -8,
+      right: 8,
+      bottom: -4.5,
+      top: 4.5,
+    });
+    const app = new Application({ views: [createFullscreenViewport(camera)] });
+
+    app.resize(1600, 800);
+
+    expect(camera.left).toBe(-8);
+    expect(camera.right).toBe(8);
+  });
+
+  it("touches no camera for a degenerate surface", () => {
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const renderer = new NullRenderer();
+    const app = new Application({
+      renderer,
+      views: [createFullscreenViewport(camera)],
+    });
+
+    app.resize(0, 600);
+
+    // The renderer is still told — a zero-width canvas is a real state — but a
+    // projection is not written with an aspect of 0.
+    expect(renderer.lastResize).toEqual({
+      width: 0,
+      height: 600,
+      resolution: 1,
+    });
+    expect(camera.aspect).toBe(1);
+  });
+
+  it("updates every full-surface view, sharing a camera idempotently", () => {
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const second = new PerspectiveCamera({ aspect: 1 });
+    const app = new Application({
+      views: [
+        createFullscreenViewport(camera, "main"),
+        createFullscreenViewport(second, "overlay"),
+        createFullscreenViewport(camera, "again"),
+      ],
+    });
+
+    app.resize(1000, 250);
+
+    expect(camera.aspect).toBe(4);
+    expect(second.aspect).toBe(4);
+  });
+
+  it("applies the constructor's width, height and resolution", () => {
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const renderer = new NullRenderer();
+    const app = new Application({
+      renderer,
+      width: 900,
+      height: 300,
+      resolution: 2,
+      views: [createFullscreenViewport(camera)],
+    });
+
+    expect(app.width).toBe(900);
+    expect(app.resolution).toBe(2);
+    expect(renderer.lastResize).toEqual({
+      width: 900,
+      height: 300,
+      resolution: 2,
+    });
+    expect(camera.aspect).toBe(3);
+  });
+
+  it("declares no size when only one dimension is supplied", () => {
+    const renderer = new NullRenderer();
+    const app = new Application({ renderer, width: 900, resolution: 2 });
+
+    expect(app.width).toBe(0);
+    expect(app.resolution).toBe(2);
+    expect(renderer.resizeCount).toBe(0);
+  });
+
+  it("recomputes projections with the configured depth range (D8)", () => {
+    const negativeOne = new PerspectiveCamera({ aspect: 1 });
+    const zeroToOne = new PerspectiveCamera({ aspect: 1 });
+    new Application({
+      views: [createFullscreenViewport(negativeOne)],
+    }).resize(1600, 800);
+    new Application({
+      depthRange: "zero-to-one",
+      views: [createFullscreenViewport(zeroToOne)],
+    }).resize(1600, 800);
+
+    // The two conventions differ in the third column/row of the projection.
+    expect(negativeOne.projectionMatrix.elements[10]).not.toBe(
+      zeroToOne.projectionMatrix.elements[10],
+    );
+  });
+
+  it("refuses arguments that are not a surface", () => {
+    const app = new Application();
+
+    expect(() => {
+      app.resize(Number.NaN, 100);
+    }).toThrow(RangeError);
+    expect(() => {
+      app.resize(100, -1);
+    }).toThrow(RangeError);
+    expect(() => {
+      app.resize(100, 100, 0);
+    }).toThrow(RangeError);
+    expect(() => {
+      app.resize(100, 100, Number.POSITIVE_INFINITY);
+    }).toThrow(RangeError);
+  });
+
+  it("is legal before initialize and while stopped, and refused after dispose", async () => {
+    const app = new Application({ renderer: new NullRenderer() });
+
+    app.resize(100, 100);
+    await app.initialize();
+    app.start();
+    app.stop();
+    app.resize(200, 200);
+    expect(app.width).toBe(200);
+
+    app.dispose();
+    let thrown: unknown;
+    try {
+      app.resize(300, 300);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isFourError(thrown) && thrown.code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
   });
 });

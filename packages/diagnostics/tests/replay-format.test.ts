@@ -24,6 +24,7 @@ import {
   type JsonValue,
   type ReplayRecording,
   REPLAY_FORMAT_VERSION,
+  SUPPORTED_REPLAY_FORMAT_VERSIONS,
   assertReplayCompatible,
   cloneJsonValue,
   decodeBase64,
@@ -277,7 +278,9 @@ describe("validateReplayRecording — the happy path", () => {
   it("accepts a minimal document and freezes it", () => {
     const value = recording();
 
-    expect(value.formatVersion).toBe(REPLAY_FORMAT_VERSION);
+    // A document with no world configuration is still a version-1 document:
+    // the canonical version is the lowest that can express the content (PH-6).
+    expect(value.formatVersion).toBe(1);
     expect(value.adapterName).toBe("rapier2d");
     expect(value.inputs).toEqual([]);
     expect(value.frames).toEqual([]);
@@ -388,7 +391,7 @@ describe("validateReplayRecording — refusals (§34)", () => {
       "SERIALIZATION_VERSION_MISMATCH",
     );
     expect(isFourError(thrown) ? thrown.context : undefined).toEqual({
-      expected: REPLAY_FORMAT_VERSION,
+      expected: [...SUPPORTED_REPLAY_FORMAT_VERSIONS],
       found: 99,
     });
   });
@@ -598,9 +601,9 @@ describe("encodeReplayRecording / decodeReplayRecording", () => {
   });
 
   it("refuses a decoded document from a future format version", () => {
-    const text = JSON.stringify({ ...recording(), formatVersion: 2 });
+    const text = JSON.stringify({ ...recording(), formatVersion: 3 });
 
-    expect(() => decodeReplayRecording(text)).toThrow(/formatVersion 2/);
+    expect(() => decodeReplayRecording(text)).toThrow(/formatVersion 3/);
   });
 });
 
@@ -665,5 +668,126 @@ describe("assertReplayCompatible / isReplayCompatible (§34)", () => {
     };
 
     expect(() => assertReplayCompatible(value, snapshot)).not.toThrow();
+  });
+});
+
+/**
+ * PH-6 (2026-08-06): §34's "solver settings" gained a dedicated field, and the
+ * format version became a range so that every document written before it still
+ * reads and re-encodes byte for byte.
+ */
+describe("worldConfiguration and the format-version range (§34, PH-6)", () => {
+  const configuration = {
+    dimension: "2d",
+    gravity: [0, -9.81, 0],
+    sleeping: { enabled: true, timeToSleep: 0.5 },
+    determinism: "same-runtime",
+    solverIterations: 8,
+  };
+
+  it("carries the configuration verbatim and declares version 2", () => {
+    const value = recording({
+      formatVersion: 2,
+      worldConfiguration: configuration,
+    });
+
+    expect(value.formatVersion).toBe(2);
+    expect(value.worldConfiguration).toEqual(configuration);
+  });
+
+  it("derives the version from the content, not from the input", () => {
+    // Declared 2, carries nothing version 2 can express: canonicalizes to 1.
+    expect(recording({ formatVersion: 2 }).formatVersion).toBe(1);
+    // Declared 1 with a configuration is refused, not silently upgraded.
+    expect(() =>
+      validateReplayRecording(
+        rawRecording({ formatVersion: 1, worldConfiguration: configuration }),
+      ),
+    ).toThrow(/needs 2/);
+  });
+
+  it("places the configuration in a fixed key position", () => {
+    const value = recording({
+      formatVersion: 2,
+      worldConfiguration: configuration,
+      seed: 7,
+    });
+
+    expect(Object.keys(value)).toEqual([
+      "formatVersion",
+      "adapterName",
+      "adapterVersion",
+      "seed",
+      "fixedDeltaTime",
+      "worldConfiguration",
+      "initialSnapshot",
+      "inputs",
+      "frames",
+      "finalChecksum",
+    ]);
+  });
+
+  it("keeps a version-1 document byte-identical through the bump", () => {
+    // The property every committed recording and every determinism golden
+    // depends on: a document with no configuration is spelled exactly as it was
+    // before version 2 existed.
+    const text = encodeReplayRecording(recording());
+
+    expect(text).toContain('"formatVersion":1');
+    expect(text).not.toContain("worldConfiguration");
+    expect(encodeReplayRecording(decodeReplayRecording(text))).toBe(text);
+  });
+
+  it("re-encodes a version-2 document identically", () => {
+    const text = encodeReplayRecording(
+      recording({ formatVersion: 2, worldConfiguration: configuration }),
+    );
+
+    expect(encodeReplayRecording(decodeReplayRecording(text))).toBe(text);
+  });
+
+  it("downgrades to version 1 when the configuration is dropped", () => {
+    const two = recording({
+      formatVersion: 2,
+      worldConfiguration: configuration,
+    });
+    const rest: Record<string, unknown> = { ...two };
+    delete rest.worldConfiguration;
+
+    const one = validateReplayRecording(rest);
+
+    expect(one.formatVersion).toBe(1);
+    expect(one.worldConfiguration).toBeUndefined();
+  });
+
+  it("deep-freezes the configuration it carries", () => {
+    const value = recording({
+      formatVersion: 2,
+      worldConfiguration: configuration,
+    });
+
+    expect(Object.isFrozen(value.worldConfiguration)).toBe(true);
+  });
+
+  it("refuses a configuration JSON cannot carry, naming the field", () => {
+    expect(() =>
+      validateReplayRecording(
+        rawRecording({
+          formatVersion: 2,
+          worldConfiguration: { gravity: [0, Number.NaN, 0] },
+        }),
+      ),
+    ).toThrow(/recording\.worldConfiguration/);
+  });
+
+  it("reads every supported version and no others", () => {
+    expect([...SUPPORTED_REPLAY_FORMAT_VERSIONS]).toEqual([1, 2]);
+    expect(REPLAY_FORMAT_VERSION).toBe(2);
+    expect(() =>
+      validateReplayRecording(rawRecording({ formatVersion: 0 })),
+    ).toThrow(/formatVersion 0/);
+    expect(() =>
+      validateReplayRecording(rawRecording({ formatVersion: 3 })),
+    ).toThrow(/formatVersion 3/);
   });
 });

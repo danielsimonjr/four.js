@@ -35,17 +35,44 @@
  * - It never touches the scene graph, and it holds no reference to a scene: the
  *   candidate list is a function the caller owns (`pickables`), for the reasons
  *   `pick` documents.
- * - It does not handle `pointercancel`, wheel, or keyboard (§72 lists them;
- *   this is the pointer subset of WP-3a.2). A cancelled pointer currently looks
- *   like a pointer that stopped moving; the fix is one more listener and is
- *   left to the packet that has a browser to verify it against.
+ * - It does not handle wheel or keyboard (§72 lists them; this is the pointer
+ *   subset of WP-3a.2). `pointercancel` **is** handled as of 2026-08-06 (A-9);
+ *   the note that used to stand here said a cancelled pointer looked like a
+ *   pointer that stopped moving, and that is no longer true.
  *
- * ## Multiple pointers
+ * ## Multiple pointers, and when a pointer stops existing (2026-08-06, A-9)
  *
  * All state — the press that a click is measured from, the hovered node, the
  * capture — is keyed by `pointerId`, so two fingers are two independent
  * interactions rather than one interleaved mess. Nothing is shared between
  * pointers.
+ *
+ * A pointer's entry is created on demand and **deleted when the pointer ends**
+ * — on `pointerup` and on `pointercancel`. That matters because the platform
+ * issues a *fresh* `pointerId` for every touch contact and every pen contact:
+ * a map that only ever grew would grow for the life of the surface, and each
+ * entry retains `downTarget` and `captured`, both `Node` references, so it
+ * would pin scene nodes the application had already removed from the graph
+ * (§83's "detached nodes retaining listeners" class of leak, not merely a map
+ * slot). `dispose()` remains the bulk clear; the per-pointer teardown is what
+ * makes a long-lived surface bounded.
+ *
+ * The teardown is **the same for both endings**, in this order: dispatch the
+ * ending event, synthesize `click` (release only, and only when the press and
+ * the release agree — a cancel never clicks), release the capture, fire the
+ * pending `pointerleave`, forget the pointer. Every decision the ending needs
+ * is read before anything is dispatched, so a listener that starts a new
+ * interaction cannot rewrite this one's history.
+ *
+ * **Known consequence, stated rather than hidden.** A `pointerup` therefore
+ * ends hover as well: a mouse that presses and releases without moving fires
+ * `pointerleave`, and the next `pointermove` fires `pointerenter` again. That
+ * is right for touch and pen, where the contact really has ceased to exist,
+ * and it is a behavioural change for the mouse, whose pointer persists.
+ * Distinguishing the two needs `pointerType` on
+ * {@link SurfacePointerEvent} — which the platform event carries and this
+ * three-field structural subset does not — so retaining a mouse's hover across
+ * its own release is left to the packet that widens that interface.
  */
 
 import { Vector3, type DepthRange } from "@four/math";
@@ -217,6 +244,10 @@ export class PointerInput {
     this.#handleUp(event);
   };
 
+  readonly #onPointerCancel = (event: SurfacePointerEvent): void => {
+    this.#handleCancel(event);
+  };
+
   constructor(surface: PointerSurface, options: PointerInputOptions) {
     this.#surface = surface;
     this.camera = options.camera;
@@ -229,6 +260,7 @@ export class PointerInput {
     surface.addEventListener("pointerdown", this.#onPointerDown);
     surface.addEventListener("pointermove", this.#onPointerMove);
     surface.addEventListener("pointerup", this.#onPointerUp);
+    surface.addEventListener("pointercancel", this.#onPointerCancel);
   }
 
   /**
@@ -273,6 +305,20 @@ export class PointerInput {
   }
 
   /**
+   * How many pointers this input is currently tracking (2026-08-06, A-9).
+   *
+   * A pointer is tracked from its first event until it ends (`pointerup` or
+   * `pointercancel`), so on a healthy surface this is the number of fingers,
+   * pens, and mice that have touched it and not yet let go — never a running
+   * total. Public so that the leak this closed stays testable from outside the
+   * class: a regression is `trackedPointerCount` climbing with the number of
+   * completed gestures rather than with the number of live ones.
+   */
+  get trackedPointerCount(): number {
+    return this.#pointers.size;
+  }
+
+  /**
    * Converts a client-pixel position to normalized device coordinates through
    * the surface's current rectangle, writing `[ndcX, ndcY]` into `out`.
    *
@@ -313,6 +359,7 @@ export class PointerInput {
     this.#surface.removeEventListener("pointerdown", this.#onPointerDown);
     this.#surface.removeEventListener("pointermove", this.#onPointerMove);
     this.#surface.removeEventListener("pointerup", this.#onPointerUp);
+    this.#surface.removeEventListener("pointercancel", this.#onPointerCancel);
     this.#pointers.clear();
   }
 
@@ -368,10 +415,56 @@ export class PointerInput {
       this.#dispatch("click", resolved);
     }
 
+    this.#endPointer(state, resolved);
+  }
+
+  /**
+   * The system took the pointer away (§72 `pointercancel`, 2026-08-06 A-9):
+   * a touch turned into a browser scroll, the stylus left the digitizer, the
+   * window lost the pointer.
+   *
+   * The same teardown as a release, minus the click — the gesture did not
+   * complete, and synthesizing "the user tapped this" for a tap the user never
+   * finished is the one thing a cancel must not do. Hover is not updated before
+   * the dispatch either: a cancelled pointer has not crossed anything, it has
+   * stopped existing, so the only boundary event it owes is the `pointerleave`
+   * the teardown fires.
+   */
+  #handleCancel(event: SurfacePointerEvent): void {
+    const state = this.#stateFor(event.pointerId);
+    const resolved = this.#resolve(event, state);
+
+    this.#dispatch("pointercancel", resolved);
+    this.#endPointer(state, resolved);
+  }
+
+  /**
+   * Forgets `pointerId` entirely — the shared tail of `pointerup` and
+   * `pointercancel` (2026-08-06, A-9; see the module header for why the entry
+   * must not survive its pointer).
+   *
+   * Order matters. The capture is released *first*, because `#updateHover`
+   * deliberately does nothing while a pointer is captured and the pending
+   * `pointerleave` must still fire; the leave is dispatched *second*, while the
+   * entry is still live, so a listener reading `getHovered` during it sees the
+   * node it is leaving; the entry is deleted *last*, so nothing a listener does
+   * can resurrect a half-torn-down pointer. A listener that presses again from
+   * inside the leave gets a fresh entry on the next platform event, which is
+   * exactly what a new gesture is.
+   */
+  #endPointer(state: PointerState, resolved: Resolution): void {
     state.downTarget = null;
     state.moved = false;
     // Implicit release, as in the DOM: a capture never outlives its gesture.
     state.captured = null;
+    this.#updateHover(state, {
+      pointerId: resolved.pointerId,
+      ndcX: resolved.ndcX,
+      ndcY: resolved.ndcY,
+      target: null,
+      point: null,
+    });
+    this.#pointers.delete(resolved.pointerId);
   }
 
   /**

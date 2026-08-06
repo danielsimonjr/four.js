@@ -19,27 +19,30 @@
  * serialization name too. This package ships the serializers for the components
  * it *can* see: `PoseTarget` (§19, §42), which lives in `@four/scene`.
  *
- * ## The registry drives the writer, too (decision, WP-11.1)
+ * ## The writer walks the node, the registry fixes the order (2026-08-06, A-15)
  *
- * `Node` exposes `addComponent` / `getComponent` / `removeComponent` and no way
- * to *enumerate* what is attached — §6a's `ComponentRegistry` is private to the
- * node. So the writer cannot walk a node's components; it walks the
- * **serializer** registry instead and probes each registered type with
- * `node.getComponent(type)`. Two consequences, both deliberate and both worth
- * stating out loud:
+ * The writer enumerates `node.components` (§6a) and looks each one up by its
+ * `typeName`. A component whose type has **no registered serializer is
+ * refused**, by name, with a `FourError` — because a save that silently drops
+ * state is a save that lies, and the caller is entitled to choose between
+ * failing and dropping rather than having the choice made for them
+ * ({@link SerializeSceneOptions.unknownComponents}, default `"throw"`, mirroring
+ * the read side's {@link InstantiateSceneOptions.unknownComponents}).
  *
- * - components appear in the document in **registration order**, which is
- *   deterministic for a given registry (ground rule 5: insertion order) but is
- *   not the node's own attach order, which nothing can observe;
- * - a component whose type has **no registered serializer is not saved, and the
- *   omission cannot be detected here**. A save that silently drops state is the
- *   one failure mode this design cannot warn about; closing it needs a component
- *   enumeration on `Node` (`@four/scene`, not this packet's files).
- *   **Staged 2026-08-02 (P11-1).**
+ * It did not always work that way. Until 2026-08-06 `Node` exposed
+ * `addComponent` / `getComponent` / `removeComponent` and no enumeration, so the
+ * writer walked the **serializer registry** instead and probed each registered
+ * type with `node.getComponent(type)` — which meant an unregistered component
+ * was not written *and the omission could not be detected here*. `Node.components`
+ * (a four-line getter forwarding §6a's registry, which had exposed the iterator
+ * all along) closed it; the staging note that stood in this header is gone with
+ * the defect.
  *
- * The reading side has no such blind spot: an unknown component type in a
- * document is visible, and {@link InstantiateSceneOptions.unknownComponents}
- * decides whether it throws (the default) or is skipped.
+ * Components still appear in the document in **registration order**, not the
+ * node's attach order: the walk collects what is attached, and the emit loop
+ * runs over the registry. That is what keeps two nodes carrying the same
+ * components spelled identically whatever order they were attached in, and it
+ * is what makes this change byte-invisible to every document written before it.
  *
  * ## Node types
  *
@@ -57,18 +60,24 @@
  * §79 requires that "node and resource ids are stable: they serialize with the
  * scene, and deserialization restores them (the engine assigns ids only to newly
  * created objects)". `Node.id` is `readonly` and assigned from `@four/scene`'s
- * monotonic counter at construction; `node.ts` anticipates this exact packet
- * ("that restore path needs a construction-time id … it belongs to the
- * serialization packet, which will widen the constructor"), but WP-11.1 may not
- * edit `@four/scene`, so {@link instantiateScene} restores the saved id by
- * writing the instance's own `id` property directly — see `restoreNodeId`. The
- * *proper* mechanism is still a widened `Node` constructor, and the known
- * boundary of the current one is recorded there.
+ * monotonic counter at construction. That counter now knows about restored ids
+ * (2026-08-06, A-17): `@four/scene` exports `restoreNodeId`, which reserves the
+ * id against the counter as it writes it, and `NodeOptions.id` does the same at
+ * construction time — so a node built *after* a load can no longer be handed an
+ * id a loaded node already holds. {@link instantiateScene} additionally refuses
+ * a document that names one id twice, since reserving cannot help there.
  */
 
 import { FourError, type Component, type ComponentType } from "@four/core";
 import type { Quaternion, Vector3 } from "@four/math";
-import { Group, Node, PoseTarget, Scene, type Transform } from "@four/scene";
+import {
+  Group,
+  Node,
+  PoseTarget,
+  Scene,
+  restoreNodeId,
+  type Transform,
+} from "@four/scene";
 
 import {
   SCENE_FORMAT_VERSION,
@@ -125,6 +134,34 @@ export interface ComponentSerializer<T extends Component> {
 interface RegisteredSerializer {
   readonly type: ComponentType<Component>;
   readonly serializer: ComponentSerializer<Component>;
+}
+
+/**
+ * What to do with a component this build cannot carry across the document
+ * boundary — one with no registered serializer (§79).
+ *
+ * `"throw"` on both sides by default: losing state must be opt-in, whether it
+ * is lost on the way out or on the way in.
+ */
+export type UnknownComponentPolicy = "throw" | "skip";
+
+/**
+ * The `typeName` of a component instance, read through its constructor (§6a,
+ * plan D2).
+ *
+ * Transcribed from `@four/core`'s own private helper rather than imported: the
+ * function is not part of that package's public surface, and the alternative —
+ * widening `@four/core`'s exports so one caller can read a static field it can
+ * already reach — is a larger change than four lines. Returns `undefined` for a
+ * component class that omits `typeName`, which §6a's registry rejects at attach
+ * time, so it can only be seen here on a component attached through some other
+ * route.
+ */
+function componentTypeNameOf(component: Component): string | undefined {
+  const constructor = (component as { constructor?: unknown }).constructor as
+    { typeName?: unknown } | undefined;
+  const typeName = constructor?.typeName;
+  return typeof typeName === "string" ? typeName : undefined;
 }
 
 /**
@@ -194,16 +231,54 @@ export class ComponentSerializerRegistry {
   }
 
   /**
-   * The document entries for every registered component type attached to
-   * `node`, in registration order.
+   * The document entries for the components attached to `node`, in
+   * **registration** order (§6a, §79).
    *
-   * Probing beats enumeration only because `Node` offers no enumeration; see the
-   * module documentation for what that costs.
+   * Every attached component is accounted for: the walk is over `node.components`
+   * (2026-08-06, A-15), so a component whose type this registry does not know
+   * is *seen* rather than silently missed, and `unknownComponents` decides what
+   * happens to it. Emission then runs over the registry, which is what keeps the
+   * output order independent of the order the components were attached in.
+   *
+   * @param node the node whose components to write
+   * @param unknownComponents `"throw"` (the default) refuses an unserializable
+   * component; `"skip"` drops it
+   * @throws FourError `INVALID_APPLICATION_STATE` for a component with no
+   * registered serializer, or one whose class carries no `typeName` (plan D2),
+   * under the default policy
    */
-  serializeComponents(node: Node): ComponentDocument[] {
+  serializeComponents(
+    node: Node,
+    unknownComponents: UnknownComponentPolicy = "throw",
+  ): ComponentDocument[] {
+    // Collected by `typeName` first so the emit loop below can stay in
+    // registration order; a node holds at most one component per type (§6a), so
+    // this map is exactly as long as the node's component list.
+    const attached = new Map<string, Component>();
+    for (const component of node.components) {
+      const typeName = componentTypeNameOf(component);
+      if (typeName === undefined || !this.#entries.has(typeName)) {
+        if (unknownComponents === "skip") {
+          continue;
+        }
+        throw new FourError(
+          "INVALID_APPLICATION_STATE",
+          `Node ${node.id} carries a component of type ${JSON.stringify(typeName ?? component.constructor.name)}, which has no registered serializer (§79); register one, or pass { unknownComponents: "skip" } to drop it from the document.`,
+          {
+            context: {
+              node: node.id,
+              typeName: typeName ?? null,
+              componentClass: component.constructor.name,
+            },
+          },
+        );
+      }
+      attached.set(typeName, component);
+    }
+
     const documents: ComponentDocument[] = [];
-    for (const entry of this.#entries.values()) {
-      const component = node.getComponent(entry.type);
+    for (const [typeName, entry] of this.#entries) {
+      const component = attached.get(typeName);
       if (component === undefined) {
         continue;
       }
@@ -367,6 +442,37 @@ export interface SerializeSceneOptions {
    * built-in `Scene` / `Group` names, and a node with neither is a `FourError`.
    */
   readonly nodeTypeOf?: (node: Node) => string | undefined;
+  /**
+   * The node's **subclass** state, written to {@link SceneNodeDocument.data}
+   * and handed back verbatim to
+   * {@link InstantiateSceneOptions.nodeFactory} (2026-08-06).
+   *
+   * Return `undefined` — as this option does for every node when it is omitted
+   * — and the node carries no `data` at all, so a document written without it
+   * is byte-identical to one written before the field existed. Anything else
+   * must be representable JSON; `validateSceneDocument` refuses the rest,
+   * naming the node.
+   *
+   * The pair with {@link SerializeSceneOptions.nodeTypeOf}: `nodeTypeOf` says
+   * *what class* the node was, `nodeDataOf` says *what state* it held, and the
+   * factory needs both to rebuild it.
+   */
+  readonly nodeDataOf?: (node: Node) => JsonValue | undefined;
+  /**
+   * What to do with a component whose type has no registered serializer
+   * (2026-08-06, A-15).
+   *
+   * `"throw"` (the default) refuses the save: an unserializable component is
+   * state that would be gone after the round trip, and a save that quietly
+   * loses state is worse than one that fails. `"skip"` drops it — the right
+   * choice for a writer that deliberately carries the hierarchy only, and the
+   * reason the choice is the caller's.
+   *
+   * The mirror of {@link InstantiateSceneOptions.unknownComponents}, same
+   * spelling and same default, so a program that has to be lenient says so once
+   * on each side rather than discovering the asymmetry.
+   */
+  readonly unknownComponents?: UnknownComponentPolicy;
 }
 
 function resolveNodeType(node: Node, options: SerializeSceneOptions): string {
@@ -398,7 +504,7 @@ function serializeNode(
   for (const child of node.children) {
     children.push(serializeNode(child, registry, options));
   }
-  return {
+  const document: Record<string, unknown> = {
     id: node.id,
     name: node.name,
     type: resolveNodeType(node, options),
@@ -411,9 +517,17 @@ function serializeNode(
     // Validated (and refused, if it holds anything JSON cannot carry) by
     // `validateSceneDocument` below, which names the offending path.
     metadata: node.metadata,
-    components: registry.serializeComponents(node),
-    children,
   };
+  const data = options.nodeDataOf?.(node);
+  if (data !== undefined) {
+    document.data = data;
+  }
+  document.components = registry.serializeComponents(
+    node,
+    options.unknownComponents ?? "throw",
+  );
+  document.children = children;
+  return document;
 }
 
 /**
@@ -427,10 +541,12 @@ function serializeNode(
  *
  * @param root the node to serialize, with its descendants
  * @param registry the component serializers to apply
- * @param options node-type mapping for application classes
+ * @param options node-type mapping and subclass-state writer for application
+ * classes, and the unknown-component policy
  * @returns the canonical, frozen document
  * @throws FourError `INVALID_APPLICATION_STATE` for a node class with no type
- * name
+ * name, or a component with no registered serializer (unless
+ * {@link SerializeSceneOptions.unknownComponents} is `"skip"`)
  * @throws TypeError if any value cannot be represented as JSON — a `NaN` in a
  * transform, a `Map` in `metadata`, a component payload holding `undefined`
  */
@@ -474,26 +590,7 @@ export interface InstantiateSceneOptions {
    * component entry whatever its type, so decode → encode round-trips data this
    * build cannot instantiate. Only the live scene loses it.
    */
-  readonly unknownComponents?: "throw" | "skip";
-}
-
-/**
- * Restores a saved node id (§79).
- *
- * `Node.id` is `readonly` in the type system and an ordinary writable own
- * property at runtime (a class field under `useDefineForClassFields`), so the
- * write is a cast rather than a redefinition. It is confined to this one
- * function, which exists because WP-11.1 may not edit `@four/scene`; `node.ts`
- * already names the real fix (a construction-time id parameter).
- *
- * **Known boundary:** `@four/scene`'s id counter does not know about restored
- * ids, so a node constructed *after* a load can be assigned an id a loaded node
- * already holds. Restoring into a fresh process — the normal case — is safe
- * because the counter starts below every id it ever issued. Closing it needs the
- * constructor change above. **Staged 2026-08-02 (P11-1).**
- */
-function restoreNodeId(node: Node, id: string): void {
-  (node as unknown as { id: string }).id = id;
+  readonly unknownComponents?: UnknownComponentPolicy;
 }
 
 /** A deep, *unfrozen* copy of a validated JSON value. */
@@ -529,11 +626,16 @@ function createNode(
   if (custom !== undefined) {
     return custom;
   }
+  // The id goes in through the constructor (§79, 2026-08-06 A-17), which also
+  // reserves it against `@four/scene`'s counter. A `nodeFactory` cannot be made
+  // to do that — it constructs the node itself — so that path restores the id
+  // afterwards through `restoreNodeId`, which reserves it too.
+  const id = document.id === undefined ? {} : { id: document.id };
   if (document.type === SCENE_NODE_TYPE) {
-    return new Scene();
+    return new Scene(id);
   }
   if (document.type === GROUP_NODE_TYPE) {
-    return new Group();
+    return new Group(id);
   }
   throw new FourError(
     "INVALID_SCENE_GRAPH",
@@ -546,12 +648,23 @@ function instantiateNode(
   document: SceneNodeDocument,
   registry: ComponentSerializerRegistry,
   options: InstantiateSceneOptions,
+  seenIds: Set<string>,
 ): Node {
   const node = createNode(document, options);
 
-  if (document.id !== undefined) {
+  if (document.id !== undefined && node.id !== document.id) {
+    // Only reachable through a `nodeFactory`, which built the node itself and
+    // so could not take the id at construction; see `createNode`.
     restoreNodeId(node, document.id);
   }
+  if (seenIds.has(node.id)) {
+    throw new FourError(
+      "INVALID_SCENE_GRAPH",
+      `Scene document produces node id ${JSON.stringify(node.id)} twice; node ids are unique and references resolve by id (§79).`,
+      { context: { node: node.id } },
+    );
+  }
+  seenIds.add(node.id);
   node.name = document.name ?? "";
   applyTransformDocument(document.transform, node.transform);
   node.transformAuthority = document.transformAuthority ?? "manual";
@@ -577,7 +690,7 @@ function instantiateNode(
   }
 
   for (const childDocument of document.children ?? []) {
-    node.add(instantiateNode(childDocument, registry, options));
+    node.add(instantiateNode(childDocument, registry, options, seenIds));
   }
   return node;
 }
@@ -599,8 +712,11 @@ export function instantiateSceneNodes(
   options: InstantiateSceneOptions = {},
 ): Node[] {
   const roots: Node[] = [];
+  // One id set across every root: a document's ids are unique document-wide,
+  // not per root (§79).
+  const seenIds = new Set<string>();
   for (const nodeDocument of document.nodes) {
-    roots.push(instantiateNode(nodeDocument, registry, options));
+    roots.push(instantiateNode(nodeDocument, registry, options, seenIds));
   }
   return roots;
 }
@@ -636,5 +752,5 @@ export function instantiateScene(
       { context: { roots: document.nodes.length } },
     );
   }
-  return instantiateNode(document.nodes[0], registry, options);
+  return instantiateNode(document.nodes[0], registry, options, new Set());
 }

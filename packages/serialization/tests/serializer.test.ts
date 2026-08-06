@@ -210,7 +210,9 @@ describe("ComponentSerializerRegistry", () => {
     node.addComponent(new PoseTarget());
 
     // Attach order is Health-then-PoseTarget; the document order is the
-    // registry's, because `Node` exposes no component enumeration.
+    // registry's — the walk is over the node (A-15), the emission over the
+    // registry, so what is attached decides *whether* and the registry decides
+    // *where*.
     expect(registry().serializeComponents(node)).toEqual([
       {
         type: PoseTarget.typeName,
@@ -223,13 +225,74 @@ describe("ComponentSerializerRegistry", () => {
     ]);
   });
 
-  it("silently omits a component with no registered serializer (known boundary)", () => {
+  it("refuses a component with no registered serializer (A-15)", () => {
     const node = new Group();
     node.addComponent(new Health(3));
 
+    let thrown: unknown;
+    try {
+      createDefaultComponentSerializers().serializeComponents(node);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isFourError(thrown) && thrown.code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+    expect(isFourError(thrown) && thrown.message).toMatch(
+      /no registered serializer/,
+    );
+    expect(isFourError(thrown) && thrown.context).toEqual({
+      node: node.id,
+      typeName: Health.typeName,
+      componentClass: "Health",
+    });
+  });
+
+  it("skips an unserializable component on request (A-15)", () => {
+    const node = new Group();
+    node.addComponent(new Health(3));
+    node.addComponent(new PoseTarget());
+
     expect(
-      createDefaultComponentSerializers().serializeComponents(node),
-    ).toEqual([]);
+      createDefaultComponentSerializers().serializeComponents(node, "skip"),
+    ).toEqual([
+      {
+        type: PoseTarget.typeName,
+        data: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0, w: 1 },
+        },
+      },
+    ]);
+  });
+
+  it("refuses a component whose class carries no typeName (A-15)", () => {
+    // §6a's registry rejects such a class at attach time, so the writer can
+    // only meet one on a host that bypassed the registry — and it must still
+    // refuse rather than quietly drop it. A structural stand-in for the host is
+    // enough: `serializeComponents` reads `id` and `components` only.
+    class Rogue {
+      host = null;
+    }
+    const host = {
+      id: "node-rogue",
+      components: [new Rogue()][Symbol.iterator](),
+    } as unknown as Group;
+
+    let thrown: unknown;
+    try {
+      createDefaultComponentSerializers().serializeComponents(host);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isFourError(thrown) && thrown.code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+    expect(isFourError(thrown) && thrown.context).toEqual({
+      node: "node-rogue",
+      typeName: null,
+      componentClass: "Rogue",
+    });
   });
 
   it("returns undefined for an unknown component document", () => {
@@ -630,6 +693,163 @@ describe("instantiateSceneNodes", () => {
     expect(roots[1]).toBeInstanceOf(Scene);
     expect(roots.map((node) => node.id)).toEqual(["a", "b"]);
     expect(roots.map((node) => node.name)).toEqual(["first", "second"]);
+  });
+});
+
+/**
+ * A-17 (2026-08-06): restored ids used to be written past `@four/scene`'s
+ * counter without advancing it, so the next node constructed in the process
+ * could be handed an id a loaded node already held.
+ */
+describe("node identity after a load (§79, A-17)", () => {
+  it("advances the id counter past a restored engine-shaped id", () => {
+    // Far beyond anything this process will have reached.
+    const restoredId = "node-900000001";
+    const document = validateSceneDocument({
+      formatVersion: 1,
+      nodes: [{ type: "group", id: restoredId }],
+    });
+
+    const reloaded = instantiateScene(document, registry());
+    expect(reloaded.id).toBe(restoredId);
+
+    // The node built *after* the load must not collide with it.
+    const fresh = new Group();
+    expect(fresh.id).not.toBe(restoredId);
+    expect(Number(/^node-(\d+)$/.exec(fresh.id)?.[1])).toBeGreaterThan(
+      900000001,
+    );
+  });
+
+  it("leaves an application-shaped id alone", () => {
+    const before = new Group().id;
+    const document = validateSceneDocument({
+      formatVersion: 1,
+      nodes: [{ type: "group", id: "player" }],
+    });
+
+    expect(instantiateScene(document, registry()).id).toBe("player");
+
+    // A non-engine id can never collide, so it must not move the counter.
+    const beforeValue = Number(/^node-(\d+)$/.exec(before)?.[1]);
+    const afterValue = Number(/^node-(\d+)$/.exec(new Group().id)?.[1]);
+    expect(afterValue).toBe(beforeValue + 1);
+  });
+
+  it("reserves an id restored through a nodeFactory as well", () => {
+    const restoredId = "node-900000101";
+    const document = validateSceneDocument({
+      formatVersion: 1,
+      nodes: [{ type: "mesh", id: restoredId }],
+    });
+
+    const reloaded = instantiateScene(document, registry(), {
+      nodeFactory: (node) => (node.type === "mesh" ? new Group() : undefined),
+    });
+
+    expect(reloaded.id).toBe(restoredId);
+    expect(Number(/^node-(\d+)$/.exec(new Group().id)?.[1])).toBeGreaterThan(
+      900000101,
+    );
+  });
+
+  it("constructs a node with a restored id directly", () => {
+    const node = new Group({ id: "node-900000201" });
+    expect(node.id).toBe("node-900000201");
+    expect(new Group().id).toBe("node-900000202");
+  });
+
+  it("refuses a document that produces one id twice", () => {
+    // The document validator already refuses a *literal* duplicate id, so the
+    // way to reach the instantiator's own check is a `nodeFactory` that hands
+    // back two nodes carrying the same id for a document that named none.
+    const document = validateSceneDocument({
+      formatVersion: 1,
+      nodes: [{ type: "mesh", children: [{ type: "mesh" }] }],
+    });
+
+    let thrown: unknown;
+    try {
+      instantiateScene(document, registry(), {
+        nodeFactory: () => new Group({ id: "node-dup" }),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isFourError(thrown) && thrown.code).toBe("INVALID_SCENE_GRAPH");
+    expect(isFourError(thrown) && thrown.message).toMatch(/twice/);
+  });
+});
+
+/**
+ * A-14/A-16 (2026-08-06): the document gained one opaque JSON value per node so
+ * a `nodeTypeOf` / `nodeFactory` pair can carry subclass state, which is what
+ * the umbrella `four` package's `registerSceneNodeTypes()` is built on.
+ */
+describe("subclass state (§79 node data)", () => {
+  class Mesh extends Group {
+    geometry = "";
+  }
+
+  it("round-trips a node's data payload", () => {
+    const root = new Mesh();
+    root.geometry = "box";
+
+    const document = serializeScene(root, registry(), {
+      nodeTypeOf: (node) => (node instanceof Mesh ? "mesh" : undefined),
+      nodeDataOf: (node) =>
+        node instanceof Mesh ? { geometry: node.geometry } : undefined,
+    });
+
+    expect(document.nodes[0].data).toEqual({ geometry: "box" });
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(encodeSceneDocument(document)),
+      registry(),
+      {
+        nodeFactory: (node) => {
+          if (node.type !== "mesh") return undefined;
+          const mesh = new Mesh();
+          const data = asJsonObject(node.data ?? {}, "mesh");
+          mesh.geometry =
+            typeof data.geometry === "string" ? data.geometry : "";
+          return mesh;
+        },
+      },
+    );
+
+    expect(reloaded).toBeInstanceOf(Mesh);
+    expect((reloaded as Mesh).geometry).toBe("box");
+  });
+
+  it("writes no data key at all when the writer returns undefined", () => {
+    const node = new Group();
+    const document = serializeScene(node, registry(), {
+      nodeDataOf: () => undefined,
+    });
+    expect("data" in document.nodes[0]).toBe(false);
+    // The byte-identity property every existing document relies on: the new
+    // field cannot move a document that does not use it.
+    expect(encodeSceneDocument(document)).toBe(
+      encodeSceneDocument(serializeScene(node, registry())),
+    );
+  });
+
+  it("keeps an explicit null payload", () => {
+    const document = serializeScene(new Group(), registry(), {
+      nodeTypeOf: () => "marker",
+      nodeDataOf: () => null,
+    });
+    expect(document.nodes[0].data).toBeNull();
+  });
+
+  it("refuses a payload JSON cannot carry, naming the node", () => {
+    expect(() =>
+      serializeScene(new Group(), registry(), {
+        nodeTypeOf: () => "marker",
+        nodeDataOf: (): JsonValue => Number.NaN,
+      }),
+    ).toThrow(/data/);
   });
 });
 

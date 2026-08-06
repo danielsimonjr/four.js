@@ -445,6 +445,24 @@ export interface Phase10Summary {
   lastStepChecksum: number;
   /** §34's `finalChecksum`; must equal {@link Phase10Summary.lastStepChecksum}. */
   finalChecksum: number;
+  /**
+   * The document's declared §34 format version (2026-08-06, PH-6).
+   *
+   * `2` for this scenario, because a `PhysicsWorld` reports a world
+   * configuration and the document therefore carries one. A recording with no
+   * configuration still declares `1` — the version is the content's, not the
+   * build's.
+   */
+  formatVersion: number;
+  /**
+   * The keys of §34's recorded "solver settings", sorted (PH-6).
+   *
+   * The readable half of the configuration evidence: this pins *that* the
+   * document carries the world configuration a replay is refused against, and
+   * which fields it names, without pinning the values twice (they are already
+   * inside `recordingDigest`).
+   */
+  worldConfigurationKeys: readonly string[];
   /** `PhysicsSolverAdapter.name` the document is keyed on (§34). */
   adapterName: string;
   /** `PhysicsSolverAdapter.version` the document is keyed on (§34). */
@@ -649,6 +667,13 @@ export async function runPhase10Scenario(): Promise<Phase10ScenarioResult> {
         firstStepChecksum: checksums[0],
         lastStepChecksum: checksums[checksums.length - 1],
         finalChecksum: recording.finalChecksum,
+        formatVersion: recording.formatVersion,
+        worldConfigurationKeys:
+          typeof recording.worldConfiguration === "object" &&
+          recording.worldConfiguration !== null &&
+          !Array.isArray(recording.worldConfiguration)
+            ? Object.keys(recording.worldConfiguration).sort()
+            : [],
         adapterName: recording.adapterName,
         adapterVersion: recording.adapterVersion,
         inputCount: recording.inputs.length,

@@ -26,3 +26,21 @@ export * as physicsSoft from "@four/physics-soft";
 
 export type { ApplicationEventMap, ApplicationOptions } from "./application.js";
 export { Application } from "./application.js";
+
+// §79 support for the engine's own node classes and components (A-14, PH-17).
+// It lives here rather than in `@four/serialization` for the reason that
+// package's own header gives: the §3.1 matrix lets it see `core`/`math`/`scene`
+// only, and the umbrella is the one place that may see `ui` and `motion` too.
+export type {
+  SceneNodeTypeOptions,
+  SceneNodeTypeSupport,
+  SceneSerializationSupport,
+} from "./scene-serializers.js";
+export {
+  BUTTON_NODE_TYPE,
+  LABEL_NODE_TYPE,
+  PANEL_NODE_TYPE,
+  registerSceneNodeTypes,
+  registerUISerializers,
+  restoreNodeId,
+} from "./scene-serializers.js";
