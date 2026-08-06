@@ -32,11 +32,32 @@ the recorded host, dominated by `physics-step.mjs` (~40 s) and `particles-100k.m
 Two §86 rows have honest headless numbers today — active rigid bodies and CPU particles —
 and both are **over** the 60 Hz fixed-step budget on this host. §86's clause is _"suitable
 modern desktop hardware"_, which a shared CI container without a GPU is not, so neither
-result is a §86 verdict; see each script's header. The rest of §86's rows (batched sprites,
-batched shapes, mesh instances, retained UI nodes, animated glyphs, GPU particles, payload)
-are GPU-bound, UI-tier or already covered elsewhere — the payload row is gated by
-`pnpm size`, and the GPU rows need a GPU. Measuring them headless would produce numbers
-about the wrong thing.
+result is a §86 verdict; see each script's header.
+
+### The unmeasured §86 rows, and why
+
+Until 2026-08-05 this section said the remaining rows "are GPU-bound, UI-tier or already
+covered elsewhere — the payload row is gated by `pnpm size`, and the GPU rows need a GPU".
+That reads as though a GPU is the only thing missing. It is not: **four of these rows name
+a feature the engine does not have**, so there is nothing to measure even on ideal
+hardware. The distinction matters when planning work — a **hardware** row becomes a
+benchmark the day it runs on a workstation; a **feature** row needs a packet first.
+
+| §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 100 000 batched sprites | **feature** | There is no sprite batching. `webgl-renderer.ts` issues one `setModel`/`setQuad`/`setTint` plus one `drawArrays`/`drawElements` **per sprite**; only the program bind and the view-projection upload amortise. The §55 `frame` sub-rectangle that an atlas needs has not landed either (`docs/AUDIT-120.md`, sprites row) |
+| 50 000 batched shapes   | **feature** | There is no shape system to batch. §50's catalogue and §51's `Path` are staged (`docs/AUDIT-120.md` S-4); the shipped 2D geometry is `circleGeometry2D` and `planeGeometry`                                                                                                                                               |
+| mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                     |
+| animated glyphs         | **feature** | §56 ships a bitmap tier whose atlas cannot be addressed per glyph — drawing one cell means cutting it into its own `Texture` (the documented workaround in `examples/first-2d-scene` and `examples/ui-demo`), so a glyph is a texture bind and a draw call. Shaping and SDF are staged (S-6)                              |
+| 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                    |
+| retained UI nodes       | hardware    | `@four/ui` ships and lays out; the row is a rendering-throughput number, so it needs a real GPU rather than SwiftShader                                                                                                                                                                                                   |
+| bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                               |
+| idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                       |
+
+So the honest summary is: one §86 row is gated, three are measured or partly measured, two
+wait on hardware, and four wait on engine features. Measuring the feature-blocked rows
+headless today would produce numbers about the wrong thing — a per-sprite draw loop timed
+as if it were a batch is worse than no number.
 
 ## What a script here is, and is not
 

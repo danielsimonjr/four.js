@@ -28,6 +28,33 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-05 — DOC-TRUTH GATE (`tools/check-docs.mjs`, `pnpm check-docs`, wired into CI
+  next to `check-spec`).** A sweep found prose claims that were false when written and
+  survived for months, because prose has no type checker: `ROADMAP.md` still said "nothing
+  on this roadmap has shipped yet" three days after the plan closed; `README.md` said
+  "42/43 … lighting is the single staged absence" after lighting shipped;
+  `docs/AUDIT-120.md` claimed "10 example applications" when six exist (the other six
+  `examples/*` directories hold a `.gitkeep` — now staged as **S-8**), called
+  `tests/visual/` "an empty placeholder" after a golden suite landed there, and called
+  sprites "batched" when the WebGL backend draws one per draw call;
+  `playwright.config.ts` said "There are no golden images" after the `visual` project
+  landed; `materials-and-render-graph.md` described a sort by "layer, then kind, then
+  material" that `compareRenderItems` has never implemented (it is `renderLayer` then
+  `renderOrder`, stable-sorted); `custom-shaders.md` said "three" internal GL programs
+  after `LitProgram` made it four. **Standing rules from this:** (1) any count in prose
+  that the filesystem can decide must be pinned mechanically — check-docs compares
+  AUDIT-120's example count against `git ls-files`; (2) a doc may name an empty
+  `examples/*` directory only in a block that also carries the marker "not yet written;
+  directory is a placeholder"; (3) corrections are **dated in place**, quoting the
+  superseded wording, and check-docs re-reads those quotes to require a nearby date, so
+  the house style is enforced rather than merely recommended; (4) documents whose subject
+  _is_ the false claims (`docs/GAP ANALYSIS v0.md`, `docs/SPEC-REVIEW.md`) are excluded by
+  name in `QUOTES_DEFECTS` — a gate must not fire on the report that found the defect.
+  Also recorded: `benchmarks/README.md`'s §86 table now separates rows blocked by
+  **hardware** (need a GPU) from rows blocked by a missing **feature** (no sprite
+  batching, no instancing outside particles, no shape system, per-glyph textures) —
+  reading "needs a GPU" across all of them had been hiding four unbuilt features.
+
 - **2026-08-04 — LIGHTING MVP SHIPPED (owner-directed; §120 now 43/43 shipped-or-MVP —
   AUDIT-120 amended).** Tier: ONE directional light, Lambert diffuse + scene ambient,
   nothing else — §68's smallest honest slice. Standing decisions: `DirectionalLight`
@@ -145,7 +172,7 @@ readable; never delete the pointer itself.
   (CDG's `check-duplicates.mjs --no-regen`, reading the report `pnpm graph` regenerates)
   joins the CI architecture-invariants step and fails on any TRUE_DUPLICATE symbol name
   beyond `docs/Architecture/duplicate-baseline.json`. Split applied: **allowlist** (=
-  legitimately independent forever, per-repo *data* exempt from the byte-identity rule) got
+  legitimately independent forever, per-repo _data_ exempt from the byte-identity rule) got
   per-package `PACKAGE_NAME` and `PARTICLE_INSTANCE_FLOATS` (deliberate duck-typed
   contract, matrix forbids the particles↔render edge — Phase 9 entry below); **baseline**
   (= accepted shrinking backlog, re-seed via `gen-duplicate-baseline.mjs` after
@@ -222,9 +249,9 @@ readable; never delete the pointer itself.
   100k + 3 fields = 16.54 ms/step mean (99.2% of the 60 Hz budget; p95 over), on a
   4-core CI Xeon; integrator alone 1.35 ms — each polymorphic §27 sample() call site
   costs ~5.3 ms/100k; field batching is a scoped future optimization. Exit: 2,585 unit
-  + 138 suite + 32 browser tests (five example sites, five webServers); particles/
-  render 100%, render-webgl 99.83%; §86 gate 32.13 kB (grew +1.21 kB from the render
-  union — verified genuine); particles-demo 18.9 kB gzip non-wasm.
+  - 138 suite + 32 browser tests (five example sites, five webServers); particles/
+    render 100%, render-webgl 99.83%; §86 gate 32.13 kB (grew +1.21 kB from the render
+    union — verified genuine); particles-demo 18.9 kB gzip non-wasm.
 - **2026-08-02 — PHASE 8 CLOSED (exit GREEN; plan-defined criterion TRUE — §111 sets no
   exit, the plan's "PID + steering pass analytic tests, demo composes with the stack"
   stands owner-to-confirm).** Five packets + one doc fix, all in `@four/motion`.
@@ -460,7 +487,7 @@ readable; never delete the pointer itself.
   §19 vs §42 authority enums, §52 tessellator package missing from §98; P2 = underspecified
   load-bearing designs, e.g. component model, event system, coordinate conventions, adapter
   interface gaps; P3 = structural/editorial). Cite items as "R-N" (same style as ERRATA
-  "E-N"). *Superseded the same day by the revision-1.1 entry below.*
+  "E-N"). _Superseded the same day by the revision-1.1 entry below._
 - **2026-07-28 — Spec revision 1.1 applied (owner-directed).** All 35 review items applied to
   `SPECIFICATION.md`; Amendments table added at the top of the spec. Key standing rules the
   revision established: **§ numbering 1–120 is frozen** — new sections use letter suffixes
@@ -470,7 +497,7 @@ readable; never delete the pointer itself.
   seconds** (tween/timeline durations included — no milliseconds anywhere); the single
   authority enum is `TransformAuthority` (§42, now includes `"blended"`; `MotionAuthority`
   no longer exists); force APIs use explicit `…AtPoint` names; `RigidBody`/colliders are
-  *components* (§6a); the solver adapter contract (§37) includes destroy/query/drainEvents
+  _components_ (§6a); the solver adapter contract (§37) includes destroy/query/drainEvents
   methods and a defined `PhysicsCapabilities`. §86 payload budget (≤150 kB gzip) was
   confirmed by the owner on 2026-07-29 (revision 1.2; no longer provisional). The `dev-workflow` plugin could not load in this
   remote session (private `danielsimonjr/skills` marketplace repo is outside the session's

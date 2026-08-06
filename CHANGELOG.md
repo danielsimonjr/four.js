@@ -8,6 +8,40 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-05 — documentation-truth sweep
+
+No behaviour changed; a set of verified-false claims in the repository's prose were
+corrected in place, each with the date and the superseded wording kept. Corrected:
+`ROADMAP.md` ("nothing on this roadmap has shipped yet" — the plan completed 2026-08-02);
+`README.md` ("42/43 … lighting is the single staged absence" — 43/43 since 2026-08-04);
+`docs/AUDIT-120.md` (the examples count, `tests/visual/` "an empty placeholder", and the
+sprites "batched" note, plus a new staged line **S-8** for the missing §93/§118–119
+examples); `tests/README.md` (rewritten from §92's taxonomy to the suites that exist, with
+a per-category "not yet covered" list); `playwright.config.ts` ("There are no golden
+images", now scoped to the `chromium` project); `docs/guides/materials-and-render-graph.md`
+(the render-list sort keys, the batching row, and the post-lighting material/lighting
+rows); `docs/guides/custom-shaders.md` ("three" internal programs → four);
+`benchmarks/README.md` (a blocked-by column separating §86 rows that need hardware from the
+four that need engine features); `docs/guides/cameras-and-coordinate-conversion.md` (an
+empty example cited as exercising the 3D path); `examples/README.md` and
+`docs/guides/README.md` (placeholder directories now marked as such).
+
+**Correction to the Phase 0 entry below (dated 2026-08-05).** That entry says
+`examples/` "gained the §93 quick-start examples and the two flagship demos (§118–119)".
+It gained **directories**, each holding a `.gitkeep` and nothing else, and four of them
+plus both flagship directories are still empty today (`git ls-files examples/`). Six
+runnable examples exist — `first-2d-scene`, `physics-playground`, `mechanism`, `blending`,
+`particles-demo`, `ui-demo` — and none of them is a flagship demo. The historical entry is
+left as written, per this file's convention of not rewriting history; `docs/AUDIT-120.md`
+**S-8** is the dated statement of what is absent.
+
+#### Added
+
+- `tools/check-docs.mjs` and `pnpm check-docs`, wired into CI next to `check-spec`: a
+  mechanical doc-truth gate that fails if a doc references an empty `examples/*` directory
+  without a placeholder marker, if `docs/AUDIT-120.md`'s example count drifts from
+  `git ls-files`, or if any of the false claims listed above reappears verbatim.
+
 ### 2026-08-05 — team code review + simplification sweep
 
 Owner-directed: a five-agent review of all 24 packages, applying
@@ -68,6 +102,7 @@ shipped-or-MVP.
 Owner-directed: implement the recorded backlog, deferring nothing. One batch:
 
 #### Added
+
 - **UI browser proof** — `examples/ui-demo` (a `@four/ui` panel of buttons and
   labels, app-supplied `WidgetSkin`s, real pointer + keyboard interaction,
   25 kB gzip) and `tests/browser/ui.spec.ts` (4 tests). Closes the plan's one
@@ -102,6 +137,7 @@ Owner-directed: implement the recorded backlog, deferring nothing. One batch:
   documents) restores exactly as before.
 
 #### Added — documentation
+
 - **The thirteen §93 prose guides** (`docs/guides/`, + index): §93's own list,
   one file per item, every code sample cross-checked against
   `docs/Architecture/package-export-surfaces.json` and the source doc
@@ -109,6 +145,7 @@ Owner-directed: implement the recorded backlog, deferring nothing. One batch:
   units record, workers, lighting). 1,853 lines.
 
 #### Fixed — tooling and docs hygiene
+
 - **TypeDoc: 123 warnings → 0.** Stale links repointed, unexported-symbol
   links backticked, cross-package links qualified for the umbrella
   conversion, declaration-merging comments demoted on the augmenting side
@@ -121,8 +158,9 @@ Owner-directed: implement the recorded backlog, deferring nothing. One batch:
   project-service errors).
 
 #### Fixed
+
 - **`blending.spec.ts` RECOVER de-flaked** (1-in-3 hard fail, recorded since
-  Phase 11): the sweep clock started *after* a SwiftShader screenshot that
+  Phase 11): the sweep clock started _after_ a SwiftShader screenshot that
   could swallow 500+ ms of the 1.5 s sweep, tripping the ≥1 s lower bound. The
   clock now starts before the click that starts the sweep (a strict superset
   of the sweep interval — deterministic), and the collapse wait is a poll
@@ -289,10 +327,10 @@ still present locally. Nothing referenced it — not `package.json`, not
 `pnpm-workspace.yaml`, not CI — so it was pure leftover from the build that
 bugchecked the machine. Removed; the workspace still builds 24/24.
 
-
 ### 2026-08-02
 
 #### Added (Phase 11 — Assets, Serialization, UI, Tooling, §113a; packets WP-11.1…WP-11.6 — THE FINAL PHASE)
+
 - `@four/serialization`: SceneDocument v1 with canonical validation, a
   component-class-keyed serializer registry, §80 migrations — byte-identical
   round trips; 84 tests, 100% coverage.
@@ -309,10 +347,11 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   reload bit-identically for 200 further steps; in-contact saves diverge only via
   unserialized solver warm-start state. Reference RigidBody/Collider serializers.
 - **Final exit GREEN. The implementation plan (§103–§113a) is complete**: 2,971 unit
-  + 172 suite + 32 browser tests; 24/24 packages; coverage ≥95% everywhere; §86 at
-  32.13/150 kB; docs 0 errors.
+  - 172 suite + 32 browser tests; 24/24 packages; coverage ≥95% everywhere; §86 at
+    32.13/150 kB; docs 0 errors.
 
 #### Added (Phase 10 — Replay, Snapshots, Diagnostics, §33–34/§113; packets WP-10.1…WP-10.5)
+
 - `@four/diagnostics`: the §34 replay format (canonical serialization, strict base64,
   adapter-validity refusal), `ReplayRecorder` + `ReplayPlayer` (host-supplied stepFn,
   periodic-snapshot seeking, slow motion, verify hooks), and `DebugDrawBuffer` with
@@ -326,6 +365,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 - Phase 10 exit GREEN, zero defects: 2,766 unit + 159 suite + 32 browser tests.
 
 #### Added (Phase 9 — Particles, §27/§36/§112; packets WP-9.1…WP-9.5)
+
 - `@four/particles`: SoA particle core (pool/emitter with seeded 4-draw spawn
   contract, plane collision, over-lifetime ramps), the §27 force-field set
   (gravity/drag/wind/radial/vortex/bounded hash-noise turbulence/volumes), and a
@@ -342,6 +382,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   fixed in-line (dated staging notes, plan-level governance note).
 
 #### Added (Phase 8 — Advanced Motion, §111; packets WP-8.1…WP-8.5)
+
 - `@four/motion`: `PIDController` (§111 sketch verbatim, anti-windup, derivative on
   measurement), `SpringDamper` (exact matrix-exponential stepping), the Reynolds
   steering set + flocking with a seeded xorshift128 RNG (BigInt-oracle-pinned),
@@ -357,6 +398,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   suite + 27 browser tests; coverage ≥95% everywhere.
 
 #### Added (Phase 7 — Physics-Animation Blending, §19/§42/§110; packets WP-7.1…WP-7.8)
+
 - `@four/scene`: `PoseTarget` component (animation-drivable target poses with
   finite-difference history); the `"blended"` transform authority unlocked (§42's
   reserved value, guarded since Phase 2).
@@ -379,6 +421,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   coverage ≥95% everywhere (physics/animation at 100%), §86 gate at 30.92/150 kB.
 
 #### Added (Phase 6 — Joints and Constraints, §28/§109; packets WP-6.1…WP-6.7)
+
 - `@four/physics`: §28 joint classes (Fixed/Hinge/Slider/Rope/Spring/Spherical +
   Revolute/Prismatic/Ball aliases) over body-local descriptor unions; world-space
   anchors converted once at `world.addJoint`; live limits/motors via command queues;
@@ -406,6 +449,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 ### 2026-08-01 (later)
 
 #### Added (Phase 5 — Physics API + Rapier Adapter, §108; packets WP-5.1…WP-5.9)
+
 - `@four/physics`: complete §20–§34 public API — types/shapes/descriptors/materials/
   events/queries + the §37 `PhysicsSolverAdapter` contract with branded handles;
   `RigidBody` + `Collider` components (§26 command buffers, §29 typed events,
@@ -430,6 +474,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   coverage gate green repo-wide, first-2d-scene unchanged at 30.19 kB gzip vs §86.
 
 #### Added (Phase 4 — Animation Core, §107; packets WP-4.0…WP-4.9)
+
 - `@four/animation`: §15 easing (12 families × in/out/in-out, 34-key registry, pinned
   constants incl. a normalized damped-spring closed form); value adapters + property
   bindings (§16 resolved-once paths, in-place writes, zero-allocation hot paths);
@@ -448,12 +493,12 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   looping timeline with a palette-stepping marker; 30.19 kB gzip vs the 150 kB §86 gate.
 - Gates (WP-4.8): phase4 determinism golden (21 quantities × 1000 fixed steps,
   in-process + fresh-child-process digests, marker-fire steps pinned), marker
-  seek-suppression determinism test, and a 4-test browser animation spec (browser total
-  15) incl. a standing cluster-isolation invariant.
+  seek-suppression determinism test, and a 4-test browser animation spec (browser total 15) incl. a standing cluster-isolation invariant.
 - Phase 4 exit GREEN (§107 criterion TRUE): 1,363 unit tests, suites ×2 with goldens
   byte-identical, browser ×2, coverage gate green, docs/spec checks clean.
 
 #### Added (Phase 3a — Interaction, Sprites, Text MVP, §106a; packets WP-3a.1…WP-3a.7)
+
 - `@four/input`: §71 picking (ray from +Y-up NDC, AABB + oriented-box tests), §72-subset
   pointer routing with scene-graph propagation (`capture:`-prefixed capture-phase keys on
   the four propagating types), `NodeEventMap` augmentation, DragManager (near-plane
@@ -474,6 +519,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   untouched, coverage ≥95% every touched package; demo-ready static build confirmed.
 
 #### Added (Phase 3 — Renderer Foundation, §106; packets WP-3.1…WP-3.9)
+
 - `@four/scene`: §47 cameras (D8 depth ranges) + §48 viewport. `@four/geometry`/
   `@four/materials`: BufferGeometry + primitives, UnlitMaterial. `@four/render`: §61
   Renderer interface (context-loss contract) + NullRenderer, render lists incl. the §43
@@ -488,6 +534,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 ### 2026-08-01
 
 #### Added (Phase 2 — Motion Foundation, §105; packets WP-2.1…WP-2.7)
+
 - `@four/motion`: five §38 integrators, MotionComponent + MotionSystem (pinned
   semi-implicit update, §42 enforcement), eight §13 trajectories with pinned constructors,
   KinematicController (moveTo/rotateTo/followPath, channel state machines) — 200 tests.
@@ -498,6 +545,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 - Fixes: CI Node 22 (type-strip test children), `four/application` subpath export.
 
 #### Added (Phase 1 — Math, Scene, and Time, §104; packets WP-1.1…WP-1.14)
+
 - `@four/math`: mutable Vector2/3/4, Quaternion (shortest-arc slerp), column-major
   Matrix3/4 with §7 pivot compose, D8 projections, change-hooks, allocation counter —
   154 tests incl. zero-allocation proofs.
@@ -517,6 +565,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 ### 2026-07-31
 
 #### Added (Phase 0 — Project Foundation, §103; plan packets WP-0.1…WP-0.15)
+
 - Working monorepo: root manifests with the pinned §3.2 toolchain, `tsconfig.base.json`,
   Turborepo pipeline, all 24 `@four/*`/`four` packages scaffolded per the §3.4 template
   (split dev/build tsconfigs, `tsc -b`, types-first exports; umbrella with per-package
@@ -531,12 +580,14 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 ### 2026-07-29
 
 #### Changed (spec revision 1.6)
+
 - npm publish names decided by the owner: umbrella `@danielsimonjr/fourjs`, sub-packages
   `@danielsimonjr/fourjs-<name>`, published from the personal scope (no org claim or
   dispute). §98 note updated; workspace names remain `four`/`@four/*`; TODO owner item
   closed.
 
 #### Added (gap-closure pass)
+
 - `docs/POSITIONING.md` — outward-facing why-exist case: the integration-is-the-product
   bet, audience order (engineering/digital-twins first), migration story, demo-first
   principle, and plainly stated risks.
@@ -544,6 +595,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   implementation-plan governance gate.
 
 #### Changed (spec revision 1.5 + plan revision 2.1)
+
 - `docs/SPECIFICATION.md` → **revision 1.5**: added §106a (Phase 3a — input, picking,
   dragging, sprites, MVP-tier text) and §113a (Phase 11 — assets, serialization, UI,
   benchmark harness, docs), closing the hole where Part IX never scheduled the §120 MVP's
@@ -561,6 +613,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   items for demo-first, shaping RFC, release workflow.
 
 #### Changed (plan revision 2 + spec revision 1.4)
+
 - `docs/plans/IMPLEMENTATION_PLAN.md` rewritten as **revision 2** after a five-way stress
   test (Haiku dry-run + executability/spec-fidelity/orchestration/design reviews, ~85
   findings): exact toolchain pins (TS 5.9.3, not 7.x), frozen 24-package dependency matrix
@@ -577,6 +630,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   stress test); AGENTS.md package map updated.
 
 #### Added
+
 - `docs/plans/IMPLEMENTATION_PLAN.md` — Phase 0 deliverable (§103; created at the root,
   moved to `docs/plans/` the same day by owner direction), written for subagent-driven
   execution: work packets `WP-N.M` with mechanical Done-checks and [H]aiku/[S]tronger model
@@ -587,6 +641,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   directories needed.
 
 #### Changed (spec revision 1.3)
+
 - `docs/SPECIFICATION.md` bumped to **revision 1.3** after a two-lens adversarial
   verification pass over the 1.1 material (16 unique findings, all fixed): world matrices
   resolve per fixed step, not per frame (§7); pause semantics defined (§10); the replay
@@ -602,6 +657,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   §6 audio marked plugin-provided.
 
 #### Added
+
 - `tools/check-spec.mjs` — mechanical consistency checker for `docs/SPECIFICATION.md`
   (section sequence with frozen 1–120 numbering, duplicates, fence balance, TOC/body
   agreement, §-reference validity, banned pre-revision terms). Intended as the docs job of
@@ -613,6 +669,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   deliverable; TypeDoc for API docs.
 
 #### Changed
+
 - Scaffold docs synced to specification revision 1.2: `CLAUDE.md`, `AGENTS.md`, `README.md`,
   `docs/ERRATA.md` (scope note — amendments live in the spec's table; the archived PDF is
   formally frozen at the pre-1.0 text), `website/README.md`, and the `core`/`motion`/
@@ -627,6 +684,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 ### 2026-07-28
 
 #### Added
+
 - `docs/SPEC-REVIEW.md` — technical review of `SPECIFICATION.md` proposing improvements
   R-1…R-35 (contradictions, underspecified designs, missing topics, structure), with a
   suggested disposition order keyed to the implementation phases. Proposals only; the
@@ -646,6 +704,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
   `benchmarks/`, `tools/`, and `website/` gained purpose READMEs.
 
 #### Changed
+
 - `docs/SPECIFICATION.md` revised to **revision 1.1**, applying all 35 review items from
   `docs/SPEC-REVIEW.md` (owner-directed): contradictions resolved (force API §23/§26,
   authority enums §19/§42 merged into `TransformAuthority` + `"blended"`, 2D gravity sign,
@@ -677,6 +736,7 @@ bugchecked the machine. Removed; the workspace still builds 24/24.
 - `docs/four-js-specification.pdf` moved unchanged to `docs/archive/`.
 
 ### Earlier
+
 - Initial commit: directory scaffold (24 empty `@four/*` package directories, empty
   `examples/`, `benchmarks/`, `tests/`, `tools/`, `website/`), specification PDF and
   extracted Markdown, `ERRATA.md`, `README.md`, MIT `LICENSE`.

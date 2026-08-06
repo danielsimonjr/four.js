@@ -3,12 +3,14 @@
 This guide covers the material tier that ships today, how a scene becomes
 draw calls (render lists, §64–§66), and — honestly — how much of §57's
 unified material model and §63's render graph exists yet. Short version: the
-MVP tier is unlit colour, textured sprites, and instanced particles on a
-WebGL 2 backend; PBR, lights, and the render graph are staged.
+MVP tier is unlit colour, textured sprites, instanced particles and — since
+the 2026-08-04 lighting packet — one Lambert-lit material on a WebGL 2
+backend; PBR, multi-light, shadows and the render graph are staged.
 
 ## The shipped materials
 
-Two material classes (`four/materials`) and one instanced path:
+Three material classes (`four/materials`) and one instanced path. This section
+said "two material classes" and omitted `LitMaterial` until 2026-08-05:
 
 ```ts
 import { SpriteMaterial, UnlitMaterial } from "four/materials";
@@ -33,6 +35,12 @@ const badge = new Sprite(new SpriteMaterial({ texture, tint: [1, 1, 1, 1] }), {
   renderLayer: 1, // draw after opaque shapes — sprites blend (§66)
 });
 ```
+
+`LitMaterial` is the third: colour-only, mirroring `UnlitMaterial`, shaded by
+one `DirectionalLight` (a `@four/scene` node) plus `Scene.ambientLight`. It
+needs geometry carrying the optional `normals` attribute — `boxGeometry` and
+`planeGeometry` generate per-face normals; 2D shapes stay unlit and
+position-only.
 
 Particles use `ParticleRenderable` (see the
 [performance guide](performance-optimization.md)); geometry comes from
@@ -63,10 +71,19 @@ const list = buildRenderList(scene, []); // live transforms
 buildInterpolatedRenderList(scene, poses, alpha, list); // §43 render poses
 ```
 
-Items sort by render layer, then kind (opaque unlit first, then blended
-sprites, then particles), then material — which is the whole of the
-transparency ordering control this tier offers: `renderLayer`, `renderOrder`,
-and sibling order (§66). The WebGL 2 backend (`WebglRenderer`, in
+Items sort by **`renderLayer`, then `renderOrder`, and nothing else** —
+`compareRenderItems` in `packages/render/src/render-list.ts` is those two keys,
+and because `Array.prototype.sort` is stable, equal keys fall back to
+generation (scene-graph) order. That is the whole of the transparency ordering
+control this tier offers (§66), and it is manual: **the list is not sorted by
+kind and not sorted by material**, so an opaque item can be drawn after a
+blended one unless you separate them with a layer or an order yourself. This
+paragraph claimed a sort "by render layer, then kind (opaque unlit first, then
+blended sprites, then particles), then material" until 2026-08-05; no such
+comparator has ever existed. The backend does track the _current_ pipeline and
+only re-binds a program when the kind changes, which is a per-run
+state-change saving on an already-ordered list — not a sort. The WebGL 2
+backend (`WebglRenderer`, in
 `four/render-webgl`) consumes the list with cached GPU resources
 (`GeometryCache`, `TextureCache`) keyed by object identity and version; a
 particle item becomes exactly one `drawArraysInstanced` whatever its count.
@@ -78,14 +95,14 @@ backend at runtime.
 
 ## Honest state of the rest
 
-| §       | feature                            | state                                                                                                                       |
-| ------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| §57–§59 | unified material model, PBR        | not implemented; `UnlitMaterial`/`SpriteMaterial` are the shipped tier                                                      |
-| §60     | shader & node-material system      | not implemented — see [custom shaders](custom-shaders.md)                                                                   |
-| §62     | backends                           | WebGL 2 shipped; `render-webgpu`, `render-canvas`, `render-svg` are scaffold-only packages                                  |
-| §63     | render graph                       | not implemented; the fixed pipeline is list → sort → draw                                                                   |
-| §65     | batching                           | particles and instancing yes; sprite/glyph batching not yet (the §55 frame-region + §65 backlog)                            |
-| §68–§70 | lighting, shadows, post-processing | **not implemented** — the one §120 MVP item recorded as a dated staged absence (2026-08-02); materials are unlit everywhere |
+| §       | feature                            | state                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §57–§59 | unified material model, PBR        | not implemented; `UnlitMaterial`, `SpriteMaterial` and `LitMaterial` are the shipped tier (this row omitted `LitMaterial` until 2026-08-05)                                                                                                                                                                                                                                                                                        |
+| §60     | shader & node-material system      | not implemented — see [custom shaders](custom-shaders.md)                                                                                                                                                                                                                                                                                                                                                                          |
+| §62     | backends                           | WebGL 2 shipped; `render-webgpu`, `render-canvas`, `render-svg` are scaffold-only packages                                                                                                                                                                                                                                                                                                                                         |
+| §63     | render graph                       | not implemented; the fixed pipeline is list → sort → draw                                                                                                                                                                                                                                                                                                                                                                          |
+| §65     | batching                           | particles are instanced (one `drawArraysInstanced` per system); **nothing else is batched or instanced** — sprites, glyphs and meshes are one draw call each (the §55 frame-region + §65 backlog). This row said "particles and instancing yes" until 2026-08-05, which read as general instancing support                                                                                                                         |
+| §68–§70 | lighting, shadows, post-processing | lighting **shipped at an MVP tier 2026-08-04** — one directional light plus a scene ambient, Lambert, via `LitMaterial`/`LitProgram`. Shadows (§69) and post-processing (§70) are not implemented. This row said lighting was "**not implemented** — the one §120 MVP item recorded as a dated staged absence (2026-08-02); materials are unlit everywhere" until 2026-08-05; see `docs/AUDIT-120.md` S-5 for what is still staged |
 
 When these land they are required to slot beneath the same `Renderer`
 interface and render-list contract, so scene code written against today's

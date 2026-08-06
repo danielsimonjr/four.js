@@ -18,8 +18,14 @@ import { defineConfig } from "@playwright/test";
  * | `examples/particles-demo` | {@link PARTICLES_PORT} | `particles` | §112's particle demonstration: a seeded CPU fountain under §27 fields bouncing off a collision plane, plus a click burst, each drawn as one instanced draw call |
  * | `examples/ui-demo` | {@link UI_PORT} | `ui` | §73–§75's retained-mode UI: a `@four/ui` panel of buttons and labels laid out by the package, skinned by the application, driven by real pointer and keyboard input (the WP-11.5 packet-intent closure) |
  *
- * There are no golden images — SwiftShader rasterises slightly differently from
- * a GPU, so every assertion is a threshold, never a pixel match (§92).
+ * **In the `chromium` project there are no golden images** — SwiftShader
+ * rasterises slightly differently from a GPU, so every assertion in
+ * `tests/browser` is a threshold, never a pixel match (§92). This sentence was
+ * unqualified ("There are no golden images") until 2026-08-05, which stopped
+ * being true when the `visual` project below landed on 2026-08-04: that project
+ * runs `tests/visual` and *does* compare committed PNG goldens, legitimately,
+ * because both sides of its comparison are SwiftShader. See the comment on the
+ * `visual` project for the scope of the exception.
  *
  * Run **all six** builds first: the web servers below serve the *built* `dist`
  * directories, which are gitignored and may be absent.

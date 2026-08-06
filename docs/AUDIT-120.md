@@ -9,6 +9,21 @@ so the one **staged** row moved to **shipped (MVP tier)**. The verdict table and
 rendering table below reflect the amendment; S-5 keeps the original staging record and
 carries the shipped note.
 
+**Corrected 2026-08-05** (doc-truth sweep; no code changed, three claims in this file were
+false when written and are corrected in place with the original wording quoted):
+
+- the tooling **examples** row claimed "10 example applications … incl. the five §93 guide
+  scenes and the flagship"; six exist and the rest are `.gitkeep`-only directories. The row
+  now says six and the shortfall is staged as **S-8**;
+- the same table said `tests/visual/` "is an empty placeholder"; a golden-image suite
+  landed there 2026-08-04;
+- the Rendering table's **sprites** note, and S-4's first sentence, said sprites are
+  "batched"; the WebGL backend draws one sprite per draw call.
+
+These are corrections to the audit's prose, not status changes: no row's verdict moved,
+and the 43-of-43 census below is unaffected. `tools/check-docs.mjs` now greps for all
+three so they cannot return.
+
 This is the exit artefact of **plan §6j, P11-5**: _"audit §120 against reality; anything
 unshipped gets a dated staged note — the exit's 'complete' reads as
 'shipped-or-staged-with-note', consistent with every prior phase."_ §113a closes Phase 11
@@ -99,14 +114,14 @@ coverage census, not a measure of effort or of risk.
 
 ## Rendering
 
-| §120 item       | status             | evidence                                                                                                         | note                                                                                                        |
-| --------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| WebGL 2         | shipped            | `packages/render-webgl/src/webgl-renderer.ts`; `tests/browser/*.spec.ts` under Chromium/SwiftShader              | §62; the other four backends are scaffolds, per §120's "WebGL 2 only"                                       |
-| 2D primitives   | shipped (MVP tier) | `packages/geometry/src/primitives.ts` (`circleGeometry2D`, `planeGeometry`), `packages/render/src/sprite.ts`     | §50's shape catalogue and §51's `Path` are staged — see **S-4**                                             |
-| basic 3D meshes | shipped            | `packages/geometry/src/primitives.ts` (`boxGeometry`), `buffer-geometry.ts`, `packages/render/src/renderable.ts` | §53–54                                                                                                      |
-| lighting        | shipped (MVP tier) | `packages/scene/src/light.ts`, `packages/materials/src/lit-material.ts`, `packages/render/src/lights.ts`, `packages/render-webgl/src/gl-program.ts` (`LitProgram`) | §68's MVP tier (2026-08-04): one directional light + scene ambient, Lambert. Widening staged — see **S-5** |
-| sprites         | shipped            | `packages/render/src/sprite.ts`, `packages/materials/src/sprite-material.ts`                                     | §55; batched                                                                                                |
-| text            | shipped (MVP tier) | `packages/text/src/{bitmap-font,glyph-atlas,text-layout}.ts`                                                     | §56's MVP tier: a built-in 6 × 12 bitmap ASCII face, atlas and layout. Shaping and SDF staged — see **S-6** |
+| §120 item       | status             | evidence                                                                                                                                                           | note                                                                                                                                                                                                                                                                                                                                     |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WebGL 2         | shipped            | `packages/render-webgl/src/webgl-renderer.ts`; `tests/browser/*.spec.ts` under Chromium/SwiftShader                                                                | §62; the other four backends are scaffolds, per §120's "WebGL 2 only"                                                                                                                                                                                                                                                                    |
+| 2D primitives   | shipped (MVP tier) | `packages/geometry/src/primitives.ts` (`circleGeometry2D`, `planeGeometry`), `packages/render/src/sprite.ts`                                                       | §50's shape catalogue and §51's `Path` are staged — see **S-4**                                                                                                                                                                                                                                                                          |
+| basic 3D meshes | shipped            | `packages/geometry/src/primitives.ts` (`boxGeometry`), `buffer-geometry.ts`, `packages/render/src/renderable.ts`                                                   | §53–54                                                                                                                                                                                                                                                                                                                                   |
+| lighting        | shipped (MVP tier) | `packages/scene/src/light.ts`, `packages/materials/src/lit-material.ts`, `packages/render/src/lights.ts`, `packages/render-webgl/src/gl-program.ts` (`LitProgram`) | §68's MVP tier (2026-08-04): one directional light + scene ambient, Lambert. Widening staged — see **S-5**                                                                                                                                                                                                                               |
+| sprites         | shipped            | `packages/render/src/sprite.ts`, `packages/materials/src/sprite-material.ts`                                                                                       | §55. This note read "batched" until 2026-08-05; it is not — `webgl-renderer.ts` issues one `setModel`/`setQuad`/`setTint` and one `drawArrays`/`drawElements` **per sprite** (only the program switch and the view-projection upload are amortised across a run). §65 sprite batching is unshipped; see the render-graph guide's §65 row |
+| text            | shipped (MVP tier) | `packages/text/src/{bitmap-font,glyph-atlas,text-layout}.ts`                                                                                                       | §56's MVP tier: a built-in 6 × 12 bitmap ASCII face, atlas and layout. Shaping and SDF staged — see **S-6**                                                                                                                                                                                                                              |
 
 ## Interaction
 
@@ -119,13 +134,13 @@ coverage census, not a measure of effort or of risk.
 
 ## Tooling — §113a's named exit clause
 
-| §120 item                      | status  | evidence                                                                                                                                             | note                                                                                                                                                                                                                                     |
-| ------------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| tests                          | shipped | 113 package unit suites, 14 root suites (`tests/integration` 6, `tests/determinism` 8), 8 Playwright specs (`tests/browser`)                         | §92; `pnpm test`, `pnpm test:suites`, `pnpm test:browser`. `tests/visual/` is an empty placeholder: §92's visual-regression tier is served by the browser specs, and per-backend perceptual baselines wait on a second backend |
-| examples                       | shipped | 10 example applications under `examples/`                                                                                                            | incl. the five §93 guide scenes and the flagship                                                                                                                                                                                         |
-| API documentation              | shipped | `typedoc.json` → `docs/api/`; `pnpm run docs` (CI job from Phase 0)                                                                                  | §93's reference half. The guides/website half is in-repo documentation per §6j                                                                                                                                                           |
-| benchmark harness              | shipped | `benchmarks/harness.mjs` + `math-ops`, `scene-propagation`, `physics-step`, `animation-sampling`, `particles-100k`; records in `benchmarks/results/` | §92's performance tests, §86's targets where honestly measurable. **Recorded, never gated** — see `benchmarks/README.md`                                                                                                                 |
-| deterministic simulation tests | shipped | `tests/determinism/*.test.ts` with 8 committed goldens (`golden/phase{1,2,4,5,6,7,9,10}.json`)                                                       | §33–34 at the `same-runtime` tier; fresh-process double runs vs committed hashes                                                                                                                                                         |
+| §120 item                      | status             | evidence                                                                                                                                                                                                                                        | note                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| tests                          | shipped            | 113 package unit suites, root suites in `tests/` (`tests/integration` 6 scenario suites + 1 example-build coverage suite, `tests/determinism` 8), 9 Playwright specs (`tests/browser`), 1 visual spec with 2 committed goldens (`tests/visual`) | §92; `pnpm test`, `pnpm test:suites`, `pnpm test:browser`. This row said `tests/visual/` "is an empty placeholder" until 2026-08-05; a SwiftShader-to-SwiftShader golden suite landed there 2026-08-04 (`tests/visual/ui-demo.spec.ts`, Playwright project `visual`). Per-backend perceptual baselines still wait on a second backend                                                                                                                          |
+| examples                       | shipped (MVP tier) | **6** runnable example applications under `examples/`: `first-2d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo` — each with a `main.ts`, a Vite build script and a browser spec                             | This row said "10 example applications … incl. the five §93 guide scenes and the flagship" until 2026-08-05. It was never true: `examples/{first-3d-scene,first-animated-scene,first-physics-scene,mixed-scene}` and both `examples/flagship/*` directories contain only a `.gitkeep` (verify with `git ls-files examples/`). §120 asks for "examples" without a count, and six runnable ones satisfy the row; the §93/§118–119 shortfall is staged as **S-8** |
+| API documentation              | shipped            | `typedoc.json` → `docs/api/`; `pnpm run docs` (CI job from Phase 0)                                                                                                                                                                             | §93's reference half. The guides/website half is in-repo documentation per §6j                                                                                                                                                                                                                                                                                                                                                                                 |
+| benchmark harness              | shipped            | `benchmarks/harness.mjs` + `math-ops`, `scene-propagation`, `physics-step`, `animation-sampling`, `particles-100k`; records in `benchmarks/results/`                                                                                            | §92's performance tests, §86's targets where honestly measurable. **Recorded, never gated** — see `benchmarks/README.md`                                                                                                                                                                                                                                                                                                                                       |
+| deterministic simulation tests | shipped            | `tests/determinism/*.test.ts` with 8 committed goldens (`golden/phase{1,2,4,5,6,7,9,10}.json`)                                                                                                                                                  | §33–34 at the `same-runtime` tier; fresh-process double runs vs committed hashes                                                                                                                                                                                                                                                                                                                                                                               |
 
 ---
 
@@ -158,7 +173,9 @@ overlay is not demonstrated end-to-end in a browser. §120's "debug drawing" is 
 honest as _data_, not yet as _pixels_.
 
 **S-4 — §50's 2D shape catalogue and §51's `Path`. Staged 2026-08-02.**
-Shipped: circle and rectangle geometry, sprites, and the batching that draws them. Staged:
+Shipped: circle and rectangle geometry, and sprites — this line read "and the batching
+that draws them" until 2026-08-05, which was wrong in both places it appeared (see the
+Rendering table's sprites row): the WebGL backend draws one sprite per draw call. Staged:
 ellipse, rounded rectangle, regular and arbitrary polygon, star, line, polyline, arc,
 sector, ring, and the whole §51 path model (Bézier construction, flatten/subdivide/
 simplify, offset, boolean operations) together with §52's stroke generation — joins, caps,
@@ -215,6 +232,27 @@ staged note Phase 11 produced, and a reader auditing MVP coverage will look for 
 glTF pipeline needs the §55 texture tier and materials beyond unlit (see **S-5**), so
 `@four/assets` ships JSON, text, binary and image loaders and stages glTF rather than
 shipping a stub.
+
+**S-8 — The §93 guide scenes and the §118–119 flagship demos. Staged 2026-08-05.**
+Six directories under `examples/` contain a `.gitkeep` and nothing else:
+`first-3d-scene`, `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
+`flagship/one-scene-everything-moves` and `flagship/motor-digital-twin`. They were created
+by the Phase 0 tree scaffold (see `CHANGELOG.md`, which announced them as if they had
+content) and no packet in Phases 1–11 was scoped to write them; the plan's per-phase
+demonstrations went to `physics-playground` (§108), `mechanism` (§109), `blending` (§110),
+`particles-demo` (§112) and `ui-demo`, and `first-2d-scene` grew into the §93 quick-start
+scene. So four of §93's six quick-start items and both §118–119 flagships have no
+implementation. Three of the four missing scenes have a shipped stand-in that covers the
+same ground (3D meshes and a `PerspectiveCamera` are unit-tested but appear in no example;
+animation is demonstrated inside `first-2d-scene`; physics is demonstrated by
+`physics-playground`, which `examples/README.md` already records as fulfilling
+`first-physics-scene`'s role) — the gap is a documentation-completeness gap against §93 and
+§118–119, not a capability gap, with one real hole: **no example exercises a perspective
+camera or a lit 3D mesh end-to-end in a browser.** Not a §120 row — §120's tooling bullet
+says "examples" without a count — so no verdict above depends on it. This is a dated
+statement of absence, not a commitment. The empty directories are marked as placeholders in
+`examples/README.md` and `docs/guides/README.md`, and `tools/check-docs.mjs` fails if a
+doc references one of them without the placeholder marker.
 
 ---
 
