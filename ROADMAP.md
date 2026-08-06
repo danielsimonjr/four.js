@@ -4,22 +4,29 @@ The release ladder below is **normative** — it reproduces §94 (Release Strate
 [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md). Everything else on this page (phase
 mapping, MVP notes) is guidance that points back at the spec and the implementation plan.
 
-This repository is currently at the scaffold-and-specification stage; nothing on this
-roadmap has shipped yet.
+This page said "this repository is currently at the scaffold-and-specification stage;
+nothing on this roadmap has shipped yet" until 2026-08-05. That was written before the
+implementation plan ran and was never revised: **the plan (§103–§113a) completed
+2026-08-02**, and the §120 MVP audit ([`docs/AUDIT-120.md`](docs/AUDIT-120.md)) records
+43 of 43 MVP items shipped as of the 2026-08-04 lighting packet. What is still true is
+that **no release below has been cut and nothing is published to npm** — the ladder is
+the release plan, not a record of releases. Read a row as "the scope exists in the
+workspace", not "the version exists on the registry"; where a row's scope ships only at
+a pinned MVP tier, `docs/AUDIT-120.md`'s staged lines (S-1…S-8) say so with dates.
 
 ## Releases (§94)
 
-| Release | Scope (§94) |
-|---|---|
-| **0.1** | math, scene, time, and basic WebGL rendering |
-| **0.2** | native 2D shapes, sprites, text, and picking |
-| **0.3** | 3D meshes, materials, lights, shadows, and mixed scenes |
-| **0.4** | motion, tweens, timelines, and path animation |
-| **0.5** | first physics adapter, bodies, colliders, forces, and collision events |
-| **0.6** | joints, motors, animation-physics blending, and replay |
-| **0.7** | assets, glTF, serialization, UI, and accessibility |
-| **0.8** | WebGPU preview, render graph, compute particles, and workers |
-| **0.9** | optimization, conformance, API stabilization, and production trials |
+| Release | Scope (§94)                                                               |
+| ------- | ------------------------------------------------------------------------- |
+| **0.1** | math, scene, time, and basic WebGL rendering                              |
+| **0.2** | native 2D shapes, sprites, text, and picking                              |
+| **0.3** | 3D meshes, materials, lights, shadows, and mixed scenes                   |
+| **0.4** | motion, tweens, timelines, and path animation                             |
+| **0.5** | first physics adapter, bodies, colliders, forces, and collision events    |
+| **0.6** | joints, motors, animation-physics blending, and replay                    |
+| **0.7** | assets, glTF, serialization, UI, and accessibility                        |
+| **0.8** | WebGPU preview, render graph, compute particles, and workers              |
+| **0.9** | optimization, conformance, API stabilization, and production trials       |
 | **1.0** | stable API, stable scene format, compatibility policy, full documentation |
 
 ## Dates
@@ -48,18 +55,18 @@ The executable plan is [`docs/plans/IMPLEMENTATION_PLAN.md`](docs/plans/IMPLEMEN
 on which phase delivers what**; the mapping below is indicative only, because §94's rungs
 and the plan's phases are not a one-to-one correspondence.
 
-| Release | Phases that feed it |
-|---|---|
-| 0.1 | Phases 0–2 (foundation, math/scene/time, motion foundation), with phase 3's renderer foundation supplying "basic WebGL rendering" |
-| 0.2 | Phases 3 / 3a (renderer foundation; input, picking, dragging, sprites, MVP-tier text) |
-| 0.3 | Continued renderer work after phase 3a — 3D materials, lights, shadows, mixed scenes; no dedicated numbered phase |
-| 0.4 | Phase 4 (animation core), building on phase 2's motion foundation |
-| 0.5 | Phase 5 (physics API + first solver adapter) |
-| 0.6 | Phases 6 (joints), 7 (physics-animation blending), and 10 (replay, snapshots, diagnostics) |
-| 0.7 | Phase 11 (assets, serialization, UI, tooling) |
-| 0.8 | Phase 9 (particles and GPU motion) plus the WebGPU backend |
-| 0.9 | Hardening, conformance, and API stabilization across all packages |
-| 1.0 | Stabilization only: freeze the API and scene format, publish the compatibility policy and documentation |
+| Release | Phases that feed it                                                                                                               |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1     | Phases 0–2 (foundation, math/scene/time, motion foundation), with phase 3's renderer foundation supplying "basic WebGL rendering" |
+| 0.2     | Phases 3 / 3a (renderer foundation; input, picking, dragging, sprites, MVP-tier text)                                             |
+| 0.3     | Continued renderer work after phase 3a — 3D materials, lights, shadows, mixed scenes; no dedicated numbered phase                 |
+| 0.4     | Phase 4 (animation core), building on phase 2's motion foundation                                                                 |
+| 0.5     | Phase 5 (physics API + first solver adapter)                                                                                      |
+| 0.6     | Phases 6 (joints), 7 (physics-animation blending), and 10 (replay, snapshots, diagnostics)                                        |
+| 0.7     | Phase 11 (assets, serialization, UI, tooling)                                                                                     |
+| 0.8     | Phase 9 (particles and GPU motion) plus the WebGPU backend                                                                        |
+| 0.9     | Hardening, conformance, and API stabilization across all packages                                                                 |
+| 1.0     | Stabilization only: freeze the API and scene format, publish the compatibility policy and documentation                           |
 
 Two seams worth naming explicitly:
 

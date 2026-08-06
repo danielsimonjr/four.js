@@ -9,9 +9,12 @@ guide's first job is to be honest about its state.
 **There is no custom shader API yet.** Nothing in the shipped surface accepts
 user GLSL/WGSL: §60's shader system, §59's PBR materials, and §63's render
 graph are all unimplemented, and no packet in the completed Phase 0–11 plan
-scheduled them. The shaders that exist are three fixed, internal programs in
-`@four/render-webgl` — `UnlitProgram`, `SpriteProgram`, and
-`ParticleProgram` — compiled from embedded sources. They are exported for the
+scheduled them. The shaders that exist are **four** fixed, internal programs in
+`@four/render-webgl` — `UnlitProgram`, `SpriteProgram`, `ParticleProgram` and
+`LitProgram` — compiled from embedded sources. (This said "three" until
+2026-08-05; `LitProgram` arrived with the 2026-08-04 lighting packet, whose
+tier is one directional light plus a scene ambient, Lambert — see
+`docs/AUDIT-120.md` S-5.) They are exported for the
 backend's own composition and tests, **not** as an extension point: their
 GLSL is not part of the public contract and may change without notice.
 
@@ -115,6 +118,6 @@ a shader-system RFC is the expected route, as it was for text shaping.
 
 - §60 (shader system), §60a (color management), §61 (renderer interface),
   §64–§66 (submission and ordering), §96 (security boundaries).
-- `packages/render-webgl/src` — the three internal programs, for the
+- `packages/render-webgl/src` — the four internal programs, for the
   curious; `packages/render/src/render-list.ts` — the contract a backend
   consumes.

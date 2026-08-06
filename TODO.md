@@ -11,6 +11,7 @@ changes in `CHANGELOG.md`.
       verifier's priority order:
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
+
 - [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
       point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69),
       §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
@@ -24,17 +25,35 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Backlog additions (doc-truth sweep, 2026-08-05)
+
+- [ ] The §93/§118–119 examples do not exist (`docs/AUDIT-120.md` **S-8**):
+      `first-3d-scene`, `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
+      `flagship/one-scene-everything-moves`, `flagship/motor-digital-twin` are
+      `.gitkeep`-only. Three have shipped stand-ins; the real hole is that **no example
+      exercises a `PerspectiveCamera` or a lit 3D mesh in a browser** — write
+      `first-3d-scene` first, or retire the directories with an owner decision
+- [ ] §65 sprite/glyph batching is unshipped and now says so in three places
+      (AUDIT-120 sprites row + S-4, the render-graph guide, `benchmarks/README.md`);
+      it blocks two §86 benchmark rows outright
+- [ ] Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear
+      (candidates: package counts, test-suite counts in `tests/README.md`, the
+      §120 verdict totals) — each addition must stay decidable by reading files
+
 ### Backlog additions (Phase 10, 2026-08-02)
+
 - [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
       vertex-color attribute needed for per-segment color) — §118 flagship pickup
 
 ### Backlog additions (Phase 9, 2026-08-02)
+
 - [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
       is the scoped fix; benchmark attribution in benchmarks/results/)
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
       GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 
 ### Backlog additions (Phase 8, 2026-08-02)
+
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
       steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
@@ -43,6 +62,7 @@ changes in `CHANGELOG.md`.
       Four.motion.PIDController (pre-existing umbrella convention — spec-revisit note)
 
 ### Backlog additions (Phase 7, 2026-08-02)
+
 - [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
 - [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
       against; solver bodies have no scale)
@@ -50,11 +70,13 @@ changes in `CHANGELOG.md`.
       inheritVelocityFrom is nearly a no-op there; other solvers may need it
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
+
 - [ ] §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased
       gain, not a hard ceiling (documented in the stable API docs); name it in the
       §90/§102 capability tables when a capping adapter (Box2D) arrives
 
 ### Backlog additions (Phase 5, 2026-08-01)
+
 - [ ] Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a
       toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
 - [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
@@ -63,18 +85,21 @@ changes in `CHANGELOG.md`.
       beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
+
 - [ ] Coverage thresholds are package-level; consider per-file granularity so a weak file
       can't hide behind a strong package average
 - [ ] Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is
       invisible; schedule blending with §60a color management work
 
 ### Backlog additions (Phase 3 exit findings)
+
 - [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
       deferral recorded in MEMORY 2026-08-01)
 
 ## Backlog
 
 ### Later milestones (decided 2026-07-29)
+
 - [ ] Deploy the public interactive demo (demo-first principle, `docs/POSITIONING.md`) —
       demo-ready static build confirmed at Phase 3a exit; deployment is the owner's step
       (note: subpath hosting like GitHub Pages needs a `--base` flag at build time)
@@ -85,6 +110,7 @@ changes in `CHANGELOG.md`.
       `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
 
 ### Documentation
+
 - [ ] Optionally regenerate the specification PDF from `docs/SPECIFICATION.md` (the archived
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
@@ -102,7 +128,7 @@ changes in `CHANGELOG.md`.
       with dated notes (see backlog and docs/AUDIT-120.md S-5)
 - [x] 2026-08-04 — **Zero-findings sweep** (owner-directed): consolidated all 5
       baselined TRUE_DUPLICATE names (SeededRandom → core, JsonValue/cloneJsonValue →
-      core with the __proto__ strengthening, DEFAULT_GRAVITY_Y → core, ColorRGBA →
+      core with the **proto** strengthening, DEFAULT_GRAVITY_Y → core, ColorRGBA →
       math; includes the Phase 9 "hoist SeededRandom" item), broke both type-only
       import cycles (AuthorityNode structural seam; RigidBodyEventMap declaration
       merging), un-exported physics-rapier's 21 in-file-only transcribed interfaces;

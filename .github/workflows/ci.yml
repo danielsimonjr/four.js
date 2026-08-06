@@ -53,6 +53,15 @@ jobs:
       - name: Check specification
         run: pnpm check-spec
 
+      # Doc-truth gate (added 2026-08-05). Prose has no type checker: the sweep
+      # that added this found claims that were false when written and survived
+      # for months. check-docs pins the ones that were fixed by hand — example
+      # counts against `git ls-files`, placeholder directories that docs must
+      # not send readers to, and the exact retired wordings — so a revert or a
+      # copy-paste from an old revision fails here instead of shipping.
+      - name: Check documentation truth
+        run: pnpm check-docs
+
       # Architecture invariants. `graph` regenerates docs/Architecture from a full
       # parse; `graph:check` then asserts every browser-facing `.` entry stays free
       # of node: builtins. four.js targets the browser, so a node: import reaching a

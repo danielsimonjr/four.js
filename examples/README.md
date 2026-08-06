@@ -1,8 +1,14 @@
 # Examples
 
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
-(§118–119). Every major feature should have a runnable example (§93). Entries below are
-implemented where noted; the rest are scaffold only.
+(§118–119). Every major feature should have a runnable example (§93).
+
+**Six examples are implemented.** The other six entries below are **not yet written; the
+directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
+they were described only as "scaffold only" in this paragraph while reading like a catalogue
+of demos in the list; each such row now carries the marker on its own line. The absence is
+dated in `docs/AUDIT-120.md` as **S-8**, and `tools/check-docs.mjs` fails if this file or a
+guide points at one of them without the marker.
 
 - [`first-2d-scene/`](first-2d-scene/) — **Implemented.** First 2D scene (§93) grown into
   the interactive demo: shapes, motion, picking, dragging, text, animation
@@ -23,11 +29,29 @@ implemented where noted; the rest are scaffold only.
 - [`physics-playground/`](physics-playground/) — **Implemented.** The §108 Phase 5 exit
   demonstration: a 2D world and a 3D world stepping side by side through one API —
   gravity, collisions, click impulses, sensor zones (`pnpm run playground:build`).
-  Fulfils the role sketched for `first-physics-scene/` (scaffold entry kept until the
+  Fulfils the role sketched for `first-physics-scene/` (placeholder entry kept until the
   owner retires it).
-- [`first-3d-scene/`](first-3d-scene/) — First 3D scene (§93): mesh, camera, lighting.
-- [`first-animated-scene/`](first-animated-scene/) — First animated scene (§93): tweens and a timeline.
-- [`first-physics-scene/`](first-physics-scene/) — First physics scene (§93): gravity, collisions, impulses.
-- [`mixed-scene/`](mixed-scene/) — Mixed 2D/3D/physics/UI example (§93, §97).
-- [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) — Flagship demo (§118): rotating cube, 2D orbit, pendulum, bouncing body, labels, UI panel, timeline, motorized hinge, collision events, pause/slow-motion/step.
-- [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) — Engineering flagship (§119): electric motor digital twin — animated rotor, bearing constraints, PID speed control, fault injection, waveforms, replay.
+- [`ui-demo/`](ui-demo/) — **Implemented.** §73–§75's retained-mode UI: a `@four/ui` panel of
+  buttons and labels laid out by the package and skinned by the application, driven by real
+  pointer and keyboard input, with a drawn focus ring (`pnpm run ui-demo:build`). Listed
+  here from 2026-08-05; it shipped earlier and this file had never mentioned it.
+- [`first-3d-scene/`](first-3d-scene/) — **Not yet written; directory is a placeholder.**
+  Planned as §93's first 3D scene: mesh, camera, lighting. No shipped example uses a
+  `PerspectiveCamera`, so this is the one placeholder with no stand-in.
+- [`first-animated-scene/`](first-animated-scene/) — **Not yet written; directory is a
+  placeholder.** Planned as §93's first animated scene: tweens and a timeline. Animation
+  ships inside `first-2d-scene/`.
+- [`first-physics-scene/`](first-physics-scene/) — **Not yet written; directory is a
+  placeholder.** Planned as §93's first physics scene: gravity, collisions, impulses.
+  `physics-playground/` fulfils the role (kept until the owner retires the entry).
+- [`mixed-scene/`](mixed-scene/) — **Not yet written; directory is a placeholder.** Planned
+  as the mixed 2D/3D/physics/UI example (§93, §97). `physics-playground/` steps a 2D and a
+  3D world side by side.
+- [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) — **Not yet
+  written; directory is a placeholder.** Planned as the §118 flagship: rotating cube, 2D
+  orbit, pendulum, bouncing body, labels, UI panel, timeline, motorized hinge, collision
+  events, pause/slow-motion/step.
+- [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) — **Not yet written;
+  directory is a placeholder.** Planned as the §119 engineering flagship: an electric motor
+  digital twin — animated rotor, bearing constraints, PID speed control, fault injection,
+  waveforms, replay.

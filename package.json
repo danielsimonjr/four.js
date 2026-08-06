@@ -11,6 +11,7 @@
   "scripts": {
     "blending:build": "vite build examples/blending",
     "build": "pnpm -r --workspace-concurrency=4 run build",
+    "check-docs": "node tools/check-docs.mjs",
     "check-spec": "node tools/check-spec.mjs",
     "coverage": "pnpm -r --filter \"./packages/*\" exec vitest run --coverage --config ../../vitest.coverage.config.ts",
     "docs": "typedoc",

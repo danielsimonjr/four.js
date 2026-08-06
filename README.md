@@ -10,8 +10,11 @@ graph, over one fixed-step simulation loop with interpolated rendering.
 
 The full implementation plan (§103–§113a) is complete: 24 workspace packages build,
 test (≈3,000 unit tests, coverage ≥95% per package, browser-verified rendering and
-input), and lint. The §120 MVP audit stands at 42/43 shipped-or-MVP; lighting is the
-single staged absence. The packages are not yet published to npm.
+input), and lint. The §120 MVP audit stands at **43/43 shipped-or-MVP** — this line read
+"42/43 … lighting is the single staged absence" until 2026-08-05, which stopped being
+true when the lighting packet landed 2026-08-04 (`docs/AUDIT-120.md`, S-5). Six of the 43
+ship at a pinned MVP tier with a dated widening staged; see that audit's staged lines
+before quoting the count. The packages are not yet published to npm.
 
 ## Quick start (§93)
 
@@ -84,14 +87,14 @@ requestAnimationFrame(function frame(now) {
 Each example is a small Vite app; build them all with `pnpm examples:build` or serve one
 directly with `npx vite examples/<name>`.
 
-| Example              | Shows                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| `first-2d-scene`     | Scene/render/motion pillars, §13 trajectories, tweens/clips/timelines, picking, dragging, text     |
-| `physics-playground` | Rigid bodies on the Rapier adapter, mixed 2D/3D worlds, §42 authority                              |
-| `mechanism`          | §28 joints: a slider-crank driven by a motor, with live limits                                     |
-| `blending`           | §19 physics-animation blending: animated ↔ ragdoll ↔ recovering, in-place re-typing              |
-| `particles-demo`     | SoA particle core, §27 force fields, one-draw-call instanced rendering                             |
-| `ui-demo`            | @four/ui widgets (panel/buttons/labels), app-supplied skins, keyboard focus, §72 pointer events    |
+| Example              | Shows                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| `first-2d-scene`     | Scene/render/motion pillars, §13 trajectories, tweens/clips/timelines, picking, dragging, text  |
+| `physics-playground` | Rigid bodies on the Rapier adapter, mixed 2D/3D worlds, §42 authority                           |
+| `mechanism`          | §28 joints: a slider-crank driven by a motor, with live limits                                  |
+| `blending`           | §19 physics-animation blending: animated ↔ ragdoll ↔ recovering, in-place re-typing             |
+| `particles-demo`     | SoA particle core, §27 force fields, one-draw-call instanced rendering                          |
+| `ui-demo`            | @four/ui widgets (panel/buttons/labels), app-supplied skins, keyboard focus, §72 pointer events |
 
 ## The four pillars
 
