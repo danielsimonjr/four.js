@@ -256,9 +256,11 @@ describe("scene round trip (§79, §113a)", () => {
       ]);
     }
 
-    // The one body authored with no mass reports the solver-derived one, and the
-    // document carries it: registration destroys authoredness before
-    // serialization ever sees it (helper module header).
+    // The one body authored with no mass *reports* the solver-derived one and
+    // the document deliberately does **not** carry it: registration mirrors the
+    // derived mass onto `RigidBody.derivedMass` and leaves authoredness alone,
+    // so `toDescriptor()` still asks the next solver to derive (§23, §25;
+    // corrected 2026-08-06 — see the helper module header).
     const derived = (root.children ?? []).find(
       (child) => child.name === "ball-derived",
     );
@@ -266,13 +268,31 @@ describe("scene round trip (§79, §113a)", () => {
       (entry) => entry.type === "rigid-body",
     );
     expect(body).toBeDefined();
-    // Density 1 kg/m² times the circle's area (§24, §25), to f32 precision —
-    // the solver derived it, and the document simply carries what the component
-    // reported afterwards.
-    expect((body?.data as JsonObject).mass).toBeCloseTo(
-      Math.PI * BALLS[1].radius * BALLS[1].radius,
-      7,
+    expect("mass" in (body?.data as JsonObject)).toBe(false);
+
+    // Density 1 kg/m² times the circle's area (§24, §25), to f32 precision: the
+    // component still *reports* it — both before and after the reload, which is
+    // what re-derivation from the saved collider buys — even though the
+    // document never wrote it down.
+    const savedDerived = run.saved.find(
+      (state) => state.name === BALLS[1].name,
     );
+    const reloadedDerived = run.restored.find(
+      (state) => state.name === BALLS[1].name,
+    );
+    const derivedArea = Math.PI * BALLS[1].radius * BALLS[1].radius;
+    expect(savedDerived?.mass).toBeCloseTo(derivedArea, 7);
+    expect(reloadedDerived?.mass).toBeCloseTo(derivedArea, 7);
+
+    // The authored ball keeps its authored mass in the document, which is the
+    // other half of the distinction.
+    const authored = (root.children ?? []).find(
+      (child) => child.name === "ball-authored",
+    );
+    const authoredBody = (authored?.components ?? []).find(
+      (entry) => entry.type === "rigid-body",
+    );
+    expect((authoredBody?.data as JsonObject).mass).toBe(BALLS[0].mass);
   }, 30_000);
 
   it("restores every §33-relevant field bit for bit (the P11-1 gate)", async () => {

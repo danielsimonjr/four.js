@@ -33,6 +33,11 @@ export type {
   PhysicsCapabilities,
   PhysicsQueryCapabilities,
   PhysicsSolverAdapter,
+  PhysicsTuningCapabilities,
+} from "./adapter.js";
+export {
+  NO_TUNING_CAPABILITIES,
+  resolveTuningCapabilities,
 } from "./adapter.js";
 export type {
   SolverBodyAccess,

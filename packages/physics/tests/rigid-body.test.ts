@@ -18,7 +18,10 @@ import type { RigidBodyCollisionEvent } from "../src/collider.js";
 import {
   RigidBody,
   clearRigidBodyCommands,
+  setRigidBodyDerivedMass,
+  setRigidBodyRegistered,
   setRigidBodySleeping,
+  setRigidBodyType,
 } from "../src/rigid-body.js";
 import { DEFAULT_ENABLED_CCD_MODE } from "../src/types.js";
 
@@ -881,5 +884,180 @@ describe("RigidBody blend weights (§19, P7-2)", () => {
     a.animationWeight = 0.5;
 
     expect(b.animationWeight).toBe(0);
+  });
+});
+
+describe("RigidBody authored mass (§23, §25; 2026-08-06)", () => {
+  it("distinguishes an authored mass from a solver-derived one", () => {
+    // The defect this suite pins: `PhysicsWorld.addBody` read the solver's
+    // derived mass back through the `mass` *setter*, which authored it — so
+    // `toDescriptor()` re-emitted a number the author never wrote, and
+    // re-registering the body froze a mass that was meant to follow the
+    // colliders. The two are now separate channels.
+    const derived = new RigidBody({ type: "dynamic" });
+    expect(derived.massAuthored).toBe(false);
+    expect(derived.derivedMass).toBeUndefined();
+
+    setRigidBodyDerivedMass(derived, 3.5);
+    // Reported — so `inverseMass` is a number, as §23 wants — but not authored.
+    expect(derived.mass).toBe(3.5);
+    expect(derived.derivedMass).toBe(3.5);
+    expect(derived.inverseMass).toBeCloseTo(1 / 3.5, 12);
+    expect(derived.massAuthored).toBe(false);
+    expect("mass" in derived.toDescriptor()).toBe(false);
+  });
+
+  it("emits an authored mass and lets a later derivation stay silent", () => {
+    const body = new RigidBody({ type: "dynamic", mass: 2 });
+    expect(body.massAuthored).toBe(true);
+    expect(body.toDescriptor().mass).toBe(2);
+
+    // A solver may report something else (a collider's own mass properties
+    // win in some mass modes); the authored value is still what is re-emitted.
+    setRigidBodyDerivedMass(body, 9);
+    expect(body.mass).toBe(2);
+    expect(body.derivedMass).toBe(9);
+    expect(body.toDescriptor().mass).toBe(2);
+  });
+
+  it("authors a mass on assignment and un-authors it on undefined", () => {
+    const body = new RigidBody({ type: "dynamic" });
+    body.mass = 4;
+    expect(body.massAuthored).toBe(true);
+    expect(body.toDescriptor().mass).toBe(4);
+
+    body.mass = undefined;
+    expect(body.massAuthored).toBe(false);
+    expect("mass" in body.toDescriptor()).toBe(false);
+    // The derived mirror is untouched by authoring: it is the solver's field.
+    setRigidBodyDerivedMass(body, 6);
+    body.mass = 5;
+    expect(body.mass).toBe(5);
+    expect(body.derivedMass).toBe(6);
+  });
+});
+
+describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () => {
+  /** A registered dynamic body: the state the drift warnings are gated on. */
+  function registeredBody(): RigidBody {
+    const body = dynamicBody();
+    setRigidBodyRegistered(body, true);
+    return body;
+  }
+
+  it("warns once per property on a registered dynamic body", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = registeredBody();
+
+    body.mass = 3;
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("getBodyHandle");
+    body.mass = 4;
+    body.mass = 5;
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(body.mass).toBe(5);
+
+    // A different property is a different mistake and warns on its own.
+    body.linearDamping = 0.5;
+    body.angularDamping = 0.25;
+    body.gravityScale = 0;
+    expect(warn).toHaveBeenCalledTimes(4);
+    body.linearDamping = 0.75;
+    expect(warn).toHaveBeenCalledTimes(4);
+
+    // Every value still landed on the component.
+    expect(body.linearDamping).toBe(0.75);
+    expect(body.angularDamping).toBe(0.25);
+    expect(body.gravityScale).toBe(0);
+    warn.mockRestore();
+  });
+
+  it("says nothing for an unregistered body or a non-dynamic one", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const loose = dynamicBody();
+    loose.mass = 3;
+    loose.linearDamping = 1;
+    expect(warn).not.toHaveBeenCalled();
+
+    // Registered, but static: its damping and gravity scale change nothing in
+    // any solver, so there is no divergence to report.
+    const stationary = new RigidBody({ type: "static" });
+    setRigidBodyRegistered(stationary, true);
+    stationary.linearDamping = 1;
+    stationary.gravityScale = 2;
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("stops warning once the last world lets go", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = dynamicBody();
+
+    // Two worlds may hold one component; the body stops being registered when
+    // the last of them releases it.
+    setRigidBodyRegistered(body, true);
+    setRigidBodyRegistered(body, true);
+    expect(body.registeredWorldCount).toBe(2);
+    setRigidBodyRegistered(body, false);
+    expect(body.registeredWorldCount).toBe(1);
+
+    body.linearDamping = 1;
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    setRigidBodyRegistered(body, false);
+    expect(body.registeredWorldCount).toBe(0);
+    // Floored at zero, so an unpaired release cannot silence a later warning.
+    setRigidBodyRegistered(body, false);
+    expect(body.registeredWorldCount).toBe(0);
+
+    const other = dynamicBody();
+    other.angularDamping = 1;
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("warns when a registered body's §22 type is assigned directly", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = registeredBody();
+
+    body.type = "kinematic-position";
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("setBodyControlMode");
+    expect(body.type).toBe("kinematic-position");
+
+    // Still once, and still warning for a body that is no longer dynamic —
+    // the mismatch is between component and solver, whatever the type is.
+    body.type = "static";
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    // Assigning the type it already has asks for nothing and says nothing.
+    const quiet = registeredBody();
+    quiet.type = "dynamic";
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("says nothing when the world re-types the body itself", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = registeredBody();
+
+    // `PhysicsWorld.setBodyControlMode` goes through this writer *after*
+    // re-typing the solver body, so component and solver agree.
+    setRigidBodyType(body, "kinematic-velocity");
+    expect(body.type).toBe("kinematic-velocity");
+    expect(warn).not.toHaveBeenCalled();
+
+    // The §23 mass rule is still enforced on that path, and a rejected write
+    // leaves both the flag and the type alone.
+    const zero = new RigidBody({ type: "static", mass: 0 });
+    setRigidBodyRegistered(zero, true);
+    expectValidationError(() => {
+      setRigidBodyType(zero, "dynamic");
+    });
+    expect(zero.type).toBe("static");
+    zero.type = "kinematic-position";
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 });

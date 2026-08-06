@@ -54,20 +54,24 @@
  *
  * Three of those deserve their own paragraph.
  *
- * **Mass authoredness survives the document but not registration.**
+ * **Mass authoredness survives registration (corrected 2026-08-06).**
  * `PhysicsWorld.addBody` finishes by reading `getBodyMass` back onto the
- * component (`#refreshMassProperties`), so a body that asked the solver to
- * derive its mass from collider density (§23, §25) reports an *authored* mass
- * from that moment on — and so does a **static** one, whose collider still has a
- * density and therefore a positive derived mass the solver never uses (measured
- * 2026-08-02: this scenario's ground reports 20 kg and its sensor 4.8 kg). The
- * document therefore records a mass for every registered body with a collider,
- * and reloading re-authors it. That is the behaviour-preserving choice — the
- * reloaded body has the same mass the saved one had, and the suite asserts that
- * the reload's masses are bit-identical to the save's — but it is not
- * authoring-preserving: the information "this mass was derived" is destroyed by
- * registration, before serialization ever sees it. Save *before* registering to
- * keep it.
+ * component (`#refreshMassProperties`). Until 2026-08-06 that read went through
+ * the `mass` *setter*, so a body that had asked the solver to derive its mass
+ * from collider density (§23, §25) reported an **authored** mass from that
+ * moment on — as did a **static** one, whose collider still has a density and
+ * therefore a positive derived mass the solver never uses (measured 2026-08-02:
+ * this scenario's ground reported 20 kg and its sensor 4.8 kg) — and
+ * `toDescriptor()` re-emitted all of it, so the document froze a number nobody
+ * had authored.
+ *
+ * The derived value now lands on `RigidBody.derivedMass`, a read-only mirror,
+ * and `toDescriptor()` emits `mass` only for a body that really authored one.
+ * So the document carries a mass for the authored ball and **none** for the
+ * derived one, and the reload re-derives it from the collider it also carries —
+ * behaviour-preserving (the reloaded masses are still bit-identical to the
+ * save's, which this suite asserts) *and* authoring-preserving: a reloaded body
+ * whose collider is later scaled follows it, exactly as the saved one did.
  *
  * **§25's fallback chain is resolved on the way out.**
  * `Collider.toDescriptor` emits `effectiveFriction` / `effectiveRestitution` /

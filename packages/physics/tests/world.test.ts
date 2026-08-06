@@ -21,6 +21,7 @@ import type {
 import {
   Collider,
   DEFAULT_SLEEPING_CONFIG,
+  PhysicsMaterial,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
@@ -150,9 +151,14 @@ afterEach(() => {
 
 describe("PhysicsWorld construction (§20, §21, §33, §37)", () => {
   it("resolves gravity, sleeping, and determinism into the adapter's options", async () => {
+    // The threshold below is one the fake adapter declares it cannot apply, so
+    // construction warns about it (§32; see the accepted-and-ignored suite).
+    // Silenced here rather than asserted — this test is about resolution.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { adapter, world } = await readyWorld({
       sleeping: { timeThreshold: 2 },
     });
+    warn.mockRestore();
 
     expect(world.dimension).toBe("2d");
     expect(world.gravity.y).toBeCloseTo(-9.81);
@@ -1424,5 +1430,223 @@ describe("PhysicsWorld disposal (§83)", () => {
       expectFourError(() => world.addBody(dynamicNode())).message,
     ).toContain("disposed");
     await expect(world.initialize()).rejects.toThrow("disposed");
+  });
+});
+
+describe("PhysicsWorld solver handles (§20, §37; 2026-08-06)", () => {
+  it("hands out the body and collider handles it registered", async () => {
+    const { adapter, world } = await readyWorld();
+    const node = dynamicNode({ density: 2 });
+    world.addBody(node);
+
+    expect(world.getBodyHandle(node)).toBe(bodyHandle(adapter, 1));
+    const collider = node.getComponent(Collider);
+    expect(collider).toBeDefined();
+    expect(world.getColliderHandle(collider as Collider)).toBe(
+      colliderHandle(adapter, 1),
+    );
+  });
+
+  it("knows nothing about what it does not hold", async () => {
+    const { world } = await readyWorld();
+    const registered = dynamicNode();
+    world.addBody(registered);
+    const stranger = dynamicNode();
+
+    expect(world.getBodyHandle(stranger)).toBeUndefined();
+    expect(
+      world.getColliderHandle(stranger.getComponent(Collider) as Collider),
+    ).toBeUndefined();
+
+    // …and a handle is only valid while the body is registered here.
+    const collider = registered.getComponent(Collider) as Collider;
+    world.removeBody(registered);
+    expect(world.getBodyHandle(registered)).toBeUndefined();
+    expect(world.getColliderHandle(collider)).toBeUndefined();
+  });
+
+  it("releases collider handles on dispose too", async () => {
+    const { world } = await readyWorld();
+    const node = dynamicNode();
+    world.addBody(node);
+    const collider = node.getComponent(Collider) as Collider;
+
+    world.dispose();
+    expect(world.getColliderHandle(collider)).toBeUndefined();
+  });
+});
+
+describe("PhysicsWorld registration mirrors (§23, §37; 2026-08-06)", () => {
+  it("marks a body registered and unregistered again", async () => {
+    const { world } = await readyWorld();
+    const node = dynamicNode();
+    const body = world.addBody(node);
+    expect(body.registeredWorldCount).toBe(1);
+
+    world.removeBody(node);
+    expect(body.registeredWorldCount).toBe(0);
+
+    world.addBody(node);
+    expect(body.registeredWorldCount).toBe(1);
+    world.dispose();
+    expect(body.registeredWorldCount).toBe(0);
+  });
+
+  it("does not launder the solver's derived mass into an authored one", async () => {
+    // The regression: the mass refresh went through `RigidBody.mass`, so
+    // `toDescriptor()` re-emitted the solver's own derivation as an authored
+    // instruction and a re-registered body froze its mass.
+    const { world } = await readyWorld();
+    const node = dynamicNode({ density: 4 });
+    const body = world.addBody(node);
+
+    expect(body.mass).toBe(4);
+    expect(body.derivedMass).toBe(4);
+    expect(body.massAuthored).toBe(false);
+    expect("mass" in body.toDescriptor()).toBe(false);
+
+    // Re-registering with a denser collider derives a new mass rather than
+    // re-imposing the old one.
+    world.removeBody(node);
+    const collider = node.getComponent(Collider) as Collider;
+    collider.density = 9;
+    world.addBody(node);
+    expect(body.mass).toBe(9);
+    expect(body.massAuthored).toBe(false);
+  });
+
+  it("keeps an authored mass authored across registration", async () => {
+    const { world } = await readyWorld();
+    const node = dynamicNode({ mass: 3, density: 4 });
+    const body = world.addBody(node);
+
+    expect(body.massAuthored).toBe(true);
+    expect(body.toDescriptor().mass).toBe(3);
+  });
+
+  it("re-types a registered body without the drift warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { world } = await readyWorld();
+    const node = dynamicNode({ density: 2 });
+    const body = world.addBody(node);
+
+    world.setBodyControlMode(node, "kinematic-position");
+    expect(body.type).toBe("kinematic-position");
+    expect(warn).not.toHaveBeenCalled();
+
+    // Assigning the component directly is the case that does warn.
+    body.type = "dynamic";
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("setBodyControlMode");
+    warn.mockRestore();
+  });
+});
+
+describe("PhysicsWorld accepted-and-ignored tunables (§25, §32, §37)", () => {
+  /** A material carrying §25 coefficients no shipped solver applies. */
+  function rollingNode(options: {
+    rolling?: number;
+    spinning?: number;
+  }): Group {
+    const node = new Group();
+    node.addComponent(new RigidBody({ type: "dynamic" }));
+    node.addComponent(
+      new Collider({
+        shape: { type: "circle", radius: 0.5 },
+        material: new PhysicsMaterial({
+          ...(options.rolling === undefined
+            ? {}
+            : { rollingFriction: options.rolling }),
+          ...(options.spinning === undefined
+            ? {}
+            : { spinningFriction: options.spinning }),
+        }),
+      }),
+    );
+    return node;
+  }
+
+  it("warns once per world for a §25 coefficient the adapter cannot apply", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { world } = await readyWorld();
+
+    world.addBody(rollingNode({ rolling: 0.1 }));
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("rollingFriction");
+
+    // A second body with the same mistake is the same mistake.
+    world.addBody(rollingNode({ rolling: 0.2 }));
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    // The other coefficient is a separate declaration and a separate warning.
+    world.addBody(rollingNode({ spinning: 0.3 }));
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[1][0]).toContain("spinningFriction");
+    warn.mockRestore();
+  });
+
+  it("says nothing when the material carries neither, or the adapter applies both", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const plain = await readyWorld();
+    plain.world.addBody(dynamicNode());
+    plain.world.addBody(rollingNode({}));
+    expect(warn).not.toHaveBeenCalled();
+
+    const capable = await readyWorld({
+      adapter: new FakeSolverAdapter({
+        capabilities: {
+          tuning: {
+            rollingFriction: true,
+            spinningFriction: true,
+            sleepThresholds: true,
+          },
+        },
+      }),
+    });
+    capable.world.addBody(rollingNode({ rolling: 0.1, spinning: 0.2 }));
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("warns once for §32 thresholds the adapter cannot apply", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    makeWorld({ sleeping: { linearThreshold: 0.5 } });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("sleeping.linearThreshold");
+
+    // Each world answers for itself; the suppression is per world.
+    makeWorld({ sleeping: { angularThreshold: 0.5, timeThreshold: 2 } });
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[1][0]).toContain("sleeping.angularThreshold");
+    expect(warn.mock.calls[1][0]).toContain("sleeping.timeThreshold");
+    warn.mockRestore();
+  });
+
+  it("leaves Appendix A's defaults, and `enabled`, unremarked", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    // `enabled` is honoured by every adapter here, and the defaults ask for
+    // nothing the solver is not already doing.
+    makeWorld({ sleeping: { enabled: false } });
+    makeWorld({ sleeping: { ...DEFAULT_SLEEPING_CONFIG } });
+    makeWorld();
+    expect(warn).not.toHaveBeenCalled();
+
+    // An adapter that declares the thresholds gets no warning either.
+    makeWorld({
+      sleeping: { timeThreshold: 4 },
+      adapter: new FakeSolverAdapter({
+        capabilities: {
+          tuning: {
+            rollingFriction: false,
+            spinningFriction: false,
+            sleepThresholds: true,
+          },
+        },
+      }),
+    });
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
