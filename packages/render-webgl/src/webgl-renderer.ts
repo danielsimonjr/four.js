@@ -58,8 +58,14 @@ import {
   ParticleProgram,
   type ParticleGlContext,
 } from "./gl-particles.js";
-import { GL, LitProgram, SpriteProgram, UnlitProgram } from "./gl-program.js";
-import { TextureCache } from "./gl-texture.js";
+import {
+  GL,
+  LitProgram,
+  MAP_TEXTURE_UNIT,
+  SpriteProgram,
+  UnlitProgram,
+} from "./gl-program.js";
+import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 
 /**
  * The subtree root {@link WebglRenderer.render} draws, and the viewports it
@@ -379,6 +385,22 @@ function applyMaterialState(
 /** §57's `opacity`, defaulted to 1 for a material that does not declare one. */
 function opacityOf(material: ItemMaterial): number {
   return material.opacity ?? 1;
+}
+
+/**
+ * §57's `map` as this backend reads it (R-19) — the texture an unlit or lit
+ * material samples, or `null`.
+ *
+ * Read defensively, exactly as `applyMaterialState` reads the render state and
+ * for the same reason: a backend meets its materials through a *structural*
+ * contract, so a material double that predates the field — or a consumer's own
+ * material type — reports `undefined`, which has to mean "no texture" rather
+ * than leaking into `TextureCache.acquire`.
+ */
+function mapOf(material: {
+  map?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.map ?? null;
 }
 
 /**
@@ -894,9 +916,16 @@ export class WebglRenderer implements Renderer {
     // The GL state mirror starts where `#applyFixedState` and GL's own defaults
     // left it; every draw below moves it only where its material asks.
     resetGlState();
-    // Whether a texture is bound to unit 0 — only the sprite path binds one, so
-    // a frame of particles and opaque geometry has nothing to unbind at the end.
+    // Whether a texture is bound to unit 0 — the sprite path binds one, and
+    // since R-19 so does an unlit or lit draw whose material carries a `map`,
+    // so a frame of particles and untextured geometry still has nothing to
+    // unbind at the end.
     let textureBound = false;
+    // Whether `activeTexture` has selected the map unit this frame. The sprite
+    // path selects it on every switch *to* the sprite pipeline (unchanged); a
+    // mapped unlit or lit draw selects it once, on the first one — both target
+    // the same unit, so a frame that mixes them issues one call either way.
+    let mapUnitActive = false;
 
     for (const view of views) {
       // §61's clears are masked by the depth and colour write state, so a view
@@ -1043,6 +1072,21 @@ export class WebglRenderer implements Renderer {
             );
             litViewUploaded = true;
           }
+          // §57's `map` (R-19): an albedo texture, bound and switched on for
+          // this draw and switched off again by the next draw that has none.
+          // A material with no map — every material authored before R-19 —
+          // acquires nothing, binds nothing, and uploads nothing.
+          const litMap = mapOf(item.material);
+          const litTexture = litMap === null ? null : textures.acquire(litMap);
+          if (litTexture !== null) {
+            if (!mapUnitActive) {
+              gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+              mapUnitActive = true;
+            }
+            gl.bindTexture(GL.TEXTURE_2D, litTexture.texture);
+            textureBound = true;
+          }
+          litProgram.setFeatures(litTexture !== null);
           litProgram.setModel(item.worldMatrix);
           litProgram.setColor(item.material.color, opacityOf(item.material));
         } else {
@@ -1051,6 +1095,23 @@ export class WebglRenderer implements Renderer {
             activeKind = "unlit";
           }
           applyMaterialState(gl, item.material, false);
+          const map = mapOf(item.material);
+          const texture = map === null ? null : textures.acquire(map);
+          if (texture !== null) {
+            if (!mapUnitActive) {
+              gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+              mapUnitActive = true;
+            }
+            gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+            textureBound = true;
+          }
+          // §53's per-vertex colours (R-19) reach the screen here, and with
+          // them §113's debug-draw overlay (R-35): a `"lines"` geometry of
+          // positions plus colours is one draw call, not one per segment.
+          program.setFeatures(
+            texture !== null,
+            item.material.vertexColors === true,
+          );
           program.setModel(item.worldMatrix);
           program.setColor(item.material.color, opacityOf(item.material));
         }

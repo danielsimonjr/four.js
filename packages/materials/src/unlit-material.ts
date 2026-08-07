@@ -1,5 +1,6 @@
 /**
- * `UnlitMaterial` (§57) — a flat RGBA color, and nothing else.
+ * `UnlitMaterial` (§57) — a flat RGBA color, optionally multiplied by a texture
+ * and by the geometry's own per-vertex colors.
  *
  * §57 defines a `Material` family (`ShapeMaterial`, `SpriteMaterial`,
  * `TextMaterial`, `LineMaterial`, `UnlitMaterial`, `StandardMaterial`,
@@ -59,11 +60,30 @@
  * through rather than clamped (decision, WP-3.3) — clamping would silently
  * rewrite authored data, and extended-range colors are exactly what §60a will
  * need to carry — but non-finite components are rejected (§85).
+ *
+ * ## Texture and vertex colors (R-19, 2026-08-07)
+ *
+ * Until R-19 a mesh in this engine could not be textured at all: only `Sprite`
+ * sampled a texture, and it derived its uv from vertex position because §53
+ * carried no uv attribute. Both halves landed together —
+ * `BufferGeometry.uvs`/`colors` (§53) and the two multipliers below:
+ *
+ * ```text
+ * fragment = color × (map ? texture(map, uv) : 1) × (vertexColors ? vColor : 1)
+ * ```
+ *
+ * Both are **off by default and cost nothing when off**: the backend leaves the
+ * shader's two feature uniforms at GL's `0` and issues no extra call, so a
+ * scene that names neither draws the byte-identical GL sequence it drew before
+ * either existed (see `@four/render-webgl`). That property is what let this
+ * land under the pixel-golden gate, and it is why the fields are a uniform
+ * switch rather than a second material family.
  */
 
 import type { ColorRGBA } from "@four/math";
 
 import { Material, type MaterialOptions } from "./material.js";
+import type { MaterialTexture } from "./texture.js";
 
 /**
  * Straight (non-premultiplied) RGBA, each component nominally in 0…1 —
@@ -88,6 +108,17 @@ export interface UnlitMaterialOptions extends MaterialOptions {
    * white `[1, 1, 1, 1]`, so an untinted material multiplies to no change.
    */
   color?: readonly [number, number, number, number];
+
+  /**
+   * Initial {@link UnlitMaterial.map} — the texture sampled with the geometry's
+   * `uvs` (§53, §55, §77). Defaults to `null`: no texture, and no cost.
+   */
+  map?: MaterialTexture | null;
+
+  /**
+   * Initial {@link UnlitMaterial.vertexColors}; defaults to `false`.
+   */
+  vertexColors?: boolean;
 }
 
 /**
@@ -144,6 +175,10 @@ export class UnlitMaterial extends Material {
    */
   readonly color: ColorRGBA;
 
+  #map: MaterialTexture | null;
+
+  #vertexColors: boolean;
+
   constructor(options: UnlitMaterialOptions = {}) {
     super(ID_PREFIX, options);
     const color = options.color ?? [1, 1, 1, 1];
@@ -153,6 +188,76 @@ export class UnlitMaterial extends Material {
       requireFinite("blue", color[2]),
       requireFinite("alpha", color[3]),
     ];
+    this.#map = options.map ?? null;
+    this.#vertexColors = options.vertexColors ?? false;
+  }
+
+  /**
+   * The texture this material samples with the geometry's `uvs`, or `null` for
+   * an untextured surface (§53, §55, §77).
+   *
+   * ```ts
+   * const material = new UnlitMaterial({ map: texture });
+   * const mesh = new Renderable(boxGeometry(), material);   // a textured box
+   * ```
+   *
+   * The sampled texel **multiplies** the material's `color`, so the default
+   * white leaves the texture untinted and a coloured material tints it. Both
+   * sides are straight (non-premultiplied) alpha, matching §66's policy for
+   * this tier and `SpriteMaterial`'s identical rule.
+   *
+   * Assigning bumps {@link Material.version}, which is what makes a backend
+   * re-bind; the version this bumps does **not** follow the texture's own (see
+   * `SpriteMaterial.texture` for why the two counters stay separate). The
+   * **old texture is not disposed** — it may still back other materials (§83) —
+   * nor is the new one adopted.
+   *
+   * A geometry with no `uvs` samples the texel at `(0, 0)` for every fragment,
+   * because GL's constant attribute default is `(0, 0, 0, 1)`. That is a
+   * legible mistake (a flat-coloured surface) rather than a crash, and it is
+   * the reason every §53 primitive builder emits uvs.
+   */
+  get map(): MaterialTexture | null {
+    return this.#map;
+  }
+
+  set map(value: MaterialTexture | null) {
+    this.#map = value;
+    this.markDirty();
+  }
+
+  /**
+   * Whether to multiply by the geometry's per-vertex `colors` attribute (§53,
+   * §60a). `false` by default: a geometry may carry colors and still draw
+   * flat, so a mesh does not change appearance the day someone adds the
+   * attribute to it.
+   *
+   * ```ts
+   * // §113's debug-draw overlay: one segment list, one draw, per-segment colour.
+   * const geometry = new BufferGeometry({ positions, colors, mode: "lines" });
+   * const material = new UnlitMaterial({ vertexColors: true });
+   * ```
+   *
+   * This is the flag that makes §84/§113's debug overlays drawable at all
+   * (R-35): a `GL.LINES` geometry carries one colour per endpoint, so contact
+   * normals, joint frames, and force vectors are a single draw call instead of
+   * one per differently-coloured segment.
+   *
+   * A `vertexColors` material drawing a geometry with **no** `colors` attribute
+   * multiplies by GL's constant default `(0, 0, 0, 1)` and renders black. That
+   * is deliberate: it is visible, and the alternative — silently ignoring the
+   * flag — hides the missing attribute.
+   *
+   * Assigning bumps {@link Material.version}: the backend switches shader
+   * feature state on it.
+   */
+  get vertexColors(): boolean {
+    return this.#vertexColors;
+  }
+
+  set vertexColors(value: boolean) {
+    this.#vertexColors = value;
+    this.markDirty();
   }
 
   /**

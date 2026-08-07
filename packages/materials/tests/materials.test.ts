@@ -504,3 +504,89 @@ describe("Material — §57's shared render state", () => {
     expect(new GlowMaterial({ blendMode: "screen" }).blendMode).toBe("screen");
   });
 });
+
+describe("UnlitMaterial.map and .vertexColors (§53, §57; R-19)", () => {
+  it("default to no texture and no per-vertex colour", () => {
+    const material = new UnlitMaterial();
+
+    expect(material.map).toBeNull();
+    expect(material.vertexColors).toBe(false);
+    expect(material.version).toBe(0);
+  });
+
+  it("accept a texture at construction, held by reference", () => {
+    const texture = fakeTexture();
+    const material = new UnlitMaterial({ map: texture, color: [1, 0, 0, 1] });
+
+    expect(material.map).toBe(texture);
+    // Construction is not a mutation.
+    expect(material.version).toBe(0);
+  });
+
+  it("bump the version on assignment, so a backend re-binds and re-switches", () => {
+    const material = new UnlitMaterial();
+    const texture = fakeTexture();
+
+    material.map = texture;
+    expect(material.map).toBe(texture);
+    expect(material.version).toBe(1);
+
+    material.vertexColors = true;
+    expect(material.vertexColors).toBe(true);
+    expect(material.version).toBe(2);
+
+    // Dropping the texture is a mutation too — the backend has to stop binding.
+    material.map = null;
+    expect(material.map).toBeNull();
+    expect(material.version).toBe(3);
+  });
+
+  it("does not dispose the texture it points at (§83)", () => {
+    // Ownership is upwards and explicit: one atlas backs many materials, so
+    // disposing a material must not take the texture with it.
+    const texture = fakeTexture();
+    const material = new UnlitMaterial({ map: texture });
+
+    material.dispose();
+
+    expect(material.disposed).toBe(true);
+    expect(texture.disposed).toBe(false);
+    expect(material.map).toBe(texture);
+  });
+
+  it("accepts vertexColors at construction without a texture", () => {
+    // The §113 debug-draw overlay's material (R-35): colours come from the
+    // geometry, so there is nothing to bind.
+    const material = new UnlitMaterial({ vertexColors: true });
+
+    expect(material.vertexColors).toBe(true);
+    expect(material.map).toBeNull();
+  });
+});
+
+describe("LitMaterial.map (§53, §57, §59; R-19)", () => {
+  it("defaults to no texture", () => {
+    expect(new LitMaterial().map).toBeNull();
+  });
+
+  it("accepts an albedo texture at construction and by assignment", () => {
+    const first = fakeTexture("texture-test-a");
+    const second = fakeTexture("texture-test-b");
+    const material = new LitMaterial({ map: first });
+
+    expect(material.map).toBe(first);
+    expect(material.version).toBe(0);
+
+    material.map = second;
+    expect(material.map).toBe(second);
+    expect(material.version).toBe(1);
+    // The old texture is neither disposed nor adopted (§83).
+    expect(first.disposed).toBe(false);
+  });
+
+  it("has no vertexColors switch — §57 puts that on the unlit member", () => {
+    const material = new LitMaterial({ map: fakeTexture() });
+
+    expect("vertexColors" in material).toBe(false);
+  });
+});

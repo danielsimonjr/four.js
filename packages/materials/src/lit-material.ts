@@ -41,6 +41,7 @@
  */
 
 import { Material, type MaterialOptions } from "./material.js";
+import type { MaterialTexture } from "./texture.js";
 import type { ColorRGBA } from "./unlit-material.js";
 
 /**
@@ -53,6 +54,12 @@ export interface LitMaterialOptions extends MaterialOptions {
    * white `[1, 1, 1, 1]`, so an untinted material shows the lighting alone.
    */
   color?: readonly [number, number, number, number];
+
+  /**
+   * Initial {@link LitMaterial.map} — the albedo texture sampled with the
+   * geometry's `uvs` (§53, §77). Defaults to `null`.
+   */
+  map?: MaterialTexture | null;
 }
 
 /**
@@ -105,6 +112,8 @@ export class LitMaterial extends Material {
    */
   readonly color: ColorRGBA;
 
+  #map: MaterialTexture | null;
+
   constructor(options: LitMaterialOptions = {}) {
     super(ID_PREFIX, options);
     const color = options.color ?? [1, 1, 1, 1];
@@ -114,6 +123,39 @@ export class LitMaterial extends Material {
       requireFinite("blue", color[2]),
       requireFinite("alpha", color[3]),
     ];
+    this.#map = options.map ?? null;
+  }
+
+  /**
+   * The albedo texture this material samples with the geometry's `uvs`, or
+   * `null` for an untextured surface (§53, §77; R-19, 2026-08-07).
+   *
+   * The sampled texel **multiplies the base colour before the lighting term**,
+   * so a texture darkens and tints the surface and the lights then shade it:
+   *
+   * ```text
+   * base = color × texture(map, uv)
+   * fragment.rgb = base.rgb × (ambient + lightColor × max(N·−L, 0))
+   * fragment.a   = base.a
+   * ```
+   *
+   * One map, deliberately: §59's metallic-roughness workflow puts normal,
+   * roughness, metalness, occlusion, and emissive maps on `StandardMaterial`,
+   * and each of them needs a second texture unit, a sampler binding, and a
+   * shader term that §59 — not this class — defines. `LitMaterial` is the
+   * minimal lit member (see the module header); a base-colour map is the one
+   * addition that needs nothing new from the shading model.
+   *
+   * Assigning bumps {@link Material.version}. Ownership, disposal, and the
+   * uv-less-geometry behaviour are exactly `UnlitMaterial.map`'s — see it.
+   */
+  get map(): MaterialTexture | null {
+    return this.#map;
+  }
+
+  set map(value: MaterialTexture | null) {
+    this.#map = value;
+    this.markDirty();
   }
 
   /**

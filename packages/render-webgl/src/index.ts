@@ -33,11 +33,14 @@ export type {
   WebglContext,
 } from "./gl-program.js";
 export {
+  COLOR_ATTRIBUTE_LOCATION,
   GL,
   LitProgram,
+  MAP_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
   POSITION_ATTRIBUTE_LOCATION,
   SpriteProgram,
+  UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
 } from "./gl-program.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";

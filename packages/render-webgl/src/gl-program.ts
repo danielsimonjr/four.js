@@ -9,7 +9,9 @@
  *    entry points this package calls, and nothing else.
  * 2. **{@link UnlitProgram}** — the MVP tier's first pipeline: positions in,
  *    `viewProjection * model * position` out, one uniform colour in the
- *    fragment stage (§57's `UnlitMaterial`, §120's "unlit colored geometry").
+ *    fragment stage (§57's `UnlitMaterial`, §120's "unlit colored geometry"),
+ *    times an optional texture sample and an optional per-vertex colour, both
+ *    selected by a uniform switch (R-19, 2026-08-07).
  * 3. **{@link SpriteProgram}** — §55's textured quad: the same vertex arrays,
  *    a uv derived from the quad's local rectangle, one texture sample times a
  *    tint (WP-3a.3). Both pipelines bind the position stream at the same fixed
@@ -302,42 +304,120 @@ export const POSITION_ATTRIBUTE_LOCATION = 0;
 export const NORMAL_ATTRIBUTE_LOCATION = 1;
 
 /**
- * The MVP vertex stage: object space → clip space, nothing else.
+ * Vertex attribute slot the optional uv stream is bound to (§53, §55; R-19,
+ * 2026-08-07) — fixed by `layout(location = 2)`, exactly as the position and
+ * normal slots are.
+ *
+ * Location 2 collides with nothing: the particle pipeline's instance
+ * attributes live in *its own* vertex arrays and attribute bindings are VAO
+ * state, so the same number means different things in two arrays that are never
+ * bound at the same time. A geometry without uvs enables nothing here and a
+ * textured draw of it reads GL's constant default `(0, 0, 0, 1)`, i.e. samples
+ * the texel at the texture's origin for every fragment.
+ */
+export const UV_ATTRIBUTE_LOCATION = 2;
+
+/**
+ * Vertex attribute slot the optional per-vertex colour stream is bound to
+ * (§53, §60a; R-19). Four floats — straight RGBA — at `layout(location = 3)`,
+ * for the same reasons as the three slots above.
+ *
+ * A geometry without colors reads GL's constant default `(0, 0, 0, 1)`, so a
+ * `vertexColors` material drawn over one renders black; that is the documented
+ * behaviour on `UnlitMaterial.vertexColors`, chosen because a visible mistake
+ * beats a silently ignored flag.
+ */
+export const COLOR_ATTRIBUTE_LOCATION = 3;
+
+/**
+ * The texture unit the `map` sampler of the unlit and lit pipelines reads from.
+ *
+ * Unit 0, permanently, and the same unit the sprite pipeline uses: this tier
+ * binds exactly one texture per draw, and §77's multi-texture materials
+ * (normal maps, masks, atlases plus data maps) are what will need a unit
+ * allocator. Naming the constant keeps the `activeTexture` call in
+ * `webgl-renderer.ts` and the sampler upload here from drifting apart.
+ */
+export const MAP_TEXTURE_UNIT = 0;
+
+/**
+ * The MVP vertex stage: object space → clip space, plus the two optional
+ * streams the fragment stage may multiply by.
  *
  * `viewProjection` is `projection * view` and is uploaded once per viewport;
  * `model` is the render item's world matrix and changes per draw. Splitting
  * them (rather than uploading one pre-multiplied MVP) keeps the per-draw upload
  * to one matrix and matches how §64's render items are already shaped.
+ *
+ * `uv` and `vertexColor` were added by R-19 (2026-08-07). `gl_Position` is
+ * computed from exactly the same expression as before, so a scene that uses
+ * neither rasterizes identically — which is what the pixel goldens check.
  */
 const VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
+layout(location = 2) in vec2 uv;
+layout(location = 3) in vec4 vertexColor;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
 
+out vec2 vUv;
+out vec4 vColor;
+
 void main() {
+  vUv = uv;
+  vColor = vertexColor;
   gl_Position = viewProjection * model * vec4(position, 1.0);
 }
 `;
 
 /**
- * The MVP fragment stage: one flat colour (§57 `UnlitMaterial`).
+ * The MVP fragment stage: one flat colour (§57 `UnlitMaterial`), optionally
+ * multiplied by a texture sample and by the interpolated vertex colour.
  *
  * `highp` because GLSL ES 3.00 requires fragment-stage `highp` support (unlike
  * ES 1.00, where `mediump` was the portable floor), and because the colour is
  * written straight to the framebuffer — there is nothing to gain from a lower
  * precision here. Straight (non-premultiplied) alpha, linear-light components,
  * matching `Viewport.clearColor` and §60a.
+ *
+ * ## One program, two uniform switches (decision, R-19)
+ *
+ * `useMap` and `useVertexColors` are **uniforms, not `#define`d variants**. A
+ * variant set would mean two more programs to compile at initialization (or a
+ * lazy compile inside `render`, which §61 forbids throwing from), two more sets
+ * of uniform locations to keep, and a pipeline switch between a textured and an
+ * untextured draw. The switch costs one uniform branch per fragment on a
+ * pipeline that does nothing else, and — the property that mattered — **a
+ * material that names neither feature issues no additional GL call at all**:
+ * both uniforms sit at GL's initial `0`, the backend mirrors that on the CPU,
+ * and it uploads only when a draw actually changes them.
+ *
+ * With both off, `fragColor` is assigned `color` with no arithmetic in between,
+ * so the frame is bit-identical to the one this shader drew before R-19.
  */
 const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
 
 uniform vec4 color;
+uniform sampler2D map;
+uniform bool useMap;
+uniform bool useVertexColors;
+
+in vec2 vUv;
+in vec4 vColor;
 
 out vec4 fragColor;
 
 void main() {
-  fragColor = color;
+  vec4 result = color;
+  if (useVertexColors) {
+    result *= vColor;
+  }
+  if (useMap) {
+    result *= texture(map, vUv);
+  }
+  fragColor = result;
 }
 `;
 
@@ -429,14 +509,17 @@ void main() {
 const LIT_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 uv;
 
 uniform mat4 viewProjection;
 uniform mat4 model;
 
 out vec3 vNormal;
+out vec2 vUv;
 
 void main() {
   vNormal = transpose(inverse(mat3(model))) * normal;
+  vUv = uv;
   gl_Position = viewProjection * model * vec4(position, 1.0);
 }
 `;
@@ -464,16 +547,23 @@ void main() {
  *   physically honest look for a plane's back.
  * - Straight alpha, linear-light arithmetic on plain 0…1 numbers; §60a's
  *   transfer functions and tone mapping are a later packet, as everywhere.
+ * - `useMap` multiplies the **base colour**, before the lighting term, so a
+ *   texture is an albedo and the lights shade it (R-19). Off, the expression
+ *   below reduces to exactly the one this shader carried before, uniform switch
+ *   and all — see `FRAGMENT_SHADER_SOURCE` for why a uniform, not a variant.
  */
 const LIT_FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
 
 uniform vec4 color;
+uniform sampler2D map;
+uniform bool useMap;
 uniform vec3 ambientLight;
 uniform vec3 lightDirection;
 uniform vec3 lightColor;
 
 in vec3 vNormal;
+in vec2 vUv;
 
 out vec4 fragColor;
 
@@ -482,7 +572,11 @@ void main() {
   float diffuse = len > 0.0
     ? max(dot(vNormal / len, -lightDirection), 0.0)
     : 0.0;
-  fragColor = vec4(color.rgb * (ambientLight + lightColor * diffuse), color.a);
+  vec4 base = color;
+  if (useMap) {
+    base *= texture(map, vUv);
+  }
+  fragColor = vec4(base.rgb * (ambientLight + lightColor * diffuse), base.a);
 }
 `;
 
@@ -652,6 +746,7 @@ export function requireUniform(
  * program.setViewProjection(viewProjection);   // once per viewport
  * program.setModel(item.worldMatrix);          // once per draw
  * program.setColor(item.material.color);
+ * program.setFeatures(hasMap, material.vertexColors);
  * ```
  *
  * Owns its GL objects and nothing else. It is **not** re-created on context
@@ -671,6 +766,29 @@ export class UnlitProgram implements Disposable {
 
   readonly #colorLocation: GlUniformLocation;
 
+  readonly #mapLocation: GlUniformLocation;
+
+  readonly #useMapLocation: GlUniformLocation;
+
+  readonly #useVertexColorsLocation: GlUniformLocation;
+
+  /**
+   * CPU mirror of the two feature uniforms, seeded with GL's own initial value
+   * for an `int`/`bool` uniform — `0`, i.e. both off. Because the mirror starts
+   * where GL starts, a frame that never enables a feature never issues a
+   * `uniform1i`, which is the whole point (see `FRAGMENT_SHADER_SOURCE`).
+   *
+   * Uniform values live in the program object, so the mirror stays accurate
+   * across pipeline switches, views, and frames; a context loss builds a new
+   * program and therefore a new mirror.
+   */
+  #useMap = false;
+
+  #useVertexColors = false;
+
+  /** Whether the sampler unit has been uploaded — see {@link setFeatures}. */
+  #samplerUploaded = false;
+
   #disposed = false;
 
   private constructor(
@@ -679,12 +797,18 @@ export class UnlitProgram implements Disposable {
     viewProjectionLocation: GlUniformLocation,
     modelLocation: GlUniformLocation,
     colorLocation: GlUniformLocation,
+    mapLocation: GlUniformLocation,
+    useMapLocation: GlUniformLocation,
+    useVertexColorsLocation: GlUniformLocation,
   ) {
     this.#gl = gl;
     this.#program = program;
     this.#viewProjectionLocation = viewProjectionLocation;
     this.#modelLocation = modelLocation;
     this.#colorLocation = colorLocation;
+    this.#mapLocation = mapLocation;
+    this.#useMapLocation = useMapLocation;
+    this.#useVertexColorsLocation = useVertexColorsLocation;
   }
 
   /**
@@ -716,6 +840,9 @@ export class UnlitProgram implements Disposable {
         requireUniform(gl, program, "viewProjection", "unlit"),
         requireUniform(gl, program, "model", "unlit"),
         requireUniform(gl, program, "color", "unlit"),
+        requireUniform(gl, program, "map", "unlit"),
+        requireUniform(gl, program, "useMap", "unlit"),
+        requireUniform(gl, program, "useVertexColors", "unlit"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);
@@ -771,6 +898,48 @@ export class UnlitProgram implements Disposable {
     colorScratch[2] = color[2];
     colorScratch[3] = color[3] * opacity;
     this.#gl.uniform4fv(this.#colorLocation, colorScratch);
+  }
+
+  /**
+   * Selects the two optional multipliers for the draw about to be issued
+   * (§53's `uvs`/`colors`, §57's `map`, R-19): whether to sample the bound
+   * texture, and whether to multiply by the geometry's per-vertex colour.
+   *
+   * ```ts
+   * program.setFeatures(material.map !== null, material.vertexColors);
+   * ```
+   *
+   * **Issues a GL call only where the draw changes something.** The mirror
+   * starts at GL's own initial `0`/`0`, so a scene whose materials name neither
+   * feature calls this once per draw and uploads nothing — the compatibility
+   * guarantee `applyMaterialState` makes for §57's render state, made again
+   * here for the same reason and checked the same way.
+   *
+   * The `map` sampler's texture unit is uploaded lazily, the first time this
+   * program is asked for a textured draw: `glUniform1i` writes into the
+   * *currently bound* program, and a sampler upload at creation time would put
+   * the renderer's program state in two places (the argument
+   * `SpriteProgram.setSampler` records). GL's initial sampler value is already
+   * {@link MAP_TEXTURE_UNIT}, so the upload is belt and braces — it costs one
+   * call in the lifetime of a program that ever draws a texture, and nothing at
+   * all in one that does not.
+   */
+  setFeatures(useMap: boolean, useVertexColors: boolean): void {
+    if (useMap !== this.#useMap) {
+      if (useMap && !this.#samplerUploaded) {
+        this.#gl.uniform1i(this.#mapLocation, MAP_TEXTURE_UNIT);
+        this.#samplerUploaded = true;
+      }
+      this.#gl.uniform1i(this.#useMapLocation, useMap ? 1 : 0);
+      this.#useMap = useMap;
+    }
+    if (useVertexColors !== this.#useVertexColors) {
+      this.#gl.uniform1i(
+        this.#useVertexColorsLocation,
+        useVertexColors ? 1 : 0,
+      );
+      this.#useVertexColors = useVertexColors;
+    }
   }
 
   /**
@@ -1012,6 +1181,15 @@ export class LitProgram implements Disposable {
 
   readonly #lightColorLocation: GlUniformLocation;
 
+  readonly #mapLocation: GlUniformLocation;
+
+  readonly #useMapLocation: GlUniformLocation;
+
+  /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
+  #useMap = false;
+
+  #samplerUploaded = false;
+
   #disposed = false;
 
   private constructor(
@@ -1023,6 +1201,8 @@ export class LitProgram implements Disposable {
     ambientLightLocation: GlUniformLocation,
     lightDirectionLocation: GlUniformLocation,
     lightColorLocation: GlUniformLocation,
+    mapLocation: GlUniformLocation,
+    useMapLocation: GlUniformLocation,
   ) {
     this.#gl = gl;
     this.#program = program;
@@ -1032,6 +1212,8 @@ export class LitProgram implements Disposable {
     this.#ambientLightLocation = ambientLightLocation;
     this.#lightDirectionLocation = lightDirectionLocation;
     this.#lightColorLocation = lightColorLocation;
+    this.#mapLocation = mapLocation;
+    this.#useMapLocation = useMapLocation;
   }
 
   /**
@@ -1057,6 +1239,8 @@ export class LitProgram implements Disposable {
         requireUniform(gl, program, "ambientLight", "lit"),
         requireUniform(gl, program, "lightDirection", "lit"),
         requireUniform(gl, program, "lightColor", "lit"),
+        requireUniform(gl, program, "map", "lit"),
+        requireUniform(gl, program, "useMap", "lit"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);
@@ -1142,6 +1326,24 @@ export class LitProgram implements Disposable {
     vec3Scratch[1] = color[1];
     vec3Scratch[2] = color[2];
     this.#gl.uniform3fv(this.#lightColorLocation, vec3Scratch);
+  }
+
+  /**
+   * Selects whether this draw samples the bound albedo texture (§57's `map`,
+   * R-19). Identical in contract to `UnlitProgram.setFeatures` — mirrored on
+   * the CPU, uploaded only on change, sampler unit uploaded lazily — minus the
+   * vertex-colour switch, which §57 puts on `UnlitMaterial` alone.
+   */
+  setFeatures(useMap: boolean): void {
+    if (useMap === this.#useMap) {
+      return;
+    }
+    if (useMap && !this.#samplerUploaded) {
+      this.#gl.uniform1i(this.#mapLocation, MAP_TEXTURE_UNIT);
+      this.#samplerUploaded = true;
+    }
+    this.#gl.uniform1i(this.#useMapLocation, useMap ? 1 : 0);
+    this.#useMap = useMap;
   }
 
   /**

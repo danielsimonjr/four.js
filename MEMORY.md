@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — R-19/R-20 (render keystones).** Decisions worth keeping:
+  - **Textured meshes are a uniform switch, not shader variants** (`useMap`/
+    `useVertexColors` on the one unlit/lit program each): the CPU-mirrored default at GL's
+    initial `0` is what keeps an untextured scene's GL sequence byte-identical, which is
+    what let R-19 land under the pixel-golden gate. Fixed attribute locations: 0 position,
+    1 normal, **2 uv, 3 colour**; `MAP_TEXTURE_UNIT = 0` shared with the sprite pipeline.
+  - The material texture contract is `MaterialTexture` (`@four/materials`, `texture.ts`);
+    `SpriteTexture` is an alias of it — published name kept, `@four/render`'s `Texture`
+    untouched.
+  - `extrudeGeometry` **rejects concave outlines when capped** (centroid-fan caps); §52's
+    tessellation module lifts the restriction. `tubeGeometry` uses parallel transport, not
+    Frenet. `capsuleGeometry.height` measures the cylindrical section only, matching §24's
+    capsule collider.
+  - Sprite's derived-uv path deliberately not rewritten — identical mapping makes a
+    rewrite unfalsifiable by the goldens; §55's atlas packet owns it (dated note in
+    `sprite.ts`).
+  - Gotcha (repeat offender): **never `git stash` in the shared worktree** — the keystone
+    agent's baseline-comparison stash swept another agent's in-flight files for ~9 minutes
+    (restored and verified, nothing lost). Same lesson as the rebase incident.
 - **2026-08-07 — A-25: §94 machinery built, publish owner-gated.** Changesets config
   hand-authored (no `changeset init`, no lockfile change); `release.yml` calls `ci.yml`
   via a new `workflow_call` trigger so a release clears exactly the PR gates; publish is

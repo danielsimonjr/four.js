@@ -279,6 +279,162 @@ describe("BufferGeometry", () => {
     });
   });
 
+  describe("uvs (§53, §55; R-19)", () => {
+    /** One uv pair per triangle() vertex. */
+    function triangleUvs(): Float32Array {
+      return new Float32Array([0, 0, 1, 0, 0, 1]);
+    }
+
+    it("are optional and default to undefined", () => {
+      expect(new BufferGeometry({ positions: triangle() }).uvs).toBeUndefined();
+    });
+
+    it("are accepted at construction and held by reference", () => {
+      const uvs = triangleUvs();
+      const geometry = new BufferGeometry({ positions: triangle(), uvs });
+
+      expect(geometry.uvs).toBe(uvs);
+      expect(geometry.version).toBe(0);
+    });
+
+    it("rejects uvs that are not two floats per vertex", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            uvs: new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]),
+          }),
+      ).toThrow(/index-aligned/);
+    });
+
+    it("rejects non-finite uvs", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            uvs: new Float32Array([0, 0, Number.NaN, 0, 0, 1]),
+          }),
+      ).toThrow(/must be finite/);
+    });
+
+    it("validates and bumps the version through the setter", () => {
+      const geometry = new BufferGeometry({ positions: triangle() });
+
+      geometry.uvs = triangleUvs();
+      expect(geometry.version).toBe(1);
+
+      geometry.uvs = undefined;
+      expect(geometry.uvs).toBeUndefined();
+      expect(geometry.version).toBe(2);
+
+      expect(() => {
+        geometry.uvs = new Float32Array([0, 0]);
+      }).toThrow(RangeError);
+      expect(geometry.version).toBe(2);
+    });
+
+    it("pins positions and uvs to the same vertex count", () => {
+      const geometry = new BufferGeometry({
+        positions: triangle(),
+        uvs: triangleUvs(),
+      });
+
+      expect(() => {
+        geometry.positions = new Float32Array([
+          0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 0, 0, 2, 1, 0,
+        ]);
+      }).toThrow(/index-aligned/);
+      expect(geometry.vertexCount).toBe(3);
+    });
+  });
+
+  describe("colors (§53, §60a; R-19)", () => {
+    /** One straight RGBA per triangle() vertex. */
+    function triangleColors(): Float32Array {
+      return new Float32Array([1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1]);
+    }
+
+    it("are optional and default to undefined", () => {
+      expect(
+        new BufferGeometry({ positions: triangle() }).colors,
+      ).toBeUndefined();
+    });
+
+    it("are accepted at construction and held by reference", () => {
+      const colors = triangleColors();
+      const geometry = new BufferGeometry({ positions: triangle(), colors });
+
+      expect(geometry.colors).toBe(colors);
+      expect(geometry.version).toBe(0);
+    });
+
+    it("rejects colors that are not four floats per vertex", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            colors: new Float32Array([1, 0, 0, 1, 0, 1, 0, 1]),
+          }),
+      ).toThrow(/index-aligned/);
+    });
+
+    it("rejects non-finite colors", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            colors: new Float32Array([
+              1,
+              0,
+              0,
+              1,
+              0,
+              Number.POSITIVE_INFINITY,
+              0,
+              1,
+              0,
+              0,
+              1,
+              1,
+            ]),
+          }),
+      ).toThrow(/must be finite/);
+    });
+
+    it("validates and bumps the version through the setter", () => {
+      const geometry = new BufferGeometry({ positions: triangle() });
+
+      geometry.colors = triangleColors();
+      expect(geometry.version).toBe(1);
+
+      geometry.colors = undefined;
+      expect(geometry.colors).toBeUndefined();
+      expect(geometry.version).toBe(2);
+
+      expect(() => {
+        geometry.colors = new Float32Array([1, 1, 1, 1]);
+      }).toThrow(RangeError);
+      expect(geometry.version).toBe(2);
+    });
+
+    it("survives an index and a mode re-assignment, and dies with dispose", () => {
+      // The §113 debug-draw layout (R-35): a line list of coloured endpoints.
+      const geometry = new BufferGeometry({
+        positions: new Float32Array([0, 0, 0, 1, 0, 0]),
+        colors: new Float32Array([1, 0, 0, 1, 0, 0, 1, 1]),
+        mode: "lines",
+      });
+
+      geometry.indices = new Uint16Array([0, 1]);
+      geometry.mode = "lines";
+      expect(geometry.colors?.length).toBe(8);
+
+      geometry.dispose();
+      expect(geometry.colors).toBeUndefined();
+      expect(geometry.uvs).toBeUndefined();
+    });
+  });
+
   describe("bounds", () => {
     it("computes the axis-aligned box of the positions", () => {
       const geometry = new BufferGeometry({
@@ -433,6 +589,21 @@ describe("boxGeometry", () => {
     expect([...seen.values()]).toEqual([2, 2, 2, 2, 2, 2]);
   });
 
+  it("maps the whole texture onto each of the six faces (§53, R-19)", () => {
+    const geometry = boxGeometry({ width: 2, height: 3, depth: 4 });
+    const uvs = geometry.uvs;
+
+    expect(uvs?.length).toBe(geometry.vertexCount * 2);
+    // Each face's four corners carry the same unit square, in the order the
+    // positions list them: bottom-left, bottom-right, top-right, top-left.
+    for (let f = 0; f < 6; f += 1) {
+      const base = f * 4 * 2;
+      expect([...(uvs ?? []).slice(base, base + 8)]).toEqual([
+        0, 0, 1, 0, 1, 1, 0, 1,
+      ]);
+    }
+  });
+
   it("indexes only vertices it has", () => {
     const geometry = boxGeometry();
     const indices = geometry.indices;
@@ -478,6 +649,20 @@ describe("planeGeometry", () => {
       expect([normals?.[i], normals?.[i + 1], normals?.[i + 2]]).toEqual([
         0, 0, 1,
       ]);
+    }
+  });
+
+  it("maps its own unit square, v = 0 at the bottom edge (§53, R-19)", () => {
+    const geometry = planeGeometry({ width: 4, height: 2 });
+
+    expect([...(geometry.uvs ?? [])]).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+    // The uv of every vertex agrees with its position in the quad, which is
+    // what makes a textured plane and a same-sized `Sprite` show a texture
+    // identically (see `@four/render`'s `sprite.ts`).
+    for (let i = 0; i < geometry.vertexCount; i += 1) {
+      const v = vertex(geometry, i);
+      expect(geometry.uvs?.[i * 2]).toBeCloseTo((v.x + 2) / 4, 12);
+      expect(geometry.uvs?.[i * 2 + 1]).toBeCloseTo((v.y + 1) / 2, 12);
     }
   });
 
@@ -549,8 +734,22 @@ describe("circleGeometry2D", () => {
     }
   });
 
-  it("stays position-only — 2D shapes are unlit (§120, 2026-08-04)", () => {
+  it("stays normal-less — 2D shapes are unlit (§120, 2026-08-04)", () => {
     expect(circleGeometry2D().normals).toBeUndefined();
+  });
+
+  it("maps the bounding square, centre at (0.5, 0.5) (§53, R-19)", () => {
+    const radius = 3;
+    const geometry = circleGeometry2D({ radius, segments: 8 });
+    const uvs = geometry.uvs;
+
+    expect(uvs?.length).toBe(geometry.vertexCount * 2);
+    expect([uvs?.[0], uvs?.[1]]).toEqual([0.5, 0.5]);
+    for (let i = 1; i < geometry.vertexCount; i += 1) {
+      const v = vertex(geometry, i);
+      expect(uvs?.[i * 2]).toBeCloseTo(0.5 + v.x / (2 * radius), 6);
+      expect(uvs?.[i * 2 + 1]).toBeCloseTo(0.5 + v.y / (2 * radius), 6);
+    }
   });
 
   it("widens the index type when 16 bits cannot address every vertex", () => {

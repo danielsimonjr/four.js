@@ -54,9 +54,11 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  COLOR_ATTRIBUTE_LOCATION,
   GL,
   GeometryCache,
   LitProgram,
+  MAP_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
@@ -65,6 +67,7 @@ import {
   ParticleProgram,
   SpriteProgram,
   TextureCache,
+  UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
   WebglRenderer,
   type ParticleGlContext,
@@ -525,6 +528,12 @@ class TestGeometry {
   /** Optional per-vertex normal stream (§53, §68) — undefined by default. */
   normals: Float32Array | undefined;
 
+  /** Optional uv stream (§53, §55; R-19) — undefined by default. */
+  uvs: Float32Array | undefined;
+
+  /** Optional per-vertex colour stream (§53, §60a; R-19) — undefined too. */
+  colors: Float32Array | undefined;
+
   indices: Uint16Array | Uint32Array | undefined;
 
   mode: "triangles" | "lines" = "triangles";
@@ -534,6 +543,8 @@ class TestGeometry {
     indices?: Uint16Array | Uint32Array,
     mode: "triangles" | "lines" = "triangles",
     normals?: Float32Array,
+    uvs?: Float32Array,
+    colors?: Float32Array,
   ) {
     nextTestGeometryId += 1;
     this.id = `test-geometry-${String(nextTestGeometryId)}`;
@@ -541,6 +552,8 @@ class TestGeometry {
     this.indices = indices;
     this.mode = mode;
     this.normals = normals;
+    this.uvs = uvs;
+    this.colors = colors;
   }
 
   get drawCount(): number {
@@ -558,6 +571,8 @@ class TestGeometry {
   dispose(): void {
     this.positions = new Float32Array(0);
     this.normals = undefined;
+    this.uvs = undefined;
+    this.colors = undefined;
     this.indices = undefined;
     this.markDirty();
   }
@@ -590,6 +605,15 @@ class TestMaterial {
 
   opacity?: number;
 
+  /**
+   * §57's `map` and §53's per-vertex colour switch (R-19) — also optional and
+   * unset by default, for the same reason: the double that predates them is
+   * exactly the case whose GL sequence must not change.
+   */
+  map?: ItemTexture | null;
+
+  vertexColors?: boolean;
+
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
   }
@@ -610,6 +634,9 @@ class TestLitMaterial {
   readonly kind = "lit" as const;
 
   readonly color: [number, number, number, number];
+
+  /** §57's albedo `map` (R-19); unset by default, like the unlit double's. */
+  map?: ItemTexture | null;
 
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
@@ -1157,7 +1184,7 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
 });
 
 describe("UnlitProgram — compilation and linking (§61, §89)", () => {
-  it("compiles both stages, links, and resolves the three uniforms", () => {
+  it("compiles both stages, links, and resolves the six uniforms", () => {
     const gl = createFakeGl();
 
     const program = UnlitProgram.create(gl);
@@ -1168,9 +1195,19 @@ describe("UnlitProgram — compilation and linking (§61, §89)", () => {
       GL.FRAGMENT_SHADER,
     ]);
     expect(gl.countOf("linkProgram")).toBe(1);
+    // `map`/`useMap`/`useVertexColors` joined with R-19 (2026-08-07): the
+    // pipeline gained two optional multipliers as uniform switches rather than
+    // as shader variants, so the program count is still one.
     expect(
       gl.callsOf("getUniformLocation").map((call) => call.args[1]),
-    ).toEqual(["viewProjection", "model", "color"]);
+    ).toEqual([
+      "viewProjection",
+      "model",
+      "color",
+      "map",
+      "useMap",
+      "useVertexColors",
+    ]);
     expect(program.disposed).toBe(false);
   });
 
@@ -3526,7 +3563,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the six uniforms", () => {
+  it("compiles both stages, links, and resolves the eight uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -3542,6 +3579,9 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
       "ambientLight",
       "lightDirection",
       "lightColor",
+      // §57's albedo `map` and its switch (R-19, 2026-08-07).
+      "map",
+      "useMap",
     ]);
     expect(program.disposed).toBe(false);
   });
@@ -4164,5 +4204,494 @@ describe("WebglRenderer.render — §57 render state (R-11)", () => {
     expect(uploadsAt(gl, spriteUniforms(gl).get("tint"))).toEqual([
       [1, 1, 1, 0.25],
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §53 standard attributes, §57 `map`, and per-vertex colour (R-19, R-35).
+//
+// The claim under test is the same two-sided one §57's render state makes: a
+// material that asks for a texture or for vertex colours gets them, and a
+// material that asks for neither costs the frame **nothing** — no extra
+// program, no extra uniform upload, no texture binding. The second half is what
+// keeps every scene authored before R-19 issuing byte-for-byte the GL sequence
+// it always did, and it is why the two features are uniform switches on one
+// program rather than shader variants.
+// ---------------------------------------------------------------------------
+
+/** Three vertices with a uv per vertex — the textured-triangle double. */
+function uvTriangleGeometry(): TestGeometry {
+  return new TestGeometry(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    undefined,
+    "triangles",
+    undefined,
+    new Float32Array([0, 0, 1, 0, 0, 1]),
+  );
+}
+
+/** The unlit program's uniform handles — it is the first program built. */
+function unlitUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("useVertexColors")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the unlit program never resolved its uniforms");
+}
+
+describe("GeometryCache — the uv and colour streams (§53, R-19)", () => {
+  it("uploads uvs at the fixed third location, two floats per vertex", () => {
+    const gl = createFakeGl();
+    const record = new GeometryCache(gl).acquire(
+      uvTriangleGeometry().asGeometry,
+    );
+
+    expect(record?.uvBuffer).not.toBeNull();
+    expect(record?.colorBuffer).toBeNull();
+    expect(gl.countOf("createBuffer")).toBe(2);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, UV_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      UV_ATTRIBUTE_LOCATION,
+      2,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([0, 0, 1, 0, 0, 1]);
+  });
+
+  it("uploads colours at the fixed fourth location, four floats per vertex", () => {
+    const gl = createFakeGl();
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0]),
+      undefined,
+      "lines",
+      undefined,
+      undefined,
+      new Float32Array([1, 0, 0, 1, 0, 0, 1, 1]),
+    );
+
+    const record = new GeometryCache(gl).acquire(geometry.asGeometry);
+
+    expect(record?.colorBuffer).not.toBeNull();
+    expect(record?.mode).toBe(GL.LINES);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, COLOR_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      COLOR_ATTRIBUTE_LOCATION,
+      4,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([
+      1, 0, 0, 1, 0, 0, 1, 1,
+    ]);
+  });
+
+  it("binds all four streams in the documented slot order", () => {
+    const gl = createFakeGl();
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      new Uint16Array([0, 1, 2]),
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+      new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    );
+
+    const record = new GeometryCache(gl).acquire(geometry.asGeometry);
+
+    expect(record?.normalBuffer).not.toBeNull();
+    expect(record?.uvBuffer).not.toBeNull();
+    expect(record?.colorBuffer).not.toBeNull();
+    expect(record?.indexBuffer).not.toBeNull();
+    // Positions, normals, uvs, colours — and the index buffer, which is not an
+    // attribute and enables nothing.
+    expect(gl.countOf("createBuffer")).toBe(5);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([
+      POSITION_ATTRIBUTE_LOCATION,
+      NORMAL_ATTRIBUTE_LOCATION,
+      UV_ATTRIBUTE_LOCATION,
+      COLOR_ATTRIBUTE_LOCATION,
+    ]);
+  });
+
+  it("leaves both slots untouched for a position-only geometry", () => {
+    const gl = createFakeGl();
+    const record = new GeometryCache(gl).acquire(triangleGeometry().asGeometry);
+
+    expect(record?.uvBuffer).toBeNull();
+    expect(record?.colorBuffer).toBeNull();
+    expect(gl.countOf("createBuffer")).toBe(1);
+  });
+
+  it("deletes every attribute buffer when a stale version re-uploads (§53)", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      undefined,
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+      new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    );
+    cache.acquire(geometry.asGeometry);
+    gl.reset();
+
+    geometry.markDirty();
+    cache.acquire(geometry.asGeometry);
+
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(gl.countOf("deleteBuffer")).toBe(4);
+  });
+
+  it("unwinds every buffer it allocated when GL refuses a later one", () => {
+    // Positions and uvs succeed, the colour buffer does not: the record is
+    // abandoned, and nothing it created survives.
+    const gl = createFakeGl();
+    let buffers = 0;
+    const base = gl.createBuffer.bind(gl);
+    gl.createBuffer = (): object | null => {
+      buffers += 1;
+      return buffers === 3 ? null : base();
+    };
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      undefined,
+      "triangles",
+      undefined,
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+      new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    );
+    const cache = new GeometryCache(gl);
+
+    expect(cache.acquire(geometry.asGeometry)).toBeNull();
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(cache.size).toBe(0);
+  });
+
+  it("unwinds when GL refuses the uv buffer itself", () => {
+    const gl = createFakeGl();
+    let buffers = 0;
+    const base = gl.createBuffer.bind(gl);
+    gl.createBuffer = (): object | null => {
+      buffers += 1;
+      return buffers === 2 ? null : base();
+    };
+
+    expect(new GeometryCache(gl).acquire(uvTriangleGeometry().asGeometry)).toBe(
+      null,
+    );
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("UnlitProgram / LitProgram — the R-19 feature switches", () => {
+  it("declares the uv and colour attributes at the fixed locations", () => {
+    const gl = createFakeGl();
+
+    UnlitProgram.create(gl);
+
+    const sources = gl.callsOf("shaderSource").map((call) => call.args[1]);
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
+    );
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(COLOR_ATTRIBUTE_LOCATION)}) in vec4 vertexColor;`,
+    );
+    expect(String(sources[1])).toContain("uniform sampler2D map;");
+    expect(String(sources[1])).toContain("uniform bool useMap;");
+    expect(String(sources[1])).toContain("uniform bool useVertexColors;");
+  });
+
+  it("declares the uv attribute on the lit pipeline too", () => {
+    const gl = createFakeGl();
+
+    LitProgram.create(gl);
+
+    const sources = gl.callsOf("shaderSource").map((call) => call.args[1]);
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
+    );
+    expect(String(sources[1])).toContain("uniform sampler2D map;");
+  });
+
+  it("uploads nothing while both features stay off — GL already starts there", () => {
+    const gl = createFakeGl();
+    const program = UnlitProgram.create(gl);
+    gl.reset();
+
+    program.setFeatures(false, false);
+    program.setFeatures(false, false);
+
+    expect(gl.countOf("uniform1i")).toBe(0);
+  });
+
+  it("uploads the sampler unit once, on the first textured draw", () => {
+    const gl = createFakeGl();
+    const program = UnlitProgram.create(gl);
+    const uniforms = unlitUniforms(gl);
+    gl.reset();
+
+    program.setFeatures(true, false);
+    program.setFeatures(true, false);
+    program.setFeatures(false, false);
+    program.setFeatures(true, false);
+
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    // On, off, on — three switch uploads, and never one for an unchanged value.
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0, 1]);
+  });
+
+  it("switches vertex colours independently of the texture", () => {
+    const gl = createFakeGl();
+    const program = UnlitProgram.create(gl);
+    const uniforms = unlitUniforms(gl);
+    gl.reset();
+
+    program.setFeatures(false, true);
+    program.setFeatures(false, true);
+    program.setFeatures(false, false);
+
+    expect(uploadsAt(gl, uniforms.get("useVertexColors"))).toEqual([1, 0]);
+    // No texture was ever asked for, so the sampler was never uploaded.
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([]);
+  });
+
+  it("mirrors the lit pipeline's one switch the same way", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    const uniforms = litUniforms(gl);
+    gl.reset();
+
+    program.setFeatures(false);
+    program.setFeatures(true);
+    program.setFeatures(true);
+    program.setFeatures(false);
+
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+  });
+});
+
+describe("WebglRenderer.render — textured and vertex-coloured meshes (R-19)", () => {
+  it("costs an untextured, uncoloured scene nothing at all", async () => {
+    // The compatibility guarantee, asserted as the absence of every call the
+    // two features could have made — the same shape as R-11's assertion, and
+    // the reason this could land under the pixel-golden gate.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("useProgram")).toBe(1);
+    expect(gl.countOf("uniform1i")).toBe(0);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("activeTexture")).toBe(0);
+    expect(gl.countOf("createTexture")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("binds a mapped unlit material's texture and switches the sampler on", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const material = new TestMaterial([1, 1, 1, 1]);
+    material.map = texture.asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = unlitUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    expect(gl.callsOf("activeTexture")[0].args[0]).toBe(
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+    );
+    // Bound before the draw, and unbound when the frame ends.
+    const names = gl.names();
+    expect(names.indexOf("bindTexture")).toBeLessThan(
+      names.indexOf("drawArrays"),
+    );
+    expect(gl.callsOf("bindTexture").at(-1)?.args[1]).toBeNull();
+    // Still one pipeline: the switch is a uniform, not a variant.
+    expect(gl.countOf("useProgram")).toBe(1);
+  });
+
+  it("switches the sampler back off for an untextured item after a textured one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const textured = new TestMaterial();
+    textured.map = new TestTexture().asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), textured));
+    root.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, unlitUniforms(gl).get("useMap"))).toEqual([1, 0]);
+    expect(gl.countOf("drawArrays")).toBe(2);
+    // One `activeTexture` for the frame, whatever the mix.
+    expect(gl.countOf("activeTexture")).toBe(1);
+  });
+
+  it("skips the map of a disposed texture rather than drawing undefined content", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    texture.dispose();
+    const material = new TestMaterial();
+    material.map = texture.asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // §83: the geometry still draws, flat-coloured — the *texture* is what is
+    // unusable, not the mesh.
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("uniform1i")).toBe(0);
+  });
+
+  it("binds a lit material's albedo map through the lit pipeline", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const material = new TestLitMaterial([1, 0, 0, 1]);
+    material.map = new TestTexture().asTexture;
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      undefined,
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+    );
+    const root = createRoot();
+    root.add(litRenderable(geometry, material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = litUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    // The last thing the frame does is unbind, whatever the upload path bound
+    // on the way (§61: leave nothing bound).
+    expect(gl.callsOf("bindTexture").at(-1)?.args[1]).toBeNull();
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // The geometry's uv stream went up alongside its normals.
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([
+      POSITION_ATTRIBUTE_LOCATION,
+      NORMAL_ATTRIBUTE_LOCATION,
+      UV_ATTRIBUTE_LOCATION,
+    ]);
+  });
+
+  it("shares one GL texture between a sprite and a mapped mesh", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const material = new TestMaterial();
+    material.map = texture.asTexture;
+    const root = createRoot();
+    root.add(sprite(new TestSpriteMaterial(texture)));
+    root.add(renderable(uvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The texture cache is keyed on the texture, not on the pipeline that
+    // reaches it, so one upload serves both.
+    expect(gl.countOf("createTexture")).toBe(1);
+    // The sprite's quad is indexed and the mesh is not, so the two draws come
+    // out of different entry points.
+    expect(gl.countOf("drawElements") + gl.countOf("drawArrays")).toBe(2);
+  });
+
+  it("draws a lines-mode geometry with per-vertex colour in ONE call (R-35)", async () => {
+    // The §113 debug-draw overlay, end to end: `DebugDrawBuffer`'s seven-float
+    // segment layout splits into positions plus straight-RGBA colours, uploads
+    // as one `"lines"` geometry, and draws through the unlit pipeline with
+    // `vertexColors` on. Before R-19 there was no colour attribute and no
+    // switch to consume it, so the overlay had never been shown as pixels.
+    const { renderer, gl, camera } = await initialized();
+    // Two segments: a red one along +X, a green one along +Y.
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0]),
+      undefined,
+      "lines",
+      undefined,
+      undefined,
+      new Float32Array([1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]),
+    );
+    const material = new TestMaterial();
+    material.vertexColors = true;
+    const root = createRoot();
+    root.add(renderable(geometry, material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = unlitUniforms(gl);
+    // The switch is on, the texture switch is not, and no texture was bound.
+    expect(uploadsAt(gl, uniforms.get("useVertexColors"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([]);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    // The colours reached the GPU at the documented slot, four per vertex.
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, COLOR_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      COLOR_ATTRIBUTE_LOCATION,
+      4,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([
+      1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+    ]);
+    // Four vertices, two segments, **one** draw call — the property that makes
+    // an overlay of thousands of segments affordable (§84).
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.callsOf("drawArrays")[0].args).toEqual([GL.LINES, 0, 4]);
+    // The material's flat colour still multiplies, so an overlay can be faded.
+    expect(uploadsAt(gl, uniforms.get("color"))).toEqual([[1, 1, 1, 1]]);
+  });
+
+  it("re-uploads the feature state after a context loss and restore (§61)", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const material = new TestMaterial();
+    material.map = new TestTexture().asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), material));
+    renderer.render(root, [createView(camera)]);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    // A restored context brings a fresh program whose uniforms are back at
+    // GL's defaults — and a fresh CPU mirror with them — so both the sampler
+    // unit and the switch go up again rather than being assumed still set.
+    expect(gl.countOf("uniform1i")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(1);
   });
 });

@@ -1,13 +1,14 @@
 /**
- * Primitive geometry builders (§53) — the three shapes the §120 MVP needs.
+ * Primitive geometry builders (§53) — the box, the plane, and the 2D circle.
  *
  * §53 lists eleven required 3D primitives (plane, box, sphere, cylinder, cone,
  * capsule, torus, lathe, extrusion, tube, height field) and §50 lists the 2D
- * shape family. This packet builds **box**, **plane**, and a 2D **circle**,
- * which is the smallest set that exercises both dimensionalities end to end:
- * a solid with six differently-oriented faces, a flat quad, and a fan-shaped
- * 2D shape. The rest are later packets; adding them here would multiply the
- * winding and attribute review surface without changing a single renderer path.
+ * shape family. This module builds **box**, **plane**, and a 2D **circle** —
+ * the smallest set that exercises both dimensionalities end to end: a solid
+ * with six differently-oriented faces, a flat quad, and a fan-shaped 2D shape.
+ * The other nine 3D primitives live in `primitives-3d.ts`, which closed R-20 on
+ * 2026-08-07 and where the note this header used to carry ("the rest are later
+ * packets") was finally spent.
  *
  * ## Conventions (§7a)
  *
@@ -30,10 +31,23 @@
  * here deferred to, and it made the deferred call: a box with per-face normals
  * carries 24 vertices rather than 8, because a corner shared by three faces
  * has three different normals and an indexed vertex can hold only one. The
- * **2D** builder (`circleGeometry2D`) stays position-only: 2D shapes are
- * unlit in the §120 tier, and a normal on a flat shape that never lights
- * would be dead weight in every upload. Uvs, tangents, and the rest of §53's
- * attribute set remain with the packets that need them.
+ * **2D** builder (`circleGeometry2D`) stays position-only for normals: 2D
+ * shapes are unlit in the §120 tier, and a normal on a flat shape that never
+ * lights would be dead weight in every upload.
+ *
+ * **Every** builder here emits `uvs` as of R-19 (2026-08-07) — §53's `uv`
+ * attribute, two floats per vertex, `v = 0` at the bottom edge (§7a). Emitting
+ * them costs one Float32Array per geometry and changes nothing a scene draws:
+ * the unlit and lit pipelines sample a texture only when their material carries
+ * a `map`, so an untextured box uploads a uv stream that no fragment reads.
+ * The layouts are stated per builder below, because a uv layout is a public
+ * contract the moment anyone paints a texture against it.
+ *
+ * Tangents, a secondary uv set, joints/weights, and instance transforms remain
+ * with the packets that need them. `colors` is a `BufferGeometry` attribute
+ * that no *primitive* emits: a solid-colour box wants a material colour, not
+ * 24 copies of one RGBA (§113's debug draw is the caller that builds colour
+ * streams, and it builds them from segments, not from primitives).
  *
  * Options are validated the way `BufferGeometry` validates its buffers: extents
  * must be finite and positive, segment counts finite integers ≥ 3, and a
@@ -42,37 +56,7 @@
  */
 
 import { BufferGeometry } from "./buffer-geometry.js";
-import type { GeometryIndexArray } from "./buffer-geometry.js";
-
-/**
- * Highest vertex count addressable by a `Uint16Array` index — 65 536 vertices
- * means a maximum index of 65 535.
- */
-const UINT16_VERTEX_LIMIT = 65536;
-
-/**
- * Allocates the narrowest index array that can address `vertexCount` vertices.
- * WebGL 2 accepts both element types, and the 16-bit form halves the upload for
- * every primitive this packet builds.
- */
-function createIndices(
-  indexCount: number,
-  vertexCount: number,
-): GeometryIndexArray {
-  return vertexCount <= UINT16_VERTEX_LIMIT
-    ? new Uint16Array(indexCount)
-    : new Uint32Array(indexCount);
-}
-
-/** Validates one extent (width/height/depth/radius). */
-function requirePositive(name: string, value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new RangeError(
-      `${name} must be a finite positive number; got ${String(value)} (§85).`,
-    );
-  }
-  return value;
-}
+import { createIndices, requirePositive } from "./primitive-support.js";
 
 /** Options of {@link boxGeometry}. All extents default to 1. */
 export interface BoxGeometryOptions {
@@ -122,6 +106,16 @@ export interface CircleGeometry2DOptions {
  * a corner belongs to three faces with three different normals, so a lit box
  * needs the split — exactly the trade the original attribute note predicted.
  * The triangles drawn are the same 12, so unlit rendering is unchanged.
+ *
+ * ## Uv layout (§53, R-19)
+ *
+ * **Per face, not an atlas**: each of the six faces maps the *whole* `[0, 1]²`
+ * texture, with `(0, 0)` at the face's first listed corner and `v` growing
+ * towards the face's "up". A single texture therefore appears once on every
+ * side — the behaviour a crate, a die, or a debug grid wants — instead of six
+ * strips of one image. An atlased box, where each face takes a sub-rectangle,
+ * is what §55's `frame` regions are for and needs a layout convention this
+ * builder must not invent (decision, R-19).
  */
 export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
   const hx = requirePositive("width", options.width ?? 1) / 2;
@@ -171,6 +165,18 @@ export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
      0, -1,  0,   0, -1,  0,   0, -1,  0,   0, -1,  0, // -Y
   ]);
 
+  // Each face's four corners are listed bottom-left, bottom-right, top-right,
+  // top-left as seen from outside, so one uv quad serves all six (§53, R-19).
+  // prettier-ignore
+  const uvs = new Float32Array([
+    0, 0,  1, 0,  1, 1,  0, 1, // +Z
+    0, 0,  1, 0,  1, 1,  0, 1, // -Z
+    0, 0,  1, 0,  1, 1,  0, 1, // +X
+    0, 0,  1, 0,  1, 1,  0, 1, // -X
+    0, 0,  1, 0,  1, 1,  0, 1, // +Y
+    0, 0,  1, 0,  1, 1,  0, 1, // -Y
+  ]);
+
   // Two triangles per face over its four corners: (0, 1, 2) and (0, 2, 3)
   // within the face, offset by the face's base vertex.
   const indices = new Uint16Array(36);
@@ -185,7 +191,13 @@ export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
     indices[offset + 5] = base + 3;
   }
 
-  return new BufferGeometry({ positions, normals, indices, mode: "triangles" });
+  return new BufferGeometry({
+    positions,
+    normals,
+    uvs,
+    indices,
+    mode: "triangles",
+  });
 }
 
 /**
@@ -203,6 +215,13 @@ export function boxGeometry(options: BoxGeometryOptions = {}): BufferGeometry {
  * above lights from `+Y` as expected. The back side is a legitimate view
  * (back-face culling is off, see `@four/render-webgl`) but Lambert-dark:
  * a face lit from behind receives its ambient term only.
+ *
+ * Uv (§53, R-19) is the quad's own unit square seen from +Z: `(0, 0)` at the
+ * bottom-left corner, `u` growing with `+x`, `v` growing with `+y`. That is the
+ * same mapping the sprite pipeline derives from a quad's local rectangle
+ * (`@four/render-webgl`), so a textured plane and a `Sprite` of the same size
+ * show a texture identically — which is what makes the derived-uv workaround
+ * safe to retire when its packet gets to it.
  */
 export function planeGeometry(
   options: PlaneGeometryOptions = {},
@@ -221,9 +240,19 @@ export function planeGeometry(
   const normals = new Float32Array([
     0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
   ]);
+  // prettier-ignore
+  const uvs = new Float32Array([
+    0, 0,  1, 0,  1, 1,  0, 1,
+  ]);
   const indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
 
-  return new BufferGeometry({ positions, normals, indices, mode: "triangles" });
+  return new BufferGeometry({
+    positions,
+    normals,
+    uvs,
+    indices,
+    mode: "triangles",
+  });
 }
 
 /**
@@ -240,6 +269,13 @@ export function planeGeometry(
  * Rim vertex `i` sits at angle `2πi / segments`, so vertices advance
  * counter-clockwise from +X and every triangle `(centre, i, i + 1)` is wound
  * counter-clockwise seen from +Z (§7a).
+ *
+ * Uv (§53, R-19) is the circle's **bounding square**: `(0.5, 0.5)` at the
+ * centre and `(0.5 + 0.5·cos θ, 0.5 + 0.5·sin θ)` on the rim, so a texture is
+ * mapped as if painted on the square the disc is inscribed in and the disc cuts
+ * out its middle. That is the mapping a radial gauge, a clock face, or a
+ * circular sprite wants; the alternative — polar uv, `u = θ/2π`, `v = r/radius`
+ * — belongs to whichever packet needs a swirl and can add it as an option.
  */
 export function circleGeometry2D(
   options: CircleGeometry2DOptions = {},
@@ -255,13 +291,20 @@ export function circleGeometry2D(
 
   const vertexCount = segments + 1;
   const positions = new Float32Array(vertexCount * 3);
-  // positions[0..2] is the centre, already zero.
+  const uvs = new Float32Array(vertexCount * 2);
+  // positions[0..2] is the centre, already zero; its uv is the square's middle.
+  uvs[0] = 0.5;
+  uvs[1] = 0.5;
   for (let i = 0; i < segments; i += 1) {
     const angle = (2 * Math.PI * i) / segments;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
     const offset = (i + 1) * 3;
-    positions[offset] = radius * Math.cos(angle);
-    positions[offset + 1] = radius * Math.sin(angle);
+    positions[offset] = radius * cos;
+    positions[offset + 1] = radius * sin;
     positions[offset + 2] = 0;
+    uvs[(i + 1) * 2] = 0.5 + 0.5 * cos;
+    uvs[(i + 1) * 2 + 1] = 0.5 + 0.5 * sin;
   }
 
   const indices = createIndices(segments * 3, vertexCount);
@@ -273,5 +316,5 @@ export function circleGeometry2D(
     indices[offset + 2] = ((i + 1) % segments) + 1;
   }
 
-  return new BufferGeometry({ positions, indices, mode: "triangles" });
+  return new BufferGeometry({ positions, uvs, indices, mode: "triangles" });
 }

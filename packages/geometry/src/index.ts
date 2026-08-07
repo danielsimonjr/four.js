@@ -8,6 +8,29 @@ export type {
 } from "./buffer-geometry.js";
 export { BufferGeometry } from "./buffer-geometry.js";
 export type {
+  CapsuleGeometryOptions,
+  ExtrudeGeometryOptions,
+  HeightFieldGeometryOptions,
+  LatheGeometryOptions,
+  Point2D,
+  Point3D,
+  SphereGeometryOptions,
+  TaperedGeometryOptions,
+  TorusGeometryOptions,
+  TubeGeometryOptions,
+} from "./primitives-3d.js";
+export {
+  capsuleGeometry,
+  coneGeometry,
+  cylinderGeometry,
+  extrudeGeometry,
+  heightFieldGeometry,
+  latheGeometry,
+  sphereGeometry,
+  torusGeometry,
+  tubeGeometry,
+} from "./primitives-3d.js";
+export type {
   BoxGeometryOptions,
   CircleGeometry2DOptions,
   PlaneGeometryOptions,

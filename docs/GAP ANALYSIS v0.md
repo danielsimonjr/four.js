@@ -1007,6 +1007,14 @@ The set is **closed at the type level**, which is the ergonomics half of this ga
 
 ### R-19 — Sprites and 3D geometry cannot be textured; §53 ships two of eight standard attributes
 
+> **CLOSED 2026-08-07** (the load-bearing half) — `BufferGeometry.uvs`/`.colors` on the
+> `normals` precedent; `UnlitMaterial.map`/`.vertexColors` and `LitMaterial.map` over the
+> new `MaterialTexture` contract; uv/colour streams in `@four/render-webgl` behind a
+> uniform switch whose GL-initial-`0` default keeps untextured scenes byte-identical
+> (pixel goldens unchanged). R-35's data path now exists. Sprite's derived-uv path stays,
+> deliberately — §55's atlas packet owns the rewrite. Tangents, second uv, joints/weights,
+> and instance transform remain deferred. Kept for the record.
+
 **§53, §54, §55.** `BufferGeometry` carries `positions`, optional `normals`, optional `indices`, `mode` — and nothing else (`packages/geometry/src/buffer-geometry.ts:293-355`). §53's standard set requires position, normal, **tangent, color, uv and secondary uv, joints and weights, instance transform, custom typed attributes**. Six of eight are absent.
 
 The sharpest consequence is not obvious from the attribute list: **there is no way to texture a mesh.** `UnlitMaterial` and `LitMaterial` carry a colour and no texture; only `Sprite` samples a texture, and it derives uv **from vertex position** as a documented workaround (`packages/render/src/sprite.ts:56-66`). So a textured box, a textured ground plane, or a textured glTF mesh is unreachable through the public API.
@@ -1021,6 +1029,13 @@ Secondary consequence: no per-vertex `color` attribute is why §113's debug-draw
 ## Geometry
 
 ### R-20 — §53: 3 of 11 required 3D primitives; no sphere, no cylinder, no capsule, no torus
+
+> **CLOSED 2026-08-07** — nine primitives shipped (`sphere`, `cylinder`, `cone`,
+> `capsule`, `torus`, `lathe`, `extrude`, `tube`, `heightField`): Y-up, centred, CCW,
+> analytic normals + uvs, §85-validated, tests recomputing face normals from positions as
+> an independent oracle. `extrude` rejects concave capped outlines until §52's
+> tessellation module; `tube` is parallel-transported; `capsule.height` matches §24's
+> collider measurement. Kept for the record.
 
 **§53.** `@four/geometry` exports `boxGeometry`, `planeGeometry`, `circleGeometry2D` (`packages/geometry/src/primitives.ts`). Missing: **sphere, cylinder, cone, capsule, torus, lathe, extrusion, tube, height field** — nine of eleven.
 **Severity:** blocker. `@four/physics` ships sphere, capsule and cylinder _colliders_; there is no way to draw them. Every physics demo therefore renders boxes for round bodies, and §119's motor model is unbuildable.

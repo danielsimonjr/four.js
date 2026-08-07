@@ -27,6 +27,19 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 2 (2026-08-07) — in progress
 
+- [x] **R-19 + R-20 DONE 2026-08-07** (render-tier keystones): `BufferGeometry.uvs`/
+      `.colors`, `UnlitMaterial.map`/`.vertexColors`, `LitMaterial.map`, nine 3D
+      primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
+      is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
+      `@four/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
+- [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
+      restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
+      uvs); qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly
+- [ ] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
+      `tests/browser/blending.spec.ts:978` ("RECOVER: a second click blends the chain
+      back onto its animation") fails intermittently under load, passes in isolation —
+      needs a de-flake pass of its own
+
 - [x] **A-26 DONE 2026-08-07.** `docs/COMPATIBILITY.md` (§90's five tables) +
       `tools/generate-compatibility.mjs` (solver-adapter block generated from live
       capability declarations; `--check` detects drift)

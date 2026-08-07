@@ -8,6 +8,50 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — R-19 + R-20 closed: §53 vertex attributes, textured meshes, nine 3D primitives
+
+The render tier's two keystone gaps close together. Until now a mesh could not be textured
+at all (only `Sprite` sampled a texture, deriving uv from position) and the 3D primitive
+set stopped at box/plane.
+
+#### Added
+
+- **`BufferGeometry.uvs` / `.colors` (R-19, §53)** — on the `normals` precedent exactly:
+  optional, index-aligned, §85-validated on assignment, version-bumping setters, dropped by
+  `dispose()`. Uvs now ship from `boxGeometry` (per-face), `planeGeometry`, and
+  `circleGeometry2D`. The remaining §53 attributes (tangents, second uv, joints/weights,
+  instance transform) stay deferred with the existing notes.
+- **`UnlitMaterial.map` / `.vertexColors`, `LitMaterial.map`** — the texture contract is
+  the new `MaterialTexture` (`packages/materials/src/texture.ts`); `SpriteTexture` stays
+  exported as an alias, so `@four/render`'s `Texture` is untouched. The lit map multiplies
+  the base colour **before** the lighting term.
+- **Nine 3D primitives (R-20, §53)** — `sphere`, `cylinder`, `cone`, `capsule`, `torus`,
+  `lathe`, `extrude`, `tube`, `heightField`: Y-up, centred, CCW, analytic normals, uvs.
+  `capsule.height` measures the cylindrical section only (§24's collider convention);
+  `tube` uses a parallel-transported frame (Frenet flips at straight runs); `extrude`
+  **rejects concave outlines when `capped`** (§85 — centroid-fan caps would draw folded;
+  §52's tessellation module lifts this). Tests recompute face normals from positions as an
+  independent oracle.
+- **Vertex-colour unlit path (unblocks R-35)** — a `"lines"` geometry with per-endpoint
+  colours draws as one call with `useVertexColors=1`; the §84/§113 debug-overlay data path
+  now exists end to end.
+
+#### Changed
+
+- **Untextured scenes issue a byte-identical GL sequence.** The unlit/lit pipelines sample
+  the map through a uniform switch on one program (`useMap`/`useVertexColors`, CPU mirror
+  seeded at GL's initial `0`), not shader variants — a material naming neither feature
+  issues no extra GL call. That property is what let this land under the pixel-golden
+  gate. Attribute locations are now fixed: 0 position, 1 normal, 2 uv, 3 colour.
+- `Sprite`'s derived-uv path is deliberately unchanged (the rewrite belongs to §55's atlas
+  packet, which can retire `SpriteProgram`'s `quad` uniform with it — dated note in
+  `sprite.ts`).
+
+Gates: geometry/materials/render/render-webgl 96/57/130/211 unit tests; geometry and
+materials at 100% coverage (kept), render 99.65 / render-webgl 99.55; suites 183
+bit-exact; 38/38 browser with byte-unchanged visual goldens; TypeDoc 0; sizes within
+limits (ui-demo 28.1/30 kB — 1.9 kB headroom left).
+
 ### 2026-08-07 — A-25: §94 release machinery built (publish stays owner-gated)
 
 #### Added
