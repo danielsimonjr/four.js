@@ -104,7 +104,11 @@
  *   restores the §23/§24/§25 default, exactly as `@four/motion` does;
  * - **`type`, `ccdMode`, and `shape.type`** — absent or unrecognized throws a
  *   `FourError` naming the field and the section, because loading half a
- *   simulation is worse than not loading it.
+ *   simulation is worse than not loading it;
+ * - **`inertiaTensor`** — absent is a statement ("derive it"), so it restores a
+ *   body that derives; *present and unreadable* throws (2026-08-07), because
+ *   the alternative is to silently change the body's mass mode. See
+ *   {@link readMatrix3}.
  *
  * ## Conventions (§7a, §7b)
  *
@@ -274,16 +278,37 @@ function readCCDMode(value: JsonValue | undefined): CCDMode {
   );
 }
 
-/** Reads nine column-major elements into a fresh `Matrix3`, or `undefined`. */
+/**
+ * Reads nine column-major elements into a fresh `Matrix3`; `undefined` only
+ * when the field is **absent**.
+ *
+ * Absent means "derive the inertia from the colliders" (§23) — a statement the
+ * document is entitled to make. Present-but-unreadable means nothing, and it is
+ * refused (2026-08-07): until then a malformed tensor was silently treated as
+ * an absent one, which flips the body's mass mode from authored to derived on
+ * load. That changes what the solver simulates and shows up as a checksum
+ * divergence with nothing anywhere to point at — the failure mode this module's
+ * "a tag has no defensible default" rule exists to prevent, and an authored mass
+ * distribution is as much of a tag as `type` is.
+ */
 function readMatrix3(value: JsonValue | undefined): Matrix3 | undefined {
-  if (!Array.isArray(value) || value.length !== 9) {
+  if (value === undefined) {
     return undefined;
+  }
+  if (!Array.isArray(value) || value.length !== 9) {
+    return fail(
+      `A rigid-body document's "inertiaTensor" is present but is not nine column-major elements (§23, §79); silently deriving the inertia instead would change what is simulated.`,
+      { field: "inertiaTensor", value },
+    );
   }
   const elements = value as readonly JsonValue[];
   const values: number[] = [];
   for (const element of elements) {
     if (typeof element !== "number" || !Number.isFinite(element)) {
-      return undefined;
+      return fail(
+        `A rigid-body document's "inertiaTensor" carries ${JSON.stringify(element)}, which is not a finite number (§23, §79).`,
+        { field: "inertiaTensor", value: element },
+      );
     }
     values.push(element);
   }
@@ -434,14 +459,25 @@ export interface RigidBodyDocument {
   /** §19 animated share of a `"blended"` pose. */
   readonly animationWeight: number;
   /**
-   * §32 sleep state **as diagnostics only**.
+   * §32 sleep state **as diagnostics only** — written by this serializer,
+   * never read by it.
    *
    * Recorded so a saved document says whether the body was simulating, and
    * deliberately *not* applied on load: sleep is solver state (§34), and
    * `RigidBody.sleeping` is read-only precisely because only a solver report may
-   * change it (§23, §32).
+   * change it (§23, §32). It earns its bytes when a §79 document is read beside
+   * a §34 snapshot of the same moment — "this body reloaded awake because it was
+   * asleep when saved" is otherwise unanswerable from the document alone.
+   *
+   * **Optional on the read side** (decision, 2026-08-07). The write side always
+   * emits it, so every document this build produces carries it and no existing
+   * file's bytes moved; the type says `?` because `deserialize` ignores the
+   * field entirely, so a hand-written or foreign document that omits it is
+   * perfectly valid and must not be described as malformed. The alternative
+   * considered — dropping the field — would have changed the bytes of every
+   * rigid-body document to save nothing that anyone reads a document for.
    */
-  readonly sleeping: boolean;
+  readonly sleeping?: boolean;
 }
 
 /**

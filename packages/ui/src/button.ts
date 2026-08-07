@@ -63,7 +63,12 @@
  * - **Chords are ignored.** Control-Enter, Alt-Space, and Command-Enter mean
  *   something to the host or the application, not to a button. Shift is not in
  *   that list: Shift-Enter still activates, as it does on a DOM button.
- * - **The default is suppressed**, so Space does not also scroll the host page.
+ * - **The default is suppressed when — and only when — the keystroke was
+ *   consumed**, so Space does not also scroll the host page after it activated
+ *   a button, and *does* scroll it when the button refused (2026-08-07: the
+ *   suppression used to run before {@link Button.activate} and therefore also
+ *   swallowed the key for a disabled or disposed button, which emits nothing;
+ *   a control that does nothing must not eat the host's key).
  *
  * Both keys act on `keydown`. The DOM distinguishes them (Enter activates on
  * key-down, Space on key-up, so a Space can be aborted by dragging off), and
@@ -118,8 +123,10 @@ export class Button extends Panel {
     this.addSubscription(
       this.on("keydown", (event) => {
         if (event.target !== this || !isActivationKey(event)) return;
-        event.preventDefault();
-        this.activate("keyboard");
+        // Suppress the platform default exactly when the keystroke was
+        // consumed — `activate` returns false for a disabled, disposed, or
+        // disabled-by-`enabled` button, which emitted nothing.
+        if (this.activate("keyboard")) event.preventDefault();
       }),
     );
   }

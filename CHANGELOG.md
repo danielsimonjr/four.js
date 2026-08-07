@@ -8,6 +8,58 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — Closure-review fixes: 24 findings from the adversarial pass over the wave commits
+
+An adversarial code review of the five landed closure batches (93cda8d, ab13840, fe8eb6f,
+c843e2d, b48f053) produced 25 verified findings; the 24 whose files were free are fixed
+here (the render-tier `glState` findings land separately). Each behavioral fix carries a
+regression test; each doc contradiction now has doc and code agreeing, with dated in-place
+corrections.
+
+#### Fixed
+
+- **`KinematicController` has a §79 serializer** and `registerSceneNodeTypes` registers it
+  — a scene using the component could not be saved at all after A-15's throw-by-default
+  (the right default, which obliges the umbrella to cover every shipped component). The
+  payload is deliberately empty (`{}`): the class has no constructor options, in-flight
+  commands are §79-excluded simulation state, and `followPath` holds a live `Trajectory`
+  no document can name. **Registry completeness is now enforced mechanically**: an
+  enumerating test walks every umbrella barrel for `static typeName` classes and requires
+  each to be registered — a sixth component must be registered or the suite fails.
+- **Physics teardown no longer does O(N·M) discarded work**: `#destroyRegistration` issues
+  one `destroyBody` (§37: "destroys a body and everything attached to it") instead of N
+  per-collider destroys each running a full-world heir scan and a doomed mass
+  recomputation; Rapier `BodyRecord`s keep a per-body `colliderIds` list so the heir
+  lookup is O(1) anyway. Snapshot bytes unchanged; goldens bit-identical.
+- **`wrap: false` keyboard traversal really leaves the widget tree** (it was a focus trap
+  with an extra step: the next Tab re-entered via the root fallback and suppressed the
+  host default). Leaving now costs the documented two keystrokes.
+- **`Button` suppresses the platform default only when it consumed the key** — a disabled
+  focused button no longer swallows Space's scroll while emitting nothing.
+- **`PointerInput` no longer erases a gesture started from inside a `pointerleave`**
+  (ending-state flag; a re-press during teardown mints a fresh entry, as the doc claimed).
+- **`KeyboardInput` is inert after `dispose()`** (a retained surface listener no longer
+  reaches the scene).
+- **`Application` validates `options.resolution` on the resolution-only path**
+  (`resolution: 0` reached `renderer.resize` unchecked).
+- **`reserveNodeId` no longer saturates at `MAX_SAFE_INTEGER`** (a hostile id then handed
+  every subsequent node the same id — the exact collision the guard exists to prevent).
+- **A malformed `inertiaTensor` in a §79 document is refused loudly** instead of silently
+  switching the body to collider-derived rotational inertia (a §33 checksum divergence
+  with nothing to point at).
+- Doc corrections: the fabricated §61 quotation about camera aspect is restated as the
+  A-7 decision it was (citing §47/§48), and `resize` is §45's seventh method, not eighth.
+
+#### Changed
+
+- `RigidBodyDocument.sleeping` is now optional on the read side (write side still emits it
+  — bytes unchanged); it is write-only diagnostics and says so.
+- `dispatchThreePhase` type-pairs its two listener keys (`capture:pointerup` with
+  `keydown` no longer type-checks); drift warnings fire only on real value changes
+  (self-assignment no longer burns the one-shot warn slot); `RigidBody.#massAuthored`
+  deleted (derived from `#mass !== undefined`); keyboard traversal allocates its focus
+  order per keystroke, matching `PointerInput`'s stated re-entrancy discipline.
+
 ### 2026-08-07 — A-23 closed: §96 untrusted-content limits enforced and tested
 
 Asset loads and document decoders now enforce input-size limits and a deadline, and the

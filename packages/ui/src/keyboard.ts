@@ -65,19 +65,25 @@ function byTabIndex(a: UIWidget, b: UIWidget): number {
 }
 
 /**
- * Whether Tab visits `widget`: it must be focusable, interactable, and not have
- * opted out with a negative `tabIndex`.
+ * Whether Tab visits `widget`: it must be focusable, not disabled, not
+ * disposed, and not have opted out with a negative `tabIndex`.
  *
  * `interactive` is deliberately **not** consulted. It governs whether *pointers*
  * reach a widget (it is what drops one from `collectPickables`), and a control
  * that is unreachable by mouse is precisely the one a keyboard user still needs
  * — the DOM makes the same distinction between `pointer-events: none` and
  * `tabindex="-1"`.
+ *
+ * `enabled` is not consulted either, and for the opposite reason: it is a
+ * **subtree** rule, not a per-widget one. `collectInto` prunes at the first
+ * node that is `enabled = false` — so a disabled panel takes its buttons with
+ * it, and nothing that reaches this function can be disabled (2026-08-07: the
+ * `widget.enabled` term that used to stand here was dead, and reading it here
+ * suggested a per-widget test that would have disagreed with the walk).
  */
 function isTabbable(widget: UIWidget): boolean {
   return (
     widget.focusable &&
-    widget.enabled &&
     !widget.disabled &&
     !widget.disposed &&
     tabIndexOf(widget) >= 0
@@ -169,6 +175,10 @@ export interface KeyboardTraversalOptions {
    * widget tree the way it would leave any other component of the host page.
    * That is the right default for a UI panel embedded in a larger document, and
    * the wrong one for a full-screen application, which is why it is a choice.
+   *
+   * Leaving costs **two** keystrokes, and the second one is the one that
+   * escapes (2026-08-07): see {@link installKeyboardTraversal} for why, and for
+   * what the corrected wording replaced.
    */
   wrap?: boolean;
 }
@@ -188,6 +198,29 @@ export interface KeyboardTraversalOptions {
  * everywhere else); a Tab chorded with Alt, Control, or Meta is not ours and is
  * passed through untouched.
  *
+ * ## Leaving the tree with `wrap: false` (corrected 2026-08-07)
+ *
+ * The option's note used to promise that the traversal "**blurs** at each end
+ * and lets the keystroke through with its platform default intact, so the focus
+ * leaves the widget tree" — which described one keystroke and delivered
+ * something else. With the documented wiring (`keyboardFocusTarget` falls back
+ * to the root when nothing is focused) the *next* Tab arrived at the root with
+ * nothing focused, was read as "enter the tree", and put the focus straight back
+ * on the first widget with `preventDefault()` on top. The focus left for exactly
+ * one keystroke and the host never got one.
+ *
+ * What happens now: the keystroke that steps off the end blurs and passes
+ * through (the host moves its own focus ring), and the **next** Tab is passed
+ * through as well — the traversal remembers that it just let go, so it does not
+ * treat "nothing focused" as an invitation to re-enter. The keystroke after
+ * that re-enters at the near end, which is what a user tabbing back into an
+ * embedded panel means. Two keystrokes leave, the third returns; nothing in
+ * that sequence suppresses a host default the traversal did not act on.
+ *
+ * The exit memory is deliberately one-shot and per-installation: anything that
+ * moves the focus back into the tree — a click, a programmatic `focus()`, the
+ * re-entering Tab itself — makes the next Tab an ordinary step again.
+ *
  * Nothing here writes a transform, and nothing here activates anything — a
  * focused `Button` reads its own Enter and Space.
  */
@@ -196,8 +229,12 @@ export function installKeyboardTraversal(
   options: KeyboardTraversalOptions = {},
 ): Unsubscribe {
   const wrap = options.wrap ?? true;
-  /** Traversal-order scratch, reused across keystrokes; see `collectFocusOrder`. */
-  const order: UIWidget[] = [];
+  /**
+   * Whether the previous Tab deliberately stepped off the end of a `wrap:
+   * false` traversal. Cleared by the keystroke that consumes it, and by every
+   * keystroke that focuses something. See the header.
+   */
+  let exited = false;
 
   return root.on("keydown", (event: SceneKeyEvent) => {
     if (event.key !== "Tab") {
@@ -208,7 +245,11 @@ export function installKeyboardTraversal(
       return;
     }
 
-    collectFocusOrder(root, order);
+    // Allocated per keystroke rather than kept as shared scratch, matching
+    // `PointerInput`'s discipline: a listener may dispatch another keystroke
+    // through this same tree, and a reused array would be rewritten underneath
+    // the walk still using it. Tab is not a hot path.
+    const order = collectFocusOrder(root);
     if (order.length === 0) {
       return;
     }
@@ -219,8 +260,13 @@ export function installKeyboardTraversal(
 
     // Nothing focused (or the focused widget is not in this order — it may be
     // hidden, disabled, or opted out since it took the focus): enter the tree
-    // at the end Tab arrives from.
+    // at the end Tab arrives from — unless the previous Tab was the one that
+    // left it, in which case this keystroke belongs to the host too.
     if (current === null || from === -1) {
+      if (exited) {
+        exited = false;
+        return;
+      }
       order[backwards ? order.length - 1 : 0].focus();
       event.preventDefault();
       return;
@@ -230,6 +276,7 @@ export function installKeyboardTraversal(
     if (next < 0 || next >= order.length) {
       if (!wrap) {
         // The focus leaves the tree: drop it and let the host have the key.
+        exited = true;
         current.blur();
         return;
       }
@@ -238,6 +285,7 @@ export function installKeyboardTraversal(
       return;
     }
 
+    exited = false;
     order[next].focus();
     event.preventDefault();
   });

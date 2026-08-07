@@ -2115,9 +2115,26 @@ export class PhysicsWorld {
   }
 
   /**
-   * Warns once per world when a registered collider carries a §25 material
-   * coefficient the adapter has declared it cannot apply (§25, §37;
+   * Warns once per world when a collider carries, **at `addBody`**, a §25
+   * material coefficient the adapter has declared it cannot apply (§25, §37;
    * 2026-08-06).
+   *
+   * ## Registration time only, and why it stays that way (decision, 2026-08-07)
+   *
+   * This runs from `addBody` and nowhere else, so a `PhysicsMaterial` attached
+   * to a collider *after* its body was registered — or mutated in place, which
+   * §25 materials permit — is never inspected and never warned about. That is
+   * not an oversight to be papered over with a second call site: a collider
+   * component has no change channel to the world at all (the same gap
+   * `RigidBody`'s "this write reaches no solver" warnings name from the other
+   * side), so there is nothing to hook. A post-registration material assignment
+   * does not reach the solver either, with or without adapter support, so the
+   * unhonoured-coefficient warning would be the *second* thing wrong with it
+   * and not the first.
+   *
+   * Widening §37 so that live material changes reach a solver is the packet
+   * that should also move this check; until then the honest scope is stated
+   * here rather than implied by where the call happens to sit.
    *
    * `PhysicsMaterial.rollingFriction` and `spinningFriction` are §25 fields the
    * stable API accepts and validates, and no Rapier 0.19.3 build has a binding
@@ -2763,24 +2780,53 @@ export class PhysicsWorld {
   }
 
   /**
-   * Destroys one registration's solver objects, colliders first (§37, §83), and
-   * releases the component-side bookkeeping that went with them: the
-   * component→handle indices {@link PhysicsWorld.getColliderHandle} reads, and
-   * the `RigidBody`'s registration count, which is what its
-   * "this write reaches no solver" warnings are gated on.
+   * Destroys one registration's solver objects (§37, §83) and releases the
+   * component-side bookkeeping that went with them: the component→handle
+   * indices {@link PhysicsWorld.getColliderHandle} reads, and the `RigidBody`'s
+   * registration count, which is what its "this write reaches no solver"
+   * warnings are gated on.
    *
    * The single place both `removeBody` and `dispose` funnel through, so a
    * disposed world leaves no component believing it is still simulated.
+   *
+   * ## One `destroyBody`, not one call per collider (2026-08-07)
+   *
+   * §37 defines `destroyBody` as destroying "a body and everything attached to
+   * it", so the body's colliders are the adapter's to free and this method
+   * frees them by destroying the body. It used to call `destroyCollider` for
+   * each of them first, which was work no one could observe and work that cost:
+   * every such call re-established the §23 mass of a body that ceased to exist
+   * on the next line — on the Rapier adapters a `Collider.setMass` on a
+   * collider already being removed plus a `recomputeMassPropertiesFromColliders`
+   * per collider, each preceded by a scan for the body's surviving
+   * lowest-id collider. Teardown of an N-collider body was quadratic in the
+   * world's collider count for a result that was immediately discarded.
+   *
+   * **Teardown path only, and nothing else moved.** A world registers and
+   * unregisters colliders with their body — there is no single-collider
+   * removal on this class — so this is the only call site that changed;
+   * `PhysicsSolverAdapter.destroyCollider` remains §37's contract for an
+   * adapter used directly, and both Rapier adapters keep the mass refresh that
+   * matters when a collider is destroyed and its body survives. Step order,
+   * event dispatch, and the order of the registry deletions below are
+   * untouched: the component→handle indices are still released in reverse
+   * registration order, and a stepping world sees exactly the solver calls it
+   * saw before.
+   *
+   * The one thing this leans on is the §37 sentence quoted above. An adapter
+   * whose `destroyBody` left its colliders behind was already violating it —
+   * and would previously have been rescued by this method's per-collider calls,
+   * which is a rescue no contract promised.
    */
   #destroyRegistration(registration: BodyRegistration): void {
+    // Body first: §37 makes the adapter responsible for what is attached to it.
+    this.#adapter.destroyBody(registration.handle);
     for (let i = registration.colliders.length - 1; i >= 0; i -= 1) {
       const collider = registration.colliders[i];
       this.#collidersById.delete(collider.id);
       this.#collidersByComponent.delete(collider.collider);
-      this.#adapter.destroyCollider(collider.handle);
     }
     registration.colliders.length = 0;
-    this.#adapter.destroyBody(registration.handle);
     setRigidBodyRegistered(registration.body, false);
     if (registration.tracked) {
       this.#poses?.untrack(registration.node);

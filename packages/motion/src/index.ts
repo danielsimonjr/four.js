@@ -47,7 +47,10 @@ export type {
 } from "./motion-component.js";
 export { MotionComponent, MotionSystem } from "./motion-component.js";
 export type { ComponentSerializerShape } from "./serializers.js";
-export { MOTION_COMPONENT_SERIALIZER } from "./serializers.js";
+export {
+  KINEMATIC_CONTROLLER_SERIALIZER,
+  MOTION_COMPONENT_SERIALIZER,
+} from "./serializers.js";
 export type { PIDControllerOptions, PIDDerivativeSource } from "./pid.js";
 export { DEFAULT_PID_OUTPUT_LIMITS, PIDController } from "./pid.js";
 export {

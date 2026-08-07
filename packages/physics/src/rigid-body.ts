@@ -37,10 +37,13 @@
  * | §26 forces and impulses, `wake()` / `sleep()` | component → solver, once per fixed step, through the command buffers below — the supported way to influence a running body. |
  *
  * The setters that fall in the second row warn once per body when the body is a
- * registered dynamic one, naming the two routes that do work: re-register the
- * body (`removeBody` → `addBody`, which rebuilds the descriptor), or reach the
+ * registered dynamic one **and the assignment actually changes the value**
+ * (2026-08-07), naming the two routes that do work: re-register the body
+ * (`removeBody` → `addBody`, which rebuilds the descriptor), or reach the
  * solver directly through `PhysicsWorld.getBodyHandle(node)` and the adapter's
- * `SolverBodyAccess`. The velocity vectors and `centerOfMass` are `readonly`
+ * `SolverBodyAccess`. A self-assignment desynchronizes nothing, and the
+ * warning is one-shot per body per field: spending it on a no-op would silence
+ * the write that follows. The velocity vectors and `centerOfMass` are `readonly`
  * fields mutated in place, so *no* interception is possible there — the table
  * above is their only warning. Widening the §37 seam so these become live
  * writes is deliberately a later wave.
@@ -318,6 +321,17 @@ interface RigidBodyWorldBinding {
  * keep enforcing it. Set and cleared synchronously around one assignment — no
  * `await` and no user callback runs in between — so it can never be observed in
  * the set state by anything else.
+ *
+ * **The hazard, stated (2026-08-07).** Being module-level, the flag suppresses
+ * the type-drift warning for *every* `RigidBody` in the process while it is
+ * set, not merely for the one being re-typed. That is safe only because of the
+ * "no callback in between" property above: the window is one assignment inside
+ * `setRigidBodyType`, so no other body's setter can run in it. It would stop
+ * being safe the moment the `type` setter emitted an event, invoked a change
+ * hook, or otherwise handed control to application code — a listener re-typing
+ * a second body from inside that window would have its own drift warning eaten
+ * silently. A setter that gains a callback must take the suppression with it
+ * (a parameter, or a per-instance token), not inherit this flag.
  */
 let worldDrivenTypeWrite = false;
 
@@ -538,16 +552,12 @@ export class RigidBody
    *
    * Written by the constructor and the {@link RigidBody.mass} setter and by
    * nothing else — see {@link RigidBody.massAuthored} for why a solver-derived
-   * mass may not land here.
+   * mass may not land here. Its definedness *is* the authoredness flag
+   * (2026-08-07: a separate `#massAuthored` boolean tracked exactly
+   * `#mass !== undefined` at every program point and was deleted rather than
+   * kept in step by hand).
    */
   #mass?: number;
-
-  /**
-   * Whether {@link RigidBody.mass} was named by the constructor descriptor or
-   * assigned through its setter — the mass half of the distinction
-   * {@link RigidBody.centerOfMassAuthored} draws for the centre.
-   */
-  #massAuthored: boolean;
 
   /**
    * Which solver-drift warnings this body has already emitted, allocated on the
@@ -614,7 +624,6 @@ export class RigidBody
 
     this.#type = descriptor.type;
     this.#mass = descriptor.mass;
-    this.#massAuthored = descriptor.mass !== undefined;
     this.#ccdMode = resolveCCDMode(descriptor);
     this.#ccdPredictionDistance = descriptor.ccdPredictionDistance;
 
@@ -712,12 +721,19 @@ export class RigidBody
 
   set mass(value: number | undefined) {
     validateMass(this.#type, value);
-    this.#warnSolverDrift(
-      "mass",
-      "A registered RigidBody's mass was assigned, which changes the component but not the solver: mass reaches a solver body once, at createBody (§23, §37). Re-register the body (world.removeBody(node) then world.addBody(node)) to rebuild it from the descriptor, or write to the solver through world.getBodyHandle(node).",
-    );
+    // Only a *change* can drift from the solver, and the warning is one-shot
+    // per body per key (2026-08-07): letting `body.mass = body.mass` consume
+    // the single warning would spend it on the one assignment that cannot
+    // possibly have desynchronized anything. The comparison is against the
+    // authored mass, so authoring a value equal to a solver-derived one still
+    // counts as a change — it is one, and `toDescriptor` now emits it.
+    if (value !== this.#mass) {
+      this.#warnSolverDrift(
+        "mass",
+        "A registered RigidBody's mass was assigned, which changes the component but not the solver: mass reaches a solver body once, at createBody (§23, §37). Re-register the body (world.removeBody(node) then world.addBody(node)) to rebuild it from the descriptor, or write to the solver through world.getBodyHandle(node).",
+      );
+    }
     this.#mass = value;
-    this.#massAuthored = value !== undefined;
   }
 
   /**
@@ -735,15 +751,16 @@ export class RigidBody
    * colliders" into "my mass is 3.0141594". Scaling a collider afterwards then
    * changed nothing, silently.
    *
-   * The two masses are therefore kept apart: this flag and `#mass` for what the
-   * author said, {@link RigidBody.derivedMass} for what the solver answered,
-   * and `toDescriptor` emits the field **only when this holds**. It is the same
+   * The two masses are therefore kept apart: `#mass` for what the author said,
+   * {@link RigidBody.derivedMass} for what the solver answered, and
+   * `toDescriptor` emits the field **only when this holds**. It is the same
    * rule {@link RigidBody.centerOfMassAuthored} states for the centre, with a
-   * simpler test: no default value competes with `undefined` here, so the
-   * sticky half is the whole of it.
+   * simpler test: no default value competes with `undefined` here, so an
+   * authored mass is exactly a defined `#mass` — which is what this getter
+   * derives rather than mirroring in a second field.
    */
   get massAuthored(): boolean {
-    return this.#massAuthored;
+    return this.#mass !== undefined;
   }
 
   /**
@@ -759,10 +776,14 @@ export class RigidBody
   }
 
   set linearDamping(value: number) {
-    this.#warnSolverDrift(
-      "linearDamping",
-      "A registered RigidBody's linearDamping was assigned, which changes the component but not the solver: damping reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
-    );
+    // See {@link RigidBody.mass}'s setter: a no-op assignment cannot drift from
+    // the solver and must not consume the one-shot warning (2026-08-07).
+    if (value !== this.#linearDamping) {
+      this.#warnSolverDrift(
+        "linearDamping",
+        "A registered RigidBody's linearDamping was assigned, which changes the component but not the solver: damping reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
+      );
+    }
     this.#linearDamping = value;
   }
 
@@ -772,10 +793,12 @@ export class RigidBody
   }
 
   set angularDamping(value: number) {
-    this.#warnSolverDrift(
-      "angularDamping",
-      "A registered RigidBody's angularDamping was assigned, which changes the component but not the solver: damping reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
-    );
+    if (value !== this.#angularDamping) {
+      this.#warnSolverDrift(
+        "angularDamping",
+        "A registered RigidBody's angularDamping was assigned, which changes the component but not the solver: damping reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
+      );
+    }
     this.#angularDamping = value;
   }
 
@@ -791,10 +814,12 @@ export class RigidBody
   }
 
   set gravityScale(value: number) {
-    this.#warnSolverDrift(
-      "gravityScale",
-      "A registered RigidBody's gravityScale was assigned, which changes the component but not the solver: the scale reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
-    );
+    if (value !== this.#gravityScale) {
+      this.#warnSolverDrift(
+        "gravityScale",
+        "A registered RigidBody's gravityScale was assigned, which changes the component but not the solver: the scale reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
+      );
+    }
     this.#gravityScale = value;
   }
 
@@ -1291,10 +1316,11 @@ export class RigidBody
       ccdMode: this.#ccdMode,
     };
     // The authored mass only — never {@link RigidBody.derivedMass}, which is
-    // the solver's answer and not an instruction to the next solver.
-    const authoredMass = this.#massAuthored ? this.#mass : undefined;
-    if (authoredMass !== undefined) {
-      descriptor.mass = authoredMass;
+    // the solver's answer and not an instruction to the next solver. `#mass`
+    // holds the authored value and nothing else, so its definedness is the
+    // whole of {@link RigidBody.massAuthored}.
+    if (this.#mass !== undefined) {
+      descriptor.mass = this.#mass;
     }
     // Emitted only while the mode is still speculative: the §85 validation
     // this descriptor faces again in validateFor rejects the distance with

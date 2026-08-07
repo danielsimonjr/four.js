@@ -28,6 +28,29 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — Closure-review fix batch (24 findings).** Decisions worth keeping:
+  - **`KinematicController`'s §79 payload is deliberately empty** (`{}`): no constructor
+    options; in-flight commands are simulation state; `followPath` holds a live
+    `Trajectory` no document can reference. **Registry completeness is enforced
+    mechanically** — `packages/four/tests/scene-serializers.test.ts` enumerates every
+    umbrella barrel class carrying `static typeName` (currently `collider,
+kinematic-controller, motion, pose-target, rigid-body`) and requires each registered;
+    a sixth component fails the suite until registered.
+  - **`PhysicsWorld.#destroyRegistration` issues one `destroyBody`** (§37: "destroys a
+    body and everything attached to it"), teardown-path-only; adapters keep
+    `destroyCollider`'s mass refresh for the body-survives case, and Rapier `BodyRecord`s
+    carry `colliderIds` so heir lookup is O(1). The §34 snapshot envelope still writes a
+    collider _count_ (format-2 layout pinned); restore re-derives the id list from the
+    collider table.
+  - `RigidBodyDocument.sleeping` stays write-only diagnostics, now optional on the read
+    side — dropping it would move every document's bytes for no reader.
+  - The §25 unhonoured-material warning stays registration-time-only, documented in the
+    method; moving it belongs to the packet that widens §37 for live material changes.
+  - `worldDrivenTypeWrite` is a process-global suppression, safe only while the `type`
+    setter runs no callbacks — a setter that gains one must carry its own suppression
+    token (hazard paragraph added in place).
+  - `wrap: false` traversal exits cost two keystrokes (blur, then pass-through) — the
+    one-shot `exited` flag is forgotten by any programmatic focus.
 - **2026-08-07 — A-23 (§96 untrusted content).** Decisions worth keeping:
   - **A signal cannot cross the `FetchLike` seam today — measured, not assumed.** Widening
     to `(url, init?: { signal?: AbortSignalLike })` breaks `typeof fetch` assignability

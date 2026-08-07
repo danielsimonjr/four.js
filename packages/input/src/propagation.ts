@@ -29,6 +29,13 @@
  * `satisfies Record<…, string>`, so a missing entry is a compile error — and
  * costs nothing: no closure, no string concatenation, no allocation per event.
  *
+ * The two keys are nevertheless **paired by the type system** (2026-08-07):
+ * `captureKey` is constrained to the `` `capture:${type}` `` member of
+ * `NodeEventMap`, so a call that hands over a matched pair from one source and
+ * a mismatched one from another — `("keydown", "capture:pointerdown")` — does
+ * not compile. Naming the convention in a constraint is what keeps "the keys
+ * are arguments" from meaning "the keys are unrelated".
+ *
  * ## What this module deliberately does not own
  *
  * Which types propagate and which are targeted-only. `pointerenter` and
@@ -146,10 +153,18 @@ export function buildPropagationPath(target: Node, out: Node[] = []): Node[] {
  * An empty path dispatches nothing, which is what makes a resolution failure (a
  * pointer that hit nothing, a keystroke with nothing focused) a no-op rather
  * than a special case at every call site.
+ *
+ * `CaptureKey` is constrained to `type`'s own `"capture:"`-prefixed key, so the
+ * two arguments cannot come from different event families (see the module
+ * header). Both call sites already pass `CAPTURE_KEYS[type]`, which is exactly
+ * that key.
  */
 export function dispatchThreePhase<
   BubbleKey extends keyof NodeEventMap,
-  CaptureKey extends keyof NodeEventMap,
+  CaptureKey extends Extract<
+    keyof NodeEventMap,
+    `capture:${BubbleKey & string}`
+  >,
 >(
   event: NodeEventMap[BubbleKey] & NodeEventMap[CaptureKey] & SceneInputEvent,
   path: readonly Node[],

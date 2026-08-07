@@ -36,12 +36,20 @@
  *
  * Covered: the three §73 widgets (`Panel`, `Label`, `Button`) with their §74
  * box model and layout, their interaction flags, and their §75 accessibility
- * record; `MotionComponent` (§11), through the serializer `@four/motion` itself
- * exports; and `RigidBody` and `Collider` (§23–§25), through the pair
- * `@four/physics` exports (`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`,
- * 2026-08-06 — the `PH-17` remainder). All three packages declare their
- * serializers against the same structural `ComponentSerializer` shape, so
- * registering them here adds no §3.1 edge anywhere.
+ * record; `MotionComponent` (§11) and `KinematicController` (§12, added
+ * 2026-08-07), through the serializers `@four/motion` itself exports; and
+ * `RigidBody` and `Collider` (§23–§25), through the pair `@four/physics`
+ * exports (`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, 2026-08-06 — the
+ * `PH-17` remainder). All three packages declare their serializers against the
+ * same structural `ComponentSerializer` shape, so registering them here adds no
+ * §3.1 edge anywhere.
+ *
+ * That is **every** component class the engine ships — the five with a
+ * `static typeName`, counting `PoseTarget`, which `@four/serialization` seeds
+ * itself. `tests/scene-serializers.test.ts` enumerates them off the umbrella's
+ * own barrels and fails if one is missing, because an unregistered component
+ * makes `serializeScene` throw (A-15) and the only sign of a new one being
+ * forgotten would be an application that cannot save its scene.
  *
  * A scene carrying physics components therefore saves and reloads through this
  * one call, with no `{ unknownComponents: "skip" }` opt-out and nothing dropped
@@ -63,7 +71,12 @@
  */
 
 import type { JsonValue } from "@four/core";
-import { MOTION_COMPONENT_SERIALIZER, MotionComponent } from "@four/motion";
+import {
+  KINEMATIC_CONTROLLER_SERIALIZER,
+  KinematicController,
+  MOTION_COMPONENT_SERIALIZER,
+  MotionComponent,
+} from "@four/motion";
 import {
   COLLIDER_SERIALIZER,
   Collider,
@@ -129,8 +142,9 @@ export interface SceneNodeTypeSupport {
 export interface SceneSerializationSupport extends SceneNodeTypeSupport {
   /**
    * The component serializers, seeded with `PoseTarget` (from
-   * `@four/serialization`), `MotionComponent` (§11), and the two physics
-   * components — `RigidBody` (§23) and `Collider` (§24).
+   * `@four/serialization`), `MotionComponent` (§11), `KinematicController`
+   * (§12), and the two physics components — `RigidBody` (§23) and `Collider`
+   * (§24).
    *
    * A fresh registry per call, never a shared singleton — registries are
    * mutable, and two applications registering their own component types must
@@ -508,9 +522,20 @@ export function registerPhysicsSerializers(
  * const io = registerSceneNodeTypes({ atlas });
  * const document = serializeScene(root, io.components, {
  *   nodeTypeOf: (node) => myTypeOf(node) ?? io.write.nodeTypeOf(node),
- *   nodeDataOf: (node) => myDataOf(node) ?? io.write.nodeDataOf(node),
+ *   nodeDataOf: (node) => {
+ *     const mine = myDataOf(node);
+ *     return mine === undefined ? io.write.nodeDataOf(node) : mine;
+ *   },
  * });
  * ```
+ *
+ * The two fall-backs are spelled differently on purpose (2026-08-07): a node
+ * type is a string or nothing, so `??` says what it means, but §79 node *data*
+ * is one opaque JSON value and `null` is a legitimate one — a writer that
+ * "said something" by writing `null` would have `??` fall through to this
+ * module's writer and lose it. The composition test is therefore
+ * `!== undefined`, which is the same rule `serializeScene` itself applies to a
+ * writer's answer.
  *
  * `restoreNodeId` is not needed by any of this: every widget takes its id
  * through {@link UIWidgetOptions} (which extends `NodeOptions`), so a restored
@@ -525,6 +550,10 @@ export function registerSceneNodeTypes(
 ): SceneSerializationSupport {
   const components = createDefaultComponentSerializers();
   components.register(MotionComponent, MOTION_COMPONENT_SERIALIZER);
+  // §12's controller, added 2026-08-07: without it a scene carrying one could
+  // not be saved at all, because an unregistered component throws (A-15). Its
+  // payload is empty by design — see `KINEMATIC_CONTROLLER_SERIALIZER`.
+  components.register(KinematicController, KINEMATIC_CONTROLLER_SERIALIZER);
   registerPhysicsSerializers(components);
   return { components, ...registerUISerializers(options) };
 }

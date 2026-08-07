@@ -664,6 +664,76 @@ describe("mass after a collider is destroyed (§23, §24, §37)", () => {
     adapter.dispose();
   });
 
+  // 2026-08-07: the heir is chosen from the body's **own** collider list (a
+  // per-body array) rather than by scanning every collider in the world. The
+  // choice must still be the body's lowest monotonic id, with other bodies'
+  // colliders — created both before and after it — ignored.
+  it("picks the body's own lowest-id collider as the heir", async () => {
+    const adapter = await createAdapter();
+    const other = adapter.createBody({ type: "dynamic", mass: 9 });
+    adapter.createCollider({
+      body: other,
+      shape: { type: "circle", radius: 0.5 },
+      density: 1000,
+    });
+
+    const body = adapter.createBody({ type: "dynamic", mass: 5 });
+    const bearer = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+      density: 1000,
+    });
+    const middle = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.25 },
+      density: 1000,
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.25 },
+      density: 1000,
+    });
+    // A later collider on the *other* body: a global scan could reach it.
+    adapter.createCollider({
+      body: other,
+      shape: { type: "circle", radius: 0.5 },
+      density: 1000,
+    });
+
+    adapter.destroyCollider(bearer);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+    expect(adapter.getBodyMass(other)).toBeCloseTo(9, 5);
+
+    // `middle` is now the heir; destroying it moves the mass on again rather
+    // than losing it.
+    adapter.destroyCollider(middle);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+    adapter.dispose();
+  });
+
+  it("keeps the heir list across a §34 snapshot restore", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 6 });
+    const bearer = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+      density: 1000,
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.25 },
+      density: 1000,
+    });
+
+    // The envelope carries a per-body *count*; the ids are re-derived from its
+    // collider table, so a restored world can still find a body's own heir.
+    adapter.restoreSnapshot(adapter.createSnapshot());
+
+    adapter.destroyCollider(bearer);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(6, 5);
+    adapter.dispose();
+  });
+
   it("gives the mass back to a replacement collider", async () => {
     const adapter = await createAdapter();
     const body = adapter.createBody({ type: "dynamic", mass: 4 });

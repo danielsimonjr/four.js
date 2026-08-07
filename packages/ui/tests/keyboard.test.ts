@@ -340,6 +340,57 @@ describe("installKeyboardTraversal (§75)", () => {
     expect(event.defaultPrevented).toBe(false);
   });
 
+  // 2026-08-07: the exit used to last exactly one keystroke. The next Tab
+  // arrived at the root with nothing focused, was read as "enter the tree", and
+  // put the focus straight back on b0 *with* preventDefault — so the host never
+  // saw a Tab and the documented "the focus leaves the widget tree" was false.
+  it("keeps the focus out for the keystroke after it leaves (wrap: false)", () => {
+    const { root, buttons } = tree(2);
+    installKeyboardTraversal(root, { wrap: false });
+    buttons[1].focus();
+
+    const leaving = press(root, "Tab");
+    expect(focusName(root)).toBe("none");
+    expect(leaving.defaultPrevented).toBe(false);
+
+    const outside = press(root, "Tab");
+    expect(focusName(root)).toBe("none");
+    expect(outside.defaultPrevented).toBe(false);
+
+    // The third keystroke is an ordinary "enter the tree" again: a user tabbing
+    // back into an embedded panel arrives at its first widget.
+    const returning = press(root, "Tab");
+    expect(focusName(root)).toBe("b0");
+    expect(returning.defaultPrevented).toBe(true);
+  });
+
+  it("re-enters at the last widget when the return keystroke is Shift-Tab", () => {
+    const { root, buttons } = tree(2);
+    installKeyboardTraversal(root, { wrap: false });
+    buttons[0].focus();
+
+    press(root, "Tab", { shift: true }); // leaves at the start
+    press(root, "Tab", { shift: true }); // belongs to the host
+    expect(focusName(root)).toBe("none");
+
+    press(root, "Tab", { shift: true });
+    expect(focusName(root)).toBe("b1");
+  });
+
+  it("forgets the exit as soon as something is focused again", () => {
+    const { root, buttons } = tree(2);
+    installKeyboardTraversal(root, { wrap: false });
+    buttons[1].focus();
+
+    press(root, "Tab"); // leaves the tree
+    buttons[0].focus(); // …and the application puts the focus back
+
+    const event = press(root, "Tab");
+
+    expect(focusName(root)).toBe("b1");
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("still traverses inside the tree when wrapping is off", () => {
     const { root, buttons } = tree(2);
     installKeyboardTraversal(root, { wrap: false });
@@ -347,6 +398,24 @@ describe("installKeyboardTraversal (§75)", () => {
 
     press(root, "Tab");
 
+    expect(focusName(root)).toBe("b1");
+  });
+
+  // The `enabled` prune is the *walk's*, not `isTabbable`'s (2026-08-07): the
+  // per-widget term was dead because `collectInto` never descends into a
+  // disabled subtree, and this pins the behaviour the remaining rule provides.
+  it("skips a disabled subtree, including the disabled node itself", () => {
+    const { root, buttons } = tree(2);
+    const nested = new Button({ name: "nested", focusable: true });
+    buttons[0].add(nested);
+    buttons[0].enabled = false;
+
+    expect(collectFocusOrder(root).map((widget) => widget.name)).toEqual([
+      "b1",
+    ]);
+
+    installKeyboardTraversal(root);
+    press(root, "Tab");
     expect(focusName(root)).toBe("b1");
   });
 

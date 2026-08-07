@@ -1,5 +1,6 @@
 /**
- * The §79 serializer for this package's component (PH-17, 2026-08-06).
+ * The §79 serializers for this package's two components (PH-17, 2026-08-06;
+ * `KinematicController` added 2026-08-07).
  *
  * §6a says components "serialize under registered type names (§79)", and §79's
  * registry is `@four/serialization`'s — which may depend on `core`, `math`, and
@@ -26,16 +27,21 @@
  *
  * ## What is written, and what is not
  *
- * Everything §11 declares: both velocities, both accelerations, both damping
- * rates, and the two optional limits — which are written only when set, so a
- * component at its defaults produces a small, diff-friendly payload (§79).
- * Nothing else exists to write: `MotionComponent` is state only, and `host` is
- * the registry's to assign (§6a).
+ * For {@link MotionComponent}, everything §11 declares: both velocities, both
+ * accelerations, both damping rates, and the two optional limits — which are
+ * written only when set, so a component at its defaults produces a small,
+ * diff-friendly payload (§79). Nothing else exists to write: `MotionComponent`
+ * is state only, and `host` is the registry's to assign (§6a).
+ *
+ * For {@link KinematicController}, nothing — see
+ * {@link KINEMATIC_CONTROLLER_SERIALIZER} for why an empty payload is the
+ * complete answer for that class rather than an omission.
  */
 
 import type { JsonValue } from "@four/core";
 import { Vector3 } from "@four/math";
 
+import { KinematicController } from "./kinematic-controller.js";
 import { MotionComponent } from "./motion-component.js";
 
 /**
@@ -140,5 +146,71 @@ export const MOTION_COMPONENT_SERIALIZER: ComponentSerializerShape<MotionCompone
         component.maxAngularSpeed = record.maxAngularSpeed;
       }
       return component;
+    },
+  };
+
+/**
+ * The §79 serializer for {@link KinematicController} (§12, 2026-08-07).
+ *
+ * ```ts
+ * import { KinematicController, KINEMATIC_CONTROLLER_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(KinematicController, KINEMATIC_CONTROLLER_SERIALIZER);
+ * ```
+ *
+ * or, from an application, one call: `registerSceneNodeTypes()` in the umbrella
+ * `four` package registers it alongside every other component the engine ships.
+ *
+ * ## Why it exists at all
+ *
+ * `serializeComponents` **throws** for a component with no registered
+ * serializer (A-15, 2026-08-06), which turned "this scene contains a
+ * `KinematicController`" into a `serializeScene` that could not save the scene
+ * at all. Four of the five shipped components had a serializer; this is the
+ * fifth. `packages/four/tests/scene-serializers.test.ts` now enumerates every
+ * exported class carrying a `static typeName` and asserts each one is
+ * registered, so the sixth component cannot be forgotten the same way.
+ *
+ * ## Why the payload is empty, and why that is complete (decision)
+ *
+ * A `KinematicController` takes no constructor options: every field it owns is
+ * written by `moveTo`, `rotateTo`, `followPath`, or a cancel. So its persistent
+ * scene content is precisely the fact that it is attached — the payload `{}` is
+ * a *complete* description of a freshly constructed controller, not a lossy
+ * summary of a configured one.
+ *
+ * What is deliberately not carried is the **in-flight command**, and there are
+ * two independent reasons:
+ *
+ * - §79 keeps simulation state out of a scene document ("physics state,
+ *   animation state, and replay data must be separate optional sections"), and
+ *   a half-finished move is exactly that: `@four/physics`'s serializers draw
+ *   the same line with the same words ("a document is a scene, not a
+ *   simulation"). The node's transform *is* saved, so a scene saved mid-move
+ *   reloads with the node where the move had got to, standing still.
+ * - `followPath` holds a §13 {@link Trajectory} **by reference** — a live
+ *   object with a `samplePosition` function, which no JSON document can carry
+ *   and which §79's resource rule (documents reference resources by logical
+ *   key) has nowhere to name. A serializer that wrote the other two channels
+ *   and dropped this one would restore *some* commands and not others, which is
+ *   worse than restoring none: the round trip would depend on which of three
+ *   methods the author happened to call last.
+ *
+ * Carrying commands would therefore need a trajectory resource table and a
+ * document version that can express one; the seam for it is this function, not
+ * the format.
+ *
+ * Reading is total, like `MOTION_COMPONENT_SERIALIZER`'s: whatever the document
+ * carries — `{}`, a payload from a future build that does record commands,
+ * `null` — restores an idle controller rather than refusing the scene.
+ */
+export const KINEMATIC_CONTROLLER_SERIALIZER: ComponentSerializerShape<KinematicController> =
+  {
+    serialize(): JsonValue {
+      return {};
+    },
+
+    deserialize(): KinematicController {
+      return new KinematicController();
     },
   };

@@ -242,6 +242,28 @@ describe("Button", () => {
     expect(gone.log).toHaveLength(0);
   });
 
+  // 2026-08-07: the default was suppressed *before* `activate` was consulted,
+  // so a refused button still ate the host's keystroke — a control that does
+  // nothing must not swallow the Space that would have scrolled the page.
+  it("suppresses the platform default exactly when it consumed the key", () => {
+    const { button } = buttonWithLog();
+    expect(pressKey(button, " ").defaultPrevented).toBe(true);
+
+    const disabled = buttonWithLog();
+    disabled.button.disabled = true;
+    const refused = pressKey(disabled.button, " ");
+    expect(refused.defaultPrevented).toBe(false);
+    expect(disabled.log).toHaveLength(0);
+
+    const off = buttonWithLog();
+    off.button.enabled = false;
+    expect(pressKey(off.button, "Enter").defaultPrevented).toBe(false);
+
+    const gone = buttonWithLog();
+    gone.button.dispose();
+    expect(pressKey(gone.button, "Enter").defaultPrevented).toBe(false);
+  });
+
   it("is a Panel, so it lays its own content out (§74)", () => {
     const atlas = buildGlyphAtlas();
     const button = new Button({

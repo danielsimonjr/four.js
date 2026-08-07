@@ -75,14 +75,20 @@ changes in `CHANGELOG.md`.
       flagship demo page blocked on A-21. §113a's "documentation and website per §93" exit
       criterion is now recorded as having been met on the documentation half only —
       partially addressed by the Pages deploy
-- [ ] **Closure-diff review findings (2026-08-07 adversarial pass over commits 93cda8d,
-      ab13840, fe8eb6f, c843e2d, b48f053):** 25 findings, ranked shortlist recorded in the
-      review report. Deferred until their owning agents land: the `glState`
-      module-global + missing try/finally in `webgl-renderer.ts` (render tier in flight),
-      `Material.opacity`/`blendMode` setter validation (same), `REPLAY_FORMAT_VERSION`
-      naming (diagnostics in flight with A-23). The rest are being fixed in a dedicated
-      batch (KinematicController serializer, physics teardown O(N·M), keyboard wrap:false
-      trap, resolution validation, and the small items)
+- [x] **Closure-diff review findings — 24 of 25 fixed 2026-08-07** (adversarial pass over
+      commits 93cda8d, ab13840, fe8eb6f, c843e2d, b48f053): KinematicController
+      serializer + mechanical registry-completeness test, physics teardown O(N·M) →
+      one destroyBody + per-body collider ids, keyboard wrap:false trap, Button
+      preventDefault-only-when-consumed, pointer re-entrancy, KeyboardInput dispose
+      guard, resolution validation, reserveNodeId saturation, loud inertiaTensor
+      refusal, fabricated-§61-quote and lifecycle-count doc corrections, plus the
+      simplification set (#massAuthored, no-op warn guards, scratch allocation,
+      capture-key type pairing)
+- [ ] **Review findings still open:** the render-tier set (`glState` module-global +
+      missing try/finally, `Material.opacity`/`blendMode` setter validation,
+      restoreGlState coherence, dead `??` fallbacks — fix agent in flight) and
+      `REPLAY_FORMAT_VERSION` naming (low; rename to LATEST_/add MINIMUM_ constant —
+      diagnostics now free)
 
 - [x] **A-10 DONE 2026-08-07.** `@four/input` gains `KeyboardInput` over a duck-typed
       `KeySurface`, `SceneKeyEvent` with `preventDefault()`, `dispatchKeyEvent`, and the

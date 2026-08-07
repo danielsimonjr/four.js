@@ -12,7 +12,7 @@
  */
 
 import { isFourError } from "@four/core";
-import { MotionComponent } from "@four/motion";
+import { KinematicController, MotionComponent } from "@four/motion";
 import { Vector3 } from "@four/math";
 import { Collider, RigidBody } from "@four/physics";
 import { Group, Scene } from "@four/scene";
@@ -28,6 +28,7 @@ import { buildGlyphAtlas } from "@four/text";
 import { Button, Label, Panel } from "@four/ui";
 import { describe, expect, it } from "vitest";
 
+import * as four from "../src/index.js";
 import {
   BUTTON_NODE_TYPE,
   LABEL_NODE_TYPE,
@@ -374,6 +375,73 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(collider?.body).toBe(body);
   });
 
+  it("round-trips a KinematicController, which used to break the save (2026-08-07)", () => {
+    // §12's controller was the one shipped component with no serializer, and
+    // A-15 had made that a hard error: a scene carrying one could not be saved
+    // at all. Its payload is empty by design — the class has no constructor
+    // options — so what is asserted here is that the component survives as a
+    // live, idle controller rather than disappearing or throwing.
+    const io = registerSceneNodeTypes();
+    const root = new Group();
+    const controller = root.addComponent(new KinematicController());
+    controller.moveTo(new Vector3(4, 0, 0), { duration: 1 });
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const restored = reloaded.getComponent(KinematicController);
+    expect(restored).toBeInstanceOf(KinematicController);
+    expect(restored?.host).toBe(reloaded);
+    // The in-flight command is not scene state (§79): the node reloads where
+    // its transform says it is, standing still.
+    expect(restored?.translationActive).toBe(false);
+  });
+
+  it("registers a serializer for every component class the engine ships", () => {
+    // The enumerating test the KinematicController gap asked for (2026-08-07).
+    // A component with no serializer makes `serializeScene` throw (A-15), and
+    // the only symptom of a *new* one being forgotten would be an application
+    // that cannot save its scene — so the check is mechanical: walk the
+    // umbrella's own barrels, find every exported class carrying a
+    // `static typeName` (plan D2's component key), and require each one.
+    const shipped = new Map<string, string>();
+    for (const [namespace, module_] of Object.entries(
+      four as Record<string, unknown>,
+    )) {
+      if (typeof module_ !== "object" || module_ === null) continue;
+      for (const [name, value] of Object.entries(
+        module_ as Record<string, unknown>,
+      )) {
+        if (typeof value !== "function") continue;
+        const typeName = (value as { typeName?: unknown }).typeName;
+        if (typeof typeName === "string" && typeName !== "") {
+          shipped.set(typeName, `${namespace}.${name}`);
+        }
+      }
+    }
+
+    // The list is asserted as well as walked: a component that stops being
+    // exported would otherwise make this test pass by finding less.
+    expect([...shipped.keys()].sort()).toEqual([
+      "collider",
+      "kinematic-controller",
+      "motion",
+      "pose-target",
+      "rigid-body",
+    ]);
+
+    const registry = registerSceneNodeTypes().components;
+    const missing = [...shipped].filter(
+      ([typeName]) => !registry.has(typeName),
+    );
+    expect(missing).toEqual([]);
+  });
+
   it("hands out a fresh registry per call", () => {
     const first = registerSceneNodeTypes().components;
     const second = registerSceneNodeTypes().components;
@@ -381,6 +449,7 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(first).not.toBe(second);
     expect(first.has(MotionComponent.typeName)).toBe(true);
     expect(second.has(MotionComponent.typeName)).toBe(true);
+    expect(first.has(KinematicController.typeName)).toBe(true);
     expect(first.has(RigidBody.typeName)).toBe(true);
     expect(first.has(Collider.typeName)).toBe(true);
   });

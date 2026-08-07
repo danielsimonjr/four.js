@@ -972,6 +972,46 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
     warn.mockRestore();
   });
 
+  // 2026-08-07: the warning is one-shot per body per field, and a
+  // self-assignment cannot have desynchronized anything — spending the single
+  // warning on a no-op would silence the write that follows it.
+  it("does not spend the one warning on an assignment that changes nothing", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const body = registeredBody();
+
+    body.mass = body.mass;
+    body.linearDamping = body.linearDamping;
+    body.angularDamping = body.angularDamping;
+    body.gravityScale = body.gravityScale;
+    expect(warn).not.toHaveBeenCalled();
+
+    // The slots are all still armed: each real change warns exactly once.
+    body.mass = 7;
+    body.linearDamping = 0.5;
+    body.angularDamping = 0.25;
+    body.gravityScale = 0;
+    expect(warn).toHaveBeenCalledTimes(4);
+    warn.mockRestore();
+  });
+
+  it("counts authoring a solver-derived mass as a change (§23)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    // No authored mass: this body is asking the solver to derive one.
+    const body = new RigidBody({ type: "dynamic" });
+    setRigidBodyRegistered(body, true);
+    setRigidBodyDerivedMass(body, 4);
+    expect(body.mass).toBe(4);
+    expect(body.massAuthored).toBe(false);
+
+    // The *reported* mass is unchanged, but "derive my mass" just became "my
+    // mass is 4", which `toDescriptor` now emits — a change, and warned about.
+    body.mass = 4;
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(body.massAuthored).toBe(true);
+    warn.mockRestore();
+  });
+
   it("says nothing for an unregistered body or a non-dynamic one", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 

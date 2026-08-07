@@ -237,6 +237,10 @@ export interface ApplicationOptions {
   /**
    * Device pixels per logical pixel (§45, §61) — `devicePixelRatio` in a
    * browser. Default `1`.
+   *
+   * Validated at construction, with or without a `width`/`height` pair
+   * (2026-08-07): a non-finite or non-positive value throws a `RangeError` from
+   * the constructor rather than reaching `renderer.resize` on some later call.
    */
   resolution?: number;
 
@@ -317,6 +321,27 @@ function isFullSurface(view: Viewport): boolean {
     view.width === 1 &&
     view.height === 1
   );
+}
+
+/**
+ * Refuses a resolution that is not a finite number of device pixels per logical
+ * pixel `> 0`.
+ *
+ * One function rather than an inline check inside {@link Application.resize},
+ * because the constructor has a **second** way in: `ApplicationOptions`
+ * `resolution` without a `width`/`height` pair never reaches `resize` and used
+ * to be stored unvalidated (2026-08-07), so `new Application({ renderer,
+ * resolution: 0 })` was accepted and the *next* `resize(w, h)` forwarded the
+ * zero to `renderer.resize` — a degenerate drawing buffer, reported at a call
+ * site that had done nothing wrong. Both paths validate through here now, so an
+ * option and an argument are refused by the same rule with the same message.
+ */
+function assertResolution(resolution: number): void {
+  if (!Number.isFinite(resolution) || resolution <= 0) {
+    throw new RangeError(
+      `Application resolution must be a finite number of device pixels per logical pixel > 0 (got ${String(resolution)}).`,
+    );
+  }
 }
 
 export class Application extends EventEmitter<ApplicationEventMap> {
@@ -510,6 +535,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     // surface, and forwarding a half-declared `0 × h` would blank a canvas the
     // host had already sized.
     if (options.resolution !== undefined) {
+      // Validated even on this path, which does not go through `resize`
+      // (2026-08-07) — see `assertResolution`.
+      assertResolution(options.resolution);
       this.#resolution = options.resolution;
     }
     if (options.width !== undefined && options.height !== undefined) {
@@ -702,8 +730,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   }
 
   /**
-   * Resizes the drawing surface (§45's eighth lifecycle method, 2026-08-06
-   * A-7).
+   * Resizes the drawing surface (§45's seventh lifecycle method, 2026-08-06
+   * A-7; "eighth" until 2026-08-07 — §45 lists initialize, start, stop, pause,
+   * resume, step, resize, dispose, and `resize` is the seventh of those eight).
    *
    * Three things happen, in this order:
    *
@@ -718,12 +747,19 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    *    {@link PerspectiveCamera} has its `aspect` set to `width / height` and
    *    its projection rebuilt.
    *
-   * **Why this class updates cameras and the renderer does not.** §61 is
-   * explicit that "a camera's `aspect` is the application's to set, because only
-   * the application knows which camera belongs to which viewport" — and this
-   * class is exactly that knowledge: {@link Application.views} is the mapping.
-   * §47 keeps projection recomputation explicit, so the rebuild is a call to
-   * `updateProjectionMatrix`, made with {@link ApplicationOptions.depthRange}.
+   * **Why this class updates cameras and the renderer does not** (decision,
+   * A-7; the sentence here quoted §61 until 2026-08-07 — "a camera's `aspect`
+   * is the application's to set, because only the application knows which
+   * camera belongs to which viewport" — and §61 says no such thing: it defines
+   * `Renderer.resize(width, height, resolution)` and nothing about cameras. The
+   * reasoning stands on its own and is restated as the decision it is). §47
+   * gives the camera its projection and §48 maps one camera to one viewport
+   * rectangle; a renderer is handed the finished `Viewport[]` and has no way to
+   * know which of those rectangles a given camera was authored for. This class
+   * is exactly that knowledge — {@link Application.views} is the mapping — so
+   * the aspect update belongs here. §47 keeps projection recomputation
+   * explicit, so the rebuild is a call to `updateProjectionMatrix`, made with
+   * {@link ApplicationOptions.depthRange}.
    *
    * **Full-surface** means `normalized` with the rectangle `(0, 0, 1, 1)` —
    * what `createFullscreenViewport` builds. A partial viewport is left alone
@@ -763,13 +799,8 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         `Application.resize height must be a finite number of logical pixels >= 0 (got ${String(height)}).`,
       );
     }
-    if (
-      resolution !== undefined &&
-      (!Number.isFinite(resolution) || resolution <= 0)
-    ) {
-      throw new RangeError(
-        `Application.resize resolution must be a finite number of device pixels per logical pixel > 0 (got ${String(resolution)}).`,
-      );
+    if (resolution !== undefined) {
+      assertResolution(resolution);
     }
 
     this.#surfaceWidth = width;

@@ -613,8 +613,18 @@ interface BodyRecord {
   massMode: MassMode;
   /** The §23 `mass`, when one was given. */
   explicitMass: number;
-  /** Colliders created on this body so far — `"first-collider"` reads it. */
-  colliderCount: number;
+  /**
+   * Ids of this body's live colliders, in ascending (creation) order — the
+   * `"first-collider"` mass mode reads both its length and its head
+   * (2026-08-07; a bare `colliderCount` stood here until then, which forced
+   * `#firstColliderOf` to scan every collider in the world to find the body's
+   * own).
+   *
+   * Maintained in exactly two places: `createCollider` appends, and
+   * `#forgetCollider` removes. Ids are monotonic and never reused, so appending
+   * keeps the list sorted and removal preserves that.
+   */
+  readonly colliderIds: number[];
   /** `false` once destroyed; a handle to a dead record is rejected. */
   alive: boolean;
 }
@@ -691,7 +701,14 @@ interface SnapshotMeta {
   readonly nextColliderId: number;
   /** Next monotonic joint id (§28, envelope version 2). */
   readonly nextJointId: number;
-  /** Bodies in insertion order: `[id, rapierHandle, sleeping, massMode, explicitMass, colliderCount]`. */
+  /**
+   * Bodies in insertion order:
+   * `[id, rapierHandle, sleeping, massMode, explicitMass, colliderCount]`.
+   *
+   * The trailing count is part of the pinned format-version-2 layout and is
+   * still written; the restore path re-derives each body's collider ids from
+   * {@link SnapshotMeta.colliders} instead of reading it (2026-08-07).
+   */
   readonly bodies: readonly [
     number,
     number,
@@ -1050,7 +1067,7 @@ export class Rapier3dAdapter
       sleeping: body.isSleeping(),
       massMode,
       explicitMass,
-      colliderCount: 0,
+      colliderIds: [],
       alive: true,
     };
     this.#nextBodyId += 1;
@@ -1175,7 +1192,6 @@ export class Rapier3dAdapter
     );
 
     const collider = world.createCollider(colliderDesc, bodyRecord.body);
-    bodyRecord.colliderCount += 1;
     // Keep `getBodyMass` truthful before the first step, as for `createBody`.
     bodyRecord.body.recomputeMassPropertiesFromColliders();
 
@@ -1192,6 +1208,10 @@ export class Rapier3dAdapter
     this.#nextColliderId += 1;
     this.#colliders.set(record.id, record);
     this.#collidersByRapierHandle.set(record.rapierHandle, record);
+    // After the record exists, and after `applyColliderMass` has read the list
+    // as it was: this collider is the body's first exactly when the list was
+    // empty above.
+    bodyRecord.colliderIds.push(record.id);
     return record as unknown as PhysicsColliderHandle;
   }
 
@@ -1201,17 +1221,22 @@ export class Rapier3dAdapter
    * ## The body's mass is rebuilt, not left behind (2026-08-06)
    *
    * Identical to `Rapier2dAdapter.destroyCollider`, and fixing the same silent
-   * pair of defects: the collider count is decremented (so a replacement
-   * collider on a `"first-collider"` body is created carrying the authored mass
-   * instead of `density: 0`), a surviving `"first-collider"` body hands its
-   * authored mass to the surviving collider with the lowest monotonic id
-   * (§33-stable insertion order), and the body's mass properties are recomputed
-   * so `getBodyMass` stays truthful before the next step.
+   * pair of defects: the id leaves `BodyRecord.colliderIds` (so a
+   * replacement collider on a `"first-collider"` body is created carrying the
+   * authored mass instead of `density: 0`), a surviving `"first-collider"` body
+   * hands its authored mass to the surviving collider with the lowest monotonic
+   * id (§33-stable creation order), and the body's mass properties are
+   * recomputed so `getBodyMass` stays truthful before the next step.
    *
    * Re-applying rather than refusing: §23's authored mass belongs to the body,
    * not to whichever collider was holding it. A body left with no collider at
    * all keeps nothing — there is nowhere to hold it — and gets the mass back
    * from the next collider created on it.
+   *
+   * **Not called when the body itself is going away** (2026-08-07):
+   * `PhysicsWorld` tears a registration down with a single `destroyBody`, which
+   * §37 defines as taking everything attached with it, so none of this runs for
+   * a body one line from destruction — see that method's note.
    */
   destroyCollider(handle: PhysicsColliderHandle): void {
     const world = this.#requireWorld();
@@ -1741,7 +1766,11 @@ export class Rapier3dAdapter
         record.sleeping,
         record.massMode,
         record.explicitMass,
-        record.colliderCount,
+        // The envelope keeps carrying the *count* (its layout is pinned by
+        // format version 2); the ids themselves are re-derived on restore from
+        // the `colliders` table below, which already names each collider's
+        // body. Same bytes as before 2026-08-07.
+        record.colliderIds.length,
       ]),
       colliders: [...this.#colliders.values()].map((record) => [
         record.id,
@@ -2454,22 +2483,23 @@ export class Rapier3dAdapter
 
   /**
    * Drops a collider from every index, including any pair it was part of, and
-   * decrements its body's collider count — the §23 bookkeeping
+   * from its body's `BodyRecord.colliderIds` — the §23 bookkeeping
    * `applyColliderMass` reads. See {@link Rapier3dAdapter.destroyCollider}.
    *
    * Both guards are belt-and-braces, as in the 2D adapter: a collider cannot
-   * outlive its body through the public API, and the count cannot fall below
-   * the colliders that raised it — but a negative count would read as "no
-   * colliders" and re-arm the authored-mass branch wrongly, so neither is
-   * allowed to produce one.
+   * outlive its body through the public API, and an id cannot be missing from
+   * the list `createCollider` put it in.
    */
   #forgetCollider(record: ColliderRecord): void {
     record.alive = false;
     this.#colliders.delete(record.id);
     this.#collidersByRapierHandle.delete(record.rapierHandle);
     const body = this.#bodies.get(record.bodyId);
-    if (body !== undefined && body.colliderCount > 0) {
-      body.colliderCount -= 1;
+    if (body !== undefined) {
+      const index = body.colliderIds.indexOf(record.id);
+      if (index >= 0) {
+        body.colliderIds.splice(index, 1);
+      }
     }
     for (const [key, pair] of [...this.#activePairs]) {
       if (pair.a === record || pair.b === record) {
@@ -2483,8 +2513,8 @@ export class Rapier3dAdapter
    * See {@link Rapier3dAdapter.destroyCollider} for the rule and its rationale.
    */
   #refreshMassAfterColliderLoss(body: BodyRecord): void {
-    if (body.massMode === "first-collider" && body.colliderCount > 0) {
-      const heir = this.#firstColliderOf(body.id);
+    if (body.massMode === "first-collider") {
+      const heir = this.#firstColliderOf(body);
       if (heir !== undefined) {
         heir.collider.setMass(body.explicitMass);
       }
@@ -2493,18 +2523,19 @@ export class Rapier3dAdapter
   }
 
   /**
-   * The surviving collider of `bodyId` with the lowest monotonic id, or
-   * `undefined` when the body has none left. `Map` insertion order over a
-   * monotonic counter is ascending id order, so the choice is §33 deterministic
-   * and independent of which collider was destroyed.
+   * The surviving collider of `body` with the lowest monotonic id, or
+   * `undefined` when the body has none left.
+   *
+   * `BodyRecord.colliderIds` is that body's own list in ascending id
+   * order, so the choice is §33 deterministic — independent of which collider
+   * was destroyed and of any Rapier handle — and the lookup costs one map read
+   * rather than a scan of every collider in the world (2026-08-07; the previous
+   * form walked `#colliders` looking for a matching `bodyId`, which made
+   * destroying an N-collider body O(N · M) in a world of M colliders).
    */
-  #firstColliderOf(bodyId: number): ColliderRecord | undefined {
-    for (const record of this.#colliders.values()) {
-      if (record.bodyId === bodyId) {
-        return record;
-      }
-    }
-    return undefined;
+  #firstColliderOf(body: BodyRecord): ColliderRecord | undefined {
+    const first = body.colliderIds[0];
+    return first === undefined ? undefined : this.#colliders.get(first);
   }
 
   /** §30's filter, applied to one Rapier collider. See `raycast`. */
@@ -2784,13 +2815,15 @@ export class Rapier3dAdapter
     this.#bodiesByRapierHandle.clear();
     this.#collidersByRapierHandle.clear();
 
+    // The envelope's per-body collider *count* is deliberately not read: the
+    // list of ids is rebuilt from the `colliders` table below, which is the
+    // same information in a form that also says *which* ids (2026-08-07).
     for (const [
       id,
       rapierHandle,
       sleeping,
       massMode,
       explicitMass,
-      colliderCount,
     ] of meta.bodies) {
       const existing = this.#bodies.get(id);
       const body = world.getRigidBody(rapierHandle);
@@ -2801,7 +2834,7 @@ export class Rapier3dAdapter
         sleeping,
         massMode,
         explicitMass,
-        colliderCount,
+        colliderIds: [],
         alive: true,
       };
       record.rapierHandle = rapierHandle;
@@ -2809,7 +2842,7 @@ export class Rapier3dAdapter
       record.sleeping = sleeping;
       record.massMode = massMode;
       record.explicitMass = explicitMass;
-      record.colliderCount = colliderCount;
+      record.colliderIds.length = 0;
       record.alive = true;
       survivingBodies.set(id, record);
       this.#bodiesByRapierHandle.set(rapierHandle, record);
@@ -2844,6 +2877,10 @@ export class Rapier3dAdapter
       record.alive = true;
       survivingColliders.set(id, record);
       this.#collidersByRapierHandle.set(rapierHandle, record);
+      // Rebuilds the owning body's id list. `meta.colliders` is written in
+      // `#colliders` order, i.e. ascending id, so appending keeps the list
+      // sorted exactly as `createCollider` does.
+      survivingBodies.get(bodyId)?.colliderIds.push(id);
     }
 
     const survivingJoints = new Map<number, JointRecord>();
@@ -3001,7 +3038,7 @@ function applyColliderMass(
       colliderDesc.setDensity(resolveDensity(desc.density, desc.material));
       return;
     case "first-collider":
-      if (body.colliderCount === 0) {
+      if (body.colliderIds.length === 0) {
         colliderDesc.setMass(body.explicitMass);
       } else {
         colliderDesc.setDensity(0);

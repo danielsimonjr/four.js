@@ -479,6 +479,34 @@ describe("KeyboardInput", () => {
     surface.fire("keydown", "a");
     expect(listener).not.toHaveBeenCalled();
   });
+
+  // 2026-08-07 (§83): removing the surface listeners is not the whole of being
+  // disposed — a surface may deliver an event that was already queued, and a
+  // retained listener can be called outright. Neither may reach the focus
+  // resolver or the scene afterwards.
+  it("is inert for an event delivered after dispose", () => {
+    const surface = new FakeKeySurface();
+    const focused = new Group();
+    const listener = vi.fn();
+    const focusTarget = vi.fn(() => focused as Node | null);
+    focused.on("keydown", listener);
+    const input = new KeyboardInput(surface, { focusTarget });
+    const retained = surface.listeners.get("keydown")?.[0];
+
+    input.dispose();
+    retained?.({
+      key: "a",
+      code: "KeyA",
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      repeat: false,
+    });
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(focusTarget).not.toHaveBeenCalled();
+  });
 });
 
 describe("NodeEventMap augmentation — key events (§6b)", () => {

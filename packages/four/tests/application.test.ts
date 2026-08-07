@@ -972,6 +972,29 @@ describe("Application — resize (§45, §61, §47)", () => {
     expect(renderer.resizeCount).toBe(0);
   });
 
+  // 2026-08-07: the resolution-only constructor path never reached `resize`,
+  // so a bad value was stored unchecked and forwarded to `renderer.resize` by
+  // whatever `app.resize(w, h)` came next — an error reported at a call site
+  // that had done nothing wrong.
+  it("refuses a constructor resolution that is not a positive finite number", () => {
+    for (const resolution of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(
+        () => new Application({ renderer: new NullRenderer(), resolution }),
+      ).toThrow(RangeError);
+    }
+
+    // …and the same value is still refused on the width/height path.
+    expect(
+      () =>
+        new Application({
+          renderer: new NullRenderer(),
+          width: 100,
+          height: 100,
+          resolution: 0,
+        }),
+    ).toThrow(RangeError);
+  });
+
   it("recomputes projections with the configured depth range (D8)", () => {
     const negativeOne = new PerspectiveCamera({ aspect: 1 });
     const zeroToOne = new PerspectiveCamera({ aspect: 1 });

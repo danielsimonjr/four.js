@@ -191,8 +191,18 @@ export class KeyboardInput {
    * is exactly what §75's Tab traversal does — cannot redirect the event it is
    * handling. The next keystroke asks the resolver again and gets the new
    * answer.
+   *
+   * A disposed input is **inert** (2026-08-07, §83): `dispose` removes the
+   * surface listeners, but a surface may still deliver an event that was already
+   * queued, and a test double or a synthetic dispatcher may call a retained
+   * listener outright. Neither may reach the focus resolver or the scene after
+   * the object has said it is done — teardown must not have to trust its
+   * surface.
    */
   #handle(type: SceneKeyEventType, event: SurfaceKeyEvent): void {
+    if (this.#disposed) {
+      return;
+    }
     const target = this.#focusTarget();
     if (target === null) {
       return;

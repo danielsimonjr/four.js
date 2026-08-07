@@ -1,19 +1,26 @@
 /**
- * `MOTION_COMPONENT_SERIALIZER` (§11, §79, PH-17 — 2026-08-06).
+ * `MOTION_COMPONENT_SERIALIZER` (§11, §79, PH-17 — 2026-08-06) and
+ * `KINEMATIC_CONTROLLER_SERIALIZER` (§12, 2026-08-07).
  *
- * Two things are under test: the payload round-trips every §11 field exactly,
- * and the structural declaration still matches `@four/serialization`'s
- * `ComponentSerializer`. The second is what the module header calls the honest
- * cost of duck typing — no compiler checks the two declarations against each
- * other, so a transcribed mirror is asserted here instead.
+ * Two things are under test: the payloads round-trip every field the components
+ * declare, and the structural declaration still matches
+ * `@four/serialization`'s `ComponentSerializer`. The second is what the module
+ * header calls the honest cost of duck typing — no compiler checks the two
+ * declarations against each other, so a transcribed mirror is asserted here
+ * instead.
  */
 
 import type { JsonValue } from "@four/core";
-import { Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@four/math";
 import { Group, type Node } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
-import { MOTION_COMPONENT_SERIALIZER, MotionComponent } from "../src/index.js";
+import {
+  KINEMATIC_CONTROLLER_SERIALIZER,
+  KinematicController,
+  MOTION_COMPONENT_SERIALIZER,
+  MotionComponent,
+} from "../src/index.js";
 
 /**
  * `@four/serialization`'s `ComponentSerializer<T>`, transcribed member for
@@ -141,5 +148,78 @@ describe("MOTION_COMPONENT_SERIALIZER", () => {
       true,
     );
     expect(restored.damping).toBe(0);
+  });
+});
+
+/**
+ * §12's controller (2026-08-07). It carries no authored state at all — its
+ * constructor takes no options — so the interesting assertions are that the
+ * payload is complete-and-empty, that reading anything at all produces a live
+ * idle controller, and that an in-flight command is deliberately not carried.
+ */
+describe("KINEMATIC_CONTROLLER_SERIALIZER", () => {
+  it("is assignable to the ComponentSerializer contract it targets", () => {
+    const mirror: ComponentSerializerMirror<KinematicController> =
+      KINEMATIC_CONTROLLER_SERIALIZER;
+
+    expect(
+      mirror.deserialize(
+        mirror.serialize(new KinematicController()),
+        new Group(),
+      ),
+    ).toBeInstanceOf(KinematicController);
+  });
+
+  it("writes an empty payload for a controller with nothing authored", () => {
+    expect(
+      KINEMATIC_CONTROLLER_SERIALIZER.serialize(new KinematicController()),
+    ).toEqual({});
+  });
+
+  it("round-trips through JSON into a live, idle controller", () => {
+    const controller = new KinematicController();
+    const restored = KINEMATIC_CONTROLLER_SERIALIZER.deserialize(
+      JSON.parse(
+        JSON.stringify(KINEMATIC_CONTROLLER_SERIALIZER.serialize(controller)),
+      ) as JsonValue,
+      new Group(),
+    );
+
+    expect(restored).toBeInstanceOf(KinematicController);
+    expect(restored.translationActive).toBe(false);
+    expect(restored.rotationActive).toBe(false);
+    expect(restored.commandGeneration).toBe(0);
+    expect(restored.host).toBeNull();
+  });
+
+  it("does not carry an in-flight command — a document is a scene, not a run", () => {
+    const controller = new KinematicController();
+    controller.moveTo(new Vector3(10, 0, 0), { duration: 2 });
+    controller.rotateTo(new Quaternion(), { duration: 1 });
+    expect(controller.translationActive).toBe(true);
+
+    const restored = KINEMATIC_CONTROLLER_SERIALIZER.deserialize(
+      KINEMATIC_CONTROLLER_SERIALIZER.serialize(controller),
+      new Group(),
+    );
+
+    expect(restored.translationActive).toBe(false);
+    expect(restored.rotationActive).toBe(false);
+  });
+
+  it("restores an idle controller from any payload a document can carry", () => {
+    for (const payload of [
+      null,
+      {},
+      { commands: 3 },
+      [1, 2, 3],
+    ] as JsonValue[]) {
+      const restored = KINEMATIC_CONTROLLER_SERIALIZER.deserialize(
+        payload,
+        new Group(),
+      );
+      expect(restored.translationActive).toBe(false);
+      expect(restored.commandGeneration).toBe(0);
+    }
   });
 });
