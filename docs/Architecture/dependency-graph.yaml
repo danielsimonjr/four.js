@@ -1,10 +1,10 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-05"
-  totalFiles: 161
+  lastUpdated: "2026-08-07"
+  totalFiles: 173
   totalModules: 24
-  totalExports: 1244
+  totalExports: 1390
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -824,13 +824,20 @@ modules:
             - disposeAll
             - Disposable
       exports:
+        - DEFAULT_MAXIMUM_BYTES
+        - DEFAULT_TIMEOUT_SECONDS
         - AssetManager
       classes:
         - AssetManager
       interfaces:
         - FetchResponse
+        - ResponseHeadersLike
+        - TimerLike
         - AssetLoader
         - AssetManagerOptions
+      constants:
+        - DEFAULT_MAXIMUM_BYTES
+        - DEFAULT_TIMEOUT_SECONDS
     packages/assets/src/index.ts:
       description: "`@four/assets` — the asset system (§76–78)."
       externalDependencies: []
@@ -839,6 +846,8 @@ modules:
         - file: ./asset-manager.js
           imports:
             - AssetManager
+            - DEFAULT_MAXIMUM_BYTES
+            - DEFAULT_TIMEOUT_SECONDS
           reExport: true
         - file: ./loaders.js
           imports:
@@ -854,6 +863,8 @@ modules:
             - AssetManagerOptions
             - FetchLike
             - FetchResponse
+            - ResponseHeadersLike
+            - TimerLike
           reExport: true
           typeOnly: true
         - file: ./loaders.js
@@ -865,6 +876,8 @@ modules:
       workspaceDependencies: []
       exports:
         - AssetManager
+        - DEFAULT_MAXIMUM_BYTES
+        - DEFAULT_TIMEOUT_SECONDS
         - ImageAsset
         - binaryLoader
         - createImageLoader
@@ -875,10 +888,14 @@ modules:
         - AssetManagerOptions
         - FetchLike
         - FetchResponse
+        - ResponseHeadersLike
+        - TimerLike
         - ImageBitmapLike
         - ImageDecodeLike
       reExported:
         - AssetManager
+        - DEFAULT_MAXIMUM_BYTES
+        - DEFAULT_TIMEOUT_SECONDS
         - ImageAsset
         - binaryLoader
         - createImageLoader
@@ -888,6 +905,8 @@ modules:
         - AssetManagerOptions
         - FetchLike
         - FetchResponse
+        - ResponseHeadersLike
+        - TimerLike
         - ImageBitmapLike
         - ImageDecodeLike
       constants:
@@ -985,7 +1004,7 @@ modules:
       classes:
         - EventEmitter
     packages/core/src/index.ts:
-      description: Package entry point for @four/core (re-exports 18 symbols)
+      description: Package entry point for @four/core (re-exports 22 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -1018,6 +1037,12 @@ modules:
           imports:
             - EventEmitter
           reExport: true
+        - file: ./untrusted.js
+          imports:
+            - DEFAULT_MAXIMUM_DEPTH
+            - DEFAULT_MAXIMUM_TEXT_LENGTH
+            - parseUntrustedJson
+          reExport: true
         - file: ./json.js
           imports:
             - JsonValue
@@ -1048,6 +1073,11 @@ modules:
             - Unsubscribe
           reExport: true
           typeOnly: true
+        - file: ./untrusted.js
+          imports:
+            - UntrustedJsonLimits
+          reExport: true
+          typeOnly: true
       workspaceDependencies: []
       exports:
         - DEFAULT_GRAVITY_Y
@@ -1058,6 +1088,9 @@ modules:
         - FourError
         - isFourError
         - EventEmitter
+        - DEFAULT_MAXIMUM_DEPTH
+        - DEFAULT_MAXIMUM_TEXT_LENGTH
+        - parseUntrustedJson
         - PACKAGE_NAME
         - JsonValue
         - Component
@@ -1069,6 +1102,7 @@ modules:
         - FourErrorOptions
         - EventListener
         - Unsubscribe
+        - UntrustedJsonLimits
       reExported:
         - DEFAULT_GRAVITY_Y
         - cloneJsonValue
@@ -1078,6 +1112,9 @@ modules:
         - FourError
         - isFourError
         - EventEmitter
+        - DEFAULT_MAXIMUM_DEPTH
+        - DEFAULT_MAXIMUM_TEXT_LENGTH
+        - parseUntrustedJson
         - JsonValue
         - Component
         - ComponentHost
@@ -1088,6 +1125,7 @@ modules:
         - FourErrorOptions
         - EventListener
         - Unsubscribe
+        - UntrustedJsonLimits
       constants:
         - PACKAGE_NAME
     packages/core/src/json.ts:
@@ -1110,6 +1148,26 @@ modules:
         - SeededRandom
       classes:
         - SeededRandom
+    packages/core/src/untrusted.ts:
+      description: Untrusted-input guards for the document formats (§96).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./errors.js
+          imports:
+            - FourError
+      workspaceDependencies: []
+      exports:
+        - DEFAULT_MAXIMUM_TEXT_LENGTH
+        - DEFAULT_MAXIMUM_DEPTH
+        - parseUntrustedJson
+      interfaces:
+        - UntrustedJsonLimits
+      functions:
+        - parseUntrustedJson
+      constants:
+        - DEFAULT_MAXIMUM_TEXT_LENGTH
+        - DEFAULT_MAXIMUM_DEPTH
   packages/diagnostics:
     packages/diagnostics/src/checksum.ts:
       description: Deterministic checksums over float sequences (§33, plan D6).
@@ -1140,9 +1198,12 @@ modules:
         - DEBUG_VERTEX_FLOATS
         - DEBUG_SEGMENT_FLOATS
         - DEBUG_POSITION_FLOATS_PER_SEGMENT
+        - DEBUG_COLOR_FLOATS_PER_SEGMENT
         - DEFAULT_DEBUG_BUFFER_CAPACITY
         - DEBUG_DRAW_DEFAULT_COLORS
         - DEBUG_DRAW_STAGED
+        - debugDrawStreams
+        - applyDebugDrawStreams
         - collectBodyVelocities
         - collectBodyOrigins
         - collectCentersOfMass
@@ -1156,6 +1217,8 @@ modules:
       interfaces:
         - Vector3Like
         - DebugDrawBufferOptions
+        - DebugDrawStreams
+        - DebugGeometrySink
         - DebugBodyAccess
         - DebugJointAccess
         - DebugContactPoint
@@ -1171,6 +1234,8 @@ modules:
         - SolverJointStatistics
         - StagedVisualization
       functions:
+        - debugDrawStreams
+        - applyDebugDrawStreams
         - collectBodyVelocities
         - collectBodyOrigins
         - collectCentersOfMass
@@ -1182,6 +1247,7 @@ modules:
         - DEBUG_VERTEX_FLOATS
         - DEBUG_SEGMENT_FLOATS
         - DEBUG_POSITION_FLOATS_PER_SEGMENT
+        - DEBUG_COLOR_FLOATS_PER_SEGMENT
         - DEFAULT_DEBUG_BUFFER_CAPACITY
         - DEBUG_DRAW_DEFAULT_COLORS
         - DEBUG_DRAW_STAGED
@@ -1201,7 +1267,10 @@ modules:
           reExport: true
         - file: ./replay-format.js
           imports:
+            - LATEST_REPLAY_FORMAT_VERSION
+            - MINIMUM_REPLAY_FORMAT_VERSION
             - REPLAY_FORMAT_VERSION
+            - SUPPORTED_REPLAY_FORMAT_VERSIONS
             - assertReplayCompatible
             - cloneJsonValue
             - decodeBase64
@@ -1218,6 +1287,7 @@ modules:
           reExport: true
         - file: ./debug-draw.js
           imports:
+            - DEBUG_COLOR_FLOATS_PER_SEGMENT
             - DEBUG_DRAW_DEFAULT_COLORS
             - DEBUG_DRAW_STAGED
             - DEBUG_POSITION_FLOATS_PER_SEGMENT
@@ -1225,11 +1295,13 @@ modules:
             - DEBUG_VERTEX_FLOATS
             - DEFAULT_DEBUG_BUFFER_CAPACITY
             - DebugDrawBuffer
+            - applyDebugDrawStreams
             - collectBodyOrigins
             - collectBodyVelocities
             - collectCentersOfMass
             - collectContactImpulses
             - collectContactPoints
+            - debugDrawStreams
             - solverJointStatistics
             - solverStatistics
           reExport: true
@@ -1253,6 +1325,7 @@ modules:
             - ReplayInputRecord
             - ReplayRecording
             - ReplaySnapshotRecord
+            - UntrustedJsonLimits
           reExport: true
           typeOnly: true
         - file: ./replay-player.js
@@ -1275,6 +1348,8 @@ modules:
             - DebugColor
             - DebugContactPoint
             - DebugDrawBufferOptions
+            - DebugDrawStreams
+            - DebugGeometrySink
             - DebugJointAccess
             - DebugPhysicsEventLike
             - SolverJointStatistics
@@ -1288,7 +1363,10 @@ modules:
         - createChecksum
         - hashFloats
         - ReplayRecorder
+        - LATEST_REPLAY_FORMAT_VERSION
+        - MINIMUM_REPLAY_FORMAT_VERSION
         - REPLAY_FORMAT_VERSION
+        - SUPPORTED_REPLAY_FORMAT_VERSIONS
         - assertReplayCompatible
         - cloneJsonValue
         - decodeBase64
@@ -1299,6 +1377,7 @@ modules:
         - validateReplayRecording
         - DEFAULT_REPLAY_MAXIMUM_SUB_STEPS
         - ReplayPlayer
+        - DEBUG_COLOR_FLOATS_PER_SEGMENT
         - DEBUG_DRAW_DEFAULT_COLORS
         - DEBUG_DRAW_STAGED
         - DEBUG_POSITION_FLOATS_PER_SEGMENT
@@ -1306,11 +1385,13 @@ modules:
         - DEBUG_VERTEX_FLOATS
         - DEFAULT_DEBUG_BUFFER_CAPACITY
         - DebugDrawBuffer
+        - applyDebugDrawStreams
         - collectBodyOrigins
         - collectBodyVelocities
         - collectCentersOfMass
         - collectContactImpulses
         - collectContactPoints
+        - debugDrawStreams
         - solverJointStatistics
         - solverStatistics
         - PACKAGE_NAME
@@ -1324,6 +1405,7 @@ modules:
         - ReplayInputRecord
         - ReplayRecording
         - ReplaySnapshotRecord
+        - UntrustedJsonLimits
         - ReplayPlayerOptions
         - ReplayStepEvent
         - ReplayStepListener
@@ -1338,6 +1420,8 @@ modules:
         - DebugColor
         - DebugContactPoint
         - DebugDrawBufferOptions
+        - DebugDrawStreams
+        - DebugGeometrySink
         - DebugJointAccess
         - DebugPhysicsEventLike
         - SolverJointStatistics
@@ -1348,7 +1432,10 @@ modules:
         - createChecksum
         - hashFloats
         - ReplayRecorder
+        - LATEST_REPLAY_FORMAT_VERSION
+        - MINIMUM_REPLAY_FORMAT_VERSION
         - REPLAY_FORMAT_VERSION
+        - SUPPORTED_REPLAY_FORMAT_VERSIONS
         - assertReplayCompatible
         - cloneJsonValue
         - decodeBase64
@@ -1359,6 +1446,7 @@ modules:
         - validateReplayRecording
         - DEFAULT_REPLAY_MAXIMUM_SUB_STEPS
         - ReplayPlayer
+        - DEBUG_COLOR_FLOATS_PER_SEGMENT
         - DEBUG_DRAW_DEFAULT_COLORS
         - DEBUG_DRAW_STAGED
         - DEBUG_POSITION_FLOATS_PER_SEGMENT
@@ -1366,11 +1454,13 @@ modules:
         - DEBUG_VERTEX_FLOATS
         - DEFAULT_DEBUG_BUFFER_CAPACITY
         - DebugDrawBuffer
+        - applyDebugDrawStreams
         - collectBodyOrigins
         - collectBodyVelocities
         - collectCentersOfMass
         - collectContactImpulses
         - collectContactPoints
+        - debugDrawStreams
         - solverJointStatistics
         - solverStatistics
         - Checksum
@@ -1383,6 +1473,7 @@ modules:
         - ReplayInputRecord
         - ReplayRecording
         - ReplaySnapshotRecord
+        - UntrustedJsonLimits
         - ReplayPlayerOptions
         - ReplayStepEvent
         - ReplayStepListener
@@ -1397,6 +1488,8 @@ modules:
         - DebugColor
         - DebugContactPoint
         - DebugDrawBufferOptions
+        - DebugDrawStreams
+        - DebugGeometrySink
         - DebugJointAccess
         - DebugPhysicsEventLike
         - SolverJointStatistics
@@ -1412,12 +1505,12 @@ modules:
       internalDependencies:
         - file: ./replay-format.js
           imports:
+            - LATEST_REPLAY_FORMAT_VERSION
             - JsonValue
             - ReplayFrameRecord
             - ReplayInputRecord
             - ReplayRecording
             - ReplaySnapshotRecord
-            - REPLAY_FORMAT_VERSION
             - cloneJsonValue
             - encodeBase64
             - validateReplayRecording
@@ -1445,7 +1538,9 @@ modules:
           imports:
             - FourError
             - cloneJsonValue
+            - parseUntrustedJson
             - JsonValue
+            - UntrustedJsonLimits
         - package: "@four/core"
           directory: packages/core
           imports:
@@ -1454,9 +1549,16 @@ modules:
           directory: packages/core
           imports:
             - JsonValue
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - UntrustedJsonLimits
       exports:
         - cloneJsonValue
+        - LATEST_REPLAY_FORMAT_VERSION
+        - MINIMUM_REPLAY_FORMAT_VERSION
         - REPLAY_FORMAT_VERSION
+        - SUPPORTED_REPLAY_FORMAT_VERSIONS
         - encodeBase64
         - decodeBase64
         - validateReplayRecording
@@ -1465,9 +1567,11 @@ modules:
         - assertReplayCompatible
         - isReplayCompatible
         - JsonValue
+        - UntrustedJsonLimits
       reExported:
         - cloneJsonValue
         - JsonValue
+        - UntrustedJsonLimits
       interfaces:
         - ReplayInputRecord
         - ReplayFrameRecord
@@ -1483,7 +1587,10 @@ modules:
         - assertReplayCompatible
         - isReplayCompatible
       constants:
+        - LATEST_REPLAY_FORMAT_VERSION
+        - MINIMUM_REPLAY_FORMAT_VERSION
         - REPLAY_FORMAT_VERSION
+        - SUPPORTED_REPLAY_FORMAT_VERSIONS
     packages/diagnostics/src/replay-player.ts:
       description: Replay playback and inspection (§33–34, §113; plan P10-3) — the consuming
       externalDependencies: []
@@ -1549,9 +1656,14 @@ modules:
             - SystemRegistry
             - Detach
             - ReadonlyTimeState
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - DepthRange
         - package: "@four/scene"
           directory: packages/scene
           imports:
+            - PerspectiveCamera
             - PoseBuffer
             - Scene
             - createSnapshotSystem
@@ -1630,21 +1742,58 @@ modules:
           imports:
             - Application
           reExport: true
+        - file: ./scene-serializers.js
+          imports:
+            - BUTTON_NODE_TYPE
+            - LABEL_NODE_TYPE
+            - PANEL_NODE_TYPE
+            - registerPhysicsSerializers
+            - registerSceneNodeTypes
+            - registerUISerializers
+            - restoreNodeId
+          reExport: true
         - file: ./application.js
           imports:
             - ApplicationEventMap
             - ApplicationOptions
           reExport: true
           typeOnly: true
+        - file: ./scene-serializers.js
+          imports:
+            - SceneNodeTypeOptions
+            - SceneNodeTypeSupport
+            - SceneSerializationSupport
+          reExport: true
+          typeOnly: true
       workspaceDependencies: []
       exports:
         - Application
+        - BUTTON_NODE_TYPE
+        - LABEL_NODE_TYPE
+        - PANEL_NODE_TYPE
+        - registerPhysicsSerializers
+        - registerSceneNodeTypes
+        - registerUISerializers
+        - restoreNodeId
         - ApplicationEventMap
         - ApplicationOptions
+        - SceneNodeTypeOptions
+        - SceneNodeTypeSupport
+        - SceneSerializationSupport
       reExported:
         - Application
+        - BUTTON_NODE_TYPE
+        - LABEL_NODE_TYPE
+        - PANEL_NODE_TYPE
+        - registerPhysicsSerializers
+        - registerSceneNodeTypes
+        - registerUISerializers
+        - restoreNodeId
         - ApplicationEventMap
         - ApplicationOptions
+        - SceneNodeTypeOptions
+        - SceneNodeTypeSupport
+        - SceneSerializationSupport
     packages/four/src/input.ts:
       description: input module
       externalDependencies: []
@@ -1827,6 +1976,76 @@ modules:
       exports: []
       reExported:
         - "* from @four/render"
+    packages/four/src/scene-serializers.ts:
+      description: §79 node types and component serializers for the classes the engine itself
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - JsonValue
+        - package: "@four/motion"
+          directory: packages/motion
+          imports:
+            - KINEMATIC_CONTROLLER_SERIALIZER
+            - KinematicController
+            - MOTION_COMPONENT_SERIALIZER
+            - MotionComponent
+        - package: "@four/physics"
+          directory: packages/physics
+          imports:
+            - COLLIDER_SERIALIZER
+            - Collider
+            - RIGID_BODY_SERIALIZER
+            - RigidBody
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - restoreNodeId
+            - Node
+        - package: "@four/serialization"
+          directory: packages/serialization
+          imports:
+            - ComponentSerializerRegistry
+            - createDefaultComponentSerializers
+            - InstantiateSceneOptions
+            - SceneNodeDocument
+            - SerializeSceneOptions
+        - package: "@four/text"
+          directory: packages/text
+          imports:
+            - GlyphAtlas
+        - package: "@four/ui"
+          directory: packages/ui
+          imports:
+            - Button
+            - Label
+            - Panel
+            - UIWidget
+            - UIWidgetOptions
+            - WidgetAccessibility
+      exports:
+        - restoreNodeId
+        - PANEL_NODE_TYPE
+        - LABEL_NODE_TYPE
+        - BUTTON_NODE_TYPE
+        - registerUISerializers
+        - registerPhysicsSerializers
+        - registerSceneNodeTypes
+      interfaces:
+        - SceneNodeTypeOptions
+        - SceneNodeTypeSupport
+        - SceneSerializationSupport
+      functions:
+        - registerUISerializers
+        - registerPhysicsSerializers
+        - registerSceneNodeTypes
+      constants:
+        - PANEL_NODE_TYPE
+        - LABEL_NODE_TYPE
+        - BUTTON_NODE_TYPE
     packages/four/src/scene.ts:
       description: scene module
       externalDependencies: []
@@ -1902,13 +2121,25 @@ modules:
         - GeometryBounds
         - BufferGeometryOptions
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 11 symbols)
+      description: Package entry point for @four/geometry (re-exports 30 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
         - file: ./buffer-geometry.js
           imports:
             - BufferGeometry
+          reExport: true
+        - file: ./primitives-3d.js
+          imports:
+            - capsuleGeometry
+            - coneGeometry
+            - cylinderGeometry
+            - extrudeGeometry
+            - heightFieldGeometry
+            - latheGeometry
+            - sphereGeometry
+            - torusGeometry
+            - tubeGeometry
           reExport: true
         - file: ./primitives.js
           imports:
@@ -1924,6 +2155,20 @@ modules:
             - GeometryIndexArray
           reExport: true
           typeOnly: true
+        - file: ./primitives-3d.js
+          imports:
+            - CapsuleGeometryOptions
+            - ExtrudeGeometryOptions
+            - HeightFieldGeometryOptions
+            - LatheGeometryOptions
+            - Point2D
+            - Point3D
+            - SphereGeometryOptions
+            - TaperedGeometryOptions
+            - TorusGeometryOptions
+            - TubeGeometryOptions
+          reExport: true
+          typeOnly: true
         - file: ./primitives.js
           imports:
             - BoxGeometryOptions
@@ -1934,6 +2179,15 @@ modules:
       workspaceDependencies: []
       exports:
         - BufferGeometry
+        - capsuleGeometry
+        - coneGeometry
+        - cylinderGeometry
+        - extrudeGeometry
+        - heightFieldGeometry
+        - latheGeometry
+        - sphereGeometry
+        - torusGeometry
+        - tubeGeometry
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
@@ -1942,11 +2196,30 @@ modules:
         - GeometryBounds
         - GeometryDrawMode
         - GeometryIndexArray
+        - CapsuleGeometryOptions
+        - ExtrudeGeometryOptions
+        - HeightFieldGeometryOptions
+        - LatheGeometryOptions
+        - Point2D
+        - Point3D
+        - SphereGeometryOptions
+        - TaperedGeometryOptions
+        - TorusGeometryOptions
+        - TubeGeometryOptions
         - BoxGeometryOptions
         - CircleGeometry2DOptions
         - PlaneGeometryOptions
       reExported:
         - BufferGeometry
+        - capsuleGeometry
+        - coneGeometry
+        - cylinderGeometry
+        - extrudeGeometry
+        - heightFieldGeometry
+        - latheGeometry
+        - sphereGeometry
+        - torusGeometry
+        - tubeGeometry
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
@@ -1954,23 +2227,102 @@ modules:
         - GeometryBounds
         - GeometryDrawMode
         - GeometryIndexArray
+        - CapsuleGeometryOptions
+        - ExtrudeGeometryOptions
+        - HeightFieldGeometryOptions
+        - LatheGeometryOptions
+        - Point2D
+        - Point3D
+        - SphereGeometryOptions
+        - TaperedGeometryOptions
+        - TorusGeometryOptions
+        - TubeGeometryOptions
         - BoxGeometryOptions
         - CircleGeometry2DOptions
         - PlaneGeometryOptions
       constants:
         - PACKAGE_NAME
-    packages/geometry/src/primitives.ts:
-      description: Primitive geometry builders (§53) — the three shapes the §120 MVP needs.
+    packages/geometry/src/primitive-support.ts:
+      description: Shared building blocks of the §53 primitive builders — index allocation,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - createIndices
+        - requirePositive
+        - requireNonNegative
+        - requireSegments
+        - gridIndices
+        - writeCap
+      functions:
+        - createIndices
+        - requirePositive
+        - requireNonNegative
+        - requireSegments
+        - gridIndices
+        - writeCap
+    packages/geometry/src/primitives-3d.ts:
+      description: The nine 3D primitives §53 requires beyond the box and the plane — sphere,
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
         - file: ./buffer-geometry.js
           imports:
             - BufferGeometry
+        - file: ./primitive-support.js
+          imports:
+            - createIndices
+            - gridIndices
+            - requireNonNegative
+            - requirePositive
+            - requireSegments
+            - writeCap
+            - IndexArray
+      workspaceDependencies: []
+      exports:
+        - sphereGeometry
+        - cylinderGeometry
+        - coneGeometry
+        - capsuleGeometry
+        - torusGeometry
+        - latheGeometry
+        - extrudeGeometry
+        - tubeGeometry
+        - heightFieldGeometry
+      interfaces:
+        - Point2D
+        - Point3D
+        - SphereGeometryOptions
+        - TaperedGeometryOptions
+        - CapsuleGeometryOptions
+        - TorusGeometryOptions
+        - LatheGeometryOptions
+        - ExtrudeGeometryOptions
+        - TubeGeometryOptions
+        - HeightFieldGeometryOptions
+      functions:
+        - sphereGeometry
+        - cylinderGeometry
+        - coneGeometry
+        - capsuleGeometry
+        - torusGeometry
+        - latheGeometry
+        - extrudeGeometry
+        - tubeGeometry
+        - heightFieldGeometry
+    packages/geometry/src/primitives.ts:
+      description: Primitive geometry builders (§53) — the box, the plane, and the 2D circle.
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
         - file: ./buffer-geometry.js
           imports:
-            - GeometryIndexArray
-          typeOnly: true
+            - BufferGeometry
+        - file: ./primitive-support.js
+          imports:
+            - createIndices
+            - requirePositive
       workspaceDependencies: []
       exports:
         - boxGeometry
@@ -2024,13 +2376,22 @@ modules:
       interfaces:
         - DragManagerOptions
     packages/input/src/index.ts:
-      description: Package entry point for @four/input (re-exports 21 symbols)
+      description: Package entry point for @four/input (re-exports 34 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
         - file: ./drag.js
           imports:
             - DragManager
+          reExport: true
+        - file: ./key-events.js
+          imports:
+            - SceneKeyEvent
+            - dispatchKeyEvent
+          reExport: true
+        - file: ./keyboard-input.js
+          imports:
+            - KeyboardInput
           reExport: true
         - file: ./pick.js
           imports:
@@ -2041,7 +2402,6 @@ modules:
           imports:
             - CAPTURE_KEY_PREFIX
             - ScenePointerEvent
-            - buildPropagationPath
             - dispatchPointerEvent
           reExport: true
         - file: ./pointer-input.js
@@ -2049,10 +2409,32 @@ modules:
             - DEFAULT_CLICK_MOVE_THRESHOLD
             - PointerInput
           reExport: true
+        - file: ./propagation.js
+          imports:
+            - SceneInputEvent
+            - buildPropagationPath
+            - dispatchThreePhase
+          reExport: true
         - file: ./drag.js
           imports:
             - DragListener
             - DragManagerOptions
+          reExport: true
+          typeOnly: true
+        - file: ./key-events.js
+          imports:
+            - KeyDefaultSuppressor
+            - KeyModifiers
+            - SceneKeyEventInit
+            - SceneKeyEventType
+          reExport: true
+          typeOnly: true
+        - file: ./keyboard-input.js
+          imports:
+            - KeySurface
+            - KeyboardInputOptions
+            - SurfaceKeyEvent
+            - SurfaceKeyListener
           reExport: true
           typeOnly: true
         - file: ./pick.js
@@ -2080,17 +2462,30 @@ modules:
       workspaceDependencies: []
       exports:
         - DragManager
+        - SceneKeyEvent
+        - dispatchKeyEvent
+        - KeyboardInput
         - createPickRay
         - pick
         - CAPTURE_KEY_PREFIX
         - ScenePointerEvent
-        - buildPropagationPath
         - dispatchPointerEvent
         - DEFAULT_CLICK_MOVE_THRESHOLD
         - PointerInput
+        - SceneInputEvent
+        - buildPropagationPath
+        - dispatchThreePhase
         - PACKAGE_NAME
         - DragListener
         - DragManagerOptions
+        - KeyDefaultSuppressor
+        - KeyModifiers
+        - SceneKeyEventInit
+        - SceneKeyEventType
+        - KeySurface
+        - KeyboardInputOptions
+        - SurfaceKeyEvent
+        - SurfaceKeyListener
         - PickHit
         - Pickable
         - PropagatingPointerEventType
@@ -2103,16 +2498,29 @@ modules:
         - SurfaceRect
       reExported:
         - DragManager
+        - SceneKeyEvent
+        - dispatchKeyEvent
+        - KeyboardInput
         - createPickRay
         - pick
         - CAPTURE_KEY_PREFIX
         - ScenePointerEvent
-        - buildPropagationPath
         - dispatchPointerEvent
         - DEFAULT_CLICK_MOVE_THRESHOLD
         - PointerInput
+        - SceneInputEvent
+        - buildPropagationPath
+        - dispatchThreePhase
         - DragListener
         - DragManagerOptions
+        - KeyDefaultSuppressor
+        - KeyModifiers
+        - SceneKeyEventInit
+        - SceneKeyEventType
+        - KeySurface
+        - KeyboardInputOptions
+        - SurfaceKeyEvent
+        - SurfaceKeyListener
         - PickHit
         - Pickable
         - PropagatingPointerEventType
@@ -2125,6 +2533,58 @@ modules:
         - SurfaceRect
       constants:
         - PACKAGE_NAME
+    packages/input/src/key-events.ts:
+      description: Key events and their propagation through the scene graph (§72, §6b,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./propagation.js
+          imports:
+            - SceneInputEvent
+            - dispatchThreePhase
+      workspaceDependencies:
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Node
+      exports:
+        - dispatchKeyEvent
+        - SceneKeyEvent
+      classes:
+        - SceneKeyEvent
+      interfaces:
+        - KeyModifiers
+        - KeyDefaultSuppressor
+        - SceneKeyEventInit
+      functions:
+        - dispatchKeyEvent
+    packages/input/src/keyboard-input.ts:
+      description: "The keyboard source (§72, 2026-08-07, A-10): platform key events in, scene"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./key-events.js
+          imports:
+            - SceneKeyEvent
+            - dispatchKeyEvent
+            - KeyDefaultSuppressor
+            - SceneKeyEventType
+        - file: ./propagation.js
+          imports:
+            - buildPropagationPath
+      workspaceDependencies:
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Node
+      exports:
+        - KeyboardInput
+      classes:
+        - KeyboardInput
+      interfaces:
+        - SurfaceKeyEvent
+        - KeySurface
+        - KeyboardInputOptions
     packages/input/src/pick.ts:
       description: Picking and hit testing (§71) — the bounds tier.
       externalDependencies: []
@@ -2156,7 +2616,15 @@ modules:
       description: Pointer events and their propagation through the scene graph (§72, §6b).
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./propagation.js
+          imports:
+            - SceneInputEvent
+            - dispatchThreePhase
+        - file: ./propagation.js
+          imports:
+            - buildPropagationPath
+          reExport: true
       workspaceDependencies:
         - package: "@four/math"
           directory: packages/math
@@ -2167,16 +2635,17 @@ modules:
           imports:
             - Node
       exports:
-        - CAPTURE_KEY_PREFIX
         - buildPropagationPath
+        - CAPTURE_KEY_PREFIX
         - dispatchPointerEvent
         - ScenePointerEvent
+      reExported:
+        - buildPropagationPath
       classes:
         - ScenePointerEvent
       interfaces:
         - ScenePointerEventInit
       functions:
-        - buildPropagationPath
         - dispatchPointerEvent
       constants:
         - CAPTURE_KEY_PREFIX
@@ -2220,15 +2689,36 @@ modules:
         - PointerInputOptions
       constants:
         - DEFAULT_CLICK_MOVE_THRESHOLD
+    packages/input/src/propagation.ts:
+      description: The propagation machinery every scene input event shares (§72, §6b) — the
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Node
+            - NodeEventMap
+      exports:
+        - buildPropagationPath
+        - dispatchThreePhase
+      functions:
+        - buildPropagationPath
+        - dispatchThreePhase
   packages/materials:
     packages/materials/src/index.ts:
-      description: Package entry point for @four/materials (re-exports 8 symbols)
+      description: Package entry point for @four/materials (re-exports 12 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
         - file: ./lit-material.js
           imports:
             - LitMaterial
+          reExport: true
+        - file: ./material.js
+          imports:
+            - Material
           reExport: true
         - file: ./sprite-material.js
           imports:
@@ -2243,10 +2733,21 @@ modules:
             - LitMaterialOptions
           reExport: true
           typeOnly: true
+        - file: ./material.js
+          imports:
+            - BlendMode
+            - MaterialOptions
+          reExport: true
+          typeOnly: true
         - file: ./sprite-material.js
           imports:
             - SpriteMaterialOptions
             - SpriteTexture
+          reExport: true
+          typeOnly: true
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
           reExport: true
           typeOnly: true
         - file: ./unlit-material.js
@@ -2258,21 +2759,29 @@ modules:
       workspaceDependencies: []
       exports:
         - LitMaterial
+        - Material
         - SpriteMaterial
         - UnlitMaterial
         - PACKAGE_NAME
         - LitMaterialOptions
+        - BlendMode
+        - MaterialOptions
         - SpriteMaterialOptions
         - SpriteTexture
+        - MaterialTexture
         - ColorRGBA
         - UnlitMaterialOptions
       reExported:
         - LitMaterial
+        - Material
         - SpriteMaterial
         - UnlitMaterial
         - LitMaterialOptions
+        - BlendMode
+        - MaterialOptions
         - SpriteMaterialOptions
         - SpriteTexture
+        - MaterialTexture
         - ColorRGBA
         - UnlitMaterialOptions
       constants:
@@ -2282,44 +2791,27 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./material.js
+          imports:
+            - Material
+            - MaterialOptions
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
+          typeOnly: true
         - file: ./unlit-material.js
           imports:
             - ColorRGBA
           typeOnly: true
-      workspaceDependencies:
-        - package: "@four/core"
-          directory: packages/core
-          imports:
-            - Disposable
+      workspaceDependencies: []
       exports:
         - LitMaterial
       classes:
         - LitMaterial
       interfaces:
         - LitMaterialOptions
-    packages/materials/src/sprite-material.ts:
-      description: "`SpriteMaterial` (§55, §57) — one texture, one tint."
-      externalDependencies: []
-      nodeDependencies: []
-      internalDependencies:
-        - file: ./unlit-material.js
-          imports:
-            - ColorRGBA
-          typeOnly: true
-      workspaceDependencies:
-        - package: "@four/core"
-          directory: packages/core
-          imports:
-            - Disposable
-      exports:
-        - SpriteMaterial
-      classes:
-        - SpriteMaterial
-      interfaces:
-        - SpriteTexture
-        - SpriteMaterialOptions
-    packages/materials/src/unlit-material.ts:
-      description: "`UnlitMaterial` (§57) — a flat RGBA color, and nothing else."
+    packages/materials/src/material.ts:
+      description: "`Material` (§57) — the abstract base every material family member extends,"
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
@@ -2328,6 +2820,56 @@ modules:
           directory: packages/core
           imports:
             - Disposable
+      exports: []
+      interfaces:
+        - MaterialOptions
+    packages/materials/src/sprite-material.ts:
+      description: "`SpriteMaterial` (§55, §57) — one texture, one tint."
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./material.js
+          imports:
+            - Material
+            - MaterialOptions
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
+          typeOnly: true
+        - file: ./unlit-material.js
+          imports:
+            - ColorRGBA
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - SpriteMaterial
+      classes:
+        - SpriteMaterial
+      interfaces:
+        - SpriteMaterialOptions
+    packages/materials/src/texture.ts:
+      description: The read surface of a texture as a **material** and a rendering backend see
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports: []
+      interfaces:
+        - MaterialTexture
+    packages/materials/src/unlit-material.ts:
+      description: "`UnlitMaterial` (§57) — a flat RGBA color, optionally multiplied by a texture"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./material.js
+          imports:
+            - Material
+            - MaterialOptions
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
+          typeOnly: true
+      workspaceDependencies:
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -2571,7 +3113,7 @@ modules:
         - createTwoBoneIKSolution
         - solveTwoBoneIK
     packages/motion/src/index.ts:
-      description: Package entry point for @four/motion (re-exports 109 symbols)
+      description: Package entry point for @four/motion (re-exports 112 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -2609,6 +3151,11 @@ modules:
           imports:
             - MotionComponent
             - MotionSystem
+          reExport: true
+        - file: ./serializers.js
+          imports:
+            - KINEMATIC_CONTROLLER_SERIALIZER
+            - MOTION_COMPONENT_SERIALIZER
           reExport: true
         - file: ./pid.js
           imports:
@@ -2715,6 +3262,11 @@ modules:
             - MotionSystemOptions
           reExport: true
           typeOnly: true
+        - file: ./serializers.js
+          imports:
+            - ComponentSerializerShape
+          reExport: true
+          typeOnly: true
         - file: ./pid.js
           imports:
             - PIDControllerOptions
@@ -2789,6 +3341,8 @@ modules:
         - KinematicSystem
         - MotionComponent
         - MotionSystem
+        - KINEMATIC_CONTROLLER_SERIALIZER
+        - MOTION_COMPONENT_SERIALIZER
         - DEFAULT_PID_OUTPUT_LIMITS
         - PIDController
         - ballisticApexHeight
@@ -2851,6 +3405,7 @@ modules:
         - RotateOptions
         - MotionComponentOptions
         - MotionSystemOptions
+        - ComponentSerializerShape
         - PIDControllerOptions
         - PIDDerivativeSource
         - SchedulerCallback
@@ -2900,6 +3455,8 @@ modules:
         - KinematicSystem
         - MotionComponent
         - MotionSystem
+        - KINEMATIC_CONTROLLER_SERIALIZER
+        - MOTION_COMPONENT_SERIALIZER
         - DEFAULT_PID_OUTPUT_LIMITS
         - PIDController
         - ballisticApexHeight
@@ -2961,6 +3518,7 @@ modules:
         - RotateOptions
         - MotionComponentOptions
         - MotionSystemOptions
+        - ComponentSerializerShape
         - PIDControllerOptions
         - PIDDerivativeSource
         - SchedulerCallback
@@ -3173,6 +3731,34 @@ modules:
         - Scheduler
       interfaces:
         - SchedulerOptions
+    packages/motion/src/serializers.ts:
+      description: The §79 serializers for this package's two components (PH-17, 2026-08-06;
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./kinematic-controller.js
+          imports:
+            - KinematicController
+        - file: ./motion-component.js
+          imports:
+            - MotionComponent
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - JsonValue
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Vector3
+      exports:
+        - MOTION_COMPONENT_SERIALIZER
+        - KINEMATIC_CONTROLLER_SERIALIZER
+      interfaces:
+        - ComponentSerializerShape
+      constants:
+        - MOTION_COMPONENT_SERIALIZER
+        - KINEMATIC_CONTROLLER_SERIALIZER
     packages/motion/src/spring-damper.ts:
       description: Spring-damper controller (§111), the game-smoothing primitive.
       externalDependencies: []
@@ -3741,11 +4327,18 @@ modules:
           directory: packages/core
           imports:
             - Disposable
-      exports: []
+      exports:
+        - NO_TUNING_CAPABILITIES
+        - resolveTuningCapabilities
       interfaces:
         - PhysicsQueryCapabilities
+        - PhysicsTuningCapabilities
         - PhysicsCapabilities
         - PhysicsSolverAdapter
+      functions:
+        - resolveTuningCapabilities
+      constants:
+        - NO_TUNING_CAPABILITIES
     packages/physics/src/body-access.ts:
       description: Per-handle access to a solver's bodies — the seam §37's two `sync*` methods
       externalDependencies: []
@@ -3964,6 +4557,11 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./adapter.js
+          imports:
+            - NO_TUNING_CAPABILITIES
+            - resolveTuningCapabilities
+          reExport: true
         - file: ./body-access.js
           imports:
             - missingSolverJointAccess
@@ -4027,6 +4625,13 @@ modules:
             - resolveQueryOptions
             - sortHitsByDistance
           reExport: true
+        - file: ./serializers.js
+          imports:
+            - COLLIDER_SERIALIZER
+            - RIGID_BODY_SERIALIZER
+            - deserializeCollisionShape
+            - serializeCollisionShape
+          reExport: true
         - file: ./rigid-body.js
           imports:
             - RigidBody
@@ -4075,6 +4680,7 @@ modules:
             - PhysicsCapabilities
             - PhysicsQueryCapabilities
             - PhysicsSolverAdapter
+            - PhysicsTuningCapabilities
           reExport: true
           typeOnly: true
         - file: ./body-access.js
@@ -4171,6 +4777,13 @@ modules:
             - ShapeCastQuery
           reExport: true
           typeOnly: true
+        - file: ./serializers.js
+          imports:
+            - ColliderDocument
+            - PhysicsMaterialDocument
+            - RigidBodyDocument
+          reExport: true
+          typeOnly: true
         - file: ./rigid-body.js
           imports:
             - BlendWeights
@@ -4231,6 +4844,8 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - NO_TUNING_CAPABILITIES
+        - resolveTuningCapabilities
         - missingSolverJointAccess
         - supportsSolverJointAccess
         - Collider
@@ -4273,6 +4888,10 @@ modules:
         - passesQueryFilter
         - resolveQueryOptions
         - sortHitsByDistance
+        - COLLIDER_SERIALIZER
+        - RIGID_BODY_SERIALIZER
+        - deserializeCollisionShape
+        - serializeCollisionShape
         - RigidBody
         - COLLISION_SHAPE_TYPES_2D
         - COLLISION_SHAPE_TYPES_3D
@@ -4305,6 +4924,7 @@ modules:
         - PhysicsCapabilities
         - PhysicsQueryCapabilities
         - PhysicsSolverAdapter
+        - PhysicsTuningCapabilities
         - SolverBodyAccess
         - SolverJointAccess
         - SolverJointMotor
@@ -4367,6 +4987,9 @@ modules:
         - ResolvedQueryOptions
         - ShapeCastHit
         - ShapeCastQuery
+        - ColliderDocument
+        - PhysicsMaterialDocument
+        - RigidBodyDocument
         - BlendWeights
         - PointLoad
         - RigidBodyCommands
@@ -4410,6 +5033,8 @@ modules:
         - WorldRaycastHit
         - WorldShapeCastHit
       reExported:
+        - NO_TUNING_CAPABILITIES
+        - resolveTuningCapabilities
         - missingSolverJointAccess
         - supportsSolverJointAccess
         - Collider
@@ -4452,6 +5077,10 @@ modules:
         - passesQueryFilter
         - resolveQueryOptions
         - sortHitsByDistance
+        - COLLIDER_SERIALIZER
+        - RIGID_BODY_SERIALIZER
+        - deserializeCollisionShape
+        - serializeCollisionShape
         - RigidBody
         - COLLISION_SHAPE_TYPES_2D
         - COLLISION_SHAPE_TYPES_3D
@@ -4483,6 +5112,7 @@ modules:
         - PhysicsCapabilities
         - PhysicsQueryCapabilities
         - PhysicsSolverAdapter
+        - PhysicsTuningCapabilities
         - SolverBodyAccess
         - SolverJointAccess
         - SolverJointMotor
@@ -4545,6 +5175,9 @@ modules:
         - ResolvedQueryOptions
         - ShapeCastHit
         - ShapeCastQuery
+        - ColliderDocument
+        - PhysicsMaterialDocument
+        - RigidBodyDocument
         - BlendWeights
         - PointLoad
         - RigidBodyCommands
@@ -4857,6 +5490,9 @@ modules:
             - Vector3
       exports:
         - clearRigidBodyCommands
+        - setRigidBodyRegistered
+        - setRigidBodyType
+        - setRigidBodyDerivedMass
         - setRigidBodySleeping
         - RigidBody
       classes:
@@ -4868,7 +5504,86 @@ modules:
         - RigidBodyEventMap
       functions:
         - clearRigidBodyCommands
+        - setRigidBodyRegistered
+        - setRigidBodyType
+        - setRigidBodyDerivedMass
         - setRigidBodySleeping
+    packages/physics/src/serializers.ts:
+      description: The §79 serializers for this package's two components — `RigidBody` (§23) and
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./collider.js
+          imports:
+            - Collider
+            - ColliderOptions
+        - file: ./descriptors.js
+          imports:
+            - RigidBodyDescriptor
+          typeOnly: true
+        - file: ./material.js
+          imports:
+            - DEFAULT_DENSITY
+            - DEFAULT_FRICTION
+            - DEFAULT_RESTITUTION
+            - PhysicsMaterial
+            - PhysicsMaterialOptions
+        - file: ./queries.js
+          imports:
+            - ALL_COLLISION_GROUPS
+        - file: ./rigid-body.js
+          imports:
+            - RigidBody
+        - file: ./shapes.js
+          imports:
+            - CollisionShape
+          typeOnly: true
+        - file: ./types.js
+          imports:
+            - BODY_TYPES
+            - CCD_MODES
+            - DEFAULT_CCD_MODE
+        - file: ./types.js
+          imports:
+            - BodyType
+            - CCDMode
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - JsonValue
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix3
+            - Quaternion
+            - Vector2
+            - Vector3
+        - package: "@four/motion"
+          directory: packages/motion
+          imports:
+            - ComponentSerializerShape
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Transform
+      exports:
+        - RIGID_BODY_SERIALIZER
+        - COLLIDER_SERIALIZER
+        - serializeCollisionShape
+        - deserializeCollisionShape
+      interfaces:
+        - RigidBodyDocument
+        - PhysicsMaterialDocument
+        - ColliderDocument
+      functions:
+        - serializeCollisionShape
+        - deserializeCollisionShape
+      constants:
+        - RIGID_BODY_SERIALIZER
+        - COLLIDER_SERIALIZER
     packages/physics/src/shapes.ts:
       description: Collision shapes (§24) and their §85 parameter validation.
       externalDependencies: []
@@ -5025,7 +5740,11 @@ modules:
         - file: ./adapter.js
           imports:
             - PhysicsSolverAdapter
+            - PhysicsTuningCapabilities
           typeOnly: true
+        - file: ./adapter.js
+          imports:
+            - resolveTuningCapabilities
         - file: ./body-access.js
           imports:
             - SolverBodyAccess
@@ -5089,7 +5808,10 @@ modules:
           imports:
             - RigidBody
             - clearRigidBodyCommands
+            - setRigidBodyDerivedMass
+            - setRigidBodyRegistered
             - setRigidBodySleeping
+            - setRigidBodyType
         - file: ./shapes.js
           imports:
             - CollisionShape
@@ -5109,6 +5831,7 @@ modules:
         - file: ./types.js
           imports:
             - DEFAULT_DETERMINISM_LEVEL
+            - DEFAULT_SLEEPING_CONFIG
             - DETERMINISM_LEVELS
         - file: ./validation.js
           imports:
@@ -5782,7 +6505,7 @@ modules:
         - PACKAGE_NAME
   packages/render:
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 39 symbols)
+      description: Package entry point for @four/render (re-exports 40 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -5851,6 +6574,7 @@ modules:
         - file: ./renderable.js
           imports:
             - RenderableOptions
+            - SurfaceMaterial
           reExport: true
           typeOnly: true
         - file: ./renderer.js
@@ -5907,6 +6631,7 @@ modules:
         - SpriteRenderItem
         - UnlitRenderItem
         - RenderableOptions
+        - SurfaceMaterial
         - RenderInterpolation
         - Renderer
         - RendererBackend
@@ -5947,6 +6672,7 @@ modules:
         - SpriteRenderItem
         - UnlitRenderItem
         - RenderableOptions
+        - SurfaceMaterial
         - RenderInterpolation
         - Renderer
         - RendererBackend
@@ -6023,9 +6749,6 @@ modules:
         - file: ./renderable.js
           imports:
             - Renderable
-        - file: ./sprite.js
-          imports:
-            - Sprite
       workspaceDependencies:
         - package: "@four/geometry"
           directory: packages/geometry
@@ -6041,6 +6764,7 @@ modules:
           directory: packages/materials
           imports:
             - LitMaterial
+            - Material
             - SpriteMaterial
             - UnlitMaterial
         - package: "@four/scene"
@@ -6081,6 +6805,7 @@ modules:
           directory: packages/materials
           imports:
             - LitMaterial
+            - Material
             - UnlitMaterial
         - package: "@four/scene"
           directory: packages/scene
@@ -6128,7 +6853,10 @@ modules:
       description: "`Sprite` (§55) — a textured, tinted quad in the scene graph."
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./renderable.js
+          imports:
+            - Renderable
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -6146,10 +6874,6 @@ modules:
           directory: packages/materials
           imports:
             - SpriteMaterial
-        - package: "@four/scene"
-          directory: packages/scene
-          imports:
-            - Node
       exports:
         - Sprite
       classes:
@@ -6206,9 +6930,11 @@ modules:
       internalDependencies:
         - file: ./gl-program.js
           imports:
+            - COLOR_ATTRIBUTE_LOCATION
             - GL
             - NORMAL_ATTRIBUTE_LOCATION
             - POSITION_ATTRIBUTE_LOCATION
+            - UV_ATTRIBUTE_LOCATION
             - WebglContext
         - file: ./gl-program.js
           imports:
@@ -6294,6 +7020,9 @@ modules:
         - GL
         - POSITION_ATTRIBUTE_LOCATION
         - NORMAL_ATTRIBUTE_LOCATION
+        - UV_ATTRIBUTE_LOCATION
+        - COLOR_ATTRIBUTE_LOCATION
+        - MAP_TEXTURE_UNIT
         - matrixScratch
         - createLinkedProgram
         - requireUniform
@@ -6313,6 +7042,9 @@ modules:
         - GL
         - POSITION_ATTRIBUTE_LOCATION
         - NORMAL_ATTRIBUTE_LOCATION
+        - UV_ATTRIBUTE_LOCATION
+        - COLOR_ATTRIBUTE_LOCATION
+        - MAP_TEXTURE_UNIT
         - matrixScratch
     packages/render-webgl/src/gl-texture.ts:
       description: "GPU-side textures for the WebGL 2 backend: one `WebGLTexture` per"
@@ -6353,11 +7085,14 @@ modules:
           reExport: true
         - file: ./gl-program.js
           imports:
+            - COLOR_ATTRIBUTE_LOCATION
             - GL
             - LitProgram
+            - MAP_TEXTURE_UNIT
             - NORMAL_ATTRIBUTE_LOCATION
             - POSITION_ATTRIBUTE_LOCATION
             - SpriteProgram
+            - UV_ATTRIBUTE_LOCATION
             - UnlitProgram
           reExport: true
         - file: ./gl-texture.js
@@ -6411,11 +7146,14 @@ modules:
         - PARTICLE_GL
         - ParticleBatchCache
         - ParticleProgram
+        - COLOR_ATTRIBUTE_LOCATION
         - GL
         - LitProgram
+        - MAP_TEXTURE_UNIT
         - NORMAL_ATTRIBUTE_LOCATION
         - POSITION_ATTRIBUTE_LOCATION
         - SpriteProgram
+        - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
         - TextureCache
         - WebglRenderer
@@ -6442,11 +7180,14 @@ modules:
         - PARTICLE_GL
         - ParticleBatchCache
         - ParticleProgram
+        - COLOR_ATTRIBUTE_LOCATION
         - GL
         - LitProgram
+        - MAP_TEXTURE_UNIT
         - NORMAL_ATTRIBUTE_LOCATION
         - POSITION_ATTRIBUTE_LOCATION
         - SpriteProgram
+        - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
         - TextureCache
         - WebglRenderer
@@ -6485,11 +7226,13 @@ modules:
           imports:
             - GL
             - LitProgram
+            - MAP_TEXTURE_UNIT
             - SpriteProgram
             - UnlitProgram
         - file: ./gl-texture.js
           imports:
             - TextureCache
+            - CacheableTexture
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -6593,7 +7336,7 @@ modules:
       classes:
         - Group
     packages/scene/src/index.ts:
-      description: Package entry point for @four/scene (re-exports 31 symbols)
+      description: Package entry point for @four/scene (re-exports 33 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -6626,6 +7369,7 @@ modules:
         - file: ./node.js
           imports:
             - Node
+            - restoreNodeId
           reExport: true
         - file: ./pose-target.js
           imports:
@@ -6676,6 +7420,7 @@ modules:
           imports:
             - NodeEventMap
             - NodeHierarchyEvent
+            - NodeOptions
             - NodeType
           reExport: true
           typeOnly: true
@@ -6703,6 +7448,7 @@ modules:
         - PoseBuffer
         - createSnapshotSystem
         - Node
+        - restoreNodeId
         - PoseTarget
         - Scene
         - Transform
@@ -6720,6 +7466,7 @@ modules:
         - SnapshotSystemOptions
         - NodeEventMap
         - NodeHierarchyEvent
+        - NodeOptions
         - NodeType
         - Viewport
         - WorldTransformStats
@@ -6736,6 +7483,7 @@ modules:
         - PoseBuffer
         - createSnapshotSystem
         - Node
+        - restoreNodeId
         - PoseTarget
         - Scene
         - Transform
@@ -6752,6 +7500,7 @@ modules:
         - SnapshotSystemOptions
         - NodeEventMap
         - NodeHierarchyEvent
+        - NodeOptions
         - NodeType
         - Viewport
         - WorldTransformStats
@@ -6834,10 +7583,14 @@ modules:
           imports:
             - Quaternion
             - Vector3
-      exports: []
+      exports:
+        - restoreNodeId
       interfaces:
         - NodeHierarchyEvent
         - NodeEventMap
+        - NodeOptions
+      functions:
+        - restoreNodeId
     packages/scene/src/pose-target.ts:
       description: The `PoseTarget` component (§6a, §19, §42) — the pose animation *asks* for,
       externalDependencies: []
@@ -6955,7 +7708,9 @@ modules:
           imports:
             - FourError
             - cloneJsonValue
+            - parseUntrustedJson
             - JsonValue
+            - UntrustedJsonLimits
         - package: "@four/scene"
           directory: packages/scene
           imports:
@@ -6970,6 +7725,10 @@ modules:
           directory: packages/core
           imports:
             - JsonValue
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - UntrustedJsonLimits
       exports:
         - cloneJsonValue
         - SCENE_FORMAT_VERSION
@@ -6982,9 +7741,11 @@ modules:
         - encodeSceneDocument
         - decodeSceneDocument
         - JsonValue
+        - UntrustedJsonLimits
       reExported:
         - cloneJsonValue
         - JsonValue
+        - UntrustedJsonLimits
       interfaces:
         - Vector3Document
         - QuaternionDocument
@@ -7048,6 +7809,7 @@ modules:
             - SceneDocument
             - SceneNodeDocument
             - TransformDocument
+            - UntrustedJsonLimits
             - Vector3Document
           reExport: true
           typeOnly: true
@@ -7064,6 +7826,7 @@ modules:
             - ComponentSerializer
             - InstantiateSceneOptions
             - SerializeSceneOptions
+            - UnknownComponentPolicy
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -7098,6 +7861,7 @@ modules:
         - SceneDocument
         - SceneNodeDocument
         - TransformDocument
+        - UntrustedJsonLimits
         - Vector3Document
         - MigrateSceneDocumentOptions
         - SceneMigration
@@ -7106,6 +7870,7 @@ modules:
         - ComponentSerializer
         - InstantiateSceneOptions
         - SerializeSceneOptions
+        - UnknownComponentPolicy
       reExported:
         - SCENE_FORMAT_VERSION
         - asJsonObject
@@ -7136,6 +7901,7 @@ modules:
         - SceneDocument
         - SceneNodeDocument
         - TransformDocument
+        - UntrustedJsonLimits
         - Vector3Document
         - MigrateSceneDocumentOptions
         - SceneMigration
@@ -7144,6 +7910,7 @@ modules:
         - ComponentSerializer
         - InstantiateSceneOptions
         - SerializeSceneOptions
+        - UnknownComponentPolicy
       constants:
         - PACKAGE_NAME
     packages/serialization/src/migration.ts:
@@ -7215,6 +7982,7 @@ modules:
             - Node
             - PoseTarget
             - Scene
+            - restoreNodeId
             - Transform
       exports:
         - SCENE_NODE_TYPE
@@ -7407,6 +8175,7 @@ modules:
           directory: packages/input
           imports:
             - ScenePointerEvent
+            - SceneKeyEvent
       exports:
         - Button
       classes:
@@ -7419,6 +8188,12 @@ modules:
         - file: ./button.js
           imports:
             - Button
+          reExport: true
+        - file: ./keyboard.js
+          imports:
+            - collectFocusOrder
+            - installKeyboardTraversal
+            - keyboardFocusTarget
           reExport: true
         - file: ./label.js
           imports:
@@ -7442,6 +8217,11 @@ modules:
         - file: ./button.js
           imports:
             - ButtonOptions
+          reExport: true
+          typeOnly: true
+        - file: ./keyboard.js
+          imports:
+            - KeyboardTraversalOptions
           reExport: true
           typeOnly: true
         - file: ./label.js
@@ -7475,6 +8255,9 @@ modules:
       workspaceDependencies: []
       exports:
         - Button
+        - collectFocusOrder
+        - installKeyboardTraversal
+        - keyboardFocusTarget
         - Label
         - Panel
         - Insets
@@ -7487,6 +8270,7 @@ modules:
         - isUIWidget
         - PACKAGE_NAME
         - ButtonOptions
+        - KeyboardTraversalOptions
         - LabelOptions
         - LayoutAlign
         - LayoutDirection
@@ -7505,6 +8289,9 @@ modules:
         - WidgetStateSnapshot
       reExported:
         - Button
+        - collectFocusOrder
+        - installKeyboardTraversal
+        - keyboardFocusTarget
         - Label
         - Panel
         - Insets
@@ -7516,6 +8303,7 @@ modules:
         - focusedWidget
         - isUIWidget
         - ButtonOptions
+        - KeyboardTraversalOptions
         - LabelOptions
         - LayoutAlign
         - LayoutDirection
@@ -7534,6 +8322,38 @@ modules:
         - WidgetStateSnapshot
       constants:
         - PACKAGE_NAME
+    packages/ui/src/keyboard.ts:
+      description: "§75's keyboard navigation: Tab traversal over a widget tree (2026-08-07,"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./widget.js
+          imports:
+            - UIWidget
+            - focusedWidget
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - Unsubscribe
+        - package: "@four/input"
+          directory: packages/input
+          imports:
+            - SceneKeyEvent
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Node
+      exports:
+        - collectFocusOrder
+        - keyboardFocusTarget
+        - installKeyboardTraversal
+      interfaces:
+        - KeyboardTraversalOptions
+      functions:
+        - collectFocusOrder
+        - keyboardFocusTarget
+        - installKeyboardTraversal
     packages/ui/src/label.ts:
       description: "`Label` (§73) — a widget whose intrinsic size is its text (§74, §56)."
       externalDependencies: []
@@ -7609,6 +8429,7 @@ modules:
           imports:
             - Node
             - warnAuthorityConflict
+            - NodeOptions
       exports:
         - UI_LAYOUT_AUTHORITY
         - UI_STAGED
@@ -7670,6 +8491,7 @@ dependencyGraph:
         - packages/core/src/index.ts
         - packages/core/src/json.ts
         - packages/core/src/random.ts
+        - packages/core/src/untrusted.ts
     - name: Packages/diagnostics
       files:
         - packages/diagnostics/src/checksum.ts
@@ -7701,6 +8523,7 @@ dependencyGraph:
         - packages/four/src/render-webgl.ts
         - packages/four/src/render-webgpu.ts
         - packages/four/src/render.ts
+        - packages/four/src/scene-serializers.ts
         - packages/four/src/scene.ts
         - packages/four/src/serialization.ts
         - packages/four/src/text.ts
@@ -7709,19 +8532,26 @@ dependencyGraph:
       files:
         - packages/geometry/src/buffer-geometry.ts
         - packages/geometry/src/index.ts
+        - packages/geometry/src/primitive-support.ts
+        - packages/geometry/src/primitives-3d.ts
         - packages/geometry/src/primitives.ts
     - name: Packages/input
       files:
         - packages/input/src/drag.ts
         - packages/input/src/index.ts
+        - packages/input/src/key-events.ts
+        - packages/input/src/keyboard-input.ts
         - packages/input/src/pick.ts
         - packages/input/src/pointer-events.ts
         - packages/input/src/pointer-input.ts
+        - packages/input/src/propagation.ts
     - name: Packages/materials
       files:
         - packages/materials/src/index.ts
         - packages/materials/src/lit-material.ts
+        - packages/materials/src/material.ts
         - packages/materials/src/sprite-material.ts
+        - packages/materials/src/texture.ts
         - packages/materials/src/unlit-material.ts
     - name: Packages/math
       files:
@@ -7746,6 +8576,7 @@ dependencyGraph:
         - packages/motion/src/prediction.ts
         - packages/motion/src/random.ts
         - packages/motion/src/scheduler.ts
+        - packages/motion/src/serializers.ts
         - packages/motion/src/spring-damper.ts
         - packages/motion/src/steering.ts
         - packages/motion/src/systems.ts
@@ -7773,6 +8604,7 @@ dependencyGraph:
         - packages/physics/src/physics-system.ts
         - packages/physics/src/queries.ts
         - packages/physics/src/rigid-body.ts
+        - packages/physics/src/serializers.ts
         - packages/physics/src/shapes.ts
         - packages/physics/src/types.ts
         - packages/physics/src/validation.ts
@@ -7849,22 +8681,23 @@ dependencyGraph:
       files:
         - packages/ui/src/button.ts
         - packages/ui/src/index.ts
+        - packages/ui/src/keyboard.ts
         - packages/ui/src/label.ts
         - packages/ui/src/panel.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 161
+  totalTypeScriptFiles: 173
   totalModules: 24
-  totalLinesOfCode: 56760
-  totalExports: 1244
-  totalClasses: 91
-  totalInterfaces: 276
-  totalFunctions: 185
+  totalLinesOfCode: 65307
+  totalExports: 1390
+  totalClasses: 93
+  totalInterfaces: 308
+  totalFunctions: 218
   totalTypeGuards: 12
   totalEnums: 0
-  totalConstants: 174
-  totalReExports: 817
-  totalTypeOnlyImports: 172
+  totalConstants: 193
+  totalReExports: 908
+  totalTypeOnlyImports: 187
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 0
   unusedFilesCount: 0

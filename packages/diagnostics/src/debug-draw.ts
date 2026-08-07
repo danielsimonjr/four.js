@@ -23,45 +23,35 @@
  *   list costs one array write and one version bump — no reallocation.
  * - `packages/render-webgl/src/gl-geometry.ts` — `glMode()` maps `"lines"` to
  *   `GL.LINES` today, so a `"lines"` geometry already reaches the GPU.
- * - `packages/render/src/render-list.ts` — `RenderItemKind` is
- *   `"unlit" | "sprite" | "particles"`; a `Renderable` carrying a `"lines"`
+ * - `packages/render/src/render-list.ts` — a `Renderable` carrying a `"lines"`
  *   `BufferGeometry` and an `UnlitMaterial` becomes an ordinary `"unlit"` item
  *   with no render-package change at all.
- * - `packages/materials/src/unlit-material.ts` — `UnlitMaterial` is **one flat
- *   RGBA for the whole draw**. There is no vertex-colour attribute anywhere in
- *   `BufferGeometry` (it stores positions and indices, nothing else).
  *
- * So: **no new render item kind is needed for the MVP, and none is added here**
- * (`packages/render/**` is not in this packet's file list, and a "debug-lines"
- * item would also duplicate what unlit lines already do). The honest integration
- * an application writes today, entirely outside this package:
+ * So: **no new render item kind is needed, and none is added here.**
  *
- * ```ts
- * // once
- * const positions = new Float32Array(maxSegments * DEBUG_POSITION_FLOATS_PER_SEGMENT);
- * const geometry = new BufferGeometry({ positions, mode: "lines" });
- * const node = new Renderable(geometry, new UnlitMaterial({ color: [1, 0, 0, 1] }));
+ * ## Per-segment colour in one draw (R-35 closed, 2026-08-07)
  *
- * // per frame
- * buffer.clear();
- * collectBodyVelocities(adapter, buffer, { scale: 0.2 });
- * buffer.writePositions(positions);         // 6 floats per segment, no allocation
- * geometry.markDirty();
- * ```
+ * Until 2026-08-07 the verdict above carried a stated cost — **one colour per
+ * draw** — because `BufferGeometry` had no colour attribute and `UnlitMaterial`
+ * was one flat RGBA. R-19 landed `BufferGeometry.colors` and
+ * `UnlitMaterial.vertexColors`, and `@four/render-webgl` uploads the colour
+ * stream at a fixed attribute slot, so the whole overlay now draws in **one
+ * call at any segment count**.
  *
- * The cost of that path, stated plainly: **one colour per draw**. The buffer
- * stores a colour per vertex regardless (see the layout below), because the
- * colour is real diagnostic data — it is what distinguishes a contact normal
- * from a velocity vector — and because a future vertex-coloured render item
- * should be able to upload this buffer verbatim. Until that item exists an
- * application gets per-category colour by using **one buffer and one
- * `Renderable` per category** (the ordinary case: each provider call already
- * takes one colour), or by filtering a mixed buffer with
- * {@link DebugDrawBuffer.writePositionsForColor}. Anything finer — per-segment
- * colour in one draw — needs a render packet that adds a vertex-colour
- * attribute to `BufferGeometry` and either a `"debug-lines"` item kind or a
- * vertex-colour flag on `UnlitMaterial`. That is listed in
- * {@link DEBUG_DRAW_STAGED} rather than faked here.
+ * The bridge is {@link debugDrawStreams} + {@link applyDebugDrawStreams}: they
+ * de-interleave this buffer's seven-float vertices into the two contiguous
+ * streams `BufferGeometry` wants, reusing the arrays whenever the segment count
+ * holds. This package still emits **plain `Float32Array`s and never a
+ * `BufferGeometry`** — the frozen §3.1 matrix gives `diagnostics` no `geometry`
+ * edge — so the two-line assembly happens in the application; see
+ * {@link debugDrawStreams} for it.
+ *
+ * The buffer always stored a colour per vertex, deliberately, so that this
+ * upload would repack nothing when it arrived. It did. The older
+ * one-draw-per-colour routes still work and are still the right answer when the
+ * overlay's categories want separate materials or draw order:
+ * {@link DebugDrawBuffer.writePositions} with one buffer per category, or
+ * {@link DebugDrawBuffer.writePositionsForColor} to filter a mixed one.
  *
  * ## Buffer layout (decision, WP-10.3)
  *
@@ -160,6 +150,13 @@ export const DEBUG_SEGMENT_FLOATS = DEBUG_VERTEX_FLOATS * 2;
  * `BufferGeometry` takes (`x, y, z` per vertex, two vertices).
  */
 export const DEBUG_POSITION_FLOATS_PER_SEGMENT = 6;
+
+/**
+ * Floats a segment occupies in a **colors-only** array — the form
+ * `BufferGeometry.colors` takes (straight `r, g, b, a` per vertex, two
+ * vertices). See {@link debugDrawStreams}.
+ */
+export const DEBUG_COLOR_FLOATS_PER_SEGMENT = 8;
 
 /** Segments a {@link DebugDrawBuffer} holds before its first growth. */
 export const DEFAULT_DEBUG_BUFFER_CAPACITY = 64;
@@ -297,6 +294,14 @@ export class DebugDrawBuffer {
    */
   get positionFloatLength(): number {
     return this.#lineCount * DEBUG_POSITION_FLOATS_PER_SEGMENT;
+  }
+
+  /**
+   * Floats {@link DebugDrawBuffer.writeColors} will write:
+   * `lineCount * `{@link DEBUG_COLOR_FLOATS_PER_SEGMENT}.
+   */
+  get colorFloatLength(): number {
+    return this.#lineCount * DEBUG_COLOR_FLOATS_PER_SEGMENT;
   }
 
   /**
@@ -501,6 +506,57 @@ export class DebugDrawBuffer {
   }
 
   /**
+   * Copies the live segments' **colours** into `out` — 8 floats per segment
+   * (straight RGBA per vertex, two vertices), the layout
+   * `BufferGeometry.colors` wants alongside the positions
+   * {@link DebugDrawBuffer.writePositions} produces.
+   *
+   * This is the other half of the split: the buffer interleaves position and
+   * colour per vertex (module header), a GL vertex attribute wants each stream
+   * contiguous, and these two methods are the de-interleave. No expansion
+   * happens — the colour is already stored per vertex, so a future gradient
+   * segment (two different endpoint colours) comes out correct without a
+   * change here.
+   *
+   * Allocates nothing. Returns the number of floats written, which is
+   * {@link DebugDrawBuffer.colorFloatLength}. Floats in `out` past that are
+   * left untouched, exactly as {@link DebugDrawBuffer.writePositions} leaves
+   * them.
+   *
+   * @throws RangeError if `out` cannot hold the segments at `offset`.
+   */
+  writeColors(out: Float32Array, offset = 0): number {
+    const needed = this.colorFloatLength;
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      throw new RangeError(
+        `writeColors offset must be a non-negative integer; got ` +
+          `${String(offset)}.`,
+      );
+    }
+    if (out.length - offset < needed) {
+      throw new RangeError(
+        `writeColors needs ${String(needed)} floats at offset ` +
+          `${String(offset)}, but the destination holds ${String(out.length)}.`,
+      );
+    }
+    const data = this.#data;
+    let write = offset;
+    for (let line = 0; line < this.#lineCount; line += 1) {
+      const read = line * DEBUG_SEGMENT_FLOATS;
+      out[write] = data[read + 3];
+      out[write + 1] = data[read + 4];
+      out[write + 2] = data[read + 5];
+      out[write + 3] = data[read + 6];
+      out[write + 4] = data[read + DEBUG_VERTEX_FLOATS + 3];
+      out[write + 5] = data[read + DEBUG_VERTEX_FLOATS + 4];
+      out[write + 6] = data[read + DEBUG_VERTEX_FLOATS + 5];
+      out[write + 7] = data[read + DEBUG_VERTEX_FLOATS + 6];
+      write += DEBUG_COLOR_FLOATS_PER_SEGMENT;
+    }
+    return needed;
+  }
+
+  /**
    * {@link DebugDrawBuffer.writePositions} restricted to the segments whose
    * first vertex carries exactly `color` — how one mixed buffer feeds several
    * single-colour `UnlitMaterial` draws while the render path has no
@@ -584,6 +640,204 @@ export class DebugDrawBuffer {
     this.#lineCount += 1;
     return at;
   }
+}
+
+/**
+ * A {@link DebugDrawBuffer}'s contents de-interleaved into the two vertex
+ * streams a per-segment-coloured line draw needs — the R-35 bridge, shipped as
+ * **plain `Float32Array`s** (see {@link debugDrawStreams} for why they are not
+ * a `BufferGeometry`).
+ *
+ * Both arrays are sized **exactly** for the live segments, which is what
+ * `BufferGeometry` requires: it validates that `colors.length` is four floats
+ * per vertex of `positions`, so a slack tail is not merely wasteful here, it is
+ * rejected (§85).
+ */
+export interface DebugDrawStreams {
+  /**
+   * `x, y, z` per vertex, two vertices per segment —
+   * `segmentCount * `{@link DEBUG_POSITION_FLOATS_PER_SEGMENT} floats, world
+   * space. Feeds `BufferGeometry.positions` with `mode: "lines"`.
+   */
+  positions: Float32Array;
+
+  /**
+   * Straight RGBA per vertex —
+   * `segmentCount * `{@link DEBUG_COLOR_FLOATS_PER_SEGMENT} floats,
+   * index-aligned with {@link DebugDrawStreams.positions}. Feeds
+   * `BufferGeometry.colors`, which an `UnlitMaterial` reads when its
+   * `vertexColors` flag is on.
+   */
+  colors: Float32Array;
+
+  /** Segments packed — the source buffer's `lineCount` at the last update. */
+  segmentCount: number;
+
+  /** `segmentCount * 2` — the vertex count both arrays are aligned to. */
+  vertexCount: number;
+
+  /**
+   * Whether the last {@link debugDrawStreams} call **replaced** the two arrays
+   * (because the segment count changed) rather than rewriting them in place.
+   *
+   * `true` means a geometry pointing at the old arrays must be re-pointed at
+   * the new ones; `false` means an in-place rewrite happened and a
+   * `markDirty()` is all the geometry needs.
+   * {@link applyDebugDrawStreams} does exactly that, so a caller only reads
+   * this flag when it drives its own sink.
+   */
+  resized: boolean;
+}
+
+/**
+ * Packs `buffer`'s live segments into the position + colour streams a
+ * per-segment-coloured `GL.LINES` draw wants — the function that finally makes
+ * §84/§113's debug overlay **drawable in one call** (R-35).
+ *
+ * ## Why this returns arrays and not a `BufferGeometry` (decision, R-35)
+ *
+ * The §3.1 dependency matrix gives `@four/diagnostics` exactly three edges —
+ * `core`, `math`, `scene` — and `geometry` is not among them; the matrix is
+ * frozen, so this package cannot import `BufferGeometry` and must not pretend
+ * to. What it can do is emit the two arrays in the exact shape `BufferGeometry`
+ * accepts **verbatim**, which is the same duck-typed-contract move
+ * `ParticleDrawable` and `ReplayTarget` make. The assembly is two lines in the
+ * application, which owns both packages:
+ *
+ * ```ts
+ * // once
+ * const streams = debugDrawStreams(buffer);
+ * const geometry = new BufferGeometry({ ...streams, mode: "lines" });
+ * const node = new Renderable(geometry, new UnlitMaterial({ vertexColors: true }));
+ *
+ * // per frame
+ * buffer.clear();
+ * collectContactPoints(world.queuedEvents, buffer);
+ * debugDrawStreams(buffer, streams);        // pack (no alloc at a stable count)
+ * applyDebugDrawStreams(streams, geometry); // re-point or markDirty
+ * ```
+ *
+ * The `{ ...streams, mode: "lines" }` spread works because
+ * {@link DebugDrawStreams}'s first two fields are named exactly as
+ * `BufferGeometryOptions`' `positions` and `colors`; the extra count fields are
+ * ignored by the constructor. That naming is deliberate and load-bearing.
+ *
+ * ## Reuse (§7b out-parameter discipline)
+ *
+ * Pass the record back as `out` and the arrays are **rewritten in place**
+ * whenever the segment count is unchanged — the steady state of an overlay
+ * whose provider set is fixed, where this allocates nothing at all. When the
+ * count moves, the two arrays are replaced (they must be: `BufferGeometry`
+ * rejects a slack tail) and {@link DebugDrawStreams.resized} says so.
+ *
+ * Growing-and-never-shrinking, {@link DebugDrawBuffer}'s own policy, is
+ * deliberately **not** copied here: an oversized array is exactly what the
+ * geometry refuses, and re-pointing a geometry costs a full §85 validation scan
+ * of both streams anyway, which dwarfs the allocation it would save.
+ *
+ * An empty buffer yields two zero-length arrays — a legal, empty `"lines"`
+ * geometry that draws nothing, so an overlay with nothing to say needs no
+ * special case.
+ *
+ * @param buffer the source; only its live segments are read
+ * @param out a record from a previous call, to reuse
+ * @returns `out` when given, otherwise a fresh record
+ */
+export function debugDrawStreams(
+  buffer: DebugDrawBuffer,
+  out?: DebugDrawStreams,
+): DebugDrawStreams {
+  const segmentCount = buffer.lineCount;
+  const positionFloats = buffer.positionFloatLength;
+  const colorFloats = buffer.colorFloatLength;
+  let positions = out?.positions;
+  let colors = out?.colors;
+  let resized = false;
+  if (positions === undefined || positions.length !== positionFloats) {
+    positions = new Float32Array(positionFloats);
+    resized = true;
+  }
+  if (colors === undefined || colors.length !== colorFloats) {
+    colors = new Float32Array(colorFloats);
+    resized = true;
+  }
+  buffer.writePositions(positions);
+  buffer.writeColors(colors);
+  if (out === undefined) {
+    return {
+      positions,
+      colors,
+      segmentCount,
+      vertexCount: segmentCount * 2,
+      resized,
+    };
+  }
+  out.positions = positions;
+  out.colors = colors;
+  out.segmentCount = segmentCount;
+  out.vertexCount = segmentCount * 2;
+  out.resized = resized;
+  return out;
+}
+
+/**
+ * The part of `BufferGeometry` {@link applyDebugDrawStreams} touches, declared
+ * locally because `@four/diagnostics` has no `geometry` edge in the frozen §3.1
+ * matrix — the same structural-seam rule as {@link DebugBodyAccess}, and the
+ * same honest cost: **nothing type-checks this declaration against
+ * `BufferGeometry`**; a change to those three members fails this package's
+ * *tests*, which mirror the semantics, not its build.
+ *
+ * A `BufferGeometry` satisfies it as it stands (`positions` and `colors` are
+ * accessor pairs, `markDirty` bumps the version). So does any hand-rolled sink
+ * with the same three members.
+ */
+export interface DebugGeometrySink {
+  /** Vertex positions; assigning validates and bumps the version (§85). */
+  positions: Float32Array;
+
+  /**
+   * Per-vertex straight RGBA, or `undefined` for none. Assigning validates it
+   * against the *current* positions, which is why
+   * {@link applyDebugDrawStreams} drops it before replacing them.
+   */
+  colors: Float32Array | undefined;
+
+  /** Announces an in-place write into either array. */
+  markDirty(): void;
+}
+
+/**
+ * Points `geometry` at `streams`, or just marks it dirty when it already holds
+ * those exact arrays — the second of the two lines in
+ * {@link debugDrawStreams}' per-frame example.
+ *
+ * The three-assignment order is not stylistic. A geometry validates a new
+ * `positions` against the colours it currently holds, so assigning a
+ * *shorter* positions array while the old colours are still attached throws;
+ * dropping the colours first is the only order that works for every count
+ * change, including the first call.
+ *
+ * When the arrays are unchanged (a stable segment count — see
+ * {@link DebugDrawStreams.resized}) this is a single version bump: no
+ * validation scan, no upload sizing change, just the dirty flag every backend
+ * keys its buffer on.
+ */
+export function applyDebugDrawStreams(
+  streams: DebugDrawStreams,
+  geometry: DebugGeometrySink,
+): void {
+  if (
+    !streams.resized &&
+    geometry.positions === streams.positions &&
+    geometry.colors === streams.colors
+  ) {
+    geometry.markDirty();
+    return;
+  }
+  geometry.colors = undefined;
+  geometry.positions = streams.positions;
+  geometry.colors = streams.colors;
 }
 
 /**
@@ -1204,6 +1458,10 @@ export interface StagedVisualization {
  * Exported as data, not left in prose, so that an overlay can list what it
  * cannot show and a later packet can delete entries as it lands them. The
  * entries are asserted by `tests/debug-draw.test.ts`.
+ *
+ * Deleted so far: `"per-segment-colored-draw"` (staged 2026-08-02, **landed
+ * 2026-08-07** by R-19's colour attribute plus {@link debugDrawStreams} — see
+ * the module header).
  */
 export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
   Object.freeze({
@@ -1245,27 +1503,6 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
       "a read of the accumulated per-step force/torque, either on " +
       "SolverBodyAccess or exposed by PhysicsWorld's §26 command buffers " +
       "through a diagnostics-facing interface.",
-    staged: "2026-08-02",
-  }),
-  Object.freeze({
-    id: "per-segment-colored-draw",
-    specItem: "the overlay render path (plan P10-3)",
-    reason:
-      "BufferGeometry stores positions, indices and (since the 2026-08-04 " +
-      "lighting packet) normals — still no per-vertex colour — and " +
-      "UnlitMaterial is one flat RGBA per draw, so a single draw cannot " +
-      'colour segments individually. RenderItemKind is "unlit" | "sprite" | ' +
-      '"particles" | "lit", none of which reads a colour attribute; ' +
-      "packages/render/** was outside the staging packet's file list.",
-    shippedInstead:
-      'one draw per colour — a "lines" BufferGeometry plus UnlitMaterial fed ' +
-      "by writePositions (one buffer per category) or " +
-      "writePositionsForColor (one mixed buffer, filtered).",
-    unblockedBy:
-      "a render packet adding a vertex-colour attribute to BufferGeometry " +
-      'plus either a "debug-lines" RenderItemKind or a vertexColors flag on ' +
-      "UnlitMaterial; DebugDrawBuffer's layout already interleaves the colour " +
-      "per vertex for that upload.",
     staged: "2026-08-02",
   }),
 ]);

@@ -28,6 +28,21 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — R-35 + F7 (diagnostics).** Decisions worth keeping:
+  - `diagnostics → geometry` re-confirmed **absent** from the frozen §3.1 matrix; R-35
+    closed by emitting `Float32Array`s whose field names (`positions`, `colors`) spread
+    straight into `BufferGeometryOptions` — third instance of the duck-typed-contract
+    pattern (`ParticleDrawable`, `ReplayTarget`, `DebugGeometrySink`).
+  - `debugDrawStreams` deliberately does **not** copy `DebugDrawBuffer`'s
+    grow-never-shrink policy: §85 index alignment makes an oversized colour array
+    _illegal_, not merely wasteful. The `colors = undefined` → `positions` → `colors`
+    assignment order in `applyDebugDrawStreams` is required by `BufferGeometry`'s
+    validate-against-current-attributes rule — a shrinking overlay throws in any other
+    order.
+  - **A version constant that names a bound must say so** (F7): `REPLAY_FORMAT_VERSION`'s
+    name silently became false on 2026-08-06 when PH-6 introduced the lowest-version
+    rule; renamed `LATEST_`/`MINIMUM_` with a deprecated alias, and existing documents'
+    byte-identity is now asserted by a test rather than assumed.
 - **2026-08-07 — Render-tier review fixes (F13–F16).** Decisions worth keeping:
   - **F14 policy: validated accessors, unchanged version semantics.** `opacity`/
     `blendMode` are accessors applying the constructor's validation on every write; the

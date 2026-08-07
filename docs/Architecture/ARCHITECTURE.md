@@ -505,7 +505,8 @@ The architecture makes that a testable property rather than a hope:
    don't.
 5. **Replay.** `ReplayRecorder` (recording is non-perturbing — proven, since
    Rapier's snapshot is a pure read) produces a versioned, canonically
-   validated JSON document (`REPLAY_FORMAT_VERSION`, exact-match; strict
+   validated JSON document (`LATEST_REPLAY_FORMAT_VERSION`, with a document
+   declaring the lowest supported version that expresses it; strict
    canonical base64); `ReplayPlayer` owns bookkeeping only while the host
    supplies the step function, with checksum verification as the runtime
    signal that the pairing is right. The Phase 10 exit proof: record →

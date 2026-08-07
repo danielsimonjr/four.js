@@ -62,7 +62,7 @@
 import { FourError } from "@four/core";
 
 import {
-  REPLAY_FORMAT_VERSION,
+  LATEST_REPLAY_FORMAT_VERSION,
   type JsonValue,
   type ReplayFrameRecord,
   type ReplayInputRecord,
@@ -415,8 +415,10 @@ export class ReplayRecorder {
       // The real version is derived from the content by
       // `validateReplayRecording` below (PH-6: a document declares the lowest
       // version that can express it), so this is only the upper bound the
-      // validator checks the content against.
-      formatVersion: REPLAY_FORMAT_VERSION,
+      // validator checks the content against — which is exactly what
+      // `LATEST_…` names, and why the old `REPLAY_FORMAT_VERSION` spelling was
+      // renamed (F7, 2026-08-07).
+      formatVersion: LATEST_REPLAY_FORMAT_VERSION,
       adapterName: this.#adapterName,
       adapterVersion: this.#adapterVersion,
     };

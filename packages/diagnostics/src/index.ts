@@ -20,6 +20,10 @@ export type {
   UntrustedJsonLimits,
 } from "./replay-format.js";
 export {
+  LATEST_REPLAY_FORMAT_VERSION,
+  MINIMUM_REPLAY_FORMAT_VERSION,
+  // Deprecated 2026-08-07 (F7) alias of LATEST_REPLAY_FORMAT_VERSION; still
+  // exported so no consumer breaks.
   REPLAY_FORMAT_VERSION,
   SUPPORTED_REPLAY_FORMAT_VERSIONS,
   assertReplayCompatible,
@@ -57,6 +61,8 @@ export type {
   DebugColor,
   DebugContactPoint,
   DebugDrawBufferOptions,
+  DebugDrawStreams,
+  DebugGeometrySink,
   DebugJointAccess,
   DebugPhysicsEventLike,
   SolverJointStatistics,
@@ -65,6 +71,7 @@ export type {
   Vector3Like,
 } from "./debug-draw.js";
 export {
+  DEBUG_COLOR_FLOATS_PER_SEGMENT,
   DEBUG_DRAW_DEFAULT_COLORS,
   DEBUG_DRAW_STAGED,
   DEBUG_POSITION_FLOATS_PER_SEGMENT,
@@ -72,11 +79,13 @@ export {
   DEBUG_VERTEX_FLOATS,
   DEFAULT_DEBUG_BUFFER_CAPACITY,
   DebugDrawBuffer,
+  applyDebugDrawStreams,
   collectBodyOrigins,
   collectBodyVelocities,
   collectCentersOfMass,
   collectContactImpulses,
   collectContactPoints,
+  debugDrawStreams,
   solverJointStatistics,
   solverStatistics,
 } from "./debug-draw.js";

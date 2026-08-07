@@ -23,6 +23,8 @@ import { describe, expect, it } from "vitest";
 import {
   type JsonValue,
   type ReplayRecording,
+  LATEST_REPLAY_FORMAT_VERSION,
+  MINIMUM_REPLAY_FORMAT_VERSION,
   REPLAY_FORMAT_VERSION,
   SUPPORTED_REPLAY_FORMAT_VERSIONS,
   assertReplayCompatible,
@@ -782,12 +784,37 @@ describe("worldConfiguration and the format-version range (§34, PH-6)", () => {
 
   it("reads every supported version and no others", () => {
     expect([...SUPPORTED_REPLAY_FORMAT_VERSIONS]).toEqual([1, 2]);
-    expect(REPLAY_FORMAT_VERSION).toBe(2);
+    expect(LATEST_REPLAY_FORMAT_VERSION).toBe(2);
+    expect(MINIMUM_REPLAY_FORMAT_VERSION).toBe(1);
     expect(() =>
       validateReplayRecording(rawRecording({ formatVersion: 0 })),
     ).toThrow(/formatVersion 0/);
     expect(() =>
       validateReplayRecording(rawRecording({ formatVersion: 3 })),
     ).toThrow(/formatVersion 3/);
+  });
+
+  it("pins the two bounds to the ends of the supported range", () => {
+    // The bounds are spelled separately from the list, so this is the check
+    // that keeps them from drifting when a version 3 lands.
+    const versions = [...SUPPORTED_REPLAY_FORMAT_VERSIONS];
+    expect(versions[0]).toBe(MINIMUM_REPLAY_FORMAT_VERSION);
+    expect(versions[versions.length - 1]).toBe(LATEST_REPLAY_FORMAT_VERSION);
+    expect([...versions].sort((a, b) => a - b)).toEqual(versions);
+  });
+
+  it("keeps REPLAY_FORMAT_VERSION as a deprecated alias of the latest (F7)", () => {
+    // Renamed 2026-08-07: PH-6 made a document declare the *lowest* version
+    // that can express it, so the old name's promise — "the version of a
+    // document this build wrote" — stopped being true for every
+    // configuration-free recording. The alias stays so no consumer breaks.
+    expect(REPLAY_FORMAT_VERSION).toBe(LATEST_REPLAY_FORMAT_VERSION);
+    // And the rename moved no bytes: a configuration-free document written by
+    // this build still declares the minimum, not the alias's value.
+    const written = validateReplayRecording(
+      rawRecording({ formatVersion: REPLAY_FORMAT_VERSION }),
+    );
+    expect(written.formatVersion).toBe(MINIMUM_REPLAY_FORMAT_VERSION);
+    expect(written.formatVersion).not.toBe(REPLAY_FORMAT_VERSION);
   });
 });

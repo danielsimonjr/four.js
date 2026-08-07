@@ -1176,6 +1176,16 @@ Worse, because §55's `frame` sub-rectangle is missing (R-30) a sprite maps its 
 
 ### R-35 — §113/§120 debug drawing cannot be rendered: `GL.LINES` carries no per-vertex colour
 
+> **CLOSED 2026-08-07** — `debugDrawStreams(buffer, out?)` / `applyDebugDrawStreams`
+> in `@four/diagnostics` de-interleave the 7-float layout into exactly-sized
+> `positions`/`colors` arrays that spread straight into `BufferGeometryOptions` (no new
+> §3.1 edge — the duck-typed-contract pattern's third instance), over R-19's `colors`
+> attribute and `vertexColors` material flag; the whole overlay is one draw call at any
+> segment count, proven in `tests/integration/debug-overlay-render.test.ts` and the
+> render-webgl lines test. `DEBUG_DRAW_STAGED` loses `"per-segment-colored-draw"`;
+> `joint-anchors` and `applied-force-vectors` remain genuinely seam-blocked. Unblocks
+> the §118/§119 force/torque overlays. Kept for the record.
+
 **§120 "debug drawing", §84.** The data path ships (seven providers in `packages/diagnostics/src/debug-draw.ts`). Drawing them needs a per-segment vertex-colour attribute, which `BufferGeometry` does not have (R-19) and `UnlitProgram` does not consume. So the overlay has never been shown as pixels.
 **Severity:** minor for a shipping app, **major** for §118/§119 (both list force/torque vector overlays as required features).
 **Effort:** S once R-19 lands a `color` attribute.

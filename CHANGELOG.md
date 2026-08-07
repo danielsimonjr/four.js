@@ -8,6 +8,30 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — R-35 closed: the §84/§113 debug overlay draws (+ review F7)
+
+#### Added
+
+- **`@four/diagnostics`: `debugDrawStreams(buffer, out?)` + `applyDebugDrawStreams`
+  (R-35)** — de-interleaves a `DebugDrawBuffer`'s 7-float layout into exactly-sized
+  `positions`/`colors` `Float32Array`s whose field names spread straight into
+  `BufferGeometryOptions` (`new BufferGeometry({ ...streams, mode: "lines" })` is the
+  whole bridge — no new §3.1 edge; the duck-typed-contract pattern's third instance,
+  after `ParticleDrawable` and `ReplayTarget`). With R-19's `colors` attribute and
+  `vertexColors` material flag, the whole overlay is **one draw call** at any segment
+  count — proven end to end in `tests/integration/debug-overlay-render.test.ts`.
+  Supporting surface: `writeColors`, `colorFloatLength`, `DEBUG_COLOR_FLOATS_PER_SEGMENT`,
+  `DebugGeometrySink`. `DEBUG_DRAW_STAGED` loses `"per-segment-colored-draw"`; the two
+  survivors are still genuinely seam-blocked.
+
+#### Changed
+
+- **`REPLAY_FORMAT_VERSION` renamed (review F7)** — `LATEST_REPLAY_FORMAT_VERSION` (2)
+  and `MINIMUM_REPLAY_FORMAT_VERSION` (1) say what became true when PH-6's
+  lowest-version-that-expresses rule landed; the old name stays as a deprecated alias.
+  **No document bytes changed** — asserted by a test, not assumed; goldens bit-identical.
+  Doc mentions across Architecture/COMPATIBILITY/guides updated.
+
 ### 2026-08-07 — Render-tier review fixes: exception-safe GL state, validated material writes
 
 The remaining four findings from the adversarial closure review (F13–F16), re-verified

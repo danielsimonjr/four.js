@@ -205,12 +205,12 @@ results are not specified across JavaScript engines — which is exactly what
 number here moves only when a document's _shape_ changes, never because a
 package released.
 
-| Format                         | Constant                                                     | Writes | Reads    | Where                  |
-| ------------------------------ | ------------------------------------------------------------ | ------ | -------- | ---------------------- |
-| Scene document (§79)           | `SCENE_FORMAT_VERSION`                                       | `1`    | `1`      | `@four/serialization`  |
-| Replay recording (§34)         | `REPLAY_FORMAT_VERSION` / `SUPPORTED_REPLAY_FORMAT_VERSIONS` | `2`    | `1`, `2` | `@four/diagnostics`    |
-| Rapier snapshot envelope (§34) | `SNAPSHOT_FORMAT_VERSION` (module-private, not exported)     | `2`    | `2`      | `@four/physics-rapier` |
-| `.four` binary package (§79)   | —                                                            | —      | —        | not implemented (A-16) |
+| Format                         | Constant                                                            | Writes | Reads    | Where                  |
+| ------------------------------ | ------------------------------------------------------------------- | ------ | -------- | ---------------------- |
+| Scene document (§79)           | `SCENE_FORMAT_VERSION`                                              | `1`    | `1`      | `@four/serialization`  |
+| Replay recording (§34)         | `LATEST_REPLAY_FORMAT_VERSION` / `SUPPORTED_REPLAY_FORMAT_VERSIONS` | `2`    | `1`, `2` | `@four/diagnostics`    |
+| Rapier snapshot envelope (§34) | `SNAPSHOT_FORMAT_VERSION` (module-private, not exported)            | `2`    | `2`      | `@four/physics-rapier` |
+| `.four` binary package (§79)   | —                                                                   | —      | —        | not implemented (A-16) |
 
 **The versioning rule, decided 2026-08-06 (PH-6): a document declares the
 lowest version that can express its content**, not the version of the build

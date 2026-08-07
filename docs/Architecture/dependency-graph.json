@@ -2,10 +2,10 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-05",
-    "totalFiles": 161,
+    "lastUpdated": "2026-08-07",
+    "totalFiles": 173,
     "totalModules": 24,
-    "totalExports": 1244
+    "totalExports": 1390
   },
   "entryPoints": [
     {
@@ -1080,6 +1080,8 @@
           }
         ],
         "exports": [
+          "DEFAULT_MAXIMUM_BYTES",
+          "DEFAULT_TIMEOUT_SECONDS",
           "AssetManager"
         ],
         "classes": [
@@ -1087,8 +1089,14 @@
         ],
         "interfaces": [
           "FetchResponse",
+          "ResponseHeadersLike",
+          "TimerLike",
           "AssetLoader",
           "AssetManagerOptions"
+        ],
+        "constants": [
+          "DEFAULT_MAXIMUM_BYTES",
+          "DEFAULT_TIMEOUT_SECONDS"
         ]
       },
       "packages/assets/src/index.ts": {
@@ -1099,7 +1107,9 @@
           {
             "file": "./asset-manager.js",
             "imports": [
-              "AssetManager"
+              "AssetManager",
+              "DEFAULT_MAXIMUM_BYTES",
+              "DEFAULT_TIMEOUT_SECONDS"
             ],
             "reExport": true
           },
@@ -1120,7 +1130,9 @@
               "AssetLoader",
               "AssetManagerOptions",
               "FetchLike",
-              "FetchResponse"
+              "FetchResponse",
+              "ResponseHeadersLike",
+              "TimerLike"
             ],
             "reExport": true,
             "typeOnly": true
@@ -1138,6 +1150,8 @@
         "workspaceDependencies": [],
         "exports": [
           "AssetManager",
+          "DEFAULT_MAXIMUM_BYTES",
+          "DEFAULT_TIMEOUT_SECONDS",
           "ImageAsset",
           "binaryLoader",
           "createImageLoader",
@@ -1148,11 +1162,15 @@
           "AssetManagerOptions",
           "FetchLike",
           "FetchResponse",
+          "ResponseHeadersLike",
+          "TimerLike",
           "ImageBitmapLike",
           "ImageDecodeLike"
         ],
         "reExported": [
           "AssetManager",
+          "DEFAULT_MAXIMUM_BYTES",
+          "DEFAULT_TIMEOUT_SECONDS",
           "ImageAsset",
           "binaryLoader",
           "createImageLoader",
@@ -1162,6 +1180,8 @@
           "AssetManagerOptions",
           "FetchLike",
           "FetchResponse",
+          "ResponseHeadersLike",
+          "TimerLike",
           "ImageBitmapLike",
           "ImageDecodeLike"
         ],
@@ -1296,7 +1316,7 @@
         ]
       },
       "packages/core/src/index.ts": {
-        "description": "Package entry point for @four/core (re-exports 18 symbols)",
+        "description": "Package entry point for @four/core (re-exports 22 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -1351,6 +1371,15 @@
             "reExport": true
           },
           {
+            "file": "./untrusted.js",
+            "imports": [
+              "DEFAULT_MAXIMUM_DEPTH",
+              "DEFAULT_MAXIMUM_TEXT_LENGTH",
+              "parseUntrustedJson"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./json.js",
             "imports": [
               "JsonValue"
@@ -1394,6 +1423,14 @@
             ],
             "reExport": true,
             "typeOnly": true
+          },
+          {
+            "file": "./untrusted.js",
+            "imports": [
+              "UntrustedJsonLimits"
+            ],
+            "reExport": true,
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [],
@@ -1406,6 +1443,9 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "DEFAULT_MAXIMUM_DEPTH",
+          "DEFAULT_MAXIMUM_TEXT_LENGTH",
+          "parseUntrustedJson",
           "PACKAGE_NAME",
           "JsonValue",
           "Component",
@@ -1416,7 +1456,8 @@
           "FourErrorCode",
           "FourErrorOptions",
           "EventListener",
-          "Unsubscribe"
+          "Unsubscribe",
+          "UntrustedJsonLimits"
         ],
         "reExported": [
           "DEFAULT_GRAVITY_Y",
@@ -1427,6 +1468,9 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "DEFAULT_MAXIMUM_DEPTH",
+          "DEFAULT_MAXIMUM_TEXT_LENGTH",
+          "parseUntrustedJson",
           "JsonValue",
           "Component",
           "ComponentHost",
@@ -1436,7 +1480,8 @@
           "FourErrorCode",
           "FourErrorOptions",
           "EventListener",
-          "Unsubscribe"
+          "Unsubscribe",
+          "UntrustedJsonLimits"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -1466,6 +1511,35 @@
         ],
         "classes": [
           "SeededRandom"
+        ]
+      },
+      "packages/core/src/untrusted.ts": {
+        "description": "Untrusted-input guards for the document formats (§96).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./errors.js",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "DEFAULT_MAXIMUM_TEXT_LENGTH",
+          "DEFAULT_MAXIMUM_DEPTH",
+          "parseUntrustedJson"
+        ],
+        "interfaces": [
+          "UntrustedJsonLimits"
+        ],
+        "functions": [
+          "parseUntrustedJson"
+        ],
+        "constants": [
+          "DEFAULT_MAXIMUM_TEXT_LENGTH",
+          "DEFAULT_MAXIMUM_DEPTH"
         ]
       }
     },
@@ -1507,9 +1581,12 @@
           "DEBUG_VERTEX_FLOATS",
           "DEBUG_SEGMENT_FLOATS",
           "DEBUG_POSITION_FLOATS_PER_SEGMENT",
+          "DEBUG_COLOR_FLOATS_PER_SEGMENT",
           "DEFAULT_DEBUG_BUFFER_CAPACITY",
           "DEBUG_DRAW_DEFAULT_COLORS",
           "DEBUG_DRAW_STAGED",
+          "debugDrawStreams",
+          "applyDebugDrawStreams",
           "collectBodyVelocities",
           "collectBodyOrigins",
           "collectCentersOfMass",
@@ -1525,6 +1602,8 @@
         "interfaces": [
           "Vector3Like",
           "DebugDrawBufferOptions",
+          "DebugDrawStreams",
+          "DebugGeometrySink",
           "DebugBodyAccess",
           "DebugJointAccess",
           "DebugContactPoint",
@@ -1541,6 +1620,8 @@
           "StagedVisualization"
         ],
         "functions": [
+          "debugDrawStreams",
+          "applyDebugDrawStreams",
           "collectBodyVelocities",
           "collectBodyOrigins",
           "collectCentersOfMass",
@@ -1553,6 +1634,7 @@
           "DEBUG_VERTEX_FLOATS",
           "DEBUG_SEGMENT_FLOATS",
           "DEBUG_POSITION_FLOATS_PER_SEGMENT",
+          "DEBUG_COLOR_FLOATS_PER_SEGMENT",
           "DEFAULT_DEBUG_BUFFER_CAPACITY",
           "DEBUG_DRAW_DEFAULT_COLORS",
           "DEBUG_DRAW_STAGED"
@@ -1581,7 +1663,10 @@
           {
             "file": "./replay-format.js",
             "imports": [
+              "LATEST_REPLAY_FORMAT_VERSION",
+              "MINIMUM_REPLAY_FORMAT_VERSION",
               "REPLAY_FORMAT_VERSION",
+              "SUPPORTED_REPLAY_FORMAT_VERSIONS",
               "assertReplayCompatible",
               "cloneJsonValue",
               "decodeBase64",
@@ -1604,6 +1689,7 @@
           {
             "file": "./debug-draw.js",
             "imports": [
+              "DEBUG_COLOR_FLOATS_PER_SEGMENT",
               "DEBUG_DRAW_DEFAULT_COLORS",
               "DEBUG_DRAW_STAGED",
               "DEBUG_POSITION_FLOATS_PER_SEGMENT",
@@ -1611,11 +1697,13 @@
               "DEBUG_VERTEX_FLOATS",
               "DEFAULT_DEBUG_BUFFER_CAPACITY",
               "DebugDrawBuffer",
+              "applyDebugDrawStreams",
               "collectBodyOrigins",
               "collectBodyVelocities",
               "collectCentersOfMass",
               "collectContactImpulses",
               "collectContactPoints",
+              "debugDrawStreams",
               "solverJointStatistics",
               "solverStatistics"
             ],
@@ -1647,7 +1735,8 @@
               "ReplayFrameRecord",
               "ReplayInputRecord",
               "ReplayRecording",
-              "ReplaySnapshotRecord"
+              "ReplaySnapshotRecord",
+              "UntrustedJsonLimits"
             ],
             "reExport": true,
             "typeOnly": true
@@ -1676,6 +1765,8 @@
               "DebugColor",
               "DebugContactPoint",
               "DebugDrawBufferOptions",
+              "DebugDrawStreams",
+              "DebugGeometrySink",
               "DebugJointAccess",
               "DebugPhysicsEventLike",
               "SolverJointStatistics",
@@ -1692,7 +1783,10 @@
           "createChecksum",
           "hashFloats",
           "ReplayRecorder",
+          "LATEST_REPLAY_FORMAT_VERSION",
+          "MINIMUM_REPLAY_FORMAT_VERSION",
           "REPLAY_FORMAT_VERSION",
+          "SUPPORTED_REPLAY_FORMAT_VERSIONS",
           "assertReplayCompatible",
           "cloneJsonValue",
           "decodeBase64",
@@ -1703,6 +1797,7 @@
           "validateReplayRecording",
           "DEFAULT_REPLAY_MAXIMUM_SUB_STEPS",
           "ReplayPlayer",
+          "DEBUG_COLOR_FLOATS_PER_SEGMENT",
           "DEBUG_DRAW_DEFAULT_COLORS",
           "DEBUG_DRAW_STAGED",
           "DEBUG_POSITION_FLOATS_PER_SEGMENT",
@@ -1710,11 +1805,13 @@
           "DEBUG_VERTEX_FLOATS",
           "DEFAULT_DEBUG_BUFFER_CAPACITY",
           "DebugDrawBuffer",
+          "applyDebugDrawStreams",
           "collectBodyOrigins",
           "collectBodyVelocities",
           "collectCentersOfMass",
           "collectContactImpulses",
           "collectContactPoints",
+          "debugDrawStreams",
           "solverJointStatistics",
           "solverStatistics",
           "PACKAGE_NAME",
@@ -1728,6 +1825,7 @@
           "ReplayInputRecord",
           "ReplayRecording",
           "ReplaySnapshotRecord",
+          "UntrustedJsonLimits",
           "ReplayPlayerOptions",
           "ReplayStepEvent",
           "ReplayStepListener",
@@ -1742,6 +1840,8 @@
           "DebugColor",
           "DebugContactPoint",
           "DebugDrawBufferOptions",
+          "DebugDrawStreams",
+          "DebugGeometrySink",
           "DebugJointAccess",
           "DebugPhysicsEventLike",
           "SolverJointStatistics",
@@ -1753,7 +1853,10 @@
           "createChecksum",
           "hashFloats",
           "ReplayRecorder",
+          "LATEST_REPLAY_FORMAT_VERSION",
+          "MINIMUM_REPLAY_FORMAT_VERSION",
           "REPLAY_FORMAT_VERSION",
+          "SUPPORTED_REPLAY_FORMAT_VERSIONS",
           "assertReplayCompatible",
           "cloneJsonValue",
           "decodeBase64",
@@ -1764,6 +1867,7 @@
           "validateReplayRecording",
           "DEFAULT_REPLAY_MAXIMUM_SUB_STEPS",
           "ReplayPlayer",
+          "DEBUG_COLOR_FLOATS_PER_SEGMENT",
           "DEBUG_DRAW_DEFAULT_COLORS",
           "DEBUG_DRAW_STAGED",
           "DEBUG_POSITION_FLOATS_PER_SEGMENT",
@@ -1771,11 +1875,13 @@
           "DEBUG_VERTEX_FLOATS",
           "DEFAULT_DEBUG_BUFFER_CAPACITY",
           "DebugDrawBuffer",
+          "applyDebugDrawStreams",
           "collectBodyOrigins",
           "collectBodyVelocities",
           "collectCentersOfMass",
           "collectContactImpulses",
           "collectContactPoints",
+          "debugDrawStreams",
           "solverJointStatistics",
           "solverStatistics",
           "Checksum",
@@ -1788,6 +1894,7 @@
           "ReplayInputRecord",
           "ReplayRecording",
           "ReplaySnapshotRecord",
+          "UntrustedJsonLimits",
           "ReplayPlayerOptions",
           "ReplayStepEvent",
           "ReplayStepListener",
@@ -1802,6 +1909,8 @@
           "DebugColor",
           "DebugContactPoint",
           "DebugDrawBufferOptions",
+          "DebugDrawStreams",
+          "DebugGeometrySink",
           "DebugJointAccess",
           "DebugPhysicsEventLike",
           "SolverJointStatistics",
@@ -1821,12 +1930,12 @@
           {
             "file": "./replay-format.js",
             "imports": [
+              "LATEST_REPLAY_FORMAT_VERSION",
               "JsonValue",
               "ReplayFrameRecord",
               "ReplayInputRecord",
               "ReplayRecording",
               "ReplaySnapshotRecord",
-              "REPLAY_FORMAT_VERSION",
               "cloneJsonValue",
               "encodeBase64",
               "validateReplayRecording"
@@ -1866,7 +1975,9 @@
             "imports": [
               "FourError",
               "cloneJsonValue",
-              "JsonValue"
+              "parseUntrustedJson",
+              "JsonValue",
+              "UntrustedJsonLimits"
             ]
           },
           {
@@ -1882,11 +1993,21 @@
             "imports": [
               "JsonValue"
             ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "UntrustedJsonLimits"
+            ]
           }
         ],
         "exports": [
           "cloneJsonValue",
+          "LATEST_REPLAY_FORMAT_VERSION",
+          "MINIMUM_REPLAY_FORMAT_VERSION",
           "REPLAY_FORMAT_VERSION",
+          "SUPPORTED_REPLAY_FORMAT_VERSIONS",
           "encodeBase64",
           "decodeBase64",
           "validateReplayRecording",
@@ -1894,11 +2015,13 @@
           "decodeReplayRecording",
           "assertReplayCompatible",
           "isReplayCompatible",
-          "JsonValue"
+          "JsonValue",
+          "UntrustedJsonLimits"
         ],
         "reExported": [
           "cloneJsonValue",
-          "JsonValue"
+          "JsonValue",
+          "UntrustedJsonLimits"
         ],
         "interfaces": [
           "ReplayInputRecord",
@@ -1917,7 +2040,10 @@
           "isReplayCompatible"
         ],
         "constants": [
-          "REPLAY_FORMAT_VERSION"
+          "LATEST_REPLAY_FORMAT_VERSION",
+          "MINIMUM_REPLAY_FORMAT_VERSION",
+          "REPLAY_FORMAT_VERSION",
+          "SUPPORTED_REPLAY_FORMAT_VERSIONS"
         ]
       },
       "packages/diagnostics/src/replay-player.ts": {
@@ -2015,9 +2141,17 @@
             ]
           },
           {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "DepthRange"
+            ]
+          },
+          {
             "package": "@four/scene",
             "directory": "packages/scene",
             "imports": [
+              "PerspectiveCamera",
               "PoseBuffer",
               "Scene",
               "createSnapshotSystem",
@@ -2134,10 +2268,33 @@
             "reExport": true
           },
           {
+            "file": "./scene-serializers.js",
+            "imports": [
+              "BUTTON_NODE_TYPE",
+              "LABEL_NODE_TYPE",
+              "PANEL_NODE_TYPE",
+              "registerPhysicsSerializers",
+              "registerSceneNodeTypes",
+              "registerUISerializers",
+              "restoreNodeId"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./application.js",
             "imports": [
               "ApplicationEventMap",
               "ApplicationOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./scene-serializers.js",
+            "imports": [
+              "SceneNodeTypeOptions",
+              "SceneNodeTypeSupport",
+              "SceneSerializationSupport"
             ],
             "reExport": true,
             "typeOnly": true
@@ -2146,13 +2303,33 @@
         "workspaceDependencies": [],
         "exports": [
           "Application",
+          "BUTTON_NODE_TYPE",
+          "LABEL_NODE_TYPE",
+          "PANEL_NODE_TYPE",
+          "registerPhysicsSerializers",
+          "registerSceneNodeTypes",
+          "registerUISerializers",
+          "restoreNodeId",
           "ApplicationEventMap",
-          "ApplicationOptions"
+          "ApplicationOptions",
+          "SceneNodeTypeOptions",
+          "SceneNodeTypeSupport",
+          "SceneSerializationSupport"
         ],
         "reExported": [
           "Application",
+          "BUTTON_NODE_TYPE",
+          "LABEL_NODE_TYPE",
+          "PANEL_NODE_TYPE",
+          "registerPhysicsSerializers",
+          "registerSceneNodeTypes",
+          "registerUISerializers",
+          "restoreNodeId",
           "ApplicationEventMap",
-          "ApplicationOptions"
+          "ApplicationOptions",
+          "SceneNodeTypeOptions",
+          "SceneNodeTypeSupport",
+          "SceneSerializationSupport"
         ]
       },
       "packages/four/src/input.ts": {
@@ -2421,6 +2598,103 @@
           "* from @four/render"
         ]
       },
+      "packages/four/src/scene-serializers.ts": {
+        "description": "§79 node types and component serializers for the classes the engine itself",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "JsonValue"
+            ]
+          },
+          {
+            "package": "@four/motion",
+            "directory": "packages/motion",
+            "imports": [
+              "KINEMATIC_CONTROLLER_SERIALIZER",
+              "KinematicController",
+              "MOTION_COMPONENT_SERIALIZER",
+              "MotionComponent"
+            ]
+          },
+          {
+            "package": "@four/physics",
+            "directory": "packages/physics",
+            "imports": [
+              "COLLIDER_SERIALIZER",
+              "Collider",
+              "RIGID_BODY_SERIALIZER",
+              "RigidBody"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "restoreNodeId",
+              "Node"
+            ]
+          },
+          {
+            "package": "@four/serialization",
+            "directory": "packages/serialization",
+            "imports": [
+              "ComponentSerializerRegistry",
+              "createDefaultComponentSerializers",
+              "InstantiateSceneOptions",
+              "SceneNodeDocument",
+              "SerializeSceneOptions"
+            ]
+          },
+          {
+            "package": "@four/text",
+            "directory": "packages/text",
+            "imports": [
+              "GlyphAtlas"
+            ]
+          },
+          {
+            "package": "@four/ui",
+            "directory": "packages/ui",
+            "imports": [
+              "Button",
+              "Label",
+              "Panel",
+              "UIWidget",
+              "UIWidgetOptions",
+              "WidgetAccessibility"
+            ]
+          }
+        ],
+        "exports": [
+          "restoreNodeId",
+          "PANEL_NODE_TYPE",
+          "LABEL_NODE_TYPE",
+          "BUTTON_NODE_TYPE",
+          "registerUISerializers",
+          "registerPhysicsSerializers",
+          "registerSceneNodeTypes"
+        ],
+        "interfaces": [
+          "SceneNodeTypeOptions",
+          "SceneNodeTypeSupport",
+          "SceneSerializationSupport"
+        ],
+        "functions": [
+          "registerUISerializers",
+          "registerPhysicsSerializers",
+          "registerSceneNodeTypes"
+        ],
+        "constants": [
+          "PANEL_NODE_TYPE",
+          "LABEL_NODE_TYPE",
+          "BUTTON_NODE_TYPE"
+        ]
+      },
       "packages/four/src/scene.ts": {
         "description": "scene module",
         "externalDependencies": [],
@@ -2532,7 +2806,7 @@
         ]
       },
       "packages/geometry/src/index.ts": {
-        "description": "Package entry point for @four/geometry (re-exports 11 symbols)",
+        "description": "Package entry point for @four/geometry (re-exports 30 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -2540,6 +2814,21 @@
             "file": "./buffer-geometry.js",
             "imports": [
               "BufferGeometry"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./primitives-3d.js",
+            "imports": [
+              "capsuleGeometry",
+              "coneGeometry",
+              "cylinderGeometry",
+              "extrudeGeometry",
+              "heightFieldGeometry",
+              "latheGeometry",
+              "sphereGeometry",
+              "torusGeometry",
+              "tubeGeometry"
             ],
             "reExport": true
           },
@@ -2564,6 +2853,23 @@
             "typeOnly": true
           },
           {
+            "file": "./primitives-3d.js",
+            "imports": [
+              "CapsuleGeometryOptions",
+              "ExtrudeGeometryOptions",
+              "HeightFieldGeometryOptions",
+              "LatheGeometryOptions",
+              "Point2D",
+              "Point3D",
+              "SphereGeometryOptions",
+              "TaperedGeometryOptions",
+              "TorusGeometryOptions",
+              "TubeGeometryOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./primitives.js",
             "imports": [
               "BoxGeometryOptions",
@@ -2577,6 +2883,15 @@
         "workspaceDependencies": [],
         "exports": [
           "BufferGeometry",
+          "capsuleGeometry",
+          "coneGeometry",
+          "cylinderGeometry",
+          "extrudeGeometry",
+          "heightFieldGeometry",
+          "latheGeometry",
+          "sphereGeometry",
+          "torusGeometry",
+          "tubeGeometry",
           "boxGeometry",
           "circleGeometry2D",
           "planeGeometry",
@@ -2585,12 +2900,31 @@
           "GeometryBounds",
           "GeometryDrawMode",
           "GeometryIndexArray",
+          "CapsuleGeometryOptions",
+          "ExtrudeGeometryOptions",
+          "HeightFieldGeometryOptions",
+          "LatheGeometryOptions",
+          "Point2D",
+          "Point3D",
+          "SphereGeometryOptions",
+          "TaperedGeometryOptions",
+          "TorusGeometryOptions",
+          "TubeGeometryOptions",
           "BoxGeometryOptions",
           "CircleGeometry2DOptions",
           "PlaneGeometryOptions"
         ],
         "reExported": [
           "BufferGeometry",
+          "capsuleGeometry",
+          "coneGeometry",
+          "cylinderGeometry",
+          "extrudeGeometry",
+          "heightFieldGeometry",
+          "latheGeometry",
+          "sphereGeometry",
+          "torusGeometry",
+          "tubeGeometry",
           "boxGeometry",
           "circleGeometry2D",
           "planeGeometry",
@@ -2598,6 +2932,16 @@
           "GeometryBounds",
           "GeometryDrawMode",
           "GeometryIndexArray",
+          "CapsuleGeometryOptions",
+          "ExtrudeGeometryOptions",
+          "HeightFieldGeometryOptions",
+          "LatheGeometryOptions",
+          "Point2D",
+          "Point3D",
+          "SphereGeometryOptions",
+          "TaperedGeometryOptions",
+          "TorusGeometryOptions",
+          "TubeGeometryOptions",
           "BoxGeometryOptions",
           "CircleGeometry2DOptions",
           "PlaneGeometryOptions"
@@ -2606,8 +2950,31 @@
           "PACKAGE_NAME"
         ]
       },
-      "packages/geometry/src/primitives.ts": {
-        "description": "Primitive geometry builders (§53) — the three shapes the §120 MVP needs.",
+      "packages/geometry/src/primitive-support.ts": {
+        "description": "Shared building blocks of the §53 primitive builders — index allocation,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "createIndices",
+          "requirePositive",
+          "requireNonNegative",
+          "requireSegments",
+          "gridIndices",
+          "writeCap"
+        ],
+        "functions": [
+          "createIndices",
+          "requirePositive",
+          "requireNonNegative",
+          "requireSegments",
+          "gridIndices",
+          "writeCap"
+        ]
+      },
+      "packages/geometry/src/primitives-3d.ts": {
+        "description": "The nine 3D primitives §53 requires beyond the box and the plane — sphere,",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -2618,11 +2985,71 @@
             ]
           },
           {
+            "file": "./primitive-support.js",
+            "imports": [
+              "createIndices",
+              "gridIndices",
+              "requireNonNegative",
+              "requirePositive",
+              "requireSegments",
+              "writeCap",
+              "IndexArray"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "sphereGeometry",
+          "cylinderGeometry",
+          "coneGeometry",
+          "capsuleGeometry",
+          "torusGeometry",
+          "latheGeometry",
+          "extrudeGeometry",
+          "tubeGeometry",
+          "heightFieldGeometry"
+        ],
+        "interfaces": [
+          "Point2D",
+          "Point3D",
+          "SphereGeometryOptions",
+          "TaperedGeometryOptions",
+          "CapsuleGeometryOptions",
+          "TorusGeometryOptions",
+          "LatheGeometryOptions",
+          "ExtrudeGeometryOptions",
+          "TubeGeometryOptions",
+          "HeightFieldGeometryOptions"
+        ],
+        "functions": [
+          "sphereGeometry",
+          "cylinderGeometry",
+          "coneGeometry",
+          "capsuleGeometry",
+          "torusGeometry",
+          "latheGeometry",
+          "extrudeGeometry",
+          "tubeGeometry",
+          "heightFieldGeometry"
+        ]
+      },
+      "packages/geometry/src/primitives.ts": {
+        "description": "Primitive geometry builders (§53) — the box, the plane, and the 2D circle.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
             "file": "./buffer-geometry.js",
             "imports": [
-              "GeometryIndexArray"
-            ],
-            "typeOnly": true
+              "BufferGeometry"
+            ]
+          },
+          {
+            "file": "./primitive-support.js",
+            "imports": [
+              "createIndices",
+              "requirePositive"
+            ]
           }
         ],
         "workspaceDependencies": [],
@@ -2707,7 +3134,7 @@
         ]
       },
       "packages/input/src/index.ts": {
-        "description": "Package entry point for @four/input (re-exports 21 symbols)",
+        "description": "Package entry point for @four/input (re-exports 34 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -2715,6 +3142,21 @@
             "file": "./drag.js",
             "imports": [
               "DragManager"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./key-events.js",
+            "imports": [
+              "SceneKeyEvent",
+              "dispatchKeyEvent"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./keyboard-input.js",
+            "imports": [
+              "KeyboardInput"
             ],
             "reExport": true
           },
@@ -2731,7 +3173,6 @@
             "imports": [
               "CAPTURE_KEY_PREFIX",
               "ScenePointerEvent",
-              "buildPropagationPath",
               "dispatchPointerEvent"
             ],
             "reExport": true
@@ -2745,10 +3186,41 @@
             "reExport": true
           },
           {
+            "file": "./propagation.js",
+            "imports": [
+              "SceneInputEvent",
+              "buildPropagationPath",
+              "dispatchThreePhase"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./drag.js",
             "imports": [
               "DragListener",
               "DragManagerOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./key-events.js",
+            "imports": [
+              "KeyDefaultSuppressor",
+              "KeyModifiers",
+              "SceneKeyEventInit",
+              "SceneKeyEventType"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./keyboard-input.js",
+            "imports": [
+              "KeySurface",
+              "KeyboardInputOptions",
+              "SurfaceKeyEvent",
+              "SurfaceKeyListener"
             ],
             "reExport": true,
             "typeOnly": true
@@ -2788,17 +3260,30 @@
         "workspaceDependencies": [],
         "exports": [
           "DragManager",
+          "SceneKeyEvent",
+          "dispatchKeyEvent",
+          "KeyboardInput",
           "createPickRay",
           "pick",
           "CAPTURE_KEY_PREFIX",
           "ScenePointerEvent",
-          "buildPropagationPath",
           "dispatchPointerEvent",
           "DEFAULT_CLICK_MOVE_THRESHOLD",
           "PointerInput",
+          "SceneInputEvent",
+          "buildPropagationPath",
+          "dispatchThreePhase",
           "PACKAGE_NAME",
           "DragListener",
           "DragManagerOptions",
+          "KeyDefaultSuppressor",
+          "KeyModifiers",
+          "SceneKeyEventInit",
+          "SceneKeyEventType",
+          "KeySurface",
+          "KeyboardInputOptions",
+          "SurfaceKeyEvent",
+          "SurfaceKeyListener",
           "PickHit",
           "Pickable",
           "PropagatingPointerEventType",
@@ -2812,16 +3297,29 @@
         ],
         "reExported": [
           "DragManager",
+          "SceneKeyEvent",
+          "dispatchKeyEvent",
+          "KeyboardInput",
           "createPickRay",
           "pick",
           "CAPTURE_KEY_PREFIX",
           "ScenePointerEvent",
-          "buildPropagationPath",
           "dispatchPointerEvent",
           "DEFAULT_CLICK_MOVE_THRESHOLD",
           "PointerInput",
+          "SceneInputEvent",
+          "buildPropagationPath",
+          "dispatchThreePhase",
           "DragListener",
           "DragManagerOptions",
+          "KeyDefaultSuppressor",
+          "KeyModifiers",
+          "SceneKeyEventInit",
+          "SceneKeyEventType",
+          "KeySurface",
+          "KeyboardInputOptions",
+          "SurfaceKeyEvent",
+          "SurfaceKeyListener",
           "PickHit",
           "Pickable",
           "PropagatingPointerEventType",
@@ -2835,6 +3333,86 @@
         ],
         "constants": [
           "PACKAGE_NAME"
+        ]
+      },
+      "packages/input/src/key-events.ts": {
+        "description": "Key events and their propagation through the scene graph (§72, §6b,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./propagation.js",
+            "imports": [
+              "SceneInputEvent",
+              "dispatchThreePhase"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "dispatchKeyEvent",
+          "SceneKeyEvent"
+        ],
+        "classes": [
+          "SceneKeyEvent"
+        ],
+        "interfaces": [
+          "KeyModifiers",
+          "KeyDefaultSuppressor",
+          "SceneKeyEventInit"
+        ],
+        "functions": [
+          "dispatchKeyEvent"
+        ]
+      },
+      "packages/input/src/keyboard-input.ts": {
+        "description": "The keyboard source (§72, 2026-08-07, A-10): platform key events in, scene",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./key-events.js",
+            "imports": [
+              "SceneKeyEvent",
+              "dispatchKeyEvent",
+              "KeyDefaultSuppressor",
+              "SceneKeyEventType"
+            ]
+          },
+          {
+            "file": "./propagation.js",
+            "imports": [
+              "buildPropagationPath"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "KeyboardInput"
+        ],
+        "classes": [
+          "KeyboardInput"
+        ],
+        "interfaces": [
+          "SurfaceKeyEvent",
+          "KeySurface",
+          "KeyboardInputOptions"
         ]
       },
       "packages/input/src/pick.ts": {
@@ -2879,7 +3457,22 @@
         "description": "Pointer events and their propagation through the scene graph (§72, §6b).",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./propagation.js",
+            "imports": [
+              "SceneInputEvent",
+              "dispatchThreePhase"
+            ]
+          },
+          {
+            "file": "./propagation.js",
+            "imports": [
+              "buildPropagationPath"
+            ],
+            "reExport": true
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/math",
@@ -2897,10 +3490,13 @@
           }
         ],
         "exports": [
-          "CAPTURE_KEY_PREFIX",
           "buildPropagationPath",
+          "CAPTURE_KEY_PREFIX",
           "dispatchPointerEvent",
           "ScenePointerEvent"
+        ],
+        "reExported": [
+          "buildPropagationPath"
         ],
         "classes": [
           "ScenePointerEvent"
@@ -2909,7 +3505,6 @@
           "ScenePointerEventInit"
         ],
         "functions": [
-          "buildPropagationPath",
           "dispatchPointerEvent"
         ],
         "constants": [
@@ -2974,11 +3569,35 @@
         "constants": [
           "DEFAULT_CLICK_MOVE_THRESHOLD"
         ]
+      },
+      "packages/input/src/propagation.ts": {
+        "description": "The propagation machinery every scene input event shares (§72, §6b) — the",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node",
+              "NodeEventMap"
+            ]
+          }
+        ],
+        "exports": [
+          "buildPropagationPath",
+          "dispatchThreePhase"
+        ],
+        "functions": [
+          "buildPropagationPath",
+          "dispatchThreePhase"
+        ]
       }
     },
     "packages/materials": {
       "packages/materials/src/index.ts": {
-        "description": "Package entry point for @four/materials (re-exports 8 symbols)",
+        "description": "Package entry point for @four/materials (re-exports 12 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -2986,6 +3605,13 @@
             "file": "./lit-material.js",
             "imports": [
               "LitMaterial"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./material.js",
+            "imports": [
+              "Material"
             ],
             "reExport": true
           },
@@ -3012,10 +3638,27 @@
             "typeOnly": true
           },
           {
+            "file": "./material.js",
+            "imports": [
+              "BlendMode",
+              "MaterialOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./sprite-material.js",
             "imports": [
               "SpriteMaterialOptions",
               "SpriteTexture"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "MaterialTexture"
             ],
             "reExport": true,
             "typeOnly": true
@@ -3033,22 +3676,30 @@
         "workspaceDependencies": [],
         "exports": [
           "LitMaterial",
+          "Material",
           "SpriteMaterial",
           "UnlitMaterial",
           "PACKAGE_NAME",
           "LitMaterialOptions",
+          "BlendMode",
+          "MaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
+          "MaterialTexture",
           "ColorRGBA",
           "UnlitMaterialOptions"
         ],
         "reExported": [
           "LitMaterial",
+          "Material",
           "SpriteMaterial",
           "UnlitMaterial",
           "LitMaterialOptions",
+          "BlendMode",
+          "MaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
+          "MaterialTexture",
           "ColorRGBA",
           "UnlitMaterialOptions"
         ],
@@ -3062,6 +3713,20 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./material.js",
+            "imports": [
+              "Material",
+              "MaterialOptions"
+            ]
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "MaterialTexture"
+            ],
+            "typeOnly": true
+          },
+          {
             "file": "./unlit-material.js",
             "imports": [
               "ColorRGBA"
@@ -3069,15 +3734,7 @@
             "typeOnly": true
           }
         ],
-        "workspaceDependencies": [
-          {
-            "package": "@four/core",
-            "directory": "packages/core",
-            "imports": [
-              "Disposable"
-            ]
-          }
-        ],
+        "workspaceDependencies": [],
         "exports": [
           "LitMaterial"
         ],
@@ -3088,41 +3745,8 @@
           "LitMaterialOptions"
         ]
       },
-      "packages/materials/src/sprite-material.ts": {
-        "description": "`SpriteMaterial` (§55, §57) — one texture, one tint.",
-        "externalDependencies": [],
-        "nodeDependencies": [],
-        "internalDependencies": [
-          {
-            "file": "./unlit-material.js",
-            "imports": [
-              "ColorRGBA"
-            ],
-            "typeOnly": true
-          }
-        ],
-        "workspaceDependencies": [
-          {
-            "package": "@four/core",
-            "directory": "packages/core",
-            "imports": [
-              "Disposable"
-            ]
-          }
-        ],
-        "exports": [
-          "SpriteMaterial"
-        ],
-        "classes": [
-          "SpriteMaterial"
-        ],
-        "interfaces": [
-          "SpriteTexture",
-          "SpriteMaterialOptions"
-        ]
-      },
-      "packages/materials/src/unlit-material.ts": {
-        "description": "`UnlitMaterial` (§57) — a flat RGBA color, and nothing else.",
+      "packages/materials/src/material.ts": {
+        "description": "`Material` (§57) — the abstract base every material family member extends,",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
@@ -3133,7 +3757,83 @@
             "imports": [
               "Disposable"
             ]
+          }
+        ],
+        "exports": [],
+        "interfaces": [
+          "MaterialOptions"
+        ]
+      },
+      "packages/materials/src/sprite-material.ts": {
+        "description": "`SpriteMaterial` (§55, §57) — one texture, one tint.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./material.js",
+            "imports": [
+              "Material",
+              "MaterialOptions"
+            ]
           },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "MaterialTexture"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./unlit-material.js",
+            "imports": [
+              "ColorRGBA"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "SpriteMaterial"
+        ],
+        "classes": [
+          "SpriteMaterial"
+        ],
+        "interfaces": [
+          "SpriteMaterialOptions"
+        ]
+      },
+      "packages/materials/src/texture.ts": {
+        "description": "The read surface of a texture as a **material** and a rendering backend see",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [],
+        "interfaces": [
+          "MaterialTexture"
+        ]
+      },
+      "packages/materials/src/unlit-material.ts": {
+        "description": "`UnlitMaterial` (§57) — a flat RGBA color, optionally multiplied by a texture",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./material.js",
+            "imports": [
+              "Material",
+              "MaterialOptions"
+            ]
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "MaterialTexture"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
           {
             "package": "@four/math",
             "directory": "packages/math",
@@ -3491,7 +4191,7 @@
         ]
       },
       "packages/motion/src/index.ts": {
-        "description": "Package entry point for @four/motion (re-exports 109 symbols)",
+        "description": "Package entry point for @four/motion (re-exports 112 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -3542,6 +4242,14 @@
             "imports": [
               "MotionComponent",
               "MotionSystem"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./serializers.js",
+            "imports": [
+              "KINEMATIC_CONTROLLER_SERIALIZER",
+              "MOTION_COMPONENT_SERIALIZER"
             ],
             "reExport": true
           },
@@ -3690,6 +4398,14 @@
             "typeOnly": true
           },
           {
+            "file": "./serializers.js",
+            "imports": [
+              "ComponentSerializerShape"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./pid.js",
             "imports": [
               "PIDControllerOptions",
@@ -3782,6 +4498,8 @@
           "KinematicSystem",
           "MotionComponent",
           "MotionSystem",
+          "KINEMATIC_CONTROLLER_SERIALIZER",
+          "MOTION_COMPONENT_SERIALIZER",
           "DEFAULT_PID_OUTPUT_LIMITS",
           "PIDController",
           "ballisticApexHeight",
@@ -3844,6 +4562,7 @@
           "RotateOptions",
           "MotionComponentOptions",
           "MotionSystemOptions",
+          "ComponentSerializerShape",
           "PIDControllerOptions",
           "PIDDerivativeSource",
           "SchedulerCallback",
@@ -3894,6 +4613,8 @@
           "KinematicSystem",
           "MotionComponent",
           "MotionSystem",
+          "KINEMATIC_CONTROLLER_SERIALIZER",
+          "MOTION_COMPONENT_SERIALIZER",
           "DEFAULT_PID_OUTPUT_LIMITS",
           "PIDController",
           "ballisticApexHeight",
@@ -3955,6 +4676,7 @@
           "RotateOptions",
           "MotionComponentOptions",
           "MotionSystemOptions",
+          "ComponentSerializerShape",
           "PIDControllerOptions",
           "PIDDerivativeSource",
           "SchedulerCallback",
@@ -4242,6 +4964,52 @@
         ],
         "interfaces": [
           "SchedulerOptions"
+        ]
+      },
+      "packages/motion/src/serializers.ts": {
+        "description": "The §79 serializers for this package's two components (PH-17, 2026-08-06;",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./kinematic-controller.js",
+            "imports": [
+              "KinematicController"
+            ]
+          },
+          {
+            "file": "./motion-component.js",
+            "imports": [
+              "MotionComponent"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "JsonValue"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          }
+        ],
+        "exports": [
+          "MOTION_COMPONENT_SERIALIZER",
+          "KINEMATIC_CONTROLLER_SERIALIZER"
+        ],
+        "interfaces": [
+          "ComponentSerializerShape"
+        ],
+        "constants": [
+          "MOTION_COMPONENT_SERIALIZER",
+          "KINEMATIC_CONTROLLER_SERIALIZER"
         ]
       },
       "packages/motion/src/spring-damper.ts": {
@@ -4994,11 +5762,21 @@
             ]
           }
         ],
-        "exports": [],
+        "exports": [
+          "NO_TUNING_CAPABILITIES",
+          "resolveTuningCapabilities"
+        ],
         "interfaces": [
           "PhysicsQueryCapabilities",
+          "PhysicsTuningCapabilities",
           "PhysicsCapabilities",
           "PhysicsSolverAdapter"
+        ],
+        "functions": [
+          "resolveTuningCapabilities"
+        ],
+        "constants": [
+          "NO_TUNING_CAPABILITIES"
         ]
       },
       "packages/physics/src/body-access.ts": {
@@ -5319,6 +6097,14 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./adapter.js",
+            "imports": [
+              "NO_TUNING_CAPABILITIES",
+              "resolveTuningCapabilities"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./body-access.js",
             "imports": [
               "missingSolverJointAccess",
@@ -5403,6 +6189,16 @@
             "reExport": true
           },
           {
+            "file": "./serializers.js",
+            "imports": [
+              "COLLIDER_SERIALIZER",
+              "RIGID_BODY_SERIALIZER",
+              "deserializeCollisionShape",
+              "serializeCollisionShape"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./rigid-body.js",
             "imports": [
               "RigidBody"
@@ -5465,7 +6261,8 @@
             "imports": [
               "PhysicsCapabilities",
               "PhysicsQueryCapabilities",
-              "PhysicsSolverAdapter"
+              "PhysicsSolverAdapter",
+              "PhysicsTuningCapabilities"
             ],
             "reExport": true,
             "typeOnly": true
@@ -5589,6 +6386,16 @@
             "typeOnly": true
           },
           {
+            "file": "./serializers.js",
+            "imports": [
+              "ColliderDocument",
+              "PhysicsMaterialDocument",
+              "RigidBodyDocument"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./rigid-body.js",
             "imports": [
               "BlendWeights",
@@ -5661,6 +6468,8 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "NO_TUNING_CAPABILITIES",
+          "resolveTuningCapabilities",
           "missingSolverJointAccess",
           "supportsSolverJointAccess",
           "Collider",
@@ -5703,6 +6512,10 @@
           "passesQueryFilter",
           "resolveQueryOptions",
           "sortHitsByDistance",
+          "COLLIDER_SERIALIZER",
+          "RIGID_BODY_SERIALIZER",
+          "deserializeCollisionShape",
+          "serializeCollisionShape",
           "RigidBody",
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
@@ -5735,6 +6548,7 @@
           "PhysicsCapabilities",
           "PhysicsQueryCapabilities",
           "PhysicsSolverAdapter",
+          "PhysicsTuningCapabilities",
           "SolverBodyAccess",
           "SolverJointAccess",
           "SolverJointMotor",
@@ -5797,6 +6611,9 @@
           "ResolvedQueryOptions",
           "ShapeCastHit",
           "ShapeCastQuery",
+          "ColliderDocument",
+          "PhysicsMaterialDocument",
+          "RigidBodyDocument",
           "BlendWeights",
           "PointLoad",
           "RigidBodyCommands",
@@ -5841,6 +6658,8 @@
           "WorldShapeCastHit"
         ],
         "reExported": [
+          "NO_TUNING_CAPABILITIES",
+          "resolveTuningCapabilities",
           "missingSolverJointAccess",
           "supportsSolverJointAccess",
           "Collider",
@@ -5883,6 +6702,10 @@
           "passesQueryFilter",
           "resolveQueryOptions",
           "sortHitsByDistance",
+          "COLLIDER_SERIALIZER",
+          "RIGID_BODY_SERIALIZER",
+          "deserializeCollisionShape",
+          "serializeCollisionShape",
           "RigidBody",
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
@@ -5914,6 +6737,7 @@
           "PhysicsCapabilities",
           "PhysicsQueryCapabilities",
           "PhysicsSolverAdapter",
+          "PhysicsTuningCapabilities",
           "SolverBodyAccess",
           "SolverJointAccess",
           "SolverJointMotor",
@@ -5976,6 +6800,9 @@
           "ResolvedQueryOptions",
           "ShapeCastHit",
           "ShapeCastQuery",
+          "ColliderDocument",
+          "PhysicsMaterialDocument",
+          "RigidBodyDocument",
           "BlendWeights",
           "PointLoad",
           "RigidBodyCommands",
@@ -6397,6 +7224,9 @@
         ],
         "exports": [
           "clearRigidBodyCommands",
+          "setRigidBodyRegistered",
+          "setRigidBodyType",
+          "setRigidBodyDerivedMass",
           "setRigidBodySleeping",
           "RigidBody"
         ],
@@ -6411,7 +7241,129 @@
         ],
         "functions": [
           "clearRigidBodyCommands",
+          "setRigidBodyRegistered",
+          "setRigidBodyType",
+          "setRigidBodyDerivedMass",
           "setRigidBodySleeping"
+        ]
+      },
+      "packages/physics/src/serializers.ts": {
+        "description": "The §79 serializers for this package's two components — `RigidBody` (§23) and",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./collider.js",
+            "imports": [
+              "Collider",
+              "ColliderOptions"
+            ]
+          },
+          {
+            "file": "./descriptors.js",
+            "imports": [
+              "RigidBodyDescriptor"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./material.js",
+            "imports": [
+              "DEFAULT_DENSITY",
+              "DEFAULT_FRICTION",
+              "DEFAULT_RESTITUTION",
+              "PhysicsMaterial",
+              "PhysicsMaterialOptions"
+            ]
+          },
+          {
+            "file": "./queries.js",
+            "imports": [
+              "ALL_COLLISION_GROUPS"
+            ]
+          },
+          {
+            "file": "./rigid-body.js",
+            "imports": [
+              "RigidBody"
+            ]
+          },
+          {
+            "file": "./shapes.js",
+            "imports": [
+              "CollisionShape"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./types.js",
+            "imports": [
+              "BODY_TYPES",
+              "CCD_MODES",
+              "DEFAULT_CCD_MODE"
+            ]
+          },
+          {
+            "file": "./types.js",
+            "imports": [
+              "BodyType",
+              "CCDMode"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError",
+              "JsonValue"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix3",
+              "Quaternion",
+              "Vector2",
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/motion",
+            "directory": "packages/motion",
+            "imports": [
+              "ComponentSerializerShape"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Transform"
+            ]
+          }
+        ],
+        "exports": [
+          "RIGID_BODY_SERIALIZER",
+          "COLLIDER_SERIALIZER",
+          "serializeCollisionShape",
+          "deserializeCollisionShape"
+        ],
+        "interfaces": [
+          "RigidBodyDocument",
+          "PhysicsMaterialDocument",
+          "ColliderDocument"
+        ],
+        "functions": [
+          "serializeCollisionShape",
+          "deserializeCollisionShape"
+        ],
+        "constants": [
+          "RIGID_BODY_SERIALIZER",
+          "COLLIDER_SERIALIZER"
         ]
       },
       "packages/physics/src/shapes.ts": {
@@ -6620,9 +7572,16 @@
           {
             "file": "./adapter.js",
             "imports": [
-              "PhysicsSolverAdapter"
+              "PhysicsSolverAdapter",
+              "PhysicsTuningCapabilities"
             ],
             "typeOnly": true
+          },
+          {
+            "file": "./adapter.js",
+            "imports": [
+              "resolveTuningCapabilities"
+            ]
           },
           {
             "file": "./body-access.js",
@@ -6721,7 +7680,10 @@
             "imports": [
               "RigidBody",
               "clearRigidBodyCommands",
-              "setRigidBodySleeping"
+              "setRigidBodyDerivedMass",
+              "setRigidBodyRegistered",
+              "setRigidBodySleeping",
+              "setRigidBodyType"
             ]
           },
           {
@@ -6750,6 +7712,7 @@
             "file": "./types.js",
             "imports": [
               "DEFAULT_DETERMINISM_LEVEL",
+              "DEFAULT_SLEEPING_CONFIG",
               "DETERMINISM_LEVELS"
             ]
           },
@@ -7630,7 +8593,7 @@
     },
     "packages/render": {
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 39 symbols)",
+        "description": "Package entry point for @four/render (re-exports 40 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -7729,7 +8692,8 @@
           {
             "file": "./renderable.js",
             "imports": [
-              "RenderableOptions"
+              "RenderableOptions",
+              "SurfaceMaterial"
             ],
             "reExport": true,
             "typeOnly": true
@@ -7798,6 +8762,7 @@
           "SpriteRenderItem",
           "UnlitRenderItem",
           "RenderableOptions",
+          "SurfaceMaterial",
           "RenderInterpolation",
           "Renderer",
           "RendererBackend",
@@ -7839,6 +8804,7 @@
           "SpriteRenderItem",
           "UnlitRenderItem",
           "RenderableOptions",
+          "SurfaceMaterial",
           "RenderInterpolation",
           "Renderer",
           "RendererBackend",
@@ -7943,12 +8909,6 @@
             "imports": [
               "Renderable"
             ]
-          },
-          {
-            "file": "./sprite.js",
-            "imports": [
-              "Sprite"
-            ]
           }
         ],
         "workspaceDependencies": [
@@ -7973,6 +8933,7 @@
             "directory": "packages/materials",
             "imports": [
               "LitMaterial",
+              "Material",
               "SpriteMaterial",
               "UnlitMaterial"
             ]
@@ -8027,6 +8988,7 @@
             "directory": "packages/materials",
             "imports": [
               "LitMaterial",
+              "Material",
               "UnlitMaterial"
             ]
           },
@@ -8098,7 +9060,14 @@
         "description": "`Sprite` (§55) — a textured, tinted quad in the scene graph.",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./renderable.js",
+            "imports": [
+              "Renderable"
+            ]
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -8126,13 +9095,6 @@
             "directory": "packages/materials",
             "imports": [
               "SpriteMaterial"
-            ]
-          },
-          {
-            "package": "@four/scene",
-            "directory": "packages/scene",
-            "imports": [
-              "Node"
             ]
           }
         ],
@@ -8217,9 +9179,11 @@
           {
             "file": "./gl-program.js",
             "imports": [
+              "COLOR_ATTRIBUTE_LOCATION",
               "GL",
               "NORMAL_ATTRIBUTE_LOCATION",
               "POSITION_ATTRIBUTE_LOCATION",
+              "UV_ATTRIBUTE_LOCATION",
               "WebglContext"
             ]
           },
@@ -8345,6 +9309,9 @@
           "GL",
           "POSITION_ATTRIBUTE_LOCATION",
           "NORMAL_ATTRIBUTE_LOCATION",
+          "UV_ATTRIBUTE_LOCATION",
+          "COLOR_ATTRIBUTE_LOCATION",
+          "MAP_TEXTURE_UNIT",
           "matrixScratch",
           "createLinkedProgram",
           "requireUniform",
@@ -8368,6 +9335,9 @@
           "GL",
           "POSITION_ATTRIBUTE_LOCATION",
           "NORMAL_ATTRIBUTE_LOCATION",
+          "UV_ATTRIBUTE_LOCATION",
+          "COLOR_ATTRIBUTE_LOCATION",
+          "MAP_TEXTURE_UNIT",
           "matrixScratch"
         ]
       },
@@ -8429,11 +9399,14 @@
           {
             "file": "./gl-program.js",
             "imports": [
+              "COLOR_ATTRIBUTE_LOCATION",
               "GL",
               "LitProgram",
+              "MAP_TEXTURE_UNIT",
               "NORMAL_ATTRIBUTE_LOCATION",
               "POSITION_ATTRIBUTE_LOCATION",
               "SpriteProgram",
+              "UV_ATTRIBUTE_LOCATION",
               "UnlitProgram"
             ],
             "reExport": true
@@ -8511,11 +9484,14 @@
           "PARTICLE_GL",
           "ParticleBatchCache",
           "ParticleProgram",
+          "COLOR_ATTRIBUTE_LOCATION",
           "GL",
           "LitProgram",
+          "MAP_TEXTURE_UNIT",
           "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
           "SpriteProgram",
+          "UV_ATTRIBUTE_LOCATION",
           "UnlitProgram",
           "TextureCache",
           "WebglRenderer",
@@ -8543,11 +9519,14 @@
           "PARTICLE_GL",
           "ParticleBatchCache",
           "ParticleProgram",
+          "COLOR_ATTRIBUTE_LOCATION",
           "GL",
           "LitProgram",
+          "MAP_TEXTURE_UNIT",
           "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
           "SpriteProgram",
+          "UV_ATTRIBUTE_LOCATION",
           "UnlitProgram",
           "TextureCache",
           "WebglRenderer",
@@ -8596,6 +9575,7 @@
             "imports": [
               "GL",
               "LitProgram",
+              "MAP_TEXTURE_UNIT",
               "SpriteProgram",
               "UnlitProgram"
             ]
@@ -8603,7 +9583,8 @@
           {
             "file": "./gl-texture.js",
             "imports": [
-              "TextureCache"
+              "TextureCache",
+              "CacheableTexture"
             ]
           }
         ],
@@ -8756,7 +9737,7 @@
         ]
       },
       "packages/scene/src/index.ts": {
-        "description": "Package entry point for @four/scene (re-exports 31 symbols)",
+        "description": "Package entry point for @four/scene (re-exports 33 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -8804,7 +9785,8 @@
           {
             "file": "./node.js",
             "imports": [
-              "Node"
+              "Node",
+              "restoreNodeId"
             ],
             "reExport": true
           },
@@ -8885,6 +9867,7 @@
             "imports": [
               "NodeEventMap",
               "NodeHierarchyEvent",
+              "NodeOptions",
               "NodeType"
             ],
             "reExport": true,
@@ -8921,6 +9904,7 @@
           "PoseBuffer",
           "createSnapshotSystem",
           "Node",
+          "restoreNodeId",
           "PoseTarget",
           "Scene",
           "Transform",
@@ -8938,6 +9922,7 @@
           "SnapshotSystemOptions",
           "NodeEventMap",
           "NodeHierarchyEvent",
+          "NodeOptions",
           "NodeType",
           "Viewport",
           "WorldTransformStats"
@@ -8955,6 +9940,7 @@
           "PoseBuffer",
           "createSnapshotSystem",
           "Node",
+          "restoreNodeId",
           "PoseTarget",
           "Scene",
           "Transform",
@@ -8971,6 +9957,7 @@
           "SnapshotSystemOptions",
           "NodeEventMap",
           "NodeHierarchyEvent",
+          "NodeOptions",
           "NodeType",
           "Viewport",
           "WorldTransformStats"
@@ -9099,10 +10086,16 @@
             ]
           }
         ],
-        "exports": [],
+        "exports": [
+          "restoreNodeId"
+        ],
         "interfaces": [
           "NodeHierarchyEvent",
-          "NodeEventMap"
+          "NodeEventMap",
+          "NodeOptions"
+        ],
+        "functions": [
+          "restoreNodeId"
         ]
       },
       "packages/scene/src/pose-target.ts": {
@@ -9282,7 +10275,9 @@
             "imports": [
               "FourError",
               "cloneJsonValue",
-              "JsonValue"
+              "parseUntrustedJson",
+              "JsonValue",
+              "UntrustedJsonLimits"
             ]
           },
           {
@@ -9307,6 +10302,13 @@
             "imports": [
               "JsonValue"
             ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "UntrustedJsonLimits"
+            ]
           }
         ],
         "exports": [
@@ -9320,11 +10322,13 @@
           "validateSceneDocument",
           "encodeSceneDocument",
           "decodeSceneDocument",
-          "JsonValue"
+          "JsonValue",
+          "UntrustedJsonLimits"
         ],
         "reExported": [
           "cloneJsonValue",
-          "JsonValue"
+          "JsonValue",
+          "UntrustedJsonLimits"
         ],
         "interfaces": [
           "Vector3Document",
@@ -9403,6 +10407,7 @@
               "SceneDocument",
               "SceneNodeDocument",
               "TransformDocument",
+              "UntrustedJsonLimits",
               "Vector3Document"
             ],
             "reExport": true,
@@ -9424,7 +10429,8 @@
             "imports": [
               "ComponentSerializer",
               "InstantiateSceneOptions",
-              "SerializeSceneOptions"
+              "SerializeSceneOptions",
+              "UnknownComponentPolicy"
             ],
             "reExport": true,
             "typeOnly": true
@@ -9462,6 +10468,7 @@
           "SceneDocument",
           "SceneNodeDocument",
           "TransformDocument",
+          "UntrustedJsonLimits",
           "Vector3Document",
           "MigrateSceneDocumentOptions",
           "SceneMigration",
@@ -9469,7 +10476,8 @@
           "SceneMigrationWarning",
           "ComponentSerializer",
           "InstantiateSceneOptions",
-          "SerializeSceneOptions"
+          "SerializeSceneOptions",
+          "UnknownComponentPolicy"
         ],
         "reExported": [
           "SCENE_FORMAT_VERSION",
@@ -9501,6 +10509,7 @@
           "SceneDocument",
           "SceneNodeDocument",
           "TransformDocument",
+          "UntrustedJsonLimits",
           "Vector3Document",
           "MigrateSceneDocumentOptions",
           "SceneMigration",
@@ -9508,7 +10517,8 @@
           "SceneMigrationWarning",
           "ComponentSerializer",
           "InstantiateSceneOptions",
-          "SerializeSceneOptions"
+          "SerializeSceneOptions",
+          "UnknownComponentPolicy"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -9607,6 +10617,7 @@
               "Node",
               "PoseTarget",
               "Scene",
+              "restoreNodeId",
               "Transform"
             ]
           }
@@ -9864,7 +10875,8 @@
             "package": "@four/input",
             "directory": "packages/input",
             "imports": [
-              "ScenePointerEvent"
+              "ScenePointerEvent",
+              "SceneKeyEvent"
             ]
           }
         ],
@@ -9884,6 +10896,15 @@
             "file": "./button.js",
             "imports": [
               "Button"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./keyboard.js",
+            "imports": [
+              "collectFocusOrder",
+              "installKeyboardTraversal",
+              "keyboardFocusTarget"
             ],
             "reExport": true
           },
@@ -9919,6 +10940,14 @@
             "file": "./button.js",
             "imports": [
               "ButtonOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./keyboard.js",
+            "imports": [
+              "KeyboardTraversalOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -9964,6 +10993,9 @@
         "workspaceDependencies": [],
         "exports": [
           "Button",
+          "collectFocusOrder",
+          "installKeyboardTraversal",
+          "keyboardFocusTarget",
           "Label",
           "Panel",
           "Insets",
@@ -9976,6 +11008,7 @@
           "isUIWidget",
           "PACKAGE_NAME",
           "ButtonOptions",
+          "KeyboardTraversalOptions",
           "LabelOptions",
           "LayoutAlign",
           "LayoutDirection",
@@ -9995,6 +11028,9 @@
         ],
         "reExported": [
           "Button",
+          "collectFocusOrder",
+          "installKeyboardTraversal",
+          "keyboardFocusTarget",
           "Label",
           "Panel",
           "Insets",
@@ -10006,6 +11042,7 @@
           "focusedWidget",
           "isUIWidget",
           "ButtonOptions",
+          "KeyboardTraversalOptions",
           "LabelOptions",
           "LayoutAlign",
           "LayoutDirection",
@@ -10025,6 +11062,56 @@
         ],
         "constants": [
           "PACKAGE_NAME"
+        ]
+      },
+      "packages/ui/src/keyboard.ts": {
+        "description": "§75's keyboard navigation: Tab traversal over a widget tree (2026-08-07,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./widget.js",
+            "imports": [
+              "UIWidget",
+              "focusedWidget"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Unsubscribe"
+            ]
+          },
+          {
+            "package": "@four/input",
+            "directory": "packages/input",
+            "imports": [
+              "SceneKeyEvent"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "collectFocusOrder",
+          "keyboardFocusTarget",
+          "installKeyboardTraversal"
+        ],
+        "interfaces": [
+          "KeyboardTraversalOptions"
+        ],
+        "functions": [
+          "collectFocusOrder",
+          "keyboardFocusTarget",
+          "installKeyboardTraversal"
         ]
       },
       "packages/ui/src/label.ts": {
@@ -10138,7 +11225,8 @@
             "directory": "packages/scene",
             "imports": [
               "Node",
-              "warnAuthorityConflict"
+              "warnAuthorityConflict",
+              "NodeOptions"
             ]
           }
         ],
@@ -10218,7 +11306,8 @@
           "packages/core/src/events.ts",
           "packages/core/src/index.ts",
           "packages/core/src/json.ts",
-          "packages/core/src/random.ts"
+          "packages/core/src/random.ts",
+          "packages/core/src/untrusted.ts"
         ]
       },
       {
@@ -10256,6 +11345,7 @@
           "packages/four/src/render-webgl.ts",
           "packages/four/src/render-webgpu.ts",
           "packages/four/src/render.ts",
+          "packages/four/src/scene-serializers.ts",
           "packages/four/src/scene.ts",
           "packages/four/src/serialization.ts",
           "packages/four/src/text.ts",
@@ -10267,6 +11357,8 @@
         "files": [
           "packages/geometry/src/buffer-geometry.ts",
           "packages/geometry/src/index.ts",
+          "packages/geometry/src/primitive-support.ts",
+          "packages/geometry/src/primitives-3d.ts",
           "packages/geometry/src/primitives.ts"
         ]
       },
@@ -10275,9 +11367,12 @@
         "files": [
           "packages/input/src/drag.ts",
           "packages/input/src/index.ts",
+          "packages/input/src/key-events.ts",
+          "packages/input/src/keyboard-input.ts",
           "packages/input/src/pick.ts",
           "packages/input/src/pointer-events.ts",
-          "packages/input/src/pointer-input.ts"
+          "packages/input/src/pointer-input.ts",
+          "packages/input/src/propagation.ts"
         ]
       },
       {
@@ -10285,7 +11380,9 @@
         "files": [
           "packages/materials/src/index.ts",
           "packages/materials/src/lit-material.ts",
+          "packages/materials/src/material.ts",
           "packages/materials/src/sprite-material.ts",
+          "packages/materials/src/texture.ts",
           "packages/materials/src/unlit-material.ts"
         ]
       },
@@ -10316,6 +11413,7 @@
           "packages/motion/src/prediction.ts",
           "packages/motion/src/random.ts",
           "packages/motion/src/scheduler.ts",
+          "packages/motion/src/serializers.ts",
           "packages/motion/src/spring-damper.ts",
           "packages/motion/src/steering.ts",
           "packages/motion/src/systems.ts",
@@ -10349,6 +11447,7 @@
           "packages/physics/src/physics-system.ts",
           "packages/physics/src/queries.ts",
           "packages/physics/src/rigid-body.ts",
+          "packages/physics/src/serializers.ts",
           "packages/physics/src/shapes.ts",
           "packages/physics/src/types.ts",
           "packages/physics/src/validation.ts",
@@ -10461,6 +11560,7 @@
         "files": [
           "packages/ui/src/button.ts",
           "packages/ui/src/index.ts",
+          "packages/ui/src/keyboard.ts",
           "packages/ui/src/label.ts",
           "packages/ui/src/panel.ts",
           "packages/ui/src/widget.ts"
@@ -10469,18 +11569,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 161,
+    "totalTypeScriptFiles": 173,
     "totalModules": 24,
-    "totalLinesOfCode": 56760,
-    "totalExports": 1244,
-    "totalClasses": 91,
-    "totalInterfaces": 276,
-    "totalFunctions": 185,
+    "totalLinesOfCode": 65307,
+    "totalExports": 1390,
+    "totalClasses": 93,
+    "totalInterfaces": 308,
+    "totalFunctions": 218,
     "totalTypeGuards": 12,
     "totalEnums": 0,
-    "totalConstants": 174,
-    "totalReExports": 817,
-    "totalTypeOnlyImports": 172,
+    "totalConstants": 193,
+    "totalReExports": 908,
+    "totalTypeOnlyImports": 187,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 0,
     "unusedFilesCount": 0,

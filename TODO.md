@@ -84,11 +84,11 @@ changes in `CHANGELOG.md`.
       refusal, fabricated-§61-quote and lifecycle-count doc corrections, plus the
       simplification set (#massAuthored, no-op warn guards, scratch allocation,
       capture-key type pairing)
-- [ ] **Review findings still open:** the render-tier set (`glState` module-global +
-      missing try/finally, `Material.opacity`/`blendMode` setter validation,
-      restoreGlState coherence, dead `??` fallbacks — fix agent in flight) and
-      `REPLAY_FORMAT_VERSION` naming (low; rename to LATEST_/add MINIMUM_ constant —
-      diagnostics now free)
+- [x] **Review findings — ALL 25 closed 2026-08-07:** the render-tier set landed
+      (per-renderer `glState` + try/finally, validated `opacity`/`blendMode` accessors,
+      restoreGlState coherence, dead-fallback cleanup) and F7 landed
+      (`LATEST_REPLAY_FORMAT_VERSION`/`MINIMUM_REPLAY_FORMAT_VERSION` with the old name
+      as a deprecated alias; document bytes proven unchanged)
 
 - [x] **A-10 DONE 2026-08-07.** `@four/input` gains `KeyboardInput` over a duck-typed
       `KeySurface`, `SceneKeyEvent` with `preventDefault()`, `dispatchKeyEvent`, and the
@@ -158,8 +158,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 10, 2026-08-02)
 
-- [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
-      vertex-color attribute needed for per-segment color) — §118 flagship pickup
+- [x] Debug overlay render wiring — **done 2026-08-07** (R-35 closed:
+      `debugDrawStreams`/`applyDebugDrawStreams` + R-19's vertex colors; one draw call,
+      demonstrated in `tests/integration/debug-overlay-render.test.ts`)
 
 ### Backlog additions (Phase 9, 2026-08-02)
 
