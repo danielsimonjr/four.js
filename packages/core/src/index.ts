@@ -17,6 +17,37 @@ export type { FourErrorCode, FourErrorOptions } from "./errors.js";
 export { FourError, isFourError } from "./errors.js";
 export type { EventListener, Unsubscribe } from "./events.js";
 export { EventEmitter } from "./events.js";
+export type {
+  AngleUnit,
+  LengthUnit,
+  MassUnit,
+  TimeUnit,
+  UnitQuantity,
+  UnitScale,
+  UnitSystem,
+  UnitSystemInit,
+} from "./units.js";
+export {
+  SI_UNITS,
+  angleFromDisplay,
+  angleToDisplay,
+  formatAngle,
+  formatLength,
+  formatMass,
+  formatTime,
+  kilogramsToWorldMass,
+  lengthFromDisplay,
+  lengthToDisplay,
+  massFromDisplay,
+  massToDisplay,
+  metersToWorldLength,
+  resolveUnitSystem,
+  timeFromDisplay,
+  timeToDisplay,
+  unitSymbol,
+  worldLengthToMeters,
+  worldMassToKilograms,
+} from "./units.js";
 export type { UntrustedJsonLimits } from "./untrusted.js";
 export {
   DEFAULT_MAXIMUM_DEPTH,

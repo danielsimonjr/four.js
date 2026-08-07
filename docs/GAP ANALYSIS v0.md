@@ -229,6 +229,15 @@ _Dependencies:_ A-5 (memory counters), A-6 (surface), and the render/physics ana
 
 ### A-2 — §40 `UnitSystem` never shipped, though §98 assigns it to `@four/core`
 
+> **CLOSED 2026-08-07** (one closure with PH-13) — shipped as
+> `packages/core/src/units.ts` at the conversion/authoring tier §40 actually specifies:
+> `UnitSystem`/`SI_UNITS`/`resolveUnitSystem`, the eight `To/FromDisplay` conversions,
+> SI accessors, `unitSymbol`, `format*`. Display-only is enforced mechanically — an
+> integration test forbids any other package importing the module and proves
+> helper-authored values bit-identical to engine-unit authoring. Steps 1–2 of the plan
+> done; step 3 (`PhysicsWorldOptions.units`) staged as a physics packet; step 4 blocked
+> on A-16. No `ApplicationOptions.units` — §45 lists none. Kept for the record.
+
 **§40, §98, §101** · **Severity: High** · **Effort: M** · **SEMI-RECORDED**
 
 _What exists:_ `packages/core/src/conventions.ts` holds exactly one constant, `DEFAULT_GRAVITY_Y`. `docs/guides/units-and-numerical-stability.md:23` states the absence honestly ("no `UnitSystem` API has shipped … today the conversion layer is yours").
@@ -1582,6 +1591,10 @@ Nothing in `@four/scene` carries a space mode; `Node` has `transform`, `visible`
 ---
 
 ## PH-13 — §40 `UnitSystem` unshipped
+
+> **CLOSED 2026-08-07** — one closure with A-2 (this was the same item filed from two
+> tiers); see A-2's banner. The physics-side step (§41 envelope in SI via
+> `PhysicsWorldOptions.units`) is staged as its own `@four/physics` packet.
 
 |                       |                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |

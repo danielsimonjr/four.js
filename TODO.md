@@ -27,6 +27,13 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **A-2/PH-13 CLOSED 2026-08-07** (one item, filed twice): §40 `UnitSystem` in
+      `@four/core` at the conversion/authoring tier the spec specifies; display-only
+      rule enforced by an integration test that forbids any other package importing it
+- [ ] **§40 follow-ups:** physics §41-envelope-in-SI (`PhysicsWorldOptions.units`, a
+      `@four/physics` packet); §79 header units (after A-16); text parsing
+      (`parseAngle("90°")` — needs locale + failure policy); consider a row for
+      `packages/math/src/color.ts` at 0% coverage (pre-existing, spotted during gates)
 - [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@four/render` —
       passes over R-4's target seam, transcript-identical to hand-written calls,
       tree-shakes out of all bundles. **R-6 (§70 post-FX) now unblocked — effects are

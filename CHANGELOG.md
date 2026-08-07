@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-2/PH-13 closed: §40 `UnitSystem` (display/authoring conversion only)
+
+#### Added
+
+- **§40 `UnitSystem` in `@four/core`** — `UnitSystem`, `SI_UNITS`, `resolveUnitSystem`
+  (returns the shared frozen `SI_UNITS` with zero allocation when given nothing),
+  `{angle,time,length,mass}{To,From}Display`, the SI accessors §101 will read
+  (`worldLengthToMeters` …), `unitSymbol`, and `format{Length,Mass,Time,Angle}`.
+  **Declaring a unit system changes nothing the engine computes** — every API signature
+  stays radians, seconds, and world units (spec rev 1.3's narrowing, quoted in the
+  module header). §85 validation refuses selectors outside §40's unions and non-finite/
+  non-positive scale factors — refused, not clamped. The two under-specified points
+  were decided, not guessed: `"custom"` means "the display unit _is_ the world unit"
+  (exact identity) and gets no symbol (§40 supplies no label field).
+- **The display-only rule is enforced mechanically**:
+  `tests/integration/units-display.test.ts` fails if any package source outside
+  `@four/core` imports the module (visible `ALLOWED` allowlist), and proves authoring
+  through the helpers is **bit-identical** to authoring in engine units on a real
+  motion command — because the conversions are measurably inexact in their last bits
+  (8.8% of degree round trips, 2.5% of millisecond ones), a solver calling them would
+  diverge from its own replay (§33–§34). Closes gap items **A-2 and PH-13** (one item,
+  filed twice). No `ApplicationOptions.units` — §45 does not list one, and adding it
+  would be inventing API. Staged with dates: §101 unit application in physics, §79
+  header serialization (after A-16), text parsing. The units guide's "no `UnitSystem`
+  API has shipped" honest-state paragraph is corrected in place, dated.
+
 ### 2026-08-07 — R-5 closed (linear-pass tier): the §63 render graph
 
 #### Added

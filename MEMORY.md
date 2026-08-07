@@ -28,6 +28,19 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — §40 UnitSystem (A-2/PH-13).** Decisions worth keeping:
+  - Shipped in `@four/core` as a **conversion tier, never an engine mode**;
+    `tests/integration/units-display.test.ts` mechanically forbids any package source
+    outside `@four/core` from importing it (visible `ALLOWED` allowlist) and proves
+    helper-authored values bit-identical to engine-unit authoring.
+  - `"custom"` = "the display unit _is_ the world unit" (exact identity) and has **no
+    symbol** — §40's two under-specified points, decided rather than guessed.
+  - **No `ApplicationOptions.units`, no `PhysicsWorldOptions.units`** — §45's record
+    lists neither; adding one would be inventing API. The physics §41 envelope reading
+    `lengthToMeters` is a staged `@four/physics` packet.
+  - The conversions are documented as **inexact** (8.8% / 2.5% last-bit divergence for
+    degrees / milliseconds over 2 000 samples) — an intentional non-fix; the only safe
+    answer is keeping them off simulation paths (§33–§34).
 - **2026-08-07 — R-5 render graph (linear-pass tier).** Decisions worth keeping:
   - **The graph is a driver, not a backend** — one pass = one `renderer.render(root,
 views, interpolation, target)`, asserted transcript-identical against hand-written
