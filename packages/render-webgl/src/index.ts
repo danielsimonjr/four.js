@@ -14,6 +14,11 @@
 
 export const PACKAGE_NAME = "@four/render-webgl";
 
+export {
+  EFFECT_TEXTURE_UNIT,
+  EFFECT_VERTEX_COUNT,
+  EffectProgram,
+} from "./gl-effect.js";
 export type { CacheableGeometry, GeometryRecord } from "./gl-geometry.js";
 export { GeometryCache } from "./gl-geometry.js";
 export type { ParticleBatchRecord, ParticleGlContext } from "./gl-particles.js";

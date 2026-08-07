@@ -27,6 +27,15 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **R-6 CLOSED (full-screen effect tier) 2026-08-07:** `EffectRenderPass` as a
+      third graph pass kind; copy + colour grade; separate `renderEffect` verb keeps
+      `render` byte-identical; ui-demo budget bumped 30 → 31 kB on a proven structural
+      conflict (even a stubbed renderEffect exceeded by 99 B)
+- [ ] **R-6 follow-ups (§70 tier 2):** per-viewport effect rectangles ("composable per
+      viewport"); tone mapping + sRGB encode with §60a/R-15 colour management + float
+      targets; the §63 on-screen pass inspector R-6 unblocked (needs the per-effect
+      viewport rectangle); outlines still wait on R-7/§71; user-authored effects are
+      R-14's RFC (the closed `ScreenEffect` union is the widening point)
 - [x] **A-2/PH-13 CLOSED 2026-08-07** (one item, filed twice): §40 `UnitSystem` in
       `@four/core` at the conversion/authoring tier the spec specifies; display-only
       rule enforced by an integration test that forbids any other package importing it

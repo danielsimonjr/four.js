@@ -8,6 +8,46 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — R-6 closed (full-screen effect tier): §70 post-processing
+
+#### Added
+
+- **§70 post-processing at the full-screen effect tier (R-6).** `@four/render` gains
+  `EffectRenderPass` — a **third `RenderGraph` pass kind**, not an escape-hatch pass:
+  a pass whose sampling is a _field_ (`source`) is validated exactly with no traversal,
+  the inverse of the `CustomRenderPass` opacity problem — plus the **closed**
+  `ScreenEffect` union (`"copy"`, `"grade"`: exposure → contrast → saturation),
+  `COPY_EFFECT`, `COLOR_GRADE_DEFAULTS`, `validateEffectRenderPass`,
+  `supportsScreenEffects`, and the optional `Renderer.renderEffect` (presence is the
+  capability, the A-1 stance). `@four/render-webgl` gains `EffectProgram` — a
+  full-screen-triangle pipeline compiled at initialization beside the other four (§61
+  forbids compiling inside a frame) — and `WebglRenderer.renderEffect`, with all state
+  borrowing inside the F13 envelope. Ping-pong chains between two `RenderTarget`s are
+  the supported form; copy is **bit-exact** (a chain of copies issues zero uniform
+  traffic), which is what makes the blit usable as §63's future debug view. Closed
+  unions are the staging mechanism: `{ kind: "bloom" }` is a compile error today, and
+  the backend _skips_ an unknown kind rather than quietly copying. Eight §70 effects
+  are staged, each naming the resource it waits on (tone mapping → §60a + float
+  targets; bloom → transient pool; AA/DoF/motion blur/SSAO → MSAA/samplable
+  depth/MRT; outlines → R-7/§71; user shaders → R-14's RFC; distortion → second input).
+- **The no-post GL path is unchanged** — `renderEffect` is a separate entry point, so
+  `render`'s body was not edited at all; the steady-state frame transcript is
+  call-for-call identical to the pre-R-6 build (pinned as a literal in
+  `tests/integration/render-effects.test.ts`, handle-aliased) modulo the constant
+  serial shift of the six objects the fifth program mints.
+
+#### Changed
+
+- **ui-demo's size budget: 30 → 31 kB (owner-recorded cost).** A fifth
+  compiled-at-init pipeline costs 0.75 kB gzip per example bundle, and the conflict is
+  structural, measured, not code golf: **even a stubbed `renderEffect` exceeds the old
+  limit by 99 B** — "compile at init" (§61) and the 30 kB budget were provably
+  incompatible; ui-demo sat at 98.9% of budget before this packet. `@four/render`'s
+  half tree-shakes completely (grep-verified: zero effect bytes in bundles); the GL
+  half cannot (nothing reachable from a class method tree-shakes — second instance of
+  A-1's cannot-tree-shake class; A-4's `__FOUR_DEV__`/opt-in seam is the recorded
+  eventual fix). The §86 spec budget (150 kB) is untouched and distant.
+
 ### 2026-08-07 — A-2/PH-13 closed: §40 `UnitSystem` (display/authoring conversion only)
 
 #### Added

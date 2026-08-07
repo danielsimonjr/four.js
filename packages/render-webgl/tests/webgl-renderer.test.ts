@@ -58,6 +58,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
+  EFFECT_TEXTURE_UNIT,
+  EffectProgram,
   GL,
   GeometryCache,
   LitProgram,
@@ -119,6 +121,14 @@ interface FakeGlOptions {
   allocateShaders?: boolean;
   /** When false, `createProgram` returns null. Default true. */
   allocatePrograms?: boolean;
+  /**
+   * 1-based index of the `createProgram` call that returns null; every other
+   * call succeeds. `initialize` builds its pipelines in a fixed order (unlit,
+   * sprite, particles, lit, effect), so this is how a test reaches the
+   * *partial* failure paths — the ones that have to dispose the programs
+   * already built rather than leak them (R-6, 2026-08-07).
+   */
+  failProgramAt?: number;
   /** When false, `createVertexArray` returns null. Default true. */
   allocateVertexArrays?: boolean;
   /** When false, `createTexture` returns null. Default true. */
@@ -194,6 +204,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     maxTextureSize = 4096,
     allocateShaders = true,
     allocatePrograms = true,
+    failProgramAt = 0,
     allocateVertexArrays = true,
     allocateTextures = true,
     allocateBuffers = true,
@@ -208,6 +219,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
   const uniformLocations = new Map<string, object>();
   const uniformsByProgram = new Map<object, Map<string, object>>();
   let handleCount = 0;
+  let programCount = 0;
 
   const record = (name: string, ...args: unknown[]): void => {
     calls.push({ name, args: snapshot(args) });
@@ -252,7 +264,11 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
     createProgram() {
       record("createProgram");
-      return allocatePrograms ? handle("program") : null;
+      programCount += 1;
+      if (!allocatePrograms || programCount === failProgramAt) {
+        return null;
+      }
+      return handle("program");
     },
     attachShader(program, shader) {
       record("attachShader", program, shader);
@@ -2193,10 +2209,11 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), particles (WP-9.3), and lit (§68, 2026-08-04):
-    // §61 requires engine-owned GPU resources to be re-created before
-    // `contextrestored` is emitted, and every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(4);
+    // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04), and
+    // the §70 effect pipeline (R-6, 2026-08-07): §61 requires engine-owned GPU
+    // resources to be re-created before `contextrestored` is emitted, and
+    // every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(5);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2302,7 +2319,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(4);
+    expect(gl.countOf("deleteProgram")).toBe(5);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2326,7 +2343,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(4);
+    expect(gl.countOf("deleteProgram")).toBe(5);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -5980,5 +5997,527 @@ describe("WebglRenderer.render — statistics change no GL call (A-1)", () => {
     // comparison above is not two empty lists agreeing.
     expect(without.names).toContain("drawElements");
     expect(statistics.drawCalls).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §70 full-screen effects (R-6, 2026-08-07).
+//
+// Two halves again, for the reason R-4's block gives. `EffectProgram` owns the
+// pipeline, its uniform mirrors, and the failure paths a driver will not
+// perform on request; `WebglRenderer.renderEffect` owns binding, sizing,
+// exception safety, the refusals — and the property the whole packet rests on,
+// that **`render` is byte-for-byte the function it was before effects
+// existed**: an effect is a separate entry point, so a frame that runs none
+// cannot have gained or lost a single GL call.
+// ---------------------------------------------------------------------------
+
+/** The effect program's uniform handles — the `spriteUniforms` pattern. */
+function effectUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("useGrade")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the effect program never resolved its uniforms");
+}
+
+/** The `useProgram` handle of the effect pipeline. */
+function effectProgramHandle(gl: FakeGl): object {
+  for (const [program, perProgram] of gl.uniformsByProgram) {
+    if (perProgram.has("useGrade")) {
+      return program;
+    }
+  }
+  throw new Error("the effect program was never linked");
+}
+
+/** An effect pass over `source`, typed off the interface under test. */
+type EffectPass = Parameters<NonNullable<Renderer["renderEffect"]>>[0];
+
+function effectPass(
+  source: RenderTarget,
+  effect: EffectPass["effect"] = { kind: "copy" },
+  destination: RenderTarget | null = null,
+): EffectPass {
+  return {
+    kind: "effect",
+    source: source.colorTexture,
+    effect,
+    target: destination,
+  };
+}
+
+describe("EffectProgram — the §70 pipeline (R-6)", () => {
+  it("compiles, links, and resolves exactly its three uniforms", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+
+    expect(program.disposed).toBe(false);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["source", "useGrade", "grade"]);
+    // No geometry of any kind: the full-screen triangle is three `gl_VertexID`
+    // corners, so this pipeline allocates no buffer and no vertex array.
+    expect(gl.countOf("createBuffer")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+  });
+
+  it("throws SHADER_COMPILATION_FAILED and cleans up exactly as the unlit program does", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+
+    const error = thrown(() => EffectProgram.create(gl));
+
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(error.message).toMatch(/effect program has no active uniform/);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("uploads the sampler once in the program's lifetime", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.use();
+    program.setSampler(EFFECT_TEXTURE_UNIT);
+    program.use();
+    program.setSampler(EFFECT_TEXTURE_UNIT);
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("source"), EFFECT_TEXTURE_UNIT],
+    ]);
+  });
+
+  it("issues nothing at all for a chain of copies", () => {
+    // The R-19 property, restated for §70: the mirror starts at GL's own
+    // initial `0`, so `useGrade` is never uploaded by a program that has only
+    // ever copied — and the fragment stage runs its no-arithmetic path, which
+    // is what makes a copy the bit-exact blit it is documented to be.
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setSampler(EFFECT_TEXTURE_UNIT);
+    gl.reset();
+
+    program.setCopy();
+    program.setCopy();
+
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("uploads the grade once and not again while the numbers hold", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.setGrade(1.5, 1, 0.5);
+    program.setGrade(1.5, 1, 0.5);
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useGrade"), 1],
+    ]);
+    expect(gl.callsOf("uniform3fv").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("grade"), [1.5, 1, 0.5]],
+    ]);
+  });
+
+  it("re-uploads only the coefficients when one of them moves", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setGrade(1, 1, 1);
+    gl.reset();
+
+    program.setGrade(1, 1, 0.25);
+
+    expect(gl.countOf("uniform1i")).toBe(0);
+    expect(gl.callsOf("uniform3fv")[0]?.args).toEqual([
+      effectUniforms(gl).get("grade"),
+      [1, 1, 0.25],
+    ]);
+  });
+
+  it("switches back to the copy path with one call", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setGrade(2, 2, 2);
+    gl.reset();
+
+    program.setCopy();
+    program.setCopy();
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useGrade"), 0],
+    ]);
+  });
+
+  it("deletes its program once, idempotently (§83)", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.dispose();
+    program.dispose();
+
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.initialize — a partial pipeline failure (R-6)", () => {
+  it.each([
+    ["lit", 4, 3],
+    ["effect", 5, 4],
+  ])(
+    "disposes the programs already built when the %s one will not allocate",
+    async (_name, failProgramAt, alreadyBuilt) => {
+      // §61's "leaves the renderer uninitialized rather than
+      // half-initialized": each `create` failure has to give back every
+      // program before it, or a rejected `initialize` leaks the whole
+      // pipeline set for the lifetime of the context.
+      const gl = createFakeGl({ failProgramAt });
+      const renderer = new WebglRenderer();
+
+      const error = await rejection(
+        renderer.initialize({ canvas: new TestCanvas(gl) }),
+      );
+
+      expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+      expect(gl.countOf("deleteProgram")).toBe(alreadyBuilt);
+      expect(renderer.initialized).toBe(false);
+    },
+  );
+});
+
+describe("WebglRenderer.renderEffect — drawing one (§70, R-6)", () => {
+  it("draws the full-screen triangle over the drawing buffer, with no geometry", async () => {
+    const { renderer, gl } = await initialized();
+    renderer.resize(320, 240);
+    const source = new RenderTarget({ width: 64, height: 64 });
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.names()).toEqual([
+      // The source's framebuffer is allocated on first sight (R-4's cache),
+      // because nothing has drawn into it yet.
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "bindTexture",
+      "createRenderbuffer",
+      "bindRenderbuffer",
+      "renderbufferStorage",
+      "bindRenderbuffer",
+      "createFramebuffer",
+      "bindFramebuffer",
+      "framebufferTexture2D",
+      "framebufferRenderbuffer",
+      "checkFramebufferStatus",
+      "bindFramebuffer",
+      // The effect itself. No `bindFramebuffer` at all on this path: the
+      // destination is the drawing buffer, exactly as an on-screen `render`
+      // issues none (R-4).
+      "scissor",
+      "viewport",
+      "disable",
+      "useProgram",
+      "uniform1i",
+      "activeTexture",
+      "bindTexture",
+      "bindVertexArray",
+      "drawArrays",
+      // The envelope gives back the depth test and the texture binding.
+      "enable",
+      "bindTexture",
+    ]);
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 320, 240]);
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 320, 240]);
+    expect(gl.callsOf("drawArrays")[0]?.args).toEqual([GL.TRIANGLES, 0, 3]);
+    expect(gl.callsOf("bindVertexArray")[0]?.args).toEqual([null]);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("binds the destination framebuffer and sizes to it, then unbinds", async () => {
+    const { renderer, gl } = await initialized();
+    renderer.resize(800, 600, 2);
+    const source = new RenderTarget({ width: 64, height: 64 });
+    const destination = new RenderTarget({ width: 128, height: 32 });
+    // Warm both allocations so the assertion is about the effect, not the
+    // cache's first-sight work.
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+
+    const framebuffers = gl.callsOf("bindFramebuffer");
+    expect(framebuffers).toHaveLength(2);
+    expect(framebuffers[0]?.args[1]).not.toBeNull();
+    expect(framebuffers[1]?.args).toEqual([GL.FRAMEBUFFER, null]);
+    // The destination's size, not the drawing buffer's — the same rule R-4
+    // states for a normalized viewport rectangle.
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 128, 32]);
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 128, 32]);
+    expect(gl.names().at(-1)).toBe("bindFramebuffer");
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("binds the source's colour attachment on the map unit", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    const attachment = attachedColorTexture(gl);
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.callsOf("activeTexture")[0]?.args).toEqual([
+      GL.TEXTURE0 + EFFECT_TEXTURE_UNIT,
+    ]);
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      attachment,
+    ]);
+  });
+
+  it("uses the effect pipeline, not one of the scene pipelines", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const effect = effectProgramHandle(gl);
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.callsOf("useProgram").map((call) => call.args[0])).toEqual([
+      effect,
+    ]);
+  });
+
+  it("uploads a grade's coefficients, defaulting each omitted one to 1", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    gl.reset();
+
+    renderer.renderEffect(
+      effectPass(source, { kind: "grade", saturation: 0.25 }),
+    );
+
+    expect(uploadsAt(gl, effectUniforms(gl).get("grade"))).toEqual([
+      [1, 1, 0.25],
+    ]);
+    expect(uploadsAt(gl, effectUniforms(gl).get("useGrade"))).toEqual([1]);
+  });
+
+  it("counts one draw call, one instance and one triangle (§84)", async () => {
+    const { renderer } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.renderEffect(
+      effectPass(new RenderTarget({ width: 4, height: 4 })),
+    );
+
+    expect(statistics).toEqual({ drawCalls: 1, instances: 1, triangles: 1 });
+  });
+});
+
+describe("WebglRenderer.renderEffect — what it refuses (§70, §83, R-4)", () => {
+  it("refuses a pass that draws into the surface it samples", async () => {
+    // R-4's feedback rule, applied to the pass instead of to a material's
+    // `map`: the draw is refused rather than producing undefined content, and
+    // `RenderGraph.validate` reports the same mistake statically.
+    const { renderer, gl } = await initialized();
+    const surface = new RenderTarget({ width: 16, height: 16 });
+    gl.reset();
+
+    renderer.renderEffect(effectPass(surface, { kind: "copy" }, surface));
+
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("skips a disposed source, and a disposed destination", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const destination = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+
+    source.dispose();
+    gl.reset();
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+    expect(gl.countOf("drawArrays")).toBe(0);
+
+    const live = new RenderTarget({ width: 8, height: 8 });
+    destination.dispose();
+    gl.reset();
+    renderer.renderEffect(effectPass(live, { kind: "copy" }, destination));
+    expect(gl.countOf("drawArrays")).toBe(0);
+    // Nothing was left bound by the pass it declined to draw.
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("skips a destination whose framebuffer GL will not allocate", async () => {
+    const { renderer, gl } = await initialized({ allocateFramebuffers: false });
+    gl.reset();
+
+    renderer.renderEffect(
+      effectPass(
+        new RenderTarget({ width: 8, height: 8 }),
+        { kind: "copy" },
+        new RenderTarget({ width: 8, height: 8 }),
+      ),
+    );
+
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("skips a source that is not a render-target texture", async () => {
+    // The structural read: a caller that bypassed `validateEffectRenderPass`
+    // hands over an ordinary texture, and gets a skipped effect rather than a
+    // black screen with nothing to explain it.
+    const { renderer, gl } = await initialized();
+    gl.reset();
+
+    renderer.renderEffect({
+      kind: "effect",
+      source: new TestTexture().asTexture,
+      effect: { kind: "copy" },
+    } as unknown as EffectPass);
+
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("skips an effect kind this build does not implement", async () => {
+    // `{ kind: "bloom" }` is a compile error; this is the same value arriving
+    // from JSON. It must not become a copy — that would be a different
+    // picture than the one asked for, silently.
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    gl.reset();
+
+    renderer.renderEffect({
+      kind: "effect",
+      source: source.colorTexture,
+      effect: { kind: "bloom" },
+    } as unknown as EffectPass);
+
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("returns silently while the context is lost, and never throws (§61)", async () => {
+    const { renderer, gl, canvas } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+
+    expect(() => {
+      renderer.renderEffect(effectPass(source));
+    }).not.toThrow();
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("throws INVALID_APPLICATION_STATE before initialize and after disposal", async () => {
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const uninitialized = new WebglRenderer();
+    expect(
+      thrown(() => uninitialized.renderEffect(effectPass(source))).code,
+    ).toBe("INVALID_APPLICATION_STATE");
+
+    const { renderer } = await initialized();
+    renderer.dispose();
+    expect(thrown(() => renderer.renderEffect(effectPass(source))).code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+  });
+});
+
+describe("WebglRenderer.renderEffect — the F13 envelope (R-6)", () => {
+  it("gives back the depth test and every binding when the draw throws", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const destination = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+    gl.reset();
+    // A driver-side failure, standing in for anything that can raise between
+    // the binds and the end of the pass.
+    const drawArrays = gl.drawArrays.bind(gl);
+    gl.drawArrays = (): never => {
+      throw new Error("the driver raised mid-effect");
+    };
+
+    try {
+      expect(() => {
+        renderer.renderEffect(
+          effectPass(source, { kind: "copy" }, destination),
+        );
+      }).toThrow(/raised mid-effect/);
+    } finally {
+      gl.drawArrays = drawArrays;
+    }
+
+    // It really did borrow — the depth test was disabled, a texture and a
+    // framebuffer were bound — and gave every one of them back.
+    expect(gl.names()).toContain("disable");
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("leaves the next frame drawing exactly as it would have", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const root = createRoot();
+    root.add(renderable(triangleGeometry()));
+
+    // A clean frame, for comparison.
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    const expected = JSON.stringify(gl.calls);
+
+    const drawArrays = gl.drawArrays.bind(gl);
+    gl.drawArrays = (): never => {
+      throw new Error("the driver raised mid-effect");
+    };
+    try {
+      expect(() => {
+        renderer.renderEffect(effectPass(source));
+      }).toThrow(/raised mid-effect/);
+    } finally {
+      gl.drawArrays = drawArrays;
+    }
+
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(JSON.stringify(gl.calls)).toBe(expected);
+  });
+});
+
+describe("WebglRenderer.render — untouched by §70 (R-6)", () => {
+  it("issues no effect-pipeline call in a frame that runs no effect", async () => {
+    // The load-bearing regression guard, in the same shape R-4's is. An effect
+    // is a separate entry point, so the only thing R-6 adds to a frame that
+    // uses none is one more program compiled at initialization — and this
+    // asserts that the frame itself never touches it.
+    const { renderer, gl, camera } = await initialized();
+    const effect = effectProgramHandle(gl);
+    const root = createRoot();
+    root.add(
+      renderable(quadGeometry()),
+      sprite(),
+      stateful(BORROWS_EVERYTHING),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("useProgram").map((call) => call.args[0])).not.toContain(
+      effect,
+    );
+    // This scene has no lit item, so the lit pipeline's light uploads are the
+    // only other `uniform3fv` in the backend and they cannot have run: the
+    // count is the effect pipeline's `grade` upload, and it is zero.
+    expect(gl.countOf("uniform3fv")).toBe(0);
   });
 });

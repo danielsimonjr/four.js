@@ -87,6 +87,7 @@ import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
+import type { EffectRenderPass } from "./effect-pass.js";
 import type { RenderTarget } from "./render-target.js";
 import type { RenderStatistics } from "./statistics.js";
 
@@ -469,6 +470,40 @@ export interface Renderer extends Disposable {
   ): void;
 
   /**
+   * Draws one §70 full-screen effect: `pass.source`'s texels over the whole of
+   * `pass.target` (or of the drawing buffer) through `pass.effect` (R-6,
+   * 2026-08-07).
+   *
+   * **Optional, and its presence is the capability** — the same stance
+   * {@link Renderer.statistics} takes, for the same two reasons: adding a
+   * required member to a published interface breaks every implementor, and a
+   * backend with no fragment stage to run an effect in (§62's SVG tier draws
+   * DOM nodes) should say so by omission rather than by silently copying.
+   * {@link supportsScreenEffects} is the runtime test;
+   * {@link RenderGraph.execute} uses it before forwarding an
+   * {@link EffectRenderPass}.
+   *
+   * A backend that declares it owes exactly what {@link Renderer.render} owes,
+   * restated because the two are separate entry points into the same device:
+   *
+   * - the destination is **bound for the call and unbound before it returns**,
+   *   even if the call throws, and nothing else is left bound either;
+   * - a lost context, a disposed source or destination, and an allocation the
+   *   device refused all **skip the effect** and return, rather than throwing
+   *   (§61, §83);
+   * - a pass whose destination *is* the surface it samples is refused, not
+   *   drawn — R-4's feedback rule, which {@link RenderGraph.validate} also
+   *   reports statically;
+   * - the effect covers the whole destination surface, replaces rather than
+   *   composites (no blend, no depth test, no clear), and leaves the §57 state
+   *   mirror where the next frame expects it.
+   *
+   * See `effect-pass.ts` for which of §70's effects this tier ships and what
+   * each staged one is waiting on.
+   */
+  renderEffect?(pass: EffectRenderPass): void;
+
+  /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at
    * `resolution` device pixels per logical pixel (§61, §45).
    *
@@ -636,6 +671,20 @@ export class NullRenderer implements Renderer {
    */
   lastRenderTarget: RenderTarget | null = null;
 
+  /** Number of {@link NullRenderer.renderEffect} calls (R-6). */
+  renderEffectCount = 0;
+
+  /**
+   * The most recent {@link EffectRenderPass} (not copied); `null` before the
+   * first call.
+   *
+   * Retained rather than cleared per call, unlike
+   * {@link NullRenderer.lastRenderTarget}, because there is no "an effect pass
+   * without an effect" call to clear it: every `renderEffect` has one, so a
+   * stale value is impossible.
+   */
+  lastEffectPass: EffectRenderPass | null = null;
+
   /** Number of {@link NullRenderer.resize} calls. */
   resizeCount = 0;
 
@@ -682,6 +731,24 @@ export class NullRenderer implements Renderer {
     this.lastViews = views;
     this.lastInterpolation = interpolation ?? null;
     this.lastRenderTarget = target ?? null;
+  }
+
+  /**
+   * Records the §70 effect pass, and draws nothing (R-6).
+   *
+   * Declared rather than omitted, exactly as
+   * {@link NullRenderer.statistics} is and for the same reason: this class is
+   * the interface's conformance fixture, and an application's post-processing
+   * wiring — which passes ran, in which order, over which surfaces — is
+   * assertable headlessly only if the null backend accepts them. A backend
+   * that genuinely *cannot* run an effect is the case the optional member
+   * exists for; this one can record, and recording is the whole of what it
+   * does for `render` too.
+   */
+  renderEffect(pass: EffectRenderPass): void {
+    this.#assertUsable("renderEffect");
+    this.renderEffectCount += 1;
+    this.lastEffectPass = pass;
   }
 
   /** Records the requested size. `resolution` defaults to `1`. */

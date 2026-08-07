@@ -942,6 +942,17 @@ interpolation?, target?)`; render-to-texture verified end-to-end
 
 ### R-6 — §70 post-processing: zero references anywhere in the codebase ⚠️
 
+> **CLOSED 2026-08-07 (full-screen effect tier)** — the ⚠️ silent flag drops: blit
+> (`COPY_EFFECT`, bit-exact) + colour grade ship as `EffectRenderPass`, a first-class
+> third `RenderGraph` pass kind whose `source` field `validate()` checks exactly;
+> `Renderer.renderEffect` is optional (presence is the capability) and a separate verb,
+> so `render`'s transcript is pinned unchanged. The eight staged effects each name the
+> resource they wait on in `packages/render/src/effect-pass.ts` (tone mapping → §60a +
+> float targets; bloom → transient pool; AA/DoF/motion-blur/SSAO → MSAA/samplable
+> depth/MRT; outlines → R-7/§71; user shaders → R-14, which widens the closed
+> `ScreenEffect` union; distortion → second input). ui-demo's budget moved 30 → 31 kB
+> on a proven structural conflict, recorded in CHANGELOG/MEMORY. Kept for the record.
+
 **§70.** Grepping `§70`, `postProcess`, `toneMapping`, `bloom`, `SSAO`, `outline` across `packages/*/src` returns **nothing**. None of tone mapping, colour grading, bloom, AA, DoF, motion blur, SSAO, outlines/selection highlighting, distortion, or custom full-screen passes exists, and there is no seam through which a consumer could add one. §70's "composable per viewport" requirement has no carrier (`Viewport.postProcessing` is absent, R-4).
 **Severity:** major (blocker for anything wanting selection outlines — an explicit §70 bullet and an obvious need for the §119 engineering demo).
 **Effort:** L. **Depends on:** R-4, R-5, R-14.

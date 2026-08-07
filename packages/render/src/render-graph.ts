@@ -33,7 +33,7 @@
  * | pass dependencies              | **shipped** — declared `inputs`, plus the sampled-target check in {@link RenderGraph.validate} |
  * | pass enable/disable            | **shipped** — {@link RenderGraph.setPassEnabled}                        |
  * | viewport-specific pipelines    | **shipped** — every pass carries its own `views`                        |
- * | debug visualization            | **partial** — {@link RenderGraph.describe} is textual; §63 wants the pass outputs on screen, which needs §70's full-screen blit |
+ * | debug visualization            | **partial** — {@link RenderGraph.describe} is textual. §63 also wants the pass outputs *on screen*, which needed §70's full-screen blit; R-6 shipped it, so an on-screen view of any intermediate target is now one `{ kind: "effect", source, effect: COPY_EFFECT }` pass. Building that view — a viewport-tiled inspector — is this module's remaining follow-up, not a missing capability |
  * | transient render targets       | **staged** — targets are application-owned `RenderTarget`s passed in; a pool that allocates and aliases per frame needs a size/format key and a lifetime analysis this tier does not compute |
  * | resource lifetime              | **staged** — same reason; §83 disposal stays the application's           |
  * | barriers and state transitions | **staged** — WebGL 2 has no explicit barriers, so there is nothing for this tier to emit; the requirement is real for the WebGPU backend (§62) and lands with it |
@@ -51,8 +51,13 @@
  *
  * A {@link CustomRenderPass} hands the pass the {@link Renderer} and gets out of
  * the way — that is the seam for anything the declarative shape cannot say (a
- * pass that renders one view per target, a §70 effect that ping-pongs twice, a
- * backend-specific blit). The graph does **not** pretend to understand it:
+ * pass that renders one view per target, a backend-specific trick, a chain
+ * whose shape is computed per frame). §70's full-screen effects deliberately do
+ * *not* go through it: they are a declarative pass kind of their own
+ * ({@link EffectRenderPass}, R-6), because a pass whose sampling is stated in a
+ * field can be checked, and one hidden behind a closure cannot — `effect-pass.ts`
+ * argues that where the type lives. The graph does **not** pretend to
+ * understand a custom pass:
  * {@link RenderGraph.validate} reports every custom pass as an `"opaque"` issue,
  * so a graph that silently stopped being checkable says so out loud instead of
  * reporting a clean bill of health it did not earn.
@@ -88,6 +93,11 @@
 import { FourError } from "@four/core";
 import type { Node, Viewport } from "@four/scene";
 
+import {
+  supportsScreenEffects,
+  validateEffectRenderPass,
+  type EffectRenderPass,
+} from "./effect-pass.js";
 import { buildRenderList, type RenderItem } from "./render-list.js";
 import { isRenderTargetTexture, type RenderTarget } from "./render-target.js";
 import type { RenderInterpolation, Renderer } from "./renderer.js";
@@ -202,8 +212,17 @@ export interface CustomRenderPass {
   readonly target?: RenderTarget | null;
 }
 
-/** One pass of a {@link RenderGraph} (§63) — declarative, or the escape hatch. */
-export type RenderPass = SceneRenderPass | CustomRenderPass;
+/**
+ * One pass of a {@link RenderGraph} (§63): a scene draw, a §70 full-screen
+ * effect, or the escape hatch.
+ *
+ * The first two are **declarative** — the graph knows what they write and what
+ * they sample, and drives each as exactly one renderer call. The third is
+ * opaque by construction, and says so (see {@link CustomRenderPass}).
+ * `effect-pass.ts` records why §70 became a member of this union rather than a
+ * mechanism beside it.
+ */
+export type RenderPass = SceneRenderPass | EffectRenderPass | CustomRenderPass;
 
 /** Extras for {@link RenderGraph.addPass} — §63's `{ inputs: [...] }`. */
 export interface AddPassOptions {
@@ -335,6 +354,11 @@ function isCustomPass(pass: RenderPass): pass is CustomRenderPass {
   return pass.kind === "custom";
 }
 
+/** True for §70's full-screen effect form (R-6); narrows the union. */
+function isEffectPass(pass: RenderPass): pass is EffectRenderPass {
+  return pass.kind === "effect";
+}
+
 /**
  * The texture a render item samples, or `null` — the material-shaped half of
  * what the WebGL backend's `resolveTexture` reads, minus the caches.
@@ -419,6 +443,14 @@ export class RenderGraph {
    * The last of those is what makes the graph acyclic by construction: an input
    * must already be in the list, and the list is the execution order.
    *
+   * An {@link EffectRenderPass} is additionally checked against §85 here, by
+   * {@link validateEffectRenderPass} — setup is the one place an effect's
+   * parameters can be rejected loudly, since a backend may not throw from
+   * inside a frame (§61). It raises a `RangeError`, not a `FourError`: a
+   * non-finite grading coefficient is a *value* violation, the same class
+   * `RenderTarget`'s size check reports, where everything else this method
+   * refuses is a graph that cannot exist.
+   *
    * The pass object is **not copied**. Mutating its `views` array between
    * frames is therefore visible to the next `execute`, which is the same
    * arrangement `renderer.render` already has with the array it is handed.
@@ -451,6 +483,9 @@ export class RenderGraph {
           { context: { name, input } },
         );
       }
+    }
+    if (isEffectPass(pass)) {
+      validateEffectRenderPass(pass);
     }
     const entry: MutableGraphPass = {
       name,
@@ -533,17 +568,33 @@ export class RenderGraph {
    *
    * Each {@link SceneRenderPass} becomes exactly one
    * `renderer.render(root, views, interpolation, target)` call — R-4's seam,
-   * with the frame's `interpolation` record threaded through unchanged — so a
-   * graph produces the same backend calls, in the same order, as the
-   * hand-written sequence it replaces. A {@link CustomRenderPass} is called
-   * instead, and whatever it does with the renderer is its own.
+   * with the frame's `interpolation` record threaded through unchanged — and
+   * each {@link EffectRenderPass} becomes exactly one
+   * `renderer.renderEffect(pass)` call, with the pass object forwarded
+   * unchanged (R-6). So a graph produces the same backend calls, in the same
+   * order, as the hand-written sequence it replaces. A
+   * {@link CustomRenderPass} is called instead, and whatever it does with the
+   * renderer is its own.
    *
    * Nothing here interprets a disposed or unallocatable target: R-4 already
    * defines both as "the backend skips the frame", and re-deciding that here
    * would give the engine two policies for one situation.
    *
+   * ## The one thing this method refuses
+   *
+   * An effect pass met by a renderer that does not implement
+   * {@link ScreenEffectRenderer} throws a
+   * {@link @four/core!FourError | FourError} carrying
+   * `INVALID_APPLICATION_STATE`. That is a deliberate exception to "a frame
+   * never throws": the mismatch is a *permanent* property of the backend the
+   * application selected (§62 selects one at the edge, once), not the
+   * transient, driver-scheduled condition §61's no-throw rule protects
+   * against — so it can only ever fail on the very first frame, loudly, where
+   * the alternative is a post-processed image that silently never appears.
+   * {@link supportsScreenEffects} answers the same question without a frame.
+   *
    * Allocates one context record per custom pass per call and nothing else; a
-   * graph of scene passes allocates nothing at all.
+   * graph of scene and effect passes allocates nothing at all.
    */
   execute(renderer: Renderer, interpolation?: RenderInterpolation): number {
     let executed = 0;
@@ -558,6 +609,18 @@ export class RenderGraph {
           graph: this,
           interpolation,
         });
+      } else if (isEffectPass(pass)) {
+        if (!supportsScreenEffects(renderer)) {
+          throw new FourError(
+            GRAPH_ERROR_CODE,
+            `RenderGraph pass ${JSON.stringify(entry.name)} is a §70 effect ` +
+              "pass, and this renderer does not implement renderEffect(). " +
+              "Select a backend that supports full-screen effects, or test " +
+              "with supportsScreenEffects(renderer) before executing (§70).",
+            { context: { name: entry.name } },
+          );
+        }
+        renderer.renderEffect(pass);
       } else {
         renderer.render(
           pass.root,
@@ -603,8 +666,9 @@ export class RenderGraph {
     const writtenBefore = new Map<RenderTarget, string>();
 
     for (const entry of enabled) {
-      const written = targetOf(entry.pass);
-      if (isCustomPass(entry.pass)) {
+      const pass = entry.pass;
+      const written = targetOf(pass);
+      if (isCustomPass(pass)) {
         issues.push({
           code: "opaque",
           severity: "info",
@@ -617,8 +681,19 @@ export class RenderGraph {
             "were skipped (§63).",
         });
       } else {
+        // What this pass samples. A scene pass has to be *discovered* — its
+        // materials decide, so the render list is the only honest source (the
+        // module header argues that at length). A §70 effect pass declares it
+        // structurally, in one field, and needs no traversal at all: that
+        // asymmetry is the reason effects are a pass kind here rather than
+        // custom passes, which would have been reported `"opaque"` and checked
+        // for nothing (R-6).
         sampled.clear();
-        collectSampledTargets(entry.pass.root, sampled);
+        if (isEffectPass(pass)) {
+          sampled.add(pass.source.renderTarget);
+        } else {
+          collectSampledTargets(pass.root, sampled);
+        }
         for (const target of sampled) {
           if (target === written) {
             issues.push({
@@ -687,12 +762,15 @@ export class RenderGraph {
    * ```text
    * RenderGraph: 4 passes, 3 enabled
    * 1. world [scene] -> render-target-1
-   * 2. bloom [scene] -> render-target-2 <- world
+   * 2. grade [effect grade] -> render-target-2 <- world
    * 3. ui [scene, disabled] -> screen
-   * 4. composite [custom] -> screen <- bloom, ui
+   * 4. composite [custom] -> screen <- grade, ui
    * ```
    *
-   * `-> screen` is a pass with no target — the default drawing buffer. The
+   * An effect pass prints its §70 effect beside its kind, because "which
+   * effect" is the only thing that distinguishes two otherwise identical
+   * passes in a chain. `-> screen` is a pass with no target — the default
+   * drawing buffer. The
    * output is deterministic (§33: no clock, no identity hashes) and is meant to
    * be logged or snapshotted; its exact layout is not a contract.
    */
@@ -706,7 +784,11 @@ export class RenderGraph {
       `RenderGraph: ${String(total)} passes, ${String(enabled)} enabled`,
     ];
     for (const [index, entry] of this.#passes.entries()) {
-      const kind = isCustomPass(entry.pass) ? "custom" : "scene";
+      const kind = isCustomPass(entry.pass)
+        ? "custom"
+        : isEffectPass(entry.pass)
+          ? `effect ${entry.pass.effect.kind}`
+          : "scene";
       const tags = entry.enabled ? kind : `${kind}, disabled`;
       const target = targetOf(entry.pass)?.id ?? "screen";
       const inputs =

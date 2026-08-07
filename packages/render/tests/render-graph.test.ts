@@ -24,7 +24,7 @@
  */
 
 import { planeGeometry } from "@four/geometry";
-import { FourError } from "@four/core";
+import { EventEmitter, FourError } from "@four/core";
 import { LitMaterial, SpriteMaterial, UnlitMaterial } from "@four/materials";
 import {
   Node,
@@ -37,6 +37,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  COPY_EFFECT,
   NullRenderer,
   PARTICLE_INSTANCE_FLOATS,
   RenderGraph,
@@ -47,6 +48,9 @@ import {
   type ParticleDrawable,
   type RenderInterpolation,
   type RenderPass,
+  type Renderer,
+  type RendererCapabilities,
+  type RendererEventMap,
 } from "../src/index.js";
 
 // ---------------------------------------------------------------------------
@@ -99,6 +103,42 @@ class RecordingRenderer extends NullRenderer {
   ): void {
     super.render(root, views, interpolation, passTarget);
     this.calls.push({ root, views, target: passTarget ?? null });
+  }
+}
+
+/**
+ * A conforming `Renderer` that declares **no** `renderEffect` — §62's SVG tier
+ * in miniature, and the case R-6's optional member exists for.
+ *
+ * Built from the interface rather than by removing the method from
+ * `NullRenderer`, because the property under test is *structural*: what
+ * `supportsScreenEffects` sees, and what `RenderGraph.execute` therefore
+ * refuses.
+ */
+class EffectlessRenderer implements Renderer {
+  readonly capabilities: RendererCapabilities = {
+    backend: "null",
+    maxTextureSize: 0,
+  };
+
+  readonly events = new EventEmitter<RendererEventMap>();
+
+  renderCount = 0;
+
+  initialize(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  render(): void {
+    this.renderCount += 1;
+  }
+
+  resize(): void {
+    /* nothing to size */
+  }
+
+  dispose(): void {
+    /* nothing to release */
   }
 }
 
@@ -612,6 +652,224 @@ describe("RenderGraph.validate — pass dependencies (§63)", () => {
 // describe() — §63 debug visualization, textual tier.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// §70 effect passes — the third pass kind (R-6, 2026-08-07).
+//
+// The claim worth testing is not that an effect pass runs; it is that it runs
+// through the *same* machinery — ordered, enableable, forwarded as exactly one
+// renderer call, and above all **checked**, where a `CustomRenderPass`
+// expressing the same effect would have been reported `"opaque"` and checked
+// for nothing.
+// ---------------------------------------------------------------------------
+
+describe("RenderGraph — §70 effect passes (R-6)", () => {
+  it("forwards the pass object unchanged, as exactly one renderEffect call", () => {
+    const renderer = new NullRenderer();
+    const source = target();
+    const destination = target();
+    const effectPass: RenderPass = {
+      kind: "effect",
+      source: source.colorTexture,
+      effect: COPY_EFFECT,
+      target: destination,
+    };
+
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: source,
+    });
+    graph.addPass("present", effectPass, { inputs: ["world"] });
+
+    expect(graph.execute(renderer)).toBe(2);
+    expect(renderer.renderEffectCount).toBe(1);
+    // Not copied, not rebuilt: R-5's "one pass, one renderer call", kept
+    // literal for the second verb.
+    expect(renderer.lastEffectPass).toBe(effectPass);
+  });
+
+  it("skips a disabled effect pass, like every other kind", () => {
+    const renderer = new NullRenderer();
+    const graph = new RenderGraph();
+    graph.addPass(
+      "present",
+      { kind: "effect", source: target().colorTexture, effect: COPY_EFFECT },
+      { enabled: false },
+    );
+
+    expect(graph.execute(renderer)).toBe(0);
+    expect(renderer.renderEffectCount).toBe(0);
+  });
+
+  it("runs §85 validation at addPass, before any frame can reach it", () => {
+    const graph = new RenderGraph();
+
+    expect(() => {
+      graph.addPass("grade", {
+        kind: "effect",
+        source: target().colorTexture,
+        effect: { kind: "grade", exposure: Number.NaN },
+      });
+    }).toThrow(RangeError);
+    // Refused, not half-added: a graph that kept the pass would draw a black
+    // frame every frame after the throw.
+    expect(graph.passes).toEqual([]);
+  });
+
+  it("refuses to execute an effect pass on a renderer that cannot draw one", () => {
+    // A deliberate exception to "a frame never throws": the mismatch is a
+    // permanent property of the backend §62 selected, so it can only fail on
+    // the very first frame — where the alternative is post-processing that
+    // silently never appears.
+    const graph = new RenderGraph();
+    graph.addPass("present", {
+      kind: "effect",
+      source: target().colorTexture,
+      effect: COPY_EFFECT,
+    });
+
+    let thrown: unknown;
+    try {
+      graph.execute(new EffectlessRenderer());
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(FourError);
+    expect((thrown as FourError).code).toBe("INVALID_APPLICATION_STATE");
+    expect((thrown as FourError).message).toMatch(
+      /does not implement renderEffect/,
+    );
+  });
+
+  it("drives a scene pass on that same renderer without complaint", () => {
+    // The refusal is about effects, not about the renderer: a graph of scene
+    // passes works on every conforming backend, which is what makes the
+    // optional member optional.
+    const renderer = new EffectlessRenderer();
+    const graph = new RenderGraph();
+    graph.addPass("world", { root: plainScene(), views: [view()] });
+
+    expect(graph.execute(renderer)).toBe(1);
+    expect(renderer.renderCount).toBe(1);
+  });
+});
+
+describe("RenderGraph.validate — an effect pass declares what it samples (R-6)", () => {
+  it("reports nothing for a producer followed by its effect", () => {
+    const source = target();
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: source,
+    });
+    graph.addPass("present", {
+      kind: "effect",
+      source: source.colorTexture,
+      effect: { kind: "grade", saturation: 0 },
+    });
+
+    expect(graph.validate()).toEqual([]);
+  });
+
+  it("reports `feedback` when an effect draws into the surface it samples", () => {
+    const surface = target();
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: surface,
+    });
+    graph.addPass("self", {
+      kind: "effect",
+      source: surface.colorTexture,
+      effect: COPY_EFFECT,
+      target: surface,
+    });
+
+    const issues = graph.validate();
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.code).toBe("feedback");
+    expect(issues[0]?.severity).toBe("error");
+    expect(issues[0]?.pass).toBe("self");
+    expect(issues[0]?.target).toBe(surface);
+  });
+
+  it("reports `order` when the effect's source is written by a later pass", () => {
+    const source = target();
+    const graph = new RenderGraph();
+    graph.addPass("present", {
+      kind: "effect",
+      source: source.colorTexture,
+      effect: COPY_EFFECT,
+    });
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: source,
+    });
+
+    const issues = graph.validate();
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.code).toBe("order");
+    expect(issues[0]?.producer).toBe("world");
+  });
+
+  it("reports `unwritten` when nothing enabled writes the effect's source", () => {
+    const source = target();
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: source,
+    });
+    graph.addPass("present", {
+      kind: "effect",
+      source: source.colorTexture,
+      effect: COPY_EFFECT,
+    });
+    graph.setPassEnabled("world", false);
+
+    const issues = graph.validate();
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.code).toBe("unwritten");
+    expect(issues[0]?.severity).toBe("warning");
+  });
+
+  it("checks a ping-pong chain end to end, and never reports `opaque`", () => {
+    // The shape R-4 named as the supported alternative to feedback, written as
+    // a chain of effect passes — and the whole argument for the pass kind: the
+    // same chain built out of custom passes would report three `"opaque"`
+    // issues and check none of this.
+    const front = target();
+    const back = target();
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: front,
+    });
+    graph.addPass(
+      "grade",
+      {
+        kind: "effect",
+        source: front.colorTexture,
+        effect: { kind: "grade", exposure: 1.2 },
+        target: back,
+      },
+      { inputs: ["world"] },
+    );
+    graph.addPass(
+      "present",
+      { kind: "effect", source: back.colorTexture, effect: COPY_EFFECT },
+      { inputs: ["grade"] },
+    );
+
+    expect(graph.validate()).toEqual([]);
+  });
+});
+
 describe("RenderGraph.describe — §63 debug visualization (textual)", () => {
   it("lists passes with kind, enablement, target and inputs", () => {
     const offscreen = target();
@@ -640,6 +898,31 @@ describe("RenderGraph.describe — §63 debug visualization (textual)", () => {
         `1. world [scene] -> ${offscreen.id}`,
         "2. ui [scene, disabled] -> screen <- world",
         "3. composite [custom] -> screen <- world, ui",
+      ].join("\n"),
+    );
+  });
+
+  it("prints which §70 effect an effect pass applies (R-6)", () => {
+    // Two passes in a chain differ only by their effect, so the effect is the
+    // only thing that makes the line identifying.
+    const offscreen = target();
+    const graph = new RenderGraph();
+    graph.addPass("world", {
+      root: plainScene(),
+      views: [view()],
+      target: offscreen,
+    });
+    graph.addPass("grade", {
+      kind: "effect",
+      source: offscreen.colorTexture,
+      effect: { kind: "grade", contrast: 1.1 },
+    });
+
+    expect(graph.describe()).toBe(
+      [
+        "RenderGraph: 2 passes, 2 enabled",
+        `1. world [scene] -> ${offscreen.id}`,
+        "2. grade [effect grade] -> screen",
       ].join("\n"),
     );
   });

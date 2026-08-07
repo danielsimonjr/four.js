@@ -1,6 +1,20 @@
 export const PACKAGE_NAME = "@four/render";
 
 export type {
+  ColorGradeEffect,
+  CopyEffect,
+  EffectRenderPass,
+  ScreenEffect,
+  ScreenEffectKind,
+  ScreenEffectRenderer,
+} from "./effect-pass.js";
+export {
+  COLOR_GRADE_DEFAULTS,
+  COPY_EFFECT,
+  supportsScreenEffects,
+  validateEffectRenderPass,
+} from "./effect-pass.js";
+export type {
   AmbientLightSource,
   DirectionalLightSource,
   SceneLights,

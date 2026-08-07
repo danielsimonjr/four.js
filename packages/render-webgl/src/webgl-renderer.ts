@@ -45,6 +45,8 @@ import {
   isParticlesItem,
   isRenderTargetTexture,
   isSpriteItem,
+  COLOR_GRADE_DEFAULTS,
+  type EffectRenderPass,
   type RenderItem,
   type RenderItemKind,
   type RenderStatistics,
@@ -52,8 +54,14 @@ import {
   type RendererCapabilities,
   type RendererEventMap,
   type RendererOptions,
+  type ScreenEffectRenderer,
 } from "@four/render";
 
+import {
+  EFFECT_TEXTURE_UNIT,
+  EFFECT_VERTEX_COUNT,
+  EffectProgram,
+} from "./gl-effect.js";
 import { GeometryCache } from "./gl-geometry.js";
 import {
   ParticleBatchCache,
@@ -841,7 +849,7 @@ function resolveRect(
  * `NullRenderer` does — disposal is the application's own doing, unlike a lost
  * context, and a silent no-op would hide the bug.
  */
-export class WebglRenderer implements Renderer {
+export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   /** The §6b channel required by `Renderer` — `contextlost`/`contextrestored`. */
   readonly events = new EventEmitter<RendererEventMap>();
 
@@ -861,6 +869,25 @@ export class WebglRenderer implements Renderer {
   #particleProgram: ParticleProgram | null = null;
 
   #litProgram: LitProgram | null = null;
+
+  /**
+   * §70's full-screen effect pipeline (R-6), or `null` before initialization
+   * and while the context is lost.
+   *
+   * Compiled by {@link WebglRenderer.initialize} with the other four, never
+   * lazily: `renderEffect` runs inside an application's frame, and a compile
+   * there could throw for a driver reason the application cannot pre-empt —
+   * the same argument §61 makes about `render` (`gl-effect.ts` restates it).
+   * The cost of that choice is one program per renderer that never runs an
+   * effect — the same deal the lit and particle pipelines already offer a
+   * purely 2D application, and **measured** rather than assumed: 0.75 kB gzip
+   * per example bundle (0.42 kB for this pipeline and its two shaders, 0.33 kB
+   * for {@link WebglRenderer.renderEffect}), because nothing reachable from a
+   * class method can tree-shake. `@four/render`'s half — `effect-pass.ts` — is
+   * a separate side-effect-free module and does tree-shake out; grepping the
+   * example bundles confirms both halves of that sentence (R-6, 2026-08-07).
+   */
+  #effectProgram: EffectProgram | null = null;
 
   #geometries: GeometryCache | null = null;
 
@@ -923,6 +950,7 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = null;
     this.#particleProgram = null;
     this.#litProgram = null;
+    this.#effectProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
     this.#renderTargets?.forget();
@@ -942,6 +970,7 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = SpriteProgram.create(gl);
     this.#particleProgram = ParticleProgram.create(gl);
     this.#litProgram = LitProgram.create(gl);
+    this.#effectProgram = EffectProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
     this.#renderTargets = new RenderTargetCache(gl);
@@ -1474,6 +1503,175 @@ export class WebglRenderer implements Renderer {
   }
 
   /**
+   * Draws one §70 full-screen effect (R-6, 2026-08-07) — `pass.source`'s
+   * colour attachment over the whole of `pass.target`, or of the drawing
+   * buffer, through `pass.effect`.
+   *
+   * The normative contract is on `@four/render`'s `Renderer.renderEffect`;
+   * this is what the WebGL 2 backend does with it, and the two readings that
+   * sentence left open.
+   *
+   * ## A separate entry point, and why `render` was not touched
+   *
+   * An effect is not a scene: it has no root, no views, no camera, no render
+   * list, and no interpolation, and it draws a triangle that exists only in
+   * the vertex stage. Routing it through `render` would have meant a fifth
+   * `RenderItemKind`, a synthetic node, and a branch inside the draw loop —
+   * and the loop is exactly where R-4, R-5 and F13 each had to re-prove that
+   * an application which uses none of those features still emits the identical
+   * GL call sequence. So §70 got its own method, and the property is preserved
+   * by construction rather than by proof: **`render` is byte-for-byte the
+   * function it was before this method existed.** The one thing R-6 adds to a
+   * frame that runs no effect is a fifth `useProgram`-able object compiled at
+   * initialization, which issues no call after that.
+   *
+   * ## What is skipped rather than thrown (§61, §83)
+   *
+   * Everything, on the same terms `render` uses — a lost context, a source or
+   * destination the application disposed, a framebuffer GL would not allocate,
+   * an effect kind this build does not implement, and a **feedback loop**: a
+   * pass whose destination is the very surface it samples. That last one is
+   * R-4's rule, applied to the pass instead of to a material's `map`; reading
+   * and writing one surface in a single draw is undefined behaviour on every
+   * backend, and `RenderGraph.validate` reports it statically as `"feedback"`
+   * so the mistake is normally caught at setup rather than here.
+   *
+   * ## State, and the F13 envelope
+   *
+   * The effect borrows four things — the framebuffer binding, the scissor and
+   * viewport rectangles, the depth test, and unit 0's texture binding — inside
+   * a `try`/`finally`, so whatever escapes leaves this renderer's §57 mirror
+   * and the context in the state the next frame expects (F13, 2026-08-07).
+   * The mirror is deliberately **not** reset on entry: `applyDepthColorState`
+   * moves only what the effect needs and the `finally` puts back exactly that,
+   * which is strictly more conservative than re-asserting a state this method
+   * did not establish.
+   *
+   * The scissor and viewport rectangles are *not* restored, exactly as `render`
+   * does not restore them: both are written unconditionally by the next view of
+   * the next frame, and every path that reads them writes them first.
+   */
+  renderEffect(pass: EffectRenderPass): void {
+    const gl = this.#requireContext("renderEffect");
+    if (this.#contextLost) {
+      return;
+    }
+
+    // Unreachable given the class invariant, exactly as in `render`; the
+    // fields are nullable so context loss can drop them, and §61 forbids
+    // throwing here, so the effect is skipped if it is ever broken.
+    const effectProgram = this.#effectProgram;
+    const renderTargets = this.#renderTargets;
+    if (effectProgram === null || renderTargets === null) {
+      return;
+    }
+
+    // Read structurally, like every other argument this backend meets: the
+    // marker guard rather than the type, so a caller that bypassed
+    // `validateEffectRenderPass` hands over a plain `Texture` and gets a
+    // skipped effect instead of a black screen with no explanation.
+    const source = pass.source;
+    if (!isRenderTargetTexture(source)) {
+      return;
+    }
+    const sourceTarget = source.renderTarget;
+    const destination = pass.target ?? null;
+    if (destination === sourceTarget) {
+      return;
+    }
+
+    // Resolved before the envelope, as `render` resolves its target and for
+    // the same reason: `acquire` is a pure allocation with nothing to unwind
+    // and never throws, so a disposed or unallocatable surface skips the
+    // effect here rather than half-drawing it.
+    const sourceRecord = renderTargets.acquire(sourceTarget);
+    if (sourceRecord === null) {
+      return;
+    }
+    let destinationRecord: RenderTargetRecord | null = null;
+    if (destination !== null) {
+      destinationRecord = renderTargets.acquire(destination);
+      if (destinationRecord === null) {
+        return;
+      }
+    }
+
+    // An effect kind this build does not implement is skipped, never quietly
+    // copied: `ScreenEffect` is a closed union precisely so that a staged §70
+    // effect is a compile error, and a value that arrived from JSON or from
+    // JavaScript must not become a different picture than the one asked for.
+    const effect = pass.effect;
+    if (effect.kind !== "copy" && effect.kind !== "grade") {
+      return;
+    }
+
+    const width = destinationRecord?.width ?? this.#bufferWidth;
+    const height = destinationRecord?.height ?? this.#bufferHeight;
+    const state = this.#glState;
+    const statistics = this.statistics;
+    let textureBound = false;
+
+    try {
+      if (destinationRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, destinationRecord.framebuffer);
+      }
+      // The whole destination surface: §70's effects are full-screen, and a
+      // per-viewport rectangle is staged (`@four/render`'s `effect-pass.ts`
+      // says what it would take). `SCISSOR_TEST` is on for this renderer's
+      // lifetime, so the rectangle has to be written or the previous view's
+      // would clip the blit.
+      gl.scissor(0, 0, width, height);
+      gl.viewport(0, 0, width, height);
+
+      // An effect *replaces* its destination: no blending, so a chain is
+      // predictable, and no depth test, so the triangle is never rejected by
+      // whatever depth the destination happens to hold. Disabling the depth
+      // test also disables depth *writes* in GL, so `depthMask` needs no
+      // change and none is issued.
+      applyBlendState(gl, state, false, "normal");
+      applyDepthColorState(gl, state, false, true, true);
+
+      effectProgram.use();
+      effectProgram.setSampler(EFFECT_TEXTURE_UNIT);
+      gl.activeTexture(GL.TEXTURE0 + EFFECT_TEXTURE_UNIT);
+      gl.bindTexture(GL.TEXTURE_2D, sourceRecord.texture);
+      textureBound = true;
+
+      if (effect.kind === "grade") {
+        effectProgram.setGrade(
+          effect.exposure ?? COLOR_GRADE_DEFAULTS.exposure,
+          effect.contrast ?? COLOR_GRADE_DEFAULTS.contrast,
+          effect.saturation ?? COLOR_GRADE_DEFAULTS.saturation,
+        );
+      } else {
+        effectProgram.setCopy();
+      }
+
+      // No vertex data at all — the three corners come from `gl_VertexID`
+      // (`gl-effect.ts`). The default vertex array is bound first because an
+      // unrelated one left bound by another consumer of this context can carry
+      // enabled attribute arrays, which WebGL validates against the draw count
+      // whether the program reads them or not.
+      gl.bindVertexArray(null);
+      gl.drawArrays(GL.TRIANGLES, 0, EFFECT_VERTEX_COUNT);
+      if (statistics !== null) {
+        // One draw call, one instance, one triangle (§84) — counted here for
+        // the same reason a scene draw is: what reached the GPU, not what was
+        // asked for.
+        countDraw(statistics, GL.TRIANGLES, EFFECT_VERTEX_COUNT, 1);
+      }
+    } finally {
+      restoreGlState(gl, state);
+      if (textureBound) {
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      if (destinationRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      }
+    }
+  }
+
+  /**
    * Resizes the drawing buffer to `width * resolution` × `height * resolution`
    * device pixels (§61, §45).
    *
@@ -1523,6 +1721,7 @@ export class WebglRenderer implements Renderer {
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
       this.#litProgram?.dispose();
+      this.#effectProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
@@ -1533,6 +1732,7 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = null;
     this.#particleProgram = null;
     this.#litProgram = null;
+    this.#effectProgram = null;
     this.#geometries = null;
     this.#textures = null;
     this.#renderTargets = null;
@@ -1572,7 +1772,7 @@ export class WebglRenderer implements Renderer {
       );
     }
 
-    // All four programs are built before anything is stored, so a shader
+    // All five programs are built before anything is stored, so a shader
     // failure leaves the renderer uninitialized rather than half-initialized —
     // and each failure disposes the ones already built.
     const program = UnlitProgram.create(gl);
@@ -1600,6 +1800,19 @@ export class WebglRenderer implements Renderer {
       program.dispose();
       throw error;
     }
+    // §70's effect pipeline, compiled here rather than on first use (R-6):
+    // `renderEffect` runs inside a frame, and §61's no-throw rule applies to
+    // it for the same reason it applies to `render` — see `#effectProgram`.
+    let effectProgram: EffectProgram;
+    try {
+      effectProgram = EffectProgram.create(gl);
+    } catch (error: unknown) {
+      litProgram.dispose();
+      particleProgram.dispose();
+      spriteProgram.dispose();
+      program.dispose();
+      throw error;
+    }
 
     this.#canvas = canvas;
     this.#gl = gl;
@@ -1607,6 +1820,7 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = spriteProgram;
     this.#particleProgram = particleProgram;
     this.#litProgram = litProgram;
+    this.#effectProgram = effectProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
     this.#renderTargets = new RenderTargetCache(gl);

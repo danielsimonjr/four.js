@@ -28,6 +28,30 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — R-6 post-processing (full-screen effect tier).** Decisions worth
+  keeping:
+  - **An effect is a graph pass kind, not an escape-hatch pass** — a pass whose
+    sampling is a _field_ is validated exactly with no traversal; expressing §70
+    through `CustomRenderPass` would be unvalidatable exactly where feedback and
+    ordering mistakes live. That asymmetry, not convenience, is the argument.
+  - **A second verb keeps the first byte-identical** — `renderEffect` is a separate
+    entry point; `render` was not edited; the frame transcript is identical modulo a
+    constant handle-serial shift of exactly 6. Routing effects through `render` would
+    put a branch in the loop R-4/R-5/F13 each had to re-prove.
+  - **Closed unions are the staging mechanism** — `ScreenEffect` is
+    `"copy" | "grade"`; `{ kind: "bloom" }` is a compile error, and the backend skips
+    an unknown kind rather than quietly copying (a JSON value must not become a
+    different picture). R-14's RFC widens the union.
+  - **Copy is bit-exact** (`useGrade` seeded at GL initial `0`, zero uniform traffic on
+    copy chains) — what makes the blit usable as §63's debug view.
+  - **Measured gotcha:** a fifth compiled-at-init pipeline costs **0.75 kB gzip in
+    every example bundle** — nothing reachable from a class method tree-shakes
+    (second instance of A-1's cannot-tree-shake class). Even a stubbed `renderEffect`
+    exceeded ui-demo's 30 kB by 99 B, so the budget moved to 31 kB (owner-recorded
+    trade; §86's 150 kB untouched). A-4's define/opt-in seam is the eventual fix.
+  - `renderEffect` does **not** reset the §57 mirror — it borrows only the depth test
+    and restores exactly that, strictly more conservative than `render`'s
+    reset-on-entry.
 - **2026-08-07 — §40 UnitSystem (A-2/PH-13).** Decisions worth keeping:
   - Shipped in `@four/core` as a **conversion tier, never an engine mode**;
     `tests/integration/units-display.test.ts` mechanically forbids any package source
