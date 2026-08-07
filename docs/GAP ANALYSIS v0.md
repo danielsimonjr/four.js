@@ -878,6 +878,18 @@ Every claim below was checked against source, not against documentation. Where a
 
 ### R-4 — No render targets, no `createTexture`, no `readPixels` — nothing renders off-screen
 
+> **CLOSED 2026-08-07** (minimal tier) — `RenderTarget` in `@four/render`,
+> `RenderTargetCache` in `@four/render-webgl`, `Renderer.render(root, views,
+interpolation?, target?)`; render-to-texture verified end-to-end
+> (`tests/integration/render-to-texture.test.ts`) through the untouched
+> `MaterialTexture` seam. A no-target frame issues zero framebuffer calls (byte-identical
+> 449-call proof); FBO binding lives inside the F13 exception envelope; feedback loops
+> refused. Deviations documented in source: target rides on `render`, not
+> `Viewport.renderTarget`; `createRenderTarget` deferred by decision (CPU descriptor +
+> backend cache). Still absent, staged with dates: `readPixels` (needs `Rectangle2`),
+> stencil (R-7), MRT, multisample, float formats, samplable depth (§69). Unblocks
+> R-5/R-6. Kept for the record.
+
 **§61, §48, §63.** Three of §61's eight members are absent, written out as a typed TODO at `packages/render/src/renderer.ts:273-290`. Consequence chain, all verified:
 
 - `Viewport` (`packages/scene/src/viewport.ts:50`) has no `renderTarget` → §48's minimaps-to-texture, picture-in-picture, mirrors, portals, offscreen textures, and "3D model previews inside 2D UI" are all unbuildable.

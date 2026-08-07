@@ -28,6 +28,26 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — R-4 render targets.** Decisions worth keeping:
+  - **A render target is a CPU-side descriptor; the framebuffer is a backend cache** —
+    third instance of the `GeometryCache`/`TextureCache` pattern, and why §61's
+    `createRenderTarget` stays deferred _by decision_: a renderer-owned target cannot
+    exist before a renderer and must be hand-rebuilt after context loss. Loss
+    re-allocates lazily; the application is told nothing.
+  - **The render-to-texture seam is `MaterialTexture`, not a new type** —
+    `RenderTarget.colorTexture` satisfies it, so R-5/R-6 inherit zero adapter work and
+    `@four/materials` needed no widening. Backends distinguish via the marker guard
+    `isRenderTargetTexture` (4th duck-typed contract).
+  - **Target depth defaults `true`** — a depth-less target would composite the same
+    scene differently off-screen than on, the exact difference render-to-texture exists
+    to avoid.
+  - **`bindFramebuffer` belongs inside the F13 envelope** — an FBO left bound by a
+    throwing frame sends every later on-screen frame into a surface nobody sees;
+    `effectiveGlState` now folds framebuffer binds so all exception-safety tests assert
+    it. The byte-identical-sequence property survived a second structural change
+    (no-target frames issue _no_ framebuffer call, not even an unbind).
+  - **Feedback loops are refused, not drawn** — a material sampling the target currently
+    rendered into is skipped like a disposed texture; ping-pong is the supported form.
 - **2026-08-07 — A-12 cheap tier (six §73 controls).** Decisions worth keeping:
   - **Radio groups are names scoped to the tree** (the `focusedWidget` scope — one notion
     of "the tree we're in"), enforced **on the transition to checked only**, never at

@@ -8,6 +8,36 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — R-4 closed: render targets, render-to-texture
+
+#### Added
+
+- **Render targets (R-4, §61/§48/§63)** — `RenderTarget`, `RenderTargetOptions`,
+  `RenderTargetFormat` (one-member `"rgba8"` union — unsupported formats are a compile
+  error), `RenderTargetTexture`, and `isRenderTargetTexture` in `@four/render`;
+  `Renderer.render` takes an optional fourth `target` argument; `RenderTargetCache`
+  (FBO + RGBA8 colour texture + optional `DEPTH_COMPONENT16` renderbuffer,
+  completeness-checked, version-keyed, loss-aware) in `@four/render-webgl`.
+  **`RenderTarget.colorTexture` satisfies `MaterialTexture`**, so an off-screen pass is
+  sampled by assigning it to any material's `map`/`texture` — no adapter, and
+  `@four/materials` was not touched at all. Target depth defaults **on** (a depth-less
+  target would composite the same scene differently off-screen than on). Feedback loops
+  are refused, not drawn (a material sampling the target being rendered into is skipped;
+  ping-pong between two targets is the supported form). `bindFramebuffer` lives inside
+  the F13 `try`/`finally` envelope — a throwing target pass cannot leave the FBO bound —
+  and every pre-existing exception-safety test now also asserts it.
+- **A frame with no target issues no framebuffer call at all**: the on-screen GL
+  sequence is byte-identical (449-call recorded comparison, the F13 method) and every
+  pixel golden is unchanged; a permanent regression test pins the zero-framebuffer-call
+  property. **R-5 (§63 render graph) and R-6 (§70 post-processing) are now unblocked.**
+  Staged with dated notes: stencil (R-7), MRT, multisample, float formats, samplable
+  depth (§69), `readPixels` (needs `Rectangle2` in `@four/math`; §92 first consumer).
+  Deviations from the gap doc's sketch, documented in source: the target rides on
+  `render` rather than `Viewport.renderTarget` (scene was outside the change's file
+  set), and §61's `createRenderTarget` factory stays deferred **by decision** — a render
+  target is a CPU-side descriptor and the framebuffer a backend cache, the
+  `GeometryCache`/`TextureCache` pattern.
+
 ### 2026-08-07 — A-12 cheap tier closed: six new §73 controls
 
 #### Added

@@ -41,6 +41,7 @@ import { FourError, isFourError } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import {
   PARTICLE_INSTANCE_FLOATS,
+  RenderTarget,
   Renderable,
   Sprite,
   particleQuadGeometry,
@@ -65,6 +66,7 @@ import {
   POSITION_ATTRIBUTE_LOCATION,
   ParticleBatchCache,
   ParticleProgram,
+  RenderTargetCache,
   SpriteProgram,
   TextureCache,
   UV_ATTRIBUTE_LOCATION,
@@ -121,6 +123,16 @@ interface FakeGlOptions {
   allocateTextures?: boolean;
   /** When false, `createBuffer` returns null. Default true. */
   allocateBuffers?: boolean;
+  /** When false, `createFramebuffer` returns null. Default true (R-4). */
+  allocateFramebuffers?: boolean;
+  /** When false, `createRenderbuffer` returns null. Default true (R-4). */
+  allocateRenderbuffers?: boolean;
+  /**
+   * Result of `checkFramebufferStatus`. Default `GL.FRAMEBUFFER_COMPLETE`;
+   * anything else is what a driver reports for an attachment combination it
+   * cannot render into (R-4).
+   */
+  framebufferStatus?: number;
   /** When false, `getUniformLocation` returns null. Default true. */
   resolveUniforms?: boolean;
   /**
@@ -183,6 +195,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     allocateVertexArrays = true,
     allocateTextures = true,
     allocateBuffers = true,
+    allocateFramebuffers = true,
+    allocateRenderbuffers = true,
+    framebufferStatus = GL.FRAMEBUFFER_COMPLETE,
     resolveUniforms = true,
     infoLog = "",
   } = options;
@@ -330,6 +345,59 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     activeTexture(unit) {
       record("activeTexture", unit);
+    },
+
+    createFramebuffer() {
+      record("createFramebuffer");
+      return allocateFramebuffers ? handle("framebuffer") : null;
+    },
+    bindFramebuffer(target, framebuffer) {
+      record("bindFramebuffer", target, framebuffer);
+    },
+    framebufferTexture2D(target, attachment, textureTarget, texture, level) {
+      record(
+        "framebufferTexture2D",
+        target,
+        attachment,
+        textureTarget,
+        texture,
+        level,
+      );
+    },
+    checkFramebufferStatus(target) {
+      record("checkFramebufferStatus", target);
+      return framebufferStatus;
+    },
+    deleteFramebuffer(framebuffer) {
+      record("deleteFramebuffer", framebuffer);
+    },
+
+    createRenderbuffer() {
+      record("createRenderbuffer");
+      return allocateRenderbuffers ? handle("renderbuffer") : null;
+    },
+    bindRenderbuffer(target, renderbuffer) {
+      record("bindRenderbuffer", target, renderbuffer);
+    },
+    renderbufferStorage(target, internalFormat, width, height) {
+      record("renderbufferStorage", target, internalFormat, width, height);
+    },
+    framebufferRenderbuffer(
+      target,
+      attachment,
+      renderbufferTarget,
+      renderbuffer,
+    ) {
+      record(
+        "framebufferRenderbuffer",
+        target,
+        attachment,
+        renderbufferTarget,
+        renderbuffer,
+      );
+    },
+    deleteRenderbuffer(renderbuffer) {
+      record("deleteRenderbuffer", renderbuffer);
     },
 
     createBuffer() {
@@ -4722,6 +4790,10 @@ function effectiveGlState(gl: FakeGl): Record<string, unknown> {
     blendFunc: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
     texture: null,
     vertexArray: null,
+    // R-4: an off-screen pass binds a framebuffer, and a frame that threw
+    // while holding one would send every later frame — on-screen included —
+    // into a surface nobody is looking at.
+    framebuffer: null,
   };
   for (const call of gl.calls) {
     if (call.name === "enable" || call.name === "disable") {
@@ -4741,6 +4813,8 @@ function effectiveGlState(gl: FakeGl): Record<string, unknown> {
       state.texture = call.args[1];
     } else if (call.name === "bindVertexArray") {
       state.vertexArray = call.args[0];
+    } else if (call.name === "bindFramebuffer") {
+      state.framebuffer = call.args[1];
     }
   }
   return state;
@@ -4755,6 +4829,7 @@ const RESTING_GL_STATE: Record<string, unknown> = {
   blendFunc: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
   texture: null,
   vertexArray: null,
+  framebuffer: null,
 };
 
 /** §57 state that makes a draw borrow every mirrored toggle at once. */
@@ -4917,5 +4992,781 @@ describe("WebglRenderer.render — a throw costs one frame (F13)", () => {
     expect(second.gl.countOf("blendFunc")).toBe(0);
     expect(effectiveGlState(first.gl)).toEqual(RESTING_GL_STATE);
     expect(effectiveGlState(second.gl)).toEqual(RESTING_GL_STATE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Render targets (§61, §48, §63; R-4, 2026-08-07).
+//
+// Two halves, deliberately separate. `RenderTargetCache` owns allocation,
+// eviction, and the failure paths a driver will not perform on request; the
+// renderer owns binding, viewport resolution, exception safety, and the one
+// property everything else rests on — that a frame with **no** target issues no
+// framebuffer call at all, so the on-screen GL sequence is byte-for-byte what
+// it was before render targets existed.
+// ---------------------------------------------------------------------------
+
+/** The handle attached as `COLOR_ATTACHMENT0` by the nth allocation. */
+function attachedColorTexture(gl: FakeGl, index = 0): unknown {
+  const call = gl.callsOf("framebufferTexture2D")[index];
+  if (call === undefined) {
+    throw new Error("no framebuffer colour attachment was recorded");
+  }
+  return call.args[3];
+}
+
+describe("RenderTargetCache — allocation (§61, §48)", () => {
+  it("allocates a colour texture, a depth renderbuffer, and a complete framebuffer", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 64, height: 32 });
+
+    const record = cache.acquire(target);
+
+    expect(record).not.toBeNull();
+    expect(cache.size).toBe(1);
+    expect(gl.names()).toEqual([
+      // The colour attachment, allocated exactly as `TextureCache` allocates a
+      // texture with no CPU-side data: zero-filled storage, so sampling a
+      // target that was never rendered into reads transparent black.
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "bindTexture",
+      // The depth buffer (§61's per-view depth clear needs somewhere to land).
+      "createRenderbuffer",
+      "bindRenderbuffer",
+      "renderbufferStorage",
+      "bindRenderbuffer",
+      // The framebuffer that binds the two together, checked and unbound.
+      "createFramebuffer",
+      "bindFramebuffer",
+      "framebufferTexture2D",
+      "framebufferRenderbuffer",
+      "checkFramebufferStatus",
+      "bindFramebuffer",
+    ]);
+  });
+
+  it("allocates the colour attachment as RGBA8 at the target's size, with no pixels", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 8, height: 4 }),
+    );
+
+    expect(gl.callsOf("texImage2D")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      0,
+      GL.RGBA8,
+      8,
+      4,
+      0,
+      GL.RGBA,
+      GL.UNSIGNED_BYTE,
+      null,
+    ]);
+  });
+
+  it("gives the colour attachment the same fixed sampler state every texture gets", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 2, height: 2 }),
+    );
+
+    expect(gl.callsOf("texParameteri").map((call) => call.args)).toEqual([
+      [GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR],
+      [GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
+      [GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
+    ]);
+  });
+
+  it("sizes the depth renderbuffer to match and attaches it", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 16, height: 9 }),
+    );
+
+    expect(gl.callsOf("renderbufferStorage")[0]?.args).toEqual([
+      GL.RENDERBUFFER,
+      GL.DEPTH_COMPONENT16,
+      16,
+      9,
+    ]);
+    const attach = gl.callsOf("framebufferRenderbuffer")[0];
+    expect(attach?.args[0]).toBe(GL.FRAMEBUFFER);
+    expect(attach?.args[1]).toBe(GL.DEPTH_ATTACHMENT);
+    expect(attach?.args[2]).toBe(GL.RENDERBUFFER);
+  });
+
+  it("skips the depth buffer entirely for a target built with depth: false", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+
+    const record = cache.acquire(
+      new RenderTarget({ width: 4, height: 4, depth: false }),
+    );
+
+    expect(record?.depthBuffer).toBeNull();
+    expect(gl.countOf("createRenderbuffer")).toBe(0);
+    expect(gl.countOf("framebufferRenderbuffer")).toBe(0);
+  });
+
+  it("leaves nothing bound — not the texture, not the renderbuffer, not the framebuffer", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 2, height: 2 }),
+    );
+
+    const last = (name: string): unknown =>
+      gl.callsOf(name).at(-1)?.args.at(-1);
+    expect(last("bindTexture")).toBeNull();
+    expect(last("bindRenderbuffer")).toBeNull();
+    expect(last("bindFramebuffer")).toBeNull();
+  });
+
+  it("reports the size it allocated at, which is what the viewport resolves against", () => {
+    const gl = createFakeGl();
+    const record = new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 128, height: 64 }),
+    );
+
+    expect(record?.width).toBe(128);
+    expect(record?.height).toBe(64);
+    expect(record?.version).toBe(0);
+  });
+});
+
+describe("RenderTargetCache — eviction (§83, §61)", () => {
+  it("returns the same record for an unchanged target without touching GL", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4 });
+    const first = cache.acquire(target);
+    gl.reset();
+
+    const second = cache.acquire(target);
+
+    expect(second).toBe(first);
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("re-allocates at the new size after a resize, deleting all three objects", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4 });
+    const first = cache.acquire(target);
+    target.resize(32, 16);
+    gl.reset();
+
+    const second = cache.acquire(target);
+
+    expect(second).not.toBe(first);
+    expect(second?.width).toBe(32);
+    expect(second?.version).toBe(1);
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+    expect(gl.callsOf("renderbufferStorage")[0]?.args).toEqual([
+      GL.RENDERBUFFER,
+      GL.DEPTH_COMPONENT16,
+      32,
+      16,
+    ]);
+    expect(cache.size).toBe(1);
+  });
+
+  it("deletes and forgets a disposed target, and never draws into it again", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4 });
+    cache.acquire(target);
+    target.dispose();
+    gl.reset();
+
+    expect(cache.acquire(target)).toBeNull();
+
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(cache.size).toBe(0);
+    // And a second attempt neither re-allocates nor deletes again.
+    gl.reset();
+    expect(cache.acquire(target)).toBeNull();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("refuses a target that was disposed before it was ever allocated", () => {
+    const gl = createFakeGl();
+    const target = new RenderTarget({ width: 4, height: 4 });
+    target.dispose();
+
+    expect(new RenderTargetCache(gl).acquire(target)).toBeNull();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("forget() drops every record without touching the lost context (§61)", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    cache.acquire(new RenderTarget({ width: 4, height: 4 }));
+    gl.reset();
+
+    cache.forget();
+
+    expect(cache.size).toBe(0);
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("dispose() deletes everything it created and is idempotent (§83)", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    cache.acquire(new RenderTarget({ width: 4, height: 4 }));
+    cache.acquire(new RenderTarget({ width: 8, height: 8, depth: false }));
+    gl.reset();
+
+    cache.dispose();
+    cache.dispose();
+
+    expect(cache.disposed).toBe(true);
+    expect(cache.size).toBe(0);
+    expect(gl.countOf("deleteFramebuffer")).toBe(2);
+    expect(gl.countOf("deleteTexture")).toBe(2);
+    // Only the depth-carrying target had a renderbuffer to delete.
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+  });
+});
+
+describe("RenderTargetCache — failure paths never throw (§61, §85)", () => {
+  it("returns null when GL will not allocate the colour texture", () => {
+    const gl = createFakeGl({ allocateTextures: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(cache.size).toBe(0);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+  });
+
+  it("returns null and frees the texture when the renderbuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateRenderbuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(cache.size).toBe(0);
+  });
+
+  it("returns null and frees both attachments when the framebuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateFramebuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+    expect(cache.size).toBe(0);
+  });
+
+  it("frees a depth-less target's texture when the framebuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateFramebuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(
+      cache.acquire(new RenderTarget({ width: 4, height: 4, depth: false })),
+    ).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(0);
+  });
+
+  it("refuses an incomplete framebuffer rather than drawing into it", () => {
+    // `GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT`. An incomplete framebuffer turns
+    // every subsequent draw into a GL_INVALID_FRAMEBUFFER_OPERATION nobody
+    // reads, which is why this is a refusal and not a warning.
+    const gl = createFakeGl({ framebufferStatus: 0x8cd6 });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+    // Unbound before the refusal — the default drawing buffer is where the
+    // next frame has to find itself.
+    expect(gl.callsOf("bindFramebuffer").at(-1)?.args[1]).toBeNull();
+    expect(cache.size).toBe(0);
+  });
+
+  it("frees a depth-less target's objects when its framebuffer is incomplete", () => {
+    const gl = createFakeGl({ framebufferStatus: 0x8cd6 });
+    const cache = new RenderTargetCache(gl);
+
+    expect(
+      cache.acquire(new RenderTarget({ width: 4, height: 4, depth: false })),
+    ).toBeNull();
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(0);
+  });
+});
+
+describe("WebglRenderer.render — the no-target path is unchanged (R-4)", () => {
+  it("issues no framebuffer call at all for an on-screen frame", async () => {
+    // The load-bearing regression guard. Every pixel golden and every browser
+    // test rests on this: a scene that never renders to texture must produce
+    // the GL sequence it produced before render targets existed, down to the
+    // absence of a single `bindFramebuffer(FRAMEBUFFER, null)`.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      renderable(quadGeometry()),
+      sprite(),
+      stateful(BORROWS_EVERYTHING),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    renderer.render(root, [createView(camera)], undefined, null);
+
+    expect(gl.countOf("bindFramebuffer")).toBe(0);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(gl.countOf("checkFramebufferStatus")).toBe(0);
+  });
+
+  it("resolves normalized rectangles against the drawing buffer, as before", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.resize(200, 100, 2);
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)]);
+
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 400, 200]);
+  });
+});
+
+describe("WebglRenderer.render — into a target (§61, §48, R-4)", () => {
+  it("binds the target's framebuffer before the first clear and unbinds after", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 64, height: 64 });
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    const names = gl.names();
+    const framebuffer = gl.callsOf("bindFramebuffer").at(-2)?.args[1];
+    expect(framebuffer).not.toBeNull();
+    // Bound before the rectangles and the clear, unbound at the very end.
+    expect(names.indexOf("bindFramebuffer")).toBeLessThan(
+      names.indexOf("scissor"),
+    );
+    expect(names.at(-1)).toBe("bindFramebuffer");
+    expect(gl.callsOf("bindFramebuffer").at(-1)?.args).toEqual([
+      GL.FRAMEBUFFER,
+      null,
+    ]);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("allocates once and re-binds the same framebuffer on later frames", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const framebuffer = gl.callsOf("bindFramebuffer")[0]?.args[1];
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(gl.callsOf("bindFramebuffer")[0]?.args).toEqual([
+      GL.FRAMEBUFFER,
+      framebuffer,
+    ]);
+  });
+
+  it("resolves normalized rectangles against the target, not the drawing buffer", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.resize(800, 600, 2);
+    const target = new RenderTarget({ width: 256, height: 128 });
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 256, 128]);
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 256, 128]);
+  });
+
+  it("takes an unnormalized rectangle as target pixels, unscaled by the resolution", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.resize(800, 600, 3);
+    const target = new RenderTarget({ width: 256, height: 256 });
+    gl.reset();
+
+    renderer.render(
+      createRoot(),
+      [
+        createView(camera, {
+          x: 8,
+          y: 16,
+          width: 64,
+          height: 32,
+          normalized: false,
+        }),
+      ],
+      undefined,
+      target,
+    );
+
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([8, 16, 64, 32]);
+  });
+
+  it("draws the same scene the same way, target or not", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 300, height: 150 });
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    // Warm both caches, so neither pass below pays an upload the other does
+    // not: what is under test is the *draw* sequence, not the allocation one.
+    renderer.render(root, [createView(camera)]);
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    gl.reset();
+    renderer.render(root, [createView(camera)], undefined, target);
+    const offscreen = gl
+      .names()
+      .filter(
+        (name) =>
+          name !== "bindFramebuffer" &&
+          name !== "createFramebuffer" &&
+          name !== "createRenderbuffer" &&
+          name !== "bindRenderbuffer" &&
+          name !== "renderbufferStorage" &&
+          name !== "framebufferTexture2D" &&
+          name !== "framebufferRenderbuffer" &&
+          name !== "checkFramebufferStatus",
+      );
+    gl.reset();
+    // The drawing buffer is 300×150 (the fake canvas's size), so the same
+    // normalized view covers the same pixel rectangle in both passes.
+    renderer.render(root, [createView(camera)]);
+
+    expect(offscreen).toEqual(gl.names());
+  });
+
+  it("re-allocates and draws into the new framebuffer after a resize", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    target.resize(64, 16);
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 64, 16]);
+  });
+
+  it("skips the whole pass for a disposed target — no bind, no clear, no draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    target.dispose();
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("skips the pass when the framebuffer comes back incomplete", async () => {
+    const { renderer, gl, camera } = await initialized({
+      framebufferStatus: 0x8cd6,
+    });
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    gl.reset();
+
+    renderer.render(
+      root,
+      [createView(camera)],
+      undefined,
+      new RenderTarget({ width: 32, height: 32 }),
+    );
+
+    // The allocation was attempted and cleaned up; nothing was drawn.
+    expect(gl.countOf("clear")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.callsOf("bindFramebuffer").at(-1)?.args[1]).toBeNull();
+  });
+
+  it("unbinds the framebuffer when a draw throws mid-pass (F13 + R-4)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    const root = createRoot();
+    root.add(throwingRenderable(BORROWS_EVERYTHING));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, [createView(camera)], undefined, target);
+    }).toThrow(/material accessor raised/);
+
+    // The framebuffer really was bound, and really was given back — along with
+    // every other piece of state the frame borrowed.
+    expect(
+      gl.callsOf("bindFramebuffer").some((call) => call.args[1] !== null),
+    ).toBe(true);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("draws into a target with interpolated §43 poses like any other frame", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    const root = createRoot();
+    const moved = renderable(triangleGeometry());
+    root.add(moved);
+    const poses = new TestPoseBuffer().track(
+      moved,
+      new Vector3(0, 0, 0),
+      new Vector3(4, 0, 0),
+    );
+    gl.reset();
+
+    renderer.render(
+      root,
+      [createView(camera)],
+      interpolationAt(poses, 0.5),
+      target,
+    );
+
+    expect(poses.alphas).toContain(0.5);
+    expect(modelUploads(gl).at(-1)?.[12]).toBe(2);
+  });
+});
+
+describe("WebglRenderer — render to texture (R-4, the R-5/R-6 unblock)", () => {
+  it("binds the target's colour attachment when a material samples it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    // Pass 1: fill the target.
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const colorTexture = attachedColorTexture(gl);
+
+    // Pass 2: sample it on screen, through the ordinary §57 `map` field.
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      colorTexture,
+    ]);
+    // Nothing was uploaded: a render-target texture has no CPU-side texels, so
+    // it must never reach `TextureCache`.
+    expect(gl.countOf("texImage2D")).toBe(0);
+    expect(gl.countOf("createTexture")).toBe(0);
+  });
+
+  it("allocates the framebuffer on first *sample*, so an unrendered target reads as transparent black", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Allocated here rather than skipped: `texImage2D(…, null)` is zero-filled
+    // storage, which samples as transparent black — a defined result.
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.callsOf("texImage2D")[0]?.args.at(-1)).toBeNull();
+    expect(gl.callsOf("bindTexture").at(-2)?.args[1]).toBe(
+      attachedColorTexture(gl),
+    );
+  });
+
+  it("switches the map sampler on for a render-target texture like any other", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    const uniforms = gl.uniformLocations;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("activeTexture")).toBe(1);
+    const useMap = gl
+      .callsOf("uniform1i")
+      .filter((call) => call.args[0] === uniforms.get("useMap"));
+    expect(useMap.at(-1)?.args[1]).toBe(1);
+  });
+
+  it("samples a target through a sprite material too (§55)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const colorTexture = attachedColorTexture(gl);
+
+    const material = new TestSpriteMaterial();
+    material.texture = target.colorTexture;
+    const root = createRoot();
+    root.add(sprite(material));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      colorTexture,
+    ]);
+    // The sprite quad is indexed (see the sprite pipeline's own tests).
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("skips a draw that samples the target it is drawing into (feedback loop)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 16, height: 16 });
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    // Allocate the framebuffer up front, so the counts below are the frame's.
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    // The geometry still draws — it simply draws untextured, because the one
+    // thing that cannot happen is reading and writing one surface at once.
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("activeTexture")).toBe(0);
+  });
+
+  it("skips a *sprite* that samples the target it is drawing into", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 16, height: 16 });
+    const material = new TestSpriteMaterial();
+    material.texture = target.colorTexture;
+    const root = createRoot();
+    root.add(sprite(material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    // A sprite with no texture has nothing to draw at all.
+    expect(gl.countOf("drawElements")).toBe(0);
+  });
+
+  it("ping-pong between two targets is not a feedback loop", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const read = new RenderTarget({ width: 16, height: 16 });
+    const write = new RenderTarget({ width: 16, height: 16 });
+    renderer.render(createRoot(), [createView(camera)], undefined, read);
+    const readTexture = attachedColorTexture(gl);
+    renderer.render(createRoot(), [createView(camera)], undefined, write);
+    const material = new TestMaterial();
+    material.map = read.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, write);
+
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      readTexture,
+    ]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("skips a draw whose target was disposed under it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const material = new TestSpriteMaterial();
+    material.texture = target.colorTexture;
+    const root = createRoot();
+    root.add(sprite(material));
+    target.dispose();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // §83's "disposed resource still in use": deleted, then skipped.
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+});
+
+describe("WebglRenderer — render targets across a context loss (§61)", () => {
+  it("forgets framebuffers without deleting them, and re-allocates on restore", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    gl.reset();
+
+    canvas.dispatch("webglcontextlost");
+
+    // The handles died with the context; deleting them would be a GL call
+    // against a lost context for no benefit.
+    expect(gl.countOf("deleteFramebuffer")).toBe(0);
+
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    // §61's "re-creates engine-owned GPU resources … render targets", done by
+    // the pass that asks for one rather than eagerly.
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteFramebuffer")).toBe(0);
+  });
+
+  it("skips an off-screen frame while the context is lost", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+
+    expect(() => {
+      renderer.render(createRoot(), [createView(camera)], undefined, target);
+    }).not.toThrow();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("deletes every framebuffer it allocated when the renderer is disposed (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.render(
+      createRoot(),
+      [createView(camera)],
+      undefined,
+      new RenderTarget({ width: 8, height: 8 }),
+    );
+    gl.reset();
+
+    renderer.dispose();
+
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.initialize — the framebuffer entry points are required (§62)", () => {
+  it("rejects a context that cannot allocate a framebuffer", async () => {
+    const gl = createFakeGl() as unknown as Record<string, unknown>;
+    delete gl.createFramebuffer;
+    const renderer = new WebglRenderer();
+
+    const error = await rejection(
+      renderer.initialize({ canvas: new TestCanvas(gl) }),
+    );
+
+    expect(error.code).toBe("RENDERER_INITIALIZATION_FAILED");
   });
 });

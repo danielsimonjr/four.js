@@ -55,6 +55,16 @@
  *   backend stateless about time, lets one renderer serve two applications, and
  *   keeps the non-interpolated path (an editor preview, a single-step
  *   screenshot) a matter of omitting an argument (decision, WP-3.6).
+ * - **`render` takes a fourth, optional {@link @four/render!RenderTarget | RenderTarget}
+ *   argument** (R-4, 2026-08-07). §48 puts the target on the *viewport*
+ *   (`Viewport.renderTarget`), which is where it belongs and where it will
+ *   land; `Viewport` is `@four/scene`'s type and R-4's file set did not include
+ *   that package, so the minimal tier routes the target through the render call
+ *   instead. The two are compatible rather than competing: a per-view target is
+ *   a loop around this argument, so the packet that adds the field implements
+ *   it by calling `render` once per target group and this parameter keeps
+ *   working for the single-target case (deviation from R-4's closure plan,
+ *   recorded here and in `render-target.ts`).
  *
  * ## Interface, not base class (§6b composition)
  *
@@ -76,6 +86,8 @@
 import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
+
+import type { RenderTarget } from "./render-target.js";
 
 /**
  * Which backend an implementation drives (§62).
@@ -272,21 +284,29 @@ export interface RenderInterpolation {
  *
  * ## Deferred §61 members (typed TODO)
  *
- * These are part of §61 and are **not** part of this interface yet, because
- * every one of them names a type this monorepo has not defined. They are added
- * by the packets that define those types:
+ * These are part of §61 and are **not** part of this interface. The list is
+ * shorter than it was — {@link @four/render!RenderTarget | RenderTarget} and
+ * {@link @four/render!Texture | Texture} both exist now — but the two
+ * *factories* stay deferred **by decision, not by absence** (R-4, 2026-08-07),
+ * and `readPixels` still names a type this monorepo does not have:
  *
  * ```ts
  * createTexture(source: TextureSource): Texture;
- * // needs Texture/TextureSource — §55 (sprite and raster system),
- * // §58 (paints, fills, strokes), §60a (color-space metadata).
- *
  * createRenderTarget(options: RenderTargetOptions): RenderTarget;
- * // needs RenderTarget — §48 (Viewport.renderTarget), §63 (render graph).
+ * // Both types exist. A renderer-*owned* resource, though, cannot be built
+ * // before a renderer, has to be built once per renderer, and has to be
+ * // re-created by hand after a §61 context loss. `GeometryCache` and
+ * // `TextureCache` in @four/render-webgl are the standing proof that the
+ * // alternative works: the resource is a CPU-side descriptor with an id and a
+ * // version, GPU residency is a backend cache, and a context loss is handled
+ * // by dropping that cache. `texture.ts` and `render-target.ts` each carry the
+ * // full argument on the class it concerns. These land with the tier that
+ * // genuinely needs renderer-owned resources — compressed or GPU-only
+ * // formats, which have no CPU-side description at all.
  *
  * readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
- * // needs RenderTarget plus Rectangle2 — §63, and §92's visual regression
- * // tests are its first consumer. Optional in §61 and stays optional.
+ * // needs `Rectangle2`, which `@four/math` does not define; §92's visual
+ * // regression tier is its first consumer. Optional in §61, stays optional.
  * ```
  */
 export interface Renderer extends Disposable {
@@ -377,6 +397,36 @@ export interface Renderer extends Disposable {
    * for the frame (§7, §64) — the interpolated path derives its matrices itself
    * and does not.
    *
+   * ### Rendering into a target (§61, §48; R-4, 2026-08-07)
+   *
+   * With `target` present the frame is drawn into that off-screen surface
+   * instead of the backend's default drawing buffer, and
+   * `target.colorTexture` can then be sampled by any material — which is the
+   * whole of render-to-texture, and what §48's minimaps, mirrors, portals and
+   * previews, §63's transient resources, and §70's effect chain are all built
+   * out of. Everything else is unchanged: the same views, the same clears, the
+   * same interpolation.
+   *
+   * Three rules bind every backend:
+   *
+   * - **Normalized viewport rectangles resolve against the *target's* size**,
+   *   not the surface's, so a full-target view is the same
+   *   `{ x: 0, y: 0, width: 1, height: 1, normalized: true }` it is on screen.
+   *   Pixel rectangles are target pixels, and are not scaled by the
+   *   {@link Renderer.resize} resolution — the target has a size of its own.
+   * - **The target is bound for the call and unbound before it returns**, even
+   *   if the frame throws. A backend leaves nothing bound behind: the next
+   *   thing to touch the device may be another renderer, or the same one
+   *   drawing to screen.
+   * - **A material sampling the target currently being drawn into is skipped**
+   *   rather than drawn. That is a read-write feedback loop on one surface,
+   *   which is undefined behaviour on every backend; the draw is dropped the
+   *   same way a disposed texture's is (§83). Ping-pong between two targets.
+   *
+   * A disposed target draws nothing at all, and a target the backend cannot
+   * allocate (an incomplete framebuffer, a device out of memory) skips the
+   * frame rather than throwing — same reasoning as the lost-context rule.
+   *
    * Returns immediately if the context is lost (see the context-loss contract
    * above): never throws for that reason.
    */
@@ -384,6 +434,7 @@ export interface Renderer extends Disposable {
     root: Node,
     views: readonly Viewport[],
     interpolation?: RenderInterpolation,
+    target?: RenderTarget | null,
   ): void;
 
   /**
@@ -524,6 +575,21 @@ export class NullRenderer implements Renderer {
    */
   lastInterpolation: RenderInterpolation | null = null;
 
+  /**
+   * The {@link @four/render!RenderTarget | RenderTarget} of the most recent
+   * `render`, or `null` when that call passed none (R-4) — cleared per call for
+   * the same reason {@link NullRenderer.lastInterpolation} is: a later
+   * on-screen frame must not leave the previous off-screen pass's target
+   * standing, which would let a test pass for the wrong reason. `null` before
+   * the first call.
+   *
+   * Nothing is drawn into it. A null renderer has no surfaces at all, so an
+   * off-screen pass is recorded and skipped exactly as an on-screen one is —
+   * which is what lets an application's render-to-texture wiring be asserted
+   * headlessly (§92's cheap half).
+   */
+  lastRenderTarget: RenderTarget | null = null;
+
   /** Number of {@link NullRenderer.resize} calls. */
   resizeCount = 0;
 
@@ -553,21 +619,23 @@ export class NullRenderer implements Renderer {
   }
 
   /**
-   * Records `root`, `views`, and the §43 `interpolation` record, and draws
-   * nothing. No pose is computed: the null backend has nothing to draw them
-   * into, and a test that wants the interpolated matrices asks
-   * {@link buildInterpolatedRenderList} for them directly.
+   * Records `root`, `views`, the §43 `interpolation` record, and the R-4
+   * `target`, and draws nothing. No pose is computed: the null backend has
+   * nothing to draw them into, and a test that wants the interpolated matrices
+   * asks {@link buildInterpolatedRenderList} for them directly.
    */
   render(
     root: Node,
     views: readonly Viewport[],
     interpolation?: RenderInterpolation,
+    target?: RenderTarget | null,
   ): void {
     this.#assertUsable("render");
     this.renderCount += 1;
     this.lastRenderRoot = root;
     this.lastViews = views;
     this.lastInterpolation = interpolation ?? null;
+    this.lastRenderTarget = target ?? null;
   }
 
   /** Records the requested size. `resolution` defaults to `1`. */

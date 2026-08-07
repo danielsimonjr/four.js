@@ -43,6 +43,7 @@ import {
   createSceneLights,
   isLitItem,
   isParticlesItem,
+  isRenderTargetTexture,
   isSpriteItem,
   type RenderItem,
   type RenderItemKind,
@@ -64,7 +65,12 @@ import {
   MAP_TEXTURE_UNIT,
   SpriteProgram,
   UnlitProgram,
+  type GlTexture,
 } from "./gl-program.js";
+import {
+  RenderTargetCache,
+  type RenderTargetRecord,
+} from "./gl-render-target.js";
 import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 
 /**
@@ -91,6 +97,16 @@ type RenderView = Parameters<Renderer["render"]>[1][number];
 type RenderInterpolationArgument = NonNullable<
   Parameters<Renderer["render"]>[2]
 >;
+
+/**
+ * The off-screen surface `render` draws into when it is given one (§61, §48;
+ * R-4), derived from the interface as {@link RenderRoot} is.
+ *
+ * `@four/render`'s `RenderTarget` — a *type* import through the interface, so
+ * this file still names nothing outside the frozen matrix. `gl-render-target.ts`
+ * imports the class by name for a reason written out there.
+ */
+type RenderTargetArgument = NonNullable<Parameters<Renderer["render"]>[3]>;
 
 /**
  * The minimum a DOM event has to offer this backend: a way to stop the default
@@ -194,6 +210,19 @@ const REQUIRED_CONTEXT_METHODS = [
   // draw, the same courtesy the check extends to every other entry point the
   // backend cannot draw without.
   "uniform3fv",
+  // The render-target path's five (R-4, 2026-08-07). Core WebGL 1 and 2 too,
+  // so they discriminate nothing either; they are checked for the same reason
+  // as `uniform3fv` — a stub that cannot allocate a framebuffer should say so
+  // at `initialize`, not on the first off-screen pass, which may be minutes
+  // into a session. `createRenderbuffer` and friends are not listed
+  // individually: no context implements half of `gl-render-target.ts`'s set,
+  // and a check per entry point would cost a loop iteration per initialize for
+  // a case that does not exist. See `gl-render-target.ts`.
+  "createFramebuffer",
+  "bindFramebuffer",
+  "framebufferTexture2D",
+  "checkFramebufferStatus",
+  "createRenderbuffer",
 ] as const;
 
 /**
@@ -454,6 +483,47 @@ function mapOf(material: {
 }
 
 /**
+ * Turns a texture a material points at into the GL texture to bind, whichever
+ * kind it is (R-4, 2026-08-07) — the one place in the draw path that knows
+ * there are two.
+ *
+ * An ordinary `Texture` is uploaded from its CPU-side texels by
+ * {@link TextureCache}. A {@link @four/render!RenderTargetTexture | render-target
+ * texture} has none — it *is* a framebuffer's colour attachment — so it resolves
+ * through {@link RenderTargetCache} instead, which allocates the framebuffer if
+ * this is the first the backend has heard of it. That is what makes sampling a
+ * target that has never been rendered into read as transparent black rather
+ * than fail.
+ *
+ * `null` means "do not bind this": a disposed resource, an allocation GL
+ * refused, or — the case only this function can see — a **feedback loop**, a
+ * material sampling the very target this frame is drawing into. Reading and
+ * writing one surface in a single pass is undefined behaviour on every backend,
+ * and undefined content is worse than a missing draw, so the draw is dropped
+ * exactly as a disposed texture's is (§83). Ping-pong between two targets to
+ * express what that draw was reaching for.
+ *
+ * The non-target path is one `isRenderTargetTexture` marker read away from what
+ * it was before, and issues the identical GL call — which is what keeps a scene
+ * that never renders to texture byte-identical at the GL boundary.
+ */
+function resolveTexture(
+  textures: TextureCache,
+  renderTargets: RenderTargetCache,
+  activeTarget: RenderTargetArgument | null,
+  texture: CacheableTexture,
+): GlTexture | null {
+  if (!isRenderTargetTexture(texture)) {
+    return textures.acquire(texture)?.texture ?? null;
+  }
+  const source = texture.renderTarget;
+  if (source === activeTarget) {
+    return null;
+  }
+  return renderTargets.acquire(source)?.texture ?? null;
+}
+
+/**
  * Restores the GL state a frame borrowed, issuing a call only for what it
  * actually changed — the mirror image of {@link applyMaterialState}.
  *
@@ -688,17 +758,36 @@ function resolveRect(
  * argument is written out in that module's header and in `@four/render`'s
  * `texture.ts`.
  *
+ * ## Render targets (§61, §48; R-4, 2026-08-07)
+ *
+ * `render`'s fourth argument draws the frame into an off-screen framebuffer
+ * instead of the canvas, and `RenderTarget.colorTexture` is then an ordinary
+ * material texture — which is the whole of render-to-texture. Three things are
+ * this backend's part of the shared contract stated on `Renderer.render`:
+ *
+ * - **Framebuffers are a cache, keyed and invalidated exactly as geometry and
+ *   textures are** (`gl-render-target.ts`), including through a context loss.
+ * - **The bind lives inside the frame's `try`/`finally`**, so a draw that
+ *   throws mid-pass cannot leave this renderer's framebuffer bound.
+ * - **A frame with no target issues no framebuffer call at all** — not a bind,
+ *   not an unbind. The on-screen GL sequence is byte-for-byte the one this
+ *   backend issued before render targets existed, which is the property the
+ *   pixel goldens and the recorded-sequence tests both pin.
+ *
  * ## Context loss (§61)
  *
  * `webglcontextlost` is captured, defaulted-prevented (without which the
  * browser never restores), and turned into a `contextlost` event; GPU handles
  * are dropped without being deleted, because they are already invalid.
  * `render` then returns silently until `webglcontextrestored` arrives, at which
- * point all four programs and all three caches are rebuilt, the fixed state and
+ * point all four programs and all four caches are rebuilt, the fixed state and
  * the surface size are re-applied, capabilities are re-read, and
  * `contextrestored` is emitted — after the rebuild, so the first frame a listener triggers
  * already draws. Geometry and texture *content* re-uploads lazily from the
- * CPU-side sources the application still holds, on the next draw that needs it.
+ * CPU-side sources the application still holds, on the next draw that needs it,
+ * and so do the framebuffers of §61's "engine-owned GPU resources … render
+ * targets": the cache cannot know which targets the next frame will use, so
+ * each one is re-allocated by the pass that asks for it (R-4).
  *
  * ## Lifecycle
  *
@@ -732,6 +821,8 @@ export class WebglRenderer implements Renderer {
   #geometries: GeometryCache | null = null;
 
   #textures: TextureCache | null = null;
+
+  #renderTargets: RenderTargetCache | null = null;
 
   #particleBatches: ParticleBatchCache | null = null;
 
@@ -774,6 +865,7 @@ export class WebglRenderer implements Renderer {
     this.#litProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
+    this.#renderTargets?.forget();
     this.#particleBatches?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
@@ -792,6 +884,7 @@ export class WebglRenderer implements Renderer {
     this.#litProgram = LitProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
+    this.#renderTargets = new RenderTargetCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
     this.#applyFixedState(gl);
     // Textures are re-uploaded lazily from the CPU-side sources their `Texture`
@@ -904,6 +997,31 @@ export class WebglRenderer implements Renderer {
    * The interpolated path does not even need that pass, since it derives every
    * matrix itself.
    *
+   * ## Off-screen passes (§61, §48; R-4, 2026-08-07)
+   *
+   * With `target` present the frame is drawn into that target's framebuffer:
+   * bound as the first act of the frame's `try`, unbound in its `finally`, and
+   * never left bound for the next caller. Normalized viewport rectangles
+   * resolve against the *target's* size rather than the drawing buffer's, so a
+   * full-target view is the same `{ 0, 0, 1, 1, normalized }` it is on screen;
+   * unnormalized rectangles are target pixels, unscaled by the `resize`
+   * resolution, which the target does not have.
+   *
+   * The pass is **skipped entirely** — no bind, no clear, no draw — when the
+   * target is disposed, when GL will not allocate its framebuffer, or when the
+   * assembled framebuffer is not `FRAMEBUFFER_COMPLETE`. §61 forbids throwing
+   * from `render` for the asynchronous, driver-scheduled failures this is one
+   * of, and half-drawing into an incomplete framebuffer would turn every
+   * subsequent draw into an unread `GL_INVALID_FRAMEBUFFER_OPERATION`.
+   *
+   * A material whose texture is *this* target's own colour attachment is
+   * skipped for the duration of the pass (`resolveTexture`): sampling the
+   * surface being written is undefined on every backend.
+   *
+   * Without `target` — the on-screen path — **not one framebuffer call is
+   * issued**, so the GL sequence is byte-for-byte what it was before render
+   * targets existed.
+   *
    * Returns immediately and silently while the context is lost, and when
    * `views` is empty (which therefore also clears nothing) — §61 both times.
    * Throws only for programmer error: rendering before `initialize` or after
@@ -926,6 +1044,7 @@ export class WebglRenderer implements Renderer {
     root: RenderRoot,
     views: readonly RenderView[],
     interpolation?: RenderInterpolationArgument,
+    target?: RenderTargetArgument | null,
   ): void {
     const gl = this.#requireContext("render");
     if (this.#contextLost || views.length === 0) {
@@ -943,6 +1062,7 @@ export class WebglRenderer implements Renderer {
     const litProgram = this.#litProgram;
     const geometries = this.#geometries;
     const textures = this.#textures;
+    const renderTargets = this.#renderTargets;
     const particleBatches = this.#particleBatches;
     if (
       program === null ||
@@ -951,10 +1071,33 @@ export class WebglRenderer implements Renderer {
       litProgram === null ||
       geometries === null ||
       textures === null ||
+      renderTargets === null ||
       particleBatches === null
     ) {
       return;
     }
+
+    // The off-screen surface, if this is an off-screen pass (R-4). Resolved
+    // *before* the frame's `try`, because `acquire` is a pure allocation with
+    // nothing to unwind and never throws (`gl-render-target.ts`): a target that
+    // is disposed, that GL would not allocate, or whose framebuffer is
+    // incomplete skips the whole frame here rather than half-drawing it. The
+    // *binding* is inside the envelope, where its `finally` can see it.
+    const activeTarget = target ?? null;
+    let targetRecord: RenderTargetRecord | null = null;
+    if (activeTarget !== null) {
+      targetRecord = renderTargets.acquire(activeTarget);
+      if (targetRecord === null) {
+        return;
+      }
+    }
+
+    // Normalized viewport rectangles resolve against the surface actually being
+    // drawn into: the drawing buffer on screen, the target's own size off
+    // screen. Read off the *record*, so the `viewport` call and the allocation
+    // agree even if the application resized the target after this call began.
+    const surfaceWidth = targetRecord?.width ?? this.#bufferWidth;
+    const surfaceHeight = targetRecord?.height ?? this.#bufferHeight;
 
     // This renderer's own state mirror, and the two frame-scoped bindings the
     // `finally` below has to see (F13, 2026-08-07).
@@ -971,6 +1114,15 @@ export class WebglRenderer implements Renderer {
     let mapUnitActive = false;
 
     try {
+      // Inside the envelope on purpose (R-4): the `finally` below unbinds it,
+      // so a draw that throws mid-pass cannot leave this renderer's framebuffer
+      // bound for whatever touches the context next. On the on-screen path this
+      // issues no call at all — which is what keeps that path's GL sequence
+      // byte-identical to the one it issued before targets existed.
+      if (targetRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, targetRecord.framebuffer);
+      }
+
       const items =
         interpolation === undefined
           ? buildRenderList(root, renderList)
@@ -1010,7 +1162,7 @@ export class WebglRenderer implements Renderer {
         // clear nothing at all. Put both back first; with §57's defaults this
         // issues no call.
         applyDepthColorState(gl, state, true, true, true);
-        resolveRect(view, this.#bufferWidth, this.#bufferHeight);
+        resolveRect(view, surfaceWidth, surfaceHeight);
         gl.scissor(rect.x, rect.y, rect.width, rect.height);
         gl.viewport(rect.x, rect.y, rect.width, rect.height);
 
@@ -1092,7 +1244,12 @@ export class WebglRenderer implements Renderer {
 
           if (isSpriteItem(item)) {
             const material = item.material;
-            const texture = textures.acquire(material.texture);
+            const texture = resolveTexture(
+              textures,
+              renderTargets,
+              activeTarget,
+              material.texture,
+            );
             if (texture === null) {
               continue;
             }
@@ -1124,7 +1281,7 @@ export class WebglRenderer implements Renderer {
               bounds.max.y - bounds.min.y,
             );
             spriteProgram.setTint(material.tint, opacityOf(material));
-            gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+            gl.bindTexture(GL.TEXTURE_2D, texture);
             textureBound = true;
           } else if (isLitItem(item)) {
             // The Lambert-lit pipeline (§68): depth-tested exactly like unlit,
@@ -1157,13 +1314,15 @@ export class WebglRenderer implements Renderer {
             // acquires nothing, binds nothing, and uploads nothing.
             const litMap = mapOf(item.material);
             const litTexture =
-              litMap === null ? null : textures.acquire(litMap);
+              litMap === null
+                ? null
+                : resolveTexture(textures, renderTargets, activeTarget, litMap);
             if (litTexture !== null) {
               if (!mapUnitActive) {
                 gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                 mapUnitActive = true;
               }
-              gl.bindTexture(GL.TEXTURE_2D, litTexture.texture);
+              gl.bindTexture(GL.TEXTURE_2D, litTexture);
               textureBound = true;
             }
             litProgram.setFeatures(litTexture !== null);
@@ -1176,13 +1335,16 @@ export class WebglRenderer implements Renderer {
             }
             applyMaterialState(gl, state, item.material, false);
             const map = mapOf(item.material);
-            const texture = map === null ? null : textures.acquire(map);
+            const texture =
+              map === null
+                ? null
+                : resolveTexture(textures, renderTargets, activeTarget, map);
             if (texture !== null) {
               if (!mapUnitActive) {
                 gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                 mapUnitActive = true;
               }
-              gl.bindTexture(GL.TEXTURE_2D, texture.texture);
+              gl.bindTexture(GL.TEXTURE_2D, texture);
               textureBound = true;
             }
             // §53's per-vertex colours (R-19) reach the screen here, and with
@@ -1223,6 +1385,14 @@ export class WebglRenderer implements Renderer {
         gl.bindTexture(GL.TEXTURE_2D, null);
       }
       gl.bindVertexArray(null);
+      // Back to the default drawing buffer (R-4). Same argument as the two
+      // unbinds above, one step stronger: a framebuffer left bound by a frame
+      // that threw would send *every later frame* — this renderer's on-screen
+      // ones included — into an off-screen surface nobody is looking at, with
+      // nothing on screen and no error anywhere to explain it.
+      if (targetRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      }
     }
   }
 
@@ -1278,6 +1448,7 @@ export class WebglRenderer implements Renderer {
       this.#litProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
+      this.#renderTargets?.dispose();
       this.#particleBatches?.dispose();
     }
 
@@ -1287,6 +1458,7 @@ export class WebglRenderer implements Renderer {
     this.#litProgram = null;
     this.#geometries = null;
     this.#textures = null;
+    this.#renderTargets = null;
     this.#particleBatches = null;
     this.#gl = null;
     this.#canvas = null;
@@ -1360,6 +1532,7 @@ export class WebglRenderer implements Renderer {
     this.#litProgram = litProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
+    this.#renderTargets = new RenderTargetCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
     this.#capabilities = readCapabilities(gl);
     this.#applyFixedState(gl);

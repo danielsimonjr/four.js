@@ -116,6 +116,13 @@ export const GL = {
   RGBA: 0x1908,
   /** `GL_CLAMP_TO_EDGE` — the wrap mode of every MVP-tier texture (§77). */
   CLAMP_TO_EDGE: 0x812f,
+  /**
+   * `GL_DEPTH_COMPONENT16` — storage format of a render target's depth
+   * renderbuffer (R-4). The narrowest depth format WebGL 2 guarantees is
+   * renderbuffer-renderable everywhere; 24-bit depth and packed
+   * depth-stencil are staged with §67 and §69 (see `gl-render-target.ts`).
+   */
+  DEPTH_COMPONENT16: 0x81a5,
   /** `GL_TEXTURE0` — the one texture unit the sprite pipeline samples from. */
   TEXTURE0: 0x84c0,
   /** `GL_RGBA8` — the sized internal format of an MVP-tier texture. */
@@ -134,6 +141,16 @@ export const GL = {
   COMPILE_STATUS: 0x8b81,
   /** `GL_LINK_STATUS`. */
   LINK_STATUS: 0x8b82,
+  /** `GL_FRAMEBUFFER_COMPLETE` — the one status a usable framebuffer reports. */
+  FRAMEBUFFER_COMPLETE: 0x8cd5,
+  /** `GL_COLOR_ATTACHMENT0` — a render target's colour texture (R-4). */
+  COLOR_ATTACHMENT0: 0x8ce0,
+  /** `GL_DEPTH_ATTACHMENT` — a render target's depth renderbuffer (R-4). */
+  DEPTH_ATTACHMENT: 0x8d00,
+  /** `GL_FRAMEBUFFER` — the bind point for both drawing and attaching (R-4). */
+  FRAMEBUFFER: 0x8d40,
+  /** `GL_RENDERBUFFER` — the bind point for depth storage (R-4). */
+  RENDERBUFFER: 0x8d41,
 } as const;
 
 /** Opaque `WebGLShader` handle. */
@@ -153,6 +170,12 @@ export type GlUniformLocation = object;
 
 /** Opaque `WebGLTexture` handle. */
 export type GlTexture = object;
+
+/** Opaque `WebGLFramebuffer` handle (R-4, `gl-render-target.ts`). */
+export type GlFramebuffer = object;
+
+/** Opaque `WebGLRenderbuffer` handle (R-4, `gl-render-target.ts`). */
+export type GlRenderbuffer = object;
 
 /**
  * The GL 2 entry points this package calls — the whole of them.
@@ -222,6 +245,50 @@ export interface WebglContext {
   texParameteri(target: number, pname: number, param: number): void;
   deleteTexture(texture: GlTexture): void;
   activeTexture(unit: number): void;
+
+  // --- Framebuffers and render targets (`gl-render-target.ts`, R-4) ---
+
+  createFramebuffer(): GlFramebuffer | null;
+  /**
+   * Binds `framebuffer` for drawing, or `null` for the default drawing buffer
+   * — the canvas (§61).
+   *
+   * `target` is always `GL.FRAMEBUFFER` in this tier: WebGL 2 can bind separate
+   * read and draw framebuffers, and the packet that needs that split (a
+   * multisample resolve blit, `readPixels` off a non-current target) is the one
+   * that will pass anything else.
+   */
+  bindFramebuffer(target: number, framebuffer: GlFramebuffer | null): void;
+  framebufferTexture2D(
+    target: number,
+    attachment: number,
+    textureTarget: number,
+    texture: GlTexture | null,
+    level: number,
+  ): void;
+  /**
+   * Reports whether the bound framebuffer is usable. Narrowed to `number`
+   * (WebIDL `GLenum`); the caller compares it against `GL.FRAMEBUFFER_COMPLETE`
+   * and refuses to draw into anything else.
+   */
+  checkFramebufferStatus(target: number): number;
+  deleteFramebuffer(framebuffer: GlFramebuffer): void;
+
+  createRenderbuffer(): GlRenderbuffer | null;
+  bindRenderbuffer(target: number, renderbuffer: GlRenderbuffer | null): void;
+  renderbufferStorage(
+    target: number,
+    internalFormat: number,
+    width: number,
+    height: number,
+  ): void;
+  framebufferRenderbuffer(
+    target: number,
+    attachment: number,
+    renderbufferTarget: number,
+    renderbuffer: GlRenderbuffer | null,
+  ): void;
+  deleteRenderbuffer(renderbuffer: GlRenderbuffer): void;
 
   // --- Buffers and vertex arrays (`gl-geometry.ts`) ---
 
