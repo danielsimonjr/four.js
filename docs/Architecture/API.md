@@ -602,8 +602,11 @@ const saved = encodeSceneDocument(document); // canonical text
 const restored = instantiateScene(decodeSceneDocument(saved), registry);
 ```
 
-Serializers are keyed by component **class**; unregistered components are
-silently unsaved (known boundary). Versioned migrations (§80) run on load via
+Serializers are keyed by component **class**; an unregistered component fails
+the save loudly (`unknownComponents: "throw"`, the A-15 default since
+2026-08-06 — this line said "silently unsaved (known boundary)" until
+2026-08-07, which stopped being true with that change; `"skip"` restores the
+old tolerance, minus the silence). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
 `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@four/physics` since

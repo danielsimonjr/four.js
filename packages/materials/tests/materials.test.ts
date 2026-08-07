@@ -5,6 +5,7 @@ import {
   Material,
   SpriteMaterial,
   UnlitMaterial,
+  type BlendMode,
   type MaterialOptions,
   type SpriteTexture,
 } from "../src/index.js";
@@ -429,6 +430,52 @@ describe("Material — §57's shared render state", () => {
         expect(() => make({ opacity: Number.POSITIVE_INFINITY })).toThrow(
           RangeError,
         );
+      });
+
+      it("rejects a non-finite opacity on assignment too, without tearing (F14)", () => {
+        // The defect this closes: the constructor validated and then handed
+        // out a writable field, so `material.opacity = NaN` reached the
+        // backend's `uniform4fv` and painted the scene black.
+        const material = make({ opacity: 0.25 });
+
+        expect(() => {
+          material.opacity = Number.NaN;
+        }).toThrow(RangeError);
+        expect(() => {
+          material.opacity = Number.NEGATIVE_INFINITY;
+        }).toThrow(RangeError);
+
+        // A rejected write leaves the previous value, as `setColor` does.
+        expect(material.opacity).toBe(0.25);
+        // Out of range still passes: only non-finite is rejected (WP-3.3).
+        material.opacity = 2.5;
+        expect(material.opacity).toBe(2.5);
+        material.opacity = -1;
+        expect(material.opacity).toBe(-1);
+        expect(material.version).toBe(0);
+      });
+
+      it("rejects a blend mode outside §57's four, however it arrives (F14)", () => {
+        const bogus = "burn" as BlendMode;
+
+        expect(() => make({ blendMode: bogus })).toThrow(RangeError);
+
+        const material = make({ blendMode: "screen" });
+        expect(() => {
+          material.blendMode = bogus;
+        }).toThrow(RangeError);
+        expect(material.blendMode).toBe("screen");
+
+        for (const mode of [
+          "normal",
+          "additive",
+          "multiply",
+          "screen",
+        ] as const) {
+          material.blendMode = mode;
+          expect(material.blendMode).toBe(mode);
+        }
+        expect(material.version).toBe(0);
       });
 
       it("does not bump the version for a render-state write", () => {

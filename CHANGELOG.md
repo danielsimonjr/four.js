@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — Render-tier review fixes: exception-safe GL state, validated material writes
+
+The remaining four findings from the adversarial closure review (F13–F16), re-verified
+against HEAD after R-19/R-20 moved the code around them.
+
+#### Fixed
+
+- **`@four/render-webgl`: a mid-frame exception no longer corrupts rendering permanently
+  (F13).** The §57 GL state mirror moved from module scope onto each `WebglRenderer`, and
+  `render` wraps its draw work in `try`/`finally` so the state restore, texture unbind,
+  and vertex-array unbind always run. Previously any throw from application code (a
+  material or geometry accessor, a disposed texture) abandoned the borrowed GL state while
+  every later frame asserted the defaults — one transient error left the scene drawing
+  blended, masked, or depth-testless, silently and forever. R-19 had widened the leak (a
+  bound texture and selected unit also escaped). The happy-path GL sequence is
+  **byte-identical, proven** — 449 recorded calls across all four pipelines compared
+  against the previous implementation — and the new regression tests fail on the old code
+  (verified against a baseline copy). The R-19 program-lifetime uniform mirrors were
+  audited and deliberately left alone: they belong to the program object, as does the
+  uniform they track, so they survive a throw correctly.
+- **`@four/materials`: `opacity` and `blendMode` validate on assignment, not only at
+  construction (F14).** `material.opacity = NaN` used to reach `uniform4fv`; `blendMode`
+  was never validated at all. Both are now accessors applying the constructor's rules
+  (§85 finite; §57's modes), rejecting before the first write. Out-of-range opacity still
+  passes unclamped and neither bumps `Material.version` — both unchanged, deliberate,
+  with the superseded doc wording quoted in place.
+- `restoreGlState` no longer passes a blend mode its helper ignores (F15); the dead
+  `BLEND_FUNCTIONS` fallback is removed now that `blendMode` is provably total, and the
+  remaining defensive material reads are documented as guarding structurally-typed test
+  doubles and the material-less particles path (F16).
+
 ### 2026-08-07 — S-8 half-closed: `examples/first-3d-scene`, the first 3D browser proof
 
 #### Added

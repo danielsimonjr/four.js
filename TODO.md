@@ -124,12 +124,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       the reference wrote, so the fallback chain re-resolves on load instead of pinning
       today's defaults into every document (a `PhysicsMaterial` round-trips by value, not
       by identity — resource-keyed sharing is a §79 resource concern)
-- [ ] **PH-17 doc follow-up:** three docs still say the reference serializers live in test
-      code — `docs/Architecture/API.md:606`, `docs/Architecture/TEST_COVERAGE.md:125`, and
-      `docs/guides/digital-twin.md:124,157`. They should point at `@four/physics`'s
-      `serializers.ts` and `registerPhysicsSerializers()`; `docs/GAP ANALYSIS v0.md`'s PH-17
-      banner still reads "partially closed". Left for a docs pass (this change's edit scope
-      was `packages/{physics,four}` + `tests/integration`)
+- [x] **PH-17 doc follow-up — done by 2026-08-07:** the serializer references in
+      `docs/Architecture/API.md` and `docs/guides/digital-twin.md` were updated in an
+      earlier pass; the gap-doc banner was fixed by the 2026-08-07 branch merge; API.md's
+      adjacent stale "silently unsaved" claim corrected 2026-08-07 (A-15 made it throw)
 - [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
       now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
       Widening that structural interface would let the mouse keep its hover across a click

@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — Render-tier review fixes (F13–F16).** Decisions worth keeping:
+  - **F14 policy: validated accessors, unchanged version semantics.** `opacity`/
+    `blendMode` are accessors applying the constructor's validation on every write; the
+    four boolean §57 fields stay plain (no invalid values). Neither bumps `version` —
+    R-12's "render state is read per draw, never cached" stands, and bumping would
+    invalidate the geometry/texture bindings that _are_ cached on that counter.
+  - **F13 audit: only `glState` was both module-global and frame-scoped** — now
+    per-`WebglRenderer`, with the frame in `try`/`finally`. The R-19 program-lifetime
+    mirrors (`useMap`/`useVertexColors`/sampler, seeded at GL initial `0`) were audited
+    and deliberately left alone — they belong to the program object and survive a throw
+    correctly; the byte-identical-sequence property was re-proved (449-call comparison).
+  - **Follow-up not taken:** `renderList`/`viewProjection`/`sceneLights`/`rect` remain
+    module-global _scratch_ (fully written before read, safe while `render` is
+    synchronous and non-re-entrant); a re-entrant `render` would corrupt them
+    independently of F13.
+  - **Gotcha (multi-agent): the Playwright browser gate is not concurrency-safe** — seven
+    fixed-port `vite preview` servers with `reuseExistingServer: false`; two agents
+    running `test:browser` kill each other's servers (`ERR_CONNECTION_REFUSED` that looks
+    like regressions). Check ports 4173–4179; re-run cut-off specs by path.
 - **2026-08-07 — first-3d-scene (S-8 half-closure).** Decisions worth keeping:
   - **A perspective claim must be measured in pixels**: two spheres sharing a geometry
     _instance_ and a material _instance_ at 5.0 m / 10.2 m give a 4.04× area ratio; an

@@ -4695,3 +4695,227 @@ describe("WebglRenderer.render — textured and vertex-coloured meshes (R-19)", 
     expect(gl.countOf("drawArrays")).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A throw mid-frame costs one frame, not the renderer (F13, 2026-08-07).
+//
+// The frame runs application code — a material or geometry accessor, a texture
+// the application disposed between draws — and that code can raise. Before the
+// `finally` in `render`, whatever GL state the frame had borrowed was simply
+// abandoned while the §57 mirror was reset by the *next* frame to the defaults
+// it had stopped guaranteeing; the skip logic then never re-issued the calls
+// that would have fixed the context, so one transient exception left every
+// later frame drawing blended, masked, or depth-testless, permanently and
+// silently. These tests fold the recorded call stream back into the state the
+// context is actually in, which is the only way to see that.
+// ---------------------------------------------------------------------------
+
+/** The GL state the recorded calls left the context in. */
+function effectiveGlState(gl: FakeGl): Record<string, unknown> {
+  // Seeded with the fixed state `#applyFixedState` establishes plus GL's own
+  // defaults — i.e. the state the tests below `reset()` on top of.
+  const state: Record<string, unknown> = {
+    blend: false,
+    depthTest: true,
+    depthWrite: true,
+    colorWrite: true,
+    blendFunc: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
+    texture: null,
+    vertexArray: null,
+  };
+  for (const call of gl.calls) {
+    if (call.name === "enable" || call.name === "disable") {
+      const on = call.name === "enable";
+      if (call.args[0] === GL.BLEND) {
+        state.blend = on;
+      } else if (call.args[0] === GL.DEPTH_TEST) {
+        state.depthTest = on;
+      }
+    } else if (call.name === "depthMask") {
+      state.depthWrite = call.args[0];
+    } else if (call.name === "colorMask") {
+      state.colorWrite = call.args[0];
+    } else if (call.name === "blendFunc") {
+      state.blendFunc = [call.args[0], call.args[1]];
+    } else if (call.name === "bindTexture") {
+      state.texture = call.args[1];
+    } else if (call.name === "bindVertexArray") {
+      state.vertexArray = call.args[0];
+    }
+  }
+  return state;
+}
+
+/** The state a frame that borrowed nothing (or gave it all back) leaves. */
+const RESTING_GL_STATE: Record<string, unknown> = {
+  blend: false,
+  depthTest: true,
+  depthWrite: true,
+  colorWrite: true,
+  blendFunc: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
+  texture: null,
+  vertexArray: null,
+};
+
+/** §57 state that makes a draw borrow every mirrored toggle at once. */
+const BORROWS_EVERYTHING: Partial<TestMaterial> = {
+  transparent: true,
+  blendMode: "additive",
+  depthTest: false,
+  depthWrite: false,
+  colorWrite: false,
+};
+
+/**
+ * A renderable whose material cannot be read: the application code that raises
+ * mid-draw, placed where the unlit pipeline has already applied the state and
+ * bound whatever the material asked for (`program.setColor` reads `color`).
+ */
+function throwingRenderable(
+  state: Partial<TestMaterial> = {},
+  map?: ItemTexture,
+): Renderable {
+  const material = new TestMaterial();
+  Object.assign(material, state);
+  if (map !== undefined) {
+    material.map = map;
+  }
+  Object.defineProperty(material, "color", {
+    get(): never {
+      throw new Error("the application's material accessor raised");
+    },
+  });
+  return new Renderable(triangleGeometry().asGeometry, material.asMaterial);
+}
+
+/** Names of the calls recorded after `mark`. */
+function callsSince(gl: FakeGl, mark: number): string[] {
+  return gl.calls.slice(mark).map((call) => call.name);
+}
+
+describe("WebglRenderer.render — a throw costs one frame (F13)", () => {
+  it("gives back every piece of state the frame borrowed", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Both transparent, so §66's sort key 2 keeps them in `renderOrder` —
+    // and both declaring the same state, so the second draw changes nothing
+    // before it raises and the frame dies holding all of it.
+    const borrower = stateful(BORROWS_EVERYTHING);
+    borrower.renderOrder = 0;
+    const thrower = throwingRenderable(
+      BORROWS_EVERYTHING,
+      new TestTexture().asTexture,
+    );
+    thrower.renderOrder = 1;
+    root.add(borrower, thrower);
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+
+    // It really did borrow: the additive function, the two masks, the depth
+    // test, and a texture on unit 0 were all issued before the throw.
+    const names = gl.names();
+    expect(names).toContain("blendFunc");
+    expect(names).toContain("colorMask");
+    expect(names).toContain("activeTexture");
+    // And gave every one of them back on the way out.
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("leaves the next frame drawing exactly as it would have", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const broken = createRoot();
+    const borrower = stateful(BORROWS_EVERYTHING);
+    borrower.renderOrder = 0;
+    const thrower = throwingRenderable(BORROWS_EVERYTHING);
+    thrower.renderOrder = 1;
+    broken.add(borrower, thrower);
+    const healthy = createRoot();
+    healthy.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(broken, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+    const mark = gl.calls.length;
+    renderer.render(healthy, [createView(camera)]);
+
+    // §57's defaults still cost nothing — the compatibility guarantee the
+    // mirror exists for, unbroken by the frame that died holding the state.
+    const after = callsSince(gl, mark);
+    expect(after).not.toContain("enable");
+    expect(after).not.toContain("disable");
+    expect(after).not.toContain("depthMask");
+    expect(after).not.toContain("colorMask");
+    expect(after).not.toContain("blendFunc");
+    expect(after.filter((name) => name === "drawArrays")).toHaveLength(1);
+    // The claim that makes the previous four assertions safe rather than
+    // merely quiet: issuing nothing is correct because the context is already
+    // in the state the mirror says it is. With the state abandoned, this frame
+    // would have drawn an opaque triangle additively, with both masks off.
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("keeps the program-lifetime feature mirrors in step (R-19)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const broken = createRoot();
+    // The throwing draw switches `useMap` and `useVertexColors` on and dies
+    // before the frame can switch them off. Those mirrors live on the program
+    // object, not on the frame — the uniforms they track live there too — so
+    // they are still accurate, and the next frame turns both off.
+    const thrower = throwingRenderable(
+      { vertexColors: true },
+      new TestTexture().asTexture,
+    );
+    broken.add(thrower);
+    const healthy = createRoot();
+    healthy.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(broken, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+    const uniforms = unlitUniforms(gl);
+    const mark = gl.calls.length;
+    renderer.render(healthy, [createView(camera)]);
+
+    const switchedOff = gl.calls
+      .slice(mark)
+      .filter((call) => call.name === "uniform1i")
+      .map((call) => [call.args[0], call.args[1]]);
+    expect(switchedOff).toEqual([
+      [uniforms.get("useMap"), 0],
+      [uniforms.get("useVertexColors"), 0],
+    ]);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("mirrors one context per renderer, not one per module", async () => {
+    // Two renderers, two contexts (§61 allows several over one application).
+    // The mirror moved onto the instance with F13; before that both of these
+    // drove one module-level object, and only `render`'s reset-on-entry kept
+    // the second renderer from inheriting the first's idea of the GL state.
+    const first = await initialized();
+    const second = await initialized();
+    const blended = createRoot();
+    blended.add(stateful(BORROWS_EVERYTHING));
+    const plain = createRoot();
+    plain.add(renderable(triangleGeometry()));
+    first.gl.reset();
+    second.gl.reset();
+
+    first.renderer.render(blended, [createView(first.camera)]);
+    second.renderer.render(plain, [createView(second.camera)]);
+    first.renderer.render(blended, [createView(first.camera)]);
+
+    // The second renderer's frame declares §57's defaults and pays nothing for
+    // them, whatever the first renderer's frames borrowed from *its* context.
+    expect(second.gl.countOf("enable")).toBe(0);
+    expect(second.gl.countOf("disable")).toBe(0);
+    expect(second.gl.countOf("blendFunc")).toBe(0);
+    expect(effectiveGlState(first.gl)).toEqual(RESTING_GL_STATE);
+    expect(effectiveGlState(second.gl)).toEqual(RESTING_GL_STATE);
+  });
+});
