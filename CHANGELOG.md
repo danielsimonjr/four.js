@@ -8,6 +8,39 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — RFCs 0001–0003 drafted (R-14, A-3, PH-10/R-22)
+
+#### Added
+
+- **`docs/rfcs/0001-shader-and-node-material-system.md` (§60, gap R-14)** — a
+  serializable shader graph in `@four/materials` as the unit of extension; **no user
+  GLSL/WGSL at any tier**. The argument is R-5/R-6's opacity principle, not only §96: a
+  source string makes every user §70 pass unvalidatable exactly where feedback and
+  ordering mistakes live, while a graph keeps `RenderGraph.validate()` able to
+  enumerate what a pass samples. Node materials are their own `RenderItemKind`,
+  compiled lazily on first draw (R-19 byte-identity preserved) behind an explicit
+  `registerNodeMaterialPipeline()`; `ScreenEffect` gains one member, `GraphEffect`.
+  Status draft, owner decision pending.
+- **`docs/rfcs/0002-plugin-system.md` (§81, gap A-3)** — `PluginContext` as a typed
+  capability bag (`defineCapability<T>` tokens exported by each registry's owning
+  package, since §3.1 gives `core` no dependencies and five of six registries live
+  downstream). Five of §81's eleven extension points are real today, one partial, five
+  absent — tabulated rather than stubbed. §96's plugin half answered narrowly: **no
+  sandbox**, but untrusted content can never become a plugin (objects only, never
+  specifiers), enforced by an integration test in the A-23 CSP-test style. Alternative
+  E (do nothing; the registries stay ordinary package APIs) is argued as genuinely
+  defensible and flagged for the owner rather than argued away. Status draft, owner
+  decision pending.
+- **`docs/rfcs/0003-skinning-and-skeletal-animation.md` (§54/§14/§17, gaps PH-10 +
+  R-22)** — the §3.1 matrix decides the split: joints/weights as `BufferGeometry`
+  attributes at locations 4/5 (continuing R-19's numbering), `Bone`/`Skeleton` as
+  scene-graph nodes (§42 authority, §19 blending, and §79 serialization then need no
+  new mechanism), skinned draws as a separate lazily-compiled pipeline (a vertex-stage
+  branch would tax every unskinned draw). Two findings: §54's `morphTargetWeights` on
+  `Mesh` is **unanimatable under §3.1** and becomes a `@four/scene` component; §17's
+  two "missing track types" are binding gaps, not `ValueKind` gaps. Status draft,
+  owner decision pending — bone-axis convention is the named question.
+
 ### 2026-08-07 — A-8/R-2/PH-19 closed: `renderer: "auto"` and `solver: "auto"`
 
 #### Added

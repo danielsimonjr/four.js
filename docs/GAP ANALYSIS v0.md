@@ -259,6 +259,14 @@ _Dependencies:_ physics analyst for step 3; A-16 for step 4.
 
 ### A-3 — §81 plugin system does not exist, and §79 already references it
 
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0002-plugin-system.md` proposes `PluginContext`
+> as a typed capability bag (tokens declared by each registry's owning package, since §3.1
+> gives `core` no dependencies), an explicit-registration-only lifecycle, and a §96
+> boundary that is enforced (documents never name modules) rather than sandboxed. Five of
+> §81's eleven extension points are real today, one partial, five absent. Status draft,
+> **owner decision pending**; one blocking sub-question (`ApplicationOptions.plugins` vs
+> the §40 precedent), and alternative E (do nothing) is genuinely defensible.
+
 **§81, §98 (`core`: "plugin host (§81)"), §79, §90** · **Severity: High** · **Effort: L** · **SILENT**
 
 _What exists:_ nothing. `grep -rn "FourPlugin|PluginContext" packages/*/src` returns **one hit**, and it is prose: `packages/serialization/src/serializer.ts:12` cites §79's "plugins register theirs (§81)" as the justification for the component-serializer registry.
@@ -1050,6 +1058,14 @@ The set is **closed at the type level**, which is the ergonomics half of this ga
 
 ### R-14 — §60 shader / node-material system: no user shaders exist, at any level
 
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0001-shader-and-node-material-system.md`
+> proposes a serializable shader graph in `@four/materials` as the unit of extension,
+> with no user GLSL/WGSL at any tier; a separate lazily-compiled, explicitly-registered
+> node pipeline preserving R-19's byte-identical GL sequence; and one new `ScreenEffect`
+> member (`GraphEffect`) that stays checkable by `RenderGraph.validate()` rather than
+> reporting opacity. Status draft, **owner decision pending** — the packet is blocked on
+> it.
+
 **§60.** Nothing in the shipped surface accepts user GLSL or WGSL. The four programs (`UnlitProgram`, `LitProgram`, `SpriteProgram`, `ParticleProgram`) are compiled from string constants private to `packages/render-webgl/src/gl-program.ts` and `gl-particles.ts`. None of §60's compiler (WGSL/GLSL ES generation, reduced Canvas/SVG fallbacks), node graph, reusable functions, uniform blocks, storage buffers, conditional variants, reflection metadata, or source maps exists.
 **Severity:** blocker for the "advanced users" §60 names, and the root cause of R-1's cost and R-6's impossibility.
 **Effort:** L (largest single item in the domain).
@@ -1140,6 +1156,15 @@ Secondary consequence: no per-vertex `color` attribute is why §113's debug-draw
 **Effort:** S–M. **Recorded:** yes — `buffer-geometry.ts:5-16,86-91`.
 
 ### R-22 — §54 Mesh, instancing, LOD, morph targets, skinning: entirely absent ⚠️
+
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0003-skinning-and-skeletal-animation.md`
+> covers both halves (PH-10 + R-22's skinning rows): joints/weights as `BufferGeometry`
+> attributes at locations 4/5, `Bone`/`Skeleton` as scene-graph nodes (§42 authority and
+> §19 blending need no new mechanism), skinned draws as a separate lazily-compiled
+> pipeline. Findings: §54's `morphTargetWeights` placement is unimplementable under the
+> frozen §3.1 matrix; §17's two missing track types are binding gaps, not `ValueKind`
+> gaps. Status draft, **owner decision pending** — bone-axis convention is the named
+> question.
 
 **§54.** Grepping `§54` across `packages/*/src` returns **one** incidental hit. Verified absent, all of it:
 
@@ -1586,6 +1611,15 @@ This is the same **structural** class of gap that `docs/AUDIT-120.md` documents 
 ---
 
 ## PH-10 — Skeletal animation, skinning, and morph targets absent everywhere
+
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0003-skinning-and-skeletal-animation.md`
+> covers both halves (PH-10 + R-22's skinning rows): joints/weights as `BufferGeometry`
+> attributes at locations 4/5, `Bone`/`Skeleton` as scene-graph nodes (§42 authority and
+> §19 blending need no new mechanism), skinned draws as a separate lazily-compiled
+> pipeline. Findings: §54's `morphTargetWeights` placement is unimplementable under the
+> frozen §3.1 matrix; §17's two missing track types are binding gaps, not `ValueKind`
+> gaps. Status draft, **owner decision pending** — bone-axis convention is the named
+> question.
 
 |                       |                                                                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -27,6 +27,17 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
+      **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
+      R-13} - A-3 blocking sub-question: `ApplicationOptions.plugins` vs the same-day §40
+      "don't invent §45 options" precedent — owner consistency call; alternative E
+      (keep registries as ordinary package APIs) genuinely defensible - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing
+      none; +Y for helpers only). Packet gates: `MorphWeights` is the sixth
+      `static typeName` and fails the registry-completeness test until registered - Cross-RFC coordination: 0001 and 0003 both widen `RenderItemKind` — whichever
+      packet lands first owns the `pipelineId` shape - New spec-revisit items: §57 `ShaderMaterial` row may become permanently
+      unshipped (0001 Q1); §54 `morphTargetWeights` placement conflicts with §3.1
+      (0003); §17's track-type promise in `track.ts:40-45` is wrong (binding forms,
+      not `ValueKind`s)
 - [x] **A-8/R-2/PH-19 CLOSED 2026-08-07** (one design, three filings): renderer +
       solver registries with explicit registration; `renderer: "auto"` /
       `solver: "auto"`; instance-naming apps keep tree-shaking (grep-proven)
