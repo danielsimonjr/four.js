@@ -90,3 +90,15 @@ export {
   solverStatistics,
 } from "./debug-draw.js";
 // --- END WP-10.3 debug-draw ---
+
+// §84 runtime statistics (A-1, 2026-08-07).
+export type { ClockSource, FrameStats, RenderStatisticsLike } from "./stats.js";
+export {
+  copyFrameStats,
+  createFrameStats,
+  createMonotonicClock,
+  monotonicNowSeconds,
+  recordRenderStatistics,
+  recordSolverStatistics,
+  resetFrameStats,
+} from "./stats.js";

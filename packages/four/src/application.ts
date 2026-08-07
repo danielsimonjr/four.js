@@ -8,16 +8,17 @@
  * surface size ({@link Application.resize}), and — optionally — a §61 renderer,
  * wired together and re-emitting the §10 main-loop events.
  *
- * **`app.input`, `app.assets`, `app.diagnostics`, `app.stats` and `app.physics`
- * are still absent, and that is now a gap rather than a schedule** (2026-08-06,
- * A-6). The note that stood here said they "arrive with the phases that build
- * them (§103)"; those phases have all landed — Phase 11 built `@four/assets`,
- * `@four/ui` and `@four/serialization` and wired none of them in — so the
- * sentence pointed at a future that no longer exists. What remains true is the
- * reason the options are absent rather than accepted and ignored: a program
- * that sets `physics: {…}` today fails to compile instead of silently
- * simulating nothing. Every example still hand-wires `PointerInput` and
- * `AssetManager`; closing that is A-6's own packet.
+ * **`app.input`, `app.assets`, `app.diagnostics` and `app.physics` are still
+ * absent, and that is now a gap rather than a schedule** (2026-08-06, A-6;
+ * `app.stats` was in this list until 2026-08-07, when A-1 added it — see
+ * {@link Application.stats}). The note that stood here said they "arrive with
+ * the phases that build them (§103)"; those phases have all landed — Phase 11
+ * built `@four/assets`, `@four/ui` and `@four/serialization` and wired none of
+ * them in — so the sentence pointed at a future that no longer exists. What
+ * remains true is the reason the options are absent rather than accepted and
+ * ignored: a program that sets `physics: {…}` today fails to compile instead of
+ * silently simulating nothing. Every example still hand-wires `PointerInput`
+ * and `AssetManager`; closing that is A-6's own packet.
  *
  * ## Why the composition root lives here
  *
@@ -88,6 +89,13 @@
 
 import { EventEmitter, FourError } from "@four/core";
 import {
+  createFrameStats,
+  monotonicNowSeconds,
+  recordRenderStatistics,
+  resetFrameStats,
+  type FrameStats,
+} from "@four/diagnostics";
+import {
   DEFAULT_FIXED_DELTA_TIME,
   DEFAULT_MAXIMUM_SUB_STEPS,
   Scheduler,
@@ -110,7 +118,7 @@ import {
 // composition subpath (WP-2.7-fix2) — a program that never names a backend
 // must not pull one in, and a backend arrives here as an *instance* the
 // application author constructed (see `ApplicationOptions.renderer`).
-import type { Renderer } from "@four/render";
+import type { RenderStatistics, Renderer } from "@four/render";
 
 /**
  * The §10 main-loop events, as §6b types them.
@@ -291,6 +299,50 @@ export interface ApplicationOptions {
    * `true` without a renderer to run the capture for a custom draw path.
    */
   poseInterpolation?: boolean;
+
+  /**
+   * Whether to measure §84's runtime statistics into {@link Application.stats}.
+   * Defaults to `false` (A-1, 2026-08-07).
+   *
+   * **Off by default, and off means off.** With statistics off,
+   * {@link Application.stats} is `null`, the clock is never read, the backend's
+   * counters are never assigned, and the frame runs the code it ran before this
+   * option existed apart from three `!== null` comparisons per frame — no
+   * allocation, and not one GPU call added, removed, or reordered. That is the
+   * point: a diagnostic that changes the thing it measures is not a diagnostic
+   * (§84), and a `render` gated on a `render`-affecting flag could not share a
+   * pixel golden with one that is not.
+   *
+   * With statistics on, the application owns one {@link FrameStats} record,
+   * resets it at the top of every {@link Application.step}, measures
+   * `cpuFrameTime` and `simulationTime` itself, and — when the renderer reports
+   * them (§61's optional `statistics` member) — reads `drawCalls`, `triangles`,
+   * and `instances` back off the backend. The counters §84 lists that nothing
+   * in this repository can yet measure stay `NaN`; `FrameStats` says which and
+   * why.
+   */
+  stats?: boolean;
+
+  /**
+   * Monotonic clock, **in seconds**, used only by the §84 statistics
+   * ({@link ApplicationOptions.stats}). Defaults to `performance.now()`
+   * divided by 1000; a host without `performance` measures nothing and the two
+   * durations read `NaN` rather than being filled from a non-monotonic
+   * `Date.now()` this repository bans outright (§33 — see
+   * `@four/diagnostics`' `createMonotonicClock`).
+   *
+   * Injected rather than reached for, the way `PointerInput` takes a
+   * `PointerSurface`: this class names no host object, so a test can measure a
+   * frame it controls (`now: () => t`), a profiler can supply its own timebase,
+   * and a worker or an exotic host is not a special case. Read at most twice
+   * per {@link Application.step}, and never at all when `stats` is off — so a
+   * clock with a cost (a syscall, a GPU query) is only paid for when its
+   * numbers are wanted.
+   *
+   * Seconds, like every other time in this engine (§7a, §9). A clock that
+   * reports milliseconds must divide.
+   */
+  now?: () => number;
 }
 
 /**
@@ -406,6 +458,44 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   readonly poses = new PoseBuffer();
 
+  /**
+   * §84's runtime statistics for the frame just stepped, or `null` when
+   * statistics are off — which is the default (A-1, 2026-08-07; A-6 recorded
+   * this member as absent until then).
+   *
+   * ```ts
+   * const app = new Application({ renderer, stats: true });
+   * // … a frame later …
+   * app.stats?.cpuFrameTime;   // seconds of CPU work in the last step
+   * app.stats?.drawCalls;      // what the backend actually submitted
+   * ```
+   *
+   * **One record, rewritten in place** every {@link Application.step} — the
+   * same discipline §9's `TimeState` follows, and for the same reason (plan D7:
+   * the loop allocates nothing per frame). Retaining a reference retains
+   * nothing; copy a frame's values with `copyFrameStats` from
+   * `@four/diagnostics`.
+   *
+   * **A field reading `NaN` was not measured this frame**, as distinct from a
+   * `0` that was measured. Five of §84's eleven counters have no producer
+   * anywhere in this repository (`gpuFrameTime`, `physicsStepTime`,
+   * `contacts`, `textureMemory`, `bufferMemory` — the last two pending §83
+   * ownership tracking), and a sixth, `activeBodies`, has one
+   * (`recordSolverStatistics`) that nothing *here* can call: this class owns no
+   * physics world, which is A-6's `app.physics`. Until it does, an application
+   * with a solver fills that field itself, from a fixed-step listener.
+   * {@link @four/diagnostics!FrameStats | FrameStats} documents each counter
+   * and what it waits on. `drawCalls`/`triangles`/`instances` are `NaN` with no
+   * renderer, or with a backend that does not report statistics, and `0` when a
+   * reporting backend drew nothing.
+   *
+   * What is deliberately *not* here: §10's fixed-step count, dropped time, and
+   * every §9 clock. They are on `app.time` already, and §84's list does not
+   * name them — a statistics block that re-published the time record would be
+   * two places to read one number.
+   */
+  readonly stats: FrameStats | null;
+
   /** Undoes {@link SystemRegistry.attachToScheduler}; run once, by `dispose`. */
   readonly #detachSystems: Detach;
 
@@ -437,6 +527,23 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     visited: 0,
     recomputed: 0,
   };
+
+  /**
+   * The record the renderer accumulates §84's draw counters into, or `null`
+   * when statistics are off or the backend does not report them (§61's
+   * optional `statistics` member).
+   *
+   * Built here as an object literal rather than with `@four/render`'s
+   * `createRenderStatistics()` for the reason the `Renderer` import is
+   * type-only (see the top of this file): the emitted JavaScript of the
+   * headless composition subpath must not pull in a render package, and the
+   * factory it would call is a three-field zero literal. `RenderStatistics` is
+   * imported as a *type*, so the shape is still pinned by the compiler.
+   */
+  readonly #renderStatistics: RenderStatistics | null = null;
+
+  /** {@link ApplicationOptions.now}; unread while statistics are off. */
+  readonly #now: () => number;
 
   /** Resolved once {@link Application.initialize} has completed. */
   #initialized = false;
@@ -477,6 +584,20 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // mutation with the frame loop (decision, WP-3.6).
       this.views.push(...options.views);
     }
+    this.#now = options.now ?? monotonicNowSeconds;
+    // §84 (A-1). One record for the application's lifetime, and — when the
+    // backend reports draw counters at all — one for the renderer to
+    // accumulate into. Assigning `renderer.statistics` reaches into an object
+    // this class does not own, which is why it happens **only** when the
+    // application was asked for statistics, and why `dispose` puts it back:
+    // ownership follows construction (§83), so the borrow is scoped to the
+    // application's life exactly as the renderer's initialization is.
+    this.stats = options.stats === true ? createFrameStats() : null;
+    const renderer = this.renderer;
+    if (this.stats !== null && renderer !== null && "statistics" in renderer) {
+      this.#renderStatistics = { drawCalls: 0, triangles: 0, instances: 0 };
+      renderer.statistics = this.#renderStatistics;
+    }
     this.#depthRange = options.depthRange;
     this.#poseInterpolation =
       options.poseInterpolation ?? this.renderer !== null;
@@ -506,8 +627,27 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     this.#detachSystems = this.systems.attachToScheduler(this.scheduler);
     const runSystems = this.scheduler.onFixedStep;
     this.scheduler.onFixedStep = (time) => {
-      runSystems?.(time);
-      this.emit("fixedUpdate", time);
+      // §84's `simulationTime`: wall-clock seconds spent inside the frame's
+      // fixed steps, summed over however many the accumulator runs. Measured
+      // around the *whole* step — systems and `fixedUpdate` listeners — because
+      // that is what the frame pays for simulating; the solver's own share is
+      // `physicsStepTime`, which only the solver can report (staged).
+      const stats = this.stats;
+      if (stats === null) {
+        runSystems?.(time);
+        this.emit("fixedUpdate", time);
+        return;
+      }
+      const started = this.#now();
+      try {
+        runSystems?.(time);
+        this.emit("fixedUpdate", time);
+      } finally {
+        // In a `finally` so a throwing system leaves the accumulator holding
+        // the time it really spent rather than losing the step entirely; the
+        // exception propagates unchanged.
+        stats.simulationTime += this.#now() - started;
+      }
     };
 
     this.scheduler.onUpdate = (time) => {
@@ -670,6 +810,12 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * what determinism (§33) and replay (§34) require. `elapsedSeconds` is real
    * (unscaled) time; `timeScale` and `paused` are applied by the scheduler.
    *
+   * With statistics on ({@link ApplicationOptions.stats}) this call is also
+   * §84's frame boundary: {@link Application.stats} is reset before the frame
+   * and finished after it, so it always describes the *last completed* step. A
+   * frame that throws records nothing — its numbers would describe half a
+   * frame, and half a frame's `drawCalls` is worse than no answer.
+   *
    * @throws FourError if the application is disposed, not initialized, not
    * running, or already inside a `step` (a nested step would advance one
    * `TimeState` re-entrantly and interleave two frames' events, which no
@@ -700,11 +846,34 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         { context: { method: "step", reentrant: true } },
       );
     }
+    const stats = this.stats;
+    let frameStarted = 0;
+    if (stats !== null) {
+      // §84's frame boundary (A-1). Everything goes back to "not measured"
+      // first, so a producer that does not run this frame cannot leave last
+      // frame's number standing; the two accumulators this class owns then
+      // seed themselves, because initializing a counter is the job of whoever
+      // is about to write it.
+      resetFrameStats(stats);
+      stats.simulationTime = 0;
+      if (this.#renderStatistics !== null) {
+        this.#renderStatistics.drawCalls = 0;
+        this.#renderStatistics.triangles = 0;
+        this.#renderStatistics.instances = 0;
+      }
+      frameStarted = this.#now();
+    }
     this.#stepping = true;
     try {
       this.scheduler.step(elapsedSeconds);
     } finally {
       this.#stepping = false;
+    }
+    if (stats !== null) {
+      if (this.#renderStatistics !== null) {
+        recordRenderStatistics(stats, this.#renderStatistics);
+      }
+      stats.cpuFrameTime = this.#now() - frameStarted;
     }
   }
 
@@ -869,6 +1038,21 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     }
     this.#disposed = true;
     this.#running = false;
+
+    // Give the renderer its `statistics` slot back (A-1). The renderer is not
+    // this application's to dispose (see below), and by the same rule the
+    // record this application lent it must not outlive the loan: a renderer
+    // shared with a second application, or kept for a later one, would
+    // otherwise go on accumulating into a record nobody reads. Cleared only
+    // when this application is the one that filled it.
+    const renderer = this.renderer;
+    if (
+      this.#renderStatistics !== null &&
+      renderer !== null &&
+      renderer.statistics === this.#renderStatistics
+    ) {
+      renderer.statistics = null;
+    }
 
     // Idempotent, and defensive about a foreign callback: `detach` only
     // restores what it replaced if nothing else has since taken over

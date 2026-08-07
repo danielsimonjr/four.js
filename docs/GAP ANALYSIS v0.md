@@ -197,6 +197,17 @@ Add to this wave the doc-only half of `PH-1` (correct `rigid-body.ts`'s header a
 
 ### A-1 — §84 runtime statistics (`app.stats.*`) do not exist
 
+> **CLOSED (measurable tier) 2026-08-07** — `app.stats` exists
+> (`ApplicationOptions.stats`, default off). `FrameStats` in `@four/diagnostics`
+> carries §84's **eleven** counters (this entry said twelve — the spec lists eleven);
+> `cpuFrameTime`, `simulationTime`, `drawCalls`, `triangles`, `instances` are measured,
+> `activeBodies` reachable via `recordSolverStatistics`. `gpuFrameTime`,
+> `physicsStepTime`, `contacts`, `textureMemory`, `bufferMemory` staged as
+> NaN-with-a-reason (A-5, A-6, §62 timestamp queries). Renderer counters arrive through
+> an optional §61 capability (presence is the capability), not a `render` out-param.
+> Stats-off is byte-identical in GL calls and allocation-free, proven. Unblocks A-5,
+> A-27, §119's overlay data. Kept for the record.
+
 **§84, §98 (`diagnostics`: "statistics, overlays, validation")** · **Severity: Critical** · **Effort: M** · **SILENT**
 
 _What exists:_ `@four/diagnostics` exports checksum, replay recorder/player/format, and debug-draw providers (`packages/diagnostics/src/index.ts`). `NullRenderer.renderCount`/`lastRenderRoot` (`packages/render/src/renderer.ts:488`) are test-double inspection fields, not statistics.

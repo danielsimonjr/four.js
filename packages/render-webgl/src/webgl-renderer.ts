@@ -47,6 +47,7 @@ import {
   isSpriteItem,
   type RenderItem,
   type RenderItemKind,
+  type RenderStatistics,
   type Renderer,
   type RendererCapabilities,
   type RendererEventMap,
@@ -456,6 +457,35 @@ function applyMaterialState(
 }
 
 /**
+ * Adds one *submitted* draw to §84's render counters (A-1, 2026-08-07).
+ *
+ * Called immediately after the GL draw entry point and only ever with a
+ * non-null record: the frame reads `this.statistics` once, and every call site
+ * is guarded by that one comparison, so a renderer with statistics off does not
+ * reach this function and issues exactly the GL sequence it always did.
+ *
+ * `vertexCount` is the draw's element count — vertices for `drawArrays`,
+ * indices for `drawElements` — which is the number GL divides by three either
+ * way. This backend has only two primitive modes (`gl-geometry.ts` maps §53's
+ * `"triangles"`/`"lines"` onto `GL.TRIANGLES`/`GL.LINES`), so anything that is
+ * not `TRIANGLES` contributes no triangles at all; `Math.floor` because a
+ * geometry whose count is not a multiple of three leaves GL a trailing partial
+ * primitive that it does not draw.
+ */
+function countDraw(
+  statistics: RenderStatistics,
+  mode: number,
+  vertexCount: number,
+  instances: number,
+): void {
+  statistics.drawCalls += 1;
+  statistics.instances += instances;
+  if (mode === GL.TRIANGLES) {
+    statistics.triangles += Math.floor(vertexCount / 3) * instances;
+  }
+}
+
+/**
  * §57's `opacity`, defaulted to 1 for a material that does not declare one —
  * a structurally-typed double or a consumer's own material type, exactly as in
  * {@link applyMaterialState}. A real `Material` always declares it, and rejects
@@ -774,6 +804,20 @@ function resolveRect(
  *   backend issued before render targets existed, which is the property the
  *   pixel goldens and the recorded-sequence tests both pin.
  *
+ * ## Statistics (§84; A-1, 2026-08-07)
+ *
+ * {@link WebglRenderer.statistics} is `null` by default and counts nothing.
+ * Assign a `RenderStatistics` record and this backend adds one entry per draw
+ * call it actually submits — `drawCalls`, `triangles` (per-instance count times
+ * instances, lines excluded), `instances` — accumulating across every `render`
+ * call until the record's owner clears it.
+ *
+ * The counters are integer increments *beside* the draw, never around it, and
+ * the field is read once per frame. Switching them on therefore adds, removes,
+ * and reorders nothing: the recorded-GL-sequence tests assert that a frame with
+ * statistics on issues the byte-identical call list of the same frame with them
+ * off, which is the property the pixel goldens rest on.
+ *
  * ## Context loss (§61)
  *
  * `webglcontextlost` is captured, defaulted-prevented (without which the
@@ -832,6 +876,22 @@ export class WebglRenderer implements Renderer {
    * for the `finally` that keeps it and the context in step.
    */
   readonly #glState = createGlState();
+
+  /**
+   * §84's render counters, or `null` (the default) to count nothing — the
+   * optional `Renderer` capability (A-1, 2026-08-07; see
+   * `@four/render`'s `statistics.ts`).
+   *
+   * This backend accumulates one entry per *submitted* draw call: a draw
+   * skipped for a geometry it could not allocate, a texture the application
+   * disposed, a zero-particle system, or a feedback loop on the current render
+   * target never reaches a counter, because it never reached the GPU.
+   *
+   * Assign it between frames. {@link WebglRenderer.render} reads the field once
+   * per call, so a record assigned from inside a frame's own listeners applies
+   * from the next frame.
+   */
+  statistics: RenderStatistics | null = null;
 
   #contextLost = false;
 
@@ -1102,6 +1162,12 @@ export class WebglRenderer implements Renderer {
     // This renderer's own state mirror, and the two frame-scoped bindings the
     // `finally` below has to see (F13, 2026-08-07).
     const state = this.#glState;
+    // §84's counters, read once for the frame (A-1, 2026-08-07): `null` is the
+    // default and the whole of the no-statistics cost — one comparison per
+    // draw, no allocation, and not a single GL call added, removed, or
+    // reordered. Read *after* the early returns above, so a frame this backend
+    // declines to draw counts nothing.
+    const statistics = this.statistics;
     // Whether a texture is bound to unit 0 — the sprite path binds one, and
     // since R-19 so does an unlit or lit draw whose material carries a `map`,
     // so a frame of particles and untextured geometry still has nothing to
@@ -1239,6 +1305,12 @@ export class WebglRenderer implements Renderer {
             particleBatches.upload(batch, item);
             gl.bindVertexArray(batch.vertexArray);
             gl.drawArraysInstanced(record.mode, 0, record.count, item.count);
+            if (statistics !== null) {
+              // One draw call, `item.count` instances of the shared quad — the
+              // §36 system's whole per-frame GPU cost, and the one place in
+              // this backend where `instances` exceeds `drawCalls`.
+              countDraw(statistics, record.mode, record.count, item.count);
+            }
             continue;
           }
 
@@ -1363,6 +1435,11 @@ export class WebglRenderer implements Renderer {
             gl.drawArrays(record.mode, 0, record.count);
           } else {
             gl.drawElements(record.mode, record.count, record.indexType, 0);
+          }
+          if (statistics !== null) {
+            // Sprite, lit, and unlit all land here: one draw call, one
+            // instance, `record.count` elements either way (§84).
+            countDraw(statistics, record.mode, record.count, 1);
           }
         }
       }

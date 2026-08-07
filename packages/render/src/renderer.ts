@@ -88,6 +88,7 @@ import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
 import type { RenderTarget } from "./render-target.js";
+import type { RenderStatistics } from "./statistics.js";
 
 /**
  * Which backend an implementation drives (§62).
@@ -332,6 +333,36 @@ export interface Renderer extends Disposable {
   readonly events: EventEmitter<RendererEventMap>;
 
   /**
+   * Where this backend accumulates §84's `drawCalls`, `triangles`, and
+   * `instances`, or `null` to count nothing (A-1, 2026-08-07).
+   *
+   * **Optional, and its presence is the capability.** §61's interface says
+   * nothing about statistics, and §84 asks the *application* for the counters —
+   * but only a backend knows what it actually submitted, so the numbers have to
+   * originate here. A backend that counts declares the member (the WebGL 2
+   * backend does); one that cannot omits it, and
+   * {@link supportsRenderStatistics} tells them apart so an application reports
+   * "not measured" rather than a confident zero.
+   *
+   * A backend that declares it owes three things, and nothing else:
+   *
+   * 1. **Accumulate, never clear** — a frame may be several `render` calls
+   *    (an off-screen pass, then the on-screen one) and §84's counters are the
+   *    frame's totals. The owner of the record clears it per frame.
+   * 2. **Count what was submitted**, not what was in the render list: a draw
+   *    skipped for a missing geometry, a disposed texture, or a feedback loop
+   *    did not happen.
+   * 3. **Change nothing else.** Switching statistics on must not add, remove,
+   *    or reorder a single GPU call — the counters are integer increments
+   *    beside the draw, never around it (see `statistics.ts`).
+   *
+   * ```ts
+   * renderer.statistics = createRenderStatistics();
+   * ```
+   */
+  statistics?: RenderStatistics | null;
+
+  /**
    * Acquires the backend's context or device (§61, §45).
    *
    * Asynchronous because WebGPU adapter/device acquisition is (§45's
@@ -550,6 +581,21 @@ export class NullRenderer implements Renderer {
 
   /** The §6b channel required by {@link Renderer}. Never emitted to by this class. */
   readonly events = new EventEmitter<RendererEventMap>();
+
+  /**
+   * §84's render counters (A-1). Declared, and **never written to** — this
+   * renderer submits no draw calls at all, so every frame's honest contribution
+   * to `drawCalls`, `triangles`, and `instances` is zero, and adding zero is
+   * writing nothing.
+   *
+   * Declaring it rather than omitting it is deliberate: it makes a headless
+   * application's statistics wiring assertable end to end
+   * ({@link supportsRenderStatistics} answers `true`, `app.stats.drawCalls`
+   * reads `0` rather than `NaN`), which is the same job every other recording
+   * field on this class does. A backend that genuinely *cannot* count is the
+   * case the optional member exists for; this one can, and the answer is zero.
+   */
+  statistics: RenderStatistics | null = null;
 
   /** Number of completed {@link NullRenderer.initialize} calls. */
   initializeCount = 0;

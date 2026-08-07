@@ -53,6 +53,15 @@ export type {
   ResizeRecord,
 } from "./renderer.js";
 export { NullRenderer } from "./renderer.js";
+export type {
+  RenderStatistics,
+  RenderStatisticsReporter,
+} from "./statistics.js";
+export {
+  createRenderStatistics,
+  resetRenderStatistics,
+  supportsRenderStatistics,
+} from "./statistics.js";
 export type { SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type { TextureSource } from "./texture.js";

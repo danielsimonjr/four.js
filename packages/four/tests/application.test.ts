@@ -1051,3 +1051,321 @@ describe("Application — resize (§45, §61, §47)", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// §84 runtime statistics (A-1, 2026-08-07).
+// ---------------------------------------------------------------------------
+
+/** A clock the test drives, in seconds (§7a). */
+class TestClock {
+  seconds = 0;
+
+  /** Every reading handed out, in call order. */
+  readonly readings: number[] = [];
+
+  readonly now = (): number => {
+    this.readings.push(this.seconds);
+    return this.seconds;
+  };
+
+  /** Advances the clock, as a frame's work would. */
+  advance(delta: number): void {
+    this.seconds += delta;
+  }
+}
+
+/**
+ * A renderer that reports §84 draw counters — a `NullRenderer` that counts as
+ * if it had drawn, which is the only way to assert the copy-back headlessly
+ * (the real counting is `@four/render-webgl`'s own test).
+ */
+class CountingRenderer extends NullRenderer {
+  /** Added to the assigned record on every `render` call. */
+  drawsPerFrame = 3;
+
+  override render(...args: Parameters<NullRenderer["render"]>): void {
+    super.render(...args);
+    const statistics = this.statistics;
+    if (statistics !== null) {
+      statistics.drawCalls += this.drawsPerFrame;
+      statistics.triangles += this.drawsPerFrame * 2;
+      statistics.instances += this.drawsPerFrame;
+    }
+  }
+}
+
+/** A backend that does not report statistics at all (§61's optional member). */
+class UncountingRenderer extends NullRenderer {
+  constructor() {
+    super();
+    // The capability is presence: a backend that cannot count omits the
+    // member, and `Application` must then report "not measured" rather than a
+    // confident zero.
+    delete (this as { statistics?: unknown }).statistics;
+  }
+}
+
+describe("Application — §84 statistics (A-1)", () => {
+  it("has no statistics by default", async () => {
+    const app = await startedApplication({ renderer: new NullRenderer() });
+    app.step(FIXED);
+    expect(app.stats).toBeNull();
+  });
+
+  it("never reads the clock while statistics are off", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ now: clock.now });
+    app.step(FIXED * 3);
+    expect(clock.readings).toEqual([]);
+  });
+
+  it("never assigns the renderer's record while statistics are off", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer });
+    app.step(FIXED);
+    expect(renderer.statistics).toBeNull();
+    expect(app.stats).toBeNull();
+  });
+
+  it("exposes §84's eleven counters once switched on", async () => {
+    const app = await startedApplication({ stats: true });
+    expect(Object.keys(app.stats ?? {})).toEqual([
+      "cpuFrameTime",
+      "gpuFrameTime",
+      "simulationTime",
+      "physicsStepTime",
+      "drawCalls",
+      "triangles",
+      "instances",
+      "activeBodies",
+      "contacts",
+      "textureMemory",
+      "bufferMemory",
+    ]);
+  });
+
+  it("measures cpuFrameTime in seconds across the whole step", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.on("render", () => {
+      clock.advance(0.004);
+    });
+    app.on("update", () => {
+      clock.advance(0.002);
+    });
+
+    app.step(FIXED);
+
+    expect(app.stats?.cpuFrameTime).toBeCloseTo(0.006, 12);
+  });
+
+  it("measures simulationTime as the seconds spent in the frame's fixed steps", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.on("fixedUpdate", () => {
+      clock.advance(0.001);
+    });
+    app.on("update", () => {
+      clock.advance(0.5);
+    });
+
+    // Three fixed steps' worth of elapsed time, one `update`.
+    app.step(FIXED * 3);
+
+    expect(app.stats?.simulationTime).toBeCloseTo(0.003, 12);
+    // …and the outer measurement still contains it plus the update's half
+    // second, which is what makes the two numbers different quantities.
+    expect(app.stats?.cpuFrameTime).toBeCloseTo(0.503, 12);
+  });
+
+  it("reports 0 simulation seconds for a frame that ran no fixed step", async () => {
+    const app = await startedApplication({ stats: true });
+    app.step(FIXED / 4);
+    expect(app.stats?.simulationTime).toBe(0);
+  });
+
+  it("reads the backend's draw counters back after the frame", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+
+    expect(app.stats?.drawCalls).toBe(3);
+    expect(app.stats?.triangles).toBe(6);
+    expect(app.stats?.instances).toBe(3);
+  });
+
+  it("clears the backend's record between frames, so counters are per-frame", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+    app.step(FIXED);
+
+    expect(renderer.renderCount).toBe(2);
+    expect(app.stats?.drawCalls).toBe(3);
+  });
+
+  it("reports 0 draws for a frame the renderer was not asked to draw", async () => {
+    // A counting backend with no viewport: `render` is never called, and
+    // "counted; nothing was drawn" is 0 — not `NaN`, which would mean nobody
+    // counted at all.
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+
+    app.step(FIXED);
+
+    expect(renderer.renderCount).toBe(0);
+    expect(app.stats?.drawCalls).toBe(0);
+  });
+
+  it("reports NaN for draws a headless application cannot have counted", async () => {
+    const app = await startedApplication({ stats: true });
+    app.step(FIXED);
+    expect(app.stats?.drawCalls).toBeNaN();
+    expect(app.stats?.triangles).toBeNaN();
+    expect(app.stats?.instances).toBeNaN();
+  });
+
+  it("reports NaN for a backend that does not report statistics", async () => {
+    const renderer = new UncountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+
+    expect(renderer.renderCount).toBe(1);
+    expect(app.stats?.drawCalls).toBeNaN();
+  });
+
+  it("leaves every staged counter unmeasured, frame after frame", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+    app.step(FIXED);
+
+    // The five §84 counters with no producer in this repository. They must read
+    // "not measured", not 0 — see `FrameStats` for what each one waits on.
+    expect(app.stats?.gpuFrameTime).toBeNaN();
+    expect(app.stats?.physicsStepTime).toBeNaN();
+    expect(app.stats?.activeBodies).toBeNaN();
+    expect(app.stats?.contacts).toBeNaN();
+    expect(app.stats?.textureMemory).toBeNaN();
+    expect(app.stats?.bufferMemory).toBeNaN();
+  });
+
+  it("rewrites one record in place rather than allocating per frame", async () => {
+    const app = await startedApplication({ stats: true });
+    const stats = app.stats;
+    app.step(FIXED);
+    const first = stats?.cpuFrameTime;
+    app.step(FIXED);
+    expect(app.stats).toBe(stats);
+    expect(typeof first).toBe("number");
+  });
+
+  it("describes the last completed frame, never a half-finished one", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.step(FIXED);
+    const measured = app.stats?.cpuFrameTime;
+    app.on("update", () => {
+      throw new Error("listener exploded");
+    });
+
+    expect(() => {
+      app.step(FIXED);
+    }).toThrow("listener exploded");
+
+    // The throwing frame wrote nothing back: `cpuFrameTime` was reset to "not
+    // measured" at the top of the step and never finished.
+    expect(app.stats?.cpuFrameTime).toBeNaN();
+    expect(typeof measured).toBe("number");
+  });
+
+  it("keeps the time a throwing fixed step really spent", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.on("fixedUpdate", () => {
+      clock.advance(0.002);
+      throw new Error("system exploded");
+    });
+
+    expect(() => {
+      app.step(FIXED);
+    }).toThrow("system exploded");
+
+    expect(app.stats?.simulationTime).toBeCloseTo(0.002, 12);
+  });
+
+  it("gives the renderer its statistics slot back on dispose (§83)", () => {
+    const renderer = new CountingRenderer();
+    const app = new Application({ renderer, stats: true });
+    expect(renderer.statistics).not.toBeNull();
+
+    app.dispose();
+
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("leaves a slot it did not fill alone", () => {
+    const renderer = new CountingRenderer();
+    const app = new Application({ renderer, stats: true });
+    const foreign = { drawCalls: 0, triangles: 0, instances: 0 };
+    renderer.statistics = foreign;
+
+    app.dispose();
+
+    // A second application — or the author's own profiler — took the slot
+    // after this one filled it; disposal must not steal it back.
+    expect(renderer.statistics).toBe(foreign);
+  });
+
+  it("does not touch the renderer's slot when statistics are off", () => {
+    const renderer = new CountingRenderer();
+    const foreign = { drawCalls: 0, triangles: 0, instances: 0 };
+    renderer.statistics = foreign;
+    const app = new Application({ renderer });
+
+    app.dispose();
+
+    expect(renderer.statistics).toBe(foreign);
+  });
+
+  it("changes nothing about the frame it measures (§33)", async () => {
+    // Determinism's own guard: two applications fed identical steps produce
+    // identical event traces and identical scene state whether or not one of
+    // them is being measured. A statistics option that moved a single number
+    // would break every §92 determinism suite.
+    const plain: string[] = [];
+    const measured: string[] = [];
+    const a = await startedApplication({ renderer: new NullRenderer() });
+    const b = await startedApplication({
+      renderer: new NullRenderer(),
+      stats: true,
+    });
+    traceEvents(a, plain);
+    traceEvents(b, measured);
+    const node = new Group();
+    a.scene.add(node);
+    const other = new Group();
+    b.scene.add(other);
+    node.transform.position.set(1, 2, 3);
+    other.transform.position.set(1, 2, 3);
+
+    for (const elapsed of [FIXED * 2.5, FIXED / 3, FIXED * 7]) {
+      a.step(elapsed);
+      b.step(elapsed);
+    }
+
+    expect(measured).toEqual(plain);
+    expect(copyTimeState(b.time)).toEqual(copyTimeState(a.time));
+    expect(other.transform.worldMatrix.elements).toEqual(
+      node.transform.worldMatrix.elements,
+    );
+  });
+});

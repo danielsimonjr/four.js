@@ -28,6 +28,24 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-1 §84 statistics.** Decisions worth keeping:
+  - **`NaN` means "not measured", `0` means "measured zero"** — the rule that let §84
+    ship before all its producers; staged counters are test-asserted to stay `NaN` so
+    none can quietly start reading 0.
+  - **Presence is the capability**: `Renderer.statistics` is optional; a backend that
+    cannot count omits the member instead of reporting zeros. **Backends accumulate,
+    owners clear** — a frame may be several `render` calls (off-screen + on-screen), so
+    totals only work if the backend never resets.
+  - `Date.now` is banned repo-wide (§33) → `createMonotonicClock` has **no fallback**; a
+    wall clock in diagnostics is not a §33 violation because nothing there feeds a
+    simulation. `FrameStats.simulationTime` is a **duration** (seconds inside the
+    frame's fixed steps), not §9's clock — one name, two quantities, settled by §84's
+    neighbouring fields.
+  - The renderer-counter transcription (`RenderStatisticsLike`) is the **fifth**
+    duck-typed contract; a `@four/render` test pins the real type against it.
+  - **Gotcha:** `four/application`'s runtime import of `@four/diagnostics` costs
+    ~0.4 kB gzip per example even with stats off — the first diagnostic that cannot
+    tree-shake; concrete motivation for A-4's `__FOUR_DEV__` define.
 - **2026-08-07 — R-4 render targets.** Decisions worth keeping:
   - **A render target is a CPU-side descriptor; the framebuffer is a backend cache** —
     third instance of the `GeometryCache`/`TextureCache` pattern, and why §61's

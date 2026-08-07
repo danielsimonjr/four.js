@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-1 closed (measurable tier): §84 runtime statistics
+
+#### Added
+
+- **§84 runtime statistics (gap A-1).** `@four/diagnostics` gains `FrameStats` — §84's
+  **eleven** counters (the gap entry said twelve; the spec lists eleven, pinned by a
+  test) — with `createFrameStats`/`resetFrameStats`/`copyFrameStats` (out-param),
+  `recordRenderStatistics`, `recordSolverStatistics`, and `createMonotonicClock`.
+  `@four/render` gains `RenderStatistics` and an **optional `Renderer.statistics`
+  capability — presence is the capability** (the `RendererCapabilities` stance applied
+  to counters; a backend that cannot count omits the member instead of reporting
+  zeros); `@four/render-webgl` counts the draw calls, triangles, and instances it
+  actually **submits** (a skipped geometry, disposed texture, zero-particle system, or
+  lost-context frame counts nothing). `Application` gains `stats: FrameStats | null`,
+  opt-in via `ApplicationOptions.stats` (default off) with an injectable `now` clock —
+  closing the `app.stats` slice of A-6. Renderer counters reach diagnostics through a
+  structural transcription (fifth duck-typed-contract instance), no §3.1 edge.
+- **A field reading `NaN` was not measured; `0` was measured zero** — the rule that let
+  §84 ship before all its producers: `gpuFrameTime` (§62 timestamp queries),
+  `physicsStepTime` + `contacts` (`PhysicsWorld.step`'s to report), `textureMemory` +
+  `bufferMemory` (A-5's ownership tracking) are staged as `NaN`-with-a-reason and
+  test-asserted to stay `NaN` so none can quietly start reading 0. `Date.now` is banned
+  repo-wide (§33), so the clock has **no fallback** — a host without `performance`
+  measures nothing rather than measuring badly.
+- **Statistics off is byte-identical in GL calls and allocation-free** — proven at unit
+  and application level (recorded-sequence equality, the F13/R-4 method's third
+  survival) plus determinism traces with stats on vs off. Cost when off: one `!== null`
+  per fixed step, frame, and draw. Honest size note: `Application`'s unconditional
+  references cost ~0.3–0.5 kB gzip per example bundle (ui-demo at 29.68/30 kB) — A-4's
+  `__FOUR_DEV__` define is the recorded fix.
+
 ### 2026-08-07 — R-4 closed: render targets, render-to-texture
 
 #### Added

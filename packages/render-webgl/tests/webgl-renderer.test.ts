@@ -44,7 +44,9 @@ import {
   RenderTarget,
   Renderable,
   Sprite,
+  createRenderStatistics,
   particleQuadGeometry,
+  type RenderStatistics,
   type LitRenderItem,
   type ParticleRenderItem,
   type RenderItem,
@@ -5768,5 +5770,215 @@ describe("WebglRenderer.initialize — the framebuffer entry points are required
     );
 
     expect(error.code).toBe("RENDERER_INITIALIZATION_FAILED");
+  });
+});
+
+describe("WebglRenderer.render — §84 statistics (A-1)", () => {
+  it("counts nothing at all until a record is assigned", async () => {
+    const { renderer, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(quadGeometry()), renderable(triangleGeometry()));
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("counts one draw call per submitted draw, with its triangles", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Two indexed triangles plus one unindexed one: 6 indices + 3 vertices.
+    root.add(renderable(quadGeometry()), renderable(triangleGeometry()));
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements") + gl.countOf("drawArrays")).toBe(2);
+    expect(statistics).toEqual({ drawCalls: 2, triangles: 3, instances: 2 });
+  });
+
+  it("counts an instanced particle draw once, with all of its instances", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(1000, 250);
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(particles.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+    // One call; 250 instances of the shared six-vertex quad = 500 triangles.
+    expect(statistics).toEqual({
+      drawCalls: 1,
+      triangles: 500,
+      instances: 250,
+    });
+  });
+
+  it("counts a lines geometry's draw but none of its vertices as triangles", async () => {
+    const { renderer, camera } = await initialized();
+    const lines = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
+      undefined,
+      "lines",
+    );
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(renderable(lines), [createView(camera)]);
+
+    expect(statistics).toEqual({ drawCalls: 1, triangles: 0, instances: 1 });
+  });
+
+  it("counts a draw per view, because each view submits its own", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(renderable(triangleGeometry()), [
+      createView(camera),
+      createView(camera, { id: "inset", x: 0.5, width: 0.5 }),
+    ]);
+
+    expect(statistics.drawCalls).toBe(2);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("accumulates across the render calls of one frame and never clears", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = renderable(triangleGeometry());
+    const views = [createView(camera)];
+
+    // §84's counters are frame totals, and an off-screen pass plus an on-screen
+    // pass is one frame: the backend adds, the owner of the record clears.
+    renderer.render(
+      root,
+      views,
+      undefined,
+      new RenderTarget({
+        width: 16,
+        height: 16,
+      }),
+    );
+    renderer.render(root, views);
+
+    expect(statistics).toEqual({ drawCalls: 2, triangles: 2, instances: 2 });
+  });
+
+  it("does not count a draw it skipped", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    // A sprite whose texture is disposed is skipped before its draw (§83), and
+    // a zero-particle system never reaches one either. Counting the render list
+    // instead of the submissions would report both.
+    const texture = new TestTexture();
+    texture.dispose();
+    const root = createRoot();
+    root.add(sprite(new TestSpriteMaterial(texture)));
+    const empty = new TestParticles(16, 0);
+
+    renderer.render(root, [createView(camera)]);
+    renderer.render(empty.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+    expect(statistics).toEqual({ drawCalls: 0, triangles: 0, instances: 0 });
+  });
+
+  it("counts nothing for a frame the context loss made this backend skip", async () => {
+    const { renderer, canvas, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    canvas.dispatch("webglcontextlost");
+
+    renderer.render(renderable(triangleGeometry()), [createView(camera)]);
+
+    expect(statistics).toEqual({ drawCalls: 0, triangles: 0, instances: 0 });
+  });
+
+  it("stops counting the moment the record is cleared", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = renderable(triangleGeometry());
+    const views = [createView(camera)];
+
+    renderer.render(root, views);
+    renderer.statistics = null;
+    renderer.render(root, views);
+
+    expect(statistics.drawCalls).toBe(1);
+  });
+
+  it("counts the draws of a frame that throws, up to the throw (F13)", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = createRoot();
+    const drawn = renderable(triangleGeometry());
+    drawn.renderOrder = 0;
+    const thrower = throwingRenderable();
+    thrower.renderOrder = 1;
+    root.add(drawn, thrower);
+
+    expect(() => {
+      renderer.render(root, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+
+    // The first draw really did reach the GPU; the second never did. A
+    // statistics record that unwound with the frame would under-report work the
+    // driver has already been given.
+    expect(statistics.drawCalls).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — statistics change no GL call (A-1)", () => {
+  /**
+   * The load-bearing regression guard for A-1, and the sibling of R-4's
+   * "no framebuffer call at all" test.
+   *
+   * §84's counters are a diagnostic; a diagnostic that changes the thing it
+   * measures is not one. Every pixel golden and every browser test rests on the
+   * frame with statistics *on* issuing the byte-identical GL call list — same
+   * names, same arguments, same order — as the frame with them off.
+   */
+  async function sequenceOf(statistics: RenderStatistics | null): Promise<{
+    names: string[];
+    calls: string;
+  }> {
+    const { renderer, gl, camera } = await initialized();
+    renderer.statistics = statistics;
+    // All four pipelines in one frame, so the comparison covers every draw
+    // site: indexed and unindexed unlit, a blended material, a sprite, and the
+    // instanced particle path.
+    const root = new TestGroup();
+    root.add(new TestParticles(64, 12));
+    root.addRenderables(
+      renderable(quadGeometry()),
+      stateful({ transparent: true }, [1, 0, 0, 0.5]),
+      sprite(),
+    );
+    gl.reset();
+    renderer.render(root.asNode, [createView(camera)]);
+    return {
+      names: gl.names(),
+      calls: JSON.stringify(gl.calls),
+    };
+  }
+
+  it("issues the identical call sequence with and without a record", async () => {
+    const without = await sequenceOf(null);
+    const statistics = createRenderStatistics();
+    const with_ = await sequenceOf(statistics);
+
+    expect(with_.names).toEqual(without.names);
+    expect(with_.calls).toBe(without.calls);
+    // …and the frame that was measured really did draw something, so the
+    // comparison above is not two empty lists agreeing.
+    expect(without.names).toContain("drawElements");
+    expect(statistics.drawCalls).toBeGreaterThan(0);
   });
 });

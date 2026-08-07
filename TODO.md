@@ -27,6 +27,19 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
+      eleven counters; opt-in, default off; byte-identical GL + allocation-free when
+      off). The A-6 `app.stats` slice is closed
+- [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
+      belongs to the packet that gives `Application` a physics world (A-6);
+      (b) `textureMemory`/`bufferMemory` ride on A-5's resource tracking;
+      (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
+      field; (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
+      bundles** — Application's unconditional stats references cost ~0.4 kB gzip per
+      example and ui-demo is at 29.68/30 kB (0.32 kB headroom); (e) `WorldTransformStats`
+      (visited/recomputed) is computed every frame and unexposed — deliberately, §84
+      does not name it
+
 - [x] **A-12 cheap tier DONE 2026-08-07:** `Toggle`, `Checkbox`, `RadioButton`,
       `Slider`, `ProgressIndicator`, `ImageWidget` — nine of §73's sixteen now ship.
       Follow-ups now recorded per blocker: menu/tooltip need a widget-reachable §9
