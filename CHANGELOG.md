@@ -8,6 +8,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-12 cheap tier closed: six new §73 controls
+
+#### Added
+
+- **Six §73 controls in `@four/ui` (gap A-12, the unblocked half)** — `Toggle`,
+  `Checkbox`, `RadioButton` (exclusive by **group name scoped to the tree**, the same
+  scope `focusedWidget` uses; enforced on the transition to checked only, never at
+  construction or attach, so a §79 document reloads exactly as saved), `Slider` (§72
+  pointer drag via `worldPoint` + inverse world matrix — what moves is a number, not the
+  transform, so `DragManager` was deliberately not used; §75 arrows/Home/End; clamp →
+  snap → step-back resolve rule), `ProgressIndicator`, and `ImageWidget` (named with the
+  suffix because `Image` is a browser global; the widget owns box + §79 `source` key,
+  the skin decodes and draws). Each ships complete: §72 pointer state, §75 keyboard
+  activation, a `WidgetSkin` hook, §79 node-type pair (`ui:toggle` … `ui:image`) from
+  `registerUISerializers`. **Nine of §73's sixteen controls now ship.**
+- **`WidgetStateSnapshot.checked`** (`boolean | null` — `null` for non-checkable
+  controls, ARIA's absent-vs-false distinction) and **`WidgetSkin.onContentChange`** (a
+  fifth hook for value/`indeterminate`/`source` changes — neither layout nor §75 state).
+  `UIWidget.captureState`/`publishState` are now `protected`; `Button.willActivate()` is
+  the pre-emit hook so `uiactivate` listeners read post-flip state (DOM order). All
+  additive.
+
+#### Changed
+
+- **`UI_STAGED[0]` narrowed** to the genuinely blocked names, each with its blocker:
+  text input (§56 selection/caret), scroll view + virtual list (§74 overflow + §67
+  clipping), embedded 3D viewport (§48), canvas view, menu + tooltip (a hover delay is a
+  §9 time reading widgets cannot reach), list (selection model + overflow).
+
 ### 2026-08-07 — R-35 closed: the §84/§113 debug overlay draws (+ review F7)
 
 #### Added

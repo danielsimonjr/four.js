@@ -25,6 +25,22 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Gap-closure wave 3 (2026-08-07) — in progress
+
+- [x] **A-12 cheap tier DONE 2026-08-07:** `Toggle`, `Checkbox`, `RadioButton`,
+      `Slider`, `ProgressIndicator`, `ImageWidget` — nine of §73's sixteen now ship.
+      Follow-ups now recorded per blocker: menu/tooltip need a widget-reachable §9
+      update hook; list/virtual list/scroll view need §74 overflow + §67 clipping; text
+      input needs §56 (S-6); embedded viewport needs §48; slider drag-past-the-track
+      needs §71's analytic drag plane
+- [x] **R-4 DONE 2026-08-07:** `RenderTarget` (@four/render) + `RenderTargetCache`
+      (@four/render-webgl), `Renderer.render(..., target?)`; render-to-texture through
+      the untouched `MaterialTexture` seam; no-target frames issue zero framebuffer
+      calls (byte-identical 449-call proof). **R-5 (§63 graph) and R-6 (§70 post-FX)
+      now unblocked.** Follow-ups: `Viewport.renderTarget` (needs @four/scene),
+      `readPixels` + `Rectangle2` in @four/math (§92 first consumer), stencil (R-7),
+      MRT/multisample/float formats, samplable depth (§69)
+
 ### Gap-closure wave 2 (2026-08-07) — in progress
 
 - [x] **A-23 DONE 2026-08-07** (§96): asset `maximumBytes`/`timeoutSeconds`,

@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-12 cheap tier (six §73 controls).** Decisions worth keeping:
+  - **Radio groups are names scoped to the tree** (the `focusedWidget` scope — one notion
+    of "the tree we're in"), enforced **on the transition to checked only**, never at
+    construction or attach — §79 documents reload exactly as saved (two radios authored
+    `checked: true` stay both-checked until one is re-checked; tested and documented).
+    Group-by-parent was rejected because wrapping radios in a layout `Panel` would
+    silently dissolve the group.
+  - **`Slider` owns its pointer math** (`worldPoint` + inverse world matrix), not
+    `DragManager` — §42: the slider's transform is layout-owned; what moves is a number.
+    Drag-past-the-track is staged on A-9's captured-pointer `worldPoint: null` decision.
+    `resolveValue` is clamp → snap → step-back-if-over-max (the `<input type=range>`
+    rule: a step that doesn't divide the range leaves the top unreachable).
+  - Checkedness is §75 _state_ on `WidgetStateSnapshot` (`checked: boolean | null`,
+    ARIA's absent-vs-false); values flow through `uivaluechange` + the new
+    `onContentChange` skin hook — neither layout nor state.
+  - `ImageWidget` carries the suffix because `Image` is a browser global that
+    `import { Image } from "@four/ui"` would shadow exactly where pictures load.
+  - Menu/tooltip staged honestly: a hover delay is a §9 time reading, and the §10 loop
+    that owns time lives above `@four/ui` — a tooltip built today would invent a clock.
 - **2026-08-07 — R-35 + F7 (diagnostics).** Decisions worth keeping:
   - `diagnostics → geometry` re-confirmed **absent** from the frozen §3.1 matrix; R-35
     closed by emitting `Float32Array`s whose field names (`positions`, `colors`) spread

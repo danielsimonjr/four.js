@@ -411,6 +411,14 @@ Bounding-volume only. `node.hitTestMode` does not exist. Recorded thoroughly at 
 
 ### A-12 — §73 ships 3 of 16 controls
 
+> **PARTIALLY CLOSED 2026-08-07** — the cheap tier shipped: `Toggle`, `Checkbox`,
+> `RadioButton` (group-by-name, enforced on transition so §79 stays faithful), `Slider`,
+> `ProgressIndicator`, `ImageWidget`, all serialized by `registerUISerializers`. Nine of
+> sixteen §73 controls ship. Still open behind stated blockers: text input (§56/S-6),
+> scroll view + virtual list (§74 + §67), embedded 3D viewport (§48), canvas view,
+> menu + tooltip (a per-frame §9 update hook widgets cannot reach), list.
+> `UI_STAGED[0]` no longer claims the shipped six.
+
 **§73** · **Severity: Medium** · **Effort: L** · **RECORDED (`UI_STAGED[0]`)**
 
 Ships `Panel`, `Label`, `Button`. Absent: toggle, checkbox, radio, slider, text input, scroll view, list, virtual list, image, progress indicator, menu, tooltip, canvas view, embedded 3D viewport. The staging note's claim — "each remaining control is a widget subclass over this same base and needs no new engine surface" — is true for toggle/checkbox/radio/progress/image, and **not true** for three of them: text input needs §56's selection and caret support (staged, S-6), scroll view needs §74 overflow and scroll extent (staged, `UI_STAGED[2]`) plus §67 clipping, and the embedded 3D viewport needs a §48 nested render surface. Recommend splitting the note so the cheap ten are separable from the three that are blocked.

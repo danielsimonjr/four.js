@@ -25,14 +25,30 @@ import {
   serializeScene,
 } from "@four/serialization";
 import { buildGlyphAtlas } from "@four/text";
-import { Button, Label, Panel } from "@four/ui";
+import {
+  Button,
+  Checkbox,
+  ImageWidget,
+  Label,
+  Panel,
+  ProgressIndicator,
+  RadioButton,
+  Slider,
+  Toggle,
+} from "@four/ui";
 import { describe, expect, it } from "vitest";
 
 import * as four from "../src/index.js";
 import {
   BUTTON_NODE_TYPE,
+  CHECKBOX_NODE_TYPE,
+  IMAGE_NODE_TYPE,
   LABEL_NODE_TYPE,
   PANEL_NODE_TYPE,
+  PROGRESS_NODE_TYPE,
+  RADIO_BUTTON_NODE_TYPE,
+  SLIDER_NODE_TYPE,
+  TOGGLE_NODE_TYPE,
   registerPhysicsSerializers,
   registerSceneNodeTypes,
   registerUISerializers,
@@ -195,6 +211,15 @@ describe("registerSceneNodeTypes — §73 widgets survive §79", () => {
     expect(io.write.nodeTypeOf(new Panel())).toBe(PANEL_NODE_TYPE);
     expect(io.write.nodeTypeOf(new Label())).toBe(LABEL_NODE_TYPE);
     expect(io.write.nodeTypeOf(new Button())).toBe(BUTTON_NODE_TYPE);
+    // The six §73 controls added 2026-08-07 (A-12).
+    expect(io.write.nodeTypeOf(new Toggle())).toBe(TOGGLE_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new Checkbox())).toBe(CHECKBOX_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new RadioButton())).toBe(RADIO_BUTTON_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new Slider())).toBe(SLIDER_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new ProgressIndicator())).toBe(
+      PROGRESS_NODE_TYPE,
+    );
+    expect(io.write.nodeTypeOf(new ImageWidget())).toBe(IMAGE_NODE_TYPE);
     // Exact class identity: a `Scene` is not this pair's business, and neither
     // is an application's own widget subclass.
     expect(io.write.nodeTypeOf(new Scene())).toBeUndefined();
@@ -265,6 +290,256 @@ describe("registerSceneNodeTypes — §73 widgets survive §79", () => {
     expect(reloaded.width).toBe(40);
     expect(reloaded.layoutType).toBe("absolute");
     expect(reloaded.accessibility).toBeNull();
+  });
+});
+
+/**
+ * The six §73 controls that shipped on 2026-08-07 (A-12). Each one adds state
+ * the base widget payload does not carry — checkedness, a group name, a range
+ * and its value, an image key — and §73's "UI objects … share serialization"
+ * only holds if that state survives the trip too.
+ */
+describe("registerSceneNodeTypes — the A-12 controls survive §79", () => {
+  /** One of each control, with every field moved off its default. */
+  function buildControls(): Panel {
+    const root = new Panel({
+      name: "settings",
+      layout: { type: "flex", direction: "column", gap: 4 },
+    });
+    root.add(
+      new Toggle({ name: "mute", checked: true, width: 40, height: 20 }),
+      new Checkbox({ name: "loop", checked: false, padding: 2 }),
+      new RadioButton({ name: "low", group: "quality" }),
+      new RadioButton({ name: "high", group: "quality", checked: true }),
+      new Slider({
+        name: "gravity",
+        min: -20,
+        max: 0,
+        step: 0.5,
+        value: -9.5,
+        orientation: "vertical",
+        width: 24,
+        height: 160,
+      }),
+      new ProgressIndicator({
+        name: "loading",
+        min: 0,
+        max: 200,
+        value: 50,
+        indeterminate: true,
+      }),
+      new ImageWidget({
+        name: "avatar",
+        source: "textures/avatar.png",
+        naturalWidth: 64,
+        naturalHeight: 48,
+      }),
+    );
+    return root;
+  }
+
+  it("round-trips every control's own state through JSON text", () => {
+    const io = registerSceneNodeTypes();
+    const root = buildControls();
+    root.layout();
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    ) as Panel;
+
+    const [mute, loop, low, high, gravity, loading, avatar] =
+      reloaded.children as [
+        Toggle,
+        Checkbox,
+        RadioButton,
+        RadioButton,
+        Slider,
+        ProgressIndicator,
+        ImageWidget,
+      ];
+
+    expect(mute).toBeInstanceOf(Toggle);
+    expect(mute.checked).toBe(true);
+    expect(mute.width).toBe(40);
+
+    expect(loop).toBeInstanceOf(Checkbox);
+    expect(loop.checked).toBe(false);
+    expect(loop.padding.top).toBe(2);
+
+    expect(low).toBeInstanceOf(RadioButton);
+    expect([low.group, low.checked]).toEqual(["quality", false]);
+    // Both members reload as they were saved — the group is not reconciled on
+    // the way in, which is what keeps a document faithful.
+    expect([high.group, high.checked]).toEqual(["quality", true]);
+
+    expect(gravity).toBeInstanceOf(Slider);
+    expect([gravity.min, gravity.max, gravity.step, gravity.value]).toEqual([
+      -20, 0, 0.5, -9.5,
+    ]);
+    expect(gravity.orientation).toBe("vertical");
+
+    expect(loading).toBeInstanceOf(ProgressIndicator);
+    expect([loading.min, loading.max, loading.value]).toEqual([0, 200, 50]);
+    expect(loading.indeterminate).toBe(true);
+
+    expect(avatar).toBeInstanceOf(ImageWidget);
+    expect(avatar.source).toBe("textures/avatar.png");
+    expect([avatar.naturalWidth, avatar.naturalHeight]).toEqual([64, 48]);
+  });
+
+  it("is textually idempotent, controls included", () => {
+    const io = registerSceneNodeTypes();
+    const root = buildControls();
+    root.layout();
+
+    const first = encodeSceneDocument(
+      serializeScene(root, io.components, io.write),
+    );
+    const second = encodeSceneDocument(
+      serializeScene(
+        instantiateScene(decodeSceneDocument(first), io.components, io.read),
+        io.components,
+        io.write,
+      ),
+    );
+
+    expect(second).toBe(first);
+  });
+
+  it("keeps a restored control live — the reload is a widget, not a record", () => {
+    const io = registerSceneNodeTypes();
+    const source = new Panel();
+    source.add(new Toggle({ checked: true }), new Slider({ max: 10, step: 1 }));
+
+    const reloaded = instantiateScene(
+      serializeScene(source, io.components, io.write),
+      io.components,
+      io.read,
+    );
+    const [toggle, slider] = reloaded.children as [Toggle, Slider];
+
+    toggle.activate();
+    slider.value = 4;
+
+    expect(toggle.checked).toBe(false);
+    expect(slider.value).toBe(4);
+  });
+});
+
+/**
+ * A §79 payload may come from a build that wrote less, wrote more, or wrote
+ * nonsense — and every one of these controls validates its inputs (§85) and
+ * throws. The reader therefore has to filter, or a single corrupted number
+ * would take down the whole scene instead of one field.
+ */
+describe("registerUISerializers — the A-12 controls read defensively", () => {
+  const io = registerUISerializers();
+
+  it("defaults a checkable payload that says nothing", () => {
+    for (const type of [
+      TOGGLE_NODE_TYPE,
+      CHECKBOX_NODE_TYPE,
+      RADIO_BUTTON_NODE_TYPE,
+    ]) {
+      const control = io.read.nodeFactory({
+        type,
+        data: { checked: "yes", group: 7 },
+      }) as Toggle;
+      expect(control.checked).toBe(false);
+    }
+    expect(
+      (io.read.nodeFactory({ type: RADIO_BUTTON_NODE_TYPE }) as RadioButton)
+        .group,
+    ).toBe("");
+  });
+
+  it("drops a range whose bounds contradict each other, keeping both defaults", () => {
+    const slider = io.read.nodeFactory({
+      type: SLIDER_NODE_TYPE,
+      data: { min: 10, max: 0, value: 5 },
+    }) as Slider;
+
+    expect([slider.min, slider.max]).toEqual([0, 1]);
+    // The value is still applied, resolved against the defaults it landed in.
+    expect(slider.value).toBe(1);
+  });
+
+  it("fills a half-written range from the class defaults", () => {
+    // `{ min: 5 }` alone would throw against the default maximum of 1, so the
+    // reader always passes both — and a pair that cannot be reconciled is
+    // dropped whole.
+    const wide = io.read.nodeFactory({
+      type: SLIDER_NODE_TYPE,
+      data: { max: 10 },
+    }) as Slider;
+    expect([wide.min, wide.max]).toEqual([0, 10]);
+
+    const raised = io.read.nodeFactory({
+      type: PROGRESS_NODE_TYPE,
+      data: { min: 5 },
+    }) as ProgressIndicator;
+    expect([raised.min, raised.max]).toEqual([0, 1]);
+  });
+
+  it("ignores a step, a value, and an orientation it cannot use", () => {
+    const slider = io.read.nodeFactory({
+      type: SLIDER_NODE_TYPE,
+      data: {
+        max: 10,
+        step: -2,
+        value: "half",
+        orientation: "diagonal",
+      },
+    }) as Slider;
+
+    expect(slider.step).toBe(0);
+    expect(slider.value).toBe(0);
+    expect(slider.orientation).toBe("horizontal");
+  });
+
+  it("ignores a non-finite number rather than throwing on the whole scene", () => {
+    const slider = io.read.nodeFactory({
+      type: SLIDER_NODE_TYPE,
+      data: { min: Number.NaN, max: Infinity, step: Number.NaN, value: 0.5 },
+    }) as Slider;
+
+    expect([slider.min, slider.max, slider.step, slider.value]).toEqual([
+      0, 1, 0, 0.5,
+    ]);
+  });
+
+  it("defaults a progress payload that says nothing usable", () => {
+    const progress = io.read.nodeFactory({
+      type: PROGRESS_NODE_TYPE,
+      data: { value: [], indeterminate: "maybe" },
+    }) as ProgressIndicator;
+
+    expect([progress.min, progress.max, progress.value]).toEqual([0, 1, 0]);
+    expect(progress.indeterminate).toBe(false);
+  });
+
+  it("ignores an image source and natural size it cannot use", () => {
+    const image = io.read.nodeFactory({
+      type: IMAGE_NODE_TYPE,
+      data: { source: 42, naturalWidth: -8, naturalHeight: "tall" },
+    }) as ImageWidget;
+
+    expect(image.source).toBeNull();
+    expect([image.naturalWidth, image.naturalHeight]).toEqual([0, 0]);
+  });
+
+  it("reads a layout record onto a control, which is a panel too", () => {
+    const slider = io.read.nodeFactory({
+      type: SLIDER_NODE_TYPE,
+      data: { layout: { type: "flex", direction: "column" } },
+    }) as Slider;
+
+    expect(slider.layoutType).toBe("flex");
+    expect(slider.direction).toBe("column");
   });
 });
 

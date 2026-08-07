@@ -27,6 +27,12 @@
  * A button is {@link UIWidget.focusable} by default (a panel is not) — it is a
  * control, and §75 asks for focus management over controls.
  *
+ * It is also the base of every §73 control whose gesture *is* a click:
+ * `Toggle`, `Checkbox`, and `RadioButton` are buttons that do something to
+ * themselves on the way through {@link Button.willActivate} (2026-08-07,
+ * A-12). `Slider` is deliberately not one — dragging a value is not a click,
+ * and a slider emits `uivaluechange`, never `uiactivate`.
+ *
  * ## Activation is exactly one event per click
  *
  * The `click` @four/input synthesizes is already the right predicate: a press
@@ -149,7 +155,27 @@ export class Button extends Panel {
     pointerEvent: ScenePointerEvent | null = null,
   ): boolean {
     if (this.disposed || this.disabled || !this.enabled) return false;
+    this.willActivate();
     this.emit("uiactivate", { widget: this, source, pointerEvent });
     return true;
+  }
+
+  /**
+   * Runs after this activation is accepted and **before** `uiactivate` is
+   * emitted; a no-op for a plain button (2026-08-07, A-12).
+   *
+   * The seam a control whose activation *means* something overrides — a
+   * `Toggle` flips its checkedness here, a `RadioButton` checks itself — so
+   * that a `uiactivate` listener reads the state the activation produced rather
+   * than the state it replaced. That is the DOM's order too: a checkbox's
+   * checkedness is already updated when the click handler runs.
+   *
+   * A hook rather than an `activate()` override so a subclass cannot get the
+   * refusal guards subtly wrong: whatever runs here has already passed
+   * "not disposed, not disabled, enabled", and a refused activation changes
+   * nothing at all.
+   */
+  protected willActivate(): void {
+    // A plain button's activation is the event and nothing else.
   }
 }

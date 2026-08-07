@@ -487,12 +487,14 @@ describe("the §72 interaction state machine", () => {
       pressed: false,
       focused: false,
       disabled: false,
+      checked: null,
     });
     expect(events[0].current).toEqual({
       hovered: true,
       pressed: false,
       focused: false,
       disabled: false,
+      checked: null,
     });
 
     dispatch("pointerup", widget); // not pressed — nothing changes
@@ -509,6 +511,7 @@ describe("the §72 interaction state machine", () => {
       pressed: false,
       focused: false,
       disabled: false,
+      checked: null,
     });
 
     dispatch("pointerleave", widget); // nothing left to clear
@@ -523,6 +526,8 @@ describe("the §72 interaction state machine", () => {
       pressed: false,
       focused: false,
       disabled: false,
+      // `null`, not `false`: a bare widget is not a checkable control (A-12).
+      checked: null,
     });
   });
 
@@ -729,7 +734,9 @@ describe("UI_STAGED (§73–§75)", () => {
   it("names every staged area with a dated note", () => {
     expect(UI_STAGED.length).toBeGreaterThan(0);
     for (const entry of UI_STAGED) {
-      expect(entry).toContain("2026-08-02");
+      // A date, not one fixed date: the §73 entry was narrowed on 2026-08-07
+      // (A-12) and carries both the original staging date and the narrowing.
+      expect(entry).toMatch(/2026-\d\d-\d\d/);
     }
     expect(Object.isFrozen(UI_STAGED)).toBe(true);
   });
@@ -750,5 +757,25 @@ describe("UI_STAGED (§73–§75)", () => {
     for (const entry of UI_STAGED) {
       expect(entry).not.toContain("keyboard navigation");
     }
+  });
+
+  it("no longer stages the six §73 controls that shipped (A-12)", () => {
+    // Same rule, applied to the controls half: toggle, checkbox, radio button,
+    // slider, progress indicator, and image are implemented, so the staging
+    // note must not still claim them. What it must still claim is the four
+    // names that are genuinely blocked, each with its blocker.
+    const text = UI_STAGED.join("\n");
+    // The pre-A-12 wording, which claimed all thirteen and promised that each
+    // "needs no new engine surface" — the second half of which was false for
+    // four of them.
+    expect(text).not.toContain("toggle, checkbox, radio control");
+    expect(text).not.toContain("needs no new engine surface");
+    expect(text).toContain("shipped beside panel, label, and button");
+    expect(text).toContain("text input");
+    expect(text).toContain("scroll view");
+    expect(text).toContain("§48 nested render surface");
+    expect(text).toContain("§56 selection and caret");
+    // Tooltip and menu are staged on the missing update hook, not on effort.
+    expect(text).toContain("per-frame update hook");
   });
 });

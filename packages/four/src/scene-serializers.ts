@@ -34,9 +34,12 @@
  *
  * ## What is covered, and what is deliberately not
  *
- * Covered: the three §73 widgets (`Panel`, `Label`, `Button`) with their §74
- * box model and layout, their interaction flags, and their §75 accessibility
- * record; `MotionComponent` (§11) and `KinematicController` (§12, added
+ * Covered: the nine §73 widgets — `Panel`, `Label`, `Button`, and, since
+ * 2026-08-07 (A-12), `Toggle`, `Checkbox`, `RadioButton`, `Slider`,
+ * `ProgressIndicator`, and `ImageWidget` — with their §74 box model and layout,
+ * their interaction flags, their §75 accessibility record, and whatever state
+ * each control adds (checkedness, a group name, a range and its value, an image
+ * key); `MotionComponent` (§11) and `KinematicController` (§12, added
  * 2026-08-07), through the serializers `@four/motion` itself exports; and
  * `RigidBody` and `Collider` (§23–§25), through the pair `@four/physics`
  * exports (`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, 2026-08-06 — the
@@ -94,9 +97,16 @@ import {
 import type { GlyphAtlas } from "@four/text";
 import {
   Button,
+  Checkbox,
+  ImageWidget,
   Label,
   Panel,
+  ProgressIndicator,
+  RadioButton,
+  Slider,
+  Toggle,
   UIWidget,
+  type CheckableWidget,
   type UIWidgetOptions,
   type WidgetAccessibility,
 } from "@four/ui";
@@ -109,6 +119,30 @@ export const LABEL_NODE_TYPE = "ui:label";
 
 /** The document `type` a {@link Button} serializes as. */
 export const BUTTON_NODE_TYPE = "ui:button";
+
+/** The document `type` a {@link Toggle} serializes as (2026-08-07, A-12). */
+export const TOGGLE_NODE_TYPE = "ui:toggle";
+
+/** The document `type` a {@link Checkbox} serializes as. */
+export const CHECKBOX_NODE_TYPE = "ui:checkbox";
+
+/** The document `type` a {@link RadioButton} serializes as. */
+export const RADIO_BUTTON_NODE_TYPE = "ui:radio";
+
+/** The document `type` a {@link Slider} serializes as. */
+export const SLIDER_NODE_TYPE = "ui:slider";
+
+/** The document `type` a {@link ProgressIndicator} serializes as. */
+export const PROGRESS_NODE_TYPE = "ui:progress";
+
+/**
+ * The document `type` an {@link ImageWidget} serializes as.
+ *
+ * `ui:image` — §73's own name for the control. The class carries a `Widget`
+ * suffix only because `Image` is a browser global; the document format has no
+ * such collision to avoid.
+ */
+export const IMAGE_NODE_TYPE = "ui:image";
 
 /** Options for {@link registerUISerializers} and {@link registerSceneNodeTypes}. */
 export interface SceneNodeTypeOptions {
@@ -174,6 +208,21 @@ function readNumber(value: JsonValue | undefined): number | undefined {
 
 function readBoolean(value: JsonValue | undefined): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
+}
+
+/**
+ * A **finite** number, or `undefined` (2026-08-07, A-12).
+ *
+ * The controls that carry a value validate their inputs (§85) and throw on
+ * anything else, so every number handed to one of their constructors below goes
+ * through this first: a hand-built or corrupted payload must restore a usable
+ * widget rather than take the whole scene down with it, which is the same
+ * tolerance the layout and label reads already apply.
+ */
+function readFinite(value: JsonValue | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 /**
@@ -385,10 +434,40 @@ function applyPanelData(panel: Panel, document: SceneNodeDocument): void {
   }
 }
 
+// --- the §73 controls that carry their own state (2026-08-07, A-12) ----------
+
+/** A checkable control's payload: a panel's, plus the one flag it adds. */
+function checkableDataJson(widget: CheckableWidget): Record<string, JsonValue> {
+  return { ...panelDataJson(widget), checked: widget.checked };
+}
+
+/**
+ * The bounds a ranged control (`Slider`, `ProgressIndicator`) restores.
+ *
+ * Both are always returned — filled in from the class defaults when the payload
+ * omits one — because the two are checked against each other at construction
+ * and a half-read pair is exactly what makes that check throw. A pair that
+ * contradicts itself is dropped **whole**: `{}` keeps both class defaults,
+ * which is a usable control, where applying one bound would move the other's
+ * meaning in a way the document never stated.
+ */
+function readBounds(
+  data: { readonly [key: string]: JsonValue },
+  defaultMin: number,
+  defaultMax: number,
+): { min: number; max: number } | Record<string, never> {
+  const min = readFinite(data.min) ?? defaultMin;
+  const max = readFinite(data.max) ?? defaultMax;
+  return max < min ? {} : { min, max };
+}
+
 // --- the pairs ---------------------------------------------------------------
 
 /**
- * The §73/§79 node-type pair for `Panel`, `Label`, and `Button` (A-14).
+ * The §73/§79 node-type pair for every widget class `@four/ui` ships — `Panel`,
+ * `Label`, `Button`, `Toggle`, `Checkbox`, `RadioButton`, `Slider`,
+ * `ProgressIndicator`, and `ImageWidget` (A-14; the six controls added
+ * 2026-08-07, A-12).
  *
  * Matched by **exact class identity**, exactly as `@four/serialization` matches
  * its own two: a subclass of `Button` is not a `Button` for this purpose, and
@@ -411,6 +490,12 @@ export function registerUISerializers(
         if (constructor === Button) return BUTTON_NODE_TYPE;
         if (constructor === Label) return LABEL_NODE_TYPE;
         if (constructor === Panel) return PANEL_NODE_TYPE;
+        if (constructor === Toggle) return TOGGLE_NODE_TYPE;
+        if (constructor === Checkbox) return CHECKBOX_NODE_TYPE;
+        if (constructor === RadioButton) return RADIO_BUTTON_NODE_TYPE;
+        if (constructor === Slider) return SLIDER_NODE_TYPE;
+        if (constructor === ProgressIndicator) return PROGRESS_NODE_TYPE;
+        if (constructor === ImageWidget) return IMAGE_NODE_TYPE;
         return undefined;
       },
       nodeDataOf: (node: Node): JsonValue | undefined => {
@@ -425,6 +510,43 @@ export function registerUISerializers(
             text: label.text,
             size: label.size,
             letterSpacing: label.letterSpacing,
+          };
+        }
+        if (constructor === Toggle || constructor === Checkbox) {
+          return checkableDataJson(node as CheckableWidget);
+        }
+        if (constructor === RadioButton) {
+          const radio = node as RadioButton;
+          return { ...checkableDataJson(radio), group: radio.group };
+        }
+        if (constructor === Slider) {
+          const slider = node as Slider;
+          return {
+            ...panelDataJson(slider),
+            min: slider.min,
+            max: slider.max,
+            step: slider.step,
+            value: slider.value,
+            orientation: slider.orientation,
+          };
+        }
+        if (constructor === ProgressIndicator) {
+          const progress = node as ProgressIndicator;
+          return {
+            ...panelDataJson(progress),
+            min: progress.min,
+            max: progress.max,
+            value: progress.value,
+            indeterminate: progress.indeterminate,
+          };
+        }
+        if (constructor === ImageWidget) {
+          const image = node as ImageWidget;
+          return {
+            ...widgetDataJson(image),
+            source: image.source,
+            naturalWidth: image.naturalWidth,
+            naturalHeight: image.naturalHeight,
           };
         }
         return undefined;
@@ -442,6 +564,75 @@ export function registerUISerializers(
           const panel = new Panel(widgetOptions);
           applyPanelData(panel, document);
           return panel;
+        }
+        if (
+          document.type === TOGGLE_NODE_TYPE ||
+          document.type === CHECKBOX_NODE_TYPE ||
+          document.type === RADIO_BUTTON_NODE_TYPE
+        ) {
+          const data = record(document.data);
+          const checked = readBoolean(data.checked) ?? false;
+          const options = { ...widgetOptions, checked };
+          let control: Panel;
+          if (document.type === TOGGLE_NODE_TYPE) {
+            control = new Toggle(options);
+          } else if (document.type === CHECKBOX_NODE_TYPE) {
+            control = new Checkbox(options);
+          } else {
+            // Restored through the constructor, so no group is reconciled on
+            // the way in: `RadioButton` enforces exclusivity on the transition
+            // to checked, precisely so a document reloads as it was saved.
+            control = new RadioButton({
+              ...options,
+              group: readString(data.group) ?? "",
+            });
+          }
+          applyPanelData(control, document);
+          return control;
+        }
+        if (document.type === SLIDER_NODE_TYPE) {
+          const data = record(document.data);
+          const step = readFinite(data.step);
+          const value = readFinite(data.value);
+          const orientation = readString(data.orientation);
+          const slider = new Slider({
+            ...widgetOptions,
+            ...readBounds(data, 0, 1),
+            ...(step !== undefined && step >= 0 ? { step } : {}),
+            ...(value !== undefined ? { value } : {}),
+            ...(orientation === "horizontal" || orientation === "vertical"
+              ? { orientation }
+              : {}),
+          });
+          applyPanelData(slider, document);
+          return slider;
+        }
+        if (document.type === PROGRESS_NODE_TYPE) {
+          const data = record(document.data);
+          const value = readFinite(data.value);
+          const progress = new ProgressIndicator({
+            ...widgetOptions,
+            ...readBounds(data, 0, 1),
+            ...(value !== undefined ? { value } : {}),
+            indeterminate: readBoolean(data.indeterminate) ?? false,
+          });
+          applyPanelData(progress, document);
+          return progress;
+        }
+        if (document.type === IMAGE_NODE_TYPE) {
+          const data = record(document.data);
+          const naturalWidth = readFinite(data.naturalWidth);
+          const naturalHeight = readFinite(data.naturalHeight);
+          return new ImageWidget({
+            ...widgetOptions,
+            source: readString(data.source) ?? null,
+            ...(naturalWidth !== undefined && naturalWidth >= 0
+              ? { naturalWidth }
+              : {}),
+            ...(naturalHeight !== undefined && naturalHeight >= 0
+              ? { naturalHeight }
+              : {}),
+          });
         }
         if (document.type === LABEL_NODE_TYPE) {
           const data = record(document.data);
