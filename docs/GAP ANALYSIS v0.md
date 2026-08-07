@@ -489,7 +489,7 @@ _Closure plan:_ ship `registerSceneNodeTypes()` from the umbrella `four` package
 
 ### A-17 — §79 restored node ids can collide with engine-assigned ids
 
-> **CLOSED 2026-08-06.** `NodeOptions.id` restores and _reserves_ an id at construction;
+> **CLOSED 2026-08-06.** `NodeOptions.id` restores and *reserves* an id at construction;
 > `restoreNodeId` moved into `@four/scene` (which owns the field) for the `nodeFactory` path;
 > `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.
 
@@ -1334,7 +1334,7 @@ Unreachable through `PhysicsWorld` today (its only `destroyCollider` call is ins
 > through `validateReplayRecording`, re-attached in `ReplayPlayer.#snapshotAt`.
 > `REPLAY_FORMAT_VERSION` is 2 with `SUPPORTED_REPLAY_FORMAT_VERSIONS = [1, 2]`; a document
 > declares the lowest version that can express it, so every version-1 recording still
-> validates _and re-encodes byte for byte_. `golden/phase10.json` was amended envelope-only
+> validates *and re-encodes byte for byte*. `golden/phase10.json` was amended envelope-only
 > (`recordingDigest`, `recordingLength`) with the neutralized-capture proof recorded in the
 > file — see `CHANGELOG.md`.
 
@@ -1515,12 +1515,6 @@ The setter (`rigid-body.ts:601-604`) validates mass and writes `#type` unconditi
 > `@four/physics`, `MOTION_COMPONENT_SERIALIZER` from `@four/motion`, registered via
 > `registerPhysicsSerializers()`/`registerSceneNodeTypes()`; the unregistered-component
 > silent drop became `unknownComponents: "throw" | "skip"` (A-15). Kept for the record.
-
-> **PARTIALLY CLOSED 2026-08-06.** `MOTION_COMPONENT_SERIALIZER` ships from `@four/motion`
-> against a structural `ComponentSerializerShape` (no new §3.1 edge), and unregistered
-> components are refused rather than silently dropped (A-15). **`RIGID_BODY_SERIALIZER` and
-> `COLLIDER_SERIALIZER` remain open** — they belong in `@four/physics`, which that change
-> could not touch; tracked in `TODO.md`.
 
 |                       |                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
