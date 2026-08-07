@@ -27,6 +27,15 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **PH-1 CLOSED 2026-08-07** (stage 1 truth table 2026-08-06; stage 2 live writes
+      2026-08-07): `SolverBodyTuningAccess` + step-top drain; mass/damping/gravity/CCD/
+      collider material/filter live on Rapier; `PhysicsWorld.teleport` ships
+- [ ] **PH-1 follow-ups:** (a) PH-5 (runtime collider add/remove) is now the only
+      blocker on a `Collider` appearing after registration — `refreshCollider` refuses
+      one loudly; (b) `Collider`'s six live fields could become accessors in a future
+      pass, removing the need for `refreshCollider` (deliberately not done — public-field
+      shape change, serialization risk); (c) live velocity writes on a dynamic body need
+      a §42-style "who wins" rule first
 - [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
       eleven counters; opt-in, default off; byte-identical GL + allocation-free when
       off). The A-6 `app.stats` slice is closed

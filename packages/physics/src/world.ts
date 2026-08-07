@@ -30,6 +30,9 @@
  *
  * ```text
  * 1. per body, in registration order:
+ *      queued §37 property changes → SolverBodyTuningAccess, then cleared
+ *        (§23 mass triple, damping, gravity scale, §31 mode; and each dirty
+ *         collider's §25 material and §24 filter — PH-1 stage 2)
  *      resetForces → the §26 command buffer → the §32 sleep command → clear
  *      kinematic bodies: setNextKinematicTransform / setBodyVelocities
  *        ("blended" nodes feed the PoseTarget instead of the transform, §19)
@@ -46,6 +49,12 @@
  *      destroy + queue "jointbreak" (plan P6-2)
  * 8. dispatchEvents() → §29 events on node emitters (§39 step 9, §6b)
  * ```
+ *
+ * The property changes at the top of step 1 come **before** the forces because
+ * a force applied in the same frame as a mass change should act on the new
+ * mass. A body nobody wrote to costs one integer comparison there and no solver
+ * call, which is why a quiet world's call sequence is exactly what it was
+ * before that line existed (§33).
  *
  * Step 7 comes after step 6 because a break is the engine's *conclusion* from
  * the solved step, not something that happened during it: the contacts of the
@@ -142,9 +151,14 @@ import type {
   PhysicsTuningCapabilities,
 } from "./adapter.js";
 import { resolveTuningCapabilities } from "./adapter.js";
-import type { SolverBodyAccess, SolverJointAccess } from "./body-access.js";
+import type {
+  SolverBodyAccess,
+  SolverBodyTuningAccess,
+  SolverJointAccess,
+} from "./body-access.js";
 import {
   missingSolverJointAccess,
+  supportsSolverBodyTuning,
   supportsSolverJointAccess,
 } from "./body-access.js";
 import { Collider } from "./collider.js";
@@ -175,8 +189,13 @@ import type {
 } from "./queries.js";
 import type { BlendWeights, RigidBodySleepEvent } from "./rigid-body.js";
 import {
+  RIGID_BODY_CCD_DIRTY,
+  RIGID_BODY_DAMPING_DIRTY,
+  RIGID_BODY_GRAVITY_SCALE_DIRTY,
+  RIGID_BODY_MASS_PROPERTIES_DIRTY,
   RigidBody,
   clearRigidBodyCommands,
+  drainRigidBodySolverWrites,
   setRigidBodyDerivedMass,
   setRigidBodyRegistered,
   setRigidBodySleeping,
@@ -418,6 +437,17 @@ interface ColliderRegistration {
   readonly handle: PhysicsColliderHandle;
   readonly id: number;
   readonly body: BodyRegistration;
+  /**
+   * Whether {@link PhysicsWorld.refreshCollider} has asked for this collider's
+   * §24/§25 properties to be re-read at the next fixed step (PH-1 stage 2).
+   *
+   * A flag on the *registration* and not on the component, unlike
+   * `RigidBody.pendingSolverWrites`: `Collider`'s material and filter are plain
+   * public fields with no setters to hook, so the request is explicit anyway —
+   * and an explicit request belongs to the world that will serve it rather than
+   * to a component that may be registered with another.
+   */
+  dirty: boolean;
 }
 
 /** One registered body and everything the per-step pipeline needs about it. */
@@ -533,6 +563,38 @@ export class PhysicsWorld {
    * when it declared nothing. See {@link PhysicsTuningCapabilities}.
    */
   readonly #tuning: PhysicsTuningCapabilities;
+
+  /**
+   * The adapter's §37 property-change seam, or `undefined` when it does not
+   * implement one (PH-1 stage 2, 2026-08-07).
+   *
+   * Resolved once, at construction, by `supportsSolverBodyTuning` — the same
+   * structural detection `#jointAccess` uses, and for the same reasons. It is
+   * what {@link PhysicsWorld.supportsLiveProperties} reports and what decides
+   * whether `RigidBody`'s setters queue a write or warn that it goes nowhere.
+   */
+  readonly #bodyTuning: SolverBodyTuningAccess | undefined;
+
+  /**
+   * How many registered colliders {@link PhysicsWorld.refreshCollider} has
+   * marked and no step has served yet.
+   *
+   * The whole reason it exists is that `0` — the value in every step of every
+   * world that never calls `refreshCollider` — lets the step skip the collider
+   * scan outright, so this feature adds one integer comparison per step and not
+   * one per collider (§33: the goldens must not move).
+   */
+  #dirtyColliderCount = 0;
+
+  /**
+   * Scratch for {@link PhysicsWorld.teleport}'s "keep the current rotation"
+   * path, which has to read the solver's pose before it writes one back (§7b,
+   * plan D7). Never escapes the method.
+   */
+  readonly #teleportPosition = new Vector3();
+
+  /** See {@link PhysicsWorld.#teleportPosition}. */
+  readonly #teleportRotation = new Quaternion();
 
   /**
    * Which accept-and-ignore warnings this world has already emitted, allocated
@@ -703,6 +765,9 @@ export class PhysicsWorld {
     this.#gravity = resolveGravity(init.dimension, init.gravity);
     this.#sleeping = resolveSleepingConfig(init.sleeping);
     this.#tuning = resolveTuningCapabilities(capabilities);
+    this.#bodyTuning = supportsSolverBodyTuning(init.adapter)
+      ? init.adapter
+      : undefined;
     this.#warnUnhonouredSleepThresholds();
     this.#determinism = determinism;
     this.#poses = init.poses;
@@ -938,6 +1003,7 @@ export class PhysicsWorld {
         handle: colliderHandle,
         id: this.#adapter.getColliderId(colliderHandle),
         body: registration,
+        dirty: false,
       };
       registration.colliders.push(colliderRegistration);
       this.#collidersById.set(colliderRegistration.id, colliderRegistration);
@@ -952,7 +1018,7 @@ export class PhysicsWorld {
         colliderRegistration,
       );
     }
-    setRigidBodyRegistered(body, true);
+    setRigidBodyRegistered(body, true, this.#bodyTuning !== undefined);
     if (tracked) {
       this.#poses?.track(node);
     }
@@ -1061,6 +1127,146 @@ export class PhysicsWorld {
    */
   getColliderHandle(collider: Collider): PhysicsColliderHandle | undefined {
     return this.#collidersByComponent.get(collider)?.handle;
+  }
+
+  // --- §37 property changes (PH-1 stage 2) ----------------------------------
+
+  /**
+   * Whether this world's adapter can carry a **property change** into its
+   * solver after `createBody` — the §37 seam `SolverBodyTuningAccess` (PH-1
+   * stage 2, 2026-08-07).
+   *
+   * Declared, not guessed, and answerable before anything is registered: a
+   * caller building a tuning UI can ask once and disable the sliders rather
+   * than discovering the limitation from a `console.warn` on the first drag.
+   * `false` does not make the writes illegal — `RigidBody`'s setters keep
+   * accepting them and keep warning once per body per field, and
+   * `removeBody` + `addBody` still rebuilds the solver body from the changed
+   * descriptor.
+   *
+   * The properties this covers are `rigid-body.ts`'s truth table plus
+   * {@link PhysicsWorld.refreshCollider}'s §24/§25 fields. It is deliberately
+   * one boolean and not six: see `supportsSolverBodyTuning`.
+   */
+  get supportsLiveProperties(): boolean {
+    return this.#bodyTuning !== undefined;
+  }
+
+  /**
+   * Re-reads a registered `Collider`'s §25 material and §24 filter at the next
+   * fixed step (PH-1 stage 2).
+   *
+   * ```ts
+   * ice.friction = 0.02;
+   * world.refreshCollider(ice); // …in force from the next step on
+   * ```
+   *
+   * ## Why a collider has to be *asked* and a body does not
+   *
+   * `RigidBody.mass` and its neighbours are accessors, so the component sees
+   * every write and queues it by itself. `Collider.friction`, `restitution`,
+   * `density`, `sensor`, `collisionGroups`, and `collisionMask` are plain
+   * public fields — §24 and §25 describe them as data — and a plain field
+   * assignment is unobservable. The alternatives were to shadow-copy six values
+   * per collider and diff them every step, which is real per-step cost for
+   * something that changes almost never, or to say so. This says so.
+   *
+   * Marking is idempotent, costs no allocation, and is served in ascending
+   * collider id within ascending body id (§33). A collider this world does not
+   * hold is **refused**, rather than silently doing nothing: passing the wrong
+   * one is the mistake this call exists to make visible.
+   *
+   * On an adapter without the §37 property seam
+   * ({@link PhysicsWorld.supportsLiveProperties} `false`) the request is
+   * accepted and consumed but reaches no solver; the collider's values still
+   * take effect on the next `removeBody` + `addBody`. Nothing is warned here —
+   * the world-level answer is a property a caller can read, and warning per
+   * collider would print once per collider in a scene-wide misconfiguration.
+   *
+   * @throws FourError if `collider` is not registered with this world (§24, §85)
+   */
+  refreshCollider(collider: Collider): void {
+    const registration = this.#collidersByComponent.get(collider);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        "That Collider is not registered with this PhysicsWorld, so there is nothing to refresh (§24, §37). A collider is registered when world.addBody scans its body's subtree; adding one afterwards is not yet supported.",
+        { context: { adapter: this.#adapter.name } },
+      );
+    }
+    if (registration.dirty) {
+      return;
+    }
+    registration.dirty = true;
+    this.#dirtyColliderCount += 1;
+  }
+
+  /**
+   * Moves a registered body to a new pose **without deriving the motion that
+   * got it there** — §37's "teleports", which had no stable-API route until now
+   * (PH-1 stage 2).
+   *
+   * ```ts
+   * world.teleport(player, spawnPoint); // rotation unchanged
+   * ```
+   *
+   * ## Teleport versus drive
+   *
+   * A teleport sets the pose and nothing else: velocities are untouched, and no
+   * contact response is derived for the swept volume, so a body teleported into
+   * a wall resolves the overlap from rest rather than arriving with the
+   * momentum of the jump. To *push* things on the way, drive a
+   * `"kinematic-position"` body by writing its node transform, which the
+   * kinematic feed turns into a target pose the solver interpolates towards
+   * (§22).
+   *
+   * ## Immediate, unlike §26's commands
+   *
+   * The write reaches the solver at the moment of the call, exactly as
+   * {@link PhysicsWorld.setBodyControlMode}'s does, because a teleport is a
+   * discrete authoring act with no accumulation to buffer and no meaning for
+   * "twice in one step" beyond "the last one wins". §6b's rule about not doing
+   * physics work during event dispatch is unaffected: this is not dispatch.
+   *
+   * The node's own transform is **not** written here. Under `"physics"`
+   * authority (§42) the publish pass writes it from the solver after the next
+   * step, which is the one writer §42 permits; writing it here as well would
+   * make this method a second author of the same transform.
+   *
+   * @param rotation the new orientation, or `undefined` to keep the current one
+   * @param wake whether to wake a sleeping body (§32), default `true`
+   * @throws FourError if `node` is not registered with this world (§85)
+   */
+  teleport(
+    node: Node,
+    position: Vector3Input,
+    rotation?: RotationInput,
+    wake = true,
+  ): void {
+    const registration = this.#bodiesByNode.get(node);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `Node ${node.id} is not registered with this PhysicsWorld, so there is no solver body to teleport (§37, §85). Call world.addBody(node) first.`,
+        { context: { node: node.id } },
+      );
+    }
+    const { handle } = registration;
+    if (rotation === undefined) {
+      this.#adapter.getBodyTransform(
+        handle,
+        this.#teleportPosition,
+        this.#teleportRotation,
+      );
+      this.#adapter.setBodyTransform(
+        handle,
+        position,
+        this.#teleportRotation,
+        wake,
+      );
+      return;
+    }
+    this.#adapter.setBodyTransform(handle, position, rotation, wake);
   }
 
   /**
@@ -1391,6 +1597,22 @@ export class PhysicsWorld {
    * fixed delta — the accumulator, the sub-step clamp, and `droppedTime` are
    * §10's business, not the world's. Nothing here reads a clock (§33).
    *
+   * ## §37's "property changes" go first (PH-1 stage 2, 2026-08-07)
+   *
+   * The scene→solver pass now opens with {@link PhysicsWorld.refreshCollider}'s
+   * and `RigidBody`'s pending property writes, ahead of §26's forces and the
+   * kinematic feed, so that a force applied in the same frame as a mass change
+   * acts on the new mass. The drain walks `#bodiesByNode`, which is registration
+   * order and therefore ascending solver id (ids are monotonic and a re-added
+   * body is appended), and each body's colliders in ascending id within it —
+   * §33's ordering rule, applied to a second stream of writes.
+   *
+   * A body nobody wrote to costs **one integer comparison and no solver call**,
+   * and a world in which `refreshCollider` was never called skips the collider
+   * scan entirely: a quiet world therefore issues exactly the solver-call
+   * sequence it issued before this seam existed, which is why no §33 golden
+   * moved.
+   *
    * Allocates nothing in steady state: the per-body loops write into the
    * components' and nodes' own vectors, and the event queue is reused unless the
    * step actually produced events.
@@ -1399,6 +1621,7 @@ export class PhysicsWorld {
     this.#requireReady();
     this.#lastStepDelta = deltaSeconds;
     for (const registration of this.#bodiesByNode.values()) {
+      this.#drainSolverWrites(registration);
       this.#applyCommands(registration);
       this.#feedKinematic(registration);
     }
@@ -2190,6 +2413,99 @@ export class PhysicsWorld {
   }
 
   /**
+   * Pushes one body's — and its colliders' — pending §37 property changes into
+   * the solver, then clears them (§23, §24, §25, §31; PH-1 stage 2,
+   * 2026-08-07).
+   *
+   * ## The two early exits are the feature
+   *
+   * `drainRigidBodySolverWrites` returns `0` for a body nobody wrote to, and
+   * {@link PhysicsWorld.#dirtyColliderCount} is `0` for a world nobody called
+   * {@link PhysicsWorld.refreshCollider} on. Both cases fall straight through
+   * without touching the adapter, which is the guarantee that turning this on
+   * changed no existing simulation: a world whose components were not written
+   * between steps makes exactly the solver calls it made before.
+   *
+   * The mask is drained **even when the adapter cannot serve it**, so a body
+   * whose writes were already reported as unreachable (the setters warn, see
+   * `rigid-body.ts`'s table) does not accumulate bits forever and then flush
+   * them all the moment it is registered with a world that can.
+   *
+   * ## What is pushed, and what deliberately is not
+   *
+   * §23's mass triple goes as one call and only when the mass is **authored** —
+   * a derived mass belongs to the colliders, and pushing it back would author
+   * it, which is exactly PH-4's laundering. `centerOfMass` and `inertiaTensor`
+   * ride along in whatever state they are in, since a solver sets the three
+   * together. The two dampings are one call. The §31 mode carries the authored
+   * prediction distance. Colliders re-present their *effective* §25
+   * coefficients — the collider's own field beats its `PhysicsMaterial`, and
+   * that precedence stays in `Collider`, never in an adapter — plus their §24
+   * filter; density is offered only for a body whose mass is collider-derived,
+   * because writing one into a body with an authored mass would silently
+   * replace it.
+   *
+   * Allocates nothing.
+   */
+  #drainSolverWrites(registration: BodyRegistration): void {
+    const tuning = this.#bodyTuning;
+    const { body, handle } = registration;
+    const pending = drainRigidBodySolverWrites(body);
+
+    if (pending !== 0 && tuning !== undefined) {
+      if ((pending & RIGID_BODY_MASS_PROPERTIES_DIRTY) !== 0) {
+        const mass = body.mass;
+        // `massAuthored` and not `mass !== undefined`: the getter falls back to
+        // the solver's own derived mass (§23), and re-authoring that is PH-4.
+        if (body.massAuthored && mass !== undefined) {
+          tuning.setBodyMassProperties(
+            handle,
+            mass,
+            body.centerOfMassAuthored ? body.centerOfMass : undefined,
+            body.inertiaTensor,
+          );
+        }
+      }
+      if ((pending & RIGID_BODY_DAMPING_DIRTY) !== 0) {
+        tuning.setBodyDamping(handle, body.linearDamping, body.angularDamping);
+      }
+      if ((pending & RIGID_BODY_GRAVITY_SCALE_DIRTY) !== 0) {
+        tuning.setBodyGravityScale(handle, body.gravityScale);
+      }
+      if ((pending & RIGID_BODY_CCD_DIRTY) !== 0) {
+        tuning.setBodyCcdMode(handle, body.ccdMode, body.ccdPredictionDistance);
+      }
+    }
+
+    if (this.#dirtyColliderCount === 0) {
+      return;
+    }
+    for (const colliderRegistration of registration.colliders) {
+      if (!colliderRegistration.dirty) {
+        continue;
+      }
+      colliderRegistration.dirty = false;
+      this.#dirtyColliderCount -= 1;
+      if (tuning === undefined) {
+        continue;
+      }
+      const { collider } = colliderRegistration;
+      tuning.setColliderMaterial(
+        colliderRegistration.handle,
+        collider.effectiveFriction,
+        collider.effectiveRestitution,
+        body.massAuthored ? undefined : collider.effectiveDensity,
+      );
+      tuning.setColliderFilter(
+        colliderRegistration.handle,
+        collider.sensor,
+        collider.collisionGroups,
+        collider.collisionMask,
+      );
+    }
+  }
+
+  /**
    * Drains one body's §26 command buffer into the solver and clears it (§26,
    * §32).
    *
@@ -2823,11 +3139,21 @@ export class PhysicsWorld {
     this.#adapter.destroyBody(registration.handle);
     for (let i = registration.colliders.length - 1; i >= 0; i -= 1) {
       const collider = registration.colliders[i];
+      // A refresh nobody served does not survive the collider it was asked for
+      // (PH-1 stage 2): leaving the count high would make every later step pay
+      // for a scan that can find nothing.
+      if (collider.dirty) {
+        this.#dirtyColliderCount -= 1;
+      }
       this.#collidersById.delete(collider.id);
       this.#collidersByComponent.delete(collider.collider);
     }
     registration.colliders.length = 0;
-    setRigidBodyRegistered(registration.body, false);
+    setRigidBodyRegistered(
+      registration.body,
+      false,
+      this.#bodyTuning !== undefined,
+    );
     if (registration.tracked) {
       this.#poses?.untrack(registration.node);
     }

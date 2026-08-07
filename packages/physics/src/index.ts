@@ -45,11 +45,14 @@ export {
 } from "./adapter.js";
 export type {
   SolverBodyAccess,
+  SolverBodyTuningAccess,
   SolverJointAccess,
   SolverJointMotor,
 } from "./body-access.js";
 export {
+  missingSolverBodyTuning,
   missingSolverJointAccess,
+  supportsSolverBodyTuning,
   supportsSolverJointAccess,
 } from "./body-access.js";
 export type {

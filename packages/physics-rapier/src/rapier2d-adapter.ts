@@ -91,6 +91,7 @@
 
 import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
+import type { Matrix3 } from "@four/math";
 import {
   ALL_COLLISION_GROUPS,
   DEFAULT_FRICTION,
@@ -116,6 +117,7 @@ import type {
   ContactPoint,
   JointDescriptor,
   ShippedJointType,
+  SolverBodyTuningAccess,
   SolverJointAccess,
   SolverJointMotor,
   OverlapHit,
@@ -680,7 +682,11 @@ export interface RapierBodyAccess {
  * `dispose` is idempotent and terminal.
  */
 export class Rapier2dAdapter
-  implements PhysicsSolverAdapter, RapierBodyAccess, SolverJointAccess
+  implements
+    PhysicsSolverAdapter,
+    RapierBodyAccess,
+    SolverBodyTuningAccess,
+    SolverJointAccess
 {
   /** §37 `name`. */
   readonly name: string = ADAPTER_NAME;
@@ -2104,6 +2110,207 @@ export class Rapier2dAdapter
     for (const record of this.#colliders.values()) {
       visit(record as unknown as PhysicsColliderHandle, record.id);
     }
+  }
+
+  // --------------------------------------------- §37 property changes (PH-1)
+
+  /**
+   * Replaces §23's mass triple on a live body —
+   * `SolverBodyTuningAccess.setBodyMassProperties` (PH-1 stage 2, 2026-08-07).
+   *
+   * ## It re-runs `createBody`'s mass-mode decision, deliberately
+   *
+   * `createBody` puts an authored mass in one of two places depending on what
+   * else was authored (`resolveMassMode`): a bare `mass` goes onto the body's
+   * **first collider** so Rapier still derives the centre and the inertia from
+   * the geometry, while a `mass` with a centre or a tensor goes onto the
+   * **body** as additional mass properties, with every collider zeroed out of
+   * the derivation. This method makes exactly the same choice from the same
+   * inputs and rewrites `BodyRecord.massMode`, so that `body.mass = 5` and
+   * `removeBody` + `addBody` with `mass: 5` leave Rapier in the same state —
+   * and so that a later `createCollider` or `destroyCollider` on this body
+   * keeps making the right call about who carries the mass.
+   *
+   * A body with **no colliders** takes the body branch whatever was authored:
+   * the first-collider branch would have nowhere to put the mass, and losing it
+   * silently is what §23 forbids.
+   *
+   * `recomputeMassPropertiesFromColliders()` runs last for the reason
+   * {@link Rapier2dAdapter.createBody} records: Rapier does not surface a mass
+   * change in `mass()` until the next step otherwise, which would make
+   * `getBodyMass` disagree with what was just written.
+   */
+  setBodyMassProperties(
+    handle: PhysicsBodyHandle,
+    mass: number,
+    centerOfMass: Vector3 | undefined,
+    inertiaTensor: Matrix3 | undefined,
+    wake = true,
+  ): void {
+    const record = this.#requireBody(handle);
+    const onBody =
+      centerOfMass !== undefined ||
+      inertiaTensor !== undefined ||
+      record.colliderIds.length === 0;
+
+    if (onBody) {
+      record.massMode = "body";
+      for (const colliderId of record.colliderIds) {
+        this.#colliders.get(colliderId)?.collider.setDensity(0);
+      }
+      record.body.setAdditionalMassProperties(
+        mass,
+        toRapierVector2(
+          "centerOfMass",
+          centerOfMass ?? this.#scratchVector3.set(0, 0, 0),
+          this.#scratchRapierA,
+        ),
+        // §23's last rule: in a `"2d"` world only the tensor's Z diagonal entry
+        // is used, which is `Matrix3.elements[8]` in the column-major layout.
+        inertiaTensor?.elements[8] ?? 0,
+        wake,
+      );
+    } else {
+      record.massMode = "first-collider";
+      // Clears whatever a previous `"body"` mode put on the body itself, so
+      // switching back does not leave two masses in the sum.
+      this.#scratchRapierA.x = 0;
+      this.#scratchRapierA.y = 0;
+      record.body.setAdditionalMassProperties(0, this.#scratchRapierA, 0, wake);
+      for (let i = 0; i < record.colliderIds.length; i += 1) {
+        const collider = this.#colliders.get(record.colliderIds[i])?.collider;
+        // Belt-and-braces, like `#forgetCollider`'s guards: `colliderIds` and
+        // `#colliders` are written and spliced together, so an id in the list
+        // always resolves.
+        if (collider === undefined) {
+          continue;
+        }
+        if (i === 0) {
+          collider.setMass(mass);
+        } else {
+          collider.setDensity(0);
+        }
+      }
+    }
+
+    record.explicitMass = mass;
+    record.body.recomputeMassPropertiesFromColliders();
+  }
+
+  /** @inheritDoc */
+  setBodyDamping(
+    handle: PhysicsBodyHandle,
+    linear: number,
+    angular: number,
+  ): void {
+    const record = this.#requireBody(handle);
+    record.body.setLinearDamping(linear);
+    record.body.setAngularDamping(angular);
+  }
+
+  /** @inheritDoc */
+  setBodyGravityScale(
+    handle: PhysicsBodyHandle,
+    scale: number,
+    wake = true,
+  ): void {
+    this.#requireBody(handle).body.setGravityScale(scale, wake);
+  }
+
+  /**
+   * Selects §31's method on a live body —
+   * `SolverBodyTuningAccess.setBodyCcdMode`.
+   *
+   * The two Rapier switches are independent (`enableCcd` for swept CCD,
+   * `setSoftCcdPrediction` for the speculative kind), so each mode sets one and
+   * clears the other; a prediction distance of `0` is how Rapier expresses "no
+   * soft CCD", which is what {@link Rapier2dAdapter.getBodyCcdMode} reads back.
+   * That round trip is what makes `"disabled"` genuinely reversible rather than
+   * leaving a body speculatively swept forever.
+   */
+  setBodyCcdMode(
+    handle: PhysicsBodyHandle,
+    mode: CCDMode,
+    predictionDistance?: number,
+  ): void {
+    const body = this.#requireBody(handle).body;
+    body.enableCcd(mode === "swept");
+    body.setSoftCcdPrediction(
+      mode === "speculative"
+        ? (predictionDistance ?? SOFT_CCD_PREDICTION_DISTANCE)
+        : 0,
+    );
+  }
+
+  /**
+   * Replaces a collider's §25 surface properties —
+   * `SolverBodyTuningAccess.setColliderMaterial`.
+   *
+   * `friction` and `restitution` arrive already resolved by the engine (the
+   * collider's own field beats its `PhysicsMaterial`), so this is two Rapier
+   * setters and no precedence logic. The combine rules set at `createCollider`
+   * are left alone: they are §25 engine policy, not a per-collider property.
+   *
+   * `density` is `undefined` for a body whose mass was authored, and then the
+   * collider's mass contribution is left exactly as `createCollider` and
+   * {@link Rapier2dAdapter.setBodyMassProperties} arranged it — writing a
+   * density there would silently un-author the body's mass. When it is defined
+   * the body's derived mass is recomputed straight away, so `getBodyMass` never
+   * reports a figure that is one step stale.
+   */
+  setColliderMaterial(
+    handle: PhysicsColliderHandle,
+    friction: number,
+    restitution: number,
+    density: number | undefined,
+  ): void {
+    const record = this.#requireCollider(handle);
+    record.collider.setFriction(friction);
+    record.collider.setRestitution(restitution);
+    if (density !== undefined) {
+      record.collider.setDensity(density);
+      this.#bodies
+        .get(record.bodyId)
+        ?.body.recomputeMassPropertiesFromColliders();
+    }
+  }
+
+  /**
+   * Replaces a collider's §24 participation —
+   * `SolverBodyTuningAccess.setColliderFilter`.
+   *
+   * `ActiveCollisionTypes.ALL` is set when a collider **becomes** a sensor, for
+   * the reason `createCollider` records: Rapier's `DEFAULT` excludes
+   * kinematic-versus-fixed, so a fixed sensor would see nothing from a
+   * kinematic body. It is not cleared again when a sensor becomes a solid
+   * collider — widening which pairs are considered changes no §29 event that a
+   * narrower set would have produced, while narrowing it mid-run could drop a
+   * pair the engine is already tracking.
+   *
+   * A pair that is **already touching** when the sensor flag flips keeps the
+   * classification it was opened with until the two separate: §29's
+   * `collisionend` and `triggerexit` must name the same event the matching
+   * `…start` did, and re-labelling an open pair would emit one without the
+   * other.
+   */
+  setColliderFilter(
+    handle: PhysicsColliderHandle,
+    sensor: boolean,
+    collisionGroups: number,
+    collisionMask: number,
+  ): void {
+    const rapier = this.#requireRapier();
+    const record = this.#requireCollider(handle);
+    if (sensor && !record.sensor) {
+      record.collider.setActiveCollisionTypes(rapier.ActiveCollisionTypes.ALL);
+    }
+    record.collider.setSensor(sensor);
+    record.collider.setCollisionGroups(
+      packInteractionGroups(collisionGroups, collisionMask),
+    );
+    record.sensor = sensor;
+    record.collisionGroups = collisionGroups;
+    record.collisionMask = collisionMask;
   }
 
   // ------------------------------------------------------- §28 joint accessors

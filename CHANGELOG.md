@@ -8,6 +8,48 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — PH-1 stage 2: §37 property changes reach the solver
+
+#### Added
+
+- **`SolverBodyTuningAccess` (`@four/physics`)** — the §37 seam for post-registration
+  property changes: `setBodyMassProperties`, `setBodyDamping`, `setBodyGravityScale`,
+  `setBodyCcdMode`, `setColliderMaterial`, `setColliderFilter`. Optional and
+  **structurally detected** (`supportsSolverBodyTuning` / `missingSolverBodyTuning`),
+  **all-or-nothing** across the six methods, on the `SolverJointAccess` precedent —
+  `PhysicsCapabilities` stays frozen and an adapter implementing none of it is still a
+  legal `PhysicsWorldAdapter`. Both Rapier adapters implement all six (the live mass
+  write re-runs `resolveMassMode` and rewrites `BodyRecord.massMode`, so a live `mass`
+  and a re-registration converge and PH-3's heir logic keeps working).
+- **`PhysicsWorld.supportsLiveProperties`** (readable before registration — a tuning UI
+  can disable sliders instead of learning from a warn), **`refreshCollider(collider)`**
+  (explicit by design — §24/§25 fields are plain public data that cannot be
+  intercepted), **`teleport(node, position, rotation?, wake?)`** (§37's "teleports"
+  finally has a stable-API route), **`RigidBody.markMassPropertiesChanged()`**,
+  **`pendingSolverWrites`** (a bit set — §23's triple is one bit, the damping pair one),
+  **`liveSolverWriteWorldCount`** (a body in two worlds where one can't carry the write
+  still warns, because that is the truth).
+
+#### Fixed
+
+- **`mass`, `linearDamping`, `angularDamping`, `gravityScale`, and `ccdMode` written
+  after `world.addBody` now reach the solver** at the top of the next fixed step —
+  before commands and kinematic feed, so a force applied the same frame as a mass change
+  acts on the new mass — and a `Collider`'s §25 material / §24 filter does too via
+  `refreshCollider`. The `rigid-body.ts` truth table is now a two-column table (adapter
+  with seam / without), dated; warn-once machinery stays exactly where a write is still
+  unreachable. `mass = undefined` is documented as **permanently** unreachable (not
+  staged): un-authoring means restoring collider densities only the registration path
+  holds.
+
+#### Changed
+
+- Determinism: the drain walks ascending body id, ascending collider id within a body,
+  seam-declaration order per body; draining clears, so a body in two worlds hands its
+  writes to whichever steps first (§26's command-buffer semantics). **A quiet world makes
+  no extra solver call** — asserted by deep-equalling adapter call sequences — so every
+  §33 golden is byte-identical.
+
 ### 2026-08-07 — A-1 closed (measurable tier): §84 runtime statistics
 
 #### Added

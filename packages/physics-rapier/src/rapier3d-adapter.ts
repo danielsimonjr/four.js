@@ -199,6 +199,7 @@
 
 import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
+import type { Matrix3 } from "@four/math";
 import {
   ALL_COLLISION_GROUPS,
   DEFAULT_FRICTION,
@@ -245,6 +246,7 @@ import type {
   ShapeCastQuery,
   ShippedJointType,
   SleepingConfig,
+  SolverBodyTuningAccess,
   SolverJointAccess,
   SolverJointMotor,
   Vector3Input,
@@ -762,7 +764,11 @@ interface SnapshotMeta {
  * `dispose` is idempotent and terminal.
  */
 export class Rapier3dAdapter
-  implements PhysicsSolverAdapter, RapierBodyAccess, SolverJointAccess
+  implements
+    PhysicsSolverAdapter,
+    RapierBodyAccess,
+    SolverBodyTuningAccess,
+    SolverJointAccess
 {
   /** §37 `name`. */
   readonly name: string = ADAPTER_NAME;
@@ -2160,6 +2166,178 @@ export class Rapier3dAdapter
     for (const record of this.#colliders.values()) {
       visit(record as unknown as PhysicsColliderHandle, record.id);
     }
+  }
+
+  // --------------------------------------------- §37 property changes (PH-1)
+
+  /**
+   * Replaces §23's mass triple on a live body —
+   * `SolverBodyTuningAccess.setBodyMassProperties` (PH-1 stage 2, 2026-08-07).
+   *
+   * The rule, the mass-mode rewrite, and the trailing
+   * `recomputeMassPropertiesFromColliders()` are the 2D adapter's, verbatim:
+   * see {@link Rapier2dAdapter.setBodyMassProperties}. What differs is 3D's
+   * shape of the distribution — a principal-inertia **vector** plus a frame,
+   * which is why `toPrincipalInertia3d` refuses a tensor with off-diagonal
+   * terms here and `elements[8]` suffices there (§23, §37).
+   */
+  setBodyMassProperties(
+    handle: PhysicsBodyHandle,
+    mass: number,
+    centerOfMass: Vector3 | undefined,
+    inertiaTensor: Matrix3 | undefined,
+    wake = true,
+  ): void {
+    const record = this.#requireBody(handle);
+    const onBody =
+      centerOfMass !== undefined ||
+      inertiaTensor !== undefined ||
+      record.colliderIds.length === 0;
+
+    const principalInertia = this.#scratchRapierB;
+    if (onBody) {
+      record.massMode = "body";
+      for (const colliderId of record.colliderIds) {
+        this.#colliders.get(colliderId)?.collider.setDensity(0);
+      }
+      if (inertiaTensor === undefined) {
+        principalInertia.x = 0;
+        principalInertia.y = 0;
+        principalInertia.z = 0;
+      } else {
+        toPrincipalInertia3d(inertiaTensor, principalInertia);
+      }
+      record.body.setAdditionalMassProperties(
+        mass,
+        toRapierVector3(
+          "centerOfMass",
+          centerOfMass ?? this.#scratchVector3.set(0, 0, 0),
+          this.#scratchRapierA,
+        ),
+        principalInertia,
+        IDENTITY_INERTIA_FRAME,
+        wake,
+      );
+    } else {
+      record.massMode = "first-collider";
+      // Clears whatever a previous `"body"` mode put on the body itself.
+      this.#scratchRapierA.x = 0;
+      this.#scratchRapierA.y = 0;
+      this.#scratchRapierA.z = 0;
+      principalInertia.x = 0;
+      principalInertia.y = 0;
+      principalInertia.z = 0;
+      record.body.setAdditionalMassProperties(
+        0,
+        this.#scratchRapierA,
+        principalInertia,
+        IDENTITY_INERTIA_FRAME,
+        wake,
+      );
+      for (let i = 0; i < record.colliderIds.length; i += 1) {
+        const collider = this.#colliders.get(record.colliderIds[i])?.collider;
+        // Belt-and-braces, like `#forgetCollider`'s guards: `colliderIds` and
+        // `#colliders` are written and spliced together, so an id in the list
+        // always resolves.
+        if (collider === undefined) {
+          continue;
+        }
+        if (i === 0) {
+          collider.setMass(mass);
+        } else {
+          collider.setDensity(0);
+        }
+      }
+    }
+
+    record.explicitMass = mass;
+    record.body.recomputeMassPropertiesFromColliders();
+  }
+
+  /** @inheritDoc */
+  setBodyDamping(
+    handle: PhysicsBodyHandle,
+    linear: number,
+    angular: number,
+  ): void {
+    const record = this.#requireBody(handle);
+    record.body.setLinearDamping(linear);
+    record.body.setAngularDamping(angular);
+  }
+
+  /** @inheritDoc */
+  setBodyGravityScale(
+    handle: PhysicsBodyHandle,
+    scale: number,
+    wake = true,
+  ): void {
+    this.#requireBody(handle).body.setGravityScale(scale, wake);
+  }
+
+  /**
+   * Selects §31's method on a live body — the 2D adapter's rule and its
+   * reversibility argument unchanged; see
+   * {@link Rapier2dAdapter.setBodyCcdMode}.
+   */
+  setBodyCcdMode(
+    handle: PhysicsBodyHandle,
+    mode: CCDMode,
+    predictionDistance?: number,
+  ): void {
+    const body = this.#requireBody(handle).body;
+    body.enableCcd(mode === "swept");
+    body.setSoftCcdPrediction(
+      mode === "speculative"
+        ? (predictionDistance ?? SOFT_CCD_PREDICTION_DISTANCE)
+        : 0,
+    );
+  }
+
+  /**
+   * Replaces a collider's §25 surface properties — see
+   * {@link Rapier2dAdapter.setColliderMaterial} for why `density` is optional
+   * and what an `undefined` one protects.
+   */
+  setColliderMaterial(
+    handle: PhysicsColliderHandle,
+    friction: number,
+    restitution: number,
+    density: number | undefined,
+  ): void {
+    const record = this.#requireCollider(handle);
+    record.collider.setFriction(friction);
+    record.collider.setRestitution(restitution);
+    if (density !== undefined) {
+      record.collider.setDensity(density);
+      this.#bodies
+        .get(record.bodyId)
+        ?.body.recomputeMassPropertiesFromColliders();
+    }
+  }
+
+  /**
+   * Replaces a collider's §24 participation — see
+   * {@link Rapier2dAdapter.setColliderFilter} for the `ActiveCollisionTypes`
+   * widening and for what happens to a pair that is already touching.
+   */
+  setColliderFilter(
+    handle: PhysicsColliderHandle,
+    sensor: boolean,
+    collisionGroups: number,
+    collisionMask: number,
+  ): void {
+    const rapier = this.#requireRapier();
+    const record = this.#requireCollider(handle);
+    if (sensor && !record.sensor) {
+      record.collider.setActiveCollisionTypes(rapier.ActiveCollisionTypes.ALL);
+    }
+    record.collider.setSensor(sensor);
+    record.collider.setCollisionGroups(
+      packInteractionGroups3d(collisionGroups, collisionMask),
+    );
+    record.sensor = sensor;
+    record.collisionGroups = collisionGroups;
+    record.collisionMask = collisionMask;
   }
 
   // ----------------------------------------------------------- joint accessors

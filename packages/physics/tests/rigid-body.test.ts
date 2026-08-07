@@ -941,7 +941,7 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
   /** A registered dynamic body: the state the drift warnings are gated on. */
   function registeredBody(): RigidBody {
     const body = dynamicBody();
-    setRigidBodyRegistered(body, true);
+    setRigidBodyRegistered(body, true, false);
     return body;
   }
 
@@ -998,7 +998,7 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     // No authored mass: this body is asking the solver to derive one.
     const body = new RigidBody({ type: "dynamic" });
-    setRigidBodyRegistered(body, true);
+    setRigidBodyRegistered(body, true, false);
     setRigidBodyDerivedMass(body, 4);
     expect(body.mass).toBe(4);
     expect(body.massAuthored).toBe(false);
@@ -1023,7 +1023,7 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
     // Registered, but static: its damping and gravity scale change nothing in
     // any solver, so there is no divergence to report.
     const stationary = new RigidBody({ type: "static" });
-    setRigidBodyRegistered(stationary, true);
+    setRigidBodyRegistered(stationary, true, false);
     stationary.linearDamping = 1;
     stationary.gravityScale = 2;
     expect(warn).not.toHaveBeenCalled();
@@ -1036,19 +1036,19 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
 
     // Two worlds may hold one component; the body stops being registered when
     // the last of them releases it.
-    setRigidBodyRegistered(body, true);
-    setRigidBodyRegistered(body, true);
+    setRigidBodyRegistered(body, true, false);
+    setRigidBodyRegistered(body, true, false);
     expect(body.registeredWorldCount).toBe(2);
-    setRigidBodyRegistered(body, false);
+    setRigidBodyRegistered(body, false, false);
     expect(body.registeredWorldCount).toBe(1);
 
     body.linearDamping = 1;
     expect(warn).toHaveBeenCalledTimes(1);
 
-    setRigidBodyRegistered(body, false);
+    setRigidBodyRegistered(body, false, false);
     expect(body.registeredWorldCount).toBe(0);
     // Floored at zero, so an unpaired release cannot silence a later warning.
-    setRigidBodyRegistered(body, false);
+    setRigidBodyRegistered(body, false, false);
     expect(body.registeredWorldCount).toBe(0);
 
     const other = dynamicBody();
@@ -1091,7 +1091,7 @@ describe("RigidBody writes that reach no solver (§23, §37; 2026-08-06)", () =>
     // The §23 mass rule is still enforced on that path, and a rejected write
     // leaves both the flag and the type alone.
     const zero = new RigidBody({ type: "static", mass: 0 });
-    setRigidBodyRegistered(zero, true);
+    setRigidBodyRegistered(zero, true, false);
     expectValidationError(() => {
       setRigidBodyType(zero, "dynamic");
     });

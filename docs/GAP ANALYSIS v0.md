@@ -1339,6 +1339,17 @@ The failure mode is structural, not cultural: **the discipline is indexed on §1
 
 ## PH-1 — Post-registration property changes never reach the solver (and the doc claims they do)
 
+> **CLOSED 2026-08-07 (stage 2; stage 1 truth table 2026-08-06).**
+> `SolverBodyTuningAccess` (`packages/physics/src/body-access.ts`) carries §37's property
+> changes; `PhysicsWorld.step` drains `RigidBody.pendingSolverWrites` and
+> `refreshCollider`'s per-collider flag at the top of the step, ascending body id then
+> ascending collider id. Both Rapier adapters implement the seam;
+> `PhysicsWorld.supportsLiveProperties` declares it. `mass`, both dampings,
+> `gravityScale`, `ccdMode`, and a collider's §25 material / §24 filter are live;
+> `mass = undefined` stays warn-only, documented as permanently unreachable.
+> `PhysicsWorld.teleport` closes the "teleports have no stable-API route" half. Goldens
+> unmoved — a quiet world's solver-call sequence is unchanged. Kept for the record.
+
 |                       |                                                                                                                                                                                                                                                 |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Spec**              | §37 (`syncSceneToSolver` "pushes scene-authored state into the solver (kinematic targets, **teleports, property changes**)"), §23, §24                                                                                                          |

@@ -28,6 +28,28 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — PH-1 stage 2 (live solver writes).** Decisions worth keeping:
+  - **A third optional seam, detected structurally, not a seventh capability field** —
+    `supportsSolverBodyTuning` is **all-or-nothing** across six methods (per-property
+    bits would push a warn table into `RigidBody`). `PhysicsTuningCapabilities` still
+    answers "which coefficients apply"; the new predicate answers "can anything change
+    after `createBody`".
+  - **The dirty set is a bit set, one bit per solver call** (§23's triple one bit, the
+    damping pair one). `0` keeps the goldens still — a quiet world makes no extra call,
+    proven by deep-equalling adapter `callOrder` with and without the seam.
+  - **Draining clears** — a body in two worlds hands writes to whichever steps first
+    (§26 command-buffer semantics), chosen over per-world dirty sets.
+  - **Colliders cannot be intercepted** (§24/§25 plain public fields) → `refreshCollider`
+    is explicit by design; the alternative was shadow-copying six values per collider
+    and diffing every step.
+  - **`mass = undefined` is permanently unreachable, not staged** — un-authoring means
+    restoring collider densities only the registration path holds.
+  - **Rapier's live mass write re-runs `resolveMassMode`** and rewrites
+    `BodyRecord.massMode`, so live writes and re-registration converge and PH-3's heir
+    logic keeps working.
+  - **Gotcha:** vitest transpiles without typechecking — a changed package-internal
+    signature passes unit suites and only fails at `pnpm run docs`/`tsc`; run the docs
+    gate after touching any cross-file signature.
 - **2026-08-07 — A-1 §84 statistics.** Decisions worth keeping:
   - **`NaN` means "not measured", `0` means "measured zero"** — the rule that let §84
     ship before all its producers; staged counters are test-asserted to stay `NaN` so
