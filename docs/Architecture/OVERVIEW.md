@@ -187,7 +187,8 @@ notes at their would-be home in the source:
   soft-body packages are reserved stubs (see the table above).
 - **Rendering**: shadows (§69), `StandardMaterial`/PBR (§59), color strings
   and tone mapping (§60a), point/spot/hemisphere/area lights and multi-light,
-  the §63 render graph, GPU compute (§82).
+  §63's transient-target/lifetime/barrier tier (the linear-pass `RenderGraph` shipped
+  2026-08-07), GPU compute (§82).
 - **Content**: glTF loading (§78), SDF/shaped text (§56 full tier),
   morph/skeletal animation tracks, distance and gear joints (§28).
 - **Platform**: workers (§88) — the engine is main-thread today, with APIs

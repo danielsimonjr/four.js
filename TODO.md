@@ -27,6 +27,16 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@four/render` —
+      passes over R-4's target seam, transcript-identical to hand-written calls,
+      tree-shakes out of all bundles. **R-6 (§70 post-FX) now unblocked — effects are
+      graph passes; do not build a parallel mechanism**
+- [ ] **R-5 follow-ups:** add `INVALID_RENDER_GRAPH` to §89's `FourErrorCode` union and
+      switch `GRAPH_ERROR_CODE` to it; adopt `tests/integration/helpers/recording-gl.ts`
+      in `render-to-texture.test.ts` (mechanical dedupe); §63's on-screen pass-output
+      debug view waits on §70's full-screen blit; format the two pre-existing prettier
+      warnings (`packages/render/package.json`,
+      `tests/integration/examples-build-coverage.test.ts`)
 - [x] **PH-5 CLOSED 2026-08-07:** `PhysicsWorld.addCollider`/`removeCollider` — one
       collider on a live body, handle/id/checksum position/joints/pose all surviving;
       mass proven both directions on authored- and derived-mass bodies; §34 needed

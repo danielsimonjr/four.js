@@ -36,6 +36,18 @@ export {
   isUnlitItem,
 } from "./render-list.js";
 export type {
+  AddPassOptions,
+  CustomRenderPass,
+  RenderGraphIssue,
+  RenderGraphIssueCode,
+  RenderGraphIssueSeverity,
+  RenderGraphPass,
+  RenderPass,
+  RenderPassContext,
+  SceneRenderPass,
+} from "./render-graph.js";
+export { RenderGraph } from "./render-graph.js";
+export type {
   RenderTargetFormat,
   RenderTargetOptions,
   RenderTargetTexture,

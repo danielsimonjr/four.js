@@ -914,6 +914,18 @@ interpolation?, target?)`; render-to-texture verified end-to-end
 
 ### R-5 — §63 render graph does not exist
 
+> **CLOSED 2026-08-07 (linear-pass tier).** `RenderGraph` in `@four/render`: named,
+> ordered, enableable passes over R-4's target seam, one `execute()` call,
+> transcript-identical to the hand-written `renderer.render` calls it replaces.
+> Shipped: declared `inputs` (acyclic by construction) + discovered sampled-target
+> validation (`buildRenderList` + `isRenderTargetTexture` — sees what the backend
+> sees), enable/disable, per-pass viewports, textual `describe()`, an honest `"opaque"`
+> issue on every `CustomRenderPass`. Staged with dated reasons: transient targets,
+> resource lifetimes, barriers (backend facts; real for WebGPU), on-screen debug view
+> (needs §70's blit). §63's fixed pass order is now _expressible_ but not prescribed —
+> R-10/R-29 still own ordering/sorting. Unblocks R-6: effects are graph passes. Kept
+> for the record.
+
 **§63.** Zero implementation. The only source references are three lines naming §63 as _somebody else's_ prerequisite (`renderer.ts:285`, `texture.ts:181`, `viewport.ts:42`). The spec's `Four.RenderGraph` example, pass dependencies, transient targets, resource lifetime, barriers, pass enable/disable, per-viewport pipelines, and debug visualization are all absent. `docs/guides/materials-and-render-graph.md` is honest about this.
 **Severity:** major. **Effort:** L. **Depends on:** R-4.
 **Recorded:** ⚠️ **partially — no design note or dated staging record owns §63.** It appears only in `OVERVIEW.md:190`'s staged list, added after the fact. No file in `packages/render/src` claims it.

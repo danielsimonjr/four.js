@@ -28,6 +28,26 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — R-5 render graph (linear-pass tier).** Decisions worth keeping:
+  - **The graph is a driver, not a backend** — one pass = one `renderer.render(root,
+views, interpolation, target)`, asserted transcript-identical against hand-written
+    calls. Re-prove that property after any backend restructure.
+  - **Acyclicity by construction beats a topological sort** — inputs must already exist;
+    insertion order is execution order (§63's own example is written in execution
+    order); a sort would buy reordering nobody asked for and cost "the graph does what
+    the list says". `removePass` refused while a consumer names it.
+  - **Sampling is discovered, not declared** — `validate()` runs the real
+    `buildRenderList` and reads `isRenderTargetTexture`, seeing what the backend sees;
+    deliberately setup-time (a `map` reassignment makes any cache unsound; per-frame
+    checking doubles traversal).
+  - **An escape hatch must report its own opacity** — `CustomRenderPass` always emits an
+    `"opaque"` info issue; a graph that stopped being checkable says so.
+  - **Correction to the R-4 entry (supersede, not rewrite):** "feedback loops are
+    refused, not drawn" holds for _sprites_; for `UnlitMaterial`/`LitMaterial` the
+    `map` is refused but the draw survives untextured — one rule for the sample, two
+    outcomes for the draw (`webgl-renderer.ts` sprite skip vs `setFeatures(false)`).
+  - Clear policy stays on `Viewport` — what makes a compositing pass (no `clearColor`)
+    expressible. No new duck-typed contract — the graph reuses `isRenderTargetTexture`.
 - **2026-08-07 — PH-5 (runtime colliders).** Decisions worth keeping:
   - **No `node` parameter, no diffing refresh** — `Collider.requireBody()` is the single
     source of truth about which body a collider joins, shared verbatim with `addBody`'s

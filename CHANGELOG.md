@@ -8,6 +8,34 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — R-5 closed (linear-pass tier): the §63 render graph
+
+#### Added
+
+- **`RenderGraph` in `@four/render` (R-5, §63)** — an ordered, named, individually
+  enableable list of render passes executed by one `execute(renderer, interpolation?)`
+  call, each pass one `renderer.render(root, views, interpolation, target)` over R-4's
+  seam — asserted **transcript-identical** to the hand-written calls it replaces, which
+  is what makes adopting the graph a refactor rather than a rendering change. Ships
+  §63's pass dependencies (declared `inputs` validated at `addPass` — **acyclicity by
+  construction**: an input must name an already-added pass and insertion order is
+  execution order, so cycles are unconstructable — plus a discovered sampled-target
+  check: `validate()` runs the real `buildRenderList` and reads the
+  `isRenderTargetTexture` marker, seeing exactly what the backend sees), pass
+  enable/disable (a disabled pass issues zero GL), per-pass viewports, and a textual
+  `describe()`. Clear policy stays on `Viewport.clearColor` (§48) — which is exactly
+  what makes a compositing pass expressible. The `CustomRenderPass` escape hatch always
+  reports an `"opaque"` validation issue, so an unchecked graph says so instead of
+  returning a clean bill it did not earn. Transient targets, resource lifetimes, and
+  barriers staged with dated reasons; the module tree-shakes out of every example
+  bundle (byte-identical md5s, `RenderGraph` absent from all seven).
+- **R-6 (§70 post-processing) is now unblocked** — effects are graph passes.
+- Correction recorded against the R-4 note: "feedback loops are refused, not drawn"
+  holds for **sprites** (draw skipped); an `UnlitMaterial`/`LitMaterial` sampling its
+  own target has the `map` refused but the draw survives untextured — one rule for the
+  sample, two outcomes for the draw. The `"feedback"` issue documentation states this
+  accurately.
+
 ### 2026-08-07 — PH-5 closed: runtime collider add/remove
 
 #### Added
