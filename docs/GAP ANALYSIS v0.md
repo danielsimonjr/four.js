@@ -1511,11 +1511,10 @@ The setter (`rigid-body.ts:601-604`) validates mass and writes `#type` unconditi
 
 ## PH-17 — No shipped `ComponentSerializer`s for `RigidBody`, `Collider`, or `MotionComponent`
 
-> **PARTIALLY CLOSED 2026-08-06.** `MOTION_COMPONENT_SERIALIZER` ships from `@four/motion`
-> against a structural `ComponentSerializerShape` (no new §3.1 edge), and unregistered
-> components are refused rather than silently dropped (A-15). **`RIGID_BODY_SERIALIZER` and
-> `COLLIDER_SERIALIZER` remain open** — they belong in `@four/physics`, which that change
-> could not touch; tracked in `TODO.md`.
+> **CLOSED 2026-08-06** — `RIGID_BODY_SERIALIZER`/`COLLIDER_SERIALIZER` ship from
+> `@four/physics`, `MOTION_COMPONENT_SERIALIZER` from `@four/motion`, registered via
+> `registerPhysicsSerializers()`/`registerSceneNodeTypes()`; the unregistered-component
+> silent drop became `unknownComponents: "throw" | "skip"` (A-15). Kept for the record.
 
 |                       |                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

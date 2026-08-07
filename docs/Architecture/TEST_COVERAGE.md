@@ -122,7 +122,8 @@ From `pnpm run test:suites` — `Test Files 15 passed (15)`,
 decoded in-process), not fakes — the replay rig reads origins, velocities,
 centers of mass, and contact impulses per step, and the round-trip suite
 carries the reference `RigidBody`/`Collider` serializers
-(`tests/integration/helpers/roundtrip-scenarios.ts`).
+(shipped as `RIGID_BODY_SERIALIZER`/`COLLIDER_SERIALIZER` from `@four/physics` since
+2026-08-06; the helper now registers the shipped serializers).
 
 **`tests/determinism/`** (8 files): `phase1-headless-stepping`,
 `phase2-motion`, `phase4-animation`, `phase5-physics`, `phase6-joints`,

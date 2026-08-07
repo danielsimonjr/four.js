@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.6 — 2026-07-29**
+**Specification revision 1.7 — 2026-08-06**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -21,6 +21,7 @@
 | 1.4 | 2026-07-29 | §98: the §45 Application composition root moved from `core` to the `four` umbrella package — `core` owning the application shell would invert the dependency direction (§45's Application owns scene, renderer, scheduler, input, assets, diagnostics, all of which sit above `core`). Found by the implementation-plan stress test. |
 | 1.5 | 2026-07-29 | Gap-closure pass: Part IX never scheduled the §120 MVP's interaction/content/tooling scope — added §106a (Phase 3a: input, picking, sprites, MVP-tier text) and §113a (Phase 11: assets, serialization, UI, benchmark harness, documentation). §56 gains an MVP text tier (full shaping staged behind a shaping-engine decision). §98 gains a publish-names note (`four` and `four-js` are occupied on npm; `fourjs`/`@fourjs` free as of 2026-07-29). |
 | 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@four/*`. |
+| 1.7 | 2026-08-06 | Public-API reconciliation (gap analysis A-22/PH-18, owner decision — amend the specification rather than alias the shipped surface). New §97a "Namespace and Naming Conventions" records the per-package umbrella barrel (decision WP-0.7-fix1: collision avoidance plus §91 tree-shaking, so every `Four.X` of Parts VII and X reads `Four.<package>.X`), the shipped-name mapping (`Mesh`→`Renderable`; `*Geometry` classes→geometry factory functions; `*Collider` classes→one `Collider` component over a `CollisionShape` descriptor union; `Motion`→`MotionComponent`; `SceneMigrator.upgrade`→`migrateSceneDocument` + `SceneMigrationRegistry`; `scene.activeCamera`→§48 viewports on `app.views`; `physicsWeight`/`animationWeight` on the `RigidBody` component, not the node), the names with no shipped equivalent yet (a `Text` node, `AnimationController`, `Circle`, `StandardMaterial`, §8 space modes, `Node.animation`), and the deferred string-selection affordances (`renderer: "auto"`, `solver: "auto"`). §97 and §114–§117 and the inline snippets of §11, §15, §16, §18, §20, §111 are rewritten against the shipped API; where a feature is unshipped the example shows the available-today form and cites §97a. Frozen §1–120 numbering respected: the new section takes a letter suffix. |
 
 ---
 
@@ -439,12 +440,19 @@ to physics solvers.
 Example:
 
 ```ts
-const motion = new Four.Motion({
+import { Vector3 } from "four/math";
+import { MotionComponent } from "four/motion";
+
+const motion = new MotionComponent({
     linearVelocity: new Vector3(2, 0, 0),
     angularVelocity: new Vector3(0, 1, 0)
 });
 node.addComponent(motion);
 ```
+
+The class ships as `MotionComponent` (`Four.motion.MotionComponent` through the
+umbrella barrel), not `Motion`; see §97a. A `MotionComponent` only moves a node
+once a `MotionSystem` is registered and tracking it (§39).
 
 ### 12. Kinematic Motion
 Kinematic controllers directly prescribe movement.
@@ -521,7 +529,9 @@ four.js shall support:
 ### 15. Tween API
 
 ```ts
-Four.animate(node.position)
+import { animate } from "four/animation";
+
+animate(node.position)
   .to({ x: 10, y: 5 }, 1.0)
   .ease("cubic-out")
   .play();
@@ -542,13 +552,19 @@ Required easing families:
 - bounce;
 - elastic;
 - spring.
+
+Each family but `linear` names three `EasingName` values — `"<family>-in"`,
+`"<family>-out"`, `"<family>-in-out"` — so `.ease("spring")` is not a name;
+`.ease("spring-out")` is (§97a).
 ### 16. Timeline API
 
 ```ts
-const timeline = new Four.Timeline();
+import { Timeline, tween } from "four/animation";
+
+const timeline = new Timeline();
 timeline
-  .at(0, Four.tween(node.position, { x: 5 }, 0.8))
-  .at(0.25, Four.tween(node, { opacity: 0.5 }, 0.5))
+  .at(0, tween(node.position, { x: 5 }, 0.8))
+  .at(0.25, tween(node, { opacity: 0.5 }, 0.5))
   .at(1.0, () => console.log("complete"));
 timeline.play();
 ```
@@ -610,9 +626,10 @@ Interpolation modes:
 - Hermite;
 - spherical linear interpolation for quaternions.
 ### 18. Animation State Machines
+The target form — a declarative controller owning states and transitions:
 
 ```ts
-const controller = new Four.AnimationController({
+const controller = new AnimationController({
     states: {
       idle: idleClip,
       walk: walkClip,
@@ -622,6 +639,34 @@ const controller = new Four.AnimationController({
       { from: "idle", to: "walk", when: "speed > 0.1" },
       { from: "walk", to: "run", when: "speed > 5" }
     ]
+});
+```
+
+`AnimationController` is **not implemented** (§97a). The available-today form is
+an `AnimationMixer` per node plus application-side selection; it has no
+transition durations, no exit time, and no blend trees, and it is not a
+substitute for this section — it is what this section is scheduled to replace:
+
+```ts
+import { AnimationMixer, AnimationSystem } from "four/animation";
+
+const animation = new AnimationSystem();
+app.systems.register(animation);
+
+const LOOP = { loop: Number.POSITIVE_INFINITY };
+let current = idleClip;
+let mixer = animation.track(new AnimationMixer(character).play(current, LOOP));
+
+// The transition condition, evaluated by the application once per fixed step.
+app.on("fixedUpdate", () => {
+    const next = speed > 5 ? runClip : speed > 0.1 ? walkClip : idleClip;
+    if (next === current) return;
+    // A played mixer binds once (§16), so a state change is a new mixer: `stop`
+    // releases the property claims, and the successor takes them uncontested.
+    animation.untrack(mixer);
+    mixer.stop();
+    current = next;
+    mixer = animation.track(new AnimationMixer(character).play(next, LOOP));
 });
 ```
 
@@ -664,12 +709,22 @@ The core framework may use adapter-backed solvers, but users should not need
 to write solver-specific application code for common tasks.
 
 ```ts
-const world = new Four.PhysicsWorld({
+import { Vector3 } from "four/math";
+import { PhysicsWorld } from "four/physics";
+import { Rapier3dAdapter } from "four/physics-rapier";
+
+const world = new PhysicsWorld({
     dimension: "3d",
     gravity: new Vector3(0, -9.81, 0),
-    solver: "auto"
+    adapter: new Rapier3dAdapter()
 });
+await world.initialize();
 ```
+
+The world takes an **adapter instance**; the `solver: "auto"` string form of
+§37's capability-driven selection is deferred to the same registry work as
+`renderer: "auto"` (§97a). Swapping solvers is still the one line this section
+promises: it is the `adapter` argument, and nothing above it changes.
 
 ### 21. Physics Dimensions
 
@@ -1311,7 +1366,7 @@ Renderables and 2D Vector Graphics (§49-52), Geometry, Materials, and Shading
 (§53-60a), Renderer
 Core (§61-67), Lighting and Post-Processing (§68-70), Interaction and UI (§71-75),
 Assets and Serialization (§76-81), Platform and Runtime (§82-90), Process and
-Quality (§91-96), Worked Example (§97).
+Quality (§91-96), Worked Example and Conventions (§97-97a).
 
 **Application and Scene Services (§45-§48)**
 ### 45. Application Model
@@ -2546,55 +2601,238 @@ Requirements:
 - cancellation and timeouts for expensive decoders;
 - documented content-security-policy behavior.
 
-**Worked Example (§97)**
+**Worked Example and Conventions (§97-§97a)**
 ### 97. Complete Mixed-Scene Example
+One application, one scene graph, and every pillar in it: a 3D mesh under solver
+authority, world-space text, a UI panel, and a button that applies an impulse.
+The spellings are the shipped ones; §97a says what each replaced and why.
 
 ```ts
-import * as Four from "four";
-const app = new Four.Application({
-    canvas: document.querySelector("#app"),
-    renderer: "auto",
-    fixedTimeStep: 1 / 60,
-    physics: { dimension: "3d", gravity: [0, -9.81, 0] }
-});
-await app.initialize();
-const camera = new Four.PerspectiveCamera({
-    fieldOfView: Math.PI / 3,
+import { Application } from "four/application";
+import { boxGeometry } from "four/geometry";
+import { LitMaterial, SpriteMaterial } from "four/materials";
+import { Vector3 } from "four/math";
+import { Collider, PhysicsSystem, PhysicsWorld, RigidBody } from "four/physics";
+import { Rapier3dAdapter } from "four/physics-rapier";
+import { Renderable, Sprite, type Texture } from "four/render";
+import { WebglRenderer } from "four/render-webgl";
+import {
+    DirectionalLight,
+    Group,
+    PerspectiveCamera,
+    createFullscreenViewport
+} from "four/scene";
+import {
+    buildGlyphAtlas,
+    layoutText,
+    type GlyphAtlas,
+    type TextQuad
+} from "four/text";
+import { Button, Label, Panel } from "four/ui";
+
+// --- application (§45): the renderer is an instance, not a string (§97a) ------
+const canvas = document.querySelector("canvas") as HTMLCanvasElement;
+
+const camera = new PerspectiveCamera({
+    fieldOfView: Math.PI / 3,   // radians (§7a)
     near: 0.1,
     far: 1000
 });
-camera.position.set(0, 2, 6);
-app.scene.activeCamera = camera;
-const cube = new Four.Mesh({
-    geometry: new Four.BoxGeometry({ width: 1, height: 1, depth: 1 }),
-    material: new Four.StandardMaterial({ baseColor: "#5588ff" })
+camera.transform.position.set(0, 2, 6);
+camera.updateProjectionMatrix();
+
+const app = new Application({
+    canvas,
+    renderer: new WebglRenderer(),
+    fixedTimeStep: 1 / 60,
+    // §48: a camera reaches the renderer through a viewport on `app.views`;
+    // there is no `scene.activeCamera` (§97a).
+    views: [createFullscreenViewport(camera)]
 });
-cube.addComponent(new Four.RigidBody({ type: "dynamic", mass: 1 }));
-cube.addComponent(new Four.BoxCollider({ size: [1, 1, 1] }));
-const label = new Four.Text({
-    text: "Transformer T-101",
-    fontSize: 24,
-    color: "#ffffff",
-    space: "billboard"
-});
-label.position.set(0, 1.2, 0);
+app.scene.add(camera, new DirectionalLight({ color: [1, 1, 1], intensity: 1 }));
+
+// --- physics (§20, §37): a world is built and tracked, not an app option -----
+const physics = new PhysicsSystem();
+app.systems.register(physics);
+const world = physics.track(
+    new PhysicsWorld({
+        dimension: "3d",
+        gravity: new Vector3(0, -9.81, 0),
+        adapter: new Rapier3dAdapter(),
+        poses: app.poses          // §43: render interpolation reads from here
+    })
+);
+
+// --- the cube (§49, §53, §57, §23, §24) --------------------------------------
+const cube = new Renderable(
+    boxGeometry({ width: 1, height: 1, depth: 1 }),
+    new LitMaterial({ color: [0.33, 0.53, 1, 1] })   // linear RGBA, 0..1 (§60a)
+);
+cube.transformAuthority = "physics";                 // §42: one owner, declared
+cube.addComponent(new RigidBody({ type: "dynamic", mass: 1 }));
+cube.addComponent(
+    new Collider({
+        // One collider component over a shape descriptor, not a shape class
+        // (§97a); half-extents, so this box matches the 1 x 1 x 1 geometry.
+        shape: { type: "box", halfExtents: new Vector3(0.5, 0.5, 0.5) }
+    })
+);
+app.scene.add(cube);
+
+// --- the label (§55, §56): text is data, and the application draws it (§97a) --
+// One glyph cell cut out of the atlas into its own texture. Elided here because
+// it is arithmetic, not API; `examples/first-2d-scene/main.ts` implements it.
+declare function glyphTexture(atlas: GlyphAtlas, quad: TextQuad): Texture;
+
+const atlas = buildGlyphAtlas();
+const layout = layoutText("Transformer T-101", atlas, { size: 0.26 });
+const label = new Group();
+// Parented to the cube, so it follows the body. §8's `space: "billboard"` —
+// turning to face the camera — is not implemented (§97a).
+label.transform.position.set(-layout.width / 2, 1.2, 0);
+for (const quad of layout.quads) {
+    const glyph = new Sprite(
+        new SpriteMaterial({
+            texture: glyphTexture(atlas, quad),
+            tint: [1, 1, 1, 1]
+        }),
+        {
+            width: quad.x1 - quad.x0,
+            height: quad.y1 - quad.y0,
+            anchor: { x: 0, y: 0 },
+            renderLayer: 1          // sprites blend, so they draw last (§66)
+        }
+    );
+    glyph.transform.position.set(quad.x0, quad.y0, 0);
+    label.add(glyph);
+}
 cube.add(label);
-const panel = new Four.Panel({
-    space: "screen",
-    width: 320,
-    height: 180,
-    x: 20,
-    y: 20,
-    layout: { type: "flex", direction: "column", gap: 8 }
+
+// --- the panel (§73, §74): widgets own layout, the application owns pixels ----
+const panel = new Panel({
+    layout: { type: "flex", direction: "column", gap: 0.08, padding: 0.12 }
 });
-const impulseButton = new Four.Button({ label: "Apply Impulse" });
-impulseButton.on("click", () => {
-    cube.getComponent(Four.RigidBody)?.applyImpulse(new Four.Vector3(0, 4, 0));
+// World units: §8's `space: "screen"` is not implemented, so a screen-space
+// panel is a widget subtree placed in the world, or under its own orthographic
+// viewport (§48, §97a).
+panel.transform.position.set(-3.2, 1.6, 0);
+
+const impulseButton = new Button({ width: 1.6, height: 0.4 });
+impulseButton.add(new Label({ text: "Apply Impulse", atlas, size: 0.2 }));
+// `uiactivate` is the §73 activation — a §72 click or a programmatic
+// `activate()`, indistinguishable downstream except by `event.source`.
+impulseButton.on("uiactivate", () => {
+    cube.getComponent(RigidBody)?.applyImpulse(new Vector3(0, 4, 0));
 });
-panel.add(new Four.Text({ text: "System Status" }), impulseButton);
-app.scene.add(cube, panel);
+
+panel.add(new Label({ text: "System Status", atlas, size: 0.24 }), impulseButton);
+app.scene.add(panel);
+panel.layout();     // one explicit pass; layout is never implicit (§74)
+
+// Every widget surface above is drawn by an application-supplied `WidgetSkin`
+// (§73): `@four/ui` may not import a renderer, so it measures and states but
+// never draws. Assign `panel.skin` / `impulseButton.skin` to make it visible.
+
+// --- run (§10): the host drives the loop, the engine never calls rAF ---------
+await app.initialize();     // acquires the WebGL 2 context
+await world.initialize();   // decodes the solver's wasm image (§37)
 app.start();
+
+let last: number | null = null;
+requestAnimationFrame(function frame(now: number): void {
+    // The one place a wall clock is allowed: a presentation-side measurement,
+    // converted to seconds before it crosses into the engine (§7a, §33).
+    if (last !== null) app.step((now - last) / 1000);
+    last = now;
+    requestAnimationFrame(frame);
+});
 ```
+
+### 97a. Namespace and Naming Conventions
+The examples of §97 and Part X were written against a flat umbrella barrel
+(`Four.Mesh`, `Four.animate`) and against names the implementation later chose
+differently. This section is the reconciliation. It is normative for how the
+examples in this specification are spelled, and it records — rather than
+hides — the affordances that are deferred rather than renamed.
+
+**The umbrella barrel is per-package namespaces.** `import * as Four from
+"four"` yields one namespace per §98 package, plus the §45 composition root,
+which is the only API the umbrella owns rather than re-exports:
+
+```ts
+import * as Four from "four";
+
+const app = new Four.Application({ /* ... */ });        // owned by `four`
+const pid = new Four.motion.PIDController({ kp: 2 });   // re-exported namespace
+const body = new Four.physics.RigidBody({ type: "dynamic" });
+```
+
+So **every `Four.X` in this specification reads `Four.<package>.X`**, with
+`<package>` the §98 package name in camelCase — `physicsRapier` for
+`@four/physics-rapier`, `renderWebgl` for `@four/render-webgl`. Two reasons,
+both binding:
+
+- **Collision avoidance.** Independent packages legitimately export the same
+  identifier: `ColorRGBA` from both `math` and `materials`, `SeededRandom` from
+  `core`, `motion`, and `particles`, `PACKAGE_NAME` from every package. A flat
+  barrel would have to rename or drop one side of every collision.
+- **§91 tree-shaking and the §86 payload budget.** A flat barrel re-exporting
+  two dozen packages by name puts every one of them in the module graph of any
+  program that imports the umbrella; a minimal 2D application would carry the
+  renderer and physics surfaces it never names. Namespaces keep each package a
+  separate, droppable subgraph.
+
+Applications that want short names use the **subpath** form, which is what §97,
+Part X, and every worked example use, and which tree-shakes the same way:
+
+```ts
+import { Application } from "four/application";
+import { Vector3 } from "four/math";
+import { PhysicsWorld, RigidBody } from "four/physics";
+```
+
+**Shipped-name mapping.** Where this specification's prose names a symbol, the
+implementation ships it as follows.
+
+| This specification | Shipped API | Note |
+|---|---|---|
+| `Four.Mesh` (§49, §54) | `Renderable` (`four/render`) | One concrete node carrying a `BufferGeometry` and a material. §49's family — `Shape2D`, `Text`, `Mesh`, `Line3D`, `PointCloud` — narrows it later. |
+| `Four.BoxGeometry`, `Four.SphereGeometry` (§53) | `boxGeometry(...)`, `planeGeometry(...)`, `circleGeometry2D(...)` (`four/geometry`) | Geometry primitives are **factory functions returning `BufferGeometry`**, not classes. There is no sphere primitive yet. |
+| `Four.StandardMaterial` (§59) | `LitMaterial`, `UnlitMaterial` (`four/materials`) | §59's PBR material is staged; the MVP tier is one Lambert-diffuse material and one flat one. Colors are linear RGBA arrays in 0..1 (§60a), not CSS strings. |
+| `Four.BoxCollider`, `Four.SphereCollider` (§24) | one `Collider` component over a `CollisionShape` descriptor union (`four/physics`) | `new Collider({ shape: { type: "box", halfExtents } })`. There are no per-shape collider classes; §24's shape catalogue is a discriminated union, which is what lets `COLLISION_SHAPE_TYPES_2D`/`_3D` state per-dimension validity. |
+| `Four.Motion` (§11) | `MotionComponent` (`four/motion`) | Renamed for what it is: a §6a component, not the motion pillar. |
+| `Four.Text` (§56) | *no node* — `layoutText` + `buildGlyphAtlas` (`four/text`) + `Sprite` (`four/render`) | §56's MVP tier produces **data**: baseline-origin quads and a glyph atlas. The application turns quads into sprites. A `Text` node, and the one-draw-call batching it needs, are unbuilt. |
+| `Four.Circle` (§50) | `circleGeometry2D(...)` + `Renderable` | §50's shape-node catalogue (`Circle`, `Rect`, `Path`, …) is staged; a filled circle today is geometry plus a material. |
+| `Four.AnimationController` (§18) | *unimplemented* — `AnimationMixer` + application-side selection | §18's state machines, blend trees, and layered/additive animation are scheduled, not shipped. See §18 for the available-today form. |
+| `Four.SceneMigrator.upgrade` (§80) | `migrateSceneDocument(...)` + `SceneMigrationRegistry` (`four/serialization`) | A registry of versioned `SceneMigration`s and a function over it, rather than an object with an `upgrade` method; warnings are returned, not thrown. |
+| `app.scene.activeCamera = camera` (§47) | `app.views.push(createFullscreenViewport(camera))` (§48) | A scene has no active camera. A camera reaches the renderer through a §48 `Viewport`, which is what makes split-screen and multi-view a list operation rather than a mode. |
+| `node.physicsWeight`, `node.animationWeight` (§19, §117) | `RigidBody.physicsWeight`, `RigidBody.animationWeight` | §19's blend weights live on the body component, beside the state they blend — a node with no body has nothing to weight. |
+| `node.animation.play(...)` (§117) | `new AnimationMixer(target).play(clip)` (`four/animation`) | There is no `Node.animation` member; playback is owned by a mixer, and an `AnimationSystem` advances it (§39). |
+| `Four.PIDController` (§111) | `Four.motion.PIDController` / `four/motion` | Namespace only; the constructor shape of §111 is exact. |
+| `Four.HingeJoint`, `Four.Panel`, `Four.Button`, `Four.PerspectiveCamera`, `Four.Vector3` | unchanged, under their package namespaces | `four/physics`, `four/ui`, `four/ui`, `four/scene`, `four/math`. |
+
+**Names with no shipped equivalent.** §8's `SpaceMode` — `"screen"`,
+`"billboard"`, `"viewport"`, `"camera"`, `"local-plane"` — is not implemented on
+any node: every node is world-space, so screen-space UI is a widget subtree
+placed in world units (optionally under its own orthographic §48 viewport), and
+a billboard is an application-side orientation update. Billboarding in
+particular needs a per-view render list, which §64's list builder does not yet
+produce. §82's `ComputePass` likewise has no surface.
+
+**Deferred string selection (recorded deviations, not renames).** Two of this
+specification's affordances select an implementation by string, and both are
+deferred to one future registry packet for the same concrete reason: resolving a
+string to a class means the umbrella importing every candidate package at
+runtime, which every program then carries (§86, §91).
+
+| Specified | Today | Why deferred |
+|---|---|---|
+| `renderer: "auto" \| "webgpu" \| "webgl2" \| "canvas2d" \| "svg"` (§45, §62) | `renderer: Renderer \| false` — an instance the application constructs | A string form must resolve through a registry a backend package opts into, so that §62's capability-ordered fallback exists without `four` statically importing any backend. Appendix A's `"auto"` order stands as the specified ordering for that packet. |
+| `solver: "auto"` (§20, §37) | `adapter: PhysicsWorldAdapter` — an instance | Same payload reason. The capability machinery §37 requires is already live: a world validates its requested `dimension` and `determinism` against `adapter.capabilities` at construction and fails immediately rather than degrading quietly. Only the selection front-end is missing. |
+
+Passing an instance remains supported after those land: §45 requires every
+system to be constructible and ownable independently, so the string form widens
+the option rather than replacing it.
 
 ## Part VIII - Package Architecture
 
@@ -2889,13 +3127,24 @@ Engineering relevance
 A PID utility should support simulation and visualization of control systems:
 
 ```ts
-const controller = new Four.PIDController({
+import { PIDController } from "four/motion";
+
+const controller = new PIDController({
     kp: 2,
     ki: 0.5,
     kd: 0.1,
     outputLimits: [-10, 10]
 });
+
+// Once per fixed step, with the injected simulation delta (§10, §33).
+app.on("fixedUpdate", (time) => {
+    const command = controller.update(setpoint, measurement, time.fixedDeltaTime);
+    shaftHinge.setMotor({ enabled: true, targetVelocity: command, maxTorque: 400 });
+});
 ```
+
+Through the umbrella barrel this is `Four.motion.PIDController` (§97a); the
+constructor options above are exact.
 
 ### 112. Phase 9 - Particles and GPU Motion
 Components
@@ -2938,77 +3187,148 @@ Exit criteria
 A scene can be saved, reloaded, and benchmarked, and the §120 tooling list is
 complete.
 ## Part X - Public API Examples
+These four examples are written in the shipped spellings; §97a maps them back to
+the names this specification's prose uses. Each continues from the one before —
+§115 to §117 assume §114's `app` and a `world` built as in §20.
 ### 114. Basic Animated Object
 
 ```ts
-import * as Four from "four";
-const app = new Four.Application({
-    canvas: document.querySelector("canvas"),
-    renderer: "auto"
+import { animate } from "four/animation";
+import { Application } from "four/application";
+import { circleGeometry2D } from "four/geometry";
+import { UnlitMaterial } from "four/materials";
+import { Renderable } from "four/render";
+import { WebglRenderer } from "four/render-webgl";
+import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+
+const camera = new OrthographicCamera({
+    left: -4, right: 4, bottom: -3, top: 3, near: 0.1, far: 10
 });
-const circle = new Four.Circle({
-    radius: 40,
-    fill: "#4f7cff"
+camera.transform.position.set(0, 0, 5);
+camera.updateProjectionMatrix();
+
+const app = new Application({
+    canvas: document.querySelector("canvas") as HTMLCanvasElement,
+    renderer: new WebglRenderer(),      // an instance, not "auto" (§97a)
+    views: [createFullscreenViewport(camera)]
 });
+
+// A filled circle is geometry plus a material (§97a); world units, not pixels.
+const circle = new Renderable(
+    circleGeometry2D({ radius: 0.4 }),
+    new UnlitMaterial({ color: [0.31, 0.49, 1, 1] })
+);
+circle.transform.position.set(-3, 0, 0);
 app.scene.add(circle);
-Four.animate(circle.position)
-  .to({ x: 500 }, 1.5)
-  .ease("spring")
+
+// Seconds, never milliseconds (§7a). "spring" names a family; the easing is
+// one of its three variants (§15, §97a).
+animate(circle.transform.position)
+  .to({ x: 3 }, 1.5)
+  .ease("spring-out")
   .play();
+
+await app.initialize();
 app.start();
 ```
 
 ### 115. Dynamic Physics Object
 
 ```ts
-const ball = new Four.Mesh({
-    geometry: new Four.SphereGeometry({ radius: 0.5 }),
-    material: new Four.StandardMaterial({
-        baseColor: "#ff8844"
-    })
-});
-ball.addComponent(
-  new Four.RigidBody({
-      type: "dynamic",
-      mass: 1
-  })
+import { LitMaterial } from "four/materials";
+import { Vector3 } from "four/math";
+import { Collider, RigidBody } from "four/physics";
+import { Renderable } from "four/render";
+import { boxGeometry } from "four/geometry";
+
+// No sphere primitive ships yet, so the drawn shape is a box and the collider
+// says what the solver sees (§97a). The two are authored separately on purpose:
+// physics needs extents, rendering needs vertices.
+const ball = new Renderable(
+    boxGeometry({ width: 1, height: 1, depth: 1 }),
+    new LitMaterial({ color: [1, 0.53, 0.27, 1] })
 );
+ball.transformAuthority = "physics";        // §42: the solver owns this node
+ball.addComponent(new RigidBody({ type: "dynamic", mass: 1 }));
 ball.addComponent(
-  new Four.SphereCollider({
-      radius: 0.5,
+  new Collider({
+      shape: { type: "sphere", radius: 0.5 },
       restitution: 0.8,
       friction: 0.3
   })
 );
 app.scene.add(ball);
+
+// Registration reads the components and the node's transform as the initial
+// pose, and writes the derived mass back onto the component (§23, §37).
+world.addBody(ball);
 ```
 
 ### 116. Motorized Hinge
 
 ```ts
-const hinge = new Four.HingeJoint({
+import { HingeJoint } from "four/physics";
+import { Vector3 } from "four/math";
+
+const hinge = new HingeJoint({
+    // The two §23 body components, not their nodes.
     bodyA: frameBody,
     bodyB: rotorBody,
-    anchor: new Four.Vector3(0, 0, 0),
-    axis: new Four.Vector3(0, 0, 1),
+    // Anchor and axis are authored in WORLD space and converted once, at
+    // `addJoint` — so pose both bodies before jointing them (§28).
+    anchor: new Vector3(0, 0, 0),
+    axis: new Vector3(0, 0, 1),
     motor: {
       enabled: true,
-      targetVelocity: 10,
-      maxTorque: 100
+      targetVelocity: 10,       // radians per second (§7a)
+      maxTorque: 100            // newton-metres
     }
 });
-physicsWorld.addJoint(hinge);
+world.addJoint(hinge);
 ```
+
+On the shipped Rapier adapters `maxTorque` is a force-based **gain** rather than
+§28's hard ceiling — a declared capability deviation (§37, §90), not a defect of
+this example. `setMotor` and `setLimits` stay live after registration; anchors
+and axes are frozen.
 
 ### 117. Physics and Animation Blend
 
 ```ts
-robot.transformAuthority = "blended";
-robot.animation.play("walk");
-robot.physicsWeight = 0.2;
-robot.on("impact", () => {
-    robot.physicsWeight = 1;
-    robot.animationWeight = 0;
+import { AnimationMixer, AnimationSystem } from "four/animation";
+import { RigidBody, createPoseTargetCaptureSystem } from "four/physics";
+import { PoseTarget } from "four/scene";
+
+// §19's pipeline: animation writes a target pose, the solver writes a solved
+// pose, and the two are blended by weight. The capture system is REQUIRED —
+// without it the velocity handed to the solver on activation is meaningless.
+const animation = new AnimationSystem();
+app.systems.register(createPoseTargetCaptureSystem(physics.worlds));
+app.systems.register(animation);
+
+robot.transformAuthority = "blended";           // §42 selects the §19 pipeline
+const target = robot.addComponent(new PoseTarget()).copyFrom(robot.transform);
+const body = robot.addComponent(new RigidBody({ type: "kinematic-position" }));
+
+// The clip drives the PoseTarget, not the transform: nothing but §19's blend
+// writes a "blended" node (§97a — there is no `robot.animation`).
+animation.track(
+    new AnimationMixer(target).play(walkClip, {
+        loop: Number.POSITIVE_INFINITY,
+        authority: robot
+    })
+);
+
+// §19's weights live on the body component, not the node (§97a).
+body.physicsWeight = 0.2;
+body.animationWeight = 0.8;
+
+// §29's collision name, dispatched after the fixed step (§39 step 9).
+body.on("collisionstart", () => {
+    body.physicsWeight = 1;
+    body.animationWeight = 0;
+    // Hand the chain to the solver, inheriting the animated target's velocity.
+    world.setBodyControlMode(robot, "dynamic", { inheritVelocityFrom: target });
 });
 ```
 

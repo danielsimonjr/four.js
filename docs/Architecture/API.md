@@ -223,7 +223,9 @@ slab.material.setColor(0.1, 0.52, 0.45, 1); // recolour in place; read per draw
 
 const sun = new DirectionalLight({ color: [1, 1, 1], intensity: 1 });
 app.scene.add(sun); // shines along the node's −Z world axis
-app.scene.ambientLight = [0.1, 0.1, 0.12]; // scene-wide term, not a node (§68)
+app.scene.ambientLight[0] = 0.1; // readonly tuple: write INTO it (§68)
+app.scene.ambientLight[1] = 0.1;
+app.scene.ambientLight[2] = 0.12; // scene-wide term, not a node
 ```
 
 Honest tier boundaries the guide states: one directional light (multi-light,
@@ -394,7 +396,7 @@ class PhysicsWorld {
 | `Collider`                      | Shape + `collisionGroups`/`collisionMask` bits (§24, mutual filtering), `sensor` flag, friction/restitution (explicit fields beat `PhysicsMaterial`; restitution combines `max` per Appendix A).                                                                                           |
 | `CollisionShape`                | `circle`, `rectangle`, `polygon`, `capsule` (2D) / `sphere`, `box`, `capsule` (3D) descriptor unions — see `COLLISION_SHAPE_TYPES_2D/3D`.                                                                                                                                                  |
 | Joints                          | `HingeJoint`/`RevoluteJoint`, `SliderJoint`/`PrismaticJoint`, `BallJoint`/`SphericalJoint`, `FixedJoint`, `RopeJoint`, `SpringJoint` (§28). Anchors/axes authored in **world space**, converted once at `addJoint`. `setMotor`/`setLimits` are live; geometry is frozen post-registration. |
-| Events                          | `collisionenter`/`collisionstay`/`collisionexit` on bodies, `triggerenter`/`triggerexit` on sensor colliders, `sleep`/`wake`, joint `break` — all dispatched **after** the fixed step (§29, §39 step 9).                                                                                   |
+| Events                          | `collisionstart`/`collisionstay`/`collisionend` on bodies, `triggerenter`/`triggerexit` on sensor colliders, `sleep`/`wake`, joint `break` — all dispatched **after** the fixed step (§29, §39 step 9).                                                                                    |
 | `PhysicsSystem`                 | Registers world stepping into the §39 registry at `PRIORITY_PHYSICS_SOLVE`.                                                                                                                                                                                                                |
 | `createPoseTargetCaptureSystem` | **Required** (priority 299) for §19 blending/velocity-inheritance users — an uncaptured animated target inherits wildly inflated velocity.                                                                                                                                                 |
 | `PhysicsMaterial`               | §25 shared friction/restitution/density with combine modes.                                                                                                                                                                                                                                |
@@ -603,7 +605,8 @@ Serializers are keyed by component **class**; unregistered components are
 silently unsaved (known boundary). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
-`tests/integration/helpers/roundtrip-scenarios.ts`. The §79/§34 boundary is
+`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@four/physics` since
+2026-08-06 (previously reference code in the test helpers). The §79/§34 boundary is
 measured: a contact-free save round-trips bit-identically; resuming
 mid-contact exactly requires pairing the document with a §34 snapshot.
 
