@@ -121,7 +121,8 @@ const restored = instantiateScene(decodeSceneDocument(saved), registry);
 ```
 
 Reference `RigidBody`/`Collider` serializers live in
-`tests/integration/helpers/roundtrip-scenarios.ts`. Versioned migrations
+`registerPhysicsSerializers()` from the `four` umbrella (shipped 2026-08-06; formerly
+reference code in the test helpers). Versioned migrations
 (§80) run on load via the migration registry, with warnings surfaced.
 
 **The §79/§34 boundary, measured:** a contact-free save round-trips
@@ -154,6 +155,6 @@ textures plus non-unlit materials), so 3D twin geometry today is procedural
 
 - §33, §34, §79, §80, §76, §113, §116/§119 (the motor-twin demonstrations).
 - `tests/integration/helpers/replay-scenarios.ts` and
-  `roundtrip-scenarios.ts` — the reference wiring;
+  `registerPhysicsSerializers()` (`four` umbrella) — the shipped wiring;
   [fixed-step simulation](fixed-step-simulation.md) for why any of this is
   possible.

@@ -603,7 +603,8 @@ Serializers are keyed by component **class**; unregistered components are
 silently unsaved (known boundary). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
-`tests/integration/helpers/roundtrip-scenarios.ts`. The §79/§34 boundary is
+`RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@four/physics` since
+2026-08-06 (previously reference code in the test helpers). The §79/§34 boundary is
 measured: a contact-free save round-trips bit-identically; resuming
 mid-contact exactly requires pairing the document with a §34 snapshot.
 
