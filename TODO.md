@@ -99,12 +99,24 @@ changes in `CHANGELOG.md`.
 - [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
       eleven counters; opt-in, default off; byte-identical GL + allocation-free when
       off). The A-6 `app.stats` slice is closed
+- [x] **A-5 partial DONE 2026-08-07 (accounting tier):** byte + live-instance
+      accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
+      live. A-1 follow-up (b) closed
+- [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
+      warnings — leaked resources (now _derivable_ from the counters, but nothing
+      warns), disposed-in-use, duplicate asset loads, detached-node listeners, stale
+      physics handles, per-frame allocations; creation-site capture and
+      FinalizationRegistry leak detection need A-4's dev flag
+- [ ] **A-5 follow-ups:** AssetManager duplicate-load warning; materials + solver
+      handles unaccounted (§83 names "GPU and solver resources");
+      `RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
+      with §67's DEPTH24_STENCIL8 and float formats
 - [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
       belongs to the packet that gives `Application` a physics world (A-6);
-      (b) `textureMemory`/`bufferMemory` ride on A-5's resource tracking;
       (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
       field; (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
-      bundles** — Application's unconditional stats references cost ~0.4 kB gzip per
+      bundles** — now the practical blocker: ui-demo is at **30.96/31 kB (~40 B
+      headroom)** after A-5; Application's unconditional stats references cost ~0.4 kB gzip per
       example and ui-demo is at 29.68/30 kB (0.32 kB headroom); (e) `WorldTransformStats`
       (visited/recomputed) is computed every frame and unexposed — deliberately, §84
       does not name it

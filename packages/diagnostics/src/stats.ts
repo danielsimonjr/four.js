@@ -59,10 +59,12 @@
  * ## Producers, and the seams they arrive through
  *
  * `@four/diagnostics` may depend on `core`, `math`, and `scene` only (plan
- * §3.1, frozen), so it cannot import `@four/render` or `@four/physics` to
- * receive their numbers. Producers therefore reach this record the way
- * `debug-draw.ts` reaches a solver — through a **locally declared shape
- * satisfied structurally**:
+ * §3.1, frozen), so it cannot import `@four/render`, `@four/geometry`, or
+ * `@four/physics` to receive their numbers. Producers therefore reach this
+ * record without being named — usually the way `debug-draw.ts` reaches a
+ * solver, through a **locally declared shape satisfied structurally**, and
+ * once (A-5) through plain numbers, where there was no foreign shape to
+ * describe:
  *
  * - {@link RenderStatisticsLike} transcribes `@four/render`'s
  *   `RenderStatistics` (`drawCalls`, `triangles`, `instances`), which a backend
@@ -72,12 +74,19 @@
  * - {@link recordSolverStatistics} takes the {@link SolverStatistics} this
  *   package already produces from a §113 `DebugBodyAccess`, so `activeBodies`
  *   is reachable today by anything that can already draw a collider overlay.
+ * - {@link recordResourceMemory} takes §83's live-resource totals as two plain
+ *   numbers — `@four/render`'s `textureMemoryBytes()` and `@four/geometry`'s
+ *   `geometryMemoryBytes()` (A-5, 2026-08-07). No transcribed shape here,
+ *   unlike every other seam in this package: the producers own no record to
+ *   describe, only two accumulators, so a duck-typed interface would be
+ *   ceremony around a pair of numbers — and passing them directly is
+ *   allocation-free by construction rather than by discipline.
  * - `cpuFrameTime` and `simulationTime` are the frame loop's own measurements;
  *   `Application` (`four`) makes them.
  *
  * ## What is staged, and why (2026-08-07)
  *
- * Five of the eleven counters have no producer anywhere in this repository and
+ * Three of the eleven counters have no producer anywhere in this repository and
  * are left `NaN` by every path through it. They are staged deliberately, not
  * forgotten:
  *
@@ -95,11 +104,10 @@
  *   than what the field names promise. `simulationTime` covers the honest
  *   outer measurement in the meantime; both fields are plain writable numbers,
  *   so the packet that adds the seam writes them without changing this type.
- * - **`textureMemory`** and **`bufferMemory`** need §83 ownership tracking
- *   (gap A-5): a texture shared by two materials has no owner and no reference
- *   count today, so any total this repository could compute would be a guess
- *   about which of them to bill. A-1's closure plan says exactly this — "ship
- *   them last or as `NaN`-with-a-note rather than guessed".
+ *
+ * `textureMemory` and `bufferMemory` were the other two until A-5 landed the
+ * §83 resource accounting they were waiting on (2026-08-07) — see
+ * {@link recordResourceMemory}.
  */
 
 import type { SolverStatistics } from "./debug-draw.js";
@@ -194,14 +202,24 @@ export interface FrameStats {
   contacts: number;
 
   /**
-   * Bytes of GPU texture memory the engine holds. **Staged** — always `NaN`;
-   * needs §83 ownership tracking (gap A-5, module header).
+   * Bytes of texture memory the engine holds — every live (constructed,
+   * undisposed) texture and render target, from §83's resource accounting
+   * (A-5). Written by {@link recordResourceMemory}.
+   *
+   * A **level**, not a per-frame quantity: unlike every other counter here it
+   * describes the engine at the end of the frame rather than something the
+   * frame did. Two frames that draw the same scene report the same value; a
+   * value that climbs across identical frames is §83's "leaked textures".
    */
   textureMemory: number;
 
   /**
-   * Bytes of GPU buffer memory the engine holds. **Staged** — always `NaN`;
-   * needs §83 ownership tracking (gap A-5, module header).
+   * Bytes of vertex and index buffer memory the engine holds — every live
+   * geometry, from §83's resource accounting (A-5). Written by
+   * {@link recordResourceMemory}.
+   *
+   * A level rather than a per-frame quantity; see
+   * {@link FrameStats.textureMemory}.
    */
   bufferMemory: number;
 }
@@ -315,6 +333,44 @@ export function recordRenderStatistics(
   stats.drawCalls = render.drawCalls;
   stats.triangles = render.triangles;
   stats.instances = render.instances;
+}
+
+/**
+ * Writes §83's live-resource totals into the §84 record (A-5, 2026-08-07).
+ *
+ * ```ts
+ * recordResourceMemory(
+ *   app.stats,
+ *   textureMemoryBytes(),    // @four/render
+ *   geometryMemoryBytes(),   // @four/geometry
+ * );
+ * ```
+ *
+ * Two numbers rather than a transcribed record, for the reason the module
+ * header gives: the producers hold accumulators, not objects, so there is no
+ * foreign shape to agree with and nothing to allocate.
+ *
+ * Call it **after** the frame's work, like {@link recordRenderStatistics}: the
+ * two counters are *levels*, so the answer that means anything is the one taken
+ * once the frame's creations and disposals have happened. Passing the same
+ * numbers twice overwrites rather than accumulates, which is what makes a total
+ * that fell report as fallen.
+ *
+ * The totals are process-wide rather than per-application, because a resource
+ * belongs to whoever created it and not to an `Application` (§83) — two
+ * applications sharing an atlas are each honestly told about the whole of it.
+ * They are also an accounting of what the engine *holds*, not a query of the
+ * driver: a geometry created and never drawn has no GPU buffer yet. The
+ * producing modules (`resource-memory.ts`, in both packages) state both
+ * properties at length.
+ */
+export function recordResourceMemory(
+  stats: FrameStats,
+  textureBytes: number,
+  bufferBytes: number,
+): void {
+  stats.textureMemory = textureBytes;
+  stats.bufferMemory = bufferBytes;
 }
 
 /**

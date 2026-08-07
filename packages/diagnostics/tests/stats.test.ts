@@ -25,6 +25,7 @@ import {
   createMonotonicClock,
   monotonicNowSeconds,
   recordRenderStatistics,
+  recordResourceMemory,
   recordSolverStatistics,
   resetFrameStats,
 } from "../src/stats.js";
@@ -156,6 +157,37 @@ describe("recordRenderStatistics", () => {
     });
     expect(stats.drawCalls).toBe(0);
     expect(Number.isNaN(stats.drawCalls)).toBe(false);
+  });
+});
+
+describe("recordResourceMemory", () => {
+  it("copies §83's two live-resource totals and nothing else", () => {
+    const stats = createFrameStats();
+    recordResourceMemory(stats, 262144, 1536);
+    expect(stats.textureMemory).toBe(262144);
+    expect(stats.bufferMemory).toBe(1536);
+    expect(stats.drawCalls).toBeNaN();
+    expect(stats.cpuFrameTime).toBeNaN();
+  });
+
+  it("records an engine holding nothing as 0, not as unmeasured", () => {
+    // The A-1 rule: `0` means "counted; nothing held", and an application with
+    // no resources at all has genuinely measured that.
+    const stats = createFrameStats();
+    recordResourceMemory(stats, 0, 0);
+    expect(stats.textureMemory).toBe(0);
+    expect(stats.bufferMemory).toBe(0);
+    expect(Number.isNaN(stats.textureMemory)).toBe(false);
+  });
+
+  it("re-reads its source, so a level that fell is reported as fallen", () => {
+    // The counters are levels, not accumulations: the second call must
+    // overwrite rather than add.
+    const stats = createFrameStats();
+    recordResourceMemory(stats, 4096, 900);
+    recordResourceMemory(stats, 0, 12);
+    expect(stats.textureMemory).toBe(0);
+    expect(stats.bufferMemory).toBe(12);
   });
 });
 

@@ -36,3 +36,4 @@ export type {
   PlaneGeometryOptions,
 } from "./primitives.js";
 export { boxGeometry, circleGeometry2D, planeGeometry } from "./primitives.js";
+export { geometryMemoryBytes, liveGeometryCount } from "./resource-memory.js";

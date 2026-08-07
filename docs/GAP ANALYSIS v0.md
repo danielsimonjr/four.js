@@ -314,6 +314,18 @@ _Dependencies:_ A-1 (same package, same frame hook); scene/render analysts for s
 
 ### A-5 — §83 development warnings and ownership tracking are absent
 
+> **PARTIALLY CLOSED 2026-08-07 (accounting tier).** §83's "reference counting or
+> ownership tracking" now exists as _ownership-free accounting_: `resource-memory.ts`
+> in `@four/geometry` and `@four/render` hold process-wide live-instance counts and
+> byte totals for `BufferGeometry`/`Texture`/`RenderTarget`, fed at
+> construction/mutation/disposal from new `byteLength` getters. Holding numbers
+> rather than references is what keeps the tracker from being the leak it reports; a
+> resource collected without `dispose()` is deliberately never subtracted. §84's
+> `textureMemory`/`bufferMemory` are measured as of this packet (A-1 dependency
+> discharged) via `recordResourceMemory`. **Still open:** the six development
+> _warnings_ and creation-site capture (folded into A-4's dev-mode work), the
+> AssetManager duplicate-load warning, and materials/solver-handle accounting.
+
 **§83** · **Severity: Medium** · **Effort: M** · **SILENT**
 
 _What exists:_ the disposal half of §83 is solid — `Disposable`, `disposeAll` (`packages/core/src/disposable.ts`), idempotent terminal `dispose()` on `Application`, `PointerInput`, `NullRenderer`, `Texture`, `ImageAsset`; and §83's reference counting exists in exactly one place, `AssetManager`.

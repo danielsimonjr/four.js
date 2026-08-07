@@ -92,9 +92,17 @@ import {
   createFrameStats,
   monotonicNowSeconds,
   recordRenderStatistics,
+  recordResourceMemory,
   resetFrameStats,
   type FrameStats,
 } from "@four/diagnostics";
+// The one value this module takes from `@four/geometry` (A-5, 2026-08-07):
+// `geometryMemoryBytes` is a two-line reader over `resource-memory.ts`'s
+// module-level total, it names no geometry type and no primitive builder, and
+// the module it lives in is a leaf — so a bundle that never builds a geometry
+// keeps this function and drops the rest of the package, exactly as the
+// `resolveRenderer` import below drops every backend.
+import { geometryMemoryBytes } from "@four/geometry";
 import {
   DEFAULT_FIXED_DELTA_TIME,
   DEFAULT_MAXIMUM_SUB_STEPS,
@@ -125,17 +133,18 @@ import type {
   RendererRegistry,
   RendererSelection,
 } from "@four/render";
-// The one value this module takes from `@four/render` (R-2/A-8, 2026-08-07),
-// and the reason the sentence above says "backend" rather than "package":
-// `resolveRenderer` is `renderer-registry.ts`'s eight-line front door, it
-// names no backend and no other module of that package, and it deliberately
-// does not reference `RendererRegistry` — so a bundle whose application hands
-// this class a constructed renderer keeps this function and its message and
-// drops the registry, the §62 preference walk, and every backend with it. The
-// alternative, a `switch` over the §45 string, would make `four` import all
-// five backends and cost every program a renderer it never uses (§91; MEMORY
-// 2026-08-01).
-import { resolveRenderer } from "@four/render";
+// The two values this module takes from `@four/render` (R-2/A-8 and A-5,
+// 2026-08-07), and the reason the sentence above says "backend" rather than
+// "package": each is a leaf function that names no backend and no other module
+// of that package. `resolveRenderer` is `renderer-registry.ts`'s eight-line
+// front door and deliberately does not reference `RendererRegistry`, so a
+// bundle whose application hands this class a constructed renderer keeps this
+// function and its message and drops the registry, the §62 preference walk,
+// and every backend with it. The alternative, a `switch` over the §45 string,
+// would make `four` import all five backends and cost every program a renderer
+// it never uses (§91; MEMORY 2026-08-01). `textureMemoryBytes` reads
+// `resource-memory.ts`'s module-level §83 total and pulls in nothing else.
+import { resolveRenderer, textureMemoryBytes } from "@four/render";
 
 /**
  * The §10 main-loop events, as §6b types them.
@@ -403,9 +412,10 @@ export interface ApplicationOptions {
    * resets it at the top of every {@link Application.step}, measures
    * `cpuFrameTime` and `simulationTime` itself, and — when the renderer reports
    * them (§61's optional `statistics` member) — reads `drawCalls`, `triangles`,
-   * and `instances` back off the backend. The counters §84 lists that nothing
-   * in this repository can yet measure stay `NaN`; `FrameStats` says which and
-   * why.
+   * and `instances` back off the backend, and reads §83's live-resource totals
+   * for `textureMemory`/`bufferMemory` (A-5). The counters §84 lists that
+   * nothing in this repository can yet measure stay `NaN`; `FrameStats` says
+   * which and why.
    */
   stats?: boolean;
 
@@ -572,13 +582,17 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * `@four/diagnostics`.
    *
    * **A field reading `NaN` was not measured this frame**, as distinct from a
-   * `0` that was measured. Five of §84's eleven counters have no producer
+   * `0` that was measured. Three of §84's eleven counters have no producer
    * anywhere in this repository (`gpuFrameTime`, `physicsStepTime`,
-   * `contacts`, `textureMemory`, `bufferMemory` — the last two pending §83
-   * ownership tracking), and a sixth, `activeBodies`, has one
+   * `contacts`), and a fourth, `activeBodies`, has one
    * (`recordSolverStatistics`) that nothing *here* can call: this class owns no
    * physics world, which is A-6's `app.physics`. Until it does, an application
    * with a solver fills that field itself, from a fixed-step listener.
+   * `textureMemory` and `bufferMemory` joined the measured set with A-5's §83
+   * resource accounting (2026-08-07); they are **levels** — the bytes every
+   * live geometry, texture, and render target in the process holds at the end
+   * of the frame — and are reported with or without a renderer, because a
+   * resource is memory the engine holds whether or not anything drew it.
    * {@link @four/diagnostics!FrameStats | FrameStats} documents each counter
    * and what it waits on. `drawCalls`/`triangles`/`instances` are `NaN` with no
    * renderer, or with a backend that does not report statistics, and `0` when a
@@ -1068,6 +1082,13 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       if (this.#renderStatistics !== null) {
         recordRenderStatistics(stats, this.#renderStatistics);
       }
+      // §83's live-resource totals (A-5). Read *after* the frame, because they
+      // are levels rather than per-frame accumulations: what matters is what
+      // the engine holds once this frame's creations and disposals have
+      // happened. Unconditional — unlike the draw counters these need no
+      // renderer, since a geometry a headless application built is memory it
+      // holds whether or not anything has drawn it.
+      recordResourceMemory(stats, textureMemoryBytes(), geometryMemoryBytes());
       stats.cpuFrameTime = this.#now() - frameStarted;
     }
   }

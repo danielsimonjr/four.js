@@ -94,6 +94,11 @@ export type {
   ResizeRecord,
 } from "./renderer.js";
 export { NullRenderer } from "./renderer.js";
+export {
+  liveRenderTargetCount,
+  liveTextureCount,
+  textureMemoryBytes,
+} from "./resource-memory.js";
 export type {
   RenderStatistics,
   RenderStatisticsReporter,

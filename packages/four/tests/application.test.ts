@@ -12,9 +12,11 @@ import {
   type SimulationSystem,
   type TimeState,
 } from "@four/motion";
+import { BufferGeometry } from "@four/geometry";
 import {
   NullRenderer,
   RendererRegistry,
+  Texture,
   clearRegisteredRenderers,
   registerRenderer,
   type RendererBackend,
@@ -1256,14 +1258,55 @@ describe("Application — §84 statistics (A-1)", () => {
     app.step(FIXED);
     app.step(FIXED);
 
-    // The five §84 counters with no producer in this repository. They must read
+    // The four §84 counters with no producer in this repository. They must read
     // "not measured", not 0 — see `FrameStats` for what each one waits on.
+    // `textureMemory`/`bufferMemory` left this list when A-5 landed §83's
+    // resource accounting (2026-08-07); they are asserted live below.
     expect(app.stats?.gpuFrameTime).toBeNaN();
     expect(app.stats?.physicsStepTime).toBeNaN();
     expect(app.stats?.activeBodies).toBeNaN();
     expect(app.stats?.contacts).toBeNaN();
-    expect(app.stats?.textureMemory).toBeNaN();
-    expect(app.stats?.bufferMemory).toBeNaN();
+  });
+
+  it("reports §83's live-resource totals as the two memory counters (A-5)", async () => {
+    const app = await startedApplication({ stats: true });
+
+    app.step(FIXED);
+    const textureBefore = app.stats?.textureMemory ?? Number.NaN;
+    const bufferBefore = app.stats?.bufferMemory ?? Number.NaN;
+    expect(textureBefore).not.toBeNaN();
+    expect(bufferBefore).not.toBeNaN();
+
+    // Process-wide totals, so the assertions are deltas: another test file in
+    // the same worker may hold resources of its own (§83 — the numbers are
+    // levels for the realm, not for this application).
+    const geometry = new BufferGeometry({
+      positions: new Float32Array(9),
+    });
+    const texture = new Texture({ width: 4, height: 4 });
+
+    app.step(FIXED);
+    expect((app.stats?.bufferMemory ?? 0) - bufferBefore).toBe(36);
+    expect((app.stats?.textureMemory ?? 0) - textureBefore).toBe(64);
+
+    geometry.dispose();
+    texture.dispose();
+
+    app.step(FIXED);
+    expect(app.stats?.bufferMemory).toBe(bufferBefore);
+    expect(app.stats?.textureMemory).toBe(textureBefore);
+  });
+
+  it("measures the memory counters with no renderer at all (A-5)", async () => {
+    // Unlike the draw counters, these need no backend: a geometry a headless
+    // application built is memory the engine holds whether or not it was drawn.
+    const app = await startedApplication({ stats: true });
+
+    app.step(FIXED);
+
+    expect(app.stats?.drawCalls).toBeNaN();
+    expect(app.stats?.bufferMemory).toBeGreaterThanOrEqual(0);
+    expect(app.stats?.textureMemory).toBeGreaterThanOrEqual(0);
   });
 
   it("rewrites one record in place rather than allocating per frame", async () => {

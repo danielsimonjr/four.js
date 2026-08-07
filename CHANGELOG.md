@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-5 (accounting tier): §83 resource accounting; two §84 counters live
+
+#### Added
+
+- **§83 resource accounting (gap A-5).** `BufferGeometry.byteLength`,
+  `Texture.byteLength`, `RenderTarget.byteLength` (colour + the backend's real
+  `DEPTH_COMPONENT16` when `depth`), and process-wide live totals:
+  `geometryMemoryBytes()`/`liveGeometryCount()` (`@four/geometry`),
+  `textureMemoryBytes()`/`liveTextureCount()`/`liveRenderTargetCount()`
+  (`@four/render`). **Leak-safe by holding numbers, not references** (a tracker
+  retaining its resources would _be_ the leak; a `WeakRef` registry answers "was this
+  collected?", not §83's "was this disposed?"). A resource dropped without `dispose()`
+  stays billed — a counter that healed itself on GC would hide the only thing it
+  exists to show. One rule ("a disposed resource holds nothing": `byteLength → 0`)
+  makes double-dispose, resurrection-by-setter, and delta arithmetic fall out with no
+  call-site special cases. `recordResourceMemory` in `@four/diagnostics` is the §84
+  bridge — deliberately two numbers, not a transcribed record (no producer-owned shape
+  exists, so the seam is allocation-free by construction; the duck-typed-contract
+  count stays at five).
+
+#### Changed
+
+- **`app.stats.textureMemory` and `.bufferMemory` are measured** rather than staged
+  `NaN`; staged counters drop five → three. Both are **levels** (the first
+  `FrameStats` fields describing the engine, not the frame), reported with or without
+  a renderer, and are an accounting of what the engine _holds and would upload_, not a
+  driver query — stated on the fields. No backend file changed; the GL sequence is
+  byte-identical (structural: `render-webgl` untouched; also proven by the recording
+  rig). Size: +0.22 kB gzip; ui-demo at 30.96/31 kB — A-4's `__FOUR_DEV__` define is
+  now the practical blocker for the next `four`/`ui`-touching packet.
+
 ### 2026-08-07 — §79 drawing-tier node types (A-16 remainder)
 
 #### Added

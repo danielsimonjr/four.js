@@ -99,6 +99,7 @@ export {
   createMonotonicClock,
   monotonicNowSeconds,
   recordRenderStatistics,
+  recordResourceMemory,
   recordSolverStatistics,
   resetFrameStats,
 } from "./stats.js";

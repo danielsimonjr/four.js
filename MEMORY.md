@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-5 §83 resource accounting.** Decisions worth keeping:
+  - **Numbers, not references** — a tracker holding its resources would _be_ the leak;
+    `WeakRef`/`FinalizationRegistry` answers "was this collected?", not §83's "was this
+    disposed?", and non-deterministically.
+  - **A resource dropped without `dispose()` is never subtracted** — a self-healing
+    counter would hide the leak signal it exists to show; §83's contract is explicit
+    lifetimes and the accounting refuses to be more forgiving than the spec.
+  - **"A disposed resource holds nothing"** (`byteLength → 0`) — one rule makes
+    double-dispose, resurrection-by-setter, and delta arithmetic all fall out.
+  - **Levels, not per-frame counters** — `textureMemory`/`bufferMemory` describe the
+    engine, not the frame; reported with or without a renderer; an accounting of what
+    the engine holds and would upload, not GPU residency — stated on the fields.
+  - **Not every seam needs a transcribed shape** — `ResourceMemoryLike` was built then
+    deleted (no producer-owned record exists); `recordResourceMemory(stats, tex, buf)`
+    is allocation-free by construction. Duck-typed-contract count stays at five.
+  - **Gotchas (measured):** folding accounting into `markDirty()` with an
+    `#accountedBytes` field is _larger_ minified and puts byte math on a per-frame
+    path — don't retry. A-5 costs +0.22 kB gzip; ui-demo at 30.96/31 — A-4's
+    `__FOUR_DEV__` is now the practical blocker for the next four/ui-touching packet.
 - **2026-08-07 — A-16 remainder (drawing-tier §79 pairs).** Decisions worth keeping:
   - **Resources are keys, not payloads, and the catalog is a seam not a format** — §79
     mandates key-plus-manifest; the manifest needs A-18 content hashing, so what ships

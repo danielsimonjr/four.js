@@ -97,6 +97,8 @@
 import type { Disposable } from "@four/core";
 import type { MaterialTexture } from "@four/materials";
 
+import { noteRenderTarget } from "./resource-memory.js";
+
 /**
  * The texel format of a target's colour attachment (§62 "texture formats").
  *
@@ -316,6 +318,12 @@ class RenderTargetColorTexture implements RenderTargetTexture {
  * deliberately does not. Disposal is idempotent and terminal: a disposed target
  * is skipped by a backend rather than drawn into, exactly as a disposed texture
  * is skipped rather than sampled.
+ *
+ * Every target reports its size ({@link RenderTarget.byteLength}) to the
+ * process-wide §83 totals in `resource-memory.ts` — at construction, on
+ * `resize()`, and on `dispose()` — so an off-screen surface that is re-created
+ * per resize instead of resized shows up in §84's `textureMemory` as the leak
+ * it is (A-5, 2026-08-07).
  */
 export class RenderTarget implements Disposable {
   /**
@@ -350,6 +358,7 @@ export class RenderTarget implements Disposable {
     this.#height = options.height;
     this.#format = format;
     this.#depth = options.depth ?? true;
+    noteRenderTarget(1, this.byteLength);
   }
 
   /** Width of the colour attachment in texels. */
@@ -392,6 +401,33 @@ export class RenderTarget implements Disposable {
   }
 
   /**
+   * Bytes this target's attachments describe (§83, §84's `textureMemory`).
+   *
+   * Four bytes per texel for the `"rgba8"` colour attachment, plus **two** per
+   * texel for the depth buffer when {@link RenderTarget.depth} is on: the only
+   * depth storage this tier allocates is `DEPTH_COMPONENT16` (see
+   * `@four/render-webgl`'s `gl-render-target.ts`), and quoting the backend's
+   * actual format is the difference between accounting and guessing. The two
+   * constants move together when §67's `DEPTH24_STENCIL8` and §62's
+   * floating-point formats widen {@link RenderTargetFormat}.
+   *
+   * ```ts
+   * new RenderTarget({ width: 512, height: 512 }).byteLength; // 512*512*6
+   * new RenderTarget({ width: 512, height: 512, depth: false }).byteLength;
+   * // 512*512*4
+   * ```
+   *
+   * **`0` once disposed** — one rule with `Texture.byteLength`: a disposed
+   * resource holds nothing.
+   */
+  get byteLength(): number {
+    if (this.#disposed) {
+      return 0;
+    }
+    return this.#width * this.#height * (this.#depth ? 6 : 4);
+  }
+
+  /**
    * Changes the size of the colour (and depth) attachment (§85 validated).
    *
    * The backend re-allocates on the next frame that draws into this target,
@@ -417,8 +453,10 @@ export class RenderTarget implements Disposable {
       );
     }
     validateSize(width, height);
+    const before = this.byteLength;
     this.#width = width;
     this.#height = height;
+    noteRenderTarget(0, this.byteLength - before);
     this.#version += 1;
   }
 
@@ -435,12 +473,19 @@ export class RenderTarget implements Disposable {
    *
    * Materials pointing at {@link RenderTarget.colorTexture} are not notified;
    * ownership is explicit and upwards (§83).
+   *
+   * It **does** remove this target and its bytes from the process-wide §83
+   * totals (`textureMemoryBytes`, `liveRenderTargetCount`), exactly once: the
+   * idempotence guard above is what makes a double `dispose()` subtract once
+   * rather than twice.
    */
   dispose(): void {
     if (this.#disposed) {
       return;
     }
+    const before = this.byteLength;
     this.#disposed = true;
+    noteRenderTarget(-1, -before);
     this.#version += 1;
   }
 }

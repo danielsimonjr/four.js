@@ -78,10 +78,21 @@
  * In-place edits followed by {@link BufferGeometry.markDirty} are *not*
  * re-validated. That is the fast path, and re-validating it would defeat the
  * purpose of having one.
+ *
+ * ## Resource accounting (§83, A-5)
+ *
+ * Every geometry reports its size ({@link BufferGeometry.byteLength}) to the
+ * process-wide totals in `resource-memory.ts` — at construction, on each
+ * attribute replacement, and on `dispose()` — which is what makes §84's
+ * `bufferMemory` measurable and a leaked geometry visible. The accounting is
+ * arithmetic on two module-level numbers, holds no reference to anything, and
+ * never runs on a draw path. `resource-memory.ts` documents the design.
  */
 
 import type { Disposable } from "@four/core";
 import { Vector3 } from "@four/math";
+
+import { noteGeometry } from "./resource-memory.js";
 
 /**
  * How a geometry's vertices assemble into primitives.
@@ -352,6 +363,18 @@ export class BufferGeometry implements Disposable {
     this.#colors = options.colors;
     this.#indices = options.indices;
     this.#mode = mode;
+    noteGeometry(1, this.byteLength);
+  }
+
+  /**
+   * Announces a mutation that may have changed how many bytes this geometry
+   * holds: reconciles the §83 totals against `bytesBefore` and bumps the
+   * version. The one place attribute replacement and disposal share, so the two
+   * cannot drift apart.
+   */
+  #mutated(bytesBefore: number): void {
+    noteGeometry(0, this.byteLength - bytesBefore);
+    this.markDirty();
   }
 
   /**
@@ -377,8 +400,9 @@ export class BufferGeometry implements Disposable {
       this.#indices,
       this.#mode,
     );
+    const before = this.byteLength;
     this.#positions = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -407,8 +431,9 @@ export class BufferGeometry implements Disposable {
       this.#indices,
       this.#mode,
     );
+    const before = this.byteLength;
     this.#normals = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -439,8 +464,9 @@ export class BufferGeometry implements Disposable {
       this.#indices,
       this.#mode,
     );
+    const before = this.byteLength;
     this.#uvs = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -471,8 +497,9 @@ export class BufferGeometry implements Disposable {
       this.#indices,
       this.#mode,
     );
+    const before = this.byteLength;
     this.#colors = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -494,8 +521,9 @@ export class BufferGeometry implements Disposable {
       value,
       this.#mode,
     );
+    const before = this.byteLength;
     this.#indices = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -547,6 +575,40 @@ export class BufferGeometry implements Disposable {
   /** Whether {@link BufferGeometry.dispose} has run. */
   get disposed(): boolean {
     return this.#disposed;
+  }
+
+  /**
+   * Bytes this geometry holds (§83, §84's `bufferMemory`) — the sum of the
+   * `byteLength`s of `positions` and whichever of `normals`, `uvs`, `colors`,
+   * and `indices` are present, and therefore exactly what a backend uploads
+   * for it.
+   *
+   * ```ts
+   * // 3 vertices × 3 floats × 4 bytes
+   * new BufferGeometry({ positions: new Float32Array(9) }).byteLength; // 36
+   * ```
+   *
+   * **`0` once disposed**, because a disposed geometry holds nothing — that is
+   * the same fact `positions` reports by becoming empty, stated as a single
+   * rule so that a write into a disposed geometry (already a §83 "disposed
+   * resource still in use" mistake) cannot resurrect its bytes in the
+   * process-wide totals.
+   *
+   * Derived on every read rather than cached: it is five property reads and an
+   * addition, nothing on the draw path calls it, and a cached copy would be one
+   * more thing an in-place edit could invalidate.
+   */
+  get byteLength(): number {
+    if (this.#disposed) {
+      return 0;
+    }
+    return (
+      this.#positions.byteLength +
+      (this.#normals?.byteLength ?? 0) +
+      (this.#uvs?.byteLength ?? 0) +
+      (this.#colors?.byteLength ?? 0) +
+      (this.#indices?.byteLength ?? 0)
+    );
   }
 
   /**
@@ -634,17 +696,24 @@ export class BufferGeometry implements Disposable {
    * Disposing does **not** notify the renderables pointing at this geometry;
    * ownership is explicit and upwards (§83), so whoever created the geometry
    * decides when nothing needs it any more.
+   *
+   * It **does** remove this geometry and its bytes from the process-wide §83
+   * totals (`geometryMemoryBytes`, `liveGeometryCount`), exactly once: the
+   * idempotence guard above is what makes a double `dispose()` subtract once
+   * rather than twice.
    */
   dispose(): void {
     if (this.#disposed) {
       return;
     }
+    const before = this.byteLength;
     this.#disposed = true;
     this.#positions = EMPTY_POSITIONS;
     this.#normals = undefined;
     this.#uvs = undefined;
     this.#colors = undefined;
     this.#indices = undefined;
+    noteGeometry(-1, -before);
     this.markDirty();
   }
 }

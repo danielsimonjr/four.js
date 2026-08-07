@@ -26,9 +26,14 @@
  * assertion above it and be wrong exactly when a frame is interesting.
  */
 
-import { planeGeometry } from "@four/geometry";
+import { geometryMemoryBytes, planeGeometry } from "@four/geometry";
 import { UnlitMaterial } from "@four/materials";
-import { Renderable } from "@four/render";
+import {
+  RenderTarget,
+  Renderable,
+  Texture,
+  textureMemoryBytes,
+} from "@four/render";
 import {
   GL,
   WebglRenderer,
@@ -332,11 +337,68 @@ describe("A-1 — §84 statistics through the whole stack", () => {
       app.stats?.physicsStepTime,
       app.stats?.activeBodies,
       app.stats?.contacts,
-      app.stats?.textureMemory,
-      app.stats?.bufferMemory,
     ]) {
       expect(staged).toBeNaN();
     }
+  });
+
+  it("reports §83's live-resource totals as textureMemory/bufferMemory (A-5)", async () => {
+    // The A-5 half of the same claim, and the same shape of end-to-end check:
+    // `@four/geometry` and `@four/render` each keep a process-wide total of
+    // what their live resources hold, `@four/diagnostics` transcribes the pair
+    // it may not import, and `Application` reads them at the frame boundary.
+    const { app } = await harness(3, { stats: true });
+
+    app.step(FIXED);
+
+    // The harness built three real `planeGeometry` quads, so the total is at
+    // least their bytes — and it is the *same* number the producing package
+    // reports, which is what makes this a bridge test rather than a re-derived
+    // guess.
+    expect(app.stats?.bufferMemory).toBe(geometryMemoryBytes());
+    expect(app.stats?.textureMemory).toBe(textureMemoryBytes());
+    expect(app.stats?.bufferMemory).toBeGreaterThan(0);
+  });
+
+  it("follows a texture and a target created and disposed mid-session (A-5)", async () => {
+    const { app } = await harness(1, { stats: true });
+
+    app.step(FIXED);
+    const before = app.stats?.textureMemory ?? Number.NaN;
+    expect(before).not.toBeNaN();
+
+    const atlas = new Texture({ width: 64, height: 64 });
+    const target = new RenderTarget({ width: 32, height: 32, depth: false });
+
+    app.step(FIXED);
+    expect((app.stats?.textureMemory ?? 0) - before).toBe(
+      64 * 64 * 4 + 32 * 32 * 4,
+    );
+
+    atlas.dispose();
+    target.dispose();
+
+    app.step(FIXED);
+    expect(app.stats?.textureMemory).toBe(before);
+  });
+
+  it("adds no GL call for the memory counters (A-5)", async () => {
+    // The counters are read from CPU-side accounting, never from the driver, so
+    // switching statistics on must still produce the byte-identical GL
+    // sequence the A-1 test below pins — asserted here with a live texture and
+    // target in the process, which is the case a driver query would break.
+    const atlas = new Texture({ width: 8, height: 8 });
+    const off = await harness(2);
+    const on = await harness(2, { stats: true });
+
+    off.app.step(FIXED);
+    on.app.step(FIXED);
+
+    expect(on.recorder.names).toEqual(off.recorder.names);
+    expect(on.app.stats?.textureMemory).toBeGreaterThanOrEqual(
+      atlas.byteLength,
+    );
+    atlas.dispose();
   });
 
   it("costs the frame nothing at all when it is off", async () => {
@@ -354,6 +416,9 @@ describe("A-1 — §84 statistics through the whole stack", () => {
     expect(off.renderer.statistics).toBeNull();
     expect(on.recorder.names).toEqual(off.recorder.names);
     expect(on.app.stats?.drawCalls).toBe(3);
+    // …and the A-5 counters are live in the measured application while the
+    // unmeasured one still records nothing at all.
+    expect(on.app.stats?.bufferMemory).toBeGreaterThan(0);
   });
 
   it("hands the backend's statistics slot back when the application is disposed", async () => {
