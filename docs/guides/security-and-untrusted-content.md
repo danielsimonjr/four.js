@@ -1,0 +1,189 @@
+# Security and untrusted content
+
+§96 opens with a single sentence that decides everything else in this guide:
+
+> Asset loaders and scene deserializers shall treat external content as
+> untrusted.
+
+A scene file, a replay recording, and a downloaded asset all arrive from
+somewhere the application does not control — a CDN, a user's disk, a bug
+report, a URL someone pasted. This guide states what the engine does about
+that, what it does **not** do, and the content-security-policy posture a
+deployer can write their headers from.
+
+## Honest state first
+
+§96 lists seven requirements. Four are met, one is partial, and two are absent
+because the feature they would guard does not exist yet.
+
+| §96 requirement                                  | State       | Where                                                                                                                                                                                      |
+| ------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| bounds checking                                  | **met**     | `validateSceneDocument` / `validateReplayRecording` rebuild a document field by field and drop every key they do not know; geometry validates index ranges; base64 is canonical-only       |
+| no arbitrary code execution from scene files     | **met**     | the formats are JSON; `cloneJsonValue` refuses a `__proto__` key; nothing anywhere in the engine calls `eval` or builds a `Function` from a string (see "CSP posture", which is tested)    |
+| input-size limits                                | **met**     | `AssetManagerOptions.maximumBytes` for transport; `maximumTextLength` on `decodeSceneDocument` / `decodeReplayRecording` for documents — all three finite by default                       |
+| cancellation and timeouts for expensive decoders | **partial** | `AssetManagerOptions.timeoutSeconds` bounds a whole load, transport and decode together. Caller-driven cancellation and transport-level `AbortSignal` are still staged — see "What is not" |
+| documented content-security-policy behavior      | **met**     | this guide's "CSP posture" section, enforced by `tests/integration/security-csp.test.ts`                                                                                                   |
+| decompression limits                             | **absent**  | no compressed path exists (no gzip, no Draco, no Basis) — there is nothing yet to bound                                                                                                    |
+| safe shader/plugin boundaries                    | **absent**  | there is no plugin system, and no application-authored shader source path; see `custom-shaders.md` for the staged §60 seam                                                                 |
+
+Depth limiting is the sixth item's neighbour rather than one of the seven, and
+it is met: both decoders bound JSON nesting. It matters more than its absence
+from the list suggests — see "Deep documents are a denial of service", below.
+
+## Assets: bytes and deadlines
+
+`AssetManager` is the only thing in the engine that touches a network, so both
+transport-side §96 limits live on it. Both defaults are **finite**; a limit
+that defaults to `Infinity` is documentation, not a limit.
+
+```ts
+import { AssetManager, jsonLoader } from "four/assets";
+
+const assets = new AssetManager({
+  maximumBytes: 8 * 1024 * 1024, // default: 64 MiB
+  timeoutSeconds: 10, // default: 30 s — seconds, like every four.js duration
+});
+
+try {
+  const level = await assets.load("/levels/1.json", jsonLoader);
+} catch (error) {
+  // FourError, code "ASSET_LOAD_FAILED", context:
+  //   { url, loader, limitName: "maximumBytes" | "timeoutSeconds",
+  //     limit, observed? }
+}
+```
+
+Two details are worth knowing because they change what an attacker can do:
+
+- **The size limit is checked twice.** First against the response's declared
+  `content-length`, before a single byte of body is read — an oversize download
+  is refused while it is still a header. Then against what the body actually
+  produced, because `content-length` is a claim by the same party that sent the
+  bytes. The loader is handed a bounded view of the response whose
+  `arrayBuffer()`, `text()`, and `json()` refuse an over-budget body rather
+  than returning it, so a decoder never sees bytes the application declined.
+  `text()` is measured in UTF-16 code units, which is never more than the UTF-8
+  byte count — conservative in the safe direction.
+- **The deadline covers decode, not just transport.** §96's phrase is
+  "expensive decoders", and a decoder that never returns is exactly as fatal as
+  a socket that never closes.
+
+Either limit can be set to `Number.POSITIVE_INFINITY`, which is how an
+application records in its own source that it has decided to trust an origin.
+
+## Documents: length and depth
+
+```ts
+import { decodeSceneDocument } from "four/serialization";
+import { decodeReplayRecording } from "four/diagnostics";
+
+const scene = decodeSceneDocument(text, {
+  maximumTextLength: 1_000_000, // default: 33_554_432 UTF-16 code units
+  maximumDepth: 64, // default: 1024 nesting levels
+});
+
+const recording = decodeReplayRecording(replayText);
+```
+
+A refused document raises `FourError` with code `UNTRUSTED_INPUT_REJECTED` and
+a `context` naming the `limitName`, its `limit`, and the `observed`
+measurement — so a host can log which policy fired without parsing a message.
+That code is deliberately distinct from the `TypeError`s the validators throw
+for a malformed field: those say "this is not a scene", this says "this is not
+something we are willing to look at".
+
+The two `validate*` entry points (`validateSceneDocument`,
+`validateReplayRecording`) are **not** guarded, and that is deliberate: they
+take a value the caller already built or vouched for — `ReplayRecorder.finish`
+and `ReplayPlayer.load` both go through them — and bounding an in-memory object
+the process just produced would refuse nothing an attacker controls. The guard
+belongs at the text boundary, which is where the untrusted content is.
+
+### Deep documents are a denial of service
+
+`JSON.parse` is not the vulnerable step. V8 parses a hundred thousand levels of
+`[[[[…]]]]` without complaint. The vulnerable step is the engine's own:
+`validateSceneDocument` recurses once per `children` generation,
+`cloneJsonValue` once per level of a metadata payload. A few kilobytes of
+nested brackets therefore buys a `RangeError: Maximum call stack size exceeded`
+thrown from deep inside a validator, on a stack too short to say what happened,
+in a host that shares that stack with everything else on the page.
+
+So the depth check runs before any recursive consumer sees the value, and the
+check is itself **iterative** — breadth-first, one level at a time. A recursive
+depth checker would be the same defect wearing the guard's name: it would
+overflow on precisely the input it exists to refuse.
+
+The default of 1024 levels admits a node subtree roughly 500 generations deep
+(a §79 node costs two JSON levels per generation), which is far past any
+authored scene and far short of the recursion depth at which a validator dies.
+
+## CSP posture
+
+four.js is designed to run under a strict Content-Security-Policy with **no
+`'unsafe-eval'` and no `'unsafe-inline'`**. Concretely, no package in this
+repository:
+
+- calls `eval`, or builds a function from a string (`new Function`, or a
+  string argument to `setTimeout` / `setInterval`) — so `script-src` needs no
+  `'unsafe-eval'`;
+- writes markup into the document (`innerHTML`, `outerHTML`,
+  `insertAdjacentHTML`, `document.write`) or assigns a raw `style.cssText` — so
+  neither `script-src` nor `style-src` needs `'unsafe-inline'`;
+- injects a `<script>` or `<style>` element of its own. The renderer draws into
+  a canvas the application supplies; `@four/ui` is a scene-graph widget tier
+  that renders through that same canvas, not a DOM component library.
+
+A workable starting policy for an application built on four.js:
+
+```
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self';
+  style-src 'self';
+  img-src 'self' data: blob:;
+  connect-src 'self' https://your-asset-origin.example;
+  worker-src 'self' blob:;
+```
+
+Widen `connect-src` to the origins `AssetManager` fetches from, and `img-src`
+to wherever textures come from. `worker-src 'self' blob:` is there for §88's
+staged worker modes; drop it until you use one.
+
+**This section is tested, not merely asserted.**
+`tests/integration/security-csp.test.ts` greps every `packages/*/src` file and
+every example for those constructs and fails if one appears. A package that
+genuinely needs one does not silence the test — it changes this guide first,
+because this guide is the document a deployer's policy is written from.
+
+Two related deployment headers are covered elsewhere: WebGPU and shared-memory
+worker modes need COOP/COEP, which
+[Workers and cross-origin isolation](workers-and-cross-origin-isolation.md)
+explains.
+
+## What is not covered
+
+Being explicit about the holes is the point of the honest-state table; these
+are the three that most affect how you deploy:
+
+1. **Transport-level cancellation.** `timeoutSeconds` releases the _caller_ —
+   the promise rejects and the cache entry is evicted, so the key is
+   immediately retryable — but the underlying request is not aborted and may
+   drain in the background. A signal cannot be threaded through the
+   `FetchLike` seam without either naming DOM types the package refuses to
+   name, or breaking the property that a platform `fetch` needs no adapter; the
+   compatible design (a generic signal parameter) is recorded in
+   `packages/assets/src/asset-manager.ts`'s staging note.
+2. **Decompression limits.** Nothing in the engine decompresses anything yet.
+   When a compressed texture or a gzipped scene lands, it needs a ratio bound
+   as well as an output bound — an input-size limit alone does not stop a zip
+   bomb.
+3. **Shader and plugin boundaries.** There is no plugin system, and no path by
+   which a scene file can name shader source. Both would be new trust
+   boundaries and both need their own §96 pass when they arrive.
+
+Beyond §96's list, two ordinary web-application responsibilities remain the
+application's, not the engine's: four.js never validates that a URL points
+somewhere you meant (do that before calling `load`), and it never sets response
+headers — `Content-Type`, `X-Content-Type-Options: nosniff`, and CORS policy
+are your server's.

@@ -63,7 +63,13 @@
  * those units.
  */
 
-import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
+import {
+  FourError,
+  cloneJsonValue,
+  parseUntrustedJson,
+  type JsonValue,
+  type UntrustedJsonLimits,
+} from "@four/core";
 import {
   DEFAULT_TRANSFORM_AUTHORITY,
   TRANSFORM_AUTHORITIES,
@@ -674,13 +680,48 @@ export function encodeSceneDocument(document: SceneDocument): string {
 }
 
 /**
- * Parses and validates JSON text as a §79 scene document.
+ * Size and nesting bounds for an untrusted document — `@four/core`'s
+ * {@link UntrustedJsonLimits}, re-exported so a caller of
+ * {@link decodeSceneDocument} does not have to reach past this package for the
+ * type of its own second argument.
+ *
+ * The same type bounds `@four/diagnostics`' §34 recordings; see `@four/core`'s
+ * `untrusted.ts` for why one definition sits below both.
+ */
+export type { UntrustedJsonLimits } from "@four/core";
+
+/**
+ * Parses and validates JSON text as a §79 scene document, treating the text as
+ * **untrusted** (§96).
+ *
+ * §96 requires that "scene deserializers shall treat external content as
+ * untrusted", with input-size limits among its named requirements. This is that
+ * enforcement point for the §79 format, and it is the *only* one on this path:
+ * the text length is checked before `JSON.parse` runs, and the nesting depth
+ * before {@link validateSceneDocument} — whose `validateNode` recurses once per
+ * `children` generation — ever sees the value. A caller that parses the text
+ * itself and hands the result to {@link validateSceneDocument} has opted out of
+ * both, deliberately; that entry point stays unguarded because by then the
+ * value is already a live object the caller built or vouched for.
+ *
+ * Both bounds default to finite, generous values (`DEFAULT_MAXIMUM_TEXT_LENGTH`,
+ * `DEFAULT_MAXIMUM_DEPTH`), so a document this engine has ever written decodes
+ * exactly as it did before the guard existed. Raising one is an explicit,
+ * per-call decision.
  *
  * @param text JSON text, typically read from a `.four.json` file (§79)
+ * @param limits optional §96 bounds; omitted fields take their defaults
  * @returns the canonical, frozen document
+ * @throws FourError `UNTRUSTED_INPUT_REJECTED` if the text is too long or nests
+ * too deeply
  * @throws SyntaxError if the text is not JSON; then exactly as
  * {@link validateSceneDocument}
  */
-export function decodeSceneDocument(text: string): SceneDocument {
-  return validateSceneDocument(JSON.parse(text) as unknown);
+export function decodeSceneDocument(
+  text: string,
+  limits?: UntrustedJsonLimits,
+): SceneDocument {
+  return validateSceneDocument(
+    parseUntrustedJson(text, "Scene document", limits),
+  );
 }

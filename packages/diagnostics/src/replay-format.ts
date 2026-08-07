@@ -69,7 +69,13 @@
  * produce. Step indices are non-negative safe integers.
  */
 
-import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
+import {
+  FourError,
+  cloneJsonValue,
+  parseUntrustedJson,
+  type JsonValue,
+  type UntrustedJsonLimits,
+} from "@four/core";
 
 /**
  * Any value JSON can carry, losslessly — `@four/core`'s {@link JsonValue},
@@ -713,15 +719,50 @@ export function encodeReplayRecording(recording: ReplayRecording): string {
 }
 
 /**
- * Parses and validates JSON text as a §34 replay document.
+ * Size and nesting bounds for an untrusted document — `@four/core`'s
+ * {@link UntrustedJsonLimits}, re-exported so a caller of
+ * {@link decodeReplayRecording} does not have to reach past this package for
+ * the type of its own second argument.
+ *
+ * The same type bounds `@four/serialization`'s §79 scene documents; see
+ * `@four/core`'s `untrusted.ts` for why one definition sits below both.
+ */
+export type { UntrustedJsonLimits } from "@four/core";
+
+/**
+ * Parses and validates JSON text as a §34 replay document, treating the text as
+ * **untrusted** (§96).
+ *
+ * A recording is exactly the kind of file §96 has in mind: it arrives from a bug
+ * report, a CI artifact, or a user's disk, and the first thing the engine does
+ * with it is walk it. So the text length is checked before `JSON.parse` runs,
+ * and the nesting depth before {@link validateReplayRecording} — whose
+ * `cloneJsonValue` copies of `metadata` and `worldConfiguration` recurse once
+ * per level — ever sees the value.
+ *
+ * {@link validateReplayRecording} itself stays unguarded, deliberately: it is
+ * the entry point for a value the caller *built* (`ReplayRecorder.finish` and
+ * `ReplayPlayer.load` both go through it), and bounding an in-memory object the
+ * process just produced would refuse nothing an attacker controls.
+ *
+ * Both bounds default to finite, generous values, so every recording and golden
+ * in this repository decodes exactly as it did before the guard existed.
  *
  * @param text JSON text, typically read from a file
+ * @param limits optional §96 bounds; omitted fields take their defaults
  * @returns the canonical, frozen recording
+ * @throws FourError `UNTRUSTED_INPUT_REJECTED` if the text is too long or nests
+ * too deeply
  * @throws SyntaxError if the text is not JSON; then exactly as
  * {@link validateReplayRecording}
  */
-export function decodeReplayRecording(text: string): ReplayRecording {
-  return validateReplayRecording(JSON.parse(text) as unknown);
+export function decodeReplayRecording(
+  text: string,
+  limits?: UntrustedJsonLimits,
+): ReplayRecording {
+  return validateReplayRecording(
+    parseUntrustedJson(text, "Replay recording", limits),
+  );
 }
 
 /**

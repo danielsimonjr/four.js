@@ -27,6 +27,22 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 2 (2026-08-07) — in progress
 
+- [x] **A-23 DONE 2026-08-07** (§96): asset `maximumBytes`/`timeoutSeconds`,
+      `decodeSceneDocument`/`decodeReplayRecording` over `parseUntrustedJson`
+      (text-length + iterative depth limits), `UNTRUSTED_INPUT_REJECTED`, the
+      security guide, and the CSP grep test
+- [ ] **A-18 half-remaining:** deadline + eviction closed by A-23; still open:
+      caller-driven cancellation and transport `AbortSignal` — the compatible design
+      (generic `FetchLike<TSignal>` + injected abort handle) is recorded in
+      `packages/assets/src/asset-manager.ts`; the naive `signal` parameter widening is
+      proven incompatible with `typeof fetch`
+- [ ] **§96 residue:** decompression limits (needed the moment gzip/Draco/Basis lands —
+      a size bound alone does not stop a zip bomb); shader/plugin trust boundaries
+      (blocked on A-3)
+- [ ] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
+      graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/
+      materials/assets/core/serialization/diagnostics surface)
+
 - [x] **R-19 + R-20 DONE 2026-08-07** (render-tier keystones): `BufferGeometry.uvs`/
       `.colors`, `UnlitMaterial.map`/`.vertexColors`, `LitMaterial.map`, nine 3D
       primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left

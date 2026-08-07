@@ -25,6 +25,7 @@ export type {
   SceneDocument,
   SceneNodeDocument,
   TransformDocument,
+  UntrustedJsonLimits,
   Vector3Document,
 } from "./format.js";
 export {

@@ -8,6 +8,7 @@ Implements §33–34 (checksums, snapshots, replay) and the data side of §41/§
 
 - **Checksums (§33)** — `createChecksum` / `Checksum` / `hashFloats`, the FNV-1a digest used by the determinism golden tests.
 - **Replay (§34)** — `ReplayRecorder` and `ReplayPlayer` over a duck-typed `ReplayTarget` (any `PhysicsWorld`-shaped host; `applyInput` optional), plus the versioned recording envelope: `encodeReplayRecording` / `decodeReplayRecording` / `validateReplayRecording`, `isReplayCompatible` / `assertReplayCompatible`, `REPLAY_FORMAT_VERSION`, and strict canonical base64 (`encodeBase64` / `decodeBase64`). Recording is non-perturbing; replays are checksum-verified bit-identical.
+- **§96 untrusted text** — `decodeReplayRecording(text, limits?)` takes `UntrustedJsonLimits` (`maximumTextLength`, `maximumDepth`; finite defaults) and refuses an over-budget or over-deep recording with `UNTRUSTED_INPUT_REJECTED` before `cloneJsonValue` recurses into it. `validateReplayRecording` is deliberately unguarded — recorders hand it live values.
 - **Debug draw (§41)** — `DebugDrawBuffer` (world-space line list, 7 floats per vertex) fed by duck-typed collectors: `collectBodyOrigins`, `collectBodyVelocities`, `collectContactPoints`, `collectContactImpulses`.
 - **Solver statistics** — `solverStatistics` / `solverJointStatistics` over the adapter access seams.
 

@@ -8,6 +8,41 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-23 closed: §96 untrusted-content limits enforced and tested
+
+Asset loads and document decoders now enforce input-size limits and a deadline, and the
+CSP posture is documented and mechanically tested. `grep -rn "§96"` went from zero source
+citations to 40+.
+
+#### Security
+
+- **`@four/assets`**: `AssetManagerOptions.maximumBytes` (default 64 MiB) checked against
+  `content-length` **before** the body is read _and_ against the body a loader actually
+  reads (a lying header is caught by the second check — tested), and `timeoutSeconds`
+  (default 30, injectable `TimerLike`; seconds per repo convention — milliseconds appear
+  only at the platform boundary parameter) covering transport and decode together.
+  Refusals are `ASSET_LOAD_FAILED` with `context.limitName`/`.limit`/`.observed`, uncached
+  and retryable. This closes the **deadline half of A-18** (a stalled load can no longer
+  pin a refcount forever); caller-driven abort remains, with its compatible design
+  (`FetchLike<TSignal>` + injected abort handle) recorded in `asset-manager.ts` — the
+  naive `signal` widening is proven incompatible with `typeof fetch`.
+- **`@four/serialization` / `@four/diagnostics`**: new `decodeSceneDocument(text, limits?)`
+  (§79) and `decodeReplayRecording(text, limits?)` (§34) route through `@four/core`'s new
+  `parseUntrustedJson` — `maximumTextLength` (32 Mi code units) and `maximumDepth` (1024
+  levels, walked **iteratively**: a recursive checker would overflow on exactly the input
+  it refuses; the vulnerability is proven by tests showing the unguarded validators
+  stack-overflow at 50 000 nesting generations). New §89 error code
+  `UNTRUSTED_INPUT_REJECTED` separates "hostile input" from the validators' "malformed
+  input". Guards live at the text boundary only — `validateSceneDocument` /
+  `validateReplayRecording` are unchanged by design, which is what kept every golden
+  byte-identical.
+- **New guide `docs/guides/security-and-untrusted-content.md`** (§96 requirement table —
+  met/partial/absent, honestly — and the CSP posture) and
+  **`tests/integration/security-csp.test.ts`**, which fails if any shipped source gains
+  `eval`, `new Function`, a string-argument timer, `innerHTML`/`document.write`, or
+  `style.cssText`; each matcher self-tests against a positive example so it cannot rot
+  into a no-op.
+
 ### 2026-08-07 — R-19 + R-20 closed: §53 vertex attributes, textured meshes, nine 3D primitives
 
 The render tier's two keystone gaps close together. Until now a mesh could not be textured

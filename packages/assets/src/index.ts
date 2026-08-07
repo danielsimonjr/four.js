@@ -6,6 +6,12 @@
  * image loaders. glTF/GLB (§78) and the texture system (§77) are staged with
  * dated notes in `loaders.ts` and `asset-manager.ts` — they need the §55
  * material tier and a texture representation that do not exist yet.
+ *
+ * §96's "asset loaders … shall treat external content as untrusted" is enforced
+ * by the manager, not the loaders: an input-size limit
+ * ({@link DEFAULT_MAXIMUM_BYTES}) and a whole-load deadline
+ * ({@link DEFAULT_TIMEOUT_SECONDS}), both finite by default, both overridable
+ * per manager. See `docs/guides/security-and-untrusted-content.md`.
  */
 
 export const PACKAGE_NAME = "@four/assets";
@@ -15,8 +21,14 @@ export type {
   AssetManagerOptions,
   FetchLike,
   FetchResponse,
+  ResponseHeadersLike,
+  TimerLike,
 } from "./asset-manager.js";
-export { AssetManager } from "./asset-manager.js";
+export {
+  AssetManager,
+  DEFAULT_MAXIMUM_BYTES,
+  DEFAULT_TIMEOUT_SECONDS,
+} from "./asset-manager.js";
 export type { ImageBitmapLike, ImageDecodeLike } from "./loaders.js";
 export {
   ImageAsset,

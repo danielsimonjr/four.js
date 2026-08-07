@@ -17,3 +17,9 @@ export type { FourErrorCode, FourErrorOptions } from "./errors.js";
 export { FourError, isFourError } from "./errors.js";
 export type { EventListener, Unsubscribe } from "./events.js";
 export { EventEmitter } from "./events.js";
+export type { UntrustedJsonLimits } from "./untrusted.js";
+export {
+  DEFAULT_MAXIMUM_DEPTH,
+  DEFAULT_MAXIMUM_TEXT_LENGTH,
+  parseUntrustedJson,
+} from "./untrusted.js";

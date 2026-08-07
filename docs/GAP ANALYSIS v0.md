@@ -633,6 +633,16 @@ _Dependencies:_ owner decision (spec amendment); blocks A-21 step 3.
 
 ### A-23 — §96 security requirements are entirely unimplemented
 
+> **CLOSED 2026-08-07** — asset `maximumBytes` (64 MiB, checked against `content-length`
+> before the body is read and again against the bytes a loader reads) + `timeoutSeconds`
+> (30 s, injectable `TimerLike`); `decodeSceneDocument`/`decodeReplayRecording` over
+> `@four/core`'s `parseUntrustedJson` (32 Mi code units, 1024 levels, **iterative** depth
+> walk); new `UNTRUSTED_INPUT_REJECTED` code; `docs/guides/security-and-untrusted-content.md`
+> with the honest requirement table; the CSP posture enforced by
+> `tests/integration/security-csp.test.ts`. Closes A-18's deadline half. Still absent, now
+> recorded: decompression limits (no compressed path exists yet) and plugin boundaries
+> (A-3). Kept for the record.
+
 **§96, §76, §79** · **Severity: High** · **Effort: M** · **SILENT**
 
 §96 opens _"Asset loaders and scene deserializers shall treat external content as untrusted"_ and lists seven requirements. Verified state:

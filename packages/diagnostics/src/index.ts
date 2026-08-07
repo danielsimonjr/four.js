@@ -17,6 +17,7 @@ export type {
   ReplayInputRecord,
   ReplayRecording,
   ReplaySnapshotRecord,
+  UntrustedJsonLimits,
 } from "./replay-format.js";
 export {
   REPLAY_FORMAT_VERSION,

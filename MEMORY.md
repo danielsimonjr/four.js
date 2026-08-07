@@ -28,6 +28,31 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-23 (§96 untrusted content).** Decisions worth keeping:
+  - **A signal cannot cross the `FetchLike` seam today — measured, not assumed.** Widening
+    to `(url, init?: { signal?: AbortSignalLike })` breaks `typeof fetch` assignability
+    (contravariant parameters; `RequestInit.signal` is `AbortSignal | null`, and a
+    structural stand-in is missing `onabort`/`reason`/`throwIfAborted`/`dispatchEvent`).
+    The compatible widening is generic — `FetchLike<TSignal = never>` plus an injected
+    `() => { signal: TSignal; abort(): void }` — recorded in `asset-manager.ts` as A-18's
+    remaining half. `FetchResponse` **property** widening is safe
+    (`headers?: ResponseHeadersLike`) and is how the `content-length` pre-check got in.
+  - **§96 guards belong at the text boundary (`decode*`), never at `validate*`** — the
+    validators take values the process itself built, so guarding them refuses nothing an
+    attacker controls and would bound the recorder's own output. This is what kept every
+    golden byte-identical.
+  - **Any depth checker must be iterative** — a recursive one overflows on precisely the
+    input it guards (proven: the unguarded validators stack-overflow at 50 000 nesting
+    generations while `JSON.parse` succeeds).
+  - **A limit defaulting to `Infinity` is documentation, not a limit** — all four defaults
+    are finite (64 MiB / 30 s / 32 Mi code units / 1024 levels);
+    `Number.POSITIVE_INFINITY` is the explicit in-source opt-out.
+  - New §89 code `UNTRUSTED_INPUT_REJECTED` ("hostile input") vs the validators'
+    `TypeError` ("malformed input"); asset refusals stay `ASSET_LOAD_FAILED`; all carry
+    `context.limitName`/`.limit`.
+  - **The CSP claim is enforced, not asserted** (`tests/integration/security-csp.test.ts`,
+    self-testing matchers) — per the 2026-08-05 doc-truth rule. A package that needs
+    `eval` changes the guide first.
 - **2026-08-07 — R-19/R-20 (render keystones).** Decisions worth keeping:
   - **Textured meshes are a uniform switch, not shader variants** (`useMap`/
     `useVertexColors` on the one unlit/lit program each): the CPU-mirrored default at GL's

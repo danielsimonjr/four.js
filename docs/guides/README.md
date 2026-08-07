@@ -53,6 +53,18 @@ assumes the ones above it:
 13. **[The digital twin](digital-twin.md)** — serialization (§79), snapshots
     and replay (§34), determinism (§33), and assets (§76), composed.
 
+A fourteenth guide sits alongside those thirteen. It is not one of §93's
+nineteen documentation items; §96 asks for the documentation itself, in its
+"documented content-security-policy behavior" requirement, and the answer reads
+as a guide:
+
+14. **[Security and untrusted content](security-and-untrusted-content.md)** —
+    §96's seven requirements with an honest met/partial/absent table, the
+    input-size limits and load deadline on `AssetManager` (§76), the text-length
+    and nesting bounds on the §79 and §34 document decoders, and the CSP
+    posture, which `tests/integration/security-csp.test.ts` enforces rather than
+    asserts.
+
 ## Conventions every guide assumes
 
 - The world is **right-handed, Y-up, in 2D and 3D alike** (§7a). 2D gravity is
