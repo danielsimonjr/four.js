@@ -13,6 +13,16 @@ export type {
 export { ComponentRegistry } from "./component.js";
 export type { Disposable } from "./disposable.js";
 export { disposeAll } from "./disposable.js";
+// §85 build mode (A-4, 2026-08-07). `DEV` is the flag every other package
+// gates author-facing work behind; see `dev.ts` for the §33 rule that keeps it
+// out of anything the simulation computes.
+export {
+  DEV,
+  devAssert,
+  devWarn,
+  devWarnOnce,
+  resetDevWarnings,
+} from "./dev.js";
 export type { FourErrorCode, FourErrorOptions } from "./errors.js";
 export { FourError, isFourError } from "./errors.js";
 export type { EventListener, Unsubscribe } from "./events.js";

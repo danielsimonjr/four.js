@@ -288,6 +288,17 @@ _Dependencies:_ A-22 (compatibility ranges), A-6.
 
 ### A-4 — §85 validation is scattered and has no development/production split
 
+> **CLOSED 2026-08-07 (build-mode tier).** `packages/core/src/dev.ts` ships
+> `DEV`/`devWarn`/`devWarnOnce`/`devAssert` behind an optional `__FOUR_DEV__` define
+> (dev-default, opt-out; identifier read only under `typeof`); §84's stats wiring,
+> §6a's duplicate-component warning, and §83's new `auditResourceLeaks` are gated; all
+> eight example builds define it false (0.46–0.52 kB gzip saved each; ui-demo
+> 30.46/31). `tests/integration/dev-build-mode.test.ts` proves the stripping with a
+> real bundler and mechanically enforces the §33 allowlist (simulation packages
+> refused outright). **Still open under A-4:** the §85 validation catalogue (step 2),
+> converting scattered scene/physics checks to `devAssert` (step 3), routing §42's
+> authority-conflict warn through the channel (step 4).
+
 **§85, §98 (`diagnostics`: "… validation (§84-85)"), §41** · **Severity: High** · **Effort: M** · **SILENT**
 
 _What exists:_ real, well-tested validation, but in the wrong places and only for some of §85's list. `packages/physics/src/validation.ts` covers mass/inertia/dimensions/joint limits; `packages/scene/src/node.ts:293,301` catches scene-graph cycles; `packages/serialization/src/format.ts` refuses non-finite numbers and version mismatches; `packages/geometry` validates index ranges; `render-webgl` surfaces shader-compilation failures.

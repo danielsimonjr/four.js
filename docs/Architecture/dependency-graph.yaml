@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-07"
-  totalFiles: 192
+  totalFiles: 196
   totalModules: 24
-  totalExports: 1608
+  totalExports: 1664
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -14,7 +14,7 @@ entryPoints:
     description: "`@four/assets` — the asset system (§76–78)."
   - file: packages/core/src/index.ts
     type: main
-    description: Entry Point
+    description: §85 build mode (A-4, 2026-08-07). `DEV` is the flag every other package
   - file: packages/diagnostics/src/index.ts
     type: main
     description: "--- WP-10.2 (ReplayPlayer) begin -------------------------------------------"
@@ -1048,6 +1048,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./dev.js
+          imports:
+            - DEV
+            - devWarn
         - file: ./errors.js
           imports:
             - FourError
@@ -1070,6 +1074,32 @@ modules:
         - DEFAULT_GRAVITY_Y
       constants:
         - DEFAULT_GRAVITY_Y
+    packages/core/src/dev.ts:
+      description: The build-mode flag (§85, A-4, 2026-08-07) — one place that answers "is this
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./errors.js
+          imports:
+            - FourError
+        - file: ./errors.js
+          imports:
+            - FourErrorCode
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - DEV
+        - devWarn
+        - devWarnOnce
+        - resetDevWarnings
+        - devAssert
+      functions:
+        - devWarn
+        - devWarnOnce
+        - resetDevWarnings
+        - devAssert
+      constants:
+        - DEV
     packages/core/src/disposable.ts:
       description: Explicit disposal (§83).
       externalDependencies: []
@@ -1108,7 +1138,7 @@ modules:
       classes:
         - EventEmitter
     packages/core/src/index.ts:
-      description: Package entry point for @four/core (re-exports 49 symbols)
+      description: §85 build mode (A-4, 2026-08-07). `DEV` is the flag every other package
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -1131,6 +1161,14 @@ modules:
         - file: ./disposable.js
           imports:
             - disposeAll
+          reExport: true
+        - file: ./dev.js
+          imports:
+            - DEV
+            - devAssert
+            - devWarn
+            - devWarnOnce
+            - resetDevWarnings
           reExport: true
         - file: ./errors.js
           imports:
@@ -1223,6 +1261,11 @@ modules:
         - SeededRandom
         - ComponentRegistry
         - disposeAll
+        - DEV
+        - devAssert
+        - devWarn
+        - devWarnOnce
+        - resetDevWarnings
         - FourError
         - isFourError
         - EventEmitter
@@ -1274,6 +1317,11 @@ modules:
         - SeededRandom
         - ComponentRegistry
         - disposeAll
+        - DEV
+        - devAssert
+        - devWarn
+        - devWarnOnce
+        - resetDevWarnings
         - FourError
         - isFourError
         - EventEmitter
@@ -1551,6 +1599,11 @@ modules:
             - solverJointStatistics
             - solverStatistics
           reExport: true
+        - file: ./resource-audit.js
+          imports:
+            - NO_RESOURCE_LEAKS
+            - auditResourceLeaks
+          reExport: true
         - file: ./stats.js
           imports:
             - copyFrameStats
@@ -1558,6 +1611,7 @@ modules:
             - createMonotonicClock
             - monotonicNowSeconds
             - recordRenderStatistics
+            - recordResourceMemory
             - recordSolverStatistics
             - resetFrameStats
           reExport: true
@@ -1614,6 +1668,13 @@ modules:
             - Vector3Like
           reExport: true
           typeOnly: true
+        - file: ./resource-audit.js
+          imports:
+            - AuditResourceLeaksOptions
+            - LiveResourceCounts
+            - ResourceLeakReport
+          reExport: true
+          typeOnly: true
         - file: ./stats.js
           imports:
             - ClockSource
@@ -1657,11 +1718,14 @@ modules:
         - debugDrawStreams
         - solverJointStatistics
         - solverStatistics
+        - NO_RESOURCE_LEAKS
+        - auditResourceLeaks
         - copyFrameStats
         - createFrameStats
         - createMonotonicClock
         - monotonicNowSeconds
         - recordRenderStatistics
+        - recordResourceMemory
         - recordSolverStatistics
         - resetFrameStats
         - PACKAGE_NAME
@@ -1698,6 +1762,9 @@ modules:
         - SolverStatistics
         - StagedVisualization
         - Vector3Like
+        - AuditResourceLeaksOptions
+        - LiveResourceCounts
+        - ResourceLeakReport
         - ClockSource
         - FrameStats
         - RenderStatisticsLike
@@ -1736,11 +1803,14 @@ modules:
         - debugDrawStreams
         - solverJointStatistics
         - solverStatistics
+        - NO_RESOURCE_LEAKS
+        - auditResourceLeaks
         - copyFrameStats
         - createFrameStats
         - createMonotonicClock
         - monotonicNowSeconds
         - recordRenderStatistics
+        - recordResourceMemory
         - recordSolverStatistics
         - resetFrameStats
         - Checksum
@@ -1776,6 +1846,9 @@ modules:
         - SolverStatistics
         - StagedVisualization
         - Vector3Like
+        - AuditResourceLeaksOptions
+        - LiveResourceCounts
+        - ResourceLeakReport
         - ClockSource
         - FrameStats
         - RenderStatisticsLike
@@ -1905,6 +1978,28 @@ modules:
         - ReplayPlayerOptions
       constants:
         - DEFAULT_REPLAY_MAXIMUM_SUB_STEPS
+    packages/diagnostics/src/resource-audit.ts:
+      description: §83's first development warning — **leaked textures and buffers** (A-4/A-5,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - devWarnOnce
+      exports:
+        - NO_RESOURCE_LEAKS
+        - auditResourceLeaks
+      interfaces:
+        - LiveResourceCounts
+        - ResourceLeakReport
+        - AuditResourceLeaksOptions
+      functions:
+        - auditResourceLeaks
+      constants:
+        - NO_RESOURCE_LEAKS
     packages/diagnostics/src/stats.ts:
       description: §84 runtime statistics — the record behind `app.stats` (A-1, 2026-08-07).
       externalDependencies: []
@@ -1921,6 +2016,7 @@ modules:
         - resetFrameStats
         - copyFrameStats
         - recordRenderStatistics
+        - recordResourceMemory
         - recordSolverStatistics
         - createMonotonicClock
       interfaces:
@@ -1932,6 +2028,7 @@ modules:
         - resetFrameStats
         - copyFrameStats
         - recordRenderStatistics
+        - recordResourceMemory
         - recordSolverStatistics
         - createMonotonicClock
       constants:
@@ -1959,6 +2056,7 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - DEV
             - EventEmitter
             - FourError
         - package: "@four/diagnostics"
@@ -1967,8 +2065,13 @@ modules:
             - createFrameStats
             - monotonicNowSeconds
             - recordRenderStatistics
+            - recordResourceMemory
             - resetFrameStats
             - FrameStats
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - geometryMemoryBytes
         - package: "@four/motion"
           directory: packages/motion
           imports:
@@ -2004,6 +2107,7 @@ modules:
           directory: packages/render
           imports:
             - resolveRenderer
+            - textureMemoryBytes
       exports:
         - Application
       classes:
@@ -2075,11 +2179,25 @@ modules:
         - file: ./scene-serializers.js
           imports:
             - BUTTON_NODE_TYPE
+            - CHECKBOX_NODE_TYPE
+            - DIRECTIONAL_LIGHT_NODE_TYPE
+            - IMAGE_NODE_TYPE
             - LABEL_NODE_TYPE
+            - ORTHOGRAPHIC_CAMERA_NODE_TYPE
             - PANEL_NODE_TYPE
+            - PERSPECTIVE_CAMERA_NODE_TYPE
+            - PROGRESS_NODE_TYPE
+            - RADIO_BUTTON_NODE_TYPE
+            - RENDERABLE_NODE_TYPE
+            - SLIDER_NODE_TYPE
+            - SPRITE_NODE_TYPE
+            - TOGGLE_NODE_TYPE
+            - composeSceneNodeTypes
             - registerPhysicsSerializers
+            - registerRenderSerializers
             - registerSceneNodeTypes
             - registerUISerializers
+            - resourceCatalog
             - restoreNodeId
           reExport: true
         - file: ./application.js
@@ -2092,38 +2210,72 @@ modules:
           imports:
             - SceneNodeTypeOptions
             - SceneNodeTypeSupport
+            - SceneResourceCatalog
             - SceneSerializationSupport
+            - UnknownResourcePolicy
           reExport: true
           typeOnly: true
       workspaceDependencies: []
       exports:
         - Application
         - BUTTON_NODE_TYPE
+        - CHECKBOX_NODE_TYPE
+        - DIRECTIONAL_LIGHT_NODE_TYPE
+        - IMAGE_NODE_TYPE
         - LABEL_NODE_TYPE
+        - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - PANEL_NODE_TYPE
+        - PERSPECTIVE_CAMERA_NODE_TYPE
+        - PROGRESS_NODE_TYPE
+        - RADIO_BUTTON_NODE_TYPE
+        - RENDERABLE_NODE_TYPE
+        - SLIDER_NODE_TYPE
+        - SPRITE_NODE_TYPE
+        - TOGGLE_NODE_TYPE
+        - composeSceneNodeTypes
         - registerPhysicsSerializers
+        - registerRenderSerializers
         - registerSceneNodeTypes
         - registerUISerializers
+        - resourceCatalog
         - restoreNodeId
         - ApplicationEventMap
         - ApplicationOptions
         - SceneNodeTypeOptions
         - SceneNodeTypeSupport
+        - SceneResourceCatalog
         - SceneSerializationSupport
+        - UnknownResourcePolicy
       reExported:
         - Application
         - BUTTON_NODE_TYPE
+        - CHECKBOX_NODE_TYPE
+        - DIRECTIONAL_LIGHT_NODE_TYPE
+        - IMAGE_NODE_TYPE
         - LABEL_NODE_TYPE
+        - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - PANEL_NODE_TYPE
+        - PERSPECTIVE_CAMERA_NODE_TYPE
+        - PROGRESS_NODE_TYPE
+        - RADIO_BUTTON_NODE_TYPE
+        - RENDERABLE_NODE_TYPE
+        - SLIDER_NODE_TYPE
+        - SPRITE_NODE_TYPE
+        - TOGGLE_NODE_TYPE
+        - composeSceneNodeTypes
         - registerPhysicsSerializers
+        - registerRenderSerializers
         - registerSceneNodeTypes
         - registerUISerializers
+        - resourceCatalog
         - restoreNodeId
         - ApplicationEventMap
         - ApplicationOptions
         - SceneNodeTypeOptions
         - SceneNodeTypeSupport
+        - SceneResourceCatalog
         - SceneSerializationSupport
+        - UnknownResourcePolicy
     packages/four/src/input.ts:
       description: input module
       externalDependencies: []
@@ -2315,7 +2467,17 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - FourError
             - JsonValue
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - BufferGeometry
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - Material
+            - SpriteMaterial
         - package: "@four/motion"
           directory: packages/motion
           imports:
@@ -2330,9 +2492,17 @@ modules:
             - Collider
             - RIGID_BODY_SERIALIZER
             - RigidBody
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - Renderable
+            - Sprite
         - package: "@four/scene"
           directory: packages/scene
           imports:
+            - DirectionalLight
+            - OrthographicCamera
+            - PerspectiveCamera
             - restoreNodeId
             - Node
         - package: "@four/serialization"
@@ -2374,15 +2544,27 @@ modules:
         - SLIDER_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - IMAGE_NODE_TYPE
+        - RENDERABLE_NODE_TYPE
+        - SPRITE_NODE_TYPE
+        - PERSPECTIVE_CAMERA_NODE_TYPE
+        - ORTHOGRAPHIC_CAMERA_NODE_TYPE
+        - DIRECTIONAL_LIGHT_NODE_TYPE
+        - resourceCatalog
         - registerUISerializers
+        - registerRenderSerializers
+        - composeSceneNodeTypes
         - registerPhysicsSerializers
         - registerSceneNodeTypes
       interfaces:
+        - SceneResourceCatalog
         - SceneNodeTypeOptions
         - SceneNodeTypeSupport
         - SceneSerializationSupport
       functions:
+        - resourceCatalog
         - registerUISerializers
+        - registerRenderSerializers
+        - composeSceneNodeTypes
         - registerPhysicsSerializers
         - registerSceneNodeTypes
       constants:
@@ -2395,6 +2577,11 @@ modules:
         - SLIDER_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - IMAGE_NODE_TYPE
+        - RENDERABLE_NODE_TYPE
+        - SPRITE_NODE_TYPE
+        - PERSPECTIVE_CAMERA_NODE_TYPE
+        - ORTHOGRAPHIC_CAMERA_NODE_TYPE
+        - DIRECTIONAL_LIGHT_NODE_TYPE
     packages/four/src/scene.ts:
       description: scene module
       externalDependencies: []
@@ -2452,7 +2639,10 @@ modules:
       description: "`BufferGeometry` (§53) — CPU-side vertex data, in the one shape the MVP"
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./resource-memory.js
+          imports:
+            - noteGeometry
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -2470,7 +2660,7 @@ modules:
         - GeometryBounds
         - BufferGeometryOptions
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 30 symbols)
+      description: Package entry point for @four/geometry (re-exports 32 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -2495,6 +2685,11 @@ modules:
             - boxGeometry
             - circleGeometry2D
             - planeGeometry
+          reExport: true
+        - file: ./resource-memory.js
+          imports:
+            - geometryMemoryBytes
+            - liveGeometryCount
           reExport: true
         - file: ./buffer-geometry.js
           imports:
@@ -2540,6 +2735,8 @@ modules:
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
+        - geometryMemoryBytes
+        - liveGeometryCount
         - PACKAGE_NAME
         - BufferGeometryOptions
         - GeometryBounds
@@ -2572,6 +2769,8 @@ modules:
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
+        - geometryMemoryBytes
+        - liveGeometryCount
         - BufferGeometryOptions
         - GeometryBounds
         - GeometryDrawMode
@@ -2685,6 +2884,20 @@ modules:
         - boxGeometry
         - planeGeometry
         - circleGeometry2D
+    packages/geometry/src/resource-memory.ts:
+      description: §83 resource accounting for geometries — how many are live, and how many
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - noteGeometry
+        - geometryMemoryBytes
+        - liveGeometryCount
+      functions:
+        - noteGeometry
+        - geometryMemoryBytes
+        - liveGeometryCount
   packages/input:
     packages/input/src/drag.ts:
       description: "Dragging (§72, §120): press a node, move the pointer, get world-space deltas."
@@ -7062,7 +7275,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 81 symbols)
+      description: Package entry point for @four/render (re-exports 84 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -7122,6 +7335,12 @@ modules:
         - file: ./renderer.js
           imports:
             - NullRenderer
+          reExport: true
+        - file: ./resource-memory.js
+          imports:
+            - liveRenderTargetCount
+            - liveTextureCount
+            - textureMemoryBytes
           reExport: true
         - file: ./statistics.js
           imports:
@@ -7263,6 +7482,9 @@ modules:
         - registeredRenderers
         - resolveRenderer
         - NullRenderer
+        - liveRenderTargetCount
+        - liveTextureCount
+        - textureMemoryBytes
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
@@ -7346,6 +7568,9 @@ modules:
         - registeredRenderers
         - resolveRenderer
         - NullRenderer
+        - liveRenderTargetCount
+        - liveTextureCount
+        - textureMemoryBytes
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
@@ -7554,7 +7779,10 @@ modules:
       description: "`RenderTarget` (§61, §48, §63, §77) — an off-screen surface a frame can be"
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./resource-memory.js
+          imports:
+            - noteRenderTarget
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -7680,6 +7908,24 @@ modules:
         - RenderInterpolation
         - Renderer
         - ResizeRecord
+    packages/render/src/resource-memory.ts:
+      description: §83 resource accounting for textures and render targets — how many are live,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - noteTexture
+        - noteRenderTarget
+        - textureMemoryBytes
+        - liveTextureCount
+        - liveRenderTargetCount
+      functions:
+        - noteTexture
+        - noteRenderTarget
+        - textureMemoryBytes
+        - liveTextureCount
+        - liveRenderTargetCount
     packages/render/src/sprite.ts:
       description: "`Sprite` (§55) — a textured, tinted quad in the scene graph."
       externalDependencies: []
@@ -7732,7 +7978,10 @@ modules:
       description: "`Texture` (§77, §55, §61) — CPU-side texel data with a stable identity and a"
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./resource-memory.js
+          imports:
+            - noteTexture
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -9700,6 +9949,7 @@ dependencyGraph:
       files:
         - packages/core/src/component.ts
         - packages/core/src/conventions.ts
+        - packages/core/src/dev.ts
         - packages/core/src/disposable.ts
         - packages/core/src/errors.ts
         - packages/core/src/events.ts
@@ -9716,6 +9966,7 @@ dependencyGraph:
         - packages/diagnostics/src/recorder.ts
         - packages/diagnostics/src/replay-format.ts
         - packages/diagnostics/src/replay-player.ts
+        - packages/diagnostics/src/resource-audit.ts
         - packages/diagnostics/src/stats.ts
     - name: Packages/four
       files:
@@ -9752,6 +10003,7 @@ dependencyGraph:
         - packages/geometry/src/primitive-support.ts
         - packages/geometry/src/primitives-3d.ts
         - packages/geometry/src/primitives.ts
+        - packages/geometry/src/resource-memory.ts
     - name: Packages/input
       files:
         - packages/input/src/drag.ts
@@ -9855,6 +10107,7 @@ dependencyGraph:
         - packages/render/src/renderable.ts
         - packages/render/src/renderer-registry.ts
         - packages/render/src/renderer.ts
+        - packages/render/src/resource-memory.ts
         - packages/render/src/sprite.ts
         - packages/render/src/statistics.ts
         - packages/render/src/texture.ts
@@ -9919,18 +10172,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 192
+  totalTypeScriptFiles: 196
   totalModules: 24
-  totalLinesOfCode: 75664
-  totalExports: 1608
+  totalLinesOfCode: 77300
+  totalExports: 1664
   totalClasses: 106
-  totalInterfaces: 349
-  totalFunctions: 270
+  totalInterfaces: 353
+  totalFunctions: 287
   totalTypeGuards: 15
   totalEnums: 0
-  totalConstants: 210
-  totalReExports: 1044
-  totalTypeOnlyImports: 218
+  totalConstants: 217
+  totalReExports: 1076
+  totalTypeOnlyImports: 220
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 1
   unusedFilesCount: 0

@@ -99,6 +99,17 @@ changes in `CHANGELOG.md`.
 - [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
       eleven counters; opt-in, default off; byte-identical GL + allocation-free when
       off). The A-6 `app.stats` slice is closed
+- [x] **A-4 CLOSED (build-mode tier) 2026-08-07:** `DEV`/`devWarn*`/`devAssert` behind
+      optional `__FOUR_DEV__` (dev-default, opt-out); §84 stats + §6a duplicate warn +
+      §83 leak audit gated; eight example configs define it false; 0.46–0.52 kB gzip
+      saved each (ui-demo 30.46/31); §33 allowlist enforced by an integration test.
+      A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
+- [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
+      step 2); converting scattered scene/physics checks to `devAssert` (step 3);
+      routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
+      package); R-6's effect pipeline needs an opt-in registry split, not the dev
+      define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
+      loads, detached-node listeners, stale physics handles, per-frame allocations
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
       `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
       measuring browser tests (49 total), first user of the §62/§37 registries and

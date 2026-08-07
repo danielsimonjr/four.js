@@ -91,6 +91,14 @@ export {
 } from "./debug-draw.js";
 // --- END WP-10.3 debug-draw ---
 
+// §83's leaked-resource development warning (A-4/A-5, 2026-08-07).
+export type {
+  AuditResourceLeaksOptions,
+  LiveResourceCounts,
+  ResourceLeakReport,
+} from "./resource-audit.js";
+export { NO_RESOURCE_LEAKS, auditResourceLeaks } from "./resource-audit.js";
+
 // §84 runtime statistics (A-1, 2026-08-07).
 export type { ClockSource, FrameStats, RenderStatisticsLike } from "./stats.js";
 export {

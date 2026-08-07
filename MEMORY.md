@@ -28,6 +28,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-4 dev/prod builds.** Decisions worth keeping:
+  - **Dev is the default; you opt out** — `typeof __FOUR_DEV__ !== "undefined" ?
+__FOUR_DEV__ : true` in one file (`@four/core` `dev.ts`); the identifier is never
+    read outside `typeof`; un-bundled runs (tests, determinism) are dev automatically.
+  - **The flag may remove work, never change a number (§33)** — enforced by the
+    `GATED` allowlist in `tests/integration/dev-build-mode.test.ts`, not prose;
+    simulation packages refused outright. **Guard at the call site** — the helpers'
+    internal early-return only stops the console write, not message construction.
+  - **Gotchas (measured):** a private class method cannot be tree-shaken off a class
+    (empty it with a leading `if (!DEV) return;`); a top-level _call_ survives
+    tree-shaking without `/* @__PURE__ */`; storing the option beats storing the
+    resolved value when the default lives in a package production drops.
+  - **§83's leak check is an audit you call, not a watcher** — a growing counter is
+    not a leak; only the caller knows which span should balance. §85's asymmetry is
+    deliberate: `devAssert` skips entirely in production; every `FourError` stays
+    unconditional. R-6's pipeline is NOT dev-gated — `renderEffect` is a production
+    feature; its cost needs a registry split.
 - **2026-08-07 — §118 flagship.** Decisions worth keeping:
   - **A screen-space UI is a camera child until §46 layers land** — §48's `layerMask`
     is deferred, so a second viewport would draw the whole scene twice; camera

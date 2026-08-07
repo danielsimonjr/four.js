@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { isFourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
@@ -1631,5 +1631,72 @@ describe("Application — §45 renderer selection (R-2 / A-8)", () => {
   it("says nothing is registered when no backend opted in (§85)", async () => {
     const app = new Application({ renderer: "auto" });
     await expect(app.initialize()).rejects.toThrow(/no backend is registered/);
+  });
+});
+
+describe("Application — §85 production build (A-4)", () => {
+  /**
+   * The §84 wiring above is what a production bundle drops. Proving that at the
+   * *source* level means evaluating the other build: `DEV` is resolved once at
+   * module load and has no setter (see `packages/core/src/dev.ts`), so the only
+   * honest test is a fresh module graph with `__FOUR_DEV__` defined.
+   *
+   * That this actually removes the code from a bundle — rather than merely
+   * skipping it at runtime — is `tests/integration/dev-build-mode.test.ts`,
+   * which runs a real bundler. Two different claims, two different gates.
+   */
+  async function productionApplication(
+    options: ApplicationOptions = {},
+  ): Promise<Application> {
+    vi.stubGlobal("__FOUR_DEV__", false);
+    vi.resetModules();
+    const module = await import("../src/application.js");
+    const app = new module.Application(options);
+    await app.initialize();
+    app.start();
+    return app;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("leaves app.stats null even when stats: true was asked for", async () => {
+    const app = await productionApplication({ stats: true });
+    app.step(FIXED);
+    // The declared type is `FrameStats | null` in both builds — the option and
+    // the member keep their shapes, so nothing here is a public-API change.
+    expect(app.stats).toBeNull();
+  });
+
+  it("never reads the injected clock", async () => {
+    const clock = new TestClock();
+    const app = await productionApplication({ stats: true, now: clock.now });
+    app.step(FIXED * 3);
+    expect(clock.readings).toEqual([]);
+  });
+
+  it("never borrows the renderer's statistics record", async () => {
+    const renderer = new CountingRenderer();
+    const app = await productionApplication({ renderer, stats: true });
+    app.step(FIXED);
+    expect(renderer.statistics).toBeNull();
+    app.dispose();
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("runs the frame otherwise unchanged", async () => {
+    // §33's rule for the flag: it may remove measurement, never change a
+    // number. The loop still steps, still emits, still draws.
+    const renderer = new CountingRenderer();
+    const app = await productionApplication({ renderer });
+    const log: string[] = [];
+    app.on("fixedUpdate", () => log.push("fixedUpdate"));
+    app.on("update", () => log.push("update"));
+    app.on("render", () => log.push("render"));
+    app.step(FIXED);
+    expect(log).toEqual(["fixedUpdate", "update", "render"]);
+    expect(app.time.simulationStep).toBe(1);
   });
 });

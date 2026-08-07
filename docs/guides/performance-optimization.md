@@ -21,10 +21,12 @@ say:
 - **Scene:** a clean world-transform pass is only ~3× cheaper than a full
   recompute — dirty-tracking helps but is not free; scene depth is
   recursion-limited around ~8 k.
-- **Payload:** the §86 gate holds the minimal 2D app at **32.13 kB gzip** of
-  its 150 kB budget. Solver wasm is outside the budget by its wording
-  (~670 kB gzip per Rapier dimension) — load it async and show a loading
-  state, as every physics example does.
+- **Payload:** the §86 gate holds the minimal 2D app at **36.79 kB gzip** of
+  its 150 kB budget (32.13 kB when this line was written; the example has
+  gained scene content since, and 0.48 kB of the current figure came back off
+  it when the production build mode landed — see below). Solver wasm is outside
+  the budget by its wording (~670 kB gzip per Rapier dimension) — load it async
+  and show a loading state, as every physics example does.
 
 ## Draw calls: batching is per system, not per particle
 
@@ -132,6 +134,125 @@ Prefer `position.set(...)` over building new vectors; one clamped `set` also
 advances the transform version once instead of twice. Diagnostics helpers
 follow the same convention (`solverStatistics(access, out)` reuses `out`).
 
+## Development and production builds (§85)
+
+§85 ends with a permission: _"Production builds may disable expensive
+validation while preserving essential safety checks."_ The engine acts on it
+through one build-time define.
+
+```ts
+// vite.config.ts (esbuild, Rollup and webpack all spell this the same way)
+export default defineConfig({
+  define: { __FOUR_DEV__: "false" },
+});
+```
+
+**You opt out, not in.** `__FOUR_DEV__` is a global that need not exist. The
+engine reads it as `typeof __FOUR_DEV__ !== "undefined" ? __FOUR_DEV__ : true`,
+in one place (`@four/core`'s `dev.ts`), so a program that never configures a
+bundler — a `<script type="module">`, a Vitest run, `node` — is a development
+build and gets every warning. Define it as `"false"` and the ternary folds to a
+literal at build time, every `if (DEV)` in every package becomes dead code, and
+the tree-shaker deletes it.
+
+What a production build stops shipping today, measured on the repository's own
+examples:
+
+| Example        | development | production | saved   |
+| -------------- | ----------- | ---------- | ------- |
+| first-2d-scene | 37.27 kB    | 36.79 kB   | 0.48 kB |
+| first-3d-scene | 25.50 kB    | 25.04 kB   | 0.46 kB |
+| particles-demo | 23.56 kB    | 23.04 kB   | 0.52 kB |
+| ui-demo        | 30.96 kB    | 30.46 kB   | 0.50 kB |
+
+(gzip, `pnpm run size`. The flagship is unchanged at 1.54 MB — its payload is
+Rapier's two wasm images, which dwarf half a kilobyte.)
+
+Three things go, and they are all things only an author reads:
+
+- **§84's statistics wiring.** `app.stats` is `null` in a production build even
+  if you passed `stats: true`, and `@four/diagnostics` leaves the bundle
+  entirely. The option and the member keep their types in both builds, so
+  `app.stats?.drawCalls` compiles and runs either way — it simply answers
+  `undefined`. Measure in development.
+- **§6a's duplicate-component warning.** The _behaviour_ — one component of a
+  type per node, the old one detached — is unconditional; only the
+  `console.warn` moves.
+- **§83's leak audit.** `auditResourceLeaks` returns `NO_RESOURCE_LEAKS`
+  without looking at its arguments.
+
+**What never moves:** every `FourError` the engine throws. §85 calls those the
+"essential safety checks", and a production build performs all of them —
+scene-graph cycles, serialization version mismatches, invalid geometry indices,
+lifecycle misuse. If a check must hold in the field, it is a throw, not a
+warning.
+
+**And nothing the simulation computes may depend on it** (§33). A replay
+recorded in a development build has to reproduce bit-exactly in a production
+one, so the flag is confined to warnings, assertions and measurement.
+`tests/integration/dev-build-mode.test.ts` enforces that mechanically: it lists
+every file allowed to gate on the flag, and fails when a new one appears
+without a recorded argument.
+
+### Writing your own gated code
+
+`@four/core` exports the flag and three helpers:
+
+```ts
+import { DEV, devWarn, devWarnOnce, devAssert } from "four/core";
+
+if (DEV && node.scale.x === 0) {
+  devWarnOnce(
+    `degenerate:${String(node.id)}`,
+    "a zero scale is not invertible (§85).",
+  );
+}
+```
+
+Guard at the **call site**, not only inside the helper. Each helper begins with
+its own `if (!DEV) return;`, but that only stops the console write — the
+message you passed was still built. `if (DEV) devWarn(…)` deletes the whole
+statement, message included.
+
+`devAssert(condition, code, message)` throws a `FourError` in development and
+does nothing in production, which is §85's "expensive validation" exactly. Use
+it for scans an author must fix before shipping; never for a condition a
+shipped program is expected to hit, and never where the code below it depends
+on the throw having fired.
+
+### Auditing for leaked resources (§83)
+
+The §83 accounting is a set of process-wide counters, and the audit over them is
+a function you call around a span you expect to balance — not a watcher, because
+only you know which span was supposed to end where it began:
+
+```ts
+import { liveGeometryCount, geometryMemoryBytes } from "four/geometry";
+import {
+  liveTextureCount,
+  liveRenderTargetCount,
+  textureMemoryBytes,
+} from "four/render";
+import { auditResourceLeaks } from "four/diagnostics";
+
+const read = () => ({
+  geometries: liveGeometryCount(),
+  bufferBytes: geometryMemoryBytes(),
+  textures: liveTextureCount(),
+  renderTargets: liveRenderTargetCount(),
+  textureBytes: textureMemoryBytes(),
+});
+
+const before = read();
+level.dispose();
+auditResourceLeaks(before, read(), { label: "level teardown" });
+```
+
+It warns once per label. A resource the collector reclaimed without a
+`dispose()` call still counts as leaked — §83's contract is that lifetimes are
+explicit, and a total that healed itself would hide the leak it exists to
+reveal.
+
 ## The checklist
 
 - **Track poses only for movers** (§43). Untracked static nodes draw from
@@ -154,10 +275,14 @@ follow the same convention (`solverStatistics(access, out)` reuses `out`).
   `droppedCount`, `TimeState.droppedTime`, checksummed step times — before
   reaching for a profiler, and keep `benchmarks/` as the model for a fair
   headless measurement.
+- **Ship a production build** (§85): `define: { __FOUR_DEV__: "false" }`, which
+  is what the examples do and what `pnpm run size` measures.
 
 ## Cross-references
 
 - §86 (targets), §87 (spatial indexing — honest state: staged; steering uses
-  brute-force neighbours today), §65 (batching), §32 (sleeping).
+  brute-force neighbours today), §65 (batching), §32 (sleeping), §85
+  (development vs. production builds), §83 (resource lifetimes), §84
+  (statistics).
 - `benchmarks/` (committed records), `examples/particles-demo` (batching made
   visible, with its own honest scale note).

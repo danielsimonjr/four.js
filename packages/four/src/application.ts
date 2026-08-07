@@ -87,7 +87,17 @@
  * that one option.
  */
 
-import { EventEmitter, FourError } from "@four/core";
+import { DEV, EventEmitter, FourError } from "@four/core";
+// Every runtime value in this block, plus `geometryMemoryBytes` and
+// `textureMemoryBytes` below, is named **only** from code that `DEV` makes
+// unreachable (A-4, 2026-08-07) — either directly inside an `if (DEV)`, or
+// inside a block guarded by a local that `DEV` initializes to a literal
+// `null`. That is what makes the §84 wiring free in a production bundle: with
+// `__FOUR_DEV__` defined as `false` the guards fold, every reference below
+// becomes unreachable, and the tree-shaker drops `@four/diagnostics` out of the
+// graph entirely — the ~0.4 kB gzip A-1 measured as "the first diagnostic that
+// cannot tree-shake". Adding an unguarded use of any of them undoes the packet;
+// `tests/integration/dev-build-mode.test.ts` fails when it does.
 import {
   createFrameStats,
   monotonicNowSeconds,
@@ -416,6 +426,15 @@ export interface ApplicationOptions {
    * for `textureMemory`/`bufferMemory` (A-5). The counters §84 lists that
    * nothing in this repository can yet measure stay `NaN`; `FrameStats` says
    * which and why.
+   *
+   * **A production build ignores this option** (A-4, 2026-08-07). §84 is a
+   * development tool and §85 lets a production build drop expensive
+   * diagnostics, so the whole path is gated on `@four/core`'s `DEV`: with
+   * `__FOUR_DEV__` defined as `false`, `stats: true` still type-checks (the
+   * option and {@link Application.stats}'s type are unchanged in both builds)
+   * and {@link Application.stats} is `null`. Measure in development, or ship a
+   * build that leaves `__FOUR_DEV__` alone — see
+   * `docs/guides/performance-optimization.md`.
    */
   stats?: boolean;
 
@@ -602,6 +621,13 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * every §9 clock. They are on `app.time` already, and §84's list does not
    * name them — a statistics block that re-published the time record would be
    * two places to read one number.
+   *
+   * **Always `null` in a production build** (A-4, 2026-08-07): §85 permits a
+   * production build to drop expensive diagnostics, and this whole path is
+   * gated on `@four/core`'s `DEV`. The declared type is the same in both
+   * builds — a program that reads `app.stats?.drawCalls` compiles and runs
+   * either way and simply gets `undefined` — so nothing here is a public-shape
+   * change. See {@link ApplicationOptions.stats}.
    */
   readonly stats: FrameStats | null;
 
@@ -682,8 +708,18 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   readonly #statisticsRequested: boolean;
 
-  /** {@link ApplicationOptions.now}; unread while statistics are off. */
-  readonly #now: () => number;
+  /**
+   * {@link ApplicationOptions.now} **as given** — `undefined` when the author
+   * injected no clock, rather than pre-resolved to `monotonicNowSeconds`.
+   *
+   * Storing the option rather than the resolved clock is an A-4 requirement,
+   * not a style choice: resolving it in the constructor would put a reference
+   * to `@four/diagnostics` outside every `if (DEV)` guard, which would keep the
+   * package in a production bundle and undo the packet. The default is applied
+   * instead at the two places that read it, both of which are unreachable when
+   * `DEV` folds to `false`.
+   */
+  readonly #now: (() => number) | undefined;
 
   /** Resolved once {@link Application.initialize} has completed. */
   #initialized = false;
@@ -736,12 +772,14 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // mutation with the frame loop (decision, WP-3.6).
       this.views.push(...options.views);
     }
-    this.#now = options.now ?? monotonicNowSeconds;
-    // §84 (A-1). One record for the application's lifetime, and — when the
-    // backend reports draw counters at all — one for the renderer to
-    // accumulate into; `#lendStatistics` does the lending, here for an instance
-    // and again after a string selection resolves.
-    this.stats = options.stats === true ? createFrameStats() : null;
+    this.#now = options.now;
+    // §84 (A-1), behind §85's build mode (A-4). One record for the
+    // application's lifetime, and — when the backend reports draw counters at
+    // all — one for the renderer to accumulate into; `#lendStatistics` does the
+    // lending, here for an instance and again after a string selection
+    // resolves. `DEV &&` first, so a production build folds the whole
+    // expression to `null` and `createFrameStats` goes unreferenced.
+    this.stats = DEV && options.stats === true ? createFrameStats() : null;
     this.#statisticsRequested = this.stats !== null;
     this.#lendStatistics();
     this.#depthRange = options.depthRange;
@@ -782,13 +820,22 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // around the *whole* step — systems and `fixedUpdate` listeners — because
       // that is what the frame pays for simulating; the solver's own share is
       // `physicsStepTime`, which only the solver can report (staged).
-      const stats = this.stats;
+      //
+      // `DEV ? … : null` rather than `this.stats` (A-4): in a production build
+      // the initializer is the literal `null`, so the measuring branch below is
+      // provably unreachable and the timing calls disappear with it. In
+      // development it is exactly `this.stats` and the behaviour is unchanged.
+      const stats = DEV ? this.stats : null;
       if (stats === null) {
         runSystems?.(time);
         this.emit("fixedUpdate", time);
         return;
       }
-      const started = this.#now();
+      // The default clock is resolved here rather than in the constructor so
+      // that `monotonicNowSeconds` — and with it `@four/diagnostics` — is named
+      // only from code a production build deletes (A-4; see `#now`).
+      const now = this.#now ?? monotonicNowSeconds;
+      const started = now();
       try {
         runSystems?.(time);
         this.emit("fixedUpdate", time);
@@ -796,7 +843,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         // In a `finally` so a throwing system leaves the accumulator holding
         // the time it really spent rather than losing the step entirely; the
         // exception propagates unchanged.
-        stats.simulationTime += this.#now() - started;
+        stats.simulationTime += now() - started;
       }
     };
 
@@ -938,6 +985,11 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * re-assigns the same object.
    */
   #lendStatistics(): void {
+    // A-4: a private method cannot be tree-shaken off a class, so the body is
+    // what has to disappear. With `DEV` folded to `false` this is `return;` and
+    // everything after it — including the `RenderStatistics` literal — is dead
+    // code the minifier deletes.
+    if (!DEV) return;
     const renderer = this.#renderer;
     if (
       !this.#statisticsRequested ||
@@ -1055,7 +1107,11 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         { context: { method: "step", reentrant: true } },
       );
     }
-    const stats = this.stats;
+    // A-4, as in `onFixedStep` above: `null` by construction in a production
+    // build, so both measuring blocks in this method fold away and with them
+    // every reference this module has to `@four/diagnostics`,
+    // `geometryMemoryBytes`, and `textureMemoryBytes`.
+    const stats = DEV ? this.stats : null;
     let frameStarted = 0;
     if (stats !== null) {
       // §84's frame boundary (A-1). Everything goes back to "not measured"
@@ -1070,7 +1126,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         this.#renderStatistics.triangles = 0;
         this.#renderStatistics.instances = 0;
       }
-      frameStarted = this.#now();
+      frameStarted = (this.#now ?? monotonicNowSeconds)();
     }
     this.#stepping = true;
     try {
@@ -1089,7 +1145,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // renderer, since a geometry a headless application built is memory it
       // holds whether or not anything has drawn it.
       recordResourceMemory(stats, textureMemoryBytes(), geometryMemoryBytes());
-      stats.cpuFrameTime = this.#now() - frameStarted;
+      stats.cpuFrameTime = (this.#now ?? monotonicNowSeconds)() - frameStarted;
     }
   }
 
@@ -1263,6 +1319,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     // when this application is the one that filled it.
     const renderer = this.renderer;
     if (
+      // A-4: nothing lends a record in a production build (`#lendStatistics`
+      // returns immediately there), so there is nothing to give back.
+      DEV &&
       this.#renderStatistics !== null &&
       renderer !== null &&
       renderer.statistics === this.#renderStatistics

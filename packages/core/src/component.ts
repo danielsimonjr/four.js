@@ -18,6 +18,7 @@
  *   name.
  */
 
+import { DEV, devWarn } from "./dev.js";
 import { FourError } from "./errors.js";
 
 /**
@@ -141,14 +142,19 @@ export class ComponentRegistry implements ComponentHost {
       if (existing === component) {
         return component;
       }
-      // §6a development warning. There is no build-mode flag in the engine
-      // yet (diagnostics arrive in a later phase), so the warning is
-      // unconditional; one call per replacement, never deduplicated across
-      // replacements — each one is a distinct authoring mistake.
-      console.warn(
-        `[four] A component of type "${typeName}" is already attached; ` +
-          "replacing it (§6a: at most one component of a given type per node).",
-      );
+      // §6a development warning. Unconditional until 2026-08-07 ("there is no
+      // build-mode flag in the engine yet"), now gated on §85's `DEV` (A-4):
+      // the guard is at the call site rather than inside `devWarn`, so a
+      // production bundle deletes the message text along with the call. One
+      // call per replacement, never deduplicated across replacements — each one
+      // is a distinct authoring mistake, which is why this is `devWarn` and not
+      // `devWarnOnce`.
+      if (DEV) {
+        devWarn(
+          `A component of type "${typeName}" is already attached; ` +
+            "replacing it (§6a: at most one component of a given type per node).",
+        );
+      }
       this.#detach(typeName, existing);
     }
 

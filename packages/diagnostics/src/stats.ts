@@ -471,5 +471,14 @@ export function createMonotonicClock(
 /**
  * The default seconds-valued monotonic clock — {@link createMonotonicClock}
  * over `globalThis`, resolved once at module load.
+ *
+ * The `@__PURE__` annotation is load-bearing (A-4, 2026-08-07): a top-level
+ * *call* is something a bundler must assume might have side effects, so without
+ * it this initializer survived into every production bundle — the call, and
+ * with it `createMonotonicClock`'s body — even after `Application` stopped
+ * naming the binding outside its `DEV` guards. It reads one property off
+ * `globalThis` and binds a method, which is exactly what the annotation
+ * promises. Nothing about the runtime behaviour changes.
  */
-export const monotonicNowSeconds: () => number = createMonotonicClock();
+export const monotonicNowSeconds: () => number =
+  /* @__PURE__ */ createMonotonicClock();

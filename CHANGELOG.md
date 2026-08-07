@@ -8,6 +8,43 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-4 closed (build-mode tier): development/production builds
+
+#### Added
+
+- **§85 development/production builds (A-4).** `@four/core` exports `DEV`, `devWarn`,
+  `devWarnOnce`, `devAssert`, `resetDevWarnings`, resolved from an optional
+  `__FOUR_DEV__` global (`typeof … ? … : true` — read only under `typeof`, so an
+  unaware host cannot crash). **Dev is the default; you opt out**: bare consumption,
+  Vitest, and the determinism suites are development builds automatically; a bundler
+  `define: { __FOUR_DEV__: "false" }` folds the guarded paths away. `devAssert` skips
+  its check entirely in production — and every `FourError` stays unconditional (§85's
+  "essential safety checks" asymmetry, deliberate). `@four/diagnostics` gains
+  `auditResourceLeaks` — §83's first development warning, an **audit you call, not a
+  watcher that runs** (only the caller knows which span was supposed to balance;
+  `FinalizationRegistry` rejected again for the A-5 reason).
+- **The flag may remove work, never change a number (§33) — enforced mechanically**:
+  `tests/integration/dev-build-mode.test.ts` allowlists the five files permitted to
+  import the dev channel (each with its §33 argument recorded; a sixth fails the
+  suite), refuses the simulation packages outright, asserts every example config
+  carries the define, and proves the stripping with a real bundler. Pixel goldens
+  passed against the production ui-demo bundle — independent evidence the flag moved
+  no pixel.
+
+#### Changed
+
+- §84's statistics wiring, §6a's duplicate-component warning, and §83's leak audit are
+  gated on `DEV`; `app.stats` is `null` in a production build even with `stats: true`
+  (declared types unchanged). All eight example Vite configs define the flag false, so
+  `pnpm run size` now measures what a user ships: **0.46–0.52 kB gzip saved per
+  example** (ui-demo 30.96 → **30.46 kB** — headroom 40 B → ~540 B; `.size-limit.json`
+  deliberately unchanged, nothing loosened). Two enabling fixes recorded:
+  `monotonicNowSeconds` carries `/* @__PURE__ */` (a bare top-level call otherwise
+  survives tree-shaking), and `Application` stores `options.now` as given rather than
+  pre-resolved (the default lives in a package production drops). Deliberately NOT
+  gated: R-6's effect pipeline — `renderEffect` is a production feature; its 0.75 kB
+  needs an opt-in registry split (recorded), not a dev flag.
+
 ### 2026-08-07 — §118 flagship: "One Scene, Everything Moves" (gap A-21, second half)
 
 #### Added
