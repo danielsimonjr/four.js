@@ -8,12 +8,17 @@
  * independent half — and produces "compact render items" exactly as §64 asks,
  * so the drawing hot path never makes a virtual call on a node.
  *
- * Three node kinds generate an item: §49's `Renderable`, §55's `Sprite`, and —
- * structurally, never by inheritance — a §36 particle system, which contributes
- * **one batched item for the whole system** (plan P9-3). The first two are
- * siblings rather than parent and child only until §57's `Material` base lands
- * (see `sprite.ts`); the third is a duck-typed contract because the frozen
- * dependency matrix forbids an edge in either direction (see `particles.ts`).
+ * Two node kinds generate an item: §49's `Renderable` — which §55's `Sprite`
+ * has been a subclass of since §57's `Material` base landed (2026-08-06) — and,
+ * structurally and never by inheritance, a §36 particle system, which
+ * contributes **one batched item for the whole system** (plan P9-3). The second
+ * is a duck-typed contract because the frozen dependency matrix forbids an edge
+ * in either direction (see `particles.ts`).
+ *
+ * Which pipeline a renderable draws through is read off its **material's**
+ * `kind` (§57), not off the node's class: that is one property load, it is what
+ * makes a family member a consumer writes reachable without editing this file,
+ * and it is why the sprite no longer needs an `instanceof` of its own.
  *
  * Not here, and why:
  *
@@ -34,15 +39,27 @@
  *
  * §66's full order is: render layer, opaque versus transparent, pipeline and
  * material compatibility, depth, explicit render order. This packet sorts by
- * **render layer, then explicit render order, then scene-graph order**, and
- * defers the middle three:
+ * **render layer, then opaque before transparent, then explicit render order,
+ * then scene-graph order** — keys 1, 2, and 5 — and defers keys 3 and 4:
  *
- * - opaque/transparent classification needs §57's `transparent`/`blendMode`
- *   state, which `UnlitMaterial` does not carry yet;
  * - material and pipeline sorting needs the backend's notion of a pipeline
  *   (WP-3.5) — sorting by `material.id` here would encode an ordering the
- *   backend then has to fight;
- * - depth sorting needs a camera (WP-3.1/3.2) to measure distance along.
+ *   backend then has to fight — and, unlike key 2, it **reorders scenes that
+ *   never asked for it**: every existing scene would have its draws permuted by
+ *   material identity, which is exactly what a pixel-golden gate refuses.
+ *   Deferred 2026-08-06 with that reason, and it wants `pipelineKey` on
+ *   `RenderItemBase` (R-10, R-9);
+ * - depth sorting needs a camera (WP-3.1/3.2) to measure distance along, and a
+ *   per-view render list to measure it in (§87 culling, R-8).
+ *
+ * Key 2 landed on 2026-08-06 with §57's `transparent` flag (`material.ts`).
+ * It is a **no-op for every scene that does not use it**: with the base's
+ * `transparent: false` default every item classifies opaque, the comparator
+ * returns 0, and the stable sort leaves the list exactly as it was — which is
+ * the property that let the key land under the pixel-golden gate. The sprite
+ * and particle pipelines blend by construction but are *classified* by their
+ * material's flag like everything else; reclassifying them wholesale is a
+ * follow-up (2026-08-06), because it would reorder existing scenes.
  *
  * The tie-break is **scene-graph order** — the depth-first, insertion-ordered
  * walk of §6 — which makes the list a deterministic function of the scene (§33)
@@ -63,6 +80,7 @@ import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type {
   LitMaterial,
+  Material,
   SpriteMaterial,
   UnlitMaterial,
 } from "@four/materials";
@@ -70,7 +88,6 @@ import type { Node, PoseBuffer } from "@four/scene";
 
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
-import { Sprite } from "./sprite.js";
 
 /**
  * Which pipeline a render item needs (§64 stage 7, §66 sort key 3).
@@ -120,6 +137,16 @@ interface RenderItemBase {
   renderOrder: number;
   /** §66 sort key 1, copied from the drawable node. */
   renderLayer: number;
+  /**
+   * §66 sort key 2, read off the item's material (§57's `transparent`) at
+   * generation time: `false` for an opaque draw, `true` for a blended one.
+   *
+   * Snapshotted onto the item rather than reached through `material.transparent`
+   * inside the comparator, for the reason §64 gives for compact render items —
+   * a comparator runs O(n log n) times and must not chase a reference per
+   * call — and because a particle item has no material to ask.
+   */
+  transparent: boolean;
 }
 
 /** A draw generated from a `Renderable` (§49) — flat colour, no texture. */
@@ -241,6 +268,26 @@ interface MutableRenderItem extends RenderItemBase {
 }
 
 /**
+ * Which pipeline draws a node carrying `material` (§57, §64).
+ *
+ * One property load and a three-way comparison, with `"unlit"` as the fallback
+ * so that a structurally-typed material double predating the discriminant — or
+ * a family member no backend knows yet — keeps drawing flat-coloured rather
+ * than vanishing. Replacing this mapping with the registry §64 wants, so a
+ * consumer's material can bring its own pipeline, is R-12's remaining half and
+ * is recorded as a follow-up (2026-08-06).
+ */
+function pipelineOf(material: Material): RenderItemKind {
+  if (material.kind === "lit") {
+    return "lit";
+  }
+  if (material.kind === "sprite") {
+    return "sprite";
+  }
+  return "unlit";
+}
+
+/**
  * The `instances` a non-particle pooled item carries: shared, empty, never
  * uploaded. One array for the whole module, so pooling a thousand items does
  * not allocate a thousand empty buffers.
@@ -320,6 +367,7 @@ function itemAt(
       material: undefined,
       renderOrder: 0,
       renderLayer: 0,
+      transparent: false,
       id: "",
       count: 0,
       instances: EMPTY_INSTANCES,
@@ -449,6 +497,19 @@ function writeWorldMatrix(
 }
 
 /**
+ * Narrows `node` to a drawable renderable, whatever material it carries.
+ *
+ * `node instanceof Renderable` on its own narrows to `Renderable<any>`, because
+ * the class is generic in its material — and an `any` would spread from
+ * `node.material` into every read that follows. This guard states the
+ * instantiation the render list actually wants: the material is a
+ * {@link Material}, and its `kind` says which pipeline draws it.
+ */
+function isRenderable(node: Node): node is Renderable<Material> {
+  return node instanceof Renderable;
+}
+
+/**
  * Appends render items for `node`'s subtree to `out`, starting at index
  * `count`, and returns the new count. Depth-first in insertion order (§6).
  *
@@ -479,24 +540,26 @@ function collect(
   }
 
   let next = count;
-  if (node instanceof Renderable || node instanceof Sprite) {
-    // A sprite rebuilds its quad here if the anchor or the size moved; a
-    // renderable's geometry is whatever it was handed.
-    const item = itemAt(pool, next, node.geometry, node.transform.worldMatrix);
-    // A sprite is its own pipeline; a renderable's pipeline is its material's
-    // `kind` discriminant (§57, §68) — one property load, with `"unlit"` as
-    // the fallback so a structurally-typed material double that predates the
-    // discriminant keeps drawing flat-coloured rather than vanishing.
-    item.kind =
-      node instanceof Sprite
-        ? "sprite"
-        : node.material.kind === "lit"
-          ? "lit"
-          : "unlit";
-    item.geometry = node.geometry;
-    item.material = node.material;
+  if (isRenderable(node)) {
+    // A sprite rebuilds its quad here if the anchor or the size moved (its
+    // `geometry` accessor is an override); a plain renderable's geometry is
+    // whatever it was handed.
+    const geometry = node.geometry;
+    const material = node.material;
+    const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
+    item.kind = pipelineOf(material);
+    item.geometry = geometry;
+    // The cast is the union's, not the material's: `MutableRenderItem` types
+    // this slot as the three known surface materials, and `pipelineOf` has just
+    // decided which of them the backend will read it as.
+    item.material = material as UnlitMaterial | LitMaterial | SpriteMaterial;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
+    // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
+    // read: a material double built before the flag existed reports
+    // `undefined`, which classifies opaque — the behaviour every scene had
+    // before the key landed.
+    item.transparent = material.transparent === true;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
@@ -526,6 +589,12 @@ function collect(
     item.instances = node.particleInstances;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
+    // §66 key 2: a particle system has no material to declare `transparent`,
+    // and its pipeline blends by construction (§36's colour ramp). It is
+    // classified **opaque** so that key 2 leaves particle scenes in exactly the
+    // order they drew in before the key existed; giving §36 a render-state
+    // carrier of its own is the follow-up (2026-08-06).
+    item.transparent = false;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;
@@ -539,14 +608,29 @@ function collect(
 }
 
 /**
- * §66's comparator, reduced to the two keys this tier has (see the module
- * header). Returns 0 for equal keys, which a **stable** sort resolves in favour
- * of generation — i.e. scene-graph — order; `Array.prototype.sort` has been
- * required to be stable since ES2019.
+ * §66's comparator, reduced to the three keys this tier has — layer (key 1),
+ * opaque before transparent (key 2), explicit render order (key 5). Returns 0
+ * for equal keys, which a **stable** sort resolves in favour of generation —
+ * i.e. scene-graph — order; `Array.prototype.sort` has been required to be
+ * stable since ES2019.
+ *
+ * Key 2 sits **above** explicit render order, as §66 lists it: within a layer,
+ * every opaque draw is issued before any blended one, so a transparent surface
+ * composites over the geometry it overlaps instead of racing it in scene order
+ * and being depth-rejected. `renderOrder` still orders inside each of the two
+ * groups, which is where an author's manual ordering of overlapping
+ * transparency belongs.
+ *
+ * An author who needs a blended draw *underneath* an opaque one — a rare but
+ * real case, e.g. a glow behind a mask — reaches for `renderLayer`, which is
+ * key 1 and outranks this.
  */
 function compareRenderItems(a: RenderItem, b: RenderItem): number {
   if (a.renderLayer !== b.renderLayer) {
     return a.renderLayer - b.renderLayer;
+  }
+  if (a.transparent !== b.transparent) {
+    return a.transparent ? 1 : -1;
   }
   return a.renderOrder - b.renderOrder;
 }

@@ -10,13 +10,21 @@
  * packets that can draw them, and is listed as deferred on {@link SpriteMaterial}
  * rather than sketched here.
  *
- * As with `UnlitMaterial`, §57's abstract `Material` base is **not** introduced:
- * every field of it (`opacity`, `transparent`, `blendMode`, `depthTest`,
- * `depthWrite`, `colorWrite`, `stencil`) is render state whose meaning is fixed
- * by the backend packet that translates it into GL calls, and a base class with
- * two subclasses that share nothing but an id and a version constrains nothing.
- * When the base lands, both materials narrow onto it and the id spaces merge
- * (see {@link SpriteMaterial.id}).
+ * As with `UnlitMaterial`, §57's abstract `Material` base was **not** introduced
+ * by this packet: every field of it (`opacity`, `transparent`, `blendMode`,
+ * `depthTest`, `depthWrite`, `colorWrite`, `stencil`) is render state whose
+ * meaning is fixed by the backend packet that translates it into GL calls, and a
+ * base class with two subclasses that share nothing but an id and a version
+ * constrains nothing.
+ *
+ * **The base landed on 2026-08-06** (`material.ts`), the backend that gives its
+ * fields meaning having shipped in between, and this class extends it: the id
+ * spaces merged onto one counter exactly as predicted (see
+ * {@link SpriteMaterial.id}), and `version`, `markDirty`, `dispose`, and §57's
+ * six render-state fields now live on {@link Material}. This class also gained
+ * the {@link SpriteMaterial.kind} discriminant its two siblings already had,
+ * now that it shares a base — and therefore a `Renderable.material` slot —
+ * with them.
  *
  * ## Why the texture type is declared here (decision, WP-3a.3)
  *
@@ -41,14 +49,14 @@
  * ## Ownership (§83)
  *
  * A material **points at** its texture; it does not own it. One texture atlas
- * routinely backs hundreds of materials, so {@link SpriteMaterial.dispose}
- * deliberately does *not* dispose the texture — whoever created the texture
- * disposes it. This is the same rule `Renderable` follows for its geometry and
- * material.
+ * routinely backs hundreds of materials, so {@link Material.dispose} — which
+ * this class inherits unchanged — deliberately does *not* dispose the texture:
+ * whoever created the texture disposes it. Tearing it out from under its other
+ * users is exactly the bug the ownership rule exists to prevent. This is the
+ * same rule `Renderable` follows for its geometry and material.
  */
 
-import type { Disposable } from "@four/core";
-
+import { Material, type MaterialOptions } from "./material.js";
 import type { ColorRGBA } from "./unlit-material.js";
 
 /**
@@ -95,8 +103,11 @@ export interface SpriteTexture {
   readonly disposed: boolean;
 }
 
-/** Construction arguments of {@link SpriteMaterial}. */
-export interface SpriteMaterialOptions {
+/**
+ * Construction arguments of {@link SpriteMaterial} — its texture and tint, plus
+ * §57's shared render state from {@link MaterialOptions}.
+ */
+export interface SpriteMaterialOptions extends MaterialOptions {
   /**
    * The texture to sample. Required: a sprite material without one draws
    * nothing, and defaulting it would hide the mistake behind an invisible
@@ -112,22 +123,16 @@ export interface SpriteMaterialOptions {
 }
 
 /**
- * Source of sprite-material ids.
+ * The prefix this family member's ids carry.
  *
- * A **separate** counter from `UnlitMaterial`'s, with its own prefix, because
- * the shared allocator is module-private to `unlit-material.ts` and §57's
- * `Material` base — which is what will eventually own one id space for the
- * whole family — is not this packet's to introduce. Two counters sharing the
- * `material-` prefix would mint colliding ids, which is precisely what a cache
- * key must never do (decision, WP-3a.3).
+ * It used to front a **separate** counter from `UnlitMaterial`'s, because §57's
+ * `Material` base — which is what owns one id space for the whole family — was
+ * not WP-3a.3's to introduce. The base landed 2026-08-06 and the counter behind
+ * this prefix is now the family-wide one in `material.ts`; the prefix stays,
+ * because two members sharing the `material-` prefix would mint colliding ids,
+ * which is precisely what a cache key must never do (decision, WP-3a.3).
  */
-let nextSpriteMaterialId = 1;
-
-function assignSpriteMaterialId(): string {
-  const id = `sprite-material-${String(nextSpriteMaterialId)}`;
-  nextSpriteMaterialId += 1;
-  return id;
-}
+const ID_PREFIX = "sprite-material";
 
 /** Rejects non-finite tint components (§85). */
 function requireFinite(name: string, value: number): number {
@@ -166,24 +171,31 @@ function requireFinite(name: string, value: number): number {
  * ## Version, not events
  *
  * Backends cache uniform uploads and texture bindings against
- * {@link SpriteMaterial.version}, the same contract `UnlitMaterial`,
+ * {@link Material.version}, the same contract `UnlitMaterial`,
  * `BufferGeometry`, and `Transform` offer. {@link SpriteMaterial.setTint} and
  * the {@link SpriteMaterial.texture} setter bump it; writing into the tint array
- * in place does not, and must be announced with
- * {@link SpriteMaterial.markDirty}.
+ * in place does not, and must be announced with {@link Material.markDirty}.
+ *
+ * ## Blending (§66)
+ *
+ * The sprite pipeline blends **by construction** — it did before §57's
+ * `transparent` flag existed and it still does, so a textured quad with an
+ * alpha channel composites whether or not the material declares itself
+ * transparent. What {@link Material.transparent} decides for a sprite is
+ * therefore only its place in §66's sort key 2, and
+ * {@link Material.blendMode} — honoured here whatever `transparent` says —
+ * decides how it composites: `"additive"` gives the usual glow sprite.
  *
  * Materials are **shared, not owned by nodes** (§83): any number of sprites may
  * point at one, and disposing it is the job of whoever created it.
  */
-export class SpriteMaterial implements Disposable {
+export class SpriteMaterial extends Material {
   /**
-   * Stable identity, assigned at construction from a monotonic counter and
-   * formatted `sprite-material-<n>`. Unique within a process, ascending in
-   * construction order, never reused — §33 forbids random or clock-derived
-   * identity. See `assignSpriteMaterialId` for why the prefix differs
-   * from `UnlitMaterial`'s.
+   * Pipeline discriminant (§57, §64) — see `UnlitMaterial.kind`. Added
+   * 2026-08-06, when this class joined the {@link Material} base and with it
+   * the discriminated union a `Renderable`'s material is dispatched through.
    */
-  readonly id: string = assignSpriteMaterialId();
+  readonly kind = "sprite" as const;
 
   /**
    * Straight RGBA in 0…1 multiplied into the sampled texel; opaque white by
@@ -193,7 +205,7 @@ export class SpriteMaterial implements Disposable {
    * hold a reference to it, and replacing the array wholesale would leave that
    * reference pointing at the old tint forever. Use
    * {@link SpriteMaterial.setTint}, or write components directly and call
-   * {@link SpriteMaterial.markDirty}.
+   * {@link Material.markDirty}.
    *
    * Values outside 0…1 are passed through rather than clamped, matching
    * `UnlitMaterial.color`: clamping would silently rewrite authored data, and
@@ -204,11 +216,8 @@ export class SpriteMaterial implements Disposable {
 
   #texture: SpriteTexture;
 
-  #version = 0;
-
-  #disposed = false;
-
   constructor(options: SpriteMaterialOptions) {
+    super(ID_PREFIX, options);
     this.#texture = options.texture;
     const tint = options.tint ?? [1, 1, 1, 1];
     this.tint = [
@@ -221,7 +230,13 @@ export class SpriteMaterial implements Disposable {
 
   /**
    * The texture this material samples (§77). Assigning a different one bumps
-   * {@link SpriteMaterial.version}, which is what makes a backend re-bind.
+   * {@link Material.version}, which is what makes a backend re-bind.
+   *
+   * The version this bumps does **not** follow the texture's own: a texture
+   * whose texels change bumps *its* version, and a backend validates its
+   * texture upload against that one. Folding the two together would force a
+   * material to subscribe to its texture, which is the subscription §53
+   * rejected in favour of version counters in the first place.
    *
    * The **old texture is not disposed** — it may still back other materials
    * (§83). Nor is the new one adopted: this material points at it and nothing
@@ -237,26 +252,7 @@ export class SpriteMaterial implements Disposable {
   }
 
   /**
-   * Counter incremented on every mutation. Backends cache against it; treat it
-   * as opaque and compare for inequality, exactly like `Transform.version`.
-   *
-   * It does **not** follow the texture's own version: a texture whose texels
-   * change bumps *its* version, and a backend validates its texture upload
-   * against that one. Folding the two together would force a material to
-   * subscribe to its texture, which is the subscription §53 rejected in favour
-   * of version counters in the first place.
-   */
-  get version(): number {
-    return this.#version;
-  }
-
-  /** Whether {@link SpriteMaterial.dispose} has run. */
-  get disposed(): boolean {
-    return this.#disposed;
-  }
-
-  /**
-   * Writes the tint and bumps {@link SpriteMaterial.version} once. Returns
+   * Writes the tint and bumps {@link Material.version} once. Returns
    * `this` for chaining (§7b's mutate-and-return convention).
    *
    * `alpha` defaults to `1` rather than to the current alpha, for the reason
@@ -277,36 +273,5 @@ export class SpriteMaterial implements Disposable {
     this.tint[3] = validAlpha;
     this.markDirty();
     return this;
-  }
-
-  /**
-   * Announces a mutation the material could not see — a direct write into
-   * {@link SpriteMaterial.tint}. Bumps the version by one. Calling it after
-   * `setTint` is harmless, only wasteful.
-   */
-  markDirty(): void {
-    this.#version += 1;
-  }
-
-  /**
-   * Releases this material (§83). Idempotent.
-   *
-   * **The texture is not disposed.** It is shared — one atlas backs many
-   * materials — and §83 puts disposal on whoever created the resource. Tearing
-   * it out from under its other users is exactly the bug the ownership rule
-   * exists to prevent.
-   *
-   * There is nothing GPU-side to free from here either: the backend owns the
-   * uniform state built from this material and drops it when it sees the
-   * material disposed, which is what the version bump signals. The tint array
-   * is kept, so a use-after-dispose shows up as a diagnosable warning rather
-   * than a silently black sprite (§83).
-   */
-  dispose(): void {
-    if (this.#disposed) {
-      return;
-    }
-    this.#disposed = true;
-    this.markDirty();
   }
 }

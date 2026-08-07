@@ -23,6 +23,10 @@
  * solve and writes the weighted target/solver pose after it, plus
  * `createPoseTargetCaptureSystem` — the §39 step-3−1 system an application must
  * register for the target history the blend's velocity inheritance reads.
+ * 2026-08-06 adds the §79 component serializers (`PH-17`):
+ * `RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER`, typed against the
+ * structural `ComponentSerializerShape` so registering them into
+ * `@four/serialization`'s registry needs no new §3.1 edge.
  *
  * Named exports only, alphabetical within each module group.
  */
@@ -33,6 +37,11 @@ export type {
   PhysicsCapabilities,
   PhysicsQueryCapabilities,
   PhysicsSolverAdapter,
+  PhysicsTuningCapabilities,
+} from "./adapter.js";
+export {
+  NO_TUNING_CAPABILITIES,
+  resolveTuningCapabilities,
 } from "./adapter.js";
 export type {
   SolverBodyAccess,
@@ -160,6 +169,17 @@ export {
   resolveQueryOptions,
   sortHitsByDistance,
 } from "./queries.js";
+export type {
+  ColliderDocument,
+  PhysicsMaterialDocument,
+  RigidBodyDocument,
+} from "./serializers.js";
+export {
+  COLLIDER_SERIALIZER,
+  RIGID_BODY_SERIALIZER,
+  deserializeCollisionShape,
+  serializeCollisionShape,
+} from "./serializers.js";
 export type {
   BlendWeights,
   PointLoad,

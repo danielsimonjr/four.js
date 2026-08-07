@@ -8,6 +8,144 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-06 — PH-17 remainder: shipped `RigidBody` / `Collider` serializers
+
+Closes the follow-up the wave-1 entry below records as "deliberately not done". The §79
+component serializers for the two physics components now ship from the package that owns
+them, so a scene carrying physics saves and reloads through one umbrella call instead of
+through a serializer copied out of a test helper.
+
+#### Added
+
+- **`RIGID_BODY_SERIALIZER` and `COLLIDER_SERIALIZER` from `@four/physics` (PH-17, §23–§25,
+  §79)** — with `serializeCollisionShape` / `deserializeCollisionShape` and the
+  `RigidBodyDocument` / `ColliderDocument` / `PhysicsMaterialDocument` shapes. Declared
+  against `ComponentSerializerShape`, the structural transcription `@four/motion` already
+  exports, **imported over the existing `physics → motion` edge** — so registering them into
+  `@four/serialization`'s registry needs no cast and adds no §3.1 edge, and the repository
+  holds one transcription rather than two that can drift. The same honest cost applies:
+  nothing type-checks it against `ComponentSerializer`, so a transcribed-mirror assignability
+  test asserts it, as `@four/motion`'s suite does.
+- **`registerPhysicsSerializers()` on the umbrella `four` package** — registers both on a
+  caller's registry and returns it. `registerSceneNodeTypes()` calls it, so one call now
+  covers the §73 widgets, `MotionComponent`, `RigidBody`, and `Collider`; it stays separate
+  so a headless simulation need not pull `@four/ui` and `@four/text` into its bundle (§91).
+
+#### Changed
+
+- **A physics scene no longer needs `{ unknownComponents: "skip" }` to save.** That opt-in
+  was the loud-but-lossy stopgap the A-15 change left in place for physics components.
+- **§25's fallback chain survives as a chain.** The WP-11.5 reference serializer wrote
+  `effectiveFriction` / `effectiveRestitution` / `effectiveDensity`, pinning today's defaults
+  into every document; the shipped one writes the §24 fields **as authored** and the
+  `PhysicsMaterial` by value, so the same chain re-resolves to the same numbers on load and a
+  later change to `DEFAULT_FRICTION` moves reloaded scenes exactly as it moves saved ones.
+  A material round-trips by value, not by identity — two colliders sharing one material
+  reload with one each, because sharing is a §79 _resource_ relationship.
+- `RigidBody` documents also carry what the reference dropped: the §23 inertia tensor, the
+  §37 initial pose (which outranks the node transform at `addBody`), and §31's
+  `ccdPredictionDistance` — each written exactly when `toDescriptor()` emits it, so `mass`
+  and `centerOfMass` stay absent for a body that asked the solver to derive them.
+- `tests/integration/helpers/roundtrip-scenarios.ts` lost its ~400 lines of duplicate
+  serializers and now calls the shipped registration; `scene-roundtrip.test.ts` gains a case
+  proving a contact-free save reloads **bit-identically** — the control's §33 checksum stream
+  element by element — through `registerSceneNodeTypes()` alone.
+
+### 2026-08-06 — gap-closure wave 1 (A-7, A-9, A-14/PH-17, A-15, A-17, PH-6)
+
+Six verified gaps from `docs/GAP ANALYSIS v0.md` closed, each with regression tests. Three
+are correctness defects (a real memory leak, a save that silently lost state, an identity
+collision), one is a missing §45 lifecycle method, and two are §34/§79 promises the code
+contradicted.
+
+#### Fixed
+
+- **`PointerInput` no longer leaks a `Node`-pinning entry per dead pointer id (A-9, §72,
+  §83).** Per-pointer state was inserted on demand and removed only by `dispose()`, so a
+  surface that saw N touch or pen contacts — the platform issues a fresh `pointerId` for each
+  one — kept N entries alive, each retaining `downTarget` and `captured`, both references to
+  nodes the application had already removed from the graph. The entry is now torn down and
+  deleted when the pointer ends. A 10 000-gesture regression test asserts
+  `trackedPointerCount === 0` throughout.
+- **A component with no registered serializer is refused on save instead of silently dropped
+  (A-15, §79, §6a).** The writer walked the _serializer_ registry and probed each registered
+  class, because `Node` offered no enumeration — so an unregistered component was unsaved and
+  the omission could not be detected. `Node.components` (a four-line getter forwarding §6a's
+  registry, which had exposed the iterator all along) closed it; `serializeScene` now throws
+  `INVALID_APPLICATION_STATE` naming the component, or drops it when the caller opts in with
+  `unknownComponents: "skip"`. **Output ordering is unchanged** — the walk is over the node,
+  the emission over the registry — so every byte-identical round-trip test still holds.
+- **A restored node id can no longer be re-issued to a node built after the load (A-17,
+  §79).** `NodeOptions.id` restores an id at construction _and reserves it_ against
+  `@four/scene`'s monotonic counter; `restoreNodeId` moved into `@four/scene` (the module
+  that owns the field) for the `nodeFactory` path that cannot use the constructor, and
+  `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.
+- **§34 replay documents carry the world configuration they were captured under (PH-6).**
+  `ReplaySnapshot.configuration` was dropped at record time and never rebuilt at replay time,
+  so `PhysicsWorld.restoreSnapshot`'s field-by-field refusal no-oped for every replay: a run
+  captured at gravity −9.81 replayed into a world built with gravity 0 ran silently and
+  diverged, signalled only by `finalChecksum` at the very end.
+
+#### Added
+
+- **`Application.resize(width, height, resolution?)` (A-7, §45)** — §45's eighth lifecycle
+  method. Records the surface size (`app.width` / `app.height` / `app.resolution`), forwards
+  to `renderer.resize`, and updates the `aspect` and projection of perspective cameras on
+  full-surface viewports. A renderer no-op when headless; the size and cameras are still
+  updated. `ApplicationOptions` gained `width`, `height`, `resolution`, and `depthRange`
+  (plan D8, for the projection rebuild).
+- **`ReplayRecording.worldConfiguration` and a format-version range (PH-6, §34).**
+  `REPLAY_FORMAT_VERSION` is `2` and `SUPPORTED_REPLAY_FORMAT_VERSIONS` is `[1, 2]`. **A
+  document declares the lowest version that can express its content**, so a recording with no
+  configuration is still a version-1 document, byte for byte as before, and every recording on
+  disk keeps validating and re-encoding identically. A version-1 document carrying a
+  configuration is refused rather than silently upgraded; deleting the field from a version-2
+  document and re-validating yields a valid version 1.
+- **`MOTION_COMPONENT_SERIALIZER` from `@four/motion` (PH-17, §11, §79)** — declared against
+  a structural `ComponentSerializerShape` so no `motion → serialization` dependency edge is
+  needed (the `ParticleDrawable` / `ReplayTarget` duck-typing pattern).
+- **`registerSceneNodeTypes()` / `registerUISerializers()` from the umbrella `four` package
+  (A-14, §73, §79).** §73 promises UI objects "share … serialization"; a `Panel`/`Label`/
+  `Button` tree previously round-tripped as bare `Node` state. It now round-trips completely
+  — §74 box model and layout, interaction flags, §75 accessibility record — through the one
+  package allowed to see both `@four/ui` and `@four/serialization`.
+- **`SceneNodeDocument.data` and `SerializeSceneOptions.nodeDataOf` (§79).** One opaque JSON
+  value per node, written by the application and handed back verbatim to `nodeFactory` — the
+  seam subclass state needed and the format did not have. Distinct from §6's `metadata`,
+  which belongs to whoever authored the scene. Absent unless a writer produces one, so
+  `SCENE_FORMAT_VERSION` is unmoved and existing documents encode identically.
+- **`pointercancel` as a propagating scene event (§72)**, with `DragManager` ending a drag on
+  it, plus `PointerInput.trackedPointerCount` and `Node.components`.
+
+#### Changed
+
+- **`tests/determinism/golden/phase10.json` was amended — envelope only, with proof.**
+  `recordingDigest` 2642391973 → 1754656889 and `recordingLength` 46822 → 47008 (+186 bytes),
+  because the §34 document now carries `worldConfiguration` and therefore declares
+  `formatVersion: 2`. **Nothing else moved:** `initialSnapshotDigest`, `stepChecksumDigest`,
+  `replayChecksumDigest`, `seekTailDigest`, the first/last/final checksums, the adapter
+  identity and every contact count are bit-identical to the 2026-08-02 record — so the
+  simulation, Rapier's snapshot bytes and the replay path are all unchanged. The claim was
+  verified rather than assumed: re-running the scenario with the new capture neutralized (a
+  `ReplayTarget` wrapper that drops `ReplaySnapshot.configuration`) reproduces the previous
+  digest and length exactly. The golden records that verification in a new `_amended` field,
+  and gained `formatVersion` and `worldConfigurationKeys` so the §34 configuration is pinned
+  from now on.
+- **Behaviour change, stated rather than hidden (A-9):** a `pointerup` now ends the pointer's
+  hover, so a mouse press-and-release fires `pointerleave` and the next `pointermove` fires
+  `pointerenter` again. That is correct for touch and pen, where the contact really ceased to
+  exist, and is a regression for the mouse, whose pointer persists. Telling them apart needs
+  `pointerType` on the structural `SurfacePointerEvent`, which this change did not widen.
+- `application.ts`'s module header no longer says input, assets and physics "arrive with the
+  phases that build them (§103)" — those phases all landed and wired none of them in. It is
+  now a dated post-plan note pointing at A-6.
+- `UIWidgetOptions` extends `NodeOptions`, so every widget accepts a restored `id`.
+
+#### Deliberately not done
+
+- `RigidBody` / `Collider` component serializers (the rest of PH-17). They belong in
+  `@four/physics`, which this change could not touch; they are tracked in `TODO.md`.
+
 ### 2026-08-05 — documentation-truth sweep
 
 No behaviour changed; a set of verified-false claims in the repository's prose were

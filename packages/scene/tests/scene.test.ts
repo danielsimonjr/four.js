@@ -6,6 +6,7 @@ import {
   Node,
   Scene,
   Transform,
+  restoreNodeId,
   type NodeHierarchyEvent,
   type NodeType,
 } from "../src/index.js";
@@ -460,6 +461,98 @@ describe("Node components (§6a delegation)", () => {
     expect(node.getComponent(Other)).toBe(other);
     expect(first.detachedFrom).toBe(node);
     expect(first.host).toBeNull();
+  });
+
+  // A-15 (2026-08-06): without enumeration a serializer can only probe for the
+  // components it already knows about, so an unregistered one is dropped from a
+  // save with nobody able to notice.
+  it("enumerates its components in attach order (§6a, A-15)", () => {
+    const node = new Group();
+    const marker = new Marker();
+    const other = new Other();
+
+    expect([...node.components]).toEqual([]);
+
+    node.addComponent(marker);
+    node.addComponent(other);
+
+    expect([...node.components]).toEqual([marker, other]);
+  });
+
+  it("enumerates live, so a detach is visible immediately", () => {
+    const node = new Group();
+    const marker = new Marker();
+    const other = new Other();
+    node.addComponent(marker);
+    node.addComponent(other);
+
+    node.removeComponent(marker);
+
+    expect([...node.components]).toEqual([other]);
+  });
+
+  it("keeps a replaced component out of the enumeration", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const node = new Group();
+    const first = new Marker("first");
+    const second = new Marker("second");
+    node.addComponent(first);
+    node.addComponent(second);
+
+    expect([...node.components]).toEqual([second]);
+  });
+});
+
+/**
+ * A-17 (2026-08-06): §79 restores a saved id, and the counter has to know
+ * about it or the next node constructed can be handed the same one.
+ */
+describe("Node identity (§6, §79, A-17)", () => {
+  it("assigns ascending engine ids by default", () => {
+    const first = Number(/^node-(\d+)$/.exec(new Group().id)?.[1]);
+    const second = Number(/^node-(\d+)$/.exec(new Group().id)?.[1]);
+
+    expect(second).toBe(first + 1);
+  });
+
+  it("takes a restored id from the constructor and reserves it", () => {
+    const restored = new Group({ id: "node-800000001" });
+
+    expect(restored.id).toBe("node-800000001");
+    expect(new Group().id).toBe("node-800000002");
+  });
+
+  it("never moves the counter backwards", () => {
+    new Group({ id: "node-800000101" });
+    const high = new Group().id;
+    // An id below the counter is legal and used verbatim; it just reserves
+    // nothing, because everything at or below it is already spent.
+    new Group({ id: "node-1" });
+
+    expect(Number(/^node-(\d+)$/.exec(new Group().id)?.[1])).toBe(
+      Number(/^node-(\d+)$/.exec(high)?.[1]) + 1,
+    );
+  });
+
+  it("accepts an opaque application id without touching the counter", () => {
+    const before = Number(/^node-(\d+)$/.exec(new Group().id)?.[1]);
+    const named = new Group({ id: "player-1" });
+
+    expect(named.id).toBe("player-1");
+    expect(Number(/^node-(\d+)$/.exec(new Group().id)?.[1])).toBe(before + 1);
+  });
+
+  it("restores an id onto an already-constructed node", () => {
+    const node = new Group();
+    restoreNodeId(node, "node-800000201");
+
+    expect(node.id).toBe("node-800000201");
+    expect(new Group().id).toBe("node-800000202");
+  });
+
+  it("passes the option through every node subclass", () => {
+    expect(new Scene({ id: "scene-a" }).id).toBe("scene-a");
+    expect(new Group({ id: "group-a" }).id).toBe("group-a");
   });
 });
 

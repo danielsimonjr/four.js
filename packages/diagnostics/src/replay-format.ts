@@ -19,7 +19,7 @@
  * | §34 item | Field |
  * | --- | --- |
  * | initial scene state | {@link ReplayRecording.initialSnapshot} — the solver's own opaque bytes, base64 |
- * | solver settings | inside those same opaque bytes, and/or caller {@link ReplayRecording.metadata} |
+ * | solver settings | {@link ReplayRecording.worldConfiguration} — the world configuration the run was captured under (§34: "a snapshot is valid only for the same adapter, adapter version, **and world configuration**") — plus whatever the adapter persists inside the opaque bytes, plus caller {@link ReplayRecording.metadata} |
  * | time step | {@link ReplayRecording.fixedDeltaTime} (seconds) |
  * | random seed | {@link ReplayRecording.seed} |
  * | external inputs, indexed by simulation step | {@link ReplayRecording.inputs} |
@@ -27,7 +27,7 @@
  * | optional periodic snapshots | {@link ReplayRecording.periodicSnapshots} |
  * | adapter name and version (refusal key) | {@link ReplayRecording.adapterName} / {@link ReplayRecording.adapterVersion} |
  *
- * Two of those deserve their honesty stated out loud (decisions, WP-10.1):
+ * One of those deserves its honesty stated out loud (decision, WP-10.1):
  *
  * - **"Initial scene state" is the *solver's* state, not the scene graph's.**
  *   `@four/diagnostics` may depend on `core`, `math`, and `scene` only — it can
@@ -37,11 +37,21 @@
  *   the *authoring* scene serialized alongside puts it in `metadata` (or ships
  *   the `@four/serialization` document next to the recording); this format does
  *   not duplicate `@four/serialization`.
- * - **"Solver settings" has no dedicated field.** The plan's pinned envelope
- *   (P10-2) does not name one, and inventing a cross-package settings schema
- *   here would be a new API surface this packet may not open. Settings that the
- *   adapter persists ride inside the opaque snapshot; anything else the caller
- *   wants pinned goes in `metadata`, which is free-form JSON.
+ *
+ * "Solver settings" used to be the second entry on that list, recorded here as
+ * having *no dedicated field* (WP-10.1). {@link ReplayRecording.worldConfiguration}
+ * closed it on **2026-08-06** (PH-6). The gap it left was not cosmetic: the
+ * refusal §34 asks for exists — `PhysicsWorld.restoreSnapshot` compares a
+ * snapshot's configuration field by field and refuses a mismatch — but the
+ * replay path could not reach it, because the configuration was dropped at
+ * record time. Replaying a run captured at gravity −9.81 into a world built
+ * with gravity 0 therefore ran silently and diverged, and the only signal was
+ * `finalChecksum`, checked at the *end*.
+ *
+ * The field stays **opaque** to this module for the same reason the snapshot
+ * bytes are: a cross-package settings schema is an API this package may not
+ * open. It is captured off the snapshot, validated as JSON, carried, and handed
+ * back — the solver decides what it means.
  *
  * ## Canonical form
  *
@@ -77,15 +87,52 @@ import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
 export type { JsonValue } from "@four/core";
 
 /**
- * The format version this build writes and is willing to read.
+ * The highest format version this build writes.
  *
- * A single supported version, not a range: §34's refusal rule is about *not*
- * running a replay whose bytes you do not understand, and a diagnostics format
- * with no shipped consumers has no compatibility debt yet. Bump it — and give
- * {@link validateReplayRecording} an upgrade path — the first time a released
- * field changes meaning.
+ * `2` since 2026-08-06 (PH-6), which added
+ * {@link ReplayRecording.worldConfiguration}.
+ *
+ * ## The versioning rule (decision, PH-6)
+ *
+ * A document declares **the lowest version that can express its content**, not
+ * the version of the build that wrote it. So a recording carrying a world
+ * configuration is a `2`, and one without is still a `1` — byte for byte the
+ * same text this format produced before version 2 existed.
+ *
+ * That rule is what makes the bump safe in both directions:
+ *
+ * - **Old documents still run.** A `1` is read by this build unchanged and
+ *   re-encodes identically, so every recording on disk, and every golden that
+ *   pins one, is untouched. §34's refusal is about not running bytes you do not
+ *   understand — and this build understands a `1` completely.
+ * - **New documents are refused by old builds, loudly.** A version-1 reader
+ *   meeting a `2` raises `SERIALIZATION_VERSION_MISMATCH` naming both numbers,
+ *   which is exactly right: it would otherwise drop the configuration during
+ *   its canonical rebuild and replay into a mismatched world without noticing —
+ *   the very defect PH-6 closed.
+ * - **Downgrading is a real operation, not a hack.** Deleting
+ *   `worldConfiguration` from a `2` and re-validating yields a valid `1`
+ *   (`validateReplayRecording` re-derives the version from the content), so a
+ *   recording can be handed to an older build deliberately, losing exactly the
+ *   guarantee it names.
+ *
+ * See {@link SUPPORTED_REPLAY_FORMAT_VERSIONS} for what this build reads.
  */
-export const REPLAY_FORMAT_VERSION = 1;
+export const REPLAY_FORMAT_VERSION = 2;
+
+/**
+ * Every format version {@link validateReplayRecording} accepts, ascending.
+ *
+ * A *range* rather than a single number since 2026-08-06 (PH-6) — see
+ * {@link REPLAY_FORMAT_VERSION} for the rule that keeps the range honest. Each
+ * version in it is a shape this build can read completely; a version outside it
+ * is refused rather than guessed at (§34).
+ */
+export const SUPPORTED_REPLAY_FORMAT_VERSIONS: readonly number[] =
+  Object.freeze([1, 2]);
+
+/** The version a document needs to carry a world configuration (PH-6). */
+const WORLD_CONFIGURATION_VERSION = 2;
 
 /** One external input, indexed by the simulation step it applies to (§34). */
 export interface ReplayInputRecord {
@@ -140,12 +187,38 @@ export interface ReplayAdapterIdentity {
  * `null`.
  */
 export interface ReplayRecording extends ReplayAdapterIdentity {
-  /** Always {@link REPLAY_FORMAT_VERSION} for a document this build wrote. */
+  /**
+   * The lowest format version that can express this document — `2` when it
+   * carries a {@link ReplayRecording.worldConfiguration}, `1` otherwise. See
+   * {@link REPLAY_FORMAT_VERSION}.
+   */
   readonly formatVersion: number;
   /** Seed of the run's RNG (§33), when the caller supplied one. */
   readonly seed?: number;
   /** The fixed simulation step, in seconds (§10). */
   readonly fixedDeltaTime: number;
+  /**
+   * The world configuration the run was captured under — §34's "solver
+   * settings" (2026-08-06, PH-6).
+   *
+   * Whatever the target put on `ReplaySnapshot.configuration` at
+   * `ReplayRecorder.begin`. For a `PhysicsWorld` that is its
+   * `PhysicsSnapshotConfiguration`: dimension, resolved gravity, resolved §32
+   * sleeping, §33 determinism tier, and §28 solver iterations when set — every
+   * field of which changes what stepping the restored bytes produces.
+   *
+   * **Opaque here.** This module validates it as JSON and carries it; it never
+   * reads a field. `ReplayPlayer` re-attaches it to every snapshot it restores,
+   * and the *solver* decides whether it matches — `PhysicsWorld.restoreSnapshot`
+   * refuses a mismatch field by field, which is the §34 refusal this format
+   * previously could not reach.
+   *
+   * Absent when the target supplied none, which is every recording made before
+   * this field existed and every target that does not report a configuration.
+   * An absent configuration restores exactly as it always did: the adapter
+   * name/version check is then the whole §34 guarantee.
+   */
+  readonly worldConfiguration?: JsonValue;
   /** The solver's state before step 0, base64. */
   readonly initialSnapshot: string;
   /** External inputs in recorded (insertion) order; steps non-decreasing. */
@@ -485,11 +558,18 @@ function validateSnapshots(
  * byte-stable, and no unknown field from an untrusted document survives into
  * the player.
  *
+ * The declared `formatVersion` is **re-derived** rather than copied: the result
+ * carries the lowest version that can express it (see
+ * {@link REPLAY_FORMAT_VERSION}), so validation is idempotent and a
+ * configuration-free document is spelled exactly as version 1 always spelled
+ * it.
+ *
  * @param value the candidate document (typically `JSON.parse` output)
  * @returns the canonical, frozen recording
  * @throws FourError `SERIALIZATION_VERSION_MISMATCH` if `formatVersion` is not
- * {@link REPLAY_FORMAT_VERSION} — §34's "refuses to run" applied to the
- * envelope itself
+ * one of {@link SUPPORTED_REPLAY_FORMAT_VERSIONS}, or if the document declares
+ * a version too low for the fields it carries — §34's "refuses to run" applied
+ * to the envelope itself
  * @throws TypeError if any field is missing, mistyped, or out of range; the
  * message names the field's path
  */
@@ -499,12 +579,34 @@ export function validateReplayRecording(value: unknown): ReplayRecording {
     record.formatVersion,
     "recording.formatVersion",
   );
-  if (formatVersion !== REPLAY_FORMAT_VERSION) {
+  if (!SUPPORTED_REPLAY_FORMAT_VERSIONS.includes(formatVersion)) {
     throw new FourError(
       "SERIALIZATION_VERSION_MISMATCH",
-      `Replay document declares formatVersion ${String(formatVersion)}; this build reads ${String(REPLAY_FORMAT_VERSION)} only (§34).`,
+      `Replay document declares formatVersion ${String(formatVersion)}; this build reads ${SUPPORTED_REPLAY_FORMAT_VERSIONS.join(", ")} (§34).`,
       {
-        context: { expected: REPLAY_FORMAT_VERSION, found: formatVersion },
+        context: {
+          expected: [...SUPPORTED_REPLAY_FORMAT_VERSIONS],
+          found: formatVersion,
+        },
+      },
+    );
+  }
+  if (
+    record.worldConfiguration !== undefined &&
+    formatVersion < WORLD_CONFIGURATION_VERSION
+  ) {
+    // A version-1 reader would drop the field during its canonical rebuild and
+    // then replay into a world it never checked — so a document that declares
+    // `1` may not carry one (PH-6). The producer writes the version its content
+    // needs; nothing has to guess.
+    throw new FourError(
+      "SERIALIZATION_VERSION_MISMATCH",
+      `Replay document declares formatVersion ${String(formatVersion)} and carries a worldConfiguration, which needs ${String(WORLD_CONFIGURATION_VERSION)} (§34).`,
+      {
+        context: {
+          expected: WORLD_CONFIGURATION_VERSION,
+          found: formatVersion,
+        },
       },
     );
   }
@@ -546,10 +648,23 @@ export function validateReplayRecording(value: unknown): ReplayRecording {
     validateFrames(record.frames, "recording.frames"),
   );
 
+  // The version is re-derived from the content, not copied from the input: a
+  // document declares the lowest version that can express it (PH-6), which is
+  // what keeps a configuration-free recording byte-identical to the version-1
+  // text this format has always produced.
+  const worldConfiguration =
+    record.worldConfiguration === undefined
+      ? undefined
+      : cloneJsonValue(
+          record.worldConfiguration,
+          "recording.worldConfiguration",
+        );
+
   // Built key by key in the documented order, so `JSON.stringify` emits one
   // fixed spelling per document and an absent optional is an absent key.
   const canonical: Record<string, unknown> = {
-    formatVersion: REPLAY_FORMAT_VERSION,
+    formatVersion:
+      worldConfiguration === undefined ? 1 : WORLD_CONFIGURATION_VERSION,
     adapterName,
     adapterVersion,
   };
@@ -557,6 +672,9 @@ export function validateReplayRecording(value: unknown): ReplayRecording {
     canonical.seed = asFiniteNumber(record.seed, "recording.seed");
   }
   canonical.fixedDeltaTime = fixedDeltaTime;
+  if (worldConfiguration !== undefined) {
+    canonical.worldConfiguration = worldConfiguration;
+  }
   canonical.initialSnapshot = initialSnapshot;
   canonical.inputs = inputs;
   canonical.frames = frames;

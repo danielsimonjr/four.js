@@ -137,7 +137,11 @@ import {
   type TransformAuthority,
 } from "@four/scene";
 
-import type { PhysicsSolverAdapter } from "./adapter.js";
+import type {
+  PhysicsSolverAdapter,
+  PhysicsTuningCapabilities,
+} from "./adapter.js";
+import { resolveTuningCapabilities } from "./adapter.js";
 import type { SolverBodyAccess, SolverJointAccess } from "./body-access.js";
 import {
   missingSolverJointAccess,
@@ -173,7 +177,10 @@ import type { BlendWeights, RigidBodySleepEvent } from "./rigid-body.js";
 import {
   RigidBody,
   clearRigidBodyCommands,
+  setRigidBodyDerivedMass,
+  setRigidBodyRegistered,
   setRigidBodySleeping,
+  setRigidBodyType,
 } from "./rigid-body.js";
 import type { CollisionShape } from "./shapes.js";
 import type {
@@ -187,7 +194,11 @@ import type {
   SleepingConfig,
   Vector3Input,
 } from "./types.js";
-import { DEFAULT_DETERMINISM_LEVEL, DETERMINISM_LEVELS } from "./types.js";
+import {
+  DEFAULT_DETERMINISM_LEVEL,
+  DEFAULT_SLEEPING_CONFIG,
+  DETERMINISM_LEVELS,
+} from "./types.js";
 import {
   validateJointDescriptor,
   validateMass,
@@ -516,6 +527,20 @@ export class PhysicsWorld {
   /** Resolved §32 sleeping configuration, frozen. */
   readonly #sleeping: SleepingConfig;
 
+  /**
+   * What the adapter declared it actually applies of §25's rolling/spinning
+   * friction and §32's sleeping thresholds — {@link NO_TUNING_CAPABILITIES}
+   * when it declared nothing. See {@link PhysicsTuningCapabilities}.
+   */
+  readonly #tuning: PhysicsTuningCapabilities;
+
+  /**
+   * Which accept-and-ignore warnings this world has already emitted, allocated
+   * on the first one. Once per world per field: a scene with two hundred
+   * rolling-friction colliders has made one mistake, not two hundred.
+   */
+  #tuningWarned?: Set<string>;
+
   /** The §33 tier this world asked for, which the adapter can meet. */
   readonly #determinism: DeterminismLevel;
 
@@ -543,6 +568,13 @@ export class PhysicsWorld {
 
   /** Registered colliders keyed by the adapter's monotonic id. */
   readonly #collidersById = new Map<number, ColliderRegistration>();
+
+  /**
+   * Registered colliders keyed by their `Collider` component — the index
+   * {@link PhysicsWorld.getColliderHandle} answers from, kept in step with
+   * {@link PhysicsWorld.addBody} and `#destroyRegistration`.
+   */
+  readonly #collidersByComponent = new Map<Collider, ColliderRegistration>();
 
   /** Registered joints in **registration order** (§28, §33). */
   readonly #jointsByJoint = new Map<Joint, JointRegistration>();
@@ -670,6 +702,8 @@ export class PhysicsWorld {
     this.#dimension = init.dimension;
     this.#gravity = resolveGravity(init.dimension, init.gravity);
     this.#sleeping = resolveSleepingConfig(init.sleeping);
+    this.#tuning = resolveTuningCapabilities(capabilities);
+    this.#warnUnhonouredSleepThresholds();
     this.#determinism = determinism;
     this.#poses = init.poses;
     this.#options = Object.freeze({
@@ -704,9 +738,13 @@ export class PhysicsWorld {
 
   /**
    * The resolved §32 sleeping configuration, kept accessible because an adapter
-   * maps only what its solver exposes — Rapier 2D honours `enabled` and
-   * compiles the three thresholds into its wasm — so a caller that needs to
-   * know what was *asked for* can still read it here.
+   * maps only what its solver exposes — both Rapier adapters honour `enabled`
+   * (`setCanSleep`) and apply **none** of the three thresholds, which have no
+   * binding at 0.19.3 — so a caller that needs to know what was *asked for* can
+   * still read it here.
+   *
+   * A threshold authored against an adapter that declares it cannot apply one
+   * warns once at construction; see `PhysicsCapabilities.tuning`.
    */
   get sleeping(): SleepingConfig {
     return this.#sleeping;
@@ -820,8 +858,13 @@ export class PhysicsWorld {
    * the world reads `getBodyMass` back onto the component: a dynamic body whose
    * mass was never authored stops reporting `inverseMass === NaN`. A solver that
    * reports a non-positive mass — a body with no collider, or a static body —
-   * leaves the component's `mass` alone, because §23 forbids expressing "does
-   * not simulate" as a zero mass.
+   * leaves the component alone, because §23 forbids expressing "does not
+   * simulate" as a zero mass.
+   *
+   * The value lands on `RigidBody.derivedMass` and **does not author**
+   * `RigidBody.mass` (2026-08-06): `mass` still reports it, `toDescriptor()`
+   * still omits it, and a body registered twice derives twice instead of
+   * freezing the first solver's answer. See `#refreshMassProperties`.
    *
    * Assigning `body.type` after registration changes the **component** and not
    * the solver — the two would then disagree about what is being simulated. Use
@@ -903,11 +946,19 @@ export class PhysicsWorld {
     this.#bodiesByNode.set(node, registration);
     this.#bodiesById.set(id, registration);
     this.#bodiesByComponent.set(body, registration);
+    for (const colliderRegistration of registration.colliders) {
+      this.#collidersByComponent.set(
+        colliderRegistration.collider,
+        colliderRegistration,
+      );
+    }
+    setRigidBodyRegistered(body, true);
     if (tracked) {
       this.#poses?.track(node);
     }
 
     this.#refreshMassProperties(registration);
+    this.#warnUnhonouredMaterials(registration);
     return body;
   }
 
@@ -949,6 +1000,67 @@ export class PhysicsWorld {
   /** The `RigidBody` registered for `node`, or `undefined`. */
   getBody(node: Node): RigidBody | undefined {
     return this.#bodiesByNode.get(node)?.body;
+  }
+
+  /**
+   * The solver handle of `node`'s body, or `undefined` when it is not
+   * registered here — **below the stable API** (§20, §37).
+   *
+   * ```ts
+   * const handle = world.getBodyHandle(node);
+   * if (handle !== undefined) {
+   *   // `world.adapter` is a SolverBodyAccess on both Rapier adapters:
+   *   world.adapter.setBodyVelocities(handle, velocity, spin, true);
+   * }
+   * ```
+   *
+   * ## What this is for, and what it costs
+   *
+   * §20's promise is that common tasks need no solver-specific code, not that
+   * uncommon ones are forbidden. A `RigidBody` carries authored state that
+   * reaches the solver **once**, at `createBody` (see `rigid-body.ts`'s module
+   * header): re-tuning damping, gravity scale, or mass on a body that is
+   * already simulating has no route through the component. Until the §37 seam
+   * widens, the honest answer is a handle plus a documented warning, not a
+   * setter that quietly does nothing.
+   *
+   * A handle taken from here is **opaque and unforgeable** (`types.ts`), and
+   * everything below this line is the adapter's contract rather than this
+   * package's:
+   *
+   * - it is valid only while the body is registered with **this** world — a
+   *   `removeBody`, a re-registration, or `dispose()` invalidates it, and using
+   *   a stale handle is the adapter's error to raise;
+   * - what a write does is the *solver's* business: `PhysicsWorld` does not see
+   *   it, does not mirror it onto the component, and cannot keep §33's
+   *   checksums comparable across runs that did it differently;
+   * - a write that changes the simulation makes the component's mirrors
+   *   (`mass`, damping, `gravityScale`) stale in the other direction. The
+   *   component is not re-read from the solver except for velocities and the
+   *   sleep flag.
+   *
+   * Prefer the supported routes where they exist: §26's force and impulse
+   * commands, {@link PhysicsWorld.setBodyControlMode} for §22 types, and
+   * `removeBody` + `addBody` to rebuild a body from a changed descriptor.
+   */
+  getBodyHandle(node: Node): PhysicsBodyHandle | undefined {
+    return this.#bodiesByNode.get(node)?.handle;
+  }
+
+  /**
+   * The solver handle of a registered `Collider` component, or `undefined` —
+   * **below the stable API**, with every caveat
+   * {@link PhysicsWorld.getBodyHandle} states (§24, §37).
+   *
+   * The collider must have been registered by this world, which happens when
+   * `addBody` scans the body's subtree: a `Collider` on a node this world does
+   * not hold has no handle to give. §25's rolling and spinning friction are the
+   * motivating case — no shipped solver applies them (see
+   * `PhysicsCapabilities.tuning`), and a caller who needs a solver-specific
+   * equivalent needs the handle to reach it.
+   */
+  getColliderHandle(collider: Collider): PhysicsColliderHandle | undefined {
+    return this.#collidersByComponent.get(collider)?.handle;
   }
 
   /**
@@ -1077,7 +1189,10 @@ export class PhysicsWorld {
 
     const wake = options.wake ?? true;
     this.#adapter.setBodyType(registration.handle, type, wake);
-    body.type = type;
+    // Through the package-internal writer, not `body.type = type`: the public
+    // setter warns about exactly this assignment on a registered body, and here
+    // the solver has just been re-typed, so there is no divergence to report.
+    setRigidBodyType(body, type);
     registration.type = type;
     this.#retrackPose(registration);
 
@@ -1654,7 +1769,11 @@ export class PhysicsWorld {
   #refuseConfigurationMismatch(
     configuration: PhysicsSnapshotConfiguration,
   ): void {
-    const mismatch = (field: string, expected: unknown, found: unknown): never => {
+    const mismatch = (
+      field: string,
+      expected: unknown,
+      found: unknown,
+    ): never => {
       throw new FourError(
         WORLD_ERROR_CODE,
         `Snapshot was captured under a different world configuration: ${field} was ${JSON.stringify(found)} at capture and is ${JSON.stringify(expected)} here. Stepping the restored state under different rules is not a continuation of the captured run (§34); rebuild the world with the captured configuration, or capture a fresh snapshot.`,
@@ -1665,7 +1784,11 @@ export class PhysicsWorld {
       mismatch("dimension", this.#dimension, configuration.dimension);
     }
     const [gx, gy, gz] = configuration.gravity;
-    if (gx !== this.#gravity.x || gy !== this.#gravity.y || gz !== this.#gravity.z) {
+    if (
+      gx !== this.#gravity.x ||
+      gy !== this.#gravity.y ||
+      gz !== this.#gravity.z
+    ) {
       mismatch(
         "gravity",
         [this.#gravity.x, this.#gravity.y, this.#gravity.z],
@@ -1725,6 +1848,7 @@ export class PhysicsWorld {
     this.#bodiesById.clear();
     this.#bodiesByComponent.clear();
     this.#collidersById.clear();
+    this.#collidersByComponent.clear();
     this.#jointsByJoint.clear();
     this.#jointsById.clear();
     this.#queue = [];
@@ -1926,12 +2050,126 @@ export class PhysicsWorld {
   /**
    * Reads the solver's mass back onto the component after registration (§23,
    * §25; plan §6d note of 2026-08-01). See {@link PhysicsWorld.addBody}.
+   *
+   * The value lands on `RigidBody.derivedMass`, **not** on `RigidBody.mass`
+   * (2026-08-06). Until then this assigned the setter, which authored the
+   * number: `toDescriptor()` re-emitted the solver's own derivation as though
+   * the author had written `mass: 3.0141594`, so re-registering the body — or
+   * serializing and reloading the scene — silently froze a mass that was
+   * supposed to follow the colliders. `RigidBody.mass` still reports the
+   * derived value (it falls back to the mirror), so nothing a caller reads
+   * changes; what changes is what the body *asks the next solver for*.
    */
   #refreshMassProperties(registration: BodyRegistration): void {
     const mass = this.#adapter.getBodyMass(registration.handle);
     if (Number.isFinite(mass) && mass > 0) {
-      registration.body.mass = mass;
+      setRigidBodyDerivedMass(registration.body, mass);
     }
+  }
+
+  /**
+   * Warns once per world when this world's §32 sleeping **thresholds** differ
+   * from Appendix A's and the adapter has declared it cannot apply them (§32,
+   * §37; 2026-08-06).
+   *
+   * `PhysicsWorldOptions.sleeping` is validated, resolved, and handed to
+   * `initialize` in full, and both Rapier adapters read exactly one field of it
+   * — `enabled`, through `RigidBodyDesc.setCanSleep`. `linearThreshold`,
+   * `angularThreshold`, and `timeThreshold` have no binding at Rapier 0.19.3
+   * (verified by enumerating `IntegrationParameters` in both builds), so a
+   * world that asks bodies to sleep after 5 s of near-stillness gets Rapier's
+   * own compiled-in thresholds and no indication that it did.
+   *
+   * Only a **departure from Appendix A** warns: passing the defaults — or only
+   * `{ enabled: false }`, which every adapter here honours — asks for nothing
+   * the solver is not already doing, and warning about it would train callers
+   * to ignore the message.
+   *
+   * Emitted from the constructor, before anything is registered, because that
+   * is where the mismatch already exists.
+   */
+  #warnUnhonouredSleepThresholds(): void {
+    if (this.#tuning.sleepThresholds) {
+      return;
+    }
+    const sleeping = this.#sleeping;
+    const departures: string[] = [];
+    if (sleeping.linearThreshold !== DEFAULT_SLEEPING_CONFIG.linearThreshold) {
+      departures.push("linearThreshold");
+    }
+    if (
+      sleeping.angularThreshold !== DEFAULT_SLEEPING_CONFIG.angularThreshold
+    ) {
+      departures.push("angularThreshold");
+    }
+    if (sleeping.timeThreshold !== DEFAULT_SLEEPING_CONFIG.timeThreshold) {
+      departures.push("timeThreshold");
+    }
+    if (departures.length === 0) {
+      return;
+    }
+    this.#warnTuning(
+      "sleepThresholds",
+      `sleeping.${departures.join(", sleeping.")} was authored, but adapter ${JSON.stringify(this.#adapter.name)} declares it applies no §32 sleeping thresholds, so the solver keeps its own. The world's sleeping configuration is readable at world.sleeping and reaches the adapter in full; only these fields stop there. sleeping.enabled is unaffected.`,
+    );
+  }
+
+  /**
+   * Warns once per world when a registered collider carries a §25 material
+   * coefficient the adapter has declared it cannot apply (§25, §37;
+   * 2026-08-06).
+   *
+   * `PhysicsMaterial.rollingFriction` and `spinningFriction` are §25 fields the
+   * stable API accepts and validates, and no Rapier 0.19.3 build has a binding
+   * for either. Accepting them silently would mean a ball authored to stop
+   * rolling that never stops rolling, with nothing anywhere to explain it.
+   *
+   * The declaration is per-field, so an adapter that gains one of the two later
+   * warns about the other alone.
+   */
+  #warnUnhonouredMaterials(registration: BodyRegistration): void {
+    for (const { collider } of registration.colliders) {
+      const material = collider.material;
+      if (material === undefined) {
+        continue;
+      }
+      if (
+        material.rollingFriction !== undefined &&
+        !this.#tuning.rollingFriction
+      ) {
+        this.#warnTuning(
+          "rollingFriction",
+          `A PhysicsMaterial on node ${registration.node.id} sets rollingFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 rolling friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
+        );
+      }
+      if (
+        material.spinningFriction !== undefined &&
+        !this.#tuning.spinningFriction
+      ) {
+        this.#warnTuning(
+          "spinningFriction",
+          `A PhysicsMaterial on node ${registration.node.id} sets spinningFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 spinning friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
+        );
+      }
+    }
+  }
+
+  /**
+   * `console.warn` at most once per world per `key` — the same development
+   * semantics `warnAuthorityConflict` (§42) and `RigidBody`'s drift warnings
+   * use: the first occurrence names the mistake and every repeat is suppressed,
+   * because a scene-wide misconfiguration would otherwise print once per body
+   * forever.
+   */
+  #warnTuning(key: string, message: string): void {
+    const warned = (this.#tuningWarned ??= new Set<string>());
+    if (warned.has(key)) {
+      return;
+    }
+    warned.add(key);
+    console.warn(
+      `[four] ${message} Further ${key} occurrences in this world are suppressed.`,
+    );
   }
 
   /**
@@ -2524,15 +2762,26 @@ export class PhysicsWorld {
     );
   }
 
-  /** Destroys one registration's solver objects, colliders first (§37, §83). */
+  /**
+   * Destroys one registration's solver objects, colliders first (§37, §83), and
+   * releases the component-side bookkeeping that went with them: the
+   * component→handle indices {@link PhysicsWorld.getColliderHandle} reads, and
+   * the `RigidBody`'s registration count, which is what its
+   * "this write reaches no solver" warnings are gated on.
+   *
+   * The single place both `removeBody` and `dispose` funnel through, so a
+   * disposed world leaves no component believing it is still simulated.
+   */
   #destroyRegistration(registration: BodyRegistration): void {
     for (let i = registration.colliders.length - 1; i >= 0; i -= 1) {
       const collider = registration.colliders[i];
       this.#collidersById.delete(collider.id);
+      this.#collidersByComponent.delete(collider.collider);
       this.#adapter.destroyCollider(collider.handle);
     }
     registration.colliders.length = 0;
     this.#adapter.destroyBody(registration.handle);
+    setRigidBodyRegistered(registration.body, false);
     if (registration.tracked) {
       this.#poses?.untrack(registration.node);
     }

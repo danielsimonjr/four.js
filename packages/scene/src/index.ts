@@ -23,8 +23,13 @@ export {
   PoseBuffer,
   createSnapshotSystem,
 } from "./interpolation.js";
-export type { NodeEventMap, NodeHierarchyEvent, NodeType } from "./node.js";
-export { Node } from "./node.js";
+export type {
+  NodeEventMap,
+  NodeHierarchyEvent,
+  NodeOptions,
+  NodeType,
+} from "./node.js";
+export { Node, restoreNodeId } from "./node.js";
 export { PoseTarget } from "./pose-target.js";
 export { Scene } from "./scene.js";
 export { Transform } from "./transform.js";

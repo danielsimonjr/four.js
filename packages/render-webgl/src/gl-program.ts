@@ -58,10 +58,20 @@ export const GL = {
   LINES: 0x0001,
   /** `GL_TRIANGLES` — three vertices per primitive. */
   TRIANGLES: 0x0004,
+  /** `GL_ZERO` — destination factor of the `"multiply"` blend mode (§57). */
+  ZERO: 0,
+  /** `GL_ONE` — destination factor of `"additive"`, source of `"screen"`. */
+  ONE: 1,
+  /** `GL_SRC_COLOR`; declared for completeness of the blend-factor set. */
+  SRC_COLOR: 0x0300,
+  /** `GL_ONE_MINUS_SRC_COLOR` — destination factor of `"screen"`. */
+  ONE_MINUS_SRC_COLOR: 0x0301,
   /** `GL_SRC_ALPHA` — source factor of the straight-alpha blend (§66). */
   SRC_ALPHA: 0x0302,
   /** `GL_ONE_MINUS_SRC_ALPHA` — destination factor of the same blend. */
   ONE_MINUS_SRC_ALPHA: 0x0303,
+  /** `GL_DST_COLOR` — source factor of the `"multiply"` blend mode. */
+  DST_COLOR: 0x0306,
   /** `GL_DEPTH_BUFFER_BIT`, for {@link WebglContext.clear}. */
   DEPTH_BUFFER_BIT: 0x00000100,
   /** `GL_COLOR_BUFFER_BIT`, for {@link WebglContext.clear}. */
@@ -244,6 +254,22 @@ export interface WebglContext {
   clearDepth(depth: number): void;
   clear(mask: number): void;
   blendFunc(sourceFactor: number, destinationFactor: number): void;
+  /**
+   * Enables or disables writing to the depth buffer (§57's `depthWrite`).
+   *
+   * Separate from `enable(DEPTH_TEST)`, which is what §57's `depthTest`
+   * controls: the usual transparent surface *tests* depth and does not *write*
+   * it, and only two GL entry points can say that.
+   */
+  depthMask(enabled: boolean): void;
+  /**
+   * Enables or disables writing each colour channel (§57's `colorWrite`).
+   *
+   * Per-channel in GL; this tier only ever sets all four together, because §57
+   * declares one boolean. A per-channel mask is what a later `colorWrite`
+   * carrying a channel set would drive.
+   */
+  colorMask(red: boolean, green: boolean, blue: boolean, alpha: boolean): void;
   drawArrays(mode: number, first: number, count: number): void;
   drawElements(mode: number, count: number, type: number, offset: number): void;
   isContextLost(): boolean;
@@ -727,15 +753,23 @@ export class UnlitProgram implements Disposable {
   }
 
   /**
-   * Uploads a straight-alpha, linear-light RGBA colour (§57, §60a). Accepts the
-   * material's own live array; the values are copied into scratch, so the
-   * material keeps ownership of its array.
+   * Uploads a straight-alpha, linear-light RGBA colour (§57, §60a), scaled by
+   * the material's `opacity`. Accepts the material's own live array; the values
+   * are copied into scratch, so the material keeps ownership of its array.
+   *
+   * `opacity` multiplies **alpha only** — §57 makes it a uniform transparency
+   * over whatever alpha the colour already carries — and defaults to `1`, at
+   * which `alpha × 1` is `alpha` bit for bit, so a material that never touches
+   * opacity uploads exactly what it did before the field existed.
    */
-  setColor(color: readonly [number, number, number, number]): void {
+  setColor(
+    color: readonly [number, number, number, number],
+    opacity = 1,
+  ): void {
     colorScratch[0] = color[0];
     colorScratch[1] = color[1];
     colorScratch[2] = color[2];
-    colorScratch[3] = color[3];
+    colorScratch[3] = color[3] * opacity;
     this.#gl.uniform4fv(this.#colorLocation, colorScratch);
   }
 
@@ -903,15 +937,17 @@ export class SpriteProgram implements Disposable {
   }
 
   /**
-   * Uploads a straight-alpha RGBA tint (§55, §66). Accepts the material's own
+   * Uploads a straight-alpha RGBA tint (§55, §66) scaled by the material's
+   * `opacity` — see `UnlitProgram.setColor` for the multiply and why the
+   * default reproduces the previous upload exactly. Accepts the material's own
    * live array; the values are copied into scratch, so the material keeps
    * ownership of its array.
    */
-  setTint(tint: readonly [number, number, number, number]): void {
+  setTint(tint: readonly [number, number, number, number], opacity = 1): void {
     colorScratch[0] = tint[0];
     colorScratch[1] = tint[1];
     colorScratch[2] = tint[2];
-    colorScratch[3] = tint[3];
+    colorScratch[3] = tint[3] * opacity;
     this.#gl.uniform4fv(this.#tintLocation, colorScratch);
   }
 
@@ -1059,14 +1095,19 @@ export class LitProgram implements Disposable {
 
   /**
    * Uploads a straight-alpha, linear-light RGBA colour (§57, §60a) — the
-   * material's base color. Accepts the material's own live array; the values
-   * are copied into scratch, so the material keeps ownership of its array.
+   * material's base color, scaled by its `opacity` exactly as
+   * `UnlitProgram.setColor` does. Accepts the material's own live array; the
+   * values are copied into scratch, so the material keeps ownership of its
+   * array.
    */
-  setColor(color: readonly [number, number, number, number]): void {
+  setColor(
+    color: readonly [number, number, number, number],
+    opacity = 1,
+  ): void {
     colorScratch[0] = color[0];
     colorScratch[1] = color[1];
     colorScratch[2] = color[2];
-    colorScratch[3] = color[3];
+    colorScratch[3] = color[3] * opacity;
     this.#gl.uniform4fv(this.#colorLocation, colorScratch);
   }
 

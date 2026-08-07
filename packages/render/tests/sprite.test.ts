@@ -327,6 +327,41 @@ describe("Sprite — the quad built from anchor and size (§55, §7a)", () => {
   });
 });
 
+describe("Sprite — §55's `extends Renderable` (2026-08-06)", () => {
+  it("is a Renderable, and reaches the render list through one instanceof", () => {
+    const sprite = new Sprite(spriteMaterial());
+
+    expect(sprite).toBeInstanceOf(Renderable);
+    // The inherited members: the three the class used to re-declare, gone.
+    expect(sprite.renderLayer).toBe(0);
+    expect(sprite.renderOrder).toBe(0);
+    expect(sprite.material.kind).toBe("sprite");
+  });
+
+  it("takes the layer and order options every renderable takes", () => {
+    const sprite = new Sprite(spriteMaterial(), {
+      renderLayer: 2,
+      renderOrder: -3,
+    });
+
+    expect(sprite.renderLayer).toBe(2);
+    expect(sprite.renderOrder).toBe(-3);
+  });
+
+  it("hands its own quad to the base, and keeps deriving it", () => {
+    const sprite = new Sprite(spriteMaterial(), { width: 2, height: 2 });
+
+    // Read through the base's slot: the override is what rebuilds it, so both
+    // views of `geometry` are the same live quad.
+    const asRenderable: Renderable<SpriteMaterial> = sprite;
+    expect(asRenderable.geometry).toBe(sprite.geometry);
+
+    sprite.width = 4;
+    expect(asRenderable.geometry).toBe(sprite.geometry);
+    expect(corners(sprite)[1][0]).toBe(2);
+  });
+});
+
 describe("Sprite — rebuilds (§53 version contract)", () => {
   it("keeps one geometry instance across a resize and bumps its version", () => {
     const sprite = new Sprite(spriteMaterial());

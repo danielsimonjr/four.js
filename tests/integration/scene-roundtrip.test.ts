@@ -7,20 +7,23 @@
  * 1. **`@four/serialization` × `@four/physics` × `@four/physics-rapier`.** The
  *    P11-1 gate is "round-trip save → load → §33-checksum-relevant state
  *    equality", and it cannot be met inside `@four/serialization`, which may not
- *    name `RigidBody` (plan §3.1). `helpers/roundtrip-scenarios.ts` performs the
- *    one cross-package registration P11-1 assigns to this layer and holds the
- *    reference serializers applications copy; this file is what proves they
- *    work.
+ *    name `RigidBody` (plan §3.1). Since 2026-08-06 (`PH-17`) the serializers
+ *    are **shipped** — `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` from
+ *    `@four/physics`, registered by the umbrella's
+ *    `registerPhysicsSerializers()` — and `helpers/roundtrip-scenarios.ts`
+ *    holds only the scenario. This file is what proves the shipped pair works.
  * 2. **The §79 / §34 line.** Saving a *scene* is not snapshotting a
  *    *simulation*, and the difference is measurable: the same scene reloads
  *    bit-identically when the solver holds no contacts, and parts from the run
  *    it was saved from within two steps when it does. Both halves are asserted
  *    below, because the pair is the finding — either one alone is an anecdote.
  * 3. **`@four/ui` composition (§72–§75).** A `Panel`/`Label`/`Button` tree lays
- *    itself out and activates from a synthetic §72 click, and — the honest part
- *    — its serialization behaviour is stated as it actually is rather than
- *    assumed: widgets are `Node`s, but no widget serializers exist, so what
- *    round-trips is exactly the base-`Node` state.
+ *    itself out and activates from a synthetic §72 click, and round-trips
+ *    through §79 — completely, including its §74 box model and §75
+ *    accessibility record, through the umbrella package's
+ *    `registerSceneNodeTypes()` (2026-08-06, A-14). The hand-written
+ *    `nodeTypeOf` pair beside it shows what an application pays for supplying
+ *    the minimum instead: the classes come back, the box model does not.
  *
  * Plus the §80 exercise the format needs and nothing else covers: a
  * hand-authored older document, upgraded by a registered migration and then
@@ -33,12 +36,13 @@
  * a constant, injected delta, so every number below is reproducible.
  */
 
+import { isFourError } from "@four/core";
 import {
   ScenePointerEvent,
   buildPropagationPath,
   dispatchPointerEvent,
 } from "@four/input";
-import { Collider, RigidBody } from "@four/physics";
+import { Collider, RIGID_BODY_SERIALIZER, RigidBody } from "@four/physics";
 import { Group, Node, Scene } from "@four/scene";
 import {
   ComponentSerializerRegistry,
@@ -56,6 +60,7 @@ import {
 } from "@four/serialization";
 import { buildGlyphAtlas } from "@four/text";
 import { Button, Label, Panel, UI_LAYOUT_AUTHORITY } from "@four/ui";
+import { registerSceneNodeTypes } from "four";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -65,7 +70,6 @@ import {
   CONTACT_RELOAD_POSITION_TOLERANCE,
   CONTACT_RELOAD_VELOCITY_TOLERANCE,
   CONTROL_STEPS,
-  RIGID_BODY_SERIALIZER,
   SAVE_STEP,
   SIM_ROOT_NAME,
   createRoundtripRig,
@@ -256,9 +260,11 @@ describe("scene round trip (§79, §113a)", () => {
       ]);
     }
 
-    // The one body authored with no mass reports the solver-derived one, and the
-    // document carries it: registration destroys authoredness before
-    // serialization ever sees it (helper module header).
+    // The one body authored with no mass *reports* the solver-derived one and
+    // the document deliberately does **not** carry it: registration mirrors the
+    // derived mass onto `RigidBody.derivedMass` and leaves authoredness alone,
+    // so `toDescriptor()` still asks the next solver to derive (§23, §25;
+    // corrected 2026-08-06 — see the helper module header).
     const derived = (root.children ?? []).find(
       (child) => child.name === "ball-derived",
     );
@@ -266,13 +272,31 @@ describe("scene round trip (§79, §113a)", () => {
       (entry) => entry.type === "rigid-body",
     );
     expect(body).toBeDefined();
-    // Density 1 kg/m² times the circle's area (§24, §25), to f32 precision —
-    // the solver derived it, and the document simply carries what the component
-    // reported afterwards.
-    expect((body?.data as JsonObject).mass).toBeCloseTo(
-      Math.PI * BALLS[1].radius * BALLS[1].radius,
-      7,
+    expect("mass" in (body?.data as JsonObject)).toBe(false);
+
+    // Density 1 kg/m² times the circle's area (§24, §25), to f32 precision: the
+    // component still *reports* it — both before and after the reload, which is
+    // what re-derivation from the saved collider buys — even though the
+    // document never wrote it down.
+    const savedDerived = run.saved.find(
+      (state) => state.name === BALLS[1].name,
     );
+    const reloadedDerived = run.restored.find(
+      (state) => state.name === BALLS[1].name,
+    );
+    const derivedArea = Math.PI * BALLS[1].radius * BALLS[1].radius;
+    expect(savedDerived?.mass).toBeCloseTo(derivedArea, 7);
+    expect(reloadedDerived?.mass).toBeCloseTo(derivedArea, 7);
+
+    // The authored ball keeps its authored mass in the document, which is the
+    // other half of the distinction.
+    const authored = (root.children ?? []).find(
+      (child) => child.name === "ball-authored",
+    );
+    const authoredBody = (authored?.components ?? []).find(
+      (entry) => entry.type === "rigid-body",
+    );
+    expect((authoredBody?.data as JsonObject).mass).toBe(BALLS[0].mass);
   }, 30_000);
 
   it("restores every §33-relevant field bit for bit (the P11-1 gate)", async () => {
@@ -324,6 +348,61 @@ describe("scene round trip (§79, §113a)", () => {
       ),
     ).toBe(-1);
     expectStatesIdentical(run.final, expected.states);
+  }, 30_000);
+
+  it("saves and reloads a physics scene through registerSceneNodeTypes alone (PH-17)", async () => {
+    // The closing half of PH-17, and the one path an application actually
+    // takes: no hand-written registry, no `{ unknownComponents: "skip" }`, no
+    // serializer copied out of a test helper — one umbrella call that knows
+    // `RigidBody` and `Collider` because `@four/physics` ships their
+    // serializers and this package registers them.
+    //
+    // Saved contact-free (see the §79/§34 boundary above), so the claim is the
+    // strongest one a §79 document can make: the reloaded world reproduces the
+    // control's §33 checksum stream *element by element*, through every later
+    // collision and bounce.
+    const expected = await control();
+    const io = registerSceneNodeTypes();
+    expect(io.components.has(RigidBody.typeName)).toBe(true);
+    expect(io.components.has(Collider.typeName)).toBe(true);
+
+    const original = await createRoundtripRig();
+    let text: string;
+    let saved: readonly BodyState[];
+    try {
+      stepChecksums(original, CONTACT_FREE_SAVE_STEP);
+      saved = readBodyStates(original);
+      text = encodeSceneDocument(
+        serializeScene(original.root, io.components, io.write),
+      );
+    } finally {
+      original.dispose();
+    }
+
+    // Every body node carries both components; the widget node-type pair the
+    // same call installs simply never matches a `Group` and stays out of the way.
+    const document = decodeSceneDocument(text);
+    expect(document.nodes[0].type).toBe("group");
+    for (const child of document.nodes[0].children ?? []) {
+      expect((child.components ?? []).map((entry) => entry.type)).toEqual([
+        "rigid-body",
+        "collider",
+      ]);
+    }
+
+    const reloaded = await loadRoundtripRig(
+      instantiateScene(document, io.components, io.read),
+    );
+    try {
+      expect(reloaded.nodes).toHaveLength(BODY_COUNT);
+      expectStatesIdentical(readBodyStates(reloaded), saved);
+      expect(
+        stepChecksums(reloaded, CONTROL_STEPS - CONTACT_FREE_SAVE_STEP),
+      ).toEqual([...expected.checksums.slice(CONTACT_FREE_SAVE_STEP)]);
+      expectStatesIdentical(readBodyStates(reloaded), expected.states);
+    } finally {
+      reloaded.dispose();
+    }
   }, 30_000);
 
   it("re-triggers the reloaded sensor exactly as the control did (§24, §29)", async () => {
@@ -379,16 +458,14 @@ describe("scene round trip (§79, §113a)", () => {
     }
   }, 30_000);
 
-  it("silently drops a component whose class was never registered", async () => {
-    // The known boundary `serializer.ts` records: the writer walks the
-    // *serializer* registry and probes each registered class, because `Node`
-    // offers no component enumeration — so a component nobody registered is
-    // unsaved, and the omission cannot be detected at save time.
-    //
-    // Stated as a test rather than left in prose because it is the one failure
-    // mode of this design, and an application that copies the reference
-    // serializers needs to know that forgetting one of the two `register` calls
-    // costs it every collider in the scene, with nothing raised anywhere.
+  it("refuses to save a component whose class was never registered (A-15)", async () => {
+    // This used to be the one failure mode of the design, asserted here as
+    // "silently drops": the writer walked the *serializer* registry and probed
+    // each registered class, because `Node` offered no component enumeration —
+    // so a component nobody registered was unsaved and the omission could not
+    // be detected at save time. `Node.components` closed it on 2026-08-06;
+    // forgetting one of the two `register` calls now costs a `FourError`
+    // naming the component, not every collider in the scene.
     const partial = new ComponentSerializerRegistry().register(
       RigidBody,
       RIGID_BODY_SERIALIZER,
@@ -408,11 +485,27 @@ describe("scene round trip (§79, §113a)", () => {
           componentsOf(serializeScene(rig.root, createRoundtripSerializers())),
         ),
       ).toEqual(new Set(["rigid-body", "collider"]));
-      // No throw, no warning, no marker in the document: the colliders are
-      // simply not there.
-      expect(new Set(componentsOf(serializeScene(rig.root, partial)))).toEqual(
-        new Set(["rigid-body"]),
+
+      let thrown: unknown;
+      try {
+        serializeScene(rig.root, partial);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(isFourError(thrown) && thrown.code).toBe(
+        "INVALID_APPLICATION_STATE",
       );
+      expect(isFourError(thrown) && thrown.message).toMatch(/collider/);
+
+      // Dropping it is still available — as a deliberate, per-save opt-in that
+      // mirrors the read side, rather than as the default.
+      expect(
+        new Set(
+          componentsOf(
+            serializeScene(rig.root, partial, { unknownComponents: "skip" }),
+          ),
+        ),
+      ).toEqual(new Set(["rigid-body"]));
     } finally {
       rig.dispose();
     }
@@ -524,9 +617,10 @@ describe("UI composition (§72–§75)", () => {
     // `serializeScene` matches node types by **exact class identity**, and a
     // `Panel` is neither `Scene` nor `Group`. Writing it out as `"group"` would
     // reload it as a plain group and lose everything that made it a panel, so
-    // the writer refuses and names the class instead. There is no `@four/ui`
-    // serializer and this suite does not invent one: the honest MVP answer is
-    // that a widget tree does not round-trip out of the box.
+    // the writer refuses and names the class instead. Widget serializers now
+    // exist — `registerSceneNodeTypes()` in the umbrella `four` package, see
+    // the test below — but they are opt-in, and a caller that supplies none
+    // still gets this refusal rather than a silent downgrade.
     //
     // The refusal names the *deepest* offending class, because `serializeScene`
     // walks children before it resolves its own type — here the `Label` inside
@@ -540,19 +634,19 @@ describe("UI composition (§72–§75)", () => {
     );
   });
 
-  it("round-trips a widget tree's Node state, and nothing a widget added to it", () => {
-    // With `nodeTypeOf` / `nodeFactory` supplied by the application, the tree
-    // does round-trip — as `Node`s. What survives is exactly what
-    // `@four/scene`'s own serializer carries: hierarchy, names, transforms
-    // (including the positions the layout pass wrote), authority, flags, tags.
+  it("round-trips a widget tree's Node state through a bare nodeTypeOf pair", () => {
+    // The minimum an application can supply: a `nodeTypeOf` / `nodeFactory`
+    // pair that names the classes and nothing more. The tree round-trips — as
+    // `Node`s. What survives is exactly what `@four/scene`'s own serializer
+    // carries: hierarchy, names, transforms (including the positions the layout
+    // pass wrote), authority, flags, tags.
     //
     // What does **not** survive is every field `UIWidget` added: requested
     // width/height, padding and margins, the label's text and atlas, the
     // button's focusability. A reloaded tree is therefore a correctly *placed*
     // widget tree that has forgotten how it was placed — laying it out again
-    // would move everything. Closing that needs `@four/ui` component or node
-    // serializers, which §113a's MVP tier does not ship; the physics scene is
-    // what carries the "saved and reloaded" gate.
+    // would move everything. That is the cost of writing the pair by hand;
+    // `registerSceneNodeTypes()` (next test) is the pair that does not pay it.
     const { root, button } = buildUITree();
     root.layout();
 
@@ -596,6 +690,41 @@ describe("UI composition (§72–§75)", () => {
     // all, and there is nowhere for a width or a string of text to have gone.
     expect(reloaded.children[1]).not.toBeInstanceOf(Button);
     expect(reloaded).not.toBeInstanceOf(Panel);
+  });
+
+  it("round-trips a widget tree completely through registerSceneNodeTypes (A-14)", () => {
+    // §73: "UI objects are scene nodes and therefore share animation, input,
+    // clipping, serialization, and diagnostics." Of those five, serialization
+    // did not hold until 2026-08-06 — and this is the cross-package proof that
+    // it now does, because only the umbrella package may see `@four/ui` and
+    // `@four/serialization` at once.
+    const { root, button, buttonLabel } = buildUITree();
+    root.layout();
+    const io = registerSceneNodeTypes({ atlas: buildGlyphAtlas() });
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    expect(reloaded).toBeInstanceOf(Panel);
+    const restoredButton = (reloaded as Panel).children[1];
+    expect(restoredButton).toBeInstanceOf(Button);
+    expect((restoredButton as Button).width).toBe(button.width);
+    expect((restoredButton as Button).height).toBe(button.height);
+    expect((restoredButton as Button).focusable).toBe(button.focusable);
+    const restoredLabel = (restoredButton as Button).children[0];
+    expect(restoredLabel).toBeInstanceOf(Label);
+    expect((restoredLabel as Label).text).toBe(buttonLabel.text);
+
+    // The real test of "it remembers how it was placed": lay the reloaded tree
+    // out from scratch and it lands where the original did.
+    const before = button.transform.position.y;
+    (reloaded as Panel).layout();
+    expect(restoredButton.transform.position.y).toBeCloseTo(before, 12);
   });
 });
 

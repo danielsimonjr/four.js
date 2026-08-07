@@ -35,7 +35,7 @@ export {
   isSpriteItem,
   isUnlitItem,
 } from "./render-list.js";
-export type { RenderableOptions } from "./renderable.js";
+export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export type {
   RenderInterpolation,

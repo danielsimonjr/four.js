@@ -748,14 +748,15 @@ describe("PointerInput — pointer capture", () => {
 });
 
 describe("PointerInput — lifecycle", () => {
-  it("subscribes to down, move, and up", () => {
+  it("subscribes to down, move, up, and cancel", () => {
     const { surface } = harness();
     expect([...surface.listeners.keys()].sort()).toEqual([
+      "pointercancel",
       "pointerdown",
       "pointermove",
       "pointerup",
     ]);
-    expect(surface.listenerCount).toBe(3);
+    expect(surface.listenerCount).toBe(4);
   });
 
   it("removes every listener on dispose, idempotently", () => {
@@ -774,6 +775,194 @@ describe("PointerInput — lifecycle", () => {
       input.dispose();
     }).not.toThrow();
     expect(surface.listenerCount).toBe(0);
+  });
+
+  it("forgets every tracked pointer on dispose", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 4);
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 5);
+    expect(input.trackedPointerCount).toBe(2);
+
+    input.dispose();
+    expect(input.trackedPointerCount).toBe(0);
+  });
+});
+
+/**
+ * A-9 (2026-08-06): per-pointer state used to be inserted on demand and never
+ * removed, so a surface that saw N touch contacts kept N entries — each one
+ * holding `downTarget` and `captured` `Node` references — until `dispose()`.
+ */
+describe("PointerInput — pointer lifetime (§72, §83, A-9)", () => {
+  it("forgets a pointer when it is released", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 3);
+    expect(input.trackedPointerCount).toBe(1);
+    expect(input.getHovered(3)).toBe(box.node);
+
+    surface.fire("pointerup", clientXOf(0), clientYOf(0), 3);
+    expect(input.trackedPointerCount).toBe(0);
+    expect(input.getHovered(3)).toBeNull();
+    expect(input.getPointerCapture(3)).toBeNull();
+  });
+
+  it("fires the pending leave when a release ends the hover", () => {
+    const box = boxAt(0, 0);
+    const { surface } = harness([box]);
+    const order: string[] = [];
+    box.node.on("pointerenter", () => order.push("enter"));
+    box.node.on("pointerup", () => order.push("up"));
+    box.node.on("click", () => order.push("click"));
+    box.node.on("pointerleave", (event) => {
+      order.push("leave");
+      // Target-only, and no world point: the pointer is no longer on it.
+      expect(event.target).toBe(box.node);
+      expect(event.worldPoint).toBeUndefined();
+    });
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointerup", clientXOf(0), clientYOf(0));
+
+    expect(order).toEqual(["enter", "up", "click", "leave"]);
+  });
+
+  it("releases a capture and fires no leave for a pointer that never hovered", () => {
+    const left = boxAt(-1.5, 0);
+    const right = boxAt(1.5, 0);
+    const { surface, input } = harness([left, right]);
+    const leave = vi.fn();
+    left.node.on("pointerleave", leave);
+    right.node.on("pointerleave", leave);
+
+    input.setPointerCapture(left.node, 1);
+    surface.fire("pointermove", clientXOf(0.75), clientYOf(0));
+    surface.fire("pointerup", clientXOf(0.75), clientYOf(0));
+
+    expect(leave).not.toHaveBeenCalled();
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
+  it("dispatches pointercancel through the three phases and ends the pointer", () => {
+    const root = new Group();
+    const box = boxAt(0, 0);
+    root.add(box.node);
+    const { surface, input } = harness([box]);
+    const order: string[] = [];
+    root.on("capture:pointercancel", () => order.push("capture:root"));
+    box.node.on("pointercancel", (event) => {
+      order.push("target");
+      expect(event.type).toBe("pointercancel");
+      expect(event.pointerId).toBe(11);
+    });
+    root.on("pointercancel", () => order.push("bubble:root"));
+    box.node.on("pointerleave", () => order.push("leave"));
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 11);
+    expect(input.trackedPointerCount).toBe(1);
+
+    surface.fire("pointercancel", clientXOf(0), clientYOf(0), 11);
+
+    expect(order).toEqual(["capture:root", "target", "bubble:root", "leave"]);
+    expect(input.trackedPointerCount).toBe(0);
+    expect(input.getHovered(11)).toBeNull();
+  });
+
+  it("never synthesizes a click from a cancel", () => {
+    const box = boxAt(0, 0);
+    const { surface } = harness([box]);
+    const click = vi.fn();
+    const up = vi.fn();
+    box.node.on("click", click);
+    box.node.on("pointerup", up);
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    surface.fire("pointercancel", clientXOf(0), clientYOf(0));
+
+    expect(click).not.toHaveBeenCalled();
+    expect(up).not.toHaveBeenCalled();
+  });
+
+  it("drops a capture held by a cancelled pointer", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+
+    input.setPointerCapture(box.node, 2);
+    expect(input.getPointerCapture(2)).toBe(box.node);
+
+    surface.fire("pointercancel", clientXOf(0.95), clientYOf(0.95), 2);
+
+    expect(input.getPointerCapture(2)).toBeNull();
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
+  it("a cancel that resolves to nothing still forgets the pointer", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+
+    // Off every pickable: the cancel has no target, so nothing is dispatched —
+    // the teardown must not depend on there being one.
+    surface.fire("pointercancel", clientXOf(0.95), clientYOf(0.95), 8);
+
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
+  it("leaks nothing across 10 000 gestures with distinct pointer ids", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+    const x = clientXOf(0);
+    const y = clientYOf(0);
+
+    // What a touch surface really does: every contact is a *new* pointerId.
+    for (let id = 1; id <= 10_000; id += 1) {
+      surface.fire("pointerdown", x, y, id);
+      surface.fire("pointermove", x, y, id);
+      // Half the gestures are taken away by the system rather than released.
+      surface.fire(id % 2 === 0 ? "pointerup" : "pointercancel", x, y, id);
+      expect(input.trackedPointerCount).toBe(0);
+    }
+
+    expect(input.trackedPointerCount).toBe(0);
+    expect(input.getHovered(10_000)).toBeNull();
+    expect(input.getPointerCapture(10_000)).toBeNull();
+  });
+
+  it("holds one entry per live pointer while gestures overlap", () => {
+    const left = boxAt(-1.5, 0);
+    const right = boxAt(1.5, 0);
+    const { surface, input } = harness([left, right]);
+
+    surface.fire("pointerdown", clientXOf(-0.75), clientYOf(0), 7);
+    surface.fire("pointerdown", clientXOf(0.75), clientYOf(0), 9);
+    expect(input.trackedPointerCount).toBe(2);
+
+    surface.fire("pointerup", clientXOf(-0.75), clientYOf(0), 7);
+    expect(input.trackedPointerCount).toBe(1);
+    expect(input.getHovered(9)).toBe(right.node);
+
+    surface.fire("pointercancel", clientXOf(0.75), clientYOf(0), 9);
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
+  it("retains no reference to a node a completed gesture touched", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+    const captured: Node[] = [];
+    box.node.on("pointerleave", () => captured.push(box.node));
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 12);
+    input.setPointerCapture(box.node, 12);
+    surface.fire("pointerup", clientXOf(0), clientYOf(0), 12);
+
+    // The application removes the node; nothing inside the input may still name
+    // it (§83: a dead pointer must not pin a detached node).
+    expect(input.trackedPointerCount).toBe(0);
+    expect(input.getPointerCapture(12)).toBeNull();
+    expect(input.getHovered(12)).toBeNull();
+    expect(captured).toHaveLength(1);
   });
 
   it("uses the camera it currently holds", () => {
@@ -884,6 +1073,25 @@ describe("DragManager", () => {
     expect(h.drags.isDragging(1)).toBe(false);
     expect(h.started).toEqual([h.box.node]);
     expect(h.ended).toEqual([h.box.node]);
+  });
+
+  it("ends a drag whose pointer the system cancelled (A-9)", () => {
+    const h = dragHarness();
+    h.drags.makeDraggable(h.box.node);
+
+    h.surface.fire("pointerdown", clientXOf(0), clientYOf(0));
+    expect(h.drags.isDragging(1)).toBe(true);
+
+    h.surface.fire("pointercancel", clientXOf(0.5), clientYOf(0));
+
+    expect(h.drags.isDragging(1)).toBe(false);
+    expect(h.ended).toEqual([h.box.node]);
+    expect(h.input.getPointerCapture(1)).toBeNull();
+    expect(h.input.trackedPointerCount).toBe(0);
+
+    // Nothing follows a cancelled gesture: the pointer is gone.
+    h.surface.fire("pointermove", clientXOf(0.25), clientYOf(0));
+    expect(h.deltas).toEqual([]);
   });
 
   it("ignores moves when no drag is in progress", () => {

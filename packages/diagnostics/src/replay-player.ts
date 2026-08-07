@@ -765,13 +765,28 @@ export class ReplayPlayer {
     return low;
   }
 
-  /** Wraps base64 snapshot bytes in the identity §34 keys them on. */
+  /**
+   * Wraps base64 snapshot bytes in the identity §34 keys them on — adapter name
+   * and version, and the recorded **world configuration** when the document
+   * carries one (2026-08-06, PH-6).
+   *
+   * The configuration is what lets the target refuse a mismatch: without it,
+   * `PhysicsWorld.restoreSnapshot`'s field-by-field check no-oped for every
+   * replay, so a run captured at gravity −9.81 replayed into a world built with
+   * gravity 0 diverged silently and was caught only by `finalChecksum` at the
+   * very end. A recording that predates the field (a version-1 document) still
+   * restores exactly as it always did.
+   */
   #snapshotAt(data: string): ReplaySnapshot {
-    return {
+    const configuration = this.recording.worldConfiguration;
+    const snapshot: ReplaySnapshot = {
       adapterName: this.recording.adapterName,
       adapterVersion: this.recording.adapterVersion,
       data: decodeBase64(data),
     };
+    return configuration === undefined
+      ? snapshot
+      : { ...snapshot, configuration };
   }
 
   #requireLoaded(method: string): void {

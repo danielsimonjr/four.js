@@ -21,22 +21,36 @@
  * ({@link RigidBody.initialPosition}, {@link RigidBody.initialRotation}), so a
  * descriptor round-trips through the component unchanged.
  *
- * ## Authored state versus solved state
+ * ## Authored state versus solved state — read this before writing a field
  *
- * {@link RigidBody.linearVelocity}, {@link RigidBody.angularVelocity},
- * {@link RigidBody.centerOfMass} and friends are what the engine pushes *into*
- * the solver at `syncSceneToSolver`. Once a body is simulating the solver owns
- * its velocities, and `syncSolverToScene` refreshes these fields from the
- * solver after every step (WP-5.3). Writing one between steps is therefore an
- * authoring action that takes effect at the next sync; reading one between
- * steps yields the last solved value.
+ * The component's state reaches the solver **at registration**: `addBody` calls
+ * {@link RigidBody.toDescriptor} once and the adapter builds its body from that
+ * record. After that the traffic is mostly one-way. Precisely (corrected
+ * 2026-08-06; this header previously claimed that velocities, mass, and damping
+ * "are pushed at `syncSceneToSolver`", which no code has ever done):
  *
- * The §23 mass triple is the exception: a body that never named a mass, a
+ * | State | Registered body, per step |
+ * | --- | --- |
+ * | {@link RigidBody.linearVelocity} / {@link RigidBody.angularVelocity} | **solver → component** in the publish pass, for every body type. Fed *into* the solver only for a `"kinematic-velocity"` body (§22), which is the one type whose authored velocity is an input. A write on a dynamic body is therefore overwritten by the next step. |
+ * | {@link RigidBody.mass}, {@link RigidBody.linearDamping}, {@link RigidBody.angularDamping}, {@link RigidBody.gravityScale}, {@link RigidBody.centerOfMass}, {@link RigidBody.inertiaTensor}, {@link RigidBody.ccdMode} | **component only**. Nothing pushes them after `createBody`. |
+ * | {@link RigidBody.sleeping} | solver → component (§32). |
+ * | §26 forces and impulses, `wake()` / `sleep()` | component → solver, once per fixed step, through the command buffers below — the supported way to influence a running body. |
+ *
+ * The setters that fall in the second row warn once per body when the body is a
+ * registered dynamic one, naming the two routes that do work: re-register the
+ * body (`removeBody` → `addBody`, which rebuilds the descriptor), or reach the
+ * solver directly through `PhysicsWorld.getBodyHandle(node)` and the adapter's
+ * `SolverBodyAccess`. The velocity vectors and `centerOfMass` are `readonly`
+ * fields mutated in place, so *no* interception is possible there — the table
+ * above is their only warning. Widening the §37 seam so these become live
+ * writes is deliberately a later wave.
+ *
+ * The §23 mass triple has one more rule: a body that never named a mass, a
  * centre of mass, or an inertia tensor is asking the solver to derive all three
  * from collider density and geometry (§23, §25), so
  * {@link RigidBody.toDescriptor} omits what was never authored rather than
  * presenting a default as an instruction. See
- * {@link RigidBody.centerOfMassAuthored}.
+ * {@link RigidBody.centerOfMassAuthored} and {@link RigidBody.massAuthored}.
  *
  * ## Commands, not mutations (§26, §32)
  *
@@ -284,6 +298,29 @@ interface RigidBodySleepBinding {
   sleeping: boolean;
 }
 
+/**
+ * The world-writable view of the two mirrors a `PhysicsWorld` maintains on a
+ * body: how many worlds hold it, and what mass the solver derived for it. Same
+ * arrangement as {@link RigidBodySleepBinding}.
+ */
+interface RigidBodyWorldBinding {
+  registeredWorldCount: number;
+  derivedMass: number | undefined;
+}
+
+/**
+ * Set for the duration of `setRigidBodyType`'s write, so the {@link
+ * RigidBody.type} setter can tell a `PhysicsWorld` that has *just re-typed the
+ * solver body* from application code that has not.
+ *
+ * A module-level flag rather than a parameter because the write goes through
+ * the public setter, which is where §23's mass rule is enforced and which must
+ * keep enforcing it. Set and cleared synchronously around one assignment — no
+ * `await` and no user callback runs in between — so it can never be observed in
+ * the set state by anything else.
+ */
+let worldDrivenTypeWrite = false;
+
 /** §32's sleep-state payload as it reaches a node's listeners. */
 export type RigidBodySleepEvent = SleepEvent<RigidBody>;
 
@@ -433,17 +470,14 @@ export class RigidBody
    */
   inertiaTensor?: Matrix3;
 
-  /** Linear damping coefficient, `>= 0` (§23). */
-  linearDamping: number;
+  /** Backing store for {@link RigidBody.linearDamping}. */
+  #linearDamping: number;
 
-  /** Angular damping coefficient, `>= 0` (§23). */
-  angularDamping: number;
+  /** Backing store for {@link RigidBody.angularDamping}. */
+  #angularDamping: number;
 
-  /**
-   * Multiplier on world gravity for this body (§23). `1` leaves gravity as-is,
-   * `0` makes the body weightless, a negative value inverts it.
-   */
-  gravityScale: number;
+  /** Backing store for {@link RigidBody.gravityScale}. */
+  #gravityScale: number;
 
   /**
    * Whether the solver has put this body to sleep (§23, §32).
@@ -454,6 +488,32 @@ export class RigidBody
    * also emits `"sleep"` or `"wake"` (WP-5.3).
    */
   readonly sleeping: boolean = false;
+
+  /**
+   * How many `PhysicsWorld`s currently hold this component (§37), normally `0`
+   * or `1`.
+   *
+   * Read-only state like {@link RigidBody.sleeping}, written by
+   * `PhysicsWorld.addBody` and `removeBody`. A count rather than a flag because
+   * nothing forbids registering one component with two worlds, and because the
+   * body stops being registered only when the *last* of them lets go. It is
+   * what turns this class's "that write reaches no solver" warnings on — see
+   * the module header's table.
+   */
+  readonly registeredWorldCount: number = 0;
+
+  /**
+   * The last mass the **solver** derived for this body, or `undefined` before
+   * one was read (§23, §25).
+   *
+   * Read-only mirror of solver state, written by `PhysicsWorld.addBody`'s mass
+   * refresh. It exists so that a derived mass can be *reported* — {@link
+   * RigidBody.mass} falls back to it, so `inverseMass` is a number rather than
+   * `NaN` for a density-derived body — without being *authored*: only an
+   * authored mass is re-emitted by {@link RigidBody.toDescriptor}. See
+   * {@link RigidBody.massAuthored}.
+   */
+  readonly derivedMass?: number;
 
   /**
    * The initial world position a descriptor carried, or `undefined` (§37).
@@ -473,8 +533,27 @@ export class RigidBody
   /** Backing store for {@link RigidBody.type}. */
   #type: BodyType;
 
-  /** Backing store for {@link RigidBody.mass}; `undefined` means "derive it". */
+  /**
+   * The **authored** mass; `undefined` means "derive it from the colliders".
+   *
+   * Written by the constructor and the {@link RigidBody.mass} setter and by
+   * nothing else — see {@link RigidBody.massAuthored} for why a solver-derived
+   * mass may not land here.
+   */
   #mass?: number;
+
+  /**
+   * Whether {@link RigidBody.mass} was named by the constructor descriptor or
+   * assigned through its setter — the mass half of the distinction
+   * {@link RigidBody.centerOfMassAuthored} draws for the centre.
+   */
+  #massAuthored: boolean;
+
+  /**
+   * Which solver-drift warnings this body has already emitted, allocated on the
+   * first one. See {@link RigidBody.mass}.
+   */
+  #driftWarned?: Set<string>;
 
   /**
    * Whether a centre of mass was named by the constructor descriptor or by
@@ -535,6 +614,7 @@ export class RigidBody
 
     this.#type = descriptor.type;
     this.#mass = descriptor.mass;
+    this.#massAuthored = descriptor.mass !== undefined;
     this.#ccdMode = resolveCCDMode(descriptor);
     this.#ccdPredictionDistance = descriptor.ccdPredictionDistance;
 
@@ -558,9 +638,9 @@ export class RigidBody
       this.inertiaTensor = new Matrix3().copy(descriptor.inertiaTensor);
     }
 
-    this.linearDamping = descriptor.linearDamping ?? 0;
-    this.angularDamping = descriptor.angularDamping ?? 0;
-    this.gravityScale = descriptor.gravityScale ?? DEFAULT_GRAVITY_SCALE;
+    this.#linearDamping = descriptor.linearDamping ?? 0;
+    this.#angularDamping = descriptor.angularDamping ?? 0;
+    this.#gravityScale = descriptor.gravityScale ?? DEFAULT_GRAVITY_SCALE;
 
     if (descriptor.position !== undefined) {
       this.initialPosition = widenToVector3(descriptor.position);
@@ -593,31 +673,129 @@ export class RigidBody
    * can seed the new velocities from an animated `PoseTarget` — §19's
    * animated → kinematic → dynamic transitions. WP-5.3's rule that a re-typed
    * body had to be removed and added again is superseded by it.
+   *
+   * Assigning here while the body is registered is not silently accepted: the
+   * setter warns once per body (2026-08-06) naming `setBodyControlMode`, which
+   * is the call that moves the solver too. The assignment still happens — the
+   * component is the caller's — but the divergence is on the record instead of
+   * showing up later as a body that refuses to fall.
    */
   get type(): BodyType {
     return this.#type;
   }
 
   set type(value: BodyType) {
-    validateMass(value, this.#mass);
+    validateMass(value, this.mass);
+    if (value !== this.#type) {
+      this.#warnTypeDrift(
+        `A registered RigidBody's type was set to ${JSON.stringify(value)} directly, which changes the component but not the solver: the world keeps simulating the old §22 model and the fixed-step pipeline keeps branching on it. Call world.setBodyControlMode(node, type) instead — it re-types the solver body in place (§22, §23, plan P7-3).`,
+      );
+    }
     this.#type = value;
   }
 
   /**
-   * Mass in kilograms (§23), or `undefined` when it is to be derived from
-   * collider density times volume (§23, §24, §25).
+   * Mass in kilograms (§23): the authored mass when there is one, otherwise the
+   * last mass the solver derived from collider density times volume (§23, §24,
+   * §25), or `undefined` when neither exists.
    *
-   * Authoritative when present and re-validated on assignment: a dynamic body's
-   * mass must be positive, and non-simulated mass is expressed through the body
-   * *type*, never `mass = 0` (§23, §85).
+   * Authoritative when authored and re-validated on assignment: a dynamic
+   * body's mass must be positive, and non-simulated mass is expressed through
+   * the body *type*, never `mass = 0` (§23, §85). Assigning here **authors** the
+   * mass — see {@link RigidBody.massAuthored} — and warns once for a registered
+   * dynamic body, because nothing pushes a mass into a solver body after
+   * `createBody` (see the module header).
    */
   get mass(): number | undefined {
-    return this.#mass;
+    return this.#mass ?? this.derivedMass;
   }
 
   set mass(value: number | undefined) {
     validateMass(this.#type, value);
+    this.#warnSolverDrift(
+      "mass",
+      "A registered RigidBody's mass was assigned, which changes the component but not the solver: mass reaches a solver body once, at createBody (§23, §37). Re-register the body (world.removeBody(node) then world.addBody(node)) to rebuild it from the descriptor, or write to the solver through world.getBodyHandle(node).",
+    );
     this.#mass = value;
+    this.#massAuthored = value !== undefined;
+  }
+
+  /**
+   * Whether {@link RigidBody.mass} is an **authored** mass rather than one the
+   * solver derived (§23, §25).
+   *
+   * ## Why the distinction has to exist
+   *
+   * `PhysicsWorld.addBody` reads the solver's mass back onto the component so
+   * that a density-derived body stops reporting `inverseMass === NaN`. Before
+   * 2026-08-06 that read went through the `mass` *setter*, which made the
+   * derived number indistinguishable from an authored one — so
+   * {@link RigidBody.toDescriptor} re-emitted it as `mass`, and re-registering
+   * the body (or serializing and reloading it) turned "derive my mass from my
+   * colliders" into "my mass is 3.0141594". Scaling a collider afterwards then
+   * changed nothing, silently.
+   *
+   * The two masses are therefore kept apart: this flag and `#mass` for what the
+   * author said, {@link RigidBody.derivedMass} for what the solver answered,
+   * and `toDescriptor` emits the field **only when this holds**. It is the same
+   * rule {@link RigidBody.centerOfMassAuthored} states for the centre, with a
+   * simpler test: no default value competes with `undefined` here, so the
+   * sticky half is the whole of it.
+   */
+  get massAuthored(): boolean {
+    return this.#massAuthored;
+  }
+
+  /**
+   * Linear damping coefficient, `>= 0` (§23).
+   *
+   * Applied to the solver body at `createBody`. Assigning to a registered
+   * dynamic body warns once (see the module header) — the value is kept on the
+   * component and reaches a solver only through re-registration or
+   * `PhysicsWorld.getBodyHandle`.
+   */
+  get linearDamping(): number {
+    return this.#linearDamping;
+  }
+
+  set linearDamping(value: number) {
+    this.#warnSolverDrift(
+      "linearDamping",
+      "A registered RigidBody's linearDamping was assigned, which changes the component but not the solver: damping reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
+    );
+    this.#linearDamping = value;
+  }
+
+  /** Angular damping coefficient, `>= 0` (§23). See {@link RigidBody.linearDamping}. */
+  get angularDamping(): number {
+    return this.#angularDamping;
+  }
+
+  set angularDamping(value: number) {
+    this.#warnSolverDrift(
+      "angularDamping",
+      "A registered RigidBody's angularDamping was assigned, which changes the component but not the solver: damping reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
+    );
+    this.#angularDamping = value;
+  }
+
+  /**
+   * Multiplier on world gravity for this body (§23). `1` leaves gravity as-is,
+   * `0` makes the body weightless, a negative value inverts it.
+   *
+   * Applied at `createBody`; see {@link RigidBody.linearDamping} for what an
+   * assignment to a registered body does and does not do.
+   */
+  get gravityScale(): number {
+    return this.#gravityScale;
+  }
+
+  set gravityScale(value: number) {
+    this.#warnSolverDrift(
+      "gravityScale",
+      "A registered RigidBody's gravityScale was assigned, which changes the component but not the solver: the scale reaches a solver body once, at createBody (§23, §37). Re-register the body, or write to the solver through world.getBodyHandle(node).",
+    );
+    this.#gravityScale = value;
   }
 
   /**
@@ -636,7 +814,11 @@ export class RigidBody
     if (this.#type !== "dynamic") {
       return 0;
     }
-    return this.#mass === undefined ? Number.NaN : 1 / this.#mass;
+    // {@link RigidBody.mass}, so a solver-derived mass answers here too — the
+    // authored/derived split is about what `toDescriptor` emits, not about what
+    // the body reports about itself.
+    const mass = this.mass;
+    return mass === undefined ? Number.NaN : 1 / mass;
   }
 
   /**
@@ -881,6 +1063,60 @@ export class RigidBody
     return out;
   }
 
+  /**
+   * Warns once when authored state that only reaches a solver at `createBody`
+   * is assigned on a **registered dynamic** body (2026-08-06; see the module
+   * header's table).
+   *
+   * Dynamic and not every type, because the other types have a live route for
+   * the state that matters to them: a `"kinematic-velocity"` body's velocities
+   * *are* fed to the solver every step (§22), and a static body's damping
+   * changes nothing either way. A dynamic body is the case where the author's
+   * write and the simulation genuinely part company.
+   *
+   * A warning and not an error: the component is the caller's, the assignment
+   * is legal, and a body that is about to be removed and re-added is written to
+   * exactly like this. Errors would reject the workflow rather than the
+   * mistake — the same reasoning `normalizedWeights` documents.
+   */
+  #warnSolverDrift(key: string, message: string): void {
+    if (this.registeredWorldCount === 0 || this.#type !== "dynamic") {
+      return;
+    }
+    this.#warnOnce(key, message);
+  }
+
+  /**
+   * Warns once when a **registered** body's `type` is assigned directly, at any
+   * §22 type: the mismatch this one produces is between the component's model
+   * and the solver's, which is wrong for a static body exactly as it is for a
+   * dynamic one. See the {@link RigidBody.type} setter.
+   */
+  #warnTypeDrift(message: string): void {
+    if (worldDrivenTypeWrite || this.registeredWorldCount === 0) {
+      return;
+    }
+    this.#warnOnce("type", message);
+  }
+
+  /**
+   * `console.warn` at most once per body per `key` — the §42-style
+   * once-per-subject suppression {@link RigidBody.normalizedWeights} documents,
+   * keyed so that four different mistakes are four different warnings and each
+   * repeat is silent. The set is allocated on the first warning, so a body that
+   * never warns carries nothing.
+   */
+  #warnOnce(key: string, message: string): void {
+    const warned = (this.#driftWarned ??= new Set<string>());
+    if (warned.has(key)) {
+      return;
+    }
+    warned.add(key);
+    console.warn(
+      `[four] ${message} Further ${key} occurrences on this body are suppressed.`,
+    );
+  }
+
   /** Emits the both-zero warning at most once per body. See {@link RigidBody.normalizedWeights}. */
   #warnZeroWeights(): void {
     if (this.#zeroWeightsWarned) {
@@ -1031,6 +1267,12 @@ export class RigidBody
    * density-derived mass unreachable (WP-5.2-fix1). It is emitted exactly when
    * {@link RigidBody.centerOfMassAuthored} holds, which that property documents.
    *
+   * `mass` follows the same rule against the same defect (2026-08-06): only an
+   * **authored** mass is emitted, so a body whose mass a solver derived at
+   * registration still asks the next solver to derive it rather than presenting
+   * the first solver's answer as an instruction. See
+   * {@link RigidBody.massAuthored}.
+   *
    * §19's {@link RigidBody.physicsWeight} and {@link RigidBody.animationWeight}
    * are deliberately **absent**: a solver simulates a body, it does not blend
    * one, and the blend happens entirely above the adapter (§37) after the solve
@@ -1042,14 +1284,17 @@ export class RigidBody
       type: this.#type,
       linearVelocity: this.linearVelocity,
       angularVelocity: this.angularVelocity,
-      linearDamping: this.linearDamping,
-      angularDamping: this.angularDamping,
-      gravityScale: this.gravityScale,
+      linearDamping: this.#linearDamping,
+      angularDamping: this.#angularDamping,
+      gravityScale: this.#gravityScale,
       continuousCollisionDetection: this.continuousCollisionDetection,
       ccdMode: this.#ccdMode,
     };
-    if (this.#mass !== undefined) {
-      descriptor.mass = this.#mass;
+    // The authored mass only — never {@link RigidBody.derivedMass}, which is
+    // the solver's answer and not an instruction to the next solver.
+    const authoredMass = this.#massAuthored ? this.#mass : undefined;
+    if (authoredMass !== undefined) {
+      descriptor.mass = authoredMass;
     }
     // Emitted only while the mode is still speculative: the §85 validation
     // this descriptor faces again in validateFor rejects the distance with
@@ -1109,6 +1354,67 @@ export function clearRigidBodyCommands(body: RigidBody): void {
   commands.pointForceCount = 0;
   commands.pointImpulseCount = 0;
   commands.sleepCommand = null;
+}
+
+/**
+ * Records that `body` joined (`true`) or left (`false`) a `PhysicsWorld` (§37).
+ *
+ * **Package-internal**, and the only writer of the registration count:
+ * `PhysicsWorld.addBody` and `removeBody` call it, and the count is what turns
+ * the component's "this reaches no solver" warnings on. Deliberately a free
+ * function outside the barrel, like `clearRigidBodyCommands` — application code
+ * that could claim a body was registered would only be able to manufacture
+ * warnings or silence real ones.
+ *
+ * Increments and decrements are paired by construction — one registration adds
+ * one and its teardown removes one — and the floor at zero is belt-and-braces
+ * for a caller that ever unpairs them: a negative count would read as
+ * "unregistered" and silence warnings that should fire.
+ */
+export function setRigidBodyRegistered(
+  body: RigidBody,
+  registered: boolean,
+): void {
+  const binding = body as unknown as RigidBodyWorldBinding;
+  const current = binding.registeredWorldCount;
+  binding.registeredWorldCount = registered
+    ? current + 1
+    : Math.max(current - 1, 0);
+}
+
+/**
+ * Sets `body`'s §22 type **without** the registered-body warning the public
+ * setter emits (plan P7-3).
+ *
+ * **Package-internal**: the one caller is `PhysicsWorld.setBodyControlMode`,
+ * which has just re-typed the solver body, so component and solver agree and
+ * there is nothing to warn about. Every other route to a registered body's type
+ * is the drift the setter reports.
+ *
+ * The write still goes through the public setter — §23's mass rule is enforced
+ * there and must stay enforced — with `worldDrivenTypeWrite` set across it.
+ */
+export function setRigidBodyType(body: RigidBody, type: BodyType): void {
+  worldDrivenTypeWrite = true;
+  try {
+    body.type = type;
+  } finally {
+    worldDrivenTypeWrite = false;
+  }
+}
+
+/**
+ * Publishes the mass the solver derived for `body` onto its
+ * {@link RigidBody.derivedMass} mirror (§23, §25).
+ *
+ * **Package-internal**, and the only writer: `PhysicsWorld.addBody` reads
+ * `getBodyMass` back through it after the colliders exist. It must never write
+ * {@link RigidBody.mass}, which is the authoring channel — a derived number
+ * assigned there is re-emitted by `toDescriptor` as though the author had named
+ * it, which is the laundering this pair of fields exists to prevent.
+ */
+export function setRigidBodyDerivedMass(body: RigidBody, mass: number): void {
+  (body as unknown as RigidBodyWorldBinding).derivedMass = mass;
 }
 
 /**

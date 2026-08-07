@@ -272,6 +272,20 @@ export interface RapierCollider {
   restitution(): number;
   density(): number;
   mass(): number;
+  /**
+   * Live mass override (`setMass(mass: number): void`, declared at
+   * `geometry/collider.d.ts` line 274 of the installed 0.19.3 typings), which
+   * upstream documents as overriding any density or mass the `ColliderDesc`
+   * carried.
+   *
+   * Called from exactly one place: when a `"first-collider"` body loses the
+   * collider that was holding its authored mass, the surviving collider with
+   * the lowest monotonic id takes it over — see `Rapier2dAdapter.destroyCollider`.
+   * The parent body's own mass is refreshed by
+   * {@link RapierRigidBody.recomputeMassPropertiesFromColliders} afterwards, as
+   * everywhere else in this adapter.
+   */
+  setMass(mass: number): void;
   collisionGroups(): number;
   projectPoint(
     point: RapierVector,
@@ -823,6 +837,8 @@ export interface RapierCollider3d {
   restitution(): number;
   density(): number;
   mass(): number;
+  /** Live mass override; see {@link RapierCollider.setMass} for the one caller. */
+  setMass(mass: number): void;
   collisionGroups(): number;
   projectPoint(
     point: RapierVector3,

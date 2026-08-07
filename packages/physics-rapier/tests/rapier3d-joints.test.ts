@@ -1058,6 +1058,97 @@ describe("snapshots with joints (§34)", () => {
     }).toThrowError(/envelope version 1 is not 2/u);
     adapter.dispose();
   });
+
+  // The 2D adapter has always refused a joint table its Rapier bytes cannot
+  // back (`joint === null`); the 3D one accepted whatever `getImpulseJoint`
+  // answered, which for an unknown handle is a live-*looking* object with
+  // `handle === 0` — a registry entry pointing at joint zero, silently. Fixed
+  // 2026-08-06 by checking the handle it got back against the handle it asked
+  // for.
+  it("refuses an envelope whose joint table does not match its Rapier bytes", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorAt(adapter, new Vector3(0, 0, 0));
+    adapter.createJoint({
+      type: "revolute",
+      bodyA: anchor,
+      bodyB: ballAt(adapter, new Vector3(1, 0, 0)),
+      anchorA: new Vector3(0, 0, 0),
+      anchorB: new Vector3(-1, 0, 0),
+      axis: new Vector3(0, 0, 1),
+    });
+
+    const snapshot = adapter.createSnapshot();
+    const header = new DataView(snapshot);
+    const metaLength = header.getUint32(8, true);
+    const rapierLength = header.getUint32(12, true);
+    const bytes = new Uint8Array(snapshot);
+    const meta = JSON.parse(
+      new TextDecoder().decode(bytes.subarray(16, 16 + metaLength)),
+    ) as { joints: [number, number, string, number, number][] };
+    // Same denormal trick the 2D suite uses: a plausible integer decodes to
+    // index 0 and resolves to the real joint, so the handle has to be one the
+    // restored world genuinely does not have.
+    meta.joints[0][1] = Number.MIN_VALUE * 9999;
+    const rewritten = new TextEncoder().encode(JSON.stringify(meta));
+    const rebuilt = new ArrayBuffer(16 + rewritten.byteLength + rapierLength);
+    const out = new Uint8Array(rebuilt);
+    out.set(bytes.subarray(0, 16));
+    out.set(rewritten, 16);
+    out.set(
+      bytes.subarray(16 + metaLength, 16 + metaLength + rapierLength),
+      16 + rewritten.byteLength,
+    );
+    const rebuiltHeader = new DataView(rebuilt);
+    rebuiltHeader.setUint32(8, rewritten.byteLength, true);
+    rebuiltHeader.setUint32(12, rapierLength, true);
+
+    expect(() => adapter.restoreSnapshot(rebuilt)).toThrowError(
+      /does not contain/u,
+    );
+    adapter.dispose();
+  });
+
+  // The other half of the same fix: a *reused* record has to describe the joint
+  // the envelope names. Restoring a world whose joint 1 is `fixed` into an
+  // adapter whose joint 1 was `revolute` used to leave the record claiming
+  // "revolute", so §28's "this type has no limits" refusal never fired and the
+  // adapter reached for `setLimits` on a `FixedImpulseJoint` that has none.
+  it("re-reads a restored joint's type and body links from the envelope", async () => {
+    const source = await createAdapter();
+    const base = anchorAt(source, new Vector3(0, 0, 0));
+    source.createJoint({
+      type: "fixed",
+      bodyA: base,
+      bodyB: ballAt(source, new Vector3(1, 0, 0)),
+      anchorA: new Vector3(1, 0, 0),
+      anchorB: new Vector3(0, 0, 0),
+    });
+    const snapshot = source.createSnapshot();
+    source.dispose();
+
+    const target = await createAdapter();
+    const anchor = anchorAt(target, new Vector3(0, 0, 0));
+    const hinge = target.createJoint({
+      type: "revolute",
+      bodyA: anchor,
+      bodyB: ballAt(target, new Vector3(1, 0, 0)),
+      anchorA: new Vector3(0, 0, 0),
+      anchorB: new Vector3(-1, 0, 0),
+      axis: new Vector3(0, 0, 1),
+      limits: { min: -0.5, max: 0.5 },
+    });
+    expect(target.getJointId(hinge)).toBe(1);
+
+    target.restoreSnapshot(snapshot);
+
+    // Same id, same record object — and now a `fixed` joint, which §28 says has
+    // no limits and no motor on this solver.
+    expect(target.getJointId(hinge)).toBe(1);
+    expect(() => target.setJointLimits(hinge, -0.2, 0.2)).toThrowError(
+      /fixed joint has no limits/u,
+    );
+    target.dispose();
+  });
 });
 
 describe("determinism with joints (§33)", () => {

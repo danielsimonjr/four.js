@@ -20,6 +20,7 @@ export type {
 } from "./replay-format.js";
 export {
   REPLAY_FORMAT_VERSION,
+  SUPPORTED_REPLAY_FORMAT_VERSIONS,
   assertReplayCompatible,
   cloneJsonValue,
   decodeBase64,

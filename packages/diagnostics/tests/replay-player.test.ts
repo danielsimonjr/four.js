@@ -939,3 +939,110 @@ describe("ReplayPlayer.onStep", () => {
     expect(events.map((event) => event.step)).toEqual([1]);
   });
 });
+
+/**
+ * PH-6 (2026-08-06): the player rebuilt `{ adapterName, adapterVersion, data }`
+ * and dropped the world configuration, so a target's own configuration refusal
+ * (`PhysicsWorld.restoreSnapshot`) could never fire during a replay.
+ */
+describe("ReplayPlayer — world configuration (§34, PH-6)", () => {
+  const configuration = {
+    dimension: "2d",
+    gravity: [0, -9.81, 0],
+    sleeping: { enabled: true, timeToSleep: 0.5 },
+    determinism: "same-runtime",
+  };
+
+  /** A world that reports a configuration and refuses a mismatched one. */
+  class ConfiguredWorld extends FakeWorld {
+    readonly seen: unknown[] = [];
+
+    constructor(readonly own: unknown = configuration) {
+      super();
+    }
+
+    override createSnapshot(): ReplaySnapshot {
+      return { ...super.createSnapshot(), configuration: this.own };
+    }
+
+    override restoreSnapshot(snapshot: ReplaySnapshot): void {
+      this.seen.push(snapshot.configuration);
+      // The shape of `PhysicsWorld.#refuseConfigurationMismatch`, reduced to
+      // what this test needs: an equal configuration restores, anything else
+      // is refused before the bytes reach the adapter (§34).
+      if (
+        snapshot.configuration !== undefined &&
+        JSON.stringify(snapshot.configuration) !== JSON.stringify(this.own)
+      ) {
+        throw new Error("world configuration mismatch (§34)");
+      }
+      super.restoreSnapshot(snapshot);
+    }
+  }
+
+  function record(world: FakeWorld): ReplayRecording {
+    const recorder = new ReplayRecorder();
+    recorder.begin(world, {
+      fixedDeltaTime: FIXED_DT,
+      snapshotIntervalSteps: 2,
+    });
+    for (let i = 0; i < 3; i += 1) {
+      world.step(FIXED_DT);
+      recorder.recordFrame(1, 0);
+    }
+    return recorder.end();
+  }
+
+  it("re-attaches the recorded configuration to every restored snapshot", () => {
+    const recording = record(new ConfiguredWorld());
+    const target = new ConfiguredWorld();
+    const player = new ReplayPlayer(recording, {
+      target,
+      stepFn: (deltaTime) => target.step(deltaTime),
+    });
+
+    player.load();
+    player.seekToStep(2);
+
+    expect(target.seen.length).toBeGreaterThan(0);
+    for (const seen of target.seen) {
+      expect(seen).toEqual(configuration);
+    }
+  });
+
+  it("lets the target refuse a replay into a differently configured world", () => {
+    const recording = record(new ConfiguredWorld());
+    const mismatched = new ConfiguredWorld({
+      ...configuration,
+      gravity: [0, 0, 0],
+    });
+    const player = new ReplayPlayer(recording, {
+      target: mismatched,
+      stepFn: (deltaTime) => mismatched.step(deltaTime),
+    });
+
+    // Before PH-6 this ran to completion and diverged silently; the only signal
+    // was `finalChecksum`, checked at the very end.
+    expect(() => {
+      player.load();
+    }).toThrow(/world configuration mismatch/);
+  });
+
+  it("restores a version-1 recording exactly as it always did", () => {
+    // No configuration recorded, so none is attached — and a target that would
+    // refuse a mismatch has nothing to compare, which is the pre-PH-6
+    // behaviour and remains correct for every document already on disk.
+    const recording = record(new FakeWorld());
+    const target = new ConfiguredWorld();
+    const player = new ReplayPlayer(recording, {
+      target,
+      stepFn: (deltaTime) => target.step(deltaTime),
+    });
+
+    expect(recording.formatVersion).toBe(1);
+    expect(() => {
+      player.load();
+    }).not.toThrow();
+    expect(target.seen).toEqual([undefined]);
+  });
+});

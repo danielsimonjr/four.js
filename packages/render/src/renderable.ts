@@ -30,28 +30,33 @@
  *   (`BufferGeometry`, §53) the field belongs here; when `Mesh` and `Shape2D`
  *   land they narrow it rather than introduce it.
  *
- * ## The family members that are *not* subclasses
+ * The `material` field reached §49's shape on 2026-08-06, when §57's abstract
+ * `Material` base landed: see {@link Renderable.material} for what widened and
+ * what deliberately did not.
  *
- * Two of §49's family have landed without extending this class, both for
- * type-level reasons that are recorded where they bite:
+ * ## The family member that is *not* a subclass
  *
- * - **`Sprite`** (§55) extends `Node` directly because `material` cannot be
- *   widened until §57's `Material` base exists — see `sprite.ts`.
+ * `Sprite` (§55) joined the family on 2026-08-06, when §57's `Material` base
+ * made its material nameable in this class's slot. One of §49's family is still
+ * outside it, for a reason that is recorded where it bites:
+ *
  * - **`ParticleSystem`** (§36) is not in this package at all. It lives in
  *   `@four/particles`, which the frozen §3.1 dependency matrix forbids from
  *   importing `@four/render`, so it is recognised by `buildRenderList` through
  *   a **structural contract** instead of by inheritance — see `particles.ts`.
  *
- * Both are treated as first-class drawables by the render list, which tags every
- * item with a `RenderItemKind` discriminant; neither costs the backend an
+ * It is treated as a first-class drawable by the render list, which tags every
+ * item with a `RenderItemKind` discriminant; it costs the backend no
  * `instanceof`.
  *
- * Deferred with their features, not silently dropped: `depthMode` (needs the
- * §61 depth-state contract), `castShadow`/`receiveShadow` (§69), and
- * `frustumCulled` (§87 culling — the render list does no culling yet, so the
- * flag would have nothing to switch off). `material` stays a single
- * `UnlitMaterial` until §57's `Material` base and multi-material submeshes
- * exist.
+ * Deferred with their features, not silently dropped: `depthMode` (§49's
+ * four-state field — §57's `depthTest`/`depthWrite` now carry the two states
+ * the backend can honour, and the rest needs the §61 depth-state contract),
+ * `castShadow`/`receiveShadow` (§69), and `frustumCulled` (§87 culling — the
+ * render list does no culling yet, so the flag would have nothing to switch
+ * off). `material` is a single material rather than §49's `Material |
+ * Material[]`: multi-material submeshes need §54's submesh ranges, which no
+ * geometry carries.
  *
  * ## Ownership
  *
@@ -62,7 +67,7 @@
  */
 
 import type { BufferGeometry } from "@four/geometry";
-import type { LitMaterial, UnlitMaterial } from "@four/materials";
+import type { LitMaterial, Material, UnlitMaterial } from "@four/materials";
 import { Node } from "@four/scene";
 
 /** Optional construction arguments of {@link Renderable}. */
@@ -72,6 +77,18 @@ export interface RenderableOptions {
   /** Initial {@link Renderable.renderOrder}; defaults to 0. */
   renderOrder?: number;
 }
+
+/**
+ * The materials a plain {@link Renderable} shades a surface with (§57) — the
+ * default of its `M` type parameter, and the reason a `Renderable` variable
+ * still offers `setColor` after the base landed.
+ *
+ * `SpriteMaterial` is deliberately **not** in it: a sprite carries a texture,
+ * derives its own quad, and is a `Renderable<SpriteMaterial>` (§55's `Sprite`),
+ * so admitting it here would take `color` off every ordinary renderable's
+ * material for a case that has its own class.
+ */
+export type SurfaceMaterial = UnlitMaterial | LitMaterial;
 
 /**
  * A node that contributes a draw to the render list (§49).
@@ -86,20 +103,27 @@ export interface RenderableOptions {
  * subtree** from the render list, and `enabled = false` removes the subtree
  * from simulation and rendering alike — see `buildRenderList`.
  */
-export class Renderable extends Node {
-  /** Vertex data to draw (§53). Shared, not owned — see the module header. */
-  geometry: BufferGeometry;
+export class Renderable<M extends Material = SurfaceMaterial> extends Node {
+  #geometry: BufferGeometry;
 
   /**
    * Surface appearance (§57). Shared, not owned — see the module header.
    *
-   * A two-member union since the §68 lighting packet (2026-08-04): the
-   * material's own `kind` discriminant decides whether the node draws through
-   * the unlit or the lit pipeline (see `render-list.ts`). Still not §57's
-   * full `Material | Material[]` — the abstract base and multi-material
-   * submeshes remain deferred as before.
+   * Typed by the class's `M` parameter, which defaults to
+   * {@link SurfaceMaterial} — so a plain `Renderable` still carries exactly the
+   * `UnlitMaterial | LitMaterial` it carried before §57's base landed, and
+   * `renderable.material.setColor(…)` still compiles. A subclass that draws
+   * through a different pipeline **narrows** the parameter instead of
+   * re-declaring the field: §55's `Sprite` is a `Renderable<SpriteMaterial>`,
+   * and a family member a consumer writes is a `Renderable<TheirMaterial>`.
+   *
+   * The material's own `kind` discriminant — not an `instanceof`, and not the
+   * node's class — decides which pipeline draws it (see `render-list.ts`).
+   * That is what makes the parameter safe to widen: the render list learns the
+   * pipeline from the material, so a new material type does not need a new
+   * node type.
    */
-  material: UnlitMaterial | LitMaterial;
+  material: M;
 
   /**
    * Symbolic drawing group (§46, §66 sort key 1). The primary sort key of the
@@ -125,13 +149,31 @@ export class Renderable extends Node {
    */
   constructor(
     geometry: BufferGeometry,
-    material: UnlitMaterial | LitMaterial,
+    material: M,
     options: RenderableOptions = {},
   ) {
     super();
-    this.geometry = geometry;
+    this.#geometry = geometry;
     this.material = material;
     this.renderLayer = options.renderLayer ?? 0;
     this.renderOrder = options.renderOrder ?? 0;
+  }
+
+  /**
+   * Vertex data to draw (§53). Shared, not owned — see the module header.
+   *
+   * An accessor pair rather than a plain field, since 2026-08-06: §55's
+   * `Sprite` **derives** its geometry from its anchor and size and rebuilds it
+   * lazily on read, and a subclass can only override a property the base
+   * declares as an accessor (a base *field* is defined on the instance and
+   * would shadow the override). Reading and assigning behave exactly as the
+   * field did.
+   */
+  get geometry(): BufferGeometry {
+    return this.#geometry;
+  }
+
+  set geometry(value: BufferGeometry) {
+    this.#geometry = value;
   }
 }

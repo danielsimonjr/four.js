@@ -218,6 +218,186 @@ const sceneLights = createSceneLights();
 const rect = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
+ * §57's material as this backend reads it, derived from the render item union
+ * rather than imported.
+ *
+ * `@four/render-webgl` depends on `core`, `math`, and `render` only (plan §3.1,
+ * frozen), so it may not name `@four/materials`' `Material`. `RenderItem`'s
+ * `material` is that type, so taking it back off the union gives the same
+ * contract with no new edge — the technique this file already uses for the
+ * scene root and the viewport (decision, WP-3.5).
+ */
+type ItemMaterial = NonNullable<RenderItem["material"]>;
+
+/** §57's `BlendMode`, derived from the material for the same reason. */
+type ItemBlendMode = ItemMaterial["blendMode"];
+
+/**
+ * §57's `blendMode` as a GL blend function — `[sourceFactor, destination
+ * Factor]`, over **straight (non-premultiplied) alpha**, which is the policy
+ * §66 requires this engine to state and this tier commits to everywhere.
+ *
+ * Four modes, four `blendFunc` pairs, no blend *equation* changes: every one of
+ * them is `src × sourceFactor + dst × destinationFactor`, so the equation stays
+ * at GL's default `FUNC_ADD` and this backend needs no `blendEquation` entry
+ * point. Modes that do need one (`darken`, `lighten`, the Porter-Duff set)
+ * are not in §57's vocabulary here and would arrive with it.
+ */
+const BLEND_FUNCTIONS: Record<ItemBlendMode, readonly [number, number]> = {
+  normal: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
+  additive: [GL.SRC_ALPHA, GL.ONE],
+  multiply: [GL.DST_COLOR, GL.ZERO],
+  screen: [GL.ONE, GL.ONE_MINUS_SRC_COLOR],
+};
+
+/**
+ * The GL state this backend toggles per draw (§57), mirrored on the CPU so a
+ * frame issues a call only where a draw actually *changes* something.
+ *
+ * That mirroring is not an optimization, it is the compatibility guarantee:
+ * with §57's defaults — opaque, depth-tested, depth-writing, colour-writing —
+ * every comparison below is equal and the frame issues **exactly the GL
+ * sequence it issued before material render state existed**, down to the single
+ * `useProgram`. A scene pays for state only where it asks for it.
+ *
+ * Module-level and reused, like {@link renderList} and {@link rect}, and safe
+ * for the same reason: `render` resets it on entry, drives it synchronously,
+ * and restores the GL state it borrowed before returning. The values below are
+ * the fixed state `#applyFixedState` establishes (blending off, `LEQUAL` depth
+ * test on) plus GL's own defaults (depth mask on, colour mask on).
+ */
+const glState = {
+  blending: false,
+  blendMode: "normal" as ItemBlendMode,
+  depthTest: true,
+  depthWrite: true,
+  colorWrite: true,
+};
+
+/** Resets the mirror to the state a frame starts and ends in. */
+function resetGlState(): void {
+  glState.blending = false;
+  glState.blendMode = "normal";
+  glState.depthTest = true;
+  glState.depthWrite = true;
+  glState.colorWrite = true;
+}
+
+/**
+ * Applies §57's blend state for the draw about to be issued.
+ *
+ * `blend` is the material's `transparent` flag — except on the two pipelines
+ * that blend by construction (sprites and §36 particles), where the caller
+ * passes `true` because they did so before the flag existed and a scene that
+ * never heard of it must not lose its compositing.
+ *
+ * The blend *function* is only re-issued while blending is on: a mode change on
+ * an opaque material would be a call with no observable effect, and `render`
+ * restores the function at the end of the frame.
+ */
+function applyBlendState(
+  gl: ParticleGlContext,
+  blend: boolean,
+  mode: ItemBlendMode,
+): void {
+  if (blend !== glState.blending) {
+    if (blend) {
+      gl.enable(GL.BLEND);
+    } else {
+      gl.disable(GL.BLEND);
+    }
+    glState.blending = blend;
+  }
+  if (blend && mode !== glState.blendMode) {
+    const [source, destination] =
+      BLEND_FUNCTIONS[mode] ?? BLEND_FUNCTIONS.normal;
+    gl.blendFunc(source, destination);
+    glState.blendMode = mode;
+  }
+}
+
+/**
+ * Applies §57's depth and colour state for the draw about to be issued.
+ *
+ * `depthTest` is `enable`/`disable(DEPTH_TEST)`; `depthWrite` is `depthMask`;
+ * `colorWrite` is `colorMask` on all four channels (§57 declares one boolean,
+ * so all four move together — see `WebglContext.colorMask`).
+ */
+function applyDepthColorState(
+  gl: ParticleGlContext,
+  depthTest: boolean,
+  depthWrite: boolean,
+  colorWrite: boolean,
+): void {
+  if (depthTest !== glState.depthTest) {
+    if (depthTest) {
+      gl.enable(GL.DEPTH_TEST);
+    } else {
+      gl.disable(GL.DEPTH_TEST);
+    }
+    glState.depthTest = depthTest;
+  }
+  if (depthWrite !== glState.depthWrite) {
+    gl.depthMask(depthWrite);
+    glState.depthWrite = depthWrite;
+  }
+  if (colorWrite !== glState.colorWrite) {
+    gl.colorMask(colorWrite, colorWrite, colorWrite, colorWrite);
+    glState.colorWrite = colorWrite;
+  }
+}
+
+/**
+ * Applies every §57 field a material declares, defaulting each one the way a
+ * material that predates the field would behave.
+ *
+ * The reads are deliberately defensive — `!== false`, `=== true`, `?? "normal"`
+ * — rather than trusting the type. A backend meets its materials through a
+ * *structural* contract (that is what lets the unit tests drive it with
+ * doubles, and what lets a consumer's own material type reach it), so a missing
+ * field has to mean "the default", not `undefined` leaking into a GL call or a
+ * `NaN` into a uniform.
+ */
+function applyMaterialState(
+  gl: ParticleGlContext,
+  material: ItemMaterial | undefined,
+  alwaysBlend: boolean,
+): void {
+  applyBlendState(
+    gl,
+    alwaysBlend || material?.transparent === true,
+    material?.blendMode ?? "normal",
+  );
+  applyDepthColorState(
+    gl,
+    material?.depthTest !== false,
+    material?.depthWrite !== false,
+    material?.colorWrite !== false,
+  );
+}
+
+/** §57's `opacity`, defaulted to 1 for a material that does not declare one. */
+function opacityOf(material: ItemMaterial): number {
+  return material.opacity ?? 1;
+}
+
+/**
+ * Restores the GL state a frame borrowed, issuing a call only for what it
+ * actually changed — the mirror image of {@link applyMaterialState}.
+ */
+function restoreGlState(gl: ParticleGlContext): void {
+  applyBlendState(gl, false, "normal");
+  applyDepthColorState(gl, true, true, true);
+  if (glState.blendMode !== "normal") {
+    // The blend function outlives the blend enable, so a frame that ended with
+    // a non-default mode has to put it back explicitly: the next frame's fixed
+    // state is "straight alpha" and nothing else re-issues it.
+    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
+    glState.blendMode = "normal";
+  }
+}
+
+/**
  * The texture unit the sprite pipeline samples from.
  *
  * Unit 0, permanently: this tier binds exactly one texture per draw, and §77's
@@ -352,33 +532,62 @@ function resolveRect(
  *   §7a and the winding the §53 primitive builders emit.
  * - **Back-face culling OFF.** The MVP tier draws planar 2D shapes as much as
  *   3D meshes, and a plane seen from behind is a legitimate view of it, not a
- *   back face to discard. Culling becomes a per-material state when §57's
- *   `Material` base lands with `depthTest`/`depthWrite`/`colorWrite`; turning
- *   it on globally now would make half the 2D scenes in §93's examples
- *   disappear when the camera crosses their plane.
+ *   back face to discard. §57's base landed with
+ *   `depthTest`/`depthWrite`/`colorWrite` (2026-08-06) and this backend honours
+ *   all three per draw, but §57 declares **no** face-culling field, so culling
+ *   stays a global off; turning it on would make half the 2D scenes in §93's
+ *   examples disappear when the camera crosses their plane.
  * - **Scissor test on for the renderer's lifetime.** §61 requires clears to be
  *   confined to the viewport rectangle, and a `scissor` that is never enabled
  *   does not confine anything. Drawing is confined too, which is what stops a
  *   minimap's geometry from spilling into the main view.
- * - **Blend function fixed to `SRC_ALPHA`/`ONE_MINUS_SRC_ALPHA`; blending itself
- *   off.** §66 requires the engine to state its "premultiplied and straight
- *   alpha policies": this tier is **straight alpha, not premultiplied**, on
- *   every colour it touches — `UnlitMaterial.color`, `SpriteMaterial.tint`,
- *   texel data, and `Viewport.clearColor` alike. The *function* never changes,
- *   so it is set once; the *enable* is toggled around sprite runs, below.
+ * - **Blend function `SRC_ALPHA`/`ONE_MINUS_SRC_ALPHA`; blending itself off.**
+ *   §66 requires the engine to state its "premultiplied and straight alpha
+ *   policies": this tier is **straight alpha, not premultiplied**, on every
+ *   colour it touches — `UnlitMaterial.color`, `SpriteMaterial.tint`, texel
+ *   data, and `Viewport.clearColor` alike. Set once at initialization, and the
+ *   state a frame is always handed back in; since 2026-08-06 a draw whose
+ *   material names a different `blendMode` (§57) changes the function for its
+ *   run and `render` restores it before returning.
+ *
+ * ## Material render state (§57, 2026-08-06)
+ *
+ * Every draw applies the six fields §57 puts on `Material`:
+ *
+ * | field        | GL                                     |
+ * | ------------ | -------------------------------------- |
+ * | `transparent`| `enable`/`disable(BLEND)`               |
+ * | `blendMode`  | `blendFunc` (see `BLEND_FUNCTIONS`)     |
+ * | `depthTest`  | `enable`/`disable(DEPTH_TEST)`          |
+ * | `depthWrite` | `depthMask`                             |
+ * | `colorWrite` | `colorMask`                             |
+ * | `opacity`    | multiplied into the uploaded alpha      |
+ *
+ * This is the fix for the recorded defect that `UnlitMaterial.color[3]` and
+ * `LitMaterial.color[3]` were **dead fields**: blending was disabled for both
+ * pipelines unconditionally, so animating alpha was a silent no-op. It is now
+ * `transparent: true` away from working, and `opacity` drives it without
+ * touching the shared colour.
+ *
+ * The state is mirrored on the CPU (`glState`) and a call is issued only where
+ * a draw *changes* something, so §57's defaults — which are exactly this
+ * backend's previous fixed state — issue nothing at all: a scene authored
+ * before the base existed produces the same GL sequence it always did.
  *
  * ## Four pipelines (§55, §36, §68; WP-3a.3, WP-9.3, lighting 2026-08-04)
  *
  * A render item says which pipeline draws it (`RenderItem.kind`), and this
  * backend keeps all four live:
  *
- * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested and opaque;
+ * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested, and opaque
+ *   unless its material declares `transparent`;
  * - **lit** — Lambert diffuse under §68's directional light plus the scene
- *   ambient term, depth-tested and opaque like unlit, blending off. The
+ *   ambient term, depth-tested and opaque-by-default like unlit. The
  *   frame's lights are collected once per `render` call (`collectSceneLights`,
  *   `@four/render`) — and only for frames whose list actually contains a lit
  *   item, so unlit scenes never pay the walk;
- * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled;
+ * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled
+ *   whatever the material says (the pipeline blends by construction);
  * - **particles** — one `drawArraysInstanced` per §36 particle system,
  *   screen-aligned quads coloured per instance, with `GL_BLEND` enabled
  *   (`gl-particles.ts`).
@@ -386,17 +595,19 @@ function resolveRect(
  * The unlit pipeline is the frame's starting and resting state: a scene with no
  * sprites and no particles issues exactly the GL sequence it issued before
  * either existed, down to the single `useProgram`. Blending is enabled when a
- * run of transparent items begins and disabled when the frame ends, so an
- * opaque draw never runs through a blend equation it did not ask for.
+ * draw asks for it and disabled when one stops asking, so an opaque draw never
+ * runs through a blend equation it did not ask for.
  *
- * Sprites and particles are **not depth-sorted**: §66's key 2 (opaque versus
- * transparent) and key 4 (depth) are both deferred with the material state that
- * would drive them, so they draw in render-list order — layer, then explicit
- * render order, then scene order — with depth testing and depth *writing* left
- * on. That is correct for content that does not overlap, and for overlapping
- * content an author orders with `renderOrder`; it is wrong for arbitrary
- * unsorted overlapping transparency, which is the documented limitation §66 asks
- * the engine to state and the sorting packet to fix.
+ * Draws are **not depth-sorted**: §66's key 2 (opaque before transparent)
+ * arrived in the render list on 2026-08-06 and this backend sees its effect for
+ * free, but key 4 (depth) is still deferred with the per-view list it needs, so
+ * transparent draws are ordered by layer, then explicit render order, then
+ * scene order, with depth testing and depth *writing* left on unless a material
+ * turns them off. That is correct for content that does not overlap, and for
+ * overlapping content an author orders with `renderOrder` and usually sets
+ * `depthWrite: false`; it is wrong for arbitrary unsorted overlapping
+ * transparency, which is the documented limitation §66 asks the engine to state
+ * and the depth-sorting packet to fix.
  *
  * Textures are discovered from the render list and cached exactly as geometry
  * is (`gl-texture.ts`), which is why §61's `createTexture` stays deferred — the
@@ -680,12 +891,19 @@ export class WebglRenderer implements Renderer {
     // sprites issues exactly the GL sequence it issued before sprites existed.
     program.use();
     let activeKind: RenderItemKind = "unlit";
-    let blending = false;
+    // The GL state mirror starts where `#applyFixedState` and GL's own defaults
+    // left it; every draw below moves it only where its material asks.
+    resetGlState();
     // Whether a texture is bound to unit 0 — only the sprite path binds one, so
     // a frame of particles and opaque geometry has nothing to unbind at the end.
     let textureBound = false;
 
     for (const view of views) {
+      // §61's clears are masked by the depth and colour write state, so a view
+      // that follows a `depthWrite: false` or `colorWrite: false` draw would
+      // clear nothing at all. Put both back first; with §57's defaults this
+      // issues no call.
+      applyDepthColorState(gl, true, true, true);
       resolveRect(view, this.#bufferWidth, this.#bufferHeight);
       gl.scissor(rect.x, rect.y, rect.width, rect.height);
       gl.viewport(rect.x, rect.y, rect.width, rect.height);
@@ -714,8 +932,7 @@ export class WebglRenderer implements Renderer {
       // into this view and valid for the rest of it.
       if (activeKind !== "unlit") {
         program.use();
-        gl.disable(GL.BLEND);
-        blending = false;
+        applyBlendState(gl, false, "normal");
         activeKind = "unlit";
       }
       program.setViewProjection(viewProjection);
@@ -743,14 +960,13 @@ export class WebglRenderer implements Renderer {
           }
           if (activeKind !== "particles") {
             particleProgram.use();
-            // Particles are transparent by construction (§36's colour ramp);
-            // the blend *function* was fixed at initialization to straight
-            // alpha (§66), so only the enable is toggled — see
-            // `gl-particles.ts` for the whole policy.
-            gl.enable(GL.BLEND);
-            blending = true;
             activeKind = "particles";
           }
+          // Particles are transparent by construction (§36's colour ramp) and
+          // carry no material to say otherwise, so they blend with the straight
+          // alpha function and draw with §57's default depth and colour state —
+          // see `gl-particles.ts` for the whole policy.
+          applyMaterialState(gl, undefined, true);
           if (!particleViewUploaded) {
             // The billboard offset happens between the view and the projection,
             // so this pipeline takes the two matrices separately rather than
@@ -776,10 +992,14 @@ export class WebglRenderer implements Renderer {
             spriteProgram.use();
             spriteProgram.setSampler(SPRITE_TEXTURE_UNIT);
             gl.activeTexture(GL.TEXTURE0);
-            gl.enable(GL.BLEND);
-            blending = true;
             activeKind = "sprite";
           }
+          // §55's pipeline blends by construction — it did before §57's
+          // `transparent` flag existed, and a textured quad with an alpha
+          // channel has to composite whatever the flag says — so `alwaysBlend`
+          // is `true` here. Everything else the material declares (blend mode,
+          // depth test, depth write, colour write) applies as usual.
+          applyMaterialState(gl, material, true);
           if (!spriteViewUploaded) {
             spriteProgram.setViewProjection(viewProjection);
             spriteViewUploaded = true;
@@ -795,19 +1015,19 @@ export class WebglRenderer implements Renderer {
             bounds.max.x - bounds.min.x,
             bounds.max.y - bounds.min.y,
           );
-          spriteProgram.setTint(material.tint);
+          spriteProgram.setTint(material.tint, opacityOf(material));
           gl.bindTexture(GL.TEXTURE_2D, texture.texture);
           textureBound = true;
         } else if (isLitItem(item)) {
-          // The Lambert-lit pipeline (§68): opaque and depth-tested exactly
-          // like unlit — blending off on the way in, mirroring the unlit
-          // switch below.
+          // The Lambert-lit pipeline (§68): depth-tested exactly like unlit,
+          // and opaque unless its material says otherwise (§57) — which, at
+          // the default `transparent: false`, is every material that predates
+          // the flag.
           if (activeKind !== "lit") {
             litProgram.use();
-            gl.disable(GL.BLEND);
-            blending = false;
             activeKind = "lit";
           }
+          applyMaterialState(gl, item.material, false);
           if (!litViewUploaded) {
             // The view-projection and the frame's lights, once per view —
             // uniforms live in the program object, so they hold for every lit
@@ -824,16 +1044,15 @@ export class WebglRenderer implements Renderer {
             litViewUploaded = true;
           }
           litProgram.setModel(item.worldMatrix);
-          litProgram.setColor(item.material.color);
+          litProgram.setColor(item.material.color, opacityOf(item.material));
         } else {
           if (activeKind !== "unlit") {
             program.use();
-            gl.disable(GL.BLEND);
-            blending = false;
             activeKind = "unlit";
           }
+          applyMaterialState(gl, item.material, false);
           program.setModel(item.worldMatrix);
-          program.setColor(item.material.color);
+          program.setColor(item.material.color, opacityOf(item.material));
         }
 
         gl.bindVertexArray(record.vertexArray);
@@ -848,9 +1067,7 @@ export class WebglRenderer implements Renderer {
     // Restore the fixed state the frame borrowed, and leave nothing bound: the
     // next thing to touch this context may not be this renderer (§61 allows
     // several renderers over one application).
-    if (blending) {
-      gl.disable(GL.BLEND);
-    }
+    restoreGlState(gl);
     if (textureBound) {
       gl.bindTexture(GL.TEXTURE_2D, null);
     }

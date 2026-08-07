@@ -269,6 +269,14 @@ describe("Phase 10: a session records and replays bit-identically (§113, §33�
     expect(first.summary.lastStepChecksum).toBe(golden.lastStepChecksum);
     expect(first.summary.finalChecksum).toBe(golden.finalChecksum);
 
+    // §34's "solver settings" (2026-08-06, PH-6). The document declares
+    // version 2 *because* it carries a world configuration; a recording
+    // without one is still a version-1 document, byte for byte as before.
+    expect(first.summary.formatVersion).toBe(golden.formatVersion);
+    expect(first.summary.worldConfigurationKeys).toEqual(
+      golden.worldConfigurationKeys,
+    );
+
     // The readable half of the golden: not "the hash matches" but "rapier2d
     // 0.19.3, 4 inputs, 240 frames, 8 snapshots, first contact on step 36,
     // 910 contact points over 198 steps".

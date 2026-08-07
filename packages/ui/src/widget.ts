@@ -121,7 +121,7 @@
 import type { Disposable, Unsubscribe } from "@four/core";
 import type { Pickable, ScenePointerEvent } from "@four/input";
 import { Vector2, Vector3 } from "@four/math";
-import { Node, warnAuthorityConflict } from "@four/scene";
+import { Node, warnAuthorityConflict, type NodeOptions } from "@four/scene";
 
 /**
  * The authority a layout pass writes a widget's position under (§42):
@@ -374,8 +374,13 @@ export interface WidgetSkin {
   onDetach?(widget: UIWidget): void;
 }
 
-/** Construction options shared by every widget. */
-export interface UIWidgetOptions {
+/**
+ * Construction options shared by every widget.
+ *
+ * Extends {@link NodeOptions}, so `id` is available here too — which is what
+ * lets a §79 factory rebuild a widget under its saved id (2026-08-06, A-14).
+ */
+export interface UIWidgetOptions extends NodeOptions {
   /** {@link Node#name}. */
   name?: string;
   /** {@link Node.visible}. */
@@ -611,7 +616,7 @@ export abstract class UIWidget extends Node implements Disposable {
   #disposed = false;
 
   constructor(options: UIWidgetOptions = {}) {
-    super();
+    super(options);
     // §42: the parent's layout owns this transform. See the module header for
     // why a root widget declaring this is harmless.
     this.transformAuthority = UI_LAYOUT_AUTHORITY;

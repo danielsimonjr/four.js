@@ -25,6 +25,46 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Gap-closure wave 1 (2026-08-06) — follow-ups left open
+
+Closed this wave, with tests: `A-7` (`Application.resize`), `A-9` (`PointerInput` dead-pointer
+leak + `pointercancel`), `A-15` (unregistered components no longer dropped on save), `A-17`
+(restored ids reserve against the counter; duplicate-id refusal), `A-14`/`PH-17` **partially**
+(`MOTION_COMPONENT_SERIALIZER`, `registerSceneNodeTypes()`/`registerUISerializers()`), `PH-6`
+(§34 `worldConfiguration`). What they left behind:
+
+- [x] **PH-17 remainder — done 2026-08-06.** `@four/physics` exports
+      `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` (plus `serializeCollisionShape` /
+      `deserializeCollisionShape` and the three document types), typed against the
+      `ComponentSerializerShape` `@four/motion` declares — imported over the existing
+      `physics → motion` edge, so there is one transcription in the repo and no new §3.1
+      edge. Registered by the umbrella's new `registerPhysicsSerializers()`, which
+      `registerSceneNodeTypes()` calls; a physics scene now saves with no
+      `{ unknownComponents: "skip" }`. `tests/integration/helpers/roundtrip-scenarios.ts`
+      lost its WP-11.5 duplicates and calls the shipped registration, and
+      `scene-roundtrip.test.ts` proves a contact-free save reloads bit-identically through
+      `registerSceneNodeTypes()` alone. **One behaviour changed:** §25's friction /
+      restitution / density are written **as authored** rather than as the effective values
+      the reference wrote, so the fallback chain re-resolves on load instead of pinning
+      today's defaults into every document (a `PhysicsMaterial` round-trips by value, not
+      by identity — resource-keyed sharing is a §79 resource concern)
+- [ ] **PH-17 doc follow-up:** three docs still say the reference serializers live in test
+      code — `docs/Architecture/API.md:606`, `docs/Architecture/TEST_COVERAGE.md:125`, and
+      `docs/guides/digital-twin.md:124,157`. They should point at `@four/physics`'s
+      `serializers.ts` and `registerPhysicsSerializers()`; `docs/GAP ANALYSIS v0.md`'s PH-17
+      banner still reads "partially closed". Left for a docs pass (this change's edit scope
+      was `packages/{physics,four}` + `tests/integration`)
+- [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
+      now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
+      Widening that structural interface would let the mouse keep its hover across a click
+- [ ] **A-16 remainder:** `SceneNodeDocument.data` / `SerializeSceneOptions.nodeDataOf` now
+      exist and the three §73 widgets use them; `Renderable`, `Sprite`, both cameras and
+      `DirectionalLight` still have no node-type pair. They are additions to
+      `packages/four/src/scene-serializers.ts`, not to any format
+- [ ] **A-6 remainder:** `application.ts`'s header note is now a dated post-plan note, but
+      `app.input` / `app.assets` / `app.diagnostics` / `app.stats` / `app.physics` and
+      `autoResize`/`reducedMotion` are still absent
+
 ### Backlog additions (doc-truth sweep, 2026-08-05)
 
 - [ ] The §93/§118–119 examples do not exist (`docs/AUDIT-120.md` **S-8**):

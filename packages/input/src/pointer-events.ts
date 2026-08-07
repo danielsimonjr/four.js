@@ -95,9 +95,16 @@ import type { Node } from "@four/scene";
  *
  * `"click"` is synthesized by the pointer source rather than delivered by the
  * platform — see `PointerInput` — but it propagates like the rest.
+ *
+ * `"pointercancel"` is the platform's own (2026-08-06, A-9): the system took
+ * the pointer away mid-gesture — a touch became a browser scroll or a
+ * page-level gesture, the stylus left the digitizer, the window lost the
+ * pointer. It propagates like `pointerup` and means the opposite of it: the
+ * gesture did **not** complete, so no `click` follows and a listener that
+ * committed something on press must undo it.
  */
 export type PropagatingPointerEventType =
-  "pointerdown" | "pointerup" | "pointermove" | "click";
+  "pointerdown" | "pointerup" | "pointermove" | "pointercancel" | "click";
 
 /**
  * Every pointer event type this tier delivers (§72's `pointer enter/leave,
@@ -107,7 +114,9 @@ export type PropagatingPointerEventType =
  * §72 and are not implemented here: the first three need a source of platform
  * events this packet does not own (wheel deltas, key codes, focus management),
  * and the gesture events need multi-pointer recognizers. Nothing below assumes
- * the set is closed.
+ * the set is closed — `pointercancel` joined it on 2026-08-06 (A-9) by adding
+ * one member to {@link PropagatingPointerEventType}, which is the whole cost of
+ * a new propagating type.
  */
 export type ScenePointerEventType =
   PropagatingPointerEventType | "pointerenter" | "pointerleave";
@@ -222,6 +231,7 @@ const CAPTURE_KEYS = {
   pointerdown: "capture:pointerdown",
   pointerup: "capture:pointerup",
   pointermove: "capture:pointermove",
+  pointercancel: "capture:pointercancel",
   click: "capture:click",
 } as const satisfies Record<PropagatingPointerEventType, string>;
 
@@ -246,6 +256,8 @@ declare module "@four/scene" {
     pointerup: ScenePointerEvent;
     /** Pointer moved. Capture, target, bubble. */
     pointermove: ScenePointerEvent;
+    /** The system took the pointer away mid-gesture; no `click` follows. Capture, target, bubble. */
+    pointercancel: ScenePointerEvent;
     /** Press and release on the same node without a drag. Capture, target, bubble. */
     click: ScenePointerEvent;
     /** Pointer entered this node. Target only — no capture, no bubble. */
@@ -259,6 +271,8 @@ declare module "@four/scene" {
     "capture:pointerup": ScenePointerEvent;
     /** Capture-phase `pointermove`; fires root-first, before the target. */
     "capture:pointermove": ScenePointerEvent;
+    /** Capture-phase `pointercancel`; fires root-first, before the target. */
+    "capture:pointercancel": ScenePointerEvent;
     /** Capture-phase `click`; fires root-first, before the target. */
     "capture:click": ScenePointerEvent;
   }

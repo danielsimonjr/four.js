@@ -23,6 +23,12 @@
  * - **Handles are opaque.** §37's `PhysicsBodyHandle` and friends are named but
  *   not defined; `types.ts` makes them branded, unforgeable types. An adapter
  *   casts its own solver object to one and back; nobody else can.
+ * - **One additive capability field.** §37 lists six; {@link
+ *   PhysicsCapabilities} carries an optional seventh, `tuning`, because §25's
+ *   rolling/spinning friction and §32's sleeping thresholds are accepted by the
+ *   stable API and honoured by no shipped solver. The field makes that visible
+ *   instead of silent (see {@link PhysicsTuningCapabilities}); it adds no
+ *   requirement to an adapter that never declares it.
  *
  * ## The call order the physics package guarantees (§37, §39)
  *
@@ -105,6 +111,66 @@ export interface PhysicsQueryCapabilities {
 }
 
 /**
+ * Which *accepted* tunables an adapter actually applies (§25, §32, §37).
+ *
+ * §37 fixes {@link PhysicsCapabilities}'s six fields, so this is an **additive
+ * seventh** rather than a re-shaping of them: every field here answers for a
+ * value the stable API already accepts and validates, and whose only other
+ * possible fate is to be taken and dropped. Silent accept-and-ignore is the one
+ * outcome this repository does not allow — a coefficient a solver never reads
+ * is a simulation that differs from the one that was authored, with nothing on
+ * screen or in the log to say so — so an adapter answers here and
+ * `PhysicsWorld` warns once when an authored value meets an adapter that cannot
+ * honour it.
+ *
+ * `false` is not a defect: no Rapier 0.19.3 build exposes rolling or spinning
+ * friction, or any sleeping threshold (both verified against the typings and
+ * the wasm — see `physics-rapier`'s adapter headers). It is a statement of
+ * where the value stops.
+ */
+export interface PhysicsTuningCapabilities {
+  /** Whether `PhysicsMaterial.rollingFriction` reaches the solver (§25). */
+  readonly rollingFriction: boolean;
+  /** Whether `PhysicsMaterial.spinningFriction` reaches the solver (§25). */
+  readonly spinningFriction: boolean;
+  /**
+   * Whether `PhysicsWorldOptions.sleeping`'s three **thresholds**
+   * (`linearThreshold`, `angularThreshold`, `timeThreshold`) reach the solver
+   * (§32).
+   *
+   * `SleepingConfig.enabled` is deliberately not part of this: an adapter that
+   * cannot turn sleeping off can always refuse it outright, and both Rapier
+   * adapters do honour `enabled` (`RigidBodyDesc.setCanSleep`).
+   */
+  readonly sleepThresholds: boolean;
+}
+
+/**
+ * The all-`false` reading of a {@link PhysicsCapabilities.tuning} that was
+ * never declared.
+ *
+ * "Undeclared" cannot mean "supported": an adapter that has not answered has
+ * given no evidence that it applies anything, and assuming it does is exactly
+ * the silent accept-and-ignore the declaration exists to expose. An adapter
+ * that does honour one of these says so.
+ */
+export const NO_TUNING_CAPABILITIES: PhysicsTuningCapabilities = Object.freeze({
+  rollingFriction: false,
+  spinningFriction: false,
+  sleepThresholds: false,
+});
+
+/**
+ * `capabilities.tuning`, or {@link NO_TUNING_CAPABILITIES} when the adapter did
+ * not declare one. See {@link PhysicsTuningCapabilities}.
+ */
+export function resolveTuningCapabilities(
+  capabilities: PhysicsCapabilities,
+): PhysicsTuningCapabilities {
+  return capabilities.tuning ?? NO_TUNING_CAPABILITIES;
+}
+
+/**
  * What a solver can do (§37).
  *
  * §37: *"Capability declarations drive `solver: "auto"` selection (§20) and the
@@ -156,6 +222,17 @@ export interface PhysicsCapabilities {
 
   /** Which of §30's queries are implemented. */
   readonly queries: PhysicsQueryCapabilities;
+
+  /**
+   * Which accepted §25/§32 tunables this adapter actually applies.
+   *
+   * Optional because §37 fixes the six fields above and an adapter written
+   * against that list cannot have answered; omitting it reads as
+   * {@link NO_TUNING_CAPABILITIES} — "none of them reach the solver" — through
+   * {@link resolveTuningCapabilities}, which is the reading that produces a
+   * warning rather than the one that hides a dropped coefficient.
+   */
+  readonly tuning?: PhysicsTuningCapabilities;
 }
 
 /**

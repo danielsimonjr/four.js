@@ -411,6 +411,14 @@ interface RapierUnitImpulseJoint3d extends RapierImpulseJoint3d {
  * declaration *is* `ImpulseJoint | null`, and that an unknown handle returns a
  * live-looking object with `handle === 0` rather than `null` (measured). This
  * adapter therefore only ever passes handles from its own registry.
+ *
+ * The one place a handle can arrive from *outside* that registry is a restored
+ * §34 snapshot envelope, whose joint table is JSON an attacker or a bad merge
+ * can have edited. `#rebuildRegistries` widens the return type back to
+ * `| null | undefined` there and rejects anything whose `handle` does not match
+ * the handle it asked for, so a corrupt envelope raises the §34 "the envelope
+ * and its Rapier bytes do not belong together" error instead of installing a
+ * joint record pointing at joint zero (2026-08-06).
  */
 interface RapierJointWorld3d {
   createImpulseJoint(
@@ -501,6 +509,12 @@ interface RapierJointModule3d {
  *   in an envelope that carries this adapter's registry too.
  * - `queries` — all four are implemented on Rapier's query entry points. See
  *   {@link Rapier3dAdapter.shapeCast} for the one multiplicity limit.
+ * - `tuning` — **all three `false`** (2026-08-06), for the same reasons the 2D
+ *   adapter declares: no rolling or spinning friction binding in the 3D 0.19.3
+ *   build, and no sleeping thresholds anywhere in `IntegrationParameters`
+ *   (enumerated at runtime — see this header's §32 note). `PhysicsWorld` turns
+ *   the declaration into a once-per-world warning when such a value is
+ *   authored; `SleepingConfig.enabled` *is* honoured and is not part of it.
  */
 const RAPIER_3D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
   dimensions: Object.freeze<PhysicsDimension[]>([ADAPTER_DIMENSION]),
@@ -520,6 +534,11 @@ const RAPIER_3D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
     shapeCast: true,
     overlap: true,
     point: true,
+  }),
+  tuning: Object.freeze({
+    rollingFriction: false,
+    spinningFriction: false,
+    sleepThresholds: false,
   }),
 });
 
@@ -632,12 +651,15 @@ interface JointRecord {
    * Which §28 constraint this is, kept because Rapier's own `type()` reports a
    * `spherical` joint as `Generic` (measured) and because `setJointLimits` and
    * `setJointMotor` have to name the type they are refusing.
+   *
+   * Mutable so that `restoreSnapshot` can re-assert it from the envelope, as
+   * every other restored field is (2026-08-06); nothing else writes it.
    */
-  readonly type: ShippedJointType;
+  type: ShippedJointType;
   /** {@link BodyRecord.id} of `bodyA` — `destroyBody` retires the joint by it. */
-  readonly bodyIdA: number;
-  /** {@link BodyRecord.id} of `bodyB`. */
-  readonly bodyIdB: number;
+  bodyIdA: number;
+  /** {@link BodyRecord.id} of `bodyB`. Restored from the envelope like `type`. */
+  bodyIdB: number;
   /** `false` once destroyed; a handle to a dead record is rejected. */
   alive: boolean;
 }
@@ -834,7 +856,9 @@ export class Rapier3dAdapter
    * prototype — see the module header for the full member list). Rapier's
    * thresholds are compiled into the wasm. The adapter therefore honours the
    * on/off switch and leaves the three thresholds unimplemented rather than
-   * pretending.
+   * pretending — and says so in `capabilities.tuning.sleepThresholds`, which is
+   * what makes `PhysicsWorld` warn about an authored threshold instead of
+   * dropping it silently (2026-08-06).
    */
   async initialize(options: PhysicsWorldOptions): Promise<void> {
     this.#assertNotDisposed();
@@ -1081,8 +1105,9 @@ export class Rapier3dAdapter
    * Appendix A's — friction `Average`, restitution `Max` — because Rapier's own
    * default for restitution is `Average`, which would quietly contradict §25 for
    * every contact in the world. §25's `rollingFriction` and `spinningFriction`
-   * have no Rapier 3D binding at 0.19.3 and are ignored (their `undefined`
-   * default means most callers never notice).
+   * have no Rapier 3D binding at 0.19.3 and cannot be applied here — declared
+   * in `capabilities.tuning`, so a `PhysicsWorld` registering a collider that
+   * carries one warns rather than dropping it in silence (2026-08-06).
    *
    * `collisionGroups`/`collisionMask` are packed into Rapier's single
    * `InteractionGroups` word; `sensor` sets the sensor flag *and* widens
@@ -1170,12 +1195,33 @@ export class Rapier3dAdapter
     return record as unknown as PhysicsColliderHandle;
   }
 
-  /** Destroys a collider (§37). Any contact pair it was part of is forgotten. */
+  /**
+   * Destroys a collider (§37). Any contact pair it was part of is forgotten.
+   *
+   * ## The body's mass is rebuilt, not left behind (2026-08-06)
+   *
+   * Identical to `Rapier2dAdapter.destroyCollider`, and fixing the same silent
+   * pair of defects: the collider count is decremented (so a replacement
+   * collider on a `"first-collider"` body is created carrying the authored mass
+   * instead of `density: 0`), a surviving `"first-collider"` body hands its
+   * authored mass to the surviving collider with the lowest monotonic id
+   * (§33-stable insertion order), and the body's mass properties are recomputed
+   * so `getBodyMass` stays truthful before the next step.
+   *
+   * Re-applying rather than refusing: §23's authored mass belongs to the body,
+   * not to whichever collider was holding it. A body left with no collider at
+   * all keeps nothing — there is nowhere to hold it — and gets the mass back
+   * from the next collider created on it.
+   */
   destroyCollider(handle: PhysicsColliderHandle): void {
     const world = this.#requireWorld();
     const record = this.#requireCollider(handle);
+    const bodyRecord = this.#bodies.get(record.bodyId);
     world.removeCollider(record.collider, true);
     this.#forgetCollider(record);
+    if (bodyRecord !== undefined) {
+      this.#refreshMassAfterColliderLoss(bodyRecord);
+    }
   }
 
   /**
@@ -2406,16 +2452,59 @@ export class Rapier3dAdapter
     return body as unknown as PhysicsBodyHandle;
   }
 
-  /** Drops a collider from every index, including any pair it was part of. */
+  /**
+   * Drops a collider from every index, including any pair it was part of, and
+   * decrements its body's collider count — the §23 bookkeeping
+   * `applyColliderMass` reads. See {@link Rapier3dAdapter.destroyCollider}.
+   *
+   * Both guards are belt-and-braces, as in the 2D adapter: a collider cannot
+   * outlive its body through the public API, and the count cannot fall below
+   * the colliders that raised it — but a negative count would read as "no
+   * colliders" and re-arm the authored-mass branch wrongly, so neither is
+   * allowed to produce one.
+   */
   #forgetCollider(record: ColliderRecord): void {
     record.alive = false;
     this.#colliders.delete(record.id);
     this.#collidersByRapierHandle.delete(record.rapierHandle);
+    const body = this.#bodies.get(record.bodyId);
+    if (body !== undefined && body.colliderCount > 0) {
+      body.colliderCount -= 1;
+    }
     for (const [key, pair] of [...this.#activePairs]) {
       if (pair.a === record || pair.b === record) {
         this.#activePairs.delete(key);
       }
     }
+  }
+
+  /**
+   * Re-establishes a body's §23 mass after one of its colliders was destroyed.
+   * See {@link Rapier3dAdapter.destroyCollider} for the rule and its rationale.
+   */
+  #refreshMassAfterColliderLoss(body: BodyRecord): void {
+    if (body.massMode === "first-collider" && body.colliderCount > 0) {
+      const heir = this.#firstColliderOf(body.id);
+      if (heir !== undefined) {
+        heir.collider.setMass(body.explicitMass);
+      }
+    }
+    body.body.recomputeMassPropertiesFromColliders();
+  }
+
+  /**
+   * The surviving collider of `bodyId` with the lowest monotonic id, or
+   * `undefined` when the body has none left. `Map` insertion order over a
+   * monotonic counter is ascending id order, so the choice is §33 deterministic
+   * and independent of which collider was destroyed.
+   */
+  #firstColliderOf(bodyId: number): ColliderRecord | undefined {
+    for (const record of this.#colliders.values()) {
+      if (record.bodyId === bodyId) {
+        return record;
+      }
+    }
+    return undefined;
   }
 
   /** §30's filter, applied to one Rapier collider. See `raycast`. */
@@ -2760,8 +2849,25 @@ export class Rapier3dAdapter
     const survivingJoints = new Map<number, JointRecord>();
     const jointWorld = world as unknown as RapierJointWorld3d;
     for (const [id, rapierHandle, type, bodyIdA, bodyIdB] of meta.joints) {
+      // Widened past the transcribed non-nullable declaration on purpose: the
+      // 3D `getImpulseJoint` delegates to `ImpulseJointSet.get`, which is
+      // declared `ImpulseJoint | null` and which answers an unknown handle with
+      // a live-*looking* object whose `handle` is `0` (measured — see
+      // `RapierJointWorld3d`). Both shapes have to be caught here.
+      const joint: RapierImpulseJoint3d | null | undefined =
+        jointWorld.getImpulseJoint(rapierHandle);
+      if (
+        joint === null ||
+        joint === undefined ||
+        joint.handle !== rapierHandle
+      ) {
+        throw new FourError(
+          ADAPTER_ERROR_CODE,
+          `Snapshot names a ${type} joint that the restored Rapier world does not contain (§34); the envelope and its Rapier bytes do not belong together.`,
+          { context: { adapter: ADAPTER_NAME, jointId: id } },
+        );
+      }
       const existing = this.#joints.get(id);
-      const joint = jointWorld.getImpulseJoint(rapierHandle);
       const record: JointRecord = existing ?? {
         id,
         rapierHandle,
@@ -2773,6 +2879,15 @@ export class Rapier3dAdapter
       };
       record.rapierHandle = rapierHandle;
       record.joint = joint;
+      // Re-asserted like every other restored field (the 2D adapter has always
+      // done this): a record reused across a restore must describe the joint
+      // the *envelope* names, not the one it happened to describe before. A
+      // snapshot restored into a world whose joint ids were rebuilt otherwise
+      // kept a stale §28 type — which decides whether limits and motors exist —
+      // and stale body links, which is what `destroyBody` retires joints by.
+      record.type = type;
+      record.bodyIdA = bodyIdA;
+      record.bodyIdB = bodyIdB;
       record.alive = true;
       survivingJoints.set(id, record);
     }

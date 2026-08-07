@@ -18,15 +18,22 @@
  * its tags, its free-form metadata, its components, and its children. That is
  * everything `Node` itself owns.
  *
- * It does **not** carry subclass state — a camera's field of view, a mesh's
- * geometry reference, a sprite's texture key. `@four/serialization` may depend
- * on `core`, `math`, and `scene` only (plan §3.1), so it cannot even name those
+ * It does not *interpret* subclass state — a camera's field of view, a mesh's
+ * geometry reference, a widget's box model. `@four/serialization` may depend on
+ * `core`, `math`, and `scene` only (plan §3.1), so it cannot even name those
  * types, and inventing a schema for them here would pin an API this packet may
- * not open. Subclass state belongs in a component (which *is* covered, through
- * the registry) or in a later revision of this format; until then a subclass
- * node round-trips its `Node` half only, and `instantiateScene`'s `nodeFactory`
- * is the seam through which an application reconstructs the rest.
- * **Staged 2026-08-02 (P11-1 MVP).**
+ * not open. It does **carry** it, opaquely: {@link SceneNodeDocument.data} is
+ * one JSON value per node, written by
+ * {@link SerializeSceneOptions.nodeDataOf} and read back by the matching
+ * {@link InstantiateSceneOptions.nodeFactory}, exactly as
+ * {@link ComponentDocument.data} carries a component payload this package
+ * cannot read either (2026-08-06 — the note that used to stand here said
+ * subclass state "belongs in … a later revision of this format", and left every
+ * non-trivial scene needing application-authored round-trip code; the umbrella
+ * `four` package now ships `registerSceneNodeTypes()` over this seam).
+ *
+ * The field is optional and absent unless a writer produces one, so every
+ * document written before it existed encodes byte for byte as it did.
  *
  * Physics state, animation state, and replay data are likewise absent — §79
  * requires exactly that ("separate optional sections so static scene definitions
@@ -187,6 +194,27 @@ export interface SceneNodeDocument {
   readonly tags?: readonly string[];
   /** §6 free-form user data; absent means empty. Must be representable JSON. */
   readonly metadata?: JsonObject;
+  /**
+   * The node's **subclass** state, opaque to this package (§79, 2026-08-06).
+   *
+   * Whatever {@link SerializeSceneOptions.nodeDataOf} returned for the node —
+   * a camera's projection parameters, a widget's box model and accessibility
+   * record — carried verbatim and handed straight back to
+   * {@link InstantiateSceneOptions.nodeFactory}, which receives this whole
+   * document. Validated as JSON and nothing more: this module has no idea what
+   * a `"ui:button"` is, which is precisely why a document can carry one written
+   * by a build that did.
+   *
+   * Distinct from {@link SceneNodeDocument.metadata}, and deliberately: §6's
+   * `metadata` is the *application's* free-form data and belongs to whoever
+   * authored the scene, so an engine writing its own fields into it would both
+   * collide with that data and lose the ability to tell the two apart.
+   *
+   * Absent means the node had none, which is every node whose class this build
+   * treats as plain — so a document produced without a `nodeDataOf` is
+   * unchanged by this field's existence.
+   */
+  readonly data?: JsonValue;
   /** Components in registration order (§6a); absent means none. */
   readonly components?: readonly ComponentDocument[];
   /** Children in insertion order (§6); absent means none. */
@@ -552,6 +580,14 @@ function validateNode(
     if (Object.keys(metadata).length > 0) {
       canonical.metadata = metadata;
     }
+  }
+  if (record.data !== undefined) {
+    // Opaque: validated as JSON (which refuses `NaN`, a `Map`, a cycle, a
+    // `__proto__` key) and copied, never interpreted. `null` is a legitimate
+    // payload and is kept, unlike the absent-means-default fields above — a
+    // writer that returned `null` said something, and `undefined` is how a
+    // writer says nothing.
+    canonical.data = cloneJsonValue(record.data, `${path}.data`);
   }
   if (record.components !== undefined) {
     const components = validateComponents(

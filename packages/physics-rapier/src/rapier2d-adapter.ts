@@ -263,6 +263,14 @@ const RAPIER_2D_JOINT_TYPES = [
  *   in an envelope that carries this adapter's registry too.
  * - `queries` — all four are implemented on Rapier's query entry points. See
  *   {@link Rapier2dAdapter.shapeCast} for the one multiplicity limit.
+ * - `tuning` — **all three `false`** (2026-08-06). §25's `rollingFriction` and
+ *   `spinningFriction` have no binding in the 2D 0.19.3 build, and neither do
+ *   §32's three sleeping thresholds (`IntegrationParameters` carries no
+ *   sleeping member at all — enumerated at runtime, and the reason
+ *   {@link Rapier2dAdapter.initialize}'s header says so). The declaration is
+ *   what turns those from *accepted and dropped* into a warning `PhysicsWorld`
+ *   prints once per world; `SleepingConfig.enabled` is honoured and is
+ *   deliberately not part of it.
  */
 const RAPIER_2D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
   dimensions: Object.freeze<PhysicsDimension[]>([ADAPTER_DIMENSION]),
@@ -275,6 +283,11 @@ const RAPIER_2D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
     shapeCast: true,
     overlap: true,
     point: true,
+  }),
+  tuning: Object.freeze({
+    rollingFriction: false,
+    spinningFriction: false,
+    sleepThresholds: false,
   }),
 });
 
@@ -767,6 +780,11 @@ export class Rapier2dAdapter
    * The adapter therefore honours the on/off switch and leaves the three
    * thresholds unimplemented rather than pretending; a world that depends on
    * them is depending on something no Rapier 0.19.3 binding can deliver.
+   *
+   * That last sentence is now machine-readable: `capabilities.tuning
+   * .sleepThresholds` is `false`, and `PhysicsWorld` warns once per world when a
+   * threshold departs from Appendix A against an adapter that declares it
+   * (2026-08-06). The resolved configuration still reaches this method in full.
    */
   async initialize(options: PhysicsWorldOptions): Promise<void> {
     this.#assertNotDisposed();
@@ -990,8 +1008,10 @@ export class Rapier2dAdapter
    * Appendix A's — friction `Average`, restitution `Max` — because Rapier's own
    * default for restitution is `Average`, which would quietly contradict §25 for
    * every contact in the world. §25's `rollingFriction` and `spinningFriction`
-   * have no Rapier 2D binding at 0.19.3 and are ignored (their `undefined`
-   * default means most callers never notice).
+   * have no Rapier 2D binding at 0.19.3 and cannot be applied here — which this
+   * adapter *declares*, in `capabilities.tuning`, so that a `PhysicsWorld`
+   * registering a collider that carries one warns instead of dropping it in
+   * silence (2026-08-06).
    *
    * `collisionGroups`/`collisionMask` are packed into Rapier's single
    * `InteractionGroups` word; `sensor` sets the sensor flag *and* widens
@@ -1075,12 +1095,49 @@ export class Rapier2dAdapter
     return record as unknown as PhysicsColliderHandle;
   }
 
-  /** Destroys a collider (§37). Any contact pair it was part of is forgotten. */
+  /**
+   * Destroys a collider (§37). Any contact pair it was part of is forgotten.
+   *
+   * ## The body's mass is rebuilt, not left behind (2026-08-06)
+   *
+   * A collider is a §23 mass contributor, so removing one changes the body's
+   * mass properties and the adapter's own `colliderCount` — the number
+   * {@link Rapier2dAdapter.createCollider} branches on to decide whether the
+   * *next* collider carries an authored mass. Until this fix neither was
+   * touched, and both failures were silent:
+   *
+   * - a `"first-collider"` body (an authored `mass` with no authored centre or
+   *   tensor) whose mass-bearing collider was destroyed dropped to **zero
+   *   mass** — Rapier leaves such a body motionless — and
+   * - because the count still read `1`, its replacement collider was created
+   *   with `density: 0`, so the mass never came back.
+   *
+   * What happens now, in order: the count is decremented (in `#forgetCollider`,
+   * which is also `destroyBody`'s path), then, for a surviving
+   * `"first-collider"` body that still has colliders, the authored mass is
+   * re-applied to the surviving collider with the **lowest monotonic id**
+   * (`Collider.setMass`, §33-stable — insertion order, unaffected by which
+   * collider died), and finally the body's mass properties are recomputed so
+   * `getBodyMass` is truthful before the next step, exactly as `createCollider`
+   * does.
+   *
+   * Re-applying rather than refusing the destruction is the honest option here:
+   * §23 makes an authored mass authoritative for the *body*, not for whichever
+   * collider happens to be holding it, and throwing would make "remove a
+   * collider" fail on a body that has a perfectly good place to put its mass. A
+   * body left with **no** collider keeps nothing — there is nowhere to hold it —
+   * and gets its mass back from the next collider created on it, which is what
+   * the corrected count now guarantees.
+   */
   destroyCollider(handle: PhysicsColliderHandle): void {
     const world = this.#requireWorld();
     const record = this.#requireCollider(handle);
+    const bodyRecord = this.#bodies.get(record.bodyId);
     world.removeCollider(record.collider, true);
     this.#forgetCollider(record);
+    if (bodyRecord !== undefined) {
+      this.#refreshMassAfterColliderLoss(bodyRecord);
+    }
   }
 
   /**
@@ -2329,16 +2386,67 @@ export class Rapier2dAdapter
     return body as unknown as PhysicsBodyHandle;
   }
 
-  /** Drops a collider from every index, including any pair it was part of. */
+  /**
+   * Drops a collider from every index, including any pair it was part of, and
+   * decrements its body's collider count.
+   *
+   * The count is §23 bookkeeping, not an index: `applyColliderMass` reads it to
+   * decide whether an incoming collider carries the body's authored mass, so a
+   * count that only ever grew made a replaced collider massless forever (see
+   * {@link Rapier2dAdapter.destroyCollider}).
+   *
+   * Both guards are belt-and-braces rather than live cases: a collider cannot
+   * outlive its body through the public API (`destroyBody` forgets a body's
+   * colliders while its record is still present, and drops the record
+   * immediately afterwards), and the count cannot fall below the colliders that
+   * incremented it. Neither may be allowed to make the count negative, which
+   * would read as "no colliders" and re-arm the authored-mass branch wrongly.
+   */
   #forgetCollider(record: ColliderRecord): void {
     record.alive = false;
     this.#colliders.delete(record.id);
     this.#collidersByRapierHandle.delete(record.rapierHandle);
+    const body = this.#bodies.get(record.bodyId);
+    if (body !== undefined && body.colliderCount > 0) {
+      body.colliderCount -= 1;
+    }
     for (const [key, pair] of [...this.#activePairs]) {
       if (pair.a === record || pair.b === record) {
         this.#activePairs.delete(key);
       }
     }
+  }
+
+  /**
+   * Re-establishes a body's §23 mass after one of its colliders was destroyed.
+   * See {@link Rapier2dAdapter.destroyCollider} for the rule and its rationale.
+   */
+  #refreshMassAfterColliderLoss(body: BodyRecord): void {
+    if (body.massMode === "first-collider" && body.colliderCount > 0) {
+      const heir = this.#firstColliderOf(body.id);
+      if (heir !== undefined) {
+        heir.collider.setMass(body.explicitMass);
+      }
+    }
+    body.body.recomputeMassPropertiesFromColliders();
+  }
+
+  /**
+   * The surviving collider of `bodyId` with the lowest monotonic id, or
+   * `undefined` when the body has none left.
+   *
+   * `#colliders` is keyed by that id and `Map` iterates in insertion order,
+   * which for a monotonic counter *is* ascending id order — so this is a §33
+   * deterministic choice that does not depend on which collider was destroyed
+   * or on any Rapier handle.
+   */
+  #firstColliderOf(bodyId: number): ColliderRecord | undefined {
+    for (const record of this.#colliders.values()) {
+      if (record.bodyId === bodyId) {
+        return record;
+      }
+    }
+    return undefined;
   }
 
   /** §30's filter, applied to one Rapier collider. See `raycast`. */

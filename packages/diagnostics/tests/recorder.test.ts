@@ -23,19 +23,36 @@ import {
   type ReplayTarget,
 } from "../src/recorder.js";
 import {
-  REPLAY_FORMAT_VERSION,
   assertReplayCompatible,
   decodeBase64,
+  decodeReplayRecording,
   encodeReplayRecording,
 } from "../src/replay-format.js";
 
 // --- the mirror of @four/physics -------------------------------------------
 
-/** Transcribed from `PhysicsSnapshot` in `packages/physics/src/world.ts`. */
+/**
+ * Transcribed from `PhysicsSnapshot` in `packages/physics/src/world.ts`,
+ * `configuration` included — the field the mirror had drifted away from until
+ * PH-6 (2026-08-06).
+ */
 interface MirroredPhysicsSnapshot {
   readonly adapterName: string;
   readonly adapterVersion: string;
   readonly data: ArrayBuffer;
+  readonly configuration?: MirroredSnapshotConfiguration;
+}
+
+/** Transcribed from `PhysicsSnapshotConfiguration` (`world.ts`). */
+interface MirroredSnapshotConfiguration {
+  readonly dimension: "2d" | "3d";
+  readonly gravity: readonly [number, number, number];
+  readonly sleeping: {
+    readonly enabled: boolean;
+    readonly timeToSleep: number;
+  };
+  readonly determinism: string;
+  readonly solverIterations?: number;
 }
 
 /** The three `PhysicsWorld` members a recording needs, transcribed. */
@@ -57,6 +74,9 @@ interface MirroredPhysicsWorld {
 class FakeTarget implements ReplayTarget {
   state = 0;
 
+  /** §34's world configuration, when this target reports one (PH-6). */
+  configuration: MirroredSnapshotConfiguration | undefined = undefined;
+
   snapshotCalls = 0;
 
   checksumCalls = 0;
@@ -75,12 +95,15 @@ class FakeTarget implements ReplayTarget {
 
   createSnapshot(): ReplaySnapshot {
     this.snapshotCalls += 1;
-    return {
+    const snapshot: ReplaySnapshot = {
       adapterName: this.adapterName,
       adapterVersion: this.adapterVersion,
       data: new Uint8Array([this.state & 0xff, (this.state >>> 8) & 0xff])
         .buffer,
     };
+    return this.configuration === undefined
+      ? snapshot
+      : { ...snapshot, configuration: this.configuration };
   }
 
   restoreSnapshot(snapshot: ReplaySnapshot): void {
@@ -107,9 +130,29 @@ function frame(
   recorder.recordFrame(stepCount, droppedTime);
 }
 
+/** A `PhysicsWorld`-shaped object, typed only through the mirror. */
+function mirroredWorld(): MirroredPhysicsWorld {
+  return {
+    checksum: () => 7,
+    createSnapshot: () => ({
+      adapterName: "rapier2d",
+      adapterVersion: "0.19.3",
+      data: new Uint8Array([1, 2]).buffer,
+      configuration: {
+        dimension: "2d",
+        gravity: [0, -9.81, 0],
+        sleeping: { enabled: true, timeToSleep: 0.5 },
+        determinism: "same-runtime",
+        solverIterations: 8,
+      },
+    }),
+    restoreSnapshot: () => undefined,
+  };
+}
+
 describe("ReplayTarget — structural compatibility with PhysicsWorld", () => {
   it("accepts a PhysicsWorld-shaped object as a ReplayTarget", () => {
-    const world: MirroredPhysicsWorld = new FakeTarget();
+    const world = mirroredWorld();
 
     // The assignment is the assertion: it is what `recorder.begin(world, …)`
     // does at a call site in an application, and it fails to compile if
@@ -126,13 +169,19 @@ describe("ReplayTarget — structural compatibility with PhysicsWorld", () => {
   it("hands a PhysicsSnapshot-shaped value back and forth unchanged", () => {
     const target = new FakeTarget();
 
-    const snapshot: MirroredPhysicsSnapshot = target.createSnapshot();
+    const snapshot: MirroredPhysicsSnapshot = mirroredWorld().createSnapshot();
+    // The assignment that matters: a snapshot the *solver* produced satisfies
+    // this package's mirror of it, `configuration` included (PH-6). The reverse
+    // is deliberately not assignable — `ReplaySnapshot.configuration` is
+    // `unknown` here, because naming the solver's type would need an edge to
+    // `@four/physics` this package may not have.
     const asReplaySnapshot: ReplaySnapshot = snapshot;
     target.restoreSnapshot(asReplaySnapshot);
 
     expect(Object.keys(snapshot).sort()).toEqual([
       "adapterName",
       "adapterVersion",
+      "configuration",
       "data",
     ]);
     expect(snapshot.data).toBeInstanceOf(ArrayBuffer);
@@ -158,6 +207,114 @@ describe("ReplayTarget — structural compatibility with PhysicsWorld", () => {
   });
 });
 
+/**
+ * PH-6 (2026-08-06): §34 requires a replay to store "solver settings", and the
+ * document had no field for them — so the configuration a run was captured
+ * under was discarded at record time and `PhysicsWorld.restoreSnapshot`'s
+ * field-by-field refusal no-oped for every replay.
+ */
+describe("ReplayRecorder — world configuration (§34, PH-6)", () => {
+  const configuration = {
+    dimension: "2d",
+    gravity: [0, -9.81, 0],
+    sleeping: { enabled: true, timeToSleep: 0.5 },
+    determinism: "same-runtime",
+    solverIterations: 8,
+  } as const;
+
+  it("captures the configuration off the initial snapshot", () => {
+    const target = new FakeTarget();
+    target.configuration = configuration;
+    const recorder = new ReplayRecorder();
+
+    recorder.begin(target, { fixedDeltaTime: 1 / 60 });
+    const recording = recorder.end();
+
+    expect(recording.worldConfiguration).toEqual(configuration);
+    expect(recording.formatVersion).toBe(2);
+  });
+
+  it("deep-copies it, so a later mutation cannot rewrite the recording", () => {
+    const target = new FakeTarget();
+    const mutable = {
+      dimension: "2d",
+      gravity: [0, -9.81, 0],
+      sleeping: { enabled: true, timeToSleep: 0.5 },
+      determinism: "same-runtime",
+    };
+    target.configuration = mutable as never;
+    const recorder = new ReplayRecorder();
+
+    recorder.begin(target, { fixedDeltaTime: 1 / 60 });
+    mutable.gravity[1] = 0;
+    const recording = recorder.end();
+
+    expect(recording.worldConfiguration).toMatchObject({
+      gravity: [0, -9.81, 0],
+    });
+  });
+
+  it("round-trips it through canonical text", () => {
+    const target = new FakeTarget();
+    target.configuration = configuration;
+    const recorder = new ReplayRecorder();
+    recorder.begin(target, { fixedDeltaTime: 1 / 60 });
+    const recording = recorder.end();
+
+    const text = encodeReplayRecording(recording);
+    const decoded = decodeReplayRecording(text);
+
+    expect(decoded.worldConfiguration).toEqual(configuration);
+    expect(encodeReplayRecording(decoded)).toBe(text);
+  });
+
+  it("refuses a configuration JSON cannot carry, at begin", () => {
+    const target = new FakeTarget();
+    target.configuration = { gravity: Number.NaN } as never;
+    const recorder = new ReplayRecorder();
+
+    expect(() => {
+      recorder.begin(target, { fixedDeltaTime: 1 / 60 });
+    }).toThrow(/snapshot\.configuration/);
+    // The session must not be left half-open by the refusal.
+    expect(recorder.isRecording).toBe(false);
+  });
+
+  it("writes a version-1 document for a target that reports none", () => {
+    const recorder = new ReplayRecorder();
+    recorder.begin(new FakeTarget(), { fixedDeltaTime: 1 / 60 });
+    const recording = recorder.end();
+
+    expect(recording.formatVersion).toBe(1);
+    expect("worldConfiguration" in recording).toBe(false);
+  });
+
+  it("forgets it between sessions", () => {
+    const configured = new FakeTarget();
+    configured.configuration = configuration;
+    const recorder = new ReplayRecorder();
+
+    recorder.begin(configured, { fixedDeltaTime: 1 / 60 });
+    recorder.end();
+    recorder.begin(new FakeTarget(), { fixedDeltaTime: 1 / 60 });
+    const second = recorder.end();
+
+    expect(second.worldConfiguration).toBeUndefined();
+  });
+
+  it("forgets it on abort too", () => {
+    const configured = new FakeTarget();
+    configured.configuration = configuration;
+    const recorder = new ReplayRecorder();
+
+    recorder.begin(configured, { fixedDeltaTime: 1 / 60 });
+    recorder.abort();
+    recorder.begin(new FakeTarget(), { fixedDeltaTime: 1 / 60 });
+
+    expect(recorder.end().worldConfiguration).toBeUndefined();
+  });
+});
+
 describe("ReplayRecorder.begin", () => {
   it("captures the initial snapshot and the §34 header", () => {
     const target = new FakeTarget();
@@ -172,7 +329,10 @@ describe("ReplayRecorder.begin", () => {
     const recording = recorder.end();
 
     expect(target.snapshotCalls).toBe(1);
-    expect(recording.formatVersion).toBe(REPLAY_FORMAT_VERSION);
+    // No world configuration on this target, so the document stays a
+    // version-1 document (PH-6: the version is the content's, not the build's).
+    expect(recording.formatVersion).toBe(1);
+    expect(recording.worldConfiguration).toBeUndefined();
     expect(recording.adapterName).toBe("fake2d");
     expect(recording.adapterVersion).toBe("1.0.0");
     expect(recording.fixedDeltaTime).toBe(1 / 120);

@@ -188,9 +188,17 @@ describe("capabilities and identity (§37)", () => {
       determinism: "same-runtime",
       snapshots: true,
       queries: { raycast: true, shapeCast: true, overlap: true, point: true },
+      // As in the 2D build: no binding for §25 rolling/spinning friction and
+      // none for §32's thresholds, declared instead of silently dropped.
+      tuning: {
+        rollingFriction: false,
+        spinningFriction: false,
+        sleepThresholds: false,
+      },
     });
     expect(Object.isFrozen(adapter.capabilities)).toBe(true);
     expect(Object.isFrozen(adapter.capabilities.ccdModes)).toBe(true);
+    expect(Object.isFrozen(adapter.capabilities.tuning)).toBe(true);
   });
 
   it("has no version before initialize and Rapier's version after", async () => {
@@ -727,6 +735,108 @@ describe("mass composition (§23, §25)", () => {
         centerOfMass: new Vector3(1, 0, 0),
       }),
     ).toThrowError(/requires an explicit mass/u);
+    adapter.dispose();
+  });
+});
+
+// Regression suite for the 2026-08-06 fix — the 3D half of the defect the 2D
+// adapter carried: `destroyCollider` decremented no collider count and rebuilt
+// no mass, so a `"first-collider"` body lost its authored mass outright and its
+// replacement collider was created with `density: 0`.
+describe("mass after a collider is destroyed (§23, §24, §37)", () => {
+  it("hands an authored mass to the surviving collider", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 5 });
+    const bearer = adapter.createCollider({
+      body,
+      shape: { type: "box", halfExtents: new Vector3(0.5, 0.5, 0.5) },
+      density: 1000,
+    });
+    const second = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.5 },
+      density: 1000,
+    });
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+
+    adapter.destroyCollider(bearer);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+
+    adapter.destroyCollider(second);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(0, 5);
+    adapter.dispose();
+  });
+
+  it("gives the mass back to a replacement collider", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 4 });
+    const only = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.5 },
+    });
+    adapter.destroyCollider(only);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(0, 5);
+
+    adapter.createCollider({ body, shape: { type: "sphere", radius: 0.5 } });
+    expect(adapter.getBodyMass(body)).toBeCloseTo(4, 5);
+    adapter.dispose();
+  });
+
+  it("recomputes a density-derived mass when a collider goes", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic" });
+    const first = adapter.createCollider({
+      body,
+      shape: { type: "box", halfExtents: new Vector3(0.5, 0.5, 0.5) },
+      density: 3,
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "box", halfExtents: new Vector3(0.5, 0.5, 0.5) },
+      offset: {
+        position: new Vector3(2, 0, 0),
+        rotation: new Quaternion(),
+      } as unknown as NonNullable<ColliderDescriptor["offset"]>,
+      density: 3,
+    });
+    expect(adapter.getBodyMass(body)).toBeCloseTo(6, 5);
+
+    adapter.destroyCollider(first);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(3, 5);
+    adapter.dispose();
+  });
+
+  it("leaves a body-mode body's authored triple alone", async () => {
+    const adapter = await createAdapter();
+    const inertiaTensor = new Matrix3();
+    inertiaTensor.elements[0] = 2;
+    inertiaTensor.elements[4] = 2;
+    inertiaTensor.elements[8] = 2;
+    const body = adapter.createBody({
+      type: "dynamic",
+      mass: 5,
+      centerOfMass: new Vector3(0, 0, 0),
+      inertiaTensor,
+    });
+    const collider = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.5 },
+      density: 1000,
+    });
+    adapter.destroyCollider(collider);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+    adapter.dispose();
+  });
+
+  it("still destroys every collider with its body", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 2 });
+    const collider = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.5 },
+    });
+    adapter.destroyBody(body);
+    expect(() => adapter.getColliderId(collider)).toThrowError(/destroyed/u);
     adapter.dispose();
   });
 });

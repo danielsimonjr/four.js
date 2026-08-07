@@ -26,8 +26,10 @@
  * restoreSnapshot(snapshot: PhysicsSnapshot): void;
  * ```
  *
- * and {@link ReplaySnapshot} re-declares `PhysicsSnapshot`'s three readonly
- * fields member for member. The honest cost, stated as plainly as `particles.ts`
+ * and {@link ReplaySnapshot} re-declares `PhysicsSnapshot`'s four readonly
+ * fields member for member (the fourth, `configuration`, joined on 2026-08-06 —
+ * PH-6 — closing the mirror drift this note had warned about since the physics
+ * side gained it). The honest cost, stated as plainly as `particles.ts`
  * states its own: **nothing type-checks the two declarations against each
  * other.** A change to `PhysicsSnapshot` will not fail this package's build; it
  * will fail `tests/recorder.test.ts`, which asserts assignability in both
@@ -60,12 +62,12 @@
 import { FourError } from "@four/core";
 
 import {
+  REPLAY_FORMAT_VERSION,
   type JsonValue,
   type ReplayFrameRecord,
   type ReplayInputRecord,
   type ReplayRecording,
   type ReplaySnapshotRecord,
-  REPLAY_FORMAT_VERSION,
   cloneJsonValue,
   encodeBase64,
   validateReplayRecording,
@@ -84,6 +86,22 @@ export interface ReplaySnapshot {
   readonly adapterVersion: string;
   /** The adapter's opaque bytes (§34). */
   readonly data: ArrayBuffer;
+  /**
+   * The world configuration the bytes were captured under — §34's *"a snapshot
+   * is valid only for the same adapter, adapter version, and world
+   * configuration"* (2026-08-06, PH-6).
+   *
+   * `unknown`, deliberately: `PhysicsSnapshot` types this as
+   * `PhysicsSnapshotConfiguration`, and naming that type would need an edge to
+   * `@four/physics` this package may not have. The recorder validates it as
+   * JSON and carries it ({@link @four/diagnostics!ReplayRecording.worldConfiguration});
+   * the player hands it back; only the solver reads a field of it.
+   *
+   * Optional because two legitimate producers cannot supply one: a target that
+   * has no configuration to report, and snapshots this package reconstructs
+   * from a recording that predates the field.
+   */
+  readonly configuration?: unknown;
 }
 
 /**
@@ -169,6 +187,9 @@ export class ReplayRecorder {
 
   #initialSnapshot = "";
 
+  /** §34's "solver settings", captured off the initial snapshot (PH-6). */
+  #worldConfiguration: JsonValue | undefined = undefined;
+
   #snapshotIntervalSteps = 0;
 
   /** Steps at which the next periodic snapshot becomes due; `0` if disabled. */
@@ -215,13 +236,16 @@ export class ReplayRecorder {
 
   /**
    * Opens a session and captures the initial snapshot — §34's "initial scene
-   * state", plus the adapter name and version the whole document is keyed on.
+   * state", plus the adapter name and version the whole document is keyed on
+   * and, since 2026-08-06 (PH-6), the **world configuration** it was captured
+   * under, taken from {@link ReplaySnapshot.configuration}.
    *
    * @param target the simulation to record; must be able to snapshot
    * @param options fixed step (seconds), seed, snapshot cadence, metadata
    * @throws FourError `INVALID_APPLICATION_STATE` if a session is already open
    * @throws TypeError if `fixedDeltaTime` or `snapshotIntervalSteps` is out of
-   * range, or `metadata` is not representable JSON
+   * range, or `metadata` or the target's snapshot `configuration` is not
+   * representable JSON
    */
   begin(target: ReplayTarget, options: ReplayRecorderOptions): void {
     if (this.#target !== undefined) {
@@ -257,6 +281,15 @@ export class ReplayRecorder {
     }
 
     const snapshot = target.createSnapshot();
+    // §34's "solver settings" (PH-6). Validated and copied here, at the call
+    // that introduced it, rather than at `end()` — a target that reports a
+    // configuration JSON cannot carry must fail at `begin`, before a whole
+    // session has been recorded against it. A target that reports none records
+    // a version-1 document, exactly as before.
+    const worldConfiguration =
+      snapshot.configuration === undefined
+        ? undefined
+        : cloneJsonValue(snapshot.configuration, "snapshot.configuration");
     this.#inputs.length = 0;
     this.#frames.length = 0;
     this.#snapshots.length = 0;
@@ -265,6 +298,7 @@ export class ReplayRecorder {
     this.#adapterName = snapshot.adapterName;
     this.#adapterVersion = snapshot.adapterVersion;
     this.#initialSnapshot = encodeBase64(snapshot.data);
+    this.#worldConfiguration = worldConfiguration;
     this.#fixedDeltaTime = fixedDeltaTime;
     this.#seed = options.seed;
     this.#metadata = metadata;
@@ -378,6 +412,10 @@ export class ReplayRecorder {
   end(): ReplayRecording {
     const target = this.#requireRecording("end");
     const document: Record<string, unknown> = {
+      // The real version is derived from the content by
+      // `validateReplayRecording` below (PH-6: a document declares the lowest
+      // version that can express it), so this is only the upper bound the
+      // validator checks the content against.
       formatVersion: REPLAY_FORMAT_VERSION,
       adapterName: this.#adapterName,
       adapterVersion: this.#adapterVersion,
@@ -386,6 +424,9 @@ export class ReplayRecorder {
       document.seed = this.#seed;
     }
     document.fixedDeltaTime = this.#fixedDeltaTime;
+    if (this.#worldConfiguration !== undefined) {
+      document.worldConfiguration = this.#worldConfiguration;
+    }
     document.initialSnapshot = this.#initialSnapshot;
     document.inputs = this.#inputs.slice();
     document.frames = this.#frames.slice();
@@ -419,6 +460,7 @@ export class ReplayRecorder {
     this.#snapshots.length = 0;
     this.#stepsRecorded = 0;
     this.#initialSnapshot = "";
+    this.#worldConfiguration = undefined;
     this.#metadata = undefined;
     this.#seed = undefined;
     this.#snapshotIntervalSteps = 0;

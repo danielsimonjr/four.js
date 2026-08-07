@@ -325,6 +325,11 @@ _Dependencies:_ A-1, A-7, A-14.
 
 ### A-7 — `Application.resize` is missing from §45's lifecycle
 
+> **CLOSED 2026-08-06.** `Application.resize(width, height, resolution?)` ships, with
+> `width`/`height`/`resolution`/`depthRange` construction options; full-surface perspective
+> cameras get their aspect and projection rebuilt, a headless application still records the
+> size. `autoResize` remains open (A-6).
+
 **§45** · **Severity: High** · **Effort: S** · **SEMI-RECORDED (a TODO comment, not a tracked item)**
 
 _What exists:_ `initialize`, `start`, `stop`, `pause`, `resume`, `step`, `dispose` — 7 of §45's 8 lifecycle methods. `WebglRenderer.resize(w, h, dpr)` exists and every example calls it directly.
@@ -348,6 +353,12 @@ _Dependencies:_ none blocking. Pairs naturally with A-6.
 ## C. §71–§72 input
 
 ### A-9 — `PointerInput` leaks per-pointer state for every dead pointer id
+
+> **CLOSED 2026-08-06.** Teardown-and-delete on `pointerup` and on the new `pointercancel`
+> (a new `PropagatingPointerEventType`; `DragManager` ends a drag on it). 10 000-gesture
+> regression test via the new `PointerInput.trackedPointerCount`. **Left open:**
+> `SurfacePointerEvent` has no `pointerType`, so a mouse release now ends its hover like a
+> touch does — see `TODO.md`.
 
 **§72, §83** · **Severity: High (defect)** · **Effort: S** · **RECORDED as PLAUSIBLE in `CHANGELOG.md`, absent from `TODO.md`**
 
@@ -421,6 +432,11 @@ _Dependencies:_ A-10 (hard), A-6 (for reduced motion).
 
 ### A-14 — UI widgets are scene nodes that do not survive serialization, contradicting §73
 
+> **CLOSED 2026-08-06.** `registerSceneNodeTypes()` / `registerUISerializers()` ship from the
+> umbrella `four` package (the closure plan's preferred option), carrying the §74 box model,
+> layout, interaction flags and §75 accessibility record through the new
+> `SceneNodeDocument.data` seam. A-16's remaining node classes are additions to the same file.
+
 **§73, §79** · **Severity: High** · **Effort: S** · **SEMI-RECORDED (asserted in a test's prose, not tracked)**
 
 §73: _"UI objects are scene nodes and therefore share animation, input, clipping, serialization, and diagnostics."_ Of those five, **serialization does not hold**. `createDefaultComponentSerializers()` registers exactly one serializer, `POSE_TARGET_SERIALIZER`, and `instantiateScene` reconstructs only `"scene"` and `"group"` by class identity. A `Panel`/`Label`/`Button` tree round-trips as bare `Node` state — no size, no layout, no text, no accessibility record, no widget class.
@@ -436,6 +452,11 @@ _Dependencies:_ A-16 (widget size/layout is exactly the "subclass state" the for
 ## E. §76–§81 assets and serialization
 
 ### A-15 — §79 silently drops components with no registered serializer
+
+> **CLOSED 2026-08-06.** `Node.components` forwards §6a's registry; `serializeComponents`
+> walks the node and emits in registry order (so existing byte-identical goldens are
+> unmoved), throwing `INVALID_APPLICATION_STATE` on an unserializable component unless
+> `SerializeSceneOptions.unknownComponents: "skip"` is passed. The staging paragraph is gone.
 
 **§79, §6a** · **Severity: High** · **Effort: S** · **RECORDED (staged 2026-08-02, P11-1)**
 
@@ -467,6 +488,10 @@ _Closure plan:_ ship `registerSceneNodeTypes()` from the umbrella `four` package
 ---
 
 ### A-17 — §79 restored node ids can collide with engine-assigned ids
+
+> **CLOSED 2026-08-06.** `NodeOptions.id` restores and *reserves* an id at construction;
+> `restoreNodeId` moved into `@four/scene` (which owns the field) for the `nodeFactory` path;
+> `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.
 
 **§79** · **Severity: Medium** · **Effort: S** · **RECORDED (staged 2026-08-02, P11-1)**
 
@@ -1304,6 +1329,15 @@ Unreachable through `PhysicsWorld` today (its only `destroyCollider` call is ins
 
 ## PH-6 — §34 replay documents carry no world configuration
 
+> **CLOSED 2026-08-06.** `ReplaySnapshot.configuration` (structural `unknown`) and
+> `ReplayRecording.worldConfiguration`; captured in `ReplayRecorder.begin`, round-tripped
+> through `validateReplayRecording`, re-attached in `ReplayPlayer.#snapshotAt`.
+> `REPLAY_FORMAT_VERSION` is 2 with `SUPPORTED_REPLAY_FORMAT_VERSIONS = [1, 2]`; a document
+> declares the lowest version that can express it, so every version-1 recording still
+> validates *and re-encodes byte for byte*. `golden/phase10.json` was amended envelope-only
+> (`recordingDigest`, `recordingLength`) with the neutralized-capture proof recorded in the
+> file — see `CHANGELOG.md`.
+
 |                       |                                                                                                                                                                                                                                                                                                                                                                  |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Spec**              | §34 ("A replay format should store: initial scene state; **solver settings**; time step; random seed; …")                                                                                                                                                                                                                                                        |
@@ -1476,6 +1510,12 @@ The setter (`rigid-body.ts:601-604`) validates mass and writes `#type` unconditi
 ---
 
 ## PH-17 — No shipped `ComponentSerializer`s for `RigidBody`, `Collider`, or `MotionComponent`
+
+> **PARTIALLY CLOSED 2026-08-06.** `MOTION_COMPONENT_SERIALIZER` ships from `@four/motion`
+> against a structural `ComponentSerializerShape` (no new §3.1 edge), and unregistered
+> components are refused rather than silently dropped (A-15). **`RIGID_BODY_SERIALIZER` and
+> `COLLIDER_SERIALIZER` remain open** — they belong in `@four/physics`, which that change
+> could not touch; tracked in `TODO.md`.
 
 |                       |                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

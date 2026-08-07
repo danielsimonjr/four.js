@@ -165,9 +165,19 @@ describe("capabilities and identity (§37)", () => {
       determinism: "same-runtime",
       snapshots: true,
       queries: { raycast: true, shapeCast: true, overlap: true, point: true },
+      // Rapier 0.19.3 binds none of these three (§25 rolling/spinning
+      // friction, §32 sleeping thresholds), and says so rather than accepting
+      // and dropping them — `PhysicsWorld` turns the declaration into a
+      // once-per-world warning (2026-08-06).
+      tuning: {
+        rollingFriction: false,
+        spinningFriction: false,
+        sleepThresholds: false,
+      },
     });
     expect(Object.isFrozen(adapter.capabilities)).toBe(true);
     expect(Object.isFrozen(adapter.capabilities.ccdModes)).toBe(true);
+    expect(Object.isFrozen(adapter.capabilities.tuning)).toBe(true);
   });
 
   it("has no version before initialize and Rapier's version after", async () => {
@@ -619,6 +629,116 @@ describe("mass composition (§23, §25)", () => {
     expect(() =>
       adapter.createBody({ type: "dynamic", centerOfMass: new Vector2(1, 0) }),
     ).toThrowError(/requires an explicit mass/u);
+    adapter.dispose();
+  });
+});
+
+// Regression suite for the 2026-08-06 fix: `destroyCollider` never decremented
+// the body's collider count and never rebuilt its mass, so a `"first-collider"`
+// body silently lost its whole authored mass and its replacement collider was
+// created with `density: 0`. Every expectation below fails on the old code.
+describe("mass after a collider is destroyed (§23, §24, §37)", () => {
+  it("hands an authored mass to the surviving collider", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 5 });
+    const bearer = adapter.createCollider({
+      body,
+      shape: { type: "rectangle", halfExtents: new Vector2(0.5, 0.5) },
+      density: 1000,
+    });
+    const second = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+      density: 1000,
+    });
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+
+    // The mass-bearing collider dies; the body keeps its §23 mass.
+    adapter.destroyCollider(bearer);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+
+    // …and it is the *survivor* that now carries it, so destroying that one
+    // too leaves a massless body rather than a doubled one.
+    adapter.destroyCollider(second);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(0, 5);
+    adapter.dispose();
+  });
+
+  it("gives the mass back to a replacement collider", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 4 });
+    const only = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+    });
+    adapter.destroyCollider(only);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(0, 5);
+
+    // The collider count is back to zero, so this one is created carrying the
+    // authored mass instead of `density: 0` (the old defect).
+    adapter.createCollider({ body, shape: { type: "circle", radius: 0.5 } });
+    expect(adapter.getBodyMass(body)).toBeCloseTo(4, 5);
+    adapter.dispose();
+  });
+
+  it("recomputes a density-derived mass when a collider goes", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic" });
+    const first = adapter.createCollider({
+      body,
+      shape: { type: "rectangle", halfExtents: new Vector2(0.5, 0.5) },
+      density: 3,
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "rectangle", halfExtents: new Vector2(0.5, 0.5) },
+      offset: {
+        position: new Vector3(2, 0, 0),
+        rotation: new Quaternion(),
+      } as unknown as NonNullable<ColliderDescriptor["offset"]>,
+      density: 3,
+    });
+    expect(adapter.getBodyMass(body)).toBeCloseTo(6, 5);
+
+    adapter.destroyCollider(first);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(3, 5);
+    adapter.dispose();
+  });
+
+  it("leaves a body-mode body's authored triple alone", async () => {
+    const adapter = await createAdapter();
+    const inertiaTensor = new Matrix3();
+    inertiaTensor.elements[8] = 3;
+    const body = adapter.createBody({
+      type: "dynamic",
+      mass: 5,
+      centerOfMass: new Vector2(0, 0),
+      inertiaTensor,
+    });
+    const collider = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+      density: 1000,
+    });
+    adapter.destroyCollider(collider);
+    // `"body"` mass mode puts the mass on the body itself, so losing a
+    // zero-density collider changes nothing.
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+    adapter.dispose();
+  });
+
+  it("still destroys every collider with its body", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 2 });
+    const collider = adapter.createCollider({
+      body,
+      shape: { type: "circle", radius: 0.5 },
+    });
+    adapter.destroyBody(body);
+    // The collider handle died with the body, and the count bookkeeping in
+    // `#forgetCollider` did not throw on the way (its body record is still
+    // present at that point, and is dropped immediately after).
+    expect(() => adapter.getColliderId(collider)).toThrowError(/destroyed/u);
     adapter.dispose();
   });
 });
