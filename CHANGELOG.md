@@ -8,6 +8,44 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — §118 flagship: "One Scene, Everything Moves" (gap A-21, second half)
+
+#### Added
+
+- **`examples/flagship/one-scene-everything-moves` — the §118 flagship demonstration.**
+  Every item on §118's list in one scene graph, one `Application`, one `PhysicsWorld`,
+  one frame: a textured lit cube on a `MotionComponent`, a 2D vector orbit, a
+  `SpringJoint` pendulum (spring period 0.5 s inside a 2.9 s swing, so it bounces
+  _and_ swings), a bouncing body whose §29 landings drive a particle burst and a
+  re-launch impulse, a motorised `HingeJoint`, two world-space labels (one rides the
+  body), a `@four/ui` panel parented to the camera (screen-space until §46 layers land
+  — a second viewport would draw the whole scene twice; documented), a §16 `Timeline`
+  with a lap marker, and pause / slow-motion / single-step controls, keyboard-operable.
+  **First example to use the §62/§37 registries** (`renderer: "auto"`,
+  `solver: "auto"`) and **first to assemble the §113 debug overlay** from the R-35
+  streams. Eighth Vite site and Playwright server (port 4180); budget 1.65 MB gzip
+  (measured 1.54 — `registerRapierSolver()` carries both wasm images; a per-dimension
+  registration is the recorded fix).
+- **`tests/browser/one-scene-everything-moves.spec.ts`** (6 tests; browser 43 → 49) —
+  measures rather than asserts: a hue census of six objects in one frame; ~27 000
+  changed pixels running vs **exactly 0 paused** (the strongest available proof that
+  §10's pause is `timeScale = 0` and nothing else writes); one single step advancing
+  `sim` by exactly 1/60 s; the overlay's colours 0 → 315; the slider's minimum
+  accruing 0.05 s of simulation per wall-clock second vs 1.000 at full speed;
+  Tab/Home/End/Enter through §75 with `source: "keyboard"`.
+- **`check-compat` CI fix**: the generator treated every export ending in "Adapter" as
+  a constructor, so 191ee41's factory `createRapierAdapter` turned the gate red;
+  adapter detection now also requires an upper-case initial. Found by this packet's
+  gate run.
+
+#### Changed
+
+- `docs/AUDIT-120.md` examples row 7 → 8; S-8 narrowed to the three §93 stand-in
+  scenes and §119's motor twin. `examples/README.md`, root `README.md`,
+  `website/README.md` + `website/index.html` (which also gained the missing
+  `first-3d-scene` row and now leads with the flagship), and `docs.yml`'s EXAMPLES
+  list updated; `tools/check-docs.mjs` pins move to 8 runnable / 4 placeholders.
+
 ### 2026-08-07 — A-5 (accounting tier): §83 resource accounting; two §84 counters live
 
 #### Added

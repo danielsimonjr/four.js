@@ -87,15 +87,16 @@ requestAnimationFrame(function frame(now) {
 Each example is a small Vite app; build them all with `pnpm examples:build` or serve one
 directly with `npx vite examples/<name>`.
 
-| Example              | Shows                                                                                           |
-| -------------------- | ----------------------------------------------------------------------------------------------- |
-| `first-2d-scene`     | Scene/render/motion pillars, §13 trajectories, tweens/clips/timelines, picking, dragging, text  |
-| `first-3d-scene`     | Perspective camera, §53 3D primitives, §68 directional light + ambient, lit materials           |
-| `physics-playground` | Rigid bodies on the Rapier adapter, mixed 2D/3D worlds, §42 authority                           |
-| `mechanism`          | §28 joints: a slider-crank driven by a motor, with live limits                                  |
-| `blending`           | §19 physics-animation blending: animated ↔ ragdoll ↔ recovering, in-place re-typing             |
-| `particles-demo`     | SoA particle core, §27 force fields, one-draw-call instanced rendering                          |
-| `ui-demo`            | @four/ui widgets (panel/buttons/labels), app-supplied skins, keyboard focus, §72 pointer events |
+| Example                               | Shows                                                                                                                                                                |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `first-2d-scene`                      | Scene/render/motion pillars, §13 trajectories, tweens/clips/timelines, picking, dragging, text                                                                       |
+| `first-3d-scene`                      | Perspective camera, §53 3D primitives, §68 directional light + ambient, lit materials                                                                                |
+| `physics-playground`                  | Rigid bodies on the Rapier adapter, mixed 2D/3D worlds, §42 authority                                                                                                |
+| `mechanism`                           | §28 joints: a slider-crank driven by a motor, with live limits                                                                                                       |
+| `blending`                            | §19 physics-animation blending: animated ↔ ragdoll ↔ recovering, in-place re-typing                                                                                  |
+| `particles-demo`                      | SoA particle core, §27 force fields, one-draw-call instanced rendering                                                                                               |
+| `ui-demo`                             | @four/ui widgets (panel/buttons/labels), app-supplied skins, keyboard focus, §72 pointer events                                                                      |
+| `flagship/one-scene-everything-moves` | **§118's flagship**: 2D art, lit 3D meshes, bodies, joints, particles, world text and a screen-space UI panel in one scene; pause/slow-motion/step; §62/§37 `"auto"` |
 
 ## The four pillars
 

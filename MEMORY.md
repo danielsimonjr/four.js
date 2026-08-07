@@ -28,6 +28,27 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — §118 flagship.** Decisions worth keeping:
+  - **A screen-space UI is a camera child until §46 layers land** — §48's `layerMask`
+    is deferred, so a second viewport would draw the whole scene twice; camera
+    parenting gives screen-space behaviour, one pass, and working §71 picking (first
+    perspective pick in the repo, measured).
+  - **A browser gate must not re-derive §74 layout** — the page publishes
+    `data-controls` in canvas pixels and the spec validates the claim via `data-hover`
+    before clicking. `page.mouse` needs `boundingBox()` added (canvas-relative vs
+    viewport is the trap; measured offset).
+  - **Pause is exactly 0 changed pixels**; single-step is exact because the
+    accumulator is public (`fixedDeltaTime − accumulator + 1e-6` runs exactly one
+    step, and `fixedStepsLastFrame` lets the claim be checked, not trusted).
+  - `data-*` published with `toFixed(4)` cannot support `toBeCloseTo(…, 4)` — two
+    roundings carry 1e-4. Particle hue counts swing 5× with burst phase — thresholds
+    must be set at "never ran", not "typical".
+  - **`registerRapierSolver()` pulls both wasm images** (1.54 MB gzip vs 0.69 for one
+    adapter) — the measured price of `solver: "auto"`; per-dimension registration is
+    the recorded fix.
+  - Gate repair: `generate-compatibility.mjs` now requires an upper-case initial on
+    `*Adapter` exports (the `createRapierAdapter` factory turned check-compat red at
+    HEAD for ~5 commits until the flagship's gate run caught it).
 - **2026-08-07 — A-5 §83 resource accounting.** Decisions worth keeping:
   - **Numbers, not references** — a tracker holding its resources would _be_ the leak;
     `WeakRef`/`FinalizationRegistry` answers "was this collected?", not §83's "was this

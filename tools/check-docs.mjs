@@ -177,6 +177,10 @@ for (const rel of docFiles()) {
 //    The row said "10 example applications" for three days past the point anyone
 //    could have counted six. The audit is the document most likely to be quoted,
 //    so its count is pinned to git rather than to a reviewer's memory.
+//
+//    A nested example counts too: `examples/flagship/<demo>` is keyed by its
+//    two-segment name above, so §118's flagship is one of the directories this
+//    count compares against (8 since 2026-08-07).
 // ---------------------------------------------------------------------------
 
 const auditRel = "docs/AUDIT-120.md";
@@ -241,8 +245,8 @@ const RETIRED = [
     where: ["docs/AUDIT-120.md"],
     allow: ["docs/AUDIT-120.md", "CHANGELOG.md"],
     why:
-      "seven examples/* directories have a main.ts (six until 2026-08-07, when " +
-      "first-3d-scene was written); the rest are .gitkeep (S-8)",
+      "eight examples/* directories have a main.ts (six until 2026-08-07, when " +
+      "first-3d-scene and then §118's flagship were written); the rest are .gitkeep (S-8)",
   },
   {
     re: /tests\/visual\/.*empty placeholder/i,

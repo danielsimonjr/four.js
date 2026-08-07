@@ -8,8 +8,8 @@ import { defineConfig } from "@playwright/test";
  * WP-6.6, WP-7.7, WP-9.4, the post-plan UI proof and the §93 first-3D-scene
  * proof).
  *
- * The suite drives **seven built example sites** in headless Chromium (six until
- * 2026-08-07, when `first-3d-scene` joined):
+ * The suite drives **eight built example sites** in headless Chromium (six until
+ * 2026-08-07, when `first-3d-scene` and then the §118 flagship joined):
  *
  * | site | port | specs | what it gates |
  * | ---- | ---- | ----- | ------------- |
@@ -20,6 +20,7 @@ import { defineConfig } from "@playwright/test";
  * | `examples/blending` | {@link BLENDING_PORT} | `blending` | §110's physics-animation blending: an animated chain handed to the solver as a ragdoll and blended back onto its animation, without abrupt discontinuities |
  * | `examples/particles-demo` | {@link PARTICLES_PORT} | `particles` | §112's particle demonstration: a seeded CPU fountain under §27 fields bouncing off a collision plane, plus a click burst, each drawn as one instanced draw call |
  * | `examples/ui-demo` | {@link UI_PORT} | `ui` | §73–§75's retained-mode UI: a `@four/ui` panel of buttons and labels laid out by the package, skinned by the application, driven by real pointer and keyboard input (the WP-11.5 packet-intent closure) |
+ * | `examples/flagship/one-scene-everything-moves` | {@link FLAGSHIP_PORT} | `one-scene-everything-moves` | §118's flagship: one scene holding 2D art, lit 3D meshes, rigid bodies, two joints, particles, world-space text and a screen-space UI panel, with pause / slow-motion / single-step controls |
  *
  * **In the `chromium` project there are no golden images** — SwiftShader
  * rasterises slightly differently from a GPU, so every assertion in
@@ -30,7 +31,7 @@ import { defineConfig } from "@playwright/test";
  * because both sides of its comparison are SwiftShader. See the comment on the
  * `visual` project for the scope of the exception.
  *
- * Run **all seven** builds first — or just `pnpm examples:build`, which is the
+ * Run **all eight** builds first — or just `pnpm examples:build`, which is the
  * one place they are listed: the web servers below serve the *built* `dist`
  * directories, which are gitignored and may be absent.
  *
@@ -42,6 +43,7 @@ import { defineConfig } from "@playwright/test";
  * pnpm blending:build         # examples/blending/dist
  * pnpm particles-demo:build   # examples/particles-demo/dist
  * pnpm ui-demo:build          # examples/ui-demo/dist
+ * pnpm flagship:build         # examples/flagship/one-scene-everything-moves/dist
  * pnpm test:browser
  * ```
  *
@@ -52,7 +54,7 @@ import { defineConfig } from "@playwright/test";
  * name their own absolute URLs, and restate {@link SCENE_3D_PORT} /
  * {@link PLAYGROUND_PORT} /
  * {@link MECHANISM_PORT} / {@link BLENDING_PORT} / {@link PARTICLES_PORT} /
- * {@link UI_PORT} for the reason the other specs restate the example's
+ * {@link UI_PORT} / {@link FLAGSHIP_PORT} for the reason the other specs restate the example's
  * scene constants — a browser gate checks the built page from the outside, and
  * a spec that imported this file would drag a second copy of the config into
  * every worker.
@@ -183,6 +185,25 @@ const UI_PORT = 4178;
  */
 const SCENE_3D_PORT = 4179;
 
+/**
+ * Preview port for `examples/flagship/one-scene-everything-moves` — §118's
+ * flagship demonstration.
+ *
+ * An eighth entry rather than an eighth run, for {@link PLAYGROUND_PORT}'s
+ * reason: `vite preview` serves exactly one `dist`, and Playwright starts every
+ * entry of a `webServer` array before the first test. 4180 is the next free port
+ * above the first 3D scene's and is restated verbatim in
+ * `tests/browser/one-scene-everything-moves.spec.ts`.
+ *
+ * The *expensive* tier: this site selects its solver through §37's registry
+ * (`solver: "auto"`), and `registerRapierSolver()` names both Rapier adapters —
+ * so the bundle carries **both** wasm images, like the playground's, and weighs
+ * ~1.54 MB gzip (measured 2026-08-07). A dimension-specific adapter would halve
+ * it; exercising the registry is the point of this page, and the cost is
+ * recorded rather than avoided.
+ */
+const FLAGSHIP_PORT = 4180;
+
 export default defineConfig({
   testDir: "tests/browser",
   // Failure artifacts (traces, error context) live inside the already-ignored
@@ -225,7 +246,7 @@ export default defineConfig({
       use: { browserName: "chromium" },
     },
   ],
-  // All seven sites are started before the first test and torn down after the
+  // All eight sites are started before the first test and torn down after the
   // last, so one `pnpm test:browser` run covers every spec in `testDir`. The
   // entries use different ports, so they coexist rather than race for one.
   webServer: [
@@ -294,6 +315,18 @@ export default defineConfig({
       url: `http://localhost:${String(SCENE_3D_PORT)}`,
       reuseExistingServer: false,
       // The same cheap tier: no wasm, ~23 kB gzip of JavaScript.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/flagship/one-scene-everything-moves --port ${String(FLAGSHIP_PORT)} --strictPort`,
+      url: `http://localhost:${String(FLAGSHIP_PORT)}`,
+      reuseExistingServer: false,
+      // The playground's tier and then some: two Rapier wasm images reach this
+      // bundle through the §37 registry, so it is ~4.2 MB raw and the *first*
+      // request is the slowest of the eight. The server itself still starts in
+      // well under a second.
       timeout: 60_000,
       stdout: "ignore",
       stderr: "pipe",

@@ -99,6 +99,18 @@ changes in `CHANGELOG.md`.
 - [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
       eleven counters; opt-in, default off; byte-identical GL + allocation-free when
       off). The A-6 `app.stats` slice is closed
+- [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
+      `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
+      measuring browser tests (49 total), first user of the §62/§37 registries and
+      the §113 overlay streams. Remaining under A-21/S-8: the three §93 stand-in
+      scenes (owner retire-or-write decision) and §119's motor-digital-twin
+- [ ] **Flagship follow-ups:** (a) per-dimension Rapier registration to halve the
+      1.54 MB payload (registerRapierSolver pulls both wasm images); (b) widen
+      `examples-build-coverage`'s regex to nested example paths (matches only the
+      first segment today); (c) `collectBodyOrigins`' default cross size is invisible
+      in 3D (drawn inside the body; 0 pixels at 0.18, 251 at 0.55) — consider a
+      larger default or a doc note; (d) §46 layers would let the panel move to its
+      own viewport
 - [x] **A-5 partial DONE 2026-08-07 (accounting tier):** byte + live-instance
       accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
       live. A-1 follow-up (b) closed

@@ -1,7 +1,7 @@
 name: Docs
 
 # Publishes the §93 documentation site to GitHub Pages: the TypeDoc API reference
-# plus the six built example applications, under one hand-written index.
+# plus the eight built example applications, under one hand-written index.
 #
 # The guides are not copied. Pages serves files, it does not render Markdown, so
 # `docs/guides/*.md` would arrive as plain text; the index links them on GitHub,
@@ -33,8 +33,11 @@ jobs:
     name: Build the site
     runs-on: ubuntu-latest
     env:
-      # The seven examples that have a main.ts. Named once, looped over twice.
-      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo
+      # The eight examples that have a main.ts. Named once, looped over twice.
+      # The flagship is nested one level deeper (`flagship/<demo>`), which the
+      # `vite build` path, the `--base` and the `mkdir -p` below all take as
+      # written — nothing here assumes a flat name.
+      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo flagship/one-scene-everything-moves
     steps:
       - name: Checkout
         uses: actions/checkout@v4

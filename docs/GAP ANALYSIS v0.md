@@ -620,6 +620,17 @@ _Closure plan:_ one line in `packages/render-webgpu/README.md` and a `TODO.md` e
 
 ### A-21 — Four §93 worked scenes and both §118/§119 flagships are empty `.gitkeep` directories that shipped docs link to
 
+> **PARTIALLY CLOSED 2026-08-07** (second half; `first-3d-scene` was the first) —
+> `examples/flagship/one-scene-everything-moves` is written: §118's full list in one
+> scene (textured lit cube, 2D vector orbit, spring pendulum, bouncing body with §29
+> event-driven bursts, motorised hinge, world text riding a body, camera-parented UI
+> panel, §16 timeline, pause/slow-motion/single-step, keyboard operable), built by
+> `pnpm examples:build`, previewed on Playwright's eighth server, measured by six tests
+> counting objects by hue and checking pause (exactly 0 changed pixels) and single-step
+> (exactly 1/60 s) against §10's accumulator. First example on the §62/§37 `"auto"`
+> registries and the first to assemble the §113 overlay. Still open: the three §93
+> stand-in scenes (owner retire-or-write decision) and §119's `motor-digital-twin`.
+
 **§93, §97, §118, §119, §113a** · **Severity: Critical** · **Effort: L** · **SILENT (and actively mis-stated in `docs/AUDIT-120.md`)**
 
 _Verified by `git ls-files examples/`:_

@@ -3,9 +3,9 @@
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
 (§118–119). Every major feature should have a runnable example (§93).
 
-**Seven examples are implemented** (six until 2026-08-07, when `first-3d-scene` was
-written). The other five entries below are **not yet written; the directory is a
-placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
+**Eight examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
+the §118 flagship were written). The other four entries below are **not yet written; the
+directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
 they were described only as "scaffold only" in this paragraph while reading like a catalogue
 of demos in the list; each such row now carries the marker on its own line. The absence is
 dated in `docs/AUDIT-120.md` as **S-8**, and `tools/check-docs.mjs` fails if this file or a
@@ -53,10 +53,19 @@ guide points at one of them without the marker.
 - [`mixed-scene/`](mixed-scene/) — **Not yet written; directory is a placeholder.** Planned
   as the mixed 2D/3D/physics/UI example (§93, §97). `physics-playground/` steps a 2D and a
   3D world side by side.
-- [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) — **Not yet
-  written; directory is a placeholder.** Planned as the §118 flagship: rotating cube, 2D
-  orbit, pendulum, bouncing body, labels, UI panel, timeline, motorized hinge, collision
-  events, pause/slow-motion/step.
+- [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) —
+  **Implemented (2026-08-07).** §118's flagship, "One Scene, Everything Moves": every item
+  on §118's list in one scene, one fixed-step loop and one frame — a textured lit cube spun
+  by a `MotionComponent`, a 2D vector orbit, a `SpringJoint` pendulum, a bouncing body whose
+  §29 landings fire a particle burst and a re-launch impulse, a motorised `HingeJoint`, two
+  world-space labels (one rides the bouncing body), a `@four/ui` panel parented to the
+  camera, a §16 `Timeline`, and pause / slow-motion / single-step controls that are
+  keyboard-operable. It is also the first example to select its backend _and_ its solver
+  through the §62/§37 registries (`renderer: "auto"`, `solver: "auto"`), and the first to
+  assemble the §113 debug overlay from `@four/diagnostics` streams.
+  Build it with `pnpm run flagship:build`; it carries **both** Rapier wasm images (the cost
+  of `registerRapierSolver()`, measured) and is ~1.54 MB gzip. This entry read "**not yet
+  written; directory is a placeholder**" until that date.
 - [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) — **Not yet written;
   directory is a placeholder.** Planned as the §119 engineering flagship: an electric motor
   digital twin — animated rotor, bearing constraints, PID speed control, fault injection,

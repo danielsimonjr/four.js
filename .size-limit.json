@@ -18,5 +18,10 @@
     "path": "examples/ui-demo/dist/assets/*.js",
     "limit": "31 kB",
     "gzip": true
+  },
+  {
+    "path": "examples/flagship/one-scene-everything-moves/dist/assets/*.js",
+    "limit": "1.65 MB",
+    "gzip": true
   }
 ]

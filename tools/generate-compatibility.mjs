@@ -153,8 +153,16 @@ for (const dir of solverPackageDirs) {
   const module = await import(pathToFileURL(barrel).href);
   const exportNames = Object.keys(module).sort();
 
+  // Adapter *classes* only: the name must end in "Adapter" AND start with an
+  // upper-case letter. The second check exists because 191ee41 (the §37 solver
+  // registry) added the factory `createRapierAdapter(options)`, which ends in
+  // "Adapter" but is not a constructor — `new createRapierAdapter()` threw and
+  // turned this gate red (found by the §118 flagship packet, 2026-08-07).
   const adapterExports = exportNames.filter(
-    (name) => name.endsWith("Adapter") && typeof module[name] === "function",
+    (name) =>
+      name.endsWith("Adapter") &&
+      name[0] === name[0].toUpperCase() &&
+      typeof module[name] === "function",
   );
 
   if (adapterExports.length === 0) {
