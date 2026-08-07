@@ -566,13 +566,14 @@ drags.makeDraggable(cube);
 app-supplied** through the `WidgetSkin` seam (the dependency matrix keeps
 `@four/ui` renderer-free).
 
-| Symbol                                                   | Contract                                                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `UIWidget`                                               | Base widget node: measured box, state, focus, §72 pointer + keyboard activation.               |
-| `Panel` / `Button` / `Label`                             | The shipped widgets; `PanelLayout` gives flex/stack/absolute layout.                           |
-| `WidgetSkin`                                             | The seam: reads the widget's measured box and state, returns/updates its visual nodes.         |
-| `focusedWidget` / `UIFocusEvent` / `WidgetActivateEvent` | Focus ring + activation (pointer or Enter).                                                    |
-| `UI_STAGED`                                              | Named staging record — a11y mirror and fuller keyboard navigation are staged with dated notes. |
+| Symbol                                                                   | Contract                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIWidget`                                                               | Base widget node: measured box, state, focus, §72 pointer + keyboard activation.                                                                                                                |
+| `Panel` / `Button` / `Label`                                             | The shipped widgets; `PanelLayout` gives flex/stack/absolute layout.                                                                                                                            |
+| `WidgetSkin`                                                             | The seam: reads the widget's measured box and state, returns/updates its visual nodes.                                                                                                          |
+| `focusedWidget` / `UIFocusEvent` / `WidgetActivateEvent`                 | Focus ring + activation (pointer or Enter).                                                                                                                                                     |
+| `collectFocusOrder` / `keyboardFocusTarget` / `installKeyboardTraversal` | §75 keyboard traversal (2026-08-07): Tab/Shift-Tab over `accessibility.tabIndex`, resolver seam for `KeyboardInput`.                                                                            |
+| `UI_STAGED`                                                              | Named staging record — the a11y DOM mirror, screen-reader/high-contrast/scalable-text, and reduced motion remain staged with dated notes (the keyboard-navigation entry was closed 2026-08-07). |
 
 ---
 

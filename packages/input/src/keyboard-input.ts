@@ -1,0 +1,218 @@
+/**
+ * The keyboard source (§72, 2026-08-07, A-10): platform key events in, scene
+ * key events out, routed to whatever holds the focus.
+ *
+ * ```ts
+ * const keyboard = new KeyboardInput(window, {
+ *   focusTarget: () => focusedWidget(scene) ?? uiRoot,   // @four/ui answers
+ * });
+ * button.on("keydown", (event) => { if (event.key === "Enter") activate(); });
+ * // …
+ * keyboard.dispose();
+ * ```
+ *
+ * The pointer sibling of this class is `PointerInput`, and everything
+ * structural about them is deliberately identical: a surface described by the
+ * two methods this module actually calls ({@link KeySurface}), a platform event
+ * described by the fields it actually reads ({@link SurfaceKeyEvent}), bound
+ * listeners stored once so `removeEventListener` gets the same function
+ * objects, an idempotent `dispose`, and no DOM lib type named anywhere — so a
+ * browser `window`, a `document`, a Playwright-driven page, and a plain object
+ * in a unit test are all equally acceptable surfaces.
+ *
+ * What differs is the one thing that must: **how the target is resolved.** A
+ * pointer event has a position, so `PointerInput` picks (§71). A key event does
+ * not, so this class asks — once per platform event — the injected
+ * {@link KeyboardInputOptions.focusTarget} resolver.
+ *
+ * ## Why focus is injected rather than owned (decision, A-10)
+ *
+ * §75's focus lives in `@four/ui`: one focused widget per scene root, with
+ * focus/blur events and a disabled/enabled policy this package has no business
+ * restating. And plan §3.1 is frozen in the direction that makes that work —
+ * `ui` depends on `input`, never the reverse — so `KeyboardInput` **cannot**
+ * import `focusedWidget`, and a package-private focus registry here would be a
+ * second, competing answer to a question §75 already answers.
+ *
+ * A one-function seam resolves both problems: the application (or `@four/ui`'s
+ * `keyboardFocusTarget` helper) supplies `() => Node | null`, this class calls
+ * it per event, and the resolver may return anything — the focused widget, a
+ * fallback root so keystrokes still reach a UI tree with nothing focused yet, or
+ * `null` for "nobody is listening". It is the same shape as
+ * `PointerInputOptions.pickables` for the same reason: a function, so the answer
+ * can change without re-creating the input.
+ *
+ * A resolver returning `null` dispatches nothing at all — the exact analogue of
+ * a pointer that hit nothing, and the reason there is no scene-level "the
+ * keyboard is idle" event to filter out.
+ *
+ * ## What it deliberately does not do
+ *
+ * - It never writes a transform (§42), never touches the scene graph, and holds
+ *   no reference to a scene — `PointerInput`'s whole discipline.
+ * - It never decides what a key *means*. Tab is not traversal here, Enter is not
+ *   activation here: those are §75 policy and live in `@four/ui`. This class
+ *   normalizes and routes, which is why it needs no key table at all.
+ * - It does not suppress platform defaults on its own. Whoever consumes a key
+ *   calls {@link SceneKeyEvent.preventDefault}, which forwards to the platform
+ *   event this class hands the scene event — a source that guessed which keys
+ *   the application wanted would break the ones it guessed wrong.
+ * - It handles `keydown` and `keyup` only; see `key-events.ts` for why
+ *   `keypress` is not among them.
+ */
+
+import type { Node } from "@four/scene";
+
+import {
+  SceneKeyEvent,
+  dispatchKeyEvent,
+  type KeyDefaultSuppressor,
+  type SceneKeyEventType,
+} from "./key-events.js";
+import { buildPropagationPath } from "./propagation.js";
+
+/**
+ * The platform key event this module reads — the seven fields out of the DOM's
+ * `KeyboardEvent` that a scene key event is built from, plus the optional
+ * `preventDefault` it inherits from {@link KeyDefaultSuppressor}.
+ *
+ * Structural on purpose, exactly as `SurfacePointerEvent` is: a real
+ * `KeyboardEvent` satisfies it, and so does `{ key: "Tab", code: "Tab", altKey:
+ * false, ctrlKey: false, metaKey: false, shiftKey: false, repeat: false }`.
+ *
+ * The modifier fields keep the platform's `…Key` spelling rather than this
+ * package's grouped `KeyModifiers` shape, because this is the *input*
+ * side of the normalization: the whole point is that the DOM's own event
+ * satisfies the interface without a wrapper.
+ */
+export interface SurfaceKeyEvent extends KeyDefaultSuppressor {
+  /** The character or named key produced — `"a"`, `"Enter"`, `" "`. */
+  readonly key: string;
+  /** The physical key, layout-independent — `"KeyA"`, `"Space"`. */
+  readonly code: string;
+  /** Whether Alt was held. */
+  readonly altKey: boolean;
+  /** Whether Control was held. */
+  readonly ctrlKey: boolean;
+  /** Whether Meta (Command, Windows) was held. */
+  readonly metaKey: boolean;
+  /** Whether Shift was held. */
+  readonly shiftKey: boolean;
+  /** Whether the platform's auto-repeat produced this event. */
+  readonly repeat: boolean;
+}
+
+/** A listener {@link KeySurface} delivers platform key events to. */
+export type SurfaceKeyListener = (event: SurfaceKeyEvent) => void;
+
+/**
+ * The event source key events arrive on, described by what this module actually
+ * touches — the same structural-seam policy `PointerSurface` follows, and
+ * for the same reasons.
+ *
+ * In a browser this is normally `window` or `document` rather than the canvas:
+ * an element receives key events only while it holds the DOM's focus, and the
+ * canvas of a scene whose focus model is §75's does not want the DOM's. Both
+ * satisfy this interface structurally, as does any object with the two methods.
+ *
+ * There is deliberately no runtime validation of the argument, for the reason
+ * `PointerSurface` gives: it is a checked parameter type, and §89 has no error
+ * code for "wrong argument".
+ */
+export interface KeySurface {
+  addEventListener(type: string, listener: SurfaceKeyListener): void;
+  removeEventListener(type: string, listener: SurfaceKeyListener): void;
+}
+
+/** Construction options for {@link KeyboardInput}. */
+export interface KeyboardInputOptions {
+  /**
+   * The node key events are delivered to, called once per platform event.
+   *
+   * Returning `null` means "nothing is listening", and dispatches nothing. See
+   * this module's header for why focus is resolved by an injected function
+   * rather than owned here; `@four/ui`'s `keyboardFocusTarget(root)` is the
+   * ready-made resolver for a widget tree.
+   */
+  focusTarget: () => Node | null;
+}
+
+export class KeyboardInput {
+  readonly #surface: KeySurface;
+  readonly #focusTarget: () => Node | null;
+
+  #disposed = false;
+
+  // Bound once so `removeEventListener` gets the same function objects.
+  readonly #onKeyDown = (event: SurfaceKeyEvent): void => {
+    this.#handle("keydown", event);
+  };
+
+  readonly #onKeyUp = (event: SurfaceKeyEvent): void => {
+    this.#handle("keyup", event);
+  };
+
+  constructor(surface: KeySurface, options: KeyboardInputOptions) {
+    this.#surface = surface;
+    this.#focusTarget = options.focusTarget;
+
+    surface.addEventListener("keydown", this.#onKeyDown);
+    surface.addEventListener("keyup", this.#onKeyUp);
+  }
+
+  /**
+   * Removes the surface listeners. Idempotent (§83: teardown paths must not
+   * have to test first).
+   *
+   * There is no per-key state to clear — unlike a pointer, a key has no
+   * gesture: `keydown` and `keyup` are complete in themselves, and the platform
+   * owns which keys are held. That is also why this class has no analogue of
+   * `PointerInput`'s tracked-pointer map, and so cannot leak one (A-9's whole
+   * class of defect is absent by construction).
+   *
+   * Listeners registered on nodes by the application are not touched, since
+   * this object never added them.
+   */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    this.#surface.removeEventListener("keydown", this.#onKeyDown);
+    this.#surface.removeEventListener("keyup", this.#onKeyUp);
+  }
+
+  /**
+   * Normalizes one platform event and dispatches it at the current focus
+   * target, through §72's three phases.
+   *
+   * The target is resolved *before* the event is constructed and the path
+   * *before* anything is dispatched, so a listener that moves the focus — which
+   * is exactly what §75's Tab traversal does — cannot redirect the event it is
+   * handling. The next keystroke asks the resolver again and gets the new
+   * answer.
+   */
+  #handle(type: SceneKeyEventType, event: SurfaceKeyEvent): void {
+    const target = this.#focusTarget();
+    if (target === null) {
+      return;
+    }
+    dispatchKeyEvent(
+      new SceneKeyEvent({
+        type,
+        key: event.key,
+        code: event.code,
+        modifiers: {
+          alt: event.altKey,
+          ctrl: event.ctrlKey,
+          meta: event.metaKey,
+          shift: event.shiftKey,
+        },
+        repeat: event.repeat,
+        target,
+        platformEvent: event,
+      }),
+      buildPropagationPath(target),
+    );
+  }
+}

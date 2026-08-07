@@ -734,11 +734,21 @@ describe("UI_STAGED (§73–§75)", () => {
     expect(Object.isFrozen(UI_STAGED)).toBe(true);
   });
 
-  it("records the accessibility mirror's blocker and the keyboard gap", () => {
+  it("records the accessibility mirror's blocker and the layout gaps", () => {
     const text = UI_STAGED.join("\n");
     expect(text).toContain("DOM integration");
-    expect(text).toContain("keyboard");
+    expect(text).toContain("screen-reader");
+    expect(text).toContain("reduced motion");
     expect(text).toContain("grid");
     expect(text).toContain("percentages");
+  });
+
+  it("no longer stages §75 keyboard navigation, which shipped (A-13)", () => {
+    // The entry left the array when `keyboard.ts` and `Button`'s Enter/Space
+    // listener landed; an entry that outlives the gap it records is exactly the
+    // drift this array exists to prevent.
+    for (const entry of UI_STAGED) {
+      expect(entry).not.toContain("keyboard navigation");
+    }
   });
 });

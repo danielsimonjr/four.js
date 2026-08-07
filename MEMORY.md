@@ -28,10 +28,35 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — GAP-CLOSURE WAVE 2: keyboard tier (A-10 done, A-13 keyboard half).**
+  `KeyboardInput` in `@four/input`, traversal + activation in `@four/ui`. Decisions:
+  - **Focus crosses `ui → input` as an injected resolver** — `KeyboardInput(surface,
+{ focusTarget: () => Node | null })`. `@four/ui` supplies `keyboardFocusTarget(root)`;
+    `@four/input` never imports it. §3.1 stays frozen; a `null` answer dispatches nothing
+    (the analogue of a pointer that hit nothing).
+  - **Three-phase dispatch is shared machinery** (`packages/input/src/propagation.ts`):
+    `SceneInputEvent` base + `dispatchThreePhase(event, path, type, captureKey)`. The two
+    listener keys are _arguments_ typed against `NodeEventMap` — no `"capture:" + type`
+    string concatenation, no cast. `dispatchPointerEvent` delegates to it; its public
+    surface (and `ScenePointerEvent`'s members) is unchanged.
+  - **`SceneKeyEvent.preventDefault()` forwards to the platform event** through an optional
+    `KeyDefaultSuppressor` — default-suppression (Tab/Space mean something to the host) is
+    deliberately separate from `stopPropagation`.
+  - **Traversal sorts `accessibility.tabIndex` plainly ascending** (ties by scene order,
+    stable sort; negative opts out of traversal but stays programmatically focusable) —
+    deliberately _not_ the DOM's positive-before-zero rule, which exists only because HTML
+    interleaves with a document order it cannot see. `tabIndex: 0,1,2` means what an author
+    intends.
+  - **Enter/Space live on `Button`; Tab lives on the tree** (the DOM's split). Both
+    activation keys fire on `keydown` — the DOM's Enter-down/Space-up asymmetry is a stated,
+    deliberate simplification. `WidgetActivationSource` is an open union; adding
+    `"keyboard"` was additive.
+  - `keypress` is deliberately unimplemented (documented in `key-events.ts`); wheel, gamepad,
+    XR, and focus/blur-as-input-events are recorded in `packages/input/README.md`.
 - **2026-08-06 — GAP-CLOSURE WAVE 1 (A-7, A-9, A-14/PH-17 partial, A-15, A-17, PH-6).**
   Six `docs/GAP ANALYSIS v0.md` items closed, each with regression tests. Decisions worth
   keeping:
-  - **A-9 (`PointerInput` leak).** Per-pointer state is now deleted on `pointerup` *and* on
+  - **A-9 (`PointerInput` leak).** Per-pointer state is now deleted on `pointerup` _and_ on
     the new `pointercancel`; `pointercancel` joined `PropagatingPointerEventType` (and
     `DragManager` ends a drag on it). **Known behaviour change:** because
     `SurfacePointerEvent` carries no `pointerType`, a mouse release now also fires
@@ -40,11 +65,11 @@ readable; never delete the pointer itself.
     needs `pointerType` on that structural interface and is left to the packet that widens
     it. `PointerInput.trackedPointerCount` was added so the leak stays testable.
   - **A-15 (silent component drop on save).** `Node.components` forwards §6a's registry;
-    `serializeComponents` walks the node and emits in *registry* order, so output ordering —
+    `serializeComponents` walks the node and emits in _registry_ order, so output ordering —
     and therefore every byte-identical golden — is unchanged. Unserializable components now
     throw `INVALID_APPLICATION_STATE`; `SerializeSceneOptions.unknownComponents: "skip"`
     mirrors the read side.
-  - **A-17 (id collisions).** `NodeOptions.id` restores an id at construction and *reserves*
+  - **A-17 (id collisions).** `NodeOptions.id` restores an id at construction and _reserves_
     it against the module counter; `restoreNodeId` moved from `@four/serialization` (where it
     cast a foreign class's `readonly` field) into `@four/scene`, which owns the field, for the
     `nodeFactory` path that cannot use the constructor. `instantiateScene` refuses a document
@@ -66,10 +91,10 @@ readable; never delete the pointer itself.
     finally fires on the replay path. **Versioning rule: a document declares the lowest
     version that can express its content** — `2` with a configuration, `1` without — so
     `REPLAY_FORMAT_VERSION` is 2, `SUPPORTED_REPLAY_FORMAT_VERSIONS` is `[1, 2]`, and every
-    existing version-1 recording still validates *and re-encodes byte for byte*.
+    existing version-1 recording still validates _and re-encodes byte for byte_.
   - **The phase-10 golden was amended, envelope only, with proof.** `recordingDigest`
-    2642391973 → 1754656889 and `recordingLength` 46822 → 47008 (+186 bytes); *nothing else
-    moved* — `initialSnapshotDigest`, both checksum-stream digests, `seekTailDigest`, the
+    2642391973 → 1754656889 and `recordingLength` 46822 → 47008 (+186 bytes); _nothing else
+    moved_ — `initialSnapshotDigest`, both checksum-stream digests, `seekTailDigest`, the
     first/last/final checksums and every contact count are bit-identical to the 2026-08-02
     record. The claim was proved, not assumed: re-running the scenario with the capture
     neutralized (a wrapper dropping `ReplaySnapshot.configuration`) reproduces the old digest
@@ -77,7 +102,7 @@ readable; never delete the pointer itself.
     `formatVersion` / `worldConfigurationKeys` so the §34 configuration is now pinned too.
   - **`Application.resize(width, height, resolution?)` (A-7).** Records the size, forwards to
     `renderer.resize`, and updates the `aspect` + projection of perspective cameras on
-    *full-surface* viewports only (`normalized` `(0,0,1,1)`) — §61 says the aspect is the
+    _full-surface_ viewports only (`normalized` `(0,0,1,1)`) — §61 says the aspect is the
     application's to set and this class is the only thing that knows the viewport→camera
     mapping. `ApplicationOptions` gained `width`/`height`/`resolution` and a `depthRange`
     (D8) for the projection rebuild. Orthographic extents and partial viewports are left

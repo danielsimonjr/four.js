@@ -379,6 +379,14 @@ _Closure plan:_
 
 ### A-10 — §72 input sources: 6 of 8 unimplemented
 
+> **CLOSED 2026-08-07** (keyboard, the load-bearing hole) — `KeyboardInput` ships from
+> `@four/input` over a duck-typed `KeySurface`, with `SceneKeyEvent` (`preventDefault()`
+> forwarded via `KeyDefaultSuppressor`), `dispatchKeyEvent`, and the generalized
+> three-phase `propagation.ts` (`dispatchThreePhase`; `dispatchPointerEvent` delegates,
+> surface unchanged). Focus is injected as a `focusTarget(): Node | null` resolver — §3.1
+> untouched. Wheel, gamepad, XR, `keypress`, and focus/blur-as-input-events remain staged,
+> recorded in `packages/input/README.md`. Kept for the record.
+
 **§72, §75** · **Severity: Medium** · **Effort: M** · **RECORDED**
 
 Ships: mouse/touch/pen (through the unified `PointerEvent` shape), and drag (`DragManager`). Absent: **wheel and trackpad, keyboard, gamepad, XR controllers**, plus the synthesized `double-click`, `pinch`, and `rotate` gestures and node-level `focus`/`blur` as _input_ events. Honestly recorded at `pointer-events.ts:106` and `pointer-input.ts:38`.
@@ -412,6 +420,13 @@ _Closure plan:_ one packet for the ten stateless/state-only controls (each ~60�
 ---
 
 ### A-13 — §75 accessibility mirror is inert; keyboard traversal absent
+
+> **PARTIALLY CLOSED 2026-08-07** — the keyboard half shipped: `collectFocusOrder` /
+> `keyboardFocusTarget` / `installKeyboardTraversal` in `@four/ui` (Tab/Shift-Tab from
+> `accessibility.tabIndex`, plainly ascending — a stated DOM deviation), `Button`
+> Enter/Space activation with `source: "keyboard"`, and the `UI_STAGED` keyboard entry
+> deleted. Still open: the DOM mirror, screen-reader updates, high contrast, scalable
+> text (all behind the DOM integration policy) and reduced motion (behind A-6).
 
 **§75** · **Severity: High** · **Effort: M** · **RECORDED (`UI_STAGED[3][4][5][6]`)**
 

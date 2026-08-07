@@ -24,13 +24,16 @@
  *   against; the panel and the row opt out (`interactive: false`) so a click
  *   inside a button resolves to the button rather than tying with its
  *   coplanar ancestor (the documented candidate-order rule).
- * - **Keyboard focus is the package's; key *events* are the application's.**
- *   §75's keyboard traversal is staged in `UI_STAGED` because `@four/input`
- *   ships no key source, and `Button.activate()` is public precisely so a host
- *   can drive it. This page is that host: Tab cycles `focus()` through the
- *   buttons, Enter/Space calls `activate()` on the focused one, and every
- *   listener downstream cannot tell a key from a click apart from the event's
- *   `source` field ("pointer" vs "programmatic").
+ * - **Keyboard navigation is the engine's, end to end (§75).** The application
+ *   supplies a key *surface* (`window`) and nothing else: `KeyboardInput`
+ *   normalizes the platform's events and routes them to the focused node, and
+ *   `@four/ui` decides what they mean — Tab and Shift-Tab walk the focus
+ *   through `installKeyboardTraversal`, Enter and Space activate the focused
+ *   `Button`. Until 2026-08-07 this page carried a hand-written `keydown`
+ *   handler doing both, because `@four/input` had no key source at all (the
+ *   `UI_STAGED` entry that A-10 closed); the handler is gone, and every
+ *   listener downstream still cannot tell a key from a click apart from the
+ *   event's `source` field ("pointer" vs "keyboard").
  *
  * Clicking (or key-activating) a button visibly changes two things: the status
  * label's text — re-laid-out through `layout()` and re-skinned into new glyph
@@ -76,7 +79,7 @@
 
 import { Application } from "four/application";
 import { planeGeometry } from "four/geometry";
-import { PointerInput, type Pickable } from "four/input";
+import { KeyboardInput, PointerInput, type Pickable } from "four/input";
 import { SpriteMaterial, UnlitMaterial } from "four/materials";
 import { Renderable, Sprite, Texture } from "four/render";
 import { WebglRenderer } from "four/render-webgl";
@@ -92,6 +95,8 @@ import {
   Panel,
   collectPickables,
   focusedWidget,
+  installKeyboardTraversal,
+  keyboardFocusTarget,
   type WidgetActivationSource,
   type WidgetSkin,
 } from "four/ui";
@@ -520,7 +525,13 @@ function selectSwatch(
   uiRoot.layout();
 }
 
-/** The three buttons, in `SWATCH_OPTIONS` order — Tab walks this array. */
+/**
+ * The three buttons, in `SWATCH_OPTIONS` order — kept only so the page can
+ * report which one is hovered. Tab walks the *widget tree*, not this array:
+ * `installKeyboardTraversal` collects the focus order from the scene itself,
+ * ascending `accessibility.tabIndex` (0, 1, 2 below, which agrees with the
+ * scene order) and ties broken by scene order.
+ */
 const buttons: Button[] = SWATCH_OPTIONS.map((option, index) => {
   const button = new Button({
     name: option.name,
@@ -548,7 +559,7 @@ const buttons: Button[] = SWATCH_OPTIONS.map((option, index) => {
   buttonRow.add(button);
 
   // One event, whatever the source: a §72 click synthesized by the pointer
-  // source, or a keyboard activation through the public `activate()`.
+  // source, or an Enter/Space the button read off §72's key events.
   button.on("uiactivate", (event) => {
     selectSwatch(option, event.source);
   });
@@ -578,33 +589,28 @@ new PointerInput(canvas, {
   pickables: () => collectPickables(uiRoot, pickables),
 });
 
-// --- keyboard (§75's staged half, hosted by the application) -----------------
+// --- keyboard (§72 source, §75 navigation) -----------------------------------
 
-/**
- * Tab cycles the focus through the buttons; Enter or Space activates the
- * focused one. This is the exact seam `UI_STAGED` stages: focus itself ships
- * in `@four/ui` (`focus()`, one owner per scene root), key events do not —
- * `@four/input` has no key source — so the application maps keys to the
- * public API and nothing downstream can tell this apart from a pointer except
- * by `WidgetActivateEvent.source`.
+/*
+ * Two lines, and the application decides nothing about keys.
+ *
+ * `window` satisfies `KeySurface` structurally (the same duck-typing that lets
+ * the canvas satisfy `PointerSurface`), and it rather than the canvas is the
+ * surface because a DOM element receives key events only while it holds the
+ * DOM's focus — and this scene's focus model is §75's, not the DOM's.
+ *
+ * `keyboardFocusTarget(uiRoot)` is the seam `@four/input` needs and may not
+ * import: it answers the focused widget, or the UI root when nothing is
+ * focused yet, so the very first Tab is deliverable. `installKeyboardTraversal`
+ * then owns Tab and Shift-Tab, and each `Button` owns its own Enter and Space
+ * — so a `uiactivate` from the keyboard arrives at the listener registered
+ * above with `source: "keyboard"`, on the same path a click takes.
+ *
+ * Both live exactly as long as the page does, so neither is disposed here
+ * (§83) — the ownership note `first-2d-scene` carries.
  */
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Tab") {
-    event.preventDefault();
-    const current = focusedWidget(app.scene);
-    const index = buttons.findIndex((button) => button === current);
-    // -1 (nothing focused yet) advances to 0, the first button.
-    buttons[(index + 1) % buttons.length].focus();
-    return;
-  }
-  if (event.key === "Enter" || event.key === " ") {
-    const current = focusedWidget(app.scene);
-    if (current instanceof Button) {
-      event.preventDefault();
-      current.activate();
-    }
-  }
-});
+new KeyboardInput(window, { focusTarget: keyboardFocusTarget(uiRoot) });
+installKeyboardTraversal(uiRoot);
 
 // --- what the page publishes -------------------------------------------------
 

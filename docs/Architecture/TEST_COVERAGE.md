@@ -183,8 +183,9 @@ full recompute. Nothing in CI asserts on these timings.
 - **Staged features** carry dated staging notes instead of tests:
   multi-light/shadows/PBR (§68/§69/§59), §60a color strings + tone mapping,
   SDF text shaping (§56), glTF loading (§76), §55 sprite frame regions,
-  distance/gear joints and spherical-joint limits (§28), UI a11y mirror +
-  fuller keyboard navigation (`UI_STAGED`), several debug-draw overlays
+  distance/gear joints and spherical-joint limits (§28), the UI a11y DOM
+  mirror (`UI_STAGED` — keyboard navigation shipped and tested 2026-08-07),
+  several debug-draw overlays
   (`DEBUG_DRAW_STAGED`). The staging constants are exported precisely so the
   absence is discoverable rather than silent.
 - **Placeholder example directories** (`examples/first-3d-scene`,

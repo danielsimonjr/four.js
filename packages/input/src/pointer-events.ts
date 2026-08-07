@@ -71,7 +71,7 @@
  * untouched, and keeps registration order meaningful within a phase (§6b rule
  * 2) — which a single key with an out-of-band flag could not do.
  *
- * Only the four **propagating** types have a capture key. Enter and leave are
+ * Only the **propagating** types have a capture key. Enter and leave are
  * targeted-only (see {@link dispatchPointerEvent}), so a capture key for them
  * would be a key that never fires.
  *
@@ -85,10 +85,26 @@
  * {@link buildPropagationPath} still takes an `out` for callers that can rule
  * that out. Plan D7's "engine-internal per-frame code always passes `out`"
  * governs the picking and drag maths underneath, which do.
+ *
+ * ## Where the walk itself lives (2026-08-07, A-10)
+ *
+ * The path builder and the three-phase walk moved to `propagation.ts` when the
+ * keyboard source landed, because neither was ever about pointers: a key event
+ * delivered to the focused node travels the same ancestor chain, in the same
+ * three phases, honouring the same `stopPropagation`. Nothing about this
+ * module's public surface changed — {@link buildPropagationPath} is re-exported
+ * from here, {@link dispatchPointerEvent} keeps its name and signature, and
+ * {@link ScenePointerEvent} keeps every member it had (`target`,
+ * `propagationStopped`, and `stopPropagation` are now inherited from
+ * {@link SceneInputEvent}, which is where their documentation lives).
  */
 
 import type { Vector3 } from "@four/math";
 import type { Node } from "@four/scene";
+
+import { SceneInputEvent, dispatchThreePhase } from "./propagation.js";
+
+export { buildPropagationPath } from "./propagation.js";
 
 /**
  * Pointer event types that propagate through the scene graph (§72).
@@ -110,10 +126,13 @@ export type PropagatingPointerEventType =
  * Every pointer event type this tier delivers (§72's `pointer enter/leave,
  * down/up/move, click` subset).
  *
- * Double-click, wheel, keyboard, focus/blur, pinch, and rotate are listed by
- * §72 and are not implemented here: the first three need a source of platform
- * events this packet does not own (wheel deltas, key codes, focus management),
- * and the gesture events need multi-pointer recognizers. Nothing below assumes
+ * Double-click, wheel, focus/blur, pinch, and rotate are listed by §72 and are
+ * not implemented here: the first two need a source of platform events this
+ * packet does not own (wheel deltas, focus management), and the gesture events
+ * need multi-pointer recognizers. Keyboard left this list on 2026-08-07 (A-10):
+ * `SceneKeyEvent` is a separate event class with its own source, because a key
+ * event has no pointer id and no position and would be a lie as a member of
+ * this union. Nothing below assumes
  * the set is closed — `pointercancel` joined it on 2026-08-06 (A-9) by adding
  * one member to {@link PropagatingPointerEventType}, which is the whole cost of
  * a new propagating type.
@@ -149,8 +168,13 @@ export interface ScenePointerEventInit {
  * flag, and dispatch would silently do the wrong thing. Construct one directly
  * when driving {@link dispatchPointerEvent} by hand (tests, synthetic input, a
  * non-DOM pointer source); `PointerInput` constructs them for real pointers.
+ *
+ * {@link SceneInputEvent} supplies `target`, `propagationStopped`, and
+ * `stopPropagation` — the three members every propagating input event shares.
+ * For a pointer, `target` is the deepest node the ray hit (or the capturing
+ * node), and `null` when the pointer hit nothing.
  */
-export class ScenePointerEvent {
+export class ScenePointerEvent extends SceneInputEvent {
   /** Which event this is. */
   readonly type: ScenePointerEventType;
 
@@ -164,17 +188,6 @@ export class ScenePointerEvent {
   readonly ndcY: number;
 
   /**
-   * The node the pointer resolved to — the deepest hit, and the node the
-   * propagation path ends at. `null` when the pointer hit nothing; such an
-   * event has nowhere to propagate and is not dispatched.
-   *
-   * It stays the *target* for the whole walk: a listener on an ancestor reading
-   * `event.target` sees what was actually hit, not the node it is listening on
-   * (which it already knows, having registered there).
-   */
-  readonly target: Node | null;
-
-  /**
    * World-space point on {@link ScenePointerEvent.target} under the pointer,
    * when the source knew one — the picking hit point (§71).
    *
@@ -186,39 +199,15 @@ export class ScenePointerEvent {
    */
   readonly worldPoint?: Vector3;
 
-  #propagationStopped = false;
-
   constructor(init: ScenePointerEventInit) {
+    super(init.target);
     this.type = init.type;
     this.pointerId = init.pointerId;
     this.ndcX = init.ndcX;
     this.ndcY = init.ndcY;
-    this.target = init.target;
     if (init.worldPoint !== undefined) {
       this.worldPoint = init.worldPoint;
     }
-  }
-
-  /** Whether {@link ScenePointerEvent.stopPropagation} has been called. */
-  get propagationStopped(): boolean {
-    return this.#propagationStopped;
-  }
-
-  /**
-   * Stops the event before the **next node** on the path — the DOM's
-   * `stopPropagation`, not `stopImmediatePropagation`.
-   *
-   * The remaining listeners on the node currently dispatching still run: §6b
-   * rule 2 makes registration order the contract within one emitter, and
-   * letting one listener cancel its siblings would make that order decide who
-   * gets to see an event. (There is deliberately no
-   * `stopImmediatePropagation`: no §72 requirement asks for one.)
-   *
-   * Called during the capture phase, it stops the descent as well, so the
-   * target never sees the event at all.
-   */
-  stopPropagation(): void {
-    this.#propagationStopped = true;
   }
 }
 
@@ -279,48 +268,9 @@ declare module "@four/scene" {
 }
 
 /**
- * Writes the propagation path of `target` into `out` — **root first**, target
- * last — and returns it.
- *
- * That is the order the capture phase walks; the bubble phase walks it
- * backwards. The path is captured *before* dispatch, so a listener that
- * reparents or removes a node mid-dispatch cannot change where the rest of the
- * event goes (the same "snapshot first, then deliver" rule §6b applies to
- * listener lists).
- *
- * Pass `out` to reuse an array — the walk overwrites it and truncates it to the
- * path length, allocating nothing.
- */
-export function buildPropagationPath(target: Node, out: Node[] = []): Node[] {
-  let depth = 0;
-  for (let node: Node | null = target; node !== null; node = node.parent) {
-    depth += 1;
-  }
-  out.length = depth;
-  let index = depth - 1;
-  for (let node: Node | null = target; node !== null; node = node.parent) {
-    out[index] = node;
-    index -= 1;
-  }
-  return out;
-}
-
-/**
  * Dispatches `event` along `path` (root first, target last) in the three phases
- * of §72.
- *
- * 1. **Capture** — root → target, delivering `"capture:<type>"`.
- * 2. **Target** — the last path entry, which receives its capture-keyed
- *    listeners at the end of phase 1 and its plain-keyed listeners at the start
- *    of phase 3. (The DOM does the same: a capture listener registered *on the
- *    target* fires in the at-target phase, before that node's bubble
- *    listeners.)
- * 3. **Bubble** — target → root, delivering `"<type>"`.
- *
- * {@link ScenePointerEvent.stopPropagation} is honoured **between nodes**: the
- * node dispatching when it is called finishes its listener list, and no further
- * node is visited — in either direction. A capture listener that stops
- * propagation therefore also prevents the target from seeing the event.
+ * of §72 — {@link dispatchThreePhase} with this module's listener keys, plus
+ * the two types that do not travel the path at all.
  *
  * `pointerenter` and `pointerleave` do **not** propagate: they are delivered to
  * the last path entry only. This is DOM semantics (`pointerenter`/`pointerleave`
@@ -347,18 +297,5 @@ export function dispatchPointerEvent(
     return;
   }
 
-  const captureKey = CAPTURE_KEYS[type];
-  for (let i = 0; i < depth; i += 1) {
-    path[i].emit(captureKey, event);
-    if (event.propagationStopped) {
-      return;
-    }
-  }
-
-  for (let i = depth - 1; i >= 0; i -= 1) {
-    path[i].emit(type, event);
-    if (event.propagationStopped) {
-      return;
-    }
-  }
+  dispatchThreePhase(event, path, type, CAPTURE_KEYS[type]);
 }

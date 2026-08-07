@@ -25,6 +25,19 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Gap-closure wave 2 (2026-08-07) — in progress
+
+- [x] **A-10 DONE 2026-08-07.** `@four/input` gains `KeyboardInput` over a duck-typed
+      `KeySurface`, `SceneKeyEvent` with `preventDefault()`, `dispatchKeyEvent`, and the
+      shared three-phase `propagation.ts`. Remaining input sources (wheel, gamepad, XR)
+      plus `keypress` and focus/blur-as-input-events are recorded in
+      `packages/input/README.md`, not here
+- [ ] **A-13 PARTIAL** — keyboard traversal + Enter/Space activation shipped 2026-08-07
+      (`collectFocusOrder` / `keyboardFocusTarget` / `installKeyboardTraversal`;
+      `tabIndex` live). Still inert: `label`, `role`, `disabled`'s a11y surface — DOM
+      mirror, screen-reader updates, high contrast, scalable text all blocked on a DOM
+      integration policy decision; reduced motion waits on A-6's `app.reducedMotion`
+
 ### Gap-closure wave 1 (2026-08-06) — follow-ups left open
 
 Closed this wave, with tests: `A-7` (`Application.resize`), `A-9` (`PointerInput` dead-pointer

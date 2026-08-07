@@ -17,8 +17,9 @@
  *   → UIWidget state machine (§72 hover/press) → Button click → uiactivate
  *   → application listener → skin (WidgetSkin.onStateChange) → renderer → pixels
  *
- * Chromium keyboard → window keydown → focus()/activate() (§75's staged seam)
- *   → the same listener, source: "programmatic"
+ * Chromium keyboard → window keydown → KeyboardInput (normalize + route to the
+ *   focused node) → §72 three-phase dispatch → @four/ui traversal (Tab) or
+ *   Button's Enter/Space → the same listener, source: "keyboard"
  * ```
  *
  * ## What is measured
@@ -28,7 +29,7 @@
  * | loads | §45, §73, §74 | `data-state="running"`, and the framebuffer holds the panel background, three idle button faces, glyph ink, and a coral swatch — every one an application-skinned surface positioned by the package's layout |
  * | clicks | §71, §72 | clicking each button advances `data-clicks` by exactly one, recolours the swatch (DOM account *and* pixels), reports `source: "pointer"`, focuses the pressed button; a click on empty background changes nothing |
  * | hover | §72 | moving the pointer onto a button flips `data-hover` and repaints its face in the hover colour; leaving restores the idle colour |
- * | keyboard | §75 | Tab walks the focus (`data-focused`), the focus ring is *drawn*, Enter activates with `source: "programmatic"` and recolours the swatch |
+ * | keyboard | §72, §75 | Tab walks the focus (`data-focused`), Shift-Tab walks it back, the focus ring is *drawn*, Enter and Space activate with `source: "keyboard"` and recolour the swatch |
  *
  * State that the page can report is asserted from `#status`'s `data-*`
  * attributes — the engine's own account, waited on with `waitForFunction`
@@ -760,14 +761,16 @@ test.describe("examples/ui-demo (§73–§75): @four/ui in a rendered scene", ()
     expect(errors).toEqual([]);
   });
 
-  test("Tab walks the focus, the ring is drawn, and Enter activates (§75)", async ({
+  test("Tab walks the focus, the ring is drawn, and Enter activates (§72, §75)", async ({
     page,
   }) => {
     const { canvas, errors } = await openDemo(page);
 
-    // First Tab: nothing is focused, so the host's key handler focuses the
-    // first button, and the skin shows the ring — §75's focus is the
-    // package's; only the key mapping is the application's.
+    // First Tab: nothing is focused, so `keyboardFocusTarget` routes the key to
+    // the UI root, the package's traversal listener hears it and focuses the
+    // first button, and the skin shows the ring. Every step of that is the
+    // engine's as of A-10/A-13 — the page installs a `KeyboardInput` on
+    // `window` and maps no keys itself.
     await page.keyboard.press("Tab");
     await waitForStatus(page, "focused", "coral");
     const ringPixels = await pollForPixels(
@@ -781,18 +784,24 @@ test.describe("examples/ui-demo (§73–§75): @four/ui in a rendered scene", ()
       "the focused button's ring never reached the framebuffer",
     ).toBeGreaterThanOrEqual(MINIMUM_RING_PIXELS);
 
-    // Second Tab: the focus moves — and with it the one-owner-per-scene-root
-    // guarantee: the page reports a single focused widget.
+    // Second and third Tab: the focus moves — and with it the
+    // one-owner-per-scene-root guarantee: the page reports a single focused
+    // widget. Shift-Tab then walks back, which the hand-written handler this
+    // replaced could not do at all.
     await page.keyboard.press("Tab");
     await waitForStatus(page, "focused", "mint");
+    await page.keyboard.press("Tab");
+    await waitForStatus(page, "focused", "azure");
+    await page.keyboard.press("Shift+Tab");
+    await waitForStatus(page, "focused", "mint");
 
-    // Enter activates the focused button through the public `activate()` —
-    // same listener as a click, distinguished only by its source.
+    // Enter activates the focused button through `Button`'s own key listener —
+    // same `uiactivate` as a click, distinguished only by its source.
     await page.keyboard.press("Enter");
     await waitForStatus(page, "swatch", "mint");
     const status = await readStatus(page);
     expect(status.clicks).toBe("1");
-    expect(status.source).toBe("programmatic");
+    expect(status.source).toBe("keyboard");
     expect(status.label).toBe("swatch: mint");
 
     const swatchPixels = await pollForPixels(
@@ -804,6 +813,16 @@ test.describe("examples/ui-demo (§73–§75): @four/ui in a rendered scene", ()
       swatchPixels,
       "the swatch never repainted after a keyboard activation",
     ).toBeGreaterThanOrEqual(MINIMUM_SWATCH_PIXELS);
+
+    // Space is the other §75 activation key, on the same path. Tab first, so
+    // the selection actually changes and `data-swatch` can prove it.
+    await page.keyboard.press("Tab");
+    await waitForStatus(page, "focused", "azure");
+    await page.keyboard.press(" ");
+    await waitForStatus(page, "swatch", "azure");
+    const afterSpace = await readStatus(page);
+    expect(afterSpace.clicks).toBe("2");
+    expect(afterSpace.source).toBe("keyboard");
 
     expect(errors).toEqual([]);
   });

@@ -138,6 +138,13 @@ export const UI_LAYOUT_AUTHORITY = "constraint" as const;
  * assertable in tests, and printable by a diagnostics overlay — the shape
  * `@four/diagnostics`' `DEBUG_DRAW_STAGED` established. Nothing reads it at
  * runtime; it is documentation that cannot drift out of the build.
+ *
+ * **An entry leaves this array when the thing ships.** §75's keyboard
+ * navigation and focus order left it on 2026-08-07 (A-13): `@four/input` gained
+ * the key source that was its stated blocker (A-10), and `keyboard.ts` now
+ * implements Tab/Shift-Tab traversal while `Button` implements Enter/Space
+ * activation. The four remaining §75 entries are unchanged, and three of them
+ * still wait on the same DOM integration policy.
  */
 export const UI_STAGED: readonly string[] = Object.freeze([
   "§73 controls — toggle, checkbox, radio control, slider, text input, scroll " +
@@ -161,12 +168,6 @@ export const UI_STAGED: readonly string[] = Object.freeze([
     "and how a package that may not name DOM types reaches one. Roles, names, " +
     "descriptions, and states are already carried here, so the mirror is a " +
     "consumer of existing data rather than a change to this API).",
-  "§75 keyboard navigation and focus order — focus itself ships (focus/blur, " +
-    "one focused widget per scene root); key-driven traversal and activation " +
-    "do not (2026-08-02, P11-3: §72 lists keyboard events and @four/input " +
-    "implements none — it has no key source at all. Button.activate() is " +
-    "public precisely so a keyboard layer can drive it without this package " +
-    "inventing key codes).",
   "§75 screen-reader updates, high-contrast theme hooks, and scalable text — " +
     "not implemented (2026-08-02, P11-3: the first two follow the DOM mirror; " +
     "the third is a skin and camera concern, since layout units are already " +
@@ -287,18 +288,33 @@ export interface WidgetStateChangeEvent {
   readonly current: WidgetStateSnapshot;
 }
 
-/** What caused a {@link WidgetActivateEvent}. */
-export type WidgetActivationSource = "pointer" | "programmatic";
+/**
+ * What caused a {@link WidgetActivateEvent}.
+ *
+ * `"keyboard"` joined the union on 2026-08-07 (A-13) when §75's key-driven
+ * activation landed: an Enter or a Space on a focused control is neither a
+ * pointer nor a programmatic call, and collapsing it into either would make the
+ * one field that exists to tell activations apart unable to tell the two apart
+ * that §75 most cares about. Adding a member is additive — an existing listener
+ * that switches on `"pointer"` keeps working, and one that assumed the union
+ * was closed was already wrong about `pointercancel`'s precedent.
+ */
+export type WidgetActivationSource = "pointer" | "keyboard" | "programmatic";
 
 /** Payload of the `uiactivate` event (§72 click → §73 button activation). */
 export interface WidgetActivateEvent {
   /** The activated widget — always the emitter. */
   readonly widget: UIWidget;
-  /** Whether a pointer or an explicit `activate()` call caused this. */
+  /** Whether a pointer, a key, or an explicit `activate()` call caused this. */
   readonly source: WidgetActivationSource;
   /**
-   * The `click` that caused a `"pointer"` activation; `null` for a
+   * The `click` that caused a `"pointer"` activation; `null` for a keyboard or
    * programmatic one.
+   *
+   * There is deliberately no matching `keyEvent`: a key activation's cause is
+   * already fully described by "Enter or Space on the focused control" (see
+   * `Button`), and a listener that needs the keystroke itself can read it from
+   * its own `keydown` listener, which fires on the same node first.
    */
   readonly pointerEvent: ScenePointerEvent | null;
 }
@@ -323,11 +339,15 @@ export interface UIFocusEvent {
  *
  * §75 spells this as a plain assignable record —
  * `button.accessibility = { role, label, description, tabIndex }` — and that is
- * exactly what ships: typed, serializable (§79), inert. **Nothing consumes it
- * yet**; the hidden DOM mirror is staged, see {@link UI_STAGED}. It ships
- * anyway because an application that annotates its UI today loses nothing when
- * the mirror lands, and because the mirror is then a reader of this data rather
- * than a change to this API.
+ * exactly what ships: typed, serializable (§79).
+ *
+ * **One field is live**: {@link WidgetAccessibility.tabIndex} orders (and can
+ * exclude from) the Tab traversal `keyboard.ts` implements, as of 2026-08-07
+ * (A-13). `role`, `label`, and `description` are still carried and still read by
+ * nobody — they are the hidden DOM mirror's data, and the mirror is staged (see
+ * {@link UI_STAGED}). They ship anyway because an application that annotates its
+ * UI today loses nothing when the mirror lands, and because the mirror is then a
+ * reader of this data rather than a change to this API.
  */
 export interface WidgetAccessibility {
   /** Semantic role, e.g. `"button"` (§75). Free-form: ARIA's vocabulary is not restated here. */
@@ -336,7 +356,15 @@ export interface WidgetAccessibility {
   label?: string;
   /** Accessible description (§75). */
   description?: string;
-  /** Keyboard traversal order (§75). */
+  /**
+   * Keyboard traversal order (§75); absent means `0`.
+   *
+   * Widgets are visited in ascending `tabIndex`, ties broken by scene order,
+   * and a **negative** value removes the widget from the traversal without
+   * making it unfocusable — `focus()` still works on it. See
+   * `collectFocusOrder`, which also states why this engine sorts plainly rather
+   * than copying the DOM's positive-before-zero rule.
+   */
   tabIndex?: number;
 }
 

@@ -35,8 +35,10 @@
  * - It never touches the scene graph, and it holds no reference to a scene: the
  *   candidate list is a function the caller owns (`pickables`), for the reasons
  *   `pick` documents.
- * - It does not handle wheel or keyboard (§72 lists them; this is the pointer
- *   subset of WP-3a.2). `pointercancel` **is** handled as of 2026-08-06 (A-9);
+ * - It does not handle wheel (§72 lists it; this is the pointer subset of
+ *   WP-3a.2). Keyboard is no longer on this list: `KeyboardInput` is its own
+ *   source, sibling to this one, as of 2026-08-07 (A-10).
+ *   `pointercancel` **is** handled as of 2026-08-06 (A-9);
  *   the note that used to stand here said a cancelled pointer looked like a
  *   pointer that stopped moving, and that is no longer true.
  *

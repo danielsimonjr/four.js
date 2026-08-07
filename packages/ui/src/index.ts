@@ -3,8 +3,10 @@
  *
  * Three controls over one base class: {@link Panel} (container + §74 layout),
  * {@link Label} (text measured with `@four/text`), and {@link Button} (§72
- * click → activation). Everything else §73–§75 names is staged with a dated
- * note in {@link UI_STAGED} — read that array before assuming a control exists.
+ * click → activation), plus §75's keyboard navigation over them
+ * ({@link installKeyboardTraversal}, {@link keyboardFocusTarget}). Everything
+ * else §73–§75 names is staged with a dated note in {@link UI_STAGED} — read
+ * that array before assuming a control exists.
  *
  * ```ts
  * const root = new Panel({ layout: { type: "flex", direction: "column", gap: 12, padding: 20 } });
@@ -18,7 +20,9 @@
  *   camera,
  *   pickables: () => collectPickables(root, candidates),   // §71
  * });
- * start.on("uiactivate", () => simulation.start());
+ * new KeyboardInput(window, { focusTarget: keyboardFocusTarget(root) });  // §75
+ * installKeyboardTraversal(root);                                         // Tab
+ * start.on("uiactivate", () => simulation.start());   // click, Enter, or Space
  * ```
  *
  * **Widgets do not draw themselves.** The frozen dependency matrix gives this
@@ -32,6 +36,12 @@ export const PACKAGE_NAME = "@four/ui";
 
 export type { ButtonOptions } from "./button.js";
 export { Button } from "./button.js";
+export type { KeyboardTraversalOptions } from "./keyboard.js";
+export {
+  collectFocusOrder,
+  installKeyboardTraversal,
+  keyboardFocusTarget,
+} from "./keyboard.js";
 export type { LabelOptions } from "./label.js";
 export { Label } from "./label.js";
 export type {

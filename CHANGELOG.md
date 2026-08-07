@@ -8,6 +8,53 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-10 closed, A-13 keyboard half closed: `KeyboardInput` + UI traversal
+
+The gap analysis's A-10 ("`@four/input` has exactly one input source") and the keyboard half
+of A-13 ("`WidgetAccessibility` is fully inert") close together, because they are one
+feature: keys enter through `@four/input` and land on the focused widget through `@four/ui`.
+Focus crosses that boundary as an **injected resolver** (`focusTarget(): Node | null`),
+never an import — §3.1's one-way `ui → input` edge stays frozen.
+
+#### Added
+
+- **`KeyboardInput` in `@four/input` (A-10, §70, §72)** — the keyboard analogue of
+  `PointerInput`: a duck-typed `KeySurface` (satisfied by `window`, `document`, or a plain
+  test object; no DOM lib type named anywhere), `SceneKeyEvent` (`keydown`/`keyup`, `key`,
+  `code`, grouped `modifiers`, `repeat`, plus `preventDefault()` forwarded to the platform
+  event via `KeyDefaultSuppressor` — Tab and Space mean something to the host), and
+  `dispatchKeyEvent`. `NodeEventMap` gains `keydown`/`keyup` + `capture:` pairs by the same
+  declaration merging the pointer events use. `keypress` is deliberately absent (documented).
+- **`propagation.ts` in `@four/input`** — the three-phase machinery generalized out of
+  `pointer-events.ts`: `SceneInputEvent` (abstract `target`/`stopPropagation` base),
+  `buildPropagationPath`, `dispatchThreePhase(event, path, type, captureKey)`. Listener keys
+  are parameters, not string concatenation, so `emit` stays fully checked with no cast.
+  `dispatchPointerEvent` / `ScenePointerEvent` / `buildPropagationPath` keep their exact
+  public surface — no import path changed.
+- **Keyboard traversal in `@four/ui` (A-13, §75)** — `collectFocusOrder` (prune rules of
+  `collectPickables`; ascending `accessibility.tabIndex`, scene order on ties; negative
+  `tabIndex` opts out of traversal but stays programmatically focusable),
+  `keyboardFocusTarget(root)` (the resolver for `KeyboardInput`; falls back to the root so
+  the first Tab is deliverable), `installKeyboardTraversal(root, { wrap })` for
+  Tab/Shift-Tab, and `Button` activation on Enter/Space with `source: "keyboard"`
+  (`WidgetActivationSource` widened with `"keyboard"`). One stated DOM deviation: `tabIndex`
+  sorts plainly ascending — no positive-before-zero rule, which exists only because HTML
+  interleaves with a document order this tree can see directly.
+
+#### Changed
+
+- **`UI_STAGED` shrinks by one**: the §75 keyboard-navigation entry is deleted;
+  `WidgetAccessibility.tabIndex` is live. DOM mirror, screen-reader/high-contrast/scalable
+  text, and reduced-motion entries remain, verbatim.
+- **`examples/ui-demo` drops its page-level `keydown` workaround** (20 lines → 2:
+  `new KeyboardInput(window, { focusTarget: keyboardFocusTarget(uiRoot) })` +
+  `installKeyboardTraversal(uiRoot)`). No visual change; `tests/browser/ui.spec.ts` now
+  asserts `source: "keyboard"` and covers Shift-Tab and Space.
+
+Gates: input 115 + ui 128 unit tests (51 new), both packages 100% ×4 coverage; suites 176;
+38/38 browser with byte-unchanged visual goldens; TypeDoc 0 warnings; ui-demo
+28.1/30 kB.
+
 ### 2026-08-06 — PH-17 remainder: shipped `RigidBody` / `Collider` serializers
 
 Closes the follow-up the wave-1 entry below records as "deliberately not done". The §79

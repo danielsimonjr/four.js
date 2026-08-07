@@ -4,9 +4,12 @@
  */
 
 import {
+  SceneKeyEvent,
   ScenePointerEvent,
   buildPropagationPath,
+  dispatchKeyEvent,
   dispatchPointerEvent,
+  type KeyModifiers,
 } from "@four/input";
 import { Group, type Node } from "@four/scene";
 import { buildGlyphAtlas } from "@four/text";
@@ -29,6 +32,31 @@ function dispatch(
     target,
   });
   dispatchPointerEvent(event, buildPropagationPath(target));
+  return event;
+}
+
+/**
+ * Dispatches one `keydown` at `target` through the real propagation path — what
+ * `KeyboardInput` does with the focused node's keystroke.
+ */
+function pressKey(
+  target: Node,
+  key: string,
+  options: {
+    code?: string;
+    modifiers?: Partial<KeyModifiers>;
+    repeat?: boolean;
+  } = {},
+): SceneKeyEvent {
+  const event = new SceneKeyEvent({
+    type: "keydown",
+    key,
+    code: options.code ?? key,
+    modifiers: options.modifiers,
+    repeat: options.repeat,
+    target,
+  });
+  dispatchKeyEvent(event, buildPropagationPath(target));
   return event;
 }
 
@@ -114,9 +142,104 @@ describe("Button", () => {
     dispatch("click", button);
     expect(log).toHaveLength(0);
 
-    // The staged keyboard layer drives exactly this call — see button.ts.
     expect(button.activate("programmatic")).toBe(true);
     expect(log).toHaveLength(1);
+  });
+
+  it("activates on Enter and on Space, reporting the keyboard as the source (§75)", () => {
+    for (const key of ["Enter", " "]) {
+      const { button, log } = buttonWithLog();
+
+      const event = pressKey(button, key);
+
+      expect(log).toHaveLength(1);
+      expect(log[0].source).toBe("keyboard");
+      expect(log[0].pointerEvent).toBeNull();
+      // The host must not also scroll the page on Space.
+      expect(event.defaultPrevented).toBe(true);
+    }
+  });
+
+  it("activates on the space bar's physical key whatever it produces", () => {
+    const { button, log } = buttonWithLog();
+
+    pressKey(button, "Unidentified", { code: "Space" });
+
+    expect(log).toHaveLength(1);
+  });
+
+  it("ignores every other key", () => {
+    const { button, log } = buttonWithLog();
+
+    const event = pressKey(button, "a");
+    pressKey(button, "Tab");
+    pressKey(button, "Escape");
+
+    expect(log).toHaveLength(0);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("ignores auto-repeat, so one held key is one activation", () => {
+    const { button, log } = buttonWithLog();
+
+    pressKey(button, "Enter");
+    pressKey(button, "Enter", { repeat: true });
+    pressKey(button, "Enter", { repeat: true });
+
+    expect(log).toHaveLength(1);
+  });
+
+  it("ignores a chord, but not Shift", () => {
+    const { button, log } = buttonWithLog();
+
+    for (const modifiers of [{ alt: true }, { ctrl: true }, { meta: true }]) {
+      pressKey(button, "Enter", { modifiers });
+    }
+    expect(log).toHaveLength(0);
+
+    pressKey(button, "Enter", { modifiers: { shift: true } });
+    expect(log).toHaveLength(1);
+  });
+
+  it("does not activate on a key aimed at a focused descendant", () => {
+    const { button, log } = buttonWithLog();
+    const inner = new Button({ width: 10, height: 10 });
+    button.add(inner);
+    const innerLog: WidgetActivateEvent[] = [];
+    inner.on("uiactivate", (event) => innerLog.push(event));
+
+    // The event targets the inner button and bubbles to the outer one (§72).
+    pressKey(inner, "Enter");
+
+    expect(innerLog).toHaveLength(1);
+    expect(log).toHaveLength(0);
+  });
+
+  it("keeps keyboard activation available to a non-interactive button", () => {
+    const { button, log } = buttonWithLog();
+    button.interactive = false;
+
+    pressKey(button, "Enter");
+
+    expect(log).toHaveLength(1);
+    expect(log[0].source).toBe("keyboard");
+  });
+
+  it("refuses a keyboard activation when disabled, not enabled, or disposed", () => {
+    const disabled = buttonWithLog();
+    disabled.button.disabled = true;
+    pressKey(disabled.button, "Enter");
+    expect(disabled.log).toHaveLength(0);
+
+    const off = buttonWithLog();
+    off.button.enabled = false;
+    pressKey(off.button, "Enter");
+    expect(off.log).toHaveLength(0);
+
+    const gone = buttonWithLog();
+    gone.button.dispose();
+    pressKey(gone.button, "Enter");
+    expect(gone.log).toHaveLength(0);
   });
 
   it("is a Panel, so it lays its own content out (§74)", () => {

@@ -283,7 +283,7 @@ platform pointer event  { clientX, clientY, pointerId }
 └───────────────────────────┘  └─────────────────────────────────────┘
 ```
 
-Each dispatch allocates one `ScenePointerEvent` and one path array — deliberate (events outlive their dispatch when listeners store them; pointer rates are human rates); the picking and drag math underneath uses `out` parameters per plan D7. Not yet handled (recorded WP-3a.2 scope): `pointercancel`, wheel, keyboard.
+Each dispatch allocates one `ScenePointerEvent` and one path array — deliberate (events outlive their dispatch when listeners store them; pointer rates are human rates); the picking and drag math underneath uses `out` parameters per plan D7. `pointercancel` (2026-08-06) and keyboard (2026-08-07: `KeyboardInput` routes `keydown`/`keyup` through the same three-phase path, targeted at `@four/ui`'s focused widget via an injected resolver) are handled; wheel, gamepad, and XR are not yet (recorded in `packages/input/README.md`).
 
 ---
 
