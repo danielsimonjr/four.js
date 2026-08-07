@@ -604,6 +604,11 @@
       "names": ["PARTICLE_INSTANCE_FLOATS"],
       "filesGlob": ["packages/particles/src/particle-renderable.ts", "packages/render/src/particles.ts"],
       "reason": "four.js: deliberate duck-typed cross-package contract, NOT a copy to consolidate — the dependency matrix forbids the particles↔render edge (MEMORY 2026-08-02, Phase 9: 'ParticleDrawable + ParticleSystem's SimulationSystem are DUCK-TYPED cross-package contracts (matrix forbids the edges; drift caught by tests)'). Each side pins the instance stride independently and the shared tests catch drift. 2026-08-04 gate wiring."
+    },
+    {
+      "names": ["requireNonNegative"],
+      "filesGlob": ["packages/geometry/src/primitive-support.ts", "packages/ui/src/numbers.ts"],
+      "reason": "four.js: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
     }
   ]
 }

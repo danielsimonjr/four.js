@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-07",
-    "totalFiles": 173,
+    "totalFiles": 192,
     "totalModules": 24,
-    "totalExports": 1390
+    "totalExports": 1608
   },
   "entryPoints": [
     {
@@ -224,6 +224,97 @@
           "AnimationClipOptions"
         ]
       },
+      "packages/animation/src/controller.ts": {
+        "description": "§18 animation state machines — {@link AnimationController}.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./animation-system.js",
+            "imports": [
+              "Advanceable"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./binding.js",
+            "imports": [
+              "createBinding",
+              "PropertyBinding"
+            ]
+          },
+          {
+            "file": "./clip.js",
+            "imports": [
+              "AnimationClip"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./track.js",
+            "imports": [
+              "AnimationTrackLike"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./tween.js",
+            "imports": [
+              "claimProperty",
+              "isTransformOwner",
+              "releaseProperty",
+              "requireNonNegativeSeconds",
+              "PropertyClaim"
+            ]
+          },
+          {
+            "file": "./values.js",
+            "imports": [
+              "detectAdapter",
+              "ValueAdapter"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node",
+              "warnAuthorityConflict"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "TransformAuthority"
+            ]
+          }
+        ],
+        "exports": [
+          "AnimationController"
+        ],
+        "classes": [
+          "AnimationController"
+        ],
+        "interfaces": [
+          "AnimationStateOptions",
+          "NumericCondition",
+          "BooleanCondition",
+          "TriggerCondition",
+          "AnimationTransition",
+          "AnimationControllerParameters",
+          "AnimationControllerOptions"
+        ]
+      },
       "packages/animation/src/easing.ts": {
         "description": "Easing functions (§15).",
         "externalDependencies": [],
@@ -364,6 +455,13 @@
             "reExport": true
           },
           {
+            "file": "./controller.js",
+            "imports": [
+              "AnimationController"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./easing.js",
             "imports": [
               "BACK_OVERSHOOT",
@@ -491,6 +589,25 @@
             "typeOnly": true
           },
           {
+            "file": "./controller.js",
+            "imports": [
+              "AnimationControllerOptions",
+              "AnimationControllerParameters",
+              "AnimationStateInput",
+              "AnimationStateOptions",
+              "AnimationTransition",
+              "BooleanCondition",
+              "ControllerPlaybackState",
+              "NumericComparison",
+              "NumericCondition",
+              "StateChangeListener",
+              "TransitionCondition",
+              "TriggerCondition"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./easing.js",
             "imports": [
               "EasingFunction",
@@ -558,6 +675,7 @@
           "AnimationSystem",
           "createBinding",
           "AnimationClip",
+          "AnimationController",
           "BACK_OVERSHOOT",
           "BACK_OVERSHOOT_IN_OUT",
           "BOUNCE_AMPLITUDE",
@@ -629,6 +747,18 @@
           "AnimationEvent",
           "AnimationEventVisitor",
           "TrackSampleSink",
+          "AnimationControllerOptions",
+          "AnimationControllerParameters",
+          "AnimationStateInput",
+          "AnimationStateOptions",
+          "AnimationTransition",
+          "BooleanCondition",
+          "ControllerPlaybackState",
+          "NumericComparison",
+          "NumericCondition",
+          "StateChangeListener",
+          "TransitionCondition",
+          "TriggerCondition",
           "EasingFunction",
           "EasingName",
           "AnimationEventListener",
@@ -654,6 +784,7 @@
           "AnimationSystem",
           "createBinding",
           "AnimationClip",
+          "AnimationController",
           "BACK_OVERSHOOT",
           "BACK_OVERSHOOT_IN_OUT",
           "BOUNCE_AMPLITUDE",
@@ -724,6 +855,18 @@
           "AnimationEvent",
           "AnimationEventVisitor",
           "TrackSampleSink",
+          "AnimationControllerOptions",
+          "AnimationControllerParameters",
+          "AnimationStateInput",
+          "AnimationStateOptions",
+          "AnimationTransition",
+          "BooleanCondition",
+          "ControllerPlaybackState",
+          "NumericComparison",
+          "NumericCondition",
+          "StateChangeListener",
+          "TransitionCondition",
+          "TriggerCondition",
           "EasingFunction",
           "EasingName",
           "AnimationEventListener",
@@ -1316,7 +1459,7 @@
         ]
       },
       "packages/core/src/index.ts": {
-        "description": "Package entry point for @four/core (re-exports 22 symbols)",
+        "description": "Package entry point for @four/core (re-exports 49 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -1367,6 +1510,31 @@
             "file": "./events.js",
             "imports": [
               "EventEmitter"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./units.js",
+            "imports": [
+              "SI_UNITS",
+              "angleFromDisplay",
+              "angleToDisplay",
+              "formatAngle",
+              "formatLength",
+              "formatMass",
+              "formatTime",
+              "kilogramsToWorldMass",
+              "lengthFromDisplay",
+              "lengthToDisplay",
+              "massFromDisplay",
+              "massToDisplay",
+              "metersToWorldLength",
+              "resolveUnitSystem",
+              "timeFromDisplay",
+              "timeToDisplay",
+              "unitSymbol",
+              "worldLengthToMeters",
+              "worldMassToKilograms"
             ],
             "reExport": true
           },
@@ -1425,6 +1593,21 @@
             "typeOnly": true
           },
           {
+            "file": "./units.js",
+            "imports": [
+              "AngleUnit",
+              "LengthUnit",
+              "MassUnit",
+              "TimeUnit",
+              "UnitQuantity",
+              "UnitScale",
+              "UnitSystem",
+              "UnitSystemInit"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./untrusted.js",
             "imports": [
               "UntrustedJsonLimits"
@@ -1443,6 +1626,25 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "SI_UNITS",
+          "angleFromDisplay",
+          "angleToDisplay",
+          "formatAngle",
+          "formatLength",
+          "formatMass",
+          "formatTime",
+          "kilogramsToWorldMass",
+          "lengthFromDisplay",
+          "lengthToDisplay",
+          "massFromDisplay",
+          "massToDisplay",
+          "metersToWorldLength",
+          "resolveUnitSystem",
+          "timeFromDisplay",
+          "timeToDisplay",
+          "unitSymbol",
+          "worldLengthToMeters",
+          "worldMassToKilograms",
           "DEFAULT_MAXIMUM_DEPTH",
           "DEFAULT_MAXIMUM_TEXT_LENGTH",
           "parseUntrustedJson",
@@ -1457,6 +1659,14 @@
           "FourErrorOptions",
           "EventListener",
           "Unsubscribe",
+          "AngleUnit",
+          "LengthUnit",
+          "MassUnit",
+          "TimeUnit",
+          "UnitQuantity",
+          "UnitScale",
+          "UnitSystem",
+          "UnitSystemInit",
           "UntrustedJsonLimits"
         ],
         "reExported": [
@@ -1468,6 +1678,25 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "SI_UNITS",
+          "angleFromDisplay",
+          "angleToDisplay",
+          "formatAngle",
+          "formatLength",
+          "formatMass",
+          "formatTime",
+          "kilogramsToWorldMass",
+          "lengthFromDisplay",
+          "lengthToDisplay",
+          "massFromDisplay",
+          "massToDisplay",
+          "metersToWorldLength",
+          "resolveUnitSystem",
+          "timeFromDisplay",
+          "timeToDisplay",
+          "unitSymbol",
+          "worldLengthToMeters",
+          "worldMassToKilograms",
           "DEFAULT_MAXIMUM_DEPTH",
           "DEFAULT_MAXIMUM_TEXT_LENGTH",
           "parseUntrustedJson",
@@ -1481,6 +1710,14 @@
           "FourErrorOptions",
           "EventListener",
           "Unsubscribe",
+          "AngleUnit",
+          "LengthUnit",
+          "MassUnit",
+          "TimeUnit",
+          "UnitQuantity",
+          "UnitScale",
+          "UnitSystem",
+          "UnitSystemInit",
           "UntrustedJsonLimits"
         ],
         "constants": [
@@ -1511,6 +1748,69 @@
         ],
         "classes": [
           "SeededRandom"
+        ]
+      },
+      "packages/core/src/units.ts": {
+        "description": "The §40 unit system — **display and authoring conversion only** (§40, §98).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./errors.js",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "SI_UNITS",
+          "resolveUnitSystem",
+          "angleToDisplay",
+          "angleFromDisplay",
+          "timeToDisplay",
+          "timeFromDisplay",
+          "lengthToDisplay",
+          "lengthFromDisplay",
+          "massToDisplay",
+          "massFromDisplay",
+          "worldLengthToMeters",
+          "metersToWorldLength",
+          "worldMassToKilograms",
+          "kilogramsToWorldMass",
+          "unitSymbol",
+          "formatLength",
+          "formatMass",
+          "formatTime",
+          "formatAngle"
+        ],
+        "interfaces": [
+          "UnitScale",
+          "UnitSystem",
+          "UnitSystemInit"
+        ],
+        "functions": [
+          "resolveUnitSystem",
+          "angleToDisplay",
+          "angleFromDisplay",
+          "timeToDisplay",
+          "timeFromDisplay",
+          "lengthToDisplay",
+          "lengthFromDisplay",
+          "massToDisplay",
+          "massFromDisplay",
+          "worldLengthToMeters",
+          "metersToWorldLength",
+          "worldMassToKilograms",
+          "kilogramsToWorldMass",
+          "unitSymbol",
+          "formatLength",
+          "formatMass",
+          "formatTime",
+          "formatAngle"
+        ],
+        "constants": [
+          "SI_UNITS"
         ]
       },
       "packages/core/src/untrusted.ts": {
@@ -1710,6 +2010,19 @@
             "reExport": true
           },
           {
+            "file": "./stats.js",
+            "imports": [
+              "copyFrameStats",
+              "createFrameStats",
+              "createMonotonicClock",
+              "monotonicNowSeconds",
+              "recordRenderStatistics",
+              "recordSolverStatistics",
+              "resetFrameStats"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./checksum.js",
             "imports": [
               "Checksum"
@@ -1776,6 +2089,16 @@
             ],
             "reExport": true,
             "typeOnly": true
+          },
+          {
+            "file": "./stats.js",
+            "imports": [
+              "ClockSource",
+              "FrameStats",
+              "RenderStatisticsLike"
+            ],
+            "reExport": true,
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [],
@@ -1814,6 +2137,13 @@
           "debugDrawStreams",
           "solverJointStatistics",
           "solverStatistics",
+          "copyFrameStats",
+          "createFrameStats",
+          "createMonotonicClock",
+          "monotonicNowSeconds",
+          "recordRenderStatistics",
+          "recordSolverStatistics",
+          "resetFrameStats",
           "PACKAGE_NAME",
           "Checksum",
           "ReplayRecorderOptions",
@@ -1847,7 +2177,10 @@
           "SolverJointStatistics",
           "SolverStatistics",
           "StagedVisualization",
-          "Vector3Like"
+          "Vector3Like",
+          "ClockSource",
+          "FrameStats",
+          "RenderStatisticsLike"
         ],
         "reExported": [
           "createChecksum",
@@ -1884,6 +2217,13 @@
           "debugDrawStreams",
           "solverJointStatistics",
           "solverStatistics",
+          "copyFrameStats",
+          "createFrameStats",
+          "createMonotonicClock",
+          "monotonicNowSeconds",
+          "recordRenderStatistics",
+          "recordSolverStatistics",
+          "resetFrameStats",
           "Checksum",
           "ReplayRecorderOptions",
           "ReplaySnapshot",
@@ -1916,7 +2256,10 @@
           "SolverJointStatistics",
           "SolverStatistics",
           "StagedVisualization",
-          "Vector3Like"
+          "Vector3Like",
+          "ClockSource",
+          "FrameStats",
+          "RenderStatisticsLike"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -2092,6 +2435,46 @@
         "constants": [
           "DEFAULT_REPLAY_MAXIMUM_SUB_STEPS"
         ]
+      },
+      "packages/diagnostics/src/stats.ts": {
+        "description": "§84 runtime statistics — the record behind `app.stats` (A-1, 2026-08-07).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./debug-draw.js",
+            "imports": [
+              "SolverStatistics"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "monotonicNowSeconds",
+          "createFrameStats",
+          "resetFrameStats",
+          "copyFrameStats",
+          "recordRenderStatistics",
+          "recordSolverStatistics",
+          "createMonotonicClock"
+        ],
+        "interfaces": [
+          "FrameStats",
+          "RenderStatisticsLike",
+          "ClockSource"
+        ],
+        "functions": [
+          "createFrameStats",
+          "resetFrameStats",
+          "copyFrameStats",
+          "recordRenderStatistics",
+          "recordSolverStatistics",
+          "createMonotonicClock"
+        ],
+        "constants": [
+          "monotonicNowSeconds"
+        ]
       }
     },
     "packages/four": {
@@ -2126,6 +2509,17 @@
             "imports": [
               "EventEmitter",
               "FourError"
+            ]
+          },
+          {
+            "package": "@four/diagnostics",
+            "directory": "packages/diagnostics",
+            "imports": [
+              "createFrameStats",
+              "monotonicNowSeconds",
+              "recordRenderStatistics",
+              "resetFrameStats",
+              "FrameStats"
             ]
           },
           {
@@ -2164,7 +2558,18 @@
             "package": "@four/render",
             "directory": "packages/render",
             "imports": [
-              "Renderer"
+              "RenderStatistics",
+              "Renderer",
+              "RendererFallbackReport",
+              "RendererRegistry",
+              "RendererSelection"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "resolveRenderer"
             ]
           }
         ],
@@ -2662,9 +3067,16 @@
             "directory": "packages/ui",
             "imports": [
               "Button",
+              "Checkbox",
+              "ImageWidget",
               "Label",
               "Panel",
+              "ProgressIndicator",
+              "RadioButton",
+              "Slider",
+              "Toggle",
               "UIWidget",
+              "CheckableWidget",
               "UIWidgetOptions",
               "WidgetAccessibility"
             ]
@@ -2675,6 +3087,12 @@
           "PANEL_NODE_TYPE",
           "LABEL_NODE_TYPE",
           "BUTTON_NODE_TYPE",
+          "TOGGLE_NODE_TYPE",
+          "CHECKBOX_NODE_TYPE",
+          "RADIO_BUTTON_NODE_TYPE",
+          "SLIDER_NODE_TYPE",
+          "PROGRESS_NODE_TYPE",
+          "IMAGE_NODE_TYPE",
           "registerUISerializers",
           "registerPhysicsSerializers",
           "registerSceneNodeTypes"
@@ -2692,7 +3110,13 @@
         "constants": [
           "PANEL_NODE_TYPE",
           "LABEL_NODE_TYPE",
-          "BUTTON_NODE_TYPE"
+          "BUTTON_NODE_TYPE",
+          "TOGGLE_NODE_TYPE",
+          "CHECKBOX_NODE_TYPE",
+          "RADIO_BUTTON_NODE_TYPE",
+          "SLIDER_NODE_TYPE",
+          "PROGRESS_NODE_TYPE",
+          "IMAGE_NODE_TYPE"
         ]
       },
       "packages/four/src/scene.ts": {
@@ -5804,6 +6228,7 @@
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
+              "Matrix3",
               "Quaternion",
               "Vector3"
             ]
@@ -5811,16 +6236,21 @@
         ],
         "exports": [
           "supportsSolverJointAccess",
-          "missingSolverJointAccess"
+          "missingSolverJointAccess",
+          "supportsSolverBodyTuning",
+          "missingSolverBodyTuning"
         ],
         "interfaces": [
           "SolverBodyAccess",
+          "SolverBodyTuningAccess",
           "SolverJointMotor",
           "SolverJointAccess"
         ],
         "functions": [
           "supportsSolverJointAccess",
-          "missingSolverJointAccess"
+          "missingSolverJointAccess",
+          "supportsSolverBodyTuning",
+          "missingSolverBodyTuning"
         ]
       },
       "packages/physics/src/collider.ts": {
@@ -6107,7 +6537,9 @@
           {
             "file": "./body-access.js",
             "imports": [
+              "missingSolverBodyTuning",
               "missingSolverJointAccess",
+              "supportsSolverBodyTuning",
               "supportsSolverJointAccess"
             ],
             "reExport": true
@@ -6206,6 +6638,17 @@
             "reExport": true
           },
           {
+            "file": "./solver-registry.js",
+            "imports": [
+              "SolverRegistry",
+              "clearRegisteredSolvers",
+              "registerSolver",
+              "registeredSolvers",
+              "resolveSolver"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./shapes.js",
             "imports": [
               "COLLISION_SHAPE_TYPES_2D",
@@ -6271,6 +6714,7 @@
             "file": "./body-access.js",
             "imports": [
               "SolverBodyAccess",
+              "SolverBodyTuningAccess",
               "SolverJointAccess",
               "SolverJointMotor"
             ],
@@ -6410,6 +6854,19 @@
             "typeOnly": true
           },
           {
+            "file": "./solver-registry.js",
+            "imports": [
+              "SolverName",
+              "SolverRegistration",
+              "SolverRejectionReason",
+              "SolverRejectionReport",
+              "SolverResolveOptions",
+              "SolverSelection"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./shapes.js",
             "imports": [
               "BoxShape",
@@ -6470,7 +6927,9 @@
         "exports": [
           "NO_TUNING_CAPABILITIES",
           "resolveTuningCapabilities",
+          "missingSolverBodyTuning",
           "missingSolverJointAccess",
+          "supportsSolverBodyTuning",
           "supportsSolverJointAccess",
           "Collider",
           "DEFAULT_GRAVITY_Y",
@@ -6517,6 +6976,11 @@
           "deserializeCollisionShape",
           "serializeCollisionShape",
           "RigidBody",
+          "SolverRegistry",
+          "clearRegisteredSolvers",
+          "registerSolver",
+          "registeredSolvers",
+          "resolveSolver",
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
           "shapeSupportsDimension",
@@ -6550,6 +7014,7 @@
           "PhysicsSolverAdapter",
           "PhysicsTuningCapabilities",
           "SolverBodyAccess",
+          "SolverBodyTuningAccess",
           "SolverJointAccess",
           "SolverJointMotor",
           "ColliderEventMap",
@@ -6621,6 +7086,12 @@
           "RigidBodySleepEvent",
           "SleepCommand",
           "TorqueInput",
+          "SolverName",
+          "SolverRegistration",
+          "SolverRejectionReason",
+          "SolverRejectionReport",
+          "SolverResolveOptions",
+          "SolverSelection",
           "BoxShape",
           "CapsuleShape",
           "CircleShape",
@@ -6660,7 +7131,9 @@
         "reExported": [
           "NO_TUNING_CAPABILITIES",
           "resolveTuningCapabilities",
+          "missingSolverBodyTuning",
           "missingSolverJointAccess",
+          "supportsSolverBodyTuning",
           "supportsSolverJointAccess",
           "Collider",
           "DEFAULT_GRAVITY_Y",
@@ -6707,6 +7180,11 @@
           "deserializeCollisionShape",
           "serializeCollisionShape",
           "RigidBody",
+          "SolverRegistry",
+          "clearRegisteredSolvers",
+          "registerSolver",
+          "registeredSolvers",
+          "resolveSolver",
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
           "shapeSupportsDimension",
@@ -6739,6 +7217,7 @@
           "PhysicsSolverAdapter",
           "PhysicsTuningCapabilities",
           "SolverBodyAccess",
+          "SolverBodyTuningAccess",
           "SolverJointAccess",
           "SolverJointMotor",
           "ColliderEventMap",
@@ -6810,6 +7289,12 @@
           "RigidBodySleepEvent",
           "SleepCommand",
           "TorqueInput",
+          "SolverName",
+          "SolverRegistration",
+          "SolverRejectionReason",
+          "SolverRejectionReport",
+          "SolverResolveOptions",
+          "SolverSelection",
           "BoxShape",
           "CapsuleShape",
           "CircleShape",
@@ -7223,8 +7708,13 @@
           }
         ],
         "exports": [
+          "RIGID_BODY_MASS_PROPERTIES_DIRTY",
+          "RIGID_BODY_DAMPING_DIRTY",
+          "RIGID_BODY_GRAVITY_SCALE_DIRTY",
+          "RIGID_BODY_CCD_DIRTY",
           "clearRigidBodyCommands",
           "setRigidBodyRegistered",
+          "drainRigidBodySolverWrites",
           "setRigidBodyType",
           "setRigidBodyDerivedMass",
           "setRigidBodySleeping",
@@ -7242,9 +7732,16 @@
         "functions": [
           "clearRigidBodyCommands",
           "setRigidBodyRegistered",
+          "drainRigidBodySolverWrites",
           "setRigidBodyType",
           "setRigidBodyDerivedMass",
           "setRigidBodySleeping"
+        ],
+        "constants": [
+          "RIGID_BODY_MASS_PROPERTIES_DIRTY",
+          "RIGID_BODY_DAMPING_DIRTY",
+          "RIGID_BODY_GRAVITY_SCALE_DIRTY",
+          "RIGID_BODY_CCD_DIRTY"
         ]
       },
       "packages/physics/src/serializers.ts": {
@@ -7419,6 +7916,78 @@
           "COLLISION_SHAPE_TYPES_3D"
         ]
       },
+      "packages/physics/src/solver-registry.ts": {
+        "description": "The §37 solver registry — how `solver: \"auto\"` becomes an adapter without",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./adapter.js",
+            "imports": [
+              "PhysicsSolverAdapter"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./descriptors.js",
+            "imports": [
+              "PhysicsWorldOptions"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./types.js",
+            "imports": [
+              "DeterminismLevel"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./types.js",
+            "imports": [
+              "DEFAULT_DETERMINISM_LEVEL",
+              "DETERMINISM_LEVELS"
+            ]
+          },
+          {
+            "file": "./world.js",
+            "imports": [
+              "PhysicsWorldAdapter"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "registerSolver",
+          "registeredSolvers",
+          "clearRegisteredSolvers",
+          "resolveSolver",
+          "SolverRegistry"
+        ],
+        "classes": [
+          "SolverRegistry"
+        ],
+        "interfaces": [
+          "SolverRegistration",
+          "SolverRejectionReport",
+          "SolverResolveOptions"
+        ],
+        "functions": [
+          "registerSolver",
+          "registeredSolvers",
+          "clearRegisteredSolvers",
+          "resolveSolver"
+        ]
+      },
       "packages/physics/src/types.ts": {
         "description": "The physics vocabulary (§21, §22, §25, §31, §32, §33) and the opaque solver",
         "externalDependencies": [],
@@ -7587,6 +8156,7 @@
             "file": "./body-access.js",
             "imports": [
               "SolverBodyAccess",
+              "SolverBodyTuningAccess",
               "SolverJointAccess"
             ],
             "typeOnly": true
@@ -7595,6 +8165,7 @@
             "file": "./body-access.js",
             "imports": [
               "missingSolverJointAccess",
+              "supportsSolverBodyTuning",
               "supportsSolverJointAccess"
             ]
           },
@@ -7678,8 +8249,13 @@
           {
             "file": "./rigid-body.js",
             "imports": [
+              "RIGID_BODY_CCD_DIRTY",
+              "RIGID_BODY_DAMPING_DIRTY",
+              "RIGID_BODY_GRAVITY_SCALE_DIRTY",
+              "RIGID_BODY_MASS_PROPERTIES_DIRTY",
               "RigidBody",
               "clearRigidBodyCommands",
+              "drainRigidBodySolverWrites",
               "setRigidBodyDerivedMass",
               "setRigidBodyRegistered",
               "setRigidBodySleeping",
@@ -7692,6 +8268,21 @@
               "CollisionShape"
             ],
             "typeOnly": true
+          },
+          {
+            "file": "./solver-registry.js",
+            "imports": [
+              "SolverRegistry",
+              "SolverRejectionReport",
+              "SolverSelection"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./solver-registry.js",
+            "imports": [
+              "resolveSolver"
+            ]
           },
           {
             "file": "./types.js",
@@ -8091,6 +8682,15 @@
             "reExport": true
           },
           {
+            "file": "./register.js",
+            "imports": [
+              "createRapierAdapter",
+              "isRapierSupported",
+              "registerRapierSolver"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./rapier2d-adapter.js",
             "imports": [
               "Rapier2dAdapter"
@@ -8173,6 +8773,9 @@
           "initializeRapier3d",
           "rapier3dModule",
           "rapier3dVersion",
+          "createRapierAdapter",
+          "isRapierSupported",
+          "registerRapierSolver",
           "Rapier2dAdapter",
           "Rapier3dAdapter",
           "PACKAGE_NAME",
@@ -8216,6 +8819,9 @@
           "initializeRapier3d",
           "rapier3dModule",
           "rapier3dVersion",
+          "createRapierAdapter",
+          "isRapierSupported",
+          "registerRapierSolver",
           "Rapier2dAdapter",
           "Rapier3dAdapter",
           "RapierVector2",
@@ -8367,6 +8973,13 @@
             ]
           },
           {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix3"
+            ]
+          },
+          {
             "package": "@four/physics",
             "directory": "packages/physics",
             "imports": [
@@ -8398,6 +9011,7 @@
               "ContactPoint",
               "JointDescriptor",
               "ShippedJointType",
+              "SolverBodyTuningAccess",
               "SolverJointAccess",
               "SolverJointMotor",
               "OverlapHit",
@@ -8510,6 +9124,13 @@
             ]
           },
           {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix3"
+            ]
+          },
+          {
             "package": "@four/physics",
             "directory": "packages/physics",
             "imports": [
@@ -8562,6 +9183,7 @@
               "ShapeCastQuery",
               "ShippedJointType",
               "SleepingConfig",
+              "SolverBodyTuningAccess",
               "SolverJointAccess",
               "SolverJointMotor",
               "Vector3Input"
@@ -8573,6 +9195,47 @@
         ],
         "classes": [
           "Rapier3dAdapter"
+        ]
+      },
+      "packages/physics-rapier/src/register.ts": {
+        "description": "This package's opt-in to §37's solver registry (PH-19).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./rapier2d-adapter.js",
+            "imports": [
+              "Rapier2dAdapter"
+            ]
+          },
+          {
+            "file": "./rapier3d-adapter.js",
+            "imports": [
+              "Rapier3dAdapter"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/physics",
+            "directory": "packages/physics",
+            "imports": [
+              "registerSolver",
+              "PhysicsWorldAdapter",
+              "PhysicsWorldOptions",
+              "SolverRegistry"
+            ]
+          }
+        ],
+        "exports": [
+          "isRapierSupported",
+          "createRapierAdapter",
+          "registerRapierSolver"
+        ],
+        "functions": [
+          "isRapierSupported",
+          "createRapierAdapter",
+          "registerRapierSolver"
         ]
       }
     },
@@ -8592,11 +9255,63 @@
       }
     },
     "packages/render": {
-      "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 40 symbols)",
+      "packages/render/src/effect-pass.ts": {
+        "description": "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "RenderTarget",
+              "RenderTargetTexture"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "isRenderTargetTexture"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "COLOR_GRADE_DEFAULTS",
+          "COPY_EFFECT",
+          "supportsScreenEffects",
+          "validateEffectRenderPass"
+        ],
+        "interfaces": [
+          "CopyEffect",
+          "ColorGradeEffect",
+          "EffectRenderPass",
+          "ScreenEffectRenderer"
+        ],
+        "functions": [
+          "supportsScreenEffects",
+          "validateEffectRenderPass"
+        ],
+        "constants": [
+          "COLOR_GRADE_DEFAULTS",
+          "COPY_EFFECT"
+        ]
+      },
+      "packages/render/src/index.ts": {
+        "description": "Package entry point for @four/render (re-exports 81 symbols)",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./effect-pass.js",
+            "imports": [
+              "COLOR_GRADE_DEFAULTS",
+              "COPY_EFFECT",
+              "supportsScreenEffects",
+              "validateEffectRenderPass"
+            ],
+            "reExport": true
+          },
           {
             "file": "./lights.js",
             "imports": [
@@ -8631,6 +9346,21 @@
             "reExport": true
           },
           {
+            "file": "./render-graph.js",
+            "imports": [
+              "RenderGraph"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "RenderTarget",
+              "isRenderTargetTexture"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./renderable.js",
             "imports": [
               "Renderable"
@@ -8638,9 +9368,30 @@
             "reExport": true
           },
           {
+            "file": "./renderer-registry.js",
+            "imports": [
+              "AUTO_RENDERER_ORDER",
+              "RendererRegistry",
+              "clearRegisteredRenderers",
+              "registerRenderer",
+              "registeredRenderers",
+              "resolveRenderer"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./renderer.js",
             "imports": [
               "NullRenderer"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./statistics.js",
+            "imports": [
+              "createRenderStatistics",
+              "resetRenderStatistics",
+              "supportsRenderStatistics"
             ],
             "reExport": true
           },
@@ -8657,6 +9408,19 @@
               "Texture"
             ],
             "reExport": true
+          },
+          {
+            "file": "./effect-pass.js",
+            "imports": [
+              "ColorGradeEffect",
+              "CopyEffect",
+              "EffectRenderPass",
+              "ScreenEffect",
+              "ScreenEffectKind",
+              "ScreenEffectRenderer"
+            ],
+            "reExport": true,
+            "typeOnly": true
           },
           {
             "file": "./lights.js",
@@ -8690,10 +9454,48 @@
             "typeOnly": true
           },
           {
+            "file": "./render-graph.js",
+            "imports": [
+              "AddPassOptions",
+              "CustomRenderPass",
+              "RenderGraphIssue",
+              "RenderGraphIssueCode",
+              "RenderGraphIssueSeverity",
+              "RenderGraphPass",
+              "RenderPass",
+              "RenderPassContext",
+              "SceneRenderPass"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "RenderTargetFormat",
+              "RenderTargetOptions",
+              "RenderTargetTexture"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./renderable.js",
             "imports": [
               "RenderableOptions",
               "SurfaceMaterial"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./renderer-registry.js",
+            "imports": [
+              "RendererFallbackReason",
+              "RendererFallbackReport",
+              "RendererRegistration",
+              "RendererResolveOptions",
+              "RendererSelection"
             ],
             "reExport": true,
             "typeOnly": true
@@ -8708,6 +9510,15 @@
               "RendererEventMap",
               "RendererOptions",
               "ResizeRecord"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./statistics.js",
+            "imports": [
+              "RenderStatistics",
+              "RenderStatisticsReporter"
             ],
             "reExport": true,
             "typeOnly": true
@@ -8731,6 +9542,10 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "COLOR_GRADE_DEFAULTS",
+          "COPY_EFFECT",
+          "supportsScreenEffects",
+          "validateEffectRenderPass",
           "collectSceneLights",
           "createSceneLights",
           "isDirectionalLightSource",
@@ -8746,11 +9561,29 @@
           "isParticlesItem",
           "isSpriteItem",
           "isUnlitItem",
+          "RenderGraph",
+          "RenderTarget",
+          "isRenderTargetTexture",
           "Renderable",
+          "AUTO_RENDERER_ORDER",
+          "RendererRegistry",
+          "clearRegisteredRenderers",
+          "registerRenderer",
+          "registeredRenderers",
+          "resolveRenderer",
           "NullRenderer",
+          "createRenderStatistics",
+          "resetRenderStatistics",
+          "supportsRenderStatistics",
           "Sprite",
           "Texture",
           "PACKAGE_NAME",
+          "ColorGradeEffect",
+          "CopyEffect",
+          "EffectRenderPass",
+          "ScreenEffect",
+          "ScreenEffectKind",
+          "ScreenEffectRenderer",
           "AmbientLightSource",
           "DirectionalLightSource",
           "SceneLights",
@@ -8761,8 +9594,25 @@
           "RenderItemKind",
           "SpriteRenderItem",
           "UnlitRenderItem",
+          "AddPassOptions",
+          "CustomRenderPass",
+          "RenderGraphIssue",
+          "RenderGraphIssueCode",
+          "RenderGraphIssueSeverity",
+          "RenderGraphPass",
+          "RenderPass",
+          "RenderPassContext",
+          "SceneRenderPass",
+          "RenderTargetFormat",
+          "RenderTargetOptions",
+          "RenderTargetTexture",
           "RenderableOptions",
           "SurfaceMaterial",
+          "RendererFallbackReason",
+          "RendererFallbackReport",
+          "RendererRegistration",
+          "RendererResolveOptions",
+          "RendererSelection",
           "RenderInterpolation",
           "Renderer",
           "RendererBackend",
@@ -8770,10 +9620,16 @@
           "RendererEventMap",
           "RendererOptions",
           "ResizeRecord",
+          "RenderStatistics",
+          "RenderStatisticsReporter",
           "SpriteOptions",
           "TextureSource"
         ],
         "reExported": [
+          "COLOR_GRADE_DEFAULTS",
+          "COPY_EFFECT",
+          "supportsScreenEffects",
+          "validateEffectRenderPass",
           "collectSceneLights",
           "createSceneLights",
           "isDirectionalLightSource",
@@ -8789,10 +9645,28 @@
           "isParticlesItem",
           "isSpriteItem",
           "isUnlitItem",
+          "RenderGraph",
+          "RenderTarget",
+          "isRenderTargetTexture",
           "Renderable",
+          "AUTO_RENDERER_ORDER",
+          "RendererRegistry",
+          "clearRegisteredRenderers",
+          "registerRenderer",
+          "registeredRenderers",
+          "resolveRenderer",
           "NullRenderer",
+          "createRenderStatistics",
+          "resetRenderStatistics",
+          "supportsRenderStatistics",
           "Sprite",
           "Texture",
+          "ColorGradeEffect",
+          "CopyEffect",
+          "EffectRenderPass",
+          "ScreenEffect",
+          "ScreenEffectKind",
+          "ScreenEffectRenderer",
           "AmbientLightSource",
           "DirectionalLightSource",
           "SceneLights",
@@ -8803,8 +9677,25 @@
           "RenderItemKind",
           "SpriteRenderItem",
           "UnlitRenderItem",
+          "AddPassOptions",
+          "CustomRenderPass",
+          "RenderGraphIssue",
+          "RenderGraphIssueCode",
+          "RenderGraphIssueSeverity",
+          "RenderGraphPass",
+          "RenderPass",
+          "RenderPassContext",
+          "SceneRenderPass",
+          "RenderTargetFormat",
+          "RenderTargetOptions",
+          "RenderTargetTexture",
           "RenderableOptions",
           "SurfaceMaterial",
+          "RendererFallbackReason",
+          "RendererFallbackReport",
+          "RendererRegistration",
+          "RendererResolveOptions",
+          "RendererSelection",
           "RenderInterpolation",
           "Renderer",
           "RendererBackend",
@@ -8812,6 +9703,8 @@
           "RendererEventMap",
           "RendererOptions",
           "ResizeRecord",
+          "RenderStatistics",
+          "RenderStatisticsReporter",
           "SpriteOptions",
           "TextureSource"
         ],
@@ -8892,6 +9785,74 @@
           "PARTICLE_COLOR_OFFSET"
         ]
       },
+      "packages/render/src/render-graph.ts": {
+        "description": "`RenderGraph` (§63) — an ordered list of passes, executed by one call, with",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./effect-pass.js",
+            "imports": [
+              "supportsScreenEffects",
+              "validateEffectRenderPass",
+              "EffectRenderPass"
+            ]
+          },
+          {
+            "file": "./render-list.js",
+            "imports": [
+              "buildRenderList",
+              "RenderItem"
+            ]
+          },
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "isRenderTargetTexture",
+              "RenderTarget"
+            ]
+          },
+          {
+            "file": "./renderer.js",
+            "imports": [
+              "RenderInterpolation",
+              "Renderer"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node",
+              "Viewport"
+            ]
+          }
+        ],
+        "exports": [
+          "RenderGraph"
+        ],
+        "classes": [
+          "RenderGraph"
+        ],
+        "interfaces": [
+          "RenderPassContext",
+          "SceneRenderPass",
+          "CustomRenderPass",
+          "AddPassOptions",
+          "RenderGraphPass",
+          "RenderGraphIssue"
+        ]
+      },
       "packages/render/src/render-list.ts": {
         "description": "Render-list construction (§64) — scene graph in, flat sorted draw list out.",
         "externalDependencies": [],
@@ -8970,6 +9931,42 @@
           "buildInterpolatedRenderList"
         ]
       },
+      "packages/render/src/render-target.ts": {
+        "description": "`RenderTarget` (§61, §48, §63, §77) — an off-screen surface a frame can be",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Disposable"
+            ]
+          },
+          {
+            "package": "@four/materials",
+            "directory": "packages/materials",
+            "imports": [
+              "MaterialTexture"
+            ]
+          }
+        ],
+        "exports": [
+          "isRenderTargetTexture",
+          "RenderTarget"
+        ],
+        "classes": [
+          "RenderTarget"
+        ],
+        "interfaces": [
+          "RenderTargetOptions",
+          "RenderTargetTexture"
+        ],
+        "functions": [
+          "isRenderTargetTexture"
+        ]
+      },
       "packages/render/src/renderable.ts": {
         "description": "`Renderable` (§49) — the node that draws something.",
         "externalDependencies": [],
@@ -9010,11 +10007,83 @@
           "RenderableOptions"
         ]
       },
+      "packages/render/src/renderer-registry.ts": {
+        "description": "The §62 backend registry — how a name becomes a renderer without this",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./renderer.js",
+            "imports": [
+              "Renderer",
+              "RendererBackend",
+              "RendererOptions"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "AUTO_RENDERER_ORDER",
+          "registerRenderer",
+          "registeredRenderers",
+          "clearRegisteredRenderers",
+          "resolveRenderer",
+          "RendererRegistry"
+        ],
+        "classes": [
+          "RendererRegistry"
+        ],
+        "interfaces": [
+          "RendererRegistration",
+          "RendererFallbackReport",
+          "RendererResolveOptions"
+        ],
+        "functions": [
+          "registerRenderer",
+          "registeredRenderers",
+          "clearRegisteredRenderers",
+          "resolveRenderer"
+        ],
+        "constants": [
+          "AUTO_RENDERER_ORDER"
+        ]
+      },
       "packages/render/src/renderer.ts": {
         "description": "The renderer interface (§61) — the seam every backend implements.",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./effect-pass.js",
+            "imports": [
+              "EffectRenderPass"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./render-target.js",
+            "imports": [
+              "RenderTarget"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./statistics.js",
+            "imports": [
+              "RenderStatistics"
+            ],
+            "typeOnly": true
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -9108,6 +10177,27 @@
           "SpriteOptions"
         ]
       },
+      "packages/render/src/statistics.ts": {
+        "description": "Per-frame render counters (§84's `drawCalls`/`triangles`/`instances`) — the",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "createRenderStatistics",
+          "resetRenderStatistics",
+          "supportsRenderStatistics"
+        ],
+        "interfaces": [
+          "RenderStatistics",
+          "RenderStatisticsReporter"
+        ],
+        "functions": [
+          "createRenderStatistics",
+          "resetRenderStatistics",
+          "supportsRenderStatistics"
+        ]
+      },
       "packages/render/src/texture.ts": {
         "description": "`Texture` (§77, §55, §61) — CPU-side texel data with a stable identity and a",
         "externalDependencies": [],
@@ -9171,6 +10261,44 @@
       }
     },
     "packages/render-webgl": {
+      "packages/render-webgl/src/gl-effect.ts": {
+        "description": "The full-screen effect pipeline for the WebGL 2 backend — §70's blit and",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./gl-program.js",
+            "imports": [
+              "createLinkedProgram",
+              "requireUniform",
+              "GlProgramHandle",
+              "GlUniformLocation",
+              "WebglContext"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Disposable"
+            ]
+          }
+        ],
+        "exports": [
+          "EFFECT_TEXTURE_UNIT",
+          "EFFECT_VERTEX_COUNT",
+          "EffectProgram"
+        ],
+        "classes": [
+          "EffectProgram"
+        ],
+        "constants": [
+          "EFFECT_TEXTURE_UNIT",
+          "EFFECT_VERTEX_COUNT"
+        ]
+      },
       "packages/render-webgl/src/gl-geometry.ts": {
         "description": "GPU-side geometry for the WebGL 2 backend: one vertex array per",
         "externalDependencies": [],
@@ -9341,6 +10469,41 @@
           "matrixScratch"
         ]
       },
+      "packages/render-webgl/src/gl-render-target.ts": {
+        "description": "GPU-side render targets for the WebGL 2 backend: one framebuffer object per",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./gl-program.js",
+            "imports": [
+              "GL",
+              "GlFramebuffer",
+              "GlRenderbuffer",
+              "GlTexture",
+              "WebglContext"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "RenderTarget"
+            ]
+          }
+        ],
+        "exports": [
+          "RenderTargetCache"
+        ],
+        "classes": [
+          "RenderTargetCache"
+        ],
+        "interfaces": [
+          "RenderTargetRecord"
+        ]
+      },
       "packages/render-webgl/src/gl-texture.ts": {
         "description": "GPU-side textures for the WebGL 2 backend: one `WebGLTexture` per",
         "externalDependencies": [],
@@ -9380,6 +10543,15 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./gl-effect.js",
+            "imports": [
+              "EFFECT_TEXTURE_UNIT",
+              "EFFECT_VERTEX_COUNT",
+              "EffectProgram"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./gl-geometry.js",
             "imports": [
               "GeometryCache"
@@ -9412,9 +10584,24 @@
             "reExport": true
           },
           {
+            "file": "./gl-render-target.js",
+            "imports": [
+              "RenderTargetCache"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./gl-texture.js",
             "imports": [
               "TextureCache"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./register.js",
+            "imports": [
+              "isWebgl2Supported",
+              "registerWebglRenderer"
             ],
             "reExport": true
           },
@@ -9458,6 +10645,24 @@
             "typeOnly": true
           },
           {
+            "file": "./gl-program.js",
+            "imports": [
+              "GlFramebuffer",
+              "GlRenderbuffer"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./gl-render-target.js",
+            "imports": [
+              "CacheableRenderTarget",
+              "RenderTargetRecord"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./gl-texture.js",
             "imports": [
               "CacheableTexture",
@@ -9479,6 +10684,9 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "EFFECT_TEXTURE_UNIT",
+          "EFFECT_VERTEX_COUNT",
+          "EffectProgram",
           "GeometryCache",
           "PARTICLE_ATTRIBUTE_LOCATIONS",
           "PARTICLE_GL",
@@ -9493,7 +10701,10 @@
           "SpriteProgram",
           "UV_ATTRIBUTE_LOCATION",
           "UnlitProgram",
+          "RenderTargetCache",
           "TextureCache",
+          "isWebgl2Supported",
+          "registerWebglRenderer",
           "WebglRenderer",
           "PACKAGE_NAME",
           "CacheableGeometry",
@@ -9507,6 +10718,10 @@
           "GlUniformLocation",
           "GlVertexArray",
           "WebglContext",
+          "GlFramebuffer",
+          "GlRenderbuffer",
+          "CacheableRenderTarget",
+          "RenderTargetRecord",
           "CacheableTexture",
           "TextureRecord",
           "WebglCanvas",
@@ -9514,6 +10729,9 @@
           "WebglContextEventLike"
         ],
         "reExported": [
+          "EFFECT_TEXTURE_UNIT",
+          "EFFECT_VERTEX_COUNT",
+          "EffectProgram",
           "GeometryCache",
           "PARTICLE_ATTRIBUTE_LOCATIONS",
           "PARTICLE_GL",
@@ -9528,7 +10746,10 @@
           "SpriteProgram",
           "UV_ATTRIBUTE_LOCATION",
           "UnlitProgram",
+          "RenderTargetCache",
           "TextureCache",
+          "isWebgl2Supported",
+          "registerWebglRenderer",
           "WebglRenderer",
           "CacheableGeometry",
           "GeometryRecord",
@@ -9541,6 +10762,10 @@
           "GlUniformLocation",
           "GlVertexArray",
           "WebglContext",
+          "GlFramebuffer",
+          "GlRenderbuffer",
+          "CacheableRenderTarget",
+          "RenderTargetRecord",
           "CacheableTexture",
           "TextureRecord",
           "WebglCanvas",
@@ -9551,11 +10776,51 @@
           "PACKAGE_NAME"
         ]
       },
+      "packages/render-webgl/src/register.ts": {
+        "description": "This backend's opt-in to §62's renderer registry (R-2, A-8).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgl-renderer.js",
+            "imports": [
+              "WebglRenderer"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "registerRenderer",
+              "RendererOptions",
+              "RendererRegistry"
+            ]
+          }
+        ],
+        "exports": [
+          "isWebgl2Supported",
+          "registerWebglRenderer"
+        ],
+        "functions": [
+          "isWebgl2Supported",
+          "registerWebglRenderer"
+        ]
+      },
       "packages/render-webgl/src/webgl-renderer.ts": {
         "description": "The WebGL 2 backend (§61, §62, §120) — the MVP's only renderer.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./gl-effect.js",
+            "imports": [
+              "EFFECT_TEXTURE_UNIT",
+              "EFFECT_VERTEX_COUNT",
+              "EffectProgram"
+            ]
+          },
           {
             "file": "./gl-geometry.js",
             "imports": [
@@ -9577,7 +10842,15 @@
               "LitProgram",
               "MAP_TEXTURE_UNIT",
               "SpriteProgram",
-              "UnlitProgram"
+              "UnlitProgram",
+              "GlTexture"
+            ]
+          },
+          {
+            "file": "./gl-render-target.js",
+            "imports": [
+              "RenderTargetCache",
+              "RenderTargetRecord"
             ]
           },
           {
@@ -9614,13 +10887,18 @@
               "createSceneLights",
               "isLitItem",
               "isParticlesItem",
+              "isRenderTargetTexture",
               "isSpriteItem",
+              "COLOR_GRADE_DEFAULTS",
+              "EffectRenderPass",
               "RenderItem",
               "RenderItemKind",
+              "RenderStatistics",
               "Renderer",
               "RendererCapabilities",
               "RendererEventMap",
-              "RendererOptions"
+              "RendererOptions",
+              "ScreenEffectRenderer"
             ]
           }
         ],
@@ -10887,6 +12165,70 @@
           "Button"
         ]
       },
+      "packages/ui/src/checkable.ts": {
+        "description": "`Toggle` and `Checkbox` (§73), over the checkable base they share",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./button.js",
+            "imports": [
+              "Button",
+              "ButtonOptions"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "Toggle",
+          "Checkbox"
+        ],
+        "classes": [
+          "Toggle",
+          "Checkbox"
+        ],
+        "interfaces": [
+          "CheckableWidgetOptions"
+        ]
+      },
+      "packages/ui/src/image.ts": {
+        "description": "`ImageWidget` (§73's \"image\") — a box, a source key, and an intrinsic size",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./numbers.js",
+            "imports": [
+              "requireNonNegative"
+            ]
+          },
+          {
+            "file": "./widget.js",
+            "imports": [
+              "UIWidget",
+              "UIWidgetOptions"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector2"
+            ]
+          }
+        ],
+        "exports": [
+          "ImageWidget"
+        ],
+        "classes": [
+          "ImageWidget"
+        ],
+        "interfaces": [
+          "ImageWidgetOptions"
+        ]
+      },
       "packages/ui/src/index.ts": {
         "description": "`@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75).",
         "externalDependencies": [],
@@ -10896,6 +12238,22 @@
             "file": "./button.js",
             "imports": [
               "Button"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./checkable.js",
+            "imports": [
+              "CheckableWidget",
+              "Checkbox",
+              "Toggle"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./image.js",
+            "imports": [
+              "ImageWidget"
             ],
             "reExport": true
           },
@@ -10923,6 +12281,29 @@
             "reExport": true
           },
           {
+            "file": "./progress.js",
+            "imports": [
+              "ProgressIndicator"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./radio.js",
+            "imports": [
+              "RadioButton",
+              "checkedRadio",
+              "collectRadioGroup"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./slider.js",
+            "imports": [
+              "Slider"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./widget.js",
             "imports": [
               "Insets",
@@ -10940,6 +12321,24 @@
             "file": "./button.js",
             "imports": [
               "ButtonOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./checkable.js",
+            "imports": [
+              "CheckableWidgetOptions",
+              "CheckboxOptions",
+              "ToggleOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./image.js",
+            "imports": [
+              "ImageWidgetOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -10974,6 +12373,31 @@
             "typeOnly": true
           },
           {
+            "file": "./progress.js",
+            "imports": [
+              "ProgressIndicatorOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./radio.js",
+            "imports": [
+              "RadioButtonOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./slider.js",
+            "imports": [
+              "SliderOptions",
+              "SliderOrientation"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./widget.js",
             "imports": [
               "InsetsInit",
@@ -10984,7 +12408,8 @@
               "WidgetActivationSource",
               "WidgetSkin",
               "WidgetStateChangeEvent",
-              "WidgetStateSnapshot"
+              "WidgetStateSnapshot",
+              "WidgetValueChangeEvent"
             ],
             "reExport": true,
             "typeOnly": true
@@ -10993,11 +12418,20 @@
         "workspaceDependencies": [],
         "exports": [
           "Button",
+          "CheckableWidget",
+          "Checkbox",
+          "Toggle",
+          "ImageWidget",
           "collectFocusOrder",
           "installKeyboardTraversal",
           "keyboardFocusTarget",
           "Label",
           "Panel",
+          "ProgressIndicator",
+          "RadioButton",
+          "checkedRadio",
+          "collectRadioGroup",
+          "Slider",
           "Insets",
           "UIWidget",
           "UI_LAYOUT_AUTHORITY",
@@ -11008,6 +12442,10 @@
           "isUIWidget",
           "PACKAGE_NAME",
           "ButtonOptions",
+          "CheckableWidgetOptions",
+          "CheckboxOptions",
+          "ToggleOptions",
+          "ImageWidgetOptions",
           "KeyboardTraversalOptions",
           "LabelOptions",
           "LayoutAlign",
@@ -11016,6 +12454,10 @@
           "LayoutType",
           "PanelLayout",
           "PanelOptions",
+          "ProgressIndicatorOptions",
+          "RadioButtonOptions",
+          "SliderOptions",
+          "SliderOrientation",
           "InsetsInit",
           "UIFocusEvent",
           "UIWidgetOptions",
@@ -11024,15 +12466,25 @@
           "WidgetActivationSource",
           "WidgetSkin",
           "WidgetStateChangeEvent",
-          "WidgetStateSnapshot"
+          "WidgetStateSnapshot",
+          "WidgetValueChangeEvent"
         ],
         "reExported": [
           "Button",
+          "CheckableWidget",
+          "Checkbox",
+          "Toggle",
+          "ImageWidget",
           "collectFocusOrder",
           "installKeyboardTraversal",
           "keyboardFocusTarget",
           "Label",
           "Panel",
+          "ProgressIndicator",
+          "RadioButton",
+          "checkedRadio",
+          "collectRadioGroup",
+          "Slider",
           "Insets",
           "UIWidget",
           "UI_LAYOUT_AUTHORITY",
@@ -11042,6 +12494,10 @@
           "focusedWidget",
           "isUIWidget",
           "ButtonOptions",
+          "CheckableWidgetOptions",
+          "CheckboxOptions",
+          "ToggleOptions",
+          "ImageWidgetOptions",
           "KeyboardTraversalOptions",
           "LabelOptions",
           "LayoutAlign",
@@ -11050,6 +12506,10 @@
           "LayoutType",
           "PanelLayout",
           "PanelOptions",
+          "ProgressIndicatorOptions",
+          "RadioButtonOptions",
+          "SliderOptions",
+          "SliderOrientation",
           "InsetsInit",
           "UIFocusEvent",
           "UIWidgetOptions",
@@ -11058,7 +12518,8 @@
           "WidgetActivationSource",
           "WidgetSkin",
           "WidgetStateChangeEvent",
-          "WidgetStateSnapshot"
+          "WidgetStateSnapshot",
+          "WidgetValueChangeEvent"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -11155,6 +12616,25 @@
           "LabelOptions"
         ]
       },
+      "packages/ui/src/numbers.ts": {
+        "description": "Numeric guards and range arithmetic shared by the §73 controls that carry a",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "requireFinite",
+          "requireNonNegative",
+          "resolveValue",
+          "fractionOf"
+        ],
+        "functions": [
+          "requireFinite",
+          "requireNonNegative",
+          "resolveValue",
+          "fractionOf"
+        ]
+      },
       "packages/ui/src/panel.ts": {
         "description": "`Panel` (§73) and the layout engine (§74) — the container widget, and the",
         "externalDependencies": [],
@@ -11188,6 +12668,138 @@
         "interfaces": [
           "PanelLayout",
           "PanelOptions"
+        ]
+      },
+      "packages/ui/src/progress.ts": {
+        "description": "`ProgressIndicator` (§73) — a value shown, never edited (2026-08-07, A-12).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./numbers.js",
+            "imports": [
+              "fractionOf",
+              "requireFinite"
+            ]
+          },
+          {
+            "file": "./panel.js",
+            "imports": [
+              "Panel",
+              "PanelOptions"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "ProgressIndicator"
+        ],
+        "classes": [
+          "ProgressIndicator"
+        ],
+        "interfaces": [
+          "ProgressIndicatorOptions"
+        ]
+      },
+      "packages/ui/src/radio.ts": {
+        "description": "`RadioButton` (§73's \"radio control\") and its group mechanism (2026-08-07,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./checkable.js",
+            "imports": [
+              "CheckableWidget",
+              "CheckableWidgetOptions"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/input",
+            "directory": "packages/input",
+            "imports": [
+              "SceneKeyEvent"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "collectRadioGroup",
+          "checkedRadio",
+          "RadioButton"
+        ],
+        "classes": [
+          "RadioButton"
+        ],
+        "interfaces": [
+          "RadioButtonOptions"
+        ],
+        "functions": [
+          "collectRadioGroup",
+          "checkedRadio"
+        ]
+      },
+      "packages/ui/src/slider.ts": {
+        "description": "`Slider` (§73) — a value dragged along a track (§72) or stepped with the",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./numbers.js",
+            "imports": [
+              "fractionOf",
+              "requireFinite",
+              "resolveValue"
+            ]
+          },
+          {
+            "file": "./panel.js",
+            "imports": [
+              "Panel",
+              "PanelOptions"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/input",
+            "directory": "packages/input",
+            "imports": [
+              "ScenePointerEvent",
+              "SceneKeyEvent"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix4",
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "resolveWorldTransform"
+            ]
+          }
+        ],
+        "exports": [
+          "Slider"
+        ],
+        "classes": [
+          "Slider"
+        ],
+        "interfaces": [
+          "SliderOptions"
         ]
       },
       "packages/ui/src/widget.ts": {
@@ -11246,6 +12858,7 @@
           "WidgetStateSnapshot",
           "WidgetStateChangeEvent",
           "WidgetActivateEvent",
+          "WidgetValueChangeEvent",
           "UIFocusEvent",
           "WidgetAccessibility",
           "WidgetSkin",
@@ -11267,10 +12880,16 @@
   "dependencyGraph": {
     "circularDependencies": {
       "runtime": [],
-      "typeOnly": [],
-      "total": 0,
+      "typeOnly": [
+        [
+          "packages/physics/src/world.ts",
+          "packages/physics/src/solver-registry.ts",
+          "packages/physics/src/world.ts"
+        ]
+      ],
+      "total": 1,
       "runtimeCount": 0,
-      "typeOnlyCount": 0
+      "typeOnlyCount": 1
     },
     "layers": [
       {
@@ -11279,6 +12898,7 @@
           "packages/animation/src/animation-system.ts",
           "packages/animation/src/binding.ts",
           "packages/animation/src/clip.ts",
+          "packages/animation/src/controller.ts",
           "packages/animation/src/easing.ts",
           "packages/animation/src/index.ts",
           "packages/animation/src/mixer.ts",
@@ -11307,6 +12927,7 @@
           "packages/core/src/index.ts",
           "packages/core/src/json.ts",
           "packages/core/src/random.ts",
+          "packages/core/src/units.ts",
           "packages/core/src/untrusted.ts"
         ]
       },
@@ -11318,7 +12939,8 @@
           "packages/diagnostics/src/index.ts",
           "packages/diagnostics/src/recorder.ts",
           "packages/diagnostics/src/replay-format.ts",
-          "packages/diagnostics/src/replay-player.ts"
+          "packages/diagnostics/src/replay-player.ts",
+          "packages/diagnostics/src/stats.ts"
         ]
       },
       {
@@ -11449,6 +13071,7 @@
           "packages/physics/src/rigid-body.ts",
           "packages/physics/src/serializers.ts",
           "packages/physics/src/shapes.ts",
+          "packages/physics/src/solver-registry.ts",
           "packages/physics/src/types.ts",
           "packages/physics/src/validation.ts",
           "packages/physics/src/world.ts"
@@ -11469,7 +13092,8 @@
           "packages/physics-rapier/src/index.ts",
           "packages/physics-rapier/src/init.ts",
           "packages/physics-rapier/src/rapier2d-adapter.ts",
-          "packages/physics-rapier/src/rapier3d-adapter.ts"
+          "packages/physics-rapier/src/rapier3d-adapter.ts",
+          "packages/physics-rapier/src/register.ts"
         ]
       },
       {
@@ -11481,13 +13105,18 @@
       {
         "name": "Packages/render",
         "files": [
+          "packages/render/src/effect-pass.ts",
           "packages/render/src/index.ts",
           "packages/render/src/lights.ts",
           "packages/render/src/particles.ts",
+          "packages/render/src/render-graph.ts",
           "packages/render/src/render-list.ts",
+          "packages/render/src/render-target.ts",
           "packages/render/src/renderable.ts",
+          "packages/render/src/renderer-registry.ts",
           "packages/render/src/renderer.ts",
           "packages/render/src/sprite.ts",
+          "packages/render/src/statistics.ts",
           "packages/render/src/texture.ts"
         ]
       },
@@ -11506,11 +13135,14 @@
       {
         "name": "Packages/render-webgl",
         "files": [
+          "packages/render-webgl/src/gl-effect.ts",
           "packages/render-webgl/src/gl-geometry.ts",
           "packages/render-webgl/src/gl-particles.ts",
           "packages/render-webgl/src/gl-program.ts",
+          "packages/render-webgl/src/gl-render-target.ts",
           "packages/render-webgl/src/gl-texture.ts",
           "packages/render-webgl/src/index.ts",
+          "packages/render-webgl/src/register.ts",
           "packages/render-webgl/src/webgl-renderer.ts"
         ]
       },
@@ -11559,30 +13191,36 @@
         "name": "Packages/ui",
         "files": [
           "packages/ui/src/button.ts",
+          "packages/ui/src/checkable.ts",
+          "packages/ui/src/image.ts",
           "packages/ui/src/index.ts",
           "packages/ui/src/keyboard.ts",
           "packages/ui/src/label.ts",
+          "packages/ui/src/numbers.ts",
           "packages/ui/src/panel.ts",
+          "packages/ui/src/progress.ts",
+          "packages/ui/src/radio.ts",
+          "packages/ui/src/slider.ts",
           "packages/ui/src/widget.ts"
         ]
       }
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 173,
+    "totalTypeScriptFiles": 192,
     "totalModules": 24,
-    "totalLinesOfCode": 65307,
-    "totalExports": 1390,
-    "totalClasses": 93,
-    "totalInterfaces": 308,
-    "totalFunctions": 218,
-    "totalTypeGuards": 12,
+    "totalLinesOfCode": 75664,
+    "totalExports": 1608,
+    "totalClasses": 106,
+    "totalInterfaces": 349,
+    "totalFunctions": 270,
+    "totalTypeGuards": 15,
     "totalEnums": 0,
-    "totalConstants": 193,
-    "totalReExports": 908,
-    "totalTypeOnlyImports": 187,
+    "totalConstants": 210,
+    "totalReExports": 1044,
+    "totalTypeOnlyImports": 218,
     "runtimeCircularDeps": 0,
-    "typeOnlyCircularDeps": 0,
+    "typeOnlyCircularDeps": 1,
     "unusedFilesCount": 0,
     "unusedExportsCount": 0
   }
