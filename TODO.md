@@ -30,10 +30,22 @@ changes in `CHANGELOG.md`.
 - [x] **A-26 DONE 2026-08-07.** `docs/COMPATIBILITY.md` (§90's five tables) +
       `tools/generate-compatibility.mjs` (solver-adapter block generated from live
       capability declarations; `--check` detects drift)
-- [ ] **A-26 follow-ups:** add `"check-compat": "node tools/generate-compatibility.mjs
-    --check"` to root `package.json` and wire it into CI (deferred — `.github/` and
-      `package.json` were owned by the in-flight A-25 agent when A-26 landed); extend the
-      generated block to renderer backends once `RendererCapabilities` grows past 2 fields
+- [x] **A-26 follow-up done 2026-08-07:** `check-compat` root script + ci.yml step wired
+      once A-25's agent freed those files; `tools/README.md` documents the three new tools
+- [ ] **A-26 follow-up:** extend the generated block to renderer backends once
+      `RendererCapabilities` grows past 2 fields
+- [x] **A-25 machinery DONE 2026-08-07** (publish itself stays owner-gated): Changesets
+      config, `apply-publish-names.mjs` (+tests; rewrites emitted code, not just
+      manifests), `release.yml` reusing ci.yml via `workflow_call`, `docs.yml` Pages
+      deploy, honest `website/`
+- [ ] **A-25 owner decisions before first publish:** (1) the five reserved stubs cannot be
+      Changesets-`ignore`d while `four` depends on them — publish them, drop the umbrella
+      subpaths, or make them optional peers; (2) add the `NPM_TOKEN` secret; (3) enable
+      Pages (Settings → Pages → source "GitHub Actions")
+- [ ] **A-25 remainder:** host the 13 guides (needs a static-site-generator decision);
+      flagship demo page blocked on A-21. §113a's "documentation and website per §93" exit
+      criterion is now recorded as having been met on the documentation half only —
+      partially addressed by the Pages deploy
 - [ ] **Closure-diff review findings (2026-08-07 adversarial pass over commits 93cda8d,
       ab13840, fe8eb6f, c843e2d, b48f053):** 25 findings, ranked shortlist recorded in the
       review report. Deferred until their owning agents land: the `glState`

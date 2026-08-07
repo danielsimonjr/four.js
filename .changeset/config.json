@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "fixed": [],
+  "linked": [
+    [
+      "@four/render",
+      "@four/render-webgl",
+      "@four/render-webgpu",
+      "@four/render-canvas",
+      "@four/render-svg"
+    ],
+    [
+      "@four/physics",
+      "@four/physics-rapier",
+      "@four/physics-box2d",
+      "@four/physics-soft"
+    ]
+  ],
+  "ignore": []
+}

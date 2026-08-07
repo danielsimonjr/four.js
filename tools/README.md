@@ -21,6 +21,42 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   pnpm check-spec
   ```
 
+- `check-docs.mjs` — doc-truth CI gate (added 2026-08-05): pins mechanically-checkable
+  documentation claims — example counts against `git ls-files`, placeholder directories
+  docs must not send readers to, and the exact wording of retired claims — so a revert or
+  a stale copy-paste fails in CI instead of shipping.
+
+  ```sh
+  pnpm check-docs
+  ```
+
+- `generate-compatibility.mjs` — §90 compatibility-table generator (added 2026-08-07, gap
+  A-26). Rebuilds the solver-adapter block of `docs/COMPATIBILITY.md` between its
+  generated-block markers from the adapters' **live** capability declarations (imports each
+  built `dist/`, constructs the adapter, reads `capabilities`; probes
+  `SolverBodyAccess`/`SolverJointAccess` structurally against `@four/physics`'s emitted
+  declarations). Requires a built tree. Adding an adapter package adds a column with no
+  tool edit.
+
+  ```sh
+  pnpm check-compat                # CI gate — fails if the committed doc drifted
+  node tools/generate-compatibility.mjs   # regenerate in place after an adapter change
+  ```
+
+- `apply-publish-names.mjs` — §98 publish-name mapping (added 2026-08-07, gap A-25).
+  Rewrites `@four/x` → `@danielsimonjr/fourjs-x` (and `four` → `@danielsimonjr/fourjs`)
+  into a **staging copy**, never in place: package manifests, `workspace:*` ranges
+  (resolved the way pnpm would), and quoted workspace specifiers in emitted `.js`/`.d.ts`
+  (tsc writes workspace names straight through, so manifests alone would publish 24
+  mutually-unresolvable packages). Check mode by default; `--out=<dir>` stages.
+
+  ```sh
+  pnpm publish-names               # check mode: verify the mapping, write nothing
+  pnpm publish-names:test          # its own node --test suite
+  pnpm release:publish             # staging + npm publish loop (owner-gated; see
+                                   # .changeset/README.md)
+  ```
+
 - `create-dependency-graph/` (**CDG**) — full-parse generator. Walks every workspace
   package and writes `docs/Architecture/` (dependency graph, file inventory, export
   surfaces, duplicate symbols, unused/dormant analysis). Heavy; run it when structure
@@ -41,7 +77,7 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   `TRUE_DUPLICATE` name exists beyond `docs/Architecture/duplicate-baseline.json` — the
   accepted, shrinking consolidation backlog (seeded 2026-08-04: `cloneJsonValue`,
   `DEFAULT_GRAVITY_Y`, `SeededRandom`, `ColorRGBA`, `JsonValue`). Legitimately-independent
-  duplicates are instead *allowlisted* in `duplicate-allowlist.json` with a reason
+  duplicates are instead _allowlisted_ in `duplicate-allowlist.json` with a reason
   (four.js entries: per-package `PACKAGE_NAME`; `PARTICLE_INSTANCE_FLOATS`, a deliberate
   duck-typed contract because the dependency matrix forbids the particles↔render edge).
   After consolidating a baselined name, shrink the baseline with:
@@ -85,6 +121,6 @@ dropping pnpm's negated globs rather than treating them as literal directory nam
 this copy in sync with `llm-wiki/tools/`, which carries the same fix.
 
 The byte-identity rule covers the tool **code** only. `duplicate-allowlist.json` is
-per-repo *data* (it ships with MathTS's entries, which are inert here because their file
+per-repo _data_ (it ships with MathTS's entries, which are inert here because their file
 paths never match) — four.js appends its own entries to it and the two copies are expected
 to differ. Likewise `docs/Architecture/duplicate-baseline.json` is generated per repo.

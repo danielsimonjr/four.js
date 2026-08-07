@@ -28,6 +28,18 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-25: §94 machinery built, publish owner-gated.** Changesets config
+  hand-authored (no `changeset init`, no lockfile change); `release.yml` calls `ci.yml`
+  via a new `workflow_call` trigger so a release clears exactly the PR gates; publish is
+  inert without `NPM_TOKEN`. Two standing facts discovered:
+  - **The §98 rename must include emitted code.** `dist/*.js` and `.d.ts` carry
+    `from "@four/core"` — renaming only manifests would publish 24 mutually-unresolvable
+    packages. `apply-publish-names.mjs` rewrites quoted workspace specifiers in staged
+    code (405 sites), resolves `workspace:` ranges, and publishes from the staging tree so
+    the checkout is never renamed.
+  - **The five reserved stubs cannot be Changesets-`ignore`d** while `four` depends on and
+    re-exports them (validation error reproduced). `ignore: []` until the owner decides
+    the packaging question (publish stubs / drop subpaths / optional peers).
 - **2026-08-07 — A-26 closed: §90 compatibility tables.** `docs/COMPATIBILITY.md` carries
   the five tables. The solver-adapter section is **generated** between
   `<!-- BEGIN/END GENERATED: solver-adapters -->` markers by

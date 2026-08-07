@@ -681,6 +681,15 @@ _Closure plan:_
 
 ### A-25 — §94 release machinery does not exist; `website/` is a stub
 
+> **MACHINERY CLOSED 2026-08-07** — steps 1–4 shipped: hand-authored Changesets config
+> (with the discovered blocker that the reserved stubs cannot be `ignore`d while the
+> umbrella depends on them — owner decision recorded in TODO), `apply-publish-names.mjs`
+> (+tests; rewrites emitted code, not just manifests — 405 specifier sites),
+> `release.yml` reusing ci.yml via `workflow_call` with publish gated on `NPM_TOKEN`,
+> `docs.yml` Pages deploy of TypeDoc + the six examples, honest `website/README.md` +
+> minimal index. Still open: the real site (guides hosting, flagship demo — A-21) and the
+> owner-only steps (token, Pages enablement, stub packaging decision).
+
 **§94, §93, §113a, §90** · **Severity: High** · **Effort: M** · **SEMI-RECORDED**
 
 _Verified:_

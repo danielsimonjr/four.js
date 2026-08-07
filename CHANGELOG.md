@@ -8,6 +8,33 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-25: §94 release machinery built (publish stays owner-gated)
+
+#### Added
+
+- **Changesets, initialized by hand** (no `changeset init`, no lockfile change):
+  `.changeset/config.json` (`baseBranch: main`, `access: public`, `linked` groups for the
+  render and physics families) plus a README recording the repo-specific rules — including
+  the discovered blocker that **the five reserved stubs cannot be `ignore`d** while the
+  umbrella `four` depends on and re-exports them (Changesets validation refuses it,
+  reproduced); they will publish unless the owner decides otherwise.
+- **`tools/apply-publish-names.mjs`** + `node --test` suite — applies the §98 `@four/*` →
+  `@danielsimonjr/fourjs-*` mapping into a staging copy, never in place. It must (and
+  does) rewrite **emitted code**, not just manifests: `dist/*.js`/`.d.ts` carry
+  `from "@four/core"` workspace specifiers (405 rewrite sites), and `workspace:*` ranges
+  are resolved the way pnpm would. A test asserts the umbrella's 25 subpath exports
+  survive the rewrite (§91 tree-shaking).
+- **`.github/workflows/release.yml`** — reuses the whole of `ci.yml` via a new
+  `workflow_call` trigger (a release clears exactly the PR gates), then `changesets/action`
+  with publish inert unless `NPM_TOKEN` exists. **`.github/workflows/docs.yml`** — TypeDoc
+  plus the six example sites (built with `--base=/four.js/examples/<name>/`, honoring the
+  recorded subpath-hosting gotcha) to GitHub Pages. `website/` gains an honest README and
+  a minimal static index.
+- **`check-compat` wired** (A-26 follow-up): root script + a `ci.yml` step after
+  check-docs, failing when an adapter capability declaration changes without
+  `docs/COMPATIBILITY.md` being regenerated. `tools/README.md` now documents
+  `check-docs.mjs`, `generate-compatibility.mjs`, and `apply-publish-names.mjs`.
+
 ### 2026-08-07 — A-26 closed: §90 compatibility tables published
 
 #### Added

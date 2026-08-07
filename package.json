@@ -11,6 +11,7 @@
   "scripts": {
     "blending:build": "vite build examples/blending",
     "build": "pnpm -r --workspace-concurrency=4 run build",
+    "check-compat": "node tools/generate-compatibility.mjs --check",
     "check-docs": "node tools/check-docs.mjs",
     "check-spec": "node tools/check-spec.mjs",
     "coverage": "pnpm -r --filter \"./packages/*\" exec vitest run --coverage --config ../../vitest.coverage.config.ts",
@@ -27,6 +28,10 @@
     "mechanism:build": "vite build examples/mechanism",
     "particles-demo:build": "vite build examples/particles-demo",
     "playground:build": "vite build examples/physics-playground",
+    "publish-names": "node tools/apply-publish-names.mjs",
+    "publish-names:test": "node --test tools/apply-publish-names.test.mjs",
+    "release:publish": ": \"${FOUR_PUBLISH_STAGING:?set it to a staging directory outside the checkout}\" && node tools/apply-publish-names.mjs --out=\"$FOUR_PUBLISH_STAGING\" && for dir in \"$FOUR_PUBLISH_STAGING\"/*/; do npm publish \"$dir\" --access public || exit 1; done",
+    "release:version": "changeset version",
     "size": "size-limit",
     "test": "pnpm -r --workspace-concurrency=4 run test",
     "test:browser": "playwright test",

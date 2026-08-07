@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>four.js</title>
+    <!--
+      Deployed to GitHub Pages by .github/workflows/docs.yml, which copies this
+      file to the site root next to /api/ and /examples/. Deliberately one plain
+      file with no build step: it is an index over what already exists, not the
+      §93 site, which is still staged (see README.md in this directory).
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #16181d;
+        --muted: #5b6270;
+        --bg: #ffffff;
+        --rule: #dfe3ea;
+        --link: #14539a;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #e6e8ec;
+          --muted: #9aa1af;
+          --bg: #14161a;
+          --rule: #2b2f37;
+          --link: #7fb2f0;
+        }
+      }
+      body {
+        margin: 0 auto;
+        padding: 3rem 1.25rem 5rem;
+        max-width: 46rem;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          16px/1.6 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 2rem;
+      }
+      h2 {
+        margin: 2.5rem 0 0.75rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid var(--rule);
+        font-size: 1.15rem;
+      }
+      p.lede {
+        margin: 0 0 2rem;
+        color: var(--muted);
+      }
+      a {
+        color: var(--link);
+      }
+      ul {
+        padding-left: 1.1rem;
+      }
+      li {
+        margin: 0.4rem 0;
+      }
+      li span {
+        color: var(--muted);
+      }
+      footer {
+        margin-top: 3rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--rule);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>four.js</h1>
+    <p class="lede">
+      2D, 2.5D and 3D graphics, animation, motion and physics over one shared
+      scene graph. Not yet published to npm.
+    </p>
+
+    <h2>API reference</h2>
+    <ul>
+      <li>
+        <a href="./api/">Generated API documentation</a>
+        <span>— all 24 packages, from the TypeScript declarations.</span>
+      </li>
+    </ul>
+
+    <h2>Examples</h2>
+    <ul>
+      <li>
+        <a href="./examples/first-2d-scene/">first-2d-scene</a>
+        <span>— shapes, input and picking.</span>
+      </li>
+      <li>
+        <a href="./examples/physics-playground/">physics-playground</a>
+        <span>— rigid bodies on the Rapier adapter.</span>
+      </li>
+      <li>
+        <a href="./examples/mechanism/">mechanism</a>
+        <span>— joints and a driven linkage.</span>
+      </li>
+      <li>
+        <a href="./examples/blending/">blending</a>
+        <span>— the animation-to-physics pipeline (§19).</span>
+      </li>
+      <li>
+        <a href="./examples/particles-demo/">particles-demo</a>
+        <span>— CPU particle emitters.</span>
+      </li>
+      <li>
+        <a href="./examples/ui-demo/">ui-demo</a>
+        <span>— retained-mode UI nodes in the scene graph.</span>
+      </li>
+    </ul>
+
+    <h2>Guides and specification</h2>
+    <p>These are Markdown and render on GitHub rather than here:</p>
+    <ul>
+      <li>
+        <a href="https://github.com/danielsimonjr/four.js/tree/main/docs/guides"
+          >Guides</a
+        >
+        <span
+          >— scene graph, cameras, materials, transform authority, fixed-step
+          simulation, units, performance, custom shaders, custom solver
+          adapters, and more.</span
+        >
+      </li>
+      <li>
+        <a
+          href="https://github.com/danielsimonjr/four.js/blob/main/docs/SPECIFICATION.md"
+          >Specification</a
+        >
+        <span>— the working reference the implementation follows.</span>
+      </li>
+      <li>
+        <a href="https://github.com/danielsimonjr/four.js">Repository</a>
+      </li>
+    </ul>
+
+    <footer>
+      The interactive flagship demo this page should lead with is not built yet,
+      and the guides are not hosted here yet. Both are tracked; see
+      <a
+        href="https://github.com/danielsimonjr/four.js/blob/main/website/README.md"
+        >website/README.md</a
+      >.
+    </footer>
+  </body>
+</html>
