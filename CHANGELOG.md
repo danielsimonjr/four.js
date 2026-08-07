@@ -8,6 +8,36 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — PH-9 closed (state-machine tier): §18 `AnimationController`
+
+#### Added
+
+- **`AnimationController` in `@four/animation` (PH-9, §18)** — declarative states over
+  clips; transitions with **typed conditions** (`{parameter, is, value}` — all six
+  numeric comparisons, Booleans, latched triggers; the string DSL `"speed > 0.1"` was
+  deliberately not built: a parser is a second §33 surface, staged as optional sugar),
+  cross-fade `duration`, `exitTime` in **seconds of source-state time** (§7a — a gate,
+  not a trigger instant), and transition interruption (the outgoing pose is frozen per
+  channel through the same blend path, so the frozen pose is exactly what the next
+  write would have produced). Seven of §18's nine features ship; blend trees and
+  layered/additive animation are staged with dated notes, with clip events and
+  "any state" transitions.
+- **The controller is a pose evaluator, not a mixer scheduler** — §18's cross-fade
+  needs two clips writing one property at once, which the mixer's claim semantics
+  define as a conflict; so the controller owns one _channel_ per animated path,
+  samples source and destination into scratch, mixes through the channel's
+  `ValueAdapter`, and writes once under one claim in the **same** §16 registry
+  (controller-vs-tween still resolves by the single rule). A state with no track for a
+  channel contributes the baseline captured at `play()` — the pose is a pure function
+  of (state, time, weight), and fades over partially-animated channels don't snap.
+  Consequence stated: a controller pins every channel it owns. No `seek` — a machine's
+  pose is a function of history; §34 replays it by replaying deltas.
+- **New determinism golden** `tests/determinism/golden/animation-controller.json` —
+  600 fixed steps, four states, six transitions, scripted parameter schedule; two
+  in-process runs and a fresh child process all byte-identical; all-`"linear"` tracks
+  keep the arithmetic transcendental-free so a mismatch means the controller changed.
+  **No existing golden touched.**
+
 ### 2026-08-07 — R-6 closed (full-screen effect tier): §70 post-processing
 
 #### Added

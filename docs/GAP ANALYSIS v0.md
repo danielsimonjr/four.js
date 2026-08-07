@@ -1544,6 +1544,16 @@ Bodies and colliders re-assign every field in **both** adapters; joints are the 
 
 ## PH-9 — §18 state machines, blend trees, layered and additive animation: never scheduled
 
+> **PARTIALLY CLOSED 2026-08-07** — the §18 state-machine tier ships
+> (`packages/animation/src/controller.ts`): states over clips, typed transitions with
+> duration/exit time (seconds, §7a)/interruption, parameters + latched triggers — seven
+> of §18's nine features, blending per channel through `ValueAdapter` under one claim
+> in the §16 registry, with unit coverage at 100% and its own 600-step determinism
+> golden (`golden/animation-controller.json`, transcendental-free). Blend trees and
+> layered/additive animation remain open, staged in the module header with dated
+> notes; the §18/§97a/§100 spec claims are now stale and recorded as a spec-revisit
+> item in TODO.
+
 |                       |                                                                                                                                                                                                                                                                              |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Spec**              | §14, §18 (`Four.AnimationController` with states/transitions/parameters/triggers/exit time/interruption/blend trees/layers), §100 (_"@four/animation responsibilities: … state machines; blend trees"_)                                                                      |

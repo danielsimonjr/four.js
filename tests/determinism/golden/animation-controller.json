@@ -1,0 +1,22 @@
+{
+  "_warning": "IMMUTABLE. These digests were recorded on 2026-08-07 while closing gap PH-9 (§18 AnimationController) from an actual run of tests/determinism/helpers/animation-controller-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means the controller's behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's state machines are deterministic.",
+  "_scenario": "One §18 AnimationController over four states (idle, walk, run, land) on a shared ClipTarget — the character node's own Transform plus a ColorRGBA tuple — with six transitions covering numeric comparisons, a Boolean condition, a latched trigger, cross-fade durations of 0.2-0.4 s, an exit-time gate of 0.6 s, and one uninterruptible fade. Driven by a scripted parameter schedule (SCHEDULE in the helper) applied between fixed steps, over 600 clean 1/60 s frames through Application's fixed-step scheduler with an AnimationSystem at §39 step 3. Every per-step digest is an FNV-1a checksum (plan D6, 1e-6 quantization) over position (3), transform.scale.x, colour (4), the active state's index into STATE_NAMES, and the transition weight — 10 numbers in that fixed order.",
+  "_tier": "§33 same-runtime, recorded. The scenario's own arithmetic is cross-platform-exact — every track is \"linear\" over number/vector3/color, so every value comes from a + (b - a) * t, and the transition weight from one division and a Math.min; there is no transcendental anywhere, unlike phase4's slerp and sine-in-out easing. The recorded tier stays same-runtime because §33's cross-platform tier is a claim about the whole engine, which this file cannot make alone.",
+  "summaryDigest": 3107064421,
+  "firstStepDigest": 77798045,
+  "lastStepDigest": 1291903003,
+  "stateChangeSteps": [30, 90, 180, 240, 276, 277, 278, 400, 401, 450, 451],
+  "stateChangeEdges": [
+    "idle→walk",
+    "walk→run",
+    "run→walk",
+    "walk→land",
+    "land→idle",
+    "idle→walk",
+    "walk→run",
+    "run→walk",
+    "walk→idle",
+    "idle→walk",
+    "walk→run"
+  ]
+}

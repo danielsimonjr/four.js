@@ -28,6 +28,20 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — PH-9 AnimationController.** Decisions worth keeping:
+  - **The controller is a pose evaluator, not a mixer scheduler** — cross-fades need
+    two clips writing one property at once, which the mixer's claim semantics call a
+    conflict; the controller owns one channel per path, blends via `ValueAdapter`, and
+    writes once under one claim in the same §16 registry.
+  - **Un-animated channels contribute the `play()` baseline** — the pose is a pure
+    function of (state, time, weight); a controller pins every channel it owns.
+  - **Typed predicates over the string DSL** — a parser is a second §33 surface; the
+    sugar can compile to the records later. `exitTime` is seconds of source-state time
+    (§7a), a gate not an instant. Interruption freezes the outgoing pose (captured
+    through the same blend path). No `seek` — a machine's pose is a function of
+    history; §34 replays deltas. Controllers are never `finished` and are deliberately
+    not §6a components / not serialized (§18 constructs directly; `Node.animation` is
+    unshipped per §97a).
 - **2026-08-07 — R-6 post-processing (full-screen effect tier).** Decisions worth
   keeping:
   - **An effect is a graph pass kind, not an escape-hatch pass** — a pass whose

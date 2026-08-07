@@ -27,6 +27,18 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
+      of §18's nine features, typed predicates, own determinism golden, animation
+      package still 100% coverage
+- [ ] **PH-9 follow-ups (staged 2026-08-07):** blend trees (N-way channel sample);
+      layered/additive animation (needs an additive op on `ValueAdapter` + a
+      layer/claim policy); clip-event dispatch from a controller; "any state"
+      transitions; live three-clip interruption chasing; optional `when` string sugar
+      compiling to the typed records
+- [ ] **Spec-revisit note (2026-08-07):** §18's "`AnimationController` is not
+      implemented (§97a)" paragraph, the §97a mapping-table row, and §100's coverage
+      claim are now stale — record as a spec amendment (letter-suffix rule; owner
+      decision) in the next spec pass
 - [x] **R-6 CLOSED (full-screen effect tier) 2026-08-07:** `EffectRenderPass` as a
       third graph pass kind; copy + colour grade; separate `renderEffect` verb keeps
       `render` byte-identical; ui-demo budget bumped 30 → 31 kB on a proven structural
