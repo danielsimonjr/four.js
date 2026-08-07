@@ -27,6 +27,13 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **A-8/R-2/PH-19 CLOSED 2026-08-07** (one design, three filings): renderer +
+      solver registries with explicit registration; `renderer: "auto"` /
+      `solver: "auto"`; instance-naming apps keep tree-shaking (grep-proven)
+- [ ] **Auto-selection follow-ups:** ui-demo is at 30.74/31 kB after this packet —
+      review the limit before the next ui-demo-touching packet; register a second
+      backend (R-1) so §62's ladder has a real WebGPU rung (upper rungs currently
+      exercised against doubles)
 - [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
       of §18's nine features, typed predicates, own determinism golden, animation
       package still 100% coverage
@@ -290,8 +297,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 3 exit findings)
 
-- [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
-      deferral recorded in MEMORY 2026-08-01)
+- [x] §45 renderer-string ("auto") selection — **done 2026-08-07** (A-8/R-2/PH-19
+      closure; the 2026-08-01 instance-injection deferral is retired, not reversed)
 
 ## Backlog
 

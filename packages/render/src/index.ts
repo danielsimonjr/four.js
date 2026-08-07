@@ -70,6 +70,21 @@ export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
 export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export type {
+  RendererFallbackReason,
+  RendererFallbackReport,
+  RendererRegistration,
+  RendererResolveOptions,
+  RendererSelection,
+} from "./renderer-registry.js";
+export {
+  AUTO_RENDERER_ORDER,
+  RendererRegistry,
+  clearRegisteredRenderers,
+  registerRenderer,
+  registeredRenderers,
+  resolveRenderer,
+} from "./renderer-registry.js";
+export type {
   RenderInterpolation,
   Renderer,
   RendererBackend,

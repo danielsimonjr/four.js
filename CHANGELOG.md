@@ -8,6 +8,44 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-8/R-2/PH-19 closed: `renderer: "auto"` and `solver: "auto"`
+
+#### Added
+
+- **§62 renderer registry and §37 solver registry (A-8/R-2/PH-19, closed together).**
+  Backends and solvers register themselves into a neutral host via an **explicit call**
+  (`registerWebglRenderer()`, `registerRapierSolver()`) — never a side-effect import,
+  which `"sideEffects": false` on all 24 packages makes _correctly deletable_ by any
+  bundler; `four` and `@four/physics` still import no backend and no solver. `"auto"`
+  walks §62's WebGPU → WebGL 2 → Canvas 2D → SVG order for renderers (registration
+  order deliberately not consulted — §33; the headless tier is never auto-selected;
+  fallback past a rejecting `initialize` disposes what it built and reports each skip
+  through `onFallback` — §62's diagnostics event as a callback, since §3.1 gives
+  `render` no diagnostics edge) and **registration order filtered by §37 capabilities**
+  for solvers (§37 fixes no preference; inventing one would editorialize). A named
+  backend/solver fails fast; every failure names what _is_ registered (§85), with
+  structured `context.tried`. `ApplicationOptions` gains `antialias` (its TODO said it
+  belonged with this packet), `onRendererFallback`, `rendererRegistry`;
+  `PhysicsWorldInit` gains `solver`/`solverRegistry`/`onSolverReject` with `adapter`
+  becoming the optional alternative (xor, both refusals loud).
+- **Tree-shaking is a stated discipline, measured both ways**: `resolveRenderer`/
+  `resolveSolver` never statically reference their registry class (a lazily-created
+  module `let`), so an app naming a concrete instance keeps an eight-line resolver
+  (+0.2–0.3 kB gzip) and drops the registry, the §62 order, the probes, and every
+  backend (grep-proven: zero hits in all four bundles); `"auto"` costs 0.78 kB gzip,
+  paid only by the app that asks (controlled A/B in the packet report).
+- `isSupported` probes never touch the caller's canvas — a canvas serves one context
+  per type, so a probing `getContext` would fix the attributes the backend later
+  acquires, silently disabling `antialias`. The probe is an environment question;
+  `initialize` is the real gate.
+
+#### Changed
+
+- `Application.renderer` is a **getter** — `null` until `initialize()` resolves a
+  string selection; unchanged for an instance. The WP-3.6/§45 departure is **retired,
+  not reversed**: §45's string form now works, and `four` still never imports a
+  backend.
+
 ### 2026-08-07 — PH-9 closed (state-machine tier): §18 `AnimationController`
 
 #### Added

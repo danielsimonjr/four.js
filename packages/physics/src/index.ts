@@ -194,6 +194,21 @@ export type {
 } from "./rigid-body.js";
 export { RigidBody } from "./rigid-body.js";
 export type {
+  SolverName,
+  SolverRegistration,
+  SolverRejectionReason,
+  SolverRejectionReport,
+  SolverResolveOptions,
+  SolverSelection,
+} from "./solver-registry.js";
+export {
+  SolverRegistry,
+  clearRegisteredSolvers,
+  registerSolver,
+  registeredSolvers,
+  resolveSolver,
+} from "./solver-registry.js";
+export type {
   BoxShape,
   CapsuleShape,
   CircleShape,

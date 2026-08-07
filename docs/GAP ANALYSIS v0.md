@@ -364,6 +364,13 @@ _Dependencies:_ none blocking. Pairs naturally with A-6.
 
 ### A-8 — `renderer: "auto"` and the string backend form are unimplemented
 
+> **CLOSED 2026-08-07** — §45's string form works and `four` still imports no backend:
+> `@four/render`'s `renderer-registry.ts` is a neutral host backends opt into with an
+> explicit call (`registerWebglRenderer()`). `ApplicationOptions.renderer` accepts
+> `Renderer | "auto" | <name> | false`; `antialias` landed with it;
+> `Application.renderer` is a getter (`null` until `initialize()` resolves a string).
+> See R-2's banner for the registry design.
+
 **§45, §62, §97** · **Severity: Medium** · **Effort: M** · **RECORDED**
 
 `ApplicationOptions.renderer` takes a `Renderer` instance, not §45's `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`. Recorded twice, with the correct reason (a string form makes `four` statically import every backend) and the correct fix (a backend-opt-in registry) — `application.ts:167–190` and `TODO.md` ("§45 renderer-string ('auto') selection via §62 registry packet"). No new analysis needed; flagged because it is the single most visible divergence from §97's opening lines. Owned by the render analyst.
@@ -881,6 +888,16 @@ Every claim below was checked against source, not against documentation. Where a
 **Closure:** a backend package is only tractable after §60's shader IR exists. Sequence R-14 → R-1.
 
 ### R-2 — No backend selection; `renderer: "auto"` does not exist
+
+> **CLOSED 2026-08-07** — `packages/render/src/renderer-registry.ts` +
+> `registerWebglRenderer()`. §62's preference order (WebGPU → WebGL 2 → Canvas 2D →
+> SVG; registration order ignored — §33; headless never auto-selected),
+> fallback-on-initialization-failure with disposal, fail-fast on an explicit name, §85
+> failures naming what is registered. §62's diagnostics event is an `onFallback`
+> callback (no `render → diagnostics` edge exists). Explicit registration, never
+> side-effect imports (`"sideEffects": false` makes those deletable). **Left open:**
+> only one backend is registrable, so the ladder's upper rungs are exercised against
+> doubles (R-1).
 
 **§62, §45.** §62 requires `renderer: "auto"` with WebGPU → WebGL 2 → 2D preference, a diagnostics event on WebGPU failure, and fail-fast `RENDERER_INITIALIZATION_FAILED` on explicit `"webgpu"`. `ApplicationOptions.renderer` (`packages/four/src/application.ts:197`) is `Renderer | false` — an **instance** the app constructs. There is no registry, no string form, no fallback path.
 **Missing:** the whole §62 selection layer; also §45's `width`/`height`/`resolution`/`alpha`/`powerPreference`/`autoResize` (TODO at `application.ts:146`).
@@ -1720,6 +1737,14 @@ The umbrella (`packages/four/src/index.ts`) exports one namespace per package pl
 ---
 
 ## PH-19 — `solver: "auto"` selection and capability-driven solver choice unimplemented
+
+> **CLOSED 2026-08-07** — `packages/physics/src/solver-registry.ts` +
+> `registerRapierSolver()`; `PhysicsWorldInit.solver` takes `"auto"` or a §102 name
+> (`adapter` becomes the optional alternative, xor enforced loudly). `"auto"` filters
+> on §37 `capabilities` (dimension, determinism tier) in registration order — §37
+> fixes no preference and one was not invented. A named solver is handed back
+> unfiltered so the world reports mismatches with its own §21/§33 message. **Left
+> open:** only Rapier is registrable (§102's box2d/soft are still stubs).
 
 |                       |                                                                                                                                                                                                                         |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

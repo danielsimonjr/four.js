@@ -12,7 +12,15 @@ import {
   type SimulationSystem,
   type TimeState,
 } from "@four/motion";
-import { NullRenderer } from "@four/render";
+import {
+  NullRenderer,
+  RendererRegistry,
+  clearRegisteredRenderers,
+  registerRenderer,
+  type RendererBackend,
+  type RendererCapabilities,
+  type RendererFallbackReport,
+} from "@four/render";
 import {
   Group,
   OrthographicCamera,
@@ -1367,5 +1375,218 @@ describe("Application — §84 statistics (A-1)", () => {
     expect(other.transform.worldMatrix.elements).toEqual(
       node.transform.worldMatrix.elements,
     );
+  });
+});
+
+describe("Application — §45 renderer selection (R-2 / A-8)", () => {
+  /**
+   * A registry holding one backend under `backend`, whose renderer is a
+   * `NullRenderer` reporting that backend — so §62's preference walk and the
+   * application's wiring can both be asserted without a GPU.
+   */
+  function registryWith(
+    backends: readonly {
+      backend: RendererBackend;
+      supported?: boolean;
+      fail?: boolean;
+    }[],
+  ): { registry: RendererRegistry; built: NullRenderer[] } {
+    const registry = new RendererRegistry();
+    const built: NullRenderer[] = [];
+    for (const entry of backends) {
+      registry.register({
+        backend: entry.backend,
+        isSupported: () => entry.supported ?? true,
+        create: () => {
+          const renderer = new NullRenderer();
+          (renderer as { capabilities: RendererCapabilities }).capabilities = {
+            backend: entry.backend,
+            maxTextureSize: 0,
+          };
+          if (entry.fail === true) {
+            renderer.initialize = (): Promise<void> =>
+              Promise.reject(new Error(`${entry.backend} refused`));
+          }
+          built.push(renderer);
+          return renderer;
+        },
+      });
+    }
+    return { registry, built };
+  }
+
+  it("holds no renderer until initialize resolves the selection", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+    });
+    expect(app.renderer).toBeNull();
+    await app.initialize();
+    expect(app.renderer?.capabilities.backend).toBe("webgl2");
+  });
+
+  it("resolves §62's preference order and forwards canvas and antialias", async () => {
+    const canvas = {};
+    const { registry } = registryWith([
+      { backend: "webgl2" },
+      { backend: "webgpu" },
+    ]);
+    const app = new Application({
+      renderer: "auto",
+      canvas,
+      antialias: true,
+      rendererRegistry: registry,
+    });
+    await app.initialize();
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.capabilities.backend).toBe("webgpu");
+    expect(renderer.lastInitializeOptions).toMatchObject({
+      canvas,
+      antialias: true,
+    });
+    expect(renderer.initializeCount).toBe(1);
+  });
+
+  it("reports each backend `auto` passes over (§62's diagnostics event)", async () => {
+    const { registry } = registryWith([
+      { backend: "webgpu", fail: true },
+      { backend: "webgl2" },
+    ]);
+    const reports: RendererFallbackReport[] = [];
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      onRendererFallback: (report) => reports.push(report),
+    });
+    await app.initialize();
+    expect(app.renderer?.capabilities.backend).toBe("webgl2");
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.backend).toBe("webgpu");
+    expect(reports[0]?.reason).toBe("initialization-failed");
+  });
+
+  it("rejects initialize when the selection cannot be satisfied (§62, §89)", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "webgpu",
+      rendererRegistry: registry,
+    });
+    let thrown: unknown;
+    try {
+      await app.initialize();
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(isFourError(thrown)).toBe(true);
+    if (isFourError(thrown)) {
+      expect(thrown.code).toBe("RENDERER_INITIALIZATION_FAILED");
+      expect(thrown.message).toContain('Registered: "webgl2"');
+    }
+    expect(app.initialized).toBe(false);
+    expect(app.renderer).toBeNull();
+  });
+
+  it("draws through the resolved renderer, with §43 interpolation on by default", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      views: [createFullscreenViewport(camera)],
+    });
+    await app.initialize();
+    app.start();
+    app.step(FIXED);
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.renderCount).toBe(1);
+    expect(renderer.lastRenderRoot).toBe(app.scene);
+    expect(renderer.lastInterpolation?.poseBuffer).toBe(app.poses);
+  });
+
+  it("replays a size declared before the backend existed", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      width: 800,
+      height: 400,
+      resolution: 2,
+    });
+    // Nothing to forward to yet — the option was recorded, not dropped.
+    await app.initialize();
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.lastResize).toEqual({
+      width: 800,
+      height: 400,
+      resolution: 2,
+    });
+  });
+
+  it("forwards a resize issued between construction and initialize", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+    });
+    app.resize(640, 480, 1.5);
+    await app.initialize();
+    expect((app.renderer as NullRenderer).lastResize).toEqual({
+      width: 640,
+      height: 480,
+      resolution: 1.5,
+    });
+  });
+
+  it("lends §84 statistics to a renderer it only meets at initialize (A-1)", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      stats: true,
+    });
+    await app.initialize();
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.statistics).not.toBeNull();
+    app.dispose();
+    // Returned on dispose, exactly as a constructed renderer's is (§83).
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("stays headless for `false` and for an omitted option", async () => {
+    for (const renderer of [undefined, false] as const) {
+      const app = new Application({ renderer });
+      await app.initialize();
+      expect(app.renderer).toBeNull();
+      expect(app.initialized).toBe(true);
+    }
+  });
+
+  it("still takes an instance, and initializes it with the antialias option", async () => {
+    const renderer = new NullRenderer();
+    const app = new Application({ renderer, antialias: true, canvas: {} });
+    expect(app.renderer).toBe(renderer);
+    await app.initialize();
+    expect(renderer.lastInitializeOptions?.antialias).toBe(true);
+  });
+
+  it("resolves against the shared registry when none is passed", async () => {
+    registerRenderer({
+      backend: "webgl2",
+      isSupported: () => true,
+      create: () => new NullRenderer(),
+    });
+    try {
+      const app = new Application({ renderer: "auto" });
+      await app.initialize();
+      expect(app.renderer).toBeInstanceOf(NullRenderer);
+    } finally {
+      clearRegisteredRenderers();
+    }
+  });
+
+  it("says nothing is registered when no backend opted in (§85)", async () => {
+    const app = new Application({ renderer: "auto" });
+    await expect(app.initialize()).rejects.toThrow(/no backend is registered/);
   });
 });

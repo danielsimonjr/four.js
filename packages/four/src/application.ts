@@ -114,11 +114,28 @@ import {
   type WorldTransformStats,
 } from "@four/scene";
 // Type-only, and deliberately so: the emitted JavaScript of this module must
-// not import a renderer package. `four/application` is the headless
+// not import a renderer *backend*. `four/application` is the headless
 // composition subpath (WP-2.7-fix2) — a program that never names a backend
 // must not pull one in, and a backend arrives here as an *instance* the
 // application author constructed (see `ApplicationOptions.renderer`).
-import type { RenderStatistics, Renderer } from "@four/render";
+import type {
+  RenderStatistics,
+  Renderer,
+  RendererFallbackReport,
+  RendererRegistry,
+  RendererSelection,
+} from "@four/render";
+// The one value this module takes from `@four/render` (R-2/A-8, 2026-08-07),
+// and the reason the sentence above says "backend" rather than "package":
+// `resolveRenderer` is `renderer-registry.ts`'s eight-line front door, it
+// names no backend and no other module of that package, and it deliberately
+// does not reference `RendererRegistry` — so a bundle whose application hands
+// this class a constructed renderer keeps this function and its message and
+// drops the registry, the §62 preference walk, and every backend with it. The
+// alternative, a `switch` over the §45 string, would make `four` import all
+// five backends and cost every program a renderer it never uses (§91; MEMORY
+// 2026-08-01).
+import { resolveRenderer } from "@four/render";
 
 /**
  * The §10 main-loop events, as §6b types them.
@@ -155,16 +172,18 @@ export interface ApplicationEventMap {
 /**
  * The current subset of §45's `ApplicationOptions`.
  *
- * §45's remaining options (`antialias`, `alpha`, `powerPreference`,
- * `autoResize`, `reducedMotion`, `physics`) belong to subsystems that do not
- * exist yet; each option is added by the packet that builds its subsystem.
- * Omitted numeric options take the Appendix A normative defaults.
+ * §45's remaining options (`alpha`, `powerPreference`, `autoResize`,
+ * `reducedMotion`, `physics`) belong to subsystems that do not exist yet; each
+ * option is added by the packet that builds its subsystem. Omitted numeric
+ * options take the Appendix A normative defaults.
  *
- * TODO(§62, renderer-selection packet): `antialias`/`alpha`/`powerPreference`
- * are device-selection options that only a backend constructor can honour, and
- * they belong with the `"auto"` backend selection described on
- * {@link ApplicationOptions.renderer}; accepting them now would mean storing
- * values no code reads. `autoResize` needs a `ResizeObserver` on a canvas the
+ * `antialias` landed with the §62 selection packet (R-2/A-8, 2026-08-07), for
+ * the reason its TODO gave: it is a *device-selection* option only a backend
+ * constructor can honour, so it had to wait for the code that constructs the
+ * backend. `alpha` and `powerPreference` are still absent because
+ * `RendererOptions` (§61) does not carry them — accepting them here would mean
+ * storing values no backend ever reads, which is the accept-and-ignore this
+ * repository refuses. `autoResize` needs a `ResizeObserver` on a canvas the
  * host owns, so it arrives as an injected observer factory — the discipline
  * `PointerInput` uses for `PointerSurface` — rather than as a DOM reference in
  * this file.
@@ -182,16 +201,9 @@ export interface ApplicationOptions {
   maximumSubSteps?: number;
 
   /**
-   * The backend that draws the scene (§45, §61), or `false` (the default) for a
-   * headless application that draws nothing.
-   *
-   * **An instance, not a string** (decision, WP-3.6). §45 spells this option
-   * `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`, i.e. the application
-   * selects and constructs the backend. That form is deferred, for one
-   * concrete reason: resolving a string to a class means `four` importing every
-   * backend package at runtime, and every program — including the headless and
-   * determinism ones — would then carry a WebGL renderer it never uses. So the
-   * application author constructs the backend and hands it over:
+   * The backend that draws the scene (§45, §61) — an instance, or §45's string
+   * form — or `false` (the default) for a headless application that draws
+   * nothing.
    *
    * ```ts
    * import { WebglRenderer } from "@four/render-webgl";
@@ -202,19 +214,93 @@ export interface ApplicationOptions {
    * app.start();
    * ```
    *
-   * TODO(§62, renderer-selection packet): add the §45 string form
-   * (`"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`) as a *widening* of
-   * this option, resolved through a registry a backend package opts into, so
-   * that `"auto"`'s capability-ordered fallback (§62) exists without `four`
-   * statically importing any backend. Passing an instance stays supported: §45
-   * requires the systems to be constructible and ownable independently.
+   * ## The string form (R-2/A-8, 2026-08-07)
+   *
+   * §45 spells this option `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`,
+   * and since 2026-08-01 this class took an instance instead, because
+   * resolving a string to a class would mean `four` importing every backend
+   * package at runtime: every program — the headless and determinism ones
+   * included — would carry a WebGL renderer it never uses (§91; the deferral is
+   * recorded in MEMORY, and the payload evidence was a 14.88 kB example).
+   *
+   * The string now works, and that reason is intact, because `four` still
+   * imports no backend. A backend package registers itself into
+   * `@four/render`'s §62 registry when the application asks it to, and the
+   * string is resolved against whatever was registered:
+   *
+   * ```ts
+   * import { registerWebglRenderer } from "@four/render-webgl";
+   *
+   * registerWebglRenderer();                    // the app names its backends
+   * const app = new Application({ renderer: "auto", canvas, antialias: true });
+   * await app.initialize();                     // resolves, then initializes
+   * app.renderer;                               // the WebglRenderer, from here on
+   * ```
+   *
+   * `"auto"` prefers WebGPU, then WebGL 2, then a 2D backend (§62), skipping
+   * any that is unregistered, reports itself unsupported, or fails to
+   * initialize — each skip reported through
+   * {@link ApplicationOptions.onRendererFallback}. A named backend fails fast
+   * with `RENDERER_INITIALIZATION_FAILED` (§62, §89) rather than downgrading,
+   * and so does `"auto"` when nothing is left, naming every backend that *is*
+   * registered (§85).
+   *
+   * Three consequences worth stating:
+   *
+   * 1. **{@link Application.renderer} is `null` until
+   *    {@link Application.initialize} resolves** when a string is used — there
+   *    is no renderer to hold before then. With an instance it is set at
+   *    construction, exactly as before.
+   * 2. **The registry initializes the renderer it built.** §62's fallback is
+   *    defined in terms of `initialize` failing, so the selection has to be the
+   *    one calling it; this class does not call it a second time.
+   * 3. **Passing an instance stays fully supported**, and is what §45 requires
+   *    ("the application must permit advanced users to construct and own these
+   *    systems independently").
    *
    * The application **initializes** the renderer (see
    * {@link Application.initialize}) and **drives** it once per frame, but does
    * not own it: {@link Application.dispose} leaves it alone (§83 — whoever
-   * created a resource disposes it).
+   * created a resource disposes it), including one the registry built on its
+   * behalf.
    */
-  renderer?: Renderer | false;
+  renderer?: Renderer | RendererSelection | false;
+
+  /**
+   * Requests multisampled anti-aliasing from the backend (§45, §61).
+   *
+   * Forwarded verbatim as `RendererOptions.antialias` — to the string form's
+   * construction *and* initialization, and to an instance's `initialize`. A
+   * hint, not a requirement: §61 forbids a backend from failing initialization
+   * over it.
+   *
+   * Ignored when no renderer is configured.
+   */
+  antialias?: boolean;
+
+  /**
+   * Called for each backend `renderer: "auto"` passes over, with the §62 reason
+   * (`"unsupported"` or `"initialization-failed"`).
+   *
+   * This is §62's *"emits a diagnostics event"*, delivered as a callback: the
+   * frozen §3.1 matrix gives `@four/render` no `@four/diagnostics` edge, so the
+   * report is handed to the application, which is the one place that already
+   * has both. Forwarding it to a diagnostics channel is one line.
+   *
+   * Never called for an instance, or for an explicitly named backend — naming
+   * one means it must work, so its failure is thrown rather than reported.
+   */
+  onRendererFallback?: (report: RendererFallbackReport) => void;
+
+  /**
+   * The §62 registry {@link ApplicationOptions.renderer}'s string form resolves
+   * against; the shared one by default.
+   *
+   * Pass one to keep a selection scope to itself — the discipline the tests use
+   * so that one application's backends are invisible to the next, and the seam
+   * a host embedding two independent engines needs. Unread for an instance.
+   */
+  rendererRegistry?: RendererRegistry;
 
   /**
    * The drawing surface handed to the renderer as `initialize({ canvas })`
@@ -429,12 +515,21 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * The backend this application draws with (§45, §61), or `null` when it is
    * headless.
    *
-   * Constructed by the application *author* and merely driven here — see
+   * Constructed by the application *author* — or, for the string form, by the
+   * §62 registry on its behalf (R-2/A-8) — and merely driven here; see
    * {@link ApplicationOptions.renderer}. It is initialized by
    * {@link Application.initialize}, called once per frame after the `render`
    * event, and **not** disposed by {@link Application.dispose}.
+   *
+   * A getter rather than a `readonly` field since 2026-08-07, because a string
+   * selection has nothing to hold at construction: with `renderer: "auto"` this
+   * reads `null` until `initialize()` resolves, and the resolved backend from
+   * then on. With an instance it is set in the constructor and never changes,
+   * exactly as before.
    */
-  readonly renderer: Renderer | null;
+  get renderer(): Renderer | null {
+    return this.#renderer;
+  }
 
   /**
    * The viewports drawn each frame, in order (§48). Mutable: push, splice, and
@@ -502,6 +597,30 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   /** {@link ApplicationOptions.canvas}, held until `initialize` hands it over. */
   readonly #canvas: unknown;
 
+  /** {@link ApplicationOptions.antialias}, forwarded with the canvas (§61). */
+  readonly #antialias: boolean | undefined;
+
+  /**
+   * The backend, or `null` while headless or while a string selection is still
+   * unresolved. Written exactly twice at most: the constructor, and the
+   * selection inside {@link Application.initialize}.
+   */
+  #renderer: Renderer | null;
+
+  /**
+   * §45's string form, held until {@link Application.initialize} resolves it
+   * against the §62 registry, and `null` when the option was an instance or
+   * absent (R-2/A-8).
+   */
+  readonly #rendererSelection: RendererSelection | null;
+
+  /** {@link ApplicationOptions.onRendererFallback}; §62's diagnostics report. */
+  readonly #onRendererFallback:
+    ((report: RendererFallbackReport) => void) | undefined;
+
+  /** {@link ApplicationOptions.rendererRegistry}; the shared one when absent. */
+  readonly #rendererRegistry: RendererRegistry | undefined;
+
   /** Whether the frame's draw passes §43 interpolation. See the option. */
   readonly #poseInterpolation: boolean;
 
@@ -540,7 +659,14 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * factory it would call is a three-field zero literal. `RenderStatistics` is
    * imported as a *type*, so the shape is still pinned by the compiler.
    */
-  readonly #renderStatistics: RenderStatistics | null = null;
+  #renderStatistics: RenderStatistics | null = null;
+
+  /**
+   * Whether {@link ApplicationOptions.stats} asked for §84's draw counters, so
+   * that a renderer resolved later (the string form) is wired to them exactly
+   * as a constructed one is. Unread once `#renderStatistics` is set.
+   */
+  readonly #statisticsRequested: boolean;
 
   /** {@link ApplicationOptions.now}; unread while statistics are off. */
   readonly #now: () => number;
@@ -573,11 +699,23 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       maximumSubSteps: options.maximumSubSteps ?? DEFAULT_MAXIMUM_SUB_STEPS,
     });
     this.systems = new SystemRegistry();
-    this.renderer =
-      options.renderer === undefined || options.renderer === false
+    // §45's option is now an instance, a selection string, or `false`
+    // (R-2/A-8). The string is kept and resolved in `initialize`, because
+    // building a backend means acquiring a context — asynchronous by §61, and
+    // not something a constructor may do.
+    const rendererOption = options.renderer;
+    this.#renderer =
+      rendererOption === undefined ||
+      rendererOption === false ||
+      typeof rendererOption === "string"
         ? null
-        : options.renderer;
+        : rendererOption;
+    this.#rendererSelection =
+      typeof rendererOption === "string" ? rendererOption : null;
+    this.#onRendererFallback = options.onRendererFallback;
+    this.#rendererRegistry = options.rendererRegistry;
     this.#canvas = options.canvas;
+    this.#antialias = options.antialias;
     if (options.views !== undefined) {
       // Copied, not aliased: `views` is the application's array from here on,
       // so an author who keeps their own list does not accidentally share
@@ -587,20 +725,18 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     this.#now = options.now ?? monotonicNowSeconds;
     // §84 (A-1). One record for the application's lifetime, and — when the
     // backend reports draw counters at all — one for the renderer to
-    // accumulate into. Assigning `renderer.statistics` reaches into an object
-    // this class does not own, which is why it happens **only** when the
-    // application was asked for statistics, and why `dispose` puts it back:
-    // ownership follows construction (§83), so the borrow is scoped to the
-    // application's life exactly as the renderer's initialization is.
+    // accumulate into; `#lendStatistics` does the lending, here for an instance
+    // and again after a string selection resolves.
     this.stats = options.stats === true ? createFrameStats() : null;
-    const renderer = this.renderer;
-    if (this.stats !== null && renderer !== null && "statistics" in renderer) {
-      this.#renderStatistics = { drawCalls: 0, triangles: 0, instances: 0 };
-      renderer.statistics = this.#renderStatistics;
-    }
+    this.#statisticsRequested = this.stats !== null;
+    this.#lendStatistics();
     this.#depthRange = options.depthRange;
+    // A selection counts as "a renderer is configured" for the §43 default: the
+    // capture system is registered here or not at all (see below), and a
+    // program that asked for `renderer: "auto"` is going to draw.
     this.#poseInterpolation =
-      options.poseInterpolation ?? this.renderer !== null;
+      options.poseInterpolation ??
+      (this.#renderer !== null || this.#rendererSelection !== null);
     this.#interpolation = { poseBuffer: this.poses, alpha: 0 };
     if (this.#poseInterpolation) {
       // §39 step 10, at the default `POSE_SNAPSHOT_PRIORITY`: after every
@@ -740,10 +876,69 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   initialize(): Promise<void> {
     this.#assertNotDisposed("initialize");
     this.#initialization ??= Promise.resolve().then(async () => {
-      await this.renderer?.initialize({ canvas: this.#canvas });
+      const selection = this.#rendererSelection;
+      if (selection === null) {
+        await this.#renderer?.initialize({
+          canvas: this.#canvas,
+          antialias: this.#antialias,
+        });
+      } else {
+        // The registry constructs *and* initializes: §62's fallback is defined
+        // in terms of initialization failing, so it has to own that call. What
+        // comes back is ready to draw, and is never initialized twice.
+        const renderer = await resolveRenderer(
+          selection,
+          {
+            canvas: this.#canvas,
+            antialias: this.#antialias,
+            onFallback: this.#onRendererFallback,
+          },
+          this.#rendererRegistry,
+        );
+        this.#renderer = renderer;
+        this.#lendStatistics();
+        // A size declared before the backend existed — through the `width`/
+        // `height` options or a `resize` call — was recorded but had nothing to
+        // forward to. Replay it now, so the string form ends up in exactly the
+        // state the instance form is in.
+        if (this.#surfaceWidth > 0 && this.#surfaceHeight > 0) {
+          this.resize(
+            this.#surfaceWidth,
+            this.#surfaceHeight,
+            this.#resolution,
+          );
+        }
+      }
       this.#initialized = true;
     });
     return this.#initialization;
+  }
+
+  /**
+   * Hands the renderer the §84 record to accumulate into, if this application
+   * was asked for statistics and the backend reports them (A-1).
+   *
+   * Called from the constructor for an instance and from
+   * {@link Application.initialize} for a resolved selection, so both forms wire
+   * up identically. Idempotent: a second call with the record already lent
+   * re-assigns the same object.
+   */
+  #lendStatistics(): void {
+    const renderer = this.#renderer;
+    if (
+      !this.#statisticsRequested ||
+      renderer === null ||
+      !("statistics" in renderer)
+    ) {
+      return;
+    }
+    // Assigning `renderer.statistics` reaches into an object this class does
+    // not own, which is why it happens **only** when the application was asked
+    // for statistics, and why `dispose` puts it back: ownership follows
+    // construction (§83), so the borrow is scoped to the application's life
+    // exactly as the renderer's initialization is.
+    this.#renderStatistics ??= { drawCalls: 0, triangles: 0, instances: 0 };
+    renderer.statistics = this.#renderStatistics;
   }
 
   /**

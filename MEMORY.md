@@ -28,6 +28,27 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — Auto-selection registries (A-8/R-2/PH-19).** Decisions worth keeping:
+  - **The WP-3.6/§45 departure is retired, not reversed** — §45's string works as a
+    _widening_; `four` still never imports a backend. Payload measured both ways:
+    instance +0.2–0.3 kB gzip, `"auto"` +0.78 kB paid only by the asker.
+  - **Explicit registration calls, never side-effect imports** — forced by
+    `"sideEffects": false` on all 24 packages (a side-effect module is _correctly_
+    deletable). Applies to every future registry in this repo.
+  - **`resolveRenderer`/`resolveSolver` must never statically reference their registry
+    class** (lazily-created module `let`) — the single discipline keeping registries
+    and backends out of instance-naming bundles; breaking it silently regresses every
+    example.
+  - **§62's diagnostics event is a callback in both tiers** (`onFallback`/
+    `onSolverReject`) — §3.1 gives neither `render` nor `physics` a diagnostics edge.
+  - **`isSupported` must never touch the caller's canvas** — a probing `getContext`
+    would fix the context attributes and silently disable `antialias`; the probe is an
+    environment question, `initialize` is the real gate, and `"auto"` recovers from its
+    failure.
+  - Renderer `"auto"` uses §62's order (registration order ignored — §33); solver
+    `"auto"` uses registration order (§37 fixes no preference); the headless tier is
+    never auto-selected; a _named_ solver is handed back unfiltered so `PhysicsWorld`
+    reports mismatches with its own precise message.
 - **2026-08-07 — PH-9 AnimationController.** Decisions worth keeping:
   - **The controller is a pose evaluator, not a mixer scheduler** — cross-fades need
     two clips writing one property at once, which the mixer's claim semantics call a

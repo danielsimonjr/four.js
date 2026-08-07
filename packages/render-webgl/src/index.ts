@@ -56,6 +56,7 @@ export type {
 export { RenderTargetCache } from "./gl-render-target.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";
 export { TextureCache } from "./gl-texture.js";
+export { isWebgl2Supported, registerWebglRenderer } from "./register.js";
 export type {
   WebglCanvas,
   WebglContextAttributes,

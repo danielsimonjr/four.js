@@ -203,6 +203,12 @@ import {
 } from "./rigid-body.js";
 import type { CollisionShape } from "./shapes.js";
 import type {
+  SolverRegistry,
+  SolverRejectionReport,
+  SolverSelection,
+} from "./solver-registry.js";
+import { resolveSolver } from "./solver-registry.js";
+import type {
   BodyType,
   DeterminismLevel,
   PhysicsBodyHandle,
@@ -266,14 +272,64 @@ export type PhysicsWorldAdapter = PhysicsSolverAdapter & SolverBodyAccess;
  */
 export interface PhysicsWorldInit extends PhysicsWorldOptions {
   /**
-   * The solver this world drives (plan P5-5: an instance, not a `solver: "auto"`
-   * string — that selection joins the §45 registry backlog).
+   * The solver this world drives, as an instance the application constructed
+   * (plan P5-5).
    *
    * Its `capabilities` are checked against `dimension` and `determinism` at
    * construction, so a world that cannot be simulated fails immediately rather
    * than degrading quietly (§37).
+   *
+   * Exactly one of `adapter` and {@link PhysicsWorldInit.solver} is required;
+   * giving both is refused rather than silently preferring one (§85).
    */
-  adapter: PhysicsWorldAdapter;
+  adapter?: PhysicsWorldAdapter;
+
+  /**
+   * §20's `solver: "auto"` — or one §102 solver by name — resolved through
+   * `@four/physics`'s solver registry (PH-19, 2026-08-07).
+   *
+   * The alternative to {@link PhysicsWorldInit.adapter}, and the reason it took
+   * this long: resolving a name means *something* has to map it to a class, and
+   * that something must not be this package, which would then import every
+   * solver Rapier and Box2D ship — wasm images included — into every program
+   * that ever named `PhysicsWorld`. So a solver package opts in explicitly and
+   * this option resolves against whatever the application actually imported:
+   *
+   * ```ts
+   * import { registerRapierSolver } from "@four/physics-rapier";
+   *
+   * registerRapierSolver();
+   * const world = new PhysicsWorld({ dimension: "3d", solver: "auto" });
+   * ```
+   *
+   * `"auto"` takes the first registered solver whose §37 capabilities cover
+   * this world's `dimension` and `determinism` (§20, §37); a name is handed
+   * back unfiltered, so an unsatisfiable one fails with this constructor's own
+   * §21/§33 message. Either way the adapter arrives **uninitialized** and
+   * {@link PhysicsWorld.initialize} awaits it exactly as it awaits one you
+   * constructed yourself.
+   */
+  solver?: SolverSelection;
+
+  /**
+   * The registry {@link PhysicsWorldInit.solver} resolves against; the shared
+   * one by default (§37).
+   *
+   * Pass one to keep a selection scope to itself — the discipline the tests use
+   * so that one world's registrations are invisible to the next.
+   */
+  solverRegistry?: SolverRegistry;
+
+  /**
+   * Called for each solver `solver: "auto"` passes over, with the §37 reason
+   * (`"unsupported"`, `"dimension"`, `"determinism"`).
+   *
+   * The solver-side twin of §62's fallback diagnostics event, delivered as a
+   * callback for the same reason: the frozen §3.1 matrix gives `@four/physics`
+   * no `@four/diagnostics` edge, so the report is handed to the application to
+   * route. Unread for an instance or a named solver.
+   */
+  onSolverReject?: (report: SolverRejectionReport) => void;
 
   /**
    * The engine's previous/current pose store (§43). When given, the node of
@@ -544,6 +600,52 @@ function absorbFloat(state: number, x: number): number {
  * See the module header for the pipeline, the pose contract, and what the world
  * does not own.
  */
+/**
+ * The adapter a {@link PhysicsWorldInit} names: the instance it carries, or the
+ * one its `solver` selection resolves to (§20, §37; PH-19).
+ *
+ * Exactly one of the two, checked here rather than in the type system, because
+ * a `PhysicsWorldInit` union would ripple through every caller that builds an
+ * init record field by field for the sake of a mistake that costs one `if`.
+ * Both and neither are refused with the same §85 loudness: an init carrying an
+ * `adapter` *and* a `solver` has two different intentions in it, and silently
+ * preferring one would make which solver ran a matter of reading this file.
+ */
+function selectAdapter(init: PhysicsWorldInit): PhysicsWorldAdapter {
+  if (init.adapter !== undefined) {
+    if (init.solver !== undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `A PhysicsWorld takes either an \`adapter\` instance or a \`solver\` selection, not both (§20, §37); this init carries an adapter and solver ${JSON.stringify(init.solver)}.`,
+        { context: { adapter: init.adapter.name, solver: init.solver } },
+      );
+    }
+    return init.adapter;
+  }
+  if (init.solver === undefined) {
+    throw new FourError(
+      WORLD_ERROR_CODE,
+      'A PhysicsWorld needs a solver: pass `adapter` (an instance you constructed) or `solver` ("auto", or a §102 solver by name, resolved through the registry a solver package registers itself into) — §20, §37.',
+      { context: { dimension: init.dimension } },
+    );
+  }
+  return resolveSolver(
+    init.solver,
+    {
+      // The §37 record the selection reads, spelled out rather than spread:
+      // `init` also carries `adapter`, `poses`, and the registry itself, none
+      // of which is a world option.
+      dimension: init.dimension,
+      gravity: init.gravity,
+      sleeping: init.sleeping,
+      determinism: init.determinism,
+      solverIterations: init.solverIterations,
+      onReject: init.onSolverReject,
+    },
+    init.solverRegistry,
+  );
+}
+
 export class PhysicsWorld {
   /** The adapter this world drives (plan P5-5). */
   readonly #adapter: PhysicsWorldAdapter;
@@ -710,8 +812,9 @@ export class PhysicsWorld {
   readonly #bindingScratch = new Quaternion();
 
   /**
-   * Builds a world for `init.adapter` and validates that the adapter can
-   * actually simulate it (§21, §33, §37).
+   * Builds a world for `init.adapter` — or for the solver `init.solver` names
+   * (PH-19) — and validates that the adapter can actually simulate it (§21,
+   * §33, §37).
    *
    * The options are checked by `validatePhysicsWorldOptions` (§85) and then
    * *resolved*: gravity is widened to the engine's 3D form (Appendix A's
@@ -720,21 +823,24 @@ export class PhysicsWorld {
    * `"same-runtime"`. The resolved record is what `initialize` hands the
    * adapter, so the solver and the engine agree on every value.
    *
-   * @throws FourError if the options are invalid (§85), if the adapter does not
-   * declare `dimension` among its `capabilities.dimensions`, or if the requested
-   * determinism tier is stronger than the adapter declares (§33, §37).
+   * @throws FourError if the options are invalid (§85), if neither or both of
+   * `adapter` and `solver` are given, if `solver` names nothing registered
+   * (§37), if the adapter does not declare `dimension` among its
+   * `capabilities.dimensions`, or if the requested determinism tier is stronger
+   * than the adapter declares (§33, §37).
    */
   constructor(init: PhysicsWorldInit) {
     validatePhysicsWorldOptions(init);
 
-    const capabilities = init.adapter.capabilities;
+    const adapter = selectAdapter(init);
+    const capabilities = adapter.capabilities;
     if (!capabilities.dimensions.includes(init.dimension)) {
       throw new FourError(
         WORLD_ERROR_CODE,
-        `Adapter ${JSON.stringify(init.adapter.name)} declares dimensions [${capabilities.dimensions.join(", ")}] and cannot simulate a ${JSON.stringify(init.dimension)} world (§21, §37).`,
+        `Adapter ${JSON.stringify(adapter.name)} declares dimensions [${capabilities.dimensions.join(", ")}] and cannot simulate a ${JSON.stringify(init.dimension)} world (§21, §37).`,
         {
           context: {
-            adapter: init.adapter.name,
+            adapter: adapter.name,
             requested: init.dimension,
             supported: [...capabilities.dimensions],
           },
@@ -749,10 +855,10 @@ export class PhysicsWorld {
     ) {
       throw new FourError(
         WORLD_ERROR_CODE,
-        `Adapter ${JSON.stringify(init.adapter.name)} declares determinism ${JSON.stringify(capabilities.determinism)}, weaker than the requested ${JSON.stringify(determinism)} (§33, §37). Ask for a tier the solver can reach, or use another solver.`,
+        `Adapter ${JSON.stringify(adapter.name)} declares determinism ${JSON.stringify(capabilities.determinism)}, weaker than the requested ${JSON.stringify(determinism)} (§33, §37). Ask for a tier the solver can reach, or use another solver.`,
         {
           context: {
-            adapter: init.adapter.name,
+            adapter: adapter.name,
             requested: determinism,
             declared: capabilities.determinism,
           },
@@ -760,14 +866,12 @@ export class PhysicsWorld {
       );
     }
 
-    this.#adapter = init.adapter;
+    this.#adapter = adapter;
     this.#dimension = init.dimension;
     this.#gravity = resolveGravity(init.dimension, init.gravity);
     this.#sleeping = resolveSleepingConfig(init.sleeping);
     this.#tuning = resolveTuningCapabilities(capabilities);
-    this.#bodyTuning = supportsSolverBodyTuning(init.adapter)
-      ? init.adapter
-      : undefined;
+    this.#bodyTuning = supportsSolverBodyTuning(adapter) ? adapter : undefined;
     this.#warnUnhonouredSleepThresholds();
     this.#determinism = determinism;
     this.#poses = init.poses;
