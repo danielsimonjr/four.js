@@ -3,8 +3,9 @@
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
 (§118–119). Every major feature should have a runnable example (§93).
 
-**Six examples are implemented.** The other six entries below are **not yet written; the
-directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
+**Seven examples are implemented** (six until 2026-08-07, when `first-3d-scene` was
+written). The other five entries below are **not yet written; the directory is a
+placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
 they were described only as "scaffold only" in this paragraph while reading like a catalogue
 of demos in the list; each such row now carries the marker on its own line. The absence is
 dated in `docs/AUDIT-120.md` as **S-8**, and `tools/check-docs.mjs` fails if this file or a
@@ -35,9 +36,14 @@ guide points at one of them without the marker.
   buttons and labels laid out by the package and skinned by the application, driven by real
   pointer and keyboard input, with a drawn focus ring (`pnpm run ui-demo:build`). Listed
   here from 2026-08-05; it shipped earlier and this file had never mentioned it.
-- [`first-3d-scene/`](first-3d-scene/) — **Not yet written; directory is a placeholder.**
-  Planned as §93's first 3D scene: mesh, camera, lighting. No shipped example uses a
-  `PerspectiveCamera`, so this is the one placeholder with no stand-in.
+- [`first-3d-scene/`](first-3d-scene/) — **Implemented (2026-08-07).** §93's first 3D
+  scene, and the first example of any kind to use a `PerspectiveCamera`: two identical
+  spheres at different depths (the projection measured in pixels, not asserted by class
+  name), a tumbling torus, a bobbing capsule and a ground plane, all `LitMaterial` under one
+  `DirectionalLight` plus scene ambient (§47, §53, §57, §68).
+  Build it with `pnpm run first-3d-scene:build`; it is non-wasm and ~23 kB gzip.
+  This entry read "**not yet written; directory is a placeholder** … the one placeholder
+  with no stand-in" until that date.
 - [`first-animated-scene/`](first-animated-scene/) — **Not yet written; directory is a
   placeholder.** Planned as §93's first animated scene: tweens and a timeline. Animation
   ships inside `first-2d-scene/`.

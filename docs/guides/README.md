@@ -4,17 +4,20 @@ The prose half of the §93 Documentation Plan. §93 lists nineteen documentation
 items; the first six — installation and quick start, and the five worked
 scenes — are carried by the root `README.md` and the example apps:
 
-| §93 item                     | where it lives                                                                                                                                                         |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| installation and quick start | root `README.md`                                                                                                                                                       |
-| first 2D scene               | `examples/first-2d-scene`                                                                                                                                              |
-| first 3D scene               | `examples/first-3d-scene` — **not yet written; directory is a placeholder** (`.gitkeep` only). Nearest shipped equivalent: none — no example uses a perspective camera |
-| first animated scene         | `examples/first-animated-scene` — **not yet written; directory is a placeholder**. Animation is demonstrated inside `examples/first-2d-scene`                          |
-| first physics scene          | `examples/first-physics-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`                                                    |
-| mixed 2D/3D/physics example  | `examples/mixed-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`, which steps a 2D and a 3D world side by side              |
+| §93 item                     | where it lives                                                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| installation and quick start | root `README.md`                                                                                                                                            |
+| first 2D scene               | `examples/first-2d-scene`                                                                                                                                   |
+| first 3D scene               | `examples/first-3d-scene` — a `PerspectiveCamera` over `LitMaterial` meshes under one `DirectionalLight` plus scene ambient, written 2026-08-07 (see below) |
+| first animated scene         | `examples/first-animated-scene` — **not yet written; directory is a placeholder**. Animation is demonstrated inside `examples/first-2d-scene`               |
+| first physics scene          | `examples/first-physics-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`                                         |
+| mixed 2D/3D/physics example  | `examples/mixed-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`, which steps a 2D and a 3D world side by side   |
 
 This table listed the four placeholder rows as though they were written until 2026-08-05.
-The absence is dated in `docs/AUDIT-120.md` as **S-8**; `tools/check-docs.mjs` fails if a
+The first 3D scene's row itself read "**not yet written; directory is a placeholder**
+(`.gitkeep` only). Nearest shipped equivalent: none — no example uses a perspective camera"
+until 2026-08-07, when that example was written; three placeholder rows remain. The
+absence is dated in `docs/AUDIT-120.md` as **S-8**; `tools/check-docs.mjs` fails if a
 doc points at one of these directories without the placeholder marker.
 
 The remaining thirteen items are these guides. Read them in this order — each

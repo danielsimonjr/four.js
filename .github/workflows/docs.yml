@@ -33,8 +33,8 @@ jobs:
     name: Build the site
     runs-on: ubuntu-latest
     env:
-      # The six examples that have a main.ts. Named once, looped over twice.
-      EXAMPLES: first-2d-scene physics-playground mechanism blending particles-demo ui-demo
+      # The seven examples that have a main.ts. Named once, looped over twice.
+      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo
     steps:
       - name: Checkout
         uses: actions/checkout@v4

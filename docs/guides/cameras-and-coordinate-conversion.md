@@ -140,11 +140,15 @@ handover is untrack + authority write, in that order.
 - Camera **rigs** (orbit, follow, §44) live in `@four/motion` per the spec,
   but no rig classes have shipped yet — place cameras manually or drive them
   with tweens/trajectories.
-- Every shipped example uses an orthographic camera. `PerspectiveCamera` is
-  implemented and unit-tested, but **no example exercises it**: this bullet
-  claimed `examples/first-3d-scene` did until 2026-08-05, and that directory is
-  a placeholder holding a `.gitkeep` (`docs/AUDIT-120.md`, **S-8**). The
-  perspective path has no browser-level demonstration.
+- `PerspectiveCamera` is exercised by exactly one example,
+  `examples/first-3d-scene` (written 2026-08-07); every other shipped example
+  uses an orthographic camera. This bullet claimed the same example did until
+  2026-08-05, when the claim was **false** — the directory then held only a
+  `.gitkeep` — and it read "no example exercises it … the perspective path has
+  no browser-level demonstration" from that date until the example was written.
+  The projection is now measured in a browser rather than asserted:
+  `tests/browser/first-3d-scene.spec.ts` compares the on-screen area of two
+  identical spheres at different depths (`docs/AUDIT-120.md`, **S-8**).
 
 ## Cross-references
 

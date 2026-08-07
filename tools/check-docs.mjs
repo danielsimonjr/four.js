@@ -240,7 +240,9 @@ const RETIRED = [
     re: /10 example applications/i,
     where: ["docs/AUDIT-120.md"],
     allow: ["docs/AUDIT-120.md", "CHANGELOG.md"],
-    why: "six examples/* directories have a main.ts; the rest are .gitkeep (S-8)",
+    why:
+      "seven examples/* directories have a main.ts (six until 2026-08-07, when " +
+      "first-3d-scene was written); the rest are .gitkeep (S-8)",
   },
   {
     re: /tests\/visual\/.*empty placeholder/i,

@@ -28,6 +28,21 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — first-3d-scene (S-8 half-closure).** Decisions worth keeping:
+  - **A perspective claim must be measured in pixels**: two spheres sharing a geometry
+    _instance_ and a material _instance_ at 5.0 m / 10.2 m give a 4.04× area ratio; an
+    orthographic camera gives exactly 1.0. A `data-camera` page attribute is context, not
+    evidence.
+  - **Hue classifiers need every channel pair pinned** — `blue − red` alone let lit green
+    `(86,255,143)` pass as violet (5 287 capsule pixels misattributed, measured). The
+    palette is stated as byte values in both the example and its spec.
+  - **Ergonomics gaps observed, no engine change made**: no `lookAt` on `Node`/`Camera`
+    (aiming camera and light is hand-composed quaternions — §44 camera rigs still
+    unshipped, roughest edge of the first 3D scene); the 3D primitives' segment-option
+    names are inconsistent across the family (`widthSegments`/`tubularSegments`/
+    `capSegments`) — candidates for a future naming pass.
+  - Gotcha: `vite preview --strictPort` servers survive an interrupted Playwright run —
+    kill `vite.js preview` processes before re-running `pnpm test:browser`.
 - **2026-08-07 — Closure-review fix batch (24 findings).** Decisions worth keeping:
   - **`KinematicController`'s §79 payload is deliberately empty** (`{}`): no constructor
     options; in-flight commands are simulation state; `followPath` holds a live

@@ -90,6 +90,7 @@ directly with `npx vite examples/<name>`.
 | Example              | Shows                                                                                           |
 | -------------------- | ----------------------------------------------------------------------------------------------- |
 | `first-2d-scene`     | Scene/render/motion pillars, §13 trajectories, tweens/clips/timelines, picking, dragging, text  |
+| `first-3d-scene`     | Perspective camera, §53 3D primitives, §68 directional light + ambient, lit materials           |
 | `physics-playground` | Rigid bodies on the Rapier adapter, mixed 2D/3D worlds, §42 authority                           |
 | `mechanism`          | §28 joints: a slider-crank driven by a motor, with live limits                                  |
 | `blending`           | §19 physics-animation blending: animated ↔ ragdoll ↔ recovering, in-place re-typing             |

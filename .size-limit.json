@@ -5,6 +5,11 @@
     "gzip": true
   },
   {
+    "path": "examples/first-3d-scene/dist/assets/*.js",
+    "limit": "28 kB",
+    "gzip": true
+  },
+  {
     "path": "examples/particles-demo/dist/assets/*.js",
     "limit": "25 kB",
     "gzip": true

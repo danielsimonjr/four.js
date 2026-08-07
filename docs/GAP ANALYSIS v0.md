@@ -561,16 +561,16 @@ _Closure plan:_ one line in `packages/render-webgpu/README.md` and a `TODO.md` e
 
 _Verified by `git ls-files examples/`:_
 
-| directory                                       | contents   |
-| ----------------------------------------------- | ---------- |
-| `examples/first-3d-scene/`                      | `.gitkeep` |
-| `examples/first-animated-scene/`                | `.gitkeep` |
-| `examples/first-physics-scene/`                 | `.gitkeep` |
-| `examples/mixed-scene/`                         | `.gitkeep` |
-| `examples/flagship/one-scene-everything-moves/` | `.gitkeep` |
-| `examples/flagship/motor-digital-twin/`         | `.gitkeep` |
+| directory                                       | contents                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `examples/first-3d-scene/`                      | `.gitkeep` — **written 2026-08-07** (see banner above this table's section) |
+| `examples/first-animated-scene/`                | `.gitkeep`                                                                  |
+| `examples/first-physics-scene/`                 | `.gitkeep`                                                                  |
+| `examples/mixed-scene/`                         | `.gitkeep`                                                                  |
+| `examples/flagship/one-scene-everything-moves/` | `.gitkeep`                                                                  |
+| `examples/flagship/motor-digital-twin/`         | `.gitkeep`                                                                  |
 
-**Six real examples exist** — `first-2d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo` — and each is genuinely good (built by `pnpm examples:build`, previewed and asserted by a Playwright spec, guarded against config drift by `tests/integration/examples-build-coverage.test.ts`).
+**Six real examples exist** (seven since 2026-08-07: `first-3d-scene` was written — first `PerspectiveCamera`, first lit 3D mesh in a browser, 5 measuring Playwright tests) — `first-2d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo` — and each is genuinely good (built by `pnpm examples:build`, previewed and asserted by a Playwright spec, guarded against config drift by `tests/integration/examples-build-coverage.test.ts`).
 
 **Three separate documents assert otherwise:**
 

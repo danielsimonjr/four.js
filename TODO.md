@@ -143,12 +143,14 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (doc-truth sweep, 2026-08-05)
 
-- [ ] The §93/§118–119 examples do not exist (`docs/AUDIT-120.md` **S-8**):
-      `first-3d-scene`, `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
+- [ ] The §93/§118–119 examples: five of the six directories still do not exist
+      (`docs/AUDIT-120.md` **S-8**, partially closed 2026-08-07 — `first-3d-scene` was
+      written): `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
       `flagship/one-scene-everything-moves`, `flagship/motor-digital-twin` are
-      `.gitkeep`-only. Three have shipped stand-ins; the real hole is that **no example
-      exercises a `PerspectiveCamera` or a lit 3D mesh in a browser** — write
-      `first-3d-scene` first, or retire the directories with an owner decision
+      `.gitkeep`-only. All three remaining §93 scenes have shipped stand-ins (animation
+      inside `first-2d-scene`; physics and mixed 2D/3D by `physics-playground`), so what
+      is left is the two §118–119 flagships plus an owner decision to retire the three
+      stand-in directories
 - [ ] §65 sprite/glyph batching is unshipped and now says so in three places
       (AUDIT-120 sprites row + S-4, the render-graph guide, `benchmarks/README.md`);
       it blocks two §86 benchmark rows outright

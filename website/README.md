@@ -11,7 +11,8 @@ dashboards, digital twins), and API documentation generated from TypeScript decl
 and deploys to GitHub Pages:
 
 - **the API reference** — TypeDoc output for all 24 packages (`pnpm run docs`), at `/api/`;
-- **the six runnable examples** — `first-2d-scene`, `physics-playground`, `mechanism`,
+- **the seven runnable examples** (six until 2026-08-07, when `first-3d-scene` was
+  written) — `first-2d-scene`, `first-3d-scene`, `physics-playground`, `mechanism`,
   `blending`, `particles-demo`, `ui-demo`, each built with
   `--base=/four.js/examples/<name>/` because Pages hosts them under a subpath, at
   `/examples/<name>/`;

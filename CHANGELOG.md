@@ -8,6 +8,33 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — S-8 half-closed: `examples/first-3d-scene`, the first 3D browser proof
+
+#### Added
+
+- **`examples/first-3d-scene`** — §93's first 3D scene and the first example of any kind
+  to construct a `PerspectiveCamera` or draw a `LitMaterial`: two **identical** spheres
+  (one geometry instance, one material instance — the projection is the only variable) at
+  different depths, a torus spun by a §38 `MotionComponent`, a capsule bobbed by a §15
+  tween, and a ground plane, all under one `DirectionalLight` plus `Scene.ambientLight`
+  (§47, §53, §57, §68). Non-wasm, 23.31 kB gzip; seventh Vite site and preview server
+  (port 4179), `.size-limit.json` budget 28 kB.
+- **`tests/browser/first-3d-scene.spec.ts`** (5 tests; browser total 38 → 43) — measures
+  rather than asserts: the near sphere covers **4.04×** the pixels of the identical far
+  one (an orthographic camera scores exactly 1.0; the §47 prediction was 4.1), and each
+  sphere's lit quadrant is 3.0–3.7× brighter than its shadowed one with the §68 ambient
+  term keeping the dark side above the background.
+
+#### Changed
+
+- `docs/AUDIT-120.md` examples row 6 → 7; **S-8** restated as partially closed (five
+  placeholder directories remain) with its superseded wording quoted and dated;
+  `examples/README.md`, root `README.md`, `website/README.md`, `docs.yml`'s deploy list,
+  `docs/guides/README.md`, and `docs/guides/cameras-and-coordinate-conversion.md`
+  corrected in place — "no example exercises a perspective camera" stopped being true on
+  this date. `tools/check-docs.mjs`'s retired-claim reason updated to match (now pins
+  seven).
+
 ### 2026-08-07 — Closure-review fixes: 24 findings from the adversarial pass over the wave commits
 
 An adversarial code review of the five landed closure batches (93cda8d, ab13840, fe8eb6f,
