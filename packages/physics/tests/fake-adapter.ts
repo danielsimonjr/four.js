@@ -351,6 +351,20 @@ export class FakeSolverAdapter
     const collider = this.#requireCollider(handle);
     collider.alive = false;
     this.colliders.delete(collider.id);
+    // The mass model runs in both directions (PH-5): a collider that stops
+    // existing stops contributing, which is what lets a test watch a
+    // derived-mass body lose — and an authored-mass body keep — its mass across
+    // a runtime removal. `destroyBody` never reaches here (the world tears a
+    // registration down with one `destroyBody`), so this is the body-survives
+    // case §37 defines `destroyCollider` for.
+    const { body } = collider;
+    const index = body.colliders.indexOf(collider);
+    if (index >= 0) {
+      body.colliders.splice(index, 1);
+    }
+    if (body.descriptor.mass === undefined) {
+      body.mass -= collider.descriptor.density ?? DEFAULT_DENSITY;
+    }
     this.#record("destroyCollider", collider.id);
   }
 

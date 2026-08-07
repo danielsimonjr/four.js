@@ -1422,6 +1422,15 @@ Unreachable through `PhysicsWorld` today (its only `destroyCollider` call is ins
 
 ## PH-5 — No runtime collider add/remove on a registered body
 
+> **CLOSED 2026-08-07.** `PhysicsWorld.addCollider` / `removeCollider`, resolving the
+> body through `Collider.requireBody()` (one source of truth with `addBody`'s scan).
+> `registration.colliders` stays ascending-by-id; `#collidersById`/`#collidersByComponent`
+> give event, query, and handle visibility; a pending `refreshCollider` is dropped with
+> its collider. Mass proven across add **and** remove on authored- and derived-mass
+> bodies, against the double and real Rapier in both dimensions. §34 needed nothing —
+> the envelope's collider table already re-derives `BodyRecord.colliderIds`. Goldens
+> unchanged. Kept for the record.
+
 |                       |                                    |
 | --------------------- | ---------------------------------- |
 | **Spec**              | §24, §83 (resource lifecycle), §37 |

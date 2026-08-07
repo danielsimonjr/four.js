@@ -27,6 +27,10 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+- [x] **PH-5 CLOSED 2026-08-07:** `PhysicsWorld.addCollider`/`removeCollider` — one
+      collider on a live body, handle/id/checksum position/joints/pose all surviving;
+      mass proven both directions on authored- and derived-mass bodies; §34 needed
+      nothing. PH-1's post-registration-collider refusal blocker lifted
 - [x] **PH-1 CLOSED 2026-08-07** (stage 1 truth table 2026-08-06; stage 2 live writes
       2026-08-07): `SolverBodyTuningAccess` + step-top drain; mass/damping/gravity/CCD/
       collider material/filter live on Rapier; `PhysicsWorld.teleport` ships

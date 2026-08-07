@@ -28,6 +28,21 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — PH-5 (runtime colliders).** Decisions worth keeping:
+  - **No `node` parameter, no diffing refresh** — `Collider.requireBody()` is the single
+    source of truth about which body a collider joins, shared verbatim with `addBody`'s
+    subtree scan; a diffing `refreshBody(node)` would be a second rule and a per-step
+    cost.
+  - **`removeCollider` returns `false`; `addCollider` throws** — removal follows
+    `removeBody`/`removeJoint` (unconditional teardown paths); `refreshCollider` throws
+    because a silent no-op refresh is invisible. Contrast documented in the methods.
+  - **`derivedMass` clears only at zero colliders**, never on a non-positive reported
+    mass — §23 forbids reading a solver's 0 as "no mass" (non-dynamic bodies answer 0).
+    `setRigidBodyDerivedMass` takes `number | undefined` (package-internal).
+  - **The adapters and §34 needed nothing**: F8's kept mass refresh was written for the
+    body-survives case, PH-3's heir logic holds, and F8's re-derivation of `colliderIds`
+    from the envelope's collider table makes a runtime add snapshot-safe for free —
+    proven, not assumed.
 - **2026-08-07 — PH-1 stage 2 (live solver writes).** Decisions worth keeping:
   - **A third optional seam, detected structurally, not a seventh capability field** —
     `supportsSolverBodyTuning` is **all-or-nothing** across six methods (per-property

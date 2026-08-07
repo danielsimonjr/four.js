@@ -903,6 +903,11 @@ export class PhysicsWorld {
    * `addBody(childNode)` call. That is why several colliders on one body are
    * expressed as child nodes (WP-5.2).
    *
+   * The scan happens **once**, here. A `Collider` attached after this call is
+   * handed over with {@link PhysicsWorld.addCollider}, which applies the same
+   * §24 resolution to one component (PH-5); one attached and never handed over
+   * simply is not simulated.
+   *
    * ## The initial pose (decision, WP-5.3)
    *
    * An authored `position`/`rotation` on the `RigidBody` descriptor wins; when
@@ -1058,6 +1063,153 @@ export class PhysicsWorld {
     return true;
   }
 
+  /**
+   * Registers **one** `Collider` on a body this world already holds (§24, §37,
+   * §83; PH-5, 2026-08-07).
+   *
+   * ```ts
+   * const shield = new Node();
+   * shield.addComponent(new Collider({ shape: { type: "circle", radius: 1 } }));
+   * player.addChild(shield);
+   * world.addCollider(shield.getComponent(Collider)!); // …live from here on
+   * ```
+   *
+   * ## Which body it joins — the same rule `addBody` uses, not a second one
+   *
+   * There is no `node` parameter and no body parameter: the collider's own §24
+   * ancestor walk (`Collider.requireBody`) names its body, exactly as
+   * `#collectColliders` tests it during `addBody`. One source of truth means a
+   * collider cannot be attached to a body it does not belong to, and moving the
+   * node under a different body before calling this changes the answer in the
+   * one place §24 says it lives.
+   *
+   * The body must already be registered **here**. Attaching to an unregistered
+   * node is refused rather than quietly registering the body too, because
+   * `addBody` is the call that decides a body's pose, tracking, and mass, and
+   * inferring all three from a collider would be inventing them.
+   *
+   * ## Explicit, like `refreshCollider` and for the same reason
+   *
+   * A `Collider` reaching a node is a plain `addComponent` the world cannot
+   * observe (§6a components have no world edge), so the alternative was to
+   * re-scan every registered body's subtree every step and diff it — real
+   * per-step cost, in a world where colliders almost never appear at runtime.
+   * This says so instead. See {@link PhysicsWorld.refreshCollider}, whose
+   * explicit-by-design note is the precedent.
+   *
+   * ## Ordering, mass, and §33
+   *
+   * The new registration is appended to its body's collider list, which keeps
+   * that list in **ascending adapter collider id** — the order the per-step
+   * drain and every checksum-visible iteration depend on — because adapter
+   * collider ids are monotonic and never reused, so a collider created now
+   * outranks every collider created before it.
+   *
+   * The body's mass is then re-read from the solver, since §23/§25 derive a
+   * mass from collider density: a derived-mass body gains this collider's
+   * contribution, and an authored-mass body keeps the mass it authored (the
+   * adapter is what decides which collider carries it — see
+   * `PhysicsSolverAdapter.createCollider`). Nothing is created in the solver
+   * until every check has passed, so a rejected call leaves the world exactly
+   * as it found it (§85).
+   *
+   * @returns the registered collider, for chaining
+   * @throws FourError if the world is not initialized, if the collider is
+   * already registered here, if it has no `RigidBody` above it (§23), if that
+   * body is not registered with this world, or if the collider is invalid for
+   * this dimension (§21, §85)
+   */
+  addCollider(collider: Collider): Collider {
+    this.#requireReady();
+    if (this.#collidersByComponent.has(collider)) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        "That Collider is already registered with this PhysicsWorld (§24, §37); a Collider carries one solver collider. Remove it with world.removeCollider(collider) before registering it again.",
+        {
+          context: { adapter: this.#adapter.name, shape: collider.shape.type },
+        },
+      );
+    }
+
+    // `requireBody` is §24's own resolution — the same one `#collectColliders`
+    // applies at `addBody` — so this method adds no second rule about which
+    // body a collider belongs to.
+    const body = collider.requireBody();
+    const registration = this.#bodiesByComponent.get(body);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        "The RigidBody above that Collider is not registered with this PhysicsWorld, so there is no solver body to attach it to (§23, §24, §37). Call world.addBody(node) for the body's node first — that registers the body and every Collider already in its subtree; addCollider is for the ones attached afterwards.",
+        {
+          context: { adapter: this.#adapter.name, shape: collider.shape.type },
+        },
+      );
+    }
+    collider.validateFor(this.#dimension);
+
+    const handle = this.#adapter.createCollider(
+      collider.toDescriptor(registration.handle),
+    );
+    const colliderRegistration: ColliderRegistration = {
+      collider,
+      handle,
+      id: this.#adapter.getColliderId(handle),
+      body: registration,
+      dirty: false,
+    };
+    registration.colliders.push(colliderRegistration);
+    this.#collidersById.set(colliderRegistration.id, colliderRegistration);
+    this.#collidersByComponent.set(collider, colliderRegistration);
+
+    this.#refreshMassAfterColliderChange(registration);
+    this.#warnUnhonouredMaterial(registration.node, collider);
+    return collider;
+  }
+
+  /**
+   * Removes one registered `Collider` from the solver, leaving its body
+   * simulating (§24, §37, §83; PH-5, 2026-08-07).
+   *
+   * Returns whether it was registered, so teardown paths may call it
+   * unconditionally — the shape `removeBody` and `removeJoint` already have. It
+   * is deliberately **not** the throwing refusal
+   * {@link PhysicsWorld.refreshCollider} uses: a refresh that silently did
+   * nothing would be invisible, whereas this call hands the answer back.
+   *
+   * The `Collider` component survives and may be registered again, here or
+   * elsewhere; only the solver object and this world's bookkeeping go away. A
+   * pending {@link PhysicsWorld.refreshCollider} request on it is dropped with
+   * it, so no later step pays for a scan that can find nothing.
+   *
+   * ## Mass (§23, §25)
+   *
+   * The adapter re-establishes the body's mass properties as it destroys the
+   * collider — that is precisely the "body survives" case
+   * `PhysicsSolverAdapter.destroyCollider` exists for — and the body's mass is
+   * then re-read onto the component. A body whose mass was **authored** keeps
+   * it, whatever the adapter had to do internally to hold it; a body whose mass
+   * was **derived** loses this collider's contribution, and one left with no
+   * collider at all loses its derived mass entirely (`RigidBody.mass` reports
+   * `undefined` again), because there is nothing left to derive one from.
+   */
+  removeCollider(collider: Collider): boolean {
+    const colliderRegistration = this.#collidersByComponent.get(collider);
+    if (colliderRegistration === undefined) {
+      return false;
+    }
+    const registration = colliderRegistration.body;
+    this.#adapter.destroyCollider(colliderRegistration.handle);
+    if (colliderRegistration.dirty) {
+      this.#dirtyColliderCount -= 1;
+    }
+    const index = registration.colliders.indexOf(colliderRegistration);
+    registration.colliders.splice(index, 1);
+    this.#collidersById.delete(colliderRegistration.id);
+    this.#collidersByComponent.delete(collider);
+    this.#refreshMassAfterColliderChange(registration);
+    return true;
+  }
+
   /** Whether `node` is registered with this world. */
   has(node: Node): boolean {
     return this.#bodiesByNode.has(node);
@@ -1119,8 +1271,10 @@ export class PhysicsWorld {
    * {@link PhysicsWorld.getBodyHandle} states (§24, §37).
    *
    * The collider must have been registered by this world, which happens when
-   * `addBody` scans the body's subtree: a `Collider` on a node this world does
-   * not hold has no handle to give. §25's rolling and spinning friction are the
+   * `addBody` scans the body's subtree or when
+   * {@link PhysicsWorld.addCollider} hands one over afterwards: a `Collider` on
+   * a node this world does not hold has no handle to give. §25's rolling and
+   * spinning friction are the
    * motivating case — no shipped solver applies them (see
    * `PhysicsCapabilities.tuning`), and a caller who needs a solver-specific
    * equivalent needs the handle to reach it.
@@ -1190,7 +1344,7 @@ export class PhysicsWorld {
     if (registration === undefined) {
       throw new FourError(
         WORLD_ERROR_CODE,
-        "That Collider is not registered with this PhysicsWorld, so there is nothing to refresh (§24, §37). A collider is registered when world.addBody scans its body's subtree; adding one afterwards is not yet supported.",
+        "That Collider is not registered with this PhysicsWorld, so there is nothing to refresh (§24, §37). A collider is registered when world.addBody scans its body's subtree; one attached afterwards has to be handed over with world.addCollider(collider).",
         { context: { adapter: this.#adapter.name } },
       );
     }
@@ -2291,6 +2445,36 @@ export class PhysicsWorld {
   }
 
   /**
+   * {@link PhysicsWorld.#refreshMassProperties} for a body whose collider set
+   * just changed at runtime (PH-5, 2026-08-07).
+   *
+   * Identical when the solver reports a mass, and it adds the one case
+   * registration cannot produce: a body that **had** a derived mass and no
+   * longer has anything to derive one from. Leaving the mirror behind would
+   * make `RigidBody.mass` report the mass of colliders that are gone — the same
+   * class of lie `derivedMass` was split out of `mass` to prevent — so the
+   * mirror is cleared and the body reports `undefined` again.
+   *
+   * The clear is gated on the body having **no colliders left**, and not on the
+   * reported mass alone, because a non-positive mass is not by itself evidence
+   * of anything: §23 forbids expressing "does not simulate" as a zero mass, yet
+   * a solver may still answer `0` for a body it is not simulating — a static
+   * body under Rapier, any non-dynamic body under the structural double — and
+   * `addBody`'s refresh is written around exactly that. "No colliders" is
+   * unambiguous.
+   */
+  #refreshMassAfterColliderChange(registration: BodyRegistration): void {
+    const mass = this.#adapter.getBodyMass(registration.handle);
+    if (Number.isFinite(mass) && mass > 0) {
+      setRigidBodyDerivedMass(registration.body, mass);
+      return;
+    }
+    if (registration.colliders.length === 0) {
+      setRigidBodyDerivedMass(registration.body, undefined);
+    }
+  }
+
+  /**
    * Warns once per world when this world's §32 sleeping **thresholds** differ
    * from Appendix A's and the adapter has declared it cannot apply them (§32,
    * §37; 2026-08-06).
@@ -2338,26 +2522,24 @@ export class PhysicsWorld {
   }
 
   /**
-   * Warns once per world when a collider carries, **at `addBody`**, a §25
+   * Warns once per world when a collider carries, **at registration**, a §25
    * material coefficient the adapter has declared it cannot apply (§25, §37;
    * 2026-08-06).
    *
    * ## Registration time only, and why it stays that way (decision, 2026-08-07)
    *
-   * This runs from `addBody` and nowhere else, so a `PhysicsMaterial` attached
-   * to a collider *after* its body was registered — or mutated in place, which
-   * §25 materials permit — is never inspected and never warned about. That is
-   * not an oversight to be papered over with a second call site: a collider
-   * component has no change channel to the world at all (the same gap
-   * `RigidBody`'s "this write reaches no solver" warnings name from the other
-   * side), so there is nothing to hook. A post-registration material assignment
-   * does not reach the solver either, with or without adapter support, so the
-   * unhonoured-coefficient warning would be the *second* thing wrong with it
-   * and not the first.
+   * This runs when a collider is *registered* — from `addBody`'s subtree scan
+   * and, since PH-5, from {@link PhysicsWorld.addCollider} for a collider
+   * attached afterwards — and nowhere else. A `PhysicsMaterial` swapped onto an
+   * already-registered collider, or mutated in place (which §25 materials
+   * permit), is never re-inspected and never warned about.
    *
-   * Widening §37 so that live material changes reach a solver is the packet
-   * that should also move this check; until then the honest scope is stated
-   * here rather than implied by where the call happens to sit.
+   * That is not an oversight to be papered over with a third call site. A
+   * material change is unobservable to the world (§24/§25 make these plain
+   * public fields — the same reason `refreshCollider` has to be *asked*), so
+   * there is nothing to hook; hanging the check off `refreshCollider` would
+   * warn about the field the caller had just told the world about and stay
+   * silent about the one they had not, which is worse than a stated scope.
    *
    * `PhysicsMaterial.rollingFriction` and `spinningFriction` are §25 fields the
    * stable API accepts and validates, and no Rapier 0.19.3 build has a binding
@@ -2369,28 +2551,37 @@ export class PhysicsWorld {
    */
   #warnUnhonouredMaterials(registration: BodyRegistration): void {
     for (const { collider } of registration.colliders) {
-      const material = collider.material;
-      if (material === undefined) {
-        continue;
-      }
-      if (
-        material.rollingFriction !== undefined &&
-        !this.#tuning.rollingFriction
-      ) {
-        this.#warnTuning(
-          "rollingFriction",
-          `A PhysicsMaterial on node ${registration.node.id} sets rollingFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 rolling friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
-        );
-      }
-      if (
-        material.spinningFriction !== undefined &&
-        !this.#tuning.spinningFriction
-      ) {
-        this.#warnTuning(
-          "spinningFriction",
-          `A PhysicsMaterial on node ${registration.node.id} sets spinningFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 spinning friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
-        );
-      }
+      this.#warnUnhonouredMaterial(registration.node, collider);
+    }
+  }
+
+  /**
+   * {@link PhysicsWorld.#warnUnhonouredMaterials} for a single collider — the
+   * form {@link PhysicsWorld.addCollider} needs, since it registers one and
+   * must not re-warn for the body's existing set (PH-5, 2026-08-07).
+   */
+  #warnUnhonouredMaterial(node: Node, collider: Collider): void {
+    const material = collider.material;
+    if (material === undefined) {
+      return;
+    }
+    if (
+      material.rollingFriction !== undefined &&
+      !this.#tuning.rollingFriction
+    ) {
+      this.#warnTuning(
+        "rollingFriction",
+        `A PhysicsMaterial on node ${node.id} sets rollingFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 rolling friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
+      );
+    }
+    if (
+      material.spinningFriction !== undefined &&
+      !this.#tuning.spinningFriction
+    ) {
+      this.#warnTuning(
+        "spinningFriction",
+        `A PhysicsMaterial on node ${node.id} sets spinningFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 spinning friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
+      );
     }
   }
 

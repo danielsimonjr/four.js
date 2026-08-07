@@ -1657,8 +1657,15 @@ export function setRigidBodyType(body: RigidBody, type: BodyType): void {
  * {@link RigidBody.mass}, which is the authoring channel — a derived number
  * assigned there is re-emitted by `toDescriptor` as though the author had named
  * it, which is the laundering this pair of fields exists to prevent.
+ *
+ * `undefined` **un-mirrors** it (PH-5, 2026-08-07): a body whose last collider
+ * was removed at runtime has nothing left to derive a mass from, and a mirror
+ * left behind would report the mass of colliders that no longer exist.
  */
-export function setRigidBodyDerivedMass(body: RigidBody, mass: number): void {
+export function setRigidBodyDerivedMass(
+  body: RigidBody,
+  mass: number | undefined,
+): void {
   (body as unknown as RigidBodyWorldBinding).derivedMass = mass;
 }
 

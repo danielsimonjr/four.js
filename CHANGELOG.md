@@ -8,6 +8,36 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — PH-5 closed: runtime collider add/remove
+
+#### Added
+
+- **`PhysicsWorld.addCollider(collider)` / `removeCollider(collider)` (PH-5)** —
+  register and unregister **one** `Collider` on a body the world already holds, without
+  re-creating the body: its solver handle, monotonic id, §33 checksum position, joints,
+  and pose all survive (which `removeBody` + `addBody` destroyed). Which body a collider
+  joins is `Collider.requireBody()` — §24's own resolution, the same predicate
+  `addBody`'s subtree scan applies, so there is no second rule and no `node` parameter.
+  Explicit by design (the `refreshCollider` precedent; a diffing `refreshBody` would be
+  a second rule _and_ a per-step cost). `removeCollider` returns `false` like
+  `removeBody`/`removeJoint` (unconditional teardown); `addCollider` throws with §85
+  refusals that all run before the adapter is touched.
+- **Mass is re-established in both directions**, proven against the structural double
+  and against real Rapier in both dimensions: a derived-mass body gains and loses
+  collider contributions and, left with no collider, stops reporting a mass at all
+  (`derivedMass` clears **only at zero colliders** — §23 forbids reading a solver's 0 as
+  "no mass"); an authored mass survives, carried by PH-3's heir when its collider goes,
+  created massless on the new collider. **The adapters needed nothing** — F8's kept
+  `destroyCollider` mass refresh was written for exactly this body-survives case — and
+  **§34 snapshots needed nothing**: the envelope's collider table already re-derives
+  each body's collider list, proven by bit-identical restore + replay checksum streams
+  across a runtime add and a runtime remove.
+- Determinism: goldens unchanged; a world that never adds or removes makes the
+  identical solver calls (deep-equal call sequences + identical 40-step checksum
+  streams). PH-1's "refreshCollider refuses a post-registration collider" blocker is
+  lifted; a pending refresh is dropped with its collider; `#warnUnhonouredMaterials`
+  split per collider so `addCollider` warns for the new one only.
+
 ### 2026-08-07 — PH-1 stage 2: §37 property changes reach the solver
 
 #### Added
