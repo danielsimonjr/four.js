@@ -504,7 +504,7 @@ _Closure plan:_ ship `registerSceneNodeTypes()` from the umbrella `four` package
 
 ### A-17 — §79 restored node ids can collide with engine-assigned ids
 
-> **CLOSED 2026-08-06.** `NodeOptions.id` restores and *reserves* an id at construction;
+> **CLOSED 2026-08-06.** `NodeOptions.id` restores and _reserves_ an id at construction;
 > `restoreNodeId` moved into `@four/scene` (which owns the field) for the `nodeFactory` path;
 > `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.
 
@@ -706,6 +706,12 @@ _Dependencies:_ owner decision for the actual publish; steps 1–4 are mechanica
 ---
 
 ### A-26 — §90 compatibility tables have never been published
+
+> **CLOSED 2026-08-07** — `docs/COMPATIBILITY.md` publishes the five tables; the
+> solver-adapter block is generated from the adapters' own capability declarations by
+> `tools/generate-compatibility.mjs` (`--check` detects drift), which names
+> `SolverBodyAccess`/`SolverJointAccess` per ARCHITECTURE.md's expectation. The three
+> forward-looking references now point at the real document. Kept for the record.
 
 **§90** · **Severity: Medium** · **Effort: S** · **SILENT**
 
@@ -1349,7 +1355,7 @@ Unreachable through `PhysicsWorld` today (its only `destroyCollider` call is ins
 > through `validateReplayRecording`, re-attached in `ReplayPlayer.#snapshotAt`.
 > `REPLAY_FORMAT_VERSION` is 2 with `SUPPORTED_REPLAY_FORMAT_VERSIONS = [1, 2]`; a document
 > declares the lowest version that can express it, so every version-1 recording still
-> validates *and re-encodes byte for byte*. `golden/phase10.json` was amended envelope-only
+> validates _and re-encodes byte for byte_. `golden/phase10.json` was amended envelope-only
 > (`recordingDigest`, `recordingLength`) with the neutralized-capture proof recorded in the
 > file — see `CHANGELOG.md`.
 

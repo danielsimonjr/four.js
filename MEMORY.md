@@ -28,6 +28,21 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-26 closed: §90 compatibility tables.** `docs/COMPATIBILITY.md` carries
+  the five tables. The solver-adapter section is **generated** between
+  `<!-- BEGIN/END GENERATED: solver-adapters -->` markers by
+  `tools/generate-compatibility.mjs` from live `PhysicsCapabilities` instances — never
+  hand-edit it. The generator imports the built `dist/` (deliberate: a source parse would
+  re-implement a const evaluator) and pads tables exactly as Prettier does, so `--check`
+  and `prettier --check` agree — changing one convention without the other breaks the gate.
+  The Rapier snapshot envelope version (2) is module-private and therefore hand-cited in
+  the format section, not generated — the one number there that can drift.
+- **2026-08-07 — Gotcha (concurrent agents + rebase): `git rebase` with autostash while
+  agents hold uncommitted work wiped their in-flight files** (autostash carries tracked
+  edits but the reset window still clobbered untracked files mid-write; the A-26 agent had
+  to rebuild from a scratchpad backup). When the remote moves during a multi-agent wave,
+  prefer: let agents finish → commit their batches → rebase once, or snapshot untracked
+  work first.
 - **2026-08-07 — GAP-CLOSURE WAVE 2: keyboard tier (A-10 done, A-13 keyboard half).**
   `KeyboardInput` in `@four/input`, traversal + activation in `@four/ui`. Decisions:
   - **Focus crosses `ui → input` as an injected resolver** — `KeyboardInput(surface,

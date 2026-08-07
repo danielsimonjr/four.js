@@ -27,6 +27,22 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 2 (2026-08-07) — in progress
 
+- [x] **A-26 DONE 2026-08-07.** `docs/COMPATIBILITY.md` (§90's five tables) +
+      `tools/generate-compatibility.mjs` (solver-adapter block generated from live
+      capability declarations; `--check` detects drift)
+- [ ] **A-26 follow-ups:** add `"check-compat": "node tools/generate-compatibility.mjs
+    --check"` to root `package.json` and wire it into CI (deferred — `.github/` and
+      `package.json` were owned by the in-flight A-25 agent when A-26 landed); extend the
+      generated block to renderer backends once `RendererCapabilities` grows past 2 fields
+- [ ] **Closure-diff review findings (2026-08-07 adversarial pass over commits 93cda8d,
+      ab13840, fe8eb6f, c843e2d, b48f053):** 25 findings, ranked shortlist recorded in the
+      review report. Deferred until their owning agents land: the `glState`
+      module-global + missing try/finally in `webgl-renderer.ts` (render tier in flight),
+      `Material.opacity`/`blendMode` setter validation (same), `REPLAY_FORMAT_VERSION`
+      naming (diagnostics in flight with A-23). The rest are being fixed in a dedicated
+      batch (KinematicController serializer, physics teardown O(N·M), keyboard wrap:false
+      trap, resolution validation, and the small items)
+
 - [x] **A-10 DONE 2026-08-07.** `@four/input` gains `KeyboardInput` over a duck-typed
       `KeySurface`, `SceneKeyEvent` with `preventDefault()`, `dispatchKeyEvent`, and the
       shared three-phase `propagation.ts`. Remaining input sources (wheel, gamepad, XR)

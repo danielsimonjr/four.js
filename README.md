@@ -139,6 +139,15 @@ documents its known defects and the old-to-new numbering map.
 Publish naming (§98): the umbrella package publishes as `@danielsimonjr/fourjs`, the
 sub-packages as `@danielsimonjr/fourjs-<name>`; workspace names remain `four`/`@four/*`.
 
+## Compatibility
+
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) carries §90's five tables — browser and
+runtime support (what is _tested_ versus what is merely expected), the §62 render-backend
+tiers, the physics solver adapters, the scene/replay/snapshot format versions, and the
+plugin API (n/a: §81 is unimplemented). The solver-adapter block is generated from the
+adapters' own §37 capability declarations by `node tools/generate-compatibility.mjs`;
+`--check` fails if the committed document has drifted from them.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

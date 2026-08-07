@@ -8,6 +8,27 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — A-26 closed: §90 compatibility tables published
+
+#### Added
+
+- **`docs/COMPATIBILITY.md`** — §90's five compatibility tables, published for the first
+  time (gap A-26): browser/runtime support split into _verified_ versus _expected_ (Firefox
+  and Safari are explicitly marked untested), §62 render-backend tiers, the physics solver
+  adapters, scene/replay/snapshot format versions with the PH-6 lowest-version rule, and
+  the plugin API (n/a — §81 unimplemented, gap A-3).
+- **`tools/generate-compatibility.mjs`** — emits the solver-adapter block of that document
+  from the adapters' own §37 capability declarations, read off constructed instances of the
+  built packages, with `SolverBodyAccess` / `SolverJointAccess` probed structurally against
+  `@four/physics`'s emitted declarations. `--check` fails when the committed document has
+  drifted; adding a third adapter adds a column with no tool edit.
+
+#### Changed
+
+- `docs/Architecture/ARCHITECTURE.md`, `docs/guides/custom-solver-adapters.md`, and
+  `docs/rfcs/0000-template.md` now point at the published tables instead of anticipating
+  them; `README.md` and `docs/guides/README.md` index the document.
+
 ### 2026-08-07 — A-10 closed, A-13 keyboard half closed: `KeyboardInput` + UI traversal
 
 The gap analysis's A-10 ("`@four/input` has exactly one input source") and the keyboard half

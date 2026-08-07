@@ -75,3 +75,12 @@ code sample in these guides is written against the implemented API surface
 (`docs/Architecture/package-export-surfaces.json`) and modeled on the example
 apps; where a §93 topic covers something not yet implemented, the guide says
 so and cites the staging note instead of pretending.
+
+## Beside the guides
+
+Not a §93 guide, but the document a guide sends you to when the question is
+"does this work here?":
+
+| Document                                    | What it carries                                                                                                                                                                                      |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Compatibility tables](../COMPATIBILITY.md) | §90's five tables — browser and runtime support (tested versus expected), §62 render-backend tiers, the solver adapters (generated from their own declarations), format versions, and the plugin API |

@@ -301,8 +301,12 @@ than assumed:
   unordered doubles), which is what gives §33 checksums a stable visit order.
 
 `physics-box2d` and `physics-soft` are reserved stubs. The §90/§102
-compatibility tables are expected to name `SolverBodyAccess` /
-`SolverJointAccess` when a second adapter lands.
+compatibility tables are published in `docs/COMPATIBILITY.md` (since
+2026-08-07; this paragraph read "are expected to name `SolverBodyAccess` /
+`SolverJointAccess` when a second adapter lands" until then). They do name
+both seams, per adapter — and the solver-adapter block is generated from the
+adapters' own capability declarations by `tools/generate-compatibility.mjs`,
+so it cannot drift from them.
 
 ### Seam 2: The Renderer Interface
 
