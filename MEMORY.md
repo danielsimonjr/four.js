@@ -28,6 +28,24 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-16 remainder (drawing-tier §79 pairs).** Decisions worth keeping:
+  - **Resources are keys, not payloads, and the catalog is a seam not a format** — §79
+    mandates key-plus-manifest; the manifest needs A-18 content hashing, so what ships
+    is `SceneResourceCatalog` (`keyOf`/`get`, method syntax for bivariance per the
+    `ComponentSerializer` precedent; a bare `Map` is a valid read catalog), which a
+    manifest later implements.
+  - **`unknownResources: "skip"` is write-side only** — A-15's symmetry does not
+    survive here: a component can be dropped and leave a valid node; a `Renderable`
+    cannot default its resources without inventing ones the application must dispose
+    (§83). A _node_-level skip is inexpressible through `nodeTypeOf`/`nodeDataOf`
+    (per-node data, not a filter) — recorded.
+  - **Material kind is checked for `Sprite` only** — `Renderable<M>` is generic on
+    purpose; a read-side kind whitelist would make `Renderable<GlowMaterial>` savable
+    and unloadable. Dispatch is on the §57 discriminant, never `instanceof`.
+  - **Type names are `<package>:<class>`** (extends `ui:*`); the prefix is a namespace,
+    not an import path — rev 1.3 already moved cameras between packages and a published
+    name must outlive that. Camera documents carry no `depthRange` (renderer-owned,
+    §47).
 - **2026-08-07 — Auto-selection registries (A-8/R-2/PH-19).** Decisions worth keeping:
   - **The WP-3.6/§45 departure is retired, not reversed** — §45's string works as a
     _widening_; `four` still never imports a backend. Payload measured both ways:

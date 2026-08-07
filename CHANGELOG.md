@@ -8,6 +8,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-07 — §79 drawing-tier node types (A-16 remainder)
+
+#### Added
+
+- **`registerRenderSerializers()` in `four` (§47/§49/§55/§68, §79)** — node-type pairs
+  for `Renderable` (`render:renderable`), `Sprite` (`render:sprite`),
+  `PerspectiveCamera`/`OrthographicCamera` (`scene:perspective-camera`/
+  `scene:orthographic-camera`), and `DirectionalLight` (`scene:directional-light`),
+  chained into `registerSceneNodeTypes()` by the new exported `composeSceneNodeTypes()`.
+  Cameras and the light serialize completely (projection parameters only — the matrices
+  are derived, and `depthRange` is deliberately absent because it belongs to the
+  renderer, so a document is not pinned to the backend that saved it); a sprite carries
+  no geometry key because it derives and owns its quad. Type names follow
+  `<package>:<class>` (the `ui:*` precedent) — the prefix is a namespace, not an import
+  path.
+- **`SceneResourceCatalog<T>` + `resourceCatalog(entries)` (§79 "referenced by logical
+  key")** — geometry and material cross the boundary as **keys**, resolved by an
+  injected catalog (`keyOf` out, `get` in; a bare `Map` satisfies the read half —
+  proven). §79's manifest document (key → URL + content hash) stays staged behind A-18
+  content hashing and will sit behind this seam, not replace it.
+  `unknownResources: "throw" | "skip"` relaxes the **write side only** — there is
+  deliberately no read-side skip (a `Renderable` cannot default its resources without
+  inventing ones the application must dispose, §83). Material `kind` is checked for
+  `Sprite` only — a read-side whitelist would make a consumer's `Renderable<GlowMaterial>`
+  savable and unloadable; dispatch is on the §57 discriminant, never `instanceof`.
+- All 14 `*_NODE_TYPE` constants are now re-exported from `four` (the six A-12 control
+  names were missed when they shipped). No format change: `SCENE_FORMAT_VERSION` is
+  unmoved and documents without these node types encode byte for byte as before.
+
 ### 2026-08-07 — RFCs 0001–0003 drafted (R-14, A-3, PH-10/R-22)
 
 #### Added

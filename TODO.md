@@ -229,10 +229,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
       now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
       Widening that structural interface would let the mouse keep its hover across a click
-- [ ] **A-16 remainder:** `SceneNodeDocument.data` / `SerializeSceneOptions.nodeDataOf` now
-      exist and the three §73 widgets use them; `Renderable`, `Sprite`, both cameras and
-      `DirectionalLight` still have no node-type pair. They are additions to
-      `packages/four/src/scene-serializers.ts`, not to any format
+- [x] **A-16 remainder — done 2026-08-07:** `Renderable`, `Sprite`, both cameras and
+      `DirectionalLight` have §79 node-type pairs (`registerRenderSerializers`, chained
+      by `composeSceneNodeTypes`). Geometry/material are **references** resolved through
+      the injected `SceneResourceCatalog` seam; §79's manifest (key → URL + content
+      hash) remains staged behind A-18 content hashing. Still open under A-16: the §80
+      `.four` binary package format and the manifest document itself
 - [ ] **A-6 remainder:** `application.ts`'s header note is now a dated post-plan note, but
       `app.input` / `app.assets` / `app.diagnostics` / `app.stats` / `app.physics` and
       `autoResize`/`reducedMotion` are still absent

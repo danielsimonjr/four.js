@@ -535,6 +535,14 @@ _Dependencies:_ touches `@four/scene` (foundation analyst's package) — coordin
 
 ### A-16 — §79 carries no subclass node state; §79 §80 `.four` binary format absent
 
+> **PARTIALLY CLOSED 2026-08-07** — all five named node classes have §79 pairs shipping
+> from the umbrella (`registerRenderSerializers()`), with geometry/material referenced
+> by logical key through an injected resolver (`SceneResourceCatalog`) — the format's
+> dependency stance is unchanged and no document version moved. `unknownResources`
+> relaxes the write side only (a read-side skip would invent resources the application
+> must dispose, §83). Still open: §79's asset **manifest** (key → URL + content hash,
+> blocked on A-18) and the §80 `.four` binary format.
+
 **§79** · **Severity: Medium** · **Effort: M** · **RECORDED (`format.ts:29`, `packages/serialization/README.md:18`)**
 
 The document carries `Node`'s own fields only — no camera FOV, no geometry reference, no sprite texture key, no light color, no widget box. The stated reason (the §3.1 matrix lets `serialization` see `core`/`math`/`scene` only) is correct, and `nodeFactory`/`nodeTypeOf` is the intended seam. But **nothing ships a factory for any of the eleven node subclasses the repo actually has**, so in practice every non-trivial scene needs application-authored round-trip code (A-14 is the UI instance of this).

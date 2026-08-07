@@ -12,10 +12,24 @@
  */
 
 import { isFourError } from "@four/core";
+import { planeGeometry, type BufferGeometry } from "@four/geometry";
+import {
+  LitMaterial,
+  SpriteMaterial,
+  UnlitMaterial,
+  type Material,
+} from "@four/materials";
 import { KinematicController, MotionComponent } from "@four/motion";
 import { Vector3 } from "@four/math";
 import { Collider, RigidBody } from "@four/physics";
-import { Group, Scene } from "@four/scene";
+import { Renderable, Sprite, Texture } from "@four/render";
+import {
+  DirectionalLight,
+  Group,
+  OrthographicCamera,
+  PerspectiveCamera,
+  Scene,
+} from "@four/scene";
 import {
   ComponentSerializerRegistry,
   createDefaultComponentSerializers,
@@ -42,16 +56,24 @@ import * as four from "../src/index.js";
 import {
   BUTTON_NODE_TYPE,
   CHECKBOX_NODE_TYPE,
+  DIRECTIONAL_LIGHT_NODE_TYPE,
   IMAGE_NODE_TYPE,
   LABEL_NODE_TYPE,
+  ORTHOGRAPHIC_CAMERA_NODE_TYPE,
   PANEL_NODE_TYPE,
+  PERSPECTIVE_CAMERA_NODE_TYPE,
   PROGRESS_NODE_TYPE,
   RADIO_BUTTON_NODE_TYPE,
+  RENDERABLE_NODE_TYPE,
   SLIDER_NODE_TYPE,
+  SPRITE_NODE_TYPE,
   TOGGLE_NODE_TYPE,
+  composeSceneNodeTypes,
   registerPhysicsSerializers,
+  registerRenderSerializers,
   registerSceneNodeTypes,
   registerUISerializers,
+  resourceCatalog,
 } from "../src/scene-serializers.js";
 
 const atlas = buildGlyphAtlas();
@@ -870,5 +892,579 @@ describe("registerUISerializers — defensive reads", () => {
 
     expect(panel).toBeInstanceOf(Panel);
     expect(panel.width).toBeNull();
+  });
+});
+
+/**
+ * The A-16 remainder, closed 2026-08-07: §49's `Renderable`, §55's `Sprite`,
+ * §47's two cameras, and §68's `DirectionalLight`.
+ *
+ * The load-bearing claim is not "the classes come back" but **what a shared
+ * resource does across the boundary**: §79 references geometry and materials by
+ * logical key, so a reloaded renderable must point at the *same instance* the
+ * catalog holds — a copy would silently double every buffer upload and break
+ * §83's "whoever created it disposes it".
+ */
+describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", () => {
+  const plane = planeGeometry();
+  const box = planeGeometry({ width: 2 });
+  const brick = new UnlitMaterial();
+  const sun = new LitMaterial();
+  const decal = new SpriteMaterial({
+    texture: new Texture({ width: 1, height: 1 }),
+  });
+
+  const geometries = resourceCatalog<BufferGeometry>([
+    ["geometry/plane", plane],
+    ["geometry/box", box],
+  ]);
+  const materials = resourceCatalog<Material>([
+    ["material/brick", brick],
+    ["material/sun", sun],
+    ["material/decal", decal],
+  ]);
+
+  /** Everything a drawn scene is made of, every field off its default. */
+  function buildDrawnScene(): Scene {
+    const scene = new Scene();
+    const camera = new PerspectiveCamera({
+      fieldOfView: 1.2,
+      aspect: 16 / 9,
+      near: 0.05,
+      far: 400,
+    });
+    camera.name = "eye";
+    const minimap = new OrthographicCamera({
+      left: -8,
+      right: 8,
+      bottom: -4.5,
+      top: 4.5,
+      near: 0.5,
+      far: 50,
+    });
+    const light = new DirectionalLight({ color: [1, 0.98, 0.9], intensity: 3 });
+    const floor = new Renderable(plane, brick, {
+      renderLayer: 2,
+      renderOrder: 7,
+    });
+    floor.transform.position.set(0, -1, 0);
+    const badge = new Sprite(decal, {
+      width: 3,
+      height: 2,
+      anchor: { x: 0, y: 1 },
+      renderLayer: 1,
+      renderOrder: -1,
+    });
+    scene.add(camera, minimap, light, floor, badge);
+    return scene;
+  }
+
+  it("round-trips classes, parameters, and shared resource identity through text", () => {
+    const io = registerSceneNodeTypes({ geometries, materials });
+    const scene = buildDrawnScene();
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(scene, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const [camera, minimap, light, floor, badge] = reloaded.children as [
+      PerspectiveCamera,
+      OrthographicCamera,
+      DirectionalLight,
+      Renderable,
+      Sprite,
+    ];
+
+    expect(camera).toBeInstanceOf(PerspectiveCamera);
+    expect(camera.name).toBe("eye");
+    expect([
+      camera.fieldOfView,
+      camera.aspect,
+      camera.near,
+      camera.far,
+    ]).toEqual([1.2, 16 / 9, 0.05, 400]);
+    // The projection is *derived*, not carried: a restored camera projects
+    // because its constructor rebuilt the matrix from those four numbers.
+    expect(camera.projectionMatrix.elements[0]).toBeCloseTo(
+      1 / (Math.tan(1.2 / 2) * (16 / 9)),
+      12,
+    );
+
+    expect(minimap).toBeInstanceOf(OrthographicCamera);
+    expect([
+      minimap.left,
+      minimap.right,
+      minimap.bottom,
+      minimap.top,
+      minimap.near,
+      minimap.far,
+    ]).toEqual([-8, 8, -4.5, 4.5, 0.5, 50]);
+
+    expect(light).toBeInstanceOf(DirectionalLight);
+    expect([...light.color]).toEqual([1, 0.98, 0.9]);
+    expect(light.intensity).toBe(3);
+
+    expect(floor).toBeInstanceOf(Renderable);
+    // The point of the whole seam: the same instances, not copies of them.
+    expect(floor.geometry).toBe(plane);
+    expect(floor.material).toBe(brick);
+    expect([floor.renderLayer, floor.renderOrder]).toEqual([2, 7]);
+    expect(floor.transform.position.y).toBe(-1);
+
+    expect(badge).toBeInstanceOf(Sprite);
+    expect(badge.material).toBe(decal);
+    expect([badge.width, badge.height]).toEqual([3, 2]);
+    expect([badge.anchor.x, badge.anchor.y]).toEqual([0, 1]);
+    expect([badge.renderLayer, badge.renderOrder]).toEqual([1, -1]);
+    // A sprite owns and derives its quad (§55), so it comes back with its own
+    // — never the catalog's, which is why no geometry key is written for one.
+    expect(badge.geometry).not.toBe(plane);
+    expect(badge.geometry.positions.slice(0, 3)).toEqual(
+      new Float32Array([0, -2, 0]),
+    );
+  });
+
+  it("is textually idempotent — the P11-1 round-trip gate", () => {
+    const io = registerSceneNodeTypes({ geometries, materials });
+    const scene = buildDrawnScene();
+
+    const first = encodeSceneDocument(
+      serializeScene(scene, io.components, io.write),
+    );
+    const second = encodeSceneDocument(
+      serializeScene(
+        instantiateScene(decodeSceneDocument(first), io.components, io.read),
+        io.components,
+        io.write,
+      ),
+    );
+
+    expect(second).toBe(first);
+  });
+
+  it("keeps every node's saved id, which no drawable constructor takes (A-17)", () => {
+    const io = registerSceneNodeTypes({ geometries, materials });
+    const scene = buildDrawnScene();
+    const ids: string[] = [];
+    scene.traverse((node) => ids.push(node.id));
+
+    const reloaded = instantiateScene(
+      serializeScene(scene, io.components, io.write),
+      io.components,
+      io.read,
+    );
+
+    const restored: string[] = [];
+    reloaded.traverse((node) => restored.push(node.id));
+    expect(restored).toEqual(ids);
+    expect(ids).not.toContain(new Group().id);
+  });
+
+  it("names each class with its own document type, by exact identity", () => {
+    const io = registerRenderSerializers();
+    expect(io.write.nodeTypeOf(new Renderable(plane, brick))).toBe(
+      RENDERABLE_NODE_TYPE,
+    );
+    expect(io.write.nodeTypeOf(new Sprite(decal))).toBe(SPRITE_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new PerspectiveCamera())).toBe(
+      PERSPECTIVE_CAMERA_NODE_TYPE,
+    );
+    expect(io.write.nodeTypeOf(new OrthographicCamera())).toBe(
+      ORTHOGRAPHIC_CAMERA_NODE_TYPE,
+    );
+    expect(io.write.nodeTypeOf(new DirectionalLight())).toBe(
+      DIRECTIONAL_LIGHT_NODE_TYPE,
+    );
+    // A `Sprite` is a `Renderable` to `instanceof` and not to this pair, which
+    // is what keeps an application's own subclass from being written out as
+    // its base and reloaded as one.
+    expect(
+      io.write.nodeTypeOf(new (class extends Renderable {})(plane, brick)),
+    ).toBeUndefined();
+    expect(io.write.nodeTypeOf(new Group())).toBeUndefined();
+    expect(io.write.nodeDataOf(new Group())).toBeUndefined();
+    expect(io.read.nodeFactory({ type: PANEL_NODE_TYPE })).toBeUndefined();
+  });
+
+  it("registers the widgets and the drawing tier from one call", () => {
+    const io = registerSceneNodeTypes({ atlas, geometries, materials });
+
+    expect(io.write.nodeTypeOf(new Panel())).toBe(PANEL_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new Sprite(decal))).toBe(SPRITE_NODE_TYPE);
+    // Neither half claims what the other owns, and neither claims a `Scene` —
+    // `serializeScene`'s own built-in name is what that falls through to.
+    expect(io.write.nodeTypeOf(new Scene())).toBeUndefined();
+    expect(io.write.nodeDataOf(new Scene())).toBeUndefined();
+    expect(io.read.nodeFactory({ type: "group" })).toBeUndefined();
+  });
+});
+
+/**
+ * §85, both directions: a resource reference that cannot be named on the way
+ * out or resolved on the way in is refused loudly, because the alternative is a
+ * document that saves cleanly and cannot be loaded.
+ */
+describe("registerRenderSerializers — resource references are refused loudly", () => {
+  const plane = planeGeometry();
+  const brick = new UnlitMaterial();
+  const decal = new SpriteMaterial({
+    texture: new Texture({ width: 1, height: 1 }),
+  });
+  const geometries = resourceCatalog<BufferGeometry>([
+    ["geometry/plane", plane],
+  ]);
+  const materials = resourceCatalog<Material>([
+    ["material/brick", brick],
+    ["material/decal", decal],
+  ]);
+
+  function codeOf(run: () => unknown): unknown {
+    try {
+      run();
+    } catch (error) {
+      return isFourError(error) ? error.code : error;
+    }
+    return undefined;
+  }
+
+  it("refuses to save a geometry no catalog names", () => {
+    const io = registerSceneNodeTypes();
+    expect(
+      codeOf(() =>
+        serializeScene(new Renderable(plane, brick), io.components, io.write),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+
+  it("refuses to save a material no catalog names", () => {
+    const io = registerSceneNodeTypes({ geometries });
+    expect(
+      codeOf(() =>
+        serializeScene(new Renderable(plane, brick), io.components, io.write),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+    expect(
+      codeOf(() => serializeScene(new Sprite(decal), io.components, io.write)),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+
+  it('writes a null reference under { unknownResources: "skip" }, and still refuses to load it', () => {
+    const io = registerSceneNodeTypes({ unknownResources: "skip" });
+    const document = serializeScene(
+      new Renderable(plane, brick),
+      io.components,
+      io.write,
+    );
+
+    expect(document.nodes[0].data).toEqual({
+      geometry: null,
+      material: null,
+      renderLayer: 0,
+      renderOrder: 0,
+    });
+    // The inspector case: the hierarchy saves. Loading it is still a refusal,
+    // because a renderable without a geometry is not a renderable.
+    expect(
+      codeOf(() => instantiateScene(document, io.components, io.read)),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+
+  it("refuses a key its catalog does not publish", () => {
+    const io = registerRenderSerializers({ geometries, materials });
+    expect(
+      codeOf(() =>
+        io.read.nodeFactory({
+          type: RENDERABLE_NODE_TYPE,
+          id: "node-floor",
+          data: { geometry: "geometry/plane", material: "material/missing" },
+        }),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+    // …and with no id in the document either, which is a legal §79 node.
+    expect(
+      codeOf(() =>
+        io.read.nodeFactory({
+          type: SPRITE_NODE_TYPE,
+          data: { material: "material/missing" },
+        }),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+
+  it("refuses a material a sprite cannot sample (§55, §57)", () => {
+    const io = registerRenderSerializers({ geometries, materials });
+    expect(
+      codeOf(() =>
+        io.read.nodeFactory({
+          type: SPRITE_NODE_TYPE,
+          id: "node-badge",
+          data: { material: "material/brick" },
+        }),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+    // …and with no id in the document, which is a legal §79 node.
+    expect(
+      codeOf(() =>
+        io.read.nodeFactory({
+          type: SPRITE_NODE_TYPE,
+          data: { material: "material/brick" },
+        }),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+
+  it("accepts on a Renderable every material the class accepts", () => {
+    // The counterpart of the refusal above, and the reason it is not
+    // symmetric: `Renderable<M extends Material>` is generic, so a kind
+    // whitelist here would make a legitimate `Renderable<MyMaterial>` savable
+    // and unloadable. The render list dispatches on the material's kind, not
+    // on the node's class (§57, §64).
+    const io = registerRenderSerializers({ geometries, materials });
+    const floor = io.read.nodeFactory({
+      type: RENDERABLE_NODE_TYPE,
+      id: "node-floor",
+      data: { geometry: "geometry/plane", material: "material/decal" },
+    }) as Renderable;
+
+    expect(floor).toBeInstanceOf(Renderable);
+    expect(floor.material).toBe(decal);
+  });
+
+  it("reads through a bare Map and refuses to write through one", () => {
+    // The claim the module header makes: `Map.get` *is* the read half.
+    const io = registerRenderSerializers({
+      geometries: new Map([["geometry/plane", plane]]),
+      materials: new Map<string, UnlitMaterial | SpriteMaterial>([
+        ["material/brick", brick],
+      ]),
+    });
+
+    const floor = io.read.nodeFactory({
+      type: RENDERABLE_NODE_TYPE,
+      data: { geometry: "geometry/plane", material: "material/brick" },
+    }) as Renderable;
+    expect(floor.geometry).toBe(plane);
+
+    // A map has no `keyOf`, so the write half has nothing to say — loudly.
+    expect(
+      codeOf(() => io.write.nodeDataOf(new Renderable(plane, brick))),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+
+  it("refuses to read through a write-only catalog", () => {
+    const io = registerRenderSerializers({
+      geometries: { keyOf: (): string => "geometry/plane" },
+      materials: { keyOf: (): string => "material/brick" },
+    });
+
+    expect(io.write.nodeDataOf(new Renderable(plane, brick))).toEqual({
+      geometry: "geometry/plane",
+      material: "material/brick",
+      renderLayer: 0,
+      renderOrder: 0,
+    });
+    expect(
+      codeOf(() =>
+        io.read.nodeFactory({
+          type: RENDERABLE_NODE_TYPE,
+          data: { geometry: "geometry/plane", material: "material/brick" },
+        }),
+      ),
+    ).toBe("INVALID_APPLICATION_STATE");
+  });
+});
+
+/**
+ * A §79 payload may come from a build that wrote less, wrote more, or wrote
+ * nonsense. The cameras tolerate it (their classes validate nothing and a
+ * non-finite projection parameter poisons a matrix rather than throwing); the
+ * sprite and the light validate at construction (§85), so the reader filters
+ * ahead of them exactly as it does for the §73 controls.
+ */
+describe("registerRenderSerializers — defensive reads", () => {
+  const plane = planeGeometry();
+  const brick = new UnlitMaterial();
+  const decal = new SpriteMaterial({
+    texture: new Texture({ width: 1, height: 1 }),
+  });
+  const io = registerRenderSerializers({
+    geometries: resourceCatalog<BufferGeometry>([["geometry/plane", plane]]),
+    materials: resourceCatalog<Material>([
+      ["material/brick", brick],
+      ["material/decal", decal],
+    ]),
+  });
+
+  it("keeps every camera default a payload cannot supply", () => {
+    const camera = io.read.nodeFactory({
+      type: PERSPECTIVE_CAMERA_NODE_TYPE,
+      data: { fieldOfView: Number.NaN, aspect: "wide", near: Infinity },
+    }) as PerspectiveCamera;
+
+    expect(camera.fieldOfView).toBeCloseTo(Math.PI / 3, 12);
+    expect([camera.aspect, camera.near, camera.far]).toEqual([1, 0.1, 1000]);
+
+    const minimap = io.read.nodeFactory({
+      type: ORTHOGRAPHIC_CAMERA_NODE_TYPE,
+      data: { left: -3, right: [], top: null },
+    }) as OrthographicCamera;
+    expect([minimap.left, minimap.right, minimap.bottom, minimap.top]).toEqual([
+      -3, 1, -1, 1,
+    ]);
+  });
+
+  it("restores a camera from a payload that says nothing at all", () => {
+    const camera = io.read.nodeFactory({
+      type: PERSPECTIVE_CAMERA_NODE_TYPE,
+    }) as PerspectiveCamera;
+
+    expect(camera.aspect).toBe(1);
+  });
+
+  it("ignores a sprite extent and anchor the class would reject", () => {
+    const badge = io.read.nodeFactory({
+      type: SPRITE_NODE_TYPE,
+      data: {
+        material: "material/decal",
+        width: 0,
+        height: -4,
+        anchor: [Number.NaN, 1],
+        renderLayer: "front",
+      },
+    }) as Sprite;
+
+    expect([badge.width, badge.height]).toEqual([1, 1]);
+    expect([badge.anchor.x, badge.anchor.y]).toEqual([0.5, 0.5]);
+    expect(badge.renderLayer).toBe(0);
+  });
+
+  it("ignores an anchor that is not a pair at all", () => {
+    const badge = io.read.nodeFactory({
+      type: SPRITE_NODE_TYPE,
+      data: { material: "material/decal", anchor: { x: 0, y: 0 } },
+    }) as Sprite;
+
+    expect([badge.anchor.x, badge.anchor.y]).toEqual([0.5, 0.5]);
+  });
+
+  it("ignores a light colour and intensity it cannot use", () => {
+    for (const color of [[1, 2], "white", [1, Number.NaN, 1]]) {
+      const light = io.read.nodeFactory({
+        type: DIRECTIONAL_LIGHT_NODE_TYPE,
+        data: { color, intensity: Infinity },
+      }) as DirectionalLight;
+
+      expect([...light.color]).toEqual([1, 1, 1]);
+      expect(light.intensity).toBe(1);
+    }
+  });
+
+  it("reads a colour a build wrote in full", () => {
+    const light = io.read.nodeFactory({
+      type: DIRECTIONAL_LIGHT_NODE_TYPE,
+      data: { color: [0.2, 0.4, 0.6], intensity: 2.5 },
+    }) as DirectionalLight;
+
+    expect([...light.color]).toEqual([0.2, 0.4, 0.6]);
+    expect(light.intensity).toBe(2.5);
+  });
+});
+
+describe("resourceCatalog (§79)", () => {
+  const plane = planeGeometry();
+  const box = planeGeometry({ width: 2 });
+
+  it("resolves both directions, and neither for what it does not hold", () => {
+    const catalog = resourceCatalog<BufferGeometry>([
+      ["geometry/plane", plane],
+    ]);
+
+    expect(catalog.keyOf(plane)).toBe("geometry/plane");
+    expect(catalog.get("geometry/plane")).toBe(plane);
+    expect(catalog.keyOf(box)).toBeUndefined();
+    expect(catalog.get("geometry/box")).toBeUndefined();
+  });
+
+  it("keeps the first key of a resource published twice, and resolves both", () => {
+    const catalog = resourceCatalog<BufferGeometry>([
+      ["geometry/plane", plane],
+      ["geometry/floor", plane],
+    ]);
+
+    expect(catalog.keyOf(plane)).toBe("geometry/plane");
+    expect(catalog.get("geometry/floor")).toBe(plane);
+  });
+
+  it("tolerates the same entry twice, which says nothing new", () => {
+    const catalog = resourceCatalog<BufferGeometry>([
+      ["geometry/plane", plane],
+      ["geometry/plane", plane],
+    ]);
+
+    expect(catalog.get("geometry/plane")).toBe(plane);
+  });
+
+  it("refuses one key naming two resources", () => {
+    let thrown: unknown;
+    try {
+      resourceCatalog<BufferGeometry>([
+        ["geometry/plane", plane],
+        ["geometry/plane", box],
+      ]);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(isFourError(thrown) && thrown.code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+  });
+});
+
+describe("composeSceneNodeTypes", () => {
+  const custom = new Group();
+  custom.name = "mine";
+  const mine = {
+    write: {
+      nodeTypeOf: (node: { name: string }): string | undefined =>
+        node.name === "mine" ? "com.example.thing" : undefined,
+      // `null` is a legitimate §79 payload, and must not fall through.
+      nodeDataOf: (node: { name: string }): null | undefined =>
+        node.name === "mine" ? null : undefined,
+    },
+    read: {
+      nodeFactory: (document: { type: string }): Group | undefined =>
+        document.type === "com.example.thing" ? new Group() : undefined,
+    },
+  };
+
+  it("takes the first answer and falls through on undefined only", () => {
+    const io = registerSceneNodeTypes();
+    const composed = composeSceneNodeTypes(mine, io);
+
+    expect(composed.write.nodeTypeOf(custom)).toBe("com.example.thing");
+    expect(composed.write.nodeDataOf(custom)).toBeNull();
+    expect(
+      composed.read.nodeFactory({ type: "com.example.thing" }),
+    ).toBeInstanceOf(Group);
+
+    const panel = new Panel({ width: 12 });
+    expect(composed.write.nodeTypeOf(panel)).toBe(PANEL_NODE_TYPE);
+    expect(composed.write.nodeDataOf(panel)).toMatchObject({ width: 12 });
+    expect(composed.read.nodeFactory({ type: PANEL_NODE_TYPE })).toBeInstanceOf(
+      Panel,
+    );
+  });
+
+  it("answers nothing when nobody claims the node", () => {
+    const composed = composeSceneNodeTypes(registerUISerializers(), mine);
+
+    expect(composed.write.nodeTypeOf(new Group())).toBeUndefined();
+    expect(composed.write.nodeDataOf(new Group())).toBeUndefined();
+    expect(composed.read.nodeFactory({ type: "group" })).toBeUndefined();
   });
 });
