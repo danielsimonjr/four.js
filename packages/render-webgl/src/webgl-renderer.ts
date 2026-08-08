@@ -47,6 +47,7 @@ import {
   isRenderTargetTexture,
   isSpriteItem,
   isStandardItem,
+  viewLayerMask,
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
   type RenderItem,
@@ -1332,7 +1333,28 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         let litViewUploaded = false;
         let standardViewUploaded = false;
 
+        // §46's per-view filter (R-38, 2026-08-08): `view.layerMask` when this
+        // view sets one, the camera's own `layers` otherwise — §48's fallback
+        // rule, resolved by `@four/render` so every backend spells it the same
+        // way. Both defaults are `ALL_LAYERS`, so a view that never mentions
+        // layers keeps every item and issues the GL sequence it always did.
+        //
+        // The filter lives here, per view, rather than in list construction,
+        // because this backend builds **one** list per frame and draws it into
+        // every view (§64 stage 2 vs. the per-view list of R-8). That is why
+        // `RenderItem` snapshots the node's mask. When R-8 lands, each view
+        // builds its own list with `buildRenderList(root, list, mask)` and this
+        // test becomes redundant rather than wrong.
+        const viewLayers = viewLayerMask(view);
+
         for (const item of items) {
+          // `layersMatch(item.layers, viewLayers)`, inlined: `@four/scene` is
+          // not a dependency of this package (plan §3.1, frozen), and the
+          // predicate is one bitwise AND.
+          if ((item.layers & viewLayers) === 0) {
+            continue;
+          }
+
           const record = geometries.acquire(item.geometry);
           if (record === null) {
             continue;

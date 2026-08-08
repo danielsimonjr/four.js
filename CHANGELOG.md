@@ -8,6 +8,44 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — R-38 closed: §46 symbolic layers
+
+#### Added
+
+- **§46's layer registry (`packages/scene/src/layers.ts`)** — named layers compiled to
+  a 32-bit `LayerMask` ("compile to efficient masks internally … preserving
+  human-readable names"): `defineLayer`/`layerMask`/`layerMaskNames`/`layerNames`/
+  `layersMatch`/`applyLayers`/`resetLayers`, with `Node.layers` (default the
+  `"default"` layer), §47's `Camera.layers` (default `ALL_LAYERS` — discharging the
+  `TODO(§46/§47)` `camera.ts` carried since WP-3.1), and §48's `Viewport.layerMask`.
+  `@four/render` filters during §64 stage-2 traversal (`buildRenderList(root, out,
+layerMask?)` + the interpolated form), snapshots each node's mask onto
+  `RenderItem.layers`, and resolves §48's fallback once in `viewLayerMask(view)`;
+  `@four/render-webgl` skips a filtered item per view before touching a GPU resource —
+  **one camera can feed two viewports with no overdraw** (proved: 7 drawables × 2
+  disjoint views = 7 draws, not 14). Scene files carry **names, never bits** —
+  round-trip is `layerNames()` out, `resetLayers()` + replay in saved order back.
+- **Decision — layers do not inherit.** A node's mask gates that node only (a layer is
+  _identity, not state_; subtree gating is strictly less expressive, and changing a
+  layer can never make something _else_ disappear — §46's editor-only surprise);
+  `applyLayers` is the subtree spelling, as Three.js and Unity spell it. Consequence:
+  a masked list is a **subsequence** of the unmasked one, never a permutation
+  (asserted), and traversal is unchanged. `Camera.layers` overrides `Node.layers`
+  (nothing ever reads a camera's membership); the registry is module-level, not
+  per-`Scene` (nodes exist, move, and deserialize before their scene is assembled).
+- **Byte-identity, ninth run**: a six-pipeline scene emits the identical GL transcript
+  with and without layers declared; a masked view emits exactly the GL of the scene
+  without the filtered nodes (filtering is indistinguishable from never-having-been);
+  all four pre-R-38 pinned transcripts, both goldens, and 58/58 browser unchanged —
+  and the new tests are mutation-tested, not vacuous. Cost +120 B gzip on ui-demo: the
+  render tier's §85 diagnostic is `DEV`-gated (~115 B, stripped in production; its
+  GATED-allowlist §33 argument recorded), while **`@four/scene`'s `assertLayerMask` is
+  unconditional** — the dev-build suite holds simulation packages to the blunt rule
+  that they may not branch on build mode at all. Unblocks R-8 (the mask parameter
+  already tested), R-37 (`ScreenCamera`'s missing half), §71 picking filters
+  (`layersMatch` is the whole predicate), and the flagships' viewport follow-up.
+  Staged with reasons: §25 physics groups, §70 inclusion, the §71 filter itself.
+
 ### 2026-08-08 — A-6 closed: the §45 composition root completed
 
 #### Added

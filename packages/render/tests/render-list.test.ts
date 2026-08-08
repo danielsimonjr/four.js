@@ -13,11 +13,20 @@ import {
   type Material,
 } from "@four/materials";
 import {
+  ALL_LAYERS,
+  DEFAULT_LAYER_MASK,
+  DEFAULT_LAYER_NAME,
   Group,
+  NO_LAYERS,
+  PerspectiveCamera,
   PoseBuffer,
   Scene,
+  createFullscreenViewport,
+  layerMask,
   resolveWorldTransforms,
+  type Camera,
   type Node,
+  type Viewport,
 } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
@@ -28,6 +37,7 @@ import {
   isLitItem,
   isStandardItem,
   isUnlitItem,
+  viewLayerMask,
   type RenderItem,
 } from "../src/index.js";
 
@@ -720,5 +730,223 @@ describe("buildInterpolatedRenderList", () => {
 
     expect(second).toBe(first);
     expect(second.worldMatrix).toBe(matrix);
+  });
+});
+
+describe("§46 layer filtering (R-38)", () => {
+  it("snapshots each node's mask onto its item, defaulting to the default layer", () => {
+    const scene = new Scene();
+    const plain = renderable("plain");
+    const ui = renderable("ui");
+    ui.layers = layerMask("ui");
+    scene.add(plain, ui);
+    resolveWorldTransforms(scene);
+
+    const list = buildRenderList(scene, []);
+    expect(list.map((item) => item.layers)).toEqual([
+      DEFAULT_LAYER_MASK,
+      layerMask("ui"),
+    ]);
+  });
+
+  it("is a no-op at the default mask: the list is what it always was", () => {
+    const scene = new Scene();
+    scene.add(renderable("a"), renderable("b"), renderable("c"));
+    resolveWorldTransforms(scene);
+
+    const unfiltered = names(buildRenderList(scene, []), scene);
+    const explicit = names(buildRenderList(scene, [], ALL_LAYERS), scene);
+    expect(explicit).toEqual(unfiltered);
+    expect(explicit).toEqual(["a", "b", "c"]);
+  });
+
+  it("drops items whose node shares no layer with the mask", () => {
+    const scene = new Scene();
+    const world = renderable("world");
+    const panel = renderable("panel");
+    panel.layers = layerMask("ui");
+    scene.add(world, panel);
+    resolveWorldTransforms(scene);
+
+    expect(names(buildRenderList(scene, [], layerMask("ui")), scene)).toEqual([
+      "panel",
+    ]);
+    expect(
+      names(buildRenderList(scene, [], layerMask(DEFAULT_LAYER_NAME)), scene),
+    ).toEqual(["world"]);
+    expect(buildRenderList(scene, [], NO_LAYERS)).toHaveLength(0);
+  });
+
+  it("keeps a node whose mask overlaps the view's in any bit", () => {
+    const scene = new Scene();
+    const both = renderable("both");
+    both.layers = layerMask(DEFAULT_LAYER_NAME, "ui");
+    scene.add(both);
+    resolveWorldTransforms(scene);
+
+    expect(names(buildRenderList(scene, [], layerMask("ui")), scene)).toEqual([
+      "both",
+    ]);
+    expect(
+      names(buildRenderList(scene, [], layerMask(DEFAULT_LAYER_NAME)), scene),
+    ).toEqual(["both"]);
+  });
+
+  it("skips the node without pruning its subtree — layers do not inherit", () => {
+    const scene = new Scene();
+    const group = new Group();
+    group.layers = layerMask("ui");
+    const child = renderable("child");
+    group.add(child);
+    const groupRenderable = renderable("group-body");
+    groupRenderable.layers = layerMask("ui");
+    groupRenderable.add(renderable("nested-child"));
+    scene.add(group, groupRenderable);
+    resolveWorldTransforms(scene);
+
+    // The `ui` renderable is dropped; the default-layer child *inside* it is
+    // not — which is exactly what a subtree-pruning rule would have hidden.
+    expect(
+      names(buildRenderList(scene, [], layerMask(DEFAULT_LAYER_NAME)), scene),
+    ).toEqual(["child", "nested-child"]);
+  });
+
+  it("still prunes for visible/enabled, whatever the layer says", () => {
+    const scene = new Scene();
+    const hidden = new Group();
+    hidden.visible = false;
+    hidden.add(renderable("hidden-child"));
+    scene.add(hidden, renderable("shown"));
+    resolveWorldTransforms(scene);
+
+    expect(names(buildRenderList(scene, [], ALL_LAYERS), scene)).toEqual([
+      "shown",
+    ]);
+  });
+
+  it("leaves traversal order untouched — a masked list is a subsequence", () => {
+    const scene = new Scene();
+    for (const name of ["a", "b", "c", "d"]) {
+      const node = renderable(name);
+      if (name === "b" || name === "d") {
+        node.layers = layerMask("ui");
+      }
+      scene.add(node);
+    }
+    resolveWorldTransforms(scene);
+
+    const all = names(buildRenderList(scene, []), scene);
+    const masked = names(
+      buildRenderList(scene, [], layerMask(DEFAULT_LAYER_NAME)),
+      scene,
+    );
+    expect(all).toEqual(["a", "b", "c", "d"]);
+    expect(masked).toEqual(["a", "c"]);
+    expect(all.filter((name) => masked.includes(name))).toEqual(masked);
+  });
+
+  it("filters the interpolated builder identically", () => {
+    const scene = new Scene();
+    const world = renderable("world");
+    const panel = renderable("panel");
+    panel.layers = layerMask("ui");
+    scene.add(world, panel);
+
+    const poses = new PoseBuffer();
+    poses.track(panel);
+    poses.capture();
+    panel.transform.position.set(4, 0, 0);
+    poses.capture();
+
+    const list = buildInterpolatedRenderList(
+      scene,
+      poses,
+      0.5,
+      [],
+      layerMask("ui"),
+    );
+    expect(names(list, scene)).toEqual(["panel"]);
+    expect(list[0].layers).toBe(layerMask("ui"));
+    // Interpolated, not the live transform: alpha 0.5 of 0 → 4.
+    expect(list[0].worldMatrix.elements[12]).toBeCloseTo(2, 12);
+  });
+
+  it("reads a drawable with no mask as the default layer, not as no layer", () => {
+    const scene = new Scene();
+    const legacy = renderable("legacy");
+    // A structurally typed drawable predating §46 — the shape a package outside
+    // `@four/scene` can implement (`ParticleDrawable`), or a host's own node.
+    (legacy as unknown as { layers: number | undefined }).layers = undefined;
+    scene.add(legacy);
+    resolveWorldTransforms(scene);
+
+    expect(names(buildRenderList(scene, []), scene)).toEqual(["legacy"]);
+    expect(buildRenderList(scene, [])[0].layers).toBe(DEFAULT_LAYER_MASK);
+    expect(
+      names(buildRenderList(scene, [], layerMask(DEFAULT_LAYER_NAME)), scene),
+    ).toEqual(["legacy"]);
+    expect(buildRenderList(scene, [], layerMask("ui"))).toHaveLength(0);
+  });
+
+  it("refuses a malformed mask (§85)", () => {
+    const scene = new Scene();
+    scene.add(renderable("a"));
+    resolveWorldTransforms(scene);
+
+    expect(() => buildRenderList(scene, [], Number.NaN)).toThrow(
+      /buildRenderList\(layerMask\)/u,
+    );
+    expect(() =>
+      buildInterpolatedRenderList(scene, new PoseBuffer(), 0.5, [], 1.5),
+    ).toThrow(/buildInterpolatedRenderList\(layerMask\)/u);
+  });
+});
+
+describe("§47/§48 — viewLayerMask (R-38)", () => {
+  const camera = new PerspectiveCamera();
+
+  it("prefers the viewport's own mask", () => {
+    const view: Viewport = {
+      ...createFullscreenViewport(camera),
+      layerMask: layerMask("ui"),
+    };
+    expect(viewLayerMask(view)).toBe(layerMask("ui"));
+  });
+
+  it("falls back to the camera when the viewport says nothing", () => {
+    const narrowed = new PerspectiveCamera();
+    narrowed.layers = layerMask(DEFAULT_LAYER_NAME);
+    expect(viewLayerMask(createFullscreenViewport(narrowed))).toBe(
+      DEFAULT_LAYER_MASK,
+    );
+    expect(viewLayerMask(createFullscreenViewport(camera))).toBe(ALL_LAYERS);
+  });
+
+  it("reads a camera double that predates the field as ALL_LAYERS", () => {
+    // A structurally typed camera built before §46 landed — the case
+    // `@four/render-webgl`'s own test double is, and the reason the fallback
+    // is not dead code.
+    const legacy = { ...createFullscreenViewport(camera) };
+    legacy.camera = { ...camera, layers: undefined } as unknown as Camera;
+    expect(viewLayerMask(legacy)).toBe(ALL_LAYERS);
+  });
+
+  it("refuses a malformed viewport mask in a development build (§85)", () => {
+    const view: Viewport = {
+      ...createFullscreenViewport(camera, "minimap"),
+      layerMask: Number.NaN,
+    };
+    // Named by view id, because a frame with several viewports has to say
+    // which one. The message is built only on the failing call — see the
+    // guard's comment.
+    expect(() => viewLayerMask(view)).toThrow(/viewport "minimap"/u);
+  });
+
+  it("lets NO_LAYERS mean an empty view rather than falling back", () => {
+    const view: Viewport = {
+      ...createFullscreenViewport(camera),
+      layerMask: NO_LAYERS,
+    };
+    expect(viewLayerMask(view)).toBe(NO_LAYERS);
   });
 });

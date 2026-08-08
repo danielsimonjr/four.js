@@ -884,10 +884,25 @@ class TestCamera {
    */
   readonly transform = { worldMatrix: new Matrix4() };
 
+  /**
+   * §47's visibility mask (R-38, 2026-08-08), left `undefined` so that every
+   * other case in this file keeps exercising the *pre-field* double — which is
+   * the shape `viewLayerMask`'s `?? ALL_LAYERS` fallback exists for, and the
+   * evidence that a camera which never heard of layers still draws everything.
+   * {@link TestCamera.sees} opts a single case in.
+   */
+  layers: number | undefined = undefined;
+
   updateViewMatrixCalls = 0;
 
   updateViewMatrix(): void {
     this.updateViewMatrixCalls += 1;
+  }
+
+  /** Narrows what this camera sees to `mask` (§47). */
+  sees(mask: number): this {
+    this.layers = mask;
+    return this;
   }
 
   /** Places the eye, as a real camera's resolved world matrix would. */
@@ -2048,6 +2063,116 @@ describe("WebglRenderer.render — uniforms and draws (§64, §57)", () => {
   });
 });
 
+describe("WebglRenderer.render — §46 layer filtering (R-38, §47, §48)", () => {
+  /**
+   * A root with two drawables on different §46 layers: `world` on the default
+   * layer (bit 0, drawn with `drawElements`) and `panel` on bit 1 (drawn with
+   * `drawArrays`), so the two are told apart by which entry point fired.
+   */
+  function layeredRoot(): Renderable {
+    const root = createRoot();
+    const world = renderable(quadGeometry());
+    const panel = renderable(triangleGeometry());
+    panel.layers = 0b10;
+    root.add(world, panel);
+    return root;
+  }
+
+  it("draws everything when neither the view nor the camera narrows (no-op)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = layeredRoot();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("skips an item whose layers miss the viewport's mask (§48)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = layeredRoot();
+    gl.reset();
+
+    renderer.render(root, [createView(camera, { layerMask: 0b01 })]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("falls back to the camera's own mask when the viewport sets none (§47)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = layeredRoot();
+    camera.sees(0b10);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("lets the viewport override a camera that would have seen more", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = layeredRoot();
+    camera.sees(0b11);
+    gl.reset();
+
+    renderer.render(root, [createView(camera, { layerMask: 0b10 })]);
+
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("draws two different slices of one list into two views (the §48 case)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = layeredRoot();
+    gl.reset();
+
+    renderer.render(root, [
+      createView(camera, { id: "world", layerMask: 0b01 }),
+      createView(camera, { id: "ui", layerMask: 0b10 }),
+    ]);
+
+    // Two views, two clears, but each item drawn exactly once — which is the
+    // whole point of the field: a screen-space overlay stops costing a second
+    // full pass over the world.
+    expect(gl.countOf("clear")).toBe(2);
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("draws nothing into a view that selects no layer at all", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = layeredRoot();
+    gl.reset();
+
+    renderer.render(root, [createView(camera, { layerMask: 0 })]);
+
+    // Cleared, but nothing drawn: the rectangle is still this view's.
+    expect(gl.countOf("clearDepth")).toBe(1);
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("never acquires a GPU resource for an item it filters out", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const panel = renderable(triangleGeometry());
+    panel.layers = 0b10;
+    root.add(panel);
+    gl.reset();
+
+    renderer.render(root, [createView(camera, { layerMask: 0b01 })]);
+
+    // The filter runs before `geometries.acquire`, so a layer nobody views
+    // costs no buffer, no vertex array, and no upload.
+    expect(gl.countOf("createBuffer")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+});
+
 describe("WebglRenderer.render — §43 interpolated poses (WP-3.6)", () => {
   /** A root with one drawable child; the root itself draws nothing. */
   function interpolationScene(): { root: Renderable; child: Renderable } {
@@ -3118,6 +3243,9 @@ function particleItem(
     geometry: particleQuadGeometry(),
     renderLayer: 0,
     renderOrder: 0,
+    // §46's membership mask, as `buildRenderList` snapshots it off the emitting
+    // node (R-38): the default layer, which every view's mask contains.
+    layers: 1,
     // §66 key 2, as `buildRenderList` writes it for a particle system: the
     // pipeline blends by construction but the item classifies opaque, so the
     // sort leaves particle scenes in the order they were authored in.

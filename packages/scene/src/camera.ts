@@ -18,10 +18,11 @@
  * }
  * ```
  *
- * `layers` is deliberately absent here — see {@link Camera} — and the other two
- * required §47 camera types (`ScreenCamera`, `ObliqueCamera`, plus the custom
- * projection camera and the camera rigs) are later phases. The MVP (§120) needs
- * perspective and orthographic, which is what this module ships.
+ * All six are shipped: `layers` joined them with §46's layer registry (R-38,
+ * 2026-08-08 — it was deliberately absent until then, see {@link Camera.layers}).
+ * The other two required §47 camera types (`ScreenCamera`, `ObliqueCamera`, plus
+ * the custom projection camera and the camera rigs) are later phases. The MVP
+ * (§120) needs perspective and orthographic, which is what this module ships.
  *
  * ## Where the matrices come from
  *
@@ -53,6 +54,7 @@
 
 import { Matrix4, type DepthRange } from "@four/math";
 
+import { ALL_LAYERS, type LayerMask } from "./layers.js";
 import { Node } from "./node.js";
 import { resolveWorldTransform } from "./world-transforms.js";
 
@@ -90,19 +92,15 @@ const DEFAULT_FAR = 1000;
  * them as mutable fields; `readonly` here refers to the binding only and is the
  * stronger guarantee — write *into* them.
  *
- * ## `layers` (deferred)
+ * ## `layers` (R-38, 2026-08-08)
  *
  * §47's declaration ends with `layers: LayerMask`, the per-camera visibility
- * mask of §46 ("symbolic layers control camera visibility"). It is not
- * implemented in this packet and no placeholder is invented for it: §46 requires
- * named layers that "compile to efficient masks internally while preserving
- * human-readable names in the public API and serialized scene files", which is a
- * scene-wide layer registry (naming, allocation, serialization, and the physics
- * and picking masks that share it), not a number on a camera. The render-list
- * builder and `Viewport.layerMask` (§48) are filtered by it when it lands; until
- * then every camera sees every node.
- *
- * TODO(§46/§47): add `layers: LayerMask` together with the scene layer registry.
+ * mask of §46 ("symbolic layers control camera visibility"). It waited for the
+ * layer registry §46 actually requires — named layers that "compile to efficient
+ * masks internally while preserving human-readable names in the public API and
+ * serialized scene files" — rather than being invented as a bare number here.
+ * That registry now exists (`layers.ts`), so the field does too; see
+ * {@link Camera.layers}.
  */
 export abstract class Camera extends Node {
   /**
@@ -134,6 +132,47 @@ export abstract class Camera extends Node {
    * Written by {@link Camera.updateViewMatrix}; the instance is never replaced.
    */
   readonly viewMatrix: Matrix4 = new Matrix4();
+
+  /**
+   * Which §46 layers this camera can see (§47, R-38, 2026-08-08).
+   *
+   * ```ts
+   * worldCamera.layers = layerMask("default");  // everything but the UI
+   * uiCamera.layers = layerMask("ui");          // only the UI
+   * ```
+   *
+   * A node is drawn for this camera when `layersMatch(node.layers,
+   * camera.layers)` — the two masks share at least one bit. Defaults to
+   * {@link ALL_LAYERS}: a camera sees every layer until told otherwise, which is
+   * what keeps a scene that never mentions layers identical to the one it was
+   * before they existed.
+   *
+   * This is the **fallback**, not the last word: §48 lets a viewport narrow it
+   * further with its own `layerMask`, so one camera can feed two views that show
+   * different slices of the same scene (`Viewport.layerMask`). A camera's mask
+   * is per-camera state; a viewport's is per-view.
+   *
+   * ## It **overrides** `Node.layers` (decision, R-38)
+   *
+   * There is one property, not two: §47 spells the camera's visibility mask
+   * `layers`, and `Node.layers` — this engine's object-side membership mask,
+   * which §6 does not declare — has the same name. Redeclaring the field here
+   * narrows its meaning for cameras from "layers this node belongs to" to
+   * "layers this camera looks at", and changes its default from
+   * `DEFAULT_LAYER_MASK` to {@link ALL_LAYERS}.
+   *
+   * That is safe rather than merely convenient: **nothing ever reads a camera's
+   * membership**. A `Camera` is not a `Renderable`, so §64's list generates no
+   * item for it whatever its mask says; it is not a picking candidate; and §46's
+   * remaining consumers (physics groups, post-processing inclusion) do not apply
+   * to a camera either. The alternative — a second field with a different name —
+   * would contradict §47's declaration to preserve a fact no code can use.
+   *
+   * One consequence worth knowing: `applyLayers(scene, mask)` walks *every*
+   * node, so it rewrites the visibility mask of any camera inside that subtree.
+   * Apply layers to the branch you mean, or re-set the camera afterwards.
+   */
+  layers: LayerMask = ALL_LAYERS;
 
   /**
    * Rebuilds {@link Camera.projectionMatrix} from this camera's projection

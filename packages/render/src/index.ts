@@ -52,6 +52,7 @@ export {
   isSpriteItem,
   isStandardItem,
   isUnlitItem,
+  viewLayerMask,
 } from "./render-list.js";
 export type {
   AddPassOptions,

@@ -12,6 +12,26 @@ export type {
 } from "./camera.js";
 export { Camera, OrthographicCamera, PerspectiveCamera } from "./camera.js";
 export { Group } from "./group.js";
+export type { LayerMask, LayeredNode } from "./layers.js";
+export {
+  ALL_LAYERS,
+  DEFAULT_LAYER,
+  DEFAULT_LAYER_MASK,
+  DEFAULT_LAYER_NAME,
+  LAYER_COUNT,
+  NO_LAYERS,
+  applyLayers,
+  assertLayerMask,
+  defineLayer,
+  isLayerMask,
+  layerIndex,
+  layerMask,
+  layerMaskNames,
+  layerName,
+  layerNames,
+  layersMatch,
+  resetLayers,
+} from "./layers.js";
 export type { ColorRGB, DirectionalLightOptions } from "./light.js";
 export { DirectionalLight } from "./light.js";
 export type {

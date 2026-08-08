@@ -18,7 +18,13 @@
 import { planeGeometry } from "@four/geometry";
 import { constructionCount, resetConstructionCount } from "@four/math";
 import { SpriteMaterial, UnlitMaterial } from "@four/materials";
-import { Node, PoseBuffer, Scene, resolveWorldTransforms } from "@four/scene";
+import {
+  DEFAULT_LAYER_MASK,
+  Node,
+  PoseBuffer,
+  Scene,
+  resolveWorldTransforms,
+} from "@four/scene";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -394,5 +400,38 @@ describe("the interleaved instance layout (the cross-package contract)", () => {
     expect(item.kind).toBe("sprite");
     expect(item.material).toBe(sprite.material);
     expect(isParticlesItem(item)).toBe(false);
+  });
+});
+
+describe("§46 layer filtering of a particle system (R-38)", () => {
+  it("snapshots the emitter's mask onto its batched item", () => {
+    const node = new TestParticles(2);
+    node.layers = 0b10;
+    const list = buildRenderList(sceneWith(node), []);
+
+    expect(list).toHaveLength(1);
+    expect(particlesAt(list, 0).layers).toBe(0b10);
+  });
+
+  it("drops the system — and skips its repack — when no view wants its layer", () => {
+    const node = new TestParticles(2);
+    node.layers = 0b10;
+    const scene = sceneWith(node);
+
+    const list = buildRenderList(scene, [], 0b01);
+
+    expect(list).toHaveLength(0);
+    // `updateParticleInstances` is the emitter's own per-build work (plan
+    // P9-3); a filtered system must not pay it.
+    expect(node.updateCalls).toBe(0);
+  });
+
+  it("keeps drawing at the default mask", () => {
+    const node = new TestParticles(2);
+    const list = buildRenderList(sceneWith(node), []);
+
+    expect(list).toHaveLength(1);
+    expect(particlesAt(list, 0).layers).toBe(DEFAULT_LAYER_MASK);
+    expect(node.updateCalls).toBe(1);
   });
 });

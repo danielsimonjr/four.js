@@ -28,6 +28,26 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — R-38 §46 layers.** Decisions worth keeping:
+  - **Layers are self-only, never subtree** — a layer is identity, not state (off-ness
+    inherits; belonging doesn't); subtree gating is strictly less expressive (a `"ui"`
+    node could not carry a `"default"` child); changing a layer can never make
+    something _else_ disappear. `applyLayers` is the subtree spelling (the
+    Three.js/Unity model).
+  - `Camera.layers` **overrides** `Node.layers` — safe because nothing reads a
+    camera's membership. The registry is **module-level, not per-Scene** (nodes exist,
+    move between scenes, and deserialize before their scene is assembled).
+  - **§46 requires names in scene files, never bits** — round-trip is `layerNames()`
+    out, `resetLayers()` + replay in saved order back.
+  - **`@four/scene` may not branch on `DEV` at all** (the dev-build suite's blunt §33
+    rule for simulation packages) — its §85 check is unconditional; the render tier's
+    copy is GATED with a recorded argument (~115 B, the difference between +240 B and
+    +120 B).
+  - Byte-identity technique, third confirmation: **a permissive default mask makes a
+    new filter a no-op on the existing path**, exactly as a `bool` uniform at GL's
+    initial `false` did. Gotcha: a new required field on `RenderItemBase` breaks
+    hand-built item literals only under TypeDoc/tsc, not Vitest.
+
 - **2026-08-08 — A-6 composition root.** Decisions worth keeping:
   - **A world cannot be an option-record here** — `four/application` importing
     `@four/physics` puts a solver in every UI bundle; §45's `PhysicsWorldOptions` form

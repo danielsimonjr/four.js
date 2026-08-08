@@ -76,6 +76,7 @@
  * the next build into the same array.
  */
 
+import { DEV } from "@four/core";
 import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type {
@@ -85,7 +86,17 @@ import type {
   StandardMaterial,
   UnlitMaterial,
 } from "@four/materials";
-import type { Node, PoseBuffer } from "@four/scene";
+import {
+  ALL_LAYERS,
+  DEFAULT_LAYER_MASK,
+  assertLayerMask,
+  isLayerMask,
+  layersMatch,
+  type LayerMask,
+  type Node,
+  type PoseBuffer,
+  type Viewport,
+} from "@four/scene";
 
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
@@ -146,6 +157,26 @@ interface RenderItemBase {
   renderOrder: number;
   /** §66 sort key 1, copied from the drawable node. */
   renderLayer: number;
+  /**
+   * The drawable node's §46 layer mask, snapshotted at generation time (R-38,
+   * 2026-08-08).
+   *
+   * Not a sort key and not read by the comparator — it is what lets **one**
+   * render list serve several views with different masks, which is the shape
+   * this engine has until the per-view list arrives (R-8): the backend tests
+   * `item.layers & effectiveViewMask` once per item per view, before it touches
+   * a GPU resource. Filtering *at build time* is the other half and is
+   * {@link buildRenderList}'s `layerMask` parameter; the two compose, since an
+   * item that was never generated cannot be drawn into any view.
+   *
+   * On the item rather than reached through a node reference for the reason §64
+   * gives for compact render items in the first place — and because a compact
+   * item has no node reference to reach through.
+   *
+   * Confusingly adjacent to `renderLayer` above, and unrelated: that is §66's
+   * ordering ordinal, this is §46's membership set.
+   */
+  layers: LayerMask;
   /**
    * §66 sort key 2, read off the item's material (§57's `transparent`) at
    * generation time: `false` for an opaque draw, `true` for a blended one.
@@ -361,6 +392,42 @@ export function isParticlesItem(item: RenderItem): item is ParticleRenderItem {
   return item.kind === "particles";
 }
 
+/**
+ * The §46 layer mask a view actually draws (§47, §48; R-38, 2026-08-08) —
+ * `view.layerMask` when it has one, the camera's own `layers` otherwise.
+ *
+ * ```ts
+ * const mask = viewLayerMask(view);
+ * for (const item of list) {
+ *   if ((item.layers & mask) === 0) continue;   // layersMatch, inlined
+ *   draw(item);
+ * }
+ * ```
+ *
+ * §48's fallback rule in exactly one place, so every backend and every consumer
+ * that draws a viewport resolves it identically. Both defaults are `ALL_LAYERS`
+ * — a viewport with no mask over a camera with no mask draws every layer — so
+ * this returns `ALL_LAYERS` for every view built before layers existed.
+ *
+ * The trailing `?? ALL_LAYERS` is not dead: `Camera.layers` is non-optional in
+ * the type system, but a **structurally typed camera** predating the field
+ * (`@four/render-webgl`'s test double, a host's own minimal camera object)
+ * reports `undefined`, and that must resolve to "draws everything" rather than
+ * to a mask of zero that silently empties the view. Same defence, same reason,
+ * as `material.transparent === true` in `collect`.
+ */
+export function viewLayerMask(view: Viewport): LayerMask {
+  const mask = view.layerMask ?? view.camera.layers ?? ALL_LAYERS;
+  // §85, and only in a development build: this runs once per view per frame, so
+  // the cheap predicate gates the message — a template literal built here would
+  // allocate a string every frame, which is precisely what `@four/core`'s
+  // `dev.ts` tells callers not to do. `assertLayerMask` re-tests and throws.
+  if (DEV && !isLayerMask(mask)) {
+    assertLayerMask(mask, `viewport "${view.id}" layer mask`);
+  }
+  return mask;
+}
+
 /** Pooled backing store for one `out` array. */
 interface ListPool {
   /** Item objects, indexed by generation order (not by final sorted order). */
@@ -414,6 +481,7 @@ function itemAt(
       material: undefined,
       renderOrder: 0,
       renderLayer: 0,
+      layers: DEFAULT_LAYER_MASK,
       transparent: false,
       id: "",
       count: 0,
@@ -560,7 +628,9 @@ function isRenderable(node: Node): node is Renderable<Material> {
  * Appends render items for `node`'s subtree to `out`, starting at index
  * `count`, and returns the new count. Depth-first in insertion order (§6).
  *
- * Filtering is §64 stage 2 and prunes **whole subtrees**:
+ * Filtering is §64 stage 2, and it comes in two shapes.
+ *
+ * **Subtree pruning**, for the two §6 flags:
  *
  * - `visible === false` — §6's rendering flag. Pruning rather than skipping the
  *   single node is the behaviour authors expect (hiding a group hides what is
@@ -573,6 +643,15 @@ function isRenderable(node: Node): node is Renderable<Material> {
  *
  * Both are checked on every node, including the traversal root: passing a
  * hidden root yields an empty list.
+ *
+ * **Per-node skipping**, for §46's layer mask (R-38, 2026-08-08): a node whose
+ * `layers` shares no bit with `mask` generates no item, and **its children are
+ * still visited**. That asymmetry is deliberate and is §46's model — a layer is
+ * membership, not state, so it does not inherit (see `@four/scene`'s
+ * `layers.ts` for the recorded decision). The consequence here is that layer
+ * filtering costs one `&` per node and never changes the traversal, which is
+ * what keeps a masked list a permutation-free subsequence of the unmasked one
+ * (§33) and what makes `ALL_LAYERS` a true no-op.
  */
 function collect(
   node: Node,
@@ -581,13 +660,27 @@ function collect(
   count: number,
   poses: PoseBuffer | null,
   alpha: number,
+  mask: LayerMask,
 ): number {
   if (!node.visible || !node.enabled) {
     return count;
   }
 
   let next = count;
-  if (isRenderable(node)) {
+  // §46's mask, read once and shared by both drawable arms.
+  //
+  // `?? DEFAULT_LAYER_MASK` for the same reason `material.transparent === true`
+  // is written that way below: a **structurally typed** drawable predating the
+  // field — a `ParticleDrawable` implemented outside `@four/scene`, a host's own
+  // minimal node — reports `undefined`, and that must read as "on the default
+  // layer", which is where every real node starts. Reading it as a bare
+  // `undefined` would make `undefined & mask` zero and drop the node from every
+  // list, silently.
+  const nodeLayers = node.layers ?? DEFAULT_LAYER_MASK;
+  // `false` skips this node only — the children below are visited either way,
+  // because §46 layers do not inherit.
+  const onLayer = layersMatch(nodeLayers, mask);
+  if (onLayer && isRenderable(node)) {
     // A sprite rebuilds its quad here if the anchor or the size moved (its
     // `geometry` accessor is an override); a plain renderable's geometry is
     // whatever it was handed.
@@ -603,6 +696,8 @@ function collect(
       UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
+    // §46's mask, snapshotted so a per-view filter needs no node reference.
+    item.layers = nodeLayers;
     // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
     // read: a material double built before the flag existed reports
     // `undefined`, which classifies opaque — the behaviour every scene had
@@ -618,7 +713,7 @@ function collect(
     // `MutableRenderItem`.
     out[next] = item as RenderItem;
     next += 1;
-  } else if (isParticleDrawable(node)) {
+  } else if (onLayer && isParticleDrawable(node)) {
     // §36's whole system becomes **one** item (plan P9-3). The repack is the
     // node's own work and happens here, at list-build time, so the uploaded
     // arrays cannot be a step older than the item that points at them — see
@@ -638,6 +733,7 @@ function collect(
     item.instances = node.particleInstances;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
+    item.layers = nodeLayers;
     // §66 key 2: a particle system has no material to declare `transparent`,
     // and its pipeline blends by construction (§36's colour ramp). It is
     // classified **opaque** so that key 2 leaves particle scenes in exactly the
@@ -651,7 +747,7 @@ function collect(
 
   const children = node.children;
   for (let i = 0; i < children.length; i += 1) {
-    next = collect(children[i], out, pool, next, poses, alpha);
+    next = collect(children[i], out, pool, next, poses, alpha, mask);
   }
   return next;
 }
@@ -717,10 +813,43 @@ function compareRenderItems(a: RenderItem, b: RenderItem): number {
  * Allocates nothing in the steady state: no items, no matrices, no math
  * objects. The first few frames grow the pool to the scene's item count and
  * then stop.
+ *
+ * ## `layerMask` (§46, §64 stage 2; R-38, 2026-08-08)
+ *
+ * ```ts
+ * buildRenderList(scene, list, camera.layers);   // only what this camera sees
+ * ```
+ *
+ * Only nodes sharing a bit with `layerMask` generate items; their children are
+ * traversed regardless, because §46 layers do not inherit (see `collect`). The
+ * default is `ALL_LAYERS`, which makes the test true for every node whose mask
+ * is non-zero — i.e. every node that has not been explicitly removed from all
+ * layers — so a caller that omits it gets exactly the list it got before the
+ * parameter existed, in exactly the same order.
+ *
+ * This is the **build-time** half of §46 filtering, for the caller that builds
+ * one list per view. The other half is {@link RenderItem}'s `layers` snapshot,
+ * which lets one shared list be filtered per view at draw time; the WebGL
+ * backend uses that today because it builds one list per frame (R-8).
+ *
+ * @throws FourError `INVALID_SCENE_GRAPH` **in a development build** when
+ * `layerMask` is not an integer in `[0, 0xffffffff]` (§85) — a `NaN` mask would
+ * otherwise empty the list with no diagnostic at all. §85 lets a production
+ * build drop expensive validation, and this one costs bytes in every shipped
+ * bundle for a mistake that is an authoring error by construction, so it is
+ * gated: measured at ~115 B gzip on `ui-demo`, deleted entirely by
+ * `__FOUR_DEV__: false` (R-38, 2026-08-08). The check itself,
+ * `@four/scene`'s `assertLayerMask`, is unconditional there — `@four/scene` is a
+ * §33 simulation package and may not branch on the build mode at all.
  */
-export function buildRenderList(root: Node, out: RenderItem[]): RenderItem[] {
+export function buildRenderList(
+  root: Node,
+  out: RenderItem[],
+  layerMask: LayerMask = ALL_LAYERS,
+): RenderItem[] {
+  if (DEV) assertLayerMask(layerMask, "buildRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, null, 0);
+  const count = collect(root, out, pool, 0, null, 0, layerMask);
   out.length = count;
   out.sort(compareRenderItems);
   return out;
@@ -753,15 +882,22 @@ export function buildRenderList(root: Node, out: RenderItem[]): RenderItem[] {
  * writes scene state** (§43: the render transform must not feed back into the
  * simulation). It also does not need `resolveWorldTransforms` to have run: it
  * derives every matrix itself, at `O(depth)` per item.
+ *
+ * `layerMask` filters exactly as it does for {@link buildRenderList} — same
+ * default, same semantics, same development-only §85 check — and interacts with nothing else
+ * here: a filtered node contributes no item, so no render pose is composed for
+ * it either.
  */
 export function buildInterpolatedRenderList(
   root: Node,
   poses: PoseBuffer,
   alpha: number,
   out: RenderItem[],
+  layerMask: LayerMask = ALL_LAYERS,
 ): RenderItem[] {
+  if (DEV) assertLayerMask(layerMask, "buildInterpolatedRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, poses, alpha);
+  const count = collect(root, out, pool, 0, poses, alpha, layerMask);
   out.length = count;
   out.sort(compareRenderItems);
   return out;
