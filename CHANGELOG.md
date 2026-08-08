@@ -8,6 +8,68 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — R-29 (frame half): §55 sprite frame sub-rectangles
+
+#### Added
+
+- **§55 sprite `frame` sub-rectangles (R-29).** `Sprite.frame`/`setFrame()`/
+  `SpriteOptions.frame` select a texture region in **texels, bottom-left origin**
+  (forced, not chosen: `MaterialTexture.data` documents row 0 as `v = 0`, §7a puts +Y
+  up — and normalized units would make §85's containment check vacuous);
+  `SpriteRenderItem.frame` carries it; the WebGL 2 backend resolves it **into the
+  existing `quad` uniform**. Many sprites now share one atlas texture, one material,
+  one upload — proven end to end: four glyph cells go from 4 `createTexture` +
+  4 `texImage2D` to 1 + 1, with identical uv rectangles. §85 refuses out-of-bounds
+  frames (validated before the first write; one named hole dated in place — a later
+  texture swap is unchecked and samples clamp-to-edge, wanting R-30's §77 change
+  notification). A frame write re-uploads nothing — the property §55's animation
+  clips and §86's glyph batching need.
+- **The 2026-08-07 mechanism prediction is retracted in place, with the derivation
+  that disproves it**: a frame is an affine _reparametrization_ of the derived-uv map
+  (`quad.zw = w·tw/fw`, `quad.xy = minX − fx·w/fw`), so the unchanged shader samples
+  the sub-rectangle exactly — no uv attribute, no new uniform, no new GL call, and
+  frameless sprites are byte-identical **by code path** (tenth recorded-sequence run;
+  the R-13-era pinned transcript containing a sprite still asserts verbatim). A real
+  uv stream remains §65 batching's answer, recorded there. Staged with dated notes:
+  the named-frame atlas object (a §77 metadata container for `@four/assets`) and
+  sprite animation clips (§14/§17 step tracks — a private timeline inside `Sprite`
+  would be a second animation system). §55 now 5 of 11.
+- **Diagnostics cost bytes, measured**: five per-component §85 messages were +330 B
+  gzip — more than the rest of the feature; collapsed to two whole-value messages.
+  ui-demo at 32.98/33 kB (**20 B headroom — effectively exhausted**; flagged). The
+  four examples' `cutGlyphCell` workaround and `packages/text`'s one-texture-per-cell
+  advisory are now retirable (recorded, not touched). Serializer follow-up recorded:
+  `Sprite` documents don't yet carry `frame`.
+
+### 2026-08-08 — A-24 closed: §61's context-loss contract has its suite
+
+#### Tests
+
+- **A-24 — three tiers, 17 tests, no product change needed.** Unit
+  (`webgl-renderer.test.ts`, 9): the frame after a restore equals the frame before the
+  loss **call for call** (handles normalized to first-appearance); **not one GPU
+  handle from before the loss is ever touched again** — programs, shaders, buffers,
+  VAOs, textures, framebuffers, renderbuffers, uniform locations, asserted disjoint
+  across a full post-restore workload _and_ across a second loss/restore cycle;
+  pipelines rebuild eagerly, resources lazily (restore alone: 6 `createProgram`, zero
+  resource creations); a texture edited and a target resized _while lost_ come back at
+  their new version/size; the F13 envelope closes on a loss delivered mid-frame (from
+  inside a material accessor); the §70 effect pipeline survives; dispose-while-lost
+  issues zero GL calls. Integration (`renderer-context-loss.test.ts`, 7): an
+  `Application` steps to **bit-identical §12 positions** across four contextless
+  frames with zero GL calls (loss is invisible above the renderer); the
+  `NullRenderer.events` seam finally does the job it was built for; `app.stats` counts
+  no draw for a skipped frame; a `RenderGraph` target re-allocates at its post-loss
+  size. Browser (`context-loss.spec.ts`, real ANGLE context via `WEBGL_lose_context`):
+  the restore arrives **only because the backend calls `preventDefault()`** — the one
+  clause a double can only inspect — with an empty error log while the context is
+  gone. **The loss path was correct before it was tested** — A-24 was a behavioural
+  gap, not a coverage one (the path was already at 100% lines; the four remaining
+  uncovered statements are invariant guards unreachable through the public API — do
+  not chase them). One §83 corner recorded for the owner: `dispose()` after a
+  _failed_ restore leaks the rebuilt programs; the obvious fix would break the tested
+  "not one GL call while lost" property, so it is deliberately unmade.
+
 ### 2026-08-08 — R-38 closed: §46 symbolic layers
 
 #### Added

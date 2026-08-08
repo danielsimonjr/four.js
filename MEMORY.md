@@ -28,6 +28,32 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — R-29 sprite frames + A-24 context-loss suite.** Decisions worth
+  keeping:
+  - **A §55 frame does not need authored uv** — it is an affine reparametrization of
+    the derived-uv map (`quad.zw = w·tw/fw`, `quad.xy = minX − fx·w/fw`); the `quad`
+    uniform survives generalized and its _name_ is load-bearing (an argument of
+    `getUniformLocation`). The 2026-08-07 retire-the-uniform prediction is retracted
+    in place. A real uv stream remains §65 batching's answer.
+  - **Frames are texels, bottom-left origin** — forced by `MaterialTexture.data`'s
+    row-0-is-`v=0`; normalized units would make §85's containment check vacuous. A
+    frame write re-uploads nothing (the property §55 clips and §86 batching need).
+    Named hole: containment is write-time only; a later texture swap samples
+    clamp-to-edge (wants R-30's §77 change notification).
+  - **Diagnostics cost bytes, measured**: five per-component §85 messages = +330 B
+    gzip, more than the feature; two whole-value messages are the trade. ui-demo at
+    32.98/33 kB — **20 B left**; next bundle-touching packet needs a proposal.
+  - **§61's loss path was correct before it was tested** (A-24: 17 tests, no product
+    bug) — the gap was proof, not behaviour. The four remaining uncovered
+    render-webgl statements are invariant guards unreachable through the public API —
+    do not chase 100% there. `getExtension` on a lost context returns `null` —
+    capture `WEBGL_lose_context` before losing.
+  - **Owner call recorded:** dispose-after-failed-restore leaks rebuilt programs
+    (§83); the obvious `gl.isContextLost()` fix breaks the tested
+    not-one-GL-call-while-lost property — deliberately unmade.
+  - Serializer follow-up: `Sprite` documents don't yet carry `frame` (one field;
+    round-trip passes today because the field is simply absent).
+
 - **2026-08-08 — R-38 §46 layers.** Decisions worth keeping:
   - **Layers are self-only, never subtree** — a layer is identity, not state (off-ness
     inherits; belonging doesn't); subtree gating is strictly less expressive (a `"ui"`
