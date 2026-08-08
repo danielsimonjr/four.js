@@ -8,6 +8,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — Specification revision 1.8: the consolidated amendment pass
+
+#### Documentation
+
+- **Spec revision 1.8** (`docs/SPECIFICATION.md`, one amendments-table row, frozen
+  §1–120 numbering untouched, no new lettered sections). **Reversed four statements
+  shipping had made false**: §18 + §97a's "`AnimationController` is not implemented"
+  (replaced with a compiling shipped-form snippet, the pose-evaluator rationale, and a
+  per-feature shipped/scheduled split of §18's nine); §20 + §97a's deferred
+  `solver: "auto"`/`renderer: "auto"` (rewritten with the registry semantics —
+  including why registration is never an import side effect); §97a's `StandardMaterial`
+  row; §97's "a world is built and tracked, not an app option". **Corrected two
+  never-implementable statements**: §54's `morphTargetWeights` placement (→ a §6a
+  `MorphWeights` scene component with the declared field kept as an accessor — the
+  frozen dependency matrix made the original placement impossible) and §17's two
+  "missing track types" (binding forms over existing value kinds, not new
+  discriminants). **Added**: `LitMaterial` to §57's family (the 2026-08-04 revisit
+  note discharged); a _provisionally withdrawn_ marker on §57's `ShaderMaterial` row
+  carrying RFC 0001's draft status inline (acceptance makes it permanent, rejection
+  restores the row — deliberately not settled while the RFC is a draft); §61's
+  deferred-by-decision note on `createTexture`/`createRenderTarget`.
+- **Triaged out, with the rule that emerged recorded in MEMORY**: §100, §65, and §55
+  are _requirements lists_, never status claims — a spec section is not stale merely
+  because its requirement is unbuilt; only implementation-status statements are
+  amendment targets. §111's namespace note was already fixed by revision 1.7 (the TODO
+  entry was the stale artifact). Code-side follow-up recorded:
+  `packages/animation/src/track.ts:40-45` still promises the opposite of §17's new
+  text — corrected in the RFC 0003 packet or as a chore.
+
 ### 2026-08-08 — R-29 (frame half): §55 sprite frame sub-rectangles
 
 #### Added

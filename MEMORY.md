@@ -28,6 +28,28 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — Spec revision 1.8 (consolidated amendment pass).** All queued
+  spec-revisit items applied in one pass; no new lettered sections, `ALLOWED_LETTERED`
+  unchanged. Rules that emerged:
+  - **A spec section that lists requirements is not stale merely because the
+    requirement is unbuilt** — only statements about implementation _status_ are
+    amendment targets (why §65/§55/§100 were triaged out while §18/§97a were
+    rewritten).
+  - **When the spec's own placement of a field is unimplementable under the frozen
+    dependency matrix, correct the spec** rather than annotate the source (§54's
+    `morphTargetWeights` → `MorphWeights` component, declared spelling kept as an
+    accessor).
+  - **RFC-derived amendments carry the RFC's status** — §57's `ShaderMaterial` row is
+    _provisionally withdrawn, RFC 0001 draft, decision pending_, never settled while
+    the RFC is a draft.
+  - Gotcha: **"§3.1" in the RFCs/plan is the implementation plan's dependency matrix,
+    not the spec's §3.1 ("Scene")** — `check-spec`'s reference check resolves the
+    number and cannot catch the confusion.
+  - Gotcha: `docs/SPECIFICATION.md` + `docs/ERRATA.md` are hand-formatted and have
+    never been prettier-clean (2,128 diff-lines at HEAD) though neither is in
+    `.prettierignore`; CI runs no prettier job — treat the spec as prettier-exempt and
+    never `--write` it as a side effect (owner call: make the exemption explicit).
+
 - **2026-08-08 — R-29 sprite frames + A-24 context-loss suite.** Decisions worth
   keeping:
   - **A §55 frame does not need authored uv** — it is an affine reparametrization of
