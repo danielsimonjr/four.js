@@ -44,6 +44,7 @@ import {
   DEFAULT_TRANSFORM_AUTHORITY,
   type TransformAuthority,
 } from "./authority.js";
+import { DEFAULT_LAYER_MASK, type LayerMask } from "./layers.js";
 import { Transform } from "./transform.js";
 
 /**
@@ -234,6 +235,34 @@ export abstract class Node
 
   /** Free-form tags, queried by `Scene.findByTag` (§46). Empty by default. */
   tags: Set<string> = new Set<string>();
+
+  /**
+   * Which §46 layers this node belongs to, as a bit mask (R-38, 2026-08-08).
+   *
+   * Defaults to {@link DEFAULT_LAYER_MASK} — the layer named `"default"`, and
+   * nothing else — so a scene that never mentions layers is seen by every
+   * camera and every viewport, whose own masks default to `ALL_LAYERS`.
+   *
+   * ```ts
+   * node.layers = layerMask("ui");            // one layer
+   * node.layers = layerMask("ui", "debug");   // two
+   * applyLayers(panel, layerMask("ui"));      // this node *and* its subtree
+   * ```
+   *
+   * **The mask gates this node only**, not its subtree: a child on another
+   * layer is unaffected by what its parent is on, which is the opposite of
+   * `visible`/`enabled` and is a recorded decision — see `layers.ts` for the
+   * reasoning and for the subtree spelling.
+   *
+   * A plain field, like `visible` and `tags`, rather than a validated accessor:
+   * the render list reads it once per node per frame, and §85's checks are made
+   * where a mask is *built* ({@link layerMask}) and where one is *accepted* from
+   * an author (`assertLayerMask`), not on every read of a hot field.
+   *
+   * Not to be confused with `Renderable.renderLayer` (§49), which is §66's sort
+   * ordinal rather than a membership mask.
+   */
+  layers: LayerMask = DEFAULT_LAYER_MASK;
 
   /** Free-form user data (§6). Its own object per node. */
   metadata: Record<string, unknown> = {};

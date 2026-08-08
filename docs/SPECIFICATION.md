@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.7 — 2026-08-06**
+**Specification revision 1.8 — 2026-08-08**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -22,6 +22,7 @@
 | 1.5 | 2026-07-29 | Gap-closure pass: Part IX never scheduled the §120 MVP's interaction/content/tooling scope — added §106a (Phase 3a: input, picking, sprites, MVP-tier text) and §113a (Phase 11: assets, serialization, UI, benchmark harness, documentation). §56 gains an MVP text tier (full shaping staged behind a shaping-engine decision). §98 gains a publish-names note (`four` and `four-js` are occupied on npm; `fourjs`/`@fourjs` free as of 2026-07-29). |
 | 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@four/*`. |
 | 1.7 | 2026-08-06 | Public-API reconciliation (gap analysis A-22/PH-18, owner decision — amend the specification rather than alias the shipped surface). New §97a "Namespace and Naming Conventions" records the per-package umbrella barrel (decision WP-0.7-fix1: collision avoidance plus §91 tree-shaking, so every `Four.X` of Parts VII and X reads `Four.<package>.X`), the shipped-name mapping (`Mesh`→`Renderable`; `*Geometry` classes→geometry factory functions; `*Collider` classes→one `Collider` component over a `CollisionShape` descriptor union; `Motion`→`MotionComponent`; `SceneMigrator.upgrade`→`migrateSceneDocument` + `SceneMigrationRegistry`; `scene.activeCamera`→§48 viewports on `app.views`; `physicsWeight`/`animationWeight` on the `RigidBody` component, not the node), the names with no shipped equivalent yet (a `Text` node, `AnimationController`, `Circle`, `StandardMaterial`, §8 space modes, `Node.animation`), and the deferred string-selection affordances (`renderer: "auto"`, `solver: "auto"`). §97 and §114–§117 and the inline snippets of §11, §15, §16, §18, §20, §111 are rewritten against the shipped API; where a feature is unshipped the example shows the available-today form and cites §97a. Frozen §1–120 numbering respected: the new section takes a letter suffix. |
+| 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@four/render` node that the frozen package dependency matrix forbids `@four/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
 
 ---
 
@@ -625,6 +626,15 @@ Interpolation modes:
 - cubic;
 - Hermite;
 - spherical linear interpolation for quaternions.
+Two entries in the track-type list are **binding forms, not value kinds**. A
+*morph weight* track animates a `number` into one element of a weight array
+(§54); a *skeletal joint* track animates the `vector` and `quaternion` transform
+channels of a bone node, and quaternion slerp is already the fifth interpolation
+mode above. Both are served by the value kinds and adapters this section already
+lists; what they need is a **target form that addresses an array element**, not
+new track types, new value kinds, or new adapters. Recorded explicitly so that a
+future implementation does not add duplicate discriminants for values it can
+already represent (RFC 0003 §2).
 ### 18. Animation State Machines
 The target form — a declarative controller owning states and transitions:
 
@@ -642,44 +652,64 @@ const controller = new AnimationController({
 });
 ```
 
-`AnimationController` is **not implemented** (§97a). The available-today form is
-an `AnimationMixer` per node plus application-side selection; it has no
-transition durations, no exit time, and no blend trees, and it is not a
-substitute for this section — it is what this section is scheduled to replace:
+`AnimationController` **is implemented** (`four/animation`). Superseded wording:
+revision 1.7 said *"`AnimationController` is **not implemented** (§97a). The
+available-today form is an `AnimationMixer` per node plus application-side
+selection"* and showed that mixer form here; both statements were true when
+written and are false now.
+
+Two spellings differ from the target form above, and both are deliberate rather
+than pending:
+
+- the controller takes the **`target` object** its track paths resolve against,
+  exactly as an `AnimationMixer` does (§16);
+- `when` is a list of **typed predicate records**, not the string expression
+  shown above. A string DSL is a second surface that has to be parsed
+  identically forever to keep §33 determinism, so it is deferred as sugar that
+  compiles to these records; the records are the normative form.
 
 ```ts
-import { AnimationMixer, AnimationSystem } from "four/animation";
+import { AnimationController, AnimationSystem } from "four/animation";
 
 const animation = new AnimationSystem();
 app.systems.register(animation);
 
-const LOOP = { loop: Number.POSITIVE_INFINITY };
-let current = idleClip;
-let mixer = animation.track(new AnimationMixer(character).play(current, LOOP));
-
-// The transition condition, evaluated by the application once per fixed step.
-app.on("fixedUpdate", () => {
-    const next = speed > 5 ? runClip : speed > 0.1 ? walkClip : idleClip;
-    if (next === current) return;
-    // A played mixer binds once (§16), so a state change is a new mixer: `stop`
-    // releases the property claims, and the successor takes them uncontested.
-    animation.untrack(mixer);
-    mixer.stop();
-    current = next;
-    mixer = animation.track(new AnimationMixer(character).play(next, LOOP));
+const controller = new AnimationController({
+    target: character,
+    states: { idle: idleClip, walk: walkClip, run: runClip },
+    parameters: { numbers: { speed: 0 } },
+    transitions: [
+      { from: "idle", to: "walk",
+        when: [{ parameter: "speed", is: "greater", value: 0.1 }] },
+      { from: "walk", to: "run",
+        when: [{ parameter: "speed", is: "greater", value: 5 }],
+        duration: 0.2 }          // cross-fade length in seconds (§7a)
+    ]
 });
+animation.track(controller.play());
+
+// Parameters are written by the application; the machine reads them per step.
+app.on("fixedUpdate", () => controller.setNumber("speed", speed));
 ```
 
+The controller is a **pose evaluator**, not a scheduler of mixers: it owns one
+channel per animated property, blends the outgoing and incoming states through
+the same value adapters §17 defines, and writes once under one claim in the §16
+registry — which is why a cross-fade does not read as a property conflict.
+Transform writes are gated by the target node's §42 authority.
+
 State machine features:
-- parameters;
-- Boolean conditions;
-- numeric comparisons;
-- triggers;
-- transition duration;
-- exit time;
-- transition interruption;
-- blend trees;
-- layered animation.
+- parameters — **shipped**;
+- Boolean conditions — **shipped**;
+- numeric comparisons — **shipped**;
+- triggers — **shipped**;
+- transition duration — **shipped**;
+- exit time — **shipped** (seconds of source-state time, §7a, not a normalized
+fraction: §7a admits no other unit);
+- transition interruption — **shipped**;
+- blend trees — scheduled;
+- layered animation — scheduled (needs an additive operation on the §17 value
+adapters and a layer/claim policy against §16).
 ### 19. Physics-Animation Blending
 Which system moves a node is governed by its transform authority (§42). The
 `"blended"` authority selects the blending pipeline defined in this section.
@@ -721,10 +751,27 @@ const world = new PhysicsWorld({
 await world.initialize();
 ```
 
-The world takes an **adapter instance**; the `solver: "auto"` string form of
-§37's capability-driven selection is deferred to the same registry work as
-`renderer: "auto"` (§97a). Swapping solvers is still the one line this section
-promises: it is the `adapter` argument, and nothing above it changes.
+The world takes either an **adapter instance**, as above, or the `solver` string
+form — `"auto"`, or one §102 solver by name — which resolves through
+`@four/physics`'s solver registry. Superseded wording: revision 1.7 said the
+string form *"is deferred to the same registry work as `renderer: "auto"`
+(§97a)"*; that registry shipped, and both string forms now exist (§97a).
+
+```ts
+import { PhysicsWorld } from "four/physics";
+import { registerRapierSolver } from "four/physics-rapier";
+
+registerRapierSolver();                       // explicit, never a side-effect import
+const world = new PhysicsWorld({ dimension: "3d", solver: "auto" });
+```
+
+Registration is an **explicit call**, not an import side effect: every package
+declares `"sideEffects": false` (§91), so a module that only registered itself
+would be correctly deleted by a bundler — and a solver resolved by import order
+would not be §33-deterministic. The cost of naming a solver package is its wasm
+image in the bundle, which is why the string form widens the `adapter` argument
+rather than replacing it. Swapping solvers is still the one line this section
+promises.
 
 ### 21. Physics Dimensions
 
@@ -1674,6 +1721,24 @@ class Mesh extends Renderable {
 }
 ```
 
+`morphTargetWeights` is **storage on a scene-side component**, reached through
+the declaration above rather than held by it. Superseded wording: this section
+previously placed the weights on `Mesh` as plain state. `Mesh` extends
+`Renderable` (§49), which lives in `@four/render` (§98), and the animation
+package is not permitted to depend on a rendering backend — the layering rule
+this specification states in §3.2 and §61 and that the implementation plan's
+frozen package dependency matrix enforces edge by edge. So §14's required
+morph-target animation had no legal way to bind the field: this specification's
+own placement made one of its own requirements unimplementable under a
+constraint it also imposes. The weights therefore live in a **`MorphWeights`
+component (§6a) on the node**: the animation system reaches them through
+`node.getComponent(MorphWeights)`, the renderer reads the same component when
+building the render item, and `Mesh.morphTargetWeights` above remains valid as an
+accessor over that component — the spelling is unchanged, only the storage moved.
+The component is serializable through §79's component registry with no new
+machinery. Recorded by RFC 0003 (§54, §14, §17), whose packet ships the component
+alongside the skeletal rows below.
+
 The engine shall support:
 - indexed and non-indexed geometry;
 - multiple material groups;
@@ -1767,6 +1832,7 @@ Material
 +-- TextMaterial
 +-- LineMaterial
 +-- UnlitMaterial
++-- LitMaterial
 +-- StandardMaterial
 +-- PhysicalMaterial
 +-- ShaderMaterial
@@ -1776,6 +1842,27 @@ Material
 
 The API unifies lifecycle and render state while preserving specialized 2D and
 3D properties.
+
+Two notes on that family, both amendments rather than restatements:
+
+- **`LitMaterial` is a member of the family.** It was absent from the list until
+  this revision. It is the single-term Lambert-diffuse material that sits between
+  `UnlitMaterial` and §59's metallic-roughness `StandardMaterial` — the tier a
+  backend can shade before a PBR pipeline exists — and it is not a stage of
+  `StandardMaterial`, because a scene that wants flat diffuse shading should not
+  be made to carry roughness, metalness, and their maps. `UnlitMaterial`,
+  `LitMaterial`, and `StandardMaterial` all ship.
+- **`ShaderMaterial` is provisionally withdrawn.** RFC 0001 (§60) proposes that
+  it never be implemented, because `ShaderMaterial` has no meaning other than
+  "material carrying raw GLSL or WGSL source", and §96 forbids exactly that: a
+  shader expressed as a string is an opaque pass that §63's graph validation
+  cannot check, it is not backend-independent, and it pins internal shader
+  sources as public contract. §60's node/graph material is the sanctioned
+  extension surface, and `NodeMaterial` is the family member that carries it.
+  **Status: RFC 0001 is a draft with the owner's decision pending**; the row is
+  retained here so it cannot be implemented by inference from this list alone.
+  Accepting the RFC makes the withdrawal permanent and gets its own amendments
+  row; rejecting it restores the row unchanged.
 ### 58. Paints, Fills, and Strokes
 A shape paint may be:
 - solid color;
@@ -1881,6 +1968,17 @@ re-creates engine-owned GPU resources (pipelines, internal buffers, render targe
 on restore, and re-uploads user resources that retain CPU-side sources; resources
 without retained sources expose a documented re-upload hook. Error codes are defined
 in §89; the required integration test in §92.
+`createTexture` and `createRenderTarget` are **deferred by decision, not by
+omission**, and a backend that implements neither is conformant until the tier
+that needs them arrives. Both `Texture` and `RenderTarget` exist as CPU-side
+descriptors carrying an id and a version, with GPU residency held in a
+backend-owned cache keyed by that id — which is precisely what lets the context
+loss above be handled by dropping the cache instead of re-issuing every resource
+by hand. A renderer-*owned* resource has the opposite properties: it cannot be
+constructed before a renderer exists, it must be built once per renderer, and it
+must be re-created explicitly after every loss. The two factories therefore land
+with the tier that genuinely requires them — compressed or GPU-only formats,
+which have no CPU-side description at all.
 ### 62. Rendering Backends and Capability Tiers
 Supported backends:
 1. WebGPU;
@@ -2630,7 +2728,7 @@ import {
 } from "four/text";
 import { Button, Label, Panel } from "four/ui";
 
-// --- application (§45): the renderer is an instance, not a string (§97a) ------
+// --- application (§45): an instance here; `renderer: "auto"` also works (§97a) -
 const canvas = document.querySelector("canvas") as HTMLCanvasElement;
 
 const camera = new PerspectiveCamera({
@@ -2651,7 +2749,11 @@ const app = new Application({
 });
 app.scene.add(camera, new DirectionalLight({ color: [1, 1, 1], intensity: 1 }));
 
-// --- physics (§20, §37): a world is built and tracked, not an app option -----
+// --- physics (§20, §37): built and tracked here. §45's `physics` option also
+// takes a world, or a `({ poses }) => PhysicsWorld` factory — the factory form
+// exists because a world takes its pose buffer at construction and the
+// application's buffer does not exist until the application does. Only §45's
+// literal `{ solver, dimension }` record is still deferred (§97a).
 const physics = new PhysicsSystem();
 app.systems.register(physics);
 const world = physics.track(
@@ -2798,12 +2900,12 @@ implementation ships it as follows.
 |---|---|---|
 | `Four.Mesh` (§49, §54) | `Renderable` (`four/render`) | One concrete node carrying a `BufferGeometry` and a material. §49's family — `Shape2D`, `Text`, `Mesh`, `Line3D`, `PointCloud` — narrows it later. |
 | `Four.BoxGeometry`, `Four.SphereGeometry` (§53) | `boxGeometry(...)`, `planeGeometry(...)`, `circleGeometry2D(...)` (`four/geometry`) | Geometry primitives are **factory functions returning `BufferGeometry`**, not classes. There is no sphere primitive yet. |
-| `Four.StandardMaterial` (§59) | `LitMaterial`, `UnlitMaterial` (`four/materials`) | §59's PBR material is staged; the MVP tier is one Lambert-diffuse material and one flat one. Colors are linear RGBA arrays in 0..1 (§60a), not CSS strings. |
+| `Four.StandardMaterial` (§59) | `StandardMaterial` (`four/materials`) — name unchanged | **Shipped**, beside `UnlitMaterial` and `LitMaterial` (§57). Superseded row (revision 1.7): *"§59's PBR material is staged; the MVP tier is one Lambert-diffuse material and one flat one"*. `baseColor`, `metalness`, `roughness`, and `emissive` ship; §59's `normalMap` is staged behind §53's tangent attribute and `occlusionMap` behind a second texture unit. Colors are linear RGBA arrays in 0..1 (§60a), not CSS strings. |
 | `Four.BoxCollider`, `Four.SphereCollider` (§24) | one `Collider` component over a `CollisionShape` descriptor union (`four/physics`) | `new Collider({ shape: { type: "box", halfExtents } })`. There are no per-shape collider classes; §24's shape catalogue is a discriminated union, which is what lets `COLLISION_SHAPE_TYPES_2D`/`_3D` state per-dimension validity. |
 | `Four.Motion` (§11) | `MotionComponent` (`four/motion`) | Renamed for what it is: a §6a component, not the motion pillar. |
 | `Four.Text` (§56) | *no node* — `layoutText` + `buildGlyphAtlas` (`four/text`) + `Sprite` (`four/render`) | §56's MVP tier produces **data**: baseline-origin quads and a glyph atlas. The application turns quads into sprites. A `Text` node, and the one-draw-call batching it needs, are unbuilt. |
 | `Four.Circle` (§50) | `circleGeometry2D(...)` + `Renderable` | §50's shape-node catalogue (`Circle`, `Rect`, `Path`, …) is staged; a filled circle today is geometry plus a material. |
-| `Four.AnimationController` (§18) | *unimplemented* — `AnimationMixer` + application-side selection | §18's state machines, blend trees, and layered/additive animation are scheduled, not shipped. See §18 for the available-today form. |
+| `Four.AnimationController` (§18) | `AnimationController` (`four/animation`) — name unchanged | **Shipped.** Superseded row (revision 1.7): *"unimplemented — `AnimationMixer` + application-side selection"*. Two spelling differences, both recorded in §18: the constructor takes the `target` object track paths resolve against, and `when` is a list of typed predicate records rather than a string expression. Blend trees and layered animation remain scheduled. |
 | `Four.SceneMigrator.upgrade` (§80) | `migrateSceneDocument(...)` + `SceneMigrationRegistry` (`four/serialization`) | A registry of versioned `SceneMigration`s and a function over it, rather than an object with an `upgrade` method; warnings are returned, not thrown. |
 | `app.scene.activeCamera = camera` (§47) | `app.views.push(createFullscreenViewport(camera))` (§48) | A scene has no active camera. A camera reaches the renderer through a §48 `Viewport`, which is what makes split-screen and multi-view a list operation rather than a mode. |
 | `node.physicsWeight`, `node.animationWeight` (§19, §117) | `RigidBody.physicsWeight`, `RigidBody.animationWeight` | §19's blend weights live on the body component, beside the state they blend — a node with no body has nothing to weight. |
@@ -2819,20 +2921,29 @@ a billboard is an application-side orientation update. Billboarding in
 particular needs a per-view render list, which §64's list builder does not yet
 produce. §82's `ComputePass` likewise has no surface.
 
-**Deferred string selection (recorded deviations, not renames).** Two of this
-specification's affordances select an implementation by string, and both are
-deferred to one future registry packet for the same concrete reason: resolving a
-string to a class means the umbrella importing every candidate package at
-runtime, which every program then carries (§86, §91).
+**String selection (shipped, with one remaining deferral).** Superseded wording:
+revision 1.7 recorded `renderer: "auto"` and `solver: "auto"` under the heading
+*"Deferred string selection (recorded deviations, not renames)"*, saying both
+were *"deferred to one future registry packet"*. That packet shipped and both
+strings now resolve; the deviation is retired rather than reversed, because the
+constraint that produced it still binds and is what the registries are shaped
+around: resolving a string to a class must never make the umbrella import every
+candidate package, which every program would then carry (§86, §91).
 
-| Specified | Today | Why deferred |
+| Specified | Today | Note |
 |---|---|---|
-| `renderer: "auto" \| "webgpu" \| "webgl2" \| "canvas2d" \| "svg"` (§45, §62) | `renderer: Renderer \| false` — an instance the application constructs | A string form must resolve through a registry a backend package opts into, so that §62's capability-ordered fallback exists without `four` statically importing any backend. Appendix A's `"auto"` order stands as the specified ordering for that packet. |
-| `solver: "auto"` (§20, §37) | `adapter: PhysicsWorldAdapter` — an instance | Same payload reason. The capability machinery §37 requires is already live: a world validates its requested `dimension` and `determinism` against `adapter.capabilities` at construction and fails immediately rather than degrading quietly. Only the selection front-end is missing. |
+| `renderer: "auto" \| "webgpu" \| "webgl2" \| "canvas2d" \| "svg"` (§45, §62) | **shipped** — the string, or a `Renderer` instance, or `false` | Resolved through a renderer registry a backend package opts into by an explicit `register…` call. `"auto"` walks Appendix A's order (registration order is deliberately ignored, §33), skips the headless tier, and falls back with §62's diagnostics callback when a backend's `initialize` fails; a *named* backend fails fast per §62. Support probing never touches the caller's canvas — a probing `getContext` would fix the context attributes and silently disable `antialias`. |
+| `solver: "auto"` (§20, §37) | **shipped** — the string, one §102 solver by name, or an `adapter` instance | Resolved through `@four/physics`'s solver registry. `"auto"` walks registration order, since §37 fixes no preference between solvers; a solver named explicitly is handed back unfiltered so that `PhysicsWorld` reports a capability mismatch with its own precise message rather than silently selecting something else. |
+| `physics: { solver, dimension }` as an §45 option record (§45) | **deferred** — `physics` takes a `PhysicsWorld`, or a `({ poses }) => PhysicsWorld` factory | The one remaining instance of this deviation, and for the original reason: the composition root constructing a world from an option record would put `@four/physics` — and therefore a solver — in the module graph of every program that names `Application`, including one that only draws a user interface. The factory form exists because a world takes its §43 pose buffer at construction and the application's buffer does not exist until the application does. |
 
-Passing an instance remains supported after those land: §45 requires every
-system to be constructible and ownable independently, so the string form widens
-the option rather than replacing it.
+Registration is always an **explicit call, never an import side effect**: every
+package declares `"sideEffects": false` (§91), so a module whose only job was to
+register itself would be correctly deleted by a bundler, and a resolution order
+that depended on import order would not be deterministic (§33).
+
+Passing an instance remains supported: §45 requires every system to be
+constructible and ownable independently, so a string form widens the option
+rather than replacing it.
 
 ## Part VIII - Package Architecture
 

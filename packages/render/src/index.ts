@@ -4,6 +4,7 @@ export type {
   ColorGradeEffect,
   CopyEffect,
   EffectRenderPass,
+  OutputTransformEffect,
   ScreenEffect,
   ScreenEffectKind,
   ScreenEffectRenderer,
@@ -11,6 +12,7 @@ export type {
 export {
   COLOR_GRADE_DEFAULTS,
   COPY_EFFECT,
+  OUTPUT_TRANSFORM_EFFECT,
   supportsScreenEffects,
   validateEffectRenderPass,
 } from "./effect-pass.js";
@@ -39,6 +41,7 @@ export type {
   RenderItem,
   RenderItemKind,
   SpriteRenderItem,
+  StandardRenderItem,
   UnlitRenderItem,
 } from "./render-list.js";
 export {
@@ -47,7 +50,9 @@ export {
   isLitItem,
   isParticlesItem,
   isSpriteItem,
+  isStandardItem,
   isUnlitItem,
+  viewLayerMask,
 } from "./render-list.js";
 export type {
   AddPassOptions,
@@ -108,7 +113,7 @@ export {
   resetRenderStatistics,
   supportsRenderStatistics,
 } from "./statistics.js";
-export type { SpriteOptions } from "./sprite.js";
+export type { SpriteFrame, SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type { TextureSource } from "./texture.js";
 export { Texture } from "./texture.js";

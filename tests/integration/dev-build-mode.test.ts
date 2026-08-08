@@ -209,6 +209,10 @@ const GATED: ReadonlyMap<string, string> = new Map([
     join("packages", "four", "src", "application.ts"),
     "§84's statistics wiring (A-1). Measurement only: `stats` is read by nobody inside the engine, and the frame's event order, transforms and draw calls are identical either way",
   ],
+  [
+    join("packages", "render", "src", "render-list.ts"),
+    "§85's layer-mask refusal (R-38). Refusal only: a well-formed mask — the only kind `layerMask()` can build — passes the check untouched, so the list, its order, and every item in it are identical either way. What the guard drops is the *diagnostic* for a `NaN` or fractional mask, which a production build answers with the empty view it would have drawn anyway. `@four/scene`'s `assertLayerMask` is unconditional, because §33 forbids that package from branching on the build mode at all; this is the render tier's copy of the call, gated because it costs ~115 B gzip in every shipped bundle",
+  ],
 ]);
 
 /** Every `.ts` file under `packages/<name>/src`, repository-relative. */

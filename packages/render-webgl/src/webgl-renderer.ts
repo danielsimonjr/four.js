@@ -4,8 +4,9 @@
  * §120 fixes the MVP tier as *"WebGL 2 only, one solver adapter, basic 2D/3D
  * primitives"*, and §62 lists WebGL 2 as backend 2 of 5. {@link WebglRenderer}
  * implements `@four/render`'s `Renderer` for that tier and its later additions:
- * four pipelines (unlit, lit, sprite, particles — see the class documentation),
- * one vertex array per geometry, `"negative-one-to-one"` clip depth (plan D8).
+ * five scene pipelines (unlit, lit, standard, sprite, particles — see the class
+ * documentation) plus §70's full-screen effect program, one vertex array per
+ * geometry, `"negative-one-to-one"` clip depth (plan D8).
  *
  * The normative clear and viewport semantics live on `Renderer.render`'s
  * documentation in `@four/render`, not here — they are shared by every backend
@@ -45,6 +46,8 @@ import {
   isParticlesItem,
   isRenderTargetTexture,
   isSpriteItem,
+  isStandardItem,
+  viewLayerMask,
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
   type RenderItem,
@@ -80,6 +83,7 @@ import {
   RenderTargetCache,
   type RenderTargetRecord,
 } from "./gl-render-target.js";
+import { StandardProgram } from "./gl-standard.js";
 import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 
 /**
@@ -213,6 +217,10 @@ const REQUIRED_CONTEXT_METHODS = [
   "bufferSubData",
   "vertexAttribDivisor",
   "drawArraysInstanced",
+  // The standard pipeline's one (§59, R-13, 2026-08-08): `metalness` and
+  // `roughness` are scalars. Core WebGL 1 and 2, so it discriminates nothing —
+  // listed for the same fail-fast courtesy as `uniform3fv` below.
+  "uniform1f",
   // The lit pipeline's one (§68, 2026-08-04): its light uniforms are vec3s.
   // Core WebGL 1 *and* 2, so it discriminates nothing — it is here so an
   // incomplete stub fails fast at initialize rather than at the first lit
@@ -756,10 +764,12 @@ function resolveRect(
  * it borrowed, so the mirror cannot outlive its agreement with the context (see
  * {@link WebglRenderer.render}).
  *
- * ## Four pipelines (§55, §36, §68; WP-3a.3, WP-9.3, lighting 2026-08-04)
+ * ## Five scene pipelines (§55, §36, §59, §68; WP-3a.3, WP-9.3, lighting
+ * 2026-08-04, R-13 2026-08-08)
  *
  * A render item says which pipeline draws it (`RenderItem.kind`), and this
- * backend keeps all four live:
+ * backend keeps all five live (a sixth program, §70's full-screen effect, is
+ * driven by {@link WebglRenderer.renderEffect} and never by a render item):
  *
  * - **unlit** — flat colour, the §120 MVP pipeline, depth-tested, and opaque
  *   unless its material declares `transparent`;
@@ -767,7 +777,12 @@ function resolveRect(
  *   ambient term, depth-tested and opaque-by-default like unlit. The
  *   frame's lights are collected once per `render` call (`collectSceneLights`,
  *   `@four/render`) — and only for frames whose list actually contains a lit
- *   item, so unlit scenes never pay the walk;
+ *   or standard item, so unlit scenes never pay the walk;
+ * - **standard** — §59's metallic-roughness BRDF (GGX, Smith, Schlick) under
+ *   the same one light and the same ambient term, plus the eye position the
+ *   specular lobe needs (`gl-standard.ts`). It shades in the same untagged
+ *   linear space and blends by the same straight-alpha rule as the lit
+ *   pipeline, so a scene may mix the two families freely;
  * - **sprite** — one texture sample times a tint, with `GL_BLEND` enabled
  *   whatever the material says (the pipeline blends by construction);
  * - **particles** — one `drawArraysInstanced` per §36 particle system,
@@ -832,7 +847,7 @@ function resolveRect(
  * browser never restores), and turned into a `contextlost` event; GPU handles
  * are dropped without being deleted, because they are already invalid.
  * `render` then returns silently until `webglcontextrestored` arrives, at which
- * point all four programs and all four caches are rebuilt, the fixed state and
+ * point all six programs and all four caches are rebuilt, the fixed state and
  * the surface size are re-applied, capabilities are re-read, and
  * `contextrestored` is emitted — after the rebuild, so the first frame a listener triggers
  * already draws. Geometry and texture *content* re-uploads lazily from the
@@ -869,6 +884,20 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #particleProgram: ParticleProgram | null = null;
 
   #litProgram: LitProgram | null = null;
+
+  /**
+   * §59's metallic-roughness pipeline (R-13, 2026-08-08), or `null` before
+   * initialization and while the context is lost.
+   *
+   * Compiled by {@link WebglRenderer.initialize} beside the other five, for the
+   * reason `#effectProgram` states at length and §61 requires: a shader compile
+   * can throw for a driver reason no application can pre-empt, and `render` may
+   * not throw. The cost is one program per renderer that never draws a
+   * `StandardMaterial` — the same deal the lit, particle, and effect pipelines
+   * already offer an application that uses none of them, and **measured**
+   * rather than assumed (see the CHANGELOG entry for R-13).
+   */
+  #standardProgram: StandardProgram | null = null;
 
   /**
    * §70's full-screen effect pipeline (R-6), or `null` before initialization
@@ -950,6 +979,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#spriteProgram = null;
     this.#particleProgram = null;
     this.#litProgram = null;
+    this.#standardProgram = null;
     this.#effectProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
@@ -970,6 +1000,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#spriteProgram = SpriteProgram.create(gl);
     this.#particleProgram = ParticleProgram.create(gl);
     this.#litProgram = LitProgram.create(gl);
+    this.#standardProgram = StandardProgram.create(gl);
     this.#effectProgram = EffectProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
@@ -1149,6 +1180,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     const spriteProgram = this.#spriteProgram;
     const particleProgram = this.#particleProgram;
     const litProgram = this.#litProgram;
+    const standardProgram = this.#standardProgram;
     const geometries = this.#geometries;
     const textures = this.#textures;
     const renderTargets = this.#renderTargets;
@@ -1158,6 +1190,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       spriteProgram === null ||
       particleProgram === null ||
       litProgram === null ||
+      standardProgram === null ||
       geometries === null ||
       textures === null ||
       renderTargets === null ||
@@ -1232,9 +1265,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // by them: one `kind` comparison per item decides, so a scene with no lit
       // materials adds nothing to its frame but this loop. Collected once per
       // call, not per view — lights are frame state, like the render list.
+      // Both shaded families ask for the same record (§59's standard pipeline
+      // reads exactly the ambient term and directional light §68 collects), so
+      // one walk serves them together and a scene with neither still pays only
+      // this comparison.
       let hasLitItems = false;
       for (const item of items) {
-        if (item.kind === "lit") {
+        if (item.kind === "lit" || item.kind === "standard") {
           hasLitItems = true;
           break;
         }
@@ -1294,8 +1331,30 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         let spriteViewUploaded = false;
         let particleViewUploaded = false;
         let litViewUploaded = false;
+        let standardViewUploaded = false;
+
+        // §46's per-view filter (R-38, 2026-08-08): `view.layerMask` when this
+        // view sets one, the camera's own `layers` otherwise — §48's fallback
+        // rule, resolved by `@four/render` so every backend spells it the same
+        // way. Both defaults are `ALL_LAYERS`, so a view that never mentions
+        // layers keeps every item and issues the GL sequence it always did.
+        //
+        // The filter lives here, per view, rather than in list construction,
+        // because this backend builds **one** list per frame and draws it into
+        // every view (§64 stage 2 vs. the per-view list of R-8). That is why
+        // `RenderItem` snapshots the node's mask. When R-8 lands, each view
+        // builds its own list with `buildRenderList(root, list, mask)` and this
+        // test becomes redundant rather than wrong.
+        const viewLayers = viewLayerMask(view);
 
         for (const item of items) {
+          // `layersMatch(item.layers, viewLayers)`, inlined: `@four/scene` is
+          // not a dependency of this package (plan §3.1, frozen), and the
+          // predicate is one bitwise AND.
+          if ((item.layers & viewLayers) === 0) {
+            continue;
+          }
+
           const record = geometries.acquire(item.geometry);
           if (record === null) {
             continue;
@@ -1370,17 +1429,46 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               spriteProgram.setViewProjection(viewProjection);
               spriteViewUploaded = true;
             }
-            // The quad's local rectangle, from which the vertex stage derives uv.
-            // `computeBounds()` is cached against the geometry's version, so this
-            // is a version comparison per draw, not a pass over the vertices.
+            // The local rectangle the whole texture maps onto, from which the
+            // vertex stage derives uv. `computeBounds()` is cached against the
+            // geometry's version, so this is a version comparison per draw, not
+            // a pass over the vertices.
             const bounds = item.geometry.computeBounds();
+            const quadWidth = bounds.max.x - bounds.min.x;
+            const quadHeight = bounds.max.y - bounds.min.y;
             spriteProgram.setModel(item.worldMatrix);
-            spriteProgram.setQuad(
-              bounds.min.x,
-              bounds.min.y,
-              bounds.max.x - bounds.min.x,
-              bounds.max.y - bounds.min.y,
-            );
+            // §55's frame (R-29, 2026-08-08). `?? null` for the same reason
+            // `material.transparent === true` is written that way in the render
+            // list: a **structurally typed** sprite item built before the field
+            // existed reports `undefined`, which must read as "no frame".
+            const frame = item.frame ?? null;
+            if (frame === null) {
+              // Unchanged, deliberately and to the byte: a sprite with no frame
+              // takes the branch it took before frames existed and uploads the
+              // same four floats through the same call. See
+              // `SpriteProgram.setQuad`.
+              spriteProgram.setQuad(
+                bounds.min.x,
+                bounds.min.y,
+                quadWidth,
+                quadHeight,
+              );
+            } else {
+              // The reparametrization derived in `@four/render`'s `sprite.ts`:
+              // the rectangle the *whole* texture would occupy, given that the
+              // quad shows `frame` of it. Collapses to the four values above at
+              // `frame = (0, 0, texture.width, texture.height)`. `map` rather
+              // than `texture`, which above is the *GL handle* this draw binds:
+              // the texel size comes from the engine-side texture the material
+              // points at.
+              const map = material.texture;
+              spriteProgram.setQuad(
+                bounds.min.x - (frame.x * quadWidth) / frame.width,
+                bounds.min.y - (frame.y * quadHeight) / frame.height,
+                (quadWidth * map.width) / frame.width,
+                (quadHeight * map.height) / frame.height,
+              );
+            }
             spriteProgram.setTint(material.tint, opacityOf(material));
             gl.bindTexture(GL.TEXTURE_2D, texture);
             textureBound = true;
@@ -1429,6 +1517,67 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             litProgram.setFeatures(litTexture !== null);
             litProgram.setModel(item.worldMatrix);
             litProgram.setColor(item.material.color, opacityOf(item.material));
+          } else if (isStandardItem(item)) {
+            // §59's metallic-roughness pipeline (R-13). Structurally the lit
+            // branch above — same lights, same albedo map, same §57 render
+            // state — plus the two things a specular lobe needs and a diffuse
+            // one does not: the eye position, and the surface's own metalness,
+            // roughness, and emissive term.
+            if (activeKind !== "standard") {
+              standardProgram.use();
+              activeKind = "standard";
+            }
+            applyMaterialState(gl, state, item.material, false);
+            if (!standardViewUploaded) {
+              // Per-view state: uniforms live in the program object, so one
+              // upload holds for every standard draw into this view even when
+              // other pipelines run in between.
+              standardProgram.setViewProjection(viewProjection);
+              standardProgram.setAmbientLight(sceneLights.ambientColor);
+              standardProgram.setDirectionalLight(
+                sceneLights.direction,
+                sceneLights.directionalColor,
+              );
+              // The eye, read straight out of the camera's world matrix
+              // translation column — `updateViewMatrix()` above resolved that
+              // matrix, so this needs no second resolve and allocates nothing.
+              const cameraElements = camera.transform.worldMatrix.elements;
+              standardProgram.setCameraPosition(
+                cameraElements[12],
+                cameraElements[13],
+                cameraElements[14],
+              );
+              standardViewUploaded = true;
+            }
+            const standardMap = mapOf(item.material);
+            const standardTexture =
+              standardMap === null
+                ? null
+                : resolveTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    standardMap,
+                  );
+            if (standardTexture !== null) {
+              if (!mapUnitActive) {
+                gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                mapUnitActive = true;
+              }
+              gl.bindTexture(GL.TEXTURE_2D, standardTexture);
+              textureBound = true;
+            }
+            standardProgram.setFeatures(standardTexture !== null);
+            standardProgram.setModel(item.worldMatrix);
+            standardProgram.setBaseColor(
+              item.material.baseColor,
+              opacityOf(item.material),
+            );
+            standardProgram.setSurface(
+              item.material.metalness,
+              item.material.roughness,
+              item.material.emissive,
+            );
           } else {
             if (activeKind !== "unlit") {
               program.use();
@@ -1601,7 +1750,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // effect is a compile error, and a value that arrived from JSON or from
     // JavaScript must not become a different picture than the one asked for.
     const effect = pass.effect;
-    if (effect.kind !== "copy" && effect.kind !== "grade") {
+    if (
+      effect.kind !== "copy" &&
+      effect.kind !== "grade" &&
+      effect.kind !== "output-transform"
+    ) {
       return;
     }
 
@@ -1643,6 +1796,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           effect.contrast ?? COLOR_GRADE_DEFAULTS.contrast,
           effect.saturation ?? COLOR_GRADE_DEFAULTS.saturation,
         );
+      } else if (effect.kind === "output-transform") {
+        // §60a's output transform, as the final render-graph pass: the encode
+        // happens once, over the composited linear-light frame, and never
+        // inside a material's fragment stage (R-15, 2026-08-08).
+        effectProgram.setOutputTransform();
       } else {
         effectProgram.setCopy();
       }
@@ -1721,6 +1879,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
       this.#litProgram?.dispose();
+      this.#standardProgram?.dispose();
       this.#effectProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
@@ -1732,6 +1891,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#spriteProgram = null;
     this.#particleProgram = null;
     this.#litProgram = null;
+    this.#standardProgram = null;
     this.#effectProgram = null;
     this.#geometries = null;
     this.#textures = null;
@@ -1772,7 +1932,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       );
     }
 
-    // All five programs are built before anything is stored, so a shader
+    // All six programs are built before anything is stored, so a shader
     // failure leaves the renderer uninitialized rather than half-initialized —
     // and each failure disposes the ones already built.
     const program = UnlitProgram.create(gl);
@@ -1800,6 +1960,19 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       program.dispose();
       throw error;
     }
+    // §59's metallic-roughness pipeline (R-13), compiled here for the reason
+    // every other pipeline is: §61 forbids a frame from throwing, and a shader
+    // compile is exactly the operation that can.
+    let standardProgram: StandardProgram;
+    try {
+      standardProgram = StandardProgram.create(gl);
+    } catch (error: unknown) {
+      litProgram.dispose();
+      particleProgram.dispose();
+      spriteProgram.dispose();
+      program.dispose();
+      throw error;
+    }
     // §70's effect pipeline, compiled here rather than on first use (R-6):
     // `renderEffect` runs inside a frame, and §61's no-throw rule applies to
     // it for the same reason it applies to `render` — see `#effectProgram`.
@@ -1807,6 +1980,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     try {
       effectProgram = EffectProgram.create(gl);
     } catch (error: unknown) {
+      standardProgram.dispose();
       litProgram.dispose();
       particleProgram.dispose();
       spriteProgram.dispose();
@@ -1820,6 +1994,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#spriteProgram = spriteProgram;
     this.#particleProgram = particleProgram;
     this.#litProgram = litProgram;
+    this.#standardProgram = standardProgram;
     this.#effectProgram = effectProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);

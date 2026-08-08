@@ -49,7 +49,12 @@ export interface DirectionalLightSource {
    */
   readonly isDirectionalLight: true;
 
-  /** Straight RGB in 0…1, no color space attached (§60a deferral). */
+  /**
+   * Straight RGB in 0…1, in §60a's **linear-light working space** — uploaded to
+   * the shader as it stands (the "no colour space attached" deferral this line
+   * carried is resolved by R-15, 2026-08-08; an author with a CSS string decodes
+   * it with `@four/math`'s `srgbToLinearRGB(parseColorRGB(css), out)`).
+   */
   readonly color: readonly [number, number, number];
 
   /** Scalar multiplier on the color (§68); dimensionless in this tier. */

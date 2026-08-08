@@ -1,5 +1,18 @@
 # four.js — Gap Analysis v0
 
+> **SUPERSEDED 2026-08-08 by `docs/GAP ANALYSIS v1.md`** (which re-analyses the tree at
+> `e0ddd3b`, after the 2026-08-07 closure campaign). This document is kept unchanged as the
+> historical record — its 97 filings, closure plans, dependency graphs, and dated closure
+> banners remain the evidence trail behind v1's status table, and v1 cites them by ID. Read
+> v1 for current status; read this for why each finding was filed and what closing it was
+> expected to take. Two caveats a reader of the banners below should carry: the banner set is
+> **incomplete** — commits `ab13840` and `fe8eb6f` (both 2026-08-06) closed `PH-2`, `PH-3`,
+> `PH-4`, `PH-7`, `PH-14`, `PH-15`, `PH-16`, `PH-1` stage 1, `R-11`, and `R-12`/`R-10` at
+> their base tiers without adding banners here or entries in `CHANGELOG.md`; and several
+> banners read `CLOSED` for a closure that shipped at a **named tier** narrower than the spec
+> section (`R-4`, `R-5`, `R-6`, `A-1`, `A-10`), with the residue named in v1 §3 and §4.
+> Per the `MEMORY.md` convention, nothing below was rewritten.
+
 **Date:** 2026-08-05
 **Tree ref:** `cff56e7` on branch `claude/tools-integration-rji2sr` (working tree clean; this analysis is read-only — nothing in the tree was edited to produce it).
 **Spec baseline:** `docs/SPECIFICATION.md` (revision per its own amendments table), Parts I–XIII, §1–§120 plus the lettered sections.

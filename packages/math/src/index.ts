@@ -1,7 +1,17 @@
 export const PACKAGE_NAME = "@four/math";
 
 export { constructionCount, resetConstructionCount } from "./alloc-counter.js";
-export type { ColorRGBA } from "./color.js";
+export type { ColorRGB, ColorRGBA, ColorSpace } from "./color.js";
+export {
+  linearToSrgb,
+  linearToSrgbRGB,
+  linearToSrgbRGBA,
+  parseColor,
+  parseColorRGB,
+  srgbToLinear,
+  srgbToLinearRGB,
+  srgbToLinearRGBA,
+} from "./color.js";
 export { Matrix3 } from "./matrix3.js";
 export { Matrix4 } from "./matrix4.js";
 export type { DepthRange } from "./matrix4.js";

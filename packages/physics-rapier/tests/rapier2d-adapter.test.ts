@@ -173,6 +173,7 @@ describe("capabilities and identity (§37)", () => {
         rollingFriction: false,
         spinningFriction: false,
         sleepThresholds: false,
+        jointMotorEffortCap: false,
       },
     });
     expect(Object.isFrozen(adapter.capabilities)).toBe(true);

@@ -1348,43 +1348,19 @@ export interface SolverStatistics {
 }
 
 /**
- * Counts {@link SolverStatistics} in one pass per collection.
+ * `solverStatistics` **moved to `stats.ts`** on 2026-08-08 (A-6). It is
+ * re-exported from the package under its own name, so nothing outside changed.
  *
- * `out` follows §7b's out-parameter convention: pass a record to reuse and this
- * allocates nothing; omit it and one plain object is allocated (a record, not a
- * math type — the `constructionCount()` allocation tests do not see it).
+ * The reason is a measurement, not tidiness: this module allocates four
+ * module-level scratch math objects and freezes
+ * {@link DEBUG_DRAW_STAGED}, and a bundler must keep all of it because those
+ * are calls. Naming *one* function from this file therefore cost **939 B gzip**
+ * in every bundle (measured on `examples/ui-demo`) — which is what a frame loop
+ * had to pay to report §84's `activeBodies`, whether or not it drew a single
+ * debug line. The counter's producer belongs with the counter's record;
+ * {@link SolverStatistics} and {@link DebugBodyAccess} stay here, because they
+ * are this module's seam and types cost nothing.
  */
-export function solverStatistics<THandle, TColliderHandle>(
-  access: DebugBodyAccess<THandle, TColliderHandle>,
-  out?: SolverStatistics,
-): SolverStatistics {
-  const stats: SolverStatistics = out ?? {
-    bodyCount: 0,
-    sleepingCount: 0,
-    awakeCount: 0,
-    colliderCount: 0,
-    maxBodyId: -1,
-  };
-  stats.bodyCount = 0;
-  stats.sleepingCount = 0;
-  stats.awakeCount = 0;
-  stats.colliderCount = 0;
-  stats.maxBodyId = -1;
-  access.forEachBody((handle, id) => {
-    stats.bodyCount += 1;
-    if (access.isBodySleeping(handle)) {
-      stats.sleepingCount += 1;
-    }
-    if (id > stats.maxBodyId) {
-      stats.maxBodyId = id;
-    }
-  });
-  stats.awakeCount = stats.bodyCount - stats.sleepingCount;
-  access.forEachCollider(() => {
-    stats.colliderCount += 1;
-  });
-  return stats;
-}
 
 /**
  * The joint half of §113's solver statistics — everything the joint seam
@@ -1408,11 +1384,13 @@ export interface SolverJointStatistics {
  *
  * This is **all** the joint seam gives a visualizer: `SolverJointAccess` is
  * `reportsJointReactions`, `getJointReaction`, `setJointLimits`,
- * `setJointMotor`, `getJointId`, `forEachJoint` — no anchors, no connected
+ * `setJointMotor`, `setJointCollisionEnabled` (PH-22f, 2026-08-08),
+ * `getJointId`, `forEachJoint` — no anchors, no connected
  * bodies, no joint type. Constraint *geometry* is therefore staged; see
  * {@link DEBUG_DRAW_STAGED}.
  *
- * `out` follows the same convention as {@link solverStatistics}.
+ * `out` follows the same convention as
+ * {@link @four/diagnostics!solverStatistics | solverStatistics}.
  */
 export function solverJointStatistics<THandle>(
   access: DebugJointAccess<THandle>,
@@ -1470,7 +1448,8 @@ export const DEBUG_DRAW_STAGED: readonly StagedVisualization[] = Object.freeze([
     reason:
       "SolverJointAccess (packages/physics/src/body-access.ts) is " +
       "reportsJointReactions, getJointReaction, setJointLimits, " +
-      "setJointMotor, getJointId, forEachJoint. A joint's anchors, its " +
+      "setJointMotor, setJointCollisionEnabled, getJointId, forEachJoint " +
+      "(the sixth setter landed 2026-08-08, PH-22f). A joint's anchors, its " +
       "connected bodies and its type are held by @four/physics's Joint " +
       "descriptors, which @four/diagnostics may not import, and are not " +
       "readable through the seam — so there is no point in space to draw. " +

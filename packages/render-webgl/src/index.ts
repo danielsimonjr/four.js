@@ -54,6 +54,7 @@ export type {
   RenderTargetRecord,
 } from "./gl-render-target.js";
 export { RenderTargetCache } from "./gl-render-target.js";
+export { StandardProgram } from "./gl-standard.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";
 export { TextureCache } from "./gl-texture.js";
 export { isWebgl2Supported, registerWebglRenderer } from "./register.js";

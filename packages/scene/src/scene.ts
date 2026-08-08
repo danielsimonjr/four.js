@@ -72,8 +72,9 @@ export class Scene extends Node {
    * `light.ts`'s module header for the staging note. The array instance is
    * `readonly` — write *into* it (`scene.ambientLight[0] = 0.2`), as with
    * every color the renderer may hold a reference to. Components are plain
-   * 0…1 numbers with no color space attached (§60a deferral) and are not
-   * validated: like `Transform`'s math members, per-frame scene state trades
+   * 0…1 numbers in §60a's linear-light working space (R-15, 2026-08-08 — this
+   * line said "no color space attached (§60a deferral)" until the policy
+   * landed) and are not validated: like `Transform`'s math members, per-frame scene state trades
    * write-time checks for the §85 development-build diagnostics to come.
    *
    * Only lit materials see it; unlit rendering ignores lighting entirely

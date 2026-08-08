@@ -284,8 +284,8 @@ export const JOINT_TYPES = [
  *
  * §28 names nine types; {@link JOINT_TYPES} keeps that vocabulary because
  * `PhysicsCapabilities.jointTypes` is `string[]` and an adapter may implement
- * more than the engine builds. The *descriptor* union is narrower on purpose,
- * exactly as `CollisionShape` is narrower than §24's shape list (plan P5-6):
+ * more than the engine builds. The *descriptor* union is narrower on purpose —
+ * the joint counterpart of the §24 shape list PH-22a completed:
  *
  * | §28 type          | Status                                              |
  * | ----------------- | --------------------------------------------------- |

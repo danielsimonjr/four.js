@@ -564,6 +564,23 @@ export interface SolverJointAccess {
    */
   setJointMotor(handle: PhysicsJointHandle, motor: SolverJointMotor): void;
 
+  /**
+   * Turns contact generation between the two joined bodies on or off after
+   * creation (§28 `collisionEnabled`; PH-22f, 2026-08-08).
+   *
+   * The third of §28's live reconfigurations, and the last one every shipped
+   * solver can actually perform: Rapier's base `ImpulseJoint` carries
+   * `setContactsEnabled` for **every** joint type in both dimensions, which is
+   * what separates this from the anchors, axis, rope length, spring terms and
+   * swing cone — those have no live setter at 0.19.3 and stay frozen (see
+   * `joints.ts`'s table for the per-property measurement).
+   *
+   * Same call discipline as {@link SolverJointAccess.setJointLimits}: at most
+   * once per joint per fixed step, from the scene→solver phase, only for a
+   * joint that queued the change.
+   */
+  setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void;
+
   /** The monotonic id this joint is registered and iterated under (§33). */
   getJointId(handle: PhysicsJointHandle): number;
 
@@ -580,6 +597,7 @@ const JOINT_ACCESS_METHODS = [
   "getJointReaction",
   "setJointLimits",
   "setJointMotor",
+  "setJointCollisionEnabled",
   "getJointId",
   "forEachJoint",
 ] as const satisfies readonly (keyof SolverJointAccess)[];

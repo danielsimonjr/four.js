@@ -51,15 +51,29 @@
  * material still writes its alpha unblended, which is what every scene
  * authored before the flag existed did.
  *
- * ## Color space (§60a)
+ * ## Colour space (§60a)
  *
- * The four components are **plain numbers in the documented range 0…1**, with
- * no color space attached: §60a's working/output space policy, transfer
- * functions, and tone mapping are a later packet, and tagging a space here
- * would pin half of that design by accident. Values outside 0…1 are passed
- * through rather than clamped (decision, WP-3.3) — clamping would silently
- * rewrite authored data, and extended-range colors are exactly what §60a will
- * need to carry — but non-finite components are rejected (§85).
+ * **Superseded 2026-08-08 by R-15.** This block used to say "no color space
+ * attached: §60a's working/output space policy, transfer functions, and tone
+ * mapping are a later packet, and tagging a space here would pin half of that
+ * design by accident". The policy has landed and it pins this: these four
+ * components are **linear-light**, the working space §60a makes the GPU
+ * pipeline run in. The numbers did not move — an unlit draw multiplied them
+ * unchanged before and multiplies them unchanged now — but they are named
+ * rather than untagged, and the transfer functions that convert *into* this
+ * space ship in `@four/math` (`srgbToLinearRGBA`, `parseColor`; see that
+ * package's `color.ts` header for the policy in full).
+ *
+ * There is still no colour-space **field** here, and that is now a decision
+ * rather than a deferral: §60a puts its metadata on resources — textures (§77)
+ * and render targets (§63) — and a material colour is working-space by
+ * definition, so a tag would have one legal value.
+ *
+ * Values outside 0…1 are still passed through rather than clamped (decision,
+ * WP-3.3) — clamping would silently rewrite authored data, and extended-range
+ * colours are exactly what §60a carries — but non-finite components are
+ * rejected (§85). The encode on the way out is §60a's *final render-graph pass*
+ * (`@four/render`'s `OutputTransformEffect`), never a step in this material.
  *
  * ## Texture and vertex colors (R-19, 2026-08-07)
  *

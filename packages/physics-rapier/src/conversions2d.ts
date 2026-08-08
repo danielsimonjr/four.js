@@ -338,9 +338,11 @@ function packGroupHalf(field: string, value: number): number {
  * Builds the Rapier shape for a §24 collision shape, for the query entry points
  * that take a bare `Shape` (§30 `overlap` and `shapeCast`).
  *
- * Only the plan P5-6 2D tier is reachable — circle, rectangle, capsule, convex
- * polygon — because `validateCollisionShape(shape, "2d")` runs first everywhere
- * this is called. The 3D tags are rejected here rather than silently promoted.
+ * Only the **convex** 2D tier is reachable — circle, rectangle, capsule, convex
+ * polygon — because the query entry points run `validateQueryShape(shape,
+ * "2d")` first, which refuses the 3D tags and the two composite 2D shapes
+ * (`polyline`, `chain`; PH-22a). The 3D tags are rejected here rather than
+ * silently promoted.
  *
  * **Capsule axis.** Rapier's `Capsule(halfHeight, radius)` puts the cylindrical
  * section along **+Y** in 2D, which is exactly §24's convention — verified
@@ -376,9 +378,17 @@ export function createRapierShape(shape: CollisionShape): RapierShape {
  * `createCollider` counterpart of {@link createRapierShape}.
  *
  * `ColliderDesc.convexHull` returns `null` when the point cloud is degenerate.
- * That cannot happen for a shape `validateCollisionShape` accepted (it rejects
- * outlines that enclose no area), so the `null` branch is a defensive
- * conversion to a `FourError` rather than an expected path.
+ * `validateCollisionShape` already rejects an outline that encloses no area
+ * exactly, so this only fires for an outline that is non-degenerate in exact
+ * arithmetic and degenerate under Rapier's own epsilon — a real difference of
+ * opinion between the two, reported rather than passed on.
+ *
+ * **Polyline and chain (PH-22a).** Both are `ColliderDesc.polyline`; the whole
+ * difference is the index buffer. An `N`-vertex polyline gets `N − 1` segments
+ * `(0,1), (1,2), …`; an `N`-vertex chain gets `N`, the last one `(N−1, 0)`.
+ * Indices are always passed explicitly — the upstream "omit for a line strip"
+ * default would make the open case implicit and the closed case explicit, and
+ * one code path that reads the same for both is worth the extra array.
  */
 export function createRapierColliderDesc(
   shape: CollisionShape,
@@ -393,22 +403,50 @@ export function createRapierColliderDesc(
       );
     case "capsule":
       return RAPIER_2D.ColliderDesc.capsule(shape.halfHeight, shape.radius);
-    case "polygon": {
-      const desc = RAPIER_2D.ColliderDesc.convexHull(
-        polygonVertices(shape.vertices),
+    case "polygon":
+      return requireHullDesc(
+        RAPIER_2D.ColliderDesc.convexHull(polygonVertices(shape.vertices)),
+        shape.type,
       );
-      if (desc === null) {
-        throw new FourError(
-          CONVERSION_ERROR_CODE,
-          "polygon shape: Rapier could not build a convex hull from the outline (§24, §85).",
-          { context: { dimension: DIMENSION, shape: shape.type } },
-        );
-      }
-      return desc;
-    }
+    case "polyline":
+      return RAPIER_2D.ColliderDesc.polyline(
+        polygonVertices(shape.vertices),
+        segmentIndices(shape.vertices.length, false),
+      );
+    case "chain":
+      return RAPIER_2D.ColliderDesc.polyline(
+        polygonVertices(shape.vertices),
+        segmentIndices(shape.vertices.length, true),
+      );
     default:
       throw unsupportedShape(shape.type);
   }
+}
+
+/**
+ * Turns `ColliderDesc.convexHull`'s `null` into a `FourError` (§24, §85).
+ *
+ * Rapier's typings declare the return as `ColliderDesc | null`, so this branch
+ * must exist. **No 0.19.3 input reaches it**: measured 2026-08-08, the 2D
+ * build returns a descriptor for empty, single-point, collinear, and
+ * `NaN`-bearing outlines alike. Rather than write a `!` — a promise about a
+ * solver this package does not own — the translation is a named, exported
+ * function, so the contract is testable at the version that never produces the
+ * `null` as well as at one that might. (Before PH-22a this was an inline
+ * branch, and the one uncovered fragment of this module.)
+ */
+export function requireHullDesc(
+  desc: RapierColliderDesc | null,
+  shapeType: string,
+): RapierColliderDesc {
+  if (desc === null) {
+    throw new FourError(
+      CONVERSION_ERROR_CODE,
+      `${shapeType} shape: Rapier could not build a convex hull from the outline (§24, §85).`,
+      { context: { dimension: DIMENSION, shape: shapeType } },
+    );
+  }
+  return desc;
 }
 
 /** Flattens a polygon outline into the `Float32Array` Rapier expects. */
@@ -422,6 +460,23 @@ function polygonVertices(
     flat[i * 2 + 1] = vertex.y;
   }
   return flat;
+}
+
+/**
+ * The segment index buffer for a run of `count` vertices — `count` segments
+ * when `closed`, `count − 1` when not (§24, PH-22a).
+ *
+ * Ascending and contiguous, so the solver sees the vertices in the order the
+ * caller wrote them (§33).
+ */
+function segmentIndices(count: number, closed: boolean): Uint32Array {
+  const segments = closed ? count : count - 1;
+  const indices = new Uint32Array(segments * 2);
+  for (let i = 0; i < segments; i += 1) {
+    indices[i * 2] = i;
+    indices[i * 2 + 1] = (i + 1) % count;
+  }
+  return indices;
 }
 
 /** The error for a shape that exists in `CollisionShape` but not in 2D. */

@@ -8,10 +8,11 @@
  * upload with residency diagnostics. This packet implements **one** of those:
  * a 2D, RGBA8, non-mipmapped texture built from a plain byte array, which is
  * what §55's sprite tier and §56's glyph atlas need in order to draw anything at
- * all. The rest are named as deferred on {@link Texture} rather than sketched,
- * because each of them (a sampler-state object, a colour-space tag, a
- * compressed-format enum) is a public shape the §79 scene format and every
- * backend have to agree on.
+ * all — plus, since R-15 (2026-08-08), the **colour-space tag** §60a needs, which
+ * the WebGL 2 backend turns into an sRGB internal format. The rest are named as
+ * deferred on {@link Texture} rather than sketched, because each of them (a
+ * sampler-state object, a compressed-format enum) is a public shape the §79
+ * scene format and every backend have to agree on.
  *
  * ## Two departures worth stating up front
  *
@@ -70,7 +71,9 @@
 
 import type { Disposable } from "@four/core";
 import type { SpriteTexture } from "@four/materials";
+import type { ColorSpace } from "@four/math";
 
+import { validateColorSpace } from "./render-target.js";
 import { noteTexture } from "./resource-memory.js";
 
 /**
@@ -111,12 +114,43 @@ export interface TextureSource {
    * (§76), not by the backend.
    *
    * Straight (non-premultiplied) alpha, matching §66's straight-alpha policy
-   * for this tier and `UnlitMaterial.color`. Colour-space metadata (§60a: sRGB
-   * for colour maps, linear for data maps) is **not** carried yet — tagging a
-   * space here would pin half of §60a's design by accident — so the MVP tier
-   * samples these bytes as-is.
+   * for this tier and `UnlitMaterial.color`. Colour-space metadata is carried
+   * by {@link TextureSource.colorSpace} since 2026-08-08 (R-15); it was
+   * deliberately absent before that, and the note that said so — "tagging a
+   * space here would pin half of §60a's design by accident" — is superseded.
    */
   readonly data?: Uint8Array;
+
+  /**
+   * The colour space these texels are in — §60a's first bullet: "color textures
+   * default to sRGB-encoded and are decoded to linear on sample; data maps
+   * (normal, roughness, occlusion) default to linear" (R-15, 2026-08-08).
+   *
+   * ```ts
+   * // An albedo map authored in an image editor: sRGB-encoded bytes.
+   * new Texture({ width, height, data, colorSpace: "srgb" });
+   * ```
+   *
+   * `"srgb"` makes the backend allocate an sRGB internal format, so the GPU
+   * decodes each sample to linear-light before the shader sees it and §60a's
+   * "lighting and blending run in linear space" holds for textured surfaces
+   * too. `"linear"` uploads the bytes as the numbers they are — the right tag
+   * for a data map, a mask, or texels a program computed.
+   *
+   * ## The dated deviation from §60a's default (owner decision, R-15)
+   *
+   * §60a defaults *colour* textures to sRGB. This field **defaults to
+   * `"linear"`**, and the reason is the one this repository applies to every
+   * default: nothing in the engine distinguishes a colour map from a data map
+   * (§59's `normalMap`/`occlusionMap` are staged, so every texture here is a
+   * colour map by elimination), so the §60a-faithful default would silently
+   * darken every texture already authored against this engine and move every
+   * pixel golden, for scenes that never asked for colour management. Opt-in
+   * keeps §60a's behaviour available and every existing frame byte-identical.
+   * Flipping it is an owner call, and the day §77's map roles land is the day
+   * it becomes cheap to make.
+   */
+  readonly colorSpace?: ColorSpace;
 }
 
 /**
@@ -138,6 +172,9 @@ const EMPTY_SOURCE: TextureSource = Object.freeze({ width: 1, height: 1 });
 
 /** Runs the §85 checks for one source. Throws on the first violation. */
 function validate(source: TextureSource): void {
+  if (source.colorSpace !== undefined) {
+    validateColorSpace(source.colorSpace, "Texture");
+  }
   for (const axis of ["width", "height"] as const) {
     const value = source[axis];
     if (!Number.isInteger(value) || value < 1) {
@@ -187,8 +224,10 @@ function validate(source: TextureSource): void {
  *
  * Cube/array/3D targets, mipmaps and their generation, wrap and filter modes
  * (the MVP samples `LINEAR` with `CLAMP_TO_EDGE` — see
- * `@four/render-webgl`'s `TextureCache`), anisotropy, colour-space metadata
- * (§60a), compressed containers, render-target textures (§63), video textures,
+ * `@four/render-webgl`'s `TextureCache`), anisotropy, the §77 *map roles* that
+ * would let colour-space metadata carry §60a's own defaults (colour maps sRGB,
+ * data maps linear — the tag itself ships, see
+ * {@link TextureSource.colorSpace}), compressed containers, render-target textures (§63), video textures,
  * and asynchronous upload with residency diagnostics (§84). Every one of them
  * adds public state that a backend, the §79 scene format, and §76's asset
  * manager all have to agree on.
@@ -242,6 +281,20 @@ export class Texture implements Disposable, SpriteTexture {
   /** Height in texels. */
   get height(): number {
     return this.#source.height;
+  }
+
+  /**
+   * The colour space of the texels (§60a), `"linear"` when the source names
+   * none — see {@link TextureSource.colorSpace} for the default and its dated
+   * deviation from §60a's own.
+   *
+   * Resolved here rather than left optional so the backend reads one value and
+   * never repeats the `?? "linear"`; `MaterialTexture.colorSpace` stays
+   * optional because a test double and every pre-R-15 texture satisfy it
+   * unchanged.
+   */
+  get colorSpace(): ColorSpace {
+    return this.#source.colorSpace ?? "linear";
   }
 
   /**

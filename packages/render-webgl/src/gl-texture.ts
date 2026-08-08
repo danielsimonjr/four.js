@@ -193,6 +193,17 @@ export class TextureCache {
    *
    * The binding is cleared afterwards so an upload triggered mid-frame cannot
    * leave a texture other than the one being drawn bound to unit 0.
+   *
+   * ## Colour space (§60a, R-15, 2026-08-08)
+   *
+   * A texture tagged `colorSpace: "srgb"` is allocated `SRGB8_ALPHA8` instead of
+   * `RGBA8`, so the GPU decodes every sample to linear-light before filtering
+   * and before the fragment stage sees it — which is what makes §60a's
+   * "lighting and blending run in linear space" true for a textured surface and
+   * not only for an untextured one. The tag is read defensively
+   * (`?? "linear"`): `MaterialTexture.colorSpace` is optional, so every texture
+   * written before the field existed, and every test double, keeps uploading
+   * `RGBA8` and issuing the byte-identical call it always did.
    */
   #upload(texture: CacheableTexture): TextureRecord | null {
     const gl = this.#gl;
@@ -205,7 +216,7 @@ export class TextureCache {
     gl.texImage2D(
       GL.TEXTURE_2D,
       0,
-      GL.RGBA8,
+      (texture.colorSpace ?? "linear") === "srgb" ? GL.SRGB8_ALPHA8 : GL.RGBA8,
       texture.width,
       texture.height,
       0,

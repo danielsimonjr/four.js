@@ -14,6 +14,7 @@
  */
 
 import type { Camera } from "./camera.js";
+import type { LayerMask } from "./layers.js";
 
 /**
  * A camera rendered into a rectangular region of a surface (§48).
@@ -32,10 +33,9 @@ import type { Camera } from "./camera.js";
  * ## Deferred §48 fields
  *
  * §48's full interface additionally declares `clearDepth`, `layerMask`,
- * `renderTarget`, and `postProcessing`. None is declared here yet:
+ * `renderTarget`, and `postProcessing`. `layerMask` landed with §46's layer
+ * registry (R-38, 2026-08-08) and is documented below; of the rest:
  *
- * - `layerMask?: LayerMask` — needs the §46 scene layer registry, deferred with
- *   `Camera.layers` (see `camera.ts`).
  * - `renderTarget?: RenderTarget` — off-screen targets are §63/§65 work
  *   (offscreen textures, mirrors, portals, 3D previews inside 2D UI); the MVP
  *   renders to the canvas only.
@@ -93,6 +93,35 @@ export interface Viewport {
    * when that type arrives, so widening the field then is source-compatible.
    */
   clearColor?: [number, number, number, number];
+
+  /**
+   * Which §46 layers this view draws, narrowing (or replacing) its camera's own
+   * `layers` (§48, R-38, 2026-08-08).
+   *
+   * ```ts
+   * const world = { ...createFullscreenViewport(camera), layerMask: layerMask("default") };
+   * const ui = { ...createFullscreenViewport(camera, "ui"), layerMask: layerMask("ui") };
+   * renderer.render(scene, [world, ui]);   // one camera, two passes, no overdraw
+   * ```
+   *
+   * **Absent means the camera decides**: the effective mask for a view is
+   * `view.layerMask ?? view.camera.layers`, and `Camera.layers` defaults to
+   * `ALL_LAYERS`, so a viewport that says nothing draws everything — exactly as
+   * every viewport did before this field existed. A node is drawn into this view
+   * when `layersMatch(node.layers, effectiveMask)`.
+   *
+   * Per-view rather than per-camera because that is the split §47 and §48 make:
+   * a camera's mask is what that camera can see at all, a viewport's is what
+   * *this* rectangle shows of it. Split-screen with a shared overlay, a minimap
+   * that hides debug gizmos, and a screen-space UI pass over a world pass are all
+   * the same one-camera, two-viewports arrangement.
+   *
+   * Honoured by the backend per view, from one shared render list: a filtered
+   * item is skipped before any GPU resource is touched. When the per-view render
+   * list arrives (R-8) the filter moves to list-construction time — the field's
+   * meaning does not change.
+   */
+  layerMask?: LayerMask;
 }
 
 /**

@@ -27,17 +27,23 @@
  * `transparent`, `blendMode`, `depthTest`, `depthWrite`, `colorWrite`). What
  * is left here is the lit colour and the {@link LitMaterial.kind} discriminant.
  *
- * ## Color space (§60a)
+ * ## Colour space (§60a)
  *
- * Identical to `UnlitMaterial`, stated once more because lighting is where it
- * starts to matter: the four components are **plain numbers in the documented
- * range 0…1** with no color space attached. §60a makes lighting linear-light
- * on the GPU backends, and the lit pipeline multiplies these numbers as-is —
- * so they are *treated* as linear-light — but the working/output space policy,
- * transfer functions, and tone mapping are a later packet, and tagging a space
- * here would pin half of that design by accident. Values outside 0…1 pass
- * through rather than clamp (the WP-3.3 decision `UnlitMaterial` records);
- * non-finite components are rejected (§85).
+ * **Superseded 2026-08-08 by R-15.** This block used to say the components had
+ * "no color space attached" and that "the working/output space policy, transfer
+ * functions, and tone mapping are a later packet". That packet landed: §60a's
+ * policy is written down in `@four/math`'s `color.ts`, and it names these four
+ * components **linear-light** — which is what the lit pipeline was already
+ * doing with them, multiplying them as-is under §68's light. Nothing about the
+ * arithmetic changed; the space is named instead of deferred, the conversion
+ * into it ships (`srgbToLinearRGBA`, `parseColor`), and the encode out of it is
+ * §60a's final render-graph pass (`@four/render`'s `OutputTransformEffect`),
+ * not a step in this material.
+ *
+ * Values outside 0…1 pass through rather than clamp (the WP-3.3 decision
+ * `UnlitMaterial` records); non-finite components are rejected (§85). Tone
+ * mapping — the other half of §60a's output transform — is still staged on the
+ * HDR float targets R-4 named.
  */
 
 import { Material, type MaterialOptions } from "./material.js";

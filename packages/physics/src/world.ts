@@ -202,6 +202,7 @@ import {
   setRigidBodyType,
 } from "./rigid-body.js";
 import type { CollisionShape } from "./shapes.js";
+import { shapeMaximumExtent } from "./shapes.js";
 import type {
   SolverRegistry,
   SolverRejectionReport,
@@ -250,6 +251,34 @@ const FNV_PRIME = 16777619;
 
 /** 2^32, the word boundary of §33's two-word float encoding. */
 const TWO_POW_32 = 4294967296;
+
+/**
+ * §41's distance-from-origin limit, in world units — the figure
+ * `docs/guides/units-and-numerical-stability.md` publishes verbatim, and the
+ * envelope release 1.0 supports (PH-22n).
+ */
+const SUSPICIOUS_COORDINATE = 1e5;
+
+/**
+ * The largest a **dynamic** collider may be before §41's world-scale
+ * diagnostic fires, in world units.
+ *
+ * Two decades past the guide's ~10-unit advice: a 40-unit vehicle is a design
+ * choice, a 1000-unit dynamic body is a units mistake (PH-22n).
+ */
+const SUSPICIOUS_EXTENT_MAXIMUM = 1e3;
+
+/** The smallest a dynamic collider may be — two decades past ~0.1 (PH-22n). */
+const SUSPICIOUS_EXTENT_MINIMUM = 1e-2;
+
+/**
+ * The dynamic mass ratio §41's diagnostic fires at.
+ *
+ * One decade past the guide's ~100× advice, so the warning means "far enough
+ * past the guidance that the solver will show it" rather than "you are near
+ * the guidance" (PH-22n).
+ */
+const SUSPICIOUS_MASS_RATIO = 1000;
 
 /**
  * A solver adapter a world can drive: §37's contract plus the per-handle access
@@ -705,6 +734,13 @@ export class PhysicsWorld {
    */
   #tuningWarned?: Set<string>;
 
+  /**
+   * The lightest and heaviest dynamic solver mass this world has registered,
+   * for §41's mass-ratio diagnostic (PH-22n). Allocated on the first dynamic
+   * body with a positive mass; a world of static geometry never pays for it.
+   */
+  #massRange?: { minimum: number; maximum: number };
+
   /** The §33 tier this world asked for, which the adapter can meet. */
   readonly #determinism: DeterminismLevel;
 
@@ -1132,8 +1168,9 @@ export class PhysicsWorld {
       this.#poses?.track(node);
     }
 
-    this.#refreshMassProperties(registration);
+    const solverMass = this.#refreshMassProperties(registration);
     this.#warnUnhonouredMaterials(registration);
+    this.#warnSuspiciousNumbers(registration, solverMass);
     return body;
   }
 
@@ -1780,6 +1817,7 @@ export class PhysicsWorld {
     this.#jointsByJoint.set(joint, registration);
     this.#jointsById.set(id, registration);
     bindJoint(joint, id);
+    this.#warnUngappedJointMotor(joint);
     return joint;
   }
 
@@ -2541,11 +2579,18 @@ export class PhysicsWorld {
    * derived value (it falls back to the mirror), so nothing a caller reads
    * changes; what changes is what the body *asks the next solver for*.
    */
-  #refreshMassProperties(registration: BodyRegistration): void {
+  #refreshMassProperties(registration: BodyRegistration): number {
     const mass = this.#adapter.getBodyMass(registration.handle);
     if (Number.isFinite(mass) && mass > 0) {
       setRigidBodyDerivedMass(registration.body, mass);
     }
+    /*
+     * Returned, not re-read: §41's mass-ratio diagnostic (PH-22n) wants the
+     * same number, and a second `getBodyMass` would put a solver call on the
+     * registration path that was not there before. Registration's call
+     * sequence is unchanged.
+     */
+    return mass;
   }
 
   /**
@@ -2687,6 +2732,130 @@ export class PhysicsWorld {
         `A PhysicsMaterial on node ${node.id} sets spinningFriction, but adapter ${JSON.stringify(this.#adapter.name)} declares it does not apply §25 spinning friction, so the value changes nothing in the simulation. Model the resistance another way (angular damping is the usual stand-in), or reach the solver through world.getColliderHandle(collider).`,
       );
     }
+  }
+
+  /**
+   * §41's "diagnostics should warn about suspicious values", for one
+   * newly registered body (PH-22n, 2026-08-08).
+   *
+   * Three checks, one per bullet of the §41 checklist that a solver-agnostic
+   * layer can actually see, with the thresholds
+   * `docs/guides/units-and-numerical-stability.md` already publishes:
+   *
+   * | §41 bullet             | Checked                                             | Warns beyond           |
+   * | ---------------------- | --------------------------------------------------- | ---------------------- |
+   * | Distance from origin   | the body's registered position                      | `1e5` units on an axis |
+   * | World scale            | each **dynamic** collider's largest extent           | outside `[1e-2, 1e3]`  |
+   * | Mass ratios            | this world's heaviest ÷ lightest dynamic solver mass | `1000:1`               |
+   *
+   * ## Why these thresholds and not the guide's own advice
+   *
+   * The guide *advises* keeping masses within ~100× and sizes within ~0.1–10
+   * units. A warning fired at the advice would go off in scenes that are
+   * perfectly stable, and the fastest way to make a diagnostic useless is to
+   * make it routine. Each threshold here is therefore an order of magnitude
+   * past the advice: crossing one does not mean "you ignored the guide", it
+   * means "you are far enough past it that the solver is likely to show it".
+   *
+   * **Static and kinematic colliders are exempt from the scale check.** A
+   * 40-unit ground slab or a level's triangle mesh is not a scale mistake; the
+   * §41 concern is contact tolerance between things that *move*.
+   *
+   * **It adds no solver call.** `solverMass` is the number
+   * {@link PhysicsWorld.#refreshMassProperties} has just read, threaded through
+   * rather than re-read, so a registration's `getBodyMass` sequence is exactly
+   * what it was before this diagnostic existed.
+   *
+   * **Registration time only** — the same scope, and the same reasoning, as
+   * {@link PhysicsWorld.#warnUnhonouredMaterials}: a body teleported to 1e9
+   * afterwards is invisible to the world (§23 makes the transform the scene's,
+   * not the world's), and a per-step check would be a per-step cost for a
+   * development-only signal. The mass range is cumulative across every body
+   * this world has registered, so the pair that trips it need not arrive
+   * together.
+   */
+  #warnSuspiciousNumbers(
+    registration: BodyRegistration,
+    solverMass: number,
+  ): void {
+    const node = registration.node;
+    const position = node.transform.position;
+    const farthest = Math.max(
+      Math.abs(position.x),
+      Math.abs(position.y),
+      Math.abs(position.z),
+    );
+    if (farthest > SUSPICIOUS_COORDINATE) {
+      this.#warnTuning(
+        "coordinateRange",
+        `Node ${node.id} is registered ${String(farthest)} units from the origin. 32-bit float positions lose sub-millimetre fidelity beyond roughly ${String(SUSPICIOUS_COORDINATE)} units, so contacts and joints near this body will jitter (§41, §85). Keep the simulated region within that envelope, or re-centre the world.`,
+      );
+    }
+
+    if (registration.type === "dynamic") {
+      for (const { collider } of registration.colliders) {
+        const extent = shapeMaximumExtent(collider.shape);
+        if (extent > SUSPICIOUS_EXTENT_MAXIMUM) {
+          this.#warnTuning(
+            "worldScale",
+            `A dynamic ${collider.shape.type} collider on node ${node.id} is ${String(extent)} units across. Collision margins are absolute, so sizes far outside ~0.1–10 units strain contact tolerances (§41). Scale the whole world consistently rather than one body.`,
+          );
+        } else if (extent < SUSPICIOUS_EXTENT_MINIMUM) {
+          this.#warnTuning(
+            "worldScale",
+            `A dynamic ${collider.shape.type} collider on node ${node.id} is only ${String(extent)} units across. Collision margins are absolute, so a body this small may never register a stable contact (§41). Model in metres rather than millimetres-as-units.`,
+          );
+        }
+      }
+
+      if (Number.isFinite(solverMass) && solverMass > 0) {
+        const range = (this.#massRange ??= {
+          minimum: solverMass,
+          maximum: solverMass,
+        });
+        range.minimum = Math.min(range.minimum, solverMass);
+        range.maximum = Math.max(range.maximum, solverMass);
+        if (range.maximum > range.minimum * SUSPICIOUS_MASS_RATIO) {
+          this.#warnTuning(
+            "massRatio",
+            `This world now holds dynamic bodies of ${String(range.minimum)} and ${String(range.maximum)} — a ratio of ${String(Math.round(range.maximum / range.minimum))}:1. Iterative solvers resolve a contact across a ratio this wide poorly, and the light body will be pushed through the heavy one (§41). Keep interacting bodies within ~100× of each other, or link them through intermediate masses.`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Warns once per world when an **enabled** §28 joint motor meets an adapter
+   * that declares its `maxTorque` / `maxForce` is not a hard cap (§28, §37;
+   * PH-22e, 2026-08-08).
+   *
+   * The other three `tuning` warnings fire because a value never reaches the
+   * solver. This one fires because it reaches the solver and means something
+   * else: on both Rapier adapters the effort limit is a `ForceBased` strength
+   * *gain*, so a mechanism authored to stall at `maxTorque` will instead push
+   * through the obstruction, slower. That is a wrong simulation with nothing on
+   * screen to explain it — the same failure mode, arrived at from the other
+   * direction — so it gets the same one-line-per-world treatment.
+   *
+   * A **disabled** motor is silent: it exerts nothing, so its effort limit
+   * cannot mislead. Both the registration path and the queued
+   * {@link HingeJoint.setMotor} drain call this, because a motor added after
+   * registration is exactly as misleading as one authored with the joint, and
+   * the per-world dedup means the pair still prints at most once.
+   */
+  #warnUngappedJointMotor(joint: Joint): void {
+    if (this.#tuning.jointMotorEffortCap) {
+      return;
+    }
+    const motor = readJointMotor(joint);
+    if (motor === undefined || !motor.enabled) {
+      return;
+    }
+    this.#warnTuning(
+      "jointMotorEffortCap",
+      `A ${joint.type} joint's motor limits its effort to ${String(motor.maxEffort)}, but adapter ${JSON.stringify(this.#adapter.name)} declares that limit is a strength gain rather than §28's hard cap (capabilities.tuning.jointMotorEffortCap is false). The motor is stronger for a larger value and weaker for a smaller one, but it will not stall at this one — do not size a mechanism against it. Model the stall another way, or use an adapter that declares a real cap.`,
+    );
   }
 
   /**
@@ -3193,7 +3362,7 @@ export class PhysicsWorld {
    * registration order, and clears the queues.
    *
    * The joint half of step 1 of the pipeline. A joint nobody touched costs one
-   * boolean test: `limitsDirty` and `motorDirty` are only ever set by the
+   * boolean test: the three dirty bits are only ever set by the
    * setters, and `bindJoint` clears them at registration because the descriptor
    * the solver was just built from already carried the current values.
    */
@@ -3205,7 +3374,11 @@ export class PhysicsWorld {
     for (const registration of this.#jointsByJoint.values()) {
       const joint = registration.joint;
       const commands = joint.commands;
-      if (!commands.limitsDirty && !commands.motorDirty) {
+      if (
+        !commands.limitsDirty &&
+        !commands.motorDirty &&
+        !commands.collisionDirty
+      ) {
         continue;
       }
       if (commands.limitsDirty) {
@@ -3217,8 +3390,15 @@ export class PhysicsWorld {
       if (commands.motorDirty) {
         const motor = readJointMotor(joint);
         if (motor !== undefined) {
+          this.#warnUngappedJointMotor(joint);
           access.setJointMotor(registration.handle, motor);
         }
+      }
+      if (commands.collisionDirty) {
+        access.setJointCollisionEnabled(
+          registration.handle,
+          joint.collisionEnabled,
+        );
       }
       clearJointCommands(joint);
     }

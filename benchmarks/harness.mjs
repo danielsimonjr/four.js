@@ -75,23 +75,57 @@ export const MEASUREMENT_NOTE =
   "Recorded measurement, not a gate. Nothing in CI asserts on these timings; see benchmarks/README.md for how the numbers are to be read and why this host is not 'suitable hardware'.";
 
 /**
- * The suite, in the order `benchmarks/README.md` documents it. Printed by
- * `node benchmarks/harness.mjs`, so the index cannot drift out of the tree
- * without someone noticing on the next smoke run.
+ * The suite, in the order `benchmarks/README.md` documents it and
+ * `run-all.mjs` runs it.
+ *
+ * Exported because there must be exactly one list: `node benchmarks/harness.mjs`
+ * prints it as the index, and the runner drives it. A script that exists in the
+ * tree and not here is one nobody runs, which is why the runner checks the two
+ * against each other rather than trusting either (2026-08-08, A-27).
+ *
+ * `record` is the `results/<record>.json` each script writes — spelled out
+ * rather than derived from the filename, because the two are related only by
+ * each script's own `writeResult` call.
  */
-const SUITE = [
-  ["math-ops.mjs", "§7b math throughput and per-op allocation (§83, §92)"],
+export const SUITE = Object.freeze(
   [
-    "scene-propagation.mjs",
-    "§7 world-transform resolution over deep+wide trees",
-  ],
-  ["physics-step.mjs", "§86's 5 000-rigid-body row, stepped through Rapier 3D"],
-  [
-    "animation-sampling.mjs",
-    "§17 mixer sampling of a multi-track clip at N instances",
-  ],
-  ["particles-100k.mjs", "§112's 100 000-particle CPU budget (WP-9.4)"],
-];
+    {
+      file: "math-ops.mjs",
+      record: "math-ops",
+      what: "§7b math throughput and per-op allocation (§83, §92)",
+    },
+    {
+      file: "scene-propagation.mjs",
+      record: "scene-propagation",
+      what: "§7 world-transform resolution over deep+wide trees",
+    },
+    {
+      file: "physics-step.mjs",
+      record: "physics-step",
+      what: "§86's 5 000-rigid-body row, stepped through Rapier 3D",
+    },
+    {
+      file: "animation-sampling.mjs",
+      record: "animation-sampling",
+      what: "§17 mixer sampling of a multi-track clip at N instances",
+    },
+    {
+      file: "particles-100k.mjs",
+      record: "particles-100k",
+      what: "§112's 100 000-particle CPU budget (WP-9.4)",
+    },
+    {
+      file: "ui-layout.mjs",
+      record: "ui-layout",
+      what: "§86's 5 000-retained-UI-node row, layout-and-state half",
+    },
+    {
+      file: "text-layout.mjs",
+      record: "text-layout",
+      what: "§86's 20 000-animated-glyph row, layout half",
+    },
+  ].map((entry) => Object.freeze(entry)),
+);
 
 /**
  * Rounds to `digits` decimals, so a record is readable and its `git diff` is
@@ -343,7 +377,7 @@ export function hostLines(host, caveat) {
 
 /** The text `node benchmarks/harness.mjs` prints. */
 function usage() {
-  const width = Math.max(...SUITE.map(([file]) => file.length));
+  const width = Math.max(...SUITE.map((entry) => entry.file.length));
   return [
     "four.js benchmark harness (§92 performance tests, §86 targets; plan §6j, WP-11.4)",
     "",
@@ -354,17 +388,22 @@ function usage() {
     "",
     "    pnpm run build",
     "",
-    "  Then run one, or all of them in turn:",
+    "  Then run the whole suite,",
+    "",
+    "    pnpm bench                 # node benchmarks/run-all.mjs",
+    "",
+    "  or one script at a time:",
     "",
     ...SUITE.map(
-      ([file, what]) => `    node benchmarks/${file.padEnd(width)}   ${what}`,
+      (entry) =>
+        `    node benchmarks/${entry.file.padEnd(width)}   ${entry.what}`,
     ),
     "",
     "  Each writes benchmarks/results/<name>.json, which is committed. Every number",
     "  describes the machine that produced it and is recorded, never gated: nothing",
     "  in CI asserts on a timing here. See benchmarks/README.md.",
     "",
-    "  Exports: measure (warmup/measured, optional untimed prepare), summarize,",
+    "  Exports: SUITE, measure (warmup/measured, optional untimed prepare), summarize,",
     "           summaryFields, summaryLines, mean, quantile,",
     "           round, hostRecord, hostLines, writeResult, resultsPath, printReport,",
     "           keepAlive, keepAliveTotal, MEASUREMENT_NOTE",

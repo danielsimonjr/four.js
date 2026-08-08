@@ -36,7 +36,9 @@ repository (Settings → Pages → source "GitHub Actions"), which is an owner s
   empty placeholder" until that date. What is still staged is the _site's_ half: nothing
   here embeds it as a centrepiece, and `index.html` remains a plain list of links (which
   also does not yet name `first-3d-scene`). `examples/flagship/motor-digital-twin`, §119's
-  engineering demonstration, is still not written; the directory is a placeholder.
+  engineering demonstration, was written on 2026-08-08 and is built and deployed with the
+  others; this bullet said it "is still not written; the directory is a placeholder" until
+  that date.
 - **Installation and quick start.** Deferred to first publish (§94 0.1): the install line
   would name packages nobody can install yet.
 

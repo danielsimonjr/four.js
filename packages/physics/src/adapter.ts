@@ -143,6 +143,28 @@ export interface PhysicsTuningCapabilities {
    * adapters do honour `enabled` (`RigidBodyDesc.setCanSleep`).
    */
   readonly sleepThresholds: boolean;
+
+  /**
+   * Whether a §28 joint motor's `maxTorque` / `maxForce` is a **hard ceiling**
+   * on the effort the motor may apply (PH-22e, 2026-08-08).
+   *
+   * The odd one out of this record, and deliberately so: the other three
+   * answer "does this value reach the solver at all", and this one answers
+   * "does it mean what §28 says it means". Both Rapier adapters take the value
+   * — it is not dropped — and hand it to `configureMotorVelocity` as a
+   * `ForceBased` strength **gain**, so a motor authored with `maxTorque: 50`
+   * is stronger than one authored with `maxTorque: 5` but does not stall at
+   * 50 N·m. Rapier 0.19.3 exposes no motor-force ceiling in JS, so no
+   * declaration of `true` is available there.
+   *
+   * A solver whose motor limit is a genuine cap — Box2D's `maxMotorTorque` is
+   * the canonical one — declares `true`, and §90's compatibility tables then
+   * show the difference instead of burying it in an adapter's prose. This is
+   * the only member of {@link PhysicsTuningCapabilities} whose `false` means
+   * "applied, differently" rather than "not applied", which is why it carries
+   * its own paragraph rather than a one-line entry.
+   */
+  readonly jointMotorEffortCap: boolean;
 }
 
 /**
@@ -158,6 +180,7 @@ export const NO_TUNING_CAPABILITIES: PhysicsTuningCapabilities = Object.freeze({
   rollingFriction: false,
   spinningFriction: false,
   sleepThresholds: false,
+  jointMotorEffortCap: false,
 });
 
 /**

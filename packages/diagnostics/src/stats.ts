@@ -84,9 +84,9 @@
  * - `cpuFrameTime` and `simulationTime` are the frame loop's own measurements;
  *   `Application` (`four`) makes them.
  *
- * ## What is staged, and why (2026-08-07)
+ * ## What is staged, and why (2026-08-08)
  *
- * Three of the eleven counters have no producer anywhere in this repository and
+ * Two of the eleven counters have no producer anywhere in this repository and
  * are left `NaN` by every path through it. They are staged deliberately, not
  * forgotten:
  *
@@ -97,20 +97,22 @@
  *   `EXT_disjoint_timer_query_webgl2`, which is absent on most browsers and
  *   asynchronous where it exists, so a truthful value arrives with the packet
  *   that widens capabilities.
- * - **`physicsStepTime`** and **`contacts`** are `PhysicsWorld.step`'s to
- *   report; `@four/physics` was outside A-1's file scope, and inventing the
- *   numbers here from the outside (timing the whole fixed step, counting
- *   contact *events* rather than live contacts) would report something other
- *   than what the field names promise. `simulationTime` covers the honest
- *   outer measurement in the meantime; both fields are plain writable numbers,
- *   so the packet that adds the seam writes them without changing this type.
+ * - **`contacts`** is the solver's to report, and no seam reports it.
+ *   `PhysicsWorld` publishes §29 contact *events* and no live manifold count,
+ *   and counting a step's events — or differencing begin against end to keep a
+ *   running pair total — would answer a different question from the one §84
+ *   asks. It arrives with the §37 seam that counts them.
  *
- * `textureMemory` and `bufferMemory` were the other two until A-5 landed the
- * §83 resource accounting they were waiting on (2026-08-07) — see
- * {@link recordResourceMemory}.
+ * `textureMemory` and `bufferMemory` were staged too until A-5 landed the §83
+ * resource accounting they were waiting on (2026-08-07) — see
+ * {@link recordResourceMemory} — and `physicsStepTime` until A-6 gave the
+ * composition root a world to step (2026-08-08): `four`'s `Application` times
+ * `PhysicsWorld.step` itself, which is the solve and nothing else, and
+ * accumulates it over the frame's fixed steps exactly as it accumulates
+ * `simulationTime` around the whole of them.
  */
 
-import type { SolverStatistics } from "./debug-draw.js";
+import type { DebugBodyAccess, SolverStatistics } from "./debug-draw.js";
 
 /**
  * §84's eleven runtime counters for one frame, mutated in place.
@@ -160,8 +162,14 @@ export interface FrameStats {
 
   /**
    * Seconds spent in the physics solver's step, the subset of
-   * {@link FrameStats.simulationTime} the solver owns. **Staged** — always
-   * `NaN` (module header).
+   * {@link FrameStats.simulationTime} the solver owns — summed over the frame's
+   * fixed steps, like its neighbour.
+   *
+   * Written by whoever calls `PhysicsWorld.step`; in an application that is
+   * `four`'s `Application`, and only when a world is attached to it
+   * (`ApplicationOptions.physics`, A-6). Without one the field stays `NaN`:
+   * a frame with no solver did not spend zero seconds solving, it did not
+   * measure.
    */
   physicsStepTime: number;
 
@@ -371,6 +379,61 @@ export function recordResourceMemory(
 ): void {
   stats.textureMemory = textureBytes;
   stats.bufferMemory = bufferBytes;
+}
+
+/**
+ * Counts {@link @four/diagnostics!SolverStatistics | SolverStatistics} in one
+ * pass per collection, from §113's `DebugBodyAccess` — which every
+ * `PhysicsSolverAdapter` satisfies structurally, so `world.adapter` is what you
+ * pass.
+ *
+ * ```ts
+ * recordSolverStatistics(app.stats, solverStatistics(world.adapter, record));
+ * ```
+ *
+ * `out` follows §7b's out-parameter convention: pass a record to reuse and this
+ * allocates nothing; omit it and one plain object is allocated (a record, not a
+ * math type — the `constructionCount()` allocation tests do not see it).
+ *
+ * **Why it lives here and not in `debug-draw.ts`**, where it shipped until
+ * 2026-08-08 (A-6): that module allocates module-level scratch math objects and
+ * freezes its staged-feature list, so a bundler keeps the whole file the moment
+ * anything in it is named — 939 B gzip, measured on `examples/ui-demo`, for a
+ * frame loop that wanted one integer. `four`'s `Application` reports §84's
+ * `activeBodies` from here every frame that asks for statistics; a debug overlay
+ * is a different and much rarer thing to be paying for. The seam types stay in
+ * `debug-draw.ts` — a type costs nothing to import.
+ */
+export function solverStatistics<THandle, TColliderHandle>(
+  access: DebugBodyAccess<THandle, TColliderHandle>,
+  out?: SolverStatistics,
+): SolverStatistics {
+  const stats: SolverStatistics = out ?? {
+    bodyCount: 0,
+    sleepingCount: 0,
+    awakeCount: 0,
+    colliderCount: 0,
+    maxBodyId: -1,
+  };
+  stats.bodyCount = 0;
+  stats.sleepingCount = 0;
+  stats.awakeCount = 0;
+  stats.colliderCount = 0;
+  stats.maxBodyId = -1;
+  access.forEachBody((handle, id) => {
+    stats.bodyCount += 1;
+    if (access.isBodySleeping(handle)) {
+      stats.sleepingCount += 1;
+    }
+    if (id > stats.maxBodyId) {
+      stats.maxBodyId = id;
+    }
+  });
+  stats.awakeCount = stats.bodyCount - stats.sleepingCount;
+  access.forEachCollider(() => {
+    stats.colliderCount += 1;
+  });
+  return stats;
 }
 
 /**

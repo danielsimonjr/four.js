@@ -1,7 +1,7 @@
 import { isFourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import { Group } from "@four/scene";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   JointBreakPayload,
@@ -12,10 +12,13 @@ import {
   Collider,
   FixedJoint,
   HingeJoint,
+  NO_TUNING_CAPABILITIES,
   PhysicsWorld,
   RigidBody,
+  RopeJoint,
   SliderJoint,
   SphericalJoint,
+  resolveTuningCapabilities,
   supportsSolverJointAccess,
 } from "../src/index.js";
 import { FakeJointSolverAdapter, FakeSolverAdapter } from "./fake-adapter.js";
@@ -358,7 +361,11 @@ describe("joint reconfiguration in the fixed step (§28)", () => {
       }),
     ) as HingeJoint;
     // Registration clears the queue: the descriptor already carried both.
-    expect(hinge.commands).toEqual({ limitsDirty: false, motorDirty: false });
+    expect(hinge.commands).toEqual({
+      limitsDirty: false,
+      motorDirty: false,
+      collisionDirty: false,
+    });
     world.step(1 / 60);
     expect(adapter.callsOf("setJointLimits")).toHaveLength(0);
     expect(adapter.callsOf("setJointMotor")).toHaveLength(0);
@@ -378,7 +385,11 @@ describe("joint reconfiguration in the fixed step (§28)", () => {
       targetVelocity: 5,
       maxEffort: 9,
     });
-    expect(hinge.commands).toEqual({ limitsDirty: false, motorDirty: false });
+    expect(hinge.commands).toEqual({
+      limitsDirty: false,
+      motorDirty: false,
+      collisionDirty: false,
+    });
 
     // Nothing queued, nothing pushed.
     adapter.clearCalls();
@@ -438,7 +449,11 @@ describe("joint reconfiguration in the fixed step (§28)", () => {
     world.step(1 / 60);
     expect(adapter.callsOf("setJointLimits")).toHaveLength(0);
     expect(adapter.callsOf("setJointMotor")).toHaveLength(0);
-    expect(joint.commands).toEqual({ limitsDirty: false, motorDirty: false });
+    expect(joint.commands).toEqual({
+      limitsDirty: false,
+      motorDirty: false,
+      collisionDirty: false,
+    });
   });
 });
 
@@ -768,6 +783,204 @@ describe("the fake joint adapter itself (WP-6.1)", () => {
     adapter.getJointReaction(adapter.joint(1).handle, linear, angular);
     expect([...vector(linear)]).toEqual([1, 2, 3]);
     expect([...vector(angular)]).toEqual([4, 5, 6]);
+  });
+});
+
+describe("live collisionEnabled (§28, PH-22f)", () => {
+  it("pushes a queued change once, in the scene→solver phase", async () => {
+    const { adapter, world, bodyA, bodyB } = await jointWorld();
+    const joint = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    // Registration clears the queue: the descriptor already carried the value.
+    expect(adapter.joint(1).collisionEnabled).toBe(false);
+    world.step(1 / 60);
+    expect(adapter.callsOf("setJointCollisionEnabled")).toHaveLength(0);
+
+    joint.collisionEnabled = true;
+    adapter.clearCalls();
+    world.step(1 / 60);
+
+    expect(adapter.callsOf("setJointCollisionEnabled")).toHaveLength(1);
+    expect(adapter.joint(1).collisionEnabled).toBe(true);
+    const order = adapter.callOrder;
+    expect(order.indexOf("setJointCollisionEnabled")).toBeLessThan(
+      order.indexOf("syncSceneToSolver"),
+    );
+    expect(joint.commands.collisionDirty).toBe(false);
+
+    // Nothing queued, nothing pushed.
+    adapter.clearCalls();
+    world.step(1 / 60);
+    expect(adapter.callsOf("setJointCollisionEnabled")).toHaveLength(0);
+  });
+
+  it("works for every §28 type, unlike limits and motors", async () => {
+    // The point of the closure: `setContactsEnabled` is on Rapier's base
+    // joint class, so a fixed or rope joint — neither of which can be
+    // re-limited or motored — can still be re-collided.
+    const { adapter, world, bodyA, bodyB } = await jointWorld();
+    const fixed = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    const rope = world.addJoint(new RopeJoint({ bodyA, bodyB, maxLength: 2 }));
+    adapter.clearCalls();
+
+    fixed.collisionEnabled = true;
+    rope.collisionEnabled = true;
+    world.step(1 / 60);
+
+    expect(adapter.callsOf("setJointCollisionEnabled")).toHaveLength(2);
+    expect(adapter.joint(1).collisionEnabled).toBe(true);
+    expect(adapter.joint(2).collisionEnabled).toBe(true);
+  });
+
+  it("drains joints in ascending registration order (§33)", async () => {
+    const { adapter, world, bodyA, bodyB } = await jointWorld();
+    const first = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    const second = world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    adapter.clearCalls();
+
+    // Queued in the reverse of registration order; drained in registration
+    // order regardless.
+    second.collisionEnabled = true;
+    first.collisionEnabled = true;
+    world.step(1 / 60);
+
+    expect(
+      adapter.callsOf("setJointCollisionEnabled").map((call) => call.id),
+    ).toEqual([1, 2]);
+  });
+
+  it("leaves the properties with no live setter frozen at compile time", async () => {
+    const { world, bodyA, bodyB } = await jointWorld();
+    const joint = world.addJoint(new RopeJoint({ bodyA, bodyB, maxLength: 2 }));
+
+    // The remaining frozen §28 properties are `readonly` fields, so writing
+    // one cannot compile — a stronger guarantee than the runtime throw
+    // `collisionEnabled` used to carry, and the reason PH-22f could retire
+    // that throw outright rather than replace it.
+    // @ts-expect-error - `maxLength` is readonly (§28; see the module header).
+    joint.maxLength = 5;
+    // @ts-expect-error - `anchorA` is readonly.
+    joint.anchorA = new Vector3(1, 0, 0);
+
+    expect(world.hasJoint(joint)).toBe(true);
+  });
+});
+
+describe("§28 motor effort limits are declared, not assumed (PH-22e)", () => {
+  /** A joint-capable world whose adapter declares the named tuning record. */
+  async function motorWorld(jointMotorEffortCap: boolean): Promise<{
+    world: PhysicsWorld;
+    bodyA: RigidBody;
+    bodyB: RigidBody;
+  }> {
+    const adapter = new FakeJointSolverAdapter({
+      capabilities: {
+        tuning: {
+          rollingFriction: false,
+          spinningFriction: false,
+          sleepThresholds: false,
+          jointMotorEffortCap,
+        },
+      },
+    });
+    const world = new PhysicsWorld({ dimension: "2d", adapter });
+    await world.initialize();
+    const bodyA = world.addBody(dynamicNode());
+    const bodyB = world.addBody(dynamicNode());
+    return { world, bodyA, bodyB };
+  }
+
+  it("reads an undeclared tuning record as 'not a cap'", () => {
+    // The all-false reading is the one that warns, per the same rule the other
+    // three fields follow: an adapter that has not answered has given no
+    // evidence it caps anything.
+    expect(NO_TUNING_CAPABILITIES.jointMotorEffortCap).toBe(false);
+    expect(
+      resolveTuningCapabilities(new FakeJointSolverAdapter().capabilities)
+        .jointMotorEffortCap,
+    ).toBe(false);
+  });
+
+  it("warns once when a motored joint meets an adapter with no cap", async () => {
+    const { world, bodyA, bodyB } = await motorWorld(false);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    world.addJoint(
+      new HingeJoint({
+        bodyA,
+        bodyB,
+        axis: new Vector3(0, 0, 1),
+        motor: { targetVelocity: 2, maxTorque: 50 },
+      }),
+    );
+    world.addJoint(
+      new SliderJoint({
+        bodyA,
+        bodyB,
+        axis: new Vector3(1, 0, 0),
+        motor: { targetVelocity: 1, maxForce: 30 },
+      }),
+    );
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain("strength gain");
+    expect(warn.mock.calls[0]?.[0]).toContain("jointMotorEffortCap");
+  });
+
+  it("stays silent for a disabled motor and for a motorless joint", async () => {
+    const { world, bodyA, bodyB } = await motorWorld(false);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    world.addJoint(new FixedJoint({ bodyA, bodyB }));
+    world.addJoint(
+      new HingeJoint({
+        bodyA,
+        bodyB,
+        axis: new Vector3(0, 0, 1),
+        motor: { enabled: false, targetVelocity: 2, maxTorque: 50 },
+      }),
+    );
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("stays silent when the adapter declares a real cap", async () => {
+    const { world, bodyA, bodyB } = await motorWorld(true);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    world.addJoint(
+      new HingeJoint({
+        bodyA,
+        bodyB,
+        axis: new Vector3(0, 0, 1),
+        motor: { targetVelocity: 2, maxTorque: 50 },
+      }),
+    );
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("also warns for a motor switched on after registration", async () => {
+    const { world, bodyA, bodyB } = await motorWorld(false);
+    // Registered disabled — silent, per the test above — then enabled through
+    // §28's queued reconfiguration, which is exactly as misleading.
+    const joint = world.addJoint(
+      new HingeJoint({
+        bodyA,
+        bodyB,
+        axis: new Vector3(0, 0, 1),
+        motor: { enabled: false, targetVelocity: 3, maxTorque: 12 },
+      }),
+    ) as HingeJoint;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    joint.setMotor({ enabled: true, targetVelocity: 3, maxTorque: 12 });
+    world.step(1 / 60);
+    // …and a second queued change stays quiet: one line per world.
+    joint.setMotor({ enabled: true, targetVelocity: 4, maxTorque: 12 });
+    world.step(1 / 60);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toContain("strength gain");
   });
 });
 
