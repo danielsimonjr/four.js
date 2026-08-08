@@ -8,6 +8,52 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — A-6 closed: the §45 composition root completed
+
+#### Added
+
+- **§45's absent members (A-6).** `Application` gains: **`physics`** — a `PhysicsWorld`
+  instance or a **factory handed `app.poses`** (`physics: ({ poses }) => new
+PhysicsWorld({ …, poses })`; the factory form exists because a world built before the
+  `Application` can never reach the pose buffer, so an instance-only option would ship
+  an `app.physics` that silently cannot interpolate §43), stepped at §39 step 6 and
+  disposed only when the application built it (§83: ownership follows construction, in
+  both directions — the renderer rule). §45's literal `PhysicsWorldOptions` form is
+  deferred for the recorded bundle reason (a static `@four/physics` import would put a
+  solver in every UI bundle — the third instance of the deferred-string-selection
+  pattern; the import is type-only, zero runtime bytes). **`assets`** (§76's
+  `app.assets`, instance form — the manager carries its own host seams).
+  **`autoResize`** with an injected `SurfaceObserver` seam (defaults true iff an
+  observer was supplied, so one is never accepted-and-ignored). **`reducedMotion`**
+  (`"auto" | boolean`) resolved through an injected `reducedMotionSource` **on every
+  read, never cached** — a mid-session preference change is honoured with no
+  subscription; closes A-13's reduced-motion policy half and PH-22m's policy half.
+  `app.input` and `app.diagnostics` are **refused with recorded reasons** (§45 names
+  them in prose only, no option, no example reads them — the §40 precedent; §84's
+  surface is spelled `app.stats` in the spec's own example and ships).
+- **§84 `physicsStepTime` and `activeBodies` are measured** whenever a world is
+  attached and stats are on — `physicsStepTime` covers `world.step()` only (not §39
+  step 9 event delivery), in a `finally` so a throwing solver still reports;
+  `activeBodies` is read once after the frame (a level, the A-5 pattern). `contacts`
+  stays staged with its reason recorded: the world publishes §29 _events_, not a live
+  manifold count — differencing events answers a different question. Load-bearing
+  proof: the same Rapier scene run §97-style and as `physics: () => …` produces
+  element-identical checksum sequences over 20 distinct-value frames.
+- **`solverStatistics` moved from `debug-draw.ts` to `stats.ts`** (same export, same
+  barrel) — naming it used to drag **939 B gzip** of debug-draw module state
+  (module-level scratch `Vector3`s, frozen staged lists) into every bundle; now 24 B.
+  Third measured instance of the cannot-tree-shake class: producers belong in the
+  module of the record they write.
+
+#### Changed
+
+- **ui-demo's budget: 32 → 33 kB, one coordinated bump for both wave-6 packets** —
+  HEAD sat at 31 995/32 000 (5 B headroom); A-6's composition-root growth is
+  structural (+352 B — nothing reachable from a class method tree-shakes) and the
+  in-flight §46-layers packet independently measured +254 B. §86's 150 kB budget
+  untouched. Spec-revisit recorded: §97's "a world is built and tracked, not an app
+  option" comment is stale after A-6.
+
 ### 2026-08-08 — R-15 closed (policy + opt-in-transform tier): §60a colour management
 
 #### Added

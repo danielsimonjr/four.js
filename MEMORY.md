@@ -28,6 +28,24 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — A-6 composition root.** Decisions worth keeping:
+  - **A world cannot be an option-record here** — `four/application` importing
+    `@four/physics` puts a solver in every UI bundle; §45's `PhysicsWorldOptions` form
+    waits for a world front-door the way `renderer: "auto"` waited for §62's registry
+    (third deferred-string-selection instance; the import is type-only).
+  - **The factory form exists because `PhysicsWorld` takes `poses` at construction** —
+    an instance-only option would ship an `app.physics` that silently cannot
+    interpolate (§43). **Ownership follows construction, in both directions** (§83).
+  - `reducedMotion` resolves through the injected source **on every read, never
+    cached**; a boolean short-circuits the source. `autoResize` defaults true iff an
+    observer was supplied — an observer is never accepted-and-ignored.
+  - `contacts` stays staged: the world publishes §29 _events_, not a live manifold
+    count — differencing them answers a different question (§37 seam needed).
+  - **Measured gotcha (third cannot-tree-shake instance):** naming one leaf function
+    in `debug-draw.ts` cost 939 B gzip (module-level scratch + frozen lists);
+    producers belong in the module of the record they write. Spec-revisit: §97's
+    "a world is built and tracked, not an app option" is stale after A-6.
+
 - **2026-08-08 — R-15 §60a colour management.** Decisions worth keeping:
   - **The working-space policy is written down once** (`@four/math` `color.ts` header):
     material/light/vertex colours _are_ linear-light — no per-value tag (it would have

@@ -54,8 +54,10 @@ import {
   collectContactPoints,
   debugDrawStreams,
   solverJointStatistics,
-  solverStatistics,
 } from "../src/debug-draw.js";
+// Moved to the statistics module it produces for (A-6, 2026-08-08); the tests
+// that pin its behaviour stay here, with the seam it reads.
+import { solverStatistics } from "../src/stats.js";
 
 // --- transcribed physics shapes (compile-time mirrors) ----------------------
 

@@ -87,7 +87,6 @@ export {
   collectContactPoints,
   debugDrawStreams,
   solverJointStatistics,
-  solverStatistics,
 } from "./debug-draw.js";
 // --- END WP-10.3 debug-draw ---
 
@@ -110,4 +109,5 @@ export {
   recordResourceMemory,
   recordSolverStatistics,
   resetFrameStats,
+  solverStatistics,
 } from "./stats.js";

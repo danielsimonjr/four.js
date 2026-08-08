@@ -24,7 +24,14 @@ export * as physicsRapier from "@four/physics-rapier";
 export * as physicsBox2d from "@four/physics-box2d";
 export * as physicsSoft from "@four/physics-soft";
 
-export type { ApplicationEventMap, ApplicationOptions } from "./application.js";
+export type {
+  ApplicationEventMap,
+  ApplicationOptions,
+  PhysicsWorldContext,
+  PhysicsWorldFactory,
+  SurfaceObserver,
+  SurfaceResize,
+} from "./application.js";
 export { Application } from "./application.js";
 
 // §79 support for the engine's own node classes and components (A-14, PH-17,
