@@ -220,6 +220,18 @@ export interface WebglContext {
   ): void;
   uniform4fv(location: GlUniformLocation, data: Float32Array): void;
   uniform3fv(location: GlUniformLocation, data: Float32Array): void;
+  /**
+   * Uploads one `float` uniform.
+   *
+   * Added with §59's standard pipeline (R-13, 2026-08-08), which is the first
+   * one to carry a scalar the shader reads on its own — `metalness` and
+   * `roughness`. Packing the two into a `vec3` would have kept this interface
+   * unchanged; two named scalars are what the shader actually declares, and
+   * this interface exists precisely so a new entry point is an explicit,
+   * reviewable growth of the package's GL budget rather than a silent one (see
+   * the module header).
+   */
+  uniform1f(location: GlUniformLocation, value: number): void;
   uniform1i(location: GlUniformLocation, value: number): void;
 
   // --- Textures (`gl-texture.ts`) ---

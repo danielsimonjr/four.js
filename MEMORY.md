@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — R-13 StandardMaterial.** Decisions worth keeping:
+  - **The radiometric convention is now written down**: light colour × intensity is an
+    irradiance already divided by π — neither lobe carries a `1/π`. This is what makes
+    `LitMaterial` and `StandardMaterial` composable in one scene, and the constraint
+    any future BRDF must honour.
+  - Defaults are `metalness: 0` / `roughness: 1` (three.js's, not glTF's 1/1) — a glTF
+    importer assigns both explicitly, so it cannot inherit the difference.
+  - Ambient reaches the diffuse lobe only (no IBL; a metal under ambient alone renders
+    black, honestly); roughness is floored in the shader (0.045) where the 0/0 lives,
+    not clamped in the material.
+  - `SurfaceMaterial` deliberately NOT widened (would strip `color`/`setColor` off
+    every ordinary renderable's material type — the `SpriteMaterial` exclusion
+    argument); inference handles `new Renderable(geo, new StandardMaterial())`.
+  - The duplicate-symbol gate is load-bearing — it refused a second `ColorRGB`; the
+    shared RGB tuple alias belongs in `@four/math` with R-15.
+  - ui-demo budget 31 → 32 kB on the R-6-style structural proof (compile-at-init
+    alone was 547 B over); two consecutive pipeline additions absorbed — A-4's
+    build-time pipeline-selection seam is the structural fix.
+
 - **2026-08-08 — Gotcha (multi-agent, joins the rebase/stash/ports set): a batch that
   lands code without touching a tracking file is undiscoverable within a day.** The
   `ab13840`/`fe8eb6f` closures (nine gap items) were invisible to every later agent

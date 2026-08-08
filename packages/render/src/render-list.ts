@@ -82,6 +82,7 @@ import type {
   LitMaterial,
   Material,
   SpriteMaterial,
+  StandardMaterial,
   UnlitMaterial,
 } from "@four/materials";
 import type { Node, PoseBuffer } from "@four/scene";
@@ -108,8 +109,16 @@ import { Renderable } from "./renderable.js";
  * generates `"unlit"` or `"lit"` according to its material's own `kind`
  * discriminant (§57) — a material property, not a node property, because
  * which pipeline shades a surface is exactly what a material *is*.
+ *
+ * `"standard"` joined with §59's metallic-roughness workflow (R-13,
+ * 2026-08-08), by the same rule and for the same reason. Widening this union is
+ * still an edit to this package, which is R-12's remaining half: the closed
+ * union is the **staging mechanism**, not the destination — it keeps every arm
+ * type-checked end to end while the pipeline registry §64 asks for is designed
+ * (see `pipelineOf`).
  */
-export type RenderItemKind = "unlit" | "lit" | "sprite" | "particles";
+export type RenderItemKind =
+  "unlit" | "lit" | "standard" | "sprite" | "particles";
 
 /**
  * The fields every render item carries, whatever pipeline draws it — one draw in
@@ -167,6 +176,23 @@ export interface LitRenderItem extends RenderItemBase {
   kind: "lit";
   /** Surface appearance (§57, §68). */
   material: LitMaterial;
+}
+
+/**
+ * A draw generated from a `Renderable` carrying a `StandardMaterial` (§49,
+ * §57, §59) — metallic-roughness PBR, one diffuse and one specular lobe under
+ * the same §68 lighting a {@link LitRenderItem} is shaded by.
+ *
+ * Structurally identical to a lit item, and deliberately a **separate arm**
+ * rather than a widened `LitRenderItem.material`: the two draw through
+ * different programs, and §66's sort key 3 is a pipeline key. The frame's
+ * lights travel in the shared `SceneLights` record exactly as they do for the
+ * lit pipeline — they are per-frame state, not per-draw state.
+ */
+export interface StandardRenderItem extends RenderItemBase {
+  kind: "standard";
+  /** Surface appearance (§57, §59, §68). */
+  material: StandardMaterial;
 }
 
 /** A draw generated from a {@link Sprite} (§55) — one textured, tinted quad. */
@@ -242,7 +268,11 @@ export interface ParticleRenderItem extends RenderItemBase {
  * `itemAt`.
  */
 export type RenderItem =
-  UnlitRenderItem | LitRenderItem | SpriteRenderItem | ParticleRenderItem;
+  | UnlitRenderItem
+  | LitRenderItem
+  | StandardRenderItem
+  | SpriteRenderItem
+  | ParticleRenderItem;
 
 /**
  * The pooled item as the builders write it: one mutable shape covering every
@@ -261,7 +291,7 @@ export type RenderItem =
  */
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
-  material?: UnlitMaterial | LitMaterial | SpriteMaterial;
+  material?: UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
   id: string;
   count: number;
   instances: Float32Array;
@@ -270,16 +300,25 @@ interface MutableRenderItem extends RenderItemBase {
 /**
  * Which pipeline draws a node carrying `material` (§57, §64).
  *
- * One property load and a three-way comparison, with `"unlit"` as the fallback
- * so that a structurally-typed material double predating the discriminant — or
- * a family member no backend knows yet — keeps drawing flat-coloured rather
- * than vanishing. Replacing this mapping with the registry §64 wants, so a
- * consumer's material can bring its own pipeline, is R-12's remaining half and
- * is recorded as a follow-up (2026-08-06).
+ * One property load and a short chain of comparisons, with `"unlit"` as the
+ * fallback so that a structurally-typed material double predating the
+ * discriminant — or a family member no backend knows yet — keeps drawing
+ * flat-coloured rather than vanishing. Replacing this mapping with the registry
+ * §64 wants, so a consumer's material can bring its own pipeline, is R-12's
+ * remaining half and is recorded as a follow-up (2026-08-06).
+ *
+ * The chain is ordered by how often each arm is taken, not alphabetically:
+ * `"lit"` and `"standard"` are the two surface families a 3D scene mixes, and
+ * `"sprite"` is asked last because §55's quads reach this function through the
+ * same `Renderable` slot but are a minority of the items in any scene that has
+ * both.
  */
 function pipelineOf(material: Material): RenderItemKind {
   if (material.kind === "lit") {
     return "lit";
+  }
+  if (material.kind === "standard") {
+    return "standard";
   }
   if (material.kind === "sprite") {
     return "sprite";
@@ -307,6 +346,14 @@ export function isUnlitItem(item: RenderItem): item is UnlitRenderItem {
 /** Narrows `item` to the Lambert-lit pipeline (§57's `LitMaterial`, §68). */
 export function isLitItem(item: RenderItem): item is LitRenderItem {
   return item.kind === "lit";
+}
+
+/**
+ * Narrows `item` to the metallic-roughness pipeline (§57's `StandardMaterial`,
+ * §59; R-13).
+ */
+export function isStandardItem(item: RenderItem): item is StandardRenderItem {
+  return item.kind === "standard";
 }
 
 /** Narrows `item` to the batched particle pipeline (§36; see `particles.ts`). */
@@ -550,9 +597,10 @@ function collect(
     item.kind = pipelineOf(material);
     item.geometry = geometry;
     // The cast is the union's, not the material's: `MutableRenderItem` types
-    // this slot as the three known surface materials, and `pipelineOf` has just
+    // this slot as the four known surface materials, and `pipelineOf` has just
     // decided which of them the backend will read it as.
-    item.material = material as UnlitMaterial | LitMaterial | SpriteMaterial;
+    item.material = material as
+      UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
     // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
@@ -564,7 +612,8 @@ function collect(
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
     // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
-    // and an "unlit" item an `UnlitMaterial` by construction. TypeScript cannot
+    // a "standard" item a `StandardMaterial`, and an "unlit" item an
+    // `UnlitMaterial` by construction. TypeScript cannot
     // see that across two assignments to a pooled object — see
     // `MutableRenderItem`.
     out[next] = item as RenderItem;

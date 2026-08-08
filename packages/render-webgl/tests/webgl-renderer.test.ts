@@ -52,6 +52,7 @@ import {
   type RenderItem,
   type Renderer,
   type SpriteRenderItem,
+  type StandardRenderItem,
   type UnlitRenderItem,
 } from "@four/render";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -72,6 +73,7 @@ import {
   ParticleProgram,
   RenderTargetCache,
   SpriteProgram,
+  StandardProgram,
   TextureCache,
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
@@ -93,6 +95,8 @@ type ItemGeometry = RenderItem["geometry"];
 type ItemMaterial = UnlitRenderItem["material"];
 /** The *lit* arm — §57's `LitMaterial` (§68, 2026-08-04). */
 type ItemLitMaterial = LitRenderItem["material"];
+/** The *standard* arm — §57's `StandardMaterial` (§59; R-13, 2026-08-08). */
+type ItemStandardMaterial = StandardRenderItem["material"];
 type ItemSpriteMaterial = SpriteRenderItem["material"];
 type ItemTexture = ItemSpriteMaterial["texture"];
 type RenderInterpolation = NonNullable<Parameters<Renderer["render"]>[2]>;
@@ -124,9 +128,9 @@ interface FakeGlOptions {
   /**
    * 1-based index of the `createProgram` call that returns null; every other
    * call succeeds. `initialize` builds its pipelines in a fixed order (unlit,
-   * sprite, particles, lit, effect), so this is how a test reaches the
-   * *partial* failure paths — the ones that have to dispose the programs
-   * already built rather than leak them (R-6, 2026-08-07).
+   * sprite, particles, lit, standard, effect), so this is how a test reaches
+   * the *partial* failure paths — the ones that have to dispose the programs
+   * already built rather than leak them (R-6, 2026-08-07; R-13, 2026-08-08).
    */
   failProgramAt?: number;
   /** When false, `createVertexArray` returns null. Default true. */
@@ -319,6 +323,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     uniform3fv(location, data) {
       record("uniform3fv", location, data);
+    },
+    uniform1f(location, value) {
+      record("uniform1f", location, value);
     },
     uniform1i(location, value) {
       record("uniform1i", location, value);
@@ -733,6 +740,44 @@ class TestLitMaterial {
   }
 }
 
+/**
+ * A `StandardMaterial` reduced to what the backend reads (§57, §59): the
+ * `kind` discriminant the render list branches on, §59's base colour, its two
+ * metallic-roughness scalars, and its emissive term. Same technique and same
+ * reason as {@link TestLitMaterial} — the discriminant is a plain readable
+ * property, so a double is possible at all.
+ */
+class TestStandardMaterial {
+  readonly kind = "standard" as const;
+
+  readonly baseColor: [number, number, number, number];
+
+  metalness: number;
+
+  roughness: number;
+
+  readonly emissive: [number, number, number];
+
+  /** §59's one shipped map; unset by default, like the other doubles'. */
+  map?: ItemTexture | null;
+
+  constructor(
+    baseColor: [number, number, number, number] = [1, 1, 1, 1],
+    metalness = 0,
+    roughness = 1,
+    emissive: [number, number, number] = [0, 0, 0],
+  ) {
+    this.baseColor = baseColor;
+    this.metalness = metalness;
+    this.roughness = roughness;
+    this.emissive = emissive;
+  }
+
+  get asMaterial(): ItemStandardMaterial {
+    return this as unknown as ItemStandardMaterial;
+  }
+}
+
 let nextTestTextureId = 0;
 
 /**
@@ -823,10 +868,27 @@ class TestCamera {
 
   readonly viewMatrix = new Matrix4();
 
+  /**
+   * §47's camera is a `Node`, so it carries a transform whose world matrix
+   * `updateViewMatrix()` resolves. The standard pipeline reads the eye position
+   * out of that matrix's translation column (§59's specular lobe needs a view
+   * vector), which is the one member of the camera contract this double gained
+   * on 2026-08-08 (R-13).
+   */
+  readonly transform = { worldMatrix: new Matrix4() };
+
   updateViewMatrixCalls = 0;
 
   updateViewMatrix(): void {
     this.updateViewMatrixCalls += 1;
+  }
+
+  /** Places the eye, as a real camera's resolved world matrix would. */
+  placeAt(x: number, y: number, z: number): this {
+    this.transform.worldMatrix.elements[12] = x;
+    this.transform.worldMatrix.elements[13] = y;
+    this.transform.worldMatrix.elements[14] = z;
+    return this;
   }
 
   get asCamera(): RenderCamera {
@@ -2209,11 +2271,11 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04), and
-    // the §70 effect pipeline (R-6, 2026-08-07): §61 requires engine-owned GPU
-    // resources to be re-created before `contextrestored` is emitted, and
-    // every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(5);
+    // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04),
+    // standard (§59, R-13, 2026-08-08), and the §70 effect pipeline (R-6,
+    // 2026-08-07): §61 requires engine-owned GPU resources to be re-created
+    // before `contextrestored` is emitted, and every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(6);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2319,7 +2381,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(5);
+    expect(gl.countOf("deleteProgram")).toBe(6);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2343,7 +2405,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(5);
+    expect(gl.countOf("deleteProgram")).toBe(6);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -6165,7 +6227,8 @@ describe("EffectProgram — the §70 pipeline (R-6)", () => {
 describe("WebglRenderer.initialize — a partial pipeline failure (R-6)", () => {
   it.each([
     ["lit", 4, 3],
-    ["effect", 5, 4],
+    ["standard", 5, 4],
+    ["effect", 6, 5],
   ])(
     "disposes the programs already built when the %s one will not allocate",
     async (_name, failProgramAt, alreadyBuilt) => {
@@ -6519,5 +6582,400 @@ describe("WebglRenderer.render — untouched by §70 (R-6)", () => {
     // only other `uniform3fv` in the backend and they cannot have run: the
     // count is the effect pipeline's `grade` upload, and it is zero.
     expect(gl.countOf("uniform3fv")).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §59's metallic-roughness pipeline (R-13, 2026-08-08).
+// ---------------------------------------------------------------------------
+
+/**
+ * The standard program's uniform handles, found by a uniform name only it
+ * declares — the lit and sprite lookups' pattern (see {@link litUniforms}).
+ */
+function standardUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("cameraPosition")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the standard program never resolved its uniforms");
+}
+
+function standardRenderable(
+  geometry: TestGeometry = litTriangleGeometry(),
+  material: TestStandardMaterial = new TestStandardMaterial(),
+): Renderable<ItemStandardMaterial> {
+  // The type parameter is named, unlike `litRenderable`'s: `Renderable`
+  // defaults to §57's `SurfaceMaterial` (`UnlitMaterial | LitMaterial`), and
+  // §59's member is deliberately not in it — see `renderable.ts` for why that
+  // union stays narrow.
+  return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
+  it("compiles both stages, links, and resolves the twelve uniforms", () => {
+    const gl = createFakeGl();
+
+    const program = StandardProgram.create(gl);
+
+    expect(gl.countOf("createShader")).toBe(2);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual([
+      "viewProjection",
+      "model",
+      "baseColor",
+      "metalness",
+      "roughness",
+      "emissive",
+      "ambientLight",
+      "lightDirection",
+      "lightColor",
+      "cameraPosition",
+      "map",
+      "useMap",
+    ]);
+    expect(program.disposed).toBe(false);
+  });
+
+  it("declares the three attribute streams at the fixed shared locations", () => {
+    // One geometry cache serves all six programs precisely because every
+    // pipeline names the same slots (`gl-geometry.ts`).
+    const gl = createFakeGl();
+
+    StandardProgram.create(gl);
+
+    const sources = gl
+      .callsOf("shaderSource")
+      .map((call) => String(call.args[1]));
+    for (const source of sources) {
+      expect(source.startsWith("#version 300 es\n")).toBe(true);
+    }
+    expect(sources[0]).toContain(
+      `layout(location = ${String(POSITION_ATTRIBUTE_LOCATION)}) in vec3 position;`,
+    );
+    expect(sources[0]).toContain(
+      `layout(location = ${String(NORMAL_ATTRIBUTE_LOCATION)}) in vec3 normal;`,
+    );
+    expect(sources[0]).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
+    );
+    // The world position is the one varying the lit stage does not produce.
+    expect(sources[0]).toContain("out vec3 vWorldPosition;");
+    // §59's parameters, and the BRDF's own constants.
+    expect(sources[1]).toContain("uniform float metalness;");
+    expect(sources[1]).toContain("uniform float roughness;");
+    expect(sources[1]).toContain("uniform vec3 emissive;");
+    expect(sources[1]).toContain("const float DIELECTRIC_F0 = 0.04;");
+    expect(sources[1]).toContain("const float MIN_ROUGHNESS = 0.045;");
+  });
+
+  it("uploads the view-projection, the model matrix and the base colour", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    const uniforms = standardUniforms(gl);
+
+    const viewProjection = new Matrix4();
+    viewProjection.elements[12] = 7;
+    program.setViewProjection(viewProjection);
+    const model = new Matrix4();
+    model.elements[13] = -2;
+    program.setModel(model);
+    program.setBaseColor([1, 0.5, 0.25, 0.5], 0.5);
+
+    expect(uploadsAt(gl, uniforms.get("viewProjection"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(1);
+    // `opacity` multiplies alpha only, exactly as the unlit program does.
+    expect(uploadsAt(gl, uniforms.get("baseColor"))).toEqual([
+      [1, 0.5, 0.25, 0.25],
+    ]);
+  });
+
+  it("defaults opacity to 1, so an untouched material uploads its alpha unchanged", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+
+    program.setBaseColor([1, 1, 1, 0.25]);
+
+    expect(uploadsAt(gl, standardUniforms(gl).get("baseColor"))).toEqual([
+      [1, 1, 1, 0.25],
+    ]);
+  });
+
+  it("uploads §59's surface parameters as two scalars and one vec3", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    const uniforms = standardUniforms(gl);
+
+    const emissive: [number, number, number] = [4, 2, 1];
+    program.setSurface(0.75, 0.2, emissive);
+
+    expect(uploadsAt(gl, uniforms.get("metalness"))).toEqual([0.75]);
+    expect(uploadsAt(gl, uniforms.get("roughness"))).toEqual([0.2]);
+    expect(uploadsAt(gl, uniforms.get("emissive"))).toEqual([[4, 2, 1]]);
+    // Scratch is copied at upload time, as everywhere in this backend.
+    emissive[0] = 0;
+    expect(uploadsAt(gl, uniforms.get("emissive"))).toEqual([[4, 2, 1]]);
+  });
+
+  it("uploads the lights and the eye out of copied scratch", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    const uniforms = standardUniforms(gl);
+
+    program.setAmbientLight([0.25, 0.5, 0.75]);
+    program.setDirectionalLight(new Vector3(0, -1, 0), [2, 1, 0.5]);
+    program.setCameraPosition(1, 2, 3);
+
+    expect(uploadsAt(gl, uniforms.get("ambientLight"))).toEqual([
+      [0.25, 0.5, 0.75],
+    ]);
+    expect(uploadsAt(gl, uniforms.get("lightDirection"))).toEqual([[0, -1, 0]]);
+    expect(uploadsAt(gl, uniforms.get("lightColor"))).toEqual([[2, 1, 0.5]]);
+    expect(uploadsAt(gl, uniforms.get("cameraPosition"))).toEqual([[1, 2, 3]]);
+  });
+
+  it("uploads the sampler unit once, lazily, and mirrors the map switch", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    const uniforms = standardUniforms(gl);
+
+    // Already off: the mirror starts where GL starts, so this costs nothing.
+    program.setFeatures(false);
+    expect(gl.countOf("uniform1i")).toBe(0);
+
+    program.setFeatures(true);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+
+    program.setFeatures(true);
+    expect(gl.countOf("uniform1i")).toBe(2);
+
+    program.setFeatures(false);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
+    // The sampler unit is uploaded once in the lifetime of the program.
+    program.setFeatures(true);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+  });
+
+  it("throws SHADER_COMPILATION_FAILED and cleans up exactly as the unlit program does", () => {
+    const failed = createFakeGl({ compileStatus: false });
+    const error = thrown(() => {
+      StandardProgram.create(failed);
+    });
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(error.context?.stage).toBe("vertex");
+
+    const unresolved = createFakeGl({ resolveUniforms: false });
+    const uniformError = thrown(() => {
+      StandardProgram.create(unresolved);
+    });
+    expect(uniformError.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(unresolved.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("deletes the GL program once, idempotently", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+
+    program.dispose();
+    program.dispose();
+
+    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("WebglRenderer.render — standard surfaces (§59, §68)", () => {
+  it("draws a standard item through its own pipeline with the frame's lights and the eye", async () => {
+    const { renderer, gl, camera } = await initialized();
+    camera.placeAt(0, 0, 8);
+    const root = new AmbientRoot([0.25, 0.5, 0.75]);
+    const light = new TestLight([1, 0.5, 0.25], 2, [0, -1, 0]);
+    // Components exact in 32-bit float, so the recorded upload compares
+    // without a tolerance.
+    const material = new TestStandardMaterial(
+      [0.75, 0.5, 0.25, 1],
+      1,
+      0.25,
+      [0, 0, 0.5],
+    );
+    root.add(light, standardRenderable(litTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = standardUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("ambientLight"))).toEqual([
+      [0.25, 0.5, 0.75],
+    ]);
+    expect(uploadsAt(gl, uniforms.get("lightDirection"))).toEqual([[0, -1, 0]]);
+    expect(uploadsAt(gl, uniforms.get("lightColor"))).toEqual([[2, 1, 0.5]]);
+    expect(uploadsAt(gl, uniforms.get("cameraPosition"))).toEqual([[0, 0, 8]]);
+    expect(uploadsAt(gl, uniforms.get("baseColor"))).toEqual([
+      [0.75, 0.5, 0.25, 1],
+    ]);
+    expect(uploadsAt(gl, uniforms.get("metalness"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("roughness"))).toEqual([0.25]);
+    expect(uploadsAt(gl, uniforms.get("emissive"))).toEqual([[0, 0, 0.5]]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // The frame starts on the unlit program and switches once.
+    expect(gl.countOf("useProgram")).toBe(2);
+    // Standard surfaces are opaque by default (§57): blending never turns on.
+    expect(
+      gl.callsOf("enable").filter((call) => call.args[0] === GL.BLEND),
+    ).toHaveLength(0);
+  });
+
+  it("uploads the per-view state once however many standard items draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(new TestLight(), standardRenderable(), standardRenderable());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = standardUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("ambientLight"))).toHaveLength(1);
+    expect(uploadsAt(gl, uniforms.get("cameraPosition"))).toHaveLength(1);
+    // …and the per-draw state once per draw.
+    expect(uploadsAt(gl, uniforms.get("model"))).toHaveLength(2);
+    expect(uploadsAt(gl, uniforms.get("metalness"))).toHaveLength(2);
+    expect(gl.countOf("drawArrays")).toBe(2);
+    expect(gl.countOf("useProgram")).toBe(2);
+  });
+
+  it("re-uploads the per-view state for a second viewport", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(new TestLight(), standardRenderable());
+    const second = new TestCamera().placeAt(3, 0, 0);
+    gl.reset();
+
+    renderer.render(root, [createView(camera), createView(second)]);
+
+    expect(uploadsAt(gl, standardUniforms(gl).get("cameraPosition"))).toEqual([
+      [0, 0, 0],
+      [3, 0, 0],
+    ]);
+  });
+
+  it("honours §57's render state on a standard draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestStandardMaterial();
+    const transparent = material as unknown as {
+      transparent: boolean;
+      blendMode: string;
+      depthWrite: boolean;
+      opacity: number;
+    };
+    transparent.transparent = true;
+    transparent.blendMode = "additive";
+    transparent.depthWrite = false;
+    transparent.opacity = 0.5;
+    root.add(standardRenderable(litTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(
+      gl.callsOf("enable").filter((call) => call.args[0] === GL.BLEND),
+    ).toHaveLength(1);
+    expect(gl.callsOf("blendFunc")[0].args).toEqual([GL.SRC_ALPHA, GL.ONE]);
+    expect(gl.callsOf("depthMask").map((call) => call.args[0])).toEqual([
+      false,
+      true,
+    ]);
+    expect(uploadsAt(gl, standardUniforms(gl).get("baseColor"))).toEqual([
+      [1, 1, 1, 0.5],
+    ]);
+  });
+
+  it("binds the base-colour map on the shared unit and switches it off again", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const texture = new TestTexture();
+    const mapped = new TestStandardMaterial();
+    mapped.map = texture.asTexture;
+    root.add(
+      standardRenderable(litTriangleGeometry(), mapped),
+      standardRenderable(),
+    );
+    // One warm-up frame: the first upload of a texture binds it too, and this
+    // test is about the *draw* bindings.
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+    ]);
+    const bound = gl.callsOf("bindTexture").map((call) => call.args[1]);
+    expect(bound).toHaveLength(2);
+    expect(bound[1]).toBeNull();
+    expect(uploadsAt(gl, standardUniforms(gl).get("useMap"))).toEqual([1, 0]);
+  });
+
+  it("draws a material whose texture the application disposed with no map at all", async () => {
+    // The `TextureCache` returns null, and the draw proceeds untextured — the
+    // §83 behaviour the unlit and lit paths already have.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const texture = new TestTexture();
+    texture.disposed = true;
+    const material = new TestStandardMaterial();
+    material.map = texture.asTexture;
+    root.add(standardRenderable(litTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("mixes a lit and a standard surface in one frame, one switch each", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(new TestLight(), litRenderable(), standardRenderable());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Unlit (the resting state), lit, standard — three distinct programs.
+    const programs = gl.callsOf("useProgram").map((call) => call.args[0]);
+    expect(programs).toHaveLength(3);
+    expect(new Set(programs).size).toBe(3);
+    expect(gl.countOf("drawArrays")).toBe(2);
+    // One light collection serves both families: the lit and the standard
+    // pipeline read the same `SceneLights` record.
+    expect(uploadsAt(gl, litUniforms(gl).get("lightColor"))).toHaveLength(1);
+    expect(uploadsAt(gl, standardUniforms(gl).get("lightColor"))).toHaveLength(
+      1,
+    );
+  });
+
+  it("counts a standard draw in §84's statistics like any other", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = createRoot();
+    root.add(standardRenderable());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+    expect(statistics.instances).toBe(1);
   });
 });

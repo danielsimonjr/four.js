@@ -1,0 +1,427 @@
+/**
+ * `StandardMaterial` (§59) — the metallic-roughness workflow, at the tier this
+ * engine can honestly shade today.
+ *
+ * §59 is one sentence and one constructor:
+ *
+ * ```ts
+ * const material = new Four.StandardMaterial({
+ *     baseColor: "#a0a0a0",
+ *     roughness: 0.6,
+ *     metalness: 0.1,
+ *     normalMap,
+ *     occlusionMap,
+ *     emissive: "#000000"
+ * });
+ * ```
+ *
+ * — *"StandardMaterial shall implement a metallic-roughness workflow compatible
+ * with glTF conventions"* — plus a list of later physical extensions
+ * (clearcoat, transmission, IOR, sheen, anisotropy, subsurface, iridescence)
+ * that §57 puts on `PhysicalMaterial` above this class.
+ *
+ * ## What ships, and what is staged with the reason (R-13, 2026-08-08)
+ *
+ * | §59 names            | here                                            |
+ * | -------------------- | ----------------------------------------------- |
+ * | `baseColor`          | {@link StandardMaterial.baseColor} (+ optional {@link StandardMaterial.map}) |
+ * | `metalness`          | {@link StandardMaterial.metalness}              |
+ * | `roughness`          | {@link StandardMaterial.roughness}              |
+ * | `emissive`           | {@link StandardMaterial.emissive}               |
+ * | `normalMap`          | **staged** — needs the tangent attribute        |
+ * | `occlusionMap`       | **staged** — needs a second texture unit        |
+ *
+ * The two staged maps are staged for causes that are recorded elsewhere and are
+ * not this packet's to fix:
+ *
+ * - **`normalMap` needs tangents.** A tangent-space normal map is meaningless
+ *   without a per-vertex tangent frame, and §53's tangent attribute was
+ *   deliberately left out by R-19 (2026-08-07) when `uvs` and `colors` landed —
+ *   see `@four/geometry`'s `BufferGeometry`. Shipping the field without the
+ *   attribute would put a texture in the public API that every geometry in the
+ *   engine silently ignores.
+ * - **`occlusionMap` — and glTF's `metallicRoughnessMap` and `emissiveMap` with
+ *   it — need a second texture unit.** This backend tier binds exactly one
+ *   texture per draw at `MAP_TEXTURE_UNIT`, and §77's multi-texture
+ *   materials are what will bring the unit allocator (`@four/render-webgl`'s
+ *   `gl-program.ts` says so, in those words, and has since WP-3a.3). A base
+ *   colour map is the one texture that needs nothing new; the other four each
+ *   need the same missing thing, so they arrive together with it.
+ *
+ * §59's seven physical extensions are `PhysicalMaterial`'s (§57's family puts it
+ * above this class) and are not sketched here.
+ *
+ * ## The BRDF tier, stated (§59, §68)
+ *
+ * The shading model is real metallic-roughness — Cook-Torrance with a GGX
+ * (Trowbridge-Reitz) normal distribution, a height-correlated Smith visibility
+ * term, and a Schlick Fresnel over `F0 = mix(0.04, baseColor, metalness)` —
+ * evaluated against the **one** directional light and the scene ambient term
+ * §68's MVP tier collects (`@four/render`'s `lights.ts`). One light is not a
+ * limitation of this material: multi-light needs §68's uniform arrays or its
+ * clustered path, staged where `@four/scene`'s `light.ts` records it. A
+ * Lambert-versus-GGX difference under one light is still the difference between
+ * a plastic and a metal, which is what §59 is for.
+ *
+ * There is **no image-based lighting**, so a fully metallic surface has nothing
+ * to reflect: metals carry no diffuse lobe, and with no environment the ambient
+ * term contributes nothing to them. `metalness: 1` under ambient light alone
+ * therefore renders black. That is the physically honest answer rather than a
+ * bug, and §68's "environment lighting; image-based lighting" is what changes
+ * it.
+ *
+ * ## Color space (§60a) — the same untagged linear space `LitMaterial` uses
+ *
+ * Every colour here is **plain numbers in the documented range 0…1** with no
+ * colour space attached, exactly as `LitMaterial`'s and
+ * `UnlitMaterial`'s are: §60a makes the GPU pipeline linear-light and the
+ * BRDF multiplies these numbers as-is — so they are *treated* as linear-light —
+ * but no tone mapping and no output transform exist anywhere in this engine
+ * yet, and tagging a space here would pin half of R-15's design by accident.
+ * Values outside 0…1 pass through rather than clamp (the WP-3.3 decision
+ * `UnlitMaterial` records), which is also how an HDR emissive is authored
+ * today; non-finite values are rejected (§85).
+ *
+ * That is a deliberate match, not an oversight: the standard and lit pipelines
+ * write straight (non-premultiplied) alpha into the same framebuffer with the
+ * same absent output transform, so the two families **compose in one scene** —
+ * a `StandardMaterial` sphere beside a `LitMaterial` floor is shaded in one
+ * space and blended by one rule. When §60a's transform lands it moves both at
+ * once.
+ *
+ * ## Putting one on a node (§49)
+ *
+ * `new Renderable(geometry, new StandardMaterial())` infers
+ * `Renderable<StandardMaterial>` and needs nothing said. A variable *annotated*
+ * as a bare `Renderable` is a different thing: that type parameter defaults to
+ * `@four/render`'s `SurfaceMaterial`, deliberately still `UnlitMaterial |
+ * LitMaterial`, and §59's member is not in it. Widening that union would take
+ * `color` and `setColor` off every ordinary renderable's material — the exact
+ * argument `renderable.ts` records for keeping `SpriteMaterial` out of it, and
+ * it applies unchanged to a base colour. Name the parameter
+ * (`Renderable<StandardMaterial>`, or `Renderable<Material>` for a node whose
+ * material is swapped between families) and nothing else changes: the render
+ * list picks the pipeline off the material's own `kind`, never off the node's
+ * type (R-13, 2026-08-08).
+ *
+ * ## CSS colour strings (§59's own example, R-15)
+ *
+ * `baseColor: "#a0a0a0"` does not compile against this class: there is no
+ * colour-string parser anywhere in the engine (R-15 owns it), so every colour
+ * in this API is a numeric tuple. `new StandardMaterial({ baseColor:
+ * [0.627, 0.627, 0.627, 1] })` is §59's example as it is written today.
+ */
+
+import type { ColorRGBA } from "@four/math";
+
+import { Material, type MaterialOptions } from "./material.js";
+import type { MaterialTexture } from "./texture.js";
+
+/**
+ * Construction arguments of {@link StandardMaterial} — §59's own parameters,
+ * plus §57's shared render state from {@link MaterialOptions}.
+ */
+export interface StandardMaterialOptions extends MaterialOptions {
+  /**
+   * Initial {@link StandardMaterial.baseColor}, copied into the material's own
+   * array. Defaults to opaque white `[1, 1, 1, 1]`, so an untinted surface
+   * shows the lighting and the base colour map alone.
+   */
+  baseColor?: readonly [number, number, number, number];
+
+  /**
+   * Initial {@link StandardMaterial.map} — the base colour (albedo) texture
+   * sampled with the geometry's `uvs` (§53, §77). Defaults to `null`.
+   */
+  map?: MaterialTexture | null;
+
+  /**
+   * Initial {@link StandardMaterial.metalness}; defaults to `0` (a dielectric).
+   */
+  metalness?: number;
+
+  /**
+   * Initial {@link StandardMaterial.roughness}; defaults to `1` (fully rough).
+   */
+  roughness?: number;
+
+  /**
+   * Initial {@link StandardMaterial.emissive}, copied into the material's own
+   * array. Defaults to black `[0, 0, 0]` — §59's own example writes
+   * `emissive: "#000000"` — so an unlit-from-within surface emits nothing.
+   */
+  emissive?: readonly [number, number, number];
+}
+
+/**
+ * The prefix this family member's ids carry. The counter behind it is the
+ * family-wide one in `material.ts` — one counter, one prefix per member, so two
+ * members can never mint a colliding cache key (§33).
+ */
+const ID_PREFIX = "standard-material";
+
+/** Rejects non-finite colour components (§85). */
+function requireFiniteColor(name: string, value: number): number {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(
+      `Color component ${name} must be finite; got ${String(value)} ` +
+        "(§85: NaN and infinite values).",
+    );
+  }
+  return value;
+}
+
+/**
+ * Rejects a non-finite metallic-roughness scalar (§85).
+ *
+ * **Finite, not in-range.** Both scalars are documented as 0…1 and are *not*
+ * clamped, following the decision `UnlitMaterial` records for colour
+ * components: clamping silently rewrites authored data, and a value outside the
+ * range is a legible mistake (a surface that shades wrong) rather than a
+ * corrupted material. A `NaN` is neither — it propagates into `uniform1f` and
+ * paints the surface black with nothing to point at — so that one is rejected
+ * where the assignment is still on the stack, exactly as `Material.opacity`
+ * rejects it (F14).
+ */
+function requireFiniteScalar(name: string, value: number): number {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(
+      `StandardMaterial ${name} must be finite; got ${String(value)} ` +
+        "(§85: NaN and infinite values).",
+    );
+  }
+  return value;
+}
+
+/**
+ * A physically based surface: metallic-roughness, shaded by the scene's lights
+ * (§57, §59, §68).
+ *
+ * ```ts
+ * const gold = new StandardMaterial({
+ *   baseColor: [1, 0.77, 0.34, 1],
+ *   metalness: 1,
+ *   roughness: 0.25,
+ * });
+ * const mesh = new Renderable(sphereGeometry(), gold);
+ * ```
+ *
+ * A `Renderable` carrying one produces a `"standard"` render item and draws
+ * through the standard pipeline. Like `LitMaterial` it needs the scene to
+ * supply the light: with no directional light it shades from the ambient term
+ * alone, and a geometry without a `normals` attribute has no surface to shade
+ * against and falls back to that same ambient term (see
+ * `@four/render-webgl`'s standard fragment stage).
+ *
+ * `StandardMaterial` sits **above** `LitMaterial` in §57's family, not
+ * beside it: the lit tier is one Lambert lobe times a colour, this one is a
+ * diffuse and a specular lobe with a Fresnel between them. The two shade in the
+ * same space and blend by the same rule (see the module header), so mixing them
+ * in one scene is supported and cheap — the cost of a second surface family is
+ * one pipeline switch where the render list changes `kind`.
+ *
+ * Materials are **shared, not owned by nodes** (§83): any number of
+ * `Renderable`s may point at one, and disposing it is the job of whoever
+ * created it.
+ */
+export class StandardMaterial extends Material {
+  /**
+   * Pipeline discriminant (§57, §64, §66 sort key 3) — see `UnlitMaterial.kind`
+   * for why this is a literal string rather than an `instanceof`.
+   */
+  readonly kind = "standard" as const;
+
+  /**
+   * The surface's base colour — glTF's `baseColorFactor` — as straight RGBA in
+   * 0…1; opaque white by default.
+   *
+   * For a dielectric (`metalness: 0`) this is the diffuse albedo; for a metal
+   * (`metalness: 1`) it is the specular reflectance `F0`, and the diffuse lobe
+   * vanishes. That single field doing two jobs *is* the metallic-roughness
+   * workflow, and it is why §59 names one colour rather than a diffuse and a
+   * specular one.
+   *
+   * The array instance is `readonly` — write *into* it — for the reason
+   * `UnlitMaterial.color` documents: a backend may keep a reference to it. Use
+   * {@link StandardMaterial.setBaseColor}, or write components directly and
+   * call {@link Material.markDirty}.
+   */
+  readonly baseColor: ColorRGBA;
+
+  /**
+   * Light this surface emits regardless of the scene's lights (§59), straight
+   * RGB; black `[0, 0, 0]` by default, which is §59's own example value.
+   *
+   * Added to the shaded result **after** both lobes and unaffected by
+   * `metalness`, `roughness`, or the ambient term, so an emissive surface reads
+   * the same whatever is lighting it. It does not illuminate anything else —
+   * that is §68's environment lighting, and light emitted by geometry needs the
+   * global-illumination path §69/§68 stage.
+   *
+   * Components pass through unclamped (see the module header), which is how an
+   * HDR emissive is authored today: `[4, 2, 1]` is a value four times over
+   * white, waiting for the tone mapping §60a stages. The array instance is
+   * `readonly` for the same reason {@link StandardMaterial.baseColor}'s is.
+   *
+   * The tuple is written out rather than given a `ColorRGB` alias: `@four/scene`
+   * already exports one for §68's light colours, `@four/render`'s `SceneLights`
+   * already writes the same tuple inline for the same reason, and the frozen
+   * §3.1 matrix has no edge that would let this package import either. A second
+   * own-definition of that name is what the duplicate-symbol gate exists to
+   * refuse, and refusing it is right — the alias belongs in `@four/math` beside
+   * `ColorRGBA`, hoisted by R-15's colour packet the way `ColorRGBA` itself was
+   * hoisted on 2026-08-04 (recorded 2026-08-08).
+   */
+  readonly emissive: [red: number, green: number, blue: number];
+
+  #map: MaterialTexture | null;
+
+  #metalness: number;
+
+  #roughness: number;
+
+  constructor(options: StandardMaterialOptions = {}) {
+    super(ID_PREFIX, options);
+    const baseColor = options.baseColor ?? [1, 1, 1, 1];
+    this.baseColor = [
+      requireFiniteColor("red", baseColor[0]),
+      requireFiniteColor("green", baseColor[1]),
+      requireFiniteColor("blue", baseColor[2]),
+      requireFiniteColor("alpha", baseColor[3]),
+    ];
+    const emissive = options.emissive ?? [0, 0, 0];
+    this.emissive = [
+      requireFiniteColor("emissive red", emissive[0]),
+      requireFiniteColor("emissive green", emissive[1]),
+      requireFiniteColor("emissive blue", emissive[2]),
+    ];
+    this.#map = options.map ?? null;
+    this.#metalness = requireFiniteScalar("metalness", options.metalness ?? 0);
+    this.#roughness = requireFiniteScalar("roughness", options.roughness ?? 1);
+  }
+
+  /**
+   * The base colour (albedo) texture this material samples with the geometry's
+   * `uvs`, or `null` for an untextured surface (§53, §59, §77).
+   *
+   * The sampled texel **multiplies {@link StandardMaterial.baseColor} before
+   * the BRDF**, so it is an albedo and the lights shade it — identical in
+   * meaning and in cost to `LitMaterial.map`:
+   *
+   * ```text
+   * base = baseColor × texture(map, uv)
+   * ```
+   *
+   * One map, for the reason the module header gives: the other four maps of a
+   * complete glTF metallic-roughness material each need a second texture unit
+   * or a vertex attribute this engine does not have yet.
+   *
+   * Assigning bumps {@link Material.version}. Ownership, disposal, and the
+   * uv-less-geometry behaviour are exactly `UnlitMaterial.map`'s — see it.
+   */
+  get map(): MaterialTexture | null {
+    return this.#map;
+  }
+
+  set map(value: MaterialTexture | null) {
+    this.#map = value;
+    this.markDirty();
+  }
+
+  /**
+   * How metallic the surface is (§59) — glTF's `metallicFactor`, nominally
+   * `0` (dielectric) to `1` (conductor); **`0` by default**.
+   *
+   * It moves two things at once, which is the whole of the metallic workflow:
+   * the diffuse lobe is scaled by `1 − metalness`, and the specular reflectance
+   * `F0` is interpolated from a dielectric's 4% toward
+   * {@link StandardMaterial.baseColor}. A metal is therefore a surface with no
+   * diffuse colour whose *reflection* is tinted.
+   *
+   * The default is `0`, not glTF's file-format default of `1`: `new
+   * StandardMaterial()` should be the surface the material one tier down
+   * (`LitMaterial`) already draws, made physical — not an untextured black
+   * mirror. A glTF importer reads both factors out of the file and assigns them
+   * explicitly, so it can never inherit this difference (decision, R-13).
+   *
+   * Values outside 0…1 pass through rather than clamp, and non-finite values
+   * are rejected on **every** assignment (§85, the F14 discipline) — see
+   * `requireFiniteScalar`. Assigning bumps {@link Material.version}: it changes
+   * what the surface *is*, exactly as writing its colour does.
+   */
+  get metalness(): number {
+    return this.#metalness;
+  }
+
+  set metalness(value: number) {
+    this.#metalness = requireFiniteScalar("metalness", value);
+    this.markDirty();
+  }
+
+  /**
+   * How rough the surface is (§59) — glTF's `roughnessFactor`, nominally `0`
+   * (a mirror) to `1` (fully diffuse); **`1` by default**.
+   *
+   * The GGX distribution is parameterized by `α = roughness²`, the
+   * perceptually-linear remapping glTF and every metallic-roughness renderer
+   * use, so halving this value does not halve the highlight — it is authored to
+   * be dragged on a slider.
+   *
+   * The default is `1` for the reason {@link StandardMaterial.metalness}'s `0`
+   * is: a fully rough dielectric is the closest a `StandardMaterial` gets to
+   * the `LitMaterial` it sits above, which makes `new StandardMaterial()` a
+   * legible starting point rather than a black mirror.
+   *
+   * Range, validation, and versioning are {@link StandardMaterial.metalness}'s
+   * exactly.
+   */
+  get roughness(): number {
+    return this.#roughness;
+  }
+
+  set roughness(value: number) {
+    this.#roughness = requireFiniteScalar("roughness", value);
+    this.markDirty();
+  }
+
+  /**
+   * Writes {@link StandardMaterial.baseColor} and bumps
+   * {@link Material.version} once. Returns `this` for chaining (§7b).
+   *
+   * `alpha` defaults to `1` rather than to the current alpha, for the reason
+   * `UnlitMaterial.setColor` documents. Every component is validated before the
+   * first write, so a rejected call leaves the colour exactly as it was (the
+   * 2026-08-04 torn-state rule, applied to every material in the family).
+   */
+  setBaseColor(red: number, green: number, blue: number, alpha = 1): this {
+    const validRed = requireFiniteColor("red", red);
+    const validGreen = requireFiniteColor("green", green);
+    const validBlue = requireFiniteColor("blue", blue);
+    const validAlpha = requireFiniteColor("alpha", alpha);
+    this.baseColor[0] = validRed;
+    this.baseColor[1] = validGreen;
+    this.baseColor[2] = validBlue;
+    this.baseColor[3] = validAlpha;
+    this.markDirty();
+    return this;
+  }
+
+  /**
+   * Writes {@link StandardMaterial.emissive} and bumps {@link Material.version}
+   * once. Returns `this` for chaining (§7b).
+   *
+   * Three components and no alpha: emitted light has no transparency. Validated
+   * before the first write, exactly as {@link StandardMaterial.setBaseColor}
+   * is.
+   */
+  setEmissive(red: number, green: number, blue: number): this {
+    const validRed = requireFiniteColor("emissive red", red);
+    const validGreen = requireFiniteColor("emissive green", green);
+    const validBlue = requireFiniteColor("emissive blue", blue);
+    this.emissive[0] = validRed;
+    this.emissive[1] = validGreen;
+    this.emissive[2] = validBlue;
+    this.markDirty();
+    return this;
+  }
+}

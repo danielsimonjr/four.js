@@ -16,7 +16,7 @@
   },
   {
     "path": "examples/ui-demo/dist/assets/*.js",
-    "limit": "31 kB",
+    "limit": "32 kB",
     "gzip": true
   },
   {

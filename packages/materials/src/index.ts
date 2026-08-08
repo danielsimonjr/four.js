@@ -9,6 +9,8 @@ export type {
   SpriteTexture,
 } from "./sprite-material.js";
 export { SpriteMaterial } from "./sprite-material.js";
+export type { StandardMaterialOptions } from "./standard-material.js";
+export { StandardMaterial } from "./standard-material.js";
 export type { MaterialTexture } from "./texture.js";
 export type { ColorRGBA, UnlitMaterialOptions } from "./unlit-material.js";
 export { UnlitMaterial } from "./unlit-material.js";

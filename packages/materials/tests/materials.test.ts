@@ -4,6 +4,7 @@ import {
   LitMaterial,
   Material,
   SpriteMaterial,
+  StandardMaterial,
   UnlitMaterial,
   type BlendMode,
   type MaterialOptions,
@@ -635,5 +636,162 @@ describe("LitMaterial.map (§53, §57, §59; R-19)", () => {
     const material = new LitMaterial({ map: fakeTexture() });
 
     expect("vertexColors" in material).toBe(false);
+  });
+});
+
+describe("StandardMaterial — §59's metallic-roughness workflow (R-13)", () => {
+  it("defaults to a fully rough white dielectric that emits nothing", () => {
+    const material = new StandardMaterial();
+
+    expect(material.kind).toBe("standard");
+    expect(material.baseColor).toEqual([1, 1, 1, 1]);
+    expect(material.metalness).toBe(0);
+    expect(material.roughness).toBe(1);
+    expect(material.emissive).toEqual([0, 0, 0]);
+    expect(material.map).toBeNull();
+    expect(material.version).toBe(0);
+    expect(material.disposed).toBe(false);
+    // §57's shared render state, at the base's documented defaults.
+    expect(material.opacity).toBe(1);
+    expect(material.transparent).toBe(false);
+    expect(material.blendMode).toBe("normal");
+    expect(material.id.startsWith("standard-material-")).toBe(true);
+  });
+
+  it("takes §59's own parameters at construction", () => {
+    const texture = fakeTexture("texture-standard-1");
+    const material = new StandardMaterial({
+      baseColor: [0.9, 0.7, 0.3, 0.5],
+      metalness: 1,
+      roughness: 0.25,
+      emissive: [0, 0, 0.5],
+      map: texture,
+      transparent: true,
+      blendMode: "additive",
+    });
+
+    expect(material.baseColor).toEqual([0.9, 0.7, 0.3, 0.5]);
+    expect(material.metalness).toBe(1);
+    expect(material.roughness).toBe(0.25);
+    expect(material.emissive).toEqual([0, 0, 0.5]);
+    expect(material.map).toBe(texture);
+    expect(material.transparent).toBe(true);
+    expect(material.blendMode).toBe("additive");
+  });
+
+  it("copies the colour arrays rather than adopting them", () => {
+    const baseColor: [number, number, number, number] = [1, 0, 0, 1];
+    const emissive: [number, number, number] = [0, 1, 0];
+    const material = new StandardMaterial({ baseColor, emissive });
+
+    baseColor[0] = 0;
+    emissive[1] = 0;
+    expect(material.baseColor).toEqual([1, 0, 0, 1]);
+    expect(material.emissive).toEqual([0, 1, 0]);
+  });
+
+  it("announces a base-colour write once, and defaults alpha back to opaque", () => {
+    const material = new StandardMaterial({ baseColor: [1, 1, 1, 0.25] });
+
+    expect(material.setBaseColor(0, 0.6, 1)).toBe(material);
+    expect(material.baseColor).toEqual([0, 0.6, 1, 1]);
+    expect(material.version).toBe(1);
+
+    material.setBaseColor(1, 1, 1, 0.5);
+    expect(material.baseColor[3]).toBe(0.5);
+    expect(material.version).toBe(2);
+  });
+
+  it("announces an emissive write once", () => {
+    const material = new StandardMaterial();
+
+    expect(material.setEmissive(4, 2, 1)).toBe(material);
+    expect(material.emissive).toEqual([4, 2, 1]);
+    expect(material.version).toBe(1);
+  });
+
+  it("bumps the version when a surface parameter or the map changes", () => {
+    const material = new StandardMaterial();
+
+    material.metalness = 1;
+    expect(material.metalness).toBe(1);
+    expect(material.version).toBe(1);
+
+    material.roughness = 0.1;
+    expect(material.roughness).toBe(0.1);
+    expect(material.version).toBe(2);
+
+    const texture = fakeTexture("texture-standard-2");
+    material.map = texture;
+    expect(material.map).toBe(texture);
+    expect(material.version).toBe(3);
+
+    material.map = null;
+    expect(material.map).toBeNull();
+    expect(material.version).toBe(4);
+  });
+
+  it("passes values outside 0…1 through rather than clamping (WP-3.3)", () => {
+    // The material never rewrites authored data; the *shader* applies the one
+    // floor a GGX denominator cannot survive without.
+    const material = new StandardMaterial({
+      metalness: -0.5,
+      roughness: 2,
+      baseColor: [4, 0, 0, 1],
+      emissive: [8, 4, 2],
+    });
+
+    expect(material.metalness).toBe(-0.5);
+    expect(material.roughness).toBe(2);
+    expect(material.baseColor[0]).toBe(4);
+    expect(material.emissive).toEqual([8, 4, 2]);
+  });
+
+  it("rejects a non-finite scalar at construction and on assignment (§85, F14)", () => {
+    expect(() => new StandardMaterial({ metalness: Number.NaN })).toThrow(
+      RangeError,
+    );
+    expect(
+      () => new StandardMaterial({ roughness: Number.POSITIVE_INFINITY }),
+    ).toThrow(RangeError);
+
+    const material = new StandardMaterial({ metalness: 0.5, roughness: 0.5 });
+    expect(() => {
+      material.metalness = Number.NaN;
+    }).toThrow(/must be finite/);
+    expect(() => {
+      material.roughness = Number.NEGATIVE_INFINITY;
+    }).toThrow(/must be finite/);
+    // A rejected write leaves the previous value and the version alone.
+    expect(material.metalness).toBe(0.5);
+    expect(material.roughness).toBe(0.5);
+    expect(material.version).toBe(0);
+  });
+
+  it("rejects a non-finite colour component, leaving the colour untorn", () => {
+    expect(
+      () => new StandardMaterial({ baseColor: [Number.NaN, 0, 0, 1] }),
+    ).toThrow(RangeError);
+    expect(
+      () => new StandardMaterial({ emissive: [0, Number.NaN, 0] }),
+    ).toThrow(RangeError);
+
+    const material = new StandardMaterial({ baseColor: [0.2, 0.4, 0.6, 1] });
+    expect(() => material.setBaseColor(1, Number.NaN, 1)).toThrow(RangeError);
+    expect(material.baseColor).toEqual([0.2, 0.4, 0.6, 1]);
+    expect(() => material.setEmissive(0, 0, Number.NaN)).toThrow(RangeError);
+    expect(material.emissive).toEqual([0, 0, 0]);
+    expect(material.version).toBe(0);
+  });
+
+  it("is a §57 family member: shared, disposable, and version-keyed", () => {
+    const material = new StandardMaterial();
+    expect(material).toBeInstanceOf(Material);
+
+    material.dispose();
+    expect(material.disposed).toBe(true);
+    expect(material.version).toBe(1);
+    material.dispose();
+    expect(material.version).toBe(1);
   });
 });

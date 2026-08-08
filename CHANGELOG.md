@@ -8,6 +8,46 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — R-13 closed (scalar + base-colour-map tier): §59 `StandardMaterial`
+
+#### Added
+
+- **§59 `StandardMaterial` — metallic-roughness PBR (R-13).** `@four/materials` gains
+  §57's sixth family member: `baseColor` (+ optional base-colour `map`), `metalness`
+  (default 0), `roughness` (default 1), `emissive` (straight RGB; unclamped
+  pass-through already gives HDR emissive, so no unnamed `emissiveIntensity` field).
+  `@four/render-webgl` gains a sixth pipeline (`StandardProgram`): Cook-Torrance GGX +
+  height-correlated Smith + Schlick Fresnel against §68's one directional light and
+  the scene ambient, with the **1/π folded out of both lobes** — the engine's
+  radiometric convention is now written down (light colour × intensity is an
+  irradiance already divided by π), which is what makes a fully-rough dielectric
+  reduce to the `LitMaterial` convention and the two families compose in one scene.
+  Ambient reaches the diffuse lobe only (no IBL — `metalness: 1` under ambient alone
+  renders black, honestly). Roughness floored in the shader (0.045) where the 0/0
+  division lives; the material keeps WP-3.3's no-silent-rewrites rule.
+  `RenderItemKind` gains `"standard"` as its own union arm; `WebglContext` grew
+  `uniform1f` (its first new entry point since the lit packet — three GL doubles had
+  to declare it, which is the point of the written-down budget). Staged with named
+  prerequisites: `normalMap` (R-19's deliberately-deferred tangents), the other §59
+  maps (§77's texture-unit allocator), the seven physical extensions
+  (`PhysicalMaterial`). No tone mapping/output transform — §60a/R-15 moves both lit
+  families at once.
+- **Seventh run of the recorded-sequence method**: a scene using every pre-R-13
+  pipeline emits the transcript recorded at `e0ddd3b` call for call (pinned in
+  `tests/integration/standard-material.test.ts`); browser 49/49, goldens
+  byte-unchanged. The duplicate-symbol gate refused a second `ColorRGB` export —
+  the shared RGB alias belongs in `@four/math` with R-15's colour packet (inline
+  tuple + dated note instead).
+
+#### Changed
+
+- **ui-demo's size budget: 31 → 32 kB (orchestrator decision on the agent's proof).**
+  The sixth pipeline costs ~1.18 kB gzip per bundle (a BRDF, not a blit); with the
+  draw branch stripped, compile-at-init alone measures 31.547 kB — §61's
+  no-compile-in-a-frame rule and the 31 kB budget were provably incompatible. ui-demo
+  has now absorbed two consecutive pipeline additions; A-4's build-time
+  pipeline-selection seam remains the structural fix (recorded).
+
 ### 2026-08-07 — A-4 closed (build-mode tier): development/production builds
 
 #### Added

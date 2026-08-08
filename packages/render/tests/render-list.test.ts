@@ -6,7 +6,12 @@ import {
   constructionCount,
   resetConstructionCount,
 } from "@four/math";
-import { LitMaterial, UnlitMaterial } from "@four/materials";
+import {
+  LitMaterial,
+  StandardMaterial,
+  UnlitMaterial,
+  type Material,
+} from "@four/materials";
 import {
   Group,
   PoseBuffer,
@@ -21,6 +26,7 @@ import {
   buildInterpolatedRenderList,
   buildRenderList,
   isLitItem,
+  isStandardItem,
   isUnlitItem,
   type RenderItem,
 } from "../src/index.js";
@@ -176,12 +182,47 @@ describe("buildRenderList", () => {
       }
     });
 
+    it('tags a StandardMaterial renderable "standard" and carries its material (§59, R-13)', () => {
+      const scene = new Scene();
+      const material = new StandardMaterial({ metalness: 1, roughness: 0.2 });
+      const node = new Renderable(boxGeometry(), material);
+      scene.add(node);
+
+      const [item] = buildRenderList(scene, []);
+      expect(item.kind).toBe("standard");
+      expect(isStandardItem(item)).toBe(true);
+      expect(isLitItem(item)).toBe(false);
+      expect(isUnlitItem(item)).toBe(false);
+      if (isStandardItem(item)) {
+        // The guard narrows to StandardRenderItem, so §59's own fields are
+        // reachable with no cast — the reason it is a separate union arm.
+        expect(item.material).toBe(material);
+        expect(item.material.metalness).toBe(1);
+      }
+    });
+
+    it("does not tag any other family standard", () => {
+      const scene = new Scene();
+      scene.add(renderable("a"));
+      scene.add(new Renderable(boxGeometry(), new LitMaterial()));
+
+      const items = buildRenderList(scene, []);
+      expect(items.map(isStandardItem)).toEqual([false, false]);
+    });
+
     it("re-tags a pooled slot when the material family changes", () => {
       const scene = new Scene();
       // Annotated rather than inferred: `Renderable` is generic in its material
       // (§57's base), so `new Renderable(g, new UnlitMaterial())` infers the
       // narrow `Renderable<UnlitMaterial>` — and this test swaps families.
-      const node: Renderable = new Renderable(
+      //
+      // The parameter is named explicitly rather than left at its
+      // `SurfaceMaterial` default (R-13): that default is deliberately
+      // `UnlitMaterial | LitMaterial`, because widening it would take `color`
+      // and `setColor` off every ordinary renderable's material — the argument
+      // `renderable.ts` records for keeping `SpriteMaterial` out of it, which
+      // applies unchanged to §59's `baseColor`.
+      const node: Renderable<Material> = new Renderable(
         planeGeometry(),
         new UnlitMaterial(),
       );
@@ -192,6 +233,9 @@ describe("buildRenderList", () => {
 
       node.material = new LitMaterial();
       expect(buildRenderList(scene, out)[0].kind).toBe("lit");
+
+      node.material = new StandardMaterial();
+      expect(buildRenderList(scene, out)[0].kind).toBe("standard");
 
       node.material = new UnlitMaterial();
       expect(buildRenderList(scene, out)[0].kind).toBe("unlit");

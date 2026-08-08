@@ -77,6 +77,7 @@ const CONTEXT_METHODS = [
   "uniformMatrix4fv",
   "uniform4fv",
   "uniform3fv",
+  "uniform1f",
   "uniform1i",
   "createTexture",
   "bindTexture",

@@ -39,6 +39,7 @@ export type {
   RenderItem,
   RenderItemKind,
   SpriteRenderItem,
+  StandardRenderItem,
   UnlitRenderItem,
 } from "./render-list.js";
 export {
@@ -47,6 +48,7 @@ export {
   isLitItem,
   isParticlesItem,
   isSpriteItem,
+  isStandardItem,
   isUnlitItem,
 } from "./render-list.js";
 export type {
