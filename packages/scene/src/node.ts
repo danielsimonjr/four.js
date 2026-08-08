@@ -119,6 +119,16 @@ const ENGINE_NODE_ID = /^node-(\d+)$/;
  * generated id in the first place. This is collision **avoidance**, not
  * detection — a document may still name the same id twice, which
  * `instantiateScene` refuses separately.
+ *
+ * ## The saturation guard (2026-08-07)
+ *
+ * `value` must be **strictly below** `Number.MAX_SAFE_INTEGER`, not merely a
+ * safe integer: `node-9007199254740991` would otherwise set the counter to
+ * `2 ** 53`, where `+= 1` is a no-op — every node constructed afterwards would
+ * be handed the *same* id, which is the exact aliasing this function exists to
+ * prevent. A document naming that id keeps it (ids are opaque strings, §79) and
+ * the counter is simply left where it is, so generated ids stay distinct from
+ * it and from each other.
  */
 function reserveNodeId(id: string): void {
   const match = ENGINE_NODE_ID.exec(id);
@@ -126,7 +136,11 @@ function reserveNodeId(id: string): void {
     return;
   }
   const value = Number(match[1]);
-  if (Number.isSafeInteger(value) && value >= nextNodeId) {
+  if (
+    Number.isSafeInteger(value) &&
+    value >= nextNodeId &&
+    value < Number.MAX_SAFE_INTEGER
+  ) {
     nextNodeId = value + 1;
   }
 }

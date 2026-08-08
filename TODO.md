@@ -25,6 +25,215 @@ changes in `CHANGELOG.md`.
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
+### Gap-closure wave 3 (2026-08-07) — in progress
+
+- [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
+      **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
+      R-13} - A-3 blocking sub-question: `ApplicationOptions.plugins` vs the same-day §40
+      "don't invent §45 options" precedent — owner consistency call; alternative E
+      (keep registries as ordinary package APIs) genuinely defensible - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing
+      none; +Y for helpers only). Packet gates: `MorphWeights` is the sixth
+      `static typeName` and fails the registry-completeness test until registered - Cross-RFC coordination: 0001 and 0003 both widen `RenderItemKind` — whichever
+      packet lands first owns the `pipelineId` shape - New spec-revisit items: §57 `ShaderMaterial` row may become permanently
+      unshipped (0001 Q1); §54 `morphTargetWeights` placement conflicts with §3.1
+      (0003); §17's track-type promise in `track.ts:40-45` is wrong (binding forms,
+      not `ValueKind`s)
+- [x] **A-8/R-2/PH-19 CLOSED 2026-08-07** (one design, three filings): renderer +
+      solver registries with explicit registration; `renderer: "auto"` /
+      `solver: "auto"`; instance-naming apps keep tree-shaking (grep-proven)
+- [ ] **Auto-selection follow-ups:** ui-demo is at 30.74/31 kB after this packet —
+      review the limit before the next ui-demo-touching packet; register a second
+      backend (R-1) so §62's ladder has a real WebGPU rung (upper rungs currently
+      exercised against doubles)
+- [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
+      of §18's nine features, typed predicates, own determinism golden, animation
+      package still 100% coverage
+- [ ] **PH-9 follow-ups (staged 2026-08-07):** blend trees (N-way channel sample);
+      layered/additive animation (needs an additive op on `ValueAdapter` + a
+      layer/claim policy); clip-event dispatch from a controller; "any state"
+      transitions; live three-clip interruption chasing; optional `when` string sugar
+      compiling to the typed records
+- [ ] **Spec-revisit note (2026-08-07):** §18's "`AnimationController` is not
+      implemented (§97a)" paragraph, the §97a mapping-table row, and §100's coverage
+      claim are now stale — record as a spec amendment (letter-suffix rule; owner
+      decision) in the next spec pass
+- [x] **R-6 CLOSED (full-screen effect tier) 2026-08-07:** `EffectRenderPass` as a
+      third graph pass kind; copy + colour grade; separate `renderEffect` verb keeps
+      `render` byte-identical; ui-demo budget bumped 30 → 31 kB on a proven structural
+      conflict (even a stubbed renderEffect exceeded by 99 B)
+- [ ] **R-6 follow-ups (§70 tier 2):** per-viewport effect rectangles ("composable per
+      viewport"); tone mapping + sRGB encode with §60a/R-15 colour management + float
+      targets; the §63 on-screen pass inspector R-6 unblocked (needs the per-effect
+      viewport rectangle); outlines still wait on R-7/§71; user-authored effects are
+      R-14's RFC (the closed `ScreenEffect` union is the widening point)
+- [x] **A-2/PH-13 CLOSED 2026-08-07** (one item, filed twice): §40 `UnitSystem` in
+      `@four/core` at the conversion/authoring tier the spec specifies; display-only
+      rule enforced by an integration test that forbids any other package importing it
+- [ ] **§40 follow-ups:** physics §41-envelope-in-SI (`PhysicsWorldOptions.units`, a
+      `@four/physics` packet); §79 header units (after A-16); text parsing
+      (`parseAngle("90°")` — needs locale + failure policy); consider a row for
+      `packages/math/src/color.ts` at 0% coverage (pre-existing, spotted during gates)
+- [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@four/render` —
+      passes over R-4's target seam, transcript-identical to hand-written calls,
+      tree-shakes out of all bundles. **R-6 (§70 post-FX) now unblocked — effects are
+      graph passes; do not build a parallel mechanism**
+- [ ] **R-5 follow-ups:** add `INVALID_RENDER_GRAPH` to §89's `FourErrorCode` union and
+      switch `GRAPH_ERROR_CODE` to it; adopt `tests/integration/helpers/recording-gl.ts`
+      in `render-to-texture.test.ts` (mechanical dedupe); §63's on-screen pass-output
+      debug view waits on §70's full-screen blit; format the two pre-existing prettier
+      warnings (`packages/render/package.json`,
+      `tests/integration/examples-build-coverage.test.ts`)
+- [x] **PH-5 CLOSED 2026-08-07:** `PhysicsWorld.addCollider`/`removeCollider` — one
+      collider on a live body, handle/id/checksum position/joints/pose all surviving;
+      mass proven both directions on authored- and derived-mass bodies; §34 needed
+      nothing. PH-1's post-registration-collider refusal blocker lifted
+- [x] **PH-1 CLOSED 2026-08-07** (stage 1 truth table 2026-08-06; stage 2 live writes
+      2026-08-07): `SolverBodyTuningAccess` + step-top drain; mass/damping/gravity/CCD/
+      collider material/filter live on Rapier; `PhysicsWorld.teleport` ships
+- [ ] **PH-1 follow-ups:** (a) PH-5 (runtime collider add/remove) is now the only
+      blocker on a `Collider` appearing after registration — `refreshCollider` refuses
+      one loudly; (b) `Collider`'s six live fields could become accessors in a future
+      pass, removing the need for `refreshCollider` (deliberately not done — public-field
+      shape change, serialization risk); (c) live velocity writes on a dynamic body need
+      a §42-style "who wins" rule first
+- [x] **A-1 DONE (measurable tier) 2026-08-07:** `app.stats` (`FrameStats`, §84's
+      eleven counters; opt-in, default off; byte-identical GL + allocation-free when
+      off). The A-6 `app.stats` slice is closed
+- [x] **A-4 CLOSED (build-mode tier) 2026-08-07:** `DEV`/`devWarn*`/`devAssert` behind
+      optional `__FOUR_DEV__` (dev-default, opt-out); §84 stats + §6a duplicate warn +
+      §83 leak audit gated; eight example configs define it false; 0.46–0.52 kB gzip
+      saved each (ui-demo 30.46/31); §33 allowlist enforced by an integration test.
+      A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
+- [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
+      step 2); converting scattered scene/physics checks to `devAssert` (step 3);
+      routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
+      package); R-6's effect pipeline needs an opt-in registry split, not the dev
+      define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
+      loads, detached-node listeners, stale physics handles, per-frame allocations
+- [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
+      `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
+      measuring browser tests (49 total), first user of the §62/§37 registries and
+      the §113 overlay streams. Remaining under A-21/S-8: the three §93 stand-in
+      scenes (owner retire-or-write decision) and §119's motor-digital-twin
+- [ ] **Flagship follow-ups:** (a) per-dimension Rapier registration to halve the
+      1.54 MB payload (registerRapierSolver pulls both wasm images); (b) widen
+      `examples-build-coverage`'s regex to nested example paths (matches only the
+      first segment today); (c) `collectBodyOrigins`' default cross size is invisible
+      in 3D (drawn inside the body; 0 pixels at 0.18, 251 at 0.55) — consider a
+      larger default or a doc note; (d) §46 layers would let the panel move to its
+      own viewport
+- [x] **A-5 partial DONE 2026-08-07 (accounting tier):** byte + live-instance
+      accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
+      live. A-1 follow-up (b) closed
+- [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
+      warnings — leaked resources (now _derivable_ from the counters, but nothing
+      warns), disposed-in-use, duplicate asset loads, detached-node listeners, stale
+      physics handles, per-frame allocations; creation-site capture and
+      FinalizationRegistry leak detection need A-4's dev flag
+- [ ] **A-5 follow-ups:** AssetManager duplicate-load warning; materials + solver
+      handles unaccounted (§83 names "GPU and solver resources");
+      `RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
+      with §67's DEPTH24_STENCIL8 and float formats
+- [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
+      belongs to the packet that gives `Application` a physics world (A-6);
+      (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
+      field; (d) **A-4's `__FOUR_DEV__` define should drop the §84 path from production
+      bundles** — now the practical blocker: ui-demo is at **30.96/31 kB (~40 B
+      headroom)** after A-5; Application's unconditional stats references cost ~0.4 kB gzip per
+      example and ui-demo is at 29.68/30 kB (0.32 kB headroom); (e) `WorldTransformStats`
+      (visited/recomputed) is computed every frame and unexposed — deliberately, §84
+      does not name it
+
+- [x] **A-12 cheap tier DONE 2026-08-07:** `Toggle`, `Checkbox`, `RadioButton`,
+      `Slider`, `ProgressIndicator`, `ImageWidget` — nine of §73's sixteen now ship.
+      Follow-ups now recorded per blocker: menu/tooltip need a widget-reachable §9
+      update hook; list/virtual list/scroll view need §74 overflow + §67 clipping; text
+      input needs §56 (S-6); embedded viewport needs §48; slider drag-past-the-track
+      needs §71's analytic drag plane
+- [x] **R-4 DONE 2026-08-07:** `RenderTarget` (@four/render) + `RenderTargetCache`
+      (@four/render-webgl), `Renderer.render(..., target?)`; render-to-texture through
+      the untouched `MaterialTexture` seam; no-target frames issue zero framebuffer
+      calls (byte-identical 449-call proof). **R-5 (§63 graph) and R-6 (§70 post-FX)
+      now unblocked.** Follow-ups: `Viewport.renderTarget` (needs @four/scene),
+      `readPixels` + `Rectangle2` in @four/math (§92 first consumer), stencil (R-7),
+      MRT/multisample/float formats, samplable depth (§69)
+
+### Gap-closure wave 2 (2026-08-07) — in progress
+
+- [x] **A-23 DONE 2026-08-07** (§96): asset `maximumBytes`/`timeoutSeconds`,
+      `decodeSceneDocument`/`decodeReplayRecording` over `parseUntrustedJson`
+      (text-length + iterative depth limits), `UNTRUSTED_INPUT_REJECTED`, the
+      security guide, and the CSP grep test
+- [ ] **A-18 half-remaining:** deadline + eviction closed by A-23; still open:
+      caller-driven cancellation and transport `AbortSignal` — the compatible design
+      (generic `FetchLike<TSignal>` + injected abort handle) is recorded in
+      `packages/assets/src/asset-manager.ts`; the naive `signal` parameter widening is
+      proven incompatible with `typeof fetch`
+- [ ] **§96 residue:** decompression limits (needed the moment gzip/Draco/Basis lands —
+      a size bound alone does not stop a zip bomb); shader/plugin trust boundaries
+      (blocked on A-3)
+- [ ] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
+      graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/
+      materials/assets/core/serialization/diagnostics surface)
+
+- [x] **R-19 + R-20 DONE 2026-08-07** (render-tier keystones): `BufferGeometry.uvs`/
+      `.colors`, `UnlitMaterial.map`/`.vertexColors`, `LitMaterial.map`, nine 3D
+      primitives. **R-35 is now unblocked** (data path + vertexColors exist; what's left
+      is wiring `DebugDrawBuffer`'s 7-float layout into a `BufferGeometry` — a
+      `@four/diagnostics` packet). R-9/R-13/R-22/R-30/R-32 lose their R-19 dependency
+- [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
+      restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
+      uvs); qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly
+- [ ] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
+      `tests/browser/blending.spec.ts:978` ("RECOVER: a second click blends the chain
+      back onto its animation") fails intermittently under load, passes in isolation —
+      needs a de-flake pass of its own
+
+- [x] **A-26 DONE 2026-08-07.** `docs/COMPATIBILITY.md` (§90's five tables) +
+      `tools/generate-compatibility.mjs` (solver-adapter block generated from live
+      capability declarations; `--check` detects drift)
+- [x] **A-26 follow-up done 2026-08-07:** `check-compat` root script + ci.yml step wired
+      once A-25's agent freed those files; `tools/README.md` documents the three new tools
+- [ ] **A-26 follow-up:** extend the generated block to renderer backends once
+      `RendererCapabilities` grows past 2 fields
+- [x] **A-25 machinery DONE 2026-08-07** (publish itself stays owner-gated): Changesets
+      config, `apply-publish-names.mjs` (+tests; rewrites emitted code, not just
+      manifests), `release.yml` reusing ci.yml via `workflow_call`, `docs.yml` Pages
+      deploy, honest `website/`
+- [ ] **A-25 owner decisions before first publish:** (1) the five reserved stubs cannot be
+      Changesets-`ignore`d while `four` depends on them — publish them, drop the umbrella
+      subpaths, or make them optional peers; (2) add the `NPM_TOKEN` secret; (3) enable
+      Pages (Settings → Pages → source "GitHub Actions")
+- [ ] **A-25 remainder:** host the 13 guides (needs a static-site-generator decision);
+      flagship demo page blocked on A-21. §113a's "documentation and website per §93" exit
+      criterion is now recorded as having been met on the documentation half only —
+      partially addressed by the Pages deploy
+- [x] **Closure-diff review findings — 24 of 25 fixed 2026-08-07** (adversarial pass over
+      commits 93cda8d, ab13840, fe8eb6f, c843e2d, b48f053): KinematicController
+      serializer + mechanical registry-completeness test, physics teardown O(N·M) →
+      one destroyBody + per-body collider ids, keyboard wrap:false trap, Button
+      preventDefault-only-when-consumed, pointer re-entrancy, KeyboardInput dispose
+      guard, resolution validation, reserveNodeId saturation, loud inertiaTensor
+      refusal, fabricated-§61-quote and lifecycle-count doc corrections, plus the
+      simplification set (#massAuthored, no-op warn guards, scratch allocation,
+      capture-key type pairing)
+- [x] **Review findings — ALL 25 closed 2026-08-07:** the render-tier set landed
+      (per-renderer `glState` + try/finally, validated `opacity`/`blendMode` accessors,
+      restoreGlState coherence, dead-fallback cleanup) and F7 landed
+      (`LATEST_REPLAY_FORMAT_VERSION`/`MINIMUM_REPLAY_FORMAT_VERSION` with the old name
+      as a deprecated alias; document bytes proven unchanged)
+
+- [x] **A-10 DONE 2026-08-07.** `@four/input` gains `KeyboardInput` over a duck-typed
+      `KeySurface`, `SceneKeyEvent` with `preventDefault()`, `dispatchKeyEvent`, and the
+      shared three-phase `propagation.ts`. Remaining input sources (wheel, gamepad, XR)
+      plus `keypress` and focus/blur-as-input-events are recorded in
+      `packages/input/README.md`, not here
+- [ ] **A-13 PARTIAL** — keyboard traversal + Enter/Space activation shipped 2026-08-07
+      (`collectFocusOrder` / `keyboardFocusTarget` / `installKeyboardTraversal`;
+      `tabIndex` live). Still inert: `label`, `role`, `disabled`'s a11y surface — DOM
+      mirror, screen-reader updates, high contrast, scalable text all blocked on a DOM
+      integration policy decision; reduced motion waits on A-6's `app.reducedMotion`
+
 ### Gap-closure wave 1 (2026-08-06) — follow-ups left open
 
 Closed this wave, with tests: `A-7` (`Application.resize`), `A-9` (`PointerInput` dead-pointer
@@ -48,31 +257,33 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       the reference wrote, so the fallback chain re-resolves on load instead of pinning
       today's defaults into every document (a `PhysicsMaterial` round-trips by value, not
       by identity — resource-keyed sharing is a §79 resource concern)
-- [ ] **PH-17 doc follow-up:** three docs still say the reference serializers live in test
-      code — `docs/Architecture/API.md:606`, `docs/Architecture/TEST_COVERAGE.md:125`, and
-      `docs/guides/digital-twin.md:124,157`. They should point at `@four/physics`'s
-      `serializers.ts` and `registerPhysicsSerializers()`; `docs/GAP ANALYSIS v0.md`'s PH-17
-      banner still reads "partially closed". Left for a docs pass (this change's edit scope
-      was `packages/{physics,four}` + `tests/integration`)
+- [x] **PH-17 doc follow-up — done by 2026-08-07:** the serializer references in
+      `docs/Architecture/API.md` and `docs/guides/digital-twin.md` were updated in an
+      earlier pass; the gap-doc banner was fixed by the 2026-08-07 branch merge; API.md's
+      adjacent stale "silently unsaved" claim corrected 2026-08-07 (A-15 made it throw)
 - [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
       now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
       Widening that structural interface would let the mouse keep its hover across a click
-- [ ] **A-16 remainder:** `SceneNodeDocument.data` / `SerializeSceneOptions.nodeDataOf` now
-      exist and the three §73 widgets use them; `Renderable`, `Sprite`, both cameras and
-      `DirectionalLight` still have no node-type pair. They are additions to
-      `packages/four/src/scene-serializers.ts`, not to any format
+- [x] **A-16 remainder — done 2026-08-07:** `Renderable`, `Sprite`, both cameras and
+      `DirectionalLight` have §79 node-type pairs (`registerRenderSerializers`, chained
+      by `composeSceneNodeTypes`). Geometry/material are **references** resolved through
+      the injected `SceneResourceCatalog` seam; §79's manifest (key → URL + content
+      hash) remains staged behind A-18 content hashing. Still open under A-16: the §80
+      `.four` binary package format and the manifest document itself
 - [ ] **A-6 remainder:** `application.ts`'s header note is now a dated post-plan note, but
       `app.input` / `app.assets` / `app.diagnostics` / `app.stats` / `app.physics` and
       `autoResize`/`reducedMotion` are still absent
 
 ### Backlog additions (doc-truth sweep, 2026-08-05)
 
-- [ ] The §93/§118–119 examples do not exist (`docs/AUDIT-120.md` **S-8**):
-      `first-3d-scene`, `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
+- [ ] The §93/§118–119 examples: five of the six directories still do not exist
+      (`docs/AUDIT-120.md` **S-8**, partially closed 2026-08-07 — `first-3d-scene` was
+      written): `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
       `flagship/one-scene-everything-moves`, `flagship/motor-digital-twin` are
-      `.gitkeep`-only. Three have shipped stand-ins; the real hole is that **no example
-      exercises a `PerspectiveCamera` or a lit 3D mesh in a browser** — write
-      `first-3d-scene` first, or retire the directories with an owner decision
+      `.gitkeep`-only. All three remaining §93 scenes have shipped stand-ins (animation
+      inside `first-2d-scene`; physics and mixed 2D/3D by `physics-playground`), so what
+      is left is the two §118–119 flagships plus an owner decision to retire the three
+      stand-in directories
 - [ ] §65 sprite/glyph batching is unshipped and now says so in three places
       (AUDIT-120 sprites row + S-4, the render-graph guide, `benchmarks/README.md`);
       it blocks two §86 benchmark rows outright
@@ -82,8 +293,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 10, 2026-08-02)
 
-- [ ] Debug overlay render wiring undemonstrated (lines→GL.LINES path exists;
-      vertex-color attribute needed for per-segment color) — §118 flagship pickup
+- [x] Debug overlay render wiring — **done 2026-08-07** (R-35 closed:
+      `debugDrawStreams`/`applyDebugDrawStreams` + R-19's vertex colors; one draw call,
+      demonstrated in `tests/integration/debug-overlay-render.test.ts`)
 
 ### Backlog additions (Phase 9, 2026-08-02)
 
@@ -133,8 +345,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 3 exit findings)
 
-- [ ] §45 renderer-string ("auto") selection via §62 registry packet (instance-injection
-      deferral recorded in MEMORY 2026-08-01)
+- [x] §45 renderer-string ("auto") selection — **done 2026-08-07** (A-8/R-2/PH-19
+      closure; the 2026-08-01 instance-injection deferral is retired, not reversed)
 
 ## Backlog
 

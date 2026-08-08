@@ -17,8 +17,13 @@ export type {
   ReplayInputRecord,
   ReplayRecording,
   ReplaySnapshotRecord,
+  UntrustedJsonLimits,
 } from "./replay-format.js";
 export {
+  LATEST_REPLAY_FORMAT_VERSION,
+  MINIMUM_REPLAY_FORMAT_VERSION,
+  // Deprecated 2026-08-07 (F7) alias of LATEST_REPLAY_FORMAT_VERSION; still
+  // exported so no consumer breaks.
   REPLAY_FORMAT_VERSION,
   SUPPORTED_REPLAY_FORMAT_VERSIONS,
   assertReplayCompatible,
@@ -56,6 +61,8 @@ export type {
   DebugColor,
   DebugContactPoint,
   DebugDrawBufferOptions,
+  DebugDrawStreams,
+  DebugGeometrySink,
   DebugJointAccess,
   DebugPhysicsEventLike,
   SolverJointStatistics,
@@ -64,6 +71,7 @@ export type {
   Vector3Like,
 } from "./debug-draw.js";
 export {
+  DEBUG_COLOR_FLOATS_PER_SEGMENT,
   DEBUG_DRAW_DEFAULT_COLORS,
   DEBUG_DRAW_STAGED,
   DEBUG_POSITION_FLOATS_PER_SEGMENT,
@@ -71,12 +79,35 @@ export {
   DEBUG_VERTEX_FLOATS,
   DEFAULT_DEBUG_BUFFER_CAPACITY,
   DebugDrawBuffer,
+  applyDebugDrawStreams,
   collectBodyOrigins,
   collectBodyVelocities,
   collectCentersOfMass,
   collectContactImpulses,
   collectContactPoints,
+  debugDrawStreams,
   solverJointStatistics,
   solverStatistics,
 } from "./debug-draw.js";
 // --- END WP-10.3 debug-draw ---
+
+// §83's leaked-resource development warning (A-4/A-5, 2026-08-07).
+export type {
+  AuditResourceLeaksOptions,
+  LiveResourceCounts,
+  ResourceLeakReport,
+} from "./resource-audit.js";
+export { NO_RESOURCE_LEAKS, auditResourceLeaks } from "./resource-audit.js";
+
+// §84 runtime statistics (A-1, 2026-08-07).
+export type { ClockSource, FrameStats, RenderStatisticsLike } from "./stats.js";
+export {
+  copyFrameStats,
+  createFrameStats,
+  createMonotonicClock,
+  monotonicNowSeconds,
+  recordRenderStatistics,
+  recordResourceMemory,
+  recordSolverStatistics,
+  resetFrameStats,
+} from "./stats.js";

@@ -41,9 +41,12 @@ import { FourError, isFourError } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import {
   PARTICLE_INSTANCE_FLOATS,
+  RenderTarget,
   Renderable,
   Sprite,
+  createRenderStatistics,
   particleQuadGeometry,
+  type RenderStatistics,
   type LitRenderItem,
   type ParticleRenderItem,
   type RenderItem,
@@ -54,17 +57,23 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  COLOR_ATTRIBUTE_LOCATION,
+  EFFECT_TEXTURE_UNIT,
+  EffectProgram,
   GL,
   GeometryCache,
   LitProgram,
+  MAP_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
   POSITION_ATTRIBUTE_LOCATION,
   ParticleBatchCache,
   ParticleProgram,
+  RenderTargetCache,
   SpriteProgram,
   TextureCache,
+  UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
   WebglRenderer,
   type ParticleGlContext,
@@ -112,12 +121,30 @@ interface FakeGlOptions {
   allocateShaders?: boolean;
   /** When false, `createProgram` returns null. Default true. */
   allocatePrograms?: boolean;
+  /**
+   * 1-based index of the `createProgram` call that returns null; every other
+   * call succeeds. `initialize` builds its pipelines in a fixed order (unlit,
+   * sprite, particles, lit, effect), so this is how a test reaches the
+   * *partial* failure paths — the ones that have to dispose the programs
+   * already built rather than leak them (R-6, 2026-08-07).
+   */
+  failProgramAt?: number;
   /** When false, `createVertexArray` returns null. Default true. */
   allocateVertexArrays?: boolean;
   /** When false, `createTexture` returns null. Default true. */
   allocateTextures?: boolean;
   /** When false, `createBuffer` returns null. Default true. */
   allocateBuffers?: boolean;
+  /** When false, `createFramebuffer` returns null. Default true (R-4). */
+  allocateFramebuffers?: boolean;
+  /** When false, `createRenderbuffer` returns null. Default true (R-4). */
+  allocateRenderbuffers?: boolean;
+  /**
+   * Result of `checkFramebufferStatus`. Default `GL.FRAMEBUFFER_COMPLETE`;
+   * anything else is what a driver reports for an attachment combination it
+   * cannot render into (R-4).
+   */
+  framebufferStatus?: number;
   /** When false, `getUniformLocation` returns null. Default true. */
   resolveUniforms?: boolean;
   /**
@@ -177,9 +204,13 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     maxTextureSize = 4096,
     allocateShaders = true,
     allocatePrograms = true,
+    failProgramAt = 0,
     allocateVertexArrays = true,
     allocateTextures = true,
     allocateBuffers = true,
+    allocateFramebuffers = true,
+    allocateRenderbuffers = true,
+    framebufferStatus = GL.FRAMEBUFFER_COMPLETE,
     resolveUniforms = true,
     infoLog = "",
   } = options;
@@ -188,6 +219,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
   const uniformLocations = new Map<string, object>();
   const uniformsByProgram = new Map<object, Map<string, object>>();
   let handleCount = 0;
+  let programCount = 0;
 
   const record = (name: string, ...args: unknown[]): void => {
     calls.push({ name, args: snapshot(args) });
@@ -232,7 +264,11 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
     createProgram() {
       record("createProgram");
-      return allocatePrograms ? handle("program") : null;
+      programCount += 1;
+      if (!allocatePrograms || programCount === failProgramAt) {
+        return null;
+      }
+      return handle("program");
     },
     attachShader(program, shader) {
       record("attachShader", program, shader);
@@ -327,6 +363,59 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     },
     activeTexture(unit) {
       record("activeTexture", unit);
+    },
+
+    createFramebuffer() {
+      record("createFramebuffer");
+      return allocateFramebuffers ? handle("framebuffer") : null;
+    },
+    bindFramebuffer(target, framebuffer) {
+      record("bindFramebuffer", target, framebuffer);
+    },
+    framebufferTexture2D(target, attachment, textureTarget, texture, level) {
+      record(
+        "framebufferTexture2D",
+        target,
+        attachment,
+        textureTarget,
+        texture,
+        level,
+      );
+    },
+    checkFramebufferStatus(target) {
+      record("checkFramebufferStatus", target);
+      return framebufferStatus;
+    },
+    deleteFramebuffer(framebuffer) {
+      record("deleteFramebuffer", framebuffer);
+    },
+
+    createRenderbuffer() {
+      record("createRenderbuffer");
+      return allocateRenderbuffers ? handle("renderbuffer") : null;
+    },
+    bindRenderbuffer(target, renderbuffer) {
+      record("bindRenderbuffer", target, renderbuffer);
+    },
+    renderbufferStorage(target, internalFormat, width, height) {
+      record("renderbufferStorage", target, internalFormat, width, height);
+    },
+    framebufferRenderbuffer(
+      target,
+      attachment,
+      renderbufferTarget,
+      renderbuffer,
+    ) {
+      record(
+        "framebufferRenderbuffer",
+        target,
+        attachment,
+        renderbufferTarget,
+        renderbuffer,
+      );
+    },
+    deleteRenderbuffer(renderbuffer) {
+      record("deleteRenderbuffer", renderbuffer);
     },
 
     createBuffer() {
@@ -525,6 +614,12 @@ class TestGeometry {
   /** Optional per-vertex normal stream (§53, §68) — undefined by default. */
   normals: Float32Array | undefined;
 
+  /** Optional uv stream (§53, §55; R-19) — undefined by default. */
+  uvs: Float32Array | undefined;
+
+  /** Optional per-vertex colour stream (§53, §60a; R-19) — undefined too. */
+  colors: Float32Array | undefined;
+
   indices: Uint16Array | Uint32Array | undefined;
 
   mode: "triangles" | "lines" = "triangles";
@@ -534,6 +629,8 @@ class TestGeometry {
     indices?: Uint16Array | Uint32Array,
     mode: "triangles" | "lines" = "triangles",
     normals?: Float32Array,
+    uvs?: Float32Array,
+    colors?: Float32Array,
   ) {
     nextTestGeometryId += 1;
     this.id = `test-geometry-${String(nextTestGeometryId)}`;
@@ -541,6 +638,8 @@ class TestGeometry {
     this.indices = indices;
     this.mode = mode;
     this.normals = normals;
+    this.uvs = uvs;
+    this.colors = colors;
   }
 
   get drawCount(): number {
@@ -558,6 +657,8 @@ class TestGeometry {
   dispose(): void {
     this.positions = new Float32Array(0);
     this.normals = undefined;
+    this.uvs = undefined;
+    this.colors = undefined;
     this.indices = undefined;
     this.markDirty();
   }
@@ -590,6 +691,15 @@ class TestMaterial {
 
   opacity?: number;
 
+  /**
+   * §57's `map` and §53's per-vertex colour switch (R-19) — also optional and
+   * unset by default, for the same reason: the double that predates them is
+   * exactly the case whose GL sequence must not change.
+   */
+  map?: ItemTexture | null;
+
+  vertexColors?: boolean;
+
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
   }
@@ -610,6 +720,9 @@ class TestLitMaterial {
   readonly kind = "lit" as const;
 
   readonly color: [number, number, number, number];
+
+  /** §57's albedo `map` (R-19); unset by default, like the unlit double's. */
+  map?: ItemTexture | null;
 
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
@@ -1157,7 +1270,7 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
 });
 
 describe("UnlitProgram — compilation and linking (§61, §89)", () => {
-  it("compiles both stages, links, and resolves the three uniforms", () => {
+  it("compiles both stages, links, and resolves the six uniforms", () => {
     const gl = createFakeGl();
 
     const program = UnlitProgram.create(gl);
@@ -1168,9 +1281,19 @@ describe("UnlitProgram — compilation and linking (§61, §89)", () => {
       GL.FRAGMENT_SHADER,
     ]);
     expect(gl.countOf("linkProgram")).toBe(1);
+    // `map`/`useMap`/`useVertexColors` joined with R-19 (2026-08-07): the
+    // pipeline gained two optional multipliers as uniform switches rather than
+    // as shader variants, so the program count is still one.
     expect(
       gl.callsOf("getUniformLocation").map((call) => call.args[1]),
-    ).toEqual(["viewProjection", "model", "color"]);
+    ).toEqual([
+      "viewProjection",
+      "model",
+      "color",
+      "map",
+      "useMap",
+      "useVertexColors",
+    ]);
     expect(program.disposed).toBe(false);
   });
 
@@ -2086,10 +2209,11 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
 
     canvas.dispatch("webglcontextrestored");
 
-    // Unlit, sprite (WP-3a.3), particles (WP-9.3), and lit (§68, 2026-08-04):
-    // §61 requires engine-owned GPU resources to be re-created before
-    // `contextrestored` is emitted, and every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(4);
+    // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04), and
+    // the §70 effect pipeline (R-6, 2026-08-07): §61 requires engine-owned GPU
+    // resources to be re-created before `contextrestored` is emitted, and
+    // every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(5);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2195,7 +2319,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(4);
+    expect(gl.countOf("deleteProgram")).toBe(5);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2219,7 +2343,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(4);
+    expect(gl.countOf("deleteProgram")).toBe(5);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -3526,7 +3650,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the six uniforms", () => {
+  it("compiles both stages, links, and resolves the eight uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -3542,6 +3666,9 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
       "ambientLight",
       "lightDirection",
       "lightColor",
+      // §57's albedo `map` and its switch (R-19, 2026-08-07).
+      "map",
+      "useMap",
     ]);
     expect(program.disposed).toBe(false);
   });
@@ -4164,5 +4291,2233 @@ describe("WebglRenderer.render — §57 render state (R-11)", () => {
     expect(uploadsAt(gl, spriteUniforms(gl).get("tint"))).toEqual([
       [1, 1, 1, 0.25],
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §53 standard attributes, §57 `map`, and per-vertex colour (R-19, R-35).
+//
+// The claim under test is the same two-sided one §57's render state makes: a
+// material that asks for a texture or for vertex colours gets them, and a
+// material that asks for neither costs the frame **nothing** — no extra
+// program, no extra uniform upload, no texture binding. The second half is what
+// keeps every scene authored before R-19 issuing byte-for-byte the GL sequence
+// it always did, and it is why the two features are uniform switches on one
+// program rather than shader variants.
+// ---------------------------------------------------------------------------
+
+/** Three vertices with a uv per vertex — the textured-triangle double. */
+function uvTriangleGeometry(): TestGeometry {
+  return new TestGeometry(
+    new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    undefined,
+    "triangles",
+    undefined,
+    new Float32Array([0, 0, 1, 0, 0, 1]),
+  );
+}
+
+/** The unlit program's uniform handles — it is the first program built. */
+function unlitUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("useVertexColors")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the unlit program never resolved its uniforms");
+}
+
+describe("GeometryCache — the uv and colour streams (§53, R-19)", () => {
+  it("uploads uvs at the fixed third location, two floats per vertex", () => {
+    const gl = createFakeGl();
+    const record = new GeometryCache(gl).acquire(
+      uvTriangleGeometry().asGeometry,
+    );
+
+    expect(record?.uvBuffer).not.toBeNull();
+    expect(record?.colorBuffer).toBeNull();
+    expect(gl.countOf("createBuffer")).toBe(2);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, UV_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      UV_ATTRIBUTE_LOCATION,
+      2,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([0, 0, 1, 0, 0, 1]);
+  });
+
+  it("uploads colours at the fixed fourth location, four floats per vertex", () => {
+    const gl = createFakeGl();
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0]),
+      undefined,
+      "lines",
+      undefined,
+      undefined,
+      new Float32Array([1, 0, 0, 1, 0, 0, 1, 1]),
+    );
+
+    const record = new GeometryCache(gl).acquire(geometry.asGeometry);
+
+    expect(record?.colorBuffer).not.toBeNull();
+    expect(record?.mode).toBe(GL.LINES);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, COLOR_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      COLOR_ATTRIBUTE_LOCATION,
+      4,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([
+      1, 0, 0, 1, 0, 0, 1, 1,
+    ]);
+  });
+
+  it("binds all four streams in the documented slot order", () => {
+    const gl = createFakeGl();
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      new Uint16Array([0, 1, 2]),
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+      new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    );
+
+    const record = new GeometryCache(gl).acquire(geometry.asGeometry);
+
+    expect(record?.normalBuffer).not.toBeNull();
+    expect(record?.uvBuffer).not.toBeNull();
+    expect(record?.colorBuffer).not.toBeNull();
+    expect(record?.indexBuffer).not.toBeNull();
+    // Positions, normals, uvs, colours — and the index buffer, which is not an
+    // attribute and enables nothing.
+    expect(gl.countOf("createBuffer")).toBe(5);
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([
+      POSITION_ATTRIBUTE_LOCATION,
+      NORMAL_ATTRIBUTE_LOCATION,
+      UV_ATTRIBUTE_LOCATION,
+      COLOR_ATTRIBUTE_LOCATION,
+    ]);
+  });
+
+  it("leaves both slots untouched for a position-only geometry", () => {
+    const gl = createFakeGl();
+    const record = new GeometryCache(gl).acquire(triangleGeometry().asGeometry);
+
+    expect(record?.uvBuffer).toBeNull();
+    expect(record?.colorBuffer).toBeNull();
+    expect(gl.countOf("createBuffer")).toBe(1);
+  });
+
+  it("deletes every attribute buffer when a stale version re-uploads (§53)", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      undefined,
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+      new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    );
+    cache.acquire(geometry.asGeometry);
+    gl.reset();
+
+    geometry.markDirty();
+    cache.acquire(geometry.asGeometry);
+
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(gl.countOf("deleteBuffer")).toBe(4);
+  });
+
+  it("unwinds every buffer it allocated when GL refuses a later one", () => {
+    // Positions and uvs succeed, the colour buffer does not: the record is
+    // abandoned, and nothing it created survives.
+    const gl = createFakeGl();
+    let buffers = 0;
+    const base = gl.createBuffer.bind(gl);
+    gl.createBuffer = (): object | null => {
+      buffers += 1;
+      return buffers === 3 ? null : base();
+    };
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      undefined,
+      "triangles",
+      undefined,
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+      new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
+    );
+    const cache = new GeometryCache(gl);
+
+    expect(cache.acquire(geometry.asGeometry)).toBeNull();
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(cache.size).toBe(0);
+  });
+
+  it("unwinds when GL refuses the uv buffer itself", () => {
+    const gl = createFakeGl();
+    let buffers = 0;
+    const base = gl.createBuffer.bind(gl);
+    gl.createBuffer = (): object | null => {
+      buffers += 1;
+      return buffers === 2 ? null : base();
+    };
+
+    expect(new GeometryCache(gl).acquire(uvTriangleGeometry().asGeometry)).toBe(
+      null,
+    );
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("UnlitProgram / LitProgram — the R-19 feature switches", () => {
+  it("declares the uv and colour attributes at the fixed locations", () => {
+    const gl = createFakeGl();
+
+    UnlitProgram.create(gl);
+
+    const sources = gl.callsOf("shaderSource").map((call) => call.args[1]);
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
+    );
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(COLOR_ATTRIBUTE_LOCATION)}) in vec4 vertexColor;`,
+    );
+    expect(String(sources[1])).toContain("uniform sampler2D map;");
+    expect(String(sources[1])).toContain("uniform bool useMap;");
+    expect(String(sources[1])).toContain("uniform bool useVertexColors;");
+  });
+
+  it("declares the uv attribute on the lit pipeline too", () => {
+    const gl = createFakeGl();
+
+    LitProgram.create(gl);
+
+    const sources = gl.callsOf("shaderSource").map((call) => call.args[1]);
+    expect(String(sources[0])).toContain(
+      `layout(location = ${String(UV_ATTRIBUTE_LOCATION)}) in vec2 uv;`,
+    );
+    expect(String(sources[1])).toContain("uniform sampler2D map;");
+  });
+
+  it("uploads nothing while both features stay off — GL already starts there", () => {
+    const gl = createFakeGl();
+    const program = UnlitProgram.create(gl);
+    gl.reset();
+
+    program.setFeatures(false, false);
+    program.setFeatures(false, false);
+
+    expect(gl.countOf("uniform1i")).toBe(0);
+  });
+
+  it("uploads the sampler unit once, on the first textured draw", () => {
+    const gl = createFakeGl();
+    const program = UnlitProgram.create(gl);
+    const uniforms = unlitUniforms(gl);
+    gl.reset();
+
+    program.setFeatures(true, false);
+    program.setFeatures(true, false);
+    program.setFeatures(false, false);
+    program.setFeatures(true, false);
+
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    // On, off, on — three switch uploads, and never one for an unchanged value.
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0, 1]);
+  });
+
+  it("switches vertex colours independently of the texture", () => {
+    const gl = createFakeGl();
+    const program = UnlitProgram.create(gl);
+    const uniforms = unlitUniforms(gl);
+    gl.reset();
+
+    program.setFeatures(false, true);
+    program.setFeatures(false, true);
+    program.setFeatures(false, false);
+
+    expect(uploadsAt(gl, uniforms.get("useVertexColors"))).toEqual([1, 0]);
+    // No texture was ever asked for, so the sampler was never uploaded.
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([]);
+  });
+
+  it("mirrors the lit pipeline's one switch the same way", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    const uniforms = litUniforms(gl);
+    gl.reset();
+
+    program.setFeatures(false);
+    program.setFeatures(true);
+    program.setFeatures(true);
+    program.setFeatures(false);
+
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+  });
+});
+
+describe("WebglRenderer.render — textured and vertex-coloured meshes (R-19)", () => {
+  it("costs an untextured, uncoloured scene nothing at all", async () => {
+    // The compatibility guarantee, asserted as the absence of every call the
+    // two features could have made — the same shape as R-11's assertion, and
+    // the reason this could land under the pixel-golden gate.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("useProgram")).toBe(1);
+    expect(gl.countOf("uniform1i")).toBe(0);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("activeTexture")).toBe(0);
+    expect(gl.countOf("createTexture")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("binds a mapped unlit material's texture and switches the sampler on", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const material = new TestMaterial([1, 1, 1, 1]);
+    material.map = texture.asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = unlitUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    expect(gl.callsOf("activeTexture")[0].args[0]).toBe(
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+    );
+    // Bound before the draw, and unbound when the frame ends.
+    const names = gl.names();
+    expect(names.indexOf("bindTexture")).toBeLessThan(
+      names.indexOf("drawArrays"),
+    );
+    expect(gl.callsOf("bindTexture").at(-1)?.args[1]).toBeNull();
+    // Still one pipeline: the switch is a uniform, not a variant.
+    expect(gl.countOf("useProgram")).toBe(1);
+  });
+
+  it("switches the sampler back off for an untextured item after a textured one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const textured = new TestMaterial();
+    textured.map = new TestTexture().asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), textured));
+    root.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, unlitUniforms(gl).get("useMap"))).toEqual([1, 0]);
+    expect(gl.countOf("drawArrays")).toBe(2);
+    // One `activeTexture` for the frame, whatever the mix.
+    expect(gl.countOf("activeTexture")).toBe(1);
+  });
+
+  it("skips the map of a disposed texture rather than drawing undefined content", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    texture.dispose();
+    const material = new TestMaterial();
+    material.map = texture.asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // §83: the geometry still draws, flat-coloured — the *texture* is what is
+    // unusable, not the mesh.
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("uniform1i")).toBe(0);
+  });
+
+  it("binds a lit material's albedo map through the lit pipeline", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const material = new TestLitMaterial([1, 0, 0, 1]);
+    material.map = new TestTexture().asTexture;
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      undefined,
+      "triangles",
+      new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      new Float32Array([0, 0, 1, 0, 0, 1]),
+    );
+    const root = createRoot();
+    root.add(litRenderable(geometry, material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = litUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+    // The last thing the frame does is unbind, whatever the upload path bound
+    // on the way (§61: leave nothing bound).
+    expect(gl.callsOf("bindTexture").at(-1)?.args[1]).toBeNull();
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // The geometry's uv stream went up alongside its normals.
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([
+      POSITION_ATTRIBUTE_LOCATION,
+      NORMAL_ATTRIBUTE_LOCATION,
+      UV_ATTRIBUTE_LOCATION,
+    ]);
+  });
+
+  it("shares one GL texture between a sprite and a mapped mesh", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const texture = new TestTexture();
+    const material = new TestMaterial();
+    material.map = texture.asTexture;
+    const root = createRoot();
+    root.add(sprite(new TestSpriteMaterial(texture)));
+    root.add(renderable(uvTriangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The texture cache is keyed on the texture, not on the pipeline that
+    // reaches it, so one upload serves both.
+    expect(gl.countOf("createTexture")).toBe(1);
+    // The sprite's quad is indexed and the mesh is not, so the two draws come
+    // out of different entry points.
+    expect(gl.countOf("drawElements") + gl.countOf("drawArrays")).toBe(2);
+  });
+
+  it("draws a lines-mode geometry with per-vertex colour in ONE call (R-35)", async () => {
+    // The §113 debug-draw overlay, end to end: `DebugDrawBuffer`'s seven-float
+    // segment layout splits into positions plus straight-RGBA colours, uploads
+    // as one `"lines"` geometry, and draws through the unlit pipeline with
+    // `vertexColors` on. Before R-19 there was no colour attribute and no
+    // switch to consume it, so the overlay had never been shown as pixels.
+    const { renderer, gl, camera } = await initialized();
+    // Two segments: a red one along +X, a green one along +Y.
+    const geometry = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0]),
+      undefined,
+      "lines",
+      undefined,
+      undefined,
+      new Float32Array([1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1]),
+    );
+    const material = new TestMaterial();
+    material.vertexColors = true;
+    const root = createRoot();
+    root.add(renderable(geometry, material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = unlitUniforms(gl);
+    // The switch is on, the texture switch is not, and no texture was bound.
+    expect(uploadsAt(gl, uniforms.get("useVertexColors"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([]);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    // The colours reached the GPU at the documented slot, four per vertex.
+    expect(
+      gl.callsOf("enableVertexAttribArray").map((call) => call.args[0]),
+    ).toEqual([POSITION_ATTRIBUTE_LOCATION, COLOR_ATTRIBUTE_LOCATION]);
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      COLOR_ATTRIBUTE_LOCATION,
+      4,
+      GL.FLOAT,
+      false,
+      0,
+      0,
+    ]);
+    expect(gl.callsOf("bufferData")[1].args[1]).toEqual([
+      1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
+    ]);
+    // Four vertices, two segments, **one** draw call — the property that makes
+    // an overlay of thousands of segments affordable (§84).
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.callsOf("drawArrays")[0].args).toEqual([GL.LINES, 0, 4]);
+    // The material's flat colour still multiplies, so an overlay can be faded.
+    expect(uploadsAt(gl, uniforms.get("color"))).toEqual([[1, 1, 1, 1]]);
+  });
+
+  it("re-uploads the feature state after a context loss and restore (§61)", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const material = new TestMaterial();
+    material.map = new TestTexture().asTexture;
+    const root = createRoot();
+    root.add(renderable(uvTriangleGeometry(), material));
+    renderer.render(root, [createView(camera)]);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    // A restored context brings a fresh program whose uniforms are back at
+    // GL's defaults — and a fresh CPU mirror with them — so both the sampler
+    // unit and the switch go up again rather than being assumed still set.
+    expect(gl.countOf("uniform1i")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A throw mid-frame costs one frame, not the renderer (F13, 2026-08-07).
+//
+// The frame runs application code — a material or geometry accessor, a texture
+// the application disposed between draws — and that code can raise. Before the
+// `finally` in `render`, whatever GL state the frame had borrowed was simply
+// abandoned while the §57 mirror was reset by the *next* frame to the defaults
+// it had stopped guaranteeing; the skip logic then never re-issued the calls
+// that would have fixed the context, so one transient exception left every
+// later frame drawing blended, masked, or depth-testless, permanently and
+// silently. These tests fold the recorded call stream back into the state the
+// context is actually in, which is the only way to see that.
+// ---------------------------------------------------------------------------
+
+/** The GL state the recorded calls left the context in. */
+function effectiveGlState(gl: FakeGl): Record<string, unknown> {
+  // Seeded with the fixed state `#applyFixedState` establishes plus GL's own
+  // defaults — i.e. the state the tests below `reset()` on top of.
+  const state: Record<string, unknown> = {
+    blend: false,
+    depthTest: true,
+    depthWrite: true,
+    colorWrite: true,
+    blendFunc: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
+    texture: null,
+    vertexArray: null,
+    // R-4: an off-screen pass binds a framebuffer, and a frame that threw
+    // while holding one would send every later frame — on-screen included —
+    // into a surface nobody is looking at.
+    framebuffer: null,
+  };
+  for (const call of gl.calls) {
+    if (call.name === "enable" || call.name === "disable") {
+      const on = call.name === "enable";
+      if (call.args[0] === GL.BLEND) {
+        state.blend = on;
+      } else if (call.args[0] === GL.DEPTH_TEST) {
+        state.depthTest = on;
+      }
+    } else if (call.name === "depthMask") {
+      state.depthWrite = call.args[0];
+    } else if (call.name === "colorMask") {
+      state.colorWrite = call.args[0];
+    } else if (call.name === "blendFunc") {
+      state.blendFunc = [call.args[0], call.args[1]];
+    } else if (call.name === "bindTexture") {
+      state.texture = call.args[1];
+    } else if (call.name === "bindVertexArray") {
+      state.vertexArray = call.args[0];
+    } else if (call.name === "bindFramebuffer") {
+      state.framebuffer = call.args[1];
+    }
+  }
+  return state;
+}
+
+/** The state a frame that borrowed nothing (or gave it all back) leaves. */
+const RESTING_GL_STATE: Record<string, unknown> = {
+  blend: false,
+  depthTest: true,
+  depthWrite: true,
+  colorWrite: true,
+  blendFunc: [GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA],
+  texture: null,
+  vertexArray: null,
+  framebuffer: null,
+};
+
+/** §57 state that makes a draw borrow every mirrored toggle at once. */
+const BORROWS_EVERYTHING: Partial<TestMaterial> = {
+  transparent: true,
+  blendMode: "additive",
+  depthTest: false,
+  depthWrite: false,
+  colorWrite: false,
+};
+
+/**
+ * A renderable whose material cannot be read: the application code that raises
+ * mid-draw, placed where the unlit pipeline has already applied the state and
+ * bound whatever the material asked for (`program.setColor` reads `color`).
+ */
+function throwingRenderable(
+  state: Partial<TestMaterial> = {},
+  map?: ItemTexture,
+): Renderable {
+  const material = new TestMaterial();
+  Object.assign(material, state);
+  if (map !== undefined) {
+    material.map = map;
+  }
+  Object.defineProperty(material, "color", {
+    get(): never {
+      throw new Error("the application's material accessor raised");
+    },
+  });
+  return new Renderable(triangleGeometry().asGeometry, material.asMaterial);
+}
+
+/** Names of the calls recorded after `mark`. */
+function callsSince(gl: FakeGl, mark: number): string[] {
+  return gl.calls.slice(mark).map((call) => call.name);
+}
+
+describe("WebglRenderer.render — a throw costs one frame (F13)", () => {
+  it("gives back every piece of state the frame borrowed", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Both transparent, so §66's sort key 2 keeps them in `renderOrder` —
+    // and both declaring the same state, so the second draw changes nothing
+    // before it raises and the frame dies holding all of it.
+    const borrower = stateful(BORROWS_EVERYTHING);
+    borrower.renderOrder = 0;
+    const thrower = throwingRenderable(
+      BORROWS_EVERYTHING,
+      new TestTexture().asTexture,
+    );
+    thrower.renderOrder = 1;
+    root.add(borrower, thrower);
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+
+    // It really did borrow: the additive function, the two masks, the depth
+    // test, and a texture on unit 0 were all issued before the throw.
+    const names = gl.names();
+    expect(names).toContain("blendFunc");
+    expect(names).toContain("colorMask");
+    expect(names).toContain("activeTexture");
+    // And gave every one of them back on the way out.
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("leaves the next frame drawing exactly as it would have", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const broken = createRoot();
+    const borrower = stateful(BORROWS_EVERYTHING);
+    borrower.renderOrder = 0;
+    const thrower = throwingRenderable(BORROWS_EVERYTHING);
+    thrower.renderOrder = 1;
+    broken.add(borrower, thrower);
+    const healthy = createRoot();
+    healthy.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(broken, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+    const mark = gl.calls.length;
+    renderer.render(healthy, [createView(camera)]);
+
+    // §57's defaults still cost nothing — the compatibility guarantee the
+    // mirror exists for, unbroken by the frame that died holding the state.
+    const after = callsSince(gl, mark);
+    expect(after).not.toContain("enable");
+    expect(after).not.toContain("disable");
+    expect(after).not.toContain("depthMask");
+    expect(after).not.toContain("colorMask");
+    expect(after).not.toContain("blendFunc");
+    expect(after.filter((name) => name === "drawArrays")).toHaveLength(1);
+    // The claim that makes the previous four assertions safe rather than
+    // merely quiet: issuing nothing is correct because the context is already
+    // in the state the mirror says it is. With the state abandoned, this frame
+    // would have drawn an opaque triangle additively, with both masks off.
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("keeps the program-lifetime feature mirrors in step (R-19)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const broken = createRoot();
+    // The throwing draw switches `useMap` and `useVertexColors` on and dies
+    // before the frame can switch them off. Those mirrors live on the program
+    // object, not on the frame — the uniforms they track live there too — so
+    // they are still accurate, and the next frame turns both off.
+    const thrower = throwingRenderable(
+      { vertexColors: true },
+      new TestTexture().asTexture,
+    );
+    broken.add(thrower);
+    const healthy = createRoot();
+    healthy.add(renderable(triangleGeometry()));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(broken, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+    const uniforms = unlitUniforms(gl);
+    const mark = gl.calls.length;
+    renderer.render(healthy, [createView(camera)]);
+
+    const switchedOff = gl.calls
+      .slice(mark)
+      .filter((call) => call.name === "uniform1i")
+      .map((call) => [call.args[0], call.args[1]]);
+    expect(switchedOff).toEqual([
+      [uniforms.get("useMap"), 0],
+      [uniforms.get("useVertexColors"), 0],
+    ]);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("mirrors one context per renderer, not one per module", async () => {
+    // Two renderers, two contexts (§61 allows several over one application).
+    // The mirror moved onto the instance with F13; before that both of these
+    // drove one module-level object, and only `render`'s reset-on-entry kept
+    // the second renderer from inheriting the first's idea of the GL state.
+    const first = await initialized();
+    const second = await initialized();
+    const blended = createRoot();
+    blended.add(stateful(BORROWS_EVERYTHING));
+    const plain = createRoot();
+    plain.add(renderable(triangleGeometry()));
+    first.gl.reset();
+    second.gl.reset();
+
+    first.renderer.render(blended, [createView(first.camera)]);
+    second.renderer.render(plain, [createView(second.camera)]);
+    first.renderer.render(blended, [createView(first.camera)]);
+
+    // The second renderer's frame declares §57's defaults and pays nothing for
+    // them, whatever the first renderer's frames borrowed from *its* context.
+    expect(second.gl.countOf("enable")).toBe(0);
+    expect(second.gl.countOf("disable")).toBe(0);
+    expect(second.gl.countOf("blendFunc")).toBe(0);
+    expect(effectiveGlState(first.gl)).toEqual(RESTING_GL_STATE);
+    expect(effectiveGlState(second.gl)).toEqual(RESTING_GL_STATE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Render targets (§61, §48, §63; R-4, 2026-08-07).
+//
+// Two halves, deliberately separate. `RenderTargetCache` owns allocation,
+// eviction, and the failure paths a driver will not perform on request; the
+// renderer owns binding, viewport resolution, exception safety, and the one
+// property everything else rests on — that a frame with **no** target issues no
+// framebuffer call at all, so the on-screen GL sequence is byte-for-byte what
+// it was before render targets existed.
+// ---------------------------------------------------------------------------
+
+/** The handle attached as `COLOR_ATTACHMENT0` by the nth allocation. */
+function attachedColorTexture(gl: FakeGl, index = 0): unknown {
+  const call = gl.callsOf("framebufferTexture2D")[index];
+  if (call === undefined) {
+    throw new Error("no framebuffer colour attachment was recorded");
+  }
+  return call.args[3];
+}
+
+describe("RenderTargetCache — allocation (§61, §48)", () => {
+  it("allocates a colour texture, a depth renderbuffer, and a complete framebuffer", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 64, height: 32 });
+
+    const record = cache.acquire(target);
+
+    expect(record).not.toBeNull();
+    expect(cache.size).toBe(1);
+    expect(gl.names()).toEqual([
+      // The colour attachment, allocated exactly as `TextureCache` allocates a
+      // texture with no CPU-side data: zero-filled storage, so sampling a
+      // target that was never rendered into reads transparent black.
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "bindTexture",
+      // The depth buffer (§61's per-view depth clear needs somewhere to land).
+      "createRenderbuffer",
+      "bindRenderbuffer",
+      "renderbufferStorage",
+      "bindRenderbuffer",
+      // The framebuffer that binds the two together, checked and unbound.
+      "createFramebuffer",
+      "bindFramebuffer",
+      "framebufferTexture2D",
+      "framebufferRenderbuffer",
+      "checkFramebufferStatus",
+      "bindFramebuffer",
+    ]);
+  });
+
+  it("allocates the colour attachment as RGBA8 at the target's size, with no pixels", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 8, height: 4 }),
+    );
+
+    expect(gl.callsOf("texImage2D")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      0,
+      GL.RGBA8,
+      8,
+      4,
+      0,
+      GL.RGBA,
+      GL.UNSIGNED_BYTE,
+      null,
+    ]);
+  });
+
+  it("gives the colour attachment the same fixed sampler state every texture gets", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 2, height: 2 }),
+    );
+
+    expect(gl.callsOf("texParameteri").map((call) => call.args)).toEqual([
+      [GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR],
+      [GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
+      [GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
+    ]);
+  });
+
+  it("sizes the depth renderbuffer to match and attaches it", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 16, height: 9 }),
+    );
+
+    expect(gl.callsOf("renderbufferStorage")[0]?.args).toEqual([
+      GL.RENDERBUFFER,
+      GL.DEPTH_COMPONENT16,
+      16,
+      9,
+    ]);
+    const attach = gl.callsOf("framebufferRenderbuffer")[0];
+    expect(attach?.args[0]).toBe(GL.FRAMEBUFFER);
+    expect(attach?.args[1]).toBe(GL.DEPTH_ATTACHMENT);
+    expect(attach?.args[2]).toBe(GL.RENDERBUFFER);
+  });
+
+  it("skips the depth buffer entirely for a target built with depth: false", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+
+    const record = cache.acquire(
+      new RenderTarget({ width: 4, height: 4, depth: false }),
+    );
+
+    expect(record?.depthBuffer).toBeNull();
+    expect(gl.countOf("createRenderbuffer")).toBe(0);
+    expect(gl.countOf("framebufferRenderbuffer")).toBe(0);
+  });
+
+  it("leaves nothing bound — not the texture, not the renderbuffer, not the framebuffer", () => {
+    const gl = createFakeGl();
+    new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 2, height: 2 }),
+    );
+
+    const last = (name: string): unknown =>
+      gl.callsOf(name).at(-1)?.args.at(-1);
+    expect(last("bindTexture")).toBeNull();
+    expect(last("bindRenderbuffer")).toBeNull();
+    expect(last("bindFramebuffer")).toBeNull();
+  });
+
+  it("reports the size it allocated at, which is what the viewport resolves against", () => {
+    const gl = createFakeGl();
+    const record = new RenderTargetCache(gl).acquire(
+      new RenderTarget({ width: 128, height: 64 }),
+    );
+
+    expect(record?.width).toBe(128);
+    expect(record?.height).toBe(64);
+    expect(record?.version).toBe(0);
+  });
+});
+
+describe("RenderTargetCache — eviction (§83, §61)", () => {
+  it("returns the same record for an unchanged target without touching GL", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4 });
+    const first = cache.acquire(target);
+    gl.reset();
+
+    const second = cache.acquire(target);
+
+    expect(second).toBe(first);
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("re-allocates at the new size after a resize, deleting all three objects", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4 });
+    const first = cache.acquire(target);
+    target.resize(32, 16);
+    gl.reset();
+
+    const second = cache.acquire(target);
+
+    expect(second).not.toBe(first);
+    expect(second?.width).toBe(32);
+    expect(second?.version).toBe(1);
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+    expect(gl.callsOf("renderbufferStorage")[0]?.args).toEqual([
+      GL.RENDERBUFFER,
+      GL.DEPTH_COMPONENT16,
+      32,
+      16,
+    ]);
+    expect(cache.size).toBe(1);
+  });
+
+  it("deletes and forgets a disposed target, and never draws into it again", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4 });
+    cache.acquire(target);
+    target.dispose();
+    gl.reset();
+
+    expect(cache.acquire(target)).toBeNull();
+
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(cache.size).toBe(0);
+    // And a second attempt neither re-allocates nor deletes again.
+    gl.reset();
+    expect(cache.acquire(target)).toBeNull();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("refuses a target that was disposed before it was ever allocated", () => {
+    const gl = createFakeGl();
+    const target = new RenderTarget({ width: 4, height: 4 });
+    target.dispose();
+
+    expect(new RenderTargetCache(gl).acquire(target)).toBeNull();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("forget() drops every record without touching the lost context (§61)", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    cache.acquire(new RenderTarget({ width: 4, height: 4 }));
+    gl.reset();
+
+    cache.forget();
+
+    expect(cache.size).toBe(0);
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("dispose() deletes everything it created and is idempotent (§83)", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    cache.acquire(new RenderTarget({ width: 4, height: 4 }));
+    cache.acquire(new RenderTarget({ width: 8, height: 8, depth: false }));
+    gl.reset();
+
+    cache.dispose();
+    cache.dispose();
+
+    expect(cache.disposed).toBe(true);
+    expect(cache.size).toBe(0);
+    expect(gl.countOf("deleteFramebuffer")).toBe(2);
+    expect(gl.countOf("deleteTexture")).toBe(2);
+    // Only the depth-carrying target had a renderbuffer to delete.
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+  });
+});
+
+describe("RenderTargetCache — failure paths never throw (§61, §85)", () => {
+  it("returns null when GL will not allocate the colour texture", () => {
+    const gl = createFakeGl({ allocateTextures: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(cache.size).toBe(0);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+  });
+
+  it("returns null and frees the texture when the renderbuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateRenderbuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(cache.size).toBe(0);
+  });
+
+  it("returns null and frees both attachments when the framebuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateFramebuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+    expect(cache.size).toBe(0);
+  });
+
+  it("frees a depth-less target's texture when the framebuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateFramebuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(
+      cache.acquire(new RenderTarget({ width: 4, height: 4, depth: false })),
+    ).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(0);
+  });
+
+  it("refuses an incomplete framebuffer rather than drawing into it", () => {
+    // `GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT`. An incomplete framebuffer turns
+    // every subsequent draw into a GL_INVALID_FRAMEBUFFER_OPERATION nobody
+    // reads, which is why this is a refusal and not a warning.
+    const gl = createFakeGl({ framebufferStatus: 0x8cd6 });
+    const cache = new RenderTargetCache(gl);
+
+    expect(cache.acquire(new RenderTarget({ width: 4, height: 4 }))).toBeNull();
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+    // Unbound before the refusal — the default drawing buffer is where the
+    // next frame has to find itself.
+    expect(gl.callsOf("bindFramebuffer").at(-1)?.args[1]).toBeNull();
+    expect(cache.size).toBe(0);
+  });
+
+  it("frees a depth-less target's objects when its framebuffer is incomplete", () => {
+    const gl = createFakeGl({ framebufferStatus: 0x8cd6 });
+    const cache = new RenderTargetCache(gl);
+
+    expect(
+      cache.acquire(new RenderTarget({ width: 4, height: 4, depth: false })),
+    ).toBeNull();
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteTexture")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(0);
+  });
+});
+
+describe("WebglRenderer.render — the no-target path is unchanged (R-4)", () => {
+  it("issues no framebuffer call at all for an on-screen frame", async () => {
+    // The load-bearing regression guard. Every pixel golden and every browser
+    // test rests on this: a scene that never renders to texture must produce
+    // the GL sequence it produced before render targets existed, down to the
+    // absence of a single `bindFramebuffer(FRAMEBUFFER, null)`.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      renderable(quadGeometry()),
+      sprite(),
+      stateful(BORROWS_EVERYTHING),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    renderer.render(root, [createView(camera)], undefined, null);
+
+    expect(gl.countOf("bindFramebuffer")).toBe(0);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(gl.countOf("checkFramebufferStatus")).toBe(0);
+  });
+
+  it("resolves normalized rectangles against the drawing buffer, as before", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.resize(200, 100, 2);
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)]);
+
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 400, 200]);
+  });
+});
+
+describe("WebglRenderer.render — into a target (§61, §48, R-4)", () => {
+  it("binds the target's framebuffer before the first clear and unbinds after", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 64, height: 64 });
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    const names = gl.names();
+    const framebuffer = gl.callsOf("bindFramebuffer").at(-2)?.args[1];
+    expect(framebuffer).not.toBeNull();
+    // Bound before the rectangles and the clear, unbound at the very end.
+    expect(names.indexOf("bindFramebuffer")).toBeLessThan(
+      names.indexOf("scissor"),
+    );
+    expect(names.at(-1)).toBe("bindFramebuffer");
+    expect(gl.callsOf("bindFramebuffer").at(-1)?.args).toEqual([
+      GL.FRAMEBUFFER,
+      null,
+    ]);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("allocates once and re-binds the same framebuffer on later frames", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const framebuffer = gl.callsOf("bindFramebuffer")[0]?.args[1];
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(gl.callsOf("bindFramebuffer")[0]?.args).toEqual([
+      GL.FRAMEBUFFER,
+      framebuffer,
+    ]);
+  });
+
+  it("resolves normalized rectangles against the target, not the drawing buffer", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.resize(800, 600, 2);
+    const target = new RenderTarget({ width: 256, height: 128 });
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 256, 128]);
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 256, 128]);
+  });
+
+  it("takes an unnormalized rectangle as target pixels, unscaled by the resolution", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.resize(800, 600, 3);
+    const target = new RenderTarget({ width: 256, height: 256 });
+    gl.reset();
+
+    renderer.render(
+      createRoot(),
+      [
+        createView(camera, {
+          x: 8,
+          y: 16,
+          width: 64,
+          height: 32,
+          normalized: false,
+        }),
+      ],
+      undefined,
+      target,
+    );
+
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([8, 16, 64, 32]);
+  });
+
+  it("draws the same scene the same way, target or not", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 300, height: 150 });
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    // Warm both caches, so neither pass below pays an upload the other does
+    // not: what is under test is the *draw* sequence, not the allocation one.
+    renderer.render(root, [createView(camera)]);
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    gl.reset();
+    renderer.render(root, [createView(camera)], undefined, target);
+    const offscreen = gl
+      .names()
+      .filter(
+        (name) =>
+          name !== "bindFramebuffer" &&
+          name !== "createFramebuffer" &&
+          name !== "createRenderbuffer" &&
+          name !== "bindRenderbuffer" &&
+          name !== "renderbufferStorage" &&
+          name !== "framebufferTexture2D" &&
+          name !== "framebufferRenderbuffer" &&
+          name !== "checkFramebufferStatus",
+      );
+    gl.reset();
+    // The drawing buffer is 300×150 (the fake canvas's size), so the same
+    // normalized view covers the same pixel rectangle in both passes.
+    renderer.render(root, [createView(camera)]);
+
+    expect(offscreen).toEqual(gl.names());
+  });
+
+  it("re-allocates and draws into the new framebuffer after a resize", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    target.resize(64, 16);
+    gl.reset();
+
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 64, 16]);
+  });
+
+  it("skips the whole pass for a disposed target — no bind, no clear, no draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    target.dispose();
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("skips the pass when the framebuffer comes back incomplete", async () => {
+    const { renderer, gl, camera } = await initialized({
+      framebufferStatus: 0x8cd6,
+    });
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    gl.reset();
+
+    renderer.render(
+      root,
+      [createView(camera)],
+      undefined,
+      new RenderTarget({ width: 32, height: 32 }),
+    );
+
+    // The allocation was attempted and cleaned up; nothing was drawn.
+    expect(gl.countOf("clear")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.callsOf("bindFramebuffer").at(-1)?.args[1]).toBeNull();
+  });
+
+  it("unbinds the framebuffer when a draw throws mid-pass (F13 + R-4)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    const root = createRoot();
+    root.add(throwingRenderable(BORROWS_EVERYTHING));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, [createView(camera)], undefined, target);
+    }).toThrow(/material accessor raised/);
+
+    // The framebuffer really was bound, and really was given back — along with
+    // every other piece of state the frame borrowed.
+    expect(
+      gl.callsOf("bindFramebuffer").some((call) => call.args[1] !== null),
+    ).toBe(true);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("draws into a target with interpolated §43 poses like any other frame", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    const root = createRoot();
+    const moved = renderable(triangleGeometry());
+    root.add(moved);
+    const poses = new TestPoseBuffer().track(
+      moved,
+      new Vector3(0, 0, 0),
+      new Vector3(4, 0, 0),
+    );
+    gl.reset();
+
+    renderer.render(
+      root,
+      [createView(camera)],
+      interpolationAt(poses, 0.5),
+      target,
+    );
+
+    expect(poses.alphas).toContain(0.5);
+    expect(modelUploads(gl).at(-1)?.[12]).toBe(2);
+  });
+});
+
+describe("WebglRenderer — render to texture (R-4, the R-5/R-6 unblock)", () => {
+  it("binds the target's colour attachment when a material samples it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    // Pass 1: fill the target.
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const colorTexture = attachedColorTexture(gl);
+
+    // Pass 2: sample it on screen, through the ordinary §57 `map` field.
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      colorTexture,
+    ]);
+    // Nothing was uploaded: a render-target texture has no CPU-side texels, so
+    // it must never reach `TextureCache`.
+    expect(gl.countOf("texImage2D")).toBe(0);
+    expect(gl.countOf("createTexture")).toBe(0);
+  });
+
+  it("allocates the framebuffer on first *sample*, so an unrendered target reads as transparent black", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Allocated here rather than skipped: `texImage2D(…, null)` is zero-filled
+    // storage, which samples as transparent black — a defined result.
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.callsOf("texImage2D")[0]?.args.at(-1)).toBeNull();
+    expect(gl.callsOf("bindTexture").at(-2)?.args[1]).toBe(
+      attachedColorTexture(gl),
+    );
+  });
+
+  it("switches the map sampler on for a render-target texture like any other", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    const uniforms = gl.uniformLocations;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("activeTexture")).toBe(1);
+    const useMap = gl
+      .callsOf("uniform1i")
+      .filter((call) => call.args[0] === uniforms.get("useMap"));
+    expect(useMap.at(-1)?.args[1]).toBe(1);
+  });
+
+  it("samples a target through a sprite material too (§55)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const colorTexture = attachedColorTexture(gl);
+
+    const material = new TestSpriteMaterial();
+    material.texture = target.colorTexture;
+    const root = createRoot();
+    root.add(sprite(material));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      colorTexture,
+    ]);
+    // The sprite quad is indexed (see the sprite pipeline's own tests).
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("skips a draw that samples the target it is drawing into (feedback loop)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 16, height: 16 });
+    const material = new TestMaterial();
+    material.map = target.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    // Allocate the framebuffer up front, so the counts below are the frame's.
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    // The geometry still draws — it simply draws untextured, because the one
+    // thing that cannot happen is reading and writing one surface at once.
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.countOf("bindTexture")).toBe(0);
+    expect(gl.countOf("activeTexture")).toBe(0);
+  });
+
+  it("skips a *sprite* that samples the target it is drawing into", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 16, height: 16 });
+    const material = new TestSpriteMaterial();
+    material.texture = target.colorTexture;
+    const root = createRoot();
+    root.add(sprite(material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    // A sprite with no texture has nothing to draw at all.
+    expect(gl.countOf("drawElements")).toBe(0);
+  });
+
+  it("ping-pong between two targets is not a feedback loop", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const read = new RenderTarget({ width: 16, height: 16 });
+    const write = new RenderTarget({ width: 16, height: 16 });
+    renderer.render(createRoot(), [createView(camera)], undefined, read);
+    const readTexture = attachedColorTexture(gl);
+    renderer.render(createRoot(), [createView(camera)], undefined, write);
+    const material = new TestMaterial();
+    material.map = read.colorTexture;
+    const root = createRoot();
+    root.add(renderable(triangleGeometry(), material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, write);
+
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      readTexture,
+    ]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("skips a draw whose target was disposed under it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const target = new RenderTarget({ width: 8, height: 8 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    const material = new TestSpriteMaterial();
+    material.texture = target.colorTexture;
+    const root = createRoot();
+    root.add(sprite(material));
+    target.dispose();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // §83's "disposed resource still in use": deleted, then skipped.
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+});
+
+describe("WebglRenderer — render targets across a context loss (§61)", () => {
+  it("forgets framebuffers without deleting them, and re-allocates on restore", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+    gl.reset();
+
+    canvas.dispatch("webglcontextlost");
+
+    // The handles died with the context; deleting them would be a GL call
+    // against a lost context for no benefit.
+    expect(gl.countOf("deleteFramebuffer")).toBe(0);
+
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(createRoot(), [createView(camera)], undefined, target);
+
+    // §61's "re-creates engine-owned GPU resources … render targets", done by
+    // the pass that asks for one rather than eagerly.
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteFramebuffer")).toBe(0);
+  });
+
+  it("skips an off-screen frame while the context is lost", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const target = new RenderTarget({ width: 32, height: 32 });
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+
+    expect(() => {
+      renderer.render(createRoot(), [createView(camera)], undefined, target);
+    }).not.toThrow();
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("deletes every framebuffer it allocated when the renderer is disposed (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.render(
+      createRoot(),
+      [createView(camera)],
+      undefined,
+      new RenderTarget({ width: 8, height: 8 }),
+    );
+    gl.reset();
+
+    renderer.dispose();
+
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.initialize — the framebuffer entry points are required (§62)", () => {
+  it("rejects a context that cannot allocate a framebuffer", async () => {
+    const gl = createFakeGl() as unknown as Record<string, unknown>;
+    delete gl.createFramebuffer;
+    const renderer = new WebglRenderer();
+
+    const error = await rejection(
+      renderer.initialize({ canvas: new TestCanvas(gl) }),
+    );
+
+    expect(error.code).toBe("RENDERER_INITIALIZATION_FAILED");
+  });
+});
+
+describe("WebglRenderer.render — §84 statistics (A-1)", () => {
+  it("counts nothing at all until a record is assigned", async () => {
+    const { renderer, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(quadGeometry()), renderable(triangleGeometry()));
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("counts one draw call per submitted draw, with its triangles", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Two indexed triangles plus one unindexed one: 6 indices + 3 vertices.
+    root.add(renderable(quadGeometry()), renderable(triangleGeometry()));
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements") + gl.countOf("drawArrays")).toBe(2);
+    expect(statistics).toEqual({ drawCalls: 2, triangles: 3, instances: 2 });
+  });
+
+  it("counts an instanced particle draw once, with all of its instances", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const particles = new TestParticles(1000, 250);
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(particles.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArraysInstanced")).toBe(1);
+    // One call; 250 instances of the shared six-vertex quad = 500 triangles.
+    expect(statistics).toEqual({
+      drawCalls: 1,
+      triangles: 500,
+      instances: 250,
+    });
+  });
+
+  it("counts a lines geometry's draw but none of its vertices as triangles", async () => {
+    const { renderer, camera } = await initialized();
+    const lines = new TestGeometry(
+      new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
+      undefined,
+      "lines",
+    );
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(renderable(lines), [createView(camera)]);
+
+    expect(statistics).toEqual({ drawCalls: 1, triangles: 0, instances: 1 });
+  });
+
+  it("counts a draw per view, because each view submits its own", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.render(renderable(triangleGeometry()), [
+      createView(camera),
+      createView(camera, { id: "inset", x: 0.5, width: 0.5 }),
+    ]);
+
+    expect(statistics.drawCalls).toBe(2);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("accumulates across the render calls of one frame and never clears", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = renderable(triangleGeometry());
+    const views = [createView(camera)];
+
+    // §84's counters are frame totals, and an off-screen pass plus an on-screen
+    // pass is one frame: the backend adds, the owner of the record clears.
+    renderer.render(
+      root,
+      views,
+      undefined,
+      new RenderTarget({
+        width: 16,
+        height: 16,
+      }),
+    );
+    renderer.render(root, views);
+
+    expect(statistics).toEqual({ drawCalls: 2, triangles: 2, instances: 2 });
+  });
+
+  it("does not count a draw it skipped", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    // A sprite whose texture is disposed is skipped before its draw (§83), and
+    // a zero-particle system never reaches one either. Counting the render list
+    // instead of the submissions would report both.
+    const texture = new TestTexture();
+    texture.dispose();
+    const root = createRoot();
+    root.add(sprite(new TestSpriteMaterial(texture)));
+    const empty = new TestParticles(16, 0);
+
+    renderer.render(root, [createView(camera)]);
+    renderer.render(empty.asNode, [createView(camera)]);
+
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawArraysInstanced")).toBe(0);
+    expect(statistics).toEqual({ drawCalls: 0, triangles: 0, instances: 0 });
+  });
+
+  it("counts nothing for a frame the context loss made this backend skip", async () => {
+    const { renderer, canvas, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    canvas.dispatch("webglcontextlost");
+
+    renderer.render(renderable(triangleGeometry()), [createView(camera)]);
+
+    expect(statistics).toEqual({ drawCalls: 0, triangles: 0, instances: 0 });
+  });
+
+  it("stops counting the moment the record is cleared", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = renderable(triangleGeometry());
+    const views = [createView(camera)];
+
+    renderer.render(root, views);
+    renderer.statistics = null;
+    renderer.render(root, views);
+
+    expect(statistics.drawCalls).toBe(1);
+  });
+
+  it("counts the draws of a frame that throws, up to the throw (F13)", async () => {
+    const { renderer, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = createRoot();
+    const drawn = renderable(triangleGeometry());
+    drawn.renderOrder = 0;
+    const thrower = throwingRenderable();
+    thrower.renderOrder = 1;
+    root.add(drawn, thrower);
+
+    expect(() => {
+      renderer.render(root, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+
+    // The first draw really did reach the GPU; the second never did. A
+    // statistics record that unwound with the frame would under-report work the
+    // driver has already been given.
+    expect(statistics.drawCalls).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — statistics change no GL call (A-1)", () => {
+  /**
+   * The load-bearing regression guard for A-1, and the sibling of R-4's
+   * "no framebuffer call at all" test.
+   *
+   * §84's counters are a diagnostic; a diagnostic that changes the thing it
+   * measures is not one. Every pixel golden and every browser test rests on the
+   * frame with statistics *on* issuing the byte-identical GL call list — same
+   * names, same arguments, same order — as the frame with them off.
+   */
+  async function sequenceOf(statistics: RenderStatistics | null): Promise<{
+    names: string[];
+    calls: string;
+  }> {
+    const { renderer, gl, camera } = await initialized();
+    renderer.statistics = statistics;
+    // All four pipelines in one frame, so the comparison covers every draw
+    // site: indexed and unindexed unlit, a blended material, a sprite, and the
+    // instanced particle path.
+    const root = new TestGroup();
+    root.add(new TestParticles(64, 12));
+    root.addRenderables(
+      renderable(quadGeometry()),
+      stateful({ transparent: true }, [1, 0, 0, 0.5]),
+      sprite(),
+    );
+    gl.reset();
+    renderer.render(root.asNode, [createView(camera)]);
+    return {
+      names: gl.names(),
+      calls: JSON.stringify(gl.calls),
+    };
+  }
+
+  it("issues the identical call sequence with and without a record", async () => {
+    const without = await sequenceOf(null);
+    const statistics = createRenderStatistics();
+    const with_ = await sequenceOf(statistics);
+
+    expect(with_.names).toEqual(without.names);
+    expect(with_.calls).toBe(without.calls);
+    // …and the frame that was measured really did draw something, so the
+    // comparison above is not two empty lists agreeing.
+    expect(without.names).toContain("drawElements");
+    expect(statistics.drawCalls).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §70 full-screen effects (R-6, 2026-08-07).
+//
+// Two halves again, for the reason R-4's block gives. `EffectProgram` owns the
+// pipeline, its uniform mirrors, and the failure paths a driver will not
+// perform on request; `WebglRenderer.renderEffect` owns binding, sizing,
+// exception safety, the refusals — and the property the whole packet rests on,
+// that **`render` is byte-for-byte the function it was before effects
+// existed**: an effect is a separate entry point, so a frame that runs none
+// cannot have gained or lost a single GL call.
+// ---------------------------------------------------------------------------
+
+/** The effect program's uniform handles — the `spriteUniforms` pattern. */
+function effectUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("useGrade")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the effect program never resolved its uniforms");
+}
+
+/** The `useProgram` handle of the effect pipeline. */
+function effectProgramHandle(gl: FakeGl): object {
+  for (const [program, perProgram] of gl.uniformsByProgram) {
+    if (perProgram.has("useGrade")) {
+      return program;
+    }
+  }
+  throw new Error("the effect program was never linked");
+}
+
+/** An effect pass over `source`, typed off the interface under test. */
+type EffectPass = Parameters<NonNullable<Renderer["renderEffect"]>>[0];
+
+function effectPass(
+  source: RenderTarget,
+  effect: EffectPass["effect"] = { kind: "copy" },
+  destination: RenderTarget | null = null,
+): EffectPass {
+  return {
+    kind: "effect",
+    source: source.colorTexture,
+    effect,
+    target: destination,
+  };
+}
+
+describe("EffectProgram — the §70 pipeline (R-6)", () => {
+  it("compiles, links, and resolves exactly its three uniforms", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+
+    expect(program.disposed).toBe(false);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["source", "useGrade", "grade"]);
+    // No geometry of any kind: the full-screen triangle is three `gl_VertexID`
+    // corners, so this pipeline allocates no buffer and no vertex array.
+    expect(gl.countOf("createBuffer")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+  });
+
+  it("throws SHADER_COMPILATION_FAILED and cleans up exactly as the unlit program does", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+
+    const error = thrown(() => EffectProgram.create(gl));
+
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+    expect(error.message).toMatch(/effect program has no active uniform/);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("uploads the sampler once in the program's lifetime", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.use();
+    program.setSampler(EFFECT_TEXTURE_UNIT);
+    program.use();
+    program.setSampler(EFFECT_TEXTURE_UNIT);
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("source"), EFFECT_TEXTURE_UNIT],
+    ]);
+  });
+
+  it("issues nothing at all for a chain of copies", () => {
+    // The R-19 property, restated for §70: the mirror starts at GL's own
+    // initial `0`, so `useGrade` is never uploaded by a program that has only
+    // ever copied — and the fragment stage runs its no-arithmetic path, which
+    // is what makes a copy the bit-exact blit it is documented to be.
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setSampler(EFFECT_TEXTURE_UNIT);
+    gl.reset();
+
+    program.setCopy();
+    program.setCopy();
+
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("uploads the grade once and not again while the numbers hold", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.setGrade(1.5, 1, 0.5);
+    program.setGrade(1.5, 1, 0.5);
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useGrade"), 1],
+    ]);
+    expect(gl.callsOf("uniform3fv").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("grade"), [1.5, 1, 0.5]],
+    ]);
+  });
+
+  it("re-uploads only the coefficients when one of them moves", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setGrade(1, 1, 1);
+    gl.reset();
+
+    program.setGrade(1, 1, 0.25);
+
+    expect(gl.countOf("uniform1i")).toBe(0);
+    expect(gl.callsOf("uniform3fv")[0]?.args).toEqual([
+      effectUniforms(gl).get("grade"),
+      [1, 1, 0.25],
+    ]);
+  });
+
+  it("switches back to the copy path with one call", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setGrade(2, 2, 2);
+    gl.reset();
+
+    program.setCopy();
+    program.setCopy();
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useGrade"), 0],
+    ]);
+  });
+
+  it("deletes its program once, idempotently (§83)", () => {
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.dispose();
+    program.dispose();
+
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.initialize — a partial pipeline failure (R-6)", () => {
+  it.each([
+    ["lit", 4, 3],
+    ["effect", 5, 4],
+  ])(
+    "disposes the programs already built when the %s one will not allocate",
+    async (_name, failProgramAt, alreadyBuilt) => {
+      // §61's "leaves the renderer uninitialized rather than
+      // half-initialized": each `create` failure has to give back every
+      // program before it, or a rejected `initialize` leaks the whole
+      // pipeline set for the lifetime of the context.
+      const gl = createFakeGl({ failProgramAt });
+      const renderer = new WebglRenderer();
+
+      const error = await rejection(
+        renderer.initialize({ canvas: new TestCanvas(gl) }),
+      );
+
+      expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+      expect(gl.countOf("deleteProgram")).toBe(alreadyBuilt);
+      expect(renderer.initialized).toBe(false);
+    },
+  );
+});
+
+describe("WebglRenderer.renderEffect — drawing one (§70, R-6)", () => {
+  it("draws the full-screen triangle over the drawing buffer, with no geometry", async () => {
+    const { renderer, gl } = await initialized();
+    renderer.resize(320, 240);
+    const source = new RenderTarget({ width: 64, height: 64 });
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.names()).toEqual([
+      // The source's framebuffer is allocated on first sight (R-4's cache),
+      // because nothing has drawn into it yet.
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "bindTexture",
+      "createRenderbuffer",
+      "bindRenderbuffer",
+      "renderbufferStorage",
+      "bindRenderbuffer",
+      "createFramebuffer",
+      "bindFramebuffer",
+      "framebufferTexture2D",
+      "framebufferRenderbuffer",
+      "checkFramebufferStatus",
+      "bindFramebuffer",
+      // The effect itself. No `bindFramebuffer` at all on this path: the
+      // destination is the drawing buffer, exactly as an on-screen `render`
+      // issues none (R-4).
+      "scissor",
+      "viewport",
+      "disable",
+      "useProgram",
+      "uniform1i",
+      "activeTexture",
+      "bindTexture",
+      "bindVertexArray",
+      "drawArrays",
+      // The envelope gives back the depth test and the texture binding.
+      "enable",
+      "bindTexture",
+    ]);
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 320, 240]);
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 320, 240]);
+    expect(gl.callsOf("drawArrays")[0]?.args).toEqual([GL.TRIANGLES, 0, 3]);
+    expect(gl.callsOf("bindVertexArray")[0]?.args).toEqual([null]);
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("binds the destination framebuffer and sizes to it, then unbinds", async () => {
+    const { renderer, gl } = await initialized();
+    renderer.resize(800, 600, 2);
+    const source = new RenderTarget({ width: 64, height: 64 });
+    const destination = new RenderTarget({ width: 128, height: 32 });
+    // Warm both allocations so the assertion is about the effect, not the
+    // cache's first-sight work.
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+
+    const framebuffers = gl.callsOf("bindFramebuffer");
+    expect(framebuffers).toHaveLength(2);
+    expect(framebuffers[0]?.args[1]).not.toBeNull();
+    expect(framebuffers[1]?.args).toEqual([GL.FRAMEBUFFER, null]);
+    // The destination's size, not the drawing buffer's — the same rule R-4
+    // states for a normalized viewport rectangle.
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 128, 32]);
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 128, 32]);
+    expect(gl.names().at(-1)).toBe("bindFramebuffer");
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("binds the source's colour attachment on the map unit", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    const attachment = attachedColorTexture(gl);
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.callsOf("activeTexture")[0]?.args).toEqual([
+      GL.TEXTURE0 + EFFECT_TEXTURE_UNIT,
+    ]);
+    expect(gl.callsOf("bindTexture")[0]?.args).toEqual([
+      GL.TEXTURE_2D,
+      attachment,
+    ]);
+  });
+
+  it("uses the effect pipeline, not one of the scene pipelines", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const effect = effectProgramHandle(gl);
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source));
+
+    expect(gl.callsOf("useProgram").map((call) => call.args[0])).toEqual([
+      effect,
+    ]);
+  });
+
+  it("uploads a grade's coefficients, defaulting each omitted one to 1", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    gl.reset();
+
+    renderer.renderEffect(
+      effectPass(source, { kind: "grade", saturation: 0.25 }),
+    );
+
+    expect(uploadsAt(gl, effectUniforms(gl).get("grade"))).toEqual([
+      [1, 1, 0.25],
+    ]);
+    expect(uploadsAt(gl, effectUniforms(gl).get("useGrade"))).toEqual([1]);
+  });
+
+  it("counts one draw call, one instance and one triangle (§84)", async () => {
+    const { renderer } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+
+    renderer.renderEffect(
+      effectPass(new RenderTarget({ width: 4, height: 4 })),
+    );
+
+    expect(statistics).toEqual({ drawCalls: 1, instances: 1, triangles: 1 });
+  });
+});
+
+describe("WebglRenderer.renderEffect — what it refuses (§70, §83, R-4)", () => {
+  it("refuses a pass that draws into the surface it samples", async () => {
+    // R-4's feedback rule, applied to the pass instead of to a material's
+    // `map`: the draw is refused rather than producing undefined content, and
+    // `RenderGraph.validate` reports the same mistake statically.
+    const { renderer, gl } = await initialized();
+    const surface = new RenderTarget({ width: 16, height: 16 });
+    gl.reset();
+
+    renderer.renderEffect(effectPass(surface, { kind: "copy" }, surface));
+
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("skips a disposed source, and a disposed destination", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const destination = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+
+    source.dispose();
+    gl.reset();
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+    expect(gl.countOf("drawArrays")).toBe(0);
+
+    const live = new RenderTarget({ width: 8, height: 8 });
+    destination.dispose();
+    gl.reset();
+    renderer.renderEffect(effectPass(live, { kind: "copy" }, destination));
+    expect(gl.countOf("drawArrays")).toBe(0);
+    // Nothing was left bound by the pass it declined to draw.
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("skips a destination whose framebuffer GL will not allocate", async () => {
+    const { renderer, gl } = await initialized({ allocateFramebuffers: false });
+    gl.reset();
+
+    renderer.renderEffect(
+      effectPass(
+        new RenderTarget({ width: 8, height: 8 }),
+        { kind: "copy" },
+        new RenderTarget({ width: 8, height: 8 }),
+      ),
+    );
+
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("skips a source that is not a render-target texture", async () => {
+    // The structural read: a caller that bypassed `validateEffectRenderPass`
+    // hands over an ordinary texture, and gets a skipped effect rather than a
+    // black screen with nothing to explain it.
+    const { renderer, gl } = await initialized();
+    gl.reset();
+
+    renderer.renderEffect({
+      kind: "effect",
+      source: new TestTexture().asTexture,
+      effect: { kind: "copy" },
+    } as unknown as EffectPass);
+
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("skips an effect kind this build does not implement", async () => {
+    // `{ kind: "bloom" }` is a compile error; this is the same value arriving
+    // from JSON. It must not become a copy — that would be a different
+    // picture than the one asked for, silently.
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    gl.reset();
+
+    renderer.renderEffect({
+      kind: "effect",
+      source: source.colorTexture,
+      effect: { kind: "bloom" },
+    } as unknown as EffectPass);
+
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("returns silently while the context is lost, and never throws (§61)", async () => {
+    const { renderer, gl, canvas } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+
+    expect(() => {
+      renderer.renderEffect(effectPass(source));
+    }).not.toThrow();
+    expect(gl.calls).toEqual([]);
+  });
+
+  it("throws INVALID_APPLICATION_STATE before initialize and after disposal", async () => {
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const uninitialized = new WebglRenderer();
+    expect(
+      thrown(() => uninitialized.renderEffect(effectPass(source))).code,
+    ).toBe("INVALID_APPLICATION_STATE");
+
+    const { renderer } = await initialized();
+    renderer.dispose();
+    expect(thrown(() => renderer.renderEffect(effectPass(source))).code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+  });
+});
+
+describe("WebglRenderer.renderEffect — the F13 envelope (R-6)", () => {
+  it("gives back the depth test and every binding when the draw throws", async () => {
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const destination = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source, { kind: "copy" }, destination));
+    gl.reset();
+    // A driver-side failure, standing in for anything that can raise between
+    // the binds and the end of the pass.
+    const drawArrays = gl.drawArrays.bind(gl);
+    gl.drawArrays = (): never => {
+      throw new Error("the driver raised mid-effect");
+    };
+
+    try {
+      expect(() => {
+        renderer.renderEffect(
+          effectPass(source, { kind: "copy" }, destination),
+        );
+      }).toThrow(/raised mid-effect/);
+    } finally {
+      gl.drawArrays = drawArrays;
+    }
+
+    // It really did borrow — the depth test was disabled, a texture and a
+    // framebuffer were bound — and gave every one of them back.
+    expect(gl.names()).toContain("disable");
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("leaves the next frame drawing exactly as it would have", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const root = createRoot();
+    root.add(renderable(triangleGeometry()));
+
+    // A clean frame, for comparison.
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    const expected = JSON.stringify(gl.calls);
+
+    const drawArrays = gl.drawArrays.bind(gl);
+    gl.drawArrays = (): never => {
+      throw new Error("the driver raised mid-effect");
+    };
+    try {
+      expect(() => {
+        renderer.renderEffect(effectPass(source));
+      }).toThrow(/raised mid-effect/);
+    } finally {
+      gl.drawArrays = drawArrays;
+    }
+
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(JSON.stringify(gl.calls)).toBe(expected);
+  });
+});
+
+describe("WebglRenderer.render — untouched by §70 (R-6)", () => {
+  it("issues no effect-pipeline call in a frame that runs no effect", async () => {
+    // The load-bearing regression guard, in the same shape R-4's is. An effect
+    // is a separate entry point, so the only thing R-6 adds to a frame that
+    // uses none is one more program compiled at initialization — and this
+    // asserts that the frame itself never touches it.
+    const { renderer, gl, camera } = await initialized();
+    const effect = effectProgramHandle(gl);
+    const root = createRoot();
+    root.add(
+      renderable(quadGeometry()),
+      sprite(),
+      stateful(BORROWS_EVERYTHING),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("useProgram").map((call) => call.args[0])).not.toContain(
+      effect,
+    );
+    // This scene has no lit item, so the lit pipeline's light uploads are the
+    // only other `uniform3fv` in the backend and they cannot have run: the
+    // count is the effect pipeline's `grade` upload, and it is zero.
+    expect(gl.countOf("uniform3fv")).toBe(0);
   });
 });

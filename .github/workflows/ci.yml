@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # release.yml calls this workflow rather than restating its job set, so a
+  # release clears exactly the gates a pull request clears. Additive: it changes
+  # nothing about how CI runs on push or pull_request.
+  workflow_call:
 
 jobs:
   ci:
@@ -61,6 +65,14 @@ jobs:
       # copy-paste from an old revision fails here instead of shipping.
       - name: Check documentation truth
         run: pnpm check-docs
+
+      # §90 compatibility drift (added 2026-08-07). The solver-adapter block of
+      # docs/COMPATIBILITY.md is generated from the adapters' live capability
+      # declarations; this fails when an adapter's declaration changes without
+      # the committed document being regenerated. Needs the build step above
+      # (the generator imports each package's dist).
+      - name: Check compatibility tables
+        run: pnpm check-compat
 
       # Architecture invariants. `graph` regenerates docs/Architecture from a full
       # parse; `graph:check` then asserts every browser-facing `.` entry stays free

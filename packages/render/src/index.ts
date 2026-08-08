@@ -1,6 +1,20 @@
 export const PACKAGE_NAME = "@four/render";
 
 export type {
+  ColorGradeEffect,
+  CopyEffect,
+  EffectRenderPass,
+  ScreenEffect,
+  ScreenEffectKind,
+  ScreenEffectRenderer,
+} from "./effect-pass.js";
+export {
+  COLOR_GRADE_DEFAULTS,
+  COPY_EFFECT,
+  supportsScreenEffects,
+  validateEffectRenderPass,
+} from "./effect-pass.js";
+export type {
   AmbientLightSource,
   DirectionalLightSource,
   SceneLights,
@@ -35,8 +49,41 @@ export {
   isSpriteItem,
   isUnlitItem,
 } from "./render-list.js";
+export type {
+  AddPassOptions,
+  CustomRenderPass,
+  RenderGraphIssue,
+  RenderGraphIssueCode,
+  RenderGraphIssueSeverity,
+  RenderGraphPass,
+  RenderPass,
+  RenderPassContext,
+  SceneRenderPass,
+} from "./render-graph.js";
+export { RenderGraph } from "./render-graph.js";
+export type {
+  RenderTargetFormat,
+  RenderTargetOptions,
+  RenderTargetTexture,
+} from "./render-target.js";
+export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
 export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
+export type {
+  RendererFallbackReason,
+  RendererFallbackReport,
+  RendererRegistration,
+  RendererResolveOptions,
+  RendererSelection,
+} from "./renderer-registry.js";
+export {
+  AUTO_RENDERER_ORDER,
+  RendererRegistry,
+  clearRegisteredRenderers,
+  registerRenderer,
+  registeredRenderers,
+  resolveRenderer,
+} from "./renderer-registry.js";
 export type {
   RenderInterpolation,
   Renderer,
@@ -47,6 +94,20 @@ export type {
   ResizeRecord,
 } from "./renderer.js";
 export { NullRenderer } from "./renderer.js";
+export {
+  liveRenderTargetCount,
+  liveTextureCount,
+  textureMemoryBytes,
+} from "./resource-memory.js";
+export type {
+  RenderStatistics,
+  RenderStatisticsReporter,
+} from "./statistics.js";
+export {
+  createRenderStatistics,
+  resetRenderStatistics,
+  supportsRenderStatistics,
+} from "./statistics.js";
 export type { SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type { TextureSource } from "./texture.js";

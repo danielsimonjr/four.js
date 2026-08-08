@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { isFourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
@@ -12,7 +12,17 @@ import {
   type SimulationSystem,
   type TimeState,
 } from "@four/motion";
-import { NullRenderer } from "@four/render";
+import { BufferGeometry } from "@four/geometry";
+import {
+  NullRenderer,
+  RendererRegistry,
+  Texture,
+  clearRegisteredRenderers,
+  registerRenderer,
+  type RendererBackend,
+  type RendererCapabilities,
+  type RendererFallbackReport,
+} from "@four/render";
 import {
   Group,
   OrthographicCamera,
@@ -972,6 +982,29 @@ describe("Application — resize (§45, §61, §47)", () => {
     expect(renderer.resizeCount).toBe(0);
   });
 
+  // 2026-08-07: the resolution-only constructor path never reached `resize`,
+  // so a bad value was stored unchecked and forwarded to `renderer.resize` by
+  // whatever `app.resize(w, h)` came next — an error reported at a call site
+  // that had done nothing wrong.
+  it("refuses a constructor resolution that is not a positive finite number", () => {
+    for (const resolution of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(
+        () => new Application({ renderer: new NullRenderer(), resolution }),
+      ).toThrow(RangeError);
+    }
+
+    // …and the same value is still refused on the width/height path.
+    expect(
+      () =>
+        new Application({
+          renderer: new NullRenderer(),
+          width: 100,
+          height: 100,
+          resolution: 0,
+        }),
+    ).toThrow(RangeError);
+  });
+
   it("recomputes projections with the configured depth range (D8)", () => {
     const negativeOne = new PerspectiveCamera({ aspect: 1 });
     const zeroToOne = new PerspectiveCamera({ aspect: 1 });
@@ -1026,5 +1059,644 @@ describe("Application — resize (§45, §61, §47)", () => {
     expect(isFourError(thrown) && thrown.code).toBe(
       "INVALID_APPLICATION_STATE",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §84 runtime statistics (A-1, 2026-08-07).
+// ---------------------------------------------------------------------------
+
+/** A clock the test drives, in seconds (§7a). */
+class TestClock {
+  seconds = 0;
+
+  /** Every reading handed out, in call order. */
+  readonly readings: number[] = [];
+
+  readonly now = (): number => {
+    this.readings.push(this.seconds);
+    return this.seconds;
+  };
+
+  /** Advances the clock, as a frame's work would. */
+  advance(delta: number): void {
+    this.seconds += delta;
+  }
+}
+
+/**
+ * A renderer that reports §84 draw counters — a `NullRenderer` that counts as
+ * if it had drawn, which is the only way to assert the copy-back headlessly
+ * (the real counting is `@four/render-webgl`'s own test).
+ */
+class CountingRenderer extends NullRenderer {
+  /** Added to the assigned record on every `render` call. */
+  drawsPerFrame = 3;
+
+  override render(...args: Parameters<NullRenderer["render"]>): void {
+    super.render(...args);
+    const statistics = this.statistics;
+    if (statistics !== null) {
+      statistics.drawCalls += this.drawsPerFrame;
+      statistics.triangles += this.drawsPerFrame * 2;
+      statistics.instances += this.drawsPerFrame;
+    }
+  }
+}
+
+/** A backend that does not report statistics at all (§61's optional member). */
+class UncountingRenderer extends NullRenderer {
+  constructor() {
+    super();
+    // The capability is presence: a backend that cannot count omits the
+    // member, and `Application` must then report "not measured" rather than a
+    // confident zero.
+    delete (this as { statistics?: unknown }).statistics;
+  }
+}
+
+describe("Application — §84 statistics (A-1)", () => {
+  it("has no statistics by default", async () => {
+    const app = await startedApplication({ renderer: new NullRenderer() });
+    app.step(FIXED);
+    expect(app.stats).toBeNull();
+  });
+
+  it("never reads the clock while statistics are off", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ now: clock.now });
+    app.step(FIXED * 3);
+    expect(clock.readings).toEqual([]);
+  });
+
+  it("never assigns the renderer's record while statistics are off", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer });
+    app.step(FIXED);
+    expect(renderer.statistics).toBeNull();
+    expect(app.stats).toBeNull();
+  });
+
+  it("exposes §84's eleven counters once switched on", async () => {
+    const app = await startedApplication({ stats: true });
+    expect(Object.keys(app.stats ?? {})).toEqual([
+      "cpuFrameTime",
+      "gpuFrameTime",
+      "simulationTime",
+      "physicsStepTime",
+      "drawCalls",
+      "triangles",
+      "instances",
+      "activeBodies",
+      "contacts",
+      "textureMemory",
+      "bufferMemory",
+    ]);
+  });
+
+  it("measures cpuFrameTime in seconds across the whole step", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.on("render", () => {
+      clock.advance(0.004);
+    });
+    app.on("update", () => {
+      clock.advance(0.002);
+    });
+
+    app.step(FIXED);
+
+    expect(app.stats?.cpuFrameTime).toBeCloseTo(0.006, 12);
+  });
+
+  it("measures simulationTime as the seconds spent in the frame's fixed steps", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.on("fixedUpdate", () => {
+      clock.advance(0.001);
+    });
+    app.on("update", () => {
+      clock.advance(0.5);
+    });
+
+    // Three fixed steps' worth of elapsed time, one `update`.
+    app.step(FIXED * 3);
+
+    expect(app.stats?.simulationTime).toBeCloseTo(0.003, 12);
+    // …and the outer measurement still contains it plus the update's half
+    // second, which is what makes the two numbers different quantities.
+    expect(app.stats?.cpuFrameTime).toBeCloseTo(0.503, 12);
+  });
+
+  it("reports 0 simulation seconds for a frame that ran no fixed step", async () => {
+    const app = await startedApplication({ stats: true });
+    app.step(FIXED / 4);
+    expect(app.stats?.simulationTime).toBe(0);
+  });
+
+  it("reads the backend's draw counters back after the frame", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+
+    expect(app.stats?.drawCalls).toBe(3);
+    expect(app.stats?.triangles).toBe(6);
+    expect(app.stats?.instances).toBe(3);
+  });
+
+  it("clears the backend's record between frames, so counters are per-frame", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+    app.step(FIXED);
+
+    expect(renderer.renderCount).toBe(2);
+    expect(app.stats?.drawCalls).toBe(3);
+  });
+
+  it("reports 0 draws for a frame the renderer was not asked to draw", async () => {
+    // A counting backend with no viewport: `render` is never called, and
+    // "counted; nothing was drawn" is 0 — not `NaN`, which would mean nobody
+    // counted at all.
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+
+    app.step(FIXED);
+
+    expect(renderer.renderCount).toBe(0);
+    expect(app.stats?.drawCalls).toBe(0);
+  });
+
+  it("reports NaN for draws a headless application cannot have counted", async () => {
+    const app = await startedApplication({ stats: true });
+    app.step(FIXED);
+    expect(app.stats?.drawCalls).toBeNaN();
+    expect(app.stats?.triangles).toBeNaN();
+    expect(app.stats?.instances).toBeNaN();
+  });
+
+  it("reports NaN for a backend that does not report statistics", async () => {
+    const renderer = new UncountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+
+    expect(renderer.renderCount).toBe(1);
+    expect(app.stats?.drawCalls).toBeNaN();
+  });
+
+  it("leaves every staged counter unmeasured, frame after frame", async () => {
+    const renderer = new CountingRenderer();
+    const app = await startedApplication({ renderer, stats: true });
+    app.views.push(createFullscreenViewport(new PerspectiveCamera()));
+
+    app.step(FIXED);
+    app.step(FIXED);
+
+    // The four §84 counters with no producer in this repository. They must read
+    // "not measured", not 0 — see `FrameStats` for what each one waits on.
+    // `textureMemory`/`bufferMemory` left this list when A-5 landed §83's
+    // resource accounting (2026-08-07); they are asserted live below.
+    expect(app.stats?.gpuFrameTime).toBeNaN();
+    expect(app.stats?.physicsStepTime).toBeNaN();
+    expect(app.stats?.activeBodies).toBeNaN();
+    expect(app.stats?.contacts).toBeNaN();
+  });
+
+  it("reports §83's live-resource totals as the two memory counters (A-5)", async () => {
+    const app = await startedApplication({ stats: true });
+
+    app.step(FIXED);
+    const textureBefore = app.stats?.textureMemory ?? Number.NaN;
+    const bufferBefore = app.stats?.bufferMemory ?? Number.NaN;
+    expect(textureBefore).not.toBeNaN();
+    expect(bufferBefore).not.toBeNaN();
+
+    // Process-wide totals, so the assertions are deltas: another test file in
+    // the same worker may hold resources of its own (§83 — the numbers are
+    // levels for the realm, not for this application).
+    const geometry = new BufferGeometry({
+      positions: new Float32Array(9),
+    });
+    const texture = new Texture({ width: 4, height: 4 });
+
+    app.step(FIXED);
+    expect((app.stats?.bufferMemory ?? 0) - bufferBefore).toBe(36);
+    expect((app.stats?.textureMemory ?? 0) - textureBefore).toBe(64);
+
+    geometry.dispose();
+    texture.dispose();
+
+    app.step(FIXED);
+    expect(app.stats?.bufferMemory).toBe(bufferBefore);
+    expect(app.stats?.textureMemory).toBe(textureBefore);
+  });
+
+  it("measures the memory counters with no renderer at all (A-5)", async () => {
+    // Unlike the draw counters, these need no backend: a geometry a headless
+    // application built is memory the engine holds whether or not it was drawn.
+    const app = await startedApplication({ stats: true });
+
+    app.step(FIXED);
+
+    expect(app.stats?.drawCalls).toBeNaN();
+    expect(app.stats?.bufferMemory).toBeGreaterThanOrEqual(0);
+    expect(app.stats?.textureMemory).toBeGreaterThanOrEqual(0);
+  });
+
+  it("rewrites one record in place rather than allocating per frame", async () => {
+    const app = await startedApplication({ stats: true });
+    const stats = app.stats;
+    app.step(FIXED);
+    const first = stats?.cpuFrameTime;
+    app.step(FIXED);
+    expect(app.stats).toBe(stats);
+    expect(typeof first).toBe("number");
+  });
+
+  it("describes the last completed frame, never a half-finished one", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.step(FIXED);
+    const measured = app.stats?.cpuFrameTime;
+    app.on("update", () => {
+      throw new Error("listener exploded");
+    });
+
+    expect(() => {
+      app.step(FIXED);
+    }).toThrow("listener exploded");
+
+    // The throwing frame wrote nothing back: `cpuFrameTime` was reset to "not
+    // measured" at the top of the step and never finished.
+    expect(app.stats?.cpuFrameTime).toBeNaN();
+    expect(typeof measured).toBe("number");
+  });
+
+  it("keeps the time a throwing fixed step really spent", async () => {
+    const clock = new TestClock();
+    const app = await startedApplication({ stats: true, now: clock.now });
+    app.on("fixedUpdate", () => {
+      clock.advance(0.002);
+      throw new Error("system exploded");
+    });
+
+    expect(() => {
+      app.step(FIXED);
+    }).toThrow("system exploded");
+
+    expect(app.stats?.simulationTime).toBeCloseTo(0.002, 12);
+  });
+
+  it("gives the renderer its statistics slot back on dispose (§83)", () => {
+    const renderer = new CountingRenderer();
+    const app = new Application({ renderer, stats: true });
+    expect(renderer.statistics).not.toBeNull();
+
+    app.dispose();
+
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("leaves a slot it did not fill alone", () => {
+    const renderer = new CountingRenderer();
+    const app = new Application({ renderer, stats: true });
+    const foreign = { drawCalls: 0, triangles: 0, instances: 0 };
+    renderer.statistics = foreign;
+
+    app.dispose();
+
+    // A second application — or the author's own profiler — took the slot
+    // after this one filled it; disposal must not steal it back.
+    expect(renderer.statistics).toBe(foreign);
+  });
+
+  it("does not touch the renderer's slot when statistics are off", () => {
+    const renderer = new CountingRenderer();
+    const foreign = { drawCalls: 0, triangles: 0, instances: 0 };
+    renderer.statistics = foreign;
+    const app = new Application({ renderer });
+
+    app.dispose();
+
+    expect(renderer.statistics).toBe(foreign);
+  });
+
+  it("changes nothing about the frame it measures (§33)", async () => {
+    // Determinism's own guard: two applications fed identical steps produce
+    // identical event traces and identical scene state whether or not one of
+    // them is being measured. A statistics option that moved a single number
+    // would break every §92 determinism suite.
+    const plain: string[] = [];
+    const measured: string[] = [];
+    const a = await startedApplication({ renderer: new NullRenderer() });
+    const b = await startedApplication({
+      renderer: new NullRenderer(),
+      stats: true,
+    });
+    traceEvents(a, plain);
+    traceEvents(b, measured);
+    const node = new Group();
+    a.scene.add(node);
+    const other = new Group();
+    b.scene.add(other);
+    node.transform.position.set(1, 2, 3);
+    other.transform.position.set(1, 2, 3);
+
+    for (const elapsed of [FIXED * 2.5, FIXED / 3, FIXED * 7]) {
+      a.step(elapsed);
+      b.step(elapsed);
+    }
+
+    expect(measured).toEqual(plain);
+    expect(copyTimeState(b.time)).toEqual(copyTimeState(a.time));
+    expect(other.transform.worldMatrix.elements).toEqual(
+      node.transform.worldMatrix.elements,
+    );
+  });
+});
+
+describe("Application — §45 renderer selection (R-2 / A-8)", () => {
+  /**
+   * A registry holding one backend under `backend`, whose renderer is a
+   * `NullRenderer` reporting that backend — so §62's preference walk and the
+   * application's wiring can both be asserted without a GPU.
+   */
+  function registryWith(
+    backends: readonly {
+      backend: RendererBackend;
+      supported?: boolean;
+      fail?: boolean;
+    }[],
+  ): { registry: RendererRegistry; built: NullRenderer[] } {
+    const registry = new RendererRegistry();
+    const built: NullRenderer[] = [];
+    for (const entry of backends) {
+      registry.register({
+        backend: entry.backend,
+        isSupported: () => entry.supported ?? true,
+        create: () => {
+          const renderer = new NullRenderer();
+          (renderer as { capabilities: RendererCapabilities }).capabilities = {
+            backend: entry.backend,
+            maxTextureSize: 0,
+          };
+          if (entry.fail === true) {
+            renderer.initialize = (): Promise<void> =>
+              Promise.reject(new Error(`${entry.backend} refused`));
+          }
+          built.push(renderer);
+          return renderer;
+        },
+      });
+    }
+    return { registry, built };
+  }
+
+  it("holds no renderer until initialize resolves the selection", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+    });
+    expect(app.renderer).toBeNull();
+    await app.initialize();
+    expect(app.renderer?.capabilities.backend).toBe("webgl2");
+  });
+
+  it("resolves §62's preference order and forwards canvas and antialias", async () => {
+    const canvas = {};
+    const { registry } = registryWith([
+      { backend: "webgl2" },
+      { backend: "webgpu" },
+    ]);
+    const app = new Application({
+      renderer: "auto",
+      canvas,
+      antialias: true,
+      rendererRegistry: registry,
+    });
+    await app.initialize();
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.capabilities.backend).toBe("webgpu");
+    expect(renderer.lastInitializeOptions).toMatchObject({
+      canvas,
+      antialias: true,
+    });
+    expect(renderer.initializeCount).toBe(1);
+  });
+
+  it("reports each backend `auto` passes over (§62's diagnostics event)", async () => {
+    const { registry } = registryWith([
+      { backend: "webgpu", fail: true },
+      { backend: "webgl2" },
+    ]);
+    const reports: RendererFallbackReport[] = [];
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      onRendererFallback: (report) => reports.push(report),
+    });
+    await app.initialize();
+    expect(app.renderer?.capabilities.backend).toBe("webgl2");
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.backend).toBe("webgpu");
+    expect(reports[0]?.reason).toBe("initialization-failed");
+  });
+
+  it("rejects initialize when the selection cannot be satisfied (§62, §89)", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "webgpu",
+      rendererRegistry: registry,
+    });
+    let thrown: unknown;
+    try {
+      await app.initialize();
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(isFourError(thrown)).toBe(true);
+    if (isFourError(thrown)) {
+      expect(thrown.code).toBe("RENDERER_INITIALIZATION_FAILED");
+      expect(thrown.message).toContain('Registered: "webgl2"');
+    }
+    expect(app.initialized).toBe(false);
+    expect(app.renderer).toBeNull();
+  });
+
+  it("draws through the resolved renderer, with §43 interpolation on by default", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const camera = new PerspectiveCamera({ aspect: 1 });
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      views: [createFullscreenViewport(camera)],
+    });
+    await app.initialize();
+    app.start();
+    app.step(FIXED);
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.renderCount).toBe(1);
+    expect(renderer.lastRenderRoot).toBe(app.scene);
+    expect(renderer.lastInterpolation?.poseBuffer).toBe(app.poses);
+  });
+
+  it("replays a size declared before the backend existed", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      width: 800,
+      height: 400,
+      resolution: 2,
+    });
+    // Nothing to forward to yet — the option was recorded, not dropped.
+    await app.initialize();
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.lastResize).toEqual({
+      width: 800,
+      height: 400,
+      resolution: 2,
+    });
+  });
+
+  it("forwards a resize issued between construction and initialize", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+    });
+    app.resize(640, 480, 1.5);
+    await app.initialize();
+    expect((app.renderer as NullRenderer).lastResize).toEqual({
+      width: 640,
+      height: 480,
+      resolution: 1.5,
+    });
+  });
+
+  it("lends §84 statistics to a renderer it only meets at initialize (A-1)", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      stats: true,
+    });
+    await app.initialize();
+    const renderer = app.renderer as NullRenderer;
+    expect(renderer.statistics).not.toBeNull();
+    app.dispose();
+    // Returned on dispose, exactly as a constructed renderer's is (§83).
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("stays headless for `false` and for an omitted option", async () => {
+    for (const renderer of [undefined, false] as const) {
+      const app = new Application({ renderer });
+      await app.initialize();
+      expect(app.renderer).toBeNull();
+      expect(app.initialized).toBe(true);
+    }
+  });
+
+  it("still takes an instance, and initializes it with the antialias option", async () => {
+    const renderer = new NullRenderer();
+    const app = new Application({ renderer, antialias: true, canvas: {} });
+    expect(app.renderer).toBe(renderer);
+    await app.initialize();
+    expect(renderer.lastInitializeOptions?.antialias).toBe(true);
+  });
+
+  it("resolves against the shared registry when none is passed", async () => {
+    registerRenderer({
+      backend: "webgl2",
+      isSupported: () => true,
+      create: () => new NullRenderer(),
+    });
+    try {
+      const app = new Application({ renderer: "auto" });
+      await app.initialize();
+      expect(app.renderer).toBeInstanceOf(NullRenderer);
+    } finally {
+      clearRegisteredRenderers();
+    }
+  });
+
+  it("says nothing is registered when no backend opted in (§85)", async () => {
+    const app = new Application({ renderer: "auto" });
+    await expect(app.initialize()).rejects.toThrow(/no backend is registered/);
+  });
+});
+
+describe("Application — §85 production build (A-4)", () => {
+  /**
+   * The §84 wiring above is what a production bundle drops. Proving that at the
+   * *source* level means evaluating the other build: `DEV` is resolved once at
+   * module load and has no setter (see `packages/core/src/dev.ts`), so the only
+   * honest test is a fresh module graph with `__FOUR_DEV__` defined.
+   *
+   * That this actually removes the code from a bundle — rather than merely
+   * skipping it at runtime — is `tests/integration/dev-build-mode.test.ts`,
+   * which runs a real bundler. Two different claims, two different gates.
+   */
+  async function productionApplication(
+    options: ApplicationOptions = {},
+  ): Promise<Application> {
+    vi.stubGlobal("__FOUR_DEV__", false);
+    vi.resetModules();
+    const module = await import("../src/application.js");
+    const app = new module.Application(options);
+    await app.initialize();
+    app.start();
+    return app;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("leaves app.stats null even when stats: true was asked for", async () => {
+    const app = await productionApplication({ stats: true });
+    app.step(FIXED);
+    // The declared type is `FrameStats | null` in both builds — the option and
+    // the member keep their shapes, so nothing here is a public-API change.
+    expect(app.stats).toBeNull();
+  });
+
+  it("never reads the injected clock", async () => {
+    const clock = new TestClock();
+    const app = await productionApplication({ stats: true, now: clock.now });
+    app.step(FIXED * 3);
+    expect(clock.readings).toEqual([]);
+  });
+
+  it("never borrows the renderer's statistics record", async () => {
+    const renderer = new CountingRenderer();
+    const app = await productionApplication({ renderer, stats: true });
+    app.step(FIXED);
+    expect(renderer.statistics).toBeNull();
+    app.dispose();
+    expect(renderer.statistics).toBeNull();
+  });
+
+  it("runs the frame otherwise unchanged", async () => {
+    // §33's rule for the flag: it may remove measurement, never change a
+    // number. The loop still steps, still emits, still draws.
+    const renderer = new CountingRenderer();
+    const app = await productionApplication({ renderer });
+    const log: string[] = [];
+    app.on("fixedUpdate", () => log.push("fixedUpdate"));
+    app.on("update", () => log.push("update"));
+    app.on("render", () => log.push("render"));
+    app.step(FIXED);
+    expect(log).toEqual(["fixedUpdate", "update", "render"]);
+    expect(app.time.simulationStep).toBe(1);
   });
 });

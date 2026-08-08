@@ -27,21 +27,42 @@ export * as physicsSoft from "@four/physics-soft";
 export type { ApplicationEventMap, ApplicationOptions } from "./application.js";
 export { Application } from "./application.js";
 
-// §79 support for the engine's own node classes and components (A-14, PH-17).
-// It lives here rather than in `@four/serialization` for the reason that
-// package's own header gives: the §3.1 matrix lets it see `core`/`math`/`scene`
-// only, and the umbrella is the one place that may see `ui` and `motion` too.
+// §79 support for the engine's own node classes and components (A-14, PH-17,
+// and the drawing tier — A-16, 2026-08-07). It lives here rather than in
+// `@four/serialization` for the reason that package's own header gives: the
+// §3.1 matrix lets it see `core`/`math`/`scene` only, and the umbrella is the
+// one place that may see `ui`, `render`, and `motion` too.
+//
+// Every `*_NODE_TYPE` the module writes is re-exported, so an application can
+// name any type it may meet in a document (the six A-12 control names were
+// missed when they shipped, 2026-08-07).
 export type {
   SceneNodeTypeOptions,
   SceneNodeTypeSupport,
+  SceneResourceCatalog,
   SceneSerializationSupport,
+  UnknownResourcePolicy,
 } from "./scene-serializers.js";
 export {
   BUTTON_NODE_TYPE,
+  CHECKBOX_NODE_TYPE,
+  DIRECTIONAL_LIGHT_NODE_TYPE,
+  IMAGE_NODE_TYPE,
   LABEL_NODE_TYPE,
+  ORTHOGRAPHIC_CAMERA_NODE_TYPE,
   PANEL_NODE_TYPE,
+  PERSPECTIVE_CAMERA_NODE_TYPE,
+  PROGRESS_NODE_TYPE,
+  RADIO_BUTTON_NODE_TYPE,
+  RENDERABLE_NODE_TYPE,
+  SLIDER_NODE_TYPE,
+  SPRITE_NODE_TYPE,
+  TOGGLE_NODE_TYPE,
+  composeSceneNodeTypes,
   registerPhysicsSerializers,
+  registerRenderSerializers,
   registerSceneNodeTypes,
   registerUISerializers,
+  resourceCatalog,
   restoreNodeId,
 } from "./scene-serializers.js";

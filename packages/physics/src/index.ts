@@ -45,11 +45,14 @@ export {
 } from "./adapter.js";
 export type {
   SolverBodyAccess,
+  SolverBodyTuningAccess,
   SolverJointAccess,
   SolverJointMotor,
 } from "./body-access.js";
 export {
+  missingSolverBodyTuning,
   missingSolverJointAccess,
+  supportsSolverBodyTuning,
   supportsSolverJointAccess,
 } from "./body-access.js";
 export type {
@@ -190,6 +193,21 @@ export type {
   TorqueInput,
 } from "./rigid-body.js";
 export { RigidBody } from "./rigid-body.js";
+export type {
+  SolverName,
+  SolverRegistration,
+  SolverRejectionReason,
+  SolverRejectionReport,
+  SolverResolveOptions,
+  SolverSelection,
+} from "./solver-registry.js";
+export {
+  SolverRegistry,
+  clearRegisteredSolvers,
+  registerSolver,
+  registeredSolvers,
+  resolveSolver,
+} from "./solver-registry.js";
 export type {
   BoxShape,
   CapsuleShape,

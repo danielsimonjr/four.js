@@ -32,6 +32,15 @@
  * file) is the same double *with* `SolverJointAccess`, including scripted
  * reaction impulses for the plan P6-2 break monitor.
  *
+ * ## Three doubles, then (PH-1 stage 2, 2026-08-07)
+ *
+ * `FakeTuningSolverAdapter` is the same double *with* `SolverBodyTuningAccess`,
+ * §37's post-registration property-change seam. It exists for the same reason
+ * as the joint variant: the world detects that seam structurally too, so the
+ * plain `FakeSolverAdapter` — which implements none of it — is what keeps
+ * `RigidBody`'s "this write reaches no solver" warnings under test, and the
+ * tuning variant is what proves a write does reach one.
+ *
  * ## Mass model
  *
  * `mass = descriptor.mass ?? Σ collider density` — every shape has unit volume
@@ -44,6 +53,7 @@
 
 import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
+import type { Matrix3 } from "@four/math";
 import type {
   AngularVelocityInput,
   BodyType,
@@ -71,6 +81,7 @@ import type {
   ShapeCastHit,
   ShapeCastQuery,
   SolverBodyAccess,
+  SolverBodyTuningAccess,
   Vector3Input,
 } from "../src/index.js";
 import {
@@ -340,6 +351,20 @@ export class FakeSolverAdapter
     const collider = this.#requireCollider(handle);
     collider.alive = false;
     this.colliders.delete(collider.id);
+    // The mass model runs in both directions (PH-5): a collider that stops
+    // existing stops contributing, which is what lets a test watch a
+    // derived-mass body lose — and an authored-mass body keep — its mass across
+    // a runtime removal. `destroyBody` never reaches here (the world tears a
+    // registration down with one `destroyBody`), so this is the body-survives
+    // case §37 defines `destroyCollider` for.
+    const { body } = collider;
+    const index = body.colliders.indexOf(collider);
+    if (index >= 0) {
+      body.colliders.splice(index, 1);
+    }
+    if (body.descriptor.mass === undefined) {
+      body.mass -= collider.descriptor.density ?? DEFAULT_DENSITY;
+    }
     this.#record("destroyCollider", collider.id);
   }
 
@@ -965,5 +990,221 @@ export class FakeJointSolverAdapter
         `fake adapter: joint body handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }
+  }
+}
+
+/**
+ * What a {@link FakeTuningSolverAdapter} last received for one body — the §23
+ * mass triple, §23's damping and gravity scale, and §31's mode.
+ */
+export interface FakeBodyTuning {
+  mass: number;
+  centerOfMass: Vector3 | undefined;
+  inertiaTensor: Matrix3 | undefined;
+  linearDamping: number;
+  angularDamping: number;
+  gravityScale: number;
+  ccdMode: CCDMode;
+  ccdPredictionDistance: number | undefined;
+}
+
+/** What a {@link FakeTuningSolverAdapter} last received for one collider. */
+export interface FakeColliderTuning {
+  friction: number;
+  restitution: number;
+  density: number | undefined;
+  sensor: boolean;
+  collisionGroups: number;
+  collisionMask: number;
+}
+
+/**
+ * `FakeSolverAdapter` **plus** `SolverBodyTuningAccess` — the double that
+ * proves §37's post-registration property changes reach a solver (PH-1
+ * stage 2, 2026-08-07).
+ *
+ * A subclass for exactly the reason {@link FakeJointSolverAdapter} is one:
+ * `PhysicsWorld` detects this seam *structurally*, so the plain
+ * `FakeSolverAdapter` — which implements none of it — is what proves the
+ * detection works and keeps the warn-once path under test. Every write is
+ * recorded in {@link FakeSolverAdapter.calls} (so a test can assert the drain's
+ * **order**) and applied to a per-id record a test can read back.
+ */
+export class FakeTuningSolverAdapter
+  extends FakeSolverAdapter
+  implements SolverBodyTuningAccess
+{
+  /** The last tuning each body received, keyed by monotonic body id. */
+  readonly bodyTuning = new Map<number, FakeBodyTuning>();
+
+  /** The last tuning each collider received, keyed by monotonic collider id. */
+  readonly colliderTuning = new Map<number, FakeColliderTuning>();
+
+  /** The tuning body `id` last received, or `undefined` if it received none. */
+  tuningOf(id: number): FakeBodyTuning | undefined {
+    return this.bodyTuning.get(id);
+  }
+
+  setBodyMassProperties(
+    handle: PhysicsBodyHandle,
+    mass: number,
+    centerOfMass: Vector3 | undefined,
+    inertiaTensor: Matrix3 | undefined,
+    wake = true,
+  ): void {
+    const body = this.#body(handle);
+    body.mass = mass;
+    const tuning = this.#tuning(body.id);
+    tuning.mass = mass;
+    tuning.centerOfMass = centerOfMass?.clone();
+    tuning.inertiaTensor = inertiaTensor?.clone();
+    this.calls.push({
+      method: "setBodyMassProperties",
+      id: body.id,
+      args: [mass, centerOfMass?.clone(), inertiaTensor?.clone(), wake],
+    });
+  }
+
+  setBodyDamping(
+    handle: PhysicsBodyHandle,
+    linear: number,
+    angular: number,
+  ): void {
+    const body = this.#body(handle);
+    const tuning = this.#tuning(body.id);
+    tuning.linearDamping = linear;
+    tuning.angularDamping = angular;
+    this.calls.push({
+      method: "setBodyDamping",
+      id: body.id,
+      args: [linear, angular],
+    });
+  }
+
+  setBodyGravityScale(
+    handle: PhysicsBodyHandle,
+    scale: number,
+    wake = true,
+  ): void {
+    const body = this.#body(handle);
+    this.#tuning(body.id).gravityScale = scale;
+    this.calls.push({
+      method: "setBodyGravityScale",
+      id: body.id,
+      args: [scale, wake],
+    });
+  }
+
+  setBodyCcdMode(
+    handle: PhysicsBodyHandle,
+    mode: CCDMode,
+    predictionDistance?: number,
+  ): void {
+    const body = this.#body(handle);
+    body.ccdMode = mode;
+    const tuning = this.#tuning(body.id);
+    tuning.ccdMode = mode;
+    tuning.ccdPredictionDistance = predictionDistance;
+    this.calls.push({
+      method: "setBodyCcdMode",
+      id: body.id,
+      args: [mode, predictionDistance],
+    });
+  }
+
+  setColliderMaterial(
+    handle: PhysicsColliderHandle,
+    friction: number,
+    restitution: number,
+    density: number | undefined,
+  ): void {
+    const collider = this.#collider(handle);
+    const tuning = this.#colliderTuningOf(collider.id);
+    tuning.friction = friction;
+    tuning.restitution = restitution;
+    tuning.density = density;
+    this.calls.push({
+      method: "setColliderMaterial",
+      id: collider.id,
+      args: [friction, restitution, density],
+    });
+  }
+
+  setColliderFilter(
+    handle: PhysicsColliderHandle,
+    sensor: boolean,
+    collisionGroups: number,
+    collisionMask: number,
+  ): void {
+    const collider = this.#collider(handle);
+    const tuning = this.#colliderTuningOf(collider.id);
+    tuning.sensor = sensor;
+    tuning.collisionGroups = collisionGroups;
+    tuning.collisionMask = collisionMask;
+    this.calls.push({
+      method: "setColliderFilter",
+      id: collider.id,
+      args: [sensor, collisionGroups, collisionMask],
+    });
+  }
+
+  // --- internals ------------------------------------------------------------
+
+  #tuning(id: number): FakeBodyTuning {
+    let tuning = this.bodyTuning.get(id);
+    if (tuning === undefined) {
+      tuning = {
+        mass: 0,
+        centerOfMass: undefined,
+        inertiaTensor: undefined,
+        linearDamping: 0,
+        angularDamping: 0,
+        gravityScale: 1,
+        ccdMode: "disabled",
+        ccdPredictionDistance: undefined,
+      };
+      this.bodyTuning.set(id, tuning);
+    }
+    return tuning;
+  }
+
+  #colliderTuningOf(id: number): FakeColliderTuning {
+    let tuning = this.colliderTuning.get(id);
+    if (tuning === undefined) {
+      tuning = {
+        friction: 0,
+        restitution: 0,
+        density: undefined,
+        sensor: false,
+        collisionGroups: 0,
+        collisionMask: 0,
+      };
+      this.colliderTuning.set(id, tuning);
+    }
+    return tuning;
+  }
+
+  #body(handle: PhysicsBodyHandle): FakeBody {
+    const id = (handle as unknown as { id: number }).id;
+    const body = this.bodies.get(id);
+    if (body === undefined || !body.alive) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `fake adapter: body handle ${String(id)} is foreign or destroyed (§37).`,
+      );
+    }
+    return body;
+  }
+
+  #collider(handle: PhysicsColliderHandle): FakeCollider {
+    const id = (handle as unknown as { id: number }).id;
+    const collider = this.colliders.get(id);
+    if (collider === undefined || !collider.alive) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `fake adapter: collider handle ${String(id)} is foreign or destroyed (§37).`,
+      );
+    }
+    return collider;
   }
 }

@@ -1,0 +1,316 @@
+/**
+ * A-4 — §85's development/production build split, proven at the bundle
+ * (2026-08-07).
+ *
+ * §85 closes with *"Production builds may disable expensive validation while
+ * preserving essential safety checks."* `@four/core`'s `DEV` is the mechanism;
+ * `packages/core/tests/dev.test.ts` proves its *semantics* by evaluating both
+ * builds. That is not the same claim as the one this packet actually makes,
+ * which is about **bytes**: that a real bundler, given
+ * `define: { __FOUR_DEV__: "false" }`, folds the guard to a literal and deletes
+ * the guarded code, so §84's statistics wiring and §6a's duplicate-component
+ * warning stop being shipped to users who will never read them.
+ *
+ * Only a bundler can answer that, so this file runs one — the same Vite the
+ * examples build with, twice over the same entry, and compares.
+ *
+ * The second half is the rule that keeps the mechanism safe. Determinism
+ * (§33–§34) is defined over the simulation and a replay recorded in a
+ * development build must reproduce bit-exactly in a production one, so **no
+ * value that reaches a solver, an integrator, a checksum, a snapshot, or a
+ * serialized document may depend on `DEV`**. That is a prose rule, and prose
+ * rules decay; {@link GATED} turns it into a list. A new file that gates on the
+ * flag fails this suite until someone adds it there, which is the moment the
+ * §33 argument has to be made out loud.
+ */
+
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { join, relative, sep } from "node:path";
+
+import { build } from "vite";
+import { afterAll, describe, expect, it } from "vitest";
+
+const repositoryRoot = join(import.meta.dirname, "..", "..");
+
+/**
+ * Where the throwaway bundle entry is written.
+ *
+ * Inside the repository, because Node's resolution walks up from the *entry
+ * file* and an entry in the system temp directory cannot see the workspace's
+ * `four` symlink; under `node_modules/`, because that is already ignored by
+ * git, ESLint, and Prettier, so a crashed run cannot leave a file the gates
+ * would then complain about.
+ */
+const scratchDirectory = join(
+  repositoryRoot,
+  "node_modules",
+  ".four-dev-build-mode",
+);
+
+/**
+ * The program the bundles are built from: the smallest thing that touches every
+ * path this packet gated. `stats: true` asks for §84 explicitly — a production
+ * build has to drop the wiring *despite* being asked, which is the interesting
+ * case — and `addComponent` twice reaches §6a's duplicate warning.
+ */
+const ENTRY_SOURCE = `
+import { Application } from "four/application";
+import { Group } from "four/scene";
+
+class Marker {
+  static readonly typeName = "probe.marker";
+}
+
+export function boot(): Application {
+  const app = new Application({ stats: true });
+  const node = new Group();
+  node.addComponent(new Marker());
+  node.addComponent(new Marker());
+  app.scene.add(node);
+  return app;
+}
+`;
+
+/**
+ * Strings that exist **only** on a gated path, one per gated cost.
+ *
+ * Each is a literal that survives minification (a property name a record is
+ * built with, or message text), so finding it in the output means the code that
+ * produces it was shipped. They are deliberately specific: `drawCalls` would
+ * have been a bad probe, because `@four/render`'s own statistics record uses
+ * that name on a path this packet does *not* gate.
+ */
+const GATED_MARKERS: ReadonlyArray<readonly [string, string]> = [
+  ["cpuFrameTime", "§84's FrameStats record (A-1)"],
+  [
+    "textureMemory",
+    "§84's memory counters, and with them §83's accounting readers (A-5)",
+  ],
+  ["already attached", "§6a's duplicate-component warning"],
+  [
+    "performance",
+    "the §84 monotonic clock — the last thing holding @four/diagnostics in",
+  ],
+];
+
+interface Bundles {
+  readonly development: string;
+  readonly production: string;
+}
+
+/** Bundles {@link ENTRY_SOURCE} once per build mode and returns both outputs. */
+async function bundleBothModes(): Promise<Bundles> {
+  mkdirSync(scratchDirectory, { recursive: true });
+  const entry = join(scratchDirectory, "entry.ts");
+  writeFileSync(entry, ENTRY_SOURCE);
+
+  const run = async (define: Record<string, string>): Promise<string> => {
+    const result = await build({
+      root: repositoryRoot,
+      // `configFile: false` so the repository's own Vite config (if one ever
+      // appears) cannot quietly change what this test measures.
+      configFile: false,
+      logLevel: "silent",
+      define,
+      build: {
+        write: false,
+        minify: true,
+        lib: { entry, formats: ["es"], fileName: "probe" },
+      },
+    });
+    const outputs = Array.isArray(result) ? result[0].output : [];
+    const chunk = outputs.find((output) => output.type === "chunk");
+    if (chunk === undefined || chunk.type !== "chunk") {
+      throw new Error("the probe build produced no chunk");
+    }
+    return chunk.code;
+  };
+
+  return {
+    development: await run({}),
+    production: await run({ __FOUR_DEV__: "false" }),
+  };
+}
+
+const bundles = await bundleBothModes();
+
+afterAll(() => {
+  rmSync(scratchDirectory, { recursive: true, force: true });
+});
+
+describe("A-4 — the production define strips what it says it strips", () => {
+  it.each(GATED_MARKERS)(
+    "drops %s from a production bundle",
+    (marker, what) => {
+      expect(
+        bundles.development,
+        `${what} should ship in development`,
+      ).toContain(marker);
+      expect(
+        bundles.production,
+        `${what} should not ship in production`,
+      ).not.toContain(marker);
+    },
+  );
+
+  it("leaves the identifier itself out of both bundles' runtime path", () => {
+    // Development keeps the `typeof __FOUR_DEV__` guard, which is what makes
+    // bare consumption safe: the global is never *read*, so a host that has
+    // never heard of the define does not get a ReferenceError.
+    expect(bundles.development).toContain("__FOUR_DEV__");
+    expect(bundles.development).toContain("typeof");
+    // Production has no trace of it at all — the ternary folded to a literal.
+    expect(bundles.production).not.toContain("__FOUR_DEV__");
+  });
+
+  it("is smaller, by more than a rounding error", () => {
+    // The measured saving on this entry was ~2.2 kB raw / ~0.5 kB gzip, which
+    // is A-1's recorded "~0.4 kB gzip per example" plus §6a's warning and the
+    // clock. The assertion is a floor, not the measurement: it fails if the
+    // gating silently stops working, and does not have to be edited when an
+    // unrelated packet moves the number.
+    expect(bundles.production.length).toBeLessThan(
+      bundles.development.length - 1024,
+    );
+  });
+});
+
+/**
+ * Every package source that may gate on §85's build flag, with the reason it is
+ * allowed to — and, for each, why the gated work cannot reach a simulation.
+ *
+ * Adding a file here is a deliberate act. Before you do, answer the §33
+ * question in one sentence: *if this block never ran, would any number the
+ * engine computes change?* If the answer is anything but "no", the code does
+ * not belong behind the flag.
+ */
+const GATED: ReadonlyMap<string, string> = new Map([
+  [
+    join("packages", "core", "src", "dev.ts"),
+    "declares the flag — DEV, devWarn, devWarnOnce, devAssert (A-4)",
+  ],
+  [join("packages", "core", "src", "index.ts"), "re-exports them; no logic"],
+  [
+    join("packages", "core", "src", "component.ts"),
+    "§6a's duplicate-component warning. The *replacement* is unconditional; only the console message moves with the flag",
+  ],
+  [
+    join("packages", "diagnostics", "src", "resource-audit.ts"),
+    "§83's leaked-resource audit — a function the author calls, whose only output is text",
+  ],
+  [
+    join("packages", "four", "src", "application.ts"),
+    "§84's statistics wiring (A-1). Measurement only: `stats` is read by nobody inside the engine, and the frame's event order, transforms and draw calls are identical either way",
+  ],
+]);
+
+/** Every `.ts` file under `packages/<name>/src`, repository-relative. */
+function packageSources(): string[] {
+  const found: string[] = [];
+  const packagesDirectory = join(repositoryRoot, "packages");
+  const walk = (directory: string): void => {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (name.endsWith(".ts")) found.push(relative(repositoryRoot, path));
+    }
+  };
+  for (const pkg of readdirSync(packagesDirectory)) {
+    const source = join(packagesDirectory, pkg, "src");
+    try {
+      if (!statSync(source).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    walk(source);
+  }
+  return found;
+}
+
+/**
+ * Whether `file` *imports* one of the flag's names — an import, not a text
+ * match, so a module header that merely explains the rule (as `stats.ts` does)
+ * is not mistaken for a module that follows it.
+ */
+function importsTheFlag(file: string): boolean {
+  const source = readFileSync(join(repositoryRoot, file), "utf8");
+  const imports = source.matchAll(
+    /import\s*\{([^}]*)\}\s*from\s*["'][^"']+["']/g,
+  );
+  for (const match of imports) {
+    if (/\b(?:DEV|devWarn|devWarnOnce|devAssert)\b/.test(match[1])) return true;
+  }
+  // `dev.ts` itself declares them rather than importing them.
+  return /export const DEV\b/.test(source);
+}
+
+describe("§33 — the flag stays out of everything deterministic", () => {
+  it("is gated only in files that have argued for it", () => {
+    const unexpected = packageSources().filter(
+      (file) => importsTheFlag(file) && !GATED.has(file),
+    );
+    expect(
+      unexpected,
+      "these files gate on §85's build flag without a recorded §33 argument; add them to GATED with one, or take the flag out",
+    ).toEqual([]);
+  });
+
+  it("has no stale allowlist entries", () => {
+    const sources = new Set(packageSources());
+    const gone = [...GATED.keys()].filter((file) => !sources.has(file));
+    expect(gone, "GATED names files that no longer exist").toEqual([]);
+  });
+
+  it("names no simulation package", () => {
+    // The blunt half of the rule, stated as a list rather than as a judgement:
+    // these are the packages a replay's numbers come out of, and none of them
+    // may branch on the build mode at all.
+    const simulation = [
+      "math",
+      "motion",
+      "scene",
+      "physics",
+      "animation",
+      "particles",
+    ];
+    for (const file of GATED.keys()) {
+      const pkg = file.split(sep)[1];
+      expect(
+        simulation,
+        `${file} is in a simulation package (§33)`,
+      ).not.toContain(pkg);
+    }
+  });
+});
+
+describe("every example builds in production mode", () => {
+  it("defines __FOUR_DEV__ as false", () => {
+    // The examples are what `pnpm run size` measures against §86's payload
+    // budget, so an example that forgot the define would quietly measure a
+    // development bundle and report a number no user experiences.
+    const configs: string[] = [];
+    const walk = (directory: string): void => {
+      for (const name of readdirSync(directory)) {
+        const path = join(directory, name);
+        if (name === "node_modules" || name === "dist") continue;
+        if (statSync(path).isDirectory()) walk(path);
+        else if (name === "vite.config.ts") configs.push(path);
+      }
+    };
+    walk(join(repositoryRoot, "examples"));
+    expect(configs.length).toBeGreaterThan(0);
+    for (const config of configs) {
+      expect(
+        readFileSync(config, "utf8"),
+        `${relative(repositoryRoot, config)} must build in production mode`,
+      ).toContain('__FOUR_DEV__: "false"');
+    }
+  });
+});

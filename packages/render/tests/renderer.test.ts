@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   NullRenderer,
+  RenderTarget,
   type RenderInterpolation,
   type Renderer,
   type RendererCapabilities,
@@ -215,6 +216,32 @@ describe("NullRenderer — call recording", () => {
 
     expect(renderer.lastInterpolation).toBeNull();
     expect(renderer.renderCount).toBe(2);
+  });
+
+  it("records the R-4 render target a frame passed, clearing the last", () => {
+    const { renderer, scene, views } = fixture();
+    const target = new RenderTarget({ width: 64, height: 64 });
+
+    expect(renderer.lastRenderTarget).toBeNull();
+    renderer.render(scene, views, undefined, target);
+    expect(renderer.lastRenderTarget).toBe(target);
+
+    // A later on-screen frame must not leave the off-screen pass's target
+    // standing — the rule `lastInterpolation` already follows.
+    renderer.render(scene, views);
+
+    expect(renderer.lastRenderTarget).toBeNull();
+    expect(renderer.renderCount).toBe(2);
+    target.dispose();
+  });
+
+  it("accepts an explicit null target as 'draw to the surface'", () => {
+    const { renderer, scene, views } = fixture();
+
+    renderer.render(scene, views, undefined, null);
+
+    expect(renderer.lastRenderTarget).toBeNull();
+    expect(renderer.renderCount).toBe(1);
   });
 
   it("draws nothing — the scene is untouched by a render", () => {

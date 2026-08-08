@@ -73,15 +73,33 @@
  * `addJoint` when it is absent, instead of requiring every adapter to grow
  * stubs. See {@link supportsSolverJointAccess}.
  *
- * This module is **types plus one structural predicate** — the predicate is the
- * only runtime code it ships. `FakeSolverAdapter` (`tests/fake-adapter.ts`) is
- * the structural double that proves both interfaces are implementable without a
- * solver; `Rapier2dAdapter` is the first real implementor of
+ * ## The third seam: {@link SolverBodyTuningAccess} (PH-1 stage 2, 2026-08-07)
+ *
+ * {@link SolverBodyAccess} covers the state the world exchanges **every step**.
+ * §37 also names "property changes" among what `syncSceneToSolver` carries, and
+ * until this seam existed there was nothing to carry them with: a `mass`,
+ * `linearDamping`, `gravityScale`, or `ccdMode` written after `createBody`
+ * reached no solver, and neither did a collider's §25 material or its §24
+ * filter. {@link SolverBodyTuningAccess} is those six writes, and it is a
+ * **separate, structurally detected** interface for exactly the three reasons
+ * {@link supportsSolverJointAccess} lists — an adapter that implements none of
+ * it stays a legal `PhysicsWorldAdapter`, and the engine tells the difference
+ * by looking rather than by being told. See {@link supportsSolverBodyTuning}.
+ *
+ * The world drains a per-component dirty set into these methods at the top of
+ * the step, before {@link SolverBodyAccess.applyForce} and the kinematic feed,
+ * so a property change is in force for the step that follows it. A body nobody
+ * wrote to costs zero calls.
+ *
+ * This module is **types plus four structural predicates** — the predicates are
+ * the only runtime code it ships. `FakeSolverAdapter` (`tests/fake-adapter.ts`)
+ * is the structural double that proves the interfaces are implementable without
+ * a solver; `Rapier2dAdapter` is the first real implementor of
  * {@link SolverBodyAccess}, whose own `RapierBodyAccess` it mirrors member for
  * member.
  */
 
-import type { Quaternion, Vector3 } from "@four/math";
+import type { Matrix3, Quaternion, Vector3 } from "@four/math";
 
 import type {
   AngularVelocityInput,
@@ -311,6 +329,136 @@ export interface SolverBodyAccess {
 }
 
 /**
+ * The **post-registration property writes** §37 names and
+ * {@link SolverBodyAccess} leaves out (§23, §24, §25, §31; PH-1 stage 2,
+ * 2026-08-07).
+ *
+ * ## What it is for
+ *
+ * Everything in {@link SolverBodyAccess} is per-step traffic: pose, velocity,
+ * forces, sleep. The six methods here are the *rare* writes — a mass that
+ * changed, a damping coefficient a tuning slider moved, a collider that became
+ * a sensor. They are called only for a component that was actually written to
+ * since the last step, so an adapter may implement them without any concern for
+ * per-step cost.
+ *
+ * ## Optional, and honest about it
+ *
+ * An adapter implements **all six or none**: `supportsSolverBodyTuning` is a
+ * structural all-or-nothing check, so a half-implemented seam is treated as
+ * absent rather than producing writes that reach the solver for two properties
+ * out of six. A world whose adapter does not implement it keeps `RigidBody`'s
+ * warn-once machinery on (see the truth table at the top of `rigid-body.ts`):
+ * the write is refused loudly instead of being dropped, which is the
+ * `PhysicsTuningCapabilities` rule applied to a whole seam.
+ *
+ * ## `wake`
+ *
+ * Where a method takes `wake`, `true` (the default, as everywhere else on this
+ * seam) wakes a sleeping body so the new property is felt on the next step;
+ * `false` leaves §32 sleep state alone. The two collider methods take none:
+ * Rapier's collider setters do not touch the parent body's sleep state, and
+ * inventing a wake here would make a filter change move a body.
+ */
+export interface SolverBodyTuningAccess {
+  /**
+   * Replaces §23's **mass triple** — mass, centre of mass, rotational inertia —
+   * on a body that already exists.
+   *
+   * `mass` is in kilograms and is always defined: "derive my mass from collider
+   * density again" is *not* expressible here, because undoing an authored mass
+   * means restoring every collider's own density, which only the registration
+   * path knows (see `PhysicsWorld`'s drain, which never queues an un-authoring).
+   *
+   * `centerOfMass` (body-local metres) and `inertiaTensor` are `undefined` when
+   * the component never authored them, which is §23's instruction to derive
+   * *those two* from the colliders and the new mass — not an instruction to use
+   * the origin and the identity tensor. An implementor must reproduce whatever
+   * its `createBody` does for the same combination, so that writing `mass` and
+   * re-registering the body give the same simulation.
+   *
+   * In a `"2d"` world only the tensor's Z diagonal entry is meaningful (§21,
+   * §23).
+   *
+   * Neither vector nor the tensor is retained: both are the component's own
+   * live objects, and an adapter that keeps a reference would alias them.
+   */
+  setBodyMassProperties(
+    handle: PhysicsBodyHandle,
+    mass: number,
+    centerOfMass: Vector3 | undefined,
+    inertiaTensor: Matrix3 | undefined,
+    wake?: boolean,
+  ): void;
+
+  /** Replaces §23's two damping coefficients, both `>= 0`. */
+  setBodyDamping(
+    handle: PhysicsBodyHandle,
+    linear: number,
+    angular: number,
+  ): void;
+
+  /** Replaces §23's gravity multiplier: `1` leaves gravity as-is, `0` is weightless. */
+  setBodyGravityScale(
+    handle: PhysicsBodyHandle,
+    scale: number,
+    wake?: boolean,
+  ): void;
+
+  /**
+   * Selects §31's continuous-collision method on a live body.
+   *
+   * `predictionDistance` is `"speculative"`'s prediction distance in world
+   * units, `undefined` for the adapter's documented default; it is ignored for
+   * every other mode. `"disabled"` must turn off whatever the body was using,
+   * which is what makes this reversible.
+   */
+  setBodyCcdMode(
+    handle: PhysicsBodyHandle,
+    mode: CCDMode,
+    predictionDistance?: number,
+  ): void;
+
+  /**
+   * Replaces a collider's §25 surface properties.
+   *
+   * `friction` and `restitution` are the *effective* coefficients the engine
+   * resolved from the collider's own fields and its `PhysicsMaterial` — an
+   * adapter never re-runs that precedence. `density` is `undefined` when the
+   * body's mass is not derived from collider density, in which case the
+   * implementor must leave the collider's mass contribution exactly as it is:
+   * writing a density into a body whose mass was authored would silently
+   * un-author it.
+   *
+   * §25's `rollingFriction` and `spinningFriction` are deliberately absent —
+   * they are declared through `PhysicsTuningCapabilities` (PH-14/PH-15) and
+   * neither shipped adapter applies them, so a parameter here would be a
+   * promise no implementor keeps.
+   */
+  setColliderMaterial(
+    handle: PhysicsColliderHandle,
+    friction: number,
+    restitution: number,
+    density: number | undefined,
+  ): void;
+
+  /**
+   * Replaces a collider's §24 participation: whether it is a sensor, the bit
+   * set of groups it belongs to, and the bit set it collides with.
+   *
+   * Both bit sets are 16-bit masks (§24). Turning a collider into a sensor
+   * mid-simulation changes which §29 events it emits from the next step on;
+   * pairs that were already touching are re-classified by the engine, not here.
+   */
+  setColliderFilter(
+    handle: PhysicsColliderHandle,
+    sensor: boolean,
+    collisionGroups: number,
+    collisionMask: number,
+  ): void;
+}
+
+/**
  * A motor as the solver receives it (§28 "motors"), with the units the joint's
  * own degree of freedom implies.
  *
@@ -487,4 +635,55 @@ export function missingSolverJointAccess(adapter: object): string[] {
     }
   }
   return missing;
+}
+
+/** The members {@link supportsSolverBodyTuning} looks for, as a runtime list. */
+const BODY_TUNING_METHODS = [
+  "setBodyMassProperties",
+  "setBodyDamping",
+  "setBodyGravityScale",
+  "setBodyCcdMode",
+  "setColliderMaterial",
+  "setColliderFilter",
+] as const satisfies readonly (keyof SolverBodyTuningAccess)[];
+
+/**
+ * Whether `adapter` implements {@link SolverBodyTuningAccess} — the
+ * **structural** detection a world runs once, at construction, before it
+ * promises anyone that a property write reaches the solver (PH-1 stage 2).
+ *
+ * Structural for the three reasons {@link supportsSolverJointAccess} gives, and
+ * **all-or-nothing** for a fourth: the alternative — six independent capability
+ * bits — would let an adapter honour `setBodyDamping` and drop
+ * `setBodyMassProperties`, so the engine would have to keep a per-property warn
+ * table and `RigidBody` would have to consult it from six setters. Six methods
+ * are a small enough surface that "implement the seam or do not" costs an
+ * adapter author nothing and costs the engine one boolean.
+ *
+ * `PhysicsCapabilities.tuning` (`PhysicsTuningCapabilities`) stays the
+ * declaration of which §25/§32 *coefficients* an adapter applies at all; this
+ * predicate answers the prior question of whether a value can be changed after
+ * `createBody`.
+ */
+export function supportsSolverBodyTuning(
+  adapter: object,
+): adapter is SolverBodyTuningAccess {
+  const candidate = adapter as Partial<SolverBodyTuningAccess>;
+  return BODY_TUNING_METHODS.every(
+    (method) => typeof candidate[method] === "function",
+  );
+}
+
+/**
+ * The members of {@link SolverBodyTuningAccess} that `adapter` does **not**
+ * implement, in declaration order — the detail
+ * {@link supportsSolverBodyTuning}'s `false` leaves out, and what
+ * `PhysicsWorld` puts in the warning that tells a caller why a property write
+ * stopped at the component.
+ */
+export function missingSolverBodyTuning(adapter: object): string[] {
+  const candidate = adapter as Partial<SolverBodyTuningAccess>;
+  return BODY_TUNING_METHODS.filter(
+    (method) => typeof candidate[method] !== "function",
+  );
 }

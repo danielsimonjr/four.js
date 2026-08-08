@@ -1,0 +1,361 @@
+/**
+ * §70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):
+ * one render target's colour attachment drawn over another surface through a
+ * fragment shader, described here with no backend types at all.
+ *
+ * ```ts
+ * const sceneColor = new RenderTarget({ width: 512, height: 512 });
+ *
+ * const graph = new RenderGraph();
+ * graph.addPass("world", { root: scene, views, target: sceneColor });
+ * graph.addPass(
+ *   "grade",
+ *   {
+ *     kind: "effect",
+ *     source: sceneColor.colorTexture,
+ *     effect: { kind: "grade", exposure: 1.2, saturation: 0.8 },
+ *   },
+ *   { inputs: ["world"] },
+ * );
+ *
+ * graph.execute(renderer, { poseBuffer: poses, alpha: time.interpolationAlpha });
+ * ```
+ *
+ * ## An effect is a graph pass, not a second orchestration mechanism
+ *
+ * This is the whole architectural point, and it is a recorded instruction
+ * (R-5, 2026-08-07): §63 already owns "which pass runs when, writing what,
+ * sampling what", so §70 gets a **third pass kind** rather than an `effects`
+ * array on `Viewport`, a post-processing manager, or a chain object. An
+ * {@link EffectRenderPass} is added, named, enabled, ordered, validated and
+ * described by exactly the machinery `RenderGraph` already has, and — like a
+ * {@link SceneRenderPass} — it becomes **one
+ * renderer call**, which is what keeps R-5's "the graph is a driver, not a
+ * backend" property true with two verbs instead of one.
+ *
+ * ### Why a first-class kind and not a `CustomRenderPass`
+ *
+ * `CustomRenderPass` is the escape hatch, and R-5 made it *report its own
+ * opacity*: every custom pass emits an `"opaque"` issue because the graph
+ * cannot see what it samples. An effect pass is the opposite case. Its sample
+ * is not hidden inside a closure — it is the {@link EffectRenderPass.source}
+ * field, right there in the descriptor — so the graph can check it **exactly**,
+ * with no traversal at all, where a scene pass needs a whole render list built
+ * to discover the same thing. Expressing §70 through the escape hatch would
+ * have made every effect chain unvalidatable precisely where the two mistakes
+ * it invites live: sampling the surface you are writing (`"feedback"`) and
+ * consuming a target a later pass produces (`"order"`). A third member of a
+ * union that was already discriminated (`kind`) costs one branch in `execute`,
+ * one in `validate`, one in `describe`, and buys back the checking.
+ *
+ * ## What "the minimal tier" covers, effect by effect (§70)
+ *
+ * §70 lists ten effects and one composition rule. Two of them need nothing but
+ * the source texel — those are shipped; the rest each need a *resource* this
+ * renderer does not have yet, and are named with the packet that brings it
+ * rather than approximated.
+ *
+ * | §70 requirement                     | this tier                                                                                                                                                                                                                              |
+ * | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+ * | tone mapping                        | **staged** — §60a defines it as the output transform *paired with sRGB encoding*, applied to a linear-light HDR buffer. Every surface here is `rgba8` (R-4's one-member `RenderTargetFormat`) and carries no colour-space metadata, so an operator applied now would compress a range that does not exist and write into a slot §60a says is shared with an encoding this tier cannot perform. Lands with float targets + §60a (R-15). |
+ * | color grading                       | **shipped** — {@link ColorGradeEffect}: exposure, contrast, saturation                                                                                                                                                                    |
+ * | bloom                               | **staged** — a bright-pass plus a separable blur is three passes over half-resolution surfaces, i.e. §63's *transient target pool*, which R-5 staged for a stated reason (it needs a size/format key and a lifetime analysis)              |
+ * | anti-aliasing                       | **staged** — FXAA/SMAA are neighbourhood filters and need the source's texel size and a luma pass; MSAA is a *target* capability (`renderbufferStorageMultisample` plus a resolve blit), staged on R-4                                     |
+ * | depth of field                      | **staged** — needs samplable depth; a target's depth buffer here is a renderbuffer, and depth *textures* are staged with §69                                                                                                              |
+ * | motion blur                         | **staged** — needs a velocity buffer, hence multiple render targets (staged on R-4) and previous-frame matrices                                                                                                                           |
+ * | screen-space ambient occlusion      | **staged** — samplable depth *and* normals: MRT plus depth textures, both above                                                                                                                                                           |
+ * | outlines and selection highlighting | **staged** — needs a §71 GPU identifier buffer, a depth/normal edge pass, or §67's stencil (R-7). Named in the gap analysis as R-6's most-wanted consumer, and honestly still blocked on one of those three                                |
+ * | distortion                          | **staged** — a screen-space displacement samples a second input (a flow map or a normal buffer); a pass here carries exactly one {@link EffectRenderPass.source}                                                                           |
+ * | custom full-screen passes           | **staged deliberately** — user-authored shader source is R-14's RFC (§60), which the `custom-shaders.md` guide already scopes and which §96 constrains to a declarative form. {@link ScreenEffect} is a **closed union** so that widening it is that RFC's job and an unsupported request is a compile error today, not a silent no-op |
+ * | "composable per viewport"           | **partial** — composition is per *pass*: a chain of effect passes ping-ponging between two targets composes freely, and a per-viewport chain is expressible by giving each viewport its own target. A per-viewport *rectangle* inside one effect pass is not: an effect covers its whole destination surface (see {@link EffectRenderPass}) |
+ *
+ * ## The closed union is the point, not a placeholder
+ *
+ * {@link ScreenEffect} is a discriminated union of named effects rather than a
+ * `string` or a shader source, for the reason `RenderTargetFormat` is a
+ * one-member union: `{ kind: "bloom" }` has to be a **compile error** while
+ * bloom is staged, not a value that reaches a backend which quietly copies
+ * instead. Every entry in the table above that says *staged* is therefore
+ * unwritable, and the day one ships it is the day the union grows a member.
+ *
+ * ## Where an effect is validated (§85)
+ *
+ * At **setup**, by {@link RenderGraph.addPass}, through
+ * {@link validateEffectRenderPass} — the same stance R-5 took for the graph's
+ * resource checks, and for the same reason: a backend may not throw from inside
+ * a frame (§61), and an effect's parameters do not change between the frames
+ * that would be worth re-checking. An application that hand-writes
+ * `renderer.renderEffect(pass)` without a graph bypasses that check exactly as
+ * a hand-written `renderer.render` bypasses {@link RenderGraph.validate}, and
+ * may call {@link validateEffectRenderPass} itself.
+ */
+
+import type { RenderTarget, RenderTargetTexture } from "./render-target.js";
+import { isRenderTargetTexture } from "./render-target.js";
+
+/**
+ * A straight copy of the source texture — §70's blit, and the identity element
+ * of an effect chain.
+ *
+ * The pass §63 calls "Final Composite" when nothing is being *changed*: an
+ * off-screen frame put on screen, a ping-pong buffer moved, or the on-screen
+ * debug view of an intermediate target that §63's "debug visualization" wants
+ * and {@link RenderGraph.describe} could only print in text until now.
+ *
+ * Backends must make this **bit-exact**: same texels in, same texels out, with
+ * no arithmetic between the sample and the fragment output (the WebGL 2 backend
+ * does — its fragment stage assigns the sampled texel unchanged).
+ */
+export interface CopyEffect {
+  /** Required, and the only value — the discriminant. */
+  readonly kind: "copy";
+}
+
+/**
+ * §70's "color grading": exposure, contrast, and saturation over the source,
+ * in the order named here.
+ *
+ * ```ts
+ * { kind: "grade", exposure: 1.2, contrast: 1.1, saturation: 0.85 }
+ * ```
+ *
+ * Every field is optional and defaults to `1` — the *identity* value of its
+ * operation — so `{ kind: "grade" }` is a copy with three multiplies, and a
+ * grade that names one field leaves the other two exactly alone. See
+ * {@link COLOR_GRADE_DEFAULTS}.
+ *
+ * ## What the numbers mean, precisely
+ *
+ * The pipeline is linear-light on the GPU backends (§60a), and these operate on
+ * the values as stored — there is no perceptual curve in this tier, because the
+ * output transform that would supply one is staged (see the module header).
+ * Stated as arithmetic, per colour channel, with `a` untouched throughout:
+ *
+ * 1. **exposure** — `rgb *= exposure`. A linear-light scale, so `2` is one stop
+ *    brighter, not "twice as bright" perceptually.
+ * 2. **contrast** — `rgb = (rgb - 0.5) * contrast + 0.5`. The pivot is `0.5`
+ *    *linear*, which is not perceptual mid-grey; the pivot moves to mid-grey
+ *    when §60a's transform lands, and that is a deliberate difference recorded
+ *    here rather than a rounding of it.
+ * 3. **saturation** — `rgb = mix(vec3(luma), rgb, saturation)`, with `luma` the
+ *    Rec. 709 linear-light weighted sum (`0.2126 R + 0.7152 G + 0.0722 B`);
+ *    `0` is greyscale, `1` is unchanged, above `1` oversaturates.
+ *
+ * Nothing is clamped by the effect: the destination surface's format does the
+ * clamping it does (`rgba8` saturates), and a float target — when R-4's format
+ * union widens — will not. Alpha is never touched, so an effect pass over a
+ * target with a transparent background composites afterwards exactly as the
+ * source would have.
+ */
+export interface ColorGradeEffect {
+  /** Required, and the only value — the discriminant. */
+  readonly kind: "grade";
+
+  /** Linear-light multiplier; defaults to `1`. Finite and `>= 0` (§85). */
+  readonly exposure?: number;
+
+  /** Contrast about a linear `0.5` pivot; defaults to `1`. Finite, `>= 0`. */
+  readonly contrast?: number;
+
+  /** `0` greyscale … `1` unchanged … above oversaturates. Finite, `>= 0`. */
+  readonly saturation?: number;
+}
+
+/**
+ * One §70 effect, as a closed discriminated union — see the module header for
+ * why it is closed and what widening it means.
+ */
+export type ScreenEffect = CopyEffect | ColorGradeEffect;
+
+/** {@link ScreenEffect}'s discriminant, for a caller switching over it. */
+export type ScreenEffectKind = ScreenEffect["kind"];
+
+/**
+ * The value every omitted {@link ColorGradeEffect} field takes: `1`, the
+ * identity of each of the three operations.
+ *
+ * Exported and frozen so a backend, a test, and a tool all read the same
+ * numbers rather than each writing `?? 1` and hoping. A backend applies these
+ * itself — the descriptor is handed to it as the application wrote it, never
+ * normalized in between, so nothing allocates per frame.
+ */
+export const COLOR_GRADE_DEFAULTS: {
+  readonly exposure: number;
+  readonly contrast: number;
+  readonly saturation: number;
+} = Object.freeze({ exposure: 1, contrast: 1, saturation: 1 });
+
+/**
+ * A shared, frozen {@link CopyEffect} — the effect has no parameters, so one
+ * instance serves every pass and a blit allocates nothing.
+ *
+ * ```ts
+ * graph.addPass("present", {
+ *   kind: "effect",
+ *   source: sceneColor.colorTexture,
+ *   effect: COPY_EFFECT,
+ * });
+ * ```
+ */
+export const COPY_EFFECT: CopyEffect = Object.freeze({ kind: "copy" });
+
+/**
+ * §70's full-screen effect, as a {@link RenderGraph} pass and as the argument
+ * of {@link Renderer.renderEffect} (R-6).
+ *
+ * One object serves both because the graph *forwards it unchanged* — R-5's
+ * "one pass, one renderer call", kept literal. That is also why the
+ * destination lives on the pass rather than being a separate argument the way
+ * `Renderer.render`'s `target` is: a pass is a complete description of one
+ * step, and a hand-written call needs no argument order to remember.
+ *
+ * ## What it draws
+ *
+ * The whole of the destination surface — the target's full size, or the
+ * drawing buffer's — with no depth test, no blending, and no clear: an effect
+ * *replaces* what the destination held rather than compositing over it, which
+ * is what makes a chain of them predictable. Viewport rectangles do not appear
+ * here; see the module header's note on §70's "composable per viewport".
+ *
+ * ## What it refuses
+ *
+ * Drawing into the surface it samples is a read-write feedback loop on one
+ * surface — undefined behaviour on every backend. R-4's rule applies unchanged:
+ * the *draw* is refused rather than attempted, {@link RenderGraph.validate}
+ * reports it statically as `"feedback"`, and ping-pong between two targets is
+ * the supported form. A disposed source or destination is skipped for the same
+ * reason a disposed texture is (§83).
+ */
+export interface EffectRenderPass {
+  /** Required, and the only value — this is the discriminant. */
+  readonly kind: "effect";
+
+  /**
+   * The surface to sample: a {@link RenderTarget}'s
+   * `colorTexture`.
+   *
+   * Typed as {@link RenderTargetTexture}
+   * rather than as a `RenderTarget` because it is a *texture* the pass reads,
+   * and because that is the type R-4 made assignable to every material slot —
+   * so the same expression feeds an effect pass and a textured quad, and the
+   * day a target grows several colour attachments the source names which one.
+   */
+  readonly source: RenderTargetTexture;
+
+  /** Which §70 effect to apply. {@link COPY_EFFECT} is the blit. */
+  readonly effect: ScreenEffect;
+
+  /**
+   * Where to draw, or absent/`null` for the backend's default drawing buffer.
+   * The last pass of a chain usually has none — that is the pass that puts the
+   * post-processed frame on screen.
+   */
+  readonly target?: RenderTarget | null;
+}
+
+/**
+ * A renderer that can draw §70 effect passes — the structural capability
+ * (R-6).
+ *
+ * Written as its own interface, and as an **optional** member of
+ * {@link Renderer}, for the reasons `statistics.ts`
+ * gives for `RenderStatisticsReporter`: adding a required member to a published
+ * interface breaks every implementor, and a backend with no shader stage to run
+ * an effect in (§62's SVG tier draws DOM nodes) should be able to say so by
+ * omission rather than by silently copying.
+ */
+export interface ScreenEffectRenderer {
+  /**
+   * Draws `pass` — see {@link EffectRenderPass} for what that means and what it
+   * refuses.
+   *
+   * Bound by the same three rules `Renderer.render` is: the destination is
+   * bound for the call and unbound before it returns even if the call throws,
+   * nothing is left bound behind, and a lost context, a disposed surface or an
+   * allocation the device refused **skips the effect** rather than throwing
+   * (§61).
+   */
+  renderEffect(pass: EffectRenderPass): void;
+}
+
+/**
+ * Whether `renderer` can draw §70 effect passes, narrowing it so
+ * {@link ScreenEffectRenderer.renderEffect} can be called.
+ *
+ * A property test rather than an `instanceof`: backends are separate packages
+ * and `@four/render` must not name any of them (§61) — the same duck-typed
+ * discipline as {@link supportsRenderStatistics}, `isParticleDrawable`, and
+ * `isRenderTargetTexture`. {@link RenderGraph.execute} uses it to fail loudly
+ * on the first frame instead of drawing nothing forever.
+ */
+export function supportsScreenEffects<TRenderer extends object>(
+  renderer: TRenderer,
+): renderer is TRenderer & ScreenEffectRenderer {
+  return (
+    typeof (renderer as Partial<ScreenEffectRenderer>).renderEffect ===
+    "function"
+  );
+}
+
+/** Runs the §85 check for one grading coefficient. Throws on a bad value. */
+function validateCoefficient(name: string, value: number | undefined): void {
+  if (value === undefined) {
+    return;
+  }
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(
+      `ColorGradeEffect ${name} must be a finite number of at least 0; got ` +
+        `${String(value)} (§70, §85).`,
+    );
+  }
+}
+
+/**
+ * Checks an {@link EffectRenderPass} against §85, throwing a `RangeError` on
+ * the first violation and returning nothing when the pass is well formed.
+ *
+ * Called by {@link RenderGraph.addPass} for every effect pass, which is where
+ * an application normally meets it; exported because an application that hand
+ * -writes `renderer.renderEffect` has no graph to do it (module header).
+ *
+ * Three things are checked, and deliberately nothing else:
+ *
+ * 1. **`source` really is a render-target texture** — the marker guard, not the
+ *    type, because a JavaScript caller can hand over anything and a backend
+ *    that met a plain `Texture` here would silently draw a black screen;
+ * 2. **`effect.kind` is a member of the closed union** — a value TypeScript
+ *    would have rejected, arriving from JSON or from JavaScript;
+ * 3. **each declared grading coefficient is finite and non-negative** — a
+ *    `NaN` reaching a `uniform3fv` produces an entire black frame with no
+ *    error anywhere, which is the failure this function exists to prevent.
+ *
+ * Not checked: whether the source is disposed, and whether it is the same
+ * surface as `target`. Both are *frame*-time facts (a target may be disposed
+ * long after the pass was added), both are already handled where they belong —
+ * {@link RenderGraph.validate} reports the second statically as `"feedback"`
+ * and every backend refuses both at draw time (§83, R-4).
+ */
+export function validateEffectRenderPass(pass: EffectRenderPass): void {
+  if (!isRenderTargetTexture(pass.source)) {
+    throw new RangeError(
+      "EffectRenderPass source must be a RenderTarget's colorTexture; got " +
+        `${typeof pass.source} (§70, §85).`,
+    );
+  }
+  const effect = pass.effect;
+  switch (effect.kind) {
+    case "copy":
+      return;
+    case "grade":
+      validateCoefficient("exposure", effect.exposure);
+      validateCoefficient("contrast", effect.contrast);
+      validateCoefficient("saturation", effect.saturation);
+      return;
+    default:
+      throw new RangeError(
+        `Unknown ScreenEffect kind ${JSON.stringify(
+          (effect as { kind: unknown }).kind,
+        )}; this tier ships "copy" and "grade" (§70, §85).`,
+      );
+  }
+}

@@ -92,7 +92,8 @@ target's optional `applyInput`; one code path must apply inputs live **and**
 on replay (the reference pattern is
 `tests/integration/helpers/replay-scenarios.ts`).
 
-The envelope format is versioned (`REPLAY_FORMAT_VERSION`, exact-match) and
+The envelope format is versioned (`LATEST_REPLAY_FORMAT_VERSION`; a document
+declares the lowest supported version that expresses its content) and
 validated structurally on decode — a twin can archive recordings as plain
 JSON text. Recording is non-perturbing: snapshotting is a pure read (tested).
 

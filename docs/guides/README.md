@@ -4,17 +4,20 @@ The prose half of the §93 Documentation Plan. §93 lists nineteen documentation
 items; the first six — installation and quick start, and the five worked
 scenes — are carried by the root `README.md` and the example apps:
 
-| §93 item                     | where it lives                                                                                                                                                         |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| installation and quick start | root `README.md`                                                                                                                                                       |
-| first 2D scene               | `examples/first-2d-scene`                                                                                                                                              |
-| first 3D scene               | `examples/first-3d-scene` — **not yet written; directory is a placeholder** (`.gitkeep` only). Nearest shipped equivalent: none — no example uses a perspective camera |
-| first animated scene         | `examples/first-animated-scene` — **not yet written; directory is a placeholder**. Animation is demonstrated inside `examples/first-2d-scene`                          |
-| first physics scene          | `examples/first-physics-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`                                                    |
-| mixed 2D/3D/physics example  | `examples/mixed-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`, which steps a 2D and a 3D world side by side              |
+| §93 item                     | where it lives                                                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| installation and quick start | root `README.md`                                                                                                                                            |
+| first 2D scene               | `examples/first-2d-scene`                                                                                                                                   |
+| first 3D scene               | `examples/first-3d-scene` — a `PerspectiveCamera` over `LitMaterial` meshes under one `DirectionalLight` plus scene ambient, written 2026-08-07 (see below) |
+| first animated scene         | `examples/first-animated-scene` — **not yet written; directory is a placeholder**. Animation is demonstrated inside `examples/first-2d-scene`               |
+| first physics scene          | `examples/first-physics-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`                                         |
+| mixed 2D/3D/physics example  | `examples/mixed-scene` — **not yet written; directory is a placeholder**. Use `examples/physics-playground`, which steps a 2D and a 3D world side by side   |
 
 This table listed the four placeholder rows as though they were written until 2026-08-05.
-The absence is dated in `docs/AUDIT-120.md` as **S-8**; `tools/check-docs.mjs` fails if a
+The first 3D scene's row itself read "**not yet written; directory is a placeholder**
+(`.gitkeep` only). Nearest shipped equivalent: none — no example uses a perspective camera"
+until 2026-08-07, when that example was written; three placeholder rows remain. The
+absence is dated in `docs/AUDIT-120.md` as **S-8**; `tools/check-docs.mjs` fails if a
 doc points at one of these directories without the placeholder marker.
 
 The remaining thirteen items are these guides. Read them in this order — each
@@ -53,6 +56,18 @@ assumes the ones above it:
 13. **[The digital twin](digital-twin.md)** — serialization (§79), snapshots
     and replay (§34), determinism (§33), and assets (§76), composed.
 
+A fourteenth guide sits alongside those thirteen. It is not one of §93's
+nineteen documentation items; §96 asks for the documentation itself, in its
+"documented content-security-policy behavior" requirement, and the answer reads
+as a guide:
+
+14. **[Security and untrusted content](security-and-untrusted-content.md)** —
+    §96's seven requirements with an honest met/partial/absent table, the
+    input-size limits and load deadline on `AssetManager` (§76), the text-length
+    and nesting bounds on the §79 and §34 document decoders, and the CSP
+    posture, which `tests/integration/security-csp.test.ts` enforces rather than
+    asserts.
+
 ## Conventions every guide assumes
 
 - The world is **right-handed, Y-up, in 2D and 3D alike** (§7a). 2D gravity is
@@ -75,3 +90,12 @@ code sample in these guides is written against the implemented API surface
 (`docs/Architecture/package-export-surfaces.json`) and modeled on the example
 apps; where a §93 topic covers something not yet implemented, the guide says
 so and cites the staging note instead of pretending.
+
+## Beside the guides
+
+Not a §93 guide, but the document a guide sends you to when the question is
+"does this work here?":
+
+| Document                                    | What it carries                                                                                                                                                                                      |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Compatibility tables](../COMPATIBILITY.md) | §90's five tables — browser and runtime support (tested versus expected), §62 render-backend tiers, the solver adapters (generated from their own declarations), format versions, and the plugin API |

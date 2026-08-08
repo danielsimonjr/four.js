@@ -8,16 +8,17 @@
  * surface size ({@link Application.resize}), and — optionally — a §61 renderer,
  * wired together and re-emitting the §10 main-loop events.
  *
- * **`app.input`, `app.assets`, `app.diagnostics`, `app.stats` and `app.physics`
- * are still absent, and that is now a gap rather than a schedule** (2026-08-06,
- * A-6). The note that stood here said they "arrive with the phases that build
- * them (§103)"; those phases have all landed — Phase 11 built `@four/assets`,
- * `@four/ui` and `@four/serialization` and wired none of them in — so the
- * sentence pointed at a future that no longer exists. What remains true is the
- * reason the options are absent rather than accepted and ignored: a program
- * that sets `physics: {…}` today fails to compile instead of silently
- * simulating nothing. Every example still hand-wires `PointerInput` and
- * `AssetManager`; closing that is A-6's own packet.
+ * **`app.input`, `app.assets`, `app.diagnostics` and `app.physics` are still
+ * absent, and that is now a gap rather than a schedule** (2026-08-06, A-6;
+ * `app.stats` was in this list until 2026-08-07, when A-1 added it — see
+ * {@link Application.stats}). The note that stood here said they "arrive with
+ * the phases that build them (§103)"; those phases have all landed — Phase 11
+ * built `@four/assets`, `@four/ui` and `@four/serialization` and wired none of
+ * them in — so the sentence pointed at a future that no longer exists. What
+ * remains true is the reason the options are absent rather than accepted and
+ * ignored: a program that sets `physics: {…}` today fails to compile instead of
+ * silently simulating nothing. Every example still hand-wires `PointerInput`
+ * and `AssetManager`; closing that is A-6's own packet.
  *
  * ## Why the composition root lives here
  *
@@ -86,7 +87,32 @@
  * that one option.
  */
 
-import { EventEmitter, FourError } from "@four/core";
+import { DEV, EventEmitter, FourError } from "@four/core";
+// Every runtime value in this block, plus `geometryMemoryBytes` and
+// `textureMemoryBytes` below, is named **only** from code that `DEV` makes
+// unreachable (A-4, 2026-08-07) — either directly inside an `if (DEV)`, or
+// inside a block guarded by a local that `DEV` initializes to a literal
+// `null`. That is what makes the §84 wiring free in a production bundle: with
+// `__FOUR_DEV__` defined as `false` the guards fold, every reference below
+// becomes unreachable, and the tree-shaker drops `@four/diagnostics` out of the
+// graph entirely — the ~0.4 kB gzip A-1 measured as "the first diagnostic that
+// cannot tree-shake". Adding an unguarded use of any of them undoes the packet;
+// `tests/integration/dev-build-mode.test.ts` fails when it does.
+import {
+  createFrameStats,
+  monotonicNowSeconds,
+  recordRenderStatistics,
+  recordResourceMemory,
+  resetFrameStats,
+  type FrameStats,
+} from "@four/diagnostics";
+// The one value this module takes from `@four/geometry` (A-5, 2026-08-07):
+// `geometryMemoryBytes` is a two-line reader over `resource-memory.ts`'s
+// module-level total, it names no geometry type and no primitive builder, and
+// the module it lives in is a leaf — so a bundle that never builds a geometry
+// keeps this function and drops the rest of the package, exactly as the
+// `resolveRenderer` import below drops every backend.
+import { geometryMemoryBytes } from "@four/geometry";
 import {
   DEFAULT_FIXED_DELTA_TIME,
   DEFAULT_MAXIMUM_SUB_STEPS,
@@ -106,11 +132,29 @@ import {
   type WorldTransformStats,
 } from "@four/scene";
 // Type-only, and deliberately so: the emitted JavaScript of this module must
-// not import a renderer package. `four/application` is the headless
+// not import a renderer *backend*. `four/application` is the headless
 // composition subpath (WP-2.7-fix2) — a program that never names a backend
 // must not pull one in, and a backend arrives here as an *instance* the
 // application author constructed (see `ApplicationOptions.renderer`).
-import type { Renderer } from "@four/render";
+import type {
+  RenderStatistics,
+  Renderer,
+  RendererFallbackReport,
+  RendererRegistry,
+  RendererSelection,
+} from "@four/render";
+// The two values this module takes from `@four/render` (R-2/A-8 and A-5,
+// 2026-08-07), and the reason the sentence above says "backend" rather than
+// "package": each is a leaf function that names no backend and no other module
+// of that package. `resolveRenderer` is `renderer-registry.ts`'s eight-line
+// front door and deliberately does not reference `RendererRegistry`, so a
+// bundle whose application hands this class a constructed renderer keeps this
+// function and its message and drops the registry, the §62 preference walk,
+// and every backend with it. The alternative, a `switch` over the §45 string,
+// would make `four` import all five backends and cost every program a renderer
+// it never uses (§91; MEMORY 2026-08-01). `textureMemoryBytes` reads
+// `resource-memory.ts`'s module-level §83 total and pulls in nothing else.
+import { resolveRenderer, textureMemoryBytes } from "@four/render";
 
 /**
  * The §10 main-loop events, as §6b types them.
@@ -147,16 +191,18 @@ export interface ApplicationEventMap {
 /**
  * The current subset of §45's `ApplicationOptions`.
  *
- * §45's remaining options (`antialias`, `alpha`, `powerPreference`,
- * `autoResize`, `reducedMotion`, `physics`) belong to subsystems that do not
- * exist yet; each option is added by the packet that builds its subsystem.
- * Omitted numeric options take the Appendix A normative defaults.
+ * §45's remaining options (`alpha`, `powerPreference`, `autoResize`,
+ * `reducedMotion`, `physics`) belong to subsystems that do not exist yet; each
+ * option is added by the packet that builds its subsystem. Omitted numeric
+ * options take the Appendix A normative defaults.
  *
- * TODO(§62, renderer-selection packet): `antialias`/`alpha`/`powerPreference`
- * are device-selection options that only a backend constructor can honour, and
- * they belong with the `"auto"` backend selection described on
- * {@link ApplicationOptions.renderer}; accepting them now would mean storing
- * values no code reads. `autoResize` needs a `ResizeObserver` on a canvas the
+ * `antialias` landed with the §62 selection packet (R-2/A-8, 2026-08-07), for
+ * the reason its TODO gave: it is a *device-selection* option only a backend
+ * constructor can honour, so it had to wait for the code that constructs the
+ * backend. `alpha` and `powerPreference` are still absent because
+ * `RendererOptions` (§61) does not carry them — accepting them here would mean
+ * storing values no backend ever reads, which is the accept-and-ignore this
+ * repository refuses. `autoResize` needs a `ResizeObserver` on a canvas the
  * host owns, so it arrives as an injected observer factory — the discipline
  * `PointerInput` uses for `PointerSurface` — rather than as a DOM reference in
  * this file.
@@ -174,16 +220,9 @@ export interface ApplicationOptions {
   maximumSubSteps?: number;
 
   /**
-   * The backend that draws the scene (§45, §61), or `false` (the default) for a
-   * headless application that draws nothing.
-   *
-   * **An instance, not a string** (decision, WP-3.6). §45 spells this option
-   * `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`, i.e. the application
-   * selects and constructs the backend. That form is deferred, for one
-   * concrete reason: resolving a string to a class means `four` importing every
-   * backend package at runtime, and every program — including the headless and
-   * determinism ones — would then carry a WebGL renderer it never uses. So the
-   * application author constructs the backend and hands it over:
+   * The backend that draws the scene (§45, §61) — an instance, or §45's string
+   * form — or `false` (the default) for a headless application that draws
+   * nothing.
    *
    * ```ts
    * import { WebglRenderer } from "@four/render-webgl";
@@ -194,19 +233,93 @@ export interface ApplicationOptions {
    * app.start();
    * ```
    *
-   * TODO(§62, renderer-selection packet): add the §45 string form
-   * (`"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`) as a *widening* of
-   * this option, resolved through a registry a backend package opts into, so
-   * that `"auto"`'s capability-ordered fallback (§62) exists without `four`
-   * statically importing any backend. Passing an instance stays supported: §45
-   * requires the systems to be constructible and ownable independently.
+   * ## The string form (R-2/A-8, 2026-08-07)
+   *
+   * §45 spells this option `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`,
+   * and since 2026-08-01 this class took an instance instead, because
+   * resolving a string to a class would mean `four` importing every backend
+   * package at runtime: every program — the headless and determinism ones
+   * included — would carry a WebGL renderer it never uses (§91; the deferral is
+   * recorded in MEMORY, and the payload evidence was a 14.88 kB example).
+   *
+   * The string now works, and that reason is intact, because `four` still
+   * imports no backend. A backend package registers itself into
+   * `@four/render`'s §62 registry when the application asks it to, and the
+   * string is resolved against whatever was registered:
+   *
+   * ```ts
+   * import { registerWebglRenderer } from "@four/render-webgl";
+   *
+   * registerWebglRenderer();                    // the app names its backends
+   * const app = new Application({ renderer: "auto", canvas, antialias: true });
+   * await app.initialize();                     // resolves, then initializes
+   * app.renderer;                               // the WebglRenderer, from here on
+   * ```
+   *
+   * `"auto"` prefers WebGPU, then WebGL 2, then a 2D backend (§62), skipping
+   * any that is unregistered, reports itself unsupported, or fails to
+   * initialize — each skip reported through
+   * {@link ApplicationOptions.onRendererFallback}. A named backend fails fast
+   * with `RENDERER_INITIALIZATION_FAILED` (§62, §89) rather than downgrading,
+   * and so does `"auto"` when nothing is left, naming every backend that *is*
+   * registered (§85).
+   *
+   * Three consequences worth stating:
+   *
+   * 1. **{@link Application.renderer} is `null` until
+   *    {@link Application.initialize} resolves** when a string is used — there
+   *    is no renderer to hold before then. With an instance it is set at
+   *    construction, exactly as before.
+   * 2. **The registry initializes the renderer it built.** §62's fallback is
+   *    defined in terms of `initialize` failing, so the selection has to be the
+   *    one calling it; this class does not call it a second time.
+   * 3. **Passing an instance stays fully supported**, and is what §45 requires
+   *    ("the application must permit advanced users to construct and own these
+   *    systems independently").
    *
    * The application **initializes** the renderer (see
    * {@link Application.initialize}) and **drives** it once per frame, but does
    * not own it: {@link Application.dispose} leaves it alone (§83 — whoever
-   * created a resource disposes it).
+   * created a resource disposes it), including one the registry built on its
+   * behalf.
    */
-  renderer?: Renderer | false;
+  renderer?: Renderer | RendererSelection | false;
+
+  /**
+   * Requests multisampled anti-aliasing from the backend (§45, §61).
+   *
+   * Forwarded verbatim as `RendererOptions.antialias` — to the string form's
+   * construction *and* initialization, and to an instance's `initialize`. A
+   * hint, not a requirement: §61 forbids a backend from failing initialization
+   * over it.
+   *
+   * Ignored when no renderer is configured.
+   */
+  antialias?: boolean;
+
+  /**
+   * Called for each backend `renderer: "auto"` passes over, with the §62 reason
+   * (`"unsupported"` or `"initialization-failed"`).
+   *
+   * This is §62's *"emits a diagnostics event"*, delivered as a callback: the
+   * frozen §3.1 matrix gives `@four/render` no `@four/diagnostics` edge, so the
+   * report is handed to the application, which is the one place that already
+   * has both. Forwarding it to a diagnostics channel is one line.
+   *
+   * Never called for an instance, or for an explicitly named backend — naming
+   * one means it must work, so its failure is thrown rather than reported.
+   */
+  onRendererFallback?: (report: RendererFallbackReport) => void;
+
+  /**
+   * The §62 registry {@link ApplicationOptions.renderer}'s string form resolves
+   * against; the shared one by default.
+   *
+   * Pass one to keep a selection scope to itself — the discipline the tests use
+   * so that one application's backends are invisible to the next, and the seam
+   * a host embedding two independent engines needs. Unread for an instance.
+   */
+  rendererRegistry?: RendererRegistry;
 
   /**
    * The drawing surface handed to the renderer as `initialize({ canvas })`
@@ -237,6 +350,10 @@ export interface ApplicationOptions {
   /**
    * Device pixels per logical pixel (§45, §61) — `devicePixelRatio` in a
    * browser. Default `1`.
+   *
+   * Validated at construction, with or without a `width`/`height` pair
+   * (2026-08-07): a non-finite or non-positive value throws a `RangeError` from
+   * the constructor rather than reaching `renderer.resize` on some later call.
    */
   resolution?: number;
 
@@ -287,6 +404,60 @@ export interface ApplicationOptions {
    * `true` without a renderer to run the capture for a custom draw path.
    */
   poseInterpolation?: boolean;
+
+  /**
+   * Whether to measure §84's runtime statistics into {@link Application.stats}.
+   * Defaults to `false` (A-1, 2026-08-07).
+   *
+   * **Off by default, and off means off.** With statistics off,
+   * {@link Application.stats} is `null`, the clock is never read, the backend's
+   * counters are never assigned, and the frame runs the code it ran before this
+   * option existed apart from three `!== null` comparisons per frame — no
+   * allocation, and not one GPU call added, removed, or reordered. That is the
+   * point: a diagnostic that changes the thing it measures is not a diagnostic
+   * (§84), and a `render` gated on a `render`-affecting flag could not share a
+   * pixel golden with one that is not.
+   *
+   * With statistics on, the application owns one {@link FrameStats} record,
+   * resets it at the top of every {@link Application.step}, measures
+   * `cpuFrameTime` and `simulationTime` itself, and — when the renderer reports
+   * them (§61's optional `statistics` member) — reads `drawCalls`, `triangles`,
+   * and `instances` back off the backend, and reads §83's live-resource totals
+   * for `textureMemory`/`bufferMemory` (A-5). The counters §84 lists that
+   * nothing in this repository can yet measure stay `NaN`; `FrameStats` says
+   * which and why.
+   *
+   * **A production build ignores this option** (A-4, 2026-08-07). §84 is a
+   * development tool and §85 lets a production build drop expensive
+   * diagnostics, so the whole path is gated on `@four/core`'s `DEV`: with
+   * `__FOUR_DEV__` defined as `false`, `stats: true` still type-checks (the
+   * option and {@link Application.stats}'s type are unchanged in both builds)
+   * and {@link Application.stats} is `null`. Measure in development, or ship a
+   * build that leaves `__FOUR_DEV__` alone — see
+   * `docs/guides/performance-optimization.md`.
+   */
+  stats?: boolean;
+
+  /**
+   * Monotonic clock, **in seconds**, used only by the §84 statistics
+   * ({@link ApplicationOptions.stats}). Defaults to `performance.now()`
+   * divided by 1000; a host without `performance` measures nothing and the two
+   * durations read `NaN` rather than being filled from a non-monotonic
+   * `Date.now()` this repository bans outright (§33 — see
+   * `@four/diagnostics`' `createMonotonicClock`).
+   *
+   * Injected rather than reached for, the way `PointerInput` takes a
+   * `PointerSurface`: this class names no host object, so a test can measure a
+   * frame it controls (`now: () => t`), a profiler can supply its own timebase,
+   * and a worker or an exotic host is not a special case. Read at most twice
+   * per {@link Application.step}, and never at all when `stats` is off — so a
+   * clock with a cost (a syscall, a GPU query) is only paid for when its
+   * numbers are wanted.
+   *
+   * Seconds, like every other time in this engine (§7a, §9). A clock that
+   * reports milliseconds must divide.
+   */
+  now?: () => number;
 }
 
 /**
@@ -317,6 +488,27 @@ function isFullSurface(view: Viewport): boolean {
     view.width === 1 &&
     view.height === 1
   );
+}
+
+/**
+ * Refuses a resolution that is not a finite number of device pixels per logical
+ * pixel `> 0`.
+ *
+ * One function rather than an inline check inside {@link Application.resize},
+ * because the constructor has a **second** way in: `ApplicationOptions`
+ * `resolution` without a `width`/`height` pair never reaches `resize` and used
+ * to be stored unvalidated (2026-08-07), so `new Application({ renderer,
+ * resolution: 0 })` was accepted and the *next* `resize(w, h)` forwarded the
+ * zero to `renderer.resize` — a degenerate drawing buffer, reported at a call
+ * site that had done nothing wrong. Both paths validate through here now, so an
+ * option and an argument are refused by the same rule with the same message.
+ */
+function assertResolution(resolution: number): void {
+  if (!Number.isFinite(resolution) || resolution <= 0) {
+    throw new RangeError(
+      `Application resolution must be a finite number of device pixels per logical pixel > 0 (got ${String(resolution)}).`,
+    );
+  }
 }
 
 export class Application extends EventEmitter<ApplicationEventMap> {
@@ -352,12 +544,21 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * The backend this application draws with (§45, §61), or `null` when it is
    * headless.
    *
-   * Constructed by the application *author* and merely driven here — see
+   * Constructed by the application *author* — or, for the string form, by the
+   * §62 registry on its behalf (R-2/A-8) — and merely driven here; see
    * {@link ApplicationOptions.renderer}. It is initialized by
    * {@link Application.initialize}, called once per frame after the `render`
    * event, and **not** disposed by {@link Application.dispose}.
+   *
+   * A getter rather than a `readonly` field since 2026-08-07, because a string
+   * selection has nothing to hold at construction: with `renderer: "auto"` this
+   * reads `null` until `initialize()` resolves, and the resolved backend from
+   * then on. With an instance it is set in the constructor and never changes,
+   * exactly as before.
    */
-  readonly renderer: Renderer | null;
+  get renderer(): Renderer | null {
+    return this.#renderer;
+  }
 
   /**
    * The viewports drawn each frame, in order (§48). Mutable: push, splice, and
@@ -381,11 +582,84 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   readonly poses = new PoseBuffer();
 
+  /**
+   * §84's runtime statistics for the frame just stepped, or `null` when
+   * statistics are off — which is the default (A-1, 2026-08-07; A-6 recorded
+   * this member as absent until then).
+   *
+   * ```ts
+   * const app = new Application({ renderer, stats: true });
+   * // … a frame later …
+   * app.stats?.cpuFrameTime;   // seconds of CPU work in the last step
+   * app.stats?.drawCalls;      // what the backend actually submitted
+   * ```
+   *
+   * **One record, rewritten in place** every {@link Application.step} — the
+   * same discipline §9's `TimeState` follows, and for the same reason (plan D7:
+   * the loop allocates nothing per frame). Retaining a reference retains
+   * nothing; copy a frame's values with `copyFrameStats` from
+   * `@four/diagnostics`.
+   *
+   * **A field reading `NaN` was not measured this frame**, as distinct from a
+   * `0` that was measured. Three of §84's eleven counters have no producer
+   * anywhere in this repository (`gpuFrameTime`, `physicsStepTime`,
+   * `contacts`), and a fourth, `activeBodies`, has one
+   * (`recordSolverStatistics`) that nothing *here* can call: this class owns no
+   * physics world, which is A-6's `app.physics`. Until it does, an application
+   * with a solver fills that field itself, from a fixed-step listener.
+   * `textureMemory` and `bufferMemory` joined the measured set with A-5's §83
+   * resource accounting (2026-08-07); they are **levels** — the bytes every
+   * live geometry, texture, and render target in the process holds at the end
+   * of the frame — and are reported with or without a renderer, because a
+   * resource is memory the engine holds whether or not anything drew it.
+   * {@link @four/diagnostics!FrameStats | FrameStats} documents each counter
+   * and what it waits on. `drawCalls`/`triangles`/`instances` are `NaN` with no
+   * renderer, or with a backend that does not report statistics, and `0` when a
+   * reporting backend drew nothing.
+   *
+   * What is deliberately *not* here: §10's fixed-step count, dropped time, and
+   * every §9 clock. They are on `app.time` already, and §84's list does not
+   * name them — a statistics block that re-published the time record would be
+   * two places to read one number.
+   *
+   * **Always `null` in a production build** (A-4, 2026-08-07): §85 permits a
+   * production build to drop expensive diagnostics, and this whole path is
+   * gated on `@four/core`'s `DEV`. The declared type is the same in both
+   * builds — a program that reads `app.stats?.drawCalls` compiles and runs
+   * either way and simply gets `undefined` — so nothing here is a public-shape
+   * change. See {@link ApplicationOptions.stats}.
+   */
+  readonly stats: FrameStats | null;
+
   /** Undoes {@link SystemRegistry.attachToScheduler}; run once, by `dispose`. */
   readonly #detachSystems: Detach;
 
   /** {@link ApplicationOptions.canvas}, held until `initialize` hands it over. */
   readonly #canvas: unknown;
+
+  /** {@link ApplicationOptions.antialias}, forwarded with the canvas (§61). */
+  readonly #antialias: boolean | undefined;
+
+  /**
+   * The backend, or `null` while headless or while a string selection is still
+   * unresolved. Written exactly twice at most: the constructor, and the
+   * selection inside {@link Application.initialize}.
+   */
+  #renderer: Renderer | null;
+
+  /**
+   * §45's string form, held until {@link Application.initialize} resolves it
+   * against the §62 registry, and `null` when the option was an instance or
+   * absent (R-2/A-8).
+   */
+  readonly #rendererSelection: RendererSelection | null;
+
+  /** {@link ApplicationOptions.onRendererFallback}; §62's diagnostics report. */
+  readonly #onRendererFallback:
+    ((report: RendererFallbackReport) => void) | undefined;
+
+  /** {@link ApplicationOptions.rendererRegistry}; the shared one when absent. */
+  readonly #rendererRegistry: RendererRegistry | undefined;
 
   /** Whether the frame's draw passes §43 interpolation. See the option. */
   readonly #poseInterpolation: boolean;
@@ -412,6 +686,40 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     visited: 0,
     recomputed: 0,
   };
+
+  /**
+   * The record the renderer accumulates §84's draw counters into, or `null`
+   * when statistics are off or the backend does not report them (§61's
+   * optional `statistics` member).
+   *
+   * Built here as an object literal rather than with `@four/render`'s
+   * `createRenderStatistics()` for the reason the `Renderer` import is
+   * type-only (see the top of this file): the emitted JavaScript of the
+   * headless composition subpath must not pull in a render package, and the
+   * factory it would call is a three-field zero literal. `RenderStatistics` is
+   * imported as a *type*, so the shape is still pinned by the compiler.
+   */
+  #renderStatistics: RenderStatistics | null = null;
+
+  /**
+   * Whether {@link ApplicationOptions.stats} asked for §84's draw counters, so
+   * that a renderer resolved later (the string form) is wired to them exactly
+   * as a constructed one is. Unread once `#renderStatistics` is set.
+   */
+  readonly #statisticsRequested: boolean;
+
+  /**
+   * {@link ApplicationOptions.now} **as given** — `undefined` when the author
+   * injected no clock, rather than pre-resolved to `monotonicNowSeconds`.
+   *
+   * Storing the option rather than the resolved clock is an A-4 requirement,
+   * not a style choice: resolving it in the constructor would put a reference
+   * to `@four/diagnostics` outside every `if (DEV)` guard, which would keep the
+   * package in a production bundle and undo the packet. The default is applied
+   * instead at the two places that read it, both of which are unreachable when
+   * `DEV` folds to `false`.
+   */
+  readonly #now: (() => number) | undefined;
 
   /** Resolved once {@link Application.initialize} has completed. */
   #initialized = false;
@@ -441,20 +749,46 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       maximumSubSteps: options.maximumSubSteps ?? DEFAULT_MAXIMUM_SUB_STEPS,
     });
     this.systems = new SystemRegistry();
-    this.renderer =
-      options.renderer === undefined || options.renderer === false
+    // §45's option is now an instance, a selection string, or `false`
+    // (R-2/A-8). The string is kept and resolved in `initialize`, because
+    // building a backend means acquiring a context — asynchronous by §61, and
+    // not something a constructor may do.
+    const rendererOption = options.renderer;
+    this.#renderer =
+      rendererOption === undefined ||
+      rendererOption === false ||
+      typeof rendererOption === "string"
         ? null
-        : options.renderer;
+        : rendererOption;
+    this.#rendererSelection =
+      typeof rendererOption === "string" ? rendererOption : null;
+    this.#onRendererFallback = options.onRendererFallback;
+    this.#rendererRegistry = options.rendererRegistry;
     this.#canvas = options.canvas;
+    this.#antialias = options.antialias;
     if (options.views !== undefined) {
       // Copied, not aliased: `views` is the application's array from here on,
       // so an author who keeps their own list does not accidentally share
       // mutation with the frame loop (decision, WP-3.6).
       this.views.push(...options.views);
     }
+    this.#now = options.now;
+    // §84 (A-1), behind §85's build mode (A-4). One record for the
+    // application's lifetime, and — when the backend reports draw counters at
+    // all — one for the renderer to accumulate into; `#lendStatistics` does the
+    // lending, here for an instance and again after a string selection
+    // resolves. `DEV &&` first, so a production build folds the whole
+    // expression to `null` and `createFrameStats` goes unreferenced.
+    this.stats = DEV && options.stats === true ? createFrameStats() : null;
+    this.#statisticsRequested = this.stats !== null;
+    this.#lendStatistics();
     this.#depthRange = options.depthRange;
+    // A selection counts as "a renderer is configured" for the §43 default: the
+    // capture system is registered here or not at all (see below), and a
+    // program that asked for `renderer: "auto"` is going to draw.
     this.#poseInterpolation =
-      options.poseInterpolation ?? this.renderer !== null;
+      options.poseInterpolation ??
+      (this.#renderer !== null || this.#rendererSelection !== null);
     this.#interpolation = { poseBuffer: this.poses, alpha: 0 };
     if (this.#poseInterpolation) {
       // §39 step 10, at the default `POSE_SNAPSHOT_PRIORITY`: after every
@@ -481,8 +815,36 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     this.#detachSystems = this.systems.attachToScheduler(this.scheduler);
     const runSystems = this.scheduler.onFixedStep;
     this.scheduler.onFixedStep = (time) => {
-      runSystems?.(time);
-      this.emit("fixedUpdate", time);
+      // §84's `simulationTime`: wall-clock seconds spent inside the frame's
+      // fixed steps, summed over however many the accumulator runs. Measured
+      // around the *whole* step — systems and `fixedUpdate` listeners — because
+      // that is what the frame pays for simulating; the solver's own share is
+      // `physicsStepTime`, which only the solver can report (staged).
+      //
+      // `DEV ? … : null` rather than `this.stats` (A-4): in a production build
+      // the initializer is the literal `null`, so the measuring branch below is
+      // provably unreachable and the timing calls disappear with it. In
+      // development it is exactly `this.stats` and the behaviour is unchanged.
+      const stats = DEV ? this.stats : null;
+      if (stats === null) {
+        runSystems?.(time);
+        this.emit("fixedUpdate", time);
+        return;
+      }
+      // The default clock is resolved here rather than in the constructor so
+      // that `monotonicNowSeconds` — and with it `@four/diagnostics` — is named
+      // only from code a production build deletes (A-4; see `#now`).
+      const now = this.#now ?? monotonicNowSeconds;
+      const started = now();
+      try {
+        runSystems?.(time);
+        this.emit("fixedUpdate", time);
+      } finally {
+        // In a `finally` so a throwing system leaves the accumulator holding
+        // the time it really spent rather than losing the step entirely; the
+        // exception propagates unchanged.
+        stats.simulationTime += now() - started;
+      }
     };
 
     this.scheduler.onUpdate = (time) => {
@@ -510,6 +872,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     // surface, and forwarding a half-declared `0 × h` would blank a canvas the
     // host had already sized.
     if (options.resolution !== undefined) {
+      // Validated even on this path, which does not go through `resize`
+      // (2026-08-07) — see `assertResolution`.
+      assertResolution(options.resolution);
       this.#resolution = options.resolution;
     }
     if (options.width !== undefined && options.height !== undefined) {
@@ -572,10 +937,74 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   initialize(): Promise<void> {
     this.#assertNotDisposed("initialize");
     this.#initialization ??= Promise.resolve().then(async () => {
-      await this.renderer?.initialize({ canvas: this.#canvas });
+      const selection = this.#rendererSelection;
+      if (selection === null) {
+        await this.#renderer?.initialize({
+          canvas: this.#canvas,
+          antialias: this.#antialias,
+        });
+      } else {
+        // The registry constructs *and* initializes: §62's fallback is defined
+        // in terms of initialization failing, so it has to own that call. What
+        // comes back is ready to draw, and is never initialized twice.
+        const renderer = await resolveRenderer(
+          selection,
+          {
+            canvas: this.#canvas,
+            antialias: this.#antialias,
+            onFallback: this.#onRendererFallback,
+          },
+          this.#rendererRegistry,
+        );
+        this.#renderer = renderer;
+        this.#lendStatistics();
+        // A size declared before the backend existed — through the `width`/
+        // `height` options or a `resize` call — was recorded but had nothing to
+        // forward to. Replay it now, so the string form ends up in exactly the
+        // state the instance form is in.
+        if (this.#surfaceWidth > 0 && this.#surfaceHeight > 0) {
+          this.resize(
+            this.#surfaceWidth,
+            this.#surfaceHeight,
+            this.#resolution,
+          );
+        }
+      }
       this.#initialized = true;
     });
     return this.#initialization;
+  }
+
+  /**
+   * Hands the renderer the §84 record to accumulate into, if this application
+   * was asked for statistics and the backend reports them (A-1).
+   *
+   * Called from the constructor for an instance and from
+   * {@link Application.initialize} for a resolved selection, so both forms wire
+   * up identically. Idempotent: a second call with the record already lent
+   * re-assigns the same object.
+   */
+  #lendStatistics(): void {
+    // A-4: a private method cannot be tree-shaken off a class, so the body is
+    // what has to disappear. With `DEV` folded to `false` this is `return;` and
+    // everything after it — including the `RenderStatistics` literal — is dead
+    // code the minifier deletes.
+    if (!DEV) return;
+    const renderer = this.#renderer;
+    if (
+      !this.#statisticsRequested ||
+      renderer === null ||
+      !("statistics" in renderer)
+    ) {
+      return;
+    }
+    // Assigning `renderer.statistics` reaches into an object this class does
+    // not own, which is why it happens **only** when the application was asked
+    // for statistics, and why `dispose` puts it back: ownership follows
+    // construction (§83), so the borrow is scoped to the application's life
+    // exactly as the renderer's initialization is.
+    this.#renderStatistics ??= { drawCalls: 0, triangles: 0, instances: 0 };
+    renderer.statistics = this.#renderStatistics;
   }
 
   /**
@@ -642,6 +1071,12 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * what determinism (§33) and replay (§34) require. `elapsedSeconds` is real
    * (unscaled) time; `timeScale` and `paused` are applied by the scheduler.
    *
+   * With statistics on ({@link ApplicationOptions.stats}) this call is also
+   * §84's frame boundary: {@link Application.stats} is reset before the frame
+   * and finished after it, so it always describes the *last completed* step. A
+   * frame that throws records nothing — its numbers would describe half a
+   * frame, and half a frame's `drawCalls` is worse than no answer.
+   *
    * @throws FourError if the application is disposed, not initialized, not
    * running, or already inside a `step` (a nested step would advance one
    * `TimeState` re-entrantly and interleave two frames' events, which no
@@ -672,11 +1107,45 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         { context: { method: "step", reentrant: true } },
       );
     }
+    // A-4, as in `onFixedStep` above: `null` by construction in a production
+    // build, so both measuring blocks in this method fold away and with them
+    // every reference this module has to `@four/diagnostics`,
+    // `geometryMemoryBytes`, and `textureMemoryBytes`.
+    const stats = DEV ? this.stats : null;
+    let frameStarted = 0;
+    if (stats !== null) {
+      // §84's frame boundary (A-1). Everything goes back to "not measured"
+      // first, so a producer that does not run this frame cannot leave last
+      // frame's number standing; the two accumulators this class owns then
+      // seed themselves, because initializing a counter is the job of whoever
+      // is about to write it.
+      resetFrameStats(stats);
+      stats.simulationTime = 0;
+      if (this.#renderStatistics !== null) {
+        this.#renderStatistics.drawCalls = 0;
+        this.#renderStatistics.triangles = 0;
+        this.#renderStatistics.instances = 0;
+      }
+      frameStarted = (this.#now ?? monotonicNowSeconds)();
+    }
     this.#stepping = true;
     try {
       this.scheduler.step(elapsedSeconds);
     } finally {
       this.#stepping = false;
+    }
+    if (stats !== null) {
+      if (this.#renderStatistics !== null) {
+        recordRenderStatistics(stats, this.#renderStatistics);
+      }
+      // §83's live-resource totals (A-5). Read *after* the frame, because they
+      // are levels rather than per-frame accumulations: what matters is what
+      // the engine holds once this frame's creations and disposals have
+      // happened. Unconditional — unlike the draw counters these need no
+      // renderer, since a geometry a headless application built is memory it
+      // holds whether or not anything has drawn it.
+      recordResourceMemory(stats, textureMemoryBytes(), geometryMemoryBytes());
+      stats.cpuFrameTime = (this.#now ?? monotonicNowSeconds)() - frameStarted;
     }
   }
 
@@ -702,8 +1171,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   }
 
   /**
-   * Resizes the drawing surface (§45's eighth lifecycle method, 2026-08-06
-   * A-7).
+   * Resizes the drawing surface (§45's seventh lifecycle method, 2026-08-06
+   * A-7; "eighth" until 2026-08-07 — §45 lists initialize, start, stop, pause,
+   * resume, step, resize, dispose, and `resize` is the seventh of those eight).
    *
    * Three things happen, in this order:
    *
@@ -718,12 +1188,19 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    *    {@link PerspectiveCamera} has its `aspect` set to `width / height` and
    *    its projection rebuilt.
    *
-   * **Why this class updates cameras and the renderer does not.** §61 is
-   * explicit that "a camera's `aspect` is the application's to set, because only
-   * the application knows which camera belongs to which viewport" — and this
-   * class is exactly that knowledge: {@link Application.views} is the mapping.
-   * §47 keeps projection recomputation explicit, so the rebuild is a call to
-   * `updateProjectionMatrix`, made with {@link ApplicationOptions.depthRange}.
+   * **Why this class updates cameras and the renderer does not** (decision,
+   * A-7; the sentence here quoted §61 until 2026-08-07 — "a camera's `aspect`
+   * is the application's to set, because only the application knows which
+   * camera belongs to which viewport" — and §61 says no such thing: it defines
+   * `Renderer.resize(width, height, resolution)` and nothing about cameras. The
+   * reasoning stands on its own and is restated as the decision it is). §47
+   * gives the camera its projection and §48 maps one camera to one viewport
+   * rectangle; a renderer is handed the finished `Viewport[]` and has no way to
+   * know which of those rectangles a given camera was authored for. This class
+   * is exactly that knowledge — {@link Application.views} is the mapping — so
+   * the aspect update belongs here. §47 keeps projection recomputation
+   * explicit, so the rebuild is a call to `updateProjectionMatrix`, made with
+   * {@link ApplicationOptions.depthRange}.
    *
    * **Full-surface** means `normalized` with the rectangle `(0, 0, 1, 1)` —
    * what `createFullscreenViewport` builds. A partial viewport is left alone
@@ -763,13 +1240,8 @@ export class Application extends EventEmitter<ApplicationEventMap> {
         `Application.resize height must be a finite number of logical pixels >= 0 (got ${String(height)}).`,
       );
     }
-    if (
-      resolution !== undefined &&
-      (!Number.isFinite(resolution) || resolution <= 0)
-    ) {
-      throw new RangeError(
-        `Application.resize resolution must be a finite number of device pixels per logical pixel > 0 (got ${String(resolution)}).`,
-      );
+    if (resolution !== undefined) {
+      assertResolution(resolution);
     }
 
     this.#surfaceWidth = width;
@@ -838,6 +1310,24 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     }
     this.#disposed = true;
     this.#running = false;
+
+    // Give the renderer its `statistics` slot back (A-1). The renderer is not
+    // this application's to dispose (see below), and by the same rule the
+    // record this application lent it must not outlive the loan: a renderer
+    // shared with a second application, or kept for a later one, would
+    // otherwise go on accumulating into a record nobody reads. Cleared only
+    // when this application is the one that filled it.
+    const renderer = this.renderer;
+    if (
+      // A-4: nothing lends a record in a production build (`#lendStatistics`
+      // returns immediately there), so there is nothing to give back.
+      DEV &&
+      this.#renderStatistics !== null &&
+      renderer !== null &&
+      renderer.statistics === this.#renderStatistics
+    ) {
+      renderer.statistics = null;
+    }
 
     // Idempotent, and defensive about a foreign callback: `detach` only
     // restores what it replaced if nothing else has since taken over

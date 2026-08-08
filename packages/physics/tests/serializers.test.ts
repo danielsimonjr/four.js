@@ -253,7 +253,6 @@ describe("RIGID_BODY_SERIALIZER (§23, §79)", () => {
         gravityScale: null,
         physicsWeight: [],
         rotation: { x: 0 },
-        inertiaTensor: [1, 2, 3],
       },
       new Group(),
     );
@@ -267,20 +266,44 @@ describe("RIGID_BODY_SERIALIZER (§23, §79)", () => {
     expect(restored.physicsWeight).toBe(1);
     // A partial quaternion restores the identity, not a non-unit rotation.
     expect(restored.initialRotation?.w).toBe(1);
-    // Nine finite elements or nothing: three is not a tensor.
+    // An absent tensor is the "derive it" statement, and restores as one.
     expect(restored.inertiaTensor).toBeUndefined();
   });
 
-  it("rejects an inertia tensor that is not nine finite numbers", () => {
+  // 2026-08-07: a present-but-unreadable tensor used to restore as an *absent*
+  // one, silently flipping the body from an authored mass distribution to a
+  // derived one — a divergence with nothing to point at. It fails loudly now,
+  // like every other tag this module reads.
+  it("refuses an inertia tensor that is present and not nine finite numbers", () => {
     const of = (inertiaTensor: JsonValue): Matrix3 | undefined =>
       RIGID_BODY_SERIALIZER.deserialize(
         { type: "dynamic", mass: 1, inertiaTensor },
         new Group(),
       ).inertiaTensor;
 
-    expect(of("not-an-array")).toBeUndefined();
-    expect(of([1, 2, 3, 4, 5, 6, 7, 8, "nine"])).toBeUndefined();
+    for (const malformed of [
+      "not-an-array",
+      [1, 2, 3],
+      [1, 2, 3, 4, 5, 6, 7, 8, "nine"],
+      [1, 2, 3, 4, 5, 6, 7, 8, null],
+    ] as JsonValue[]) {
+      let thrown: unknown;
+      try {
+        of(malformed);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(isFourError(thrown) && thrown.code).toBe(
+        "INVALID_APPLICATION_STATE",
+      );
+      expect(isFourError(thrown) && thrown.message).toContain("inertiaTensor");
+    }
+
     expect(of([1, 2, 3, 4, 5, 6, 7, 8, 9])).toBeInstanceOf(Matrix3);
+    expect(
+      RIGID_BODY_SERIALIZER.deserialize({ type: "dynamic" }, new Group())
+        .inertiaTensor,
+    ).toBeUndefined();
   });
 
   it("refuses a document whose body type is missing or unknown (§22)", () => {

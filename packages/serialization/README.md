@@ -7,6 +7,7 @@ Implements §79–80 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.md); 
 ## What's here
 
 - **Format** — `SceneDocument` / `SceneNodeDocument` / `ComponentDocument` types, `encodeSceneDocument` / `decodeSceneDocument` (canonical JSON text), and validators (`validateSceneDocument`, transform/vector/quaternion document validation).
+- **§96 untrusted text** — `decodeSceneDocument(text, limits?)` takes `UntrustedJsonLimits` (`maximumTextLength`, `maximumDepth`; finite defaults) and refuses an over-budget or over-deep document with `UNTRUSTED_INPUT_REJECTED` before `validateNode` recurses. `validateSceneDocument` is deliberately unguarded — it takes values, not text.
 - **Serializer** — `serializeScene` / `instantiateScene` over a `ComponentSerializerRegistry` keyed by component class; `createDefaultComponentSerializers` covers the built-in components (including `PoseTarget`).
 - **Migrations (§80)** — `SceneMigration` / `SceneMigrationRegistry`, `migrateSceneDocument` / `runSceneMigrations`, with structured warnings.
 - **JSON utilities** — `JsonValue` guards (`isJsonObject`, `isJsonArray`, `asJsonObject`) and `cloneJsonValue` (re-exported from `@four/core`, `__proto__`-refusing).

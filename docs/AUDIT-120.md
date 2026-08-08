@@ -14,7 +14,9 @@ false when written and are corrected in place with the original wording quoted):
 
 - the tooling **examples** row claimed "10 example applications … incl. the five §93 guide
   scenes and the flagship"; six exist and the rest are `.gitkeep`-only directories. The row
-  now says six and the shortfall is staged as **S-8**;
+  said six until 2026-08-07 and says eight since (`first-3d-scene`, then §118's
+  `flagship/one-scene-everything-moves`, were written); the remaining shortfall is staged as
+  **S-8**;
 - the same table said `tests/visual/` "is an empty placeholder"; a golden-image suite
   landed there 2026-08-04;
 - the Rendering table's **sprites** note, and S-4's first sentence, said sprites are
@@ -134,13 +136,13 @@ coverage census, not a measure of effort or of risk.
 
 ## Tooling — §113a's named exit clause
 
-| §120 item                      | status             | evidence                                                                                                                                                                                                                                        | note                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| tests                          | shipped            | 113 package unit suites, root suites in `tests/` (`tests/integration` 6 scenario suites + 1 example-build coverage suite, `tests/determinism` 8), 9 Playwright specs (`tests/browser`), 1 visual spec with 2 committed goldens (`tests/visual`) | §92; `pnpm test`, `pnpm test:suites`, `pnpm test:browser`. This row said `tests/visual/` "is an empty placeholder" until 2026-08-05; a SwiftShader-to-SwiftShader golden suite landed there 2026-08-04 (`tests/visual/ui-demo.spec.ts`, Playwright project `visual`). Per-backend perceptual baselines still wait on a second backend                                                                                                                          |
-| examples                       | shipped (MVP tier) | **6** runnable example applications under `examples/`: `first-2d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo` — each with a `main.ts`, a Vite build script and a browser spec                             | This row said "10 example applications … incl. the five §93 guide scenes and the flagship" until 2026-08-05. It was never true: `examples/{first-3d-scene,first-animated-scene,first-physics-scene,mixed-scene}` and both `examples/flagship/*` directories contain only a `.gitkeep` (verify with `git ls-files examples/`). §120 asks for "examples" without a count, and six runnable ones satisfy the row; the §93/§118–119 shortfall is staged as **S-8** |
-| API documentation              | shipped            | `typedoc.json` → `docs/api/`; `pnpm run docs` (CI job from Phase 0)                                                                                                                                                                             | §93's reference half. The guides/website half is in-repo documentation per §6j                                                                                                                                                                                                                                                                                                                                                                                 |
-| benchmark harness              | shipped            | `benchmarks/harness.mjs` + `math-ops`, `scene-propagation`, `physics-step`, `animation-sampling`, `particles-100k`; records in `benchmarks/results/`                                                                                            | §92's performance tests, §86's targets where honestly measurable. **Recorded, never gated** — see `benchmarks/README.md`                                                                                                                                                                                                                                                                                                                                       |
-| deterministic simulation tests | shipped            | `tests/determinism/*.test.ts` with 8 committed goldens (`golden/phase{1,2,4,5,6,7,9,10}.json`)                                                                                                                                                  | §33–34 at the `same-runtime` tier; fresh-process double runs vs committed hashes                                                                                                                                                                                                                                                                                                                                                                               |
+| §120 item                      | status             | evidence                                                                                                                                                                                                                                                                         | note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| tests                          | shipped            | 113 package unit suites, root suites in `tests/` (`tests/integration` 6 scenario suites + 1 example-build coverage suite, `tests/determinism` 8), 9 Playwright specs (`tests/browser`), 1 visual spec with 2 committed goldens (`tests/visual`)                                  | §92; `pnpm test`, `pnpm test:suites`, `pnpm test:browser`. This row said `tests/visual/` "is an empty placeholder" until 2026-08-05; a SwiftShader-to-SwiftShader golden suite landed there 2026-08-04 (`tests/visual/ui-demo.spec.ts`, Playwright project `visual`). Per-backend perceptual baselines still wait on a second backend                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| examples                       | shipped (MVP tier) | **8** runnable example applications under `examples/`: `first-2d-scene`, `first-3d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo`, and `flagship/one-scene-everything-moves` — each with a `main.ts`, a Vite build script and a browser spec | This row said "10 example applications … incl. the five §93 guide scenes and the flagship" until 2026-08-05. It was never true: `examples/{first-3d-scene,first-animated-scene,first-physics-scene,mixed-scene}` and both `examples/flagship/*` directories contained only a `.gitkeep` (verify with `git ls-files examples/`). The count read **6** until 2026-08-07, when `first-3d-scene` was written, and **7** until later the same day, when §118's flagship `flagship/one-scene-everything-moves` was written — so the sentence above is now true of the three §93 scenes and the §119 motor twin only (named in **S-8**). §120 asks for "examples" without a count, and eight runnable ones satisfy the row; the remaining §93/§119 shortfall is staged as **S-8** |
+| API documentation              | shipped            | `typedoc.json` → `docs/api/`; `pnpm run docs` (CI job from Phase 0)                                                                                                                                                                                                              | §93's reference half. The guides/website half is in-repo documentation per §6j                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| benchmark harness              | shipped            | `benchmarks/harness.mjs` + `math-ops`, `scene-propagation`, `physics-step`, `animation-sampling`, `particles-100k`; records in `benchmarks/results/`                                                                                                                             | §92's performance tests, §86's targets where honestly measurable. **Recorded, never gated** — see `benchmarks/README.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| deterministic simulation tests | shipped            | `tests/determinism/*.test.ts` with 8 committed goldens (`golden/phase{1,2,4,5,6,7,9,10}.json`)                                                                                                                                                                                   | §33–34 at the `same-runtime` tier; fresh-process double runs vs committed hashes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -233,22 +235,55 @@ glTF pipeline needs the §55 texture tier and materials beyond unlit (see **S-5*
 `@four/assets` ships JSON, text, binary and image loaders and stages glTF rather than
 shipping a stub.
 
-**S-8 — The §93 guide scenes and the §118–119 flagship demos. Staged 2026-08-05.**
-Six directories under `examples/` contain a `.gitkeep` and nothing else:
-`first-3d-scene`, `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
-`flagship/one-scene-everything-moves` and `flagship/motor-digital-twin`. They were created
-by the Phase 0 tree scaffold (see `CHANGELOG.md`, which announced them as if they had
-content) and no packet in Phases 1–11 was scoped to write them; the plan's per-phase
-demonstrations went to `physics-playground` (§108), `mechanism` (§109), `blending` (§110),
-`particles-demo` (§112) and `ui-demo`, and `first-2d-scene` grew into the §93 quick-start
-scene. So four of §93's six quick-start items and both §118–119 flagships have no
-implementation. Three of the four missing scenes have a shipped stand-in that covers the
-same ground (3D meshes and a `PerspectiveCamera` are unit-tested but appear in no example;
-animation is demonstrated inside `first-2d-scene`; physics is demonstrated by
+**S-8 — The §93 guide scenes and the §119 engineering flagship. Staged 2026-08-05;
+partially closed twice on 2026-08-07.** **Four** directories under `examples/` contain a
+`.gitkeep` and nothing else: `first-animated-scene`, `first-physics-scene`, `mixed-scene`
+and `flagship/motor-digital-twin`. They were created by the Phase 0 tree scaffold (see
+`CHANGELOG.md`, which announced them as if they had content) and no packet in Phases 1–11
+was scoped to write them; the plan's per-phase demonstrations went to `physics-playground`
+(§108), `mechanism` (§109), `blending` (§110), `particles-demo` (§112) and `ui-demo`, and
+`first-2d-scene` grew into the §93 quick-start scene. So three of §93's six quick-start
+items and §119's engineering flagship have no implementation.
+
+This paragraph said "**Six** directories … and both §118–119 flagships have no
+implementation" when it was written, and "**Five** …" after `first-3d-scene` landed.
+
+**What changed on 2026-08-07.** This paragraph said "**Six** directories … `first-3d-scene`,
+`first-animated-scene`, …" and closed on "one real hole: **no example exercises a
+perspective camera or a lit 3D mesh end-to-end in a browser**". That hole is now filled:
+`examples/first-3d-scene/` is a real example (a `PerspectiveCamera` over `LitMaterial`
+meshes built from the §53 3D primitives, under a `DirectionalLight` plus scene ambient),
+built by `pnpm examples:build`, previewed on the seventh Playwright web server and asserted
+by `tests/browser/first-3d-scene.spec.ts` — which measures the projection in pixels (the
+near sphere covers ≈ 4× the area of an identical far one; an orthographic camera would
+score 1.0) and the Lambert gradient in luminance, rather than asserting a class name. The
+examples row above moved 6 → 7 with it.
+
+**What changed again on 2026-08-07: §118's flagship.**
+`examples/flagship/one-scene-everything-moves` is now a real example, and the examples row
+moved 7 → 8. It is the demonstration §118 specifies, item by item: a rotating textured 3D
+cube, a 2D vector orbit, a spring-connected pendulum, a bouncing rigid body, world-space
+labels, a screen-space control panel, a §16 timeline, a motorised hinge, §29 collision
+events, and pause / slow-motion / single-step controls — in one scene graph, one
+`Application`, one `PhysicsWorld` and one frame. `tests/browser/one-scene-everything-moves.spec.ts`
+measures it on the eighth Playwright web server rather than asserting its parts by name:
+six objects counted by hue in one screenshot, ~27 000 changed pixels while running against
+**0** while paused, one single step advancing simulated time by exactly 1/60 s, and
+simulated time accumulating 20× slower at the slider's minimum. It is also the first
+example to take the §62 renderer and §37 solver registries' `"auto"` paths, and the first to
+assemble the §113 debug overlay from `@four/diagnostics` streams in a browser.
+
+§118's _success criterion_ is a judgement ("it must feel like one motion-capable engine"),
+and no gate can settle it; what the audit records is that the demonstration exists, builds,
+and is measured. §119's engineering flagship (`flagship/motor-digital-twin`) remains
+unwritten and is what is left of this staged note, together with the three §93 scenes.
+
+The three remaining missing scenes each have a shipped stand-in that covers the same ground
+(animation is demonstrated inside `first-2d-scene`; physics is demonstrated by
 `physics-playground`, which `examples/README.md` already records as fulfilling
-`first-physics-scene`'s role) — the gap is a documentation-completeness gap against §93 and
-§118–119, not a capability gap, with one real hole: **no example exercises a perspective
-camera or a lit 3D mesh end-to-end in a browser.** Not a §120 row — §120's tooling bullet
+`first-physics-scene`'s role; `physics-playground` also steps a 2D and a 3D world side by
+side for `mixed-scene`), so what is left is a documentation-completeness gap against §93 and
+§118–119, not a capability gap. Not a §120 row — §120's tooling bullet
 says "examples" without a count — so no verdict above depends on it. This is a dated
 statement of absence, not a commitment. The empty directories are marked as placeholders in
 `examples/README.md` and `docs/guides/README.md`, and `tools/check-docs.mjs` fails if a

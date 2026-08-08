@@ -33,7 +33,7 @@
  * | hover / press / focus state machines (§72)     | what those states *look* like |
  * | text **measurement** (`@four/text`, a real dep) | text **rendering**            |
  *
- * The seam is {@link WidgetSkin}: an application-supplied object with four
+ * The seam is {@link WidgetSkin}: an application-supplied object with five
  * optional hooks that the widget calls when something visible about it changed.
  * The app's skin holds the imports `@four/ui` may not have, reads
  * {@link UIWidget.measuredWidth}, {@link UIWidget.measuredHeight},
@@ -138,14 +138,30 @@ export const UI_LAYOUT_AUTHORITY = "constraint" as const;
  * assertable in tests, and printable by a diagnostics overlay — the shape
  * `@four/diagnostics`' `DEBUG_DRAW_STAGED` established. Nothing reads it at
  * runtime; it is documentation that cannot drift out of the build.
+ *
+ * **An entry leaves this array when the thing ships.** §75's keyboard
+ * navigation and focus order left it on 2026-08-07 (A-13): `@four/input` gained
+ * the key source that was its stated blocker (A-10), and `keyboard.ts` now
+ * implements Tab/Shift-Tab traversal while `Button` implements Enter/Space
+ * activation. The four remaining §75 entries are unchanged, and three of them
+ * still wait on the same DOM integration policy.
  */
 export const UI_STAGED: readonly string[] = Object.freeze([
-  "§73 controls — toggle, checkbox, radio control, slider, text input, scroll " +
-    "view, list and virtual list, image, progress indicator, menu, tooltip, " +
+  "§73 controls — text input, scroll view, list, virtual list, menu, tooltip, " +
     "canvas view, and embedded 3D viewport are not implemented (2026-08-02, " +
-    "WP-11.3: the MVP ships panel, label, and button, which is what §113a asks " +
-    "the layer to prove; each remaining control is a widget subclass over this " +
-    "same base and needs no new engine surface).",
+    "WP-11.3; narrowed 2026-08-07, A-12, when toggle, checkbox, radio button, " +
+    "slider, progress indicator, and image shipped beside panel, label, and " +
+    "button). Each name still here needs engine surface this layer does not " +
+    "have: text input needs §56 selection and caret; scroll view and virtual " +
+    "list need §74 overflow and scroll extent plus §67 clipping; the embedded " +
+    "3D viewport needs a §48 nested render surface; canvas view needs the " +
+    "immediate-mode drawing surface the dependency matrix keeps out of this " +
+    "package; menu and tooltip need a per-frame update hook no widget has — " +
+    "a hover delay is a §9 time-domain reading, and the loop that owns time " +
+    "(§10) lives above this package, so a tooltip built here would either " +
+    "invent a clock or measure nothing. List needs a selection model and item " +
+    "navigation over an arbitrary child set, and is not useful at any real " +
+    "size without the same §74 overflow the scroll view waits on.",
   "§74 layout modes — grid and constraints are not implemented (2026-08-02, " +
     "WP-11.3: absolute, stack, and flex ship; see Panel). §74's anchor mode " +
     "ships as the per-child anchor/pivot/offset triple honoured by absolute " +
@@ -161,12 +177,6 @@ export const UI_STAGED: readonly string[] = Object.freeze([
     "and how a package that may not name DOM types reaches one. Roles, names, " +
     "descriptions, and states are already carried here, so the mirror is a " +
     "consumer of existing data rather than a change to this API).",
-  "§75 keyboard navigation and focus order — focus itself ships (focus/blur, " +
-    "one focused widget per scene root); key-driven traversal and activation " +
-    "do not (2026-08-02, P11-3: §72 lists keyboard events and @four/input " +
-    "implements none — it has no key source at all. Button.activate() is " +
-    "public precisely so a keyboard layer can drive it without this package " +
-    "inventing key codes).",
   "§75 screen-reader updates, high-contrast theme hooks, and scalable text — " +
     "not implemented (2026-08-02, P11-3: the first two follow the DOM mirror; " +
     "the third is a skin and camera concern, since layout units are already " +
@@ -262,9 +272,10 @@ export function applyInsets(target: Insets, init: InsetsInit): Insets {
 /**
  * A widget's interaction state at one instant (§72, §75).
  *
- * The four flags §75 asks a mirror to expose that this tier can actually
- * observe. `checked` and `expanded` belong to controls that do not ship yet
- * (see {@link UI_STAGED}).
+ * The flags §75 asks a mirror to expose that this tier can actually observe.
+ * `expanded` still belongs to a control that does not ship (see
+ * {@link UI_STAGED}); `checked` joined the record on 2026-08-07 (A-12) when
+ * `Toggle`, `Checkbox`, and `RadioButton` shipped.
  */
 export interface WidgetStateSnapshot {
   /** A pointer is over this widget's hit area. */
@@ -275,6 +286,17 @@ export interface WidgetStateSnapshot {
   readonly focused: boolean;
   /** This widget refuses interaction (§75's disabled state). */
   readonly disabled: boolean;
+  /**
+   * Whether a checkable control is checked — and **`null` for a widget that is
+   * not checkable at all**, which is most of them.
+   *
+   * Three-valued rather than `false`-by-default for ARIA's own reason: an
+   * `aria-checked` of `false` says "this is a checkbox and it is clear", while
+   * an absent one says "this is not a checkbox". A panel reporting `false`
+   * would tell a §75 mirror the first when the truth is the second. See
+   * {@link UIWidget.checked}.
+   */
+  readonly checked: boolean | null;
 }
 
 /** Payload of the `uistatechange` event. */
@@ -287,20 +309,58 @@ export interface WidgetStateChangeEvent {
   readonly current: WidgetStateSnapshot;
 }
 
-/** What caused a {@link WidgetActivateEvent}. */
-export type WidgetActivationSource = "pointer" | "programmatic";
+/**
+ * What caused a {@link WidgetActivateEvent}.
+ *
+ * `"keyboard"` joined the union on 2026-08-07 (A-13) when §75's key-driven
+ * activation landed: an Enter or a Space on a focused control is neither a
+ * pointer nor a programmatic call, and collapsing it into either would make the
+ * one field that exists to tell activations apart unable to tell the two apart
+ * that §75 most cares about. Adding a member is additive — an existing listener
+ * that switches on `"pointer"` keeps working, and one that assumed the union
+ * was closed was already wrong about `pointercancel`'s precedent.
+ */
+export type WidgetActivationSource = "pointer" | "keyboard" | "programmatic";
 
 /** Payload of the `uiactivate` event (§72 click → §73 button activation). */
 export interface WidgetActivateEvent {
   /** The activated widget — always the emitter. */
   readonly widget: UIWidget;
-  /** Whether a pointer or an explicit `activate()` call caused this. */
+  /** Whether a pointer, a key, or an explicit `activate()` call caused this. */
   readonly source: WidgetActivationSource;
   /**
-   * The `click` that caused a `"pointer"` activation; `null` for a
+   * The `click` that caused a `"pointer"` activation; `null` for a keyboard or
    * programmatic one.
+   *
+   * There is deliberately no matching `keyEvent`: a key activation's cause is
+   * already fully described by "Enter or Space on the focused control" (see
+   * `Button`), and a listener that needs the keystroke itself can read it from
+   * its own `keydown` listener, which fires on the same node first.
    */
   readonly pointerEvent: ScenePointerEvent | null;
+}
+
+/**
+ * Payload of the `uivaluechange` event — a control's **number** changed
+ * (2026-08-07, A-12).
+ *
+ * A separate event from `uistatechange` because the two carry different things
+ * and a listener wants exactly one of them: `uistatechange` reports transitions
+ * of the four §75 flags and carries two {@link WidgetStateSnapshot}s, and a
+ * slider dragged across its track changes none of them. Folding a number into
+ * that snapshot would also make the base class's "nothing changed, emit
+ * nothing" comparison lie for every widget that has no value.
+ *
+ * `previous` and `current` are always different — a control that resolves an
+ * assignment to the value it already held emits nothing.
+ */
+export interface WidgetValueChangeEvent {
+  /** The widget whose value changed — always the emitter. */
+  readonly widget: UIWidget;
+  /** The value before this change. */
+  readonly previous: number;
+  /** The value after it. */
+  readonly current: number;
 }
 
 /**
@@ -323,11 +383,15 @@ export interface UIFocusEvent {
  *
  * §75 spells this as a plain assignable record —
  * `button.accessibility = { role, label, description, tabIndex }` — and that is
- * exactly what ships: typed, serializable (§79), inert. **Nothing consumes it
- * yet**; the hidden DOM mirror is staged, see {@link UI_STAGED}. It ships
- * anyway because an application that annotates its UI today loses nothing when
- * the mirror lands, and because the mirror is then a reader of this data rather
- * than a change to this API.
+ * exactly what ships: typed, serializable (§79).
+ *
+ * **One field is live**: {@link WidgetAccessibility.tabIndex} orders (and can
+ * exclude from) the Tab traversal `keyboard.ts` implements, as of 2026-08-07
+ * (A-13). `role`, `label`, and `description` are still carried and still read by
+ * nobody — they are the hidden DOM mirror's data, and the mirror is staged (see
+ * {@link UI_STAGED}). They ship anyway because an application that annotates its
+ * UI today loses nothing when the mirror lands, and because the mirror is then a
+ * reader of this data rather than a change to this API.
  */
 export interface WidgetAccessibility {
   /** Semantic role, e.g. `"button"` (§75). Free-form: ARIA's vocabulary is not restated here. */
@@ -336,7 +400,15 @@ export interface WidgetAccessibility {
   label?: string;
   /** Accessible description (§75). */
   description?: string;
-  /** Keyboard traversal order (§75). */
+  /**
+   * Keyboard traversal order (§75); absent means `0`.
+   *
+   * Widgets are visited in ascending `tabIndex`, ties broken by scene order,
+   * and a **negative** value removes the widget from the traversal without
+   * making it unfocusable — `focus()` still works on it. See
+   * `collectFocusOrder`, which also states why this engine sorts plainly rather
+   * than copying the DOM's positive-before-zero rule.
+   */
   tabIndex?: number;
 }
 
@@ -368,8 +440,24 @@ export interface WidgetSkin {
   onAttach?(widget: UIWidget): void;
   /** `widget`'s resolved size or position changed (§74). */
   onLayout?(widget: UIWidget): void;
-  /** `widget`'s interaction state changed (§72). */
+  /**
+   * `widget`'s interaction state changed (§72) — any of the flags in
+   * {@link WidgetStateSnapshot}, including a checkable control's `checked`.
+   */
   onStateChange?(widget: UIWidget): void;
+  /**
+   * Content the skin draws changed without a layout or a state transition
+   * (2026-08-07, A-12): a `Slider`'s or `ProgressIndicator`'s value, a
+   * `ProgressIndicator`'s `indeterminate` flag, an `ImageWidget`'s `source` or
+   * natural size.
+   *
+   * A fourth hook rather than an overloaded `onStateChange` because these are
+   * not §75 states — a mirror must not announce a dragged slider as having
+   * changed its hover or focus — and not `onLayout` because the widget's box is
+   * exactly what did **not** move. A skin that draws only backgrounds ignores
+   * it, which is why it is optional like the rest.
+   */
+  onContentChange?(widget: UIWidget): void;
   /** The skin was replaced or the widget disposed. */
   onDetach?(widget: UIWidget): void;
 }
@@ -440,6 +528,8 @@ declare module "@four/scene" {
     uistatechange: WidgetStateChangeEvent;
     /** A control was activated — a click, or an explicit `activate()`. Emitter only. */
     uiactivate: WidgetActivateEvent;
+    /** A control's numeric value changed (slider, progress). Emitter only. */
+    uivaluechange: WidgetValueChangeEvent;
     /** This node took the focus of its scene root (§72, §75). Emitter only. */
     focus: UIFocusEvent;
     /** This node lost that focus (§72, §75). Emitter only. */
@@ -491,6 +581,7 @@ interface MutableWidgetState {
   pressed: boolean;
   focused: boolean;
   disabled: boolean;
+  checked: boolean | null;
 }
 
 export abstract class UIWidget extends Node implements Disposable {
@@ -598,6 +689,7 @@ export abstract class UIWidget extends Node implements Disposable {
     pressed: false,
     focused: false,
     disabled: false,
+    checked: null,
   };
 
   /**
@@ -747,13 +839,13 @@ export abstract class UIWidget extends Node implements Disposable {
 
   set interactive(value: boolean) {
     if (value === this.#interactive) return;
-    this.#captureState();
+    this.captureState();
     this.#interactive = value;
     if (!value) {
       this.#hovered = false;
       this.#pressed = false;
     }
-    this.#publishState();
+    this.publishState();
   }
 
   /** A pointer is over this widget's hit area. */
@@ -781,7 +873,7 @@ export abstract class UIWidget extends Node implements Disposable {
 
   set disabled(value: boolean) {
     if (value === this.#disabled) return;
-    this.#captureState();
+    this.captureState();
     this.#disabled = value;
     if (value) {
       this.#hovered = false;
@@ -792,16 +884,37 @@ export abstract class UIWidget extends Node implements Disposable {
         this.emit("blur", { target: this, related: null });
       }
     }
-    this.#publishState();
+    this.publishState();
   }
 
-  /** A snapshot of the four §75 state flags. */
+  /**
+   * Whether this control is checked, or **`null` when it is not a checkable
+   * control** — which is what every widget in this package answers except
+   * `Toggle`, `Checkbox`, and `RadioButton` (2026-08-07, A-12).
+   *
+   * A getter with no state behind it at this level, deliberately: checkedness
+   * belongs to the three controls that have it, and giving every panel and
+   * label a `#checked` field would put a flag on hundreds of nodes to serve
+   * three classes. What the base *does* own is the comparison — see
+   * {@link UIWidget.publishState} — so a subclass that flips its own
+   * checkedness inside {@link UIWidget.captureState} /
+   * {@link UIWidget.publishState} gets `uistatechange` and the skin
+   * notification for free, exactly as hover and focus do.
+   *
+   * See {@link WidgetStateSnapshot.checked} for why `null` rather than `false`.
+   */
+  get checked(): boolean | null {
+    return null;
+  }
+
+  /** A snapshot of the §75 state flags. */
   get state(): WidgetStateSnapshot {
     return {
       hovered: this.#hovered,
       pressed: this.#pressed,
       focused: this.#focused,
       disabled: this.#disabled,
+      checked: this.checked,
     };
   }
 
@@ -836,10 +949,10 @@ export abstract class UIWidget extends Node implements Disposable {
     }
     focusOwners.set(scope, this);
     this.#focusScope = scope;
-    this.#captureState();
+    this.captureState();
     this.#focused = true;
     this.emit("focus", { target: this, related: previous });
-    this.#publishState();
+    this.publishState();
   }
 
   /** Drops the focus if this widget holds it. Emits `blur`. Otherwise a no-op. */
@@ -997,47 +1110,57 @@ export abstract class UIWidget extends Node implements Disposable {
 
   #handleEnter(): void {
     if (!this.#canInteract() || this.#hovered) return;
-    this.#captureState();
+    this.captureState();
     this.#hovered = true;
-    this.#publishState();
+    this.publishState();
   }
 
   #handleLeave(): void {
     if (!this.#hovered && !this.#pressed) return;
-    this.#captureState();
+    this.captureState();
     this.#hovered = false;
     this.#pressed = false;
-    this.#publishState();
+    this.publishState();
   }
 
   #handleDown(): void {
     if (!this.#canInteract()) return;
     if (!this.#pressed) {
-      this.#captureState();
+      this.captureState();
       this.#pressed = true;
-      this.#publishState();
+      this.publishState();
     }
     this.focus();
   }
 
   #handleUp(): void {
     if (!this.#pressed) return;
-    this.#captureState();
+    this.captureState();
     this.#pressed = false;
-    this.#publishState();
+    this.publishState();
   }
 
   #canInteract(): boolean {
     return this.#interactive && !this.#disabled && this.enabled;
   }
 
-  /** Records the current flags so {@link UIWidget.publishState} can diff them. */
-  #captureState(): void {
+  /**
+   * Records the current flags so {@link UIWidget.publishState} can diff them.
+   *
+   * `protected` rather than private since 2026-08-07 (A-12): a control that
+   * owns a state flag the base does not — a `Toggle`'s checkedness — brackets
+   * its own mutation with these two and inherits the whole publication path
+   * (no-change suppression, both snapshots, the skin notification, the event)
+   * instead of re-implementing it. There is exactly one buffer per widget, so
+   * the two calls must be adjacent: capture, mutate, publish.
+   */
+  protected captureState(): void {
     const before = this.#stateBefore;
     before.hovered = this.#hovered;
     before.pressed = this.#pressed;
     before.focused = this.#focused;
     before.disabled = this.#disabled;
+    before.checked = this.checked;
   }
 
   /**
@@ -1045,13 +1168,14 @@ export abstract class UIWidget extends Node implements Disposable {
    * {@link UIWidget.captureState}, notifying the skin first so a listener sees
    * the widget already looking the way it will look.
    */
-  #publishState(): void {
+  protected publishState(): void {
     const before = this.#stateBefore;
     if (
       before.hovered === this.#hovered &&
       before.pressed === this.#pressed &&
       before.focused === this.#focused &&
-      before.disabled === this.#disabled
+      before.disabled === this.#disabled &&
+      before.checked === this.checked
     ) {
       return;
     }
@@ -1059,6 +1183,21 @@ export abstract class UIWidget extends Node implements Disposable {
     const current = this.state;
     this.#skin?.onStateChange?.(this);
     this.emit("uistatechange", { widget: this, previous, current });
+  }
+
+  /**
+   * Tells the skin that something it draws changed which is neither this
+   * widget's box nor one of its §75 states (2026-08-07, A-12) — see
+   * {@link WidgetSkin.onContentChange}.
+   *
+   * `protected` because it is the control's own business when its content
+   * changed: `Slider`, `ProgressIndicator`, and `ImageWidget` call it, and no
+   * caller outside a widget can know better than the widget does. It emits no
+   * event: a value change has its own (`uivaluechange`), and an image's source
+   * has no observer but the skin.
+   */
+  protected notifyContentChange(): void {
+    this.#skin?.onContentChange?.(this);
   }
 
   /** Drops the focus-owner record, whatever scope it was taken in. */
@@ -1074,10 +1213,10 @@ export abstract class UIWidget extends Node implements Disposable {
   #clearFocus(related: Node | null): void {
     if (!this.#focused) return;
     this.#releaseFocusOwnership();
-    this.#captureState();
+    this.captureState();
     this.#focused = false;
     this.emit("blur", { target: this, related });
-    this.#publishState();
+    this.publishState();
   }
 }
 

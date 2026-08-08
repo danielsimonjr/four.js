@@ -5,14 +5,15 @@
  * §53 describes a family (`Geometry2D`, `Geometry3D`, `IndexedGeometry`,
  * `ProceduralGeometry`, …) over an abstract base with `id`, `version`,
  * `bounds`, `computeBounds()`, `clone()`, and `dispose()`. This packet
- * implements exactly one concrete member of it — positions, an optional
- * per-vertex `normals` attribute, optional indices, a draw mode — because that
- * is what the §120 MVP renders (unlit and Lambert-lit colored primitives,
- * WebGL 2). The rest of the family, the rest of the standard attribute set
- * (tangents, uv, joints/weights, instance transforms), and `clone()` are
- * deliberately absent rather than sketched: each of them pins a public layout
- * that the WebGL backend and the §79 scene format both have to agree with, and
- * none of them is needed to draw a box.
+ * implements exactly one concrete member of it — positions, the optional
+ * per-vertex `normals`, `uvs`, and `colors` attributes, optional indices, a
+ * draw mode — because that is what the §120 MVP renders (unlit, textured, and
+ * Lambert-lit primitives, WebGL 2). The rest of the family, the rest of §53's
+ * standard attribute set (tangents, a secondary uv set, joints/weights,
+ * instance transforms), and `clone()` are deliberately absent rather than
+ * sketched: each of them pins a public layout that the WebGL backend and the
+ * §79 scene format both have to agree with, and none of them is needed to draw
+ * a textured box.
  *
  * `normals` joined the layout with the §68 lighting packet (2026-08-04): a lit
  * surface (§120 "lighting") cannot be shaded without per-vertex normals, and
@@ -23,6 +24,27 @@
  * lit pipeline normalizes after interpolation anyway, and re-checking length
  * per component would reject legitimately denormalized authored data).
  *
+ * `uvs` and `colors` joined it the same way (R-19), and follow the `normals`
+ * precedent exactly — optional, index-aligned, §85-validated on assignment,
+ * dropped by `dispose()`:
+ *
+ * - **`uvs`** are 2 floats per vertex (`uvs[2 * i]` is vertex `i`'s u), the
+ *   texture coordinate §53 names and §55/§57's `map` samples with. `v = 0` is
+ *   the bottom edge, matching §7a's Y-up world and the bottom-row-first texel
+ *   order `@four/render`'s `TextureSource` documents — so a textured quad needs
+ *   no flip anywhere. Values outside 0…1 are legal (they tile or clamp
+ *   according to the sampler, which is backend state, not geometry state).
+ * - **`colors`** are 4 floats per vertex (`colors[4 * i]` is vertex `i`'s red),
+ *   straight (non-premultiplied) RGBA in the same nominal 0…1 range and with
+ *   the same "no color space attached" policy `UnlitMaterial.color` states
+ *   (§60a). They are what makes §113's debug-draw overlay drawable: a segment
+ *   list is positions plus colors, uploaded once and drawn with
+ *   `UnlitMaterial({ vertexColors: true })`.
+ *
+ * Neither is *consumed* unless a material asks for it: a geometry may carry uvs
+ * and still draw flat-coloured, which is what keeps the attributes free to add
+ * to the primitive builders without changing a single existing pixel.
+ *
  * ## Version, not events
  *
  * Backends cache GPU buffers per geometry. The cache key is
@@ -32,6 +54,7 @@
  *
  * ```ts
  * geometry.positions[0] = 2;  // in-place edit — invisible to the geometry
+ * geometry.uvs![0] = 0.5;     // …and so is one into any other attribute
  * geometry.markDirty();       // announce it: version += 1
  * ```
  *
@@ -55,10 +78,21 @@
  * In-place edits followed by {@link BufferGeometry.markDirty} are *not*
  * re-validated. That is the fast path, and re-validating it would defeat the
  * purpose of having one.
+ *
+ * ## Resource accounting (§83, A-5)
+ *
+ * Every geometry reports its size ({@link BufferGeometry.byteLength}) to the
+ * process-wide totals in `resource-memory.ts` — at construction, on each
+ * attribute replacement, and on `dispose()` — which is what makes §84's
+ * `bufferMemory` measurable and a leaked geometry visible. The accounting is
+ * arithmetic on two module-level numbers, holds no reference to anything, and
+ * never runs on a draw path. `resource-memory.ts` documents the design.
  */
 
 import type { Disposable } from "@four/core";
 import { Vector3 } from "@four/math";
+
+import { noteGeometry } from "./resource-memory.js";
 
 /**
  * How a geometry's vertices assemble into primitives.
@@ -117,6 +151,20 @@ export interface BufferGeometryOptions {
    */
   normals?: Float32Array;
   /**
+   * Optional per-vertex texture coordinates as uv pairs, index-aligned with
+   * `positions` (§53, §55). Length must be `2 / 3` of `positions.length` — two
+   * floats per vertex — and every value must be finite (§85). `v = 0` is the
+   * bottom edge; see the module header.
+   */
+  uvs?: Float32Array;
+  /**
+   * Optional per-vertex straight RGBA colors, index-aligned with `positions`
+   * (§53, §60a). Length must be `4 / 3` of `positions.length` — four floats
+   * per vertex — and every value must be finite (§85). Consumed only by a
+   * material that opts in (`UnlitMaterial.vertexColors`).
+   */
+  colors?: Float32Array;
+  /**
    * Optional index buffer. Every entry must be a valid vertex index and the
    * length must be a multiple of the mode's primitive size (§85).
    */
@@ -147,12 +195,51 @@ function primitiveSize(mode: GeometryDrawMode): number {
 }
 
 /**
- * Runs the §85 checks for one (positions, normals, indices, mode) quadruple.
- * Throws on the first violation; returns nothing.
+ * Runs the §85 checks for one optional vertex attribute: index-aligned with
+ * `positions` at `components` floats per vertex, every value finite.
+ *
+ * One helper for `normals`, `uvs`, and `colors` because the rule is one rule —
+ * the only difference between them is the component count and the § reference
+ * the message cites, and three copies of the same loop is how the three drift
+ * apart.
+ */
+function validateAttribute(
+  name: string,
+  values: Float32Array | undefined,
+  components: number,
+  vertexCount: number,
+  reference: string,
+): void {
+  if (values === undefined) {
+    return;
+  }
+  const expected = vertexCount * components;
+  if (values.length !== expected) {
+    throw new RangeError(
+      `Geometry ${name} must be index-aligned with positions — ` +
+        `${String(components)} floats per vertex — so their length must be ` +
+        `${String(expected)}; got ${String(values.length)} (${reference}).`,
+    );
+  }
+  for (let i = 0; i < values.length; i += 1) {
+    if (!Number.isFinite(values[i])) {
+      throw new RangeError(
+        `Geometry ${name.slice(0, -1)} ${String(i)} is ${String(values[i])}; ` +
+          `${name} must be finite (§85: NaN and infinite values).`,
+      );
+    }
+  }
+}
+
+/**
+ * Runs the §85 checks for one (positions, normals, uvs, colors, indices, mode)
+ * tuple. Throws on the first violation; returns nothing.
  */
 function validate(
   positions: Float32Array,
   normals: Float32Array | undefined,
+  uvs: Float32Array | undefined,
+  colors: Float32Array | undefined,
   indices: GeometryIndexArray | undefined,
   mode: GeometryDrawMode,
 ): void {
@@ -171,26 +258,11 @@ function validate(
     }
   }
 
-  if (normals !== undefined) {
-    if (normals.length !== positions.length) {
-      throw new RangeError(
-        `Geometry normals must be index-aligned with positions — one xyz ` +
-          `triplet per vertex — so their length must be ` +
-          `${String(positions.length)}; got ${String(normals.length)} ` +
-          "(§53, §68).",
-      );
-    }
-    for (let i = 0; i < normals.length; i += 1) {
-      if (!Number.isFinite(normals[i])) {
-        throw new RangeError(
-          `Geometry normal ${String(i)} is ${String(normals[i])}; normals ` +
-            "must be finite (§85: NaN and infinite values).",
-        );
-      }
-    }
-  }
-
   const vertexCount = positions.length / 3;
+  validateAttribute("normals", normals, 3, vertexCount, "§53, §68");
+  validateAttribute("uvs", uvs, 2, vertexCount, "§53, §55");
+  validateAttribute("colors", colors, 4, vertexCount, "§53, §60a");
+
   const size = primitiveSize(mode);
 
   if (indices === undefined) {
@@ -247,6 +319,10 @@ export class BufferGeometry implements Disposable {
 
   #normals: Float32Array | undefined;
 
+  #uvs: Float32Array | undefined;
+
+  #colors: Float32Array | undefined;
+
   #indices: GeometryIndexArray | undefined;
 
   #mode: GeometryDrawMode;
@@ -273,11 +349,32 @@ export class BufferGeometry implements Disposable {
 
   constructor(options: BufferGeometryOptions) {
     const mode = options.mode ?? "triangles";
-    validate(options.positions, options.normals, options.indices, mode);
+    validate(
+      options.positions,
+      options.normals,
+      options.uvs,
+      options.colors,
+      options.indices,
+      mode,
+    );
     this.#positions = options.positions;
     this.#normals = options.normals;
+    this.#uvs = options.uvs;
+    this.#colors = options.colors;
     this.#indices = options.indices;
     this.#mode = mode;
+    noteGeometry(1, this.byteLength);
+  }
+
+  /**
+   * Announces a mutation that may have changed how many bytes this geometry
+   * holds: reconciles the §83 totals against `bytesBefore` and bumps the
+   * version. The one place attribute replacement and disposal share, so the two
+   * cannot drift apart.
+   */
+  #mutated(bytesBefore: number): void {
+    noteGeometry(0, this.byteLength - bytesBefore);
+    this.markDirty();
   }
 
   /**
@@ -295,9 +392,17 @@ export class BufferGeometry implements Disposable {
   }
 
   set positions(value: Float32Array) {
-    validate(value, this.#normals, this.#indices, this.#mode);
+    validate(
+      value,
+      this.#normals,
+      this.#uvs,
+      this.#colors,
+      this.#indices,
+      this.#mode,
+    );
+    const before = this.byteLength;
     this.#positions = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -318,9 +423,83 @@ export class BufferGeometry implements Disposable {
   }
 
   set normals(value: Float32Array | undefined) {
-    validate(this.#positions, value, this.#indices, this.#mode);
+    validate(
+      this.#positions,
+      value,
+      this.#uvs,
+      this.#colors,
+      this.#indices,
+      this.#mode,
+    );
+    const before = this.byteLength;
     this.#normals = value;
-    this.markDirty();
+    this.#mutated(before);
+  }
+
+  /**
+   * Optional per-vertex texture coordinates as uv pairs, or `undefined` for a
+   * geometry that carries none (§53, §55). Held by reference, like
+   * {@link BufferGeometry.positions}, and subject to the same rules: assigning
+   * validates (two floats per vertex, index-aligned, finite, §85) and bumps the
+   * version; **in-place edits are invisible and need
+   * {@link BufferGeometry.markDirty}**. Assigning `undefined` drops the
+   * attribute — a textured draw of a uv-less geometry then samples the texel at
+   * `(0, 0)` for every fragment, because GL's constant attribute default is
+   * `(0, 0, 0, 1)`.
+   *
+   * Replacing `positions` with an array of a different vertex count while uvs
+   * are present therefore throws: drop or replace the uvs first, exactly as for
+   * {@link BufferGeometry.normals}.
+   */
+  get uvs(): Float32Array | undefined {
+    return this.#uvs;
+  }
+
+  set uvs(value: Float32Array | undefined) {
+    validate(
+      this.#positions,
+      this.#normals,
+      value,
+      this.#colors,
+      this.#indices,
+      this.#mode,
+    );
+    const before = this.byteLength;
+    this.#uvs = value;
+    this.#mutated(before);
+  }
+
+  /**
+   * Optional per-vertex straight RGBA colors, or `undefined` for a geometry
+   * that carries none (§53, §60a). Held by reference, like
+   * {@link BufferGeometry.positions}, and subject to the same rules: assigning
+   * validates (four floats per vertex, index-aligned, finite, §85) and bumps
+   * the version; **in-place edits are invisible and need
+   * {@link BufferGeometry.markDirty}** — which is the fast path a debug-draw
+   * overlay rewriting its segment colors every frame takes. Assigning
+   * `undefined` drops the attribute; a `vertexColors` material drawing a
+   * color-less geometry then multiplies by GL's constant default
+   * `(0, 0, 0, 1)`, i.e. renders black.
+   *
+   * Replacing `positions` with an array of a different vertex count while
+   * colors are present therefore throws: drop or replace the colors first.
+   */
+  get colors(): Float32Array | undefined {
+    return this.#colors;
+  }
+
+  set colors(value: Float32Array | undefined) {
+    validate(
+      this.#positions,
+      this.#normals,
+      this.#uvs,
+      value,
+      this.#indices,
+      this.#mode,
+    );
+    const before = this.byteLength;
+    this.#colors = value;
+    this.#mutated(before);
   }
 
   /**
@@ -334,9 +513,17 @@ export class BufferGeometry implements Disposable {
   }
 
   set indices(value: GeometryIndexArray | undefined) {
-    validate(this.#positions, this.#normals, value, this.#mode);
+    validate(
+      this.#positions,
+      this.#normals,
+      this.#uvs,
+      this.#colors,
+      value,
+      this.#mode,
+    );
+    const before = this.byteLength;
     this.#indices = value;
-    this.markDirty();
+    this.#mutated(before);
   }
 
   /**
@@ -349,7 +536,14 @@ export class BufferGeometry implements Disposable {
   }
 
   set mode(value: GeometryDrawMode) {
-    validate(this.#positions, this.#normals, this.#indices, value);
+    validate(
+      this.#positions,
+      this.#normals,
+      this.#uvs,
+      this.#colors,
+      this.#indices,
+      value,
+    );
     this.#mode = value;
     this.markDirty();
   }
@@ -384,10 +578,44 @@ export class BufferGeometry implements Disposable {
   }
 
   /**
+   * Bytes this geometry holds (§83, §84's `bufferMemory`) — the sum of the
+   * `byteLength`s of `positions` and whichever of `normals`, `uvs`, `colors`,
+   * and `indices` are present, and therefore exactly what a backend uploads
+   * for it.
+   *
+   * ```ts
+   * // 3 vertices × 3 floats × 4 bytes
+   * new BufferGeometry({ positions: new Float32Array(9) }).byteLength; // 36
+   * ```
+   *
+   * **`0` once disposed**, because a disposed geometry holds nothing — that is
+   * the same fact `positions` reports by becoming empty, stated as a single
+   * rule so that a write into a disposed geometry (already a §83 "disposed
+   * resource still in use" mistake) cannot resurrect its bytes in the
+   * process-wide totals.
+   *
+   * Derived on every read rather than cached: it is five property reads and an
+   * addition, nothing on the draw path calls it, and a cached copy would be one
+   * more thing an in-place edit could invalidate.
+   */
+  get byteLength(): number {
+    if (this.#disposed) {
+      return 0;
+    }
+    return (
+      this.#positions.byteLength +
+      (this.#normals?.byteLength ?? 0) +
+      (this.#uvs?.byteLength ?? 0) +
+      (this.#colors?.byteLength ?? 0) +
+      (this.#indices?.byteLength ?? 0)
+    );
+  }
+
+  /**
    * Announces a mutation the geometry could not see — an in-place write into
-   * `positions`, `normals`, or `indices`. Bumps {@link BufferGeometry.version}
-   * by one, which invalidates the cached bounds and every backend buffer keyed
-   * on the version.
+   * `positions`, `normals`, `uvs`, `colors`, or `indices`. Bumps
+   * {@link BufferGeometry.version} by one, which invalidates the cached bounds
+   * and every backend buffer keyed on the version.
    *
    * Calling it after a setter is harmless, only wasteful: the version advances
    * again and the bounds recompute once more.
@@ -457,7 +685,8 @@ export class BufferGeometry implements Disposable {
   /**
    * Releases this geometry's CPU-side data (§83). Idempotent.
    *
-   * The typed arrays are dropped — `positions` becomes empty, `normals` and
+   * The typed arrays are dropped — `positions` becomes empty, `normals`,
+   * `uvs`, `colors`, and
    * `indices` become `undefined` — so a large mesh's memory is reclaimable the moment
    * its owner is done with it, and the version is bumped so any backend cache
    * keyed on it re-reads (and finds nothing to draw). Nothing throws
@@ -467,15 +696,24 @@ export class BufferGeometry implements Disposable {
    * Disposing does **not** notify the renderables pointing at this geometry;
    * ownership is explicit and upwards (§83), so whoever created the geometry
    * decides when nothing needs it any more.
+   *
+   * It **does** remove this geometry and its bytes from the process-wide §83
+   * totals (`geometryMemoryBytes`, `liveGeometryCount`), exactly once: the
+   * idempotence guard above is what makes a double `dispose()` subtract once
+   * rather than twice.
    */
   dispose(): void {
     if (this.#disposed) {
       return;
     }
+    const before = this.byteLength;
     this.#disposed = true;
     this.#positions = EMPTY_POSITIONS;
     this.#normals = undefined;
+    this.#uvs = undefined;
+    this.#colors = undefined;
     this.#indices = undefined;
+    noteGeometry(-1, -before);
     this.markDirty();
   }
 }

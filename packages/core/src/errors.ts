@@ -28,6 +28,17 @@ export type FourErrorCode =
   | "PHYSICS_SOLVER_FAILED"
   | "SERIALIZATION_VERSION_MISMATCH"
   /**
+   * External content was refused by a §96 guard before anything parsed,
+   * decoded, or walked it — a document longer than `maximumTextLength`, or one
+   * nesting deeper than `maximumDepth`. Distinct from the `TypeError`s the
+   * document validators throw for a malformed field: those say "this is not a
+   * scene", this says "this is not something we are willing to look at". The
+   * `context` names the `limitName`, its `limit`, and the `observed`
+   * measurement, so a host can log the policy that fired without parsing a
+   * message.
+   */
+  | "UNTRUSTED_INPUT_REJECTED"
+  /**
    * A named part of the public API exists but its behaviour lands in a later
    * phase. Thrown at the point of use, never swallowed, so a reserved value can
    * be spelled out in the types (and serialized, and documented) long before it

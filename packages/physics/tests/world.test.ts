@@ -363,17 +363,30 @@ describe("PhysicsWorld registration (§23, §24, §37)", () => {
     expect(adapter.bodies.size).toBe(0);
   });
 
-  it("removes bodies and their colliders, and reports unknown nodes", async () => {
+  // 2026-08-07: teardown is **one** `destroyBody`, which §37 defines as taking
+  // everything attached with it. The per-collider `destroyCollider` calls that
+  // used to precede it were work whose result was discarded on the next line
+  // (each one re-established the §23 mass of the body about to be destroyed).
+  it("removes a body with one adapter call, and reports unknown nodes", async () => {
     const { adapter, world } = await readyWorld();
     const node = dynamicNode();
     world.addBody(node);
+    const colliderComponent = node.getComponent(Collider);
     adapter.clearCalls();
 
     expect(world.removeBody(node)).toBe(true);
     expect(world.removeBody(node)).toBe(false);
     expect(world.removeBody(new Group())).toBe(false);
-    expect(adapter.callOrder).toEqual(["destroyCollider", "destroyBody"]);
+    expect(adapter.callOrder).toEqual(["destroyBody"]);
     expect(world.size).toBe(0);
+    // The adapter forgot the collider with its body, and so did the world's own
+    // component→handle index: nothing believes it is still simulated.
+    expect(adapter.colliders.size).toBe(0);
+    expect(
+      colliderComponent === undefined
+        ? undefined
+        : world.getColliderHandle(colliderComponent),
+    ).toBeUndefined();
   });
 });
 
@@ -1403,16 +1416,14 @@ describe("PhysicsWorld disposal (§83)", () => {
 
     world.dispose();
 
+    // Reverse creation order, one `destroyBody` per registration (2026-08-07 —
+    // the per-collider calls that used to bracket each body are gone; §37 makes
+    // the adapter responsible for what is attached to a destroyed body).
     expect(
       adapter.calls.map((call) => `${call.method}:${String(call.id ?? "")}`),
-    ).toEqual([
-      "destroyCollider:3",
-      "destroyCollider:2",
-      "destroyBody:2",
-      "destroyCollider:1",
-      "destroyBody:1",
-      "dispose:",
-    ]);
+    ).toEqual(["destroyBody:2", "destroyBody:1", "dispose:"]);
+    // Both bodies took their colliders with them.
+    expect(adapter.colliders.size).toBe(0);
     expect(adapter.disposed).toBe(true);
     expect(world.disposed).toBe(true);
   });

@@ -56,17 +56,33 @@
  * hit with a stale `version` deletes and re-uploads) instead of leaking the old
  * entry behind a new id (decision, WP-3a.3).
  *
- * ## Texture coordinates without a uv attribute
+ * ## Texture coordinates: still derived from position, now by choice
  *
- * §53's `BufferGeometry` carries positions and indices — there is no uv stream,
- * and adding one is the packet that introduces the standard attribute set, not
- * this one. The sprite pipeline therefore derives uv from **position**: the quad
- * is a rectangle in the XY plane, so `uv = (position.xy - min) / size` maps its
- * corners onto `(0,0)…(1,1)` exactly, and `min`/`size` are the geometry's own
- * local bounds (`computeBounds()`, cached against the version). The backend
- * uploads them as one `vec4` per draw; see `@four/render-webgl`'s
- * `SpriteProgram`. The mapping is exact for any anchor and any size, and it
- * disappears the moment geometries carry real uvs.
+ * When this class was written §53's `BufferGeometry` carried positions and
+ * indices and nothing else, so the sprite pipeline derived uv from **position**:
+ * the quad is a rectangle in the XY plane, so `uv = (position.xy - min) / size`
+ * maps its corners onto `(0,0)…(1,1)` exactly, and `min`/`size` are the
+ * geometry's own local bounds (`computeBounds()`, cached against the version).
+ * The backend uploads them as one `vec4` per draw; see `@four/render-webgl`'s
+ * `SpriteProgram`.
+ *
+ * **`BufferGeometry.uvs` exists as of R-19 (2026-08-07)**, and the workaround
+ * above is no longer a workaround for a missing attribute — it is one of two
+ * ways to do the same thing. Rewriting this path is deliberately *not* part of
+ * that packet:
+ *
+ * - the two mappings are identical for every anchor and size, so the change
+ *   would be invisible on screen and unfalsifiable by the pixel goldens;
+ * - a real uv stream costs the sprite a second buffer per quad and a second
+ *   in-place rewrite on every resize, against one `vec4` uniform today —
+ *   §86's 100 000-sprite target is the reason to measure before switching;
+ * - §55's `frame`/atlas regions are the feature that actually *needs* authored
+ *   uv (a sub-rectangle is not a function of the quad's bounds), and the switch
+ *   belongs to that packet, which can retire `SpriteProgram`'s `quad` uniform
+ *   in the same move.
+ *
+ * Recorded here rather than in a tracker so the next reader of this paragraph
+ * finds the reason next to the code (follow-up: §55 atlas packet).
  *
  * ## Deferred from §55 (named, not dropped)
  *

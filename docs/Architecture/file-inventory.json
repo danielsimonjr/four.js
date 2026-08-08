@@ -1,49 +1,49 @@
 {
-  "generated": "2026-08-05",
-  "totalFiles": 335,
+  "generated": "2026-08-07",
+  "totalFiles": 423,
   "byDisposition": {
-    "reachable": 113,
+    "reachable": 148,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 158,
+    "test": 207,
     "tool": 1,
-    "config": 9,
-    "example": 6
+    "config": 11,
+    "example": 8
   },
   "byArea": {
-    "examples": 6,
-    "config": 9,
-    "src": 161,
-    "tests": 158,
+    "examples": 8,
+    "config": 11,
+    "src": 196,
+    "tests": 207,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 55,
-    "@four/animation": 23,
-    "@four/assets": 6,
-    "@four/core": 14,
-    "@four/diagnostics": 12,
-    "four": 28,
-    "@four/geometry": 5,
-    "@four/input": 8,
-    "@four/materials": 6,
+    "(root)": 75,
+    "@four/animation": 25,
+    "@four/assets": 7,
+    "@four/core": 20,
+    "@four/diagnostics": 17,
+    "four": 30,
+    "@four/geometry": 10,
+    "@four/input": 12,
+    "@four/materials": 8,
     "@four/math": 13,
-    "@four/motion": 26,
+    "@four/motion": 28,
     "@four/particles": 15,
     "@four/physics-box2d": 2,
-    "@four/physics-rapier": 16,
+    "@four/physics-rapier": 19,
     "@four/physics-soft": 2,
-    "@four/physics": 30,
+    "@four/physics": 36,
     "@four/render-canvas": 2,
     "@four/render-svg": 2,
-    "@four/render-webgl": 8,
+    "@four/render-webgl": 12,
     "@four/render-webgpu": 2,
-    "@four/render": 14,
+    "@four/render": 26,
     "@four/scene": 22,
-    "@four/serialization": 8,
+    "@four/serialization": 9,
     "@four/text": 6,
-    "@four/ui": 10
+    "@four/ui": 23
   },
   "files": [
     {
@@ -58,7 +58,7 @@
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 8
+      "loc": 17
     },
     {
       "file": "examples/first-2d-scene/main.ts",
@@ -72,7 +72,35 @@
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 8
+      "loc": 17
+    },
+    {
+      "file": "examples/first-3d-scene/main.ts",
+      "package": "(root)",
+      "area": "examples",
+      "disposition": "example",
+      "loc": 434
+    },
+    {
+      "file": "examples/first-3d-scene/vite.config.ts",
+      "package": "(root)",
+      "area": "config",
+      "disposition": "config",
+      "loc": 17
+    },
+    {
+      "file": "examples/flagship/one-scene-everything-moves/main.ts",
+      "package": "(root)",
+      "area": "examples",
+      "disposition": "example",
+      "loc": 1853
+    },
+    {
+      "file": "examples/flagship/one-scene-everything-moves/vite.config.ts",
+      "package": "(root)",
+      "area": "config",
+      "disposition": "config",
+      "loc": 17
     },
     {
       "file": "examples/mechanism/main.ts",
@@ -86,7 +114,7 @@
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 8
+      "loc": 17
     },
     {
       "file": "examples/particles-demo/main.ts",
@@ -100,7 +128,7 @@
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 8
+      "loc": 17
     },
     {
       "file": "examples/physics-playground/main.ts",
@@ -114,21 +142,21 @@
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 8
+      "loc": 17
     },
     {
       "file": "examples/ui-demo/main.ts",
       "package": "(root)",
       "area": "examples",
       "disposition": "example",
-      "loc": 674
+      "loc": 680
     },
     {
       "file": "examples/ui-demo/vite.config.ts",
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 8
+      "loc": 17
     },
     {
       "file": "packages/animation/src/animation-system.ts",
@@ -152,6 +180,13 @@
       "loc": 343
     },
     {
+      "file": "packages/animation/src/controller.ts",
+      "package": "@four/animation",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 1420
+    },
+    {
       "file": "packages/animation/src/easing.ts",
       "package": "@four/animation",
       "area": "src",
@@ -163,7 +198,7 @@
       "package": "@four/animation",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 125
+      "loc": 141
     },
     {
       "file": "packages/animation/src/mixer.ts",
@@ -227,6 +262,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 426
+    },
+    {
+      "file": "packages/animation/tests/controller.test.ts",
+      "package": "@four/animation",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 1332
     },
     {
       "file": "packages/animation/tests/easing.test.ts",
@@ -296,14 +338,14 @@
       "package": "@four/assets",
       "area": "src",
       "disposition": "reachable",
-      "loc": 514
+      "loc": 913
     },
     {
       "file": "packages/assets/src/index.ts",
       "package": "@four/assets",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 28
+      "loc": 40
     },
     {
       "file": "packages/assets/src/loaders.ts",
@@ -327,6 +369,13 @@
       "loc": 198
     },
     {
+      "file": "packages/assets/tests/security.test.ts",
+      "package": "@four/assets",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 405
+    },
+    {
       "file": "packages/assets/tests/smoke.test.ts",
       "package": "@four/assets",
       "area": "tests",
@@ -338,7 +387,7 @@
       "package": "@four/core",
       "area": "src",
       "disposition": "reachable",
-      "loc": 227
+      "loc": 233
     },
     {
       "file": "packages/core/src/conventions.ts",
@@ -346,6 +395,13 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 21
+    },
+    {
+      "file": "packages/core/src/dev.ts",
+      "package": "@four/core",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 197
     },
     {
       "file": "packages/core/src/disposable.ts",
@@ -359,7 +415,7 @@
       "package": "@four/core",
       "area": "src",
       "disposition": "reachable",
-      "loc": 82
+      "loc": 93
     },
     {
       "file": "packages/core/src/events.ts",
@@ -373,7 +429,7 @@
       "package": "@four/core",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 20
+      "loc": 67
     },
     {
       "file": "packages/core/src/json.ts",
@@ -390,11 +446,32 @@
       "loc": 263
     },
     {
+      "file": "packages/core/src/units.ts",
+      "package": "@four/core",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 661
+    },
+    {
+      "file": "packages/core/src/untrusted.ts",
+      "package": "@four/core",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 245
+    },
+    {
       "file": "packages/core/tests/component.test.ts",
       "package": "@four/core",
       "area": "tests",
       "disposition": "test",
       "loc": 375
+    },
+    {
+      "file": "packages/core/tests/dev.test.ts",
+      "package": "@four/core",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 228
     },
     {
       "file": "packages/core/tests/errors.test.ts",
@@ -432,6 +509,20 @@
       "loc": 10
     },
     {
+      "file": "packages/core/tests/units.test.ts",
+      "package": "@four/core",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 329
+    },
+    {
+      "file": "packages/core/tests/untrusted.test.ts",
+      "package": "@four/core",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 152
+    },
+    {
       "file": "packages/diagnostics/src/checksum.ts",
       "package": "@four/diagnostics",
       "area": "src",
@@ -443,35 +534,49 @@
       "package": "@four/diagnostics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1272
+      "loc": 1509
     },
     {
       "file": "packages/diagnostics/src/index.ts",
       "package": "@four/diagnostics",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 82
+      "loc": 114
     },
     {
       "file": "packages/diagnostics/src/recorder.ts",
       "package": "@four/diagnostics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 439
+      "loc": 483
     },
     {
       "file": "packages/diagnostics/src/replay-format.ts",
       "package": "@four/diagnostics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 673
+      "loc": 883
     },
     {
       "file": "packages/diagnostics/src/replay-player.ts",
       "package": "@four/diagnostics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 787
+      "loc": 802
+    },
+    {
+      "file": "packages/diagnostics/src/resource-audit.ts",
+      "package": "@four/diagnostics",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 228
+    },
+    {
+      "file": "packages/diagnostics/src/stats.ts",
+      "package": "@four/diagnostics",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 485
     },
     {
       "file": "packages/diagnostics/tests/checksum.test.ts",
@@ -485,28 +590,35 @@
       "package": "@four/diagnostics",
       "area": "tests",
       "disposition": "test",
-      "loc": 1126
+      "loc": 1514
     },
     {
       "file": "packages/diagnostics/tests/recorder.test.ts",
       "package": "@four/diagnostics",
       "area": "tests",
       "disposition": "test",
-      "loc": 607
+      "loc": 767
     },
     {
       "file": "packages/diagnostics/tests/replay-format.test.ts",
       "package": "@four/diagnostics",
       "area": "tests",
       "disposition": "test",
-      "loc": 670
+      "loc": 821
     },
     {
       "file": "packages/diagnostics/tests/replay-player.test.ts",
       "package": "@four/diagnostics",
       "area": "tests",
       "disposition": "test",
-      "loc": 942
+      "loc": 1049
+    },
+    {
+      "file": "packages/diagnostics/tests/resource-audit.test.ts",
+      "package": "@four/diagnostics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 170
     },
     {
       "file": "packages/diagnostics/tests/smoke.test.ts",
@@ -514,6 +626,20 @@
       "area": "tests",
       "disposition": "test",
       "loc": 10
+    },
+    {
+      "file": "packages/diagnostics/tests/stats.test.ts",
+      "package": "@four/diagnostics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 304
+    },
+    {
+      "file": "packages/diagnostics/tests/untrusted.test.ts",
+      "package": "@four/diagnostics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 112
     },
     {
       "file": "packages/four/src/animation.ts",
@@ -527,7 +653,7 @@
       "package": "four",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 687
+      "loc": 1378
     },
     {
       "file": "packages/four/src/assets.ts",
@@ -562,7 +688,7 @@
       "package": "four",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 29
+      "loc": 69
     },
     {
       "file": "packages/four/src/input.ts",
@@ -663,6 +789,13 @@
       "loc": 2
     },
     {
+      "file": "packages/four/src/scene-serializers.ts",
+      "package": "four",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 1395
+    },
+    {
       "file": "packages/four/src/scene.ts",
       "package": "four",
       "area": "src",
@@ -695,7 +828,7 @@
       "package": "four",
       "area": "tests",
       "disposition": "test",
-      "loc": 786
+      "loc": 1703
     },
     {
       "file": "packages/four/tests/barrels.test.ts",
@@ -703,6 +836,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 47
+    },
+    {
+      "file": "packages/four/tests/scene-serializers.test.ts",
+      "package": "four",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 1471
     },
     {
       "file": "packages/four/tests/smoke.test.ts",
@@ -716,28 +856,63 @@
       "package": "@four/geometry",
       "area": "src",
       "disposition": "reachable",
-      "loc": 482
+      "loc": 720
     },
     {
       "file": "packages/geometry/src/index.ts",
       "package": "@four/geometry",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 16
+      "loc": 40
+    },
+    {
+      "file": "packages/geometry/src/primitive-support.ts",
+      "package": "@four/geometry",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 212
+    },
+    {
+      "file": "packages/geometry/src/primitives-3d.ts",
+      "package": "@four/geometry",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 1216
     },
     {
       "file": "packages/geometry/src/primitives.ts",
       "package": "@four/geometry",
       "area": "src",
       "disposition": "reachable",
-      "loc": 278
+      "loc": 321
+    },
+    {
+      "file": "packages/geometry/src/resource-memory.ts",
+      "package": "@four/geometry",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 112
     },
     {
       "file": "packages/geometry/tests/geometry.test.ts",
       "package": "@four/geometry",
       "area": "tests",
       "disposition": "test",
-      "loc": 574
+      "loc": 773
+    },
+    {
+      "file": "packages/geometry/tests/primitives-3d.test.ts",
+      "package": "@four/geometry",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 993
+    },
+    {
+      "file": "packages/geometry/tests/resource-memory.test.ts",
+      "package": "@four/geometry",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 159
     },
     {
       "file": "packages/geometry/tests/smoke.test.ts",
@@ -751,14 +926,28 @@
       "package": "@four/input",
       "area": "src",
       "disposition": "reachable",
-      "loc": 357
+      "loc": 368
     },
     {
       "file": "packages/input/src/index.ts",
       "package": "@four/input",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 26
+      "loc": 44
+    },
+    {
+      "file": "packages/input/src/key-events.ts",
+      "package": "@four/input",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 271
+    },
+    {
+      "file": "packages/input/src/keyboard-input.ts",
+      "package": "@four/input",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 229
     },
     {
       "file": "packages/input/src/pick.ts",
@@ -772,14 +961,28 @@
       "package": "@four/input",
       "area": "src",
       "disposition": "reachable",
-      "loc": 351
+      "loc": 302
     },
     {
       "file": "packages/input/src/pointer-input.ts",
       "package": "@four/input",
       "area": "src",
       "disposition": "reachable",
-      "loc": 514
+      "loc": 648
+    },
+    {
+      "file": "packages/input/src/propagation.ts",
+      "package": "@four/input",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 193
+    },
+    {
+      "file": "packages/input/tests/keyboard.test.ts",
+      "package": "@four/input",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 535
     },
     {
       "file": "packages/input/tests/pick.test.ts",
@@ -793,7 +996,7 @@
       "package": "@four/input",
       "area": "tests",
       "disposition": "test",
-      "loc": 1093
+      "loc": 1343
     },
     {
       "file": "packages/input/tests/smoke.test.ts",
@@ -807,35 +1010,49 @@
       "package": "@four/materials",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 12
+      "loc": 15
     },
     {
       "file": "packages/materials/src/lit-material.ts",
       "package": "@four/materials",
       "area": "src",
       "disposition": "reachable",
-      "loc": 188
+      "loc": 181
+    },
+    {
+      "file": "packages/materials/src/material.ts",
+      "package": "@four/materials",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 408
     },
     {
       "file": "packages/materials/src/sprite-material.ts",
       "package": "@four/materials",
       "area": "src",
       "disposition": "reachable",
-      "loc": 313
+      "loc": 233
+    },
+    {
+      "file": "packages/materials/src/texture.ts",
+      "package": "@four/materials",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 82
     },
     {
       "file": "packages/materials/src/unlit-material.ts",
       "package": "@four/materials",
       "area": "src",
       "disposition": "reachable",
-      "loc": 220
+      "loc": 291
     },
     {
       "file": "packages/materials/tests/materials.test.ts",
       "package": "@four/materials",
       "area": "tests",
       "disposition": "test",
-      "loc": 367
+      "loc": 640
     },
     {
       "file": "packages/materials/tests/smoke.test.ts",
@@ -954,7 +1171,7 @@
       "package": "@four/motion",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 137
+      "loc": 142
     },
     {
       "file": "packages/motion/src/integrators.ts",
@@ -1004,6 +1221,13 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 233
+    },
+    {
+      "file": "packages/motion/src/serializers.ts",
+      "package": "@four/motion",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 217
     },
     {
       "file": "packages/motion/src/spring-damper.ts",
@@ -1081,6 +1305,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 537
+    },
+    {
+      "file": "packages/motion/tests/serializers.test.ts",
+      "package": "@four/motion",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 226
     },
     {
       "file": "packages/motion/tests/smoke.test.ts",
@@ -1262,28 +1493,35 @@
       "package": "@four/physics-rapier",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 63
+      "loc": 68
     },
     {
       "file": "packages/physics-rapier/src/init.ts",
       "package": "@four/physics-rapier",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1069
+      "loc": 1167
     },
     {
       "file": "packages/physics-rapier/src/rapier2d-adapter.ts",
       "package": "@four/physics-rapier",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2855
+      "loc": 3204
     },
     {
       "file": "packages/physics-rapier/src/rapier3d-adapter.ts",
       "package": "@four/physics-rapier",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2960
+      "loc": 3290
+    },
+    {
+      "file": "packages/physics-rapier/src/register.ts",
+      "package": "@four/physics-rapier",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 112
     },
     {
       "file": "packages/physics-rapier/tests/conversions2d.test.ts",
@@ -1298,6 +1536,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 336
+    },
+    {
+      "file": "packages/physics-rapier/tests/rapier-live-properties.test.ts",
+      "package": "@four/physics-rapier",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 461
     },
     {
       "file": "packages/physics-rapier/tests/rapier-retype.test.ts",
@@ -1318,7 +1563,7 @@
       "package": "@four/physics-rapier",
       "area": "tests",
       "disposition": "test",
-      "loc": 1600
+      "loc": 1790
     },
     {
       "file": "packages/physics-rapier/tests/rapier2d-joints.test.ts",
@@ -1332,14 +1577,21 @@
       "package": "@four/physics-rapier",
       "area": "tests",
       "disposition": "test",
-      "loc": 1828
+      "loc": 2002
     },
     {
       "file": "packages/physics-rapier/tests/rapier3d-joints.test.ts",
       "package": "@four/physics-rapier",
       "area": "tests",
       "disposition": "test",
-      "loc": 1099
+      "loc": 1190
+    },
+    {
+      "file": "packages/physics-rapier/tests/register.test.ts",
+      "package": "@four/physics-rapier",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 91
     },
     {
       "file": "packages/physics-rapier/tests/smoke.test.ts",
@@ -1367,14 +1619,14 @@
       "package": "@four/physics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 318
+      "loc": 395
     },
     {
       "file": "packages/physics/src/body-access.ts",
       "package": "@four/physics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 491
+      "loc": 690
     },
     {
       "file": "packages/physics/src/collider.ts",
@@ -1402,7 +1654,7 @@
       "package": "@four/physics",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 249
+      "loc": 287
     },
     {
       "file": "packages/physics/src/joints.ts",
@@ -1437,7 +1689,14 @@
       "package": "@four/physics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1132
+      "loc": 1690
+    },
+    {
+      "file": "packages/physics/src/serializers.ts",
+      "package": "@four/physics",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 748
     },
     {
       "file": "packages/physics/src/shapes.ts",
@@ -1445,6 +1704,13 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 355
+    },
+    {
+      "file": "packages/physics/src/solver-registry.ts",
+      "package": "@four/physics",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 427
     },
     {
       "file": "packages/physics/src/types.ts",
@@ -1465,7 +1731,7 @@
       "package": "@four/physics",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2674
+      "loc": 3590
     },
     {
       "file": "packages/physics/tests/collider.test.ts",
@@ -1486,7 +1752,7 @@
       "package": "@four/physics",
       "area": "tests",
       "disposition": "test",
-      "loc": 970
+      "loc": 1211
     },
     {
       "file": "packages/physics/tests/joints.test.ts",
@@ -1521,7 +1787,14 @@
       "package": "@four/physics",
       "area": "tests",
       "disposition": "test",
-      "loc": 886
+      "loc": 1104
+    },
+    {
+      "file": "packages/physics/tests/serializers.test.ts",
+      "package": "@four/physics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 607
     },
     {
       "file": "packages/physics/tests/shapes.test.ts",
@@ -1538,6 +1811,13 @@
       "loc": 10
     },
     {
+      "file": "packages/physics/tests/solver-registry.test.ts",
+      "package": "@four/physics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 426
+    },
+    {
       "file": "packages/physics/tests/validation.test.ts",
       "package": "@four/physics",
       "area": "tests",
@@ -1552,11 +1832,25 @@
       "loc": 791
     },
     {
+      "file": "packages/physics/tests/world-colliders.test.ts",
+      "package": "@four/physics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 601
+    },
+    {
       "file": "packages/physics/tests/world-joints.test.ts",
       "package": "@four/physics",
       "area": "tests",
       "disposition": "test",
       "loc": 791
+    },
+    {
+      "file": "packages/physics/tests/world-properties.test.ts",
+      "package": "@four/physics",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 637
     },
     {
       "file": "packages/physics/tests/world-transitions.test.ts",
@@ -1570,7 +1864,7 @@
       "package": "@four/physics",
       "area": "tests",
       "disposition": "test",
-      "loc": 1429
+      "loc": 1664
     },
     {
       "file": "packages/render-canvas/src/index.ts",
@@ -1601,11 +1895,18 @@
       "loc": 10
     },
     {
+      "file": "packages/render-webgl/src/gl-effect.ts",
+      "package": "@four/render-webgl",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 305
+    },
+    {
       "file": "packages/render-webgl/src/gl-geometry.ts",
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 337
+      "loc": 424
     },
     {
       "file": "packages/render-webgl/src/gl-particles.ts",
@@ -1619,7 +1920,14 @@
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1119
+      "loc": 1429
+    },
+    {
+      "file": "packages/render-webgl/src/gl-render-target.ts",
+      "package": "@four/render-webgl",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 344
     },
     {
       "file": "packages/render-webgl/src/gl-texture.ts",
@@ -1633,14 +1941,28 @@
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 51
+      "loc": 66
+    },
+    {
+      "file": "packages/render-webgl/src/register.ts",
+      "package": "@four/render-webgl",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 96
     },
     {
       "file": "packages/render-webgl/src/webgl-renderer.ts",
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1060
+      "loc": 1893
+    },
+    {
+      "file": "packages/render-webgl/tests/register.test.ts",
+      "package": "@four/render-webgl",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 109
     },
     {
       "file": "packages/render-webgl/tests/smoke.test.ts",
@@ -1654,7 +1976,7 @@
       "package": "@four/render-webgl",
       "area": "tests",
       "disposition": "test",
-      "loc": 3826
+      "loc": 6524
     },
     {
       "file": "packages/render-webgpu/src/index.ts",
@@ -1671,11 +1993,18 @@
       "loc": 10
     },
     {
+      "file": "packages/render/src/effect-pass.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 362
+    },
+    {
       "file": "packages/render/src/index.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 54
+      "loc": 115
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -1692,39 +2021,81 @@
       "loc": 250
     },
     {
+      "file": "packages/render/src/render-graph.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 825
+    },
+    {
       "file": "packages/render/src/render-list.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 636
+      "loc": 720
+    },
+    {
+      "file": "packages/render/src/render-target.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 492
     },
     {
       "file": "packages/render/src/renderable.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 138
+      "loc": 180
+    },
+    {
+      "file": "packages/render/src/renderer-registry.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 477
     },
     {
       "file": "packages/render/src/renderer.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 603
+      "loc": 784
+    },
+    {
+      "file": "packages/render/src/resource-memory.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 111
     },
     {
       "file": "packages/render/src/sprite.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 367
+      "loc": 390
+    },
+    {
+      "file": "packages/render/src/statistics.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 136
     },
     {
       "file": "packages/render/src/texture.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 298
+      "loc": 344
+    },
+    {
+      "file": "packages/render/tests/effect-pass.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 171
     },
     {
       "file": "packages/render/tests/lights.test.ts",
@@ -1738,21 +2109,49 @@
       "package": "@four/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 394
+      "loc": 399
+    },
+    {
+      "file": "packages/render/tests/render-graph.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 936
     },
     {
       "file": "packages/render/tests/render-list.test.ts",
       "package": "@four/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 552
+      "loc": 681
+    },
+    {
+      "file": "packages/render/tests/render-target.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 268
+    },
+    {
+      "file": "packages/render/tests/renderer-registry.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 424
     },
     {
       "file": "packages/render/tests/renderer.test.ts",
       "package": "@four/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 363
+      "loc": 390
+    },
+    {
+      "file": "packages/render/tests/resource-memory.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 161
     },
     {
       "file": "packages/render/tests/smoke.test.ts",
@@ -1766,7 +2165,14 @@
       "package": "@four/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 528
+      "loc": 563
+    },
+    {
+      "file": "packages/render/tests/statistics.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 110
     },
     {
       "file": "packages/scene/src/authority.ts",
@@ -1794,7 +2200,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 38
+      "loc": 43
     },
     {
       "file": "packages/scene/src/interpolation.ts",
@@ -1815,7 +2221,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "reachable",
-      "loc": 415
+      "loc": 551
     },
     {
       "file": "packages/scene/src/pose-target.ts",
@@ -1899,7 +2305,7 @@
       "package": "@four/scene",
       "area": "tests",
       "disposition": "test",
-      "loc": 564
+      "loc": 674
     },
     {
       "file": "packages/scene/tests/smoke.test.ts",
@@ -1927,14 +2333,14 @@
       "package": "@four/serialization",
       "area": "src",
       "disposition": "reachable",
-      "loc": 651
+      "loc": 728
     },
     {
       "file": "packages/serialization/src/index.ts",
       "package": "@four/serialization",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 71
+      "loc": 73
     },
     {
       "file": "packages/serialization/src/migration.ts",
@@ -1948,7 +2354,7 @@
       "package": "@four/serialization",
       "area": "src",
       "disposition": "reachable",
-      "loc": 641
+      "loc": 757
     },
     {
       "file": "packages/serialization/tests/format.test.ts",
@@ -1969,7 +2375,7 @@
       "package": "@four/serialization",
       "area": "tests",
       "disposition": "test",
-      "loc": 659
+      "loc": 879
     },
     {
       "file": "packages/serialization/tests/smoke.test.ts",
@@ -1977,6 +2383,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 10
+    },
+    {
+      "file": "packages/serialization/tests/untrusted.test.ts",
+      "package": "@four/serialization",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 120
     },
     {
       "file": "packages/text/src/bitmap-font.ts",
@@ -2025,14 +2438,35 @@
       "package": "@four/ui",
       "area": "src",
       "disposition": "reachable",
-      "loc": 97
+      "loc": 182
+    },
+    {
+      "file": "packages/ui/src/checkable.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 155
+    },
+    {
+      "file": "packages/ui/src/image.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 160
     },
     {
       "file": "packages/ui/src/index.ts",
       "package": "@four/ui",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 67
+      "loc": 95
+    },
+    {
+      "file": "packages/ui/src/keyboard.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 293
     },
     {
       "file": "packages/ui/src/label.ts",
@@ -2042,6 +2476,13 @@
       "loc": 217
     },
     {
+      "file": "packages/ui/src/numbers.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 101
+    },
+    {
       "file": "packages/ui/src/panel.ts",
       "package": "@four/ui",
       "area": "src",
@@ -2049,18 +2490,60 @@
       "loc": 361
     },
     {
+      "file": "packages/ui/src/progress.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 173
+    },
+    {
+      "file": "packages/ui/src/radio.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 247
+    },
+    {
+      "file": "packages/ui/src/slider.ts",
+      "package": "@four/ui",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 389
+    },
+    {
       "file": "packages/ui/src/widget.ts",
       "package": "@four/ui",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1134
+      "loc": 1278
     },
     {
       "file": "packages/ui/tests/button.test.ts",
       "package": "@four/ui",
       "area": "tests",
       "disposition": "test",
-      "loc": 140
+      "loc": 285
+    },
+    {
+      "file": "packages/ui/tests/checkable.test.ts",
+      "package": "@four/ui",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 178
+    },
+    {
+      "file": "packages/ui/tests/image.test.ts",
+      "package": "@four/ui",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 83
+    },
+    {
+      "file": "packages/ui/tests/keyboard.test.ts",
+      "package": "@four/ui",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 445
     },
     {
       "file": "packages/ui/tests/label.test.ts",
@@ -2077,6 +2560,27 @@
       "loc": 442
     },
     {
+      "file": "packages/ui/tests/progress.test.ts",
+      "package": "@four/ui",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 165
+    },
+    {
+      "file": "packages/ui/tests/radio.test.ts",
+      "package": "@four/ui",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 302
+    },
+    {
+      "file": "packages/ui/tests/slider.test.ts",
+      "package": "@four/ui",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 357
+    },
+    {
       "file": "packages/ui/tests/smoke.test.ts",
       "package": "@four/ui",
       "area": "tests",
@@ -2088,14 +2592,14 @@
       "package": "@four/ui",
       "area": "tests",
       "disposition": "test",
-      "loc": 745
+      "loc": 782
     },
     {
       "file": "playwright.config.ts",
       "package": "(root)",
       "area": "config",
       "disposition": "config",
-      "loc": 265
+      "loc": 336
     },
     {
       "file": "tests/browser/animation.spec.ts",
@@ -2119,6 +2623,13 @@
       "loc": 317
     },
     {
+      "file": "tests/browser/first-3d-scene.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 750
+    },
+    {
       "file": "tests/browser/interaction.spec.ts",
       "package": "(root)",
       "area": "tests",
@@ -2131,6 +2642,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 939
+    },
+    {
+      "file": "tests/browser/one-scene-everything-moves.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 1036
     },
     {
       "file": "tests/browser/particles.spec.ts",
@@ -2158,7 +2676,21 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 811
+      "loc": 830
+    },
+    {
+      "file": "tests/determinism/animation-controller.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 290
+    },
+    {
+      "file": "tests/determinism/helpers/animation-controller-scenario.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 515
     },
     {
       "file": "tests/determinism/helpers/phase1-scenario.ts",
@@ -2172,7 +2704,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 679
+      "loc": 704
     },
     {
       "file": "tests/determinism/helpers/phase2-scenario.ts",
@@ -2228,7 +2760,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 311
+      "loc": 319
     },
     {
       "file": "tests/determinism/phase2-motion.test.ts",
@@ -2273,11 +2805,39 @@
       "loc": 349
     },
     {
+      "file": "tests/integration/backend-selection.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 286
+    },
+    {
+      "file": "tests/integration/debug-overlay-render.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 248
+    },
+    {
+      "file": "tests/integration/dev-build-mode.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 317
+    },
+    {
       "file": "tests/integration/examples-build-coverage.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
       "loc": 73
+    },
+    {
+      "file": "tests/integration/frame-statistics.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 437
     },
     {
       "file": "tests/integration/helpers/blending-scenarios.ts",
@@ -2308,6 +2868,13 @@
       "loc": 545
     },
     {
+      "file": "tests/integration/helpers/recording-gl.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 214
+    },
+    {
       "file": "tests/integration/helpers/replay-scenarios.ts",
       "package": "(root)",
       "area": "tests",
@@ -2319,7 +2886,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 1040
+      "loc": 612
     },
     {
       "file": "tests/integration/motion-advanced.test.ts",
@@ -2343,6 +2910,13 @@
       "loc": 863
     },
     {
+      "file": "tests/integration/physics-live-properties.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 245
+    },
+    {
       "file": "tests/integration/physics-rapier.test.ts",
       "package": "(root)",
       "area": "tests",
@@ -2354,14 +2928,56 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 560
+      "loc": 569
+    },
+    {
+      "file": "tests/integration/physics-runtime-colliders.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 330
+    },
+    {
+      "file": "tests/integration/render-effects.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 394
+    },
+    {
+      "file": "tests/integration/render-graph.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 305
+    },
+    {
+      "file": "tests/integration/render-to-texture.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 398
     },
     {
       "file": "tests/integration/scene-roundtrip.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 694
+      "loc": 823
+    },
+    {
+      "file": "tests/integration/security-csp.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 156
+    },
+    {
+      "file": "tests/integration/units-display.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 240
     },
     {
       "file": "tests/visual/ui-demo.spec.ts",

@@ -1,0 +1,110 @@
+name: Docs
+
+# Publishes the §93 documentation site to GitHub Pages: the TypeDoc API reference
+# plus the eight built example applications, under one hand-written index.
+#
+# The guides are not copied. Pages serves files, it does not render Markdown, so
+# `docs/guides/*.md` would arrive as plain text; the index links them on GitHub,
+# where they render. Moving them onto the site properly is part of the real
+# website, which is still staged (`website/README.md`).
+#
+# Independent of ci.yml on purpose: docs are not a gate, and a docs failure must
+# not read as a red build. The package build and the TypeDoc run happen here
+# anyway, so a genuinely broken tree still cannot deploy.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Pages allows one deployment at a time; queue rather than cancel, so a
+# superseded run cannot abort a deployment that is already mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    env:
+      # The eight examples that have a main.ts. Named once, looped over twice.
+      # The flagship is nested one level deeper (`flagship/<demo>`), which the
+      # `vite build` path, the `--base` and the `mkdir -p` below all take as
+      # written — nothing here assumes a flat name.
+      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo flagship/one-scene-everything-moves
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # TypeDoc reads the built reference chain, and the examples import the
+      # umbrella package by its published specifier, which resolves to
+      # `packages/four/dist`. Both need this first.
+      - name: Build
+        run: pnpm build
+
+      - name: Build API docs
+        run: pnpm run docs
+
+      # Pages serves this repository at https://<owner>.github.io/four.js/, so
+      # every example is hosted under a subpath and needs `--base` at build time
+      # — a bundle built with the default base "/" requests its assets from the
+      # domain root and loads nothing. The example vite configs deliberately do
+      # not hardcode a base: it is a property of where a bundle is deployed, not
+      # of the example, and both `vite preview` and the Playwright browser gate
+      # serve at the root.
+      - name: Build the example sites
+        run: |
+          for example in $EXAMPLES; do
+            pnpm exec vite build "examples/$example" --base="/four.js/examples/$example/"
+          done
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/examples
+          cp website/index.html _site/index.html
+          cp -R docs/api _site/api
+          for example in $EXAMPLES; do
+            mkdir -p "_site/examples/$example"
+            cp -R "examples/$example/dist/." "_site/examples/$example/"
+          done
+          find _site -maxdepth 2 -type d
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

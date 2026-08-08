@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>four.js — First 3D Scene</title>
+    <style>
+      /* Minimal on purpose: the point of this page is the canvas. */
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0b0d13;
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        color: #9aa3b2;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: center;
+      }
+
+      p {
+        margin: 0;
+        max-width: 800px;
+      }
+
+      /* The loading state is the same element, dimmed until the context is up. */
+      #status[data-state="loading"] {
+        color: #6c7486;
+        font-style: italic;
+      }
+
+      #status[data-state="error"] {
+        color: #d97070;
+      }
+
+      /*
+        The CSS size is the layout size; the drawing-buffer size is set from
+        JavaScript via `renderer.resize(...)`, so the scene stays crisp on
+        high-DPI displays. 800 x 600 is the 4:3 shape the camera's `aspect` is
+        built from — change one and the other has to change with it.
+      */
+      #scene {
+        width: 800px;
+        height: 600px;
+        max-width: 100%;
+        display: block;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <canvas id="scene" width="800" height="600"></canvas>
+      <p>
+        four.js — the first 3D scene: a <strong>perspective camera</strong> over
+        lit meshes built from the §53 3D primitives, shaded by one directional
+        light plus scene ambient. The two spheres are the <em>same</em> geometry
+        and material — they differ on screen only because one is nearer. The
+        torus integrates an angular velocity; the capsule is moved by an
+        authored tween.
+      </p>
+      <p id="status" data-state="loading">starting…</p>
+    </main>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

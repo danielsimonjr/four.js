@@ -3,7 +3,8 @@
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
 (§118–119). Every major feature should have a runnable example (§93).
 
-**Six examples are implemented.** The other six entries below are **not yet written; the
+**Eight examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
+the §118 flagship were written). The other four entries below are **not yet written; the
 directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
 they were described only as "scaffold only" in this paragraph while reading like a catalogue
 of demos in the list; each such row now carries the marker on its own line. The absence is
@@ -35,9 +36,14 @@ guide points at one of them without the marker.
   buttons and labels laid out by the package and skinned by the application, driven by real
   pointer and keyboard input, with a drawn focus ring (`pnpm run ui-demo:build`). Listed
   here from 2026-08-05; it shipped earlier and this file had never mentioned it.
-- [`first-3d-scene/`](first-3d-scene/) — **Not yet written; directory is a placeholder.**
-  Planned as §93's first 3D scene: mesh, camera, lighting. No shipped example uses a
-  `PerspectiveCamera`, so this is the one placeholder with no stand-in.
+- [`first-3d-scene/`](first-3d-scene/) — **Implemented (2026-08-07).** §93's first 3D
+  scene, and the first example of any kind to use a `PerspectiveCamera`: two identical
+  spheres at different depths (the projection measured in pixels, not asserted by class
+  name), a tumbling torus, a bobbing capsule and a ground plane, all `LitMaterial` under one
+  `DirectionalLight` plus scene ambient (§47, §53, §57, §68).
+  Build it with `pnpm run first-3d-scene:build`; it is non-wasm and ~23 kB gzip.
+  This entry read "**not yet written; directory is a placeholder** … the one placeholder
+  with no stand-in" until that date.
 - [`first-animated-scene/`](first-animated-scene/) — **Not yet written; directory is a
   placeholder.** Planned as §93's first animated scene: tweens and a timeline. Animation
   ships inside `first-2d-scene/`.
@@ -47,10 +53,19 @@ guide points at one of them without the marker.
 - [`mixed-scene/`](mixed-scene/) — **Not yet written; directory is a placeholder.** Planned
   as the mixed 2D/3D/physics/UI example (§93, §97). `physics-playground/` steps a 2D and a
   3D world side by side.
-- [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) — **Not yet
-  written; directory is a placeholder.** Planned as the §118 flagship: rotating cube, 2D
-  orbit, pendulum, bouncing body, labels, UI panel, timeline, motorized hinge, collision
-  events, pause/slow-motion/step.
+- [`flagship/one-scene-everything-moves/`](flagship/one-scene-everything-moves/) —
+  **Implemented (2026-08-07).** §118's flagship, "One Scene, Everything Moves": every item
+  on §118's list in one scene, one fixed-step loop and one frame — a textured lit cube spun
+  by a `MotionComponent`, a 2D vector orbit, a `SpringJoint` pendulum, a bouncing body whose
+  §29 landings fire a particle burst and a re-launch impulse, a motorised `HingeJoint`, two
+  world-space labels (one rides the bouncing body), a `@four/ui` panel parented to the
+  camera, a §16 `Timeline`, and pause / slow-motion / single-step controls that are
+  keyboard-operable. It is also the first example to select its backend _and_ its solver
+  through the §62/§37 registries (`renderer: "auto"`, `solver: "auto"`), and the first to
+  assemble the §113 debug overlay from `@four/diagnostics` streams.
+  Build it with `pnpm run flagship:build`; it carries **both** Rapier wasm images (the cost
+  of `registerRapierSolver()`, measured) and is ~1.54 MB gzip. This entry read "**not yet
+  written; directory is a placeholder**" until that date.
 - [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) — **Not yet written;
   directory is a placeholder.** Planned as the §119 engineering flagship: an electric motor
   digital twin — animated rotor, bearing constraints, PID speed control, fault injection,

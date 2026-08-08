@@ -241,6 +241,35 @@ export interface RapierRigidBody {
   wakeUp(): void;
   sleep(): void;
   recomputeMassPropertiesFromColliders(): void;
+  /**
+   * The live counterparts of the four `RigidBodyDesc` setters below, added for
+   * PH-1 stage 2 (2026-08-07) so that §37's "property changes" have somewhere
+   * to land after `createBody`.
+   *
+   * Transcribed from `dynamics/rigid_body.d.ts` of the installed 0.19.3
+   * typings: `setLinearDamping(factor)` and `setAngularDamping(factor)` take no
+   * `wakeUp`, `setGravityScale(factor, wakeUp)` does, `enableCcd(enabled)` is
+   * the live form of the descriptor's `setCcdEnabled`, and
+   * `setSoftCcdPrediction(distance)` shares its name with the descriptor. The
+   * live `setAdditionalMassProperties` takes the same triple as the descriptor
+   * plus `wakeUp`.
+   */
+  setLinearDamping(factor: number): void;
+  /** See {@link RapierRigidBody.setLinearDamping}. */
+  setAngularDamping(factor: number): void;
+  /** See {@link RapierRigidBody.setLinearDamping}. */
+  setGravityScale(factor: number, wakeUp: boolean): void;
+  /** See {@link RapierRigidBody.setLinearDamping}. */
+  enableCcd(enabled: boolean): void;
+  /** See {@link RapierRigidBody.setLinearDamping}. */
+  setSoftCcdPrediction(distance: number): void;
+  /** See {@link RapierRigidBody.setLinearDamping}. */
+  setAdditionalMassProperties(
+    mass: number,
+    centerOfMass: RapierVector,
+    principalAngularInertia: number,
+    wakeUp: boolean,
+  ): void;
 }
 
 /** `dynamics/rigid_body.d.ts`: the fluent `RigidBodyDesc` setters this package calls. */
@@ -287,6 +316,23 @@ export interface RapierCollider {
    */
   setMass(mass: number): void;
   collisionGroups(): number;
+  /**
+   * The live counterparts of the `ColliderDesc` setters below (PH-1 stage 2,
+   * 2026-08-07), transcribed from `geometry/collider.d.ts` of the installed
+   * 0.19.3 typings. All five are `void` and take no `wakeUp`: Rapier's collider
+   * setters do not touch the parent body's §32 sleep state.
+   */
+  setDensity(density: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setFriction(friction: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setRestitution(restitution: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setSensor(isSensor: boolean): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setCollisionGroups(groups: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setActiveCollisionTypes(activeCollisionTypes: number): void;
   projectPoint(
     point: RapierVector,
     solid: boolean,
@@ -798,6 +844,30 @@ export interface RapierRigidBody3d {
   wakeUp(): void;
   sleep(): void;
   recomputeMassPropertiesFromColliders(): void;
+  /**
+   * The live property setters PH-1 stage 2 needs (2026-08-07) — the 3D
+   * counterparts of {@link RapierRigidBody.setLinearDamping} and friends,
+   * verified separately against the installed 3D typings rather than assumed
+   * from the 2D build. Only `setAdditionalMassProperties` differs, taking the
+   * 3D principal-inertia vector and its local frame.
+   */
+  setLinearDamping(factor: number): void;
+  /** See {@link RapierRigidBody3d.setLinearDamping}. */
+  setAngularDamping(factor: number): void;
+  /** See {@link RapierRigidBody3d.setLinearDamping}. */
+  setGravityScale(factor: number, wakeUp: boolean): void;
+  /** See {@link RapierRigidBody3d.setLinearDamping}. */
+  enableCcd(enabled: boolean): void;
+  /** See {@link RapierRigidBody3d.setLinearDamping}. */
+  setSoftCcdPrediction(distance: number): void;
+  /** See {@link RapierRigidBody3d.setLinearDamping}. */
+  setAdditionalMassProperties(
+    mass: number,
+    centerOfMass: RapierVector3,
+    principalAngularInertia: RapierVector3,
+    angularInertiaLocalFrame: RapierRotation3,
+    wakeUp: boolean,
+  ): void;
 }
 
 /**
@@ -840,6 +910,18 @@ export interface RapierCollider3d {
   /** Live mass override; see {@link RapierCollider.setMass} for the one caller. */
   setMass(mass: number): void;
   collisionGroups(): number;
+  /** See {@link RapierCollider.setDensity} — same five live setters, 3D build. */
+  setDensity(density: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setFriction(friction: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setRestitution(restitution: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setSensor(isSensor: boolean): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setCollisionGroups(groups: number): void;
+  /** See {@link RapierCollider.setDensity}. */
+  setActiveCollisionTypes(activeCollisionTypes: number): void;
   projectPoint(
     point: RapierVector3,
     solid: boolean,

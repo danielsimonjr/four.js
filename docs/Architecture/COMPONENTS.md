@@ -393,9 +393,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
 
 **Purpose**: §71 picking and the §72 pointer subset — platform events in, `ScenePointerEvent`s propagated capture → target → bubble out. Never writes a transform (§42: input reports, the application decides).
 
-**Spec**: §71, §72 (MVP subset — no wheel/keyboard/pointercancel yet). **Direct deps**: `core`, `math`, `scene`. **Status**: implemented.
+**Spec**: §71, §72 (MVP subset — no wheel/gamepad/XR yet; keyboard landed 2026-08-07, `pointercancel` 2026-08-06). **Direct deps**: `core`, `math`, `scene`. **Status**: implemented.
 
-Key exports (21 total): `PointerInput` (NDC normalization with the +Y-up flip, picking, capture, click/enter/leave synthesis), `pick` + `createPickRay` + `Pickable`/`PickHit` (ray/AABB/oriented-box, nearest hit wins), `ScenePointerEvent`, `dispatchPointerEvent`, `buildPropagationPath`, `CAPTURE_KEY_PREFIX` (`"capture:"`-prefixed keys select the capture phase on the four propagating types: `pointerdown`, `pointerup`, `pointermove`, `click`), `DragManager` (world-delta handoff to app callbacks), `PointerSurface`/`SurfacePointerEvent` (structural DOM seams). Widens scene's `NodeEventMap` by declaration merging — importing `@four/input` adds pointer keys to every node.
+Key exports: `PointerInput` (NDC normalization with the +Y-up flip, picking, capture, click/enter/leave synthesis, `pointercancel` teardown), `KeyboardInput` (duck-typed `KeySurface`, injected `focusTarget(): Node | null` resolver — focus stays `@four/ui`'s; §3.1 unchanged), `SceneKeyEvent`/`dispatchKeyEvent` (with `preventDefault()` forwarded via `KeyDefaultSuppressor`), the shared three-phase machinery in `propagation.ts` (`SceneInputEvent`, `dispatchThreePhase`), `pick` + `createPickRay` + `Pickable`/`PickHit` (ray/AABB/oriented-box, nearest hit wins), `ScenePointerEvent`, `dispatchPointerEvent`, `buildPropagationPath`, `CAPTURE_KEY_PREFIX` (`"capture:"`-prefixed keys select the capture phase on the propagating types), `DragManager` (world-delta handoff to app callbacks), `PointerSurface`/`SurfacePointerEvent` (structural DOM seams). Widens scene's `NodeEventMap` by declaration merging — importing `@four/input` adds pointer and key events to every node.
 
 ---
 
@@ -423,7 +423,7 @@ Key exports (17 total): `BitmapFont`, `createBitmapFont`, `BUILTIN_FONT`, `glyph
 
 **Purpose**: Retained-mode UI at §113a's MVP tier — widgets are scene nodes with a box model, flex/stack/absolute layout, and §72-driven hover/press/focus state machines. **Widgets do not draw themselves**: the dependency matrix gives `ui` no `render`/`materials`/`geometry`, so visuals arrive through the app-supplied `WidgetSkin` seam.
 
-**Spec**: §73–75 MVP tier. **Direct deps**: `core`, `math`, `scene`, `input`, `text`. **Status**: implemented (a11y mirror + keyboard staged — `UI_STAGED`).
+**Spec**: §73–75 MVP tier. **Direct deps**: `core`, `math`, `scene`, `input`, `text`. **Status**: implemented (keyboard traversal + activation landed 2026-08-07; a11y DOM mirror staged — `UI_STAGED`).
 
 Key exports (28 total): `UIWidget` (abstract `Node`), `Panel` + `PanelLayout` (`LayoutType` flex/stack/absolute, `LayoutDirection`, `LayoutAlign`, `LayoutJustify`, `Insets`/`applyInsets`), `Button`, `Label` (measures via `@four/text`), `WidgetSkin` (four optional hooks), `collectPickables` (§71 candidates), `focusedWidget`, `isUIWidget`, `UI_LAYOUT_AUTHORITY` (`"constraint"` — layout writes under §42 constraint authority; a widget under other authority has its position write refused with a warning), events `WidgetActivateEvent` (`uiactivate`), `WidgetStateChangeEvent`, `UIFocusEvent`, `WidgetAccessibility`. Layout is explicit: `root.layout()` runs one measure + one arrange pass.
 
@@ -448,7 +448,7 @@ Key exports (selected from ~35): `serializeScene`, `instantiateScene`, `instanti
 Key exports (selected from ~55):
 
 - **Checksums (§33)** — `Checksum`, `createChecksum`, `hashFloats` (FNV-1a; golden vectors cross-checked in fresh processes).
-- **Replay (§34)** — `ReplayRecorder` (`begin`/`recordInput`/`recordFrame`, `snapshotIntervalSteps`), `ReplayPlayer` (play/pause, `speed` slow motion, `advanceRealtime` with a sub-step clamp, `seekToStep` via nearest snapshot + re-simulation, `verifyChecksum`), `ReplayTarget`/`ReplaySnapshot` (duck-typed `PhysicsWorld` contract), `ReplayRecording` + `encodeReplayRecording`/`decodeReplayRecording` (formatVersion-1 envelope, canonical base64, `encode(decode(t)) === t`), `assertReplayCompatible`/`isReplayCompatible`, `REPLAY_FORMAT_VERSION`.
+- **Replay (§34)** — `ReplayRecorder` (`begin`/`recordInput`/`recordFrame`, `snapshotIntervalSteps`), `ReplayPlayer` (play/pause, `speed` slow motion, `advanceRealtime` with a sub-step clamp, `seekToStep` via nearest snapshot + re-simulation, `verifyChecksum`), `ReplayTarget`/`ReplaySnapshot` (duck-typed `PhysicsWorld` contract), `ReplayRecording` + `encodeReplayRecording`/`decodeReplayRecording` (versioned envelope — a document declares the lowest version that expresses it, canonical base64, `encode(decode(t)) === t`), `assertReplayCompatible`/`isReplayCompatible`, `LATEST_REPLAY_FORMAT_VERSION`/`MINIMUM_REPLAY_FORMAT_VERSION` (2026-08-07; `REPLAY_FORMAT_VERSION` is a deprecated alias).
 - **Debug draw** — `DebugDrawBuffer` (7-floats-per-vertex line list), the seven `collect*` providers (`collectBodyOrigins`, `collectBodyVelocities`, `collectCentersOfMass`, `collectContactPoints`, `collectContactImpulses`, `solverStatistics`, `solverJointStatistics`) over duck-typed `Debug*Access` shapes — all seven verified against live Rapier; `DEBUG_DRAW_STAGED` names what is honestly staged (joint-anchor viz, force vectors, per-segment color).
 
 ---

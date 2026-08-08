@@ -26,25 +26,15 @@
  * now that it shares a base — and therefore a `Renderable.material` slot —
  * with them.
  *
- * ## Why the texture type is declared here (decision, WP-3a.3)
+ * ## Where the texture type is declared (decision, WP-3a.3; moved by R-19)
  *
- * The concrete `Texture` class lives in `@four/render`, because a texture is a
- * renderer resource (§61, §77) and `@four/render` is where the renderer
- * interface lives. But the dependency matrix (plan §3.1, frozen) puts
- * `materials` *below* `render` — `render` depends on `materials`, never the
- * other way round — so this package cannot import that class.
- *
- * So the **contract** is declared here, as {@link SpriteTexture}, and
- * `@four/render`'s `Texture` declares `implements SpriteTexture`: the compiler
- * checks the two agree, the dependency edge stays pointing the one legal way,
- * and a caller writes `new SpriteMaterial({ texture })` with a real `Texture`
- * and never sees the seam. It is the same technique `@four/render-webgl` uses
- * for the GL context it does not own, one layer down.
- *
- * {@link SpriteTexture} therefore describes the texture's whole **read**
- * surface, not only the parts a material touches: a backend reaches the texture
- * *through* the material (`item.material.texture`), so anything the upload path
- * needs — the texel data above all — has to be visible here.
+ * In `texture.ts`, as {@link MaterialTexture} — read that module's header for
+ * why the contract lives in this package at all rather than being imported from
+ * `@four/render`, which owns the concrete class. It was declared *here* while
+ * sprites were the only textured pipeline; R-19 gave `UnlitMaterial` and
+ * `LitMaterial` a `map`, which made it the family's texture contract.
+ * {@link SpriteTexture} stays exported from this module, as an alias, because
+ * it is a published name.
  *
  * ## Ownership (§83)
  *
@@ -57,51 +47,16 @@
  */
 
 import { Material, type MaterialOptions } from "./material.js";
+import type { MaterialTexture } from "./texture.js";
 import type { ColorRGBA } from "./unlit-material.js";
 
 /**
  * The read surface of a texture, as a sprite material and a rendering backend
- * see it (§77) — implemented by `@four/render`'s `Texture`.
- *
- * See the module header for why this interface is declared in this package
- * rather than imported from the package that owns the class.
- *
- * Everything is `readonly`: a material and a backend observe a texture, they
- * never edit one. Mutation goes through the concrete class, which is what
- * advances {@link SpriteTexture.version}.
+ * see it (§77) — the published name for {@link MaterialTexture}, which is the
+ * same contract under the name it grew into when `UnlitMaterial` and
+ * `LitMaterial` gained a `map` (R-19, 2026-08-07).
  */
-export interface SpriteTexture {
-  /**
-   * Stable identity (§83's resource model). Backends key their upload caches on
-   * it and validate the entry with {@link SpriteTexture.version}, exactly as
-   * they do for `BufferGeometry`.
-   */
-  readonly id: string;
-
-  /** Counter advanced by every mutation; the cache-invalidation key (§53, §77). */
-  readonly version: number;
-
-  /** Width in texels. */
-  readonly width: number;
-
-  /** Height in texels. */
-  readonly height: number;
-
-  /**
-   * Tightly packed RGBA8 texels — four bytes per texel, `width * height * 4`
-   * bytes — or `null` when the texture carries no CPU-side data.
-   *
-   * **Row 0 is `v = 0`**, i.e. the bottom row in the Y-up convention of §7a and
-   * in GL's default unpack orientation. A source whose first row is the *top*
-   * one (an `ImageBitmap`, a decoded PNG) is flipped by whoever adapts it, not
-   * here — see `@four/render`'s `TextureSource` for the note on where those
-   * sources land.
-   */
-  readonly data: Uint8Array | null;
-
-  /** Whether the texture has been disposed (§83). */
-  readonly disposed: boolean;
-}
+export type SpriteTexture = MaterialTexture;
 
 /**
  * Construction arguments of {@link SpriteMaterial} — its texture and tint, plus

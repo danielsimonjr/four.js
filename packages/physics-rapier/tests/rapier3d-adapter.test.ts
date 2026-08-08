@@ -767,6 +767,70 @@ describe("mass after a collider is destroyed (§23, §24, §37)", () => {
     adapter.dispose();
   });
 
+  // 2026-08-07: as in the 2D adapter — the heir comes from the body's own
+  // collider list, not from a scan of the world's colliders.
+  it("picks the body's own lowest-id collider as the heir", async () => {
+    const adapter = await createAdapter();
+    const other = adapter.createBody({ type: "dynamic", mass: 9 });
+    adapter.createCollider({
+      body: other,
+      shape: { type: "sphere", radius: 0.5 },
+      density: 1000,
+    });
+
+    const body = adapter.createBody({ type: "dynamic", mass: 5 });
+    const bearer = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.5 },
+      density: 1000,
+    });
+    const middle = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.25 },
+      density: 1000,
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.25 },
+      density: 1000,
+    });
+    // A later collider on the *other* body: a global scan could reach it.
+    adapter.createCollider({
+      body: other,
+      shape: { type: "sphere", radius: 0.5 },
+      density: 1000,
+    });
+
+    adapter.destroyCollider(bearer);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+    expect(adapter.getBodyMass(other)).toBeCloseTo(9, 5);
+
+    adapter.destroyCollider(middle);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(5, 5);
+    adapter.dispose();
+  });
+
+  it("keeps the heir list across a §34 snapshot restore", async () => {
+    const adapter = await createAdapter();
+    const body = adapter.createBody({ type: "dynamic", mass: 6 });
+    const bearer = adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.5 },
+      density: 1000,
+    });
+    adapter.createCollider({
+      body,
+      shape: { type: "sphere", radius: 0.25 },
+      density: 1000,
+    });
+
+    adapter.restoreSnapshot(adapter.createSnapshot());
+
+    adapter.destroyCollider(bearer);
+    expect(adapter.getBodyMass(body)).toBeCloseTo(6, 5);
+    adapter.dispose();
+  });
+
   it("gives the mass back to a replacement collider", async () => {
     const adapter = await createAdapter();
     const body = adapter.createBody({ type: "dynamic", mass: 4 });

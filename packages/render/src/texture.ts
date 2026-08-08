@@ -58,10 +58,20 @@
  * A texture is **shared, not owned by the materials that sample it**: one atlas
  * backs many `SpriteMaterial`s. Whoever created it disposes it, and
  * `SpriteMaterial.dispose()` deliberately does not.
+ *
+ * Because nothing owns a shared texture, nothing could say how much texture
+ * memory the engine held — which is why every texture reports its size
+ * ({@link Texture.byteLength}) to the process-wide totals in
+ * `resource-memory.ts` at construction, on each source replacement, and on
+ * `dispose()` (A-5, 2026-08-07). That accounting is what makes §84's
+ * `textureMemory` measurable and a leaked atlas visible; it holds no reference
+ * to anything and never runs on a draw path.
  */
 
 import type { Disposable } from "@four/core";
 import type { SpriteTexture } from "@four/materials";
+
+import { noteTexture } from "./resource-memory.js";
 
 /**
  * The texel data a {@link Texture} is built from (§61's `TextureSource`, §77).
@@ -200,6 +210,7 @@ export class Texture implements Disposable, SpriteTexture {
   constructor(source: TextureSource) {
     validate(source);
     this.#source = source;
+    noteTexture(1, this.byteLength);
   }
 
   /**
@@ -217,7 +228,9 @@ export class Texture implements Disposable, SpriteTexture {
 
   set source(value: TextureSource) {
     validate(value);
+    const before = this.byteLength;
     this.#source = value;
+    noteTexture(0, this.byteLength - before);
     this.markDirty();
   }
 
@@ -260,6 +273,32 @@ export class Texture implements Disposable, SpriteTexture {
   }
 
   /**
+   * Bytes this texture describes (§83, §84's `textureMemory`) — four per texel
+   * at the current size, which is what an RGBA8 upload costs.
+   *
+   * ```ts
+   * new Texture({ width: 256, height: 256 }).byteLength; // 262144
+   * ```
+   *
+   * Counted from the **size**, not from `data`: a source with no CPU-side bytes
+   * still makes the backend allocate zero-filled storage of exactly this size
+   * (see {@link TextureSource.data}), so billing it zero would under-report the
+   * memory the engine holds. Mip levels are not counted because this tier
+   * generates none (§77, module header).
+   *
+   * **`0` once disposed**, because a disposed texture holds nothing — one rule,
+   * so that a write into a disposed texture (already a §83 "disposed resource
+   * still in use" mistake) cannot resurrect its bytes in the process-wide
+   * totals.
+   */
+  get byteLength(): number {
+    if (this.#disposed) {
+      return 0;
+    }
+    return this.#source.width * this.#source.height * 4;
+  }
+
+  /**
    * Announces a mutation the texture could not see — an in-place write into
    * `source.data`. Bumps {@link Texture.version} by one, which invalidates every
    * backend upload keyed on it.
@@ -285,13 +324,20 @@ export class Texture implements Disposable, SpriteTexture {
    * Disposing does **not** notify the materials pointing at this texture;
    * ownership is explicit and upwards (§83), so whoever created the texture
    * decides when nothing needs it any more.
+   *
+   * It **does** remove this texture and its bytes from the process-wide §83
+   * totals (`textureMemoryBytes`, `liveTextureCount`), exactly once: the
+   * idempotence guard above is what makes a double `dispose()` subtract once
+   * rather than twice.
    */
   dispose(): void {
     if (this.#disposed) {
       return;
     }
+    const before = this.byteLength;
     this.#disposed = true;
     this.#source = EMPTY_SOURCE;
+    noteTexture(-1, -before);
     this.markDirty();
   }
 }

@@ -1,10 +1,15 @@
 /**
  * `@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75).
  *
- * Three controls over one base class: {@link Panel} (container + §74 layout),
- * {@link Label} (text measured with `@four/text`), and {@link Button} (§72
- * click → activation). Everything else §73–§75 names is staged with a dated
- * note in {@link UI_STAGED} — read that array before assuming a control exists.
+ * Nine controls over one base class: {@link Panel} (container + §74 layout),
+ * {@link Label} (text measured with `@four/text`), {@link Button} (§72 click →
+ * activation), the three checkables — {@link Toggle}, {@link Checkbox}, and
+ * {@link RadioButton} (exclusive by group name) — {@link Slider} (pointer drag
+ * + §75 arrow keys), {@link ProgressIndicator}, and {@link ImageWidget}, plus
+ * §75's keyboard navigation over all of them
+ * ({@link installKeyboardTraversal}, {@link keyboardFocusTarget}). Everything
+ * else §73–§75 names is staged with a dated note in {@link UI_STAGED} — read
+ * that array before assuming a control exists.
  *
  * ```ts
  * const root = new Panel({ layout: { type: "flex", direction: "column", gap: 12, padding: 20 } });
@@ -18,7 +23,9 @@
  *   camera,
  *   pickables: () => collectPickables(root, candidates),   // §71
  * });
- * start.on("uiactivate", () => simulation.start());
+ * new KeyboardInput(window, { focusTarget: keyboardFocusTarget(root) });  // §75
+ * installKeyboardTraversal(root);                                         // Tab
+ * start.on("uiactivate", () => simulation.start());   // click, Enter, or Space
  * ```
  *
  * **Widgets do not draw themselves.** The frozen dependency matrix gives this
@@ -32,6 +39,20 @@ export const PACKAGE_NAME = "@four/ui";
 
 export type { ButtonOptions } from "./button.js";
 export { Button } from "./button.js";
+export type {
+  CheckableWidgetOptions,
+  CheckboxOptions,
+  ToggleOptions,
+} from "./checkable.js";
+export { CheckableWidget, Checkbox, Toggle } from "./checkable.js";
+export type { ImageWidgetOptions } from "./image.js";
+export { ImageWidget } from "./image.js";
+export type { KeyboardTraversalOptions } from "./keyboard.js";
+export {
+  collectFocusOrder,
+  installKeyboardTraversal,
+  keyboardFocusTarget,
+} from "./keyboard.js";
 export type { LabelOptions } from "./label.js";
 export { Label } from "./label.js";
 export type {
@@ -43,6 +64,12 @@ export type {
   PanelOptions,
 } from "./panel.js";
 export { Panel } from "./panel.js";
+export type { ProgressIndicatorOptions } from "./progress.js";
+export { ProgressIndicator } from "./progress.js";
+export type { RadioButtonOptions } from "./radio.js";
+export { RadioButton, checkedRadio, collectRadioGroup } from "./radio.js";
+export type { SliderOptions, SliderOrientation } from "./slider.js";
+export { Slider } from "./slider.js";
 export type {
   InsetsInit,
   UIFocusEvent,
@@ -53,6 +80,7 @@ export type {
   WidgetSkin,
   WidgetStateChangeEvent,
   WidgetStateSnapshot,
+  WidgetValueChangeEvent,
 } from "./widget.js";
 export {
   Insets,

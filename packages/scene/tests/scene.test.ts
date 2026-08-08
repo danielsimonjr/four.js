@@ -554,6 +554,23 @@ describe("Node identity (§6, §79, A-17)", () => {
     expect(new Scene({ id: "scene-a" }).id).toBe("scene-a");
     expect(new Group({ id: "group-a" }).id).toBe("group-a");
   });
+
+  // 2026-08-07: `Number.isSafeInteger(MAX_SAFE_INTEGER)` is true, so the
+  // saturating id used to set the counter to 2 ** 53, where `+= 1` is a no-op —
+  // every later node was handed the same id. The reservation is now skipped.
+  it("keeps issuing distinct ids after a saturating restored id", () => {
+    const saturating = new Group({
+      id: `node-${String(Number.MAX_SAFE_INTEGER)}`,
+    });
+
+    expect(saturating.id).toBe(`node-${String(Number.MAX_SAFE_INTEGER)}`);
+    const first = new Group().id;
+    const second = new Group().id;
+    expect(first).not.toBe(second);
+    expect(Number(/^node-(\d+)$/.exec(second)?.[1])).toBe(
+      Number(/^node-(\d+)$/.exec(first)?.[1]) + 1,
+    );
+  });
 });
 
 describe("Scene lookups (§46)", () => {

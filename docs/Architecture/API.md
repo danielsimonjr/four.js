@@ -566,13 +566,14 @@ drags.makeDraggable(cube);
 app-supplied** through the `WidgetSkin` seam (the dependency matrix keeps
 `@four/ui` renderer-free).
 
-| Symbol                                                   | Contract                                                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `UIWidget`                                               | Base widget node: measured box, state, focus, §72 pointer + keyboard activation.               |
-| `Panel` / `Button` / `Label`                             | The shipped widgets; `PanelLayout` gives flex/stack/absolute layout.                           |
-| `WidgetSkin`                                             | The seam: reads the widget's measured box and state, returns/updates its visual nodes.         |
-| `focusedWidget` / `UIFocusEvent` / `WidgetActivateEvent` | Focus ring + activation (pointer or Enter).                                                    |
-| `UI_STAGED`                                              | Named staging record — a11y mirror and fuller keyboard navigation are staged with dated notes. |
+| Symbol                                                                   | Contract                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UIWidget`                                                               | Base widget node: measured box, state, focus, §72 pointer + keyboard activation.                                                                                                                |
+| `Panel` / `Button` / `Label`                                             | The shipped widgets; `PanelLayout` gives flex/stack/absolute layout.                                                                                                                            |
+| `WidgetSkin`                                                             | The seam: reads the widget's measured box and state, returns/updates its visual nodes.                                                                                                          |
+| `focusedWidget` / `UIFocusEvent` / `WidgetActivateEvent`                 | Focus ring + activation (pointer or Enter).                                                                                                                                                     |
+| `collectFocusOrder` / `keyboardFocusTarget` / `installKeyboardTraversal` | §75 keyboard traversal (2026-08-07): Tab/Shift-Tab over `accessibility.tabIndex`, resolver seam for `KeyboardInput`.                                                                            |
+| `UI_STAGED`                                                              | Named staging record — the a11y DOM mirror, screen-reader/high-contrast/scalable-text, and reduced motion remain staged with dated notes (the keyboard-navigation entry was closed 2026-08-07). |
 
 ---
 
@@ -601,8 +602,11 @@ const saved = encodeSceneDocument(document); // canonical text
 const restored = instantiateScene(decodeSceneDocument(saved), registry);
 ```
 
-Serializers are keyed by component **class**; unregistered components are
-silently unsaved (known boundary). Versioned migrations (§80) run on load via
+Serializers are keyed by component **class**; an unregistered component fails
+the save loudly (`unknownComponents: "throw"`, the A-15 default since
+2026-08-06 — this line said "silently unsaved (known boundary)" until
+2026-08-07, which stopped being true with that change; `"skip"` restores the
+old tolerance, minus the silence). Versioned migrations (§80) run on load via
 `SceneMigrationRegistry` / `migrateSceneDocument`, with warnings surfaced.
 Reference `RigidBody`/`Collider` serializers live in
 `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER`, shipped from `@four/physics` since
@@ -627,16 +631,16 @@ geometry today is procedural (`four/geometry`) or custom-loaded.
 **Package:** `four/diagnostics` · **Guide:**
 [digital-twin](../guides/digital-twin.md) · **Spec:** §33–§34, §113
 
-| Symbol                                                                                                                                          | Contract                                                                                                                                                                         |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createChecksum` / `Checksum` / `hashFloats`                                                                                                    | The §33 FNV-1a checksum utility behind `world.checksum()` — pinned against golden vectors.                                                                                       |
-| `ReplayRecorder`                                                                                                                                | `begin(world, options)` → `recordFrame(steps, droppedTime)` / `recordInput(...)` → `end(): ReplayRecording`. Recording is non-perturbing (snapshotting is a pure read — tested). |
-| `ReplayPlayer`                                                                                                                                  | Bookkeeping only; the host supplies `stepFn`. `load()`, `stepOnce()`, `seekToStep(n)` (nearest snapshot + ≤ interval−1 re-steps), `verifyChecksum()`.                            |
-| `encodeReplayRecording` / `decodeReplayRecording` / `validateReplayRecording`                                                                   | The canonical, versioned envelope (`REPLAY_FORMAT_VERSION`, exact-match; strict base64; structural validation on decode) — archivable as plain JSON text.                        |
-| `isReplayCompatible` / `assertReplayCompatible`                                                                                                 | Adapter-identity gate before replaying a recording into a target.                                                                                                                |
-| `DebugDrawBuffer` + `collectBodyOrigins` / `collectBodyVelocities` / `collectContactPoints` / `collectContactImpulses` / `collectCentersOfMass` | §113 debug-draw providers writing 7-float line-list vertices; duck-typed over solver access seams, proven against live Rapier.                                                   |
-| `solverStatistics` / `solverJointStatistics`                                                                                                    | Per-step solver counters for dashboards.                                                                                                                                         |
-| `DEBUG_DRAW_STAGED`                                                                                                                             | Named staging record: joint-anchor viz, force vectors, per-segment color — staged with dated reasons.                                                                            |
+| Symbol                                                                                                                                          | Contract                                                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createChecksum` / `Checksum` / `hashFloats`                                                                                                    | The §33 FNV-1a checksum utility behind `world.checksum()` — pinned against golden vectors.                                                                                                                                            |
+| `ReplayRecorder`                                                                                                                                | `begin(world, options)` → `recordFrame(steps, droppedTime)` / `recordInput(...)` → `end(): ReplayRecording`. Recording is non-perturbing (snapshotting is a pure read — tested).                                                      |
+| `ReplayPlayer`                                                                                                                                  | Bookkeeping only; the host supplies `stepFn`. `load()`, `stepOnce()`, `seekToStep(n)` (nearest snapshot + ≤ interval−1 re-steps), `verifyChecksum()`.                                                                                 |
+| `encodeReplayRecording` / `decodeReplayRecording` / `validateReplayRecording`                                                                   | The canonical, versioned envelope (`LATEST_REPLAY_FORMAT_VERSION` 2 / `MINIMUM_REPLAY_FORMAT_VERSION` 1, per the lowest-version-that-expresses rule; strict base64; structural validation on decode) — archivable as plain JSON text. |
+| `isReplayCompatible` / `assertReplayCompatible`                                                                                                 | Adapter-identity gate before replaying a recording into a target.                                                                                                                                                                     |
+| `DebugDrawBuffer` + `collectBodyOrigins` / `collectBodyVelocities` / `collectContactPoints` / `collectContactImpulses` / `collectCentersOfMass` | §113 debug-draw providers writing 7-float line-list vertices; duck-typed over solver access seams, proven against live Rapier.                                                                                                        |
+| `solverStatistics` / `solverJointStatistics`                                                                                                    | Per-step solver counters for dashboards.                                                                                                                                                                                              |
+| `DEBUG_DRAW_STAGED`                                                                                                                             | Named staging record: joint-anchor viz, force vectors, per-segment color — staged with dated reasons.                                                                                                                                 |
 
 ```typescript
 import {

@@ -301,8 +301,12 @@ than assumed:
   unordered doubles), which is what gives §33 checksums a stable visit order.
 
 `physics-box2d` and `physics-soft` are reserved stubs. The §90/§102
-compatibility tables are expected to name `SolverBodyAccess` /
-`SolverJointAccess` when a second adapter lands.
+compatibility tables are published in `docs/COMPATIBILITY.md` (since
+2026-08-07; this paragraph read "are expected to name `SolverBodyAccess` /
+`SolverJointAccess` when a second adapter lands" until then). They do name
+both seams, per adapter — and the solver-adapter block is generated from the
+adapters' own capability declarations by `tools/generate-compatibility.mjs`,
+so it cannot drift from them.
 
 ### Seam 2: The Renderer Interface
 
@@ -501,7 +505,8 @@ The architecture makes that a testable property rather than a hope:
    don't.
 5. **Replay.** `ReplayRecorder` (recording is non-perturbing — proven, since
    Rapier's snapshot is a pure read) produces a versioned, canonically
-   validated JSON document (`REPLAY_FORMAT_VERSION`, exact-match; strict
+   validated JSON document (`LATEST_REPLAY_FORMAT_VERSION`, with a document
+   declaring the lowest supported version that expresses it; strict
    canonical base64); `ReplayPlayer` owns bookkeeping only while the host
    supplies the step function, with checksum verification as the runtime
    signal that the pairing is right. The Phase 10 exit proof: record →

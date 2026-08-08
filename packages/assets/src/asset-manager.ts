@@ -70,6 +70,36 @@
  * yet — see "Staged"), and is evicted and disposed the moment it does, so a
  * released asset never lingers in the cache.
  *
+ * ## Untrusted content (§96)
+ *
+ * §96 opens *"asset loaders and scene deserializers shall treat external
+ * content as untrusted"* and names **input-size limits** and **cancellation and
+ * timeouts for expensive decoders** among its requirements. Both are enforced
+ * here, because this is the only place in the engine that touches a network:
+ *
+ * - **{@link AssetManagerOptions.maximumBytes}** (default
+ *   {@link DEFAULT_MAXIMUM_BYTES}) is checked twice. First against the
+ *   response's declared `content-length`, *before* the body is read at all — a
+ *   4 GB download is refused while it is still a header. Then against what the
+ *   body actually produced, because a `content-length` is a claim by the same
+ *   party that sent the bytes: the loader is handed a bounded view of the
+ *   response whose `arrayBuffer()`, `text()`, and `json()` refuse an
+ *   over-budget body instead of returning it.
+ * - **{@link AssetManagerOptions.timeoutSeconds}** (default
+ *   {@link DEFAULT_TIMEOUT_SECONDS}) bounds the *whole* load — transport and
+ *   decode together, since §96's phrase is "expensive decoders" and a decoder
+ *   that never returns is exactly as fatal as a socket that never closes.
+ *
+ * Both defaults are **finite**. A limit that defaults to `Infinity` is
+ * documentation rather than a limit; either may be set to
+ * `Number.POSITIVE_INFINITY` explicitly, which is how an application records
+ * the decision to trust its origin.
+ *
+ * A refused load rejects with `ASSET_LOAD_FAILED` carrying
+ * `context.limitName` (`"maximumBytes"` or `"timeoutSeconds"`), `context.limit`,
+ * and — where there is one — `context.observed`. Like every other failure it is
+ * not cached, so retrying is calling {@link AssetManager.load} again.
+ *
  * ## Failures are never cached
  *
  * A rejected load — transport failure, non-2xx status, or a loader that could
@@ -85,12 +115,32 @@
  *
  * ## Staged (dated notes, 2026-08-02, WP-11.2)
  *
- * - **Cancellation / `AbortSignal`.** No packet or spec section pins the
- *   policy (does releasing the last reference to a pending load abort it? does
- *   one aborting caller cancel a coalesced load for the others?), and both
- *   answers are load-bearing for the refcount rules above. Deliberately absent
- *   rather than guessed; the current behaviour — a pending load always runs to
- *   completion, then evicts if unwanted — is the conservative half.
+ * - **Cancellation / `AbortSignal`.** Half of this landed with
+ *   {@link AssetManagerOptions.timeoutSeconds} (§96): a load now has a
+ *   deadline, and passing it rejects the caller's promise and evicts the entry.
+ *   What is still absent is *caller-driven* cancellation and transport-level
+ *   abort. The policy question is unchanged and still unpinned (does releasing
+ *   the last reference to a pending load abort it? does one aborting caller
+ *   cancel a coalesced load for the others?), and both answers are load-bearing
+ *   for the refcount rules above.
+ *
+ *   There is now also a *typing* obstacle worth recording, because it decides
+ *   the shape of whatever closes the rest (measured 2026-08-07). A signal
+ *   cannot simply be added to {@link FetchLike}: widening it to
+ *   `(url: string, init?: { signal?: AbortSignalLike }) => …` makes the
+ *   platform `fetch` **stop** satisfying it, because parameters are
+ *   contravariant and the DOM's `RequestInit.signal` is `AbortSignal | null` —
+ *   a structural `AbortSignalLike` "is missing the following properties from
+ *   type 'AbortSignal': onabort, reason, throwIfAborted, dispatchEvent", and
+ *   the missing ones cannot be declared without naming DOM types this package
+ *   refuses to name. So `{ fetch }` would need an adapter, and the module's
+ *   documented "no adapter needed" property would be gone. The compatible shape
+ *   is a *generic* seam — `FetchLike<TSignal = never>` paired with an injected
+ *   `() => { signal: TSignal; abort(): void }`, which infers `TSignal =
+ *   AbortSignal` from a browser's own `AbortController` and keeps every
+ *   existing call site valid. That is A-18's remaining half, deliberately not
+ *   built here: the deadline above is enforced *above* the seam, so the
+ *   caller's promise is always released even though the socket may drain.
  * - **Streaming, dependency graphs, progress reporting, worker decoding, hot
  *   reload, content hashing** (§76). Each needs a contract this packet does not
  *   have: progress needs a byte-length channel `FetchLike` does not expose,
@@ -123,6 +173,16 @@ export interface FetchResponse {
   readonly ok: boolean;
   /** The HTTP status code; `0` is acceptable for non-HTTP transports. */
   readonly status: number;
+  /**
+   * The response headers, if the transport has any (§96).
+   *
+   * Optional because a non-HTTP transport — or a unit test's fake — has none,
+   * and because it was added after the interface shipped; the DOM's `Headers`
+   * satisfies it structurally, so a real `Response` still needs no adapter.
+   * The manager reads exactly one header from it, `content-length`, to refuse
+   * an over-budget body before downloading it.
+   */
+  readonly headers?: ResponseHeadersLike;
   /** The body as bytes. */
   arrayBuffer(): Promise<ArrayBuffer>;
   /** The body decoded as UTF-8 text. */
@@ -130,6 +190,61 @@ export interface FetchResponse {
   /** The body parsed as JSON. */
   json(): Promise<unknown>;
 }
+
+/**
+ * The one thing this package needs from a header collection: a case-insensitive
+ * lookup returning the value or `null`.
+ *
+ * Structural, exactly as {@link FetchResponse} is: the DOM's `Headers` has this
+ * `get`, and a test satisfies it with `{ get: () => "1024" }`.
+ */
+export interface ResponseHeadersLike {
+  /** The header's value, or `null` when it is absent. */
+  get(name: string): string | null;
+}
+
+/**
+ * The timer seam behind {@link AssetManagerOptions.timeoutSeconds}.
+ *
+ * Injected rather than reached for, like every other IO in this module, so a
+ * unit test can expire a deadline without a wall clock and without fake global
+ * timers. `globalThis` satisfies it structurally and is the default.
+ *
+ * **Milliseconds appear here and nowhere else.** Every four.js API is in
+ * seconds (§7a) — {@link AssetManagerOptions.timeoutSeconds} included — but
+ * `setTimeout` is a platform primitive whose unit is fixed, so the conversion
+ * happens at this boundary and the boundary says so in the parameter name.
+ */
+export interface TimerLike {
+  /**
+   * Schedules `callback` after `delayMilliseconds`, returning a handle for
+   * {@link TimerLike.clearTimeout}.
+   */
+  setTimeout(callback: () => void, delayMilliseconds: number): unknown;
+  /** Cancels a pending callback; a stale handle is a no-op. */
+  clearTimeout(handle: unknown): void;
+}
+
+/**
+ * The default {@link AssetManagerOptions.maximumBytes}: 64 MiB (§96).
+ *
+ * Larger than any asset the engine's own examples and tests load by three
+ * orders of magnitude, and small enough that a runaway or hostile response
+ * cannot exhaust a browser tab's heap before anything notices. §96 requires
+ * *some* input-size limit; this is the number, written down, rather than an
+ * `Infinity` that would satisfy the letter of a default and none of its point.
+ */
+export const DEFAULT_MAXIMUM_BYTES = 67_108_864;
+
+/**
+ * The default {@link AssetManagerOptions.timeoutSeconds}: 30 seconds (§96).
+ *
+ * Seconds, like every other duration in the engine (§7a). Generous enough for a
+ * large asset over a slow link, finite enough that a stalled transport or a
+ * decoder that never returns cannot pin a load — and its reference count —
+ * forever.
+ */
+export const DEFAULT_TIMEOUT_SECONDS = 30;
 
 /**
  * The IO seam: a URL in, a {@link FetchResponse} in, a promise out.
@@ -169,6 +284,37 @@ export interface AssetManagerOptions {
    * platform default.
    */
   readonly fetch?: FetchLike;
+  /**
+   * §96 input-size limit, in bytes. Defaults to {@link DEFAULT_MAXIMUM_BYTES}.
+   *
+   * Checked against the declared `content-length` before the body is read, and
+   * against the body itself as the loader reads it. `text()` is measured in
+   * UTF-16 code units, which is never more than the UTF-8 byte count, so that
+   * check is conservative in the safe direction.
+   *
+   * `Number.POSITIVE_INFINITY` disables it; anything else must be greater than
+   * zero.
+   */
+  readonly maximumBytes?: number;
+  /**
+   * §96 deadline for a whole load — transport **and** decode — in seconds
+   * (§7a). Defaults to {@link DEFAULT_TIMEOUT_SECONDS}.
+   *
+   * On expiry the load rejects with `ASSET_LOAD_FAILED` and the entry is
+   * evicted, so the caller is released and the key is retryable. The underlying
+   * request is not aborted; see the module comment's staging note on why a
+   * signal cannot cross {@link FetchLike} today.
+   *
+   * `Number.POSITIVE_INFINITY` disables it — and with it the need for a
+   * {@link TimerLike}; anything else must be greater than zero.
+   */
+  readonly timeoutSeconds?: number;
+  /**
+   * The timer behind {@link AssetManagerOptions.timeoutSeconds}. Defaults to
+   * `globalThis`, which satisfies {@link TimerLike} in every browser and in
+   * Node.
+   */
+  readonly timer?: TimerLike;
 }
 
 /** One cache slot: a pending or settled load, plus its reference count. */
@@ -217,6 +363,124 @@ function resolveGlobalFetch(): FetchLike | undefined {
 }
 
 /**
+ * Resolves the platform timer, bound to the global object.
+ *
+ * `undefined` — rather than a throw — when the host has no `setTimeout`, for
+ * the same reason {@link resolveGlobalFetch} is lenient: a manager built in a
+ * bare runtime stays constructible, and only a load that actually needs a
+ * deadline complains.
+ */
+function resolveGlobalTimer(): TimerLike | undefined {
+  const scope = globalThis as Partial<TimerLike>;
+  const set = scope.setTimeout;
+  const clear = scope.clearTimeout;
+  if (typeof set !== "function" || typeof clear !== "function") {
+    return undefined;
+  }
+  return {
+    setTimeout: (callback: () => void, delayMilliseconds: number): unknown =>
+      set.call(scope, callback, delayMilliseconds),
+    clearTimeout: (handle: unknown): void => {
+      clear.call(scope, handle);
+    },
+  };
+}
+
+/**
+ * Validates a §96 limit as a positive number, `Infinity` included.
+ *
+ * `!(value > 0)` rather than `value <= 0`, so `NaN` — which compares false
+ * against everything — is refused by the same branch as zero and negatives. A
+ * bad limit is a programming error, so it is reported at construction, where
+ * the mistake is, rather than at the first load.
+ */
+function positiveLimit(
+  value: number | undefined,
+  fallback: number,
+  name: string,
+): number {
+  if (value === undefined) {
+    return fallback;
+  }
+  if (!(value > 0)) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `AssetManagerOptions.${name} must be greater than zero (or Number.POSITIVE_INFINITY to disable the limit); got ${String(value)}.`,
+      { context: { limitName: name, found: value } },
+    );
+  }
+  return value;
+}
+
+/**
+ * The declared body size from a response's `content-length`, or `undefined`
+ * when there is no usable one (§96).
+ *
+ * A missing header, a non-HTTP transport with no headers at all, and a header
+ * that is not a non-negative number all read the same way — "unknown" — and
+ * fall through to the post-read bound. A `content-length` is a claim by the
+ * party that sent the bytes, so it can only ever be a cheap *early* refusal,
+ * never the whole check.
+ */
+function declaredContentLength(response: FetchResponse): number | undefined {
+  const header = response.headers?.get("content-length");
+  if (header === undefined || header === null) {
+    return undefined;
+  }
+  const declared = Number(header);
+  if (!Number.isFinite(declared) || declared < 0) {
+    return undefined;
+  }
+  return declared;
+}
+
+/**
+ * Wraps a response so its body accessors refuse an over-budget payload (§96).
+ *
+ * The wrapper is what the *loader* sees, so a decoder is never handed bytes the
+ * application declined to accept. `text()` is bounded in UTF-16 code units — a
+ * UTF-8 body is never smaller than its code-unit count, so the check never
+ * refuses something under budget, and may accept something modestly over it.
+ * `json()` is routed through the bounded `text()` rather than the underlying
+ * `json()`, because a parsed value has no size to measure once it exists.
+ *
+ * @param response the response to bound
+ * @param maximumBytes the caller's limit; assumed finite (callers skip the
+ *   wrapper entirely for `Infinity`, so an unlimited manager pays nothing)
+ * @param refuse builds the `ASSET_LOAD_FAILED` for an observed size
+ * @returns a {@link FetchResponse} view over the same response
+ */
+function boundedResponse(
+  response: FetchResponse,
+  maximumBytes: number,
+  refuse: (observed: number) => FourError,
+): FetchResponse {
+  const bounded: FetchResponse = {
+    ok: response.ok,
+    status: response.status,
+    headers: response.headers,
+    async arrayBuffer(): Promise<ArrayBuffer> {
+      const data = await response.arrayBuffer();
+      if (data.byteLength > maximumBytes) {
+        throw refuse(data.byteLength);
+      }
+      return data;
+    },
+    async text(): Promise<string> {
+      const text = await response.text();
+      if (text.length > maximumBytes) {
+        throw refuse(text.length);
+      }
+      return text;
+    },
+    async json(): Promise<unknown> {
+      return JSON.parse(await bounded.text()) as unknown;
+    },
+  };
+  return bounded;
+}
+
+/**
  * Deduplicating, reference-counted asset cache (§76).
  *
  * See the module comment for cache identity, coalescing, failure, and disposal
@@ -236,10 +500,40 @@ export class AssetManager implements Disposable {
 
   readonly #fetch: FetchLike | undefined;
 
+  /** §96 input-size limit in bytes; `Infinity` when the caller disabled it. */
+  readonly #maximumBytes: number;
+
+  /** §96 whole-load deadline in seconds; `Infinity` when disabled. */
+  readonly #timeoutSeconds: number;
+
+  /** Resolved once, so a host without `setTimeout` is diagnosed at load time. */
+  readonly #timer: TimerLike | undefined;
+
   #disposed = false;
 
   constructor(options?: AssetManagerOptions) {
     this.#fetch = options?.fetch ?? resolveGlobalFetch();
+    this.#maximumBytes = positiveLimit(
+      options?.maximumBytes,
+      DEFAULT_MAXIMUM_BYTES,
+      "maximumBytes",
+    );
+    this.#timeoutSeconds = positiveLimit(
+      options?.timeoutSeconds,
+      DEFAULT_TIMEOUT_SECONDS,
+      "timeoutSeconds",
+    );
+    this.#timer = options?.timer ?? resolveGlobalTimer();
+  }
+
+  /** The effective §96 input-size limit in bytes (diagnostics and tests). */
+  get maximumBytes(): number {
+    return this.#maximumBytes;
+  }
+
+  /** The effective §96 load deadline in seconds (diagnostics and tests). */
+  get timeoutSeconds(): number {
+    return this.#timeoutSeconds;
   }
 
   /** Number of cache slots, pending loads included. */
@@ -296,6 +590,20 @@ export class AssetManager implements Disposable {
       );
     }
 
+    // §96's deadline needs a timer. Missing one is diagnosed exactly like a
+    // missing fetch — loudly, at the first load that would have needed it,
+    // naming both ways out — rather than by silently dropping the limit.
+    const timer = this.#timer;
+    if (timer === undefined && Number.isFinite(this.#timeoutSeconds)) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot load "${url}": timeoutSeconds is ${String(this.#timeoutSeconds)} ` +
+          `but this runtime has no setTimeout. Pass { timer } to the AssetManager ` +
+          `constructor, or { timeoutSeconds: Number.POSITIVE_INFINITY } to drop the §96 deadline.`,
+        { context: { url, loader: loader.name, limitName: "timeoutSeconds" } },
+      );
+    }
+
     // The entry must exist before the first `await` inside `#run`, so that a
     // second synchronous `load` of the same key coalesces onto this promise.
     // `promise` is patched in below: the handlers close over `entry`, so the
@@ -309,7 +617,12 @@ export class AssetManager implements Disposable {
       value: undefined,
       evicted: false,
     };
-    const promise = this.#run(fetchImpl, url, loader).then(
+    const promise = this.#withDeadline(
+      this.#run(fetchImpl, url, loader),
+      timer,
+      url,
+      loader.name,
+    ).then(
       (value): T => {
         entry.settled = true;
         entry.value = value;
@@ -453,6 +766,65 @@ export class AssetManager implements Disposable {
     }
   }
 
+  /**
+   * Bounds `work` by {@link AssetManagerOptions.timeoutSeconds} (§96).
+   *
+   * The deadline covers transport *and* decode, because §96's requirement names
+   * "expensive decoders" and both failure modes look identical to a caller. On
+   * expiry the returned promise rejects; `load`'s own rejection handler then
+   * evicts the entry, so the key is immediately retryable. `work` itself keeps
+   * running — see the module comment's cancellation note — but its result is
+   * discarded, and its settlement clears the timer either way.
+   *
+   * An infinite timeout returns `work` untouched, so a manager that opted out
+   * pays nothing: no timer, no extra promise, no behavioural difference from
+   * the build before §96 landed.
+   */
+  #withDeadline<T>(
+    work: Promise<T>,
+    timer: TimerLike | undefined,
+    url: string,
+    loaderName: string,
+  ): Promise<T> {
+    const seconds = this.#timeoutSeconds;
+    // A missing timer is only reachable with an infinite deadline — `load`
+    // refuses a finite one without a timer before it ever gets here — so the
+    // two conditions describe the same opt-out from either side.
+    if (timer === undefined || !Number.isFinite(seconds)) {
+      return work;
+    }
+    let handle: unknown = undefined;
+    // A race rather than a hand-rolled resolve/reject pair, so this promise can
+    // only ever be rejected with the one `FourError` below — `work`'s own
+    // failures reach the caller through `work`, unwrapped and unreclassified.
+    const deadline = new Promise<never>((_resolve, reject) => {
+      handle = timer.setTimeout(() => {
+        reject(
+          new FourError(
+            "ASSET_LOAD_FAILED",
+            `Loading "${url}" exceeded the ${String(seconds)} s limit (§96).`,
+            {
+              context: {
+                url,
+                loader: loaderName,
+                limitName: "timeoutSeconds",
+                limit: seconds,
+              },
+            },
+          ),
+        );
+      }, seconds * 1000);
+    });
+    return Promise.race([
+      work.finally(() => {
+        // Settled either way: release the timer so a completed load never
+        // holds one open (and, in Node, never keeps the process alive).
+        timer.clearTimeout(handle);
+      }),
+      deadline,
+    ]);
+  }
+
   /** Fetch, status-check, decode — every failure normalized to `FourError`. */
   async #run<T>(
     fetchImpl: FetchLike,
@@ -476,6 +848,33 @@ export class AssetManager implements Disposable {
         `Fetch failed for "${url}": HTTP ${String(response.status)}.`,
         { context: { url, loader: loader.name, status: response.status } },
       );
+    }
+
+    // §96 input-size limit, in two halves: refuse the declared length before
+    // reading anything, then bound what the body actually yields, because the
+    // declaration comes from the same party as the bytes.
+    const maximumBytes = this.#maximumBytes;
+    if (Number.isFinite(maximumBytes)) {
+      const refuse = (observed: number): FourError =>
+        new FourError(
+          "ASSET_LOAD_FAILED",
+          `"${url}" is ${String(observed)} bytes, over the ${String(maximumBytes)}-byte limit (§96).`,
+          {
+            context: {
+              url,
+              loader: loader.name,
+              status: response.status,
+              limitName: "maximumBytes",
+              limit: maximumBytes,
+              observed,
+            },
+          },
+        );
+      const declared = declaredContentLength(response);
+      if (declared !== undefined && declared > maximumBytes) {
+        throw refuse(declared);
+      }
+      response = boundedResponse(response, maximumBytes, refuse);
     }
 
     try {

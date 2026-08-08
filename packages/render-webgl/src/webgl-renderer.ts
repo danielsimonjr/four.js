@@ -43,23 +43,44 @@ import {
   createSceneLights,
   isLitItem,
   isParticlesItem,
+  isRenderTargetTexture,
   isSpriteItem,
+  COLOR_GRADE_DEFAULTS,
+  type EffectRenderPass,
   type RenderItem,
   type RenderItemKind,
+  type RenderStatistics,
   type Renderer,
   type RendererCapabilities,
   type RendererEventMap,
   type RendererOptions,
+  type ScreenEffectRenderer,
 } from "@four/render";
 
+import {
+  EFFECT_TEXTURE_UNIT,
+  EFFECT_VERTEX_COUNT,
+  EffectProgram,
+} from "./gl-effect.js";
 import { GeometryCache } from "./gl-geometry.js";
 import {
   ParticleBatchCache,
   ParticleProgram,
   type ParticleGlContext,
 } from "./gl-particles.js";
-import { GL, LitProgram, SpriteProgram, UnlitProgram } from "./gl-program.js";
-import { TextureCache } from "./gl-texture.js";
+import {
+  GL,
+  LitProgram,
+  MAP_TEXTURE_UNIT,
+  SpriteProgram,
+  UnlitProgram,
+  type GlTexture,
+} from "./gl-program.js";
+import {
+  RenderTargetCache,
+  type RenderTargetRecord,
+} from "./gl-render-target.js";
+import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 
 /**
  * The subtree root {@link WebglRenderer.render} draws, and the viewports it
@@ -85,6 +106,16 @@ type RenderView = Parameters<Renderer["render"]>[1][number];
 type RenderInterpolationArgument = NonNullable<
   Parameters<Renderer["render"]>[2]
 >;
+
+/**
+ * The off-screen surface `render` draws into when it is given one (§61, §48;
+ * R-4), derived from the interface as {@link RenderRoot} is.
+ *
+ * `@four/render`'s `RenderTarget` — a *type* import through the interface, so
+ * this file still names nothing outside the frozen matrix. `gl-render-target.ts`
+ * imports the class by name for a reason written out there.
+ */
+type RenderTargetArgument = NonNullable<Parameters<Renderer["render"]>[3]>;
 
 /**
  * The minimum a DOM event has to offer this backend: a way to stop the default
@@ -188,6 +219,19 @@ const REQUIRED_CONTEXT_METHODS = [
   // draw, the same courtesy the check extends to every other entry point the
   // backend cannot draw without.
   "uniform3fv",
+  // The render-target path's five (R-4, 2026-08-07). Core WebGL 1 and 2 too,
+  // so they discriminate nothing either; they are checked for the same reason
+  // as `uniform3fv` — a stub that cannot allocate a framebuffer should say so
+  // at `initialize`, not on the first off-screen pass, which may be minutes
+  // into a session. `createRenderbuffer` and friends are not listed
+  // individually: no context implements half of `gl-render-target.ts`'s set,
+  // and a check per entry point would cost a loop iteration per initialize for
+  // a case that does not exist. See `gl-render-target.ts`.
+  "createFramebuffer",
+  "bindFramebuffer",
+  "framebufferTexture2D",
+  "checkFramebufferStatus",
+  "createRenderbuffer",
 ] as const;
 
 /**
@@ -260,27 +304,55 @@ const BLEND_FUNCTIONS: Record<ItemBlendMode, readonly [number, number]> = {
  * sequence it issued before material render state existed**, down to the single
  * `useProgram`. A scene pays for state only where it asks for it.
  *
- * Module-level and reused, like {@link renderList} and {@link rect}, and safe
- * for the same reason: `render` resets it on entry, drives it synchronously,
- * and restores the GL state it borrowed before returning. The values below are
- * the fixed state `#applyFixedState` establishes (blending off, `LEQUAL` depth
- * test on) plus GL's own defaults (depth mask on, colour mask on).
+ * ## One mirror per renderer (F13, 2026-08-07)
+ *
+ * This was a module-level object until 2026-08-07, shared by every
+ * `WebglRenderer` in the process and therefore by every *context* — §61 allows
+ * several renderers over one application, and two of them mirror two different
+ * GL states. The sharing was masked, never fixed, by `render` resetting the
+ * mirror on entry. It is a per-instance field now
+ * ({@link WebglRenderer.render} passes it to each helper), which is also what
+ * makes the reset-on-entry an assertion the class can *keep* rather than a
+ * hope: nothing outside one renderer's own frame can move it.
+ *
+ * The values a fresh mirror carries are the fixed state `#applyFixedState`
+ * establishes (blending off, `LEQUAL` depth test on) plus GL's own defaults
+ * (depth mask on, colour mask on) — the state a frame starts and ends in.
  */
-const glState = {
-  blending: false,
-  blendMode: "normal" as ItemBlendMode,
-  depthTest: true,
-  depthWrite: true,
-  colorWrite: true,
-};
+interface GlState {
+  blending: boolean;
+  blendMode: ItemBlendMode;
+  depthTest: boolean;
+  depthWrite: boolean;
+  colorWrite: boolean;
+}
 
-/** Resets the mirror to the state a frame starts and ends in. */
-function resetGlState(): void {
-  glState.blending = false;
-  glState.blendMode = "normal";
-  glState.depthTest = true;
-  glState.depthWrite = true;
-  glState.colorWrite = true;
+/** A mirror of the state a frame starts and ends in; see `GlState`. */
+function createGlState(): GlState {
+  return {
+    blending: false,
+    blendMode: "normal",
+    depthTest: true,
+    depthWrite: true,
+    colorWrite: true,
+  };
+}
+
+/**
+ * Resets the mirror to the state a frame starts and ends in.
+ *
+ * Since F13 every frame leaves through a `finally` that restores exactly this
+ * state to *real* GL, so this is the cheap restatement of an invariant that
+ * already holds rather than the assumption it used to be: a frame that threw
+ * mid-draw no longer hands the next one a mirror that disagrees with the
+ * context. It costs no GL call either way.
+ */
+function resetGlState(state: GlState): void {
+  state.blending = false;
+  state.blendMode = "normal";
+  state.depthTest = true;
+  state.depthWrite = true;
+  state.colorWrite = true;
 }
 
 /**
@@ -293,26 +365,31 @@ function resetGlState(): void {
  *
  * The blend *function* is only re-issued while blending is on: a mode change on
  * an opaque material would be a call with no observable effect, and `render`
- * restores the function at the end of the frame.
+ * restores the function at the end of the frame — which is what `forceMode` is
+ * for, since that restore runs with blending already off (F15).
  */
 function applyBlendState(
   gl: ParticleGlContext,
+  state: GlState,
   blend: boolean,
   mode: ItemBlendMode,
+  forceMode = false,
 ): void {
-  if (blend !== glState.blending) {
+  if (blend !== state.blending) {
     if (blend) {
       gl.enable(GL.BLEND);
     } else {
       gl.disable(GL.BLEND);
     }
-    glState.blending = blend;
+    state.blending = blend;
   }
-  if (blend && mode !== glState.blendMode) {
-    const [source, destination] =
-      BLEND_FUNCTIONS[mode] ?? BLEND_FUNCTIONS.normal;
+  if ((blend || forceMode) && mode !== state.blendMode) {
+    // Total over `ItemBlendMode`: §57's `Material.blendMode` validates every
+    // assignment against the same four names (`@four/materials`, F14), and
+    // `applyMaterialState` maps a material that declares none onto `"normal"`.
+    const [source, destination] = BLEND_FUNCTIONS[mode];
     gl.blendFunc(source, destination);
-    glState.blendMode = mode;
+    state.blendMode = mode;
   }
 }
 
@@ -325,25 +402,26 @@ function applyBlendState(
  */
 function applyDepthColorState(
   gl: ParticleGlContext,
+  state: GlState,
   depthTest: boolean,
   depthWrite: boolean,
   colorWrite: boolean,
 ): void {
-  if (depthTest !== glState.depthTest) {
+  if (depthTest !== state.depthTest) {
     if (depthTest) {
       gl.enable(GL.DEPTH_TEST);
     } else {
       gl.disable(GL.DEPTH_TEST);
     }
-    glState.depthTest = depthTest;
+    state.depthTest = depthTest;
   }
-  if (depthWrite !== glState.depthWrite) {
+  if (depthWrite !== state.depthWrite) {
     gl.depthMask(depthWrite);
-    glState.depthWrite = depthWrite;
+    state.depthWrite = depthWrite;
   }
-  if (colorWrite !== glState.colorWrite) {
+  if (colorWrite !== state.colorWrite) {
     gl.colorMask(colorWrite, colorWrite, colorWrite, colorWrite);
-    glState.colorWrite = colorWrite;
+    state.colorWrite = colorWrite;
   }
 }
 
@@ -356,45 +434,146 @@ function applyDepthColorState(
  * *structural* contract (that is what lets the unit tests drive it with
  * doubles, and what lets a consumer's own material type reach it), so a missing
  * field has to mean "the default", not `undefined` leaking into a GL call or a
- * `NaN` into a uniform.
+ * `NaN` into a uniform. `material` itself is optional for the one caller that
+ * has none: §36's particles carry no material at all.
+ *
+ * That is the *whole* of what these fallbacks guard (F16, 2026-08-07). Every
+ * real `Material` declares all six fields and validates the two that can carry
+ * a bad value on assignment as well as at construction (F14) — so a fallback
+ * that no structural double could reach has been removed rather than left to
+ * read as a live defence.
  */
 function applyMaterialState(
   gl: ParticleGlContext,
+  state: GlState,
   material: ItemMaterial | undefined,
   alwaysBlend: boolean,
 ): void {
   applyBlendState(
     gl,
+    state,
     alwaysBlend || material?.transparent === true,
     material?.blendMode ?? "normal",
   );
   applyDepthColorState(
     gl,
+    state,
     material?.depthTest !== false,
     material?.depthWrite !== false,
     material?.colorWrite !== false,
   );
 }
 
-/** §57's `opacity`, defaulted to 1 for a material that does not declare one. */
+/**
+ * Adds one *submitted* draw to §84's render counters (A-1, 2026-08-07).
+ *
+ * Called immediately after the GL draw entry point and only ever with a
+ * non-null record: the frame reads `this.statistics` once, and every call site
+ * is guarded by that one comparison, so a renderer with statistics off does not
+ * reach this function and issues exactly the GL sequence it always did.
+ *
+ * `vertexCount` is the draw's element count — vertices for `drawArrays`,
+ * indices for `drawElements` — which is the number GL divides by three either
+ * way. This backend has only two primitive modes (`gl-geometry.ts` maps §53's
+ * `"triangles"`/`"lines"` onto `GL.TRIANGLES`/`GL.LINES`), so anything that is
+ * not `TRIANGLES` contributes no triangles at all; `Math.floor` because a
+ * geometry whose count is not a multiple of three leaves GL a trailing partial
+ * primitive that it does not draw.
+ */
+function countDraw(
+  statistics: RenderStatistics,
+  mode: number,
+  vertexCount: number,
+  instances: number,
+): void {
+  statistics.drawCalls += 1;
+  statistics.instances += instances;
+  if (mode === GL.TRIANGLES) {
+    statistics.triangles += Math.floor(vertexCount / 3) * instances;
+  }
+}
+
+/**
+ * §57's `opacity`, defaulted to 1 for a material that does not declare one —
+ * a structurally-typed double or a consumer's own material type, exactly as in
+ * {@link applyMaterialState}. A real `Material` always declares it, and rejects
+ * a non-finite value on every write (F14), so this multiplier cannot carry a
+ * `NaN` into `uniform4fv`.
+ */
 function opacityOf(material: ItemMaterial): number {
   return material.opacity ?? 1;
 }
 
 /**
+ * §57's `map` as this backend reads it (R-19) — the texture an unlit or lit
+ * material samples, or `null`.
+ *
+ * Read defensively, exactly as `applyMaterialState` reads the render state and
+ * for the same reason: a backend meets its materials through a *structural*
+ * contract, so a material double that predates the field — or a consumer's own
+ * material type — reports `undefined`, which has to mean "no texture" rather
+ * than leaking into `TextureCache.acquire`.
+ */
+function mapOf(material: {
+  map?: CacheableTexture | null;
+}): CacheableTexture | null {
+  return material.map ?? null;
+}
+
+/**
+ * Turns a texture a material points at into the GL texture to bind, whichever
+ * kind it is (R-4, 2026-08-07) — the one place in the draw path that knows
+ * there are two.
+ *
+ * An ordinary `Texture` is uploaded from its CPU-side texels by
+ * {@link TextureCache}. A {@link @four/render!RenderTargetTexture | render-target
+ * texture} has none — it *is* a framebuffer's colour attachment — so it resolves
+ * through {@link RenderTargetCache} instead, which allocates the framebuffer if
+ * this is the first the backend has heard of it. That is what makes sampling a
+ * target that has never been rendered into read as transparent black rather
+ * than fail.
+ *
+ * `null` means "do not bind this": a disposed resource, an allocation GL
+ * refused, or — the case only this function can see — a **feedback loop**, a
+ * material sampling the very target this frame is drawing into. Reading and
+ * writing one surface in a single pass is undefined behaviour on every backend,
+ * and undefined content is worse than a missing draw, so the draw is dropped
+ * exactly as a disposed texture's is (§83). Ping-pong between two targets to
+ * express what that draw was reaching for.
+ *
+ * The non-target path is one `isRenderTargetTexture` marker read away from what
+ * it was before, and issues the identical GL call — which is what keeps a scene
+ * that never renders to texture byte-identical at the GL boundary.
+ */
+function resolveTexture(
+  textures: TextureCache,
+  renderTargets: RenderTargetCache,
+  activeTarget: RenderTargetArgument | null,
+  texture: CacheableTexture,
+): GlTexture | null {
+  if (!isRenderTargetTexture(texture)) {
+    return textures.acquire(texture)?.texture ?? null;
+  }
+  const source = texture.renderTarget;
+  if (source === activeTarget) {
+    return null;
+  }
+  return renderTargets.acquire(source)?.texture ?? null;
+}
+
+/**
  * Restores the GL state a frame borrowed, issuing a call only for what it
  * actually changed — the mirror image of {@link applyMaterialState}.
+ *
+ * The blend function outlives the blend enable, so a frame that ended with a
+ * non-default mode has to put it back explicitly even though blending is being
+ * turned off in the same breath: that is `applyBlendState`'s `forceMode`, which
+ * replaces the hand-written `blendFunc` this function used to issue after
+ * passing a mode argument the helper ignored (F15, 2026-08-07).
  */
-function restoreGlState(gl: ParticleGlContext): void {
-  applyBlendState(gl, false, "normal");
-  applyDepthColorState(gl, true, true, true);
-  if (glState.blendMode !== "normal") {
-    // The blend function outlives the blend enable, so a frame that ended with
-    // a non-default mode has to put it back explicitly: the next frame's fixed
-    // state is "straight alpha" and nothing else re-issues it.
-    gl.blendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA);
-    glState.blendMode = "normal";
-  }
+function restoreGlState(gl: ParticleGlContext, state: GlState): void {
+  applyBlendState(gl, state, false, "normal", true);
+  applyDepthColorState(gl, state, true, true, true);
 }
 
 /**
@@ -569,10 +748,13 @@ function resolveRect(
  * `transparent: true` away from working, and `opacity` drives it without
  * touching the shared colour.
  *
- * The state is mirrored on the CPU (`glState`) and a call is issued only where
- * a draw *changes* something, so §57's defaults — which are exactly this
- * backend's previous fixed state — issue nothing at all: a scene authored
- * before the base existed produces the same GL sequence it always did.
+ * The state is mirrored on the CPU (one `GlState` **per renderer**, F13)
+ * and a call is issued only where a draw *changes* something, so §57's defaults
+ * — which are exactly this backend's previous fixed state — issue nothing at
+ * all: a scene authored before the base existed produces the same GL sequence
+ * it always did. A frame always leaves through the `finally` that restores what
+ * it borrowed, so the mirror cannot outlive its agreement with the context (see
+ * {@link WebglRenderer.render}).
  *
  * ## Four pipelines (§55, §36, §68; WP-3a.3, WP-9.3, lighting 2026-08-04)
  *
@@ -614,17 +796,50 @@ function resolveRect(
  * argument is written out in that module's header and in `@four/render`'s
  * `texture.ts`.
  *
+ * ## Render targets (§61, §48; R-4, 2026-08-07)
+ *
+ * `render`'s fourth argument draws the frame into an off-screen framebuffer
+ * instead of the canvas, and `RenderTarget.colorTexture` is then an ordinary
+ * material texture — which is the whole of render-to-texture. Three things are
+ * this backend's part of the shared contract stated on `Renderer.render`:
+ *
+ * - **Framebuffers are a cache, keyed and invalidated exactly as geometry and
+ *   textures are** (`gl-render-target.ts`), including through a context loss.
+ * - **The bind lives inside the frame's `try`/`finally`**, so a draw that
+ *   throws mid-pass cannot leave this renderer's framebuffer bound.
+ * - **A frame with no target issues no framebuffer call at all** — not a bind,
+ *   not an unbind. The on-screen GL sequence is byte-for-byte the one this
+ *   backend issued before render targets existed, which is the property the
+ *   pixel goldens and the recorded-sequence tests both pin.
+ *
+ * ## Statistics (§84; A-1, 2026-08-07)
+ *
+ * {@link WebglRenderer.statistics} is `null` by default and counts nothing.
+ * Assign a `RenderStatistics` record and this backend adds one entry per draw
+ * call it actually submits — `drawCalls`, `triangles` (per-instance count times
+ * instances, lines excluded), `instances` — accumulating across every `render`
+ * call until the record's owner clears it.
+ *
+ * The counters are integer increments *beside* the draw, never around it, and
+ * the field is read once per frame. Switching them on therefore adds, removes,
+ * and reorders nothing: the recorded-GL-sequence tests assert that a frame with
+ * statistics on issues the byte-identical call list of the same frame with them
+ * off, which is the property the pixel goldens rest on.
+ *
  * ## Context loss (§61)
  *
  * `webglcontextlost` is captured, defaulted-prevented (without which the
  * browser never restores), and turned into a `contextlost` event; GPU handles
  * are dropped without being deleted, because they are already invalid.
  * `render` then returns silently until `webglcontextrestored` arrives, at which
- * point all four programs and all three caches are rebuilt, the fixed state and
+ * point all four programs and all four caches are rebuilt, the fixed state and
  * the surface size are re-applied, capabilities are re-read, and
  * `contextrestored` is emitted — after the rebuild, so the first frame a listener triggers
  * already draws. Geometry and texture *content* re-uploads lazily from the
- * CPU-side sources the application still holds, on the next draw that needs it.
+ * CPU-side sources the application still holds, on the next draw that needs it,
+ * and so do the framebuffers of §61's "engine-owned GPU resources … render
+ * targets": the cache cannot know which targets the next frame will use, so
+ * each one is re-allocated by the pass that asks for it (R-4).
  *
  * ## Lifecycle
  *
@@ -634,7 +849,7 @@ function resolveRect(
  * `NullRenderer` does — disposal is the application's own doing, unlike a lost
  * context, and a silent no-op would hide the bug.
  */
-export class WebglRenderer implements Renderer {
+export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   /** The §6b channel required by `Renderer` — `contextlost`/`contextrestored`. */
   readonly events = new EventEmitter<RendererEventMap>();
 
@@ -655,11 +870,55 @@ export class WebglRenderer implements Renderer {
 
   #litProgram: LitProgram | null = null;
 
+  /**
+   * §70's full-screen effect pipeline (R-6), or `null` before initialization
+   * and while the context is lost.
+   *
+   * Compiled by {@link WebglRenderer.initialize} with the other four, never
+   * lazily: `renderEffect` runs inside an application's frame, and a compile
+   * there could throw for a driver reason the application cannot pre-empt —
+   * the same argument §61 makes about `render` (`gl-effect.ts` restates it).
+   * The cost of that choice is one program per renderer that never runs an
+   * effect — the same deal the lit and particle pipelines already offer a
+   * purely 2D application, and **measured** rather than assumed: 0.75 kB gzip
+   * per example bundle (0.42 kB for this pipeline and its two shaders, 0.33 kB
+   * for {@link WebglRenderer.renderEffect}), because nothing reachable from a
+   * class method can tree-shake. `@four/render`'s half — `effect-pass.ts` — is
+   * a separate side-effect-free module and does tree-shake out; grepping the
+   * example bundles confirms both halves of that sentence (R-6, 2026-08-07).
+   */
+  #effectProgram: EffectProgram | null = null;
+
   #geometries: GeometryCache | null = null;
 
   #textures: TextureCache | null = null;
 
+  #renderTargets: RenderTargetCache | null = null;
+
   #particleBatches: ParticleBatchCache | null = null;
+
+  /**
+   * This renderer's own §57 state mirror (F13) — see `GlState` for why it
+   * is per-instance rather than per-module, and {@link WebglRenderer.render}
+   * for the `finally` that keeps it and the context in step.
+   */
+  readonly #glState = createGlState();
+
+  /**
+   * §84's render counters, or `null` (the default) to count nothing — the
+   * optional `Renderer` capability (A-1, 2026-08-07; see
+   * `@four/render`'s `statistics.ts`).
+   *
+   * This backend accumulates one entry per *submitted* draw call: a draw
+   * skipped for a geometry it could not allocate, a texture the application
+   * disposed, a zero-particle system, or a feedback loop on the current render
+   * target never reaches a counter, because it never reached the GPU.
+   *
+   * Assign it between frames. {@link WebglRenderer.render} reads the field once
+   * per call, so a record assigned from inside a frame's own listeners applies
+   * from the next frame.
+   */
+  statistics: RenderStatistics | null = null;
 
   #contextLost = false;
 
@@ -691,8 +950,10 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = null;
     this.#particleProgram = null;
     this.#litProgram = null;
+    this.#effectProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
+    this.#renderTargets?.forget();
     this.#particleBatches?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
@@ -709,8 +970,10 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = SpriteProgram.create(gl);
     this.#particleProgram = ParticleProgram.create(gl);
     this.#litProgram = LitProgram.create(gl);
+    this.#effectProgram = EffectProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
+    this.#renderTargets = new RenderTargetCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
     this.#applyFixedState(gl);
     // Textures are re-uploaded lazily from the CPU-side sources their `Texture`
@@ -823,15 +1086,54 @@ export class WebglRenderer implements Renderer {
    * The interpolated path does not even need that pass, since it derives every
    * matrix itself.
    *
+   * ## Off-screen passes (§61, §48; R-4, 2026-08-07)
+   *
+   * With `target` present the frame is drawn into that target's framebuffer:
+   * bound as the first act of the frame's `try`, unbound in its `finally`, and
+   * never left bound for the next caller. Normalized viewport rectangles
+   * resolve against the *target's* size rather than the drawing buffer's, so a
+   * full-target view is the same `{ 0, 0, 1, 1, normalized }` it is on screen;
+   * unnormalized rectangles are target pixels, unscaled by the `resize`
+   * resolution, which the target does not have.
+   *
+   * The pass is **skipped entirely** — no bind, no clear, no draw — when the
+   * target is disposed, when GL will not allocate its framebuffer, or when the
+   * assembled framebuffer is not `FRAMEBUFFER_COMPLETE`. §61 forbids throwing
+   * from `render` for the asynchronous, driver-scheduled failures this is one
+   * of, and half-drawing into an incomplete framebuffer would turn every
+   * subsequent draw into an unread `GL_INVALID_FRAMEBUFFER_OPERATION`.
+   *
+   * A material whose texture is *this* target's own colour attachment is
+   * skipped for the duration of the pass (`resolveTexture`): sampling the
+   * surface being written is undefined on every backend.
+   *
+   * Without `target` — the on-screen path — **not one framebuffer call is
+   * issued**, so the GL sequence is byte-for-byte what it was before render
+   * targets existed.
+   *
    * Returns immediately and silently while the context is lost, and when
    * `views` is empty (which therefore also clears nothing) — §61 both times.
    * Throws only for programmer error: rendering before `initialize` or after
    * `dispose`.
+   *
+   * ## A throw costs one frame, not the renderer (F13, 2026-08-07)
+   *
+   * `render` itself raises nothing else, but the frame runs *application* code
+   * — a geometry or material accessor, a texture the application disposed
+   * mid-frame — and that can. The draw work is therefore wrapped in a
+   * `try`/`finally`: whatever escapes, the fixed GL state this frame borrowed
+   * is put back, the texture unit and the vertex array are unbound, and the
+   * §57 mirror ends where the next frame expects to find it. The exception is
+   * re-thrown unchanged; the *next* frame draws correctly. Before this, one
+   * transient exception desynced the mirror from the context permanently and
+   * silently, because every later frame asserted the defaults it had just
+   * stopped guaranteeing.
    */
   render(
     root: RenderRoot,
     views: readonly RenderView[],
     interpolation?: RenderInterpolationArgument,
+    target?: RenderTargetArgument | null,
   ): void {
     const gl = this.#requireContext("render");
     if (this.#contextLost || views.length === 0) {
@@ -849,6 +1151,7 @@ export class WebglRenderer implements Renderer {
     const litProgram = this.#litProgram;
     const geometries = this.#geometries;
     const textures = this.#textures;
+    const renderTargets = this.#renderTargets;
     const particleBatches = this.#particleBatches;
     if (
       program === null ||
@@ -857,221 +1160,515 @@ export class WebglRenderer implements Renderer {
       litProgram === null ||
       geometries === null ||
       textures === null ||
+      renderTargets === null ||
       particleBatches === null
     ) {
       return;
     }
 
-    const items =
-      interpolation === undefined
-        ? buildRenderList(root, renderList)
-        : buildInterpolatedRenderList(
-            root,
-            interpolation.poseBuffer,
-            interpolation.alpha,
-            renderList,
-          );
-
-    // The frame's lights (§68), collected only when something will be shaded
-    // by them: one `kind` comparison per item decides, so a scene with no lit
-    // materials adds nothing to its frame but this loop. Collected once per
-    // call, not per view — lights are frame state, like the render list.
-    let hasLitItems = false;
-    for (const item of items) {
-      if (item.kind === "lit") {
-        hasLitItems = true;
-        break;
+    // The off-screen surface, if this is an off-screen pass (R-4). Resolved
+    // *before* the frame's `try`, because `acquire` is a pure allocation with
+    // nothing to unwind and never throws (`gl-render-target.ts`): a target that
+    // is disposed, that GL would not allocate, or whose framebuffer is
+    // incomplete skips the whole frame here rather than half-drawing it. The
+    // *binding* is inside the envelope, where its `finally` can see it.
+    const activeTarget = target ?? null;
+    let targetRecord: RenderTargetRecord | null = null;
+    if (activeTarget !== null) {
+      targetRecord = renderTargets.acquire(activeTarget);
+      if (targetRecord === null) {
+        return;
       }
     }
-    if (hasLitItems) {
-      collectSceneLights(root, sceneLights);
+
+    // Normalized viewport rectangles resolve against the surface actually being
+    // drawn into: the drawing buffer on screen, the target's own size off
+    // screen. Read off the *record*, so the `viewport` call and the allocation
+    // agree even if the application resized the target after this call began.
+    const surfaceWidth = targetRecord?.width ?? this.#bufferWidth;
+    const surfaceHeight = targetRecord?.height ?? this.#bufferHeight;
+
+    // This renderer's own state mirror, and the two frame-scoped bindings the
+    // `finally` below has to see (F13, 2026-08-07).
+    const state = this.#glState;
+    // §84's counters, read once for the frame (A-1, 2026-08-07): `null` is the
+    // default and the whole of the no-statistics cost — one comparison per
+    // draw, no allocation, and not a single GL call added, removed, or
+    // reordered. Read *after* the early returns above, so a frame this backend
+    // declines to draw counts nothing.
+    const statistics = this.statistics;
+    // Whether a texture is bound to unit 0 — the sprite path binds one, and
+    // since R-19 so does an unlit or lit draw whose material carries a `map`,
+    // so a frame of particles and untextured geometry still has nothing to
+    // unbind at the end.
+    let textureBound = false;
+    // Whether `activeTexture` has selected the map unit this frame. The sprite
+    // path selects it on every switch *to* the sprite pipeline (unchanged); a
+    // mapped unlit or lit draw selects it once, on the first one — both target
+    // the same unit, so a frame that mixes them issues one call either way.
+    let mapUnitActive = false;
+
+    try {
+      // Inside the envelope on purpose (R-4): the `finally` below unbinds it,
+      // so a draw that throws mid-pass cannot leave this renderer's framebuffer
+      // bound for whatever touches the context next. On the on-screen path this
+      // issues no call at all — which is what keeps that path's GL sequence
+      // byte-identical to the one it issued before targets existed.
+      if (targetRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, targetRecord.framebuffer);
+      }
+
+      const items =
+        interpolation === undefined
+          ? buildRenderList(root, renderList)
+          : buildInterpolatedRenderList(
+              root,
+              interpolation.poseBuffer,
+              interpolation.alpha,
+              renderList,
+            );
+
+      // The frame's lights (§68), collected only when something will be shaded
+      // by them: one `kind` comparison per item decides, so a scene with no lit
+      // materials adds nothing to its frame but this loop. Collected once per
+      // call, not per view — lights are frame state, like the render list.
+      let hasLitItems = false;
+      for (const item of items) {
+        if (item.kind === "lit") {
+          hasLitItems = true;
+          break;
+        }
+      }
+      if (hasLitItems) {
+        collectSceneLights(root, sceneLights);
+      }
+
+      // The unlit pipeline is the frame's starting state, so a scene with no
+      // sprites issues exactly the GL sequence it issued before sprites existed.
+      program.use();
+      let activeKind: RenderItemKind = "unlit";
+      // The GL state mirror starts where `#applyFixedState` and GL's own defaults
+      // left it; every draw below moves it only where its material asks.
+      resetGlState(state);
+
+      for (const view of views) {
+        // §61's clears are masked by the depth and colour write state, so a view
+        // that follows a `depthWrite: false` or `colorWrite: false` draw would
+        // clear nothing at all. Put both back first; with §57's defaults this
+        // issues no call.
+        applyDepthColorState(gl, state, true, true, true);
+        resolveRect(view, surfaceWidth, surfaceHeight);
+        gl.scissor(rect.x, rect.y, rect.width, rect.height);
+        gl.viewport(rect.x, rect.y, rect.width, rect.height);
+
+        let mask = GL.DEPTH_BUFFER_BIT;
+        const clearColor = view.clearColor;
+        if (clearColor !== undefined) {
+          gl.clearColor(
+            clearColor[0],
+            clearColor[1],
+            clearColor[2],
+            clearColor[3],
+          );
+          mask |= GL.COLOR_BUFFER_BIT;
+        }
+        gl.clearDepth(1);
+        gl.clear(mask);
+
+        const camera = view.camera;
+        camera.updateViewMatrix();
+        viewProjection
+          .copy(camera.projectionMatrix)
+          .multiply(camera.viewMatrix);
+
+        // A uniform belongs to the program it was uploaded into, so the unlit
+        // pipeline has to be current before its view-projection is written — and
+        // the sprite pipeline needs its own copy, uploaded the first time it draws
+        // into this view and valid for the rest of it.
+        if (activeKind !== "unlit") {
+          program.use();
+          applyBlendState(gl, state, false, "normal");
+          activeKind = "unlit";
+        }
+        program.setViewProjection(viewProjection);
+        let spriteViewUploaded = false;
+        let particleViewUploaded = false;
+        let litViewUploaded = false;
+
+        for (const item of items) {
+          const record = geometries.acquire(item.geometry);
+          if (record === null) {
+            continue;
+          }
+
+          if (isParticlesItem(item)) {
+            // §36's whole system, one instanced draw (plan P9-3). The geometry
+            // record is the *shared unit quad* every particle item points at, so
+            // the corner stream is uploaded once for the application and this
+            // system's own vertex array is built on top of that buffer.
+            if (item.count === 0) {
+              continue;
+            }
+            const batch = particleBatches.acquire(item, record.positionBuffer);
+            if (batch === null) {
+              continue;
+            }
+            if (activeKind !== "particles") {
+              particleProgram.use();
+              activeKind = "particles";
+            }
+            // Particles are transparent by construction (§36's colour ramp) and
+            // carry no material to say otherwise, so they blend with the straight
+            // alpha function and draw with §57's default depth and colour state —
+            // see `gl-particles.ts` for the whole policy.
+            applyMaterialState(gl, state, undefined, true);
+            if (!particleViewUploaded) {
+              // The billboard offset happens between the view and the projection,
+              // so this pipeline takes the two matrices separately rather than
+              // the premultiplied `viewProjection` the other two use.
+              particleProgram.setProjection(camera.projectionMatrix);
+              particleProgram.setView(camera.viewMatrix);
+              particleViewUploaded = true;
+            }
+            particleProgram.setModel(item.worldMatrix);
+            particleBatches.upload(batch, item);
+            gl.bindVertexArray(batch.vertexArray);
+            gl.drawArraysInstanced(record.mode, 0, record.count, item.count);
+            if (statistics !== null) {
+              // One draw call, `item.count` instances of the shared quad — the
+              // §36 system's whole per-frame GPU cost, and the one place in
+              // this backend where `instances` exceeds `drawCalls`.
+              countDraw(statistics, record.mode, record.count, item.count);
+            }
+            continue;
+          }
+
+          if (isSpriteItem(item)) {
+            const material = item.material;
+            const texture = resolveTexture(
+              textures,
+              renderTargets,
+              activeTarget,
+              material.texture,
+            );
+            if (texture === null) {
+              continue;
+            }
+            if (activeKind !== "sprite") {
+              spriteProgram.use();
+              spriteProgram.setSampler(SPRITE_TEXTURE_UNIT);
+              gl.activeTexture(GL.TEXTURE0);
+              activeKind = "sprite";
+            }
+            // §55's pipeline blends by construction — it did before §57's
+            // `transparent` flag existed, and a textured quad with an alpha
+            // channel has to composite whatever the flag says — so `alwaysBlend`
+            // is `true` here. Everything else the material declares (blend mode,
+            // depth test, depth write, colour write) applies as usual.
+            applyMaterialState(gl, state, material, true);
+            if (!spriteViewUploaded) {
+              spriteProgram.setViewProjection(viewProjection);
+              spriteViewUploaded = true;
+            }
+            // The quad's local rectangle, from which the vertex stage derives uv.
+            // `computeBounds()` is cached against the geometry's version, so this
+            // is a version comparison per draw, not a pass over the vertices.
+            const bounds = item.geometry.computeBounds();
+            spriteProgram.setModel(item.worldMatrix);
+            spriteProgram.setQuad(
+              bounds.min.x,
+              bounds.min.y,
+              bounds.max.x - bounds.min.x,
+              bounds.max.y - bounds.min.y,
+            );
+            spriteProgram.setTint(material.tint, opacityOf(material));
+            gl.bindTexture(GL.TEXTURE_2D, texture);
+            textureBound = true;
+          } else if (isLitItem(item)) {
+            // The Lambert-lit pipeline (§68): depth-tested exactly like unlit,
+            // and opaque unless its material says otherwise (§57) — which, at
+            // the default `transparent: false`, is every material that predates
+            // the flag.
+            if (activeKind !== "lit") {
+              litProgram.use();
+              activeKind = "lit";
+            }
+            applyMaterialState(gl, state, item.material, false);
+            if (!litViewUploaded) {
+              // The view-projection and the frame's lights, once per view —
+              // uniforms live in the program object, so they hold for every lit
+              // draw into this view even if other pipelines run in between. The
+              // lights were collected before the view loop; a frame with no
+              // directional light uploads black `lightColor`, which zeroes the
+              // Lambert term in the shader (no variants, no branch here).
+              litProgram.setViewProjection(viewProjection);
+              litProgram.setAmbientLight(sceneLights.ambientColor);
+              litProgram.setDirectionalLight(
+                sceneLights.direction,
+                sceneLights.directionalColor,
+              );
+              litViewUploaded = true;
+            }
+            // §57's `map` (R-19): an albedo texture, bound and switched on for
+            // this draw and switched off again by the next draw that has none.
+            // A material with no map — every material authored before R-19 —
+            // acquires nothing, binds nothing, and uploads nothing.
+            const litMap = mapOf(item.material);
+            const litTexture =
+              litMap === null
+                ? null
+                : resolveTexture(textures, renderTargets, activeTarget, litMap);
+            if (litTexture !== null) {
+              if (!mapUnitActive) {
+                gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                mapUnitActive = true;
+              }
+              gl.bindTexture(GL.TEXTURE_2D, litTexture);
+              textureBound = true;
+            }
+            litProgram.setFeatures(litTexture !== null);
+            litProgram.setModel(item.worldMatrix);
+            litProgram.setColor(item.material.color, opacityOf(item.material));
+          } else {
+            if (activeKind !== "unlit") {
+              program.use();
+              activeKind = "unlit";
+            }
+            applyMaterialState(gl, state, item.material, false);
+            const map = mapOf(item.material);
+            const texture =
+              map === null
+                ? null
+                : resolveTexture(textures, renderTargets, activeTarget, map);
+            if (texture !== null) {
+              if (!mapUnitActive) {
+                gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                mapUnitActive = true;
+              }
+              gl.bindTexture(GL.TEXTURE_2D, texture);
+              textureBound = true;
+            }
+            // §53's per-vertex colours (R-19) reach the screen here, and with
+            // them §113's debug-draw overlay (R-35): a `"lines"` geometry of
+            // positions plus colours is one draw call, not one per segment.
+            program.setFeatures(
+              texture !== null,
+              item.material.vertexColors === true,
+            );
+            program.setModel(item.worldMatrix);
+            program.setColor(item.material.color, opacityOf(item.material));
+          }
+
+          gl.bindVertexArray(record.vertexArray);
+          if (record.indexType === null) {
+            gl.drawArrays(record.mode, 0, record.count);
+          } else {
+            gl.drawElements(record.mode, record.count, record.indexType, 0);
+          }
+          if (statistics !== null) {
+            // Sprite, lit, and unlit all land here: one draw call, one
+            // instance, `record.count` elements either way (§84).
+            countDraw(statistics, record.mode, record.count, 1);
+          }
+        }
+      }
+    } finally {
+      // Restore the fixed state the frame borrowed, and leave nothing bound:
+      // the next thing to touch this context may not be this renderer (§61
+      // allows several renderers over one application).
+      //
+      // In a `finally` since F13 (2026-08-07). A draw can throw for reasons
+      // that are entirely the application's — a disposed texture, a geometry
+      // whose accessor raises — and before this the frame simply abandoned
+      // whatever GL state it had borrowed. The mirror above then disagreed
+      // with the context for the rest of the process: the next frame *asserted*
+      // the defaults, so the skip logic never re-issued the calls that would
+      // have fixed them, and an opaque scene drew blended (or masked, or
+      // depth-testless) with nothing to point at. Restoring here makes a
+      // mid-frame throw cost exactly the frame it happened in.
+      restoreGlState(gl, state);
+      if (textureBound) {
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      gl.bindVertexArray(null);
+      // Back to the default drawing buffer (R-4). Same argument as the two
+      // unbinds above, one step stronger: a framebuffer left bound by a frame
+      // that threw would send *every later frame* — this renderer's on-screen
+      // ones included — into an off-screen surface nobody is looking at, with
+      // nothing on screen and no error anywhere to explain it.
+      if (targetRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      }
+    }
+  }
+
+  /**
+   * Draws one §70 full-screen effect (R-6, 2026-08-07) — `pass.source`'s
+   * colour attachment over the whole of `pass.target`, or of the drawing
+   * buffer, through `pass.effect`.
+   *
+   * The normative contract is on `@four/render`'s `Renderer.renderEffect`;
+   * this is what the WebGL 2 backend does with it, and the two readings that
+   * sentence left open.
+   *
+   * ## A separate entry point, and why `render` was not touched
+   *
+   * An effect is not a scene: it has no root, no views, no camera, no render
+   * list, and no interpolation, and it draws a triangle that exists only in
+   * the vertex stage. Routing it through `render` would have meant a fifth
+   * `RenderItemKind`, a synthetic node, and a branch inside the draw loop —
+   * and the loop is exactly where R-4, R-5 and F13 each had to re-prove that
+   * an application which uses none of those features still emits the identical
+   * GL call sequence. So §70 got its own method, and the property is preserved
+   * by construction rather than by proof: **`render` is byte-for-byte the
+   * function it was before this method existed.** The one thing R-6 adds to a
+   * frame that runs no effect is a fifth `useProgram`-able object compiled at
+   * initialization, which issues no call after that.
+   *
+   * ## What is skipped rather than thrown (§61, §83)
+   *
+   * Everything, on the same terms `render` uses — a lost context, a source or
+   * destination the application disposed, a framebuffer GL would not allocate,
+   * an effect kind this build does not implement, and a **feedback loop**: a
+   * pass whose destination is the very surface it samples. That last one is
+   * R-4's rule, applied to the pass instead of to a material's `map`; reading
+   * and writing one surface in a single draw is undefined behaviour on every
+   * backend, and `RenderGraph.validate` reports it statically as `"feedback"`
+   * so the mistake is normally caught at setup rather than here.
+   *
+   * ## State, and the F13 envelope
+   *
+   * The effect borrows four things — the framebuffer binding, the scissor and
+   * viewport rectangles, the depth test, and unit 0's texture binding — inside
+   * a `try`/`finally`, so whatever escapes leaves this renderer's §57 mirror
+   * and the context in the state the next frame expects (F13, 2026-08-07).
+   * The mirror is deliberately **not** reset on entry: `applyDepthColorState`
+   * moves only what the effect needs and the `finally` puts back exactly that,
+   * which is strictly more conservative than re-asserting a state this method
+   * did not establish.
+   *
+   * The scissor and viewport rectangles are *not* restored, exactly as `render`
+   * does not restore them: both are written unconditionally by the next view of
+   * the next frame, and every path that reads them writes them first.
+   */
+  renderEffect(pass: EffectRenderPass): void {
+    const gl = this.#requireContext("renderEffect");
+    if (this.#contextLost) {
+      return;
     }
 
-    // The unlit pipeline is the frame's starting state, so a scene with no
-    // sprites issues exactly the GL sequence it issued before sprites existed.
-    program.use();
-    let activeKind: RenderItemKind = "unlit";
-    // The GL state mirror starts where `#applyFixedState` and GL's own defaults
-    // left it; every draw below moves it only where its material asks.
-    resetGlState();
-    // Whether a texture is bound to unit 0 — only the sprite path binds one, so
-    // a frame of particles and opaque geometry has nothing to unbind at the end.
+    // Unreachable given the class invariant, exactly as in `render`; the
+    // fields are nullable so context loss can drop them, and §61 forbids
+    // throwing here, so the effect is skipped if it is ever broken.
+    const effectProgram = this.#effectProgram;
+    const renderTargets = this.#renderTargets;
+    if (effectProgram === null || renderTargets === null) {
+      return;
+    }
+
+    // Read structurally, like every other argument this backend meets: the
+    // marker guard rather than the type, so a caller that bypassed
+    // `validateEffectRenderPass` hands over a plain `Texture` and gets a
+    // skipped effect instead of a black screen with no explanation.
+    const source = pass.source;
+    if (!isRenderTargetTexture(source)) {
+      return;
+    }
+    const sourceTarget = source.renderTarget;
+    const destination = pass.target ?? null;
+    if (destination === sourceTarget) {
+      return;
+    }
+
+    // Resolved before the envelope, as `render` resolves its target and for
+    // the same reason: `acquire` is a pure allocation with nothing to unwind
+    // and never throws, so a disposed or unallocatable surface skips the
+    // effect here rather than half-drawing it.
+    const sourceRecord = renderTargets.acquire(sourceTarget);
+    if (sourceRecord === null) {
+      return;
+    }
+    let destinationRecord: RenderTargetRecord | null = null;
+    if (destination !== null) {
+      destinationRecord = renderTargets.acquire(destination);
+      if (destinationRecord === null) {
+        return;
+      }
+    }
+
+    // An effect kind this build does not implement is skipped, never quietly
+    // copied: `ScreenEffect` is a closed union precisely so that a staged §70
+    // effect is a compile error, and a value that arrived from JSON or from
+    // JavaScript must not become a different picture than the one asked for.
+    const effect = pass.effect;
+    if (effect.kind !== "copy" && effect.kind !== "grade") {
+      return;
+    }
+
+    const width = destinationRecord?.width ?? this.#bufferWidth;
+    const height = destinationRecord?.height ?? this.#bufferHeight;
+    const state = this.#glState;
+    const statistics = this.statistics;
     let textureBound = false;
 
-    for (const view of views) {
-      // §61's clears are masked by the depth and colour write state, so a view
-      // that follows a `depthWrite: false` or `colorWrite: false` draw would
-      // clear nothing at all. Put both back first; with §57's defaults this
-      // issues no call.
-      applyDepthColorState(gl, true, true, true);
-      resolveRect(view, this.#bufferWidth, this.#bufferHeight);
-      gl.scissor(rect.x, rect.y, rect.width, rect.height);
-      gl.viewport(rect.x, rect.y, rect.width, rect.height);
+    try {
+      if (destinationRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, destinationRecord.framebuffer);
+      }
+      // The whole destination surface: §70's effects are full-screen, and a
+      // per-viewport rectangle is staged (`@four/render`'s `effect-pass.ts`
+      // says what it would take). `SCISSOR_TEST` is on for this renderer's
+      // lifetime, so the rectangle has to be written or the previous view's
+      // would clip the blit.
+      gl.scissor(0, 0, width, height);
+      gl.viewport(0, 0, width, height);
 
-      let mask = GL.DEPTH_BUFFER_BIT;
-      const clearColor = view.clearColor;
-      if (clearColor !== undefined) {
-        gl.clearColor(
-          clearColor[0],
-          clearColor[1],
-          clearColor[2],
-          clearColor[3],
+      // An effect *replaces* its destination: no blending, so a chain is
+      // predictable, and no depth test, so the triangle is never rejected by
+      // whatever depth the destination happens to hold. Disabling the depth
+      // test also disables depth *writes* in GL, so `depthMask` needs no
+      // change and none is issued.
+      applyBlendState(gl, state, false, "normal");
+      applyDepthColorState(gl, state, false, true, true);
+
+      effectProgram.use();
+      effectProgram.setSampler(EFFECT_TEXTURE_UNIT);
+      gl.activeTexture(GL.TEXTURE0 + EFFECT_TEXTURE_UNIT);
+      gl.bindTexture(GL.TEXTURE_2D, sourceRecord.texture);
+      textureBound = true;
+
+      if (effect.kind === "grade") {
+        effectProgram.setGrade(
+          effect.exposure ?? COLOR_GRADE_DEFAULTS.exposure,
+          effect.contrast ?? COLOR_GRADE_DEFAULTS.contrast,
+          effect.saturation ?? COLOR_GRADE_DEFAULTS.saturation,
         );
-        mask |= GL.COLOR_BUFFER_BIT;
+      } else {
+        effectProgram.setCopy();
       }
-      gl.clearDepth(1);
-      gl.clear(mask);
 
-      const camera = view.camera;
-      camera.updateViewMatrix();
-      viewProjection.copy(camera.projectionMatrix).multiply(camera.viewMatrix);
-
-      // A uniform belongs to the program it was uploaded into, so the unlit
-      // pipeline has to be current before its view-projection is written — and
-      // the sprite pipeline needs its own copy, uploaded the first time it draws
-      // into this view and valid for the rest of it.
-      if (activeKind !== "unlit") {
-        program.use();
-        applyBlendState(gl, false, "normal");
-        activeKind = "unlit";
+      // No vertex data at all — the three corners come from `gl_VertexID`
+      // (`gl-effect.ts`). The default vertex array is bound first because an
+      // unrelated one left bound by another consumer of this context can carry
+      // enabled attribute arrays, which WebGL validates against the draw count
+      // whether the program reads them or not.
+      gl.bindVertexArray(null);
+      gl.drawArrays(GL.TRIANGLES, 0, EFFECT_VERTEX_COUNT);
+      if (statistics !== null) {
+        // One draw call, one instance, one triangle (§84) — counted here for
+        // the same reason a scene draw is: what reached the GPU, not what was
+        // asked for.
+        countDraw(statistics, GL.TRIANGLES, EFFECT_VERTEX_COUNT, 1);
       }
-      program.setViewProjection(viewProjection);
-      let spriteViewUploaded = false;
-      let particleViewUploaded = false;
-      let litViewUploaded = false;
-
-      for (const item of items) {
-        const record = geometries.acquire(item.geometry);
-        if (record === null) {
-          continue;
-        }
-
-        if (isParticlesItem(item)) {
-          // §36's whole system, one instanced draw (plan P9-3). The geometry
-          // record is the *shared unit quad* every particle item points at, so
-          // the corner stream is uploaded once for the application and this
-          // system's own vertex array is built on top of that buffer.
-          if (item.count === 0) {
-            continue;
-          }
-          const batch = particleBatches.acquire(item, record.positionBuffer);
-          if (batch === null) {
-            continue;
-          }
-          if (activeKind !== "particles") {
-            particleProgram.use();
-            activeKind = "particles";
-          }
-          // Particles are transparent by construction (§36's colour ramp) and
-          // carry no material to say otherwise, so they blend with the straight
-          // alpha function and draw with §57's default depth and colour state —
-          // see `gl-particles.ts` for the whole policy.
-          applyMaterialState(gl, undefined, true);
-          if (!particleViewUploaded) {
-            // The billboard offset happens between the view and the projection,
-            // so this pipeline takes the two matrices separately rather than
-            // the premultiplied `viewProjection` the other two use.
-            particleProgram.setProjection(camera.projectionMatrix);
-            particleProgram.setView(camera.viewMatrix);
-            particleViewUploaded = true;
-          }
-          particleProgram.setModel(item.worldMatrix);
-          particleBatches.upload(batch, item);
-          gl.bindVertexArray(batch.vertexArray);
-          gl.drawArraysInstanced(record.mode, 0, record.count, item.count);
-          continue;
-        }
-
-        if (isSpriteItem(item)) {
-          const material = item.material;
-          const texture = textures.acquire(material.texture);
-          if (texture === null) {
-            continue;
-          }
-          if (activeKind !== "sprite") {
-            spriteProgram.use();
-            spriteProgram.setSampler(SPRITE_TEXTURE_UNIT);
-            gl.activeTexture(GL.TEXTURE0);
-            activeKind = "sprite";
-          }
-          // §55's pipeline blends by construction — it did before §57's
-          // `transparent` flag existed, and a textured quad with an alpha
-          // channel has to composite whatever the flag says — so `alwaysBlend`
-          // is `true` here. Everything else the material declares (blend mode,
-          // depth test, depth write, colour write) applies as usual.
-          applyMaterialState(gl, material, true);
-          if (!spriteViewUploaded) {
-            spriteProgram.setViewProjection(viewProjection);
-            spriteViewUploaded = true;
-          }
-          // The quad's local rectangle, from which the vertex stage derives uv.
-          // `computeBounds()` is cached against the geometry's version, so this
-          // is a version comparison per draw, not a pass over the vertices.
-          const bounds = item.geometry.computeBounds();
-          spriteProgram.setModel(item.worldMatrix);
-          spriteProgram.setQuad(
-            bounds.min.x,
-            bounds.min.y,
-            bounds.max.x - bounds.min.x,
-            bounds.max.y - bounds.min.y,
-          );
-          spriteProgram.setTint(material.tint, opacityOf(material));
-          gl.bindTexture(GL.TEXTURE_2D, texture.texture);
-          textureBound = true;
-        } else if (isLitItem(item)) {
-          // The Lambert-lit pipeline (§68): depth-tested exactly like unlit,
-          // and opaque unless its material says otherwise (§57) — which, at
-          // the default `transparent: false`, is every material that predates
-          // the flag.
-          if (activeKind !== "lit") {
-            litProgram.use();
-            activeKind = "lit";
-          }
-          applyMaterialState(gl, item.material, false);
-          if (!litViewUploaded) {
-            // The view-projection and the frame's lights, once per view —
-            // uniforms live in the program object, so they hold for every lit
-            // draw into this view even if other pipelines run in between. The
-            // lights were collected before the view loop; a frame with no
-            // directional light uploads black `lightColor`, which zeroes the
-            // Lambert term in the shader (no variants, no branch here).
-            litProgram.setViewProjection(viewProjection);
-            litProgram.setAmbientLight(sceneLights.ambientColor);
-            litProgram.setDirectionalLight(
-              sceneLights.direction,
-              sceneLights.directionalColor,
-            );
-            litViewUploaded = true;
-          }
-          litProgram.setModel(item.worldMatrix);
-          litProgram.setColor(item.material.color, opacityOf(item.material));
-        } else {
-          if (activeKind !== "unlit") {
-            program.use();
-            activeKind = "unlit";
-          }
-          applyMaterialState(gl, item.material, false);
-          program.setModel(item.worldMatrix);
-          program.setColor(item.material.color, opacityOf(item.material));
-        }
-
-        gl.bindVertexArray(record.vertexArray);
-        if (record.indexType === null) {
-          gl.drawArrays(record.mode, 0, record.count);
-        } else {
-          gl.drawElements(record.mode, record.count, record.indexType, 0);
-        }
+    } finally {
+      restoreGlState(gl, state);
+      if (textureBound) {
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      if (destinationRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
       }
     }
-
-    // Restore the fixed state the frame borrowed, and leave nothing bound: the
-    // next thing to touch this context may not be this renderer (§61 allows
-    // several renderers over one application).
-    restoreGlState(gl);
-    if (textureBound) {
-      gl.bindTexture(GL.TEXTURE_2D, null);
-    }
-    gl.bindVertexArray(null);
   }
 
   /**
@@ -1124,8 +1721,10 @@ export class WebglRenderer implements Renderer {
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
       this.#litProgram?.dispose();
+      this.#effectProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
+      this.#renderTargets?.dispose();
       this.#particleBatches?.dispose();
     }
 
@@ -1133,8 +1732,10 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = null;
     this.#particleProgram = null;
     this.#litProgram = null;
+    this.#effectProgram = null;
     this.#geometries = null;
     this.#textures = null;
+    this.#renderTargets = null;
     this.#particleBatches = null;
     this.#gl = null;
     this.#canvas = null;
@@ -1171,7 +1772,7 @@ export class WebglRenderer implements Renderer {
       );
     }
 
-    // All four programs are built before anything is stored, so a shader
+    // All five programs are built before anything is stored, so a shader
     // failure leaves the renderer uninitialized rather than half-initialized —
     // and each failure disposes the ones already built.
     const program = UnlitProgram.create(gl);
@@ -1199,6 +1800,19 @@ export class WebglRenderer implements Renderer {
       program.dispose();
       throw error;
     }
+    // §70's effect pipeline, compiled here rather than on first use (R-6):
+    // `renderEffect` runs inside a frame, and §61's no-throw rule applies to
+    // it for the same reason it applies to `render` — see `#effectProgram`.
+    let effectProgram: EffectProgram;
+    try {
+      effectProgram = EffectProgram.create(gl);
+    } catch (error: unknown) {
+      litProgram.dispose();
+      particleProgram.dispose();
+      spriteProgram.dispose();
+      program.dispose();
+      throw error;
+    }
 
     this.#canvas = canvas;
     this.#gl = gl;
@@ -1206,8 +1820,10 @@ export class WebglRenderer implements Renderer {
     this.#spriteProgram = spriteProgram;
     this.#particleProgram = particleProgram;
     this.#litProgram = litProgram;
+    this.#effectProgram = effectProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
+    this.#renderTargets = new RenderTargetCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
     this.#capabilities = readCapabilities(gl);
     this.#applyFixedState(gl);

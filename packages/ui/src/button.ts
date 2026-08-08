@@ -27,6 +27,12 @@
  * A button is {@link UIWidget.focusable} by default (a panel is not) — it is a
  * control, and §75 asks for focus management over controls.
  *
+ * It is also the base of every §73 control whose gesture *is* a click:
+ * `Toggle`, `Checkbox`, and `RadioButton` are buttons that do something to
+ * themselves on the way through {@link Button.willActivate} (2026-08-07,
+ * A-12). `Slider` is deliberately not one — dragging a value is not a click,
+ * and a slider emits `uivaluechange`, never `uiactivate`.
+ *
  * ## Activation is exactly one event per click
  *
  * The `click` @four/input synthesizes is already the right predicate: a press
@@ -39,23 +45,68 @@
  * Capture → Target → Bubble), so a click on the label inside a button activates
  * the button — once, because the event travels one path.
  *
- * ## Keyboard activation (staged, 2026-08-02, P11-3)
+ * ## Keyboard activation (2026-08-07, A-13)
  *
- * §75 requires keyboard navigation and activation, and `@four/input` ships **no
- * keyboard source at all** — §72 lists keyboard events and none are
- * implemented, so there is nothing here to listen to and inventing key codes in
- * a UI package would be guessing at an input API that does not exist yet. What
- * ships instead is the half that is real: {@link Button.activate} is public and
- * takes its source, so the packet that adds a keyboard layer calls
- * `button.activate("programmatic")` on Enter or Space and every existing
- * listener works unchanged. Focus — the other half of keyboard activation —
- * already works (see `UIWidget.focus`). Recorded in `UI_STAGED`.
+ * §75's other activation path, staged from 2026-08-02 until `@four/input`
+ * gained the key source (A-10) that was its only blocker: **Enter or Space on
+ * the focused button emits the same `uiactivate`**, with
+ * `source: "keyboard"`. It is one listener, next to the click listener it
+ * mirrors, and it goes through the same public {@link Button.activate} the
+ * staging note promised a keyboard layer would call.
+ *
+ * Four decisions in it, each the DOM's:
+ *
+ * - **`event.target === this`.** Key events bubble (§72), so an ancestor button
+ *   must not activate on a keystroke aimed at a focused descendant — the same
+ *   target-scoping `UIWidget` applies to `pointerdown`/`pointerup`. Since
+ *   `KeyboardInput` routes to the focused node, "the target" *is* "the focused
+ *   control" in every ordinary wiring.
+ * - **Repeats are ignored.** Holding Enter fires a stream of `keydown`s with
+ *   `repeat: true`; a button that activated on each would fire dozens of times
+ *   for one press, against this class's "exactly one event per activation
+ *   gesture" contract. Traversal honours repeats (holding Tab keeps walking);
+ *   activation does not.
+ * - **Chords are ignored.** Control-Enter, Alt-Space, and Command-Enter mean
+ *   something to the host or the application, not to a button. Shift is not in
+ *   that list: Shift-Enter still activates, as it does on a DOM button.
+ * - **The default is suppressed when — and only when — the keystroke was
+ *   consumed**, so Space does not also scroll the host page after it activated
+ *   a button, and *does* scroll it when the button refused (2026-08-07: the
+ *   suppression used to run before {@link Button.activate} and therefore also
+ *   swallowed the key for a disabled or disposed button, which emits nothing;
+ *   a control that does nothing must not eat the host's key).
+ *
+ * Both keys act on `keydown`. The DOM distinguishes them (Enter activates on
+ * key-down, Space on key-up, so a Space can be aborted by dragging off), and
+ * this MVP does not: the abort gesture needs a pressed-by-keyboard state that
+ * nothing else here has, and firing both on the same edge is the honest simple
+ * version. Recorded as the deviation it is rather than mimicked halfway.
  */
 
-import type { ScenePointerEvent } from "@four/input";
+import type { ScenePointerEvent, SceneKeyEvent } from "@four/input";
 
 import { Panel, type PanelOptions } from "./panel.js";
 import type { WidgetActivationSource } from "./widget.js";
+
+/**
+ * Whether `event` is a §75 activation keystroke: Enter or Space, un-chorded and
+ * not auto-repeated.
+ *
+ * Space is matched on `key === " "` (its character) *and* on `code ===
+ * "Space"` (its physical key), because a keyboard layout that puts something
+ * else on the space bar is still a space bar, and because a source that
+ * normalizes only one of the two fields should not silently lose the key.
+ */
+function isActivationKey(event: SceneKeyEvent): boolean {
+  if (event.repeat) {
+    return false;
+  }
+  const modifiers = event.modifiers;
+  if (modifiers.alt || modifiers.ctrl || modifiers.meta) {
+    return false;
+  }
+  return event.key === "Enter" || event.key === " " || event.code === "Space";
+}
 
 /** Construction options for a {@link Button}. */
 export type ButtonOptions = PanelOptions;
@@ -72,6 +123,18 @@ export class Button extends Panel {
         this.activate("pointer", event);
       }),
     );
+    // §75's keyboard activation — see this module's header for each guard.
+    // `interactive` is not consulted: it governs pointers, and a control the
+    // mouse cannot reach is exactly the one a keyboard user still needs.
+    this.addSubscription(
+      this.on("keydown", (event) => {
+        if (event.target !== this || !isActivationKey(event)) return;
+        // Suppress the platform default exactly when the keystroke was
+        // consumed — `activate` returns false for a disabled, disposed, or
+        // disabled-by-`enabled` button, which emitted nothing.
+        if (this.activate("keyboard")) event.preventDefault();
+      }),
+    );
   }
 
   /**
@@ -80,17 +143,39 @@ export class Button extends Panel {
    * Refused — returning `false`, emitting nothing — when the button is
    * disposed, {@link UIWidget.disabled}, or `enabled = false`. `interactive` is
    * deliberately **not** checked: it governs whether *pointers* reach the
-   * widget, and a programmatic activation is not a pointer (the click listener
-   * checks it before calling in).
+   * widget, and neither a keyboard nor a programmatic activation is a pointer
+   * (the click listener checks it before calling in).
    *
-   * Public so a future keyboard layer can drive it — see this module's header.
+   * Public, and it stayed public: the keyboard layer this module's header
+   * describes calls it with `"keyboard"`, and an application drives it with the
+   * default `"programmatic"` — one path, one event, three sources.
    */
   activate(
     source: WidgetActivationSource = "programmatic",
     pointerEvent: ScenePointerEvent | null = null,
   ): boolean {
     if (this.disposed || this.disabled || !this.enabled) return false;
+    this.willActivate();
     this.emit("uiactivate", { widget: this, source, pointerEvent });
     return true;
+  }
+
+  /**
+   * Runs after this activation is accepted and **before** `uiactivate` is
+   * emitted; a no-op for a plain button (2026-08-07, A-12).
+   *
+   * The seam a control whose activation *means* something overrides — a
+   * `Toggle` flips its checkedness here, a `RadioButton` checks itself — so
+   * that a `uiactivate` listener reads the state the activation produced rather
+   * than the state it replaced. That is the DOM's order too: a checkbox's
+   * checkedness is already updated when the click handler runs.
+   *
+   * A hook rather than an `activate()` override so a subclass cannot get the
+   * refusal guards subtly wrong: whatever runs here has already passed
+   * "not disposed, not disabled, enabled", and a refused activation changes
+   * nothing at all.
+   */
+  protected willActivate(): void {
+    // A plain button's activation is the event and nothing else.
   }
 }

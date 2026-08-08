@@ -55,6 +55,16 @@
  *   backend stateless about time, lets one renderer serve two applications, and
  *   keeps the non-interpolated path (an editor preview, a single-step
  *   screenshot) a matter of omitting an argument (decision, WP-3.6).
+ * - **`render` takes a fourth, optional {@link @four/render!RenderTarget | RenderTarget}
+ *   argument** (R-4, 2026-08-07). §48 puts the target on the *viewport*
+ *   (`Viewport.renderTarget`), which is where it belongs and where it will
+ *   land; `Viewport` is `@four/scene`'s type and R-4's file set did not include
+ *   that package, so the minimal tier routes the target through the render call
+ *   instead. The two are compatible rather than competing: a per-view target is
+ *   a loop around this argument, so the packet that adds the field implements
+ *   it by calling `render` once per target group and this parameter keeps
+ *   working for the single-target case (deviation from R-4's closure plan,
+ *   recorded here and in `render-target.ts`).
  *
  * ## Interface, not base class (§6b composition)
  *
@@ -76,6 +86,10 @@
 import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
+
+import type { EffectRenderPass } from "./effect-pass.js";
+import type { RenderTarget } from "./render-target.js";
+import type { RenderStatistics } from "./statistics.js";
 
 /**
  * Which backend an implementation drives (§62).
@@ -272,21 +286,29 @@ export interface RenderInterpolation {
  *
  * ## Deferred §61 members (typed TODO)
  *
- * These are part of §61 and are **not** part of this interface yet, because
- * every one of them names a type this monorepo has not defined. They are added
- * by the packets that define those types:
+ * These are part of §61 and are **not** part of this interface. The list is
+ * shorter than it was — {@link @four/render!RenderTarget | RenderTarget} and
+ * {@link @four/render!Texture | Texture} both exist now — but the two
+ * *factories* stay deferred **by decision, not by absence** (R-4, 2026-08-07),
+ * and `readPixels` still names a type this monorepo does not have:
  *
  * ```ts
  * createTexture(source: TextureSource): Texture;
- * // needs Texture/TextureSource — §55 (sprite and raster system),
- * // §58 (paints, fills, strokes), §60a (color-space metadata).
- *
  * createRenderTarget(options: RenderTargetOptions): RenderTarget;
- * // needs RenderTarget — §48 (Viewport.renderTarget), §63 (render graph).
+ * // Both types exist. A renderer-*owned* resource, though, cannot be built
+ * // before a renderer, has to be built once per renderer, and has to be
+ * // re-created by hand after a §61 context loss. `GeometryCache` and
+ * // `TextureCache` in @four/render-webgl are the standing proof that the
+ * // alternative works: the resource is a CPU-side descriptor with an id and a
+ * // version, GPU residency is a backend cache, and a context loss is handled
+ * // by dropping that cache. `texture.ts` and `render-target.ts` each carry the
+ * // full argument on the class it concerns. These land with the tier that
+ * // genuinely needs renderer-owned resources — compressed or GPU-only
+ * // formats, which have no CPU-side description at all.
  *
  * readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
- * // needs RenderTarget plus Rectangle2 — §63, and §92's visual regression
- * // tests are its first consumer. Optional in §61 and stays optional.
+ * // needs `Rectangle2`, which `@four/math` does not define; §92's visual
+ * // regression tier is its first consumer. Optional in §61, stays optional.
  * ```
  */
 export interface Renderer extends Disposable {
@@ -310,6 +332,36 @@ export interface Renderer extends Disposable {
    * ```
    */
   readonly events: EventEmitter<RendererEventMap>;
+
+  /**
+   * Where this backend accumulates §84's `drawCalls`, `triangles`, and
+   * `instances`, or `null` to count nothing (A-1, 2026-08-07).
+   *
+   * **Optional, and its presence is the capability.** §61's interface says
+   * nothing about statistics, and §84 asks the *application* for the counters —
+   * but only a backend knows what it actually submitted, so the numbers have to
+   * originate here. A backend that counts declares the member (the WebGL 2
+   * backend does); one that cannot omits it, and
+   * {@link supportsRenderStatistics} tells them apart so an application reports
+   * "not measured" rather than a confident zero.
+   *
+   * A backend that declares it owes three things, and nothing else:
+   *
+   * 1. **Accumulate, never clear** — a frame may be several `render` calls
+   *    (an off-screen pass, then the on-screen one) and §84's counters are the
+   *    frame's totals. The owner of the record clears it per frame.
+   * 2. **Count what was submitted**, not what was in the render list: a draw
+   *    skipped for a missing geometry, a disposed texture, or a feedback loop
+   *    did not happen.
+   * 3. **Change nothing else.** Switching statistics on must not add, remove,
+   *    or reorder a single GPU call — the counters are integer increments
+   *    beside the draw, never around it (see `statistics.ts`).
+   *
+   * ```ts
+   * renderer.statistics = createRenderStatistics();
+   * ```
+   */
+  statistics?: RenderStatistics | null;
 
   /**
    * Acquires the backend's context or device (§61, §45).
@@ -377,6 +429,36 @@ export interface Renderer extends Disposable {
    * for the frame (§7, §64) — the interpolated path derives its matrices itself
    * and does not.
    *
+   * ### Rendering into a target (§61, §48; R-4, 2026-08-07)
+   *
+   * With `target` present the frame is drawn into that off-screen surface
+   * instead of the backend's default drawing buffer, and
+   * `target.colorTexture` can then be sampled by any material — which is the
+   * whole of render-to-texture, and what §48's minimaps, mirrors, portals and
+   * previews, §63's transient resources, and §70's effect chain are all built
+   * out of. Everything else is unchanged: the same views, the same clears, the
+   * same interpolation.
+   *
+   * Three rules bind every backend:
+   *
+   * - **Normalized viewport rectangles resolve against the *target's* size**,
+   *   not the surface's, so a full-target view is the same
+   *   `{ x: 0, y: 0, width: 1, height: 1, normalized: true }` it is on screen.
+   *   Pixel rectangles are target pixels, and are not scaled by the
+   *   {@link Renderer.resize} resolution — the target has a size of its own.
+   * - **The target is bound for the call and unbound before it returns**, even
+   *   if the frame throws. A backend leaves nothing bound behind: the next
+   *   thing to touch the device may be another renderer, or the same one
+   *   drawing to screen.
+   * - **A material sampling the target currently being drawn into is skipped**
+   *   rather than drawn. That is a read-write feedback loop on one surface,
+   *   which is undefined behaviour on every backend; the draw is dropped the
+   *   same way a disposed texture's is (§83). Ping-pong between two targets.
+   *
+   * A disposed target draws nothing at all, and a target the backend cannot
+   * allocate (an incomplete framebuffer, a device out of memory) skips the
+   * frame rather than throwing — same reasoning as the lost-context rule.
+   *
    * Returns immediately if the context is lost (see the context-loss contract
    * above): never throws for that reason.
    */
@@ -384,7 +466,42 @@ export interface Renderer extends Disposable {
     root: Node,
     views: readonly Viewport[],
     interpolation?: RenderInterpolation,
+    target?: RenderTarget | null,
   ): void;
+
+  /**
+   * Draws one §70 full-screen effect: `pass.source`'s texels over the whole of
+   * `pass.target` (or of the drawing buffer) through `pass.effect` (R-6,
+   * 2026-08-07).
+   *
+   * **Optional, and its presence is the capability** — the same stance
+   * {@link Renderer.statistics} takes, for the same two reasons: adding a
+   * required member to a published interface breaks every implementor, and a
+   * backend with no fragment stage to run an effect in (§62's SVG tier draws
+   * DOM nodes) should say so by omission rather than by silently copying.
+   * {@link supportsScreenEffects} is the runtime test;
+   * {@link RenderGraph.execute} uses it before forwarding an
+   * {@link EffectRenderPass}.
+   *
+   * A backend that declares it owes exactly what {@link Renderer.render} owes,
+   * restated because the two are separate entry points into the same device:
+   *
+   * - the destination is **bound for the call and unbound before it returns**,
+   *   even if the call throws, and nothing else is left bound either;
+   * - a lost context, a disposed source or destination, and an allocation the
+   *   device refused all **skip the effect** and return, rather than throwing
+   *   (§61, §83);
+   * - a pass whose destination *is* the surface it samples is refused, not
+   *   drawn — R-4's feedback rule, which {@link RenderGraph.validate} also
+   *   reports statically;
+   * - the effect covers the whole destination surface, replaces rather than
+   *   composites (no blend, no depth test, no clear), and leaves the §57 state
+   *   mirror where the next frame expects it.
+   *
+   * See `effect-pass.ts` for which of §70's effects this tier ships and what
+   * each staged one is waiting on.
+   */
+  renderEffect?(pass: EffectRenderPass): void;
 
   /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at
@@ -500,6 +617,21 @@ export class NullRenderer implements Renderer {
   /** The §6b channel required by {@link Renderer}. Never emitted to by this class. */
   readonly events = new EventEmitter<RendererEventMap>();
 
+  /**
+   * §84's render counters (A-1). Declared, and **never written to** — this
+   * renderer submits no draw calls at all, so every frame's honest contribution
+   * to `drawCalls`, `triangles`, and `instances` is zero, and adding zero is
+   * writing nothing.
+   *
+   * Declaring it rather than omitting it is deliberate: it makes a headless
+   * application's statistics wiring assertable end to end
+   * ({@link supportsRenderStatistics} answers `true`, `app.stats.drawCalls`
+   * reads `0` rather than `NaN`), which is the same job every other recording
+   * field on this class does. A backend that genuinely *cannot* count is the
+   * case the optional member exists for; this one can, and the answer is zero.
+   */
+  statistics: RenderStatistics | null = null;
+
   /** Number of completed {@link NullRenderer.initialize} calls. */
   initializeCount = 0;
 
@@ -523,6 +655,35 @@ export class NullRenderer implements Renderer {
    * reason. `null` before the first call.
    */
   lastInterpolation: RenderInterpolation | null = null;
+
+  /**
+   * The {@link @four/render!RenderTarget | RenderTarget} of the most recent
+   * `render`, or `null` when that call passed none (R-4) — cleared per call for
+   * the same reason {@link NullRenderer.lastInterpolation} is: a later
+   * on-screen frame must not leave the previous off-screen pass's target
+   * standing, which would let a test pass for the wrong reason. `null` before
+   * the first call.
+   *
+   * Nothing is drawn into it. A null renderer has no surfaces at all, so an
+   * off-screen pass is recorded and skipped exactly as an on-screen one is —
+   * which is what lets an application's render-to-texture wiring be asserted
+   * headlessly (§92's cheap half).
+   */
+  lastRenderTarget: RenderTarget | null = null;
+
+  /** Number of {@link NullRenderer.renderEffect} calls (R-6). */
+  renderEffectCount = 0;
+
+  /**
+   * The most recent {@link EffectRenderPass} (not copied); `null` before the
+   * first call.
+   *
+   * Retained rather than cleared per call, unlike
+   * {@link NullRenderer.lastRenderTarget}, because there is no "an effect pass
+   * without an effect" call to clear it: every `renderEffect` has one, so a
+   * stale value is impossible.
+   */
+  lastEffectPass: EffectRenderPass | null = null;
 
   /** Number of {@link NullRenderer.resize} calls. */
   resizeCount = 0;
@@ -553,21 +714,41 @@ export class NullRenderer implements Renderer {
   }
 
   /**
-   * Records `root`, `views`, and the §43 `interpolation` record, and draws
-   * nothing. No pose is computed: the null backend has nothing to draw them
-   * into, and a test that wants the interpolated matrices asks
-   * {@link buildInterpolatedRenderList} for them directly.
+   * Records `root`, `views`, the §43 `interpolation` record, and the R-4
+   * `target`, and draws nothing. No pose is computed: the null backend has
+   * nothing to draw them into, and a test that wants the interpolated matrices
+   * asks {@link buildInterpolatedRenderList} for them directly.
    */
   render(
     root: Node,
     views: readonly Viewport[],
     interpolation?: RenderInterpolation,
+    target?: RenderTarget | null,
   ): void {
     this.#assertUsable("render");
     this.renderCount += 1;
     this.lastRenderRoot = root;
     this.lastViews = views;
     this.lastInterpolation = interpolation ?? null;
+    this.lastRenderTarget = target ?? null;
+  }
+
+  /**
+   * Records the §70 effect pass, and draws nothing (R-6).
+   *
+   * Declared rather than omitted, exactly as
+   * {@link NullRenderer.statistics} is and for the same reason: this class is
+   * the interface's conformance fixture, and an application's post-processing
+   * wiring — which passes ran, in which order, over which surfaces — is
+   * assertable headlessly only if the null backend accepts them. A backend
+   * that genuinely *cannot* run an effect is the case the optional member
+   * exists for; this one can record, and recording is the whole of what it
+   * does for `render` too.
+   */
+  renderEffect(pass: EffectRenderPass): void {
+    this.#assertUsable("renderEffect");
+    this.renderEffectCount += 1;
+    this.lastEffectPass = pass;
   }
 
   /** Records the requested size. `resolution` defaults to `1`. */

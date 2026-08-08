@@ -910,6 +910,48 @@ describe("PointerInput — pointer lifetime (§72, §83, A-9)", () => {
     expect(input.trackedPointerCount).toBe(0);
   });
 
+  // 2026-08-07: the teardown deleted the map entry *after* dispatching
+  // `pointerleave`, so a listener that started a new gesture with the same
+  // pointerId during that dispatch wrote into the entry being torn down and
+  // then had it deleted — the new gesture vanished, silently.
+  it("keeps a gesture started from inside the leave of the previous one", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+    let restarted = false;
+
+    box.node.on("pointerleave", () => {
+      if (restarted) return;
+      restarted = true;
+      // Same pointer id: a synthetic re-press from inside the teardown.
+      surface.fire("pointerdown", clientXOf(0), clientYOf(0), 5);
+    });
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 5);
+    surface.fire("pointerup", clientXOf(0), clientYOf(0), 5);
+
+    // The re-press survived the outer teardown: one live pointer, hovering the
+    // node it pressed, and its own release still ends it cleanly.
+    expect(input.trackedPointerCount).toBe(1);
+    expect(input.getHovered(5)).toBe(box.node);
+
+    surface.fire("pointerup", clientXOf(0), clientYOf(0), 5);
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
+  it("still forgets a pointer whose leave listener does nothing", () => {
+    const box = boxAt(0, 0);
+    const { surface, input } = harness([box]);
+    box.node.on("pointerleave", () => {
+      // Reads the input mid-teardown: the entry is still there to be read.
+      expect(input.trackedPointerCount).toBe(1);
+    });
+
+    surface.fire("pointerdown", clientXOf(0), clientYOf(0), 6);
+    surface.fire("pointerup", clientXOf(0), clientYOf(0), 6);
+
+    expect(input.trackedPointerCount).toBe(0);
+  });
+
   it("leaks nothing across 10 000 gestures with distinct pointer ids", () => {
     const box = boxAt(0, 0);
     const { surface, input } = harness([box]);

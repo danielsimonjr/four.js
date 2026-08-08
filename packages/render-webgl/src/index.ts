@@ -14,6 +14,11 @@
 
 export const PACKAGE_NAME = "@four/render-webgl";
 
+export {
+  EFFECT_TEXTURE_UNIT,
+  EFFECT_VERTEX_COUNT,
+  EffectProgram,
+} from "./gl-effect.js";
 export type { CacheableGeometry, GeometryRecord } from "./gl-geometry.js";
 export { GeometryCache } from "./gl-geometry.js";
 export type { ParticleBatchRecord, ParticleGlContext } from "./gl-particles.js";
@@ -32,16 +37,26 @@ export type {
   GlVertexArray,
   WebglContext,
 } from "./gl-program.js";
+export type { GlFramebuffer, GlRenderbuffer } from "./gl-program.js";
 export {
+  COLOR_ATTRIBUTE_LOCATION,
   GL,
   LitProgram,
+  MAP_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
   POSITION_ATTRIBUTE_LOCATION,
   SpriteProgram,
+  UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
 } from "./gl-program.js";
+export type {
+  CacheableRenderTarget,
+  RenderTargetRecord,
+} from "./gl-render-target.js";
+export { RenderTargetCache } from "./gl-render-target.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";
 export { TextureCache } from "./gl-texture.js";
+export { isWebgl2Supported, registerWebglRenderer } from "./register.js";
 export type {
   WebglCanvas,
   WebglContextAttributes,

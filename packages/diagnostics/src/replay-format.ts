@@ -69,7 +69,13 @@
  * produce. Step indices are non-negative safe integers.
  */
 
-import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
+import {
+  FourError,
+  cloneJsonValue,
+  parseUntrustedJson,
+  type JsonValue,
+  type UntrustedJsonLimits,
+} from "@four/core";
 
 /**
  * Any value JSON can carry, losslessly — `@four/core`'s {@link JsonValue},
@@ -87,7 +93,8 @@ import { FourError, cloneJsonValue, type JsonValue } from "@four/core";
 export type { JsonValue } from "@four/core";
 
 /**
- * The highest format version this build writes.
+ * The **highest** format version this build can write — an upper bound, not the
+ * number that ends up on any particular document.
  *
  * `2` since 2026-08-06 (PH-6), which added
  * {@link ReplayRecording.worldConfiguration}.
@@ -96,8 +103,11 @@ export type { JsonValue } from "@four/core";
  *
  * A document declares **the lowest version that can express its content**, not
  * the version of the build that wrote it. So a recording carrying a world
- * configuration is a `2`, and one without is still a `1` — byte for byte the
- * same text this format produced before version 2 existed.
+ * configuration is a `2`, and one without is still a
+ * {@link MINIMUM_REPLAY_FORMAT_VERSION} — byte for byte the same text this
+ * format produced before version 2 existed. A document this build wrote is
+ * therefore somewhere in `[MINIMUM…LATEST]`; only a *configuration-carrying*
+ * one is stamped with this constant.
  *
  * That rule is what makes the bump safe in both directions:
  *
@@ -118,20 +128,63 @@ export type { JsonValue } from "@four/core";
  *
  * See {@link SUPPORTED_REPLAY_FORMAT_VERSIONS} for what this build reads.
  */
-export const REPLAY_FORMAT_VERSION = 2;
+export const LATEST_REPLAY_FORMAT_VERSION = 2;
+
+/**
+ * The **lowest** format version this build reads and writes — the version a
+ * document declares when it carries nothing that needs a later one.
+ *
+ * Every recording without a {@link ReplayRecording.worldConfiguration} is
+ * stamped with this, which is what keeps such documents byte-identical to the
+ * text this format produced before version 2 existed (PH-6, see
+ * {@link LATEST_REPLAY_FORMAT_VERSION} for the rule). Equal to
+ * `SUPPORTED_REPLAY_FORMAT_VERSIONS[0]`; the tests pin the two together.
+ *
+ * @since 2026-08-07 (review finding F7)
+ */
+export const MINIMUM_REPLAY_FORMAT_VERSION = 1;
+
+/**
+ * The old name of {@link LATEST_REPLAY_FORMAT_VERSION}, kept as an alias so no
+ * consumer breaks. Same value, same meaning it always *had*; only the name
+ * changed.
+ *
+ * @deprecated since 2026-08-07 (review finding F7) — use
+ * {@link LATEST_REPLAY_FORMAT_VERSION}. The name stopped being true on
+ * 2026-08-06, when PH-6 made a document declare the lowest version that can
+ * express it: from then on a configuration-free recording written by this build
+ * is stamped `1` while this constant reads `2`, so "the version of a document
+ * this build wrote" was no longer a thing a single number could name. The pair
+ * {@link MINIMUM_REPLAY_FORMAT_VERSION} / {@link LATEST_REPLAY_FORMAT_VERSION}
+ * says what is actually true. No document bytes changed with the rename.
+ */
+export const REPLAY_FORMAT_VERSION = LATEST_REPLAY_FORMAT_VERSION;
 
 /**
  * Every format version {@link validateReplayRecording} accepts, ascending.
  *
  * A *range* rather than a single number since 2026-08-06 (PH-6) — see
- * {@link REPLAY_FORMAT_VERSION} for the rule that keeps the range honest. Each
- * version in it is a shape this build can read completely; a version outside it
- * is refused rather than guessed at (§34).
+ * {@link LATEST_REPLAY_FORMAT_VERSION} for the rule that keeps the range
+ * honest. Each version in it is a shape this build can read completely; a
+ * version outside it is refused rather than guessed at (§34).
+ *
+ * Spelled out rather than generated from the two bounds: the versions this
+ * build understands are a *list of shapes*, and a future format that drops
+ * support for an intermediate version must be able to say so here without the
+ * bounds lying. The first and last entries are pinned to
+ * {@link MINIMUM_REPLAY_FORMAT_VERSION} / {@link LATEST_REPLAY_FORMAT_VERSION}
+ * by `tests/replay-format.test.ts`.
  */
 export const SUPPORTED_REPLAY_FORMAT_VERSIONS: readonly number[] =
   Object.freeze([1, 2]);
 
-/** The version a document needs to carry a world configuration (PH-6). */
+/**
+ * The version a document needs to carry a world configuration (PH-6) — today
+ * the same number as {@link LATEST_REPLAY_FORMAT_VERSION}, but a separate
+ * constant because it answers a different question ("what does *this field*
+ * require?" rather than "how new can a document get?") and the two part company
+ * the moment a version 3 lands.
+ */
 const WORLD_CONFIGURATION_VERSION = 2;
 
 /** One external input, indexed by the simulation step it applies to (§34). */
@@ -189,8 +242,10 @@ export interface ReplayAdapterIdentity {
 export interface ReplayRecording extends ReplayAdapterIdentity {
   /**
    * The lowest format version that can express this document — `2` when it
-   * carries a {@link ReplayRecording.worldConfiguration}, `1` otherwise. See
-   * {@link REPLAY_FORMAT_VERSION}.
+   * carries a {@link ReplayRecording.worldConfiguration},
+   * {@link MINIMUM_REPLAY_FORMAT_VERSION} otherwise. This is **not** always
+   * {@link LATEST_REPLAY_FORMAT_VERSION}, which is only the upper bound this
+   * build can reach.
    */
   readonly formatVersion: number;
   /** Seed of the run's RNG (§33), when the caller supplied one. */
@@ -560,9 +615,9 @@ function validateSnapshots(
  *
  * The declared `formatVersion` is **re-derived** rather than copied: the result
  * carries the lowest version that can express it (see
- * {@link REPLAY_FORMAT_VERSION}), so validation is idempotent and a
- * configuration-free document is spelled exactly as version 1 always spelled
- * it.
+ * {@link LATEST_REPLAY_FORMAT_VERSION}), so validation is idempotent and a
+ * configuration-free document is spelled exactly as
+ * {@link MINIMUM_REPLAY_FORMAT_VERSION} always spelled it.
  *
  * @param value the candidate document (typically `JSON.parse` output)
  * @returns the canonical, frozen recording
@@ -664,7 +719,9 @@ export function validateReplayRecording(value: unknown): ReplayRecording {
   // fixed spelling per document and an absent optional is an absent key.
   const canonical: Record<string, unknown> = {
     formatVersion:
-      worldConfiguration === undefined ? 1 : WORLD_CONFIGURATION_VERSION,
+      worldConfiguration === undefined
+        ? MINIMUM_REPLAY_FORMAT_VERSION
+        : WORLD_CONFIGURATION_VERSION,
     adapterName,
     adapterVersion,
   };
@@ -713,15 +770,50 @@ export function encodeReplayRecording(recording: ReplayRecording): string {
 }
 
 /**
- * Parses and validates JSON text as a §34 replay document.
+ * Size and nesting bounds for an untrusted document — `@four/core`'s
+ * {@link UntrustedJsonLimits}, re-exported so a caller of
+ * {@link decodeReplayRecording} does not have to reach past this package for
+ * the type of its own second argument.
+ *
+ * The same type bounds `@four/serialization`'s §79 scene documents; see
+ * `@four/core`'s `untrusted.ts` for why one definition sits below both.
+ */
+export type { UntrustedJsonLimits } from "@four/core";
+
+/**
+ * Parses and validates JSON text as a §34 replay document, treating the text as
+ * **untrusted** (§96).
+ *
+ * A recording is exactly the kind of file §96 has in mind: it arrives from a bug
+ * report, a CI artifact, or a user's disk, and the first thing the engine does
+ * with it is walk it. So the text length is checked before `JSON.parse` runs,
+ * and the nesting depth before {@link validateReplayRecording} — whose
+ * `cloneJsonValue` copies of `metadata` and `worldConfiguration` recurse once
+ * per level — ever sees the value.
+ *
+ * {@link validateReplayRecording} itself stays unguarded, deliberately: it is
+ * the entry point for a value the caller *built* (`ReplayRecorder.finish` and
+ * `ReplayPlayer.load` both go through it), and bounding an in-memory object the
+ * process just produced would refuse nothing an attacker controls.
+ *
+ * Both bounds default to finite, generous values, so every recording and golden
+ * in this repository decodes exactly as it did before the guard existed.
  *
  * @param text JSON text, typically read from a file
+ * @param limits optional §96 bounds; omitted fields take their defaults
  * @returns the canonical, frozen recording
+ * @throws FourError `UNTRUSTED_INPUT_REJECTED` if the text is too long or nests
+ * too deeply
  * @throws SyntaxError if the text is not JSON; then exactly as
  * {@link validateReplayRecording}
  */
-export function decodeReplayRecording(text: string): ReplayRecording {
-  return validateReplayRecording(JSON.parse(text) as unknown);
+export function decodeReplayRecording(
+  text: string,
+  limits?: UntrustedJsonLimits,
+): ReplayRecording {
+  return validateReplayRecording(
+    parseUntrustedJson(text, "Replay recording", limits),
+  );
 }
 
 /**

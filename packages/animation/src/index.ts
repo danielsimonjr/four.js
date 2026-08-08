@@ -32,6 +32,22 @@ export type {
 } from "./clip.js";
 export { AnimationClip } from "./clip.js";
 
+export type {
+  AnimationControllerOptions,
+  AnimationControllerParameters,
+  AnimationStateInput,
+  AnimationStateOptions,
+  AnimationTransition,
+  BooleanCondition,
+  ControllerPlaybackState,
+  NumericComparison,
+  NumericCondition,
+  StateChangeListener,
+  TransitionCondition,
+  TriggerCondition,
+} from "./controller.js";
+export { AnimationController } from "./controller.js";
+
 export type { EasingFunction, EasingName } from "./easing.js";
 export {
   BACK_OVERSHOOT,

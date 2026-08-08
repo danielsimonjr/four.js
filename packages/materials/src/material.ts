@@ -53,13 +53,30 @@
  *
  * ## Render state is read, not cached (decision, R-12)
  *
- * The six fields are plain mutable properties and do **not** bump
- * {@link Material.version}. A backend reads them once per draw, where it is
- * already deciding what to bind — there is nothing to invalidate, so there is
- * nothing to announce, and a per-field setter would cost every material an
- * accessor to protect state nobody caches. {@link Material.markDirty} stays
- * what it always was: the announcement that a *colour array* was written in
- * place.
+ * The six fields do **not** bump {@link Material.version}. A backend reads them
+ * once per draw, where it is already deciding what to bind — there is nothing
+ * to invalidate, so there is nothing to announce. {@link Material.markDirty}
+ * stays what it always was: the announcement that a *colour array* was written
+ * in place.
+ *
+ * **Amended 2026-08-07 (F14).** This section used to open "The six fields are
+ * plain mutable properties", and the "a per-field setter would cost every
+ * material an accessor to protect state nobody caches" clause was read as
+ * covering *validation* too. It did not: the constructor rejected a non-finite
+ * `opacity` (§85) and then exposed a writable field, so `material.opacity =
+ * NaN` walked straight into the backend's `uniform4fv` and painted a scene
+ * black with no diagnosable cause. {@link Material.opacity} and
+ * {@link Material.blendMode} are therefore accessors that apply **the same
+ * validation on assignment that the constructor applies**, matching
+ * `UnlitMaterial.setColor`'s validate-before-write discipline. The other four
+ * fields stay plain properties: they are booleans, a boolean has no invalid
+ * value to reject, and the backend reads them as `!== false` anyway.
+ *
+ * The *version* half of the decision is unchanged and deliberate: neither
+ * accessor calls {@link Material.markDirty}. Nothing caches render state — the
+ * backend re-reads it per draw — so there is still nothing to invalidate, and
+ * bumping would invalidate the geometry and texture bindings that *are* cached
+ * against this counter for no reason.
  *
  * ## Staged, with the date (§67, R-7)
  *
@@ -143,6 +160,34 @@ function requireFinite(name: string, value: number): number {
 }
 
 /**
+ * §57's four blend modes as a runtime list — the type erases at compile time,
+ * and {@link Material.blendMode} is assignable from outside TypeScript.
+ */
+const BLEND_MODES: readonly BlendMode[] = [
+  "normal",
+  "additive",
+  "multiply",
+  "screen",
+];
+
+/**
+ * Rejects a value outside {@link BlendMode}.
+ *
+ * The backend indexes a four-entry table with this string (`@four/render-webgl`,
+ * `BLEND_FUNCTIONS`), so an unknown mode has to fail here, where the assignment
+ * that caused it is on the stack, rather than at draw time inside a frame.
+ */
+function requireBlendMode(value: BlendMode): BlendMode {
+  if (!BLEND_MODES.includes(value)) {
+    throw new RangeError(
+      `Material blendMode must be one of ${BLEND_MODES.join(", ")}; ` +
+        `got ${String(value)} (§57).`,
+    );
+  }
+  return value;
+}
+
+/**
  * The root of §57's material family: identity, lifetime, and shared render
  * state.
  *
@@ -194,11 +239,23 @@ export abstract class Material implements Disposable {
    *
    * Like the colour components, values outside 0…1 pass through rather than
    * clamp (the WP-3.3 decision `UnlitMaterial` records); non-finite values are
-   * rejected (§85). **Opacity alone does not make a material blend** — set
+   * rejected (§85) — **on every assignment, not only at construction** (F14,
+   * 2026-08-07; see the module header). A rejected write leaves the previous
+   * opacity in place, exactly as a rejected `setColor` leaves the previous
+   * colour. Assigning does **not** bump {@link Material.version}: render state
+   * is read per draw, never cached.
+   *
+   * **Opacity alone does not make a material blend** — set
    * {@link Material.transparent} too, or the alpha is written into the colour
    * buffer without being blended against it.
    */
-  opacity: number;
+  get opacity(): number {
+    return this.#opacity;
+  }
+
+  set opacity(value: number) {
+    this.#opacity = requireFinite("opacity", value);
+  }
 
   /**
    * Whether this material's fragments are **blended** with the colour buffer
@@ -228,8 +285,19 @@ export abstract class Material implements Disposable {
    * straight-alpha blend — by default. Read only while
    * {@link Material.transparent} is `true`, except on pipelines that blend by
    * construction (sprites, particles), where it always applies.
+   *
+   * A value outside {@link BlendMode} is rejected on assignment as well as at
+   * construction (F14, 2026-08-07): the type is gone at runtime, and a backend
+   * that meets an unknown mode can only guess. Assigning does **not** bump
+   * {@link Material.version}.
    */
-  blendMode: BlendMode;
+  get blendMode(): BlendMode {
+    return this.#blendMode;
+  }
+
+  set blendMode(value: BlendMode) {
+    this.#blendMode = requireBlendMode(value);
+  }
 
   /**
    * Whether fragments are tested against the depth buffer (§57); `true` by
@@ -258,6 +326,15 @@ export abstract class Material implements Disposable {
    */
   colorWrite: boolean;
 
+  /**
+   * Backing fields for the two validated accessors. Seeded with the documented
+   * defaults so the constructor can assign *through* the setters — one copy of
+   * each rule, checked wherever the value arrives from.
+   */
+  #opacity = 1;
+
+  #blendMode: BlendMode = "normal";
+
   #version = 0;
 
   #disposed = false;
@@ -272,7 +349,9 @@ export abstract class Material implements Disposable {
   protected constructor(idPrefix: string, options: MaterialOptions = {}) {
     this.id = `${idPrefix}-${String(nextMaterialId)}`;
     nextMaterialId += 1;
-    this.opacity = requireFinite("opacity", options.opacity ?? 1);
+    // Through the setters: the validation lives in one place and applies to
+    // the option and to every later write alike (F14, 2026-08-07).
+    this.opacity = options.opacity ?? 1;
     this.transparent = options.transparent ?? false;
     this.blendMode = options.blendMode ?? "normal";
     this.depthTest = options.depthTest ?? true;

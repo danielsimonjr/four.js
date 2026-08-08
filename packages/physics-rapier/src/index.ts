@@ -57,6 +57,11 @@ export type { RapierRotation3, RapierVector3 } from "./conversions3d.js";
 export { initializeRapier2d, rapier2dModule, rapier2dVersion } from "./init.js";
 export { initializeRapier3d, rapier3dModule, rapier3dVersion } from "./init.js";
 export type { Rapier2dModule, Rapier3dModule } from "./init.js";
+export {
+  createRapierAdapter,
+  isRapierSupported,
+  registerRapierSolver,
+} from "./register.js";
 export { Rapier2dAdapter } from "./rapier2d-adapter.js";
 export type { RapierBodyAccess } from "./rapier2d-adapter.js";
 export { Rapier3dAdapter } from "./rapier3d-adapter.js";

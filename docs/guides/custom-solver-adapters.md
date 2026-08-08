@@ -103,7 +103,11 @@ demonstrates it across dimensions with a six-field kit.
   motor's `maxTorque` is a force-based _gain_, not §28's hard cap — recorded
   in the stable API docs rather than papered over. A Box2D adapter could
   honor a real cap; that difference belongs in the capability tables (§90,
-  §102).
+  §102) — published since 2026-08-07 as
+  [docs/COMPATIBILITY.md](../COMPATIBILITY.md), whose solver-adapter block is
+  generated from the declarations themselves. A deviation that no field of
+  `PhysicsCapabilities` can express goes in that document's prose beside the
+  generated table, which is where the Rapier ones already are.
 
 ## Honest state
 
@@ -122,4 +126,8 @@ demonstrates it across dimensions with a six-field kit.
 - §37 (the contract), §20–§21 (worlds and dimensions), §33–§34
   (determinism and snapshots), §90/§102 (capability and compatibility
   tables).
+- [docs/COMPATIBILITY.md](../COMPATIBILITY.md) — the published §90 tables,
+  including the generated per-adapter capability matrix and both access seams.
+  Refresh it with `node tools/generate-compatibility.mjs` after changing an
+  adapter's declarations, and `--check` verifies the committed copy.
 - `packages/physics-rapier/src` — the worked example of everything above.

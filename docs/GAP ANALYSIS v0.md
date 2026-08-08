@@ -197,6 +197,17 @@ Add to this wave the doc-only half of `PH-1` (correct `rigid-body.ts`'s header a
 
 ### A-1 — §84 runtime statistics (`app.stats.*`) do not exist
 
+> **CLOSED (measurable tier) 2026-08-07** — `app.stats` exists
+> (`ApplicationOptions.stats`, default off). `FrameStats` in `@four/diagnostics`
+> carries §84's **eleven** counters (this entry said twelve — the spec lists eleven);
+> `cpuFrameTime`, `simulationTime`, `drawCalls`, `triangles`, `instances` are measured,
+> `activeBodies` reachable via `recordSolverStatistics`. `gpuFrameTime`,
+> `physicsStepTime`, `contacts`, `textureMemory`, `bufferMemory` staged as
+> NaN-with-a-reason (A-5, A-6, §62 timestamp queries). Renderer counters arrive through
+> an optional §61 capability (presence is the capability), not a `render` out-param.
+> Stats-off is byte-identical in GL calls and allocation-free, proven. Unblocks A-5,
+> A-27, §119's overlay data. Kept for the record.
+
 **§84, §98 (`diagnostics`: "statistics, overlays, validation")** · **Severity: Critical** · **Effort: M** · **SILENT**
 
 _What exists:_ `@four/diagnostics` exports checksum, replay recorder/player/format, and debug-draw providers (`packages/diagnostics/src/index.ts`). `NullRenderer.renderCount`/`lastRenderRoot` (`packages/render/src/renderer.ts:488`) are test-double inspection fields, not statistics.
@@ -217,6 +228,15 @@ _Dependencies:_ A-5 (memory counters), A-6 (surface), and the render/physics ana
 ---
 
 ### A-2 — §40 `UnitSystem` never shipped, though §98 assigns it to `@four/core`
+
+> **CLOSED 2026-08-07** (one closure with PH-13) — shipped as
+> `packages/core/src/units.ts` at the conversion/authoring tier §40 actually specifies:
+> `UnitSystem`/`SI_UNITS`/`resolveUnitSystem`, the eight `To/FromDisplay` conversions,
+> SI accessors, `unitSymbol`, `format*`. Display-only is enforced mechanically — an
+> integration test forbids any other package importing the module and proves
+> helper-authored values bit-identical to engine-unit authoring. Steps 1–2 of the plan
+> done; step 3 (`PhysicsWorldOptions.units`) staged as a physics packet; step 4 blocked
+> on A-16. No `ApplicationOptions.units` — §45 lists none. Kept for the record.
 
 **§40, §98, §101** · **Severity: High** · **Effort: M** · **SEMI-RECORDED**
 
@@ -239,6 +259,14 @@ _Dependencies:_ physics analyst for step 3; A-16 for step 4.
 
 ### A-3 — §81 plugin system does not exist, and §79 already references it
 
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0002-plugin-system.md` proposes `PluginContext`
+> as a typed capability bag (tokens declared by each registry's owning package, since §3.1
+> gives `core` no dependencies), an explicit-registration-only lifecycle, and a §96
+> boundary that is enforced (documents never name modules) rather than sandboxed. Five of
+> §81's eleven extension points are real today, one partial, five absent. Status draft,
+> **owner decision pending**; one blocking sub-question (`ApplicationOptions.plugins` vs
+> the §40 precedent), and alternative E (do nothing) is genuinely defensible.
+
 **§81, §98 (`core`: "plugin host (§81)"), §79, §90** · **Severity: High** · **Effort: L** · **SILENT**
 
 _What exists:_ nothing. `grep -rn "FourPlugin|PluginContext" packages/*/src` returns **one hit**, and it is prose: `packages/serialization/src/serializer.ts:12` cites §79's "plugins register theirs (§81)" as the justification for the component-serializer registry.
@@ -259,6 +287,17 @@ _Dependencies:_ A-22 (compatibility ranges), A-6.
 ---
 
 ### A-4 — §85 validation is scattered and has no development/production split
+
+> **CLOSED 2026-08-07 (build-mode tier).** `packages/core/src/dev.ts` ships
+> `DEV`/`devWarn`/`devWarnOnce`/`devAssert` behind an optional `__FOUR_DEV__` define
+> (dev-default, opt-out; identifier read only under `typeof`); §84's stats wiring,
+> §6a's duplicate-component warning, and §83's new `auditResourceLeaks` are gated; all
+> eight example builds define it false (0.46–0.52 kB gzip saved each; ui-demo
+> 30.46/31). `tests/integration/dev-build-mode.test.ts` proves the stripping with a
+> real bundler and mechanically enforces the §33 allowlist (simulation packages
+> refused outright). **Still open under A-4:** the §85 validation catalogue (step 2),
+> converting scattered scene/physics checks to `devAssert` (step 3), routing §42's
+> authority-conflict warn through the channel (step 4).
 
 **§85, §98 (`diagnostics`: "… validation (§84-85)"), §41** · **Severity: High** · **Effort: M** · **SILENT**
 
@@ -285,6 +324,18 @@ _Dependencies:_ A-1 (same package, same frame hook); scene/render analysts for s
 ---
 
 ### A-5 — §83 development warnings and ownership tracking are absent
+
+> **PARTIALLY CLOSED 2026-08-07 (accounting tier).** §83's "reference counting or
+> ownership tracking" now exists as _ownership-free accounting_: `resource-memory.ts`
+> in `@four/geometry` and `@four/render` hold process-wide live-instance counts and
+> byte totals for `BufferGeometry`/`Texture`/`RenderTarget`, fed at
+> construction/mutation/disposal from new `byteLength` getters. Holding numbers
+> rather than references is what keeps the tracker from being the leak it reports; a
+> resource collected without `dispose()` is deliberately never subtracted. §84's
+> `textureMemory`/`bufferMemory` are measured as of this packet (A-1 dependency
+> discharged) via `recordResourceMemory`. **Still open:** the six development
+> _warnings_ and creation-site capture (folded into A-4's dev-mode work), the
+> AssetManager duplicate-load warning, and materials/solver-handle accounting.
 
 **§83** · **Severity: Medium** · **Effort: M** · **SILENT**
 
@@ -344,6 +395,13 @@ _Dependencies:_ none blocking. Pairs naturally with A-6.
 
 ### A-8 — `renderer: "auto"` and the string backend form are unimplemented
 
+> **CLOSED 2026-08-07** — §45's string form works and `four` still imports no backend:
+> `@four/render`'s `renderer-registry.ts` is a neutral host backends opt into with an
+> explicit call (`registerWebglRenderer()`). `ApplicationOptions.renderer` accepts
+> `Renderer | "auto" | <name> | false`; `antialias` landed with it;
+> `Application.renderer` is a getter (`null` until `initialize()` resolves a string).
+> See R-2's banner for the registry design.
+
 **§45, §62, §97** · **Severity: Medium** · **Effort: M** · **RECORDED**
 
 `ApplicationOptions.renderer` takes a `Renderer` instance, not §45's `"auto" | "webgpu" | "webgl2" | "canvas2d" | "svg"`. Recorded twice, with the correct reason (a string form makes `four` statically import every backend) and the correct fix (a backend-opt-in registry) — `application.ts:167–190` and `TODO.md` ("§45 renderer-string ('auto') selection via §62 registry packet"). No new analysis needed; flagged because it is the single most visible divergence from §97's opening lines. Owned by the render analyst.
@@ -379,6 +437,14 @@ _Closure plan:_
 
 ### A-10 — §72 input sources: 6 of 8 unimplemented
 
+> **CLOSED 2026-08-07** (keyboard, the load-bearing hole) — `KeyboardInput` ships from
+> `@four/input` over a duck-typed `KeySurface`, with `SceneKeyEvent` (`preventDefault()`
+> forwarded via `KeyDefaultSuppressor`), `dispatchKeyEvent`, and the generalized
+> three-phase `propagation.ts` (`dispatchThreePhase`; `dispatchPointerEvent` delegates,
+> surface unchanged). Focus is injected as a `focusTarget(): Node | null` resolver — §3.1
+> untouched. Wheel, gamepad, XR, `keypress`, and focus/blur-as-input-events remain staged,
+> recorded in `packages/input/README.md`. Kept for the record.
+
 **§72, §75** · **Severity: Medium** · **Effort: M** · **RECORDED**
 
 Ships: mouse/touch/pen (through the unified `PointerEvent` shape), and drag (`DragManager`). Absent: **wheel and trackpad, keyboard, gamepad, XR controllers**, plus the synthesized `double-click`, `pinch`, and `rotate` gestures and node-level `focus`/`blur` as _input_ events. Honestly recorded at `pointer-events.ts:106` and `pointer-input.ts:38`.
@@ -403,6 +469,14 @@ Bounding-volume only. `node.hitTestMode` does not exist. Recorded thoroughly at 
 
 ### A-12 — §73 ships 3 of 16 controls
 
+> **PARTIALLY CLOSED 2026-08-07** — the cheap tier shipped: `Toggle`, `Checkbox`,
+> `RadioButton` (group-by-name, enforced on transition so §79 stays faithful), `Slider`,
+> `ProgressIndicator`, `ImageWidget`, all serialized by `registerUISerializers`. Nine of
+> sixteen §73 controls ship. Still open behind stated blockers: text input (§56/S-6),
+> scroll view + virtual list (§74 + §67), embedded 3D viewport (§48), canvas view,
+> menu + tooltip (a per-frame §9 update hook widgets cannot reach), list.
+> `UI_STAGED[0]` no longer claims the shipped six.
+
 **§73** · **Severity: Medium** · **Effort: L** · **RECORDED (`UI_STAGED[0]`)**
 
 Ships `Panel`, `Label`, `Button`. Absent: toggle, checkbox, radio, slider, text input, scroll view, list, virtual list, image, progress indicator, menu, tooltip, canvas view, embedded 3D viewport. The staging note's claim — "each remaining control is a widget subclass over this same base and needs no new engine surface" — is true for toggle/checkbox/radio/progress/image, and **not true** for three of them: text input needs §56's selection and caret support (staged, S-6), scroll view needs §74 overflow and scroll extent (staged, `UI_STAGED[2]`) plus §67 clipping, and the embedded 3D viewport needs a §48 nested render surface. Recommend splitting the note so the cheap ten are separable from the three that are blocked.
@@ -412,6 +486,13 @@ _Closure plan:_ one packet for the ten stateless/state-only controls (each ~60�
 ---
 
 ### A-13 — §75 accessibility mirror is inert; keyboard traversal absent
+
+> **PARTIALLY CLOSED 2026-08-07** — the keyboard half shipped: `collectFocusOrder` /
+> `keyboardFocusTarget` / `installKeyboardTraversal` in `@four/ui` (Tab/Shift-Tab from
+> `accessibility.tabIndex`, plainly ascending — a stated DOM deviation), `Button`
+> Enter/Space activation with `source: "keyboard"`, and the `UI_STAGED` keyboard entry
+> deleted. Still open: the DOM mirror, screen-reader updates, high contrast, scalable
+> text (all behind the DOM integration policy) and reduced motion (behind A-6).
 
 **§75** · **Severity: High** · **Effort: M** · **RECORDED (`UI_STAGED[3][4][5][6]`)**
 
@@ -477,6 +558,14 @@ _Dependencies:_ touches `@four/scene` (foundation analyst's package) — coordin
 
 ### A-16 — §79 carries no subclass node state; §79 §80 `.four` binary format absent
 
+> **PARTIALLY CLOSED 2026-08-07** — all five named node classes have §79 pairs shipping
+> from the umbrella (`registerRenderSerializers()`), with geometry/material referenced
+> by logical key through an injected resolver (`SceneResourceCatalog`) — the format's
+> dependency stance is unchanged and no document version moved. `unknownResources`
+> relaxes the write side only (a read-side skip would invent resources the application
+> must dispose, §83). Still open: §79's asset **manifest** (key → URL + content hash,
+> blocked on A-18) and the §80 `.four` binary format.
+
 **§79** · **Severity: Medium** · **Effort: M** · **RECORDED (`format.ts:29`, `packages/serialization/README.md:18`)**
 
 The document carries `Node`'s own fields only — no camera FOV, no geometry reference, no sprite texture key, no light color, no widget box. The stated reason (the §3.1 matrix lets `serialization` see `core`/`math`/`scene` only) is correct, and `nodeFactory`/`nodeTypeOf` is the intended seam. But **nothing ships a factory for any of the eleven node subclasses the repo actually has**, so in practice every non-trivial scene needs application-authored round-trip code (A-14 is the UI instance of this).
@@ -489,7 +578,7 @@ _Closure plan:_ ship `registerSceneNodeTypes()` from the umbrella `four` package
 
 ### A-17 — §79 restored node ids can collide with engine-assigned ids
 
-> **CLOSED 2026-08-06.** `NodeOptions.id` restores and *reserves* an id at construction;
+> **CLOSED 2026-08-06.** `NodeOptions.id` restores and _reserves_ an id at construction;
 > `restoreNodeId` moved into `@four/scene` (which owns the field) for the `nodeFactory` path;
 > `instantiateScene` refuses a document producing one id twice with `INVALID_SCENE_GRAPH`.
 
@@ -542,20 +631,31 @@ _Closure plan:_ one line in `packages/render-webgpu/README.md` and a `TODO.md` e
 
 ### A-21 — Four §93 worked scenes and both §118/§119 flagships are empty `.gitkeep` directories that shipped docs link to
 
+> **PARTIALLY CLOSED 2026-08-07** (second half; `first-3d-scene` was the first) —
+> `examples/flagship/one-scene-everything-moves` is written: §118's full list in one
+> scene (textured lit cube, 2D vector orbit, spring pendulum, bouncing body with §29
+> event-driven bursts, motorised hinge, world text riding a body, camera-parented UI
+> panel, §16 timeline, pause/slow-motion/single-step, keyboard operable), built by
+> `pnpm examples:build`, previewed on Playwright's eighth server, measured by six tests
+> counting objects by hue and checking pause (exactly 0 changed pixels) and single-step
+> (exactly 1/60 s) against §10's accumulator. First example on the §62/§37 `"auto"`
+> registries and the first to assemble the §113 overlay. Still open: the three §93
+> stand-in scenes (owner retire-or-write decision) and §119's `motor-digital-twin`.
+
 **§93, §97, §118, §119, §113a** · **Severity: Critical** · **Effort: L** · **SILENT (and actively mis-stated in `docs/AUDIT-120.md`)**
 
 _Verified by `git ls-files examples/`:_
 
-| directory                                       | contents   |
-| ----------------------------------------------- | ---------- |
-| `examples/first-3d-scene/`                      | `.gitkeep` |
-| `examples/first-animated-scene/`                | `.gitkeep` |
-| `examples/first-physics-scene/`                 | `.gitkeep` |
-| `examples/mixed-scene/`                         | `.gitkeep` |
-| `examples/flagship/one-scene-everything-moves/` | `.gitkeep` |
-| `examples/flagship/motor-digital-twin/`         | `.gitkeep` |
+| directory                                       | contents                                                                    |
+| ----------------------------------------------- | --------------------------------------------------------------------------- |
+| `examples/first-3d-scene/`                      | `.gitkeep` — **written 2026-08-07** (see banner above this table's section) |
+| `examples/first-animated-scene/`                | `.gitkeep`                                                                  |
+| `examples/first-physics-scene/`                 | `.gitkeep`                                                                  |
+| `examples/mixed-scene/`                         | `.gitkeep`                                                                  |
+| `examples/flagship/one-scene-everything-moves/` | `.gitkeep`                                                                  |
+| `examples/flagship/motor-digital-twin/`         | `.gitkeep`                                                                  |
 
-**Six real examples exist** — `first-2d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo` — and each is genuinely good (built by `pnpm examples:build`, previewed and asserted by a Playwright spec, guarded against config drift by `tests/integration/examples-build-coverage.test.ts`).
+**Six real examples exist** (seven since 2026-08-07: `first-3d-scene` was written — first `PerspectiveCamera`, first lit 3D mesh in a browser, 5 measuring Playwright tests) — `first-2d-scene`, `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo` — and each is genuinely good (built by `pnpm examples:build`, previewed and asserted by a Playwright spec, guarded against config drift by `tests/integration/examples-build-coverage.test.ts`).
 
 **Three separate documents assert otherwise:**
 
@@ -618,6 +718,16 @@ _Dependencies:_ owner decision (spec amendment); blocks A-21 step 3.
 
 ### A-23 — §96 security requirements are entirely unimplemented
 
+> **CLOSED 2026-08-07** — asset `maximumBytes` (64 MiB, checked against `content-length`
+> before the body is read and again against the bytes a loader reads) + `timeoutSeconds`
+> (30 s, injectable `TimerLike`); `decodeSceneDocument`/`decodeReplayRecording` over
+> `@four/core`'s `parseUntrustedJson` (32 Mi code units, 1024 levels, **iterative** depth
+> walk); new `UNTRUSTED_INPUT_REJECTED` code; `docs/guides/security-and-untrusted-content.md`
+> with the honest requirement table; the CSP posture enforced by
+> `tests/integration/security-csp.test.ts`. Closes A-18's deadline half. Still absent, now
+> recorded: decompression limits (no compressed path exists yet) and plugin boundaries
+> (A-3). Kept for the record.
+
 **§96, §76, §79** · **Severity: High** · **Effort: M** · **SILENT**
 
 §96 opens _"Asset loaders and scene deserializers shall treat external content as untrusted"_ and lists seven requirements. Verified state:
@@ -666,6 +776,15 @@ _Closure plan:_
 
 ### A-25 — §94 release machinery does not exist; `website/` is a stub
 
+> **MACHINERY CLOSED 2026-08-07** — steps 1–4 shipped: hand-authored Changesets config
+> (with the discovered blocker that the reserved stubs cannot be `ignore`d while the
+> umbrella depends on them — owner decision recorded in TODO), `apply-publish-names.mjs`
+> (+tests; rewrites emitted code, not just manifests — 405 specifier sites),
+> `release.yml` reusing ci.yml via `workflow_call` with publish gated on `NPM_TOKEN`,
+> `docs.yml` Pages deploy of TypeDoc + the six examples, honest `website/README.md` +
+> minimal index. Still open: the real site (guides hosting, flagship demo — A-21) and the
+> owner-only steps (token, Pages enablement, stub packaging decision).
+
 **§94, §93, §113a, §90** · **Severity: High** · **Effort: M** · **SEMI-RECORDED**
 
 _Verified:_
@@ -691,6 +810,12 @@ _Dependencies:_ owner decision for the actual publish; steps 1–4 are mechanica
 ---
 
 ### A-26 — §90 compatibility tables have never been published
+
+> **CLOSED 2026-08-07** — `docs/COMPATIBILITY.md` publishes the five tables; the
+> solver-adapter block is generated from the adapters' own capability declarations by
+> `tools/generate-compatibility.mjs` (`--check` detects drift), which names
+> `SolverBodyAccess`/`SolverJointAccess` per ARCHITECTURE.md's expectation. The three
+> forward-looking references now point at the real document. Kept for the record.
 
 **§90** · **Severity: Medium** · **Effort: S** · **SILENT**
 
@@ -814,6 +939,16 @@ Every claim below was checked against source, not against documentation. Where a
 
 ### R-2 — No backend selection; `renderer: "auto"` does not exist
 
+> **CLOSED 2026-08-07** — `packages/render/src/renderer-registry.ts` +
+> `registerWebglRenderer()`. §62's preference order (WebGPU → WebGL 2 → Canvas 2D →
+> SVG; registration order ignored — §33; headless never auto-selected),
+> fallback-on-initialization-failure with disposal, fail-fast on an explicit name, §85
+> failures naming what is registered. §62's diagnostics event is an `onFallback`
+> callback (no `render → diagnostics` edge exists). Explicit registration, never
+> side-effect imports (`"sideEffects": false` makes those deletable). **Left open:**
+> only one backend is registrable, so the ladder's upper rungs are exercised against
+> doubles (R-1).
+
 **§62, §45.** §62 requires `renderer: "auto"` with WebGPU → WebGL 2 → 2D preference, a diagnostics event on WebGPU failure, and fail-fast `RENDERER_INITIALIZATION_FAILED` on explicit `"webgpu"`. `ApplicationOptions.renderer` (`packages/four/src/application.ts:197`) is `Renderer | false` — an **instance** the app constructs. There is no registry, no string form, no fallback path.
 **Missing:** the whole §62 selection layer; also §45's `width`/`height`/`resolution`/`alpha`/`powerPreference`/`autoResize` (TODO at `application.ts:146`).
 **Severity:** blocker for a real app — every consumer must hardcode a backend import, which defeats the payload argument the deferral was made for.
@@ -830,6 +965,18 @@ Every claim below was checked against source, not against documentation. Where a
 
 ### R-4 — No render targets, no `createTexture`, no `readPixels` — nothing renders off-screen
 
+> **CLOSED 2026-08-07** (minimal tier) — `RenderTarget` in `@four/render`,
+> `RenderTargetCache` in `@four/render-webgl`, `Renderer.render(root, views,
+interpolation?, target?)`; render-to-texture verified end-to-end
+> (`tests/integration/render-to-texture.test.ts`) through the untouched
+> `MaterialTexture` seam. A no-target frame issues zero framebuffer calls (byte-identical
+> 449-call proof); FBO binding lives inside the F13 exception envelope; feedback loops
+> refused. Deviations documented in source: target rides on `render`, not
+> `Viewport.renderTarget`; `createRenderTarget` deferred by decision (CPU descriptor +
+> backend cache). Still absent, staged with dates: `readPixels` (needs `Rectangle2`),
+> stencil (R-7), MRT, multisample, float formats, samplable depth (§69). Unblocks
+> R-5/R-6. Kept for the record.
+
 **§61, §48, §63.** Three of §61's eight members are absent, written out as a typed TODO at `packages/render/src/renderer.ts:273-290`. Consequence chain, all verified:
 
 - `Viewport` (`packages/scene/src/viewport.ts:50`) has no `renderTarget` → §48's minimaps-to-texture, picture-in-picture, mirrors, portals, offscreen textures, and "3D model previews inside 2D UI" are all unbuildable.
@@ -843,12 +990,35 @@ Every claim below was checked against source, not against documentation. Where a
 
 ### R-5 — §63 render graph does not exist
 
+> **CLOSED 2026-08-07 (linear-pass tier).** `RenderGraph` in `@four/render`: named,
+> ordered, enableable passes over R-4's target seam, one `execute()` call,
+> transcript-identical to the hand-written `renderer.render` calls it replaces.
+> Shipped: declared `inputs` (acyclic by construction) + discovered sampled-target
+> validation (`buildRenderList` + `isRenderTargetTexture` — sees what the backend
+> sees), enable/disable, per-pass viewports, textual `describe()`, an honest `"opaque"`
+> issue on every `CustomRenderPass`. Staged with dated reasons: transient targets,
+> resource lifetimes, barriers (backend facts; real for WebGPU), on-screen debug view
+> (needs §70's blit). §63's fixed pass order is now _expressible_ but not prescribed —
+> R-10/R-29 still own ordering/sorting. Unblocks R-6: effects are graph passes. Kept
+> for the record.
+
 **§63.** Zero implementation. The only source references are three lines naming §63 as _somebody else's_ prerequisite (`renderer.ts:285`, `texture.ts:181`, `viewport.ts:42`). The spec's `Four.RenderGraph` example, pass dependencies, transient targets, resource lifetime, barriers, pass enable/disable, per-viewport pipelines, and debug visualization are all absent. `docs/guides/materials-and-render-graph.md` is honest about this.
 **Severity:** major. **Effort:** L. **Depends on:** R-4.
 **Recorded:** ⚠️ **partially — no design note or dated staging record owns §63.** It appears only in `OVERVIEW.md:190`'s staged list, added after the fact. No file in `packages/render/src` claims it.
 **Closure:** `packages/render/src/render-graph.ts` (DAG of passes + resource handles, backend-independent) plus a backend pass-executor seam. Note §63's fixed pass order (depth prepass → shadows → opaque → transparent → world vectors/text → post → screen UI → composite) is also the missing structure behind R-10 and R-29.
 
 ### R-6 — §70 post-processing: zero references anywhere in the codebase ⚠️
+
+> **CLOSED 2026-08-07 (full-screen effect tier)** — the ⚠️ silent flag drops: blit
+> (`COPY_EFFECT`, bit-exact) + colour grade ship as `EffectRenderPass`, a first-class
+> third `RenderGraph` pass kind whose `source` field `validate()` checks exactly;
+> `Renderer.renderEffect` is optional (presence is the capability) and a separate verb,
+> so `render`'s transcript is pinned unchanged. The eight staged effects each name the
+> resource they wait on in `packages/render/src/effect-pass.ts` (tone mapping → §60a +
+> float targets; bloom → transient pool; AA/DoF/motion-blur/SSAO → MSAA/samplable
+> depth/MRT; outlines → R-7/§71; user shaders → R-14, which widens the closed
+> `ScreenEffect` union; distortion → second input). ui-demo's budget moved 30 → 31 kB
+> on a proven structural conflict, recorded in CHANGELOG/MEMORY. Kept for the record.
 
 **§70.** Grepping `§70`, `postProcess`, `toneMapping`, `bloom`, `SSAO`, `outline` across `packages/*/src` returns **nothing**. None of tone mapping, colour grading, bloom, AA, DoF, motion blur, SSAO, outlines/selection highlighting, distortion, or custom full-screen passes exists, and there is no seam through which a consumer could add one. §70's "composable per viewport" requirement has no carrier (`Viewport.postProcessing` is absent, R-4).
 **Severity:** major (blocker for anything wanting selection outlines — an explicit §70 bullet and an obvious need for the §119 engineering demo).
@@ -930,6 +1100,14 @@ The set is **closed at the type level**, which is the ergonomics half of this ga
 
 ### R-14 — §60 shader / node-material system: no user shaders exist, at any level
 
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0001-shader-and-node-material-system.md`
+> proposes a serializable shader graph in `@four/materials` as the unit of extension,
+> with no user GLSL/WGSL at any tier; a separate lazily-compiled, explicitly-registered
+> node pipeline preserving R-19's byte-identical GL sequence; and one new `ScreenEffect`
+> member (`GraphEffect`) that stays checkable by `RenderGraph.validate()` rather than
+> reporting opacity. Status draft, **owner decision pending** — the packet is blocked on
+> it.
+
 **§60.** Nothing in the shipped surface accepts user GLSL or WGSL. The four programs (`UnlitProgram`, `LitProgram`, `SpriteProgram`, `ParticleProgram`) are compiled from string constants private to `packages/render-webgl/src/gl-program.ts` and `gl-particles.ts`. None of §60's compiler (WGSL/GLSL ES generation, reduced Canvas/SVG fallbacks), node graph, reusable functions, uniform blocks, storage buffers, conditional variants, reflection metadata, or source maps exists.
 **Severity:** blocker for the "advanced users" §60 names, and the root cause of R-1's cost and R-6's impossibility.
 **Effort:** L (largest single item in the domain).
@@ -977,6 +1155,14 @@ The set is **closed at the type level**, which is the ergonomics half of this ga
 
 ### R-19 — Sprites and 3D geometry cannot be textured; §53 ships two of eight standard attributes
 
+> **CLOSED 2026-08-07** (the load-bearing half) — `BufferGeometry.uvs`/`.colors` on the
+> `normals` precedent; `UnlitMaterial.map`/`.vertexColors` and `LitMaterial.map` over the
+> new `MaterialTexture` contract; uv/colour streams in `@four/render-webgl` behind a
+> uniform switch whose GL-initial-`0` default keeps untextured scenes byte-identical
+> (pixel goldens unchanged). R-35's data path now exists. Sprite's derived-uv path stays,
+> deliberately — §55's atlas packet owns the rewrite. Tangents, second uv, joints/weights,
+> and instance transform remain deferred. Kept for the record.
+
 **§53, §54, §55.** `BufferGeometry` carries `positions`, optional `normals`, optional `indices`, `mode` — and nothing else (`packages/geometry/src/buffer-geometry.ts:293-355`). §53's standard set requires position, normal, **tangent, color, uv and secondary uv, joints and weights, instance transform, custom typed attributes**. Six of eight are absent.
 
 The sharpest consequence is not obvious from the attribute list: **there is no way to texture a mesh.** `UnlitMaterial` and `LitMaterial` carry a colour and no texture; only `Sprite` samples a texture, and it derives uv **from vertex position** as a documented workaround (`packages/render/src/sprite.ts:56-66`). So a textured box, a textured ground plane, or a textured glTF mesh is unreachable through the public API.
@@ -992,6 +1178,13 @@ Secondary consequence: no per-vertex `color` attribute is why §113's debug-draw
 
 ### R-20 — §53: 3 of 11 required 3D primitives; no sphere, no cylinder, no capsule, no torus
 
+> **CLOSED 2026-08-07** — nine primitives shipped (`sphere`, `cylinder`, `cone`,
+> `capsule`, `torus`, `lathe`, `extrude`, `tube`, `heightField`): Y-up, centred, CCW,
+> analytic normals + uvs, §85-validated, tests recomputing face normals from positions as
+> an independent oracle. `extrude` rejects concave capped outlines until §52's
+> tessellation module; `tube` is parallel-transported; `capsule.height` matches §24's
+> collider measurement. Kept for the record.
+
 **§53.** `@four/geometry` exports `boxGeometry`, `planeGeometry`, `circleGeometry2D` (`packages/geometry/src/primitives.ts`). Missing: **sphere, cylinder, cone, capsule, torus, lathe, extrusion, tube, height field** — nine of eleven.
 **Severity:** blocker. `@four/physics` ships sphere, capsule and cylinder _colliders_; there is no way to draw them. Every physics demo therefore renders boxes for round bodies, and §119's motor model is unbuildable.
 **Effort:** M (mechanical; the winding/normal conventions and validation patterns are already established and tested).
@@ -1005,6 +1198,15 @@ Secondary consequence: no per-vertex `color` attribute is why §113's debug-draw
 **Effort:** S–M. **Recorded:** yes — `buffer-geometry.ts:5-16,86-91`.
 
 ### R-22 — §54 Mesh, instancing, LOD, morph targets, skinning: entirely absent ⚠️
+
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0003-skinning-and-skeletal-animation.md`
+> covers both halves (PH-10 + R-22's skinning rows): joints/weights as `BufferGeometry`
+> attributes at locations 4/5, `Bone`/`Skeleton` as scene-graph nodes (§42 authority and
+> §19 blending need no new mechanism), skinned draws as a separate lazily-compiled
+> pipeline. Findings: §54's `morphTargetWeights` placement is unimplementable under the
+> frozen §3.1 matrix; §17's two missing track types are binding gaps, not `ValueKind`
+> gaps. Status draft, **owner decision pending** — bone-axis convention is the named
+> question.
 
 **§54.** Grepping `§54` across `packages/*/src` returns **one** incidental hit. Verified absent, all of it:
 
@@ -1120,6 +1322,16 @@ Worse, because §55's `frame` sub-rectangle is missing (R-30) a sprite maps its 
 **Recorded:** yes — `TODO.md` "Phase 9 backlog: §27 field batching".
 
 ### R-35 — §113/§120 debug drawing cannot be rendered: `GL.LINES` carries no per-vertex colour
+
+> **CLOSED 2026-08-07** — `debugDrawStreams(buffer, out?)` / `applyDebugDrawStreams`
+> in `@four/diagnostics` de-interleave the 7-float layout into exactly-sized
+> `positions`/`colors` arrays that spread straight into `BufferGeometryOptions` (no new
+> §3.1 edge — the duck-typed-contract pattern's third instance), over R-19's `colors`
+> attribute and `vertexColors` material flag; the whole overlay is one draw call at any
+> segment count, proven in `tests/integration/debug-overlay-render.test.ts` and the
+> render-webgl lines test. `DEBUG_DRAW_STAGED` loses `"per-segment-colored-draw"`;
+> `joint-anchors` and `applied-force-vectors` remain genuinely seam-blocked. Unblocks
+> the §118/§119 force/torque overlays. Kept for the record.
 
 **§120 "debug drawing", §84.** The data path ships (seven providers in `packages/diagnostics/src/debug-draw.ts`). Drawing them needs a per-segment vertex-colour attribute, which `BufferGeometry` does not have (R-19) and `UnlitProgram` does not consume. So the overlay has never been shown as pixels.
 **Severity:** minor for a shipping app, **major** for §118/§119 (both list force/torque vector overlays as required features).
@@ -1243,6 +1455,17 @@ The failure mode is structural, not cultural: **the discipline is indexed on §1
 
 ## PH-1 — Post-registration property changes never reach the solver (and the doc claims they do)
 
+> **CLOSED 2026-08-07 (stage 2; stage 1 truth table 2026-08-06).**
+> `SolverBodyTuningAccess` (`packages/physics/src/body-access.ts`) carries §37's property
+> changes; `PhysicsWorld.step` drains `RigidBody.pendingSolverWrites` and
+> `refreshCollider`'s per-collider flag at the top of the step, ascending body id then
+> ascending collider id. Both Rapier adapters implement the seam;
+> `PhysicsWorld.supportsLiveProperties` declares it. `mass`, both dampings,
+> `gravityScale`, `ccdMode`, and a collider's §25 material / §24 filter are live;
+> `mass = undefined` stays warn-only, documented as permanently unreachable.
+> `PhysicsWorld.teleport` closes the "teleports have no stable-API route" half. Goldens
+> unmoved — a quiet world's solver-call sequence is unchanged. Kept for the record.
+
 |                       |                                                                                                                                                                                                                                                 |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Spec**              | §37 (`syncSceneToSolver` "pushes scene-authored state into the solver (kinematic targets, **teleports, property changes**)"), §23, §24                                                                                                          |
@@ -1315,6 +1538,15 @@ Unreachable through `PhysicsWorld` today (its only `destroyCollider` call is ins
 
 ## PH-5 — No runtime collider add/remove on a registered body
 
+> **CLOSED 2026-08-07.** `PhysicsWorld.addCollider` / `removeCollider`, resolving the
+> body through `Collider.requireBody()` (one source of truth with `addBody`'s scan).
+> `registration.colliders` stays ascending-by-id; `#collidersById`/`#collidersByComponent`
+> give event, query, and handle visibility; a pending `refreshCollider` is dropped with
+> its collider. Mass proven across add **and** remove on authored- and derived-mass
+> bodies, against the double and real Rapier in both dimensions. §34 needed nothing —
+> the envelope's collider table already re-derives `BodyRecord.colliderIds`. Goldens
+> unchanged. Kept for the record.
+
 |                       |                                    |
 | --------------------- | ---------------------------------- |
 | **Spec**              | §24, §83 (resource lifecycle), §37 |
@@ -1334,7 +1566,7 @@ Unreachable through `PhysicsWorld` today (its only `destroyCollider` call is ins
 > through `validateReplayRecording`, re-attached in `ReplayPlayer.#snapshotAt`.
 > `REPLAY_FORMAT_VERSION` is 2 with `SUPPORTED_REPLAY_FORMAT_VERSIONS = [1, 2]`; a document
 > declares the lowest version that can express it, so every version-1 recording still
-> validates *and re-encodes byte for byte*. `golden/phase10.json` was amended envelope-only
+> validates _and re-encodes byte for byte_. `golden/phase10.json` was amended envelope-only
 > (`recordingDigest`, `recordingLength`) with the neutralized-capture proof recorded in the
 > file — see `CHANGELOG.md`.
 
@@ -1396,6 +1628,16 @@ Bodies and colliders re-assign every field in **both** adapters; joints are the 
 
 ## PH-9 — §18 state machines, blend trees, layered and additive animation: never scheduled
 
+> **PARTIALLY CLOSED 2026-08-07** — the §18 state-machine tier ships
+> (`packages/animation/src/controller.ts`): states over clips, typed transitions with
+> duration/exit time (seconds, §7a)/interruption, parameters + latched triggers — seven
+> of §18's nine features, blending per channel through `ValueAdapter` under one claim
+> in the §16 registry, with unit coverage at 100% and its own 600-step determinism
+> golden (`golden/animation-controller.json`, transcendental-free). Blend trees and
+> layered/additive animation remain open, staged in the module header with dated
+> notes; the §18/§97a/§100 spec claims are now stale and recorded as a spec-revisit
+> item in TODO.
+
 |                       |                                                                                                                                                                                                                                                                              |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Spec**              | §14, §18 (`Four.AnimationController` with states/transitions/parameters/triggers/exit time/interruption/blend trees/layers), §100 (_"@four/animation responsibilities: … state machines; blend trees"_)                                                                      |
@@ -1411,6 +1653,15 @@ This is the same **structural** class of gap that `docs/AUDIT-120.md` documents 
 ---
 
 ## PH-10 — Skeletal animation, skinning, and morph targets absent everywhere
+
+> **RFC DRAFTED 2026-08-07** — `docs/rfcs/0003-skinning-and-skeletal-animation.md`
+> covers both halves (PH-10 + R-22's skinning rows): joints/weights as `BufferGeometry`
+> attributes at locations 4/5, `Bone`/`Skeleton` as scene-graph nodes (§42 authority and
+> §19 blending need no new mechanism), skinned draws as a separate lazily-compiled
+> pipeline. Findings: §54's `morphTargetWeights` placement is unimplementable under the
+> frozen §3.1 matrix; §17's two missing track types are binding gaps, not `ValueKind`
+> gaps. Status draft, **owner decision pending** — bone-axis convention is the named
+> question.
 
 |                       |                                                                                                                                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1454,6 +1705,10 @@ Nothing in `@four/scene` carries a space mode; `Node` has `transform`, `visible`
 ---
 
 ## PH-13 — §40 `UnitSystem` unshipped
+
+> **CLOSED 2026-08-07** — one closure with A-2 (this was the same item filed from two
+> tiers); see A-2's banner. The physics-side step (§41 envelope in SI via
+> `PhysicsWorldOptions.units`) is staged as its own `@four/physics` packet.
 
 |                       |                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1558,6 +1813,14 @@ The umbrella (`packages/four/src/index.ts`) exports one namespace per package pl
 ---
 
 ## PH-19 — `solver: "auto"` selection and capability-driven solver choice unimplemented
+
+> **CLOSED 2026-08-07** — `packages/physics/src/solver-registry.ts` +
+> `registerRapierSolver()`; `PhysicsWorldInit.solver` takes `"auto"` or a §102 name
+> (`adapter` becomes the optional alternative, xor enforced loudly). `"auto"` filters
+> on §37 `capabilities` (dimension, determinism tier) in registration order — §37
+> fixes no preference and one was not invented. A named solver is handed back
+> unfiltered so the world reports mismatches with its own §21/§33 message. **Left
+> open:** only Rapier is registrable (§102's box2d/soft are still stubs).
 
 |                       |                                                                                                                                                                                                                         |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

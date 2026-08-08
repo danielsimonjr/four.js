@@ -23,7 +23,10 @@ What becomes easier, what becomes harder, what is committed to.
 
 ## Compatibility analysis
 
-Effect on public API, scene format, solver adapters, plugin API (§90 tables).
+Effect on public API, scene format, solver adapters, plugin API — the §90 tables, published as
+[docs/COMPATIBILITY.md](../COMPATIBILITY.md). Name the rows this RFC moves; if it changes a solver
+adapter's capability declarations, regenerate that document's adapter block with
+`node tools/generate-compatibility.mjs`.
 
 ## Prototype / benchmark
 

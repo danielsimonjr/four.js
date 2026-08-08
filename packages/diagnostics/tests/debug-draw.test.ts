@@ -29,6 +29,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  DEBUG_COLOR_FLOATS_PER_SEGMENT,
   DEBUG_DRAW_DEFAULT_COLORS,
   DEBUG_DRAW_STAGED,
   DEBUG_POSITION_FLOATS_PER_SEGMENT,
@@ -39,15 +40,19 @@ import {
   type DebugBodyAccess,
   type DebugCenterOfMassAccess,
   type DebugColor,
+  type DebugDrawStreams,
+  type DebugGeometrySink,
   type DebugJointAccess,
   type DebugPhysicsEventLike,
   type SolverJointStatistics,
   type SolverStatistics,
+  applyDebugDrawStreams,
   collectBodyOrigins,
   collectBodyVelocities,
   collectCentersOfMass,
   collectContactImpulses,
   collectContactPoints,
+  debugDrawStreams,
   solverJointStatistics,
   solverStatistics,
 } from "../src/debug-draw.js";
@@ -266,7 +271,13 @@ describe("layout constants", () => {
     expect(DEBUG_VERTEX_FLOATS).toBe(7);
     expect(DEBUG_SEGMENT_FLOATS).toBe(14);
     expect(DEBUG_POSITION_FLOATS_PER_SEGMENT).toBe(6);
+    expect(DEBUG_COLOR_FLOATS_PER_SEGMENT).toBe(8);
     expect(DEBUG_SEGMENT_FLOATS).toBe(DEBUG_VERTEX_FLOATS * 2);
+    // The de-interleave is lossless: the two output streams together hold
+    // exactly what one interleaved segment holds.
+    expect(
+      DEBUG_POSITION_FLOATS_PER_SEGMENT + DEBUG_COLOR_FLOATS_PER_SEGMENT,
+    ).toBe(DEBUG_SEGMENT_FLOATS);
   });
 });
 
@@ -517,6 +528,376 @@ describe("writePositionsForColor", () => {
     expect(() =>
       buffer.writePositionsForColor(new Float32Array(6), RED, -1),
     ).toThrow(RangeError);
+  });
+});
+
+// --- writeColors ------------------------------------------------------------
+
+describe("writeColors", () => {
+  it("writes 8 floats per segment — the colour of each endpoint, in order", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 2, 3), point(4, 5, 6), RED);
+    buffer.addLine(point(7, 8, 9), point(10, 11, 12), BLUE);
+
+    const out = new Float32Array(16);
+    expect(buffer.writeColors(out)).toBe(16);
+    expect(buffer.colorFloatLength).toBe(16);
+    // Both endpoints of a segment carry that segment's colour: the "expansion"
+    // §60a needs for a per-vertex attribute is already in the buffer's layout,
+    // so this is a copy, not a broadcast.
+    expect(Array.from(out)).toEqual([
+      1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1,
+    ]);
+  });
+
+  it("copies each endpoint's own colour, so a gradient segment survives", () => {
+    // Nothing in the public API writes two different endpoint colours today,
+    // but the layout allows it and this method must not collapse them — the
+    // module header promises gradients need no layout change.
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(0, 0, 0), point(1, 0, 0), RED);
+    buffer.data[10] = 0;
+    buffer.data[11] = 1;
+    buffer.data[12] = 0;
+    buffer.data[13] = 0.5;
+
+    const out = new Float32Array(8);
+    buffer.writeColors(out);
+    expect(Array.from(out)).toEqual([1, 0, 0, 1, 0, 1, 0, 0.5]);
+  });
+
+  it("honours an offset and leaves the rest of the destination untouched", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(0, 0, 0), point(1, 0, 0), RED);
+
+    const out = new Float32Array(10).fill(-1);
+    expect(buffer.writeColors(out, 2)).toBe(8);
+    expect(Array.from(out)).toEqual([-1, -1, 1, 0, 0, 1, 1, 0, 0, 1]);
+  });
+
+  it("throws when the destination is too small or the offset is invalid", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(0, 0, 0), point(1, 0, 0), RED);
+    expect(() => buffer.writeColors(new Float32Array(7))).toThrow(RangeError);
+    expect(() => buffer.writeColors(new Float32Array(8), 1)).toThrow(
+      RangeError,
+    );
+    expect(() => buffer.writeColors(new Float32Array(8), -1)).toThrow(
+      RangeError,
+    );
+    expect(() => buffer.writeColors(new Float32Array(8), 1.5)).toThrow(
+      RangeError,
+    );
+  });
+
+  it("writes nothing for an empty buffer", () => {
+    const buffer = new DebugDrawBuffer();
+    expect(buffer.writeColors(new Float32Array(0))).toBe(0);
+    expect(buffer.colorFloatLength).toBe(0);
+  });
+
+  it("ignores segments dropped by clear(), like writePositions", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(0, 0, 0), point(1, 0, 0), RED);
+    buffer.clear();
+    const out = new Float32Array(8).fill(-1);
+    expect(buffer.writeColors(out)).toBe(0);
+    expect(Array.from(out)).toEqual([-1, -1, -1, -1, -1, -1, -1, -1]);
+  });
+});
+
+// --- debugDrawStreams (R-35) ------------------------------------------------
+
+/**
+ * A stand-in for `BufferGeometry` with the three members
+ * {@link DebugGeometrySink} names, plus the one rule that makes the assignment
+ * *order* in `applyDebugDrawStreams` load-bearing: assigning `positions` while
+ * colours of a different vertex count are attached throws, exactly as §85's
+ * index-alignment check does in `packages/geometry/src/buffer-geometry.ts`.
+ *
+ * This is the seam's honest cost, same as `DebugBodyAccess`: nothing
+ * type-checks it against the real class, so this fake mirrors the *semantics*
+ * and the tests fail if the rule changes.
+ */
+class FakeGeometry implements DebugGeometrySink {
+  #positions: Float32Array;
+
+  #colors: Float32Array | undefined;
+
+  version = 0;
+
+  constructor(positions = new Float32Array(0)) {
+    this.#positions = positions;
+  }
+
+  get positions(): Float32Array {
+    return this.#positions;
+  }
+
+  set positions(value: Float32Array) {
+    if (
+      this.#colors !== undefined &&
+      this.#colors.length !== (value.length / 3) * 4
+    ) {
+      throw new RangeError("colors are not index-aligned with positions (§85)");
+    }
+    this.#positions = value;
+    this.version += 1;
+  }
+
+  get colors(): Float32Array | undefined {
+    return this.#colors;
+  }
+
+  set colors(value: Float32Array | undefined) {
+    if (
+      value !== undefined &&
+      value.length !== (this.#positions.length / 3) * 4
+    ) {
+      throw new RangeError("colors are not index-aligned with positions (§85)");
+    }
+    this.#colors = value;
+    this.version += 1;
+  }
+
+  markDirty(): void {
+    this.version += 1;
+  }
+}
+
+describe("debugDrawStreams", () => {
+  it("de-interleaves into exactly-sized positions and colors", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 2, 3), point(4, 5, 6), RED);
+    buffer.addLine(point(7, 8, 9), point(10, 11, 12), BLUE);
+
+    const streams = debugDrawStreams(buffer);
+
+    expect(streams.segmentCount).toBe(2);
+    expect(streams.vertexCount).toBe(4);
+    expect(streams.resized).toBe(true);
+    // Exactly sized, not merely large enough: BufferGeometry rejects a slack
+    // tail, because `colors.length` must be four floats per position vertex.
+    expect(streams.positions.length).toBe(12);
+    expect(streams.colors.length).toBe(16);
+    expect(streams.colors.length).toBe((streams.positions.length / 3) * 4);
+    expect(Array.from(streams.positions)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
+    expect(Array.from(streams.colors)).toEqual([
+      1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1,
+    ]);
+  });
+
+  it("agrees with writePositions / writeColors — it is the same packing", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addCross(point(1, 1, 1), 0.5, RED);
+    buffer.addVector(point(0, 0, 0), point(0, 2, 0), 0.5, BLUE);
+
+    const streams = debugDrawStreams(buffer);
+    const positions = new Float32Array(buffer.positionFloatLength);
+    const colors = new Float32Array(buffer.colorFloatLength);
+    buffer.writePositions(positions);
+    buffer.writeColors(colors);
+
+    expect(Array.from(streams.positions)).toEqual(Array.from(positions));
+    expect(Array.from(streams.colors)).toEqual(Array.from(colors));
+    expect(streams.segmentCount).toBe(4);
+  });
+
+  it("reuses the arrays in place while the segment count holds (§7b)", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    const streams = debugDrawStreams(buffer);
+    const positions = streams.positions;
+    const colors = streams.colors;
+
+    // A second frame with the same number of segments but new values.
+    buffer.clear();
+    buffer.addLine(point(9, 0, 0), point(8, 0, 0), BLUE);
+    const again = debugDrawStreams(buffer, streams);
+
+    expect(again).toBe(streams);
+    expect(again.positions).toBe(positions);
+    expect(again.colors).toBe(colors);
+    expect(again.resized).toBe(false);
+    expect(Array.from(positions)).toEqual([9, 0, 0, 8, 0, 0]);
+    expect(Array.from(colors)).toEqual([0, 0, 1, 1, 0, 0, 1, 1]);
+  });
+
+  it("replaces the arrays when the segment count moves, and says so", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    const streams = debugDrawStreams(buffer);
+    const positions = streams.positions;
+
+    buffer.addLine(point(3, 0, 0), point(4, 0, 0), BLUE);
+    debugDrawStreams(buffer, streams);
+
+    expect(streams.resized).toBe(true);
+    expect(streams.positions).not.toBe(positions);
+    expect(streams.positions.length).toBe(12);
+    expect(streams.colors.length).toBe(16);
+    expect(streams.segmentCount).toBe(2);
+
+    // …and back down again.
+    buffer.clear();
+    buffer.addLine(point(5, 0, 0), point(6, 0, 0), RED);
+    debugDrawStreams(buffer, streams);
+    expect(streams.resized).toBe(true);
+    expect(streams.positions.length).toBe(6);
+    expect(streams.colors.length).toBe(8);
+  });
+
+  it("yields two empty arrays for an empty buffer", () => {
+    const buffer = new DebugDrawBuffer();
+    const streams = debugDrawStreams(buffer);
+
+    expect(streams.segmentCount).toBe(0);
+    expect(streams.vertexCount).toBe(0);
+    expect(streams.positions.length).toBe(0);
+    expect(streams.colors.length).toBe(0);
+    // An overlay with nothing to draw needs no special case: a zero-vertex
+    // "lines" geometry is legal and draws nothing.
+    expect(streams.resized).toBe(true);
+
+    // Clearing back to empty from a non-empty frame reuses the record.
+    buffer.addLine(point(0, 0, 0), point(1, 0, 0), RED);
+    debugDrawStreams(buffer, streams);
+    buffer.clear();
+    debugDrawStreams(buffer, streams);
+    expect(streams.positions.length).toBe(0);
+    expect(streams.colors.length).toBe(0);
+    expect(streams.segmentCount).toBe(0);
+  });
+
+  it("re-packs a hand-built record with mismatched arrays", () => {
+    // `out` is a plain record, so a caller can mint one; a wrong-sized array in
+    // it must be replaced rather than written past.
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    const hand: DebugDrawStreams = {
+      positions: new Float32Array(3),
+      colors: new Float32Array(99),
+      segmentCount: 42,
+      vertexCount: 84,
+      resized: false,
+    };
+
+    debugDrawStreams(buffer, hand);
+
+    expect(hand.resized).toBe(true);
+    expect(hand.positions.length).toBe(6);
+    expect(hand.colors.length).toBe(8);
+    expect(hand.segmentCount).toBe(1);
+    expect(hand.vertexCount).toBe(2);
+  });
+
+  it("allocates no arrays per frame once the count is steady", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(0, 0, 0), point(1, 0, 0), RED);
+    const streams = debugDrawStreams(buffer);
+    const positions = streams.positions;
+    const colors = streams.colors;
+
+    for (let frame = 0; frame < 10; frame += 1) {
+      buffer.clear();
+      buffer.addLine(point(frame, 0, 0), point(frame + 1, 0, 0), RED);
+      debugDrawStreams(buffer, streams);
+      expect(streams.positions).toBe(positions);
+      expect(streams.colors).toBe(colors);
+    }
+  });
+});
+
+describe("applyDebugDrawStreams", () => {
+  it("points a geometry at the streams on the first call", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    const streams = debugDrawStreams(buffer);
+    const geometry = new FakeGeometry();
+
+    applyDebugDrawStreams(streams, geometry);
+
+    expect(geometry.positions).toBe(streams.positions);
+    expect(geometry.colors).toBe(streams.colors);
+  });
+
+  it("only bumps the version when the arrays were rewritten in place", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    const streams = debugDrawStreams(buffer);
+    const geometry = new FakeGeometry();
+    applyDebugDrawStreams(streams, geometry);
+    const version = geometry.version;
+
+    buffer.clear();
+    buffer.addLine(point(3, 0, 0), point(4, 0, 0), BLUE);
+    debugDrawStreams(buffer, streams);
+    applyDebugDrawStreams(streams, geometry);
+
+    // One version bump — the markDirty path, no revalidation, no re-pointing.
+    expect(geometry.version).toBe(version + 1);
+    expect(geometry.positions).toBe(streams.positions);
+    expect(Array.from(geometry.positions)).toEqual([3, 0, 0, 4, 0, 0]);
+  });
+
+  it("survives a shrinking segment count — the order the §85 check forces", () => {
+    // Assigning shorter positions while the longer colours are still attached
+    // throws; dropping the colours first is the only order that works.
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    buffer.addLine(point(3, 0, 0), point(4, 0, 0), BLUE);
+    const streams = debugDrawStreams(buffer);
+    const geometry = new FakeGeometry();
+    applyDebugDrawStreams(streams, geometry);
+    expect(geometry.colors?.length).toBe(16);
+
+    buffer.clear();
+    buffer.addLine(point(5, 0, 0), point(6, 0, 0), RED);
+    debugDrawStreams(buffer, streams);
+    expect(() => {
+      applyDebugDrawStreams(streams, geometry);
+    }).not.toThrow();
+    expect(geometry.positions.length).toBe(6);
+    expect(geometry.colors?.length).toBe(8);
+
+    // The naive order is what this is protecting against.
+    const naive = new FakeGeometry(new Float32Array(12));
+    naive.colors = new Float32Array(16);
+    expect(() => {
+      naive.positions = new Float32Array(6);
+    }).toThrow(RangeError);
+  });
+
+  it("re-points a geometry that was pointed elsewhere, even without a resize", () => {
+    const buffer = new DebugDrawBuffer();
+    buffer.addLine(point(1, 0, 0), point(2, 0, 0), RED);
+    const streams = debugDrawStreams(buffer);
+    const geometry = new FakeGeometry();
+    applyDebugDrawStreams(streams, geometry);
+
+    // A second frame at the same count leaves `resized` false…
+    buffer.clear();
+    buffer.addLine(point(3, 0, 0), point(4, 0, 0), RED);
+    debugDrawStreams(buffer, streams);
+    expect(streams.resized).toBe(false);
+    // …but a *different* geometry has never seen these arrays, and the
+    // identity check is what catches that rather than silently marking a
+    // stranger dirty.
+    const other = new FakeGeometry();
+    applyDebugDrawStreams(streams, other);
+    expect(other.positions).toBe(streams.positions);
+    expect(other.colors).toBe(streams.colors);
+  });
+
+  it("drives an empty overlay without throwing", () => {
+    const buffer = new DebugDrawBuffer();
+    const streams = debugDrawStreams(buffer);
+    const geometry = new FakeGeometry();
+    applyDebugDrawStreams(streams, geometry);
+    expect(geometry.positions.length).toBe(0);
+    expect(geometry.colors?.length).toBe(0);
   });
 });
 
@@ -1094,12 +1475,19 @@ describe("allocation (§7b, plan D7)", () => {
 // --- staged visualizations --------------------------------------------------
 
 describe("DEBUG_DRAW_STAGED", () => {
-  it("lists the three items still staged, dated (centre-of-mass unstaged 2026-08-04)", () => {
+  it("lists the two items still staged, dated (centre-of-mass unstaged 2026-08-04, per-segment colour 2026-08-07)", () => {
+    // Both survivors are blocked on a *seam* that does not exist — a joint
+    // anchor and a readable applied force. The two entries that have left the
+    // list left because the thing they named arrived: `getBodyCenterOfMass`
+    // (2026-08-04) and R-19's vertex-colour attribute plus `debugDrawStreams`
+    // (2026-08-07, R-35).
     expect(DEBUG_DRAW_STAGED.map((entry) => entry.id)).toEqual([
       "joint-anchors",
       "applied-force-vectors",
-      "per-segment-colored-draw",
     ]);
+    expect(DEBUG_DRAW_STAGED.map((entry) => entry.id)).not.toContain(
+      "per-segment-colored-draw",
+    );
     for (const entry of DEBUG_DRAW_STAGED) {
       expect(entry.staged).toBe("2026-08-02");
       expect(entry.reason.length).toBeGreaterThan(0);

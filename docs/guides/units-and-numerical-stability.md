@@ -19,14 +19,20 @@ behind the advice.
 - **Mass: kilograms**, derived from collider density (kg/m² in 2D, kg/m³ in
   3D) unless explicitly authored (§23).
 
-§40 sketches a `UnitSystem` record for engineering applications that must
-_display_ other units. Honest state: no `UnitSystem` API has shipped. The
-engine's internal representation and every signature are radians and seconds
-regardless — §40 is explicit that the record would govern display and
-authoring-input conversion only — so today the conversion layer is yours.
+§40's `UnitSystem` record **shipped 2026-08-07** in `@four/core` (`UnitSystem`,
+`SI_UNITS`, `resolveUnitSystem`, the `{angle,time,length,mass}{To,From}Display`
+conversions, `unitSymbol`, and the `format*` helpers) — at exactly the tier §40
+specifies: **display and authoring-input conversion only**. Declaring a unit
+system changes nothing the engine computes; every signature stays radians,
+seconds, and world units, and the conversions are inexact in their last bits,
+so they must never run inside a simulation path (§33–§34 — an integration test
+fails if any package source outside `@four/core` imports the module). This
+section said "no `UnitSystem` API has shipped … the conversion layer is yours"
+until 2026-08-07. Ad-hoc constants like the one below remain perfectly fine
+application-side style — the helpers are the engine-blessed spelling:
 
 ```ts
-// Display-side conversion helpers stay outside the engine:
+// Display-side conversion helpers stay outside the simulation:
 const RPM_TO_RAD_PER_S = (2 * Math.PI) / 60;
 hinge.setMotor({
   enabled: true,

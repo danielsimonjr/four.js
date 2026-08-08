@@ -11,13 +11,20 @@
  *
  * ## What one entry holds
  *
- * A vertex array object plus the one to three buffers it references —
- * positions, the optional normal stream (§68, 2026-08-04), the optional index
+ * A vertex array object plus the one to five buffers it references —
+ * positions, the optional normal stream (§68, 2026-08-04), the optional uv and
+ * per-vertex colour streams (§53, R-19, 2026-08-07), the optional index
  * buffer — and the
  * three numbers the draw call needs (mode, element count, index type). Binding
  * a VAO restores the whole attribute *and* element-array binding state in one
  * call, so the per-draw cost in `webgl-renderer.ts` is `bindVertexArray` plus
  * `drawElements`/`drawArrays` — nothing else per object.
+ *
+ * Optional streams are uploaded **iff the geometry carries them**, at their own
+ * fixed attribute locations, and every program ignores the slots it does not
+ * declare. So a position-only geometry produces exactly the two GL calls it
+ * always did, and a geometry that gained uvs costs one more buffer at upload
+ * time and nothing per draw.
  *
  * The VAO is program-independent: the position stream is bound to the fixed
  * slot `POSITION_ATTRIBUTE_LOCATION`, which the shader declares with an
@@ -53,9 +60,11 @@
 import type { RenderItem } from "@four/render";
 
 import {
+  COLOR_ATTRIBUTE_LOCATION,
   GL,
   NORMAL_ATTRIBUTE_LOCATION,
   POSITION_ATTRIBUTE_LOCATION,
+  UV_ATTRIBUTE_LOCATION,
   type WebglContext,
 } from "./gl-program.js";
 import type { GlBuffer, GlVertexArray } from "./gl-program.js";
@@ -88,6 +97,24 @@ export interface GeometryRecord {
    * ignores it for free.
    */
   readonly normalBuffer: GlBuffer | null;
+
+  /**
+   * Buffer backing the optional uv attribute (§53, §55; R-19), or `null` for a
+   * geometry with no texture coordinates. Bound at
+   * `UV_ATTRIBUTE_LOCATION` inside the vertex array; the unlit and lit
+   * pipelines declare the slot and sample it only when their material carries a
+   * `map`, and the sprite pipeline — which derives uv from position — ignores
+   * it entirely.
+   */
+  readonly uvBuffer: GlBuffer | null;
+
+  /**
+   * Buffer backing the optional per-vertex colour attribute (§53, §60a; R-19),
+   * or `null`. Bound at `COLOR_ATTRIBUTE_LOCATION`; consumed only by an unlit
+   * draw whose material sets `vertexColors` — which is how §113's debug-draw
+   * overlay reaches the screen (R-35).
+   */
+  readonly colorBuffer: GlBuffer | null;
 
   /** Index buffer, or `null` for a non-indexed geometry. */
   readonly indexBuffer: GlBuffer | null;
@@ -238,34 +265,67 @@ export class GeometryCache {
     if (vertexArray === null) {
       return null;
     }
-    const positionBuffer = gl.createBuffer();
-    if (positionBuffer === null) {
+
+    // Buffers are allocated before anything is bound, in the fixed order
+    // positions → normals → uvs → colors → indices, so that a refusal part way
+    // through unwinds exactly what it created and the geometry is skipped
+    // rather than half-uploaded. `allocated` records them for that unwind; the
+    // list is the reason adding two optional streams did not multiply the
+    // cleanup branches (R-19).
+    const allocated: GlBuffer[] = [];
+    const allocate = (): GlBuffer | null => {
+      const buffer = gl.createBuffer();
+      if (buffer !== null) {
+        allocated.push(buffer);
+      }
+      return buffer;
+    };
+    const abandon = (): null => {
+      for (const buffer of allocated) {
+        gl.deleteBuffer(buffer);
+      }
       gl.deleteVertexArray(vertexArray);
       return null;
+    };
+
+    const positionBuffer = allocate();
+    if (positionBuffer === null) {
+      return abandon();
     }
 
     const normals = geometry.normals;
     let normalBuffer: GlBuffer | null = null;
     if (normals !== undefined) {
-      normalBuffer = gl.createBuffer();
+      normalBuffer = allocate();
       if (normalBuffer === null) {
-        gl.deleteBuffer(positionBuffer);
-        gl.deleteVertexArray(vertexArray);
-        return null;
+        return abandon();
+      }
+    }
+
+    const uvs = geometry.uvs;
+    let uvBuffer: GlBuffer | null = null;
+    if (uvs !== undefined) {
+      uvBuffer = allocate();
+      if (uvBuffer === null) {
+        return abandon();
+      }
+    }
+
+    const colors = geometry.colors;
+    let colorBuffer: GlBuffer | null = null;
+    if (colors !== undefined) {
+      colorBuffer = allocate();
+      if (colorBuffer === null) {
+        return abandon();
       }
     }
 
     const indices = geometry.indices;
     let indexBuffer: GlBuffer | null = null;
     if (indices !== undefined) {
-      indexBuffer = gl.createBuffer();
+      indexBuffer = allocate();
       if (indexBuffer === null) {
-        if (normalBuffer !== null) {
-          gl.deleteBuffer(normalBuffer);
-        }
-        gl.deleteBuffer(positionBuffer);
-        gl.deleteVertexArray(vertexArray);
-        return null;
+        return abandon();
       }
     }
 
@@ -283,10 +343,10 @@ export class GeometryCache {
       0,
     );
 
-    // The optional normal stream (§53, §68): its own buffer at the second
+    // The optional streams (§53, §68, R-19): each its own buffer at its own
     // fixed slot. `vertexAttribPointer` captures the *current* ARRAY_BUFFER
     // binding into the vertex array, so rebinding here does not disturb the
-    // position attribute recorded above.
+    // attributes recorded above.
     if (normals !== undefined && normalBuffer !== null) {
       gl.bindBuffer(GL.ARRAY_BUFFER, normalBuffer);
       gl.bufferData(GL.ARRAY_BUFFER, normals, GL.STATIC_DRAW);
@@ -294,6 +354,27 @@ export class GeometryCache {
       gl.vertexAttribPointer(
         NORMAL_ATTRIBUTE_LOCATION,
         3,
+        GL.FLOAT,
+        false,
+        0,
+        0,
+      );
+    }
+
+    if (uvs !== undefined && uvBuffer !== null) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, uvBuffer);
+      gl.bufferData(GL.ARRAY_BUFFER, uvs, GL.STATIC_DRAW);
+      gl.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
+      gl.vertexAttribPointer(UV_ATTRIBUTE_LOCATION, 2, GL.FLOAT, false, 0, 0);
+    }
+
+    if (colors !== undefined && colorBuffer !== null) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, colorBuffer);
+      gl.bufferData(GL.ARRAY_BUFFER, colors, GL.STATIC_DRAW);
+      gl.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
+      gl.vertexAttribPointer(
+        COLOR_ATTRIBUTE_LOCATION,
+        4,
         GL.FLOAT,
         false,
         0,
@@ -313,6 +394,8 @@ export class GeometryCache {
       vertexArray,
       positionBuffer,
       normalBuffer,
+      uvBuffer,
+      colorBuffer,
       indexBuffer,
       version: geometry.version,
       mode: glMode(geometry.mode),
@@ -326,11 +409,15 @@ export class GeometryCache {
     const gl = this.#gl;
     gl.deleteVertexArray(record.vertexArray);
     gl.deleteBuffer(record.positionBuffer);
-    if (record.normalBuffer !== null) {
-      gl.deleteBuffer(record.normalBuffer);
-    }
-    if (record.indexBuffer !== null) {
-      gl.deleteBuffer(record.indexBuffer);
+    for (const buffer of [
+      record.normalBuffer,
+      record.uvBuffer,
+      record.colorBuffer,
+      record.indexBuffer,
+    ]) {
+      if (buffer !== null) {
+        gl.deleteBuffer(buffer);
+      }
     }
   }
 }

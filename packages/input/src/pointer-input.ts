@@ -35,8 +35,10 @@
  * - It never touches the scene graph, and it holds no reference to a scene: the
  *   candidate list is a function the caller owns (`pickables`), for the reasons
  *   `pick` documents.
- * - It does not handle wheel or keyboard (§72 lists them; this is the pointer
- *   subset of WP-3a.2). `pointercancel` **is** handled as of 2026-08-06 (A-9);
+ * - It does not handle wheel (§72 lists it; this is the pointer subset of
+ *   WP-3a.2). Keyboard is no longer on this list: `KeyboardInput` is its own
+ *   source, sibling to this one, as of 2026-08-07 (A-10).
+ *   `pointercancel` **is** handled as of 2026-08-06 (A-9);
  *   the note that used to stand here said a cancelled pointer looked like a
  *   pointer that stopped moving, and that is no longer true.
  *
@@ -196,6 +198,16 @@ interface PointerState {
   hovered: Node | null;
   /** Node holding this pointer's capture, or `null`. */
   captured: Node | null;
+  /**
+   * Set for the duration of this entry's teardown (2026-08-07).
+   *
+   * The teardown dispatches `pointerleave` while the entry is still in the map,
+   * and a listener may start a new gesture with the same `pointerId` during it.
+   * The flag makes `#stateFor` treat this entry as gone and mint a fresh one, so
+   * the new gesture is not written into a state that is one line from being
+   * deleted. See `#endPointer`.
+   */
+  ending: boolean;
 }
 
 function createPointerState(): PointerState {
@@ -206,6 +218,7 @@ function createPointerState(): PointerState {
     moved: false,
     hovered: null,
     captured: null,
+    ending: false,
   };
 }
 
@@ -446,17 +459,35 @@ export class PointerInput {
    * Order matters. The capture is released *first*, because `#updateHover`
    * deliberately does nothing while a pointer is captured and the pending
    * `pointerleave` must still fire; the leave is dispatched *second*, while the
-   * entry is still live, so a listener reading `getHovered` during it sees the
-   * node it is leaving; the entry is deleted *last*, so nothing a listener does
-   * can resurrect a half-torn-down pointer. A listener that presses again from
-   * inside the leave gets a fresh entry on the next platform event, which is
-   * exactly what a new gesture is.
+   * entry is still in the map, so nothing observing this input mid-teardown
+   * sees a pointer that has half vanished; the entry is deleted *last*, so
+   * nothing a listener does can resurrect a half-torn-down pointer.
+   *
+   * ## Re-entrancy: a new gesture during the leave is not erased (2026-08-07)
+   *
+   * The dispatched `pointerleave` runs application listeners, and one of them
+   * may feed a fresh `pointerdown` with the *same* `pointerId` straight back
+   * into this input (a synthetic gesture, a nested surface, a test). Until this
+   * fix that press found the entry being torn down — still in the map — wrote
+   * its `downTarget` into it, and then had the whole entry deleted by the line
+   * below: the new gesture disappeared silently, and the promise made here that
+   * "a listener that presses again from inside the leave gets a fresh entry"
+   * was not kept.
+   *
+   * It is kept now by {@link PointerState.ending}: the entry is marked before
+   * the leave is dispatched, so `#stateFor` mints a **new** entry for that
+   * `pointerId` and installs it in the map, and the delete below removes the
+   * entry only while it is still the one the map holds. A pointer therefore
+   * cannot be resurrected, and a genuinely new gesture cannot be swallowed —
+   * which are two ways of saying the same thing: the map always answers with
+   * the live pointer, never with a dead one.
    */
   #endPointer(state: PointerState, resolved: Resolution): void {
     state.downTarget = null;
     state.moved = false;
     // Implicit release, as in the DOM: a capture never outlives its gesture.
     state.captured = null;
+    state.ending = true;
     this.#updateHover(state, {
       pointerId: resolved.pointerId,
       ndcX: resolved.ndcX,
@@ -464,7 +495,9 @@ export class PointerInput {
       target: null,
       point: null,
     });
-    this.#pointers.delete(resolved.pointerId);
+    if (this.#pointers.get(resolved.pointerId) === state) {
+      this.#pointers.delete(resolved.pointerId);
+    }
   }
 
   /**
@@ -567,12 +600,20 @@ export class PointerInput {
     );
   }
 
+  /**
+   * The live state of `pointerId`, created on demand.
+   *
+   * An entry that is mid-teardown ({@link PointerState.ending}) counts as
+   * absent: it is about to be dropped, so writing a new gesture into it would
+   * lose that gesture. See `#endPointer`.
+   */
   #stateFor(pointerId: number): PointerState {
-    let state = this.#pointers.get(pointerId);
-    if (state === undefined) {
-      state = createPointerState();
-      this.#pointers.set(pointerId, state);
+    const existing = this.#pointers.get(pointerId);
+    if (existing !== undefined && !existing.ending) {
+      return existing;
     }
+    const state = createPointerState();
+    this.#pointers.set(pointerId, state);
     return state;
   }
 }

@@ -1,0 +1,343 @@
+/**
+ * GPU-side render targets for the WebGL 2 backend: one framebuffer object per
+ * `@four/render` `RenderTarget`, cached and invalidated by version (§61, §48,
+ * §63; R-4, 2026-08-07).
+ *
+ * The third member of the family `gl-geometry.ts` and `gl-texture.ts` started —
+ * same key (`id`), same validator (`version`), same lazy eviction, same
+ * loss-aware {@link RenderTargetCache.forget}, same "never throws inside
+ * `render`" rule. Reading one module tells you how the other two behave, and
+ * all three back the same claim: **GPU residency is a backend cache, not an
+ * application concern.** That is also the answer to why §61's
+ * `createRenderTarget` stays deferred; the argument is written out on
+ * `@four/render`'s `RenderTarget`, on the class it concerns.
+ *
+ * ## What one entry holds
+ *
+ * A framebuffer, the colour texture attached to it, and — unless the target was
+ * built with `depth: false` — a depth renderbuffer. Plus the size the three
+ * were allocated at, because that is what the renderer resolves a normalized
+ * viewport rectangle against: reading it off the *record* rather than off the
+ * `RenderTarget` guarantees the `viewport` call and the allocation agree even
+ * if the application resized the target after this frame began.
+ *
+ * The colour texture gets the same fixed sampler state every MVP-tier texture
+ * gets — `LINEAR` filtering, `CLAMP_TO_EDGE` wrapping (`gl-texture.ts`) — so a
+ * material sampling a target needs no special case anywhere in the draw path.
+ * `texImage2D` with `null` pixels allocates zero-filled storage, which is what
+ * makes sampling a target that has never been rendered into read as transparent
+ * black rather than as undefined content.
+ *
+ * ## Completeness is checked, not assumed (§85, §89)
+ *
+ * `checkFramebufferStatus` runs once per allocation. A framebuffer that is not
+ * `FRAMEBUFFER_COMPLETE` — an unsupported attachment combination, a size past
+ * the device's limits, a driver out of memory — is deleted immediately and
+ * reported as `null`, and the renderer skips the frame. It is emphatically not
+ * drawn into: an incomplete framebuffer turns every subsequent draw into a
+ * `GL_INVALID_FRAMEBUFFER_OPERATION`, which is a silent, per-call error nobody
+ * reads.
+ *
+ * ## Eviction policy
+ *
+ * Identical to the other two caches':
+ *
+ * - a **version bump** — `RenderTarget.resize()` — is detected on the next
+ *   `acquire`, which deletes all three objects and allocates them at the new
+ *   size. The old contents are gone; that is the documented behaviour of
+ *   `resize`, not a limitation of this cache;
+ * - **`target.dispose()`** bumps the version and marks the target disposed, so
+ *   the next `acquire` deletes the GL objects and returns `null` — the pass is
+ *   then skipped rather than drawn into a released framebuffer (§83's "disposed
+ *   resources still in use"). A target disposed and never submitted again keeps
+ *   its objects until the renderer is disposed: the same documented leak window
+ *   `GeometryCache` and `TextureCache` carry, with the same alternatives
+ *   rejected for the same reasons;
+ * - **context loss** is not eviction: {@link RenderTargetCache.forget} drops the
+ *   records without deleting anything, because every handle is already invalid
+ *   and the context must not be touched (§61). The next frame re-allocates,
+ *   which is §61's "re-creates engine-owned GPU resources … render targets" —
+ *   done lazily, because the cache cannot know which targets the next frame
+ *   will use.
+ *
+ * ## Staged (2026-08-07, R-4)
+ *
+ * The public shape of each of these is on `@four/render`'s `render-target.ts`;
+ * what this module would additionally need is noted here:
+ *
+ * - **Stencil attachments** (§67) — `DEPTH_STENCIL_ATTACHMENT` plus
+ *   `DEPTH24_STENCIL8` storage. Blocked with the rest of §67 by R-7: the
+ *   backend requests its *context* without a stencil buffer, so a stencilled
+ *   target would be the only stencilled surface in the engine.
+ * - **Multiple render targets** (§63, §70) — a colour attachment per output
+ *   plus `drawBuffers`, which is a new `WebglContext` entry point.
+ * - **Multisampling** (§62) — `renderbufferStorageMultisample` into a
+ *   colour *renderbuffer*, plus `blitFramebuffer` into a resolve texture, plus
+ *   a `MAX_SAMPLES` query. Three entry points and a second framebuffer per
+ *   target; deliberately not paid for by the minimal tier.
+ * - **`readPixels`** (§61, §92) — one entry point here, but `@four/math` has no
+ *   `Rectangle2` for §61's `region` argument. Recorded on `@four/render`'s
+ *   `Renderer` as a typed TODO.
+ */
+
+import type { RenderTarget } from "@four/render";
+
+import {
+  GL,
+  type GlFramebuffer,
+  type GlRenderbuffer,
+  type GlTexture,
+  type WebglContext,
+} from "./gl-program.js";
+
+/**
+ * The render-target type this cache stores.
+ *
+ * Imported by name, unlike `CacheableGeometry` and `CacheableTexture`, which
+ * are derived from the render item that carries them. The reason is that the
+ * two are genuinely different situations rather than an inconsistency: a
+ * geometry or a texture reaches the backend *through a material*, as a
+ * structural read contract that more than one class can satisfy, whereas a
+ * render target reaches it as the fourth argument of `Renderer.render`, typed
+ * as this one class — `@four/render` is already a dependency (plan §3.1), the
+ * class carries private state and so cannot be satisfied structurally anyway,
+ * and naming it is what lets `render-webgl`'s tests drive this cache with the
+ * real thing (decision, R-4).
+ */
+export type CacheableRenderTarget = RenderTarget;
+
+/** Everything one cached render target needs at bind time. */
+export interface RenderTargetRecord {
+  /** The framebuffer object to bind for drawing. */
+  readonly framebuffer: GlFramebuffer;
+
+  /** The colour attachment, bound when a material samples this target. */
+  readonly texture: GlTexture;
+
+  /** The depth renderbuffer, or `null` for a target built with `depth: false`. */
+  readonly depthBuffer: GlRenderbuffer | null;
+
+  /** `RenderTarget.version` this record was allocated from. */
+  readonly version: number;
+
+  /** Width the attachments were allocated at, in texels. */
+  readonly width: number;
+
+  /** Height the attachments were allocated at, in texels. */
+  readonly height: number;
+}
+
+/**
+ * Per-context store of allocated framebuffers (§61, §48, §63).
+ *
+ * One cache belongs to one GL context: the renderer builds it during
+ * `initialize` and builds a *new* one on context restore, since every handle
+ * the old one held died with the context.
+ *
+ * ```ts
+ * const cache = new RenderTargetCache(gl);
+ * const record = cache.acquire(target);
+ * if (record !== null) {
+ *   gl.bindFramebuffer(GL.FRAMEBUFFER, record.framebuffer);
+ *   // draw…
+ *   gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+ * }
+ * ```
+ */
+export class RenderTargetCache {
+  readonly #gl: WebglContext;
+
+  /** Records by `RenderTarget.id`; see the module header for eviction. */
+  readonly #records = new Map<string, RenderTargetRecord>();
+
+  #disposed = false;
+
+  constructor(gl: WebglContext) {
+    this.#gl = gl;
+  }
+
+  /** Number of framebuffers currently allocated. Diagnostics and tests (§83, §84). */
+  get size(): number {
+    return this.#records.size;
+  }
+
+  /** Whether {@link RenderTargetCache.dispose} has run. */
+  get disposed(): boolean {
+    return this.#disposed;
+  }
+
+  /**
+   * Returns the framebuffer for `target`, allocating it on first use and
+   * re-allocating it whenever `target.version` has advanced.
+   *
+   * Returns `null` — and creates no entry — when the target has been disposed,
+   * when GL refuses to allocate an object, or when the assembled framebuffer is
+   * not complete. **Never throws**: this runs inside `Renderer.render`, and §61
+   * forbids throwing there for a lost context; a failed allocation is the same
+   * class of asynchronous, driver-scheduled event, so it skips the pass rather
+   * than unwinding the frame.
+   */
+  acquire(target: CacheableRenderTarget): RenderTargetRecord | null {
+    const existing = this.#records.get(target.id);
+    if (existing !== undefined) {
+      if (existing.version === target.version) {
+        return existing;
+      }
+      this.#destroy(existing);
+      this.#records.delete(target.id);
+    }
+
+    if (target.disposed) {
+      return null;
+    }
+
+    const record = this.#allocate(target);
+    if (record === null) {
+      return null;
+    }
+    this.#records.set(target.id, record);
+    return record;
+  }
+
+  /**
+   * Drops every record **without touching the context** — the context-loss path
+   * (§61). The handles are already invalid; deleting them would be a GL call
+   * against a lost context for no benefit.
+   */
+  forget(): void {
+    this.#records.clear();
+  }
+
+  /**
+   * Deletes every framebuffer, colour texture and depth buffer this cache
+   * created (§83). Idempotent.
+   *
+   * Only valid on a live context — the renderer calls
+   * {@link RenderTargetCache.forget} instead when the context is lost. The
+   * *application's* `RenderTarget` objects are untouched: the renderer did not
+   * create them, so it does not dispose them.
+   */
+  dispose(): void {
+    if (this.#disposed) {
+      return;
+    }
+    this.#disposed = true;
+    for (const record of this.#records.values()) {
+      this.#destroy(record);
+    }
+    this.#records.clear();
+  }
+
+  /**
+   * Allocates the colour texture, the optional depth buffer, and the
+   * framebuffer that binds them together, or returns `null` if any step fails.
+   *
+   * Nothing is left bound: the texture binding is cleared as `TextureCache`
+   * clears its own (an allocation triggered mid-frame must not displace the
+   * texture being drawn with), the renderbuffer binding is cleared for the same
+   * reason, and the framebuffer goes back to the default drawing buffer — the
+   * renderer binds the target explicitly when it starts the pass, so leaving it
+   * bound here would make the bind order depend on whether this frame happened
+   * to be the allocating one.
+   */
+  #allocate(target: CacheableRenderTarget): RenderTargetRecord | null {
+    const gl = this.#gl;
+    const width = target.width;
+    const height = target.height;
+
+    const texture = gl.createTexture();
+    if (texture === null) {
+      return null;
+    }
+    gl.bindTexture(GL.TEXTURE_2D, texture);
+    gl.texImage2D(
+      GL.TEXTURE_2D,
+      0,
+      GL.RGBA8,
+      width,
+      height,
+      0,
+      GL.RGBA,
+      GL.UNSIGNED_BYTE,
+      null,
+    );
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    gl.bindTexture(GL.TEXTURE_2D, null);
+
+    let depthBuffer: GlRenderbuffer | null = null;
+    if (target.depth) {
+      depthBuffer = gl.createRenderbuffer();
+      if (depthBuffer === null) {
+        gl.deleteTexture(texture);
+        return null;
+      }
+      gl.bindRenderbuffer(GL.RENDERBUFFER, depthBuffer);
+      gl.renderbufferStorage(
+        GL.RENDERBUFFER,
+        GL.DEPTH_COMPONENT16,
+        width,
+        height,
+      );
+      gl.bindRenderbuffer(GL.RENDERBUFFER, null);
+    }
+
+    const framebuffer = gl.createFramebuffer();
+    if (framebuffer === null) {
+      gl.deleteTexture(texture);
+      if (depthBuffer !== null) {
+        gl.deleteRenderbuffer(depthBuffer);
+      }
+      return null;
+    }
+
+    gl.bindFramebuffer(GL.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(
+      GL.FRAMEBUFFER,
+      GL.COLOR_ATTACHMENT0,
+      GL.TEXTURE_2D,
+      texture,
+      0,
+    );
+    if (depthBuffer !== null) {
+      gl.framebufferRenderbuffer(
+        GL.FRAMEBUFFER,
+        GL.DEPTH_ATTACHMENT,
+        GL.RENDERBUFFER,
+        depthBuffer,
+      );
+    }
+    const status = gl.checkFramebufferStatus(GL.FRAMEBUFFER);
+    gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+
+    if (status !== GL.FRAMEBUFFER_COMPLETE) {
+      gl.deleteFramebuffer(framebuffer);
+      gl.deleteTexture(texture);
+      if (depthBuffer !== null) {
+        gl.deleteRenderbuffer(depthBuffer);
+      }
+      return null;
+    }
+
+    return {
+      framebuffer,
+      texture,
+      depthBuffer,
+      version: target.version,
+      width,
+      height,
+    };
+  }
+
+  /** Deletes the three GL objects one record owns. Live contexts only. */
+  #destroy(record: RenderTargetRecord): void {
+    const gl = this.#gl;
+    gl.deleteFramebuffer(record.framebuffer);
+    gl.deleteTexture(record.texture);
+    if (record.depthBuffer !== null) {
+      gl.deleteRenderbuffer(record.depthBuffer);
+    }
+  }
+}

@@ -28,10 +28,439 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-07 — A-4 dev/prod builds.** Decisions worth keeping:
+  - **Dev is the default; you opt out** — `typeof __FOUR_DEV__ !== "undefined" ?
+__FOUR_DEV__ : true` in one file (`@four/core` `dev.ts`); the identifier is never
+    read outside `typeof`; un-bundled runs (tests, determinism) are dev automatically.
+  - **The flag may remove work, never change a number (§33)** — enforced by the
+    `GATED` allowlist in `tests/integration/dev-build-mode.test.ts`, not prose;
+    simulation packages refused outright. **Guard at the call site** — the helpers'
+    internal early-return only stops the console write, not message construction.
+  - **Gotchas (measured):** a private class method cannot be tree-shaken off a class
+    (empty it with a leading `if (!DEV) return;`); a top-level _call_ survives
+    tree-shaking without `/* @__PURE__ */`; storing the option beats storing the
+    resolved value when the default lives in a package production drops.
+  - **§83's leak check is an audit you call, not a watcher** — a growing counter is
+    not a leak; only the caller knows which span should balance. §85's asymmetry is
+    deliberate: `devAssert` skips entirely in production; every `FourError` stays
+    unconditional. R-6's pipeline is NOT dev-gated — `renderEffect` is a production
+    feature; its cost needs a registry split.
+- **2026-08-07 — §118 flagship.** Decisions worth keeping:
+  - **A screen-space UI is a camera child until §46 layers land** — §48's `layerMask`
+    is deferred, so a second viewport would draw the whole scene twice; camera
+    parenting gives screen-space behaviour, one pass, and working §71 picking (first
+    perspective pick in the repo, measured).
+  - **A browser gate must not re-derive §74 layout** — the page publishes
+    `data-controls` in canvas pixels and the spec validates the claim via `data-hover`
+    before clicking. `page.mouse` needs `boundingBox()` added (canvas-relative vs
+    viewport is the trap; measured offset).
+  - **Pause is exactly 0 changed pixels**; single-step is exact because the
+    accumulator is public (`fixedDeltaTime − accumulator + 1e-6` runs exactly one
+    step, and `fixedStepsLastFrame` lets the claim be checked, not trusted).
+  - `data-*` published with `toFixed(4)` cannot support `toBeCloseTo(…, 4)` — two
+    roundings carry 1e-4. Particle hue counts swing 5× with burst phase — thresholds
+    must be set at "never ran", not "typical".
+  - **`registerRapierSolver()` pulls both wasm images** (1.54 MB gzip vs 0.69 for one
+    adapter) — the measured price of `solver: "auto"`; per-dimension registration is
+    the recorded fix.
+  - Gate repair: `generate-compatibility.mjs` now requires an upper-case initial on
+    `*Adapter` exports (the `createRapierAdapter` factory turned check-compat red at
+    HEAD for ~5 commits until the flagship's gate run caught it).
+- **2026-08-07 — A-5 §83 resource accounting.** Decisions worth keeping:
+  - **Numbers, not references** — a tracker holding its resources would _be_ the leak;
+    `WeakRef`/`FinalizationRegistry` answers "was this collected?", not §83's "was this
+    disposed?", and non-deterministically.
+  - **A resource dropped without `dispose()` is never subtracted** — a self-healing
+    counter would hide the leak signal it exists to show; §83's contract is explicit
+    lifetimes and the accounting refuses to be more forgiving than the spec.
+  - **"A disposed resource holds nothing"** (`byteLength → 0`) — one rule makes
+    double-dispose, resurrection-by-setter, and delta arithmetic all fall out.
+  - **Levels, not per-frame counters** — `textureMemory`/`bufferMemory` describe the
+    engine, not the frame; reported with or without a renderer; an accounting of what
+    the engine holds and would upload, not GPU residency — stated on the fields.
+  - **Not every seam needs a transcribed shape** — `ResourceMemoryLike` was built then
+    deleted (no producer-owned record exists); `recordResourceMemory(stats, tex, buf)`
+    is allocation-free by construction. Duck-typed-contract count stays at five.
+  - **Gotchas (measured):** folding accounting into `markDirty()` with an
+    `#accountedBytes` field is _larger_ minified and puts byte math on a per-frame
+    path — don't retry. A-5 costs +0.22 kB gzip; ui-demo at 30.96/31 — A-4's
+    `__FOUR_DEV__` is now the practical blocker for the next four/ui-touching packet.
+- **2026-08-07 — A-16 remainder (drawing-tier §79 pairs).** Decisions worth keeping:
+  - **Resources are keys, not payloads, and the catalog is a seam not a format** — §79
+    mandates key-plus-manifest; the manifest needs A-18 content hashing, so what ships
+    is `SceneResourceCatalog` (`keyOf`/`get`, method syntax for bivariance per the
+    `ComponentSerializer` precedent; a bare `Map` is a valid read catalog), which a
+    manifest later implements.
+  - **`unknownResources: "skip"` is write-side only** — A-15's symmetry does not
+    survive here: a component can be dropped and leave a valid node; a `Renderable`
+    cannot default its resources without inventing ones the application must dispose
+    (§83). A _node_-level skip is inexpressible through `nodeTypeOf`/`nodeDataOf`
+    (per-node data, not a filter) — recorded.
+  - **Material kind is checked for `Sprite` only** — `Renderable<M>` is generic on
+    purpose; a read-side kind whitelist would make `Renderable<GlowMaterial>` savable
+    and unloadable. Dispatch is on the §57 discriminant, never `instanceof`.
+  - **Type names are `<package>:<class>`** (extends `ui:*`); the prefix is a namespace,
+    not an import path — rev 1.3 already moved cameras between packages and a published
+    name must outlive that. Camera documents carry no `depthRange` (renderer-owned,
+    §47).
+- **2026-08-07 — Auto-selection registries (A-8/R-2/PH-19).** Decisions worth keeping:
+  - **The WP-3.6/§45 departure is retired, not reversed** — §45's string works as a
+    _widening_; `four` still never imports a backend. Payload measured both ways:
+    instance +0.2–0.3 kB gzip, `"auto"` +0.78 kB paid only by the asker.
+  - **Explicit registration calls, never side-effect imports** — forced by
+    `"sideEffects": false` on all 24 packages (a side-effect module is _correctly_
+    deletable). Applies to every future registry in this repo.
+  - **`resolveRenderer`/`resolveSolver` must never statically reference their registry
+    class** (lazily-created module `let`) — the single discipline keeping registries
+    and backends out of instance-naming bundles; breaking it silently regresses every
+    example.
+  - **§62's diagnostics event is a callback in both tiers** (`onFallback`/
+    `onSolverReject`) — §3.1 gives neither `render` nor `physics` a diagnostics edge.
+  - **`isSupported` must never touch the caller's canvas** — a probing `getContext`
+    would fix the context attributes and silently disable `antialias`; the probe is an
+    environment question, `initialize` is the real gate, and `"auto"` recovers from its
+    failure.
+  - Renderer `"auto"` uses §62's order (registration order ignored — §33); solver
+    `"auto"` uses registration order (§37 fixes no preference); the headless tier is
+    never auto-selected; a _named_ solver is handed back unfiltered so `PhysicsWorld`
+    reports mismatches with its own precise message.
+- **2026-08-07 — PH-9 AnimationController.** Decisions worth keeping:
+  - **The controller is a pose evaluator, not a mixer scheduler** — cross-fades need
+    two clips writing one property at once, which the mixer's claim semantics call a
+    conflict; the controller owns one channel per path, blends via `ValueAdapter`, and
+    writes once under one claim in the same §16 registry.
+  - **Un-animated channels contribute the `play()` baseline** — the pose is a pure
+    function of (state, time, weight); a controller pins every channel it owns.
+  - **Typed predicates over the string DSL** — a parser is a second §33 surface; the
+    sugar can compile to the records later. `exitTime` is seconds of source-state time
+    (§7a), a gate not an instant. Interruption freezes the outgoing pose (captured
+    through the same blend path). No `seek` — a machine's pose is a function of
+    history; §34 replays deltas. Controllers are never `finished` and are deliberately
+    not §6a components / not serialized (§18 constructs directly; `Node.animation` is
+    unshipped per §97a).
+- **2026-08-07 — R-6 post-processing (full-screen effect tier).** Decisions worth
+  keeping:
+  - **An effect is a graph pass kind, not an escape-hatch pass** — a pass whose
+    sampling is a _field_ is validated exactly with no traversal; expressing §70
+    through `CustomRenderPass` would be unvalidatable exactly where feedback and
+    ordering mistakes live. That asymmetry, not convenience, is the argument.
+  - **A second verb keeps the first byte-identical** — `renderEffect` is a separate
+    entry point; `render` was not edited; the frame transcript is identical modulo a
+    constant handle-serial shift of exactly 6. Routing effects through `render` would
+    put a branch in the loop R-4/R-5/F13 each had to re-prove.
+  - **Closed unions are the staging mechanism** — `ScreenEffect` is
+    `"copy" | "grade"`; `{ kind: "bloom" }` is a compile error, and the backend skips
+    an unknown kind rather than quietly copying (a JSON value must not become a
+    different picture). R-14's RFC widens the union.
+  - **Copy is bit-exact** (`useGrade` seeded at GL initial `0`, zero uniform traffic on
+    copy chains) — what makes the blit usable as §63's debug view.
+  - **Measured gotcha:** a fifth compiled-at-init pipeline costs **0.75 kB gzip in
+    every example bundle** — nothing reachable from a class method tree-shakes
+    (second instance of A-1's cannot-tree-shake class). Even a stubbed `renderEffect`
+    exceeded ui-demo's 30 kB by 99 B, so the budget moved to 31 kB (owner-recorded
+    trade; §86's 150 kB untouched). A-4's define/opt-in seam is the eventual fix.
+  - `renderEffect` does **not** reset the §57 mirror — it borrows only the depth test
+    and restores exactly that, strictly more conservative than `render`'s
+    reset-on-entry.
+- **2026-08-07 — §40 UnitSystem (A-2/PH-13).** Decisions worth keeping:
+  - Shipped in `@four/core` as a **conversion tier, never an engine mode**;
+    `tests/integration/units-display.test.ts` mechanically forbids any package source
+    outside `@four/core` from importing it (visible `ALLOWED` allowlist) and proves
+    helper-authored values bit-identical to engine-unit authoring.
+  - `"custom"` = "the display unit _is_ the world unit" (exact identity) and has **no
+    symbol** — §40's two under-specified points, decided rather than guessed.
+  - **No `ApplicationOptions.units`, no `PhysicsWorldOptions.units`** — §45's record
+    lists neither; adding one would be inventing API. The physics §41 envelope reading
+    `lengthToMeters` is a staged `@four/physics` packet.
+  - The conversions are documented as **inexact** (8.8% / 2.5% last-bit divergence for
+    degrees / milliseconds over 2 000 samples) — an intentional non-fix; the only safe
+    answer is keeping them off simulation paths (§33–§34).
+- **2026-08-07 — R-5 render graph (linear-pass tier).** Decisions worth keeping:
+  - **The graph is a driver, not a backend** — one pass = one `renderer.render(root,
+views, interpolation, target)`, asserted transcript-identical against hand-written
+    calls. Re-prove that property after any backend restructure.
+  - **Acyclicity by construction beats a topological sort** — inputs must already exist;
+    insertion order is execution order (§63's own example is written in execution
+    order); a sort would buy reordering nobody asked for and cost "the graph does what
+    the list says". `removePass` refused while a consumer names it.
+  - **Sampling is discovered, not declared** — `validate()` runs the real
+    `buildRenderList` and reads `isRenderTargetTexture`, seeing what the backend sees;
+    deliberately setup-time (a `map` reassignment makes any cache unsound; per-frame
+    checking doubles traversal).
+  - **An escape hatch must report its own opacity** — `CustomRenderPass` always emits an
+    `"opaque"` info issue; a graph that stopped being checkable says so.
+  - **Correction to the R-4 entry (supersede, not rewrite):** "feedback loops are
+    refused, not drawn" holds for _sprites_; for `UnlitMaterial`/`LitMaterial` the
+    `map` is refused but the draw survives untextured — one rule for the sample, two
+    outcomes for the draw (`webgl-renderer.ts` sprite skip vs `setFeatures(false)`).
+  - Clear policy stays on `Viewport` — what makes a compositing pass (no `clearColor`)
+    expressible. No new duck-typed contract — the graph reuses `isRenderTargetTexture`.
+- **2026-08-07 — PH-5 (runtime colliders).** Decisions worth keeping:
+  - **No `node` parameter, no diffing refresh** — `Collider.requireBody()` is the single
+    source of truth about which body a collider joins, shared verbatim with `addBody`'s
+    subtree scan; a diffing `refreshBody(node)` would be a second rule and a per-step
+    cost.
+  - **`removeCollider` returns `false`; `addCollider` throws** — removal follows
+    `removeBody`/`removeJoint` (unconditional teardown paths); `refreshCollider` throws
+    because a silent no-op refresh is invisible. Contrast documented in the methods.
+  - **`derivedMass` clears only at zero colliders**, never on a non-positive reported
+    mass — §23 forbids reading a solver's 0 as "no mass" (non-dynamic bodies answer 0).
+    `setRigidBodyDerivedMass` takes `number | undefined` (package-internal).
+  - **The adapters and §34 needed nothing**: F8's kept mass refresh was written for the
+    body-survives case, PH-3's heir logic holds, and F8's re-derivation of `colliderIds`
+    from the envelope's collider table makes a runtime add snapshot-safe for free —
+    proven, not assumed.
+- **2026-08-07 — PH-1 stage 2 (live solver writes).** Decisions worth keeping:
+  - **A third optional seam, detected structurally, not a seventh capability field** —
+    `supportsSolverBodyTuning` is **all-or-nothing** across six methods (per-property
+    bits would push a warn table into `RigidBody`). `PhysicsTuningCapabilities` still
+    answers "which coefficients apply"; the new predicate answers "can anything change
+    after `createBody`".
+  - **The dirty set is a bit set, one bit per solver call** (§23's triple one bit, the
+    damping pair one). `0` keeps the goldens still — a quiet world makes no extra call,
+    proven by deep-equalling adapter `callOrder` with and without the seam.
+  - **Draining clears** — a body in two worlds hands writes to whichever steps first
+    (§26 command-buffer semantics), chosen over per-world dirty sets.
+  - **Colliders cannot be intercepted** (§24/§25 plain public fields) → `refreshCollider`
+    is explicit by design; the alternative was shadow-copying six values per collider
+    and diffing every step.
+  - **`mass = undefined` is permanently unreachable, not staged** — un-authoring means
+    restoring collider densities only the registration path holds.
+  - **Rapier's live mass write re-runs `resolveMassMode`** and rewrites
+    `BodyRecord.massMode`, so live writes and re-registration converge and PH-3's heir
+    logic keeps working.
+  - **Gotcha:** vitest transpiles without typechecking — a changed package-internal
+    signature passes unit suites and only fails at `pnpm run docs`/`tsc`; run the docs
+    gate after touching any cross-file signature.
+- **2026-08-07 — A-1 §84 statistics.** Decisions worth keeping:
+  - **`NaN` means "not measured", `0` means "measured zero"** — the rule that let §84
+    ship before all its producers; staged counters are test-asserted to stay `NaN` so
+    none can quietly start reading 0.
+  - **Presence is the capability**: `Renderer.statistics` is optional; a backend that
+    cannot count omits the member instead of reporting zeros. **Backends accumulate,
+    owners clear** — a frame may be several `render` calls (off-screen + on-screen), so
+    totals only work if the backend never resets.
+  - `Date.now` is banned repo-wide (§33) → `createMonotonicClock` has **no fallback**; a
+    wall clock in diagnostics is not a §33 violation because nothing there feeds a
+    simulation. `FrameStats.simulationTime` is a **duration** (seconds inside the
+    frame's fixed steps), not §9's clock — one name, two quantities, settled by §84's
+    neighbouring fields.
+  - The renderer-counter transcription (`RenderStatisticsLike`) is the **fifth**
+    duck-typed contract; a `@four/render` test pins the real type against it.
+  - **Gotcha:** `four/application`'s runtime import of `@four/diagnostics` costs
+    ~0.4 kB gzip per example even with stats off — the first diagnostic that cannot
+    tree-shake; concrete motivation for A-4's `__FOUR_DEV__` define.
+- **2026-08-07 — R-4 render targets.** Decisions worth keeping:
+  - **A render target is a CPU-side descriptor; the framebuffer is a backend cache** —
+    third instance of the `GeometryCache`/`TextureCache` pattern, and why §61's
+    `createRenderTarget` stays deferred _by decision_: a renderer-owned target cannot
+    exist before a renderer and must be hand-rebuilt after context loss. Loss
+    re-allocates lazily; the application is told nothing.
+  - **The render-to-texture seam is `MaterialTexture`, not a new type** —
+    `RenderTarget.colorTexture` satisfies it, so R-5/R-6 inherit zero adapter work and
+    `@four/materials` needed no widening. Backends distinguish via the marker guard
+    `isRenderTargetTexture` (4th duck-typed contract).
+  - **Target depth defaults `true`** — a depth-less target would composite the same
+    scene differently off-screen than on, the exact difference render-to-texture exists
+    to avoid.
+  - **`bindFramebuffer` belongs inside the F13 envelope** — an FBO left bound by a
+    throwing frame sends every later on-screen frame into a surface nobody sees;
+    `effectiveGlState` now folds framebuffer binds so all exception-safety tests assert
+    it. The byte-identical-sequence property survived a second structural change
+    (no-target frames issue _no_ framebuffer call, not even an unbind).
+  - **Feedback loops are refused, not drawn** — a material sampling the target currently
+    rendered into is skipped like a disposed texture; ping-pong is the supported form.
+- **2026-08-07 — A-12 cheap tier (six §73 controls).** Decisions worth keeping:
+  - **Radio groups are names scoped to the tree** (the `focusedWidget` scope — one notion
+    of "the tree we're in"), enforced **on the transition to checked only**, never at
+    construction or attach — §79 documents reload exactly as saved (two radios authored
+    `checked: true` stay both-checked until one is re-checked; tested and documented).
+    Group-by-parent was rejected because wrapping radios in a layout `Panel` would
+    silently dissolve the group.
+  - **`Slider` owns its pointer math** (`worldPoint` + inverse world matrix), not
+    `DragManager` — §42: the slider's transform is layout-owned; what moves is a number.
+    Drag-past-the-track is staged on A-9's captured-pointer `worldPoint: null` decision.
+    `resolveValue` is clamp → snap → step-back-if-over-max (the `<input type=range>`
+    rule: a step that doesn't divide the range leaves the top unreachable).
+  - Checkedness is §75 _state_ on `WidgetStateSnapshot` (`checked: boolean | null`,
+    ARIA's absent-vs-false); values flow through `uivaluechange` + the new
+    `onContentChange` skin hook — neither layout nor state.
+  - `ImageWidget` carries the suffix because `Image` is a browser global that
+    `import { Image } from "@four/ui"` would shadow exactly where pictures load.
+  - Menu/tooltip staged honestly: a hover delay is a §9 time reading, and the §10 loop
+    that owns time lives above `@four/ui` — a tooltip built today would invent a clock.
+- **2026-08-07 — R-35 + F7 (diagnostics).** Decisions worth keeping:
+  - `diagnostics → geometry` re-confirmed **absent** from the frozen §3.1 matrix; R-35
+    closed by emitting `Float32Array`s whose field names (`positions`, `colors`) spread
+    straight into `BufferGeometryOptions` — third instance of the duck-typed-contract
+    pattern (`ParticleDrawable`, `ReplayTarget`, `DebugGeometrySink`).
+  - `debugDrawStreams` deliberately does **not** copy `DebugDrawBuffer`'s
+    grow-never-shrink policy: §85 index alignment makes an oversized colour array
+    _illegal_, not merely wasteful. The `colors = undefined` → `positions` → `colors`
+    assignment order in `applyDebugDrawStreams` is required by `BufferGeometry`'s
+    validate-against-current-attributes rule — a shrinking overlay throws in any other
+    order.
+  - **A version constant that names a bound must say so** (F7): `REPLAY_FORMAT_VERSION`'s
+    name silently became false on 2026-08-06 when PH-6 introduced the lowest-version
+    rule; renamed `LATEST_`/`MINIMUM_` with a deprecated alias, and existing documents'
+    byte-identity is now asserted by a test rather than assumed.
+- **2026-08-07 — Render-tier review fixes (F13–F16).** Decisions worth keeping:
+  - **F14 policy: validated accessors, unchanged version semantics.** `opacity`/
+    `blendMode` are accessors applying the constructor's validation on every write; the
+    four boolean §57 fields stay plain (no invalid values). Neither bumps `version` —
+    R-12's "render state is read per draw, never cached" stands, and bumping would
+    invalidate the geometry/texture bindings that _are_ cached on that counter.
+  - **F13 audit: only `glState` was both module-global and frame-scoped** — now
+    per-`WebglRenderer`, with the frame in `try`/`finally`. The R-19 program-lifetime
+    mirrors (`useMap`/`useVertexColors`/sampler, seeded at GL initial `0`) were audited
+    and deliberately left alone — they belong to the program object and survive a throw
+    correctly; the byte-identical-sequence property was re-proved (449-call comparison).
+  - **Follow-up not taken:** `renderList`/`viewProjection`/`sceneLights`/`rect` remain
+    module-global _scratch_ (fully written before read, safe while `render` is
+    synchronous and non-re-entrant); a re-entrant `render` would corrupt them
+    independently of F13.
+  - **Gotcha (multi-agent): the Playwright browser gate is not concurrency-safe** — seven
+    fixed-port `vite preview` servers with `reuseExistingServer: false`; two agents
+    running `test:browser` kill each other's servers (`ERR_CONNECTION_REFUSED` that looks
+    like regressions). Check ports 4173–4179; re-run cut-off specs by path.
+- **2026-08-07 — first-3d-scene (S-8 half-closure).** Decisions worth keeping:
+  - **A perspective claim must be measured in pixels**: two spheres sharing a geometry
+    _instance_ and a material _instance_ at 5.0 m / 10.2 m give a 4.04× area ratio; an
+    orthographic camera gives exactly 1.0. A `data-camera` page attribute is context, not
+    evidence.
+  - **Hue classifiers need every channel pair pinned** — `blue − red` alone let lit green
+    `(86,255,143)` pass as violet (5 287 capsule pixels misattributed, measured). The
+    palette is stated as byte values in both the example and its spec.
+  - **Ergonomics gaps observed, no engine change made**: no `lookAt` on `Node`/`Camera`
+    (aiming camera and light is hand-composed quaternions — §44 camera rigs still
+    unshipped, roughest edge of the first 3D scene); the 3D primitives' segment-option
+    names are inconsistent across the family (`widthSegments`/`tubularSegments`/
+    `capSegments`) — candidates for a future naming pass.
+  - Gotcha: `vite preview --strictPort` servers survive an interrupted Playwright run —
+    kill `vite.js preview` processes before re-running `pnpm test:browser`.
+- **2026-08-07 — Closure-review fix batch (24 findings).** Decisions worth keeping:
+  - **`KinematicController`'s §79 payload is deliberately empty** (`{}`): no constructor
+    options; in-flight commands are simulation state; `followPath` holds a live
+    `Trajectory` no document can reference. **Registry completeness is enforced
+    mechanically** — `packages/four/tests/scene-serializers.test.ts` enumerates every
+    umbrella barrel class carrying `static typeName` (currently `collider,
+kinematic-controller, motion, pose-target, rigid-body`) and requires each registered;
+    a sixth component fails the suite until registered.
+  - **`PhysicsWorld.#destroyRegistration` issues one `destroyBody`** (§37: "destroys a
+    body and everything attached to it"), teardown-path-only; adapters keep
+    `destroyCollider`'s mass refresh for the body-survives case, and Rapier `BodyRecord`s
+    carry `colliderIds` so heir lookup is O(1). The §34 snapshot envelope still writes a
+    collider _count_ (format-2 layout pinned); restore re-derives the id list from the
+    collider table.
+  - `RigidBodyDocument.sleeping` stays write-only diagnostics, now optional on the read
+    side — dropping it would move every document's bytes for no reader.
+  - The §25 unhonoured-material warning stays registration-time-only, documented in the
+    method; moving it belongs to the packet that widens §37 for live material changes.
+  - `worldDrivenTypeWrite` is a process-global suppression, safe only while the `type`
+    setter runs no callbacks — a setter that gains one must carry its own suppression
+    token (hazard paragraph added in place).
+  - `wrap: false` traversal exits cost two keystrokes (blur, then pass-through) — the
+    one-shot `exited` flag is forgotten by any programmatic focus.
+- **2026-08-07 — A-23 (§96 untrusted content).** Decisions worth keeping:
+  - **A signal cannot cross the `FetchLike` seam today — measured, not assumed.** Widening
+    to `(url, init?: { signal?: AbortSignalLike })` breaks `typeof fetch` assignability
+    (contravariant parameters; `RequestInit.signal` is `AbortSignal | null`, and a
+    structural stand-in is missing `onabort`/`reason`/`throwIfAborted`/`dispatchEvent`).
+    The compatible widening is generic — `FetchLike<TSignal = never>` plus an injected
+    `() => { signal: TSignal; abort(): void }` — recorded in `asset-manager.ts` as A-18's
+    remaining half. `FetchResponse` **property** widening is safe
+    (`headers?: ResponseHeadersLike`) and is how the `content-length` pre-check got in.
+  - **§96 guards belong at the text boundary (`decode*`), never at `validate*`** — the
+    validators take values the process itself built, so guarding them refuses nothing an
+    attacker controls and would bound the recorder's own output. This is what kept every
+    golden byte-identical.
+  - **Any depth checker must be iterative** — a recursive one overflows on precisely the
+    input it guards (proven: the unguarded validators stack-overflow at 50 000 nesting
+    generations while `JSON.parse` succeeds).
+  - **A limit defaulting to `Infinity` is documentation, not a limit** — all four defaults
+    are finite (64 MiB / 30 s / 32 Mi code units / 1024 levels);
+    `Number.POSITIVE_INFINITY` is the explicit in-source opt-out.
+  - New §89 code `UNTRUSTED_INPUT_REJECTED` ("hostile input") vs the validators'
+    `TypeError` ("malformed input"); asset refusals stay `ASSET_LOAD_FAILED`; all carry
+    `context.limitName`/`.limit`.
+  - **The CSP claim is enforced, not asserted** (`tests/integration/security-csp.test.ts`,
+    self-testing matchers) — per the 2026-08-05 doc-truth rule. A package that needs
+    `eval` changes the guide first.
+- **2026-08-07 — R-19/R-20 (render keystones).** Decisions worth keeping:
+  - **Textured meshes are a uniform switch, not shader variants** (`useMap`/
+    `useVertexColors` on the one unlit/lit program each): the CPU-mirrored default at GL's
+    initial `0` is what keeps an untextured scene's GL sequence byte-identical, which is
+    what let R-19 land under the pixel-golden gate. Fixed attribute locations: 0 position,
+    1 normal, **2 uv, 3 colour**; `MAP_TEXTURE_UNIT = 0` shared with the sprite pipeline.
+  - The material texture contract is `MaterialTexture` (`@four/materials`, `texture.ts`);
+    `SpriteTexture` is an alias of it — published name kept, `@four/render`'s `Texture`
+    untouched.
+  - `extrudeGeometry` **rejects concave outlines when capped** (centroid-fan caps); §52's
+    tessellation module lifts the restriction. `tubeGeometry` uses parallel transport, not
+    Frenet. `capsuleGeometry.height` measures the cylindrical section only, matching §24's
+    capsule collider.
+  - Sprite's derived-uv path deliberately not rewritten — identical mapping makes a
+    rewrite unfalsifiable by the goldens; §55's atlas packet owns it (dated note in
+    `sprite.ts`).
+  - Gotcha (repeat offender): **never `git stash` in the shared worktree** — the keystone
+    agent's baseline-comparison stash swept another agent's in-flight files for ~9 minutes
+    (restored and verified, nothing lost). Same lesson as the rebase incident.
+- **2026-08-07 — A-25: §94 machinery built, publish owner-gated.** Changesets config
+  hand-authored (no `changeset init`, no lockfile change); `release.yml` calls `ci.yml`
+  via a new `workflow_call` trigger so a release clears exactly the PR gates; publish is
+  inert without `NPM_TOKEN`. Two standing facts discovered:
+  - **The §98 rename must include emitted code.** `dist/*.js` and `.d.ts` carry
+    `from "@four/core"` — renaming only manifests would publish 24 mutually-unresolvable
+    packages. `apply-publish-names.mjs` rewrites quoted workspace specifiers in staged
+    code (405 sites), resolves `workspace:` ranges, and publishes from the staging tree so
+    the checkout is never renamed.
+  - **The five reserved stubs cannot be Changesets-`ignore`d** while `four` depends on and
+    re-exports them (validation error reproduced). `ignore: []` until the owner decides
+    the packaging question (publish stubs / drop subpaths / optional peers).
+- **2026-08-07 — A-26 closed: §90 compatibility tables.** `docs/COMPATIBILITY.md` carries
+  the five tables. The solver-adapter section is **generated** between
+  `<!-- BEGIN/END GENERATED: solver-adapters -->` markers by
+  `tools/generate-compatibility.mjs` from live `PhysicsCapabilities` instances — never
+  hand-edit it. The generator imports the built `dist/` (deliberate: a source parse would
+  re-implement a const evaluator) and pads tables exactly as Prettier does, so `--check`
+  and `prettier --check` agree — changing one convention without the other breaks the gate.
+  The Rapier snapshot envelope version (2) is module-private and therefore hand-cited in
+  the format section, not generated — the one number there that can drift.
+- **2026-08-07 — Gotcha (concurrent agents + rebase): `git rebase` with autostash while
+  agents hold uncommitted work wiped their in-flight files** (autostash carries tracked
+  edits but the reset window still clobbered untracked files mid-write; the A-26 agent had
+  to rebuild from a scratchpad backup). When the remote moves during a multi-agent wave,
+  prefer: let agents finish → commit their batches → rebase once, or snapshot untracked
+  work first.
+- **2026-08-07 — GAP-CLOSURE WAVE 2: keyboard tier (A-10 done, A-13 keyboard half).**
+  `KeyboardInput` in `@four/input`, traversal + activation in `@four/ui`. Decisions:
+  - **Focus crosses `ui → input` as an injected resolver** — `KeyboardInput(surface,
+{ focusTarget: () => Node | null })`. `@four/ui` supplies `keyboardFocusTarget(root)`;
+    `@four/input` never imports it. §3.1 stays frozen; a `null` answer dispatches nothing
+    (the analogue of a pointer that hit nothing).
+  - **Three-phase dispatch is shared machinery** (`packages/input/src/propagation.ts`):
+    `SceneInputEvent` base + `dispatchThreePhase(event, path, type, captureKey)`. The two
+    listener keys are _arguments_ typed against `NodeEventMap` — no `"capture:" + type`
+    string concatenation, no cast. `dispatchPointerEvent` delegates to it; its public
+    surface (and `ScenePointerEvent`'s members) is unchanged.
+  - **`SceneKeyEvent.preventDefault()` forwards to the platform event** through an optional
+    `KeyDefaultSuppressor` — default-suppression (Tab/Space mean something to the host) is
+    deliberately separate from `stopPropagation`.
+  - **Traversal sorts `accessibility.tabIndex` plainly ascending** (ties by scene order,
+    stable sort; negative opts out of traversal but stays programmatically focusable) —
+    deliberately _not_ the DOM's positive-before-zero rule, which exists only because HTML
+    interleaves with a document order it cannot see. `tabIndex: 0,1,2` means what an author
+    intends.
+  - **Enter/Space live on `Button`; Tab lives on the tree** (the DOM's split). Both
+    activation keys fire on `keydown` — the DOM's Enter-down/Space-up asymmetry is a stated,
+    deliberate simplification. `WidgetActivationSource` is an open union; adding
+    `"keyboard"` was additive.
+  - `keypress` is deliberately unimplemented (documented in `key-events.ts`); wheel, gamepad,
+    XR, and focus/blur-as-input-events are recorded in `packages/input/README.md`.
 - **2026-08-06 — GAP-CLOSURE WAVE 1 (A-7, A-9, A-14/PH-17 partial, A-15, A-17, PH-6).**
   Six `docs/GAP ANALYSIS v0.md` items closed, each with regression tests. Decisions worth
   keeping:
-  - **A-9 (`PointerInput` leak).** Per-pointer state is now deleted on `pointerup` *and* on
+  - **A-9 (`PointerInput` leak).** Per-pointer state is now deleted on `pointerup` _and_ on
     the new `pointercancel`; `pointercancel` joined `PropagatingPointerEventType` (and
     `DragManager` ends a drag on it). **Known behaviour change:** because
     `SurfacePointerEvent` carries no `pointerType`, a mouse release now also fires
@@ -40,11 +469,11 @@ readable; never delete the pointer itself.
     needs `pointerType` on that structural interface and is left to the packet that widens
     it. `PointerInput.trackedPointerCount` was added so the leak stays testable.
   - **A-15 (silent component drop on save).** `Node.components` forwards §6a's registry;
-    `serializeComponents` walks the node and emits in *registry* order, so output ordering —
+    `serializeComponents` walks the node and emits in _registry_ order, so output ordering —
     and therefore every byte-identical golden — is unchanged. Unserializable components now
     throw `INVALID_APPLICATION_STATE`; `SerializeSceneOptions.unknownComponents: "skip"`
     mirrors the read side.
-  - **A-17 (id collisions).** `NodeOptions.id` restores an id at construction and *reserves*
+  - **A-17 (id collisions).** `NodeOptions.id` restores an id at construction and _reserves_
     it against the module counter; `restoreNodeId` moved from `@four/serialization` (where it
     cast a foreign class's `readonly` field) into `@four/scene`, which owns the field, for the
     `nodeFactory` path that cannot use the constructor. `instantiateScene` refuses a document
@@ -66,10 +495,10 @@ readable; never delete the pointer itself.
     finally fires on the replay path. **Versioning rule: a document declares the lowest
     version that can express its content** — `2` with a configuration, `1` without — so
     `REPLAY_FORMAT_VERSION` is 2, `SUPPORTED_REPLAY_FORMAT_VERSIONS` is `[1, 2]`, and every
-    existing version-1 recording still validates *and re-encodes byte for byte*.
+    existing version-1 recording still validates _and re-encodes byte for byte_.
   - **The phase-10 golden was amended, envelope only, with proof.** `recordingDigest`
-    2642391973 → 1754656889 and `recordingLength` 46822 → 47008 (+186 bytes); *nothing else
-    moved* — `initialSnapshotDigest`, both checksum-stream digests, `seekTailDigest`, the
+    2642391973 → 1754656889 and `recordingLength` 46822 → 47008 (+186 bytes); _nothing else
+    moved_ — `initialSnapshotDigest`, both checksum-stream digests, `seekTailDigest`, the
     first/last/final checksums and every contact count are bit-identical to the 2026-08-02
     record. The claim was proved, not assumed: re-running the scenario with the capture
     neutralized (a wrapper dropping `ReplaySnapshot.configuration`) reproduces the old digest
@@ -77,7 +506,7 @@ readable; never delete the pointer itself.
     `formatVersion` / `worldConfigurationKeys` so the §34 configuration is now pinned too.
   - **`Application.resize(width, height, resolution?)` (A-7).** Records the size, forwards to
     `renderer.resize`, and updates the `aspect` + projection of perspective cameras on
-    *full-surface* viewports only (`normalized` `(0,0,1,1)`) — §61 says the aspect is the
+    _full-surface_ viewports only (`normalized` `(0,0,1,1)`) — §61 says the aspect is the
     application's to set and this class is the only thing that knows the viewport→camera
     mapping. `ApplicationOptions` gained `width`/`height`/`resolution` and a `depthRange`
     (D8) for the projection rebuild. Orthographic extents and partial viewports are left
