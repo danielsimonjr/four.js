@@ -23,5 +23,10 @@
     "path": "examples/flagship/one-scene-everything-moves/dist/assets/*.js",
     "limit": "1.65 MB",
     "gzip": true
+  },
+  {
+    "path": "examples/flagship/motor-digital-twin/dist/assets/*.js",
+    "limit": "1.00 MB",
+    "gzip": true
   }
 ]

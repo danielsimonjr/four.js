@@ -179,8 +179,9 @@ for (const rel of docFiles()) {
 //    so its count is pinned to git rather than to a reviewer's memory.
 //
 //    A nested example counts too: `examples/flagship/<demo>` is keyed by its
-//    two-segment name above, so §118's flagship is one of the directories this
-//    count compares against (8 since 2026-08-07).
+//    two-segment name above, so both flagships are among the directories this
+//    count compares against (8 since 2026-08-07; 9 since 2026-08-08, when §119's
+//    `flagship/motor-digital-twin` was written).
 // ---------------------------------------------------------------------------
 
 const auditRel = "docs/AUDIT-120.md";
@@ -245,8 +246,10 @@ const RETIRED = [
     where: ["docs/AUDIT-120.md"],
     allow: ["docs/AUDIT-120.md", "CHANGELOG.md"],
     why:
-      "eight examples/* directories have a main.ts (six until 2026-08-07, when " +
-      "first-3d-scene and then §118's flagship were written); the rest are .gitkeep (S-8)",
+      "nine examples/* directories have a main.ts (six until 2026-08-07, when " +
+      "first-3d-scene and then §118's flagship were written; nine since " +
+      "2026-08-08, when §119's motor digital twin was written); the remaining " +
+      "three are .gitkeep (S-8)",
   },
   {
     re: /tests\/visual\/.*empty placeholder/i,

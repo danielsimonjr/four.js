@@ -153,22 +153,31 @@
  * the instrument column. So each classifier below states the **region** it is
  * valid in, and the gate crops before it counts.
  *
- * | object | region | fully-lit bytes | classifier |
- * | ------ | ------ | --------------- | ---------- |
- * | rotor drum, vanes, balance weight | machine bay (left 40 %) | `(255, 150, 40)` | amber: `r ≥ 120`, `r − g ≥ 50`, `r − b ≥ 90` |
- * | stator, end bells, shaft, bench frame | machine bay | `(96, 122, 200)` | steel: `b ≥ 110`, `b − r ≥ 45`, `b − g ≥ 35` |
- * | brake pad (the rub fault) | machine bay | `(235, 60, 170)` | magenta: `r ≥ 140`, `b ≥ 110`, `g ≤ r − 100` |
- * | measured-speed trace | instrument column (right 45 %) | `(60, 220, 240)` | cyan: `g ≥ 140`, `b ≥ 140`, `g − r ≥ 80`, `b − r ≥ 80` |
- * | commanded-speed trace | instrument column | `(255, 220, 80)` | yellow: `r ≥ 170`, `g ≥ 150`, `b ≤ 130` |
- * | vibration trace | instrument column | `(80, 230, 120)` | green: `g ≥ 150`, `g − r ≥ 80`, `g − b ≥ 60` |
- * | temperature trace and bar fill | instrument column | `(255, 110, 50)` … `(70, 205, 165)` | the bar is measured by *length*, not hue — see {@link updateTemperatureBar} |
+ * Every byte value below was **measured off a built screenshot**, not derived
+ * from the material colour, because a `LitMaterial` under a directional light
+ * plus ambient produces several illumination levels of the same hue and only the
+ * ratios survive.
+ *
+ * | object | region | measured bytes | classifier |
+ * | ------ | ------ | -------------- | ---------- |
+ * | rotor drum, vanes, balance weight | machine bay (`x < 422`) | `(255, 158, 43)` | amber: `r ≥ 150`, `r − g ≥ 60`, `r − b ≥ 110` |
+ * | stator frame, end bells, shaft, isolator posts | machine bay | `(103, 128, 208)`, `(71, 88, 149)`, `(67, 84, 141)` | steel: `b ≥ 100`, `b − r ≥ 45`, `b − g ≥ 35` |
+ * | brake caliper (the rub fault) | machine bay | `(250, 64, 178)` | magenta: `r ≥ 150`, `b ≥ 110`, `g ≤ r − 100` |
+ * | measured-speed trace | chart A (`x 514…941`, `y 12…102`) | `(61, 219, 240)` | cyan: `g ≥ 140`, `b ≥ 140`, `g − r ≥ 80`, `b − r ≥ 80` |
+ * | commanded-speed trace | chart A | `(255, 219, 79)` | yellow: `r ≥ 170`, `g ≥ 150`, `b ≤ 130` |
+ * | vibration trace | chart B (`y 126…213`) | `(79, 230, 120)` | green: `g ≥ 150`, `g − r ≥ 80`, `g − b ≥ 60` |
+ * | temperature trace | chart B | `(255, 110, 51)` | orange: `r ≥ 200`, `r − g ≥ 100`, `r − b ≥ 150` |
+ * | temperature bar fill | the bar (`y 358…374`) | a ramp, `(106, 185, 143)` at 47 °C | measured by **length**, not hue — see {@link updateTemperatureBar} |
  * | glyphs | both | `(236, 239, 246)` | neutral: `min ≥ 170`, `max − min ≤ 22` |
- * | bench slab, panel surfaces | both | `≤ (56, 58, 68)` | none — they must trip nothing |
+ * | bench slab, chart and panel surfaces | both | `(43, 45, 53)`, `(18, 19, 26)` | none — they must trip nothing |
  * | background | both | `(8, 9, 14)` | none |
  *
  * The §113 overlay keeps §113's own defaults (saturated, **no blue**), and is
- * off until the `overlay` button is pressed; the gate crops the machine bay
- * before counting it, where no instrument colour can reach.
+ * off until the `vectors` button is pressed; the gate crops the machine bay
+ * before counting it, where no instrument colour can reach. `b ≤ 30` separates
+ * it from the amber rotor with a computed rather than an eyeballed margin: amber
+ * is `(1, 0.59, 0.16)` before lighting, so a pixel dark enough to satisfy it has
+ * `r ≤ 187` and fails the overlay's `max(r, g) ≥ 200`.
  *
  * ## What the frame looks like, mechanically
  *
@@ -178,9 +187,15 @@
  *     │                   PhysicsSystem(600)         Rapier 3D: stator, rotor, pad
  *     │                   instruments  (950)         thermal model, chart samples
  *     │                   pose capture (1000)        §43 previous/current states
- *     ├─ update           this file: charts, readouts, overlay, §84 stats, #status
+ *     ├─ update           this file: charts, readouts, overlay, panel text
  *     └─ render           renderer.render(scene, views, interpolationAlpha)
+ *   …then, after step() returns: §84 statistics and everything #status publishes
  * ```
+ *
+ * The last line is not a stylistic choice. `Application.step` resets §84's whole
+ * record on the way *in* and writes the render counters, the §83 resource levels
+ * and `cpuFrameTime` on the way *out*, so a page that read `app.stats` from the
+ * `update` event would find every counter `NaN` — measured, then moved.
  *
  * The control system sits at §39's `PRIORITY_COMMANDS` — step 2, strictly before
  * the step-6 solve — so the ordering is the engine's, not this file's, and the
@@ -229,7 +244,11 @@ import {
   type Material,
 } from "four/materials";
 import { Matrix4, Quaternion, Vector3 } from "four/math";
-import { PIDController, PRIORITY_COMMANDS, type SimulationSystem } from "four/motion";
+import {
+  PIDController,
+  PRIORITY_COMMANDS,
+  type SimulationSystem,
+} from "four/motion";
 import {
   Collider,
   HingeJoint,
@@ -533,14 +552,23 @@ const unitQuad = geometry("unit-quad", () =>
   planeGeometry({ width: 1, height: 1 }),
 );
 
-const steelMaterial = material("steel", new LitMaterial({ color: STEEL_COLOR }));
+const steelMaterial = material(
+  "steel",
+  new LitMaterial({ color: STEEL_COLOR }),
+);
 const statorMaterial = material(
   "stator",
   new LitMaterial({ color: STATOR_COLOR }),
 );
-const rotorMaterial = material("rotor", new LitMaterial({ color: ROTOR_COLOR }));
+const rotorMaterial = material(
+  "rotor",
+  new LitMaterial({ color: ROTOR_COLOR }),
+);
 const padMaterial = material("pad", new LitMaterial({ color: PAD_COLOR }));
-const benchMaterial = material("bench", new LitMaterial({ color: BENCH_COLOR }));
+const benchMaterial = material(
+  "bench",
+  new LitMaterial({ color: BENCH_COLOR }),
+);
 
 // --- where the machine stands -------------------------------------------------
 
@@ -751,12 +779,60 @@ const BACK_PLATE_Z = -0.44;
  * and top plates, a back wall, two side plates, and nothing between the viewer
  * and the rotor.
  */
-const platePairs: readonly (readonly [string, number, number, number, number, number, number])[] = [
-  ["base-plate", STATOR_HALF.x * 2, PLATE * 2, STATOR_HALF.z * 2, 0, -STATOR_HALF.y + PLATE, 0],
-  ["top-plate", STATOR_HALF.x * 2, PLATE * 2, STATOR_HALF.z * 2, 0, STATOR_HALF.y - PLATE, 0],
-  ["back-plate", STATOR_HALF.x * 2, STATOR_HALF.y * 2, PLATE * 1.5, 0, 0, BACK_PLATE_Z],
-  ["side-plate-left", PLATE * 2, STATOR_HALF.y * 2, STATOR_HALF.z * 2, -STATOR_HALF.x + PLATE, 0, 0],
-  ["side-plate-right", PLATE * 2, STATOR_HALF.y * 2, STATOR_HALF.z * 2, STATOR_HALF.x - PLATE, 0, 0],
+const platePairs: readonly (readonly [
+  string,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+])[] = [
+  [
+    "base-plate",
+    STATOR_HALF.x * 2,
+    PLATE * 2,
+    STATOR_HALF.z * 2,
+    0,
+    -STATOR_HALF.y + PLATE,
+    0,
+  ],
+  [
+    "top-plate",
+    STATOR_HALF.x * 2,
+    PLATE * 2,
+    STATOR_HALF.z * 2,
+    0,
+    STATOR_HALF.y - PLATE,
+    0,
+  ],
+  [
+    "back-plate",
+    STATOR_HALF.x * 2,
+    STATOR_HALF.y * 2,
+    PLATE * 1.5,
+    0,
+    0,
+    BACK_PLATE_Z,
+  ],
+  [
+    "side-plate-left",
+    PLATE * 2,
+    STATOR_HALF.y * 2,
+    STATOR_HALF.z * 2,
+    -STATOR_HALF.x + PLATE,
+    0,
+    0,
+  ],
+  [
+    "side-plate-right",
+    PLATE * 2,
+    STATOR_HALF.y * 2,
+    STATOR_HALF.z * 2,
+    STATOR_HALF.x - PLATE,
+    0,
+    0,
+  ],
 ];
 for (const [name, width, height, depth, x, y, z] of platePairs) {
   addPart(
@@ -791,9 +867,15 @@ for (const [name, z] of [
   ["bearing-drive", DRIVE_BEARING_Z],
   ["bearing-idle", IDLE_BEARING_Z],
 ] as const) {
-  addPart(stator, name, endBell, steelMaterial, 0, 0, z).transform.rotation.copy(
-    ROTOR_AXIS_OFFSET.rotation,
-  );
+  addPart(
+    stator,
+    name,
+    endBell,
+    steelMaterial,
+    0,
+    0,
+    z,
+  ).transform.rotation.copy(ROTOR_AXIS_OFFSET.rotation);
 }
 
 /** Cooling fins along the top of the frame — four thin plates, purely visual. */
@@ -997,7 +1079,11 @@ addPart(
   pad,
   "caliper-face",
   geometry("caliper-face", () =>
-    boxGeometry({ width: PAD_HALF.x * 2, height: PAD_HALF.y * 2.4, depth: 0.05 }),
+    boxGeometry({
+      width: PAD_HALF.x * 2,
+      height: PAD_HALF.y * 2.4,
+      depth: 0.05,
+    }),
   ),
   padMaterial,
   0,
@@ -2037,14 +2123,8 @@ const READOUT_INTERVAL_FRAMES = 6;
  */
 function updateReadouts(): void {
   const speed = rotorBody.angularVelocity.z;
-  setReadout(
-    0,
-    `spd ${revolutionsPerMinute(speed).toFixed(1)} rpm`,
-  );
-  setReadout(
-    1,
-    `cmd ${revolutionsPerMinute(lastCommand).toFixed(1)} rpm`,
-  );
+  setReadout(0, `spd ${revolutionsPerMinute(speed).toFixed(1)} rpm`);
+  setReadout(1, `cmd ${revolutionsPerMinute(lastCommand).toFixed(1)} rpm`);
   setReadout(
     2,
     `vib ${lengthToDisplay(vibrationAmplitude, DISPLAY_UNITS).toFixed(2)} ${unitSymbol(DISPLAY_UNITS, "length")}`,
@@ -2649,7 +2729,10 @@ function drawTorqueArc(): void {
  * solver, because no adapter here reports one (see the module header).
  */
 function drawMountReaction(): void {
-  const force = -MOUNT_STIFFNESS * mountDeflection;
+  // The stiffness is read off the **joint**, not off the constant that built it:
+  // an overlay that recomputed the mount's law from a second copy of the number
+  // would keep drawing the old force after somebody retuned the spring.
+  const force = -mountSpring.stiffness * mountDeflection;
   forceFrom.set(
     stator.transform.position.x,
     stator.transform.position.y - STATOR_HALF.y,
@@ -3058,6 +3141,16 @@ function publish(): void {
   data["tripped"] = tripped ? "true" : "false";
   data["trips"] = String(trips);
   data["fault"] = faultState();
+  // §119's "bearing constraints", read back off the two joints rather than
+  // asserted: a pair of coaxial hinges, of which exactly one is driven.
+  data["bearings"] =
+    `${driveBearing.motor === undefined ? "free" : "driven"}/` +
+    `${idleBearing.motor === undefined ? "free" : "driven"}`;
+  const travel = mountSlider.limits;
+  data["mounttravel"] =
+    travel === undefined
+      ? "unlimited"
+      : `${travel.min.toFixed(3)},${travel.max.toFixed(3)}`;
   // The signature of a saturated actuator, in the controlled quantity's own
   // units: a standing error the loop cannot close because its ceiling is below
   // the setpoint. Published rather than a boolean, because `outputLimits`
@@ -3211,7 +3304,9 @@ async function main(): Promise<void> {
   // cannot drift from what was actually registered.
   status.dataset["bodies"] = String(world.size);
   status.dataset["joints"] = String(world.jointCount);
-  status.dataset["colliders"] = String(solverStatistics(world.adapter).colliderCount);
+  status.dataset["colliders"] = String(
+    solverStatistics(world.adapter).colliderCount,
+  );
 
   app.start();
   requestAnimationFrame(frame);

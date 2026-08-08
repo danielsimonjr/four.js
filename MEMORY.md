@@ -28,6 +28,29 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — §119 motor digital twin.** Decisions worth keeping:
+  - **§84 is readable only _after_ `app.step` returns** — `step` resets the record on
+    entry; reading from the `update` event gives all-`NaN` (measured).
+  - **An instrumented example must not define `__FOUR_DEV__: "false"`** — A-4 gates
+    `Application.stats` on `DEV`; a page about instrumentation cannot ship the build
+    that strips it. The twin is the one documented dev-build example.
+  - **A derated actuator is a second controller's `outputLimits`, never an external
+    clamp** — clamping after `update` + `ki = 0` removes the accumulated term from the
+    output too and produces a two-step limit cycle (measured: command alternating
+    8.7/14.0 rad/s); §111's own anti-windup solves it exactly.
+  - Short horizontal `GL_LINES` segments are dropped by the diamond-exit rule —
+    decimate chart traces below ~4 px/segment. A rebuilt text line must `dispose()`
+    its removed sprites or it leaks one geometry per character per rebuild (measured:
+    953 kB → 1.44 MB before the fix).
+  - Two coaxial hinges are stable on Rapier 3D over 900 steps with a contact fault
+    applied and released. `collectBodyOrigins`' default cross size confirmed unusable
+    in 3D a second time; an over-long cross projects across the frame off-axis.
+  - **Index-race gotcha (second occurrence):** an agent staging files for
+    check-docs' `git ls-files` + the orchestrator committing another batch sweeps the
+    staged files into the wrong commit (dc8e1ae carries an intermediate twin
+    snapshot; superseded by the twin's own batch). Rule: `git reset` before every
+    selective staging, always.
+
 - **2026-08-08 — A-27 §86 benchmarks (CPU tier).** Decisions worth keeping:
   - **A §86 row with a measurable CPU half and a blocked draw half is recorded as
     `half`, never as measured** — the benchmarks README now has that third category

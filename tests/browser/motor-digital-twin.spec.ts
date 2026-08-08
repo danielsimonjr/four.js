@@ -161,7 +161,7 @@ function decodePng(png: Buffer): DecodedImage {
   let seenHeader = false;
   const dataChunks: Buffer[] = [];
 
-  for (let offset = 8; offset + 8 <= png.length; ) {
+  for (let offset = 8; offset + 8 <= png.length;) {
     const length = png.readUInt32BE(offset);
     const type = png.toString("ascii", offset + 4, offset + 8);
     const body = png.subarray(offset + 8, offset + 8 + length);
@@ -340,11 +340,7 @@ function isGlyphPixel(r: number, g: number, b: number): boolean {
 }
 
 /** The chart and bar background, `(18, 19, 26)`, and the page's `(8, 9, 14)`. */
-function isInstrumentBackgroundPixel(
-  r: number,
-  g: number,
-  b: number,
-): boolean {
+function isInstrumentBackgroundPixel(r: number, g: number, b: number): boolean {
   return r <= 30 && g <= 30 && b <= 40;
 }
 
@@ -365,7 +361,9 @@ function countIn(
   for (let y = y0; y < y1; y += 1) {
     for (let x = x0; x < x1; x += 1) {
       const at = (y * image.width + x) * image.bytesPerPixel;
-      if (matches(image.pixels[at], image.pixels[at + 1], image.pixels[at + 2])) {
+      if (
+        matches(image.pixels[at], image.pixels[at + 1], image.pixels[at + 2])
+      ) {
         total += 1;
       }
     }
@@ -385,7 +383,9 @@ function centroidY(
   for (let y = y0; y < y1; y += 1) {
     for (let x = x0; x < x1; x += 1) {
       const at = (y * image.width + x) * image.bytesPerPixel;
-      if (matches(image.pixels[at], image.pixels[at + 1], image.pixels[at + 2])) {
+      if (
+        matches(image.pixels[at], image.pixels[at + 1], image.pixels[at + 2])
+      ) {
         total += 1;
         sum += y;
       }
@@ -584,6 +584,12 @@ test.describe("examples/flagship/motor-digital-twin (§119)", () => {
     expect(status["bodies"]).toBe("4");
     expect(status["joints"]).toBe("5");
     expect(status["colliders"]).toBe("5");
+
+    // §119's "bearing constraints", read back off the two joints: a coaxial
+    // pair, of which exactly one carries the §28 motor. A twin with one bearing
+    // would still spin; it would not be the machine §119 describes.
+    expect(status["bearings"]).toBe("driven/free");
+    expect(status["mounttravel"]).toBe("-0.060,0.060");
 
     // §84 (A-1): this is the first example to read `app.stats`, so the gate
     // checks both halves of §84's rule — a producer's number is a number, and a
@@ -991,10 +997,13 @@ test.describe("examples/flagship/motor-digital-twin (§119)", () => {
     await page.keyboard.press("Enter");
     await page.waitForTimeout(200);
     const after = await readStatus(page);
-    expect(Number(after["activations"])).toBe(Number(before["activations"]) + 1);
-    expect(after["source"], "the activation did not come from the keyboard").toBe(
-      "keyboard",
+    expect(Number(after["activations"])).toBe(
+      Number(before["activations"]) + 1,
     );
+    expect(
+      after["source"],
+      "the activation did not come from the keyboard",
+    ).toBe("keyboard");
     expect(after["paused"]).toBe("true");
   });
 });

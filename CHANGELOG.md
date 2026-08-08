@@ -8,6 +8,41 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — §119 flagship: the motor digital twin (S-8's example program complete)
+
+#### Added
+
+- **`examples/flagship/motor-digital-twin`** — §119's engineering demonstration and the
+  positioning demo (`docs/POSITIONING.md`'s first audience): a procedural 3D motor
+  (stator frame, end bells, fins, rotor, shaft, coupling — §53 primitives under
+  `LitMaterial`), the rotor turned **by the solver** through a §28 hinge motor with
+  **two coaxial bearings** (stable on Rapier 3D over 900 steps with a contact fault
+  applied and released), **emergent vibration** (an off-axis collider + a
+  slider-and-spring mount — ~11.6 mm p-p at 200 rpm), a lumped first-order thermal
+  model with a 135 °C trip, waveform charts drawn as **one draw call** via the R-35
+  lines+vertex-colour path, two fault injections (bearing rub via a slider-driven
+  caliper; drive sag as a second `PIDController` with derated `outputLimits` — §111's
+  own anti-windup, after measuring that external clamping + `ki = 0` produces a
+  two-step limit cycle), `PIDController` closed on the measured shaft speed, §34
+  record/seek/replay with a published verify, and §79 save/load (208 nodes
+  round-tripping). **Three firsts**: `app.stats` read in an example (§84 — readable
+  only _after_ `app.step` returns, measured), §40's conversion helpers at the display
+  edge (RPM/deg/mm/ms), and a deliberate **dev build** (`__FOUR_DEV__` not defined
+  false — a page about instrumentation cannot ship the build that strips it; the one
+  documented deviation). One-wasm solver path (`new Rapier3dAdapter()` — 917.9 kB gzip
+  vs the §118 flagship's 1.54 MB), budget 1.00 MB.
+- **`tests/browser/motor-digital-twin.spec.ts`** (9 tests; browser 49 → 58) — measured:
+  bearings asserted from the joints, §84 counters (`drawcalls` 158, `contacts` honestly
+  `nan`), unit readouts equal to engine values through the declared conversions, two
+  page loads publishing the **identical** mark checksum, PID within 4 rpm of setpoint,
+  rub and sag behaviours, pause = exactly 0 changed pixels, replay-seek re-simulating
+  ≤5 steps with `replayverified` true, save round-trip true.
+- §119's residue staged in the file header with v1 citations: real chart primitives
+  (R-24/R-23), camera-parented instruments (R-37), _measured_ joint reactions (no
+  adapter reports them — the torque/force glyphs are the twin's estimate, labelled),
+  glTF model (S-7). **S-8's §118–§119 example program is complete**; only the three §93
+  stand-in directories remain (owner retire-or-write).
+
 ### 2026-08-08 — A-27 closed (CPU tier): §86 benchmarks for UI layout and glyph layout
 
 #### Added
