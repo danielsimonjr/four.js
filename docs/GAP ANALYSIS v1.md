@@ -1,0 +1,395 @@
+# four.js — Gap Analysis v1
+
+**Date:** 2026-08-08
+**Tree ref:** `e0ddd3b` on branch `claude/tools-integration-rji2sr` (working tree clean; this
+analysis is read-only apart from the superseded-pointer paragraph it adds to v0).
+**Supersedes:** `docs/GAP ANALYSIS v0.md` (2026-08-05, tree `cff56e7`), which stays in place
+as the historical record — its findings, closure plans, and dated closure banners are still
+the evidence trail behind every row below.
+**Spec baseline:** `docs/SPECIFICATION.md` revision 1.7 (2026-08-06 — §97a landed as part of
+the campaign this document reports on).
+
+**Method.** v0 filed 91 findings across three tiers (`A-*` application, `R-*` rendering,
+`PH-*` simulation) plus six documentation defects (`D-*`). Between 2026-08-06 and
+2026-08-07 a closure campaign landed against them: 26 batches recorded in `CHANGELOG.md`
+(24 dated 2026-08-07, 2 dated 2026-08-06) plus two that reached no tracking file at all.
+This document re-reads every
+one of the 97 filings against the tree at `e0ddd3b` and re-states its status. Where a status
+was checked in source rather than taken from a tracking file, the pointer in the table is the
+file that carries the evidence; no claim below rests on `CHANGELOG.md`, `TODO.md`, or
+`MEMORY.md` alone, because two of the campaign's own batches never reached those files
+(see _Tracking integrity_ below).
+
+The v0 ID space is kept verbatim. `S-*` still means `docs/AUDIT-120.md`'s staged items, never
+a v0 finding.
+
+---
+
+## 1. Executive summary
+
+### Headline
+
+**The application tier is largely closed, the simulation tier is almost entirely closed, and
+the rendering tier is now the project.** Of 97 filings, 42 are closed, 14 are partially
+closed, 4 are blocked behind three drafted RFCs, and 37 remain open — and 26 of those 37 open
+items are `R-*`. The campaign closed every render finding that was a _keystone_ (`R-4`, `R-5`,
+`R-6`, `R-12` base, `R-19`, `R-20`, `R-2`, `R-35`) and almost none that was a _feature_ (no
+PBR, no shadows, no multi-light, no colour management, no batching, no 2D vector stack, no
+`Text` node, no camera rigs). That is the right order — the blockers fell first — but it means
+the remaining backlog is longer in wall-clock terms than the closed half, not shorter.
+
+Two honest qualifications on the closed count:
+
+- Most render closures shipped at a **named tier**, not in full: `R-4` is "minimal" (no
+  `readPixels`, no MRT, no float, no samplable depth), `R-5` is "linear-pass" (no transient
+  resources, no barriers), `R-6` is "full-screen effect" (2 of 10 §70 effects), `R-12` is the
+  abstract base only (0 of 8 missing §57 family members). Each tier is declared in source
+  with a dated note naming what it defers, so the tiering is honest — but a reader counting
+  "closed" as "§N is done" would be wrong every time.
+- The `A-*` closures are the deepest: §84 statistics, §40 units, §96 security, §90
+  compatibility, §94 machinery, §45's string renderer form, keyboard input, and the §118
+  flagship all exist where nothing existed on 2026-08-05.
+
+### Counts by tier
+
+| Tier                      | Filed | Closed | Partially closed | RFC drafted | Open |
+| ------------------------- | ----- | ------ | ---------------- | ----------- | ---- |
+| Application (`A-1…A-28`)  | 28    | 13     | 9                | 1           | 5    |
+| Rendering (`R-1…R-41`)    | 41    | 9      | 4                | 2           | 26   |
+| Simulation (`PH-1…PH-22`) | 22    | 14     | 1                | 1           | 6    |
+| Doc defects (`D-1…D-6`)   | 6     | 6      | —                | —           | —    |
+| **Total**                 | 97    | 42     | 14               | 4           | 37   |
+
+Four filings are duplicates of two work items and were closed once each: `A-2`/`PH-13` (§40
+`UnitSystem`) and `A-22`/`PH-18` (Part X examples). `A-8`/`R-2`/`PH-19` were three filings of
+one design (registries) and closed in one packet. `R-22`/`PH-10` are two filings of one RFC.
+So the 42 closures represent 38 distinct pieces of work.
+
+### What moved the needle
+
+- **The three v0 keystones all landed.** `R-12`(base) + `R-11` + `R-10`(key 2) on 2026-08-06;
+  `R-19` + `R-20` and `R-4` on 2026-08-07. Their dependents lost their blockers: `R-9`,
+  `R-13`, `R-22`, `R-28`, `R-30`, `R-32`, `R-35`, `R-5`, `R-6`, `R-7`, `R-18` are all now
+  gated on their own work rather than on somebody else's.
+- **The v0 "silent sections" mostly stopped being silent.** §63 (`R-5`), §70 (`R-6`), §84
+  (`A-1`), §96 (`A-23`), §90 (`A-26`), §85's build-mode half (`A-4`) all now have code and a
+  record. Still silent, with no note anywhere: **§82** (`A-20`), **§8** (`PH-12`), **§58**
+  (`R-16`), **§54**'s non-skinning rows (`R-22`), **§26/§27 for rigid bodies** (`PH-8`).
+- **The largest single v0 gap shrank but did not close.** `A-21` was "four §93 scenes and both
+  flagships are empty directories". `examples/first-3d-scene/main.ts` and
+  `examples/flagship/one-scene-everything-moves/main.ts` are written and browser-gated; eight
+  examples now have a `main.ts`. §119's motor digital twin is not yet written, and three §93
+  stand-in directories await an owner retire-or-write decision.
+- **Nothing regressed into dishonesty.** Every tier label, every staged `NaN`, every closed
+  union that refuses an unshipped member was re-checked against source and holds.
+
+---
+
+## 2. Closed
+
+One line per closed filing. The pointer column names a file that can be opened to check the
+claim; where a closure was a decision rather than code, it names the document that records it.
+"Tier" in the notes column means the closure is complete against the finding as filed but
+narrower than the whole spec section — the residue is listed in §4 or in the source note the
+pointer names.
+
+### Application
+
+| ID     | §                | What closed it                                                                                                | Pointer                                                                             |
+| ------ | ---------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `A-1`  | 84               | `app.stats` with §84's eleven counters (8 measured, 3 staged `NaN`-with-a-reason); presence-is-the-capability | `packages/diagnostics/src/stats.ts`, `packages/render/src/statistics.ts`            |
+| `A-2`  | 40               | `UnitSystem`/`SI_UNITS`/`resolveUnitSystem` + display conversions; display-only enforced by a test            | `packages/core/src/units.ts`, `tests/integration/units-display.test.ts`             |
+| `A-7`  | 45               | `Application.resize` + `width`/`height`/`resolution`/`depthRange` options                                     | `packages/four/src/application.ts`                                                  |
+| `A-8`  | 45, 62           | `renderer: "auto" \| <name>` over an opt-in registry; `four` still imports no backend                         | `packages/render/src/renderer-registry.ts`, `packages/render-webgl/src/register.ts` |
+| `A-9`  | 72, 83           | Per-pointer teardown on `pointerup`/`pointercancel`; 10 000-gesture regression test                           | `packages/input/src/pointer-input.ts`                                               |
+| `A-10` | 72               | `KeyboardInput` + `SceneKeyEvent` + shared three-phase dispatch (keyboard tier)                               | `packages/input/src/keyboard-input.ts`, `packages/input/src/propagation.ts`         |
+| `A-14` | 73, 79           | `registerUISerializers()`; widgets round-trip with box model, layout, §75 record                              | `packages/four/src/scene-serializers.ts`                                            |
+| `A-15` | 79, 6a           | `Node.components` + throw-by-default on an unserializable component                                           | `packages/scene/src/node.ts`, `packages/serialization/src/serializer.ts`            |
+| `A-17` | 79               | `NodeOptions.id` reserves against the counter; duplicate-id refusal in `instantiateScene`                     | `packages/scene/src/node.ts`                                                        |
+| `A-22` | 97, 114–117, 97a | Owner decision: amend the spec. §97a + §97/§114–§117 rewritten and type-checked against the built `.d.ts`     | `docs/SPECIFICATION.md` (§97a; amendments row 1.7)                                  |
+| `A-23` | 96               | Asset `maximumBytes`/`timeoutSeconds`, `parseUntrustedJson`, `UNTRUSTED_INPUT_REJECTED`, CSP grep test        | `packages/core/src/untrusted.ts`, `tests/integration/security-csp.test.ts`          |
+| `A-26` | 90               | `docs/COMPATIBILITY.md`'s five tables; solver block generated from live capability declarations               | `docs/COMPATIBILITY.md`, `tools/generate-compatibility.mjs`                         |
+| `A-28` | —                | Seven false claims corrected in place + a mechanical gate so they cannot recur                                | `tools/check-docs.mjs`                                                              |
+
+### Rendering
+
+| ID          | §          | What closed it                                                                                                  | Pointer                                                                                 |
+| ----------- | ---------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `R-2`       | 62, 45     | Backend registry, §62 preference order, fallback with disposal, fail-fast on a named backend                    | `packages/render/src/renderer-registry.ts`                                              |
+| `R-4`       | 61, 48, 63 | `RenderTarget` + FBO cache + `render(root, views, interpolation, target)` (minimal tier)                        | `packages/render/src/render-target.ts`, `packages/render-webgl/src/gl-render-target.ts` |
+| `R-5`       | 63         | `RenderGraph`: ordered named passes, declared inputs, discovered sampling, `describe()` (linear-pass tier)      | `packages/render/src/render-graph.ts`                                                   |
+| `R-6`       | 70         | `EffectRenderPass` + `Renderer.renderEffect`; copy (bit-exact) and colour grade (effect tier)                   | `packages/render/src/effect-pass.ts`, `packages/render-webgl/src/gl-effect.ts`          |
+| `R-11`      | 57, 66     | `transparent`/`blendMode` honoured; the dead-alpha defect is fixed                                              | `packages/render-webgl/src/webgl-renderer.ts`                                           |
+| `R-19`      | 53         | `BufferGeometry.uvs`/`.colors`, `UnlitMaterial.map`/`.vertexColors`, `LitMaterial.map` — meshes can be textured | `packages/geometry/src/buffer-geometry.ts`, `packages/materials/src/texture.ts`         |
+| `R-20`      | 53         | Nine 3D primitives (sphere, cylinder, cone, capsule, torus, lathe, extrude, tube, height field)                 | `packages/geometry/src/primitives-3d.ts`                                                |
+| `R-35`      | 113, 120   | `debugDrawStreams`/`applyDebugDrawStreams`; the whole overlay is one draw call                                  | `packages/diagnostics/src/debug-draw.ts`                                                |
+| `R-40`      | 118        | The §118 flagship exists and is browser-gated (six measuring tests)                                             | `examples/flagship/one-scene-everything-moves/main.ts`                                  |
+| `D-1`…`D-6` | —          | All six documentation defects corrected in place 2026-08-05, four of them now gated                             | `tools/check-docs.mjs`                                                                  |
+
+### Simulation
+
+| ID      | §       | What closed it                                                                                             | Pointer                                                                                |
+| ------- | ------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `PH-1`  | 37, 23  | Stage 1 truth table (2026-08-06) + stage 2 `SolverBodyTuningAccess` and a step-top drain; `teleport()`     | `packages/physics/src/body-access.ts`, `packages/physics/src/world.ts`                 |
+| `PH-2`  | 37, 20  | `PhysicsWorld.getBodyHandle` / `getColliderHandle` escape hatches                                          | `packages/physics/src/world.ts`                                                        |
+| `PH-3`  | 23, 25  | `colliderIds` maintained on destroy; an authored first-collider mass moves to the surviving heir           | `packages/physics-rapier/src/rapier2d-adapter.ts` (mirrored in the 3D adapter)         |
+| `PH-4`  | 23      | `derivedMass` mirror; `toDescriptor()` emits `mass` only when authored                                     | `packages/physics/src/rigid-body.ts`                                                   |
+| `PH-5`  | 24, 37  | `PhysicsWorld.addCollider` / `removeCollider` with mass re-established in both directions                  | `packages/physics/src/world.ts`, `tests/integration/physics-runtime-colliders.test.ts` |
+| `PH-6`  | 34      | `ReplayRecording.worldConfiguration`; lowest-version-that-expresses rule keeps v1 documents byte-identical | `packages/diagnostics/src/recorder.ts`, `packages/diagnostics/src/replay-format.ts`    |
+| `PH-7`  | 34, 37  | 3D `#rebuildRegistries` gains the 2D null/validity check and re-asserts `type`/`bodyIdA`/`bodyIdB`         | `packages/physics-rapier/src/rapier3d-adapter.ts`                                      |
+| `PH-13` | 40      | One closure with `A-2`                                                                                     | `packages/core/src/units.ts`                                                           |
+| `PH-14` | 25      | `PhysicsTuningCapabilities` + a one-shot warning when §25's rolling/spinning friction cannot be honoured   | `packages/physics/src/adapter.ts`, `packages/physics/src/world.ts`                     |
+| `PH-15` | 32      | Same mechanism for §32's sleep thresholds                                                                  | `packages/physics/src/world.ts`                                                        |
+| `PH-16` | 22, 42  | `RigidBody.type` setter warns once on a registered body, naming `setBodyControlMode`                       | `packages/physics/src/rigid-body.ts`                                                   |
+| `PH-17` | 6a, 79  | `RIGID_BODY_SERIALIZER` / `COLLIDER_SERIALIZER` / `MOTION_COMPONENT_SERIALIZER` all ship                   | `packages/physics/src/serializers.ts`, `packages/motion/src/serializers.ts`            |
+| `PH-18` | 114–117 | One closure with `A-22` (spec revision 1.7)                                                                | `docs/SPECIFICATION.md` (§97a)                                                         |
+| `PH-19` | 20, 37  | `solver: "auto"` over a §37 capability-filtered registry                                                   | `packages/physics/src/solver-registry.ts`                                              |
+
+### Tracking integrity — two batches that closed nine filings and told nobody
+
+Verified by reading the commits and then the code, not the trackers:
+
+- **`ab13840` (2026-08-06)** closed `PH-2`, `PH-3`, `PH-4`, `PH-7`, `PH-14`, `PH-15`, `PH-16`
+  and `PH-1` stage 1. It touched **no** `CHANGELOG.md`, `MEMORY.md`, `TODO.md`, or gap-analysis
+  banner. The only record outside the source is its commit message.
+- **`fe8eb6f` (2026-08-06)** closed `R-11`, closed `R-12` at the base tier and `R-10` at sort
+  key 2 — the campaign's own keystone — with the same silence.
+
+All nine were re-verified in source for this document and are reported as closed above. But
+v0's banner set, `CHANGELOG.md`'s Unreleased section, and `TODO.md` all still read as though
+these findings were open, which is the exact failure mode v0's `A-28` was written about,
+pointed at the gap analysis itself. Repairing it is Group 0 of §4.6's recommended order and
+costs nothing but typing.
+
+---
+
+## 3. Partially closed
+
+| ID     | Shipped                                                                                                                                 | Precisely what remains                                                                                                                                                                                                                                                                     | Tracked in                                                               |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `A-4`  | §85's build-mode half: `DEV`/`devWarn`/`devWarnOnce`/`devAssert` behind `__FOUR_DEV__`, allowlist-enforced (`packages/core/src/dev.ts`) | The §85 **validation catalogue** in `@four/diagnostics`; converting scattered scene/physics checks to `devAssert`; routing §42's authority-conflict warn through the channel; §41's 1e5 envelope check                                                                                     | `TODO.md` "A-4 remainder"                                                |
+| `A-5`  | §83 accounting tier: `byteLength` + live-instance counters for geometry/texture/render target; `textureMemory`/`bufferMemory` measured  | All six §83 development **warnings**; creation-site capture; `AssetManager` duplicate-load warning; materials and solver handles unaccounted                                                                                                                                               | `TODO.md` "A-5 remainder"/"A-5 follow-ups"                               |
+| `A-12` | Six controls (`Toggle`, `Checkbox`, `RadioButton`, `Slider`, `ProgressIndicator`, `ImageWidget`) — 9 of §73's 16                        | Text input (§56/S-6), scroll view + virtual list (§74 + §67), list, canvas view, embedded viewport (§48), menu + tooltip (need a widget-reachable §9 clock)                                                                                                                                | `UI_STAGED[0]`, `TODO.md`                                                |
+| `A-13` | Keyboard half: `collectFocusOrder`/`keyboardFocusTarget`/`installKeyboardTraversal`, Enter/Space activation                             | DOM mirror, screen-reader updates, high contrast, scalable text (all behind a DOM integration policy); reduced motion (behind `A-6`)                                                                                                                                                       | `UI_STAGED`, `TODO.md` "A-13 PARTIAL"                                    |
+| `A-16` | §79 pairs for `Renderable`, `Sprite`, both cameras, `DirectionalLight`; resources by key via `SceneResourceCatalog`                     | §79's asset **manifest** (key → URL + content hash, blocked on `A-18`); the §80 `.four` binary format                                                                                                                                                                                      | `TODO.md` "A-16 remainder"                                               |
+| `A-18` | Deadline + size limits (via `A-23`); 6 of 13 §76 capabilities                                                                           | Caller-driven cancellation / transport `AbortSignal` (compatible design recorded in source), streaming, dependency graphs, progress, worker decoding, hot reload, content hashing                                                                                                          | `packages/assets/src/asset-manager.ts`, `TODO.md` "A-18 half-remaining"  |
+| `A-21` | `first-3d-scene` and the §118 flagship, both browser-gated; eight runnable examples                                                     | §119's motor digital twin, not yet written; the three §93 stand-in directories (`first-animated-scene`, `first-physics-scene`, `mixed-scene`) are placeholders awaiting an owner retire-or-write call                                                                                      | `docs/AUDIT-120.md` S-8, `TODO.md`                                       |
+| `A-24` | The documentation half: `tests/README.md` rewritten to the suites that exist; `playwright.config.ts` scoped                             | The coverage half: no **renderer context-loss** integration suite (the `NullRenderer.events` seam is still unused), no scene+renderer or picking suite, one visual spec; assets+materials waits on `A-19`                                                                                  | `TODO.md`, `tests/README.md`'s "not yet covered" list                    |
+| `A-25` | Changesets config, `apply-publish-names.mjs` (+tests), `release.yml`, `docs.yml`, minimal `website/`                                    | The real site (guides hosting, flagship page); three owner steps: stub packaging, `NPM_TOKEN`, Pages enablement                                                                                                                                                                            | `TODO.md` "A-25 owner decisions"/"A-25 remainder"                        |
+| `R-10` | §66 sort key 2 (opaque before transparent), default-opaque classification keeping scenes byte-identical                                 | Keys 3 (pipeline/material) and 4 (depth — needs the per-view list, `R-8`); OIT, weighted-blended, depth-prepass control, alpha-to-coverage, premultiplied-alpha policy                                                                                                                     | dated notes in `packages/render/src/render-list.ts`                      |
+| `R-12` | The abstract `Material` base with §57's six shared members; all three concretes re-parented; `Renderable<M>` generic                    | Eight §57 family members (`ShapeMaterial`, `TextMaterial`, `LineMaterial`, `StandardMaterial`, `PhysicalMaterial`, `ShaderMaterial`, `NodeMaterial`, `ComputeMaterial`); `stencil` (needs `R-7`); `RenderItemKind` is still a closed union, so a consumer still cannot register a pipeline | `packages/materials/src/material.ts`, RFC 0001 for the pipeline registry |
+| `R-27` | `Sprite extends Renderable<SpriteMaterial>`; dispatch on `material.kind`, not `instanceof`                                              | `depthMode`, `castShadow`, `receiveShadow`, `frustumCulled`; `material: Material[]`; the family (`Shape2D`, `Text`, `Mesh`, `Line3D`, `PointCloud`, `CustomRenderable`)                                                                                                                    | `packages/render/src/renderable.ts`                                      |
+| `R-39` | `benchmarks/README.md` now separates "needs hardware" from "needs an engine feature"                                                    | The four rows are still unreachable: batched sprites and shapes (`R-9`, `R-23`), mesh instances (`R-22`), animated glyphs (`R-28`); GPU particles need `R-1`                                                                                                                               | `benchmarks/README.md`, `TODO.md`                                        |
+| `PH-9` | §18 state-machine tier: `AnimationController`, typed transitions, parameters, latched triggers, its own determinism golden              | Blend trees; layered and additive animation; clip events from a controller; "any state" transitions                                                                                                                                                                                        | dated notes in `packages/animation/src/controller.ts`, `TODO.md`         |
+
+---
+
+## 4. Open
+
+Re-analysed from today's vantage. Severity and effort are restated against what now exists;
+where a v0 blocker fell during the campaign it is named, because several items are materially
+cheaper than v0 estimated.
+
+### 4.1 Rendering — the tier that is now the project
+
+| ID     | §       | Sev                 | Eff | Was blocked by                         | State today                                                                                                                                                                                                                                                                                                                                                |
+| ------ | ------- | ------------------- | --- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `R-15` | 60a     | major               | M   | nothing (always unblocked)             | **Now the single highest-leverage open render item.** No colour-space metadata, no sRGB↔linear, no CSS colour parsing (`packages/math/src/color.ts` is `ColorRGBA` only), no output transform. It gates `R-13`, `R-17`'s exposure/tone mapping, and `R-6`'s tier-2 tone-mapping effect — and every day it waits, more shading is built in the wrong space. |
+| `R-17` | 68      | major               | L   | `R-15`, `R-12`                         | `R-12` fell. Still exactly one directional light; `collectSceneLights` takes the first and ignores the rest. A scene cannot have two lamps.                                                                                                                                                                                                                |
+| `R-13` | 59      | major               | L   | `R-12`, `R-19`, `R-15`, `R-17`, `R-31` | `R-12` and `R-19` fell (uv + `map` exist). Now gated on `R-15` and `R-17` only. No metallic-roughness workflow anywhere.                                                                                                                                                                                                                                   |
+| `R-18` | 69      | major               | L   | `R-4`, `R-5`, `R-17`                   | `R-4`/`R-5` fell; needs `R-17` and `R-4`'s samplable-depth residue. No `castShadow` anywhere — still deliberately absent rather than accepted-and-ignored.                                                                                                                                                                                                 |
+| `R-9`  | 65, 86  | major               | L   | `R-10`, `R-19`, `R-30`                 | `R-19` fell. Now gated on `R-10` keys 3–4 (without a pipeline sort no batch ever becomes contiguous). Two §86 rows are unreachable until it lands.                                                                                                                                                                                                         |
+| `R-8`  | 64, 87  | major               | M–L | `R-38`, per-view list                  | Unchanged: no frustum test, no `frustumCulled`, one render list per frame rather than per view. `R-10` key 4 and `R-37`'s `layerMask` both wait on the per-view restructure.                                                                                                                                                                               |
+| `R-38` | 46      | major               | M   | nothing                                | Unchanged, and its dependents multiplied: `R-8`, `R-37`, §71 picking filters, and the §118 flagship's recorded follow-up (the UI panel is camera-parented because layers do not exist).                                                                                                                                                                    |
+| `R-7`  | 67      | major               | M   | `R-12`                                 | `R-12` fell; `stencil?: StencilState` is the declared hole in the new base. The GL context is still acquired with `stencil: false`, so this needs a context re-creation. Blocks §73's scroll view and §119's section views.                                                                                                                                |
+| `R-25` | 52      | major               | L   | nothing                                | The load-bearing prerequisite of the entire 2D story (`R-16`, `R-23`, `R-24`, SDF text), and the reason `extrudeGeometry` refuses concave capped outlines today.                                                                                                                                                                                           |
+| `R-24` | 51      | blocker             | L   | `R-25`                                 | No `Path` model. Blocks `R-23`, text-along-path, and §119's waveform charts.                                                                                                                                                                                                                                                                               |
+| `R-23` | 50      | blocker             | L   | `R-12`, `R-16`, `R-25`                 | 0 of 14 shape nodes. `R-12` fell; the rest stands.                                                                                                                                                                                                                                                                                                         |
+| `R-16` | 58      | blocker             | L   | `R-24`/`R-25`, `R-12`                  | Still **silent** in the repository — §58's paint model is named in no staging note. A framework advertising vector graphics still cannot fill with a gradient or stroke with a join.                                                                                                                                                                       |
+| `R-26` | 50      | major               | M   | `R-24`                                 | Still silent. SVG import/export is the practical on-ramp for 2D content and the natural pair for the `render-svg` stub.                                                                                                                                                                                                                                    |
+| `R-28` | 49, 56  | blocker             | M   | `R-30`, `R-9` (to be _good_)           | No `Text` node; `@four/text` still produces data only. Cheaper than v0 said — the node itself was always buildable, and `R-19`'s uvs remove the per-glyph-texture workaround's cause.                                                                                                                                                                      |
+| `R-29` | 55      | major               | S–M | `R-12`                                 | 4 of 11 sprite features. `frame` (the `R-28` blocker) is the S half and is unblocked now.                                                                                                                                                                                                                                                                  |
+| `R-30` | 77      | major               | M   | nothing                                | One format, one filter, one dimension. `R-4` added render-target textures as a source; mipmaps, wrap/filter, anisotropy, `ImageBitmap`, compressed containers all absent.                                                                                                                                                                                  |
+| `R-22` | 54      | major               | L   | see RFC 0003 for the skinning rows     | Instancing, LOD, morph targets, multi-material groups, dynamic buffers all absent; the instancing row makes one §86 row unreachable. Non-skinning rows are **still silent**.                                                                                                                                                                               |
+| `R-21` | 53      | major               | S–M | nothing                                | No `Geometry` base, no `clone()`, `bounds` is an AABB not a `BoundingVolume` — which is what `R-8` needs.                                                                                                                                                                                                                                                  |
+| `R-3`  | 62      | major               | S+M | nothing                                | Still 2 of 11 capability categories, and no required/optional declaration API. The S half is `gl.getParameter` calls; `A-1`'s `gpuFrameTime` and `A-26`'s generated backend table both wait on it.                                                                                                                                                         |
+| `R-1`  | 62      | major               | L   | `R-14`                                 | Four backend packages are still one-line stubs. `R-2`'s ladder is exercised against doubles because only one backend is registrable — the registry's upper rungs are unproven.                                                                                                                                                                             |
+| `R-31` | 36, 112 | minor               | L   | `R-1`, §82                             | Unchanged.                                                                                                                                                                                                                                                                                                                                                 |
+| `R-32` | 36      | minor               | M   | `R-19`, `R-12`                         | Both blockers fell; textured/rotated/soft particles are now ordinary work.                                                                                                                                                                                                                                                                                 |
+| `R-33` | 112     | minor               | S   | nothing                                | §112's exit is still proven for simulation only; a 100k browser page against the shipped instanced path would close it.                                                                                                                                                                                                                                    |
+| `R-34` | 27, 112 | minor               | M   | nothing                                | Unchanged: ~5.1 ms per field per 100k particles; batch `sampleAll` is the scoped fix.                                                                                                                                                                                                                                                                      |
+| `R-36` | 44, 47  | major               | M   | nothing                                | No camera rigs, and the `first-3d-scene` packet recorded the sharper form: there is no `lookAt` on `Node` or `Camera` at all, so aiming a camera or a light is hand-composed quaternions. Pairs with `PH-11`.                                                                                                                                              |
+| `R-37` | 47, 48  | minor–major         | S–M | `R-38`, `R-4`, `R-5`                   | `R-4`/`R-5` fell. `ScreenCamera` is still absent — which is why the flagship parents its UI panel to the camera.                                                                                                                                                                                                                                           |
+| `R-41` | 119     | major (as evidence) | L   | `R-19`, `R-20`, `R-35`, `R-37`         | **Much closer than v0 estimated.** Three of the five blockers fell: cylinders/tori exist, textures exist, the overlay draws. What remains is charts (`R-23`/`R-24`, or a `"lines"` `BufferGeometry` with vertex colours today) and the screen-space panel (the flagship's camera-parenting workaround applies).                                            |
+
+### 4.2 Application
+
+| ID     | §      | Sev    | Eff | State today                                                                                                                                                                                                                                                                                                                                                    |
+| ------ | ------ | ------ | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A-6`  | 45     | High   | M   | The composition root gained `resize`, `stats`, `antialias`, and the string renderer form, but `app.input`, `app.assets`, `app.diagnostics`, `app.physics`, `autoResize`, and `reducedMotion` are still absent. It now blocks three other items: `A-1`'s `physicsStepTime`/`contacts`/`activeBodies` wiring, `A-13`'s reduced-motion requirement, and `PH-22m`. |
+| `A-11` | 71     | Medium | L   | Unchanged and still architecturally blocked: analytic tests need §50 shape nodes (`R-23`), pixel/GPU-id picking needs a render target `@four/input` may not import. Wants an RFC, not a packet.                                                                                                                                                                |
+| `A-19` | 77, 78 | Medium | L   | Unchanged. glTF now has three blockers rather than four (materials, textures, skinning) — RFC 0003 answers the third on paper.                                                                                                                                                                                                                                 |
+| `A-20` | 82     | Low    | L   | **Still literally silent.** No `ComputePass`, and still no dated line in `packages/render-webgpu/README.md` or `TODO.md`. The cheapest open item in the document: one sentence.                                                                                                                                                                                |
+| `A-27` | 86, 92 | Medium | M   | Unchanged: five scripts, `harness.mjs` still "runs nothing", no runner, no trend. `A-1` discharged the dependency v0 named — retained-UI-node and glyph-layout benchmarks are pure CPU work `@four/ui` and `@four/text` can do today.                                                                                                                          |
+
+### 4.3 Simulation
+
+| ID      | §       | Sev         | Eff | State today                                                                                                                                                                                                                                                                        |
+| ------- | ------- | ----------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PH-8`  | 26, 27  | major       | M   | Still silent for rigid bodies: `ForceField` exists only in `@four/particles`, `PRIORITY_FORCES` has no engine occupant for bodies, and `@four/physics` exports no field type.                                                                                                      |
+| `PH-11` | 12, 44  | major       | L   | Unchanged: no steering-into-`lookAt`, no orbit, no character controller, no camera rig. §42's `"constraint"` authority still has no producing system. One packet with `R-36`.                                                                                                      |
+| `PH-12` | 8, 21   | major       | M   | Still silent: no `SpaceMode` anywhere. The §21 "2D bodies sit at z = 0" rule is the standing workaround, and the flagship's camera-parented panel is a second one.                                                                                                                 |
+| `PH-20` | 33      | minor       | M   | Unchanged: five of §33's six ship; rollback has the primitives (`ReplayPlayer.seek`) and no API.                                                                                                                                                                                   |
+| `PH-21` | 39      | minor       | M   | Unchanged: `PhysicsSystem` still occupies one priority and performs steps 6–9 internally; `PRIORITY_CONSTRAINTS`/`PRIORITY_SENSOR_UPDATE`/`PRIORITY_EVENT_DISPATCH` sit empty.                                                                                                     |
+| `PH-22` | various | minor–major | —   | The fourteen roll-ups are unchanged except `PH-22m` (reduced motion, now `A-6`'s to close) and `PH-22n` (§10 dropped-time and §41 suspicious-value warnings, now `A-4`'s catalogue). `PH-22a` (8 of §24's shapes) and `PH-22j` (the box2d/soft stubs) remain the two graded major. |
+
+### 4.4 Design drafted, implementation open — the RFC-gated trio
+
+All three are `docs/rfcs/*` drafts dated 2026-08-07 with **owner decision pending**; no packet
+may start before acceptance, and each RFC names its own blocking question (see §5).
+
+| Filing           | RFC                                       | What the RFC decides                                                                                                                                                          | What it unblocks                                                         |
+| ---------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `R-14`           | `0001-shader-and-node-material-system.md` | A serializable shader graph as the unit of extension; **no user GLSL/WGSL at any tier**; node materials as a separate lazily-compiled pipeline; one new `ScreenEffect` member | `R-1` (second backend), `R-6` tier 2, `R-13`, `R-12`'s pipeline registry |
+| `A-3`            | `0002-plugin-system.md`                   | `PluginContext` as a typed capability bag; explicit registration only; no sandbox but documents can never name a plugin. Alternative E (do nothing) is argued as defensible   | §90's plugin-API row, §79's shipped promise                              |
+| `PH-10` / `R-22` | `0003-skinning-and-skeletal-animation.md` | Joints/weights at attribute locations 4/5; `Bone`/`Skeleton` as scene nodes; skinned draws as a separate pipeline; §54's `morphTargetWeights` moves to a component            | §78 glTF (`A-19`), §17's two track types, `R-22`'s skinning rows         |
+
+### 4.5 New items the campaign itself surfaced
+
+Not v0 findings; recorded here because a re-analysis that omitted them would be incomplete.
+All are tracked in `TODO.md` or `MEMORY.md`.
+
+- **The cannot-tree-shake class.** Anything reachable from a class method ships in every
+  bundle: `A-1`'s stats references (~0.4 kB gzip) and `R-6`'s fifth pipeline (0.75 kB). The
+  ui-demo budget moved 30 → 31 kB on a proven structural conflict. `A-4`'s define helped
+  (0.46–0.52 kB back) but the real fix is an opt-in registry split, unwritten.
+- **§97a is already partially stale**, three weeks old: it records `AnimationController` as
+  unshipped (`PH-9` shipped it), and `renderer: "auto"`/`solver: "auto"` as deferred (both
+  shipped the same day). A spec-revisit item exists; the amendment does not.
+- **`registerRapierSolver()` carries both wasm images** — the flagship pays 1.54 MB gzip for
+  `solver: "auto"`. Per-dimension registration is the recorded fix.
+- **`docs/Architecture/` graph artifacts are stale** for every export added after 2026-08-06.
+- **A flaky browser gate** (`tests/browser/blending.spec.ts`, the RECOVER case) fails under
+  load and passes in isolation; pre-existing, confirmed at baseline.
+- Smaller: `INVALID_RENDER_GRAPH` is not in §89's `FourErrorCode` union; two pre-existing
+  Prettier warnings; `packages/math/src/color.ts` sits at 0% coverage (and is where `R-15`
+  will land); `examples-build-coverage`'s regex does not match nested example paths.
+
+### 4.6 Recommended order of attack
+
+Ordered by unblocked surface per unit of effort, with the ordering constraints made explicit.
+Items inside a group are independent.
+
+**Group 0 — free, do it first (hours).** Repair the tracking hole: write `CHANGELOG.md`
+entries and v0 banners for `ab13840` and `fe8eb6f`, so nine closed filings stop reading as
+open. Add the `A-20` sentence (§82) — the last literally-silent cheap item. Regenerate
+`docs/Architecture/` (`pnpm graph`). None of this needs a decision.
+
+**Group 1 — the ordering constraint (M).** `R-15` (§60a colour management). It must precede
+`R-13` and `R-17`, it is unblocked, and every frame drawn before it lands is shaded in the
+wrong space. Do not schedule the lighting work first.
+
+**Group 2 — the cheap unblockers (S–M, parallel).** `R-38` (named layers → `R-8`, `R-37`,
+picking filters, the flagship's viewport follow-up); `R-3`'s field half (S, unblocks
+`A-1`'s `gpuFrameTime` and `A-26`'s backend table); `R-29`'s `frame` (S, unblocks `R-28`);
+`A-24`'s context-loss suite (~40 lines against the seam built for it); `A-27`'s two CPU
+benchmarks plus a runner; `PH-21`'s system split.
+
+**Group 3 — 3D catches up (L, sequential).** `R-17` (multi-light) → `R-13` (PBR) → `R-18`
+(shadows), each after `R-15`. `R-10` keys 3–4 → `R-9` (batching) in parallel; that pair plus
+`R-28` closes three §86 rows and the per-glyph-draw cost.
+
+**Group 4 — the composition root (M).** `A-6`. It is one packet that discharges `A-1`'s three
+remaining counters, `A-13`'s reduced-motion requirement, and `PH-22m`, and it removes the
+hand-wiring every example still does.
+
+**Group 5 — the 2D vector stack (L, the largest remaining product gap).** `R-25`
+(tessellation) → `R-24` (`Path`) → `R-23` (shape nodes) → `R-16` (paints/strokes), with
+`R-26` (SVG) after `R-24`. This is half of what §1 means by "2D graphics", it is where three
+of the four remaining silent sections live, and it is the last real blocker on §119
+(`A-21`/`R-41`) and on `A-11`'s analytic picking.
+
+**Group 6 — owner-gated (see §5).** RFC 0001 → `R-14` → `R-1`; RFC 0003 → `R-22`/`PH-10` →
+`A-19`'s glTF; RFC 0002 → `A-3`. Decide 0001 first: it is the one whose absence is compounding
+(`R-1`, `R-6` tier 2 and `R-12`'s pipeline registry all wait on it).
+
+**Group 7 — long tail, schedule normally.** `PH-11` + `R-36` (a `lookAt` alone would remove the
+roughest edge the 3D example found), `PH-8`, `PH-12`, `PH-20`, the `PH-22` roll-ups, `A-18`'s
+cancellation, `A-19`'s texture tier, `R-21`, `R-30`, `R-31`–`R-34`, `A-11`.
+
+---
+
+## 5. Owner-decision register
+
+Every question the tree is currently waiting on, consolidated. Recommendations are the
+analysis's, not decisions.
+
+| #   | Question                                                                                                                                                                                                                                                                                                                           | Where it is recorded                                     | Recommendation                                                                                                                                                                                                           |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **Accept RFC 0001** (shader graph, no user source text at any tier)?                                                                                                                                                                                                                                                               | `docs/rfcs/0001-…md`, `TODO.md`                          | Accept. It is the compounding blocker (`R-1`, `R-6` tier 2, `R-12`'s registry), and the no-source-text stance is what keeps `RenderGraph.validate()` meaningful.                                                         |
+| 2   | RFC 0001 Q1: should `ShaderMaterial` (§57) ever exist, or be recorded as permanently unshipped?                                                                                                                                                                                                                                    | RFC 0001 open questions                                  | Record it permanently unshipped with a §57 amendment note; a source-string material re-opens §96 and §63 opacity for one row.                                                                                            |
+| 3   | RFC 0001 Q3/Q5: per-material uniform ownership for the MVP; whether §60 needs an amendments row for the "no raw source" narrowing.                                                                                                                                                                                                 | RFC 0001 open questions                                  | Per-material for the MVP; yes to the amendments row — a normative narrowing belongs in the spec, not only in an RFC.                                                                                                     |
+| 4   | **Accept RFC 0002** (plugin system) — or accept its Alternative E and defer §81 explicitly?                                                                                                                                                                                                                                        | `docs/rfcs/0002-…md`, `TODO.md`                          | Defer explicitly (Alternative E) **and** keep the capability design as a recorded deferral. Five of eleven extension points already work as package APIs; §90's plugin row can say "n/a — §81 deferred, decision dated". |
+| 5   | RFC 0002 Q1: `ApplicationOptions.plugins` — spec amendment, standalone host, or dated departure? It contradicts the same-day §40 "don't invent §45 options" precedent.                                                                                                                                                             | RFC 0002 open questions, `TODO.md`                       | If §81 proceeds: amend §45 (option (a)). §40's precedent turned on the option being absent from the spec's own list; §81 has nowhere else to live.                                                                       |
+| 6   | RFC 0002 Q3–Q5: revocability default, `RENDER_GRAPH` capability in the MVP, plugin API version start (`0.1.0` vs `1.0.0`).                                                                                                                                                                                                         | RFC 0002 open questions                                  | Conservative default (non-revocable); include `RENDER_GRAPH` as a differently-shaped capability with that stated; start at `0.1.0` — honesty beats a range that parses.                                                  |
+| 7   | **Accept RFC 0003** (skinning) and its named question: the **bone-axis convention**.                                                                                                                                                                                                                                               | `docs/rfcs/0003-…md`, `TODO.md`                          | Accept, with the RFC's recommendation: impose no convention on the data model, pin +Y for helpers only. Reversing it later invalidates authored rigs, so decide before the packet.                                       |
+| 8   | RFC 0003 Q3: §54's `morphTargetWeights` placement is unimplementable under the frozen §3.1 matrix — amendments row against §54, or a dated note?                                                                                                                                                                                   | RFC 0003 open questions                                  | Amendments row. A spec statement that cannot be implemented under a frozen constraint should be corrected in the spec, not annotated in source.                                                                          |
+| 9   | RFC 0003 Q2/Q5/Q6: four vs eight influences; refusal when a skeleton exceeds the joint limit; whether `Bone` is a subclass.                                                                                                                                                                                                        | RFC 0003 open questions                                  | Four (with locations 6/7 named as the extension point); refuse at setup with `UNSUPPORTED_GPU_FEATURE`; make `Bone` a subclass — §79 needs the `typeName`.                                                               |
+| 10  | **`A-25` stub packaging**: the five reserved stubs cannot be Changesets-`ignore`d while `four` depends on and re-exports them. Publish them, drop the umbrella subpaths, or make them optional peers?                                                                                                                              | `TODO.md` "A-25 owner decisions", `.changeset/README.md` | Publish the stubs. Dropping the subpaths breaks §98's package tree; optional peers push a resolution problem onto consumers. A stub that says "reserved; not implemented" in its README is honest.                       |
+| 11  | `A-25`: add the `NPM_TOKEN` secret; enable Pages (Settings → Pages → source "GitHub Actions").                                                                                                                                                                                                                                     | `TODO.md`                                                | Owner-only steps; the workflows are inert without them and will stay inert safely.                                                                                                                                       |
+| 12  | **§93 stand-in retirement (`A-21`/S-8)**: `first-animated-scene`, `first-physics-scene`, and `mixed-scene` are placeholder directories with shipped stand-ins (`first-2d-scene`, `physics-playground`). Retire the directories and repoint the guides, or write the three scenes?                                                  | `TODO.md`, `docs/AUDIT-120.md` S-8                       | Retire two, write one. `physics-playground` and `first-2d-scene` already claim their roles; `mixed-scene` is §97's own example and, now that §97a exists and compiles, is cheap and worth having.                        |
+| 13  | **Spec amendments waiting to be written** (all letter-suffix, none touching the frozen §1–120 numbering): §97a/§18/§100's `AnimationController` and `"auto"`-selection staleness; §57's family list having no `LitMaterial`; §17's track-type promise; §61's `createTexture`/`createRenderTarget` deferred-by-decision divergence. | `TODO.md` spec-revisit items                             | Batch them into one spec pass after RFC 0001/0003 are decided, so the §57 and §60 rows land together rather than twice.                                                                                                  |
+| 14  | `R-6`/`A-1` payload policy: the ui-demo budget moved 30 → 31 kB on a structural conflict, and the opt-in registry split that would give it back is unwritten. Is the budget the constraint, or the split the priority?                                                                                                             | `MEMORY.md` 2026-08-07 (R-6), `TODO.md`                  | Treat the split as scheduled work, not a budget bump: §86's real number (150 kB) is distant, but "every example pays for every feature" compounds silently.                                                              |
+
+---
+
+## 6. Cross-cutting observations
+
+Brief by intent — each of these is recorded at length in `MEMORY.md`'s 2026-08-07 decision
+entries, and this section exists to point rather than to duplicate.
+
+**Byte-identity became the campaign's working discipline, and it is why the closures are
+trustworthy.** Nearly every packet proved that the thing it did not change did not change:
+`R-4`'s 449-call GL sequence comparison, `R-19`'s uniform-switch default seeded at GL's
+initial `0`, `PH-1`'s deep-equalled adapter call sequences, `PH-6`'s neutralized-capture
+reproduction of a golden's previous digest, `R-5`'s transcript-identical graph execution,
+`A-4`'s pixel goldens run against a production bundle. The pattern generalises: _make the new
+feature's absence indistinguishable from before it existed, then the goldens are evidence
+rather than an obstacle._ It is the reason a campaign this large moved no determinism golden
+except one envelope field, with proof attached.
+
+**The duck-typed-contract count is now five, and it is the repository's answer to §3.1.**
+`ParticleDrawable`, `ReplayTarget`, `DebugGeometrySink`, `isRenderTargetTexture`, and the
+renderer-statistics transcription all let two packages agree on a shape without an import.
+`A-5` deliberately did _not_ add a sixth (`recordResourceMemory` takes two numbers). The count
+being tracked at all is the useful part: the pattern is load-bearing enough that its growth is
+a decision, and cheap enough to be abused.
+
+**The cannot-tree-shake class is the campaign's one accumulating cost.** Anything reachable
+from a class method ships in every bundle whether or not the app asks for it — `A-1`'s stats
+plumbing, `R-6`'s fifth pipeline. Two packets paid it, the third (`A-4`) bought some back
+with a build-mode define, and the structural fix (opt-in registry splits, as `R-2`/`PH-19`
+did for backends and solvers) is recorded and unwritten. It is the only place where "closed"
+items made a shipped number worse.
+
+**Multi-agent gotchas cost real time and are all recorded.** Never `git stash` in a shared
+worktree (nine minutes of another agent's in-flight files); `git rebase --autostash` with
+agents holding uncommitted work clobbers untracked files; the Playwright gate is not
+concurrency-safe (seven fixed-port preview servers, `reuseExistingServer: false`); Vitest
+transpiles without type-checking, so a changed cross-file signature only fails at
+`pnpm run docs`. Add one from this document: **a batch that lands code without touching a
+tracking file is invisible within a day** — `ab13840` and `fe8eb6f` closed nine filings and
+were discoverable only by reading `git log`.
+
+**The v0 root cause has been half-fixed.** v0's central finding was that staging discipline
+was indexed on §120's MVP checklist, so sections §120 never names produced no record at all.
+`tools/check-docs.mjs` now gates the mechanically checkable half, and the campaign gave §63,
+§70, §84, §96, §90 owners. But the §-indexed `STAGED.md` that both v0 analysts independently
+proposed **was never written**, and the sections still silent today (§8, §26/§27 for rigid
+bodies, §58, §82, and §54's non-skinning rows) are exactly the ones it would have surfaced.
+Recommending it a second time: one row per specification section, checked by the gate that
+already exists.
+
+---
+
+_End of Gap Analysis v1._

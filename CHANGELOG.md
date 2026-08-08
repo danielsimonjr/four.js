@@ -808,6 +808,43 @@ Gates: input 115 + ui 128 unit tests (51 new), both packages 100% ×4 coverage; 
 38/38 browser with byte-unchanged visual goldens; TypeDoc 0 warnings; ui-demo
 28.1/30 kB.
 
+### 2026-08-08 — docs: GAP ANALYSIS v1 (supersedes v0) + tracking-hole repair
+
+#### Added
+
+- **`docs/GAP ANALYSIS v1.md`** — the current-state re-analysis after the 2026-08-07
+  closure campaign: 97 filings → **42 closed · 14 partially closed · 4 RFC-drafted ·
+  37 open**, with verifiable pointers per claim, a re-prioritized attack order
+  (§4.6), and a consolidated owner-decision register (§5, 14 questions with
+  recommendations). Headline: the application tier is largely closed, simulation
+  almost entirely, and **the rendering tier is now the project** (26 of 37 open items
+  are `R-*` — every render keystone closed, almost no render feature). v0 stays as
+  the historical record with a superseded pointer at its top.
+- **Tracking-hole repair (v1's "tracking integrity" finding):** the two 2026-08-06
+  batches below landed code with no CHANGELOG entry, no gap banner, and no TODO/MEMORY
+  line — the analysis's own A-28 failure mode aimed at itself. Recorded now, verified
+  in source by the v1 pass:
+
+### 2026-08-06 — physics wave 1 (recorded 2026-08-08): PH-2/3/4/7/14/15/16 + PH-1 stage 1
+
+Commit `ab13840`, previously unrecorded here. Both Rapier adapters' collider teardown
+mass fix (PH-3: `#forgetCollider` decrements and re-homes authored mass to the
+lowest-id heir), the 3D `#rebuildRegistries` §34 validity check (PH-7),
+`#massAuthored`/`derivedMass` authority split (PH-4), `PhysicsTuningCapabilities` +
+warn-once for accepted-but-unhonoured §25 fields (PH-14/15), the registered-body
+`type`-setter warn (PH-16), `getBodyHandle`/`getColliderHandle` (PH-2), and
+`rigid-body.ts`'s property truth table (PH-1 stage 1).
+
+### 2026-08-06 — Material base (recorded 2026-08-08): §57 abstract `Material`, R-11, R-12/R-10 base tier
+
+Commit `fe8eb6f`, previously unrecorded here. The §57 abstract `Material` base
+(opacity/transparent/blendMode/depthTest/depthWrite/colorWrite, shared id counter,
+abstract `kind`); `Renderable<M extends Material>`; the backend honouring render state
+via CPU-mirrored change-only GL issuance (R-12 base tier); §66 key 2
+(opaque-before-transparent) in `compareRenderItems` with default-opaque scenes
+byte-identical (R-10 base tier); alpha/blending live for unlit materials (R-11 — the
+dead `color[3]` field).
+
 ### 2026-08-06 — PH-17 remainder: shipped `RigidBody` / `Collider` serializers
 
 Closes the follow-up the wave-1 entry below records as "deliberately not done". The §79

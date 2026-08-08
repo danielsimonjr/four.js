@@ -27,6 +27,13 @@ changes in `CHANGELOG.md`.
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
 
+> **2026-08-08:** `docs/GAP ANALYSIS v1.md` supersedes v0 as the working gap document —
+> its §4.6 attack order and §5 owner-decision register are the tracker for what
+> remains; the wave sections below are the historical per-batch record. v1 also
+> recorded nine closures from `ab13840`/`fe8eb6f` (2026-08-06) that these sections
+> never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
+> the R-12/R-10 base tiers — all closed, now in CHANGELOG.
+
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
       R-13} - A-3 blocking sub-question: `ApplicationOptions.plugins` vs the same-day §40

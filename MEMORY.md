@@ -28,6 +28,14 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — Gotcha (multi-agent, joins the rebase/stash/ports set): a batch that
+  lands code without touching a tracking file is undiscoverable within a day.** The
+  `ab13840`/`fe8eb6f` closures (nine gap items) were invisible to every later agent
+  and to the gap document until the v1 rewrite re-verified them in source — the
+  analysis's own A-28 failure mode aimed at itself. Rule: no batch commits without its
+  CHANGELOG entry and gap banner in the same commit. Also: `docs/GAP ANALYSIS v1.md`
+  supersedes v0 as the working gap document (v0 kept as history with a pointer).
+
 - **2026-08-07 — A-4 dev/prod builds.** Decisions worth keeping:
   - **Dev is the default; you opt out** — `typeof __FOUR_DEV__ !== "undefined" ?
 __FOUR_DEV__ : true` in one file (`@four/core` `dev.ts`); the identifier is never
