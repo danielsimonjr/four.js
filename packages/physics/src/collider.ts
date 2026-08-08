@@ -39,10 +39,11 @@
  *    above and whose transform is the collider's offset. This is the general
  *    answer and it needs no new concept: the scene graph already expresses
  *    "several shapes rigidly attached to one body".
- * 2. **compound shapes.** §24's `compound` shape puts several primitives in one
- *    collider. It is staged with the rest of the shape tier (plan P5-6) and
- *    will be the cheaper route for shapes that never move relative to each
- *    other.
+ * 2. **§24's `compound`.** It is the same answer as (1), not a second one:
+ *    "several shapes on one body" *is* several colliders on one body, and
+ *    since PH-5 `PhysicsWorld.addCollider` / `removeCollider` can assemble and
+ *    take one apart while the world runs. There is deliberately no
+ *    `{ type: "compound" }` shape tag (PH-22a, 2026-08-08).
  *
  * What is *not* the answer is relaxing §6a for this one component: a second
  * `Collider` on the same node replaces the first with a development warning,

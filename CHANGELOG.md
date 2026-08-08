@@ -8,6 +8,54 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — PH-22 sweep: all fourteen roll-ups triaged; four closed or advanced
+
+#### Added
+
+- **§24's remaining collision shapes (PH-22a, closed — 7 of 8 shipped).** 2D gains
+  `polyline` (open strip) and `chain` (closed loop); 3D gains `cylinder`, `cone`,
+  `convex-hull`, `triangle-mesh`, `height-field` — each §85-validated, with §79
+  document forms whose round-trip test asserts the fixture set _equals_ the shape-type
+  unions (a future tag cannot ship without a document form), and both Rapier adapters
+  converting. Three facts **measured against Rapier 0.19.3, not assumed**: the
+  heightfield's column-major `heights` layout and row→Z/column→X axis mapping
+  (raycast-verified), the cone's apex at `+halfHeight`, and composite shapes returning
+  **zero** intersections from `intersectionsWithShape` — which is why the new
+  `validateQueryShape` refuses them as §30 query shapes in all four adapter
+  overlap/shapeCast entry points (a composite is a legal collider and an illegal query
+  shape, because Rapier answers _wrongly_ rather than failing). `compound` is
+  deliberately not a tag: it is several colliders on one body, which PH-5 made
+  runtime-assemblable — composition by decision.
+- **`PhysicsTuningCapabilities.jointMotorEffortCap` (PH-22e, closed)** — the first
+  capability field whose `false` means "applied, _differently_" rather than "not
+  applied" (Rapier's `maxTorque`/`maxForce` is a gain, not a cap); `false` on both
+  adapters, warn-once on the first **enabled** motor.
+- **`Joint.collisionEnabled` is live on a registered joint (PH-22f, partial)** — the
+  per-property survey of Rapier's joint surface replaced the blanket freeze claim:
+  `setContactsEnabled` lives on the _base_ `ImpulseJoint`, so it queues through the
+  new `SolverJointAccess.setJointCollisionEnabled` and drains world-side; it was the
+  only mutable-with-throw property in the whole joint surface (the rest are `readonly`
+  fields — compile errors, which the header previously mis-described). Anchors
+  re-staged with the real reason (the world→local conversion happens once at
+  `addJoint`; a live re-anchor needs a which-pose decision).
+- **§41 numerical-stability diagnostics (PH-22n, half)** — registration-time warn-once
+  for distance-from-origin > 1e5, dynamic collider extents outside [1e-2, 1e3]
+  (static/kinematic exempt — a ground slab is not a scale mistake), and cumulative
+  dynamic mass ratio > 1000:1; each threshold a decade past the units guide's advice
+  so the warning never becomes routine. **Adds no solver call** — mass threaded out of
+  the existing refresh. The §10 dropped-time §84 warning is app-tier and moves to that
+  backlog.
+
+#### Blocked, re-verified (not closed, honestly)
+
+- PH-22b (distance/gear joints), PH-22c (break force), PH-22d (spherical cone limits):
+  re-verified against Rapier 0.19.3's actual declarations — the constraints/getters do
+  not exist at this pin; stiff-spring stand-ins would be the "almost right" wrong
+  simulation. PH-22j (box2d/soft stubs) stays an owner §102 scope decision.
+  PH-22g/h/i/k/l/m are cross-tier items belonging to animation/motion/math/core/four
+  packets (recorded per item). Diagnostics' joint-seam prose updated for the sixth
+  member.
+
 ### 2026-08-08 — R-13 closed (scalar + base-colour-map tier): §59 `StandardMaterial`
 
 #### Added

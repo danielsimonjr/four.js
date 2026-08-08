@@ -593,6 +593,8 @@ interface ScriptedJoint {
   limits: { min: number; max: number } | null;
   /** The last motor the world pushed, or `null`. */
   motor: SolverJointMotor | null;
+  /** Whether the joined bodies still collide (§28); PH-22f. */
+  collisionEnabled: boolean;
   alive: boolean;
 }
 
@@ -771,6 +773,7 @@ export class ScriptedJointAdapter
       reactionAngular: new Vector3(),
       limits: null,
       motor: null,
+      collisionEnabled: false,
       alive: true,
     });
     return handle;
@@ -1025,6 +1028,10 @@ export class ScriptedJointAdapter
 
   setJointMotor(handle: PhysicsJointHandle, motor: SolverJointMotor): void {
     this.#requireJoint(handle).motor = { ...motor };
+  }
+
+  setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void {
+    this.#requireJoint(handle).collisionEnabled = enabled;
   }
 
   getJointId(handle: PhysicsJointHandle): number {

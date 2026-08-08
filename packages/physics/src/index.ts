@@ -211,20 +211,31 @@ export {
 export type {
   BoxShape,
   CapsuleShape,
+  ChainShape,
   CircleShape,
   CollisionShape,
   CollisionShape2D,
   CollisionShape3D,
   CollisionShapeType,
+  ConeShape,
+  ConvexHullShape,
+  CylinderShape,
+  HeightFieldShape,
   PolygonShape,
+  PolylineShape,
   RectangleShape,
   SphereShape,
+  TriangleMeshShape,
 } from "./shapes.js";
 export {
   COLLISION_SHAPE_TYPES_2D,
   COLLISION_SHAPE_TYPES_3D,
+  COMPOSITE_COLLISION_SHAPE_TYPES,
+  shapeIsConvex,
+  shapeMaximumExtent,
   shapeSupportsDimension,
   validateCollisionShape,
+  validateQueryShape,
 } from "./shapes.js";
 export type {
   AngularVelocityInput,

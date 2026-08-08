@@ -341,11 +341,14 @@ function packGroupHalf(field: string, value: number): number {
  * Builds the Rapier shape for a §24 collision shape, for the query entry points
  * that take a bare `Shape` (§30 `overlap` and `shapeCast`).
  *
- * Only the plan P5-6 3D tier is reachable — sphere, box, capsule — because
- * `validateCollisionShape(shape, "3d")` runs first everywhere this is called.
- * The 2D tags are rejected here rather than silently promoted: a `"circle"` is
- * not a sphere, and guessing which the caller meant is how a 2D descriptor ends
- * up quietly simulating in three dimensions.
+ * Only the **convex** 3D tier is reachable — sphere, box, capsule, cylinder,
+ * cone, convex hull — because the query entry points run
+ * `validateQueryShape(shape, "3d")` first, which refuses the 2D tags and the
+ * three composite 3D shapes (`triangle-mesh`, `height-field`, and — being 2D —
+ * the two segment runs; PH-22a). The 2D tags are rejected here rather than
+ * silently promoted: a `"circle"` is not a sphere, and guessing which the
+ * caller meant is how a 2D descriptor ends up quietly simulating in three
+ * dimensions.
  *
  * **Capsule axis.** Rapier's `Capsule(halfHeight, radius)` puts the cylindrical
  * section along **+Y** in 3D as in 2D, which is §24's convention — verified
@@ -366,6 +369,16 @@ export function createRapierShape3d(shape: CollisionShape): RapierShape3d {
       );
     case "capsule":
       return new RAPIER_3D.Capsule(shape.halfHeight, shape.radius);
+    case "cylinder":
+      return new RAPIER_3D.Cylinder(shape.halfHeight, shape.radius);
+    case "cone":
+      return new RAPIER_3D.Cone(shape.halfHeight, shape.radius);
+    case "convex-hull":
+      /*
+       * `indices = null` asks Rapier to compute the hull, which is what a
+       * `ConvexHullShape` is: a point cloud, not an already-hulled mesh.
+       */
+      return new RAPIER_3D.ConvexPolyhedron(pointCloud(shape.points), null);
     default:
       throw unsupportedShape(shape.type);
   }
@@ -376,8 +389,14 @@ export function createRapierShape3d(shape: CollisionShape): RapierShape3d {
  * `createCollider` counterpart of {@link createRapierShape3d}.
  *
  * Note `ColliderDesc.cuboid` takes **three** half-extents in the 3D build where
- * it takes two in 2D; that is the only signature in the P5-6 tier that differs
- * between the dimensions.
+ * it takes two in 2D; that is the only shared signature that differs between
+ * the dimensions.
+ *
+ * **Height field (PH-22a).** `HeightFieldShape` counts **samples** and Rapier
+ * counts **subdivisions**, so `rows`/`columns` arrive here and leave as
+ * `rows − 1` / `columns − 1`. The heights array is passed straight through:
+ * both sides are column-major and `(rows − 1 + 1) · (columns − 1 + 1)` is
+ * `rows · columns`, which `validateCollisionShape` has already checked.
  */
 export function createRapierColliderDesc3d(
   shape: CollisionShape,
@@ -393,9 +412,69 @@ export function createRapierColliderDesc3d(
       );
     case "capsule":
       return RAPIER_3D.ColliderDesc.capsule(shape.halfHeight, shape.radius);
+    case "cylinder":
+      return RAPIER_3D.ColliderDesc.cylinder(shape.halfHeight, shape.radius);
+    case "cone":
+      return RAPIER_3D.ColliderDesc.cone(shape.halfHeight, shape.radius);
+    case "convex-hull":
+      return requireHullDesc3d(
+        RAPIER_3D.ColliderDesc.convexHull(pointCloud(shape.points)),
+        shape.type,
+      );
+    case "triangle-mesh":
+      return RAPIER_3D.ColliderDesc.trimesh(
+        pointCloud(shape.vertices),
+        Uint32Array.from(shape.indices),
+      );
+    case "height-field":
+      return RAPIER_3D.ColliderDesc.heightfield(
+        shape.rows - 1,
+        shape.columns - 1,
+        Float32Array.from(shape.heights),
+        { x: shape.scale.x, y: shape.scale.y, z: shape.scale.z },
+      );
     default:
       throw unsupportedShape(shape.type);
   }
+}
+
+/**
+ * Turns `ColliderDesc.convexHull`'s `null` into a `FourError` (§24, §85).
+ *
+ * Rapier's typings declare the return as `ColliderDesc | null`, so this branch
+ * must exist. **No 0.19.3 input reaches it**: measured 2026-08-08, the 3D
+ * build returns a descriptor for coplanar, collinear, identical, empty, and
+ * `NaN`-bearing point clouds alike. Rather than write a `!` — a promise about
+ * a solver this package does not own — the translation is a named, exported
+ * function, so the contract is testable at the version that never produces the
+ * `null` as well as at one that might.
+ */
+export function requireHullDesc3d(
+  desc: RapierColliderDesc3d | null,
+  shapeType: string,
+): RapierColliderDesc3d {
+  if (desc === null) {
+    throw new FourError(
+      CONVERSION_ERROR_CODE,
+      `${shapeType} shape: Rapier could not build a convex hull from the points (§24, §85).`,
+      { context: { dimension: DIMENSION, shape: shapeType } },
+    );
+  }
+  return desc;
+}
+
+/** Flattens a point cloud into the `Float32Array` Rapier expects. */
+function pointCloud(
+  points: readonly { x: number; y: number; z: number }[],
+): Float32Array {
+  const flat = new Float32Array(points.length * 3);
+  for (let i = 0; i < points.length; i += 1) {
+    const point = points[i];
+    flat[i * 3] = point.x;
+    flat[i * 3 + 1] = point.y;
+    flat[i * 3 + 2] = point.z;
+  }
+  return flat;
 }
 
 /**

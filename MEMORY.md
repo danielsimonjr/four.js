@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — PH-22 sweep.** Decisions worth keeping:
+  - **A composite shape is a legal collider and an illegal §30 query shape** — Rapier
+    answers _wrongly_ (zero intersections) rather than failing; `validateQueryShape`
+    refuses them at all four adapter query entry points.
+  - **§24 `compound` is deliberately not a tag** — several colliders on one body,
+    runtime-assemblable since PH-5; Rapier models it the same way.
+  - `jointMotorEffortCap` is the first capability field whose `false` means "applied,
+    _differently_" rather than "not applied" — documented as such.
+  - The per-property Rapier joint survey replaced the blanket freeze claim;
+    `collisionEnabled` was the only mutable-with-throw property (base-class
+    `setContactsEnabled`), the rest are `readonly` compile errors.
+  - **A diagnostic threshold sits a decade past the guide's advice** so it never
+    becomes routine (§41 warnings: 1e5 origin, [1e-2,1e3] dynamic extents, 1000:1
+    mass ratio; static/kinematic exempt from the extent check).
+  - Heightfield facts measured, not assumed: `heights` is column-major with row→local
+    Z, column→local X (the opposite of the intuitive reading); the public shape counts
+    samples, the adapter subtracts one. Gotcha repeat: vitest doesn't typecheck —
+    three test-only type errors only surfaced at `pnpm run docs`.
+
 - **2026-08-08 — R-13 StandardMaterial.** Decisions worth keeping:
   - **The radiometric convention is now written down**: light colour × intensity is an
     irradiance already divided by π — neither lobe carries a `1/π`. This is what makes

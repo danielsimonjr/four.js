@@ -178,6 +178,11 @@ function readNumber(value: JsonValue | undefined, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+/** Reads a JSON array, or an empty one for anything else. */
+function readArray(value: JsonValue | undefined): readonly JsonValue[] {
+  return Array.isArray(value) ? (value as readonly JsonValue[]) : [];
+}
+
 /** Reads a boolean, or `fallback` for anything else. */
 function readBoolean(value: JsonValue | undefined, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
@@ -344,16 +349,44 @@ export function serializeCollisionShape(shape: CollisionShape): JsonValue {
         radius: shape.radius,
         halfHeight: shape.halfHeight,
       };
+    case "cylinder":
+    case "cone":
+      return {
+        type: shape.type,
+        radius: shape.radius,
+        halfHeight: shape.halfHeight,
+      };
     case "polygon":
+    case "polyline":
+    case "chain":
       return {
         type: shape.type,
         vertices: shape.vertices.map((vertex) => vector2Json(vertex)),
+      };
+    case "convex-hull":
+      return {
+        type: shape.type,
+        points: shape.points.map((point) => vector3Json(point)),
+      };
+    case "triangle-mesh":
+      return {
+        type: shape.type,
+        vertices: shape.vertices.map((vertex) => vector3Json(vertex)),
+        indices: [...shape.indices],
+      };
+    case "height-field":
+      return {
+        type: shape.type,
+        rows: shape.rows,
+        columns: shape.columns,
+        heights: [...shape.heights],
+        scale: vector3Json(shape.scale),
       };
     default: {
       const unreachable: never = shape;
       throw new FourError(
         "NOT_IMPLEMENTED",
-        `No §79 document form exists for collision shape ${JSON.stringify(unreachable)}; the staged §24 shapes arrive with the packet that can build and solve them (§24, plan P5-6).`,
+        `No §79 document form exists for collision shape ${JSON.stringify(unreachable)} (§24).`,
         { context: { shape: JSON.stringify(unreachable) } },
       );
     }
@@ -396,15 +429,60 @@ export function deserializeCollisionShape(
         radius: readNumber(source.radius, 0),
         halfHeight: readNumber(source.halfHeight, 0),
       };
-    case "polygon": {
-      const vertices = Array.isArray(source.vertices)
-        ? (source.vertices as readonly JsonValue[])
-        : [];
+    case "cylinder":
       return {
-        type: "polygon",
-        vertices: vertices.map((vertex) => readVector2(vertex)),
+        type: "cylinder",
+        radius: readNumber(source.radius, 0),
+        halfHeight: readNumber(source.halfHeight, 0),
       };
-    }
+    case "cone":
+      return {
+        type: "cone",
+        radius: readNumber(source.radius, 0),
+        halfHeight: readNumber(source.halfHeight, 0),
+      };
+    case "polygon":
+    case "polyline":
+    case "chain":
+      return {
+        type,
+        vertices: readArray(source.vertices).map((vertex) =>
+          readVector2(vertex),
+        ),
+      };
+    case "convex-hull":
+      return {
+        type: "convex-hull",
+        points: readArray(source.points).map((point) =>
+          readVector3(point, new Vector3()),
+        ),
+      };
+    case "triangle-mesh":
+      return {
+        type: "triangle-mesh",
+        vertices: readArray(source.vertices).map((vertex) =>
+          readVector3(vertex, new Vector3()),
+        ),
+        /*
+         * `NaN` rather than 0 for a malformed entry: 0 is a legal index, so
+         * defaulting to it would turn a damaged document into a mesh that
+         * builds and simulates the wrong triangle. `validateCollisionShape`
+         * rejects `NaN` by name (§85).
+         */
+        indices: readArray(source.indices).map((index) =>
+          readNumber(index, Number.NaN),
+        ),
+      };
+    case "height-field":
+      return {
+        type: "height-field",
+        rows: readNumber(source.rows, 0),
+        columns: readNumber(source.columns, 0),
+        heights: readArray(source.heights).map((height) =>
+          readNumber(height, Number.NaN),
+        ),
+        scale: readVector3(source.scale, new Vector3()),
+      };
     default:
       return fail(
         `A collider document's "shape.type" is ${JSON.stringify(type ?? null)}, which is not a §24 collision shape this build ships (plan P5-6). A shape has no default, so the document is refused (§24, §79).`,

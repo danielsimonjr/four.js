@@ -919,6 +919,65 @@ describe("joint lifetime", () => {
     expect(await contacts(false)).toBe(0);
     expect(await contacts(true)).toBeGreaterThan(0);
   });
+
+  it("switches contacts on after creation, live (PH-22f)", async () => {
+    const adapter = await createAdapter({ gravity: new Vector3(0, 0, 0) });
+    const anchor = adapter.createBody({
+      type: "static",
+      position: new Vector3(0, 0, 0),
+    });
+    adapter.createCollider({
+      body: anchor,
+      shape: { type: "sphere", radius: 0.5 },
+    });
+    const bob = ballAt(adapter, new Vector3(0.4, 0, 0), 0.5, 100);
+    const joint = adapter.createJoint({
+      type: "spring",
+      bodyA: anchor,
+      bodyB: bob,
+      restLength: 0,
+      stiffness: 50,
+      damping: 0,
+      collisionEnabled: false,
+    });
+
+    const drain = (steps: number): number => {
+      let seen = 0;
+      for (let i = 0; i < steps; i += 1) {
+        adapter.syncSceneToSolver();
+        adapter.step(DT);
+        adapter.syncSolverToScene();
+        seen += adapter
+          .drainEvents()
+          .filter((event) => event.type === "collisionstart").length;
+      }
+      return seen;
+    };
+
+    expect(drain(30)).toBe(0);
+    // A spring joint has no limits and no motor; `setContactsEnabled` lives on
+    // Rapier's base joint class, which is what makes this reachable at all.
+    adapter.setJointCollisionEnabled(joint, true);
+    expect(drain(30)).toBeGreaterThan(0);
+    adapter.dispose();
+  });
+
+  it("refuses a destroyed joint handle", async () => {
+    const adapter = await createAdapter();
+    const anchor = adapter.createBody({ type: "static" });
+    const bob = ballAt(adapter, new Vector3(1, 0, 0), 0.25, 1);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: bob,
+      maxLength: 2,
+    });
+    adapter.destroyJoint(joint);
+    expect(() => {
+      adapter.setJointCollisionEnabled(joint, true);
+    }).toThrowError(/not valid for this Rapier3dAdapter/u);
+    adapter.dispose();
+  });
 });
 
 describe("snapshots with joints (§34)", () => {
