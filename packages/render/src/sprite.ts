@@ -56,7 +56,7 @@
  * hit with a stale `version` deletes and re-uploads) instead of leaking the old
  * entry behind a new id (decision, WP-3a.3).
  *
- * ## Texture coordinates: still derived from position, now by choice
+ * ## Texture coordinates: derived from position, and that survived §55's frame
  *
  * When this class was written §53's `BufferGeometry` carried positions and
  * indices and nothing else, so the sprite pipeline derived uv from **position**:
@@ -66,33 +66,78 @@
  * The backend uploads them as one `vec4` per draw; see `@four/render-webgl`'s
  * `SpriteProgram`.
  *
- * **`BufferGeometry.uvs` exists as of R-19 (2026-08-07)**, and the workaround
- * above is no longer a workaround for a missing attribute — it is one of two
- * ways to do the same thing. Rewriting this path is deliberately *not* part of
- * that packet:
+ * `BufferGeometry.uvs` exists as of R-19 (2026-08-07), and this module then
+ * carried a note predicting that §55's `frame` would force the rewrite —
+ * "a sub-rectangle is not a function of the quad's bounds", so the atlas packet
+ * would author uv and retire the `quad` uniform. **R-29 (2026-08-08) found that
+ * prediction wrong, and the note is replaced by the derivation that disproves
+ * it.** A frame is not a new mapping; it is a *reparametrization of the same
+ * affine one*. Write `w`/`h` for the quad's local size, `(fx, fy, fw, fh)` for
+ * the frame in texels and `(tw, th)` for the texture's size. The uv the
+ * fragment stage wants is
  *
- * - the two mappings are identical for every anchor and size, so the change
- *   would be invisible on screen and unfalsifiable by the pixel goldens;
- * - a real uv stream costs the sprite a second buffer per quad and a second
- *   in-place rewrite on every resize, against one `vec4` uniform today —
- *   §86's 100 000-sprite target is the reason to measure before switching;
- * - §55's `frame`/atlas regions are the feature that actually *needs* authored
- *   uv (a sub-rectangle is not a function of the quad's bounds), and the switch
- *   belongs to that packet, which can retire `SpriteProgram`'s `quad` uniform
- *   in the same move.
+ * ```text
+ * uv = (frame.xy + (position.xy - min) / size · frame.zw) / texture-size
+ * ```
  *
- * Recorded here rather than in a tracker so the next reader of this paragraph
- * finds the reason next to the code (follow-up: §55 atlas packet).
+ * which is affine in `position.xy` — so it is expressible by the *existing*
+ * shader, `uv = (position.xy - quad.xy) / quad.zw`, at
+ *
+ * ```text
+ * quad.zw = (w · tw / fw,  h · th / fh)
+ * quad.xy = (minX - fx · w / fw,  minY - fy · h / fh)
+ * ```
+ *
+ * i.e. `quad` stops meaning "the quad's own local rectangle" and starts meaning
+ * **the local rectangle the whole texture maps onto** — the quad's own
+ * rectangle exactly when there is no frame, since `(fx, fy, fw, fh) =
+ * (0, 0, tw, th)` collapses the two lines above to `quad = (minX, minY, w, h)`.
+ *
+ * Three consequences, all of them the reason this is the shipped mechanism:
+ *
+ * - **A frameless sprite's GL transcript is unchanged, by construction.** The
+ *   backend takes the same branch it always took and uploads the same four
+ *   floats through the same `uniform4fv`; there is no new uniform, no new
+ *   attribute, and no new call. Byte-identity is not a numerical argument here,
+ *   it is a code-path argument.
+ * - **Changing a frame costs no upload.** A `frame` write does not touch the
+ *   geometry, so nothing is re-uploaded and no version is bumped — which is
+ *   what §55's sprite animation clips and §86's glyph batching need, and what a
+ *   uv *attribute* could not have given them (a per-frame buffer rewrite per
+ *   quad).
+ * - **The `quad` uniform survives.** Its name is load-bearing beyond taste: a
+ *   uniform name is an argument of `getUniformLocation`, so renaming it would
+ *   itself perturb every recorded GL sequence.
+ *
+ * A real uv stream is still the right answer for §65 batching, where many quads
+ * with different frames share one draw and there is no per-draw uniform left to
+ * vary. That is a batching decision, recorded there rather than pre-empted here
+ * (2026-08-08).
  *
  * ## Deferred from §55 (named, not dropped)
  *
  * `sizeMode: "pixels" | "world"` — world only; pixel sizing needs the viewport's
  * drawing-buffer size inside the vertex stage, which is §61 state the render
- * item does not carry. `frame?: Rectangle2` and atlases — needs a uv sub-rect on
- * the material or the item. `billboardMode` — needs the camera inside the model
+ * item does not carry. `billboardMode` — needs the camera inside the model
  * transform, i.e. a per-view render list, which arrives with §87 culling.
- * Nine-slice, per-instance data, alpha masks, and sprite animation clips each
- * need either a second geometry path or §65 batching.
+ * Nine-slice, per-instance data, alpha masks, and normal-mapped sprites each
+ * need either a second geometry path or a second texture binding.
+ *
+ * Two neighbours of {@link Sprite.frame} are deliberately *not* here
+ * (2026-08-08):
+ *
+ * - **An atlas object with named frames.** `frame` is the primitive such a
+ *   thing hands out — `atlas.get("coin")` returns a {@link SpriteFrame} — and
+ *   an atlas is a §77 texture-metadata container (a parsed `.json` sidecar,
+ *   a packer's output) rather than a scene-graph feature. It belongs with
+ *   `@four/assets`, next to the loader that would parse it, and it needs
+ *   nothing from this class that is not already public.
+ * - **Sprite animation clips.** §55 lists them, but an *animated* frame is a
+ *   track that writes `frame` over time, which is §14's clip model and §17's
+ *   track types — a discrete/step-interpolated track over a frame sequence.
+ *   Building a private timeline inside `Sprite` would be a second animation
+ *   system next to the one that exists. Staged for the packet that adds a
+ *   step-interpolated non-numeric track; the property it drives is shipped.
  *
  * Transparency **sorting** (§66 key 2) arrived on 2026-08-06 and a sprite opts
  * into it like any other drawable, by declaring `transparent: true` on its
@@ -110,11 +155,75 @@ import type { SpriteMaterial } from "@four/materials";
 import { Renderable } from "./renderable.js";
 
 /**
+ * §55's `frame?: Rectangle2` — the sub-rectangle of the texture a sprite
+ * samples, in **texels** (R-29, 2026-08-08).
+ *
+ * ```ts
+ * // a 16 × 16 cell of a 128 × 128 sheet, third column, second row from the bottom
+ * sprite.setFrame(32, 16, 16, 16);
+ * ```
+ *
+ * ## Why texels, and where the origin is
+ *
+ * §55 names the type `Rectangle2` and gives no units; the two candidates were
+ * texels and normalized uv, and this is texels because:
+ *
+ * - it is the unit every atlas packer, sprite sheet, and glyph atlas already
+ *   emits, so the common case involves no conversion and no rounding;
+ * - it makes §85's containment check *mean* something — a frame is validated
+ *   against the texture it indexes, which in normalized units degenerates to
+ *   "is it inside `0…1`" and never consults the texture at all;
+ * - it keeps the field readable: `(32, 16, 16, 16)` names a cell, `(0.25, 0.125,
+ *   0.125, 0.125)` names arithmetic.
+ *
+ * The price is a coupling — a frame is only meaningful against a texture of a
+ * particular size — and it is paid where {@link Sprite.frame} documents it.
+ *
+ * **The origin is the bottom-left texel and +Y is up**, which is not a choice:
+ * `MaterialTexture.data` documents row 0 as `v = 0`, the sprite shader
+ * documents `v = 0` as the quad's bottom edge, and §7a puts +Y up in 2D exactly
+ * as in 3D. A producer whose rectangles are top-left-origin (a decoded PNG
+ * sheet, most packer sidecars) flips with `y = textureHeight - top - height`
+ * where it adapts them, which is the same place it already flips the texels.
+ *
+ * A producer that has **normalized** uv instead — `@four/text`'s `TextQuad`
+ * carries `u0/v0/u1/v1` — multiplies: `x = u0 · texture.width`,
+ * `width = (u1 - u0) · texture.width`, and the same in Y.
+ *
+ * Every field is `readonly`: a frame is read by the render list and the backend
+ * and written only through {@link Sprite.setFrame}, which validates.
+ */
+export interface SpriteFrame {
+  /** Left edge in texels, measured from the texture's left edge. */
+  readonly x: number;
+  /** Bottom edge in texels, measured from the texture's **bottom** edge. */
+  readonly y: number;
+  /** Width in texels; strictly positive. */
+  readonly width: number;
+  /** Height in texels; strictly positive. */
+  readonly height: number;
+}
+
+/** {@link SpriteFrame} as the sprite stores it — see {@link Sprite.setFrame}. */
+interface MutableSpriteFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
  * Optional construction arguments of {@link Sprite} — the quad's own size and
  * anchor, plus the two `RenderableOptions` fields every drawable takes, spelled
  * out here so the sprite's own options read as one list.
  */
 export interface SpriteOptions {
+  /**
+   * Initial {@link Sprite.frame}, copied into the sprite's own record and
+   * validated against the material's texture (§85). Omitted means the whole
+   * texture, which is what a sprite without a frame draws.
+   */
+  frame?: SpriteFrame;
   /** Initial {@link Sprite.width} in world units; defaults to 1. */
   width?: number;
   /** Initial {@link Sprite.height} in world units; defaults to 1. */
@@ -159,6 +268,89 @@ function requireFinite(name: string, value: number): number {
     );
   }
   return value;
+}
+
+/**
+ * The texel size a frame is validated against, or `null` when the sprite's
+ * material cannot say.
+ *
+ * `null` is not a hypothetical: the render suites and consumers alike hand a
+ * `Sprite` a **structurally typed** sprite material, and one written before
+ * §77's texture contract grew `width`/`height` — or a stub with no texture at
+ * all — reports `undefined`. The same defence the render list applies to
+ * `node.layers`: an absent value means "cannot check", never "check against
+ * zero", which would refuse every frame ever written.
+ */
+function textureSizeOf(material: SpriteMaterial): {
+  width: number;
+  height: number;
+} | null {
+  const texture: { width?: number; height?: number } | undefined =
+    material.texture;
+  const width = texture?.width ?? 0;
+  const height = texture?.height ?? 0;
+  return Number.isFinite(width) && width > 0 && height > 0
+    ? { width, height }
+    : null;
+}
+
+/** One frame as `(x, y, width, height)`, for the two §85 messages below. */
+function describeFrame(frame: SpriteFrame): string {
+  return (
+    `(${String(frame.x)}, ${String(frame.y)}, ` +
+    `${String(frame.width)}, ${String(frame.height)})`
+  );
+}
+
+/**
+ * Validates one frame against the texture it indexes (§85, §55).
+ *
+ * **Refuses; never clamps.** A frame that runs off the edge of its texture is
+ * an authoring mistake — a mis-packed atlas, a stale sheet, an off-by-one in a
+ * generated table — and clamping it would silently rewrite authored data and
+ * then draw *something*, which is the failure mode the repository's
+ * no-silent-rewrites rule exists to prevent. It is the rule `SpriteMaterial`
+ * follows for out-of-range tint components and `Sprite` follows for a
+ * non-positive width.
+ *
+ * Sub-texel and non-integer edges are **legal**: a half-texel inset is the
+ * standard defence against atlas bleeding under bilinear filtering, so
+ * requiring integers here would refuse the correct thing.
+ *
+ * Two messages rather than five, and both built from
+ * {@link describeFrame} — every rejected frame is printed in full, so the
+ * offending component is visible without a message naming it. That is a
+ * deliberate trade: the five-message version cost **+330 B gzipped in the
+ * `ui-demo` bundle**, measured, which is more than the whole of the rest of
+ * this feature (2026-08-08). §85 asks for refusal, not for prose.
+ */
+function validateFrame(
+  frame: SpriteFrame,
+  size: { width: number; height: number } | null,
+): void {
+  const { x, y, width, height } = frame;
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    x < 0 ||
+    y < 0
+  ) {
+    throw new RangeError(
+      "Sprite frame must be a finite rectangle with positive extents at a " +
+        `non-negative origin, in texels; got ${describeFrame(frame)} (§85).`,
+    );
+  }
+  if (size !== null && (x + width > size.width || y + height > size.height)) {
+    throw new RangeError(
+      `Sprite frame ${describeFrame(frame)} runs outside its ` +
+        `${String(size.width)} × ${String(size.height)} texture (§85). ` +
+        "Frames are in texels from the bottom-left; flip a top-left one.",
+    );
+  }
 }
 
 /**
@@ -226,6 +418,12 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
   /** Whether the quad's positions still match the anchor and the size. */
   #quadStale = true;
 
+  /**
+   * §55's frame, or `null` for the whole texture. Retained and rewritten in
+   * place by {@link Sprite.setFrame} — see it for why.
+   */
+  #frame: MutableSpriteFrame | null = null;
+
   #disposed = false;
 
   /**
@@ -255,6 +453,10 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
       requireFinite("x", anchor.x),
       requireFinite("y", anchor.y),
     );
+    if (options.frame !== undefined) {
+      const frame = options.frame;
+      this.setFrame(frame.x, frame.y, frame.width, frame.height);
+    }
   }
 
   /**
@@ -278,6 +480,91 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
   set height(value: number) {
     this.#height = requirePositive("height", value);
     this.markDirty();
+  }
+
+  /**
+   * The sub-rectangle of the texture this sprite samples, in texels, or `null`
+   * — the default — for the whole texture (§55; R-29, 2026-08-08).
+   *
+   * ```ts
+   * sprite.frame = { x: 32, y: 16, width: 16, height: 16 };  // one atlas cell
+   * sprite.frame = null;                                      // whole texture
+   * ```
+   *
+   * See {@link SpriteFrame} for the units and the bottom-left origin, and the
+   * module header for how the backend draws it without a uv attribute and
+   * without a second uniform.
+   *
+   * ## What it costs, and what it does not
+   *
+   * Nothing on the geometry: the quad is a function of the anchor and the size
+   * and is untouched by a frame, so writing one **re-uploads nothing** and
+   * leaves {@link Sprite.geometry} and its version exactly as they were. What
+   * changes is four floats of a uniform the backend already uploaded per draw.
+   * Many sprites over one atlas texture therefore share one GPU texture, one
+   * material, and one upload — which is the whole point, and what the "cut the
+   * cell into its own texture" workaround in the examples was paying to avoid.
+   *
+   * ## Validation (§85) and the one hole in it
+   *
+   * The setter **refuses** a frame that is not finite, is not positive in both
+   * extents, is negative in either origin, or runs outside the texture; it does
+   * not clamp (see `validateFrame`). Containment is checked against
+   * `material.texture` **as it is at the moment of the write**.
+   *
+   * Assigning a *different* texture to the material afterwards — or a different
+   * material to the sprite — is therefore not re-checked, because neither
+   * setter is this class's: `Material.texture` belongs to `@four/materials`,
+   * which cannot know its sprites, and `Renderable.material` is a plain field
+   * on the base. A frame left over from a larger texture then resolves to uv
+   * beyond `1`, which samples per the texture's wrap mode — clamp-to-edge is
+   * the only mode this tier has, so the sprite draws a smeared edge rather than
+   * anything undefined. Named rather than papered over (2026-08-08): the clean
+   * fix is a §77 texture-change notification, which is R-30's territory, and
+   * re-validating on read would put a throw on the render path.
+   *
+   * The returned record is the sprite's own and is **rewritten in place** by
+   * {@link Sprite.setFrame} — read it, do not retain it across a write, and do
+   * not mutate it (the type is `readonly` in every field). Same contract as
+   * {@link Sprite.anchor} and `SpriteMaterial.tint`.
+   */
+  get frame(): SpriteFrame | null {
+    return this.#frame;
+  }
+
+  set frame(value: SpriteFrame | null) {
+    if (value === null) {
+      this.#frame = null;
+      return;
+    }
+    this.setFrame(value.x, value.y, value.width, value.height);
+  }
+
+  /**
+   * Writes {@link Sprite.frame} from four texel coordinates and returns `this`
+   * for chaining (§7b's mutate-and-return convention).
+   *
+   * Validated **before** the first write, so a refused frame leaves the sprite
+   * exactly as it was rather than half-updated — the torn-state rule the three
+   * materials' `set*` methods follow.
+   *
+   * The record is allocated once per sprite and rewritten in place afterwards,
+   * so stepping a sprite through an atlas every frame allocates nothing (§7b's
+   * no-allocation-on-a-hot-path rule); the price is the aliasing the getter
+   * documents.
+   */
+  setFrame(x: number, y: number, width: number, height: number): this {
+    validateFrame({ x, y, width, height }, textureSizeOf(this.material));
+    const frame = this.#frame;
+    if (frame === null) {
+      this.#frame = { x, y, width, height };
+    } else {
+      frame.x = x;
+      frame.y = y;
+      frame.width = width;
+      frame.height = height;
+    }
+    return this;
   }
 
   /**

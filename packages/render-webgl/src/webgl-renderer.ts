@@ -1429,17 +1429,46 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               spriteProgram.setViewProjection(viewProjection);
               spriteViewUploaded = true;
             }
-            // The quad's local rectangle, from which the vertex stage derives uv.
-            // `computeBounds()` is cached against the geometry's version, so this
-            // is a version comparison per draw, not a pass over the vertices.
+            // The local rectangle the whole texture maps onto, from which the
+            // vertex stage derives uv. `computeBounds()` is cached against the
+            // geometry's version, so this is a version comparison per draw, not
+            // a pass over the vertices.
             const bounds = item.geometry.computeBounds();
+            const quadWidth = bounds.max.x - bounds.min.x;
+            const quadHeight = bounds.max.y - bounds.min.y;
             spriteProgram.setModel(item.worldMatrix);
-            spriteProgram.setQuad(
-              bounds.min.x,
-              bounds.min.y,
-              bounds.max.x - bounds.min.x,
-              bounds.max.y - bounds.min.y,
-            );
+            // §55's frame (R-29, 2026-08-08). `?? null` for the same reason
+            // `material.transparent === true` is written that way in the render
+            // list: a **structurally typed** sprite item built before the field
+            // existed reports `undefined`, which must read as "no frame".
+            const frame = item.frame ?? null;
+            if (frame === null) {
+              // Unchanged, deliberately and to the byte: a sprite with no frame
+              // takes the branch it took before frames existed and uploads the
+              // same four floats through the same call. See
+              // `SpriteProgram.setQuad`.
+              spriteProgram.setQuad(
+                bounds.min.x,
+                bounds.min.y,
+                quadWidth,
+                quadHeight,
+              );
+            } else {
+              // The reparametrization derived in `@four/render`'s `sprite.ts`:
+              // the rectangle the *whole* texture would occupy, given that the
+              // quad shows `frame` of it. Collapses to the four values above at
+              // `frame = (0, 0, texture.width, texture.height)`. `map` rather
+              // than `texture`, which above is the *GL handle* this draw binds:
+              // the texel size comes from the engine-side texture the material
+              // points at.
+              const map = material.texture;
+              spriteProgram.setQuad(
+                bounds.min.x - (frame.x * quadWidth) / frame.width,
+                bounds.min.y - (frame.y * quadHeight) / frame.height,
+                (quadWidth * map.width) / frame.width,
+                (quadHeight * map.height) / frame.height,
+              );
+            }
             spriteProgram.setTint(material.tint, opacityOf(material));
             gl.bindTexture(GL.TEXTURE_2D, texture);
             textureBound = true;

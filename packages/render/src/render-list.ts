@@ -100,6 +100,24 @@ import {
 
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
+import type { SpriteFrame } from "./sprite.js";
+
+/**
+ * A drawable that may carry §55's frame, as this module reads it (R-29,
+ * 2026-08-08).
+ *
+ * Structural, and deliberately not `node instanceof Sprite`. Which pipeline a
+ * node draws through is read off its **material** here (see `pipelineOf`), so
+ * "is a sprite item" and "is a `Sprite`" are not the same predicate: a plain
+ * `Renderable` carrying a `SpriteMaterial` produces a sprite item and has no
+ * `frame`, and that must read as "no frame" rather than as a type error or a
+ * crash. It also keeps the `instanceof` this module removed in 2026-08-06 from
+ * coming back, and keeps the import type-only — no runtime edge from the list
+ * to the node class.
+ */
+interface FramedDrawable {
+  readonly frame?: SpriteFrame | null;
+}
 
 /**
  * Which pipeline a render item needs (§64 stage 7, §66 sort key 3).
@@ -231,6 +249,27 @@ export interface SpriteRenderItem extends RenderItemBase {
   kind: "sprite";
   /** Surface appearance (§55, §57). */
   material: SpriteMaterial;
+  /**
+   * §55's frame sub-rectangle in texels, or `null` for the whole texture
+   * (R-29, 2026-08-08) — a **reference to the sprite's own record**, snapshotted
+   * like every other field at generation time.
+   *
+   * A reference rather than a copy for the reason `worldMatrix` and
+   * `material.tint` are: the item is pooled and rewritten, and copying four
+   * floats per sprite per frame buys nothing a backend can observe — it reads
+   * the frame during the same call that built the list. Read it, resolve it to
+   * uv, do not retain it.
+   *
+   * `null` rather than absent so a backend's read is one property load and one
+   * comparison on every sprite item, framed or not, with no `in` check and no
+   * shape change between the two cases — which is what keeps a frameless
+   * sprite on exactly the code path it was on before frames existed.
+   *
+   * On the sprite item and not on the item base: no other pipeline
+   * samples an atlas today. §65 batching is where that changes, and it changes
+   * by carrying uv per vertex rather than per draw.
+   */
+  frame: SpriteFrame | null;
 }
 
 /**
@@ -312,9 +351,9 @@ export type RenderItem =
  *
  * Fields that belong to one arm are present on all of them here and carry
  * harmless defaults for the others — `material` is `undefined` on a particle
- * item, `count` is `0` and `instances` empty on the other two. The exported
- * union is what hides them, which is why a caller never sees a sprite item
- * offering a particle count.
+ * item, `frame` is `null` on everything but a framed sprite, `count` is `0` and
+ * `instances` empty on the other two. The exported union is what hides them,
+ * which is why a caller never sees a sprite item offering a particle count.
  *
  * Not exported: outside this module an item is always a {@link RenderItem}, and
  * the correlation between `kind` and the arm-specific fields is an invariant the
@@ -323,6 +362,7 @@ export type RenderItem =
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
   material?: UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+  frame: SpriteFrame | null;
   id: string;
   count: number;
   instances: Float32Array;
@@ -479,6 +519,7 @@ function itemAt(
       worldMatrix,
       geometry,
       material: undefined,
+      frame: null,
       renderOrder: 0,
       renderLayer: 0,
       layers: DEFAULT_LAYER_MASK,
@@ -694,6 +735,15 @@ function collect(
     // decided which of them the backend will read it as.
     item.material = material as
       UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+    // §55's frame (R-29), read structurally and only where it can mean
+    // something. Written on **every** renderable, not only framed sprites: the
+    // item is pooled, so a slot that carried a framed sprite last frame would
+    // otherwise hand a stale sub-rectangle to whatever lands in it next — the
+    // same hazard the `material = undefined` line in the particle arm below
+    // exists for. `?? null` because a `Renderable` with a sprite material has
+    // no such property at all.
+    item.frame =
+      item.kind === "sprite" ? ((node as FramedDrawable).frame ?? null) : null;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
     // §46's mask, snapshotted so a per-view filter needs no node reference.
@@ -728,6 +778,9 @@ function collect(
     // reference would both mislead a reader and retain a material the scene may
     // have discarded.
     item.material = undefined;
+    // Likewise (R-29): a particle system has no texture sub-rectangle, and a
+    // pooled slot must not keep one a sprite left in it.
+    item.frame = null;
     item.id = node.id;
     item.count = node.particleCount;
     item.instances = node.particleInstances;

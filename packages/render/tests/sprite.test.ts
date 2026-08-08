@@ -62,6 +62,21 @@ function spriteMaterial(): SpriteMaterial {
   return new SpriteMaterial({ texture: texture() });
 }
 
+/**
+ * An 8 × 4 RGBA8 atlas: big enough that a frame's four numbers are all
+ * distinguishable from one another and from the texture's own extents, which a
+ * square texture would hide.
+ */
+function atlasMaterial(): SpriteMaterial {
+  return new SpriteMaterial({
+    texture: new Texture({
+      width: 8,
+      height: 4,
+      data: new Uint8Array(8 * 4 * 4),
+    }),
+  });
+}
+
 /** The quad's four corners as `[x, y]` pairs, in vertex order. */
 function corners(sprite: Sprite): [number, number][] {
   const p = sprite.geometry.positions;
@@ -435,6 +450,171 @@ describe("Sprite — rebuilds (§53 version contract)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// §55 frame sub-rectangles (R-29).
+// ---------------------------------------------------------------------------
+
+describe("Sprite — §55 frame sub-rectangles (R-29)", () => {
+  it("has no frame by default, which means the whole texture", () => {
+    expect(new Sprite(atlasMaterial()).frame).toBeNull();
+  });
+
+  it("takes one as a construction option, in texels", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      frame: { x: 2, y: 1, width: 4, height: 2 },
+    });
+
+    expect(sprite.frame).toEqual({ x: 2, y: 1, width: 4, height: 2 });
+  });
+
+  it("copies the option rather than retaining the caller's object", () => {
+    const authored = { x: 2, y: 1, width: 4, height: 2 };
+    const sprite = new Sprite(atlasMaterial(), { frame: authored });
+
+    expect(sprite.frame).not.toBe(authored);
+  });
+
+  it("rewrites one record in place, so stepping a sheet allocates nothing", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      frame: { x: 0, y: 0, width: 2, height: 2 },
+    });
+    const record = sprite.frame;
+
+    expect(sprite.setFrame(2, 0, 2, 2)).toBe(sprite);
+    expect(sprite.frame).toBe(record);
+    expect(sprite.frame).toEqual({ x: 2, y: 0, width: 2, height: 2 });
+  });
+
+  it("drops the frame through the setter, and takes a new one after", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      frame: { x: 0, y: 0, width: 2, height: 2 },
+    });
+
+    sprite.frame = null;
+    expect(sprite.frame).toBeNull();
+
+    sprite.frame = { x: 1, y: 1, width: 2, height: 2 };
+    expect(sprite.frame).toEqual({ x: 1, y: 1, width: 2, height: 2 });
+  });
+
+  it("accepts a frame flush with the texture's far edges", () => {
+    const sprite = new Sprite(atlasMaterial());
+
+    sprite.setFrame(4, 2, 4, 2);
+
+    expect(sprite.frame).toEqual({ x: 4, y: 2, width: 4, height: 2 });
+  });
+
+  it("accepts fractional edges — a half-texel inset is the bleed defence", () => {
+    const sprite = new Sprite(atlasMaterial());
+
+    sprite.setFrame(0.5, 0.5, 3, 1);
+
+    expect(sprite.frame?.x).toBe(0.5);
+  });
+
+  it("does not touch the quad or its version — a frame re-uploads nothing", () => {
+    const sprite = new Sprite(atlasMaterial(), { width: 2, height: 2 });
+    const geometry = sprite.geometry;
+    const version = geometry.version;
+    const before = corners(sprite);
+
+    sprite.setFrame(2, 1, 4, 2);
+
+    expect(sprite.geometry).toBe(geometry);
+    expect(sprite.geometry.version).toBe(version);
+    expect(corners(sprite)).toEqual(before);
+  });
+});
+
+describe("Sprite — frame validation (§85, refuse rather than clamp)", () => {
+  // One message covers shape, and it prints the whole rejected rectangle — so
+  // each case asserts that the *offending numbers* reach the author, which is
+  // what a per-component message was buying (see `validateFrame` for the
+  // measured reason there is no longer one message per component).
+  it.each([
+    ["a non-finite x", Number.NaN, 0, 2, 2, "(NaN, 0, 2, 2)"],
+    [
+      "a non-finite y",
+      0,
+      Number.POSITIVE_INFINITY,
+      2,
+      2,
+      "(0, Infinity, 2, 2)",
+    ],
+    ["a non-finite width", 0, 0, Number.NaN, 2, "(0, 0, NaN, 2)"],
+    ["a non-finite height", 0, 0, 2, -Infinity, "(0, 0, 2, -Infinity)"],
+    ["a zero width", 0, 0, 0, 2, "(0, 0, 0, 2)"],
+    ["a zero height", 0, 0, 2, 0, "(0, 0, 2, 0)"],
+    ["a negative width", 0, 0, -1, 2, "(0, 0, -1, 2)"],
+    ["a negative x", -1, 0, 2, 2, "(-1, 0, 2, 2)"],
+    ["a negative y", 0, -1, 2, 2, "(0, -1, 2, 2)"],
+  ] as const)("rejects %s, printing the frame", (_, x, y, w, h, shown) => {
+    const sprite = new Sprite(atlasMaterial());
+
+    expect(() => sprite.setFrame(x, y, w, h)).toThrow(RangeError);
+    expect(() => sprite.setFrame(x, y, w, h)).toThrow(
+      `finite rectangle with positive extents at a non-negative origin, in ` +
+        `texels; got ${shown}`,
+    );
+  });
+
+  it("rejects a frame that runs off the right edge, naming the texture", () => {
+    const sprite = new Sprite(atlasMaterial());
+
+    expect(() => sprite.setFrame(6, 0, 4, 2)).toThrow(
+      /runs outside its 8 × 4 texture/,
+    );
+  });
+
+  it("rejects a frame that runs off the top edge, and says where y starts", () => {
+    const sprite = new Sprite(atlasMaterial());
+
+    expect(() => sprite.setFrame(0, 3, 2, 2)).toThrow(
+      /in texels from the bottom-left/,
+    );
+  });
+
+  it("refuses through the property setter and the constructor alike", () => {
+    const sprite = new Sprite(atlasMaterial());
+
+    expect(() => {
+      sprite.frame = { x: 0, y: 0, width: 99, height: 1 };
+    }).toThrow(RangeError);
+    expect(
+      () =>
+        new Sprite(atlasMaterial(), {
+          frame: { x: 0, y: 0, width: 99, height: 1 },
+        }),
+    ).toThrow(RangeError);
+  });
+
+  it("leaves the previous frame intact when a write is refused", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      frame: { x: 2, y: 1, width: 4, height: 2 },
+    });
+
+    expect(() => sprite.setFrame(0, 0, 99, 1)).toThrow(RangeError);
+
+    expect(sprite.frame).toEqual({ x: 2, y: 1, width: 4, height: 2 });
+  });
+
+  it("checks shape but not containment when the texture cannot report a size", () => {
+    // A structurally typed sprite material — what the backend suites and
+    // consumers hand a `Sprite` — whose texture predates `width`/`height`.
+    const material = {
+      kind: "sprite",
+      tint: [1, 1, 1, 1],
+      texture: { id: "t", version: 0, data: null, disposed: false },
+    } as unknown as SpriteMaterial;
+    const sprite = new Sprite(material);
+
+    sprite.setFrame(1000, 1000, 1, 1);
+    expect(sprite.frame?.x).toBe(1000);
+    expect(() => sprite.setFrame(0, 0, 0, 1)).toThrow(RangeError);
+  });
+});
+
 describe("Sprite — disposal (§83)", () => {
   it("disposes the quad it owns and nothing else", () => {
     const material = spriteMaterial();
@@ -466,7 +646,12 @@ describe("Sprite — disposal (§83)", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildRenderList — sprites (§64, §55)", () => {
-  function sceneWith(...nodes: (Renderable | Sprite)[]): Scene {
+  // `Renderable<SpriteMaterial>` is in the union as well as `Sprite`: the
+  // pipeline is chosen by the material, so a plain renderable carrying a sprite
+  // material is a legal — and, for R-29, an interesting — inhabitant of a scene.
+  function sceneWith(
+    ...nodes: (Renderable | Renderable<SpriteMaterial> | Sprite)[]
+  ): Scene {
     const scene = new Scene();
     scene.add(...nodes);
     return scene;
@@ -563,6 +748,93 @@ describe("buildRenderList — sprites (§64, §55)", () => {
     expect(list[0].kind).toBe("sprite");
     expect(list[0].worldMatrix).not.toBe(sprite.transform.worldMatrix);
     expect(list[0].worldMatrix.elements[12]).toBe(1);
+  });
+
+  it("carries §55's frame onto the item, by reference (R-29)", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      frame: { x: 2, y: 1, width: 4, height: 2 },
+    });
+    const out: RenderItem[] = [];
+
+    const list = buildRenderList(sceneWith(sprite), out);
+
+    expect(isSpriteItem(list[0])).toBe(true);
+    expect((list[0] as SpriteRenderItem).frame).toBe(sprite.frame);
+  });
+
+  it("carries null for a sprite with no frame", () => {
+    const out: RenderItem[] = [];
+
+    const list = buildRenderList(sceneWith(new Sprite(atlasMaterial())), out);
+
+    expect((list[0] as SpriteRenderItem).frame).toBeNull();
+  });
+
+  it("carries null for a plain Renderable that happens to draw sprite-shaded", () => {
+    // The pipeline is read off the material, so this is a *sprite item* built
+    // from a node that has no `frame` property at all.
+    const node = new Renderable<SpriteMaterial>(
+      planeGeometry(),
+      atlasMaterial(),
+    );
+    const out: RenderItem[] = [];
+
+    const list = buildRenderList(sceneWith(node), out);
+
+    expect(list[0].kind).toBe("sprite");
+    expect((list[0] as SpriteRenderItem).frame).toBeNull();
+  });
+
+  it("clears a pooled item's frame when a frameless sprite reuses the slot", () => {
+    const out: RenderItem[] = [];
+    buildRenderList(
+      sceneWith(
+        new Sprite(atlasMaterial(), {
+          frame: { x: 2, y: 1, width: 4, height: 2 },
+        }),
+      ),
+      out,
+    );
+
+    const list = buildRenderList(sceneWith(new Sprite(atlasMaterial())), out);
+
+    expect((list[0] as SpriteRenderItem).frame).toBeNull();
+  });
+
+  it("clears a pooled item's frame when a non-sprite reuses the slot", () => {
+    const out: RenderItem[] = [];
+    buildRenderList(
+      sceneWith(
+        new Sprite(atlasMaterial(), {
+          frame: { x: 2, y: 1, width: 4, height: 2 },
+        }),
+      ),
+      out,
+    );
+
+    const list = buildRenderList(
+      sceneWith(new Renderable(planeGeometry(), new UnlitMaterial())),
+      out,
+    );
+
+    expect(list[0].kind).toBe("unlit");
+    expect((list[0] as unknown as SpriteRenderItem).frame).toBeNull();
+  });
+
+  it("carries the frame through the §43 interpolated builder too", () => {
+    const sprite = new Sprite(atlasMaterial(), {
+      frame: { x: 0, y: 0, width: 4, height: 2 },
+    });
+    const out: RenderItem[] = [];
+
+    const list = buildInterpolatedRenderList(
+      sceneWith(sprite),
+      new PoseBuffer(),
+      0.5,
+      out,
+    );
+
+    expect((list[0] as SpriteRenderItem).frame).toBe(sprite.frame);
   });
 
   it("rewrites a pooled item's kind when the list changes shape", () => {

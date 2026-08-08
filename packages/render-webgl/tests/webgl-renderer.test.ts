@@ -2920,6 +2920,140 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     ]);
   });
 
+  it("maps a §55 frame onto the same uniform, with no extra GL call (R-29)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // An 8 × 4 atlas, and the quad shows its top-right 4 × 2 cell.
+    const node = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+      width: 4,
+      height: 2,
+      anchor: { x: 0, y: 0 },
+    });
+    node.setFrame(4, 2, 4, 2);
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = spriteUniforms(gl);
+    // The rectangle the *whole* 8 × 4 texture maps onto: twice the quad in each
+    // axis, offset so that the quad's own [0, 4] × [0, 2] covers the far cell.
+    expect(uploadsAt(gl, uniforms.get("quad"))).toEqual([[-4, -2, 8, 4]]);
+    // uv at the quad's corners, recomputed here the way the vertex stage does,
+    // is exactly the frame in normalized coordinates — which is the claim.
+    const [minX, minY, width, height] = (
+      uploadsAt(gl, uniforms.get("quad"))[0] as number[]
+    ).map(Number);
+    expect([(0 - minX) / width, (0 - minY) / height]).toEqual([0.5, 0.5]);
+    expect([(4 - minX) / width, (2 - minY) / height]).toEqual([1, 1]);
+    // One `uniform4fv` for the quad and one for the tint, exactly as before:
+    // a frame adds no upload.
+    expect(gl.countOf("uniform4fv")).toBe(2);
+  });
+
+  it("uploads the frameless values for an identity frame (R-29 collapse)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const framed = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+      width: 3,
+      height: 2,
+      anchor: { x: 0.25, y: 0.75 },
+    });
+    framed.setFrame(0, 0, 8, 4);
+    root.add(framed);
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    const withFrame = uploadsAt(gl, spriteUniforms(gl).get("quad"));
+
+    const plainRoot = createRoot();
+    plainRoot.add(
+      sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+        width: 3,
+        height: 2,
+        anchor: { x: 0.25, y: 0.75 },
+      }),
+    );
+    gl.reset();
+    renderer.render(plainRoot, [createView(camera)]);
+
+    // The `else` branch is taken and still produces the `if` branch's numbers —
+    // which is the arithmetic half of "a frameless sprite is byte-identical".
+    expect(withFrame).toEqual(uploadsAt(gl, spriteUniforms(gl).get("quad")));
+    expect(withFrame).toEqual([[-0.75, -1.5, 3, 2]]);
+  });
+
+  it("maps a bottom-left frame, and a sub-texel inset", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const node = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+      width: 2,
+      height: 2,
+      anchor: { x: 0, y: 0 },
+    });
+    node.setFrame(0, 0, 4, 2);
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Frame at the origin ⇒ the same `min`, and a doubled extent.
+    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
+      [0, 0, 4, 4],
+    ]);
+  });
+
+  it("returns to the whole texture when the frame is cleared", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const node = sprite(new TestSpriteMaterial(new TestTexture(8, 4)), {
+      width: 2,
+      height: 2,
+      anchor: { x: 0, y: 0 },
+    });
+    node.setFrame(0, 0, 4, 2);
+    root.add(node);
+    renderer.render(root, [createView(camera)]);
+
+    node.frame = null;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
+      [0, 0, 2, 2],
+    ]);
+  });
+
+  it("draws two frames of one atlas through one texture and one binding", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // The workaround this discharges: one material, one texture, two cells.
+    const material = new TestSpriteMaterial(new TestTexture(8, 4));
+    const left = sprite(material, {
+      width: 2,
+      height: 2,
+      anchor: { x: 0, y: 0 },
+    });
+    const right = sprite(material, {
+      width: 2,
+      height: 2,
+      anchor: { x: 0, y: 0 },
+    });
+    left.setFrame(0, 0, 4, 4);
+    right.setFrame(4, 0, 4, 4);
+    root.add(left, right);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([
+      [0, 0, 4, 2],
+      [-2, 0, 4, 2],
+    ]);
+    // One upload and one GL texture for both cells — the point of an atlas.
+    expect(gl.countOf("texImage2D")).toBe(1);
+    expect(gl.countOf("createTexture")).toBe(1);
+  });
+
   it("uploads the sprite view-projection once per view, after switching to it", async () => {
     const { renderer, gl, camera } = await initialized();
     camera.projectionMatrix.identity();
@@ -7199,5 +7333,339 @@ describe("WebglRenderer.render — standard surfaces (§59, §68)", () => {
     expect(statistics.drawCalls).toBe(1);
     expect(statistics.triangles).toBe(1);
     expect(statistics.instances).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §61's loss/restore contract, end to end (A-24, 2026-08-08).
+// ---------------------------------------------------------------------------
+
+/**
+ * Every GPU handle the recorded calls mention.
+ *
+ * The double mints handles as `{ kind, serial }` objects and `snapshot` turns
+ * typed arrays into plain `Array`s, so "an object argument that is not an
+ * array" is exactly "a GL object" — programs, shaders, buffers, vertex arrays,
+ * textures, framebuffers, renderbuffers, and uniform locations alike.
+ */
+function glHandles(calls: readonly RecordedCall[]): Set<object> {
+  const handles = new Set<object>();
+  for (const call of calls) {
+    for (const argument of call.args) {
+      if (
+        typeof argument === "object" &&
+        argument !== null &&
+        !Array.isArray(argument)
+      ) {
+        handles.add(argument);
+      }
+    }
+  }
+  return handles;
+}
+
+/**
+ * A transcript in which handles are compared by *position*, not identity.
+ *
+ * `RecordingGl.transcript` in `tests/integration/helpers` serializes handles as
+ * themselves, which is what makes "the same objects in the same order" an
+ * assertable claim there. Across a context loss the objects are necessarily
+ * different — that is the whole point — so each handle is replaced by the index
+ * of its first appearance. Two frames match here when they issue the same calls
+ * with the same arguments against handles used in the same pattern, which is
+ * what "the restore put the renderer back exactly where it was" means.
+ */
+function shapedTranscript(calls: readonly RecordedCall[]): string[] {
+  const identifiers = new Map<object, string>();
+  const describe = (value: unknown): string => {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      let identifier = identifiers.get(value);
+      if (identifier === undefined) {
+        identifier = `#${String(identifiers.size)}`;
+        identifiers.set(value, identifier);
+      }
+      return identifier;
+    }
+    return JSON.stringify(value) ?? String(value);
+  };
+  return calls.map(
+    (call) => `${call.name}(${call.args.map(describe).join(", ")})`,
+  );
+}
+
+/** The `create*` entry points that hand out a GPU object other than a program. */
+const RESOURCE_ALLOCATORS = [
+  "createBuffer",
+  "createVertexArray",
+  "createTexture",
+  "createFramebuffer",
+  "createRenderbuffer",
+] as const;
+
+describe("WebglRenderer — §61 context-loss recovery (A-24)", () => {
+  /**
+   * A scene that touches every cache the renderer owns: indexed geometry
+   * (`GeometryCache`), a sprite and therefore a texture (`TextureCache`), and
+   * — through the `target` argument the tests pass — a framebuffer
+   * (`RenderTargetCache`).
+   */
+  function lossScene(): { root: Renderable; texture: TestTexture } {
+    const texture = new TestTexture();
+    const root = createRoot();
+    root.add(
+      renderable(quadGeometry()),
+      sprite(new TestSpriteMaterial(texture)),
+    );
+    return { root, texture };
+  }
+
+  it("draws the frame after a restore call for call as it drew before the loss", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = lossScene();
+    const views = [createView(camera)];
+    gl.reset();
+    renderer.render(root, views);
+    const before = shapedTranscript(gl.calls);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+
+    // Not "it draws again" — the *same* frame, against handles used in the
+    // same pattern. A restore that rebuilt one pipeline differently, skipped a
+    // re-upload, or left the §57 state mirror claiming state the fresh context
+    // does not have would show up as a diff here and nowhere else.
+    expect(shapedTranscript(gl.calls)).toEqual(before);
+    expect(before.length).toBeGreaterThan(0);
+  });
+
+  it("never touches a handle from before the loss again — the whole point of forget()", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = lossScene();
+    const views = [createView(camera)];
+    const target = new RenderTarget({ width: 16, height: 16 });
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.render(root, views);
+    renderer.render(root, views, undefined, target);
+    renderer.render(createRoot(), views, undefined, source);
+    renderer.renderEffect(effectPass(source));
+    // Every program, shader, buffer, vertex array, texture, framebuffer,
+    // renderbuffer and uniform location the live context ever handed out.
+    const dead = glHandles(gl.calls);
+    expect(dead.size).toBeGreaterThan(20);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+    renderer.render(root, views, undefined, target);
+    renderer.render(createRoot(), views, undefined, source);
+    renderer.renderEffect(effectPass(source));
+
+    // The class of bug this suite exists to catch: a cache that kept a record,
+    // a program field that was not nulled, a uniform location resolved against
+    // a dead program. Every one of them surfaces as a handle from the first
+    // list appearing in the second.
+    const reused = [...glHandles(gl.calls)].filter((handle) =>
+      dead.has(handle),
+    );
+    expect(reused).toEqual([]);
+  });
+
+  it("rebuilds the pipelines eagerly and every resource lazily", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = lossScene();
+    const views = [createView(camera)];
+    renderer.render(
+      root,
+      views,
+      undefined,
+      new RenderTarget({ width: 8, height: 8 }),
+    );
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+
+    canvas.dispatch("webglcontextrestored");
+
+    // §61 splits the restore in two: engine-owned *pipelines* come back before
+    // `contextrestored` is emitted, because a shader compile inside a frame
+    // could throw where §61 forbids throwing; everything keyed by an
+    // application object comes back on the next draw that asks for it, because
+    // the caches cannot know which of them the next frame will use.
+    expect(gl.countOf("createProgram")).toBe(6);
+    for (const allocator of RESOURCE_ALLOCATORS) {
+      expect([allocator, gl.countOf(allocator)]).toEqual([allocator, 0]);
+    }
+  });
+
+  it("re-uploads a texture edited while the context was lost at its new version", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root, texture } = lossScene();
+    const views = [createView(camera)];
+    renderer.render(root, views);
+
+    canvas.dispatch("webglcontextlost");
+    // §77's `markDirty()` while there is no context to upload into: the record
+    // that would have been invalidated is already gone, and the *next* upload
+    // has to carry the new version or the frame after that re-uploads forever.
+    texture.markDirty();
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+    const firstUploads = gl.countOf("texImage2D");
+    gl.reset();
+    renderer.render(root, views);
+
+    expect(firstUploads).toBe(1);
+    expect(gl.countOf("texImage2D")).toBe(0);
+    // Both draws still happen: the mesh's indexed quad and the sprite's.
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("re-allocates a render target resized while the context was lost at its new size", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const views = [createView(camera)];
+    const target = new RenderTarget({ width: 8, height: 8 });
+    renderer.render(createRoot(), views, undefined, target);
+
+    canvas.dispatch("webglcontextlost");
+    // Same argument as the texture above, one resource along: the record the
+    // version bump would have invalidated is already gone, so the allocation
+    // that comes back has to read the *current* size, not the cached one.
+    target.resize(32, 16);
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(createRoot(), views, undefined, target);
+
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.callsOf("texImage2D")[0]?.args.slice(3, 5)).toEqual([32, 16]);
+    // The pass draws into the new surface, not the old one.
+    expect(gl.callsOf("viewport")[0]?.args).toEqual([0, 0, 32, 16]);
+  });
+
+  it("keeps the F13 envelope when the context is lost mid-frame", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const views = [createView(camera)];
+    const material = new TestMaterial();
+    // A loss that arrives *inside* a frame, at the one place an application's
+    // own code runs during one: a material accessor. The browser cannot
+    // deliver `webglcontextlost` here — DOM events do not interleave with a
+    // synchronous call — but a renderer whose caches are emptied under it is
+    // exactly the state a mid-frame loss produces, and the frame still has to
+    // leave through its `finally`.
+    Object.defineProperty(material, "transparent", {
+      configurable: true,
+      get(): boolean {
+        canvas.dispatch("webglcontextlost");
+        return false;
+      },
+    });
+    const root = createRoot();
+    root.add(renderable(quadGeometry(), material));
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, views);
+    }).not.toThrow();
+
+    // The envelope closed: nothing left bound for whatever touches this
+    // context next (§61 allows several renderers over one application).
+    const names = gl.names();
+    expect(names).toContain("bindVertexArray");
+    const lastVertexArray = gl.callsOf("bindVertexArray").at(-1);
+    expect(lastVertexArray?.args).toEqual([null]);
+    expect(renderer.contextLost).toBe(true);
+
+    // And the mirror survived it: after the restore this renderer draws the
+    // frame a renderer that never lost its context draws.
+    Object.defineProperty(material, "transparent", {
+      configurable: true,
+      value: false,
+      writable: true,
+    });
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+    const recovered = shapedTranscript(gl.calls);
+
+    const reference = await initialized();
+    const referenceRoot = createRoot();
+    referenceRoot.add(renderable(quadGeometry(), new TestMaterial()));
+    reference.gl.reset();
+    reference.renderer.render(referenceRoot, [createView(reference.camera)]);
+
+    expect(recovered).toEqual(shapedTranscript(reference.gl.calls));
+  });
+
+  it("brings the §70 effect pipeline back with the rest (R-6)", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    const views = [createView(camera)];
+    gl.reset();
+    renderer.render(createRoot(), views, undefined, source);
+    renderer.renderEffect(effectPass(source));
+    const before = shapedTranscript(gl.calls);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(createRoot(), views, undefined, source);
+    renderer.renderEffect(effectPass(source));
+
+    // The effect program is compiled by `initialize` and never lazily, so a
+    // restore that forgot it would leave `renderEffect` a silent no-op — the
+    // failure mode §70's pipeline is compiled eagerly to avoid. The off-screen
+    // surface it samples comes back the same way every other target does: the
+    // pass that asks for one allocates it.
+    expect(gl.countOf("drawArrays")).toBe(1);
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(shapedTranscript(gl.calls)).toEqual(before);
+  });
+
+  it("survives a second loss, and the second restore reuses nothing from the first", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = lossScene();
+    const views = [createView(camera)];
+    const cycle: string[] = [];
+    renderer.events.on("contextlost", () => cycle.push("lost"));
+    renderer.events.on("contextrestored", () => cycle.push("restored"));
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+    const first = shapedTranscript(gl.calls);
+    const firstHandles = glHandles(gl.calls);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+
+    // A restore path that worked once and not twice is a real shape of this
+    // bug: `webglcontextlost` can arrive again the moment after a restore, and
+    // a browser tab that is losing its context is usually losing it repeatedly.
+    expect(cycle).toEqual(["lost", "restored", "lost", "restored"]);
+    expect(shapedTranscript(gl.calls)).toEqual(first);
+    expect(
+      [...glHandles(gl.calls)].filter((handle) => firstHandles.has(handle)),
+    ).toEqual([]);
+  });
+
+  it("stays disposable while lost, deleting nothing and leaving no listener (§83)", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = lossScene();
+    renderer.render(root, [createView(camera)]);
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+
+    renderer.dispose();
+
+    expect(gl.calls).toEqual([]);
+    expect(canvas.listenerCount("webglcontextlost")).toBe(0);
+    expect(canvas.listenerCount("webglcontextrestored")).toBe(0);
+    // A loss event delivered after disposal reaches nothing at all.
+    expect(canvas.dispatch("webglcontextlost")).toBe(false);
   });
 });
