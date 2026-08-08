@@ -28,6 +28,27 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — R-15 §60a colour management.** Decisions worth keeping:
+  - **The working-space policy is written down once** (`@four/math` `color.ts` header):
+    material/light/vertex colours _are_ linear-light — no per-value tag (it would have
+    one legal value); §60a's metadata lives on _resources_ only (textures §77, targets
+    §63).
+  - **The output transform is a pass, never a per-material encode** — §60a's "is the
+    final render-graph pass" selects the design (a per-shader encode would encode five
+    times into one framebuffer and blend between draws in the wrong space).
+  - **Both new defaults are `"linear"`** (deviating from §60a's sRGB texture default),
+    so opt-in preserves every golden — owner decision to flip + move goldens
+    deliberately. Alpha never runs through a transfer curve; nothing clamps (odd
+    extension).
+  - **§101's mapping row settles the CSS-string-options question** — §59/§68 show
+    strings in _examples_, §101 pins tuples as the shipped tier; not widened;
+    `srgbToLinearRGBA(parseColor(css), out)` is the one-line path (owner may widen).
+  - Byte-identity technique, reconfirmed twice: a second `bool` uniform seeded at GL's
+    initial `false` costs nothing; an optional resource field read as `?? "linear"`
+    keeps every pre-existing double on the old call. §86 gotcha: effect-program GLSL
+    ships in every backend bundle — the encode was inlined to fit ui-demo at
+    31.99/32 kB.
+
 - **2026-08-08 — §119 motor digital twin.** Decisions worth keeping:
   - **§84 is readable only _after_ `app.step` returns** — `step` resets the record on
     entry; reading from the `update` event gives all-`NaN` (measured).

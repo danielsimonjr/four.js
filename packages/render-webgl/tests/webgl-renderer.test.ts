@@ -802,6 +802,13 @@ class TestTexture {
 
   disposed = false;
 
+  /**
+   * §60a's colour-space tag (R-15, 2026-08-08). Left `undefined` by default,
+   * exactly as a texture written before the field existed leaves it, so every
+   * other test in this file exercises the `?? "linear"` path.
+   */
+  colorSpace?: "srgb" | "linear";
+
   constructor(width = 2, height = 2, data: Uint8Array | null = null) {
     nextTestTextureId += 1;
     this.id = `test-texture-${String(nextTestTextureId)}`;
@@ -2567,6 +2574,25 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
       null,
     ]);
     expect(cache.size).toBe(1);
+  });
+
+  it("allocates SRGB8_ALPHA8 for an sRGB-tagged texture, RGBA8 otherwise (§60a)", () => {
+    // R-15, 2026-08-08. The tag is opt-in and read defensively, so a double
+    // that predates the field — every other one in this file — still uploads
+    // the byte-identical RGBA8 call it always did.
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const untagged = new TestTexture(1, 1);
+    const tagged = new TestTexture(1, 1);
+    tagged.colorSpace = "srgb";
+
+    cache.acquire(untagged.asTexture);
+    cache.acquire(tagged.asTexture);
+
+    expect(gl.callsOf("texImage2D").map((call) => call.args[2])).toEqual([
+      GL.RGBA8,
+      GL.SRGB8_ALPHA8,
+    ]);
   });
 
   it("allocates zero-filled storage for a texture with no CPU-side data", () => {
@@ -6111,14 +6137,16 @@ function effectPass(
 }
 
 describe("EffectProgram — the §70 pipeline (R-6)", () => {
-  it("compiles, links, and resolves exactly its three uniforms", () => {
+  it("compiles, links, and resolves exactly its four uniforms", () => {
     const gl = createFakeGl();
     const program = EffectProgram.create(gl);
 
     expect(program.disposed).toBe(false);
     expect(
       gl.callsOf("getUniformLocation").map((call) => call.args[1]),
-    ).toEqual(["source", "useGrade", "grade"]);
+      // `useEncode` is R-15's §60a output transform (2026-08-08) — the fourth
+      // uniform, and the second switch that starts at GL's own initial `false`.
+    ).toEqual(["source", "useGrade", "grade", "useEncode"]);
     // No geometry of any kind: the full-screen triangle is three `gl_VertexID`
     // corners, so this pipeline allocates no buffer and no vertex array.
     expect(gl.countOf("createBuffer")).toBe(0);
@@ -6209,6 +6237,56 @@ describe("EffectProgram — the §70 pipeline (R-6)", () => {
     expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
       [effectUniforms(gl).get("useGrade"), 0],
     ]);
+  });
+
+  it("uploads §60a's encode switch once and turns it off with one call", () => {
+    // R-15, 2026-08-08. The second switch obeys the first one's rule: it starts
+    // at GL's initial `false`, so a program that never encodes never uploads
+    // it, and a chain that always encodes uploads it once.
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    gl.reset();
+
+    program.setOutputTransform();
+    program.setOutputTransform();
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useEncode"), 1],
+    ]);
+
+    gl.reset();
+    program.setCopy();
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useEncode"), 0],
+    ]);
+  });
+
+  it("keeps the two switches exclusive when a chain mixes them", () => {
+    // A grade and an output transform are different passes: switching from one
+    // to the other moves both switches, so a graded frame is never
+    // accidentally encoded twice or presented ungraded.
+    const gl = createFakeGl();
+    const program = EffectProgram.create(gl);
+    program.setGrade(2, 1, 1);
+    gl.reset();
+
+    program.setOutputTransform();
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useGrade"), 0],
+      [effectUniforms(gl).get("useEncode"), 1],
+    ]);
+
+    gl.reset();
+    program.setGrade(2, 1, 1);
+
+    expect(gl.callsOf("uniform1i").map((call) => call.args)).toEqual([
+      [effectUniforms(gl).get("useGrade"), 1],
+      [effectUniforms(gl).get("useEncode"), 0],
+    ]);
+    // The coefficients did not move, so the mirror suppresses their upload.
+    expect(gl.countOf("uniform3fv")).toBe(0);
   });
 
   it("deletes its program once, idempotently (§83)", () => {
@@ -6372,6 +6450,22 @@ describe("WebglRenderer.renderEffect — drawing one (§70, R-6)", () => {
       [1, 1, 0.25],
     ]);
     expect(uploadsAt(gl, effectUniforms(gl).get("useGrade"))).toEqual([1]);
+  });
+
+  it("selects §60a's encode for an output-transform pass, and only it", async () => {
+    // R-15, 2026-08-08: the transform is one pass over the composited frame,
+    // so what reaches GL is the encode switch — no grade, no second draw.
+    const { renderer, gl } = await initialized();
+    const source = new RenderTarget({ width: 8, height: 8 });
+    renderer.renderEffect(effectPass(source));
+    gl.reset();
+
+    renderer.renderEffect(effectPass(source, { kind: "output-transform" }));
+
+    expect(uploadsAt(gl, effectUniforms(gl).get("useEncode"))).toEqual([1]);
+    expect(uploadsAt(gl, effectUniforms(gl).get("useGrade"))).toEqual([]);
+    expect(gl.countOf("uniform3fv")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
   });
 
   it("counts one draw call, one instance and one triangle (§84)", async () => {

@@ -59,14 +59,18 @@
  *    material itself deliberately does not clamp, because clamping authored
  *    data is the thing `UnlitMaterial` refused to do in WP-3.3.
  *
- * ## Color space (§60a)
+ * ## Colour space (§60a)
  *
- * The same untagged linear space every other pipeline in this backend works in:
- * plain 0…1 numbers, straight (non-premultiplied) alpha, **no tone mapping and
- * no output transform** — §60a makes both the final render-graph pass and
- * neither exists yet (R-15). The standard and lit stages therefore write
- * comparable values into one framebuffer, which is the property that lets a
- * scene mix them. When the output transform lands it moves both.
+ * The same **linear working space** every other pipeline in this backend works
+ * in: plain 0…1 numbers, straight (non-premultiplied) alpha, and no encode of
+ * its own. The note here used to say the space was "untagged" and that no
+ * output transform existed anywhere; both halves are superseded by R-15
+ * (2026-08-08) — §60a's working-space policy is written down (`@four/math`'s
+ * `color.ts`), and its output transform ships as the final render-graph pass
+ * (`@four/render`'s `OutputTransformEffect`), which is exactly why *this* stage
+ * still encodes nothing. The standard and lit stages therefore write comparable
+ * values into one framebuffer, which is the property that lets a scene mix
+ * them. Tone mapping — §60a's other half — waits on HDR float targets.
  */
 
 import type { Disposable } from "@four/core";

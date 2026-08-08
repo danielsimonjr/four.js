@@ -8,6 +8,40 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — R-15 closed (policy + opt-in-transform tier): §60a colour management
+
+#### Added
+
+- **§60a colour management (R-15)** — v1's highest-leverage open render item.
+  `@four/math` gains the colour tier: `ColorRGB` (hoisted from `@four/scene`, exactly
+  what R-13's emissive note asked for — the duplicate gate confirms 0), `ColorSpace`,
+  the sRGB transfer functions (piecewise IEC 61966-2-1, component + RGB/RGBA
+  out-param forms, **odd-extended below zero** so extended-range values round-trip
+  rather than clamp — WP-3.3's rule extended to the curves; **alpha is never run
+  through a transfer curve** — coverage, not light), and `parseColor`/`parseColorRGB`
+  over a documented CSS subset (`#rgb…#rrggbbaa`, all `rgb()/rgba()` syntaxes,
+  `transparent`, the sixteen Level 1 keywords) that refuses everything outside it.
+  `color.ts` went 0% → 100% coverage. **The working-space policy is written down
+  once**, in `color.ts`'s header: material/light/vertex colours _are_ linear-light (a
+  per-value tag would have one legal value); §60a's metadata lives on _resources_ —
+  `TextureSource.colorSpace` (`SRGB8_ALPHA8` allocation: hardware decodes before
+  filtering) and `RenderTarget.colorSpace`, which `validateEffectRenderPass` uses to
+  refuse double encodes at setup.
+- **The output transform is a pass, never a per-material encode** — §60a's own words
+  ("is the final render-graph pass") select the design: `OutputTransformEffect`, the
+  fourth `ScreenEffect` member, executed as one `renderEffect`. Tone mapping stays
+  staged on R-4's float formats and lands as a field on this effect.
+- **Two dated deviations, both opt-in-instead-of-default** (textures default
+  `"linear"`, transform off), taken so no golden moved — every authored scene predates
+  the pipeline having an output space; the transform ships, a scene opts in, goldens
+  move deliberately. Flagged as owner decisions with the CSS-string-options question
+  (§101's mapping row pins tuples; `srgbToLinearRGBA(parseColor(css), out)` is the
+  one-line path). Eighth run of the recorded-sequence method: the R-6-era pinned
+  transcript passes unchanged; a copy-effect frame issues zero `uniform1i`; 58/58
+  browser with MD5-identical goldens. ui-demo at 31.99/32 kB — the encode GLSL was
+  inlined specifically to fit; A-4's build-time pipeline selection remains the
+  structural fix.
+
 ### 2026-08-08 — §119 flagship: the motor digital twin (S-8's example program complete)
 
 #### Added

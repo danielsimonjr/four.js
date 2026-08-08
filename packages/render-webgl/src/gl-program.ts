@@ -127,6 +127,18 @@ export const GL = {
   TEXTURE0: 0x84c0,
   /** `GL_RGBA8` — the sized internal format of an MVP-tier texture. */
   RGBA8: 0x8058,
+  /**
+   * `GL_SRGB8_ALPHA8` — the sized internal format of a texture whose texels are
+   * sRGB-encoded (§60a, R-15).
+   *
+   * Chosen instead of a decode in the shader because the hardware does it on
+   * *sample*, i.e. before filtering: bilinear interpolation between two
+   * sRGB-encoded texels is wrong in exactly the way a colour space exists to
+   * prevent, and a shader-side `pow` would interpolate first and decode after.
+   * The alpha channel of this format is **not** encoded, which matches
+   * `srgbToLinearRGBA`'s rule that alpha is coverage, not light.
+   */
+  SRGB8_ALPHA8: 0x8c43,
   /** `GL_ARRAY_BUFFER` — vertex attribute storage. */
   ARRAY_BUFFER: 0x8892,
   /** `GL_ELEMENT_ARRAY_BUFFER` — index storage; part of vertex-array state. */

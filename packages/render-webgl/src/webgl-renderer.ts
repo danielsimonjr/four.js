@@ -1699,7 +1699,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // effect is a compile error, and a value that arrived from JSON or from
     // JavaScript must not become a different picture than the one asked for.
     const effect = pass.effect;
-    if (effect.kind !== "copy" && effect.kind !== "grade") {
+    if (
+      effect.kind !== "copy" &&
+      effect.kind !== "grade" &&
+      effect.kind !== "output-transform"
+    ) {
       return;
     }
 
@@ -1741,6 +1745,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           effect.contrast ?? COLOR_GRADE_DEFAULTS.contrast,
           effect.saturation ?? COLOR_GRADE_DEFAULTS.saturation,
         );
+      } else if (effect.kind === "output-transform") {
+        // §60a's output transform, as the final render-graph pass: the encode
+        // happens once, over the composited linear-light frame, and never
+        // inside a material's fragment stage (R-15, 2026-08-08).
+        effectProgram.setOutputTransform();
       } else {
         effectProgram.setCopy();
       }

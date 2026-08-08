@@ -96,6 +96,7 @@
 
 import type { Disposable } from "@four/core";
 import type { MaterialTexture } from "@four/materials";
+import type { ColorSpace } from "@four/math";
 
 import { noteRenderTarget } from "./resource-memory.js";
 
@@ -146,6 +147,25 @@ export interface RenderTargetOptions {
    * afterwards. §69's samplable depth is staged — see the module header.
    */
   readonly depth?: boolean;
+
+  /**
+   * The colour space the attachment's texels are in — §60a's "render targets
+   * carry color-space metadata" (R-15, 2026-08-08).
+   *
+   * **Defaults to `"linear"`**: everything this engine renders is linear-light
+   * working-space content (§60a), so an off-screen target is by default an
+   * intermediate surface in that pipeline rather than a presentable image. Tag
+   * a target `"srgb"` when it is the *destination of the output transform* —
+   * the surface §60a's final render-graph pass encodes into — so that
+   * {@link validateEffectRenderPass} can tell an encode into an already-encoded
+   * surface (a double encode) from an encode into a linear one.
+   *
+   * Metadata, not behaviour: this tier's only colour format is `rgba8` and the
+   * bytes are whatever was written into them. What the tag changes is what the
+   * *graph* accepts, which is where a colour-space mistake is catchable at
+   * setup (§85) instead of visible as a washed-out frame.
+   */
+  readonly colorSpace?: ColorSpace;
 }
 
 /**
@@ -244,6 +264,25 @@ function validateFormat(format: RenderTargetFormat): void {
 }
 
 /**
+ * Runs the §85 check for a colour-space tag, and returns it (§60a).
+ *
+ * Shared by `RenderTarget` and `Texture` through the barrel, so the two report
+ * the same refusal for the same mistake; `owner` names the resource in it.
+ */
+export function validateColorSpace(
+  colorSpace: ColorSpace,
+  owner: string,
+): ColorSpace {
+  if (colorSpace !== "srgb" && colorSpace !== "linear") {
+    throw new RangeError(
+      `${owner} colorSpace ${JSON.stringify(colorSpace)} is not a color ` +
+        'space; the values are "srgb" and "linear" (§60a, §85).',
+    );
+  }
+  return colorSpace;
+}
+
+/**
  * The colour attachment view handed out by {@link RenderTarget.colorTexture}.
  *
  * Every member delegates to the target rather than copying from it, so a
@@ -288,6 +327,11 @@ class RenderTargetColorTexture implements RenderTargetTexture {
 
   get disposed(): boolean {
     return this.renderTarget.disposed;
+  }
+
+  /** The target's colour space (§60a) — one surface, one tag. */
+  get colorSpace(): ColorSpace {
+    return this.renderTarget.colorSpace;
   }
 }
 
@@ -342,6 +386,8 @@ export class RenderTarget implements Disposable {
 
   readonly #depth: boolean;
 
+  readonly #colorSpace: ColorSpace;
+
   #width: number;
 
   #height: number;
@@ -358,6 +404,10 @@ export class RenderTarget implements Disposable {
     this.#height = options.height;
     this.#format = format;
     this.#depth = options.depth ?? true;
+    this.#colorSpace = validateColorSpace(
+      options.colorSpace ?? "linear",
+      "RenderTarget",
+    );
     noteRenderTarget(1, this.byteLength);
   }
 
@@ -383,6 +433,16 @@ export class RenderTarget implements Disposable {
    */
   get depth(): boolean {
     return this.#depth;
+  }
+
+  /**
+   * The colour space of the attachment's texels (§60a) — see
+   * {@link RenderTargetOptions.colorSpace}. Fixed at construction, like
+   * {@link RenderTarget.format}: a surface does not change what its bytes mean
+   * halfway through a frame graph.
+   */
+  get colorSpace(): ColorSpace {
+    return this.#colorSpace;
   }
 
   /**

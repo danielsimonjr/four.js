@@ -4,6 +4,7 @@ export type {
   ColorGradeEffect,
   CopyEffect,
   EffectRenderPass,
+  OutputTransformEffect,
   ScreenEffect,
   ScreenEffectKind,
   ScreenEffectRenderer,
@@ -11,6 +12,7 @@ export type {
 export {
   COLOR_GRADE_DEFAULTS,
   COPY_EFFECT,
+  OUTPUT_TRANSFORM_EFFECT,
   supportsScreenEffects,
   validateEffectRenderPass,
 } from "./effect-pass.js";

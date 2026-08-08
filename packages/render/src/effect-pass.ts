@@ -50,14 +50,15 @@
  *
  * ## What "the minimal tier" covers, effect by effect (§70)
  *
- * §70 lists ten effects and one composition rule. Two of them need nothing but
- * the source texel — those are shipped; the rest each need a *resource* this
- * renderer does not have yet, and are named with the packet that brings it
- * rather than approximated.
+ * §70 lists ten effects and one composition rule. The ones that need nothing
+ * but the source texel are shipped — the blit, the colour grade, and (since
+ * R-15, 2026-08-08) the sRGB half of §60a's output transform; the rest each
+ * need a *resource* this renderer does not have yet, and are named with the
+ * packet that brings it rather than approximated.
  *
  * | §70 requirement                     | this tier                                                                                                                                                                                                                              |
  * | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
- * | tone mapping                        | **staged** — §60a defines it as the output transform *paired with sRGB encoding*, applied to a linear-light HDR buffer. Every surface here is `rgba8` (R-4's one-member `RenderTargetFormat`) and carries no colour-space metadata, so an operator applied now would compress a range that does not exist and write into a slot §60a says is shared with an encoding this tier cannot perform. Lands with float targets + §60a (R-15). |
+ * | tone mapping                        | **half shipped** (R-15, 2026-08-08) — §60a defines the output transform as tone mapping *followed by sRGB encoding*, and {@link OutputTransformEffect} ships the encoding half as §60a's final render-graph pass. The operator itself stays staged for the reason this row always gave: it compresses an HDR range onto 0…1, every surface here is `rgba8` (R-4's one-member `RenderTargetFormat`), and there is no range to compress. It lands as a *field on that effect* when float targets do. |
  * | color grading                       | **shipped** — {@link ColorGradeEffect}: exposure, contrast, saturation                                                                                                                                                                    |
  * | bloom                               | **staged** — a bright-pass plus a separable blur is three passes over half-resolution surfaces, i.e. §63's *transient target pool*, which R-5 staged for a stated reason (it needs a size/format key and a lifetime analysis)              |
  * | anti-aliasing                       | **staged** — FXAA/SMAA are neighbourhood filters and need the source's texel size and a luma pass; MSAA is a *target* capability (`renderbufferStorageMultisample` plus a resolve blit), staged on R-4                                     |
@@ -162,10 +163,90 @@ export interface ColorGradeEffect {
 }
 
 /**
+ * §60a's **output transform**: the linear-light source encoded as sRGB on the
+ * way to a presentable surface (R-15, 2026-08-08).
+ *
+ * ```ts
+ * graph.addPass("world", { root: scene, views, target: sceneColor });
+ * graph.addPass(
+ *   "present",
+ *   { kind: "effect", source: sceneColor.colorTexture, effect: OUTPUT_TRANSFORM_EFFECT },
+ *   { inputs: ["world"] },
+ * );
+ * ```
+ *
+ * ## Why this is a pass and not a step in every shader
+ *
+ * Because §60a says so, in one sentence: "the output transform — tone mapping
+ * (§68) followed by sRGB encoding — **is the final render-graph pass** (§63)".
+ * The alternative — an encode appended to the unlit, lit, standard, sprite and
+ * particle fragment stages — would encode *five times* into one framebuffer,
+ * make every blend between two draws happen in the wrong space, and multiply
+ * the backend's shader variants by two. As a pass it runs exactly once, after
+ * everything has been composited in linear light, which is the property that
+ * makes the transform correct rather than merely present.
+ *
+ * ## Opt-in, and what that costs (the dated deviation)
+ *
+ * §60a describes the transform as *the* final pass, i.e. always present. Here
+ * it is a pass an application **adds**, and a scene that does not add it renders
+ * exactly the frame it rendered before this existed — byte-identical GL,
+ * byte-identical pixels. That is deliberate (R-15, 2026-08-08): every scene,
+ * example and pixel golden in this repository was authored against an untagged
+ * pipeline whose *output* happened to be its working space, and an
+ * on-by-default encode would relight all of them at once. Making it default is
+ * an owner decision, and the honest sequence is: ship the transform, let a
+ * scene opt in, move the goldens deliberately rather than as a side effect.
+ *
+ * ## Tone mapping is the half that is still staged
+ *
+ * §60a's transform is *tone mapping then encoding*, and this effect performs
+ * the encoding only. The reason is unchanged from R-6 and is a resource, not a
+ * preference: an operator compresses an HDR range onto 0…1, every surface in
+ * this tier is `rgba8` (R-4's one-member {@link RenderTargetFormat}), and there
+ * is no range to compress. When float targets land, tone mapping arrives as a
+ * field on **this** effect — the two halves belong to one pass — rather than as
+ * a sixth member of the union.
+ *
+ * ## What an `rgba8` intermediate costs, stated rather than hidden
+ *
+ * The source of this pass is a linear-light `rgba8` surface, so the frame is
+ * quantized to 256 linear steps *before* it is encoded. sRGB spends more of its
+ * code space on darks than linear does, so re-encoding an 8-bit linear buffer
+ * can band in shadow gradients in a way a directly-encoded framebuffer would
+ * not. The fix is a wider intermediate (`rgba16f`), which is the same staged
+ * {@link RenderTargetFormat} widening tone mapping waits on — not a change to
+ * this pass. Named here because it is the one visible difference between this
+ * tier and a complete §60a pipeline.
+ *
+ * ## The arithmetic, exactly
+ *
+ * Per colour channel, `@four/math`'s `linearToSrgb`: the IEC 61966-2-1
+ * piecewise curve, odd-extended below zero. **Alpha is not encoded** — it is a
+ * coverage fraction, not a light quantity — which is the same rule
+ * `srgbToLinearRGBA` follows on the way in. Nothing is clamped by the effect;
+ * the `rgba8` destination saturates on write, as it does for a grade.
+ */
+export interface OutputTransformEffect {
+  /** Required, and the only value — the discriminant. */
+  readonly kind: "output-transform";
+}
+
+/**
+ * A shared, frozen {@link OutputTransformEffect} — the effect has no parameters
+ * (tone mapping is staged; see its documentation), so one instance serves every
+ * pass and presenting a frame allocates nothing.
+ */
+export const OUTPUT_TRANSFORM_EFFECT: OutputTransformEffect = Object.freeze({
+  kind: "output-transform",
+});
+
+/**
  * One §70 effect, as a closed discriminated union — see the module header for
  * why it is closed and what widening it means.
  */
-export type ScreenEffect = CopyEffect | ColorGradeEffect;
+export type ScreenEffect =
+  CopyEffect | ColorGradeEffect | OutputTransformEffect;
 
 /** {@link ScreenEffect}'s discriminant, for a caller switching over it. */
 export type ScreenEffectKind = ScreenEffect["kind"];
@@ -311,6 +392,41 @@ function validateCoefficient(name: string, value: number | undefined): void {
 }
 
 /**
+ * Runs the §60a checks for an output-transform pass: what it reads must be
+ * linear, and what it writes must not already be encoded.
+ *
+ * This is the whole reason §60a's colour-space metadata exists on a render
+ * target. Both mistakes it catches are invisible in code review and unmistakable
+ * on screen — a double encode washes the frame out, and encoding an already-sRGB
+ * source encodes it twice — and both are *setup*-time facts about which surfaces
+ * the graph wired together, which is exactly what {@link RenderGraph.addPass}
+ * can check before a frame runs.
+ *
+ * The default drawing buffer (`target` absent or `null`) is sRGB by definition —
+ * a browser presents it as sRGB — so it is the expected destination and passes.
+ */
+function validateOutputTransform(pass: EffectRenderPass): void {
+  const source = pass.source.renderTarget;
+  if (source.colorSpace !== "linear") {
+    throw new RangeError(
+      "An output-transform effect encodes a linear-light source, but its " +
+        `source render target is tagged ${JSON.stringify(source.colorSpace)}; ` +
+        "encoding it again would double-encode the frame (§60a, §85).",
+    );
+  }
+  const destination = pass.target ?? null;
+  if (destination !== null && destination.colorSpace !== "srgb") {
+    throw new RangeError(
+      "An output-transform effect writes sRGB-encoded texels, but its " +
+        `destination render target is tagged ` +
+        `${JSON.stringify(destination.colorSpace)}; tag it ` +
+        '`colorSpace: "srgb"`, or present to the drawing buffer by leaving ' +
+        "the pass's target absent (§60a, §85).",
+    );
+  }
+}
+
+/**
  * Checks an {@link EffectRenderPass} against §85, throwing a `RangeError` on
  * the first violation and returning nothing when the pass is well formed.
  *
@@ -318,7 +434,7 @@ function validateCoefficient(name: string, value: number | undefined): void {
  * an application normally meets it; exported because an application that hand
  * -writes `renderer.renderEffect` has no graph to do it (module header).
  *
- * Three things are checked, and deliberately nothing else:
+ * Four things are checked, and deliberately nothing else:
  *
  * 1. **`source` really is a render-target texture** — the marker guard, not the
  *    type, because a JavaScript caller can hand over anything and a backend
@@ -327,7 +443,10 @@ function validateCoefficient(name: string, value: number | undefined): void {
  *    would have rejected, arriving from JSON or from JavaScript;
  * 3. **each declared grading coefficient is finite and non-negative** — a
  *    `NaN` reaching a `uniform3fv` produces an entire black frame with no
- *    error anywhere, which is the failure this function exists to prevent.
+ *    error anywhere, which is the failure this function exists to prevent;
+ * 4. **an output-transform pass reads linear and writes sRGB** — §60a's
+ *    colour-space metadata, checked where a double encode is still a wiring
+ *    mistake rather than a washed-out frame.
  *
  * Not checked: whether the source is disposed, and whether it is the same
  * surface as `target`. Both are *frame*-time facts (a target may be disposed
@@ -351,11 +470,15 @@ export function validateEffectRenderPass(pass: EffectRenderPass): void {
       validateCoefficient("contrast", effect.contrast);
       validateCoefficient("saturation", effect.saturation);
       return;
+    case "output-transform":
+      validateOutputTransform(pass);
+      return;
     default:
       throw new RangeError(
         `Unknown ScreenEffect kind ${JSON.stringify(
           (effect as { kind: unknown }).kind,
-        )}; this tier ships "copy" and "grade" (§70, §85).`,
+        )}; this tier ships "copy", "grade" and "output-transform" ` +
+          "(§70, §60a, §85).",
       );
   }
 }

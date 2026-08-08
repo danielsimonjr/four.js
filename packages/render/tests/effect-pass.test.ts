@@ -26,6 +26,7 @@ import {
   COLOR_GRADE_DEFAULTS,
   COPY_EFFECT,
   NullRenderer,
+  OUTPUT_TRANSFORM_EFFECT,
   RenderTarget,
   supportsScreenEffects,
   validateEffectRenderPass,
@@ -49,6 +50,14 @@ describe("ScreenEffect — the closed union's shared values (§70)", () => {
   it("COPY_EFFECT is a frozen, parameterless copy", () => {
     expect(COPY_EFFECT).toEqual({ kind: "copy" });
     expect(Object.isFrozen(COPY_EFFECT)).toBe(true);
+  });
+
+  it("OUTPUT_TRANSFORM_EFFECT is a frozen, parameterless encode (§60a)", () => {
+    // Parameterless because tone mapping — the other half of §60a's output
+    // transform — is staged on the HDR float targets R-4 named, and lands as a
+    // field on this effect rather than as a sixth union member.
+    expect(OUTPUT_TRANSFORM_EFFECT).toEqual({ kind: "output-transform" });
+    expect(Object.isFrozen(OUTPUT_TRANSFORM_EFFECT)).toBe(true);
   });
 
   it("COLOR_GRADE_DEFAULTS is the identity of all three operations", () => {
@@ -111,6 +120,48 @@ describe("validateEffectRenderPass — the §85 boundary (§70)", () => {
     expect(() => {
       validateEffectRenderPass(pass({ kind: "grade", [name]: value }));
     }).toThrow(new RegExp(`ColorGradeEffect ${name}`));
+  });
+
+  it("accepts an output transform from a linear source to the drawing buffer", () => {
+    // The default case, and the one §60a describes: the last pass of the graph
+    // encodes the composited linear-light frame onto the presentable surface.
+    expect(() => {
+      validateEffectRenderPass(pass(OUTPUT_TRANSFORM_EFFECT));
+    }).not.toThrow();
+  });
+
+  it("accepts an output transform into an sRGB-tagged target", () => {
+    const destination = new RenderTarget({
+      width: 8,
+      height: 8,
+      colorSpace: "srgb",
+    });
+    expect(() => {
+      validateEffectRenderPass({
+        ...pass(OUTPUT_TRANSFORM_EFFECT),
+        target: destination,
+      });
+    }).not.toThrow();
+  });
+
+  it("refuses encoding a source that is already sRGB (§60a double encode)", () => {
+    const source = new RenderTarget({
+      width: 8,
+      height: 8,
+      colorSpace: "srgb",
+    });
+    expect(() => {
+      validateEffectRenderPass(pass(OUTPUT_TRANSFORM_EFFECT, source));
+    }).toThrow(/double-encode/);
+  });
+
+  it("refuses encoding into a linear-tagged target", () => {
+    expect(() => {
+      validateEffectRenderPass({
+        ...pass(OUTPUT_TRANSFORM_EFFECT),
+        target: target(),
+      });
+    }).toThrow(/destination render target is tagged "linear"/);
   });
 
   it("refuses an effect kind outside the closed union", () => {

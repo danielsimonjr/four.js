@@ -64,6 +64,45 @@ describe("RenderTarget — construction and defaults (§61, §85)", () => {
     expect(target.depth).toBe(true);
   });
 
+  it("defaults the colour space to linear and honours an explicit tag (§60a)", () => {
+    // §60a's "render targets carry color-space metadata", at the default this
+    // tier ships: an off-screen surface is an intermediate in a linear-light
+    // pipeline until an author says it is a presentable image (R-15).
+    expect(new RenderTarget({ width: 2, height: 2 }).colorSpace).toBe("linear");
+    expect(
+      new RenderTarget({ width: 2, height: 2, colorSpace: "srgb" }).colorSpace,
+    ).toBe("srgb");
+    expect(
+      new RenderTarget({ width: 2, height: 2, colorSpace: "linear" })
+        .colorSpace,
+    ).toBe("linear");
+  });
+
+  it("reports the target's colour space through the colour texture (§60a)", () => {
+    // One surface, one tag: a material sampling the attachment and the graph
+    // validating an output transform read the same value.
+    const linear = new RenderTarget({ width: 2, height: 2 });
+    const encoded = new RenderTarget({
+      width: 2,
+      height: 2,
+      colorSpace: "srgb",
+    });
+
+    expect(linear.colorTexture.colorSpace).toBe("linear");
+    expect(encoded.colorTexture.colorSpace).toBe("srgb");
+  });
+
+  it("refuses a colour space outside the union (§60a, §85)", () => {
+    expect(
+      () =>
+        new RenderTarget({
+          width: 2,
+          height: 2,
+          colorSpace: "display-p3",
+        } as unknown as { width: number; height: number }),
+    ).toThrow(/RenderTarget colorSpace "display-p3"/);
+  });
+
   it("honours an explicit depth: false", () => {
     expect(new RenderTarget({ width: 2, height: 2, depth: false }).depth).toBe(
       false,

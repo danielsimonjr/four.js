@@ -70,24 +70,36 @@
  * bug, and §68's "environment lighting; image-based lighting" is what changes
  * it.
  *
- * ## Color space (§60a) — the same untagged linear space `LitMaterial` uses
+ * ## Colour space (§60a) — the same linear working space `LitMaterial` uses
  *
- * Every colour here is **plain numbers in the documented range 0…1** with no
- * colour space attached, exactly as `LitMaterial`'s and
- * `UnlitMaterial`'s are: §60a makes the GPU pipeline linear-light and the
- * BRDF multiplies these numbers as-is — so they are *treated* as linear-light —
- * but no tone mapping and no output transform exist anywhere in this engine
- * yet, and tagging a space here would pin half of R-15's design by accident.
- * Values outside 0…1 pass through rather than clamp (the WP-3.3 decision
- * `UnlitMaterial` records), which is also how an HDR emissive is authored
- * today; non-finite values are rejected (§85).
+ * **Superseded 2026-08-08 by R-15.** This block used to read "no colour space
+ * attached … tagging a space here would pin half of R-15's design by accident",
+ * and that deferral is now resolved rather than still open: §60a's working-space
+ * policy is written down (`@four/math`'s `color.ts` module header), and it says
+ * these numbers **are linear-light**. Nothing about the values changed — the
+ * BRDF multiplied them as linear before the policy existed and multiplies them
+ * as linear now — but the space is no longer *untagged*: it is named, and the
+ * one thing it was waiting for, an encode on the way out, exists as
+ * `@four/render`'s `OutputTransformEffect`.
  *
- * That is a deliberate match, not an oversight: the standard and lit pipelines
- * write straight (non-premultiplied) alpha into the same framebuffer with the
- * same absent output transform, so the two families **compose in one scene** —
- * a `StandardMaterial` sphere beside a `LitMaterial` floor is shaded in one
- * space and blended by one rule. When §60a's transform lands it moves both at
- * once.
+ * What is unchanged, and stays: no per-material colour-space field. §60a puts
+ * its metadata on *resources* — textures (§77) and render targets (§63) — and a
+ * material colour is a working-space value by definition, so a tag here would
+ * have exactly one legal value. Values outside 0…1 still pass through rather
+ * than clamp (the WP-3.3 decision `UnlitMaterial` records), which is how an HDR
+ * emissive is authored; non-finite values are still rejected (§85).
+ *
+ * The match with `LitMaterial` is deliberate, not an oversight: the standard and
+ * lit pipelines write straight (non-premultiplied) alpha into the same
+ * framebuffer, so the two families **compose in one scene** — a
+ * `StandardMaterial` sphere beside a `LitMaterial` floor is shaded in one space
+ * and blended by one rule. R-15 moved both at once, as this block promised:
+ * neither family encodes its own output, because §60a makes the transform the
+ * *final render-graph pass*, not a per-material step.
+ *
+ * Tone mapping (§68) is still staged — it is the other half of §60a's output
+ * transform and needs the HDR float targets R-4 staged; `@four/render`'s
+ * `effect-pass.ts` carries the reason.
  *
  * ## Putting one on a node (§49)
  *
@@ -104,18 +116,41 @@
  * list picks the pipeline off the material's own `kind`, never off the node's
  * type (R-13, 2026-08-08).
  *
- * ## CSS colour strings (§59's own example, R-15)
+ * ## CSS colour strings (§59's own example, R-15, 2026-08-08)
  *
- * `baseColor: "#a0a0a0"` does not compile against this class: there is no
- * colour-string parser anywhere in the engine (R-15 owns it), so every colour
- * in this API is a numeric tuple. `new StandardMaterial({ baseColor:
- * [0.627, 0.627, 0.627, 1] })` is §59's example as it is written today.
+ * `baseColor: "#a0a0a0"` still does not compile against this class — but the
+ * parser it needs now exists, and the reason the option is not widened is a
+ * spec citation rather than an absence:
+ *
+ * ```ts
+ * const baseColor: ColorRGBA = [0, 0, 0, 1];
+ * srgbToLinearRGBA(parseColor("#a0a0a0"), baseColor);   // @four/math
+ * new StandardMaterial({ baseColor });                  // §59's example, today
+ * ```
+ *
+ * §60a says a CSS string denotes an **sRGB** value and the pipeline is
+ * linear-light, so a string can never be assigned to a working-space slot
+ * without the decode above. §101's shipped-name mapping then settles where the
+ * decode lives: "Colors are linear RGBA arrays in 0..1 (§60a), **not CSS
+ * strings**". Widening these options to `ColorRGBA | string` contradicts that
+ * row, so R-15 left it to the owner and shipped the two functions that make the
+ * conversion one line (recorded 2026-08-08).
  */
 
-import type { ColorRGBA } from "@four/math";
+import type { ColorRGB, ColorRGBA } from "@four/math";
 
 import { Material, type MaterialOptions } from "./material.js";
 import type { MaterialTexture } from "./texture.js";
+
+/**
+ * Straight RGB, each component nominally in 0…1 — `@four/math`'s
+ * {@link ColorRGB}, re-exported beside `UnlitMaterial`'s `ColorRGBA` (hoisted
+ * 2026-08-08 by R-15's colour packet).
+ *
+ * The type {@link StandardMaterial.emissive} carries, and the type §68's light
+ * colours carry: the colours with no opacity of their own.
+ */
+export type { ColorRGB } from "@four/math";
 
 /**
  * Construction arguments of {@link StandardMaterial} — §59's own parameters,
@@ -263,16 +298,14 @@ export class StandardMaterial extends Material {
    * white, waiting for the tone mapping §60a stages. The array instance is
    * `readonly` for the same reason {@link StandardMaterial.baseColor}'s is.
    *
-   * The tuple is written out rather than given a `ColorRGB` alias: `@four/scene`
-   * already exports one for §68's light colours, `@four/render`'s `SceneLights`
-   * already writes the same tuple inline for the same reason, and the frozen
-   * §3.1 matrix has no edge that would let this package import either. A second
-   * own-definition of that name is what the duplicate-symbol gate exists to
-   * refuse, and refusing it is right — the alias belongs in `@four/math` beside
-   * `ColorRGBA`, hoisted by R-15's colour packet the way `ColorRGBA` itself was
-   * hoisted on 2026-08-04 (recorded 2026-08-08).
+   * The type is {@link ColorRGB} — `@four/math`'s alias, hoisted there
+   * 2026-08-08 by R-15's colour packet exactly as this note asked (the tuple was
+   * written out inline until then, because a second own-definition of the name
+   * is what the duplicate-symbol gate exists to refuse and `@four/scene`'s copy
+   * was unreachable across the frozen §3.1 matrix). `@four/scene`'s `ColorRGB`
+   * is now the same declaration, re-exported.
    */
-  readonly emissive: [red: number, green: number, blue: number];
+  readonly emissive: ColorRGB;
 
   #map: MaterialTexture | null;
 

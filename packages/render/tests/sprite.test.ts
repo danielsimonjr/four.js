@@ -113,6 +113,27 @@ describe("Texture — construction and validation (§77, §85)", () => {
     );
   });
 
+  it("defaults the colour space to linear and honours an explicit tag (§60a)", () => {
+    // The dated deviation from §60a's own default (sRGB for colour textures)
+    // lives on `TextureSource.colorSpace`: opt-in keeps every already-authored
+    // texture, and every pixel golden, byte-identical (R-15, 2026-08-08).
+    expect(new Texture({ width: 1, height: 1 }).colorSpace).toBe("linear");
+    expect(
+      new Texture({ width: 1, height: 1, colorSpace: "srgb" }).colorSpace,
+    ).toBe("srgb");
+  });
+
+  it("rejects a colour space outside the union (§60a, §85)", () => {
+    expect(
+      () =>
+        new Texture({
+          width: 1,
+          height: 1,
+          colorSpace: "rec2020",
+        } as unknown as { width: number; height: number }),
+    ).toThrow(/Texture colorSpace "rec2020"/);
+  });
+
   it("rejects data whose length is not width · height · 4 (§77, §85)", () => {
     expect(
       () => new Texture({ width: 2, height: 2, data: new Uint8Array(15) }),
