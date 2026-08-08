@@ -753,6 +753,61 @@ describe("collisionEnabled (§28)", () => {
     expect(separations[0]).toBeGreaterThan(0.9);
     expect(separations[1]).toBeCloseTo(0.2, 6);
   });
+
+  it("switches contacts on after creation, live (PH-22f)", async () => {
+    const adapter = await createAdapter({ gravity: new Vector2(0, 0) });
+    const anchor = adapter.createBody({ type: "static" });
+    adapter.createCollider({
+      body: anchor,
+      shape: { type: "rectangle", halfExtents: new Vector2(0.5, 0.5) },
+    });
+    const other = boxBody(adapter, 0.2, 0, 0.5, 0.5);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: other,
+      maxLength: 5,
+      collisionEnabled: false,
+    });
+
+    // Overlapping, contacts off: nothing moves.
+    run(adapter, 60);
+    expect(positionOf(adapter, other).x).toBeCloseTo(0.2, 6);
+
+    // `setContactsEnabled` is on Rapier's *base* joint class, so this works on
+    // a rope joint — which has neither limits nor a motor to reconfigure.
+    adapter.setJointCollisionEnabled(joint, true);
+    run(adapter, 120);
+    expect(positionOf(adapter, other).x).toBeGreaterThan(0.9);
+
+    // …and back off again: the box coasts on the velocity the contact gave it
+    // (there is no gravity and no damping here) but stops being *accelerated*,
+    // so its velocity is unchanged across the next second.
+    adapter.setJointCollisionEnabled(joint, false);
+    adapter.getBodyVelocities(other, linear, angular);
+    const coasting = linear.x;
+    run(adapter, 60);
+    adapter.getBodyVelocities(other, linear, angular);
+    expect(linear.x).toBeCloseTo(coasting, 5);
+    adapter.dispose();
+  });
+
+  it("refuses a destroyed joint handle", async () => {
+    const adapter = await createAdapter();
+    const anchor = anchorBody(adapter);
+    const other = disc(adapter, 1, 0, 0.25);
+    const joint = adapter.createJoint({
+      type: "rope",
+      bodyA: anchor,
+      bodyB: other,
+      maxLength: 2,
+    });
+    adapter.destroyJoint(joint);
+    expect(() => {
+      adapter.setJointCollisionEnabled(joint, true);
+    }).toThrowError(/not valid for this Rapier2dAdapter/u);
+    adapter.dispose();
+  });
 });
 
 describe("the joint registry (§33, §37)", () => {

@@ -9,17 +9,21 @@ allocations, loading throughput.
 library — warm up, measure, reduce to order statistics, stamp the host, write one JSON
 record, print a report — extracted unchanged in substance from `particles-100k.mjs`, the
 Phase 9 script that was deliberately written without a framework until there was more than
-one script to design around. There is still no runner and no CI integration: a benchmark
-here is a plain `node` script that imports six small functions.
+one script to design around. A benchmark here is still a plain `node` script that imports a
+handful of small functions; `run-all.mjs` drives all seven of them and is the whole of the
+scheduling. (Until 2026-08-08 this paragraph read _"There is still no runner and no CI
+integration"_; the runner landed with A-27's two CPU benchmarks, and **CI integration is
+still absent** — see [The runner](#the-runner).)
 
 ```sh
 pnpm run build               # every script imports the built dist, not src
+pnpm bench                   # runs all seven, one process each
 node benchmarks/harness.mjs  # prints the suite index and how to run it
 ```
 
 `node benchmarks/harness.mjs` runs nothing; it is the suite's index and the smoke test that
-the module loads. Run the five scripts individually. The whole suite takes about **75 s** on
-the recorded host, dominated by `physics-step.mjs` (~40 s) and `particles-100k.mjs` (~15 s).
+the module loads. The whole suite takes about **77 s** on the recorded host, dominated by
+`physics-step.mjs` (~40 s) and `particles-100k.mjs` (~15 s).
 
 | script                                                                         | what it measures                                                             | §86 row                                                   |
 | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -28,11 +32,15 @@ the recorded host, dominated by `physics-step.mjs` (~40 s) and `particles-100k.m
 | [`physics-step.mjs`](#physics-stepmjs--86s-5-000-active-rigid-bodies)          | Rapier 3D fixed step at 500–5 000 **active** bodies                          | **active rigid bodies: 5 000 simple bodies baseline**     |
 | [`animation-sampling.mjs`](#animation-samplingmjs--17-mixer-sampling)          | `AnimationMixer.advance` over N instances of a 4-track clip                  | none — _animated glyphs_ is a text row, not a mixer row   |
 | [`particles-100k.mjs`](#particles-100kmjs--112s-particle-budget-wp-94-phase-9) | 100 000 CPU particles under a 3-field §27 stack                              | **CPU particles** (at 4× §86's 25 000 baseline, per §112) |
+| [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half)         | `Panel.layout()` over 500–5 000 retained widgets, cold/incremental/warm      | **retained UI nodes: 5 000** — the layout-and-state half  |
+| [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)      | `layoutText` at 1 000–50 000 drawn glyphs per frame                          | **animated glyphs: 20 000** — the layout half             |
 
-Two §86 rows have honest headless numbers today — active rigid bodies and CPU particles —
-and both are **over** the 60 Hz fixed-step budget on this host. §86's clause is _"suitable
-modern desktop hardware"_, which a shared CI container without a GPU is not, so neither
-result is a §86 verdict; see each script's header.
+Four §86 rows have honest headless numbers today — active rigid bodies, CPU particles, and
+the CPU halves of retained UI nodes and animated glyphs. The first two are **over** the
+60 Hz fixed-step budget on this host; the two CPU halves are **inside** a 60 Hz frame on it,
+with the caveat that neither is the whole row. §86's clause is _"suitable modern desktop
+hardware"_, which a shared CI container without a GPU is not, so no result here is a §86
+verdict; see each script's header.
 
 ### The unmeasured §86 rows, and why
 
@@ -43,21 +51,36 @@ a feature the engine does not have**, so there is nothing to measure even on ide
 hardware. The distinction matters when planning work — a **hardware** row becomes a
 benchmark the day it runs on a workstation; a **feature** row needs a packet first.
 
-| §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                    |
-| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 100 000 batched sprites | **feature** | There is no sprite batching. `webgl-renderer.ts` issues one `setModel`/`setQuad`/`setTint` plus one `drawArrays`/`drawElements` **per sprite**; only the program bind and the view-projection upload amortise. The §55 `frame` sub-rectangle that an atlas needs has not landed either (`docs/AUDIT-120.md`, sprites row) |
-| 50 000 batched shapes   | **feature** | There is no shape system to batch. §50's catalogue and §51's `Path` are staged (`docs/AUDIT-120.md` S-4); the shipped 2D geometry is `circleGeometry2D` and `planeGeometry`                                                                                                                                               |
-| mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                     |
-| animated glyphs         | **feature** | §56 ships a bitmap tier whose atlas cannot be addressed per glyph — drawing one cell means cutting it into its own `Texture` (the documented workaround in `examples/first-2d-scene` and `examples/ui-demo`), so a glyph is a texture bind and a draw call. Shaping and SDF are staged (S-6)                              |
-| 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                    |
-| retained UI nodes       | hardware    | `@four/ui` ships and lays out; the row is a rendering-throughput number, so it needs a real GPU rather than SwiftShader                                                                                                                                                                                                   |
-| bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                               |
-| idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                       |
+**Amended 2026-08-08 (A-27).** Two rows below moved. _Retained UI nodes_ read
+_"`@four/ui` ships and lays out; the row is a rendering-throughput number, so it needs a
+real GPU rather than SwiftShader"_ and was filed under **hardware**; that was right about
+the drawing and wrong about the layout, which is pure CPU work and is now measured by
+[`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half). _Animated glyphs_
+keeps its **feature** block for the drawing half and gains a measured layout half in
+[`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half). Both rows are
+**partly** measured — a half-row is stated as a half-row here and in each script's record.
 
-So the honest summary is: one §86 row is gated, three are measured or partly measured, two
-wait on hardware, and four wait on engine features. Measuring the feature-blocked rows
+| §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 100 000 batched sprites | **feature** | There is no sprite batching. `webgl-renderer.ts` issues one `setModel`/`setQuad`/`setTint` plus one `drawArrays`/`drawElements` **per sprite**; only the program bind and the view-projection upload amortise. The §55 `frame` sub-rectangle that an atlas needs has not landed either (`docs/AUDIT-120.md`, sprites row)                                                                                                                     |
+| 50 000 batched shapes   | **feature** | There is no shape system to batch. §50's catalogue and §51's `Path` are staged (`docs/AUDIT-120.md` S-4); the shipped 2D geometry is `circleGeometry2D` and `planeGeometry`                                                                                                                                                                                                                                                                   |
+| mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                                                                                                                                         |
+| animated glyphs         | **half**    | The **layout** half is measured (`text-layout.mjs`): `layoutText` produces the quads on the CPU. The **draw** half stays **feature**-blocked — §56 ships a bitmap tier whose atlas cannot be addressed per glyph, so drawing one cell means cutting it into its own `Texture` (the documented workaround in `examples/first-2d-scene` and `examples/ui-demo`) and a glyph is a texture bind and a draw call. Shaping and SDF are staged (S-6) |
+| 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                                                                                                                                        |
+| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@four/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader, and pays the same per-glyph texture cut as the row above                                                                                                                        |
+| bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                                                                                                                                                   |
+| idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                                                                                                                                           |
+
+So the honest summary is: one §86 row is gated, five are measured or partly measured, one
+waits on hardware, and three wait on engine features. Measuring the feature-blocked rows
 headless today would produce numbers about the wrong thing — a per-sprite draw loop timed
 as if it were a batch is worse than no number.
+
+Counting rows this way is deliberately conservative: a row whose CPU half is measured and
+whose draw half is not is **not** a row §86 can be judged on, and neither `ui-layout.mjs`
+nor `text-layout.mjs` claims otherwise. What changed on 2026-08-08 is that two absences
+stopped being unexamined. The targets are unchanged, and both rows remain unmet as whole
+rows.
 
 ## What a script here is, and is not
 
@@ -89,6 +112,7 @@ A benchmark here **records** numbers. It is never a gate.
 
 | export                                                                   | what it does                                                                                                                                                                                                                                                                             |
 | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUITE`                                                                  | the suite index — `{ file, record, what }` per script, in run order. One list, read by `node harness.mjs` (the printed index) and by `run-all.mjs` (what to run)                                                                                                                         |
 | `measure(iteration, { warmupIterations, measuredIterations, prepare? })` | times each call; returns `{ warmup, measured }` as `Float64Array` milliseconds. `iteration` gets a **globally monotonic index** so a script can derive simulation time from it. `prepare(index)` runs **untimed** before each iteration, for per-iteration setup that is not the subject |
 | `summarize(durations)`                                                   | `{ samples, meanMs, medianMs, p95Ms, p99Ms, minMs, maxMs }`, quantiles by **nearest rank** — every printed number is a duration some iteration actually took                                                                                                                             |
 | `summaryFields(summary, unit)` / `summaryLines(summary, unit)`           | those six statistics as record fields / as report lines                                                                                                                                                                                                                                  |
@@ -102,6 +126,45 @@ A record is `{ _note, benchmark, specification, recordedAt, …the script's own 
 ...hostRecord(), hostCaveat }` — the host block last, because it is the part a reader must
 check before quoting anything above it.
 
+## The runner
+
+`run-all.mjs` (2026-08-08, A-27) runs the suite. It is the smallest thing that deserves the
+name: no configuration, no new dependency, no scheduling beyond a `for` loop.
+
+```sh
+pnpm bench                        # all seven, in SUITE order
+pnpm bench ui-layout text-layout  # a subset, named by record or by filename
+pnpm bench --list                 # what would run, and which record each writes
+```
+
+- **A process per script.** Every benchmark here is a program with top-level side effects,
+  its own warm-up and its own JIT profile. In one process the first script's optimisation
+  would pay for the second's, one script's heap would set another's GC pauses, and one
+  `RangeError` would take the whole run's records with it. ~100 ms of Node start-up buys
+  independence for numbers that are read against each other.
+- **Their stdio is inherited**, so each script prints its own report as it runs. The runner
+  adds a summary and removes nothing.
+- **It asserts on no timing, and its exit code says one thing.** `1` means a script _failed_
+  — a structural assertion tripped, or the build had not been run. (`2` is reserved for the
+  operator's own mistakes: an unknown benchmark name, or a script missing from the index.
+  Those print one line, not a stack trace.) A benchmark that got slower is a finding for a
+  reader; a benchmark that threw is a broken benchmark. Adding a timing threshold here would
+  be the back door this file's doctrine forbids.
+- **`results/suite.json` is a manifest, not a summary.** Which scripts ran, whether each
+  succeeded, wall-clock seconds each, and the `benchmark`/`recordedAt` of the record each
+  wrote. It copies no measurement out of those records: one number in two files is one
+  number that can disagree with itself. `wallSeconds` includes Node start-up, loading the
+  built `dist`, scenario construction and every warm-up, so it is not a measurement of
+  anything under test.
+- **It refuses to start if the tree and `SUITE` disagree** — a `*.mjs` here that no index
+  entry names is a benchmark nobody runs, and therefore nobody maintains.
+
+**There is still no CI integration and no trend.** The gap that filed this work (A-27) also
+asked for a non-gating job on `main` that runs the suite and posts a delta comment; that
+part is unbuilt, so a regression between two commits is still something a person notices by
+reading `git diff` over `results/`, not something the repository tells anyone. Stated here
+rather than left implied.
+
 ## Results
 
 `results/` holds one JSON record per benchmark, **committed** (`.gitignore` does not cover
@@ -113,6 +176,13 @@ that it is a measurement rather than a gate.
 Re-running a script rewrites its record. Committing the rewrite is right when the intent is
 "here is today's measurement on this machine"; committing it silently after moving to a
 different machine is not — the host fields exist so a reader can tell the two apart.
+
+One mechanical constraint, learned the hard way (2026-08-08): committed records are checked
+by **Prettier**, which collapses a short array of scalars onto one line while
+`JSON.stringify(record, null, 2)` expands it — so a field like `[5000]` fails `prettier
+--check` the moment it is written. Prettier leaves objects as it finds them, so a record
+field that maps a few keys to a few numbers must be an **object**, not an array. Arrays of
+long objects (`scenarios`, `attribution`) are unaffected.
 
 ## Scripts
 
@@ -289,3 +359,106 @@ record; the shape of the result, not its exact values, is the durable part):
 The finding is recorded rather than acted on: batching the §27 seam (sampling a lane per
 call, or specialising the common built-ins) is a real optimisation with a real API cost, and
 it belongs to a packet that is scoped to make that trade, not to the packet that measured it.
+
+### `ui-layout.mjs` — §86's 5 000 retained UI nodes (CPU half)
+
+```sh
+node benchmarks/ui-layout.mjs
+```
+
+§86 asks for **5 000 retained UI nodes**. That frame costs two things — laying the tree out
+and drawing it — and `@four/ui`'s frozen dependency matrix (`core`, `math`, `scene`,
+`input`, `text`; no renderer) separates them in the engine, not merely in this file. This
+script measures the layout, which is the whole of what the package does per frame; the draw
+is the application's, goes through a `WidgetSkin`, and is not measurable here.
+
+A flex column of section panels, each a flex row of title label, button with its own caption
+label, checkbox, slider and progress bar, built to **exactly** the requested widget count
+(§86's row is a count, so an approximate tree would answer a different question). Widget
+counts 500 / 1 000 / 2 500 / 5 000, each measured in the three states a real frame produces:
+
+| pass          | invalidated before the pass | stands for                              |
+| ------------- | --------------------------- | --------------------------------------- |
+| `cold`        | every `Label`               | first frame, or a re-themed UI          |
+| `incremental` | 64 `Label`s                 | a normal frame — a few captions changed |
+| `warm`        | nothing                     | a frame where only layout inputs moved  |
+
+Invalidation runs in the harness's **untimed** `prepare` hook, and the two alternating
+caption strings have equal glyph count — so the resolved geometry is identical across all
+three passes, which the script asserts rather than assumes. It also asserts the widget count
+and that every laid-out widget carries §74's `"constraint"` authority: under any other
+authority `applyLayout` warns instead of writing, and the benchmark would be timing the
+refusal path.
+
+The findings, in the shape that outlives a given run (see `results/ui-layout.json` for the
+run under record, and its host block before quoting it):
+
+- **§86's 5 000 widgets lay out inside a 60 Hz frame on this host, and not by much.** A cold
+  pass lands on the order of **10–13 ms** against 16.667 ms, a warm one **8–11 ms**. §86
+  states this row as a count and no rate; 60 Hz is this file's reading of the table's
+  neighbouring rows, said out loud rather than smuggled in.
+- **Layout has no dirty tracking.** `layout()` measures and arranges the whole tree whatever
+  changed — the only memo in the pass is `Label.textLayout`. That is why `warm` is most of
+  `cold`: across the runs recorded so far **text measurement is 15–25 %** of a cold pass, and
+  the rest is a walk §74 performs unconditionally. A dirty-subtree skip is the obvious
+  follow-up and is not in scope here (the same finding `scene-propagation.mjs` records for
+  `resolveWorldTransforms`, in a second subsystem).
+- **State is cheap next to layout.** ~2 100 slider/progress/checkbox writes with their §6b
+  dispatch, no listeners attached, cost on the order of **0.5–0.8 ms** — 250–350 ns a write,
+  and well under a tenth of the layout pass they accompany.
+- **Per-widget cost is not flat**: warm ns/widget rises two- to two-and-a-half-fold between
+  500 and 5 000 widgets. The pass is O(n) by inspection — each widget measured once and arranged once,
+  O(1) work at each — so this is a memory-hierarchy effect on this host rather than an
+  algorithmic term. Recorded, not explained away; `perWidgetCostSpread` carries it.
+- **The noise floor is published from the data.** `incremental` contains `warm` plus 64 text
+  re-measurements, so a row where it measures _faster_ is arithmetically impossible and is
+  this host's run-to-run spread showing through. `inversionRows` names any row where that
+  happened; nothing smaller than that gap is a finding.
+
+### `text-layout.mjs` — §86's 20 000 animated glyphs (CPU half)
+
+```sh
+node benchmarks/text-layout.mjs
+```
+
+§86 asks for **20 000 animated glyphs**. Producing the quads is CPU work `@four/text` does
+today; drawing them is not, and stays blocked on a **feature** rather than on hardware — the
+§56 bitmap atlas cannot be addressed per glyph, so the shipped path cuts one `Texture` per
+glyph cell and issues a draw call each. This script closes the first half and leaves the
+second exactly where it was.
+
+**What "animated" costs, honestly.** A glyph that only _moves_ is laid out **once**: the
+quads are geometry, and animating a node's transform never re-enters `layoutText`. Only text
+whose _content_ changes — a counter, a typewriter, a scrolling log — pays this again. The
+numbers here are therefore the **worst case** for the row, not its normal case, and reading
+them as the price of 20 000 animated glyphs would overstate it.
+
+One iteration is one `layoutText` call per string in the corpus. Corpora are sized by
+**drawn glyphs**, which is what §86 counts — a space advances the pen and emits no quad — and
+each row asserts `quads.length` against the number it claims. `layoutText` is documented pure
+(§33), and the script holds it to that by comparing a probe quad across the whole run.
+
+The findings:
+
+- **20 000 glyphs lay out in roughly 2 ms** on this host — comfortably inside a 60 Hz frame,
+  at about **95–120 ns per drawn glyph**, and flat from 5 000 glyphs to 50 000.
+- **The per-call cost matters at small strings.** Holding the glyph count at 20 000 and
+  varying the string length from 1 to 200 characters, `total ≈ calls · perCall + glyphs ·
+perGlyph` fits with **perCall on the order of 120–140 ns** and perGlyph as above. So 20 000
+  one-glyph labels cost more than twice what 100 paragraphs of the same text do. The two
+  terms are fitted from the two extreme rows and `modelResidual` records how far that misses
+  the rows it did not see — published so the split reads as a description of the data rather
+  than a claim about it.
+- **Most of a glyph is allocate-and-freeze, not arithmetic.** `layoutText` allocates and
+  `Object.freeze`s one `TextQuad` per drawn glyph, plus a frozen array and a frozen result
+  per call: 20 000 frozen objects per frame at §86's count. A control row — 20 000 plain
+  object literals of the same eight numeric fields, created and frozen in the benchmark
+  itself, touching no engine code — costs **on the order of 80–90 % of the whole 20 000-glyph
+  row**. That is an upper bound rather than a split (the control writes constants where
+  `layoutText` computes coordinates), and it is where a future optimisation would have to
+  look: a flat `Float32Array` of quad coordinates, not faster arithmetic. Unlike §7b's math
+  types this path is not allocation-free and is not required to be — the quads _are_ the
+  return value.
+- **Building the atlas is setup, and is timed as such**: `buildGlyphAtlas()` on the built-in
+  6 × 12 face costs a couple of milliseconds once, and is deliberately excluded from every
+  throughput number above.

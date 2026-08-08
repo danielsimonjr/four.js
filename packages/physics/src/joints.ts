@@ -53,13 +53,13 @@
  *
  * ## What may change after registration (decision, WP-6.1)
  *
- * | Property                          | After registration                    |
- * | --------------------------------- | ------------------------------------- |
- * | `limits` (hinge, slider)          | {@link HingeJoint.setLimits}, queued  |
- * | `motor` (hinge, slider)           | {@link HingeJoint.setMotor}, queued   |
- * | `breakForce` / `breakTorque`      | free — the engine enforces them       |
- * | anchors, axis, rope, spring, cone | **frozen**; remove and re-add         |
- * | `collisionEnabled`                | **frozen**; remove and re-add         |
+ * | Property                          | After registration                              |
+ * | --------------------------------- | ----------------------------------------------- |
+ * | `limits` (hinge, slider)          | {@link HingeJoint.setLimits}, queued            |
+ * | `motor` (hinge, slider)           | {@link HingeJoint.setMotor}, queued             |
+ * | `collisionEnabled`                | plain setter, queued (PH-22f, 2026-08-08)       |
+ * | `breakForce` / `breakTorque`      | free — the engine enforces them                 |
+ * | anchors, axis, rope, spring, cone | **frozen**; remove and re-add                   |
  *
  * Limits and motors are the two things §28's own example makes live ("limit
  * switches", a motor commanded to a new speed), and both are reconfigurable in
@@ -67,13 +67,42 @@
  * drains into `SolverJointAccess` at the next fixed step — the same
  * commands-not-mutations rule §26 imposes on forces, and for the same reason:
  * the solver may be mid-step and §6b forbids physics work during dispatch.
+ * `collisionEnabled` joined them once the seam was checked property by property
+ * rather than in bulk.
  *
- * The frozen half is frozen because changing it is not reconfiguration but a
- * different joint: no adapter here can re-anchor or re-axis a live constraint,
- * and a setter that silently did nothing would be worse than no setter. Those
- * properties throw a `FourError` once the joint is registered, naming the
- * remove-and-re-add route (staged, 2026-08-01 — revisit if WP-6.2/6.3 find that
- * Rapier's `setAnchor1`/`setAnchor2` are honest enough to expose).
+ * ## Why the rest stays frozen — measured, 2026-08-08 (PH-22f)
+ *
+ * The 2026-08-01 staging note said "no adapter here can re-anchor or re-axis a
+ * live constraint" and asked for a revisit. The revisit happened, against the
+ * installed Rapier 0.19.3 typings and prototypes:
+ *
+ * | §28 property         | Rapier 0.19.3                                          | Verdict     |
+ * | -------------------- | ------------------------------------------------------ | ----------- |
+ * | `collisionEnabled`   | `ImpulseJoint.setContactsEnabled` — every type, both 2D/3D | **live**    |
+ * | anchors              | `ImpulseJoint.setAnchor1` / `setAnchor2` exist          | staged (see below) |
+ * | axis                 | no setter on any `ImpulseJoint` subclass                | frozen      |
+ * | rope `maxLength`     | `RopeImpulseJoint` declares no members at all           | frozen      |
+ * | spring rest/stiffness/damping | `SpringImpulseJoint` declares no members at all | frozen      |
+ * | spherical swing cone | `SphericalImpulseJoint` declares no members at all      | frozen      |
+ *
+ * So the blanket statement was wrong for exactly two rows.
+ * `collisionEnabled` is closed above. **Anchors are staged deliberately, not
+ * for lack of a setter**: this module converts world-space anchors to
+ * body-local frames *once, against the poses at `addJoint`* (see the section
+ * above), and a live `setAnchors` has to answer which poses a re-anchor is
+ * measured against — the poses now, or the poses the joint was built with.
+ * That is a semantic decision, not a binding, and the two answers give
+ * different mechanisms. It belongs to whichever packet also decides whether
+ * §28 wants a body-local anchor API; until then `anchorA`/`anchorB` stay
+ * `readonly`, and remove-and-re-add is the route.
+ *
+ * The frozen rows are frozen because changing them is not reconfiguration but a
+ * different joint, and a setter that silently did nothing would be worse than
+ * no setter. They are `readonly` **class fields**, so writing one is a compile
+ * error rather than a runtime rejection — a failure at the earliest moment it
+ * can be had. (Until PH-22f, `collisionEnabled` was the sole exception: a
+ * mutable property with a runtime throw. Making it live retired both the throw
+ * and the `#requireUnregistered` guard that existed only for it.)
  *
  * ## Breakage (plan P6-2)
  *
@@ -184,12 +213,18 @@ export interface JointCommands {
   readonly limitsDirty: boolean;
   /** Whether the motor changed and has not reached the solver yet. */
   readonly motorDirty: boolean;
+  /**
+   * Whether `collisionEnabled` changed and has not reached the solver yet
+   * (PH-22f, 2026-08-08).
+   */
+  readonly collisionDirty: boolean;
 }
 
 /** The writable face of {@link JointCommands}; module-private by design. */
 interface MutableJointCommands {
   limitsDirty: boolean;
   motorDirty: boolean;
+  collisionDirty: boolean;
 }
 
 /**
@@ -284,6 +319,7 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
   readonly #commands: MutableJointCommands = {
     limitsDirty: false,
     motorDirty: false,
+    collisionDirty: false,
   };
 
   /**
@@ -320,16 +356,33 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
   // --- shared state ---------------------------------------------------------
 
   /**
-   * Whether the two bodies still collide with each other (§28). Frozen once the
-   * joint is registered — see the module header.
+   * Whether the two bodies still collide with each other (§28).
+   *
+   * **Live since PH-22f (2026-08-08).** Setting it on a registered joint
+   * queues the change, exactly as {@link HingeJoint.setLimits} does, and the
+   * world drains it into `SolverJointAccess.setJointCollisionEnabled` at the
+   * top of the next fixed step (§26's commands-not-mutations rule — the solver
+   * may be mid-step, and §6b forbids physics work during dispatch). Writing
+   * the value it already holds queues nothing.
+   *
+   * It is the *only* one of §28's frozen properties that became live, because
+   * it is the only one every shipped solver can change: Rapier's base
+   * `ImpulseJoint.setContactsEnabled` exists for every joint type in both
+   * dimensions, where the anchors, axis, rope length, spring terms and swing
+   * cone have no setter at all — see the module header's table.
    */
   get collisionEnabled(): boolean {
     return this.#collisionEnabled;
   }
 
   set collisionEnabled(value: boolean) {
-    this.#requireUnregistered("collisionEnabled");
+    if (value === this.#collisionEnabled) {
+      return;
+    }
     this.#collisionEnabled = value;
+    if (this.registered) {
+      this.#commands.collisionDirty = true;
+    }
   }
 
   /**
@@ -442,17 +495,6 @@ export abstract class Joint extends EventEmitter<JointEventMap> {
    */
   dispose(): void {
     this.removeAllListeners();
-  }
-
-  #requireUnregistered(property: string): void {
-    if (this.id === undefined) {
-      return;
-    }
-    throw new FourError(
-      JOINT_ERROR_CODE,
-      `${this.type} joint: ${property} cannot change once the joint is registered — no adapter here can re-anchor a live constraint (§28; staged 2026-08-01, WP-6.1). Call world.removeJoint(joint) and add a new joint instead.`,
-      { context: { type: this.type, property, id: this.id } },
-    );
   }
 }
 
@@ -1002,6 +1044,7 @@ export function clearJointCommands(joint: Joint): void {
   const commands = joint.commands as MutableJointCommands;
   commands.limitsDirty = false;
   commands.motorDirty = false;
+  commands.collisionDirty = false;
 }
 
 /**

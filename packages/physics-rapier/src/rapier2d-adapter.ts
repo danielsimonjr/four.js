@@ -104,9 +104,9 @@ import {
   resolveSleepingConfig,
   sortHitsByDistance,
   validateColliderDescriptor,
-  validateCollisionShape,
   validateJointDescriptor,
   validatePhysicsWorldOptions,
+  validateQueryShape,
   validateRigidBodyDescriptor,
 } from "@four/physics";
 import type {
@@ -265,14 +265,18 @@ const RAPIER_2D_JOINT_TYPES = [
  *   in an envelope that carries this adapter's registry too.
  * - `queries` — all four are implemented on Rapier's query entry points. See
  *   {@link Rapier2dAdapter.shapeCast} for the one multiplicity limit.
- * - `tuning` — **all three `false`** (2026-08-06). §25's `rollingFriction` and
+ * - `tuning` — **all four `false`** (2026-08-06; the fourth added 2026-08-08).
+ *   §25's `rollingFriction` and
  *   `spinningFriction` have no binding in the 2D 0.19.3 build, and neither do
  *   §32's three sleeping thresholds (`IntegrationParameters` carries no
  *   sleeping member at all — enumerated at runtime, and the reason
  *   {@link Rapier2dAdapter.initialize}'s header says so). The declaration is
  *   what turns those from *accepted and dropped* into a warning `PhysicsWorld`
  *   prints once per world; `SleepingConfig.enabled` is honoured and is
- *   deliberately not part of it.
+ *   deliberately not part of it. `jointMotorEffortCap: false` is the odd one
+ *   out (PH-22e): §28's `maxTorque`/`maxForce` is *not* dropped here, it is
+ *   applied as a `ForceBased` strength gain rather than the hard ceiling §28
+ *   describes — see {@link Rapier2dAdapter.setJointMotor}.
  */
 const RAPIER_2D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
   dimensions: Object.freeze<PhysicsDimension[]>([ADAPTER_DIMENSION]),
@@ -290,6 +294,7 @@ const RAPIER_2D_CAPABILITIES: PhysicsCapabilities = Object.freeze({
     rollingFriction: false,
     spinningFriction: false,
     sleepThresholds: false,
+    jointMotorEffortCap: false,
   }),
 });
 
@@ -1022,9 +1027,12 @@ export class Rapier2dAdapter
   /**
    * Creates a collider on `desc.body` (§37, §24, §25).
    *
-   * The plan P5-6 2D tier — circle, rectangle, capsule, convex polygon — maps to
-   * `ColliderDesc.ball`, `.cuboid`, `.capsule`, and `.convexHull`; see
-   * `conversions2d.ts` for the capsule axis and the polygon winding rule.
+   * The full §24 2D shape list — circle, rectangle, capsule, convex polygon,
+   * polyline, chain — maps to `ColliderDesc.ball`, `.cuboid`, `.capsule`,
+   * `.convexHull`, and `.polyline` (twice, with different index buffers); see
+   * `conversions2d.ts` for the capsule axis, the polygon winding rule, and the
+   * open-versus-closed segment run. §24's `compound` is several colliders on
+   * one body, which needs nothing here (PH-22a).
    *
    * Friction and restitution come from the explicit fields, then the material,
    * then `@four/physics`'s defaults. Their **combine rules** are set to
@@ -1523,7 +1531,7 @@ export class Rapier2dAdapter
   shapeCast(query: ShapeCastQuery): ShapeCastHit[] {
     const world = this.#requireWorld();
     const options = resolveQueryOptions(query);
-    validateCollisionShape(query.shape, ADAPTER_DIMENSION);
+    validateQueryShape(query.shape, ADAPTER_DIMENSION);
 
     const position = toRapierVector2(
       "position",
@@ -1593,7 +1601,7 @@ export class Rapier2dAdapter
   overlap(query: OverlapQuery): OverlapHit[] {
     const world = this.#requireWorld();
     const options = resolveQueryOptions(query);
-    validateCollisionShape(query.shape, ADAPTER_DIMENSION);
+    validateQueryShape(query.shape, ADAPTER_DIMENSION);
 
     const position = toRapierVector2(
       "position",
@@ -2413,6 +2421,21 @@ export class Rapier2dAdapter
    */
   setJointMotor(handle: PhysicsJointHandle, motor: SolverJointMotor): void {
     this.#applyJointMotor(this.#requireJoint(handle), motor);
+  }
+
+  /**
+   * Turns contact generation between the two joined bodies on or off, live
+   * (§28 `collisionEnabled`; PH-22f, 2026-08-08).
+   *
+   * `ImpulseJoint.setContactsEnabled` is on Rapier's **base** joint class, so
+   * unlike `setLimits` and the motor configuration it works for every §28 type
+   * this adapter builds — which is why this is the one §28 property that could
+   * stop being frozen. It is the same call `createJoint` makes, so a joint
+   * created with contacts on and a joint switched to contacts on cannot drift
+   * apart.
+   */
+  setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void {
+    this.#requireJoint(handle).joint.setContactsEnabled(enabled);
   }
 
   /** @inheritDoc */

@@ -8,17 +8,39 @@
  * surface size ({@link Application.resize}), and — optionally — a §61 renderer,
  * wired together and re-emitting the §10 main-loop events.
  *
- * **`app.input`, `app.assets`, `app.diagnostics` and `app.physics` are still
- * absent, and that is now a gap rather than a schedule** (2026-08-06, A-6;
- * `app.stats` was in this list until 2026-08-07, when A-1 added it — see
- * {@link Application.stats}). The note that stood here said they "arrive with
- * the phases that build them (§103)"; those phases have all landed — Phase 11
- * built `@four/assets`, `@four/ui` and `@four/serialization` and wired none of
- * them in — so the sentence pointed at a future that no longer exists. What
- * remains true is the reason the options are absent rather than accepted and
- * ignored: a program that sets `physics: {…}` today fails to compile instead of
- * silently simulating nothing. Every example still hand-wires `PointerInput`
- * and `AssetManager`; closing that is A-6's own packet.
+ * ## What §45 names, and where each of its members stands (A-6, 2026-08-08)
+ *
+ * The note that stood here through 2026-08-07 said the missing systems "arrive
+ * with the phases that build them (§103)", and then — once every phase had
+ * landed — that their absence was a gap. A-6 is that gap, closed member by
+ * member. §45's sentence is that the Application "owns the default scene,
+ * renderer, time system, simulation scheduler, input routing, assets,
+ * diagnostics, cameras, and viewports", and its `ApplicationOptions` block
+ * lists thirteen options. This is where each one ended up:
+ *
+ * | §45 names | here |
+ * | --- | --- |
+ * | scene, scheduler, time, cameras/viewports | {@link Application.scene}, {@link Application.scheduler}, {@link Application.time}, {@link Application.views} |
+ * | `renderer`, `antialias`, `canvas`, `width`/`height`/`resolution` | R-2/A-8 and A-7, 2026-08-07 |
+ * | `fixedTimeStep`, `maximumSubSteps` | the scheduler's, from construction |
+ * | `physics` | {@link Application.physics} — a world, stepped at §39 step 6 |
+ * | assets | {@link Application.assets} — §76's `app.assets.load(…)` |
+ * | `autoResize` | {@link ApplicationOptions.autoResize}, through an injected {@link SurfaceObserver} |
+ * | `reducedMotion` | {@link Application.reducedMotion} — §75's application-level policy |
+ * | diagnostics | {@link Application.stats}, §84's named surface (A-1) |
+ * | `alpha`, `powerPreference` | **refused**: `RendererOptions` (§61) carries neither, so accepting them would store values no backend reads |
+ * | input routing | **refused**: see {@link ApplicationOptions.physics}'s neighbours below and the note under `assets` |
+ *
+ * The two refusals are the §40 precedent, not oversights: this repository does
+ * not invent an API the specification declines to write. `alpha` and
+ * `powerPreference` have nowhere to go. `app.input` has no shape — §45 names
+ * "input routing" in prose, `ApplicationOptions` lists no input option, and no
+ * example anywhere in the specification reads `app.input.*`, while `@four/input`
+ * exposes two coequal subsystems (`PointerInput`, `KeyboardInput`) plus §75's
+ * focus traversal; electing one of them to *be* `app.input` would be writing the
+ * API §45 chose not to. `app.diagnostics` is the same case with one extra fact:
+ * §84's application surface is spelled `app.stats` in the specification's own
+ * example, and it ships.
  *
  * ## Why the composition root lives here
  *
@@ -103,8 +125,11 @@ import {
   monotonicNowSeconds,
   recordRenderStatistics,
   recordResourceMemory,
+  recordSolverStatistics,
   resetFrameStats,
+  solverStatistics,
   type FrameStats,
+  type SolverStatistics,
 } from "@four/diagnostics";
 // The one value this module takes from `@four/geometry` (A-5, 2026-08-07):
 // `geometryMemoryBytes` is a two-line reader over `resource-memory.ts`'s
@@ -116,12 +141,23 @@ import { geometryMemoryBytes } from "@four/geometry";
 import {
   DEFAULT_FIXED_DELTA_TIME,
   DEFAULT_MAXIMUM_SUB_STEPS,
+  PRIORITY_PHYSICS_SOLVE,
   Scheduler,
   SystemRegistry,
   type Detach,
   type ReadonlyTimeState,
+  type SimulationSystem,
 } from "@four/motion";
 import type { DepthRange } from "@four/math";
+// Type-only, for the reason the `Renderer` import below is type-only, and with
+// more at stake: `@four/physics` is a solver-facing package, and a program that
+// draws a user interface must not carry a rigid-body world because the
+// composition root can *accept* one. A world therefore arrives here already
+// constructed — as an instance, or from the {@link PhysicsWorldFactory} this
+// class calls — and the emitted JavaScript of this module names neither
+// `PhysicsWorld` nor `AssetManager`.
+import type { AssetManager } from "@four/assets";
+import type { PhysicsWorld } from "@four/physics";
 import {
   PerspectiveCamera,
   PoseBuffer,
@@ -189,12 +225,90 @@ export interface ApplicationEventMap {
 }
 
 /**
+ * What a {@link PhysicsWorldFactory} is handed (§43, §45).
+ *
+ * One member, and it is the whole reason the factory form exists: a
+ * `PhysicsWorld` takes its {@link PoseBuffer} at construction and the
+ * application's buffer does not exist until the application does. A world built
+ * *before* the `Application` can never be given `app.poses`, so it can never
+ * auto-track its bodies for §43 render interpolation — the engine's headline
+ * physics-to-render path. Inverting the construction closes that ordering.
+ */
+export interface PhysicsWorldContext {
+  /** {@link Application.poses} — pass it to `new PhysicsWorld({ poses })`. */
+  readonly poses: PoseBuffer;
+}
+
+/**
+ * Builds the world {@link ApplicationOptions.physics} attaches, given the
+ * application's own §43 pose buffer.
+ *
+ * ```ts
+ * const app = new Application({
+ *   physics: ({ poses }) =>
+ *     new PhysicsWorld({ dimension: "3d", adapter: new Rapier3dAdapter(), poses }),
+ * });
+ * ```
+ *
+ * Called **once**, synchronously, from the constructor — so
+ * {@link Application.physics} is readable immediately, exactly as
+ * {@link Application.scene} is. A world built this way exists because the
+ * application asked for it, so the application disposes it (§83); see
+ * {@link Application.dispose}.
+ */
+export type PhysicsWorldFactory = (
+  context: PhysicsWorldContext,
+) => PhysicsWorld;
+
+/**
+ * What a {@link SurfaceObserver} reports: the surface's new size in logical
+ * pixels, and optionally its new device-pixel ratio.
+ *
+ * The arguments are {@link Application.resize}'s, because that is what the
+ * observer's report becomes.
+ */
+export type SurfaceResize = (
+  width: number,
+  height: number,
+  resolution?: number,
+) => void;
+
+/**
+ * The §45 `autoResize` seam: subscribes `onResize` to the host's surface-size
+ * changes and returns the unsubscribe.
+ *
+ * A function the host supplies rather than a `ResizeObserver` this package
+ * constructs — the discipline `PointerInput` uses for `PointerSurface` and this
+ * class already uses for {@link ApplicationOptions.now}. `four/application`
+ * compiles with no DOM lib and must run in Node, in a worker, and in a headless
+ * test, so it names no DOM type; in a browser the whole adapter is five lines:
+ *
+ * ```ts
+ * const app = new Application({
+ *   canvas,
+ *   renderer: new WebglRenderer(),
+ *   surfaceObserver: (onResize) => {
+ *     const observer = new ResizeObserver(([entry]) => {
+ *       const box = entry.contentRect;
+ *       onResize(box.width, box.height, devicePixelRatio);
+ *     });
+ *     observer.observe(canvas);
+ *     return () => { observer.disconnect(); };
+ *   },
+ * });
+ * ```
+ *
+ * The returned function is called exactly once, by {@link Application.dispose}
+ * (§83: what the application subscribed, the application unsubscribes). It must
+ * be safe to call after the surface itself has gone.
+ */
+export type SurfaceObserver = (onResize: SurfaceResize) => () => void;
+
+/**
  * The current subset of §45's `ApplicationOptions`.
  *
- * §45's remaining options (`alpha`, `powerPreference`, `autoResize`,
- * `reducedMotion`, `physics`) belong to subsystems that do not exist yet; each
- * option is added by the packet that builds its subsystem. Omitted numeric
- * options take the Appendix A normative defaults.
+ * §45 lists thirteen options; eleven of them ship. Omitted numeric options take
+ * the Appendix A normative defaults.
  *
  * `antialias` landed with the §62 selection packet (R-2/A-8, 2026-08-07), for
  * the reason its TODO gave: it is a *device-selection* option only a backend
@@ -202,10 +316,13 @@ export interface ApplicationEventMap {
  * backend. `alpha` and `powerPreference` are still absent because
  * `RendererOptions` (§61) does not carry them — accepting them here would mean
  * storing values no backend ever reads, which is the accept-and-ignore this
- * repository refuses. `autoResize` needs a `ResizeObserver` on a canvas the
- * host owns, so it arrives as an injected observer factory — the discipline
- * `PointerInput` uses for `PointerSurface` — rather than as a DOM reference in
- * this file.
+ * repository refuses.
+ *
+ * Three options here are **seams rather than settings** — `now`,
+ * {@link ApplicationOptions.surfaceObserver}, and
+ * {@link ApplicationOptions.reducedMotionSource}. Each is the host object this
+ * package refuses to name, handed in as a function; each is read only by the
+ * §45 option it serves, and never at all when that option is off.
  */
 export interface ApplicationOptions {
   /**
@@ -458,6 +575,149 @@ export interface ApplicationOptions {
    * reports milliseconds must divide.
    */
   now?: () => number;
+
+  /**
+   * The §20/§37 world this application simulates (§45), or `false` (the
+   * default) for an application with no physics at all.
+   *
+   * Two forms, and which one you use decides who owns the world (§83):
+   *
+   * ```ts
+   * // The factory form. The application constructs the world, so it disposes it.
+   * const app = new Application({
+   *   physics: ({ poses }) =>
+   *     new PhysicsWorld({ dimension: "3d", adapter: new Rapier3dAdapter(), poses }),
+   * });
+   * await app.initialize();          // awaits world.initialize() too
+   * app.physics?.addBody(node);
+   * ```
+   *
+   * ```ts
+   * // The instance form. You constructed it, so you dispose it.
+   * const world = new PhysicsWorld({ dimension: "2d", adapter });
+   * const app = new Application({ physics: world });
+   * ```
+   *
+   * ## Why a world and not §45's `PhysicsWorldOptions`
+   *
+   * §45 spells this option `PhysicsWorldOptions | false`, which would have this
+   * class call `new PhysicsWorld(…)` and `new <solver>Adapter(…)` — and that is
+   * the renderer's deferred string form again, with more at stake (R-2/A-8, and
+   * MEMORY 2026-08-01). `four/application` would import `@four/physics`
+   * statically, so **every** program that composes an application — the headless
+   * ones, the determinism harness, the user-interface examples — would carry a
+   * rigid-body world it never constructs. The renderer answer was a registry the
+   * backend opts into; `@four/physics` has the same registry for solvers
+   * (`registerSolver`, PH-19), but the world class itself has no such front
+   * door, so the honest form today is the one §45's own closing sentence
+   * requires anyway: "the application must permit advanced users to construct
+   * and own these systems independently."
+   *
+   * ## What the application does with it
+   *
+   * 1. **Registers one {@link @four/motion!SimulationSystem | SimulationSystem}** at
+   *    `PRIORITY_PHYSICS_SOLVE` (§39 step 6) that calls `world.step(fixedDeltaTime)`
+   *    and then `world.dispatchEvents()` — the two passes, in the order
+   *    `PhysicsSystem` runs them for a single world. This class cannot construct a
+   *    `PhysicsSystem` (that is a runtime import of `@four/physics`, see above),
+   *    so it registers the equivalent; **do not also track this world in a
+   *    `PhysicsSystem`**, which would step it twice per fixed step and advance
+   *    the simulation at double rate (§10, §34).
+   * 2. **Initializes it** from {@link Application.initialize}, when
+   *    `world.initialized` is still false — a WebAssembly solver loads its module
+   *    there (§37), which is why that call is asynchronous.
+   * 3. **Measures it**, when {@link ApplicationOptions.stats} is on: §84's
+   *    `physicsStepTime` and `activeBodies`. See {@link Application.stats}.
+   * 4. **Disposes it only if it built it** — the factory form. See
+   *    {@link Application.dispose}.
+   */
+  physics?: PhysicsWorld | PhysicsWorldFactory | false;
+
+  /**
+   * The §76 asset manager this application publishes as
+   * {@link Application.assets}.
+   *
+   * ```ts
+   * const app = new Application({ assets: new AssetManager() });
+   * const { robot } = await app.assets!.load({ robot: "/models/robot.glb" });
+   * ```
+   *
+   * §45's prose says the Application owns assets and §76's example reads
+   * `app.assets.load(…)`, but §45's option block lists no `assets` option and
+   * `AssetManager` takes host seams of its own (`fetch`, a timer, §96 limits),
+   * so it arrives here constructed — the same rule as
+   * {@link ApplicationOptions.renderer}'s instance form. Constructing a default
+   * one would also make `four/application` import `@four/assets` in every
+   * bundle, which is the cost the whole file is written to avoid.
+   *
+   * Held, not driven: nothing in the frame loop touches it, and
+   * {@link Application.dispose} leaves it alone (§83 — you constructed it, you
+   * dispose it, exactly as with the renderer).
+   */
+  assets?: AssetManager;
+
+  /**
+   * Whether the application resizes itself when the host reports a new surface
+   * size (§45, §48).
+   *
+   * Defaults to `true` when {@link ApplicationOptions.surfaceObserver} is
+   * supplied and `false` otherwise, so there is no way to be quietly wrong: an
+   * observer is never accepted-and-ignored, and `autoResize: true` without one
+   * throws at construction rather than silently never resizing. Pass
+   * `autoResize: false` alongside an observer to keep it unsubscribed (a program
+   * that owns its own resize policy but shares its options object).
+   *
+   * When on, every report becomes an {@link Application.resize} call with the
+   * host's numbers — so the renderer's drawing buffer and every full-surface
+   * perspective camera follow the surface, with the same validation an explicit
+   * `resize` gets. The subscription is made in the constructor, because a window
+   * resizes whether or not a frame is running, and released by
+   * {@link Application.dispose}.
+   */
+  autoResize?: boolean;
+
+  /**
+   * The host seam {@link ApplicationOptions.autoResize} subscribes to — a
+   * `ResizeObserver` in a browser, and this package names no DOM type. See
+   * {@link SurfaceObserver} for the five-line browser adapter.
+   */
+  surfaceObserver?: SurfaceObserver;
+
+  /**
+   * §75's reduced-motion policy, read back as {@link Application.reducedMotion}.
+   *
+   * `"auto"` (the default, Appendix A) follows the platform preference through
+   * {@link ApplicationOptions.reducedMotionSource}; `true` and `false` override
+   * it outright, and the source is then never called. §75 makes this an
+   * *application-level* policy precisely so that one answer serves `@four/ui`'s
+   * widgets and §14's opt-in animation consultation, rather than each of them
+   * asking the platform separately.
+   */
+  reducedMotion?: "auto" | boolean;
+
+  /**
+   * The platform preference `reducedMotion: "auto"` consults — in a browser,
+   * `matchMedia("(prefers-reduced-motion: reduce)")`:
+   *
+   * ```ts
+   * const query = matchMedia("(prefers-reduced-motion: reduce)");
+   * const app = new Application({ reducedMotionSource: () => query.matches });
+   * ```
+   *
+   * A function rather than a media-query object, for the reason
+   * {@link ApplicationOptions.now} is a function: this package names no host
+   * type, and a host with an exotic preference store (a settings file, a URL
+   * parameter, a test) is then not a special case. It is called on **every**
+   * {@link Application.reducedMotion} read and never cached, so a user who
+   * changes the preference mid-session is honoured without this class
+   * subscribing to anything; hoist the query object, as above, and the read is a
+   * property access.
+   *
+   * Absent, `"auto"` resolves to `false` — "the platform reported no
+   * preference", which is §75's safe answer and the one a host with no notion of
+   * the setting should get.
+   */
+  reducedMotionSource?: () => boolean;
 }
 
 /**
@@ -601,12 +861,22 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * `@four/diagnostics`.
    *
    * **A field reading `NaN` was not measured this frame**, as distinct from a
-   * `0` that was measured. Three of §84's eleven counters have no producer
-   * anywhere in this repository (`gpuFrameTime`, `physicsStepTime`,
-   * `contacts`), and a fourth, `activeBodies`, has one
-   * (`recordSolverStatistics`) that nothing *here* can call: this class owns no
-   * physics world, which is A-6's `app.physics`. Until it does, an application
-   * with a solver fills that field itself, from a fixed-step listener.
+   * `0` that was measured. `physicsStepTime` and `activeBodies` joined the
+   * measured set with A-6's {@link Application.physics} (2026-08-08) and are
+   * filled **only when a world is attached** — the first is seconds inside
+   * `world.step` summed over the frame's fixed steps, the second §32's awake
+   * count after the frame. Two of §84's eleven counters still have no producer
+   * anywhere in this repository:
+   *
+   * - `gpuFrameTime` needs the GPU timestamp queries §62's capabilities do not
+   *   report yet;
+   * - `contacts` has no reader at all. `PhysicsWorld` publishes contact
+   *   *events* (§29's `collisionstart`/`collisionend`) and no live manifold
+   *   count, and counting the events of a step — or differencing begin against
+   *   end to keep a running pair total — would report something other than the
+   *   number §84 asks for, which is the accept-and-ignore this file refuses. It
+   *   arrives when the solver seam reports it (§37), from `@four/physics`.
+   *
    * `textureMemory` and `bufferMemory` joined the measured set with A-5's §83
    * resource accounting (2026-08-07); they are **levels** — the bytes every
    * live geometry, texture, and render target in the process holds at the end
@@ -631,8 +901,66 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   readonly stats: FrameStats | null;
 
+  /**
+   * The §76 asset manager this application was given, or `null` (§45, §76).
+   *
+   * ```ts
+   * const { icon } = await app.assets!.load({ icon: "/images/icon.png" });
+   * ```
+   *
+   * Constructed by the application author and merely published here; see
+   * {@link ApplicationOptions.assets}. Nothing in the frame loop reads it, and
+   * {@link Application.dispose} does not dispose it (§83).
+   */
+  readonly assets: AssetManager | null;
+
   /** Undoes {@link SystemRegistry.attachToScheduler}; run once, by `dispose`. */
   readonly #detachSystems: Detach;
+
+  /**
+   * The world this application steps (§45), or `null` when it has no physics.
+   *
+   * ```ts
+   * app.physics?.addBody(node);        // §23: register a body
+   * app.physics?.gravity;              // §21: what the solver was given
+   * ```
+   *
+   * Stepped once per fixed step at §39 step 6, initialized by
+   * {@link Application.initialize}, and disposed by {@link Application.dispose}
+   * **only** when this application constructed it — see
+   * {@link ApplicationOptions.physics} for both forms and what each implies.
+   *
+   * A field rather than a getter because both forms are settled in the
+   * constructor: the factory is called there, so this never changes after
+   * construction (unlike {@link Application.renderer}, whose string form has
+   * nothing to hold until `initialize`).
+   */
+  readonly physics: PhysicsWorld | null;
+
+  /** Whether {@link Application.physics} came from a factory — §83 ownership. */
+  readonly #ownsPhysics: boolean;
+
+  /** {@link ApplicationOptions.reducedMotion}; `"auto"` by default (Appendix A). */
+  readonly #reducedMotion: "auto" | boolean;
+
+  /** {@link ApplicationOptions.reducedMotionSource}; unread unless `"auto"`. */
+  readonly #reducedMotionSource: (() => boolean) | undefined;
+
+  /**
+   * The {@link SurfaceObserver}'s unsubscribe, or `undefined` when nothing was
+   * subscribed. Called once, by {@link Application.dispose}.
+   */
+  readonly #unobserveSurface: (() => void) | undefined;
+
+  /**
+   * The reused §113 solver-statistics record `activeBodies` is counted into, or
+   * `null` until the first frame that counts (A-6, §84).
+   *
+   * Allocated lazily and exactly once, inside the statistics path, so a
+   * production build — where that path is unreachable — allocates nothing and
+   * the literal disappears with the code that writes it (A-4).
+   */
+  #solverStatistics: SolverStatistics | null = null;
 
   /** {@link ApplicationOptions.canvas}, held until `initialize` hands it over. */
   readonly #canvas: unknown;
@@ -740,6 +1068,19 @@ export class Application extends EventEmitter<ApplicationEventMap> {
 
   constructor(options: ApplicationOptions = {}) {
     super();
+    // Validated first, before anything is constructed (§85). The subscription
+    // itself is made at the *end* of this constructor, but the refusal belongs
+    // here: a throw after `ApplicationOptions.physics`'s factory had run would
+    // strand a solver world nobody holds a reference to.
+    const surfaceObserver = options.surfaceObserver;
+    const autoResize = options.autoResize ?? surfaceObserver !== undefined;
+    if (autoResize && surfaceObserver === undefined) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "Application autoResize needs a `surfaceObserver`: this package names no DOM type, so the host supplies the ResizeObserver (§45, §48).",
+        { context: { method: "constructor", autoResize: true } },
+      );
+    }
     this.scene = new Scene();
     this.scheduler = new Scheduler({
       // Explicitly resolved from motion's exported constants rather than left
@@ -790,6 +1131,22 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       options.poseInterpolation ??
       (this.#renderer !== null || this.#rendererSelection !== null);
     this.#interpolation = { poseBuffer: this.poses, alpha: 0 };
+    // §45's `physics` (A-6). The factory runs here, synchronously, so that
+    // `app.physics` is readable before `initialize` and the world receives
+    // `app.poses` — the ordering `PhysicsWorldContext` exists for. Whichever
+    // form was used, the world is stepped by the system registered below.
+    const physicsOption = options.physics;
+    this.#ownsPhysics = typeof physicsOption === "function";
+    this.physics =
+      typeof physicsOption === "function"
+        ? physicsOption({ poses: this.poses })
+        : physicsOption === undefined || physicsOption === false
+          ? null
+          : physicsOption;
+    const world = this.physics;
+    this.assets = options.assets ?? null;
+    this.#reducedMotion = options.reducedMotion ?? "auto";
+    this.#reducedMotionSource = options.reducedMotionSource;
     if (this.#poseInterpolation) {
       // §39 step 10, at the default `POSE_SNAPSHOT_PRIORITY`: after every
       // system that moves a node, so the captured pose is the finished pose of
@@ -797,6 +1154,47 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // `app.systems` describes the application before it is initialized, and
       // so a program that never initializes still tears down symmetrically.
       this.systems.register(createSnapshotSystem(this.poses));
+    }
+    if (world !== null) {
+      // §39 step 6 — the two passes `PhysicsSystem` makes for a single world:
+      // solve, then dispatch the queued events (§39 step 9, §6b: a listener
+      // never catches the solver mid-step). Registered here, at the published
+      // priority, rather than stepped from `onFixedStep` directly, so that
+      // physics keeps its place among the author's own systems (D5).
+      const physicsSystem: SimulationSystem = {
+        priority: PRIORITY_PHYSICS_SOLVE,
+        initialize() {
+          // Nothing to set up: the world is initialized by `Application
+          // .initialize`, which can await it — §39's `initialize` cannot.
+        },
+        fixedUpdate: (context) => {
+          // §84's `physicsStepTime`: seconds inside `world.step` — the solve
+          // itself, summed over the frame's fixed steps — and not the event
+          // dispatch, which is §39 step 9's delivery rather than the solver's
+          // work. `DEV ? … : null` for A-4's reason: the literal `null` in a
+          // production build makes the measuring branch unreachable.
+          const stats = DEV ? this.stats : null;
+          if (stats === null) {
+            world.step(context.time.fixedDeltaTime);
+          } else {
+            const now = this.#now ?? monotonicNowSeconds;
+            const started = now();
+            try {
+              world.step(context.time.fixedDeltaTime);
+            } finally {
+              // In a `finally`, like `simulationTime` above: a solver that
+              // throws still reports the time it really spent.
+              stats.physicsStepTime += now() - started;
+            }
+          }
+          world.dispatchEvents();
+        },
+        dispose() {
+          // The world outlives the registry teardown; whether it is disposed at
+          // all is `Application.dispose`'s decision (§83).
+        },
+      };
+      this.systems.register(physicsSystem);
     }
 
     // Composition of the fixed step (WP-1.12 decision). `attachToScheduler` is
@@ -880,6 +1278,22 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     if (options.width !== undefined && options.height !== undefined) {
       this.resize(options.width, options.height, options.resolution);
     }
+
+    // §45's `autoResize` (A-6), subscribed last — after the declared size, so
+    // the host's first report (some observers fire immediately on `observe`)
+    // lands on a fully constructed application and simply overwrites what the
+    // options declared. Refused at the top of this constructor, not here.
+    if (surfaceObserver !== undefined && autoResize) {
+      this.#unobserveSurface = surfaceObserver((width, height, resolution) => {
+        // A report that arrives after teardown is dropped rather than thrown
+        // through the host's own observer callback, where nothing could catch
+        // it: `dispose` unsubscribes, but a queued notification may already be
+        // in flight.
+        if (!this.#disposed) {
+          this.resize(width, height, resolution);
+        }
+      });
+    }
   }
 
   /** Whether {@link Application.initialize} has completed. */
@@ -908,6 +1322,32 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   get time(): ReadonlyTimeState {
     return this.scheduler.time;
+  }
+
+  /**
+   * Whether this application's animation should be reduced (§45, §75).
+   *
+   * ```ts
+   * const duration = app.reducedMotion ? 0 : 0.3;   // §14, opt-in
+   * ```
+   *
+   * The resolved policy, not the option: `reducedMotion: true | false` reads
+   * back as itself, and `"auto"` — the default (Appendix A) — is the platform
+   * preference from {@link ApplicationOptions.reducedMotionSource}, or `false`
+   * when no source was supplied.
+   *
+   * Recomputed on every read, so a user who turns the preference on mid-session
+   * is honoured without this class subscribing to anything (§75 requires the
+   * policy, not a change event). Nothing in the engine consults it yet: §75
+   * makes it the *application's* policy and hands consumption to `@four/ui`'s
+   * widgets and, on an opt-in basis, to §14's animation API — both of which
+   * reach it through this property.
+   */
+  get reducedMotion(): boolean {
+    const preference = this.#reducedMotion;
+    return preference === "auto"
+      ? (this.#reducedMotionSource?.() ?? false)
+      : preference;
   }
 
   /**
@@ -969,6 +1409,14 @@ export class Application extends EventEmitter<ApplicationEventMap> {
             this.#resolution,
           );
         }
+      }
+      // §37's solver load (A-6). Skipped when the world is already initialized,
+      // which is the ordinary case for the instance form — an author who awaits
+      // `world.initialize()` themselves is not made to construct a second world,
+      // and `PhysicsWorld.initialize` refuses a second call outright.
+      const world = this.physics;
+      if (world !== null && !world.initialized) {
+        await world.initialize();
       }
       this.#initialized = true;
     });
@@ -1121,6 +1569,12 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // is about to write it.
       resetFrameStats(stats);
       stats.simulationTime = 0;
+      if (this.physics !== null) {
+        // Seeded only when a world is attached, so an application with no
+        // physics still reports `physicsStepTime: NaN` — "nobody measured"
+        // rather than a confident zero (A-1's rule).
+        stats.physicsStepTime = 0;
+      }
       if (this.#renderStatistics !== null) {
         this.#renderStatistics.drawCalls = 0;
         this.#renderStatistics.triangles = 0;
@@ -1145,6 +1599,26 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       // renderer, since a geometry a headless application built is memory it
       // holds whether or not anything has drawn it.
       recordResourceMemory(stats, textureMemoryBytes(), geometryMemoryBytes());
+      // §84's `activeBodies` (A-6). A *level*, like the memory totals above, so
+      // it is counted once after the frame rather than accumulated per fixed
+      // step: what §32 calls awake is what the solver holds when the frame ends.
+      // The count is `@four/diagnostics`' own §113 walk over the adapter — the
+      // producer `recordSolverStatistics` was written for — reusing one record,
+      // so the measurement allocates nothing after its first frame.
+      const world = this.physics;
+      if (world !== null && world.initialized && !world.disposed) {
+        this.#solverStatistics ??= {
+          bodyCount: 0,
+          sleepingCount: 0,
+          awakeCount: 0,
+          colliderCount: 0,
+          maxBodyId: -1,
+        };
+        recordSolverStatistics(
+          stats,
+          solverStatistics(world.adapter, this.#solverStatistics),
+        );
+      }
       stats.cpuFrameTime = (this.#now ?? monotonicNowSeconds)() - frameStarted;
     }
   }
@@ -1294,9 +1768,18 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * renderer.dispose();
    * ```
    *
+   * **The physics world is disposed only when this application built it**
+   * (A-6): the factory form of {@link ApplicationOptions.physics} means the
+   * world exists for this application alone, so it goes with it, adapter
+   * included; an instance handed in is the author's and is left alone, exactly
+   * like the renderer. {@link Application.assets} is never disposed, for the
+   * same reason — you constructed it.
+   *
    * {@link Application.views} and {@link Application.poses} are left intact for
    * the same reason the scene is; the snapshot system that captured into the
-   * buffer is disposed with every other registered system.
+   * buffer is disposed with every other registered system. An `autoResize`
+   * subscription is released first of all, so no host report can reach a
+   * half-torn-down application.
    *
    * The scheduler's callbacks are cleared *before* systems are disposed, so a
    * `dispose` that touches the scheduler cannot re-enter the loop or reach a
@@ -1310,6 +1793,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     }
     this.#disposed = true;
     this.#running = false;
+
+    // First, so no further host report can reach a torn-down application (§83).
+    this.#unobserveSurface?.();
 
     // Give the renderer its `statistics` slot back (A-1). The renderer is not
     // this application's to dispose (see below), and by the same rule the
@@ -1341,7 +1827,22 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     try {
       this.systems.dispose();
     } finally {
-      this.removeAllListeners();
+      try {
+        // §83, ownership follows construction — the same rule that leaves the
+        // renderer alone, applied in the other direction. A world this
+        // application *built* (the factory form) exists only for it, and
+        // `PhysicsWorld.dispose` disposes the solver adapter with it, so
+        // leaving it would strand a WebAssembly world nothing can reach. A world
+        // handed in as an instance is the author's, and is left exactly as the
+        // renderer is. Inside the `finally` so a throwing system still releases
+        // the solver, and before the listeners are removed for the reason the
+        // registry is: teardown runs to completion whatever fails.
+        if (this.#ownsPhysics) {
+          this.physics?.dispose();
+        }
+      } finally {
+        this.removeAllListeners();
+      }
     }
   }
 

@@ -19,6 +19,7 @@ import {
   fromRapierVector2,
   packInteractionGroups,
   quaternionToAngleZ,
+  requireHullDesc,
   toRapierAngle,
   toRapierAngularScalar,
   toRapierBodyType,
@@ -166,7 +167,13 @@ describe("interaction group packing (§24)", () => {
   });
 });
 
-describe("shape mapping (plan P5-6 tier)", () => {
+describe("shape mapping (§24 2D list, PH-22a)", () => {
+  const runVertices = [
+    new Vector2(-1, 0),
+    new Vector2(0, 1),
+    new Vector2(1, 0),
+    new Vector2(0, -1),
+  ];
   const shapes: CollisionShape[] = [
     { type: "circle", radius: 0.5 },
     { type: "rectangle", halfExtents: new Vector2(1, 2) },
@@ -181,17 +188,53 @@ describe("shape mapping (plan P5-6 tier)", () => {
       ],
     },
   ];
+  const compositeShapes: CollisionShape[] = [
+    { type: "polyline", vertices: runVertices },
+    { type: "chain", vertices: runVertices },
+  ];
 
-  it("builds a Rapier shape for every 2D shape this phase ships", () => {
+  it("builds a Rapier shape for every convex 2D shape", () => {
     for (const shape of shapes) {
       expect(createRapierShape(shape)).toBeTypeOf("object");
     }
   });
 
-  it("builds a Rapier collider descriptor for every 2D shape", () => {
-    for (const shape of shapes) {
+  it("builds a Rapier collider descriptor for every §24 2D shape", () => {
+    for (const shape of [...shapes, ...compositeShapes]) {
       expect(createRapierColliderDesc(shape)).toBeTypeOf("object");
     }
+    // §24's 2D list is seven entries; `compound` is several colliders on one
+    // body rather than a shape, so six tags reach this conversion.
+    expect(shapes.length + compositeShapes.length).toBe(6);
+  });
+
+  it("translates a null hull descriptor into a FourError", () => {
+    // Rapier's typings say `ColliderDesc | null`; 0.19.3 returns a descriptor
+    // even for an empty, single-point, collinear, or NaN-bearing outline
+    // (measured 2026-08-08), so the translation is asserted directly rather
+    // than through an input that cannot produce it.
+    expect(() => requireHullDesc(null, "polygon")).toThrowError(
+      /could not build a convex hull/u,
+    );
+    expect(() => requireHullDesc(null, "polygon")).toThrowError(FourError);
+    const desc = createRapierColliderDesc({ type: "circle", radius: 1 });
+    expect(requireHullDesc(desc, "polygon")).toBe(desc);
+  });
+
+  it("builds a concave run that no polygon could express", () => {
+    const concave = [
+      new Vector2(0, 0),
+      new Vector2(2, 0),
+      new Vector2(1, 1),
+      new Vector2(2, 2),
+      new Vector2(0, 2),
+    ];
+    expect(
+      createRapierColliderDesc({ type: "polyline", vertices: concave }),
+    ).toBeTypeOf("object");
+    expect(
+      createRapierColliderDesc({ type: "chain", vertices: concave }),
+    ).toBeTypeOf("object");
   });
 
   it("accepts a polygon in either winding (the hull is recomputed)", () => {

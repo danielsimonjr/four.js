@@ -33,11 +33,11 @@ jobs:
     name: Build the site
     runs-on: ubuntu-latest
     env:
-      # The eight examples that have a main.ts. Named once, looped over twice.
+      # The nine examples that have a main.ts. Named once, looped over twice.
       # The flagship is nested one level deeper (`flagship/<demo>`), which the
       # `vite build` path, the `--base` and the `mkdir -p` below all take as
       # written — nothing here assumes a flat name.
-      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo flagship/one-scene-everything-moves
+      EXAMPLES: first-2d-scene first-3d-scene physics-playground mechanism blending particles-demo ui-demo flagship/one-scene-everything-moves flagship/motor-digital-twin
     steps:
       - name: Checkout
         uses: actions/checkout@v4

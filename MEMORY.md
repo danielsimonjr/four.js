@@ -28,6 +28,199 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — Spec revision 1.8 (consolidated amendment pass).** All queued
+  spec-revisit items applied in one pass; no new lettered sections, `ALLOWED_LETTERED`
+  unchanged. Rules that emerged:
+  - **A spec section that lists requirements is not stale merely because the
+    requirement is unbuilt** — only statements about implementation _status_ are
+    amendment targets (why §65/§55/§100 were triaged out while §18/§97a were
+    rewritten).
+  - **When the spec's own placement of a field is unimplementable under the frozen
+    dependency matrix, correct the spec** rather than annotate the source (§54's
+    `morphTargetWeights` → `MorphWeights` component, declared spelling kept as an
+    accessor).
+  - **RFC-derived amendments carry the RFC's status** — §57's `ShaderMaterial` row is
+    _provisionally withdrawn, RFC 0001 draft, decision pending_, never settled while
+    the RFC is a draft.
+  - Gotcha: **"§3.1" in the RFCs/plan is the implementation plan's dependency matrix,
+    not the spec's §3.1 ("Scene")** — `check-spec`'s reference check resolves the
+    number and cannot catch the confusion.
+  - Gotcha: `docs/SPECIFICATION.md` + `docs/ERRATA.md` are hand-formatted and have
+    never been prettier-clean (2,128 diff-lines at HEAD) though neither is in
+    `.prettierignore`; CI runs no prettier job — treat the spec as prettier-exempt and
+    never `--write` it as a side effect (owner call: make the exemption explicit).
+
+- **2026-08-08 — R-29 sprite frames + A-24 context-loss suite.** Decisions worth
+  keeping:
+  - **A §55 frame does not need authored uv** — it is an affine reparametrization of
+    the derived-uv map (`quad.zw = w·tw/fw`, `quad.xy = minX − fx·w/fw`); the `quad`
+    uniform survives generalized and its _name_ is load-bearing (an argument of
+    `getUniformLocation`). The 2026-08-07 retire-the-uniform prediction is retracted
+    in place. A real uv stream remains §65 batching's answer.
+  - **Frames are texels, bottom-left origin** — forced by `MaterialTexture.data`'s
+    row-0-is-`v=0`; normalized units would make §85's containment check vacuous. A
+    frame write re-uploads nothing (the property §55 clips and §86 batching need).
+    Named hole: containment is write-time only; a later texture swap samples
+    clamp-to-edge (wants R-30's §77 change notification).
+  - **Diagnostics cost bytes, measured**: five per-component §85 messages = +330 B
+    gzip, more than the feature; two whole-value messages are the trade. ui-demo at
+    32.98/33 kB — **20 B left**; next bundle-touching packet needs a proposal.
+  - **§61's loss path was correct before it was tested** (A-24: 17 tests, no product
+    bug) — the gap was proof, not behaviour. The four remaining uncovered
+    render-webgl statements are invariant guards unreachable through the public API —
+    do not chase 100% there. `getExtension` on a lost context returns `null` —
+    capture `WEBGL_lose_context` before losing.
+  - **Owner call recorded:** dispose-after-failed-restore leaks rebuilt programs
+    (§83); the obvious `gl.isContextLost()` fix breaks the tested
+    not-one-GL-call-while-lost property — deliberately unmade.
+  - Serializer follow-up: `Sprite` documents don't yet carry `frame` (one field;
+    round-trip passes today because the field is simply absent).
+
+- **2026-08-08 — R-38 §46 layers.** Decisions worth keeping:
+  - **Layers are self-only, never subtree** — a layer is identity, not state (off-ness
+    inherits; belonging doesn't); subtree gating is strictly less expressive (a `"ui"`
+    node could not carry a `"default"` child); changing a layer can never make
+    something _else_ disappear. `applyLayers` is the subtree spelling (the
+    Three.js/Unity model).
+  - `Camera.layers` **overrides** `Node.layers` — safe because nothing reads a
+    camera's membership. The registry is **module-level, not per-Scene** (nodes exist,
+    move between scenes, and deserialize before their scene is assembled).
+  - **§46 requires names in scene files, never bits** — round-trip is `layerNames()`
+    out, `resetLayers()` + replay in saved order back.
+  - **`@four/scene` may not branch on `DEV` at all** (the dev-build suite's blunt §33
+    rule for simulation packages) — its §85 check is unconditional; the render tier's
+    copy is GATED with a recorded argument (~115 B, the difference between +240 B and
+    +120 B).
+  - Byte-identity technique, third confirmation: **a permissive default mask makes a
+    new filter a no-op on the existing path**, exactly as a `bool` uniform at GL's
+    initial `false` did. Gotcha: a new required field on `RenderItemBase` breaks
+    hand-built item literals only under TypeDoc/tsc, not Vitest.
+
+- **2026-08-08 — A-6 composition root.** Decisions worth keeping:
+  - **A world cannot be an option-record here** — `four/application` importing
+    `@four/physics` puts a solver in every UI bundle; §45's `PhysicsWorldOptions` form
+    waits for a world front-door the way `renderer: "auto"` waited for §62's registry
+    (third deferred-string-selection instance; the import is type-only).
+  - **The factory form exists because `PhysicsWorld` takes `poses` at construction** —
+    an instance-only option would ship an `app.physics` that silently cannot
+    interpolate (§43). **Ownership follows construction, in both directions** (§83).
+  - `reducedMotion` resolves through the injected source **on every read, never
+    cached**; a boolean short-circuits the source. `autoResize` defaults true iff an
+    observer was supplied — an observer is never accepted-and-ignored.
+  - `contacts` stays staged: the world publishes §29 _events_, not a live manifold
+    count — differencing them answers a different question (§37 seam needed).
+  - **Measured gotcha (third cannot-tree-shake instance):** naming one leaf function
+    in `debug-draw.ts` cost 939 B gzip (module-level scratch + frozen lists);
+    producers belong in the module of the record they write. Spec-revisit: §97's
+    "a world is built and tracked, not an app option" is stale after A-6.
+
+- **2026-08-08 — R-15 §60a colour management.** Decisions worth keeping:
+  - **The working-space policy is written down once** (`@four/math` `color.ts` header):
+    material/light/vertex colours _are_ linear-light — no per-value tag (it would have
+    one legal value); §60a's metadata lives on _resources_ only (textures §77, targets
+    §63).
+  - **The output transform is a pass, never a per-material encode** — §60a's "is the
+    final render-graph pass" selects the design (a per-shader encode would encode five
+    times into one framebuffer and blend between draws in the wrong space).
+  - **Both new defaults are `"linear"`** (deviating from §60a's sRGB texture default),
+    so opt-in preserves every golden — owner decision to flip + move goldens
+    deliberately. Alpha never runs through a transfer curve; nothing clamps (odd
+    extension).
+  - **§101's mapping row settles the CSS-string-options question** — §59/§68 show
+    strings in _examples_, §101 pins tuples as the shipped tier; not widened;
+    `srgbToLinearRGBA(parseColor(css), out)` is the one-line path (owner may widen).
+  - Byte-identity technique, reconfirmed twice: a second `bool` uniform seeded at GL's
+    initial `false` costs nothing; an optional resource field read as `?? "linear"`
+    keeps every pre-existing double on the old call. §86 gotcha: effect-program GLSL
+    ships in every backend bundle — the encode was inlined to fit ui-demo at
+    31.99/32 kB.
+
+- **2026-08-08 — §119 motor digital twin.** Decisions worth keeping:
+  - **§84 is readable only _after_ `app.step` returns** — `step` resets the record on
+    entry; reading from the `update` event gives all-`NaN` (measured).
+  - **An instrumented example must not define `__FOUR_DEV__: "false"`** — A-4 gates
+    `Application.stats` on `DEV`; a page about instrumentation cannot ship the build
+    that strips it. The twin is the one documented dev-build example.
+  - **A derated actuator is a second controller's `outputLimits`, never an external
+    clamp** — clamping after `update` + `ki = 0` removes the accumulated term from the
+    output too and produces a two-step limit cycle (measured: command alternating
+    8.7/14.0 rad/s); §111's own anti-windup solves it exactly.
+  - Short horizontal `GL_LINES` segments are dropped by the diamond-exit rule —
+    decimate chart traces below ~4 px/segment. A rebuilt text line must `dispose()`
+    its removed sprites or it leaks one geometry per character per rebuild (measured:
+    953 kB → 1.44 MB before the fix).
+  - Two coaxial hinges are stable on Rapier 3D over 900 steps with a contact fault
+    applied and released. `collectBodyOrigins`' default cross size confirmed unusable
+    in 3D a second time; an over-long cross projects across the frame off-axis.
+  - **Index-race gotcha (second occurrence):** an agent staging files for
+    check-docs' `git ls-files` + the orchestrator committing another batch sweeps the
+    staged files into the wrong commit (dc8e1ae carries an intermediate twin
+    snapshot; superseded by the twin's own batch). Rule: `git reset` before every
+    selective staging, always.
+
+- **2026-08-08 — A-27 §86 benchmarks (CPU tier).** Decisions worth keeping:
+  - **A §86 row with a measurable CPU half and a blocked draw half is recorded as
+    `half`, never as measured** — the benchmarks README now has that third category
+    beside `hardware` and `feature`.
+  - §86 states the retained-UI and animated-glyph rows as **counts with no rate**;
+    60 Hz is an interpretation borrowed from neighbouring rows and must be labelled as
+    such wherever it appears.
+  - **The runner asserts on no timing** — exit 1 = a benchmark failed, exit 2 =
+    operator error; a timing threshold would be the back door the benchmarks README
+    forbids. Process-per-script is deliberate isolation (JIT, heap, throw containment).
+  - **Gotcha:** a committed benchmark record may not contain a short array of scalars —
+    Prettier collapses it while `JSON.stringify(…,null,2)` expands it, so the format
+    gate fails; use an object (written into the README's Results section).
+  - The 2026-08-08 re-records were taken on a loaded shared host; `physics-step`'s
+    +24% is explicitly non-attributable — re-record on a quiet host before reading any
+    trend.
+
+- **2026-08-08 — PH-22 sweep.** Decisions worth keeping:
+  - **A composite shape is a legal collider and an illegal §30 query shape** — Rapier
+    answers _wrongly_ (zero intersections) rather than failing; `validateQueryShape`
+    refuses them at all four adapter query entry points.
+  - **§24 `compound` is deliberately not a tag** — several colliders on one body,
+    runtime-assemblable since PH-5; Rapier models it the same way.
+  - `jointMotorEffortCap` is the first capability field whose `false` means "applied,
+    _differently_" rather than "not applied" — documented as such.
+  - The per-property Rapier joint survey replaced the blanket freeze claim;
+    `collisionEnabled` was the only mutable-with-throw property (base-class
+    `setContactsEnabled`), the rest are `readonly` compile errors.
+  - **A diagnostic threshold sits a decade past the guide's advice** so it never
+    becomes routine (§41 warnings: 1e5 origin, [1e-2,1e3] dynamic extents, 1000:1
+    mass ratio; static/kinematic exempt from the extent check).
+  - Heightfield facts measured, not assumed: `heights` is column-major with row→local
+    Z, column→local X (the opposite of the intuitive reading); the public shape counts
+    samples, the adapter subtracts one. Gotcha repeat: vitest doesn't typecheck —
+    three test-only type errors only surfaced at `pnpm run docs`.
+
+- **2026-08-08 — R-13 StandardMaterial.** Decisions worth keeping:
+  - **The radiometric convention is now written down**: light colour × intensity is an
+    irradiance already divided by π — neither lobe carries a `1/π`. This is what makes
+    `LitMaterial` and `StandardMaterial` composable in one scene, and the constraint
+    any future BRDF must honour.
+  - Defaults are `metalness: 0` / `roughness: 1` (three.js's, not glTF's 1/1) — a glTF
+    importer assigns both explicitly, so it cannot inherit the difference.
+  - Ambient reaches the diffuse lobe only (no IBL; a metal under ambient alone renders
+    black, honestly); roughness is floored in the shader (0.045) where the 0/0 lives,
+    not clamped in the material.
+  - `SurfaceMaterial` deliberately NOT widened (would strip `color`/`setColor` off
+    every ordinary renderable's material type — the `SpriteMaterial` exclusion
+    argument); inference handles `new Renderable(geo, new StandardMaterial())`.
+  - The duplicate-symbol gate is load-bearing — it refused a second `ColorRGB`; the
+    shared RGB tuple alias belongs in `@four/math` with R-15.
+  - ui-demo budget 31 → 32 kB on the R-6-style structural proof (compile-at-init
+    alone was 547 B over); two consecutive pipeline additions absorbed — A-4's
+    build-time pipeline-selection seam is the structural fix.
+
+- **2026-08-08 — Gotcha (multi-agent, joins the rebase/stash/ports set): a batch that
+  lands code without touching a tracking file is undiscoverable within a day.** The
+  `ab13840`/`fe8eb6f` closures (nine gap items) were invisible to every later agent
+  and to the gap document until the v1 rewrite re-verified them in source — the
+  analysis's own A-28 failure mode aimed at itself. Rule: no batch commits without its
+  CHANGELOG entry and gap banner in the same commit. Also: `docs/GAP ANALYSIS v1.md`
+  supersedes v0 as the working gap document (v0 kept as history with a pointer).
+
 - **2026-08-07 — A-4 dev/prod builds.** Decisions worth keeping:
   - **Dev is the default; you opt out** — `typeof __FOUR_DEV__ !== "undefined" ?
 __FOUR_DEV__ : true` in one file (`@four/core` `dev.ts`); the identifier is never

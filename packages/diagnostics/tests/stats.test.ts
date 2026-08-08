@@ -17,7 +17,7 @@ import { constructionCount } from "@four/math";
 import { describe, expect, it } from "vitest";
 
 import type { DebugBodyAccess, SolverStatistics } from "../src/debug-draw.js";
-import { solverStatistics } from "../src/debug-draw.js";
+import { solverStatistics } from "../src/stats.js";
 import type { FrameStats } from "../src/stats.js";
 import {
   copyFrameStats,

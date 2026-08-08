@@ -76,18 +76,48 @@
  * the next build into the same array.
  */
 
+import { DEV } from "@four/core";
 import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type {
   LitMaterial,
   Material,
   SpriteMaterial,
+  StandardMaterial,
   UnlitMaterial,
 } from "@four/materials";
-import type { Node, PoseBuffer } from "@four/scene";
+import {
+  ALL_LAYERS,
+  DEFAULT_LAYER_MASK,
+  assertLayerMask,
+  isLayerMask,
+  layersMatch,
+  type LayerMask,
+  type Node,
+  type PoseBuffer,
+  type Viewport,
+} from "@four/scene";
 
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
+import type { SpriteFrame } from "./sprite.js";
+
+/**
+ * A drawable that may carry §55's frame, as this module reads it (R-29,
+ * 2026-08-08).
+ *
+ * Structural, and deliberately not `node instanceof Sprite`. Which pipeline a
+ * node draws through is read off its **material** here (see `pipelineOf`), so
+ * "is a sprite item" and "is a `Sprite`" are not the same predicate: a plain
+ * `Renderable` carrying a `SpriteMaterial` produces a sprite item and has no
+ * `frame`, and that must read as "no frame" rather than as a type error or a
+ * crash. It also keeps the `instanceof` this module removed in 2026-08-06 from
+ * coming back, and keeps the import type-only — no runtime edge from the list
+ * to the node class.
+ */
+interface FramedDrawable {
+  readonly frame?: SpriteFrame | null;
+}
 
 /**
  * Which pipeline a render item needs (§64 stage 7, §66 sort key 3).
@@ -108,8 +138,16 @@ import { Renderable } from "./renderable.js";
  * generates `"unlit"` or `"lit"` according to its material's own `kind`
  * discriminant (§57) — a material property, not a node property, because
  * which pipeline shades a surface is exactly what a material *is*.
+ *
+ * `"standard"` joined with §59's metallic-roughness workflow (R-13,
+ * 2026-08-08), by the same rule and for the same reason. Widening this union is
+ * still an edit to this package, which is R-12's remaining half: the closed
+ * union is the **staging mechanism**, not the destination — it keeps every arm
+ * type-checked end to end while the pipeline registry §64 asks for is designed
+ * (see `pipelineOf`).
  */
-export type RenderItemKind = "unlit" | "lit" | "sprite" | "particles";
+export type RenderItemKind =
+  "unlit" | "lit" | "standard" | "sprite" | "particles";
 
 /**
  * The fields every render item carries, whatever pipeline draws it — one draw in
@@ -137,6 +175,26 @@ interface RenderItemBase {
   renderOrder: number;
   /** §66 sort key 1, copied from the drawable node. */
   renderLayer: number;
+  /**
+   * The drawable node's §46 layer mask, snapshotted at generation time (R-38,
+   * 2026-08-08).
+   *
+   * Not a sort key and not read by the comparator — it is what lets **one**
+   * render list serve several views with different masks, which is the shape
+   * this engine has until the per-view list arrives (R-8): the backend tests
+   * `item.layers & effectiveViewMask` once per item per view, before it touches
+   * a GPU resource. Filtering *at build time* is the other half and is
+   * {@link buildRenderList}'s `layerMask` parameter; the two compose, since an
+   * item that was never generated cannot be drawn into any view.
+   *
+   * On the item rather than reached through a node reference for the reason §64
+   * gives for compact render items in the first place — and because a compact
+   * item has no node reference to reach through.
+   *
+   * Confusingly adjacent to `renderLayer` above, and unrelated: that is §66's
+   * ordering ordinal, this is §46's membership set.
+   */
+  layers: LayerMask;
   /**
    * §66 sort key 2, read off the item's material (§57's `transparent`) at
    * generation time: `false` for an opaque draw, `true` for a blended one.
@@ -169,11 +227,49 @@ export interface LitRenderItem extends RenderItemBase {
   material: LitMaterial;
 }
 
+/**
+ * A draw generated from a `Renderable` carrying a `StandardMaterial` (§49,
+ * §57, §59) — metallic-roughness PBR, one diffuse and one specular lobe under
+ * the same §68 lighting a {@link LitRenderItem} is shaded by.
+ *
+ * Structurally identical to a lit item, and deliberately a **separate arm**
+ * rather than a widened `LitRenderItem.material`: the two draw through
+ * different programs, and §66's sort key 3 is a pipeline key. The frame's
+ * lights travel in the shared `SceneLights` record exactly as they do for the
+ * lit pipeline — they are per-frame state, not per-draw state.
+ */
+export interface StandardRenderItem extends RenderItemBase {
+  kind: "standard";
+  /** Surface appearance (§57, §59, §68). */
+  material: StandardMaterial;
+}
+
 /** A draw generated from a {@link Sprite} (§55) — one textured, tinted quad. */
 export interface SpriteRenderItem extends RenderItemBase {
   kind: "sprite";
   /** Surface appearance (§55, §57). */
   material: SpriteMaterial;
+  /**
+   * §55's frame sub-rectangle in texels, or `null` for the whole texture
+   * (R-29, 2026-08-08) — a **reference to the sprite's own record**, snapshotted
+   * like every other field at generation time.
+   *
+   * A reference rather than a copy for the reason `worldMatrix` and
+   * `material.tint` are: the item is pooled and rewritten, and copying four
+   * floats per sprite per frame buys nothing a backend can observe — it reads
+   * the frame during the same call that built the list. Read it, resolve it to
+   * uv, do not retain it.
+   *
+   * `null` rather than absent so a backend's read is one property load and one
+   * comparison on every sprite item, framed or not, with no `in` check and no
+   * shape change between the two cases — which is what keeps a frameless
+   * sprite on exactly the code path it was on before frames existed.
+   *
+   * On the sprite item and not on the item base: no other pipeline
+   * samples an atlas today. §65 batching is where that changes, and it changes
+   * by carrying uv per vertex rather than per draw.
+   */
+  frame: SpriteFrame | null;
 }
 
 /**
@@ -242,7 +338,11 @@ export interface ParticleRenderItem extends RenderItemBase {
  * `itemAt`.
  */
 export type RenderItem =
-  UnlitRenderItem | LitRenderItem | SpriteRenderItem | ParticleRenderItem;
+  | UnlitRenderItem
+  | LitRenderItem
+  | StandardRenderItem
+  | SpriteRenderItem
+  | ParticleRenderItem;
 
 /**
  * The pooled item as the builders write it: one mutable shape covering every
@@ -251,9 +351,9 @@ export type RenderItem =
  *
  * Fields that belong to one arm are present on all of them here and carry
  * harmless defaults for the others — `material` is `undefined` on a particle
- * item, `count` is `0` and `instances` empty on the other two. The exported
- * union is what hides them, which is why a caller never sees a sprite item
- * offering a particle count.
+ * item, `frame` is `null` on everything but a framed sprite, `count` is `0` and
+ * `instances` empty on the other two. The exported union is what hides them,
+ * which is why a caller never sees a sprite item offering a particle count.
  *
  * Not exported: outside this module an item is always a {@link RenderItem}, and
  * the correlation between `kind` and the arm-specific fields is an invariant the
@@ -261,7 +361,8 @@ export type RenderItem =
  */
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
-  material?: UnlitMaterial | LitMaterial | SpriteMaterial;
+  material?: UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+  frame: SpriteFrame | null;
   id: string;
   count: number;
   instances: Float32Array;
@@ -270,16 +371,25 @@ interface MutableRenderItem extends RenderItemBase {
 /**
  * Which pipeline draws a node carrying `material` (§57, §64).
  *
- * One property load and a three-way comparison, with `"unlit"` as the fallback
- * so that a structurally-typed material double predating the discriminant — or
- * a family member no backend knows yet — keeps drawing flat-coloured rather
- * than vanishing. Replacing this mapping with the registry §64 wants, so a
- * consumer's material can bring its own pipeline, is R-12's remaining half and
- * is recorded as a follow-up (2026-08-06).
+ * One property load and a short chain of comparisons, with `"unlit"` as the
+ * fallback so that a structurally-typed material double predating the
+ * discriminant — or a family member no backend knows yet — keeps drawing
+ * flat-coloured rather than vanishing. Replacing this mapping with the registry
+ * §64 wants, so a consumer's material can bring its own pipeline, is R-12's
+ * remaining half and is recorded as a follow-up (2026-08-06).
+ *
+ * The chain is ordered by how often each arm is taken, not alphabetically:
+ * `"lit"` and `"standard"` are the two surface families a 3D scene mixes, and
+ * `"sprite"` is asked last because §55's quads reach this function through the
+ * same `Renderable` slot but are a minority of the items in any scene that has
+ * both.
  */
 function pipelineOf(material: Material): RenderItemKind {
   if (material.kind === "lit") {
     return "lit";
+  }
+  if (material.kind === "standard") {
+    return "standard";
   }
   if (material.kind === "sprite") {
     return "sprite";
@@ -309,9 +419,53 @@ export function isLitItem(item: RenderItem): item is LitRenderItem {
   return item.kind === "lit";
 }
 
+/**
+ * Narrows `item` to the metallic-roughness pipeline (§57's `StandardMaterial`,
+ * §59; R-13).
+ */
+export function isStandardItem(item: RenderItem): item is StandardRenderItem {
+  return item.kind === "standard";
+}
+
 /** Narrows `item` to the batched particle pipeline (§36; see `particles.ts`). */
 export function isParticlesItem(item: RenderItem): item is ParticleRenderItem {
   return item.kind === "particles";
+}
+
+/**
+ * The §46 layer mask a view actually draws (§47, §48; R-38, 2026-08-08) —
+ * `view.layerMask` when it has one, the camera's own `layers` otherwise.
+ *
+ * ```ts
+ * const mask = viewLayerMask(view);
+ * for (const item of list) {
+ *   if ((item.layers & mask) === 0) continue;   // layersMatch, inlined
+ *   draw(item);
+ * }
+ * ```
+ *
+ * §48's fallback rule in exactly one place, so every backend and every consumer
+ * that draws a viewport resolves it identically. Both defaults are `ALL_LAYERS`
+ * — a viewport with no mask over a camera with no mask draws every layer — so
+ * this returns `ALL_LAYERS` for every view built before layers existed.
+ *
+ * The trailing `?? ALL_LAYERS` is not dead: `Camera.layers` is non-optional in
+ * the type system, but a **structurally typed camera** predating the field
+ * (`@four/render-webgl`'s test double, a host's own minimal camera object)
+ * reports `undefined`, and that must resolve to "draws everything" rather than
+ * to a mask of zero that silently empties the view. Same defence, same reason,
+ * as `material.transparent === true` in `collect`.
+ */
+export function viewLayerMask(view: Viewport): LayerMask {
+  const mask = view.layerMask ?? view.camera.layers ?? ALL_LAYERS;
+  // §85, and only in a development build: this runs once per view per frame, so
+  // the cheap predicate gates the message — a template literal built here would
+  // allocate a string every frame, which is precisely what `@four/core`'s
+  // `dev.ts` tells callers not to do. `assertLayerMask` re-tests and throws.
+  if (DEV && !isLayerMask(mask)) {
+    assertLayerMask(mask, `viewport "${view.id}" layer mask`);
+  }
+  return mask;
 }
 
 /** Pooled backing store for one `out` array. */
@@ -365,8 +519,10 @@ function itemAt(
       worldMatrix,
       geometry,
       material: undefined,
+      frame: null,
       renderOrder: 0,
       renderLayer: 0,
+      layers: DEFAULT_LAYER_MASK,
       transparent: false,
       id: "",
       count: 0,
@@ -513,7 +669,9 @@ function isRenderable(node: Node): node is Renderable<Material> {
  * Appends render items for `node`'s subtree to `out`, starting at index
  * `count`, and returns the new count. Depth-first in insertion order (§6).
  *
- * Filtering is §64 stage 2 and prunes **whole subtrees**:
+ * Filtering is §64 stage 2, and it comes in two shapes.
+ *
+ * **Subtree pruning**, for the two §6 flags:
  *
  * - `visible === false` — §6's rendering flag. Pruning rather than skipping the
  *   single node is the behaviour authors expect (hiding a group hides what is
@@ -526,6 +684,15 @@ function isRenderable(node: Node): node is Renderable<Material> {
  *
  * Both are checked on every node, including the traversal root: passing a
  * hidden root yields an empty list.
+ *
+ * **Per-node skipping**, for §46's layer mask (R-38, 2026-08-08): a node whose
+ * `layers` shares no bit with `mask` generates no item, and **its children are
+ * still visited**. That asymmetry is deliberate and is §46's model — a layer is
+ * membership, not state, so it does not inherit (see `@four/scene`'s
+ * `layers.ts` for the recorded decision). The consequence here is that layer
+ * filtering costs one `&` per node and never changes the traversal, which is
+ * what keeps a masked list a permutation-free subsequence of the unmasked one
+ * (§33) and what makes `ALL_LAYERS` a true no-op.
  */
 function collect(
   node: Node,
@@ -534,13 +701,27 @@ function collect(
   count: number,
   poses: PoseBuffer | null,
   alpha: number,
+  mask: LayerMask,
 ): number {
   if (!node.visible || !node.enabled) {
     return count;
   }
 
   let next = count;
-  if (isRenderable(node)) {
+  // §46's mask, read once and shared by both drawable arms.
+  //
+  // `?? DEFAULT_LAYER_MASK` for the same reason `material.transparent === true`
+  // is written that way below: a **structurally typed** drawable predating the
+  // field — a `ParticleDrawable` implemented outside `@four/scene`, a host's own
+  // minimal node — reports `undefined`, and that must read as "on the default
+  // layer", which is where every real node starts. Reading it as a bare
+  // `undefined` would make `undefined & mask` zero and drop the node from every
+  // list, silently.
+  const nodeLayers = node.layers ?? DEFAULT_LAYER_MASK;
+  // `false` skips this node only — the children below are visited either way,
+  // because §46 layers do not inherit.
+  const onLayer = layersMatch(nodeLayers, mask);
+  if (onLayer && isRenderable(node)) {
     // A sprite rebuilds its quad here if the anchor or the size moved (its
     // `geometry` accessor is an override); a plain renderable's geometry is
     // whatever it was handed.
@@ -550,11 +731,23 @@ function collect(
     item.kind = pipelineOf(material);
     item.geometry = geometry;
     // The cast is the union's, not the material's: `MutableRenderItem` types
-    // this slot as the three known surface materials, and `pipelineOf` has just
+    // this slot as the four known surface materials, and `pipelineOf` has just
     // decided which of them the backend will read it as.
-    item.material = material as UnlitMaterial | LitMaterial | SpriteMaterial;
+    item.material = material as
+      UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+    // §55's frame (R-29), read structurally and only where it can mean
+    // something. Written on **every** renderable, not only framed sprites: the
+    // item is pooled, so a slot that carried a framed sprite last frame would
+    // otherwise hand a stale sub-rectangle to whatever lands in it next — the
+    // same hazard the `material = undefined` line in the particle arm below
+    // exists for. `?? null` because a `Renderable` with a sprite material has
+    // no such property at all.
+    item.frame =
+      item.kind === "sprite" ? ((node as FramedDrawable).frame ?? null) : null;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
+    // §46's mask, snapshotted so a per-view filter needs no node reference.
+    item.layers = nodeLayers;
     // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
     // read: a material double built before the flag existed reports
     // `undefined`, which classifies opaque — the behaviour every scene had
@@ -564,12 +757,13 @@ function collect(
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
     // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
-    // and an "unlit" item an `UnlitMaterial` by construction. TypeScript cannot
+    // a "standard" item a `StandardMaterial`, and an "unlit" item an
+    // `UnlitMaterial` by construction. TypeScript cannot
     // see that across two assignments to a pooled object — see
     // `MutableRenderItem`.
     out[next] = item as RenderItem;
     next += 1;
-  } else if (isParticleDrawable(node)) {
+  } else if (onLayer && isParticleDrawable(node)) {
     // §36's whole system becomes **one** item (plan P9-3). The repack is the
     // node's own work and happens here, at list-build time, so the uploaded
     // arrays cannot be a step older than the item that points at them — see
@@ -584,11 +778,15 @@ function collect(
     // reference would both mislead a reader and retain a material the scene may
     // have discarded.
     item.material = undefined;
+    // Likewise (R-29): a particle system has no texture sub-rectangle, and a
+    // pooled slot must not keep one a sprite left in it.
+    item.frame = null;
     item.id = node.id;
     item.count = node.particleCount;
     item.instances = node.particleInstances;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
+    item.layers = nodeLayers;
     // §66 key 2: a particle system has no material to declare `transparent`,
     // and its pipeline blends by construction (§36's colour ramp). It is
     // classified **opaque** so that key 2 leaves particle scenes in exactly the
@@ -602,7 +800,7 @@ function collect(
 
   const children = node.children;
   for (let i = 0; i < children.length; i += 1) {
-    next = collect(children[i], out, pool, next, poses, alpha);
+    next = collect(children[i], out, pool, next, poses, alpha, mask);
   }
   return next;
 }
@@ -668,10 +866,43 @@ function compareRenderItems(a: RenderItem, b: RenderItem): number {
  * Allocates nothing in the steady state: no items, no matrices, no math
  * objects. The first few frames grow the pool to the scene's item count and
  * then stop.
+ *
+ * ## `layerMask` (§46, §64 stage 2; R-38, 2026-08-08)
+ *
+ * ```ts
+ * buildRenderList(scene, list, camera.layers);   // only what this camera sees
+ * ```
+ *
+ * Only nodes sharing a bit with `layerMask` generate items; their children are
+ * traversed regardless, because §46 layers do not inherit (see `collect`). The
+ * default is `ALL_LAYERS`, which makes the test true for every node whose mask
+ * is non-zero — i.e. every node that has not been explicitly removed from all
+ * layers — so a caller that omits it gets exactly the list it got before the
+ * parameter existed, in exactly the same order.
+ *
+ * This is the **build-time** half of §46 filtering, for the caller that builds
+ * one list per view. The other half is {@link RenderItem}'s `layers` snapshot,
+ * which lets one shared list be filtered per view at draw time; the WebGL
+ * backend uses that today because it builds one list per frame (R-8).
+ *
+ * @throws FourError `INVALID_SCENE_GRAPH` **in a development build** when
+ * `layerMask` is not an integer in `[0, 0xffffffff]` (§85) — a `NaN` mask would
+ * otherwise empty the list with no diagnostic at all. §85 lets a production
+ * build drop expensive validation, and this one costs bytes in every shipped
+ * bundle for a mistake that is an authoring error by construction, so it is
+ * gated: measured at ~115 B gzip on `ui-demo`, deleted entirely by
+ * `__FOUR_DEV__: false` (R-38, 2026-08-08). The check itself,
+ * `@four/scene`'s `assertLayerMask`, is unconditional there — `@four/scene` is a
+ * §33 simulation package and may not branch on the build mode at all.
  */
-export function buildRenderList(root: Node, out: RenderItem[]): RenderItem[] {
+export function buildRenderList(
+  root: Node,
+  out: RenderItem[],
+  layerMask: LayerMask = ALL_LAYERS,
+): RenderItem[] {
+  if (DEV) assertLayerMask(layerMask, "buildRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, null, 0);
+  const count = collect(root, out, pool, 0, null, 0, layerMask);
   out.length = count;
   out.sort(compareRenderItems);
   return out;
@@ -704,15 +935,22 @@ export function buildRenderList(root: Node, out: RenderItem[]): RenderItem[] {
  * writes scene state** (§43: the render transform must not feed back into the
  * simulation). It also does not need `resolveWorldTransforms` to have run: it
  * derives every matrix itself, at `O(depth)` per item.
+ *
+ * `layerMask` filters exactly as it does for {@link buildRenderList} — same
+ * default, same semantics, same development-only §85 check — and interacts with nothing else
+ * here: a filtered node contributes no item, so no render pose is composed for
+ * it either.
  */
 export function buildInterpolatedRenderList(
   root: Node,
   poses: PoseBuffer,
   alpha: number,
   out: RenderItem[],
+  layerMask: LayerMask = ALL_LAYERS,
 ): RenderItem[] {
+  if (DEV) assertLayerMask(layerMask, "buildInterpolatedRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, poses, alpha);
+  const count = collect(root, out, pool, 0, poses, alpha, layerMask);
   out.length = count;
   out.sort(compareRenderItems);
   return out;

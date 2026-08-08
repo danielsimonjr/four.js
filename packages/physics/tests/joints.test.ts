@@ -230,7 +230,11 @@ describe("Joint construction (§28)", () => {
     expect(joint.registered).toBe(false);
     expect(joint.broken).toBe(false);
     expect(joint.id).toBeUndefined();
-    expect(joint.commands).toEqual({ limitsDirty: false, motorDirty: false });
+    expect(joint.commands).toEqual({
+      limitsDirty: false,
+      motorDirty: false,
+      collisionDirty: false,
+    });
     expect(joint.breakable).toBe(false);
   });
 });
@@ -463,16 +467,29 @@ describe("HingeJoint (§28's example)", () => {
     expect(hinge.motor?.maxTorque).toBe(4);
   });
 
-  it("freezes collisionEnabled once registered (§28)", () => {
+  it("queues a collisionEnabled change once registered (§28, PH-22f)", () => {
     const { a, b } = bodies();
     const hinge = new HingeJoint({ bodyA: a, bodyB: b });
     hinge.collisionEnabled = true;
+    // Unregistered, the write is immediate and queues nothing to drain.
+    expect(hinge.commands.collisionDirty).toBe(false);
+
     pretendRegistered(hinge);
-    expect(
-      expectFourError(() => {
-        hinge.collisionEnabled = false;
-      }).message,
-    ).toContain("cannot change once the joint is registered");
+    hinge.collisionEnabled = false;
+    expect(hinge.collisionEnabled).toBe(false);
+    expect(hinge.commands.collisionDirty).toBe(true);
+  });
+
+  it("queues nothing when collisionEnabled is set to what it already is", () => {
+    const { a, b } = bodies();
+    const hinge = new HingeJoint({
+      bodyA: a,
+      bodyB: b,
+      collisionEnabled: true,
+    });
+    pretendRegistered(hinge);
+    hinge.collisionEnabled = true;
+    expect(hinge.commands.collisionDirty).toBe(false);
   });
 });
 
@@ -527,7 +544,11 @@ describe("SliderJoint (§28)", () => {
     slider.setLimits(0, 2);
     expect(slider.limits).toEqual({ min: 0, max: 2 });
     slider.setMotor({ targetVelocity: 1, maxForce: 5 });
-    expect(slider.commands).toEqual({ limitsDirty: true, motorDirty: true });
+    expect(slider.commands).toEqual({
+      limitsDirty: true,
+      motorDirty: true,
+      collisionDirty: false,
+    });
     slider.enableMotor(false);
     expect(slider.motor?.enabled).toBe(false);
 

@@ -99,9 +99,9 @@ describe("PhysicsWorldOptions.solverIterations (§28, 2026-08-04)", () => {
     const posStandard = positionOf(standard, topStandard);
     // The scenario is identical; only the iteration count differs. If the
     // option never reached the solver, these would be bit-identical.
-    expect(
-      posCoarse.x !== posStandard.x || posCoarse.y !== posStandard.y,
-    ).toBe(true);
+    expect(posCoarse.x !== posStandard.x || posCoarse.y !== posStandard.y).toBe(
+      true,
+    );
 
     coarse.dispose();
     standard.dispose();

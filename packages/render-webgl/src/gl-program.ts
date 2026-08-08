@@ -127,6 +127,18 @@ export const GL = {
   TEXTURE0: 0x84c0,
   /** `GL_RGBA8` — the sized internal format of an MVP-tier texture. */
   RGBA8: 0x8058,
+  /**
+   * `GL_SRGB8_ALPHA8` — the sized internal format of a texture whose texels are
+   * sRGB-encoded (§60a, R-15).
+   *
+   * Chosen instead of a decode in the shader because the hardware does it on
+   * *sample*, i.e. before filtering: bilinear interpolation between two
+   * sRGB-encoded texels is wrong in exactly the way a colour space exists to
+   * prevent, and a shader-side `pow` would interpolate first and decode after.
+   * The alpha channel of this format is **not** encoded, which matches
+   * `srgbToLinearRGBA`'s rule that alpha is coverage, not light.
+   */
+  SRGB8_ALPHA8: 0x8c43,
   /** `GL_ARRAY_BUFFER` — vertex attribute storage. */
   ARRAY_BUFFER: 0x8892,
   /** `GL_ELEMENT_ARRAY_BUFFER` — index storage; part of vertex-array state. */
@@ -220,6 +232,18 @@ export interface WebglContext {
   ): void;
   uniform4fv(location: GlUniformLocation, data: Float32Array): void;
   uniform3fv(location: GlUniformLocation, data: Float32Array): void;
+  /**
+   * Uploads one `float` uniform.
+   *
+   * Added with §59's standard pipeline (R-13, 2026-08-08), which is the first
+   * one to carry a scalar the shader reads on its own — `metalness` and
+   * `roughness`. Packing the two into a `vec3` would have kept this interface
+   * unchanged; two named scalars are what the shader actually declares, and
+   * this interface exists precisely so a new entry point is an explicit,
+   * reviewable growth of the package's GL budget rather than a silent one (see
+   * the module header).
+   */
+  uniform1f(location: GlUniformLocation, value: number): void;
   uniform1i(location: GlUniformLocation, value: number): void;
 
   // --- Textures (`gl-texture.ts`) ---
@@ -503,18 +527,32 @@ void main() {
  * uv = (position.xy - quad.xy) / quad.zw
  * ```
  *
- * where `quad` is `(minX, minY, width, height)` of the quad in **local** space —
- * which is precisely the geometry's own local bounds, already computed and
- * cached against its version by `BufferGeometry.computeBounds()`. The mapping is
- * exact for every anchor and every size, costs one `vec4` upload per draw
- * instead of a second vertex buffer per sprite, and lets the sprite pipeline
- * reuse the vertex arrays `gl-geometry.ts` already builds — the position stream
- * is bound to the same fixed `layout(location = 0)` slot, so one geometry cache
- * serves both pipelines (decision, WP-3a.3).
+ * where `quad` is the rectangle in **local** space that the *whole texture*
+ * maps onto. With no frame that is precisely the geometry's own local bounds,
+ * `(minX, minY, width, height)`, already computed and cached against its
+ * version by `BufferGeometry.computeBounds()`. The mapping is exact for every
+ * anchor and every size, costs one `vec4` upload per draw instead of a second
+ * vertex buffer per sprite, and lets the sprite pipeline reuse the vertex
+ * arrays `gl-geometry.ts` already builds — the position stream is bound to the
+ * same fixed `layout(location = 0)` slot, so one geometry cache serves both
+ * pipelines (decision, WP-3a.3).
+ *
+ * ## §55's frame is the same uniform (R-29, 2026-08-08)
+ *
+ * A frame sub-rectangle does **not** need an authored uv attribute, which is
+ * what this backend expected before R-29 measured it. Sampling a sub-rectangle
+ * is an affine reparametrization of the map above, so it is reached by
+ * uploading a different `quad` — the (larger, offset) rectangle the whole
+ * texture would occupy — and changing nothing else. `webgl-renderer.ts` derives
+ * it; `@four/render`'s `sprite.ts` carries the algebra. The consequences that
+ * matter here: no second uniform, no second attribute, no new GL call, and a
+ * frameless sprite's transcript byte-identical because it is the same code
+ * path with the same values.
  *
  * `v = 0` is the quad's **bottom** edge, matching §7a's Y-up world and the
  * bottom-row-first texel order `@four/render`'s `TextureSource` documents; no
- * flip is needed anywhere in this backend.
+ * flip is needed anywhere in this backend, and §55 frames are measured from the
+ * bottom-left texel for the same reason.
  */
 const SPRITE_VERTEX_SHADER_SOURCE = `#version 300 es
 layout(location = 0) in vec3 position;
@@ -1035,7 +1073,7 @@ export class UnlitProgram implements Disposable {
  * program.setSampler(0);                        // once per activation
  * program.setViewProjection(viewProjection);    // once per viewport
  * program.setModel(item.worldMatrix);           // once per draw
- * program.setQuad(minX, minY, width, height);   // the quad's local rect
+ * program.setQuad(minX, minY, width, height);   // the whole texture's local rect
  * program.setTint(item.material.tint);
  * ```
  *
@@ -1160,9 +1198,14 @@ export class SpriteProgram implements Disposable {
   }
 
   /**
-   * Uploads the quad's local rectangle — `(minX, minY, width, height)` — from
-   * which the vertex stage derives uv. See
-   * `SPRITE_VERTEX_SHADER_SOURCE`.
+   * Uploads the local rectangle the **whole texture** maps onto —
+   * `(minX, minY, width, height)` — from which the vertex stage derives uv.
+   *
+   * For a sprite with no §55 frame that is the quad's own local rectangle, and
+   * the parameter names still read that way. For a framed one it is the
+   * rectangle the quad's frame is a window into, which is larger than the quad
+   * and generally starts outside it; the caller derives it. See
+   * `SPRITE_VERTEX_SHADER_SOURCE` for both.
    */
   setQuad(minX: number, minY: number, width: number, height: number): void {
     colorScratch[0] = minX;

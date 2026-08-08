@@ -8,8 +8,9 @@ import { defineConfig } from "@playwright/test";
  * WP-6.6, WP-7.7, WP-9.4, the post-plan UI proof and the §93 first-3D-scene
  * proof).
  *
- * The suite drives **eight built example sites** in headless Chromium (six until
- * 2026-08-07, when `first-3d-scene` and then the §118 flagship joined):
+ * The suite drives **nine built example sites** in headless Chromium (six until
+ * 2026-08-07, when `first-3d-scene` and then the §118 flagship joined; nine on
+ * 2026-08-08, when §119's motor digital twin joined):
  *
  * | site | port | specs | what it gates |
  * | ---- | ---- | ----- | ------------- |
@@ -21,6 +22,7 @@ import { defineConfig } from "@playwright/test";
  * | `examples/particles-demo` | {@link PARTICLES_PORT} | `particles` | §112's particle demonstration: a seeded CPU fountain under §27 fields bouncing off a collision plane, plus a click burst, each drawn as one instanced draw call |
  * | `examples/ui-demo` | {@link UI_PORT} | `ui` | §73–§75's retained-mode UI: a `@four/ui` panel of buttons and labels laid out by the package, skinned by the application, driven by real pointer and keyboard input (the WP-11.5 packet-intent closure) |
  * | `examples/flagship/one-scene-everything-moves` | {@link FLAGSHIP_PORT} | `one-scene-everything-moves` | §118's flagship: one scene holding 2D art, lit 3D meshes, rigid bodies, two joints, particles, world-space text and a screen-space UI panel, with pause / slow-motion / single-step controls |
+ * | `examples/flagship/motor-digital-twin` | {@link TWIN_PORT} | `motor-digital-twin` | §119's engineering flagship: a motorised shaft on two bearing hinges inside a sprung stator, a `PIDController` closing the speed loop, §40 unit readouts, §84 statistics, fault injection, and §34 record/seek/replay with §79 save-and-reload |
  *
  * **In the `chromium` project there are no golden images** — SwiftShader
  * rasterises slightly differently from a GPU, so every assertion in
@@ -31,7 +33,7 @@ import { defineConfig } from "@playwright/test";
  * because both sides of its comparison are SwiftShader. See the comment on the
  * `visual` project for the scope of the exception.
  *
- * Run **all eight** builds first — or just `pnpm examples:build`, which is the
+ * Run **all nine** builds first — or just `pnpm examples:build`, which is the
  * one place they are listed: the web servers below serve the *built* `dist`
  * directories, which are gitignored and may be absent.
  *
@@ -44,6 +46,7 @@ import { defineConfig } from "@playwright/test";
  * pnpm particles-demo:build   # examples/particles-demo/dist
  * pnpm ui-demo:build          # examples/ui-demo/dist
  * pnpm flagship:build         # examples/flagship/one-scene-everything-moves/dist
+ * pnpm twin:build             # examples/flagship/motor-digital-twin/dist
  * pnpm test:browser
  * ```
  *
@@ -54,7 +57,7 @@ import { defineConfig } from "@playwright/test";
  * name their own absolute URLs, and restate {@link SCENE_3D_PORT} /
  * {@link PLAYGROUND_PORT} /
  * {@link MECHANISM_PORT} / {@link BLENDING_PORT} / {@link PARTICLES_PORT} /
- * {@link UI_PORT} / {@link FLAGSHIP_PORT} for the reason the other specs restate the example's
+ * {@link UI_PORT} / {@link FLAGSHIP_PORT} / {@link TWIN_PORT} for the reason the other specs restate the example's
  * scene constants — a browser gate checks the built page from the outside, and
  * a spec that imported this file would drag a second copy of the config into
  * every worker.
@@ -204,6 +207,26 @@ const SCENE_3D_PORT = 4179;
  */
 const FLAGSHIP_PORT = 4180;
 
+/**
+ * Preview port for `examples/flagship/motor-digital-twin` — §119's engineering
+ * flagship.
+ *
+ * A ninth entry rather than a ninth run, for {@link PLAYGROUND_PORT}'s reason:
+ * `vite preview` serves exactly one `dist`, and Playwright starts every entry of
+ * a `webServer` array before the first test. 4181 is the next free port above
+ * the §118 flagship's and is restated verbatim in
+ * `tests/browser/motor-digital-twin.spec.ts`.
+ *
+ * A middle tier, and the reason it is one: the site constructs
+ * `new Rapier3dAdapter()` directly rather than taking §37's registry, so it
+ * carries **one** wasm image instead of the §118 flagship's two — but it is the
+ * only example built with `__FOUR_DEV__` left at its default `true`, because
+ * §84's `Application.stats` is gated on it (A-4) and this page's subject is
+ * instrumentation. Measured 2026-08-08: 2.52 MB raw / 0.93 MB gzip, against the
+ * flagship's 4.20 MB / 1.54 MB.
+ */
+const TWIN_PORT = 4181;
+
 export default defineConfig({
   testDir: "tests/browser",
   // Failure artifacts (traces, error context) live inside the already-ignored
@@ -246,7 +269,7 @@ export default defineConfig({
       use: { browserName: "chromium" },
     },
   ],
-  // All eight sites are started before the first test and torn down after the
+  // All nine sites are started before the first test and torn down after the
   // last, so one `pnpm test:browser` run covers every spec in `testDir`. The
   // entries use different ports, so they coexist rather than race for one.
   webServer: [
@@ -325,8 +348,19 @@ export default defineConfig({
       reuseExistingServer: false,
       // The playground's tier and then some: two Rapier wasm images reach this
       // bundle through the §37 registry, so it is ~4.2 MB raw and the *first*
-      // request is the slowest of the eight. The server itself still starts in
+      // request is the slowest of the nine. The server itself still starts in
       // well under a second.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/flagship/motor-digital-twin --port ${String(TWIN_PORT)} --strictPort`,
+      url: `http://localhost:${String(TWIN_PORT)}`,
+      reuseExistingServer: false,
+      // One Rapier wasm image (a directly-constructed `Rapier3dAdapter`) plus a
+      // development build of the engine: ~2.5 MB raw, between the mechanism's
+      // tier and the §118 flagship's.
       timeout: 60_000,
       stdout: "ignore",
       stderr: "pipe",

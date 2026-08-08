@@ -12,6 +12,7 @@ import {
   type SimulationSystem,
   type TimeState,
 } from "@four/motion";
+import { AssetManager } from "@four/assets";
 import { BufferGeometry } from "@four/geometry";
 import {
   NullRenderer,
@@ -32,7 +33,11 @@ import {
   type Viewport,
 } from "@four/scene";
 
-import { Application, type ApplicationOptions } from "../src/application.js";
+import {
+  Application,
+  type ApplicationOptions,
+  type SurfaceResize,
+} from "../src/application.js";
 
 const FIXED = DEFAULT_FIXED_DELTA_TIME;
 
@@ -1698,5 +1703,465 @@ describe("Application — §85 production build (A-4)", () => {
     app.step(FIXED);
     expect(log).toEqual(["fixedUpdate", "update", "render"]);
     expect(app.time.simulationStep).toBe(1);
+  });
+
+  it("still steps the physics world, and measures nothing (A-6)", async () => {
+    // The §33 rule applied to A-6's addition: the build flag removes the two
+    // counters and not one solver call.
+    const world = new FakeWorld();
+    const app = await productionApplication({
+      stats: true,
+      physics: asWorld(world),
+    });
+    app.step(FIXED);
+    expect(world.calls).toEqual(["initialize", "step", "dispatchEvents"]);
+    expect(app.stats).toBeNull();
+  });
+});
+
+/**
+ * A `PhysicsWorld` double — the seven members the composition root actually
+ * touches, and nothing else (A-6).
+ *
+ * A real `PhysicsWorld` needs a `PhysicsSolverAdapter`, and `@four/physics`'
+ * own fake is a test fixture of that package rather than an exported one. What
+ * is under test here is not the world: it is the *contract* this class has with
+ * one — construct or accept, initialize once, step then dispatch per fixed
+ * step, count bodies after the frame, dispose only what it built. Every member
+ * below appears in that list, so the double is exactly the seam, and a change
+ * to `PhysicsWorld` that broke the contract would fail the `as unknown as`
+ * cast's neighbours in `src/application.ts` at compile time rather than here.
+ */
+class FakeWorld {
+  initialized = false;
+
+  disposed = false;
+
+  /** Call log, in order, so the two passes' ordering is assertable (§39). */
+  readonly calls: string[] = [];
+
+  /** Deltas handed to `step`, in order. */
+  readonly deltas: number[] = [];
+
+  /** Seconds the clock advances inside each `step` — the solver's own cost. */
+  stepCost = 0;
+
+  /** Awake and sleeping body counts the §113 walk will find. */
+  awake = 0;
+
+  asleep = 0;
+
+  colliders = 0;
+
+  constructor(private readonly clock?: TestClock) {}
+
+  /** The §113 `DebugBodyAccess` `solverStatistics` walks (`world.adapter`). */
+  get adapter(): unknown {
+    return {
+      forEachBody: (visit: (handle: number, id: number) => void): void => {
+        for (let i = 0; i < this.awake + this.asleep; i += 1) visit(i, i);
+      },
+      forEachCollider: (visit: (handle: number, id: number) => void): void => {
+        for (let i = 0; i < this.colliders; i += 1) visit(i, i);
+      },
+      isBodySleeping: (handle: number): boolean => handle >= this.awake,
+    };
+  }
+
+  initialize(): Promise<void> {
+    this.calls.push("initialize");
+    this.initialized = true;
+    return Promise.resolve();
+  }
+
+  step(delta: number): void {
+    this.calls.push("step");
+    this.deltas.push(delta);
+    this.clock?.advance(this.stepCost);
+  }
+
+  dispatchEvents(): void {
+    this.calls.push("dispatchEvents");
+  }
+
+  dispose(): void {
+    this.calls.push("dispose");
+    this.disposed = true;
+  }
+}
+
+/** The double, typed as what the option takes. */
+function asWorld(world: FakeWorld): NonNullable<ApplicationOptions["physics"]> {
+  return world as unknown as NonNullable<ApplicationOptions["physics"]>;
+}
+
+describe("Application — §45 physics (A-6)", () => {
+  it("has no world by default, and none for `false`", async () => {
+    for (const physics of [undefined, false] as const) {
+      const app = await startedApplication({ physics });
+      app.step(FIXED);
+      expect(app.physics).toBeNull();
+    }
+  });
+
+  it("builds the world from the factory, handing it app.poses (§43)", () => {
+    const world = new FakeWorld();
+    let seen: unknown;
+    const app = new Application({
+      physics: (context) => {
+        seen = context.poses;
+        return asWorld(world) as never;
+      },
+    });
+    // Synchronous, so the world is reachable before `initialize` — and it got
+    // the buffer a world constructed before the application never could.
+    expect(app.physics).toBe(world);
+    expect(seen).toBe(app.poses);
+  });
+
+  it("initializes the world it built, once", async () => {
+    const world = new FakeWorld();
+    const app = new Application({ physics: () => asWorld(world) as never });
+    expect(world.initialized).toBe(false);
+    await app.initialize();
+    await app.initialize();
+    expect(world.calls.filter((call) => call === "initialize")).toEqual([
+      "initialize",
+    ]);
+  });
+
+  it("leaves an already-initialized instance alone", async () => {
+    const world = new FakeWorld();
+    world.initialized = true;
+    const app = new Application({ physics: asWorld(world) });
+    await app.initialize();
+    expect(world.calls).toEqual([]);
+  });
+
+  it("initializes an instance that has not been initialized yet", async () => {
+    const world = new FakeWorld();
+    const app = new Application({ physics: asWorld(world) });
+    await app.initialize();
+    expect(world.initialized).toBe(true);
+  });
+
+  it("steps then dispatches, once per fixed step, at the scaled delta (§39)", async () => {
+    const world = new FakeWorld();
+    const app = await startedApplication({ physics: asWorld(world) });
+    app.step(FIXED * 2);
+    expect(world.calls).toEqual([
+      "initialize",
+      "step",
+      "dispatchEvents",
+      "step",
+      "dispatchEvents",
+    ]);
+    expect(world.deltas).toEqual([FIXED, FIXED]);
+  });
+
+  it("runs the world before the fixedUpdate listeners (§39 order)", async () => {
+    const world = new FakeWorld();
+    const log: string[] = [];
+    const app = await startedApplication({ physics: asWorld(world) });
+    app.on("fixedUpdate", () => log.push("listener"));
+    app.systems.register({
+      priority: PRIORITY_KINEMATICS,
+      initialize: () => undefined,
+      fixedUpdate: () => log.push("kinematics"),
+      dispose: () => undefined,
+    });
+    app.step(FIXED);
+    // §39: kinematics (step 5) before physics solve (step 6), and an
+    // application listener after the whole step.
+    expect(log).toEqual(["kinematics", "listener"]);
+    expect(world.calls).toContain("step");
+  });
+
+  it("disposes a world it built (§83)", async () => {
+    const world = new FakeWorld();
+    const app = await startedApplication({
+      physics: () => asWorld(world) as never,
+    });
+    app.dispose();
+    expect(world.disposed).toBe(true);
+  });
+
+  it("never disposes a world it was handed (§83)", async () => {
+    const world = new FakeWorld();
+    const app = await startedApplication({ physics: asWorld(world) });
+    app.dispose();
+    expect(world.disposed).toBe(false);
+    expect(app.physics).toBe(world);
+  });
+
+  it("still removes its listeners when a system's dispose throws", async () => {
+    const world = new FakeWorld();
+    const app = await startedApplication({
+      physics: () => asWorld(world) as never,
+    });
+    app.systems.register({
+      priority: PRIORITY_KINEMATICS,
+      initialize: () => undefined,
+      fixedUpdate: () => undefined,
+      dispose: () => {
+        throw new Error("teardown");
+      },
+    });
+    expect(() => {
+      app.dispose();
+    }).toThrow("teardown");
+    // Both of the `finally` clauses still ran.
+    expect(world.disposed).toBe(true);
+    expect(app.listenerCount("update")).toBe(0);
+  });
+});
+
+describe("Application — §84 physics counters (A-6)", () => {
+  it("leaves physicsStepTime and activeBodies unmeasured with no world", async () => {
+    const app = await startedApplication({ stats: true });
+    app.step(FIXED);
+    expect(app.stats?.physicsStepTime).toBeNaN();
+    expect(app.stats?.activeBodies).toBeNaN();
+  });
+
+  it("measures physicsStepTime across the frame's fixed steps", async () => {
+    const clock = new TestClock();
+    const world = new FakeWorld(clock);
+    world.stepCost = 0.002;
+    const app = await startedApplication({
+      stats: true,
+      now: clock.now,
+      physics: asWorld(world),
+    });
+    app.on("fixedUpdate", () => {
+      clock.advance(0.01);
+    });
+
+    app.step(FIXED * 3);
+
+    // The solve only: three steps at 2 ms, and none of the 10 ms per step the
+    // listener spent — that share belongs to `simulationTime`.
+    expect(app.stats?.physicsStepTime).toBeCloseTo(0.006, 12);
+    expect(app.stats?.simulationTime).toBeCloseTo(0.036, 12);
+  });
+
+  it("keeps the frame's numbers to that frame", async () => {
+    const clock = new TestClock();
+    const world = new FakeWorld(clock);
+    world.stepCost = 0.001;
+    const app = await startedApplication({
+      stats: true,
+      now: clock.now,
+      physics: asWorld(world),
+    });
+    app.step(FIXED);
+    expect(app.stats?.physicsStepTime).toBeCloseTo(0.001, 12);
+    // A frame with no fixed step measures a solve of zero seconds — it *was*
+    // measured, and it really did no solving.
+    app.step(FIXED / 4);
+    expect(app.stats?.physicsStepTime).toBe(0);
+  });
+
+  it("reports §32's awake bodies after the frame", async () => {
+    const world = new FakeWorld();
+    world.awake = 4;
+    world.asleep = 3;
+    world.colliders = 9;
+    const app = await startedApplication({
+      stats: true,
+      physics: asWorld(world),
+    });
+    app.step(FIXED);
+    expect(app.stats?.activeBodies).toBe(4);
+    // Reused record: a second frame with a changed population re-reads rather
+    // than accumulating.
+    world.awake = 1;
+    app.step(FIXED);
+    expect(app.stats?.activeBodies).toBe(1);
+  });
+
+  it("does not count a disposed world", async () => {
+    const world = new FakeWorld();
+    world.awake = 2;
+    const app = await startedApplication({
+      stats: true,
+      physics: asWorld(world),
+    });
+    world.disposed = true;
+    app.step(FIXED);
+    expect(app.stats?.activeBodies).toBeNaN();
+  });
+
+  it("leaves contacts staged (§84)", async () => {
+    const world = new FakeWorld();
+    const app = await startedApplication({
+      stats: true,
+      physics: asWorld(world),
+    });
+    app.step(FIXED);
+    // No live manifold count exists to read; a confident zero would be worse
+    // than "not measured" (A-1's rule).
+    expect(app.stats?.contacts).toBeNaN();
+  });
+});
+
+describe("Application — §45 autoResize (A-6)", () => {
+  it("does not subscribe when no observer was given", () => {
+    const app = new Application({});
+    app.dispose();
+    expect(app.width).toBe(0);
+  });
+
+  it("resizes from the host's report, and unsubscribes on dispose (§83)", async () => {
+    let report: SurfaceResize | undefined;
+    let unobserved = 0;
+    const renderer = new NullRenderer();
+    const app = await startedApplication({
+      renderer,
+      surfaceObserver: (onResize) => {
+        report = onResize;
+        return () => {
+          unobserved += 1;
+        };
+      },
+    });
+
+    report?.(800, 400, 2);
+
+    expect(app.width).toBe(800);
+    expect(app.height).toBe(400);
+    expect(app.resolution).toBe(2);
+    expect(renderer.lastResize).toEqual({
+      width: 800,
+      height: 400,
+      resolution: 2,
+    });
+
+    app.dispose();
+    expect(unobserved).toBe(1);
+  });
+
+  it("drops a report that arrives after dispose", async () => {
+    let report: SurfaceResize | undefined;
+    const app = await startedApplication({
+      surfaceObserver: (onResize) => {
+        report = onResize;
+        return () => undefined;
+      },
+    });
+    app.dispose();
+    // `resize` after dispose throws (§45); a queued host notification must not
+    // be the thing that throws it, inside the host's own callback.
+    expect(() => report?.(640, 480)).not.toThrow();
+    expect(app.width).toBe(0);
+  });
+
+  it("validates the host's numbers like any other resize (§85)", async () => {
+    let report: SurfaceResize | undefined;
+    await startedApplication({
+      surfaceObserver: (onResize) => {
+        report = onResize;
+        return () => undefined;
+      },
+    });
+    expect(() => report?.(Number.NaN, 400)).toThrow(RangeError);
+  });
+
+  it("refuses autoResize with no observer to subscribe to", () => {
+    expect(() => new Application({ autoResize: true })).toThrow(
+      /surfaceObserver/,
+    );
+    try {
+      new Application({ autoResize: true });
+    } catch (error) {
+      expect(isFourError(error)).toBe(true);
+    }
+  });
+
+  it("leaves an observer unsubscribed when autoResize is off", async () => {
+    let subscribed = 0;
+    const app = await startedApplication({
+      autoResize: false,
+      surfaceObserver: () => {
+        subscribed += 1;
+        return () => undefined;
+      },
+    });
+    expect(subscribed).toBe(0);
+    app.dispose();
+  });
+
+  it("lets the host's first report win over the declared size", async () => {
+    let report: SurfaceResize | undefined;
+    const app = await startedApplication({
+      width: 100,
+      height: 50,
+      surfaceObserver: (onResize) => {
+        report = onResize;
+        return () => undefined;
+      },
+    });
+    expect(app.width).toBe(100);
+    report?.(300, 150);
+    expect(app.width).toBe(300);
+    // No resolution reported: the one in force is kept, as with `resize(w, h)`.
+    expect(app.resolution).toBe(1);
+  });
+});
+
+describe("Application — §45/§75 reducedMotion (A-6, A-13)", () => {
+  it("defaults to auto, and auto with no source is false", () => {
+    expect(new Application({}).reducedMotion).toBe(false);
+  });
+
+  it("follows the platform preference under auto", () => {
+    let prefers = false;
+    const app = new Application({ reducedMotionSource: () => prefers });
+    expect(app.reducedMotion).toBe(false);
+    // Re-read every time: a user who turns the setting on mid-session is
+    // honoured without this class subscribing to anything.
+    prefers = true;
+    expect(app.reducedMotion).toBe(true);
+  });
+
+  it("overrides the platform outright when given a boolean", () => {
+    let asked = 0;
+    const source = (): boolean => {
+      asked += 1;
+      return true;
+    };
+    expect(
+      new Application({ reducedMotion: false, reducedMotionSource: source })
+        .reducedMotion,
+    ).toBe(false);
+    expect(
+      new Application({ reducedMotion: true, reducedMotionSource: source })
+        .reducedMotion,
+    ).toBe(true);
+    expect(asked).toBe(0);
+  });
+
+  it("reads back auto's resolved answer, not the option", () => {
+    const app = new Application({
+      reducedMotion: "auto",
+      reducedMotionSource: () => true,
+    });
+    expect(app.reducedMotion).toBe(true);
+  });
+});
+
+describe("Application — §45/§76 assets (A-6)", () => {
+  it("is null when none was given", () => {
+    expect(new Application({}).assets).toBeNull();
+  });
+
+  it("publishes the manager it was handed, and never disposes it (§83)", () => {
+    const manager = new AssetManager();
+    const app = new Application({ assets: manager });
+    expect(app.assets).toBe(manager);
+    app.dispose();
+    // `AssetManager.dispose` clears its cache; the application must not have
+    // called it — ownership follows construction.
+    expect(app.assets).toBe(manager);
   });
 });

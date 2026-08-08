@@ -23,6 +23,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   COLLIDER_SERIALIZER,
+  COLLISION_SHAPE_TYPES_2D,
+  COLLISION_SHAPE_TYPES_3D,
   Collider,
   PhysicsMaterial,
   RIGID_BODY_SERIALIZER,
@@ -363,22 +365,62 @@ describe("collision shape documents (§24)", () => {
       type: "polygon",
       vertices: [new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1)],
     },
+    {
+      type: "polyline",
+      vertices: [new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1)],
+    },
+    {
+      type: "chain",
+      vertices: [new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, 1)],
+    },
+    { type: "cylinder", radius: 0.4, halfHeight: 1.2 },
+    { type: "cone", radius: 0.6, halfHeight: 0.8 },
+    {
+      type: "convex-hull",
+      points: [
+        new Vector3(0, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(0, 1, 0),
+        new Vector3(0, 0, 1),
+      ],
+    },
+    {
+      type: "triangle-mesh",
+      vertices: [
+        new Vector3(0, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(0, 0, 1),
+      ],
+      indices: [0, 1, 2],
+    },
+    {
+      type: "height-field",
+      rows: 2,
+      columns: 3,
+      heights: [0, 1, 2, 3, 4, 5],
+      scale: new Vector3(4, 1, 6),
+    },
   ];
 
-  it("round-trips every shipped shape (plan P5-6)", () => {
+  it("round-trips every shipped shape (§24, PH-22a)", () => {
     for (const shape of SHAPES) {
       const restored = deserializeCollisionShape(
         throughJson(serializeCollisionShape(shape)),
       );
       expect(restored).toEqual(shape);
     }
+    // Every §24 tag the build ships has a document form — the list above is
+    // exhaustive, not a sample.
+    expect(new Set(SHAPES.map((shape) => shape.type))).toEqual(
+      new Set([...COLLISION_SHAPE_TYPES_2D, ...COLLISION_SHAPE_TYPES_3D]),
+    );
   });
 
   it("refuses to write a shape the union does not cover", () => {
     let thrown: unknown;
     try {
       serializeCollisionShape({
-        type: "cylinder",
+        type: "voxels",
         radius: 1,
       } as unknown as CollisionShape);
     } catch (error) {
@@ -388,12 +430,53 @@ describe("collision shape documents (§24)", () => {
   });
 
   it("refuses to read a shape tag this build does not ship", () => {
-    expect(() => deserializeCollisionShape({ type: "height-field" })).toThrow(
+    expect(() => deserializeCollisionShape({ type: "compound" })).toThrow(
       /collision shape/,
     );
     expect(() => deserializeCollisionShape(undefined)).toThrow(
       /collision shape/,
     );
+  });
+
+  it("reads a malformed vertex, index, or height list as empty (§79, §85)", () => {
+    // The list-valued shapes default to an empty list, which then fails the
+    // §85 minimum-count rule naming the shape — the same "let the shape
+    // report itself" rule the scalar parameters follow.
+    expect(deserializeCollisionShape({ type: "polyline" })).toEqual({
+      type: "polyline",
+      vertices: [],
+    });
+    expect(
+      deserializeCollisionShape({ type: "convex-hull", points: 7 }),
+    ).toEqual({ type: "convex-hull", points: [] });
+    // A malformed index becomes NaN rather than 0: 0 is a legal index, and a
+    // damaged document must not build a plausible wrong triangle.
+    expect(
+      deserializeCollisionShape({
+        type: "triangle-mesh",
+        vertices: [{ x: 0, y: 0, z: 0 }],
+        indices: [0, "two", 2],
+      }),
+    ).toEqual({
+      type: "triangle-mesh",
+      vertices: [new Vector3(0, 0, 0)],
+      indices: [0, Number.NaN, 2],
+    });
+    expect(
+      deserializeCollisionShape({
+        type: "height-field",
+        rows: 2,
+        columns: 2,
+        heights: [0, null, 0, 0],
+        scale: { x: 1, y: 1, z: 1 },
+      }),
+    ).toEqual({
+      type: "height-field",
+      rows: 2,
+      columns: 2,
+      heights: [0, Number.NaN, 0, 0],
+      scale: new Vector3(1, 1, 1),
+    });
   });
 
   it("defaults malformed parameters to 0, so §85 reports the shape", () => {

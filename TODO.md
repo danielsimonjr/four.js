@@ -18,14 +18,19 @@ changes in `CHANGELOG.md`.
       strings on lights, light layers; hoist the lit shader's per-vertex
       inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a
       Matrix3 utility (dated note in gl-program.ts)
-- [ ] Spec-revisit note (2026-08-04): §57's material family list has no `LitMaterial`
-      member — the MVP lit tier added one below §59's StandardMaterial; record it in a
-      spec amendment (letter-suffix rule) or fold it into the §57 revision that lands
-      the abstract Material base
+- [x] Spec-revisit note (2026-08-04) — **done, spec revision 1.8 (2026-08-08)**: §57's
+      family list now names `LitMaterial`
 - [ ] First publish (§94 0.1): Changesets release workflow + the
       @danielsimonjr/fourjs publish-name mapping — owner step
 
 ### Gap-closure wave 3 (2026-08-07) — in progress
+
+> **2026-08-08:** `docs/GAP ANALYSIS v1.md` supersedes v0 as the working gap document —
+> its §4.6 attack order and §5 owner-decision register are the tracker for what
+> remains; the wave sections below are the historical per-batch record. v1 also
+> recorded nine closures from `ab13840`/`fe8eb6f` (2026-08-06) that these sections
+> never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
+> the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
@@ -53,10 +58,8 @@ changes in `CHANGELOG.md`.
       layer/claim policy); clip-event dispatch from a controller; "any state"
       transitions; live three-clip interruption chasing; optional `when` string sugar
       compiling to the typed records
-- [ ] **Spec-revisit note (2026-08-07):** §18's "`AnimationController` is not
-      implemented (§97a)" paragraph, the §97a mapping-table row, and §100's coverage
-      claim are now stale — record as a spec amendment (letter-suffix rule; owner
-      decision) in the next spec pass
+- [x] Spec-revisit note (2026-08-07) — **done, spec revision 1.8**: §18 + §97a rewritten
+      to shipped; §100 triaged out (a requirements list, never a status claim)
 - [x] **R-6 CLOSED (full-screen effect tier) 2026-08-07:** `EffectRenderPass` as a
       third graph pass kind; copy + colour grade; separate `renderEffect` verb keeps
       `render` byte-identical; ui-demo budget bumped 30 → 31 kB on a proven structural
@@ -310,8 +313,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
       (MAY declined — see prediction.ts staging note)
-- [ ] §111 sketch namespace: spec writes Four.PIDController; real path is
-      Four.motion.PIDController (pre-existing umbrella convention — spec-revisit note)
+- [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
+      `Four.motion.PIDController` via §97a); this entry was the stale artifact
 
 ### Backlog additions (Phase 7, 2026-08-02)
 

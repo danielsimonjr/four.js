@@ -3,8 +3,9 @@
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
 (§118–119). Every major feature should have a runnable example (§93).
 
-**Eight examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
-the §118 flagship were written). The other four entries below are **not yet written; the
+**Nine examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
+the §118 flagship were written; nine on 2026-08-08, when §119's motor digital twin was
+written). The other three entries below are **not yet written; the
 directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
 they were described only as "scaffold only" in this paragraph while reading like a catalogue
 of demos in the list; each such row now carries the marker on its own line. The absence is
@@ -66,7 +67,18 @@ guide points at one of them without the marker.
   Build it with `pnpm run flagship:build`; it carries **both** Rapier wasm images (the cost
   of `registerRapierSolver()`, measured) and is ~1.54 MB gzip. This entry read "**not yet
   written; directory is a placeholder**" until that date.
-- [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) — **Not yet written;
-  directory is a placeholder.** Planned as the §119 engineering flagship: an electric motor
-  digital twin — animated rotor, bearing constraints, PID speed control, fault injection,
-  waveforms, replay.
+- [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) —
+  **Implemented (2026-08-08).** §119's engineering flagship, "Electric Motor Digital
+  Twin": a motorised shaft on two coaxial bearing `HingeJoint`s inside a stator that
+  hangs on a §28 slider-and-spring mount, so a deliberate rotor unbalance produces real
+  vibration; a `PIDController` closing the speed loop on the shaft's measured
+  `angularVelocity`; two physical faults (a bearing rub driven by a §28 **slider** motor,
+  and a supply sag expressed as a derated actuator); a lumped thermal model with a trip;
+  two scrolling waveform charts drawn as one `"lines"` draw call; and a §34 record / seek /
+  replay audit paired with a §79 save-and-reload that round-trips byte-identically.
+  It is the first example to read §84's `app.stats`, the first to use §40's unit-conversion
+  helpers (RPM, degrees, millimetres, milliseconds at the display edge only), and the only
+  one built in **development** mode, because §84's statistics path is gated on
+  `__FOUR_DEV__` (A-4). Build it with `pnpm run twin:build`; it carries **one** Rapier wasm
+  image (a directly-constructed `Rapier3dAdapter`) and is ~0.93 MB gzip. This entry read
+  "**not yet written; directory is a placeholder**" until that date.

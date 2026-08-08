@@ -19,6 +19,7 @@ import {
   fromRapierRotation3,
   fromRapierVector3,
   packInteractionGroups3d,
+  requireHullDesc3d,
   rotateVectorByRotation3,
   toPrincipalInertia3d,
   toRapierAngularVector3,
@@ -295,23 +296,122 @@ describe("quaternion point rotation", () => {
   });
 });
 
-describe("shape mapping (plan P5-6 3D tier)", () => {
-  const shapes: CollisionShape[] = [
+describe("shape mapping (§24 3D list, PH-22a)", () => {
+  /** The convex tier — everything `createRapierShape3d` can also build. */
+  const convexShapes: CollisionShape[] = [
     { type: "sphere", radius: 0.5 },
     { type: "box", halfExtents: new Vector3(1, 2, 3) },
     { type: "capsule", radius: 0.25, halfHeight: 1 },
+    { type: "cylinder", radius: 0.25, halfHeight: 1 },
+    { type: "cone", radius: 0.25, halfHeight: 1 },
+    {
+      type: "convex-hull",
+      points: [
+        new Vector3(0, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(0, 1, 0),
+        new Vector3(0, 0, 1),
+      ],
+    },
   ];
 
-  it("builds a Rapier shape for every 3D shape this phase ships", () => {
-    for (const shape of shapes) {
+  /** The composite tier — collider descriptors only (see `validateQueryShape`). */
+  const compositeShapes: CollisionShape[] = [
+    {
+      type: "triangle-mesh",
+      vertices: [
+        new Vector3(0, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(0, 0, 1),
+      ],
+      indices: [0, 1, 2],
+    },
+    {
+      type: "height-field",
+      rows: 2,
+      columns: 2,
+      heights: [0, 1, 2, 3],
+      scale: new Vector3(2, 1, 2),
+    },
+  ];
+
+  it("builds a Rapier shape for every convex 3D shape", () => {
+    for (const shape of convexShapes) {
       expect(createRapierShape3d(shape)).toBeTypeOf("object");
+    }
+    expect(convexShapes).toHaveLength(6);
+  });
+
+  it("builds a Rapier collider descriptor for every §24 3D shape", () => {
+    for (const shape of [...convexShapes, ...compositeShapes]) {
+      expect(createRapierColliderDesc3d(shape)).toBeTypeOf("object");
+    }
+    // §24's 3D list is nine entries; `compound` is several colliders on one
+    // body rather than a shape, so eight tags reach this conversion.
+    expect(convexShapes.length + compositeShapes.length).toBe(8);
+  });
+
+  it("accepts a degenerate cloud, because Rapier 0.19.3 does (measured)", () => {
+    // The `null` branch in `createRapierColliderDesc3d` is defensive, exactly
+    // like the 2D polygon one: at 0.19.3 `ColliderDesc.convexHull` returns a
+    // descriptor for coplanar, collinear, identical, and 1e-9-scale point
+    // clouds alike — measured 2026-08-08, all four. Pinning that here means a
+    // Rapier upgrade that starts refusing them turns this test red rather
+    // than silently changing what a hull means.
+    for (const points of [
+      // coplanar
+      [
+        new Vector3(0, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(1, 1, 0),
+        new Vector3(0, 1, 0),
+      ],
+      // collinear
+      [
+        new Vector3(0, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(2, 0, 0),
+        new Vector3(3, 0, 0),
+      ],
+      // four copies of one point
+      [
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+        new Vector3(0, 0, 0),
+      ],
+    ]) {
+      const shape: CollisionShape = { type: "convex-hull", points };
+      expect(createRapierColliderDesc3d(shape)).toBeTypeOf("object");
     }
   });
 
-  it("builds a Rapier collider descriptor for every 3D shape", () => {
-    for (const shape of shapes) {
-      expect(createRapierColliderDesc3d(shape)).toBeTypeOf("object");
-    }
+  it("translates a null hull descriptor into a FourError", () => {
+    // The branch `requireHullDesc3d` exists for cannot be produced by 0.19.3
+    // (see the test above), so its contract is asserted directly.
+    expect(() => requireHullDesc3d(null, "convex-hull")).toThrowError(
+      /could not build a convex hull/u,
+    );
+    expect(() => requireHullDesc3d(null, "convex-hull")).toThrowError(
+      FourError,
+    );
+    const desc = createRapierColliderDesc3d({ type: "sphere", radius: 1 });
+    expect(requireHullDesc3d(desc, "convex-hull")).toBe(desc);
+  });
+
+  it("hands Rapier subdivisions where the shape counts samples", () => {
+    // A 2×3-sample field is a 1×2-subdivision Rapier heightfield, and Rapier
+    // wants (1+1)·(2+1) = 6 heights — exactly `rows · columns`. Building it
+    // proves the conversion, because a mismatched count traps in wasm.
+    expect(() =>
+      createRapierColliderDesc3d({
+        type: "height-field",
+        rows: 2,
+        columns: 3,
+        heights: [0, 1, 2, 3, 4, 5],
+        scale: new Vector3(4, 1, 6),
+      }),
+    ).not.toThrow();
   });
 
   it("rejects a 2D shape in a 3D world (§21, §24)", () => {

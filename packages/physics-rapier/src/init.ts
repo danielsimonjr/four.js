@@ -605,6 +605,12 @@ export interface Rapier2dModule {
     cuboid(halfWidth: number, halfHeight: number): RapierColliderDesc;
     capsule(halfHeight: number, radius: number): RapierColliderDesc;
     convexHull(points: Float32Array): RapierColliderDesc | null;
+    /**
+     * §24's `polyline` and `chain` (PH-22a). `indices` is optional upstream —
+     * omitting it means "line strip" — but this package always passes it, so
+     * one entry point serves the open and the closed run.
+     */
+    polyline(vertices: Float32Array, indices: Uint32Array): RapierColliderDesc;
   };
   readonly Ray: new (origin: RapierVector, dir: RapierVector) => RapierRay;
   readonly Ball: new (radius: number) => RapierShape;
@@ -1062,10 +1068,12 @@ export interface RapierWorld3d {
  *
  * `ColliderDesc.cuboid` takes **three** half-extents here and `Cuboid` three
  * constructor arguments; `Capsule(halfHeight, radius)` keeps the 2D argument
- * order and the +Y axis. The 2D-only `convexHull`/`ConvexPolygon` entry points
- * are absent because the plan P5-6 3D tier is sphere, box, and capsule — the
- * 3D build does have `convexHull`, `cylinder`, and `cone`, and a later packet
- * that widens the tier adds them here.
+ * order and the +Y axis, as do `cylinder` and `cone` (PH-22a).
+ *
+ * The composite shapes PH-22a added — `trimesh` and `heightfield` — appear as
+ * `ColliderDesc` statics only, with no matching shape *class*: they are
+ * refused as §30 query shapes by `validateQueryShape`, so nothing ever needs
+ * to build a bare `TriMesh` or `Heightfield`.
  */
 export interface Rapier3dModule {
   init(): Promise<void>;
@@ -1088,6 +1096,22 @@ export interface Rapier3dModule {
       halfDepth: number,
     ): RapierColliderDesc3d;
     capsule(halfHeight: number, radius: number): RapierColliderDesc3d;
+    cylinder(halfHeight: number, radius: number): RapierColliderDesc3d;
+    cone(halfHeight: number, radius: number): RapierColliderDesc3d;
+    /** `null` when the point cloud encloses no volume (§24, §85). */
+    convexHull(points: Float32Array): RapierColliderDesc3d | null;
+    trimesh(vertices: Float32Array, indices: Uint32Array): RapierColliderDesc3d;
+    /**
+     * `nrows`/`ncols` are **subdivisions**, so `heights` holds
+     * `(nrows + 1) * (ncols + 1)` samples in column-major order — measured
+     * against 0.19.3, see `HeightFieldShape` in `@four/physics`.
+     */
+    heightfield(
+      nrows: number,
+      ncols: number,
+      heights: Float32Array,
+      scale: RapierVector3,
+    ): RapierColliderDesc3d;
   };
   readonly Ray: new (origin: RapierVector3, dir: RapierVector3) => RapierRay3d;
   readonly Ball: new (radius: number) => RapierShape3d;
@@ -1097,6 +1121,13 @@ export interface Rapier3dModule {
     halfDepth: number,
   ) => RapierShape3d;
   readonly Capsule: new (halfHeight: number, radius: number) => RapierShape3d;
+  readonly Cylinder: new (halfHeight: number, radius: number) => RapierShape3d;
+  readonly Cone: new (halfHeight: number, radius: number) => RapierShape3d;
+  /** `indices = null` asks Rapier to compute the hull of `vertices`. */
+  readonly ConvexPolyhedron: new (
+    vertices: Float32Array,
+    indices: Uint32Array | null,
+  ) => RapierShape3d;
 }
 
 /**

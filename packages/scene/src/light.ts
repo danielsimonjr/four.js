@@ -47,17 +47,26 @@
  */
 
 import { Vector3 } from "@four/math";
+import type { ColorRGB } from "@four/math";
 
 import { Node } from "./node.js";
 import { resolveWorldTransform } from "./world-transforms.js";
 
 /**
- * Straight RGB, each component nominally in 0…1, no color space attached
- * (§60a — see `UnlitMaterial`'s color-space note; the same deferral). A
- * mutable 3-tuple for the reason `ColorRGBA` is: a light color is not a
- * geometric vector, and a plain array uploads without an adapter.
+ * Straight RGB, each component nominally in 0…1 — `@four/math`'s
+ * {@link ColorRGB}, re-exported (hoisted 2026-08-08 by R-15's colour packet,
+ * exactly as `ColorRGBA` was hoisted 2026-08-04).
+ *
+ * The declaration moved; the type did not. A light colour is a **linear-light**
+ * value: §60a makes the GPU pipeline linear-light, and `@four/render` uploads
+ * these numbers to the shader as they stand. An author who has a CSS string
+ * decodes it first — §60a says a string denotes *sRGB* — with `@four/math`'s
+ * `srgbToLinearRGB(parseColorRGB("#ffcc00"), light.color)`. The option is not
+ * widened to accept the string itself: §101's shipped-name mapping says colours
+ * are "linear RGBA arrays in 0..1 (§60a), not CSS strings" for this tier, and
+ * changing that is an owner decision, recorded 2026-08-08.
  */
-export type ColorRGB = [red: number, green: number, blue: number];
+export type { ColorRGB } from "@four/math";
 
 /** Construction arguments of {@link DirectionalLight} (§68). */
 export interface DirectionalLightOptions {

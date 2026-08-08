@@ -835,6 +835,8 @@ export interface FakeJoint {
   limits: { min: number; max: number } | null;
   /** The last motor `setJointMotor` received, or `null`. */
   motor: SolverJointMotor | null;
+  /** Whether the joined bodies still collide (§28); PH-22f. */
+  collisionEnabled: boolean;
   alive: boolean;
 }
 
@@ -910,6 +912,7 @@ export class FakeJointSolverAdapter
       reactionAngular: new Vector3(),
       limits: null,
       motor: null,
+      collisionEnabled: desc.collisionEnabled ?? false,
       alive: true,
     });
     this.#recordJoint("createJoint", id, desc.type);
@@ -946,6 +949,12 @@ export class FakeJointSolverAdapter
     const joint = this.#requireJoint(handle);
     joint.motor = { ...motor };
     this.#recordJoint("setJointMotor", joint.id, { ...motor });
+  }
+
+  setJointCollisionEnabled(handle: PhysicsJointHandle, enabled: boolean): void {
+    const joint = this.#requireJoint(handle);
+    joint.collisionEnabled = enabled;
+    this.#recordJoint("setJointCollisionEnabled", joint.id, enabled);
   }
 
   getJointId(handle: PhysicsJointHandle): number {

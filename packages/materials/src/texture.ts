@@ -38,6 +38,8 @@
  * geometry and material.
  */
 
+import type { ColorSpace } from "@four/math";
+
 /**
  * The read surface of a texture, as a material and a rendering backend see it
  * (§77) — see the module header for why it is declared in this package rather
@@ -78,4 +80,24 @@ export interface MaterialTexture {
 
   /** Whether the texture has been disposed (§83). */
   readonly disposed: boolean;
+
+  /**
+   * The colour space the texels are in — §60a's texture metadata, read by the
+   * backend on the upload path (R-15, 2026-08-08).
+   *
+   * **Optional, and absent means `"linear"`.** §60a says colour textures
+   * *default* to sRGB-encoded; this tier defaults them to linear instead, and
+   * the deviation is deliberate and dated: flipping the default would change
+   * what every already-authored texture in the engine looks like — every pixel
+   * golden with it — for scenes that never asked for colour management. An
+   * author who has sRGB-encoded texels (a decoded PNG, an authored albedo map)
+   * says so with `colorSpace: "srgb"` and the backend decodes on sample; the
+   * §60a-conformant default is an owner decision, recorded with R-15.
+   *
+   * Optional rather than required so that a test double, a procedurally
+   * generated atlas, and every texture written before this field existed keep
+   * satisfying the contract without a line of change. Read it as
+   * `texture.colorSpace ?? "linear"`.
+   */
+  readonly colorSpace?: ColorSpace;
 }
