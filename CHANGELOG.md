@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-08 — A-27 closed (CPU tier): §86 benchmarks for UI layout and glyph layout
+
+#### Added
+
+- **Two new §86 benchmarks + a runner (A-27).** `benchmarks/ui-layout.mjs` measures the
+  layout-and-state half of _retained UI nodes: 5 000_ — **11.7 ms cold / 10.1 ms warm**
+  per `layout()` on the recorded host, inside a 60 Hz frame (60 Hz stated explicitly as
+  an interpretation borrowed from neighbouring rows — §86 gives this row a count, no
+  rate). `benchmarks/text-layout.mjs` measures the layout half of _animated glyphs:
+  20 000_ — **2.19 ms, 109 ns/glyph**, with a two-term per-call/per-glyph attribution
+  (residual 4.3%, published). `run-all.mjs` + `pnpm bench` run all seven scripts
+  process-per-script (JIT/heap isolation; a throw cannot take the run's records) and
+  write `results/suite.json` — a manifest, **never a gate**: the runner asserts on no
+  timing (a threshold would be the back door `benchmarks/README.md` forbids).
+- **Both §86 rows stay unmet as whole rows, honestly**: their draw halves are blocked
+  on §55 `frame`/§65 batching and on a GPU — the README table gains a third category,
+  **`half`**, beside `hardware` and `feature`. Findings recorded, not acted on: §74's
+  layout has no dirty tracking (text measurement is only 15–25% of a cold pass — the
+  rest is an unconditional walk, the `resolveWorldTransforms` shape in a second
+  subsystem); `layoutText`'s per-glyph cost is ~80% allocate-and-freeze, so the future
+  optimisation is a flat coordinate buffer, not faster math. The five pre-existing
+  records were re-recorded on this (loaded, shared) host — `physics-step`'s +24% is
+  explicitly non-attributable (concurrent agents + the PH-22 rebuild) and should be
+  re-recorded on a quiet host, not read as a regression. Still absent: the non-gating
+  CI trend job (stated in the README, not implied).
+
 ### 2026-08-08 — PH-22 sweep: all fourteen roll-ups triaged; four closed or advanced
 
 #### Added

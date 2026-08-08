@@ -28,6 +28,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-08 — A-27 §86 benchmarks (CPU tier).** Decisions worth keeping:
+  - **A §86 row with a measurable CPU half and a blocked draw half is recorded as
+    `half`, never as measured** — the benchmarks README now has that third category
+    beside `hardware` and `feature`.
+  - §86 states the retained-UI and animated-glyph rows as **counts with no rate**;
+    60 Hz is an interpretation borrowed from neighbouring rows and must be labelled as
+    such wherever it appears.
+  - **The runner asserts on no timing** — exit 1 = a benchmark failed, exit 2 =
+    operator error; a timing threshold would be the back door the benchmarks README
+    forbids. Process-per-script is deliberate isolation (JIT, heap, throw containment).
+  - **Gotcha:** a committed benchmark record may not contain a short array of scalars —
+    Prettier collapses it while `JSON.stringify(…,null,2)` expands it, so the format
+    gate fails; use an object (written into the README's Results section).
+  - The 2026-08-08 re-records were taken on a loaded shared host; `physics-step`'s
+    +24% is explicitly non-attributable — re-record on a quiet host before reading any
+    trend.
+
 - **2026-08-08 — PH-22 sweep.** Decisions worth keeping:
   - **A composite shape is a legal collider and an illegal §30 query shape** — Rapier
     answers _wrongly_ (zero intersections) rather than failing; `validateQueryShape`

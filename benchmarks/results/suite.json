@@ -1,0 +1,105 @@
+{
+  "_note": "Recorded measurement, not a gate. Nothing in CI asserts on these timings; see benchmarks/README.md for how the numbers are to be read and why this host is not 'suitable hardware'.",
+  "benchmark": "suite",
+  "specification": "§86 (performance targets), §92 (performance tests); A-27",
+  "recordedAt": "2026-08-08T14:48:49.351Z",
+  "runner": "node benchmarks/run-all.mjs",
+  "manifestNote": "A manifest of what ran, not a summary of what was measured: no number is copied out of a script's own record, because one number in two files is one number that can disagree with itself. Read results/<name>.json for a result.",
+  "wallSecondsNote": "Wall-clock per child process. NOT a measurement of the code under test: it includes Node start-up, loading the built dist, scenario construction and every warm-up.",
+  "scriptsRequested": 7,
+  "scriptsInSuite": 7,
+  "scriptsFailed": 0,
+  "totalWallSeconds": 84.32,
+  "scripts": [
+    {
+      "script": "math-ops.mjs",
+      "record": "math-ops",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 3.53,
+      "wrote": {
+        "benchmark": "math-ops",
+        "recordedAt": "2026-08-08T14:47:28.543Z"
+      }
+    },
+    {
+      "script": "scene-propagation.mjs",
+      "record": "scene-propagation",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 4.24,
+      "wrote": {
+        "benchmark": "scene-propagation",
+        "recordedAt": "2026-08-08T14:47:32.684Z"
+      }
+    },
+    {
+      "script": "physics-step.mjs",
+      "record": "physics-step",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 45.96,
+      "wrote": {
+        "benchmark": "physics-step",
+        "recordedAt": "2026-08-08T14:48:18.704Z"
+      }
+    },
+    {
+      "script": "animation-sampling.mjs",
+      "record": "animation-sampling",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 7.68,
+      "wrote": {
+        "benchmark": "animation-sampling",
+        "recordedAt": "2026-08-08T14:48:26.374Z"
+      }
+    },
+    {
+      "script": "particles-100k.mjs",
+      "record": "particles-100k",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 14.6,
+      "wrote": {
+        "benchmark": "particles-100k",
+        "recordedAt": "2026-08-08T14:48:41.030Z"
+      }
+    },
+    {
+      "script": "ui-layout.mjs",
+      "record": "ui-layout",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 4.63,
+      "wrote": {
+        "benchmark": "ui-layout",
+        "recordedAt": "2026-08-08T14:48:45.641Z"
+      }
+    },
+    {
+      "script": "text-layout.mjs",
+      "record": "text-layout",
+      "status": "ok",
+      "exitCode": 0,
+      "failure": null,
+      "wallSeconds": 3.67,
+      "wrote": {
+        "benchmark": "text-layout",
+        "recordedAt": "2026-08-08T14:48:49.322Z"
+      }
+    }
+  ],
+  "hostNode": "v22.22.2",
+  "hostPlatform": "linux x64",
+  "hostCpuModel": "Intel(R) Xeon(R) Processor @ 2.80GHz",
+  "hostCpuCount": 4,
+  "hostTotalMemoryGb": 15.7,
+  "hostCaveat": "CI container, no GPU, shared host. Every script's own record carries the same host block and its own caveat; this file records only that they ran together, here, on this date."
+}
