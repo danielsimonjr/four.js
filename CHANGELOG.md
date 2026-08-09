@@ -8,6 +8,42 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-24 closed (model + flatten tier): the §51 path model
+
+#### Added
+
+- **§51 `Path` in `@four/geometry` (R-24)** — §98's own placement ("path model,
+  tessellation module"). Six segment kinds as a readable command list behind a fluent
+  builder (spec's names — `cubicCurveTo`, not Canvas's; **no `fromCommands`**: the
+  builder _is_ the well-formedness invariant, so every reader below can assume it).
+  **13 of 17 §51 operations ship**: flatten (adaptive), subdivide (exact de Casteljau/
+  angle halving), simplify, reverse, transform (a non-similarity matrix on an
+  arc-bearing path is **refused**, not silently squashed), length, arc-length
+  `pointAt`/`tangentAt`/`normalAt` (what text-along-path needs), `closestPoint`, and
+  both fill rules via `fillRings`. Staged with named owners: offset path → R-16 (an
+  offset at a concave corner _is_ §58's join rule — building it first invents that
+  rule twice); the four booleans → the planar-subdivision packet §52 also needs, built
+  once together. Arcs canonicalize to a **signed sweep** rather than the raw end angle
+  — reverse/subdivide/transform become one line each.
+- **The first §33 golden pinning two tiers at once**, because §51 has two kinds of
+  segment and only one can be exact: Béziers **cross-platform** (de Casteljau at t=½ is
+  exact halving — and the claim is _asserted mechanically_: integer control points +
+  power-of-two tolerances make every emitted coordinate a dyadic rational, checked as
+  `x·2²⁴ ∈ ℤ` for all 25 330 of them), arcs **same-runtime** (a point on an arc _is_
+  sin/cos, and the sample _count_ comes from `acos`+`ceil`). Two `_tier` strings, two
+  digests — merging them would let a transcendental slipped into the Bézier path hide
+  inside the arc half's weaker claim.
+- **The flatten → tessellate handoff proven against analytic areas** (no magic
+  epsilons — the bound is the flattening's own `tolerance × length`): every fillable
+  §50 shape fills across the package boundary, including a three-ring letter "e" —
+  `fillRings`' grouping is what makes an **island** expressible (its own region, not a
+  hole-in-a-hole §52 refuses). Three real bugs found by the oracles, not by reading:
+  an inverted winding sign, a full-turn arc missing its own start by an ulp, an open
+  subpath double-counting its closing edge. **R-23 is unblocked for all 14 §50 shape
+  fills; R-26 has a model to import SVG into; §119's chart workaround becomes
+  retirable when R-23 lands.** Bundle cost: **zero bytes, A/B byte-identical**
+  (`Matrix3` is a type-only import). Graph artifacts regenerated.
+
 ### 2026-08-09 — R-25 closed (polygon tier): §52 tessellation; the 2D vector stack begins
 
 #### Added

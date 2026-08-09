@@ -1,0 +1,23 @@
+{
+  "_warning": "IMMUTABLE. These digests are gap R-24 (§51 path model) recorded on 2026-08-09 from an actual run of tests/determinism/helpers/path-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means the path model changed what it produces — a different flattening, a different subdivision, a different reversal, a different fill grouping. Find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper (or to intended §51 semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js flattens the same curve the same way twice.",
+  "_scenario": "Two catalogues, hashed separately. The 'bezier' half is 7 hand-written paths (square, letter O, even-odd island, quadratic wave, cubic blob, collinear run, subpath-after-close) plus 120 seeded paths of lines, quadratics and cubics on an integer ±32 grid. The 'arc' half is 6 hand-written paths (circle, rounded rectangle of four arcs, sector, ring, rotated ellipse, arc between a line and a cubic) plus 120 seeded elliptical arcs at quarter- and eighth-turn angles. Each path is flattened at tolerance 0.25 and 0.0625, grouped by fillRings at both, then subdivided twice, reversed and simplified, and every number produced is checksummed per plan D6. The arc half additionally hashes length, pointAt/tangentAt at nine parameters and a closestPoint query — the operations that take a square root.",
+  "_tiers": "THE TWO HALVES CLAIM DIFFERENT §33 TIERS, AND THAT IS THE POINT. 'bezier' claims cross-platform: integer control points, power-of-two tolerances, de Casteljau at t=1/2 ((a+b)*0.5 — one rounding, exact halving) and a flatness test of cross products against a squared tolerance, so every emitted coordinate is an exactly representable dyadic rational (the test asserts x * 2^24 is an integer for all 25330 of them) and no conforming engine may differ. 'arc' claims same-runtime only: a point on an arc is centre + r*(cos t, sin t), the sample count comes from Math.acos and Math.ceil, and ECMA-262 leaves all of those implementation-approximated — so both the values and, at a boundary tolerance, the sample count are allowed to differ between engines. Do not merge these two digests: a single averaged number would let a transcendental introduced into the Bézier path hide inside the arc half's weaker claim.",
+  "seed": 1369952844,
+  "tolerances": [0.25, 0.0625],
+  "bezier": {
+    "_tier": "cross-platform",
+    "paths": 127,
+    "points": 12665,
+    "summaryDigest": 238278926,
+    "firstPathDigest": 1093909749,
+    "lastPathDigest": 1506448987
+  },
+  "arc": {
+    "_tier": "same-runtime",
+    "paths": 126,
+    "points": 2540,
+    "summaryDigest": 1029896809,
+    "firstPathDigest": 1677531247,
+    "lastPathDigest": 3650947870
+  }
+}
