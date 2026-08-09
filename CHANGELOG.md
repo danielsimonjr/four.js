@@ -8,6 +8,71 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — A-18's abort half and A-9's `pointerType` closed
+
+#### Added
+
+- **§76 cancellation (A-18)** — `assets.load(url, loader, { signal })` takes any
+  `AbortSignalLike` (the DOM's `AbortSignal` satisfies it structurally). Three rules, each
+  with the test that would fail without it: (1) **an aborted load never holds a reference** —
+  a signal that already fired is refused before the cache is consulted, one that fires later
+  hands its reference back, so an aborted load must not be released, exactly like a failed
+  one; (2) **one waiter's abort is not the others'** — aborting decrements, and the request is
+  abandoned only when the last waiter goes, so a coalesced load still delivers to whoever
+  stayed; (3) **`release` is not `abort`** — releasing the last reference to a pending load
+  still lets it settle, because rejecting a promise the caller is still holding turns an
+  orderly teardown into an unhandled rejection in application code. Cancellation rejects with
+  `ASSET_LOAD_FAILED` and `context.reason === "aborted"` (§89 has no cancellation code, and a
+  discriminating context says it without widening the engine's error vocabulary).
+- **Transport-level abort (A-18)** — `AssetManagerOptions.abortController: () => new
+AbortController()`, reported by `AssetManager.canAbortTransport`. **Presence is the
+  capability**: without it the promise semantics are identical and the socket drains; with it
+  the last waiter's abort cancels the request, and so does a load that outruns
+  `timeoutSeconds` — the §96 deadline no longer leaves a request running.
+- **`pointerType` on every pointer event (A-9 remainder)** — `PointerDeviceType`
+  (`"mouse" | "pen" | "touch"`) on `ScenePointerEvent`, fed from
+  `SurfacePointerEvent.pointerType` and carried onto synthesized events (`click`, enter,
+  leave) too.
+
+#### Fixed
+
+- **A mouse no longer loses its hover when it clicks (A-9).** The A-9 teardown ended hover for
+  every device, so a `@four/ui` widget dropped its hover highlight the instant it was clicked
+  and regained it on the next move. A release now forgets the pointer _unless_ the device
+  outlives its own gesture and has a hover worth keeping — in practice a mouse over a node.
+  `pointercancel` still ends every pointer (the platform said it is gone; second-guessing that
+  with device knowledge would be a guess), pen is not treated as persistent, and a source that
+  reports no device keeps its pre-2026-08-09 behaviour exactly.
+
+#### Measured, and it decided the design
+
+- **The generic `FetchLike<TSignal>` seam works** — `typeof fetch` is assignable to
+  `FetchLike<AbortSignal>`, so `{ fetch, abortController }` still needs no adapter and
+  `@four/assets` still names no DOM type. The 2026-08-07 finding it replaces (a _concrete_
+  `AbortSignalLike` parameter makes the platform `fetch` stop satisfying the seam) is kept in
+  source.
+- **`TSignal` must not reach the instance type.** With `#fetch: FetchLike<TSignal>`,
+  `AssetManager<AbortSignal>` is **not** assignable to `AssetManager` — which would have
+  broken `new Application({ assets })` for exactly the managers that gained the capability.
+  The seam is therefore erased at the constructor; every instantiation stays mutually
+  assignable, asserted in `tests/integration/asset-abort.test.ts`.
+- **`SurfacePointerEvent.pointerType` is typed `string`, not the union.** `lib.dom` declares
+  `PointerEvent.pointerType: string`, so narrowing the seam makes a real `PointerEvent` stop
+  satisfying it. The narrowing happens once inside `@four/input`, and a vendor value or `""`
+  becomes an **absent** `pointerType` rather than a refusal: §85's refuse-don't-clamp governs
+  configuration the application got wrong, not hardware telemetry arriving mid-gesture, where
+  a throw would break input on a device newer than the union.
+
+#### Unchanged, proven
+
+- **No §83 regression from the retained mouse entry**: it exists only to hold a live hover, a
+  mouse over nothing is forgotten like any other pointer, and a mouse's `pointerId` is stable —
+  10 000 mouse clicks leave `trackedPointerCount` at 1, and A-9's original 10 000-gesture
+  touch/cancel test is untouched at 0.
+- Coverage stays 100/100/100/100 on both `@four/assets` (77 tests) and `@four/input` (133).
+  Bundle: `@four/assets` is in no example bundle; `@four/input` +111 B gzip A/B-measured in
+  isolation, `ui-demo` at 36.06/37 kB.
+
 ### 2026-08-09 — R-23 closed (solid-fill tier): §50 native 2D shape nodes
 
 #### Added

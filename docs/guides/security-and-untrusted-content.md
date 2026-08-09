@@ -16,15 +16,15 @@ deployer can write their headers from.
 §96 lists seven requirements. Four are met, one is partial, and two are absent
 because the feature they would guard does not exist yet.
 
-| §96 requirement                                  | State       | Where                                                                                                                                                                                      |
-| ------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| bounds checking                                  | **met**     | `validateSceneDocument` / `validateReplayRecording` rebuild a document field by field and drop every key they do not know; geometry validates index ranges; base64 is canonical-only       |
-| no arbitrary code execution from scene files     | **met**     | the formats are JSON; `cloneJsonValue` refuses a `__proto__` key; nothing anywhere in the engine calls `eval` or builds a `Function` from a string (see "CSP posture", which is tested)    |
-| input-size limits                                | **met**     | `AssetManagerOptions.maximumBytes` for transport; `maximumTextLength` on `decodeSceneDocument` / `decodeReplayRecording` for documents — all three finite by default                       |
-| cancellation and timeouts for expensive decoders | **partial** | `AssetManagerOptions.timeoutSeconds` bounds a whole load, transport and decode together. Caller-driven cancellation and transport-level `AbortSignal` are still staged — see "What is not" |
-| documented content-security-policy behavior      | **met**     | this guide's "CSP posture" section, enforced by `tests/integration/security-csp.test.ts`                                                                                                   |
-| decompression limits                             | **absent**  | no compressed path exists (no gzip, no Draco, no Basis) — there is nothing yet to bound                                                                                                    |
-| safe shader/plugin boundaries                    | **absent**  | there is no plugin system, and no application-authored shader source path; see `custom-shaders.md` for the staged §60 seam                                                                 |
+| §96 requirement                                  | State      | Where                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bounds checking                                  | **met**    | `validateSceneDocument` / `validateReplayRecording` rebuild a document field by field and drop every key they do not know; geometry validates index ranges; base64 is canonical-only                                                                                                    |
+| no arbitrary code execution from scene files     | **met**    | the formats are JSON; `cloneJsonValue` refuses a `__proto__` key; nothing anywhere in the engine calls `eval` or builds a `Function` from a string (see "CSP posture", which is tested)                                                                                                 |
+| input-size limits                                | **met**    | `AssetManagerOptions.maximumBytes` for transport; `maximumTextLength` on `decodeSceneDocument` / `decodeReplayRecording` for documents — all three finite by default                                                                                                                    |
+| cancellation and timeouts for expensive decoders | **met**    | `AssetManagerOptions.timeoutSeconds` bounds a whole load, transport and decode together; `load(url, loader, { signal })` cancels one caller's load, and `AssetManagerOptions.abortController` extends both to the request itself (`canAbortTransport` reports whether a manager has it) |
+| documented content-security-policy behavior      | **met**    | this guide's "CSP posture" section, enforced by `tests/integration/security-csp.test.ts`                                                                                                                                                                                                |
+| decompression limits                             | **absent** | no compressed path exists (no gzip, no Draco, no Basis) — there is nothing yet to bound                                                                                                                                                                                                 |
+| safe shader/plugin boundaries                    | **absent** | there is no plugin system, and no application-authored shader source path; see `custom-shaders.md` for the staged §60 seam                                                                                                                                                              |
 
 Depth limiting is the sixth item's neighbour rather than one of the seven, and
 it is met: both decoders bound JSON nesting. It matters more than its absence
@@ -164,23 +164,21 @@ explains.
 ## What is not covered
 
 Being explicit about the holes is the point of the honest-state table; these
-are the three that most affect how you deploy:
+are the two that most affect how you deploy:
 
-1. **Transport-level cancellation.** `timeoutSeconds` releases the _caller_ —
-   the promise rejects and the cache entry is evicted, so the key is
-   immediately retryable — but the underlying request is not aborted and may
-   drain in the background. A signal cannot be threaded through the
-   `FetchLike` seam without either naming DOM types the package refuses to
-   name, or breaking the property that a platform `fetch` needs no adapter; the
-   compatible design (a generic signal parameter) is recorded in
-   `packages/assets/src/asset-manager.ts`'s staging note.
-2. **Decompression limits.** Nothing in the engine decompresses anything yet.
+1. **Decompression limits.** Nothing in the engine decompresses anything yet.
    When a compressed texture or a gzipped scene lands, it needs a ratio bound
    as well as an output bound — an input-size limit alone does not stop a zip
    bomb.
-3. **Shader and plugin boundaries.** There is no plugin system, and no path by
+2. **Shader and plugin boundaries.** There is no plugin system, and no path by
    which a scene file can name shader source. Both would be new trust
    boundaries and both need their own §96 pass when they arrive.
+
+(Transport-level cancellation left this list on 2026-08-09: `load(url, loader,
+{ signal })` cancels a caller's load, and `AssetManagerOptions.abortController`
+aborts the underlying request — for the `timeoutSeconds` deadline too. A decode
+that has already begun still runs to its end — no signal reaches inside a
+loader — but its result is discarded and its cache slot freed.)
 
 Beyond §96's list, two ordinary web-application responsibilities remain the
 application's, not the engine's: four.js never validates that a URL points

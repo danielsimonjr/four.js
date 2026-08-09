@@ -11,10 +11,10 @@
  * §76 asks the asset manager for deduplication, caching, reference counting,
  * lazy loading, streaming, dependency graphs, progress reporting, cancellation,
  * retries, worker decoding, hot reload, and content hashing. This module ships
- * the first four plus retries, and stages the rest with dated notes (see
- * "Staged", below). The MVP reading is the plan's (P11-2): an asset manager
- * whose caching and lifetime rules are exactly specified and fully tested beats
- * a wider surface whose corners are guesses.
+ * the first four plus retries and cancellation, and stages the rest with dated
+ * notes (see "Staged", below). The MVP reading is the plan's (P11-2): an asset
+ * manager whose caching and lifetime rules are exactly specified and fully
+ * tested beats a wider surface whose corners are guesses.
  *
  * ## Everything is injected, including IO
  *
@@ -66,9 +66,53 @@
  *
  * On the last release the entry is evicted and, if the asset implements
  * `Disposable` (§83), disposed. Releasing an asset whose load is still in flight
- * is legal: the entry stays until the fetch settles (there is nothing to cancel
- * yet — see "Staged"), and is evicted and disposed the moment it does, so a
- * released asset never lingers in the cache.
+ * is legal: the entry stays until the fetch settles, and is evicted and disposed
+ * the moment it does, so a released asset never lingers in the cache.
+ *
+ * ## Cancellation (§76, 2026-08-09)
+ *
+ * A caller that may stop wanting an asset passes a signal:
+ *
+ * ```ts
+ * const controller = new AbortController();
+ * const level = assets.load("/levels/1.json", jsonLoader, {
+ *   signal: controller.signal,
+ * });
+ * controller.abort();   // `level` rejects; the reference it took is given back
+ * ```
+ *
+ * Three rules, and they are the whole contract:
+ *
+ * 1. **An aborted load never holds a reference.** A signal that is already
+ *    aborted refuses before the cache is even consulted — no entry, no fetch, no
+ *    increment. A signal that aborts later hands back the one reference its
+ *    `load` took. Either way the caller must **not** call {@link
+ *    AssetManager.release} for it, exactly as it would not for a load that
+ *    failed.
+ * 2. **One waiter's abort is not the others'.** Aborting decrements; the fetch
+ *    is abandoned only when the count reaches zero, i.e. when the *last* waiter
+ *    on a coalesced load has gone. A second caller awaiting the same key still
+ *    gets its asset. This is the only answer consistent with the refcount above:
+ *    a coalesced load is shared, so no single sharer may cancel it.
+ * 3. **`release` is not `abort`.** Releasing the last reference to a pending load
+ *    still lets it settle (rule unchanged since WP-11.2). `release` says "I no
+ *    longer need the asset"; it is not permission to reject a promise the caller
+ *    is still holding — doing so would turn an orderly teardown into an
+ *    unhandled rejection in application code. Cancellation has its own channel
+ *    because it is the caller *asking* for that rejection.
+ *
+ * When the last waiter aborts, the entry is evicted immediately (so the key is
+ * retryable at once and no later `load` coalesces onto a load nobody wants), and
+ * the transport is aborted **if the manager was given the capability** —
+ * {@link AssetManagerOptions.abortController}, reported by
+ * {@link AssetManager.canAbortTransport}. Without it the promise semantics are
+ * identical and the socket merely drains, exactly as with the §96 deadline. The
+ * deadline uses the same handle: a timed-out load now aborts its request instead
+ * of leaving it running.
+ *
+ * The signal itself is structural ({@link AbortSignalLike}) — the DOM's
+ * `AbortSignal` satisfies it, and so does `{ aborted: false, addEventListener,
+ * removeEventListener }` in a test.
  *
  * ## Untrusted content (§96)
  *
@@ -98,7 +142,11 @@
  * A refused load rejects with `ASSET_LOAD_FAILED` carrying
  * `context.limitName` (`"maximumBytes"` or `"timeoutSeconds"`), `context.limit`,
  * and — where there is one — `context.observed`. Like every other failure it is
- * not cached, so retrying is calling {@link AssetManager.load} again.
+ * not cached, so retrying is calling {@link AssetManager.load} again. An aborted
+ * load rejects with the same code and `context.reason = "aborted"`: §89's list
+ * has no cancellation code, and inventing one in `@four/core` to say what a
+ * discriminating `context` already says would widen the engine's error
+ * vocabulary for one caller.
  *
  * ## Failures are never cached
  *
@@ -113,34 +161,38 @@
  * diagnosed its own failure precisely should not have that diagnosis buried
  * under a generic wrapper.
  *
+ * ## How the signal crosses the IO seam (measured, 2026-08-07 and 2026-08-09)
+ *
+ * A signal cannot simply be added to {@link FetchLike} as a concrete structural
+ * type: widening it to `(url: string, init?: { signal?: AbortSignalLike }) => …`
+ * makes the platform `fetch` **stop** satisfying it, because parameters are
+ * contravariant and the DOM's `RequestInit.signal` is `AbortSignal | null` — a
+ * structural `AbortSignalLike` "is missing the following properties from type
+ * 'AbortSignal': onabort, reason, throwIfAborted, dispatchEvent", and the
+ * missing ones cannot be declared without naming DOM types this package
+ * refuses to name. `{ fetch }` would then need an adapter, and this module's
+ * documented "no adapter needed" property would be gone.
+ *
+ * The shape that works — recorded here on 2026-08-07 as a design, built on
+ * 2026-08-09 — is a *generic* seam: `FetchLike<TSignal = never>` paired with an
+ * injected `() => { signal: TSignal; abort(): void }`. `TSignal` is inferred
+ * from the browser's own `AbortController`, so `{ fetch, abortController: () =>
+ * new AbortController() }` type-checks with no adapter and no DOM type named
+ * here, while `{ fetch }` alone still infers `never` and every pre-existing call
+ * site keeps compiling.
+ *
+ * One further measurement decided the *storage*, and it is not obvious: keeping
+ * `TSignal` in a field (`#fetch: FetchLike<TSignal>`) makes `AssetManager` vary
+ * with it, and `AssetManager<AbortSignal>` is then **not** assignable to
+ * `AssetManager` — which would break `new Application({ assets })` for exactly
+ * the managers that gained the capability. So the seam is erased at the
+ * constructor: `TSignal` appears only in {@link AssetManagerOptions}, where it
+ * does its one job of forcing `fetch` and `abortController` to agree, and the
+ * fields hold a signal-agnostic closure. Every instantiation of the class is
+ * therefore mutually assignable, as it was before.
+ *
  * ## Staged (dated notes, 2026-08-02, WP-11.2)
  *
- * - **Cancellation / `AbortSignal`.** Half of this landed with
- *   {@link AssetManagerOptions.timeoutSeconds} (§96): a load now has a
- *   deadline, and passing it rejects the caller's promise and evicts the entry.
- *   What is still absent is *caller-driven* cancellation and transport-level
- *   abort. The policy question is unchanged and still unpinned (does releasing
- *   the last reference to a pending load abort it? does one aborting caller
- *   cancel a coalesced load for the others?), and both answers are load-bearing
- *   for the refcount rules above.
- *
- *   There is now also a *typing* obstacle worth recording, because it decides
- *   the shape of whatever closes the rest (measured 2026-08-07). A signal
- *   cannot simply be added to {@link FetchLike}: widening it to
- *   `(url: string, init?: { signal?: AbortSignalLike }) => …` makes the
- *   platform `fetch` **stop** satisfying it, because parameters are
- *   contravariant and the DOM's `RequestInit.signal` is `AbortSignal | null` —
- *   a structural `AbortSignalLike` "is missing the following properties from
- *   type 'AbortSignal': onabort, reason, throwIfAborted, dispatchEvent", and
- *   the missing ones cannot be declared without naming DOM types this package
- *   refuses to name. So `{ fetch }` would need an adapter, and the module's
- *   documented "no adapter needed" property would be gone. The compatible shape
- *   is a *generic* seam — `FetchLike<TSignal = never>` paired with an injected
- *   `() => { signal: TSignal; abort(): void }`, which infers `TSignal =
- *   AbortSignal` from a browser's own `AbortController` and keeps every
- *   existing call site valid. That is A-18's remaining half, deliberately not
- *   built here: the deadline above is enforced *above* the seam, so the
- *   caller's promise is always released even though the socket may drain.
  * - **Streaming, dependency graphs, progress reporting, worker decoding, hot
  *   reload, content hashing** (§76). Each needs a contract this packet does not
  *   have: progress needs a byte-length channel `FetchLike` does not expose,
@@ -250,10 +302,76 @@ export const DEFAULT_TIMEOUT_SECONDS = 30;
  * The IO seam: a URL in, a {@link FetchResponse} in, a promise out.
  *
  * The platform `fetch` is assignable to this (its first parameter accepts a
- * `string`, and `Response` structurally satisfies `FetchResponse`), so
- * `{ fetch }` needs no adapter in a browser or in Node ≥ 20.
+ * `string`, `RequestInit.signal` accepts `TSignal = AbortSignal`, and `Response`
+ * structurally satisfies `FetchResponse`), so `{ fetch }` needs no adapter in a
+ * browser or in Node ≥ 20.
+ *
+ * `TSignal` defaults to `never`, which makes {@link FetchInit.signal}
+ * unconstructible: a manager with no {@link AssetManagerOptions.abortController}
+ * never passes an `init`, and a one-parameter `(url) => …` implementation — the
+ * shape every call site used before cancellation landed — is still assignable.
+ * The type parameter exists to tie the transport and the abort handle together;
+ * see the module comment's measurement of why it cannot be a concrete
+ * structural type.
  */
-export type FetchLike = (url: string) => Promise<FetchResponse>;
+export type FetchLike<TSignal = never> = (
+  url: string,
+  init?: FetchInit<TSignal>,
+) => Promise<FetchResponse>;
+
+/**
+ * The one field this package puts in a request `init` — deliberately a subset
+ * of the DOM's `RequestInit`, so the platform `fetch` accepts it unchanged.
+ */
+export interface FetchInit<TSignal> {
+  /** The transport's cancellation signal, when the manager has one to give. */
+  readonly signal?: TSignal;
+}
+
+/**
+ * A cancellation source: a signal to hand the transport and the switch that
+ * trips it. The DOM's `AbortController` satisfies it exactly, which is the
+ * point — `abortController: () => new AbortController()` is the whole
+ * integration.
+ */
+export interface AbortHandle<TSignal> {
+  /** Handed to {@link FetchLike} as `init.signal`. */
+  readonly signal: TSignal;
+  /** Cancels the request the signal was given to. Called at most once. */
+  abort(): void;
+}
+
+/**
+ * The caller's side of cancellation: the subset of the DOM's `AbortSignal` this
+ * package reads, structural for the same reason {@link FetchResponse} is.
+ *
+ * A real `AbortSignal` is assignable to it (measured), and so is a hand-rolled
+ * `{ aborted, addEventListener, removeEventListener }` in a unit test. The
+ * manager both **polls** `aborted` (a signal that fired before the call is
+ * refused without touching the cache) and **subscribes** (a signal that fires
+ * later hands the reference back), so both members are needed;
+ * `removeEventListener` is not optional because a listener that outlived its
+ * load would keep the entry, the loader, and the asset reachable from the
+ * caller's signal.
+ */
+export interface AbortSignalLike {
+  /** Whether cancellation has already been requested. */
+  readonly aborted: boolean;
+  /** Subscribes to the one-shot `"abort"` notification. */
+  addEventListener(type: "abort", listener: () => void): void;
+  /** Unsubscribes a listener added with {@link AbortSignalLike.addEventListener}. */
+  removeEventListener(type: "abort", listener: () => void): void;
+}
+
+/** Per-call options for {@link AssetManager.load}. */
+export interface AssetLoadOptions {
+  /**
+   * Cancels *this* call (§76). See the module comment's three cancellation
+   * rules: an aborted load never holds a reference, one waiter's abort is not
+   * the others', and `release` is not `abort`.
+   */
+  readonly signal?: AbortSignalLike;
+}
 
 /**
  * A decoder: bytes in, an asset out.
@@ -276,14 +394,37 @@ export interface AssetLoader<T> {
   load(response: FetchResponse, url: string): Promise<T>;
 }
 
-/** Construction options for {@link AssetManager}. */
-export interface AssetManagerOptions {
+/**
+ * Construction options for {@link AssetManager}.
+ *
+ * `TSignal` is inferred from whichever of {@link AssetManagerOptions.fetch} and
+ * {@link AssetManagerOptions.abortController} is present, and its only job is to
+ * make the two agree: a controller whose signal the transport would refuse is a
+ * compile error here rather than a `TypeError` at the first load.
+ */
+export interface AssetManagerOptions<TSignal = never> {
   /**
    * The IO implementation. Defaults to `globalThis.fetch` bound to
    * `globalThis`; see the module comment for why an IO manager is allowed a
    * platform default.
    */
-  readonly fetch?: FetchLike;
+  readonly fetch?: FetchLike<TSignal>;
+  /**
+   * Mints one cancellation source per load — `() => new AbortController()` in
+   * any modern runtime (§76).
+   *
+   * **Presence is the capability.** Without it, cancellation still works at the
+   * promise level (an aborted load rejects, gives back its reference, and frees
+   * its cache slot) and the request merely drains; with it, the request is
+   * cancelled at the transport, and so is a request that outlives
+   * {@link AssetManagerOptions.timeoutSeconds}. {@link
+   * AssetManager.canAbortTransport} reports which manager this is, so a caller
+   * never has to guess.
+   *
+   * It is a factory, not a controller: a controller is single-use, and every
+   * load needs its own.
+   */
+  readonly abortController?: () => AbortHandle<TSignal>;
   /**
    * §96 input-size limit, in bytes. Defaults to {@link DEFAULT_MAXIMUM_BYTES}.
    *
@@ -302,8 +443,9 @@ export interface AssetManagerOptions {
    *
    * On expiry the load rejects with `ASSET_LOAD_FAILED` and the entry is
    * evicted, so the caller is released and the key is retryable. The underlying
-   * request is not aborted; see the module comment's staging note on why a
-   * signal cannot cross {@link FetchLike} today.
+   * request is aborted too when the manager was given an
+   * {@link AssetManagerOptions.abortController}, and left to drain when it was
+   * not — the caller's promise settles identically either way.
    *
    * `Number.POSITIVE_INFINITY` disables it — and with it the need for a
    * {@link TimerLike}; anything else must be greater than zero.
@@ -335,7 +477,27 @@ interface CacheEntry {
   value: unknown;
   /** Set when the entry was dropped from the cache before it settled. */
   evicted: boolean;
+  /**
+   * Cancels this load's request, or `undefined` when the manager was given no
+   * {@link AssetManagerOptions.abortController}. Called at most once — by the
+   * last waiter to abort, or by the §96 deadline — and never after the load has
+   * settled, where it would be a no-op anyway.
+   */
+  readonly abort: (() => void) | undefined;
 }
+
+/**
+ * The transport, with its signal type erased.
+ *
+ * The manager stores this rather than a `FetchLike<TSignal>` so that `TSignal`
+ * stays out of the class's instance type; see the module comment's variance
+ * measurement. `signal` is `unknown` here and is only ever the very value the
+ * caller's own {@link AbortHandle} produced.
+ */
+type ErasedFetch = (url: string, signal: unknown) => Promise<FetchResponse>;
+
+/** As {@link ErasedFetch}: an abort source with its signal type erased. */
+type ErasedAbortController = () => AbortHandle<unknown>;
 
 /** Whether `value` opts into explicit disposal (§83). */
 function isDisposable(value: unknown): value is Disposable {
@@ -353,13 +515,29 @@ function isDisposable(value: unknown): value is Disposable {
  * manager constructed in a bare runtime is still usable via injection and only
  * complains if someone actually asks it to fetch.
  */
-function resolveGlobalFetch(): FetchLike | undefined {
-  const scope = globalThis as Partial<{ fetch: FetchLike }>;
+function resolveGlobalFetch<TSignal>(): FetchLike<TSignal> | undefined {
+  const scope = globalThis as Partial<{ fetch: FetchLike<TSignal> }>;
   const globalFetch = scope.fetch;
   if (typeof globalFetch !== "function") {
     return undefined;
   }
-  return (url: string) => globalFetch.call(scope, url);
+  return (url: string, init?: FetchInit<TSignal>) =>
+    globalFetch.call(scope, url, init);
+}
+
+/**
+ * Wraps a caller's transport so the manager can call it without naming
+ * `TSignal` — the erasure the module comment's variance measurement forces.
+ *
+ * The `init` object is built only when there is a signal to put in it, so a
+ * manager without an {@link AssetManagerOptions.abortController} calls
+ * `fetch(url)` exactly as it did before cancellation existed.
+ */
+function eraseFetch<TSignal>(fetchImpl: FetchLike<TSignal>): ErasedFetch {
+  return (url: string, signal: unknown): Promise<FetchResponse> =>
+    signal === undefined
+      ? fetchImpl(url)
+      : fetchImpl(url, { signal: signal as TSignal });
 }
 
 /**
@@ -486,7 +664,7 @@ function boundedResponse(
  * See the module comment for cache identity, coalescing, failure, and disposal
  * semantics — they are the contract, not implementation detail.
  */
-export class AssetManager implements Disposable {
+export class AssetManager<TSignal = never> implements Disposable {
   /**
    * Loader → URL → entry.
    *
@@ -498,7 +676,10 @@ export class AssetManager implements Disposable {
    */
   readonly #entries = new Map<AssetLoader<unknown>, Map<string, CacheEntry>>();
 
-  readonly #fetch: FetchLike | undefined;
+  readonly #fetch: ErasedFetch | undefined;
+
+  /** Mints one cancellation source per load; `undefined` disables the capability. */
+  readonly #abortController: ErasedAbortController | undefined;
 
   /** §96 input-size limit in bytes; `Infinity` when the caller disabled it. */
   readonly #maximumBytes: number;
@@ -511,8 +692,12 @@ export class AssetManager implements Disposable {
 
   #disposed = false;
 
-  constructor(options?: AssetManagerOptions) {
-    this.#fetch = options?.fetch ?? resolveGlobalFetch();
+  constructor(options?: AssetManagerOptions<TSignal>) {
+    const transport = options?.fetch ?? resolveGlobalFetch<TSignal>();
+    this.#fetch = transport === undefined ? undefined : eraseFetch(transport);
+    // Assignable without a cast: `signal` is a covariant position, so an
+    // `AbortHandle<TSignal>` is an `AbortHandle<unknown>`.
+    this.#abortController = options?.abortController;
     this.#maximumBytes = positiveLimit(
       options?.maximumBytes,
       DEFAULT_MAXIMUM_BYTES,
@@ -534,6 +719,18 @@ export class AssetManager implements Disposable {
   /** The effective §96 load deadline in seconds (diagnostics and tests). */
   get timeoutSeconds(): number {
     return this.#timeoutSeconds;
+  }
+
+  /**
+   * Whether cancelling a load also cancels its request — that is, whether an
+   * {@link AssetManagerOptions.abortController} was injected (§76).
+   *
+   * Presence is the capability: {@link AssetManager.load}'s `signal` behaves the
+   * same either way, so this is the honest answer to "did the socket actually
+   * close?", not a switch that changes the API.
+   */
+  get canAbortTransport(): boolean {
+    return this.#abortController !== undefined;
   }
 
   /** Number of cache slots, pending loads included. */
@@ -558,13 +755,23 @@ export class AssetManager implements Disposable {
    * with one {@link release}. A rejection leaves nothing cached, so the same
    * call retries.
    *
+   * `options.signal` cancels **this** call (§76): the promise rejects, the
+   * reference it took is handed back — so an aborted load must not be released —
+   * and the request is abandoned once no waiter is left. See the module
+   * comment's three cancellation rules.
+   *
    * @throws FourError `INVALID_APPLICATION_STATE` if the manager is disposed,
    *   or if it has no `fetch` (none injected and no global one) and would have
    *   had to perform IO.
    * @throws FourError `ASSET_LOAD_FAILED` (asynchronously) on transport
-   *   failure, a non-`ok` response, or a loader that could not decode.
+   *   failure, a non-`ok` response, a loader that could not decode, or
+   *   cancellation (`context.reason === "aborted"`).
    */
-  load<T>(url: string, loader: AssetLoader<T>): Promise<T> {
+  load<T>(
+    url: string,
+    loader: AssetLoader<T>,
+    options?: AssetLoadOptions,
+  ): Promise<T> {
     if (this.#disposed) {
       throw new FourError(
         "INVALID_APPLICATION_STATE",
@@ -573,11 +780,23 @@ export class AssetManager implements Disposable {
       );
     }
 
+    // A signal that has already fired is answered before the cache is even
+    // consulted: no entry, no fetch, no reference to give back. Asynchronously,
+    // because "the caller changed its mind" is an outcome of the load, not a
+    // programming error like a disposed manager.
+    const signal = options?.signal;
+    if (signal?.aborted === true) {
+      return Promise.reject(abortFailure(url, loader.name));
+    }
+
     const byUrl = this.#groupFor(loader);
     const existing = byUrl.get(url);
     if (existing !== undefined) {
       existing.refCount += 1;
-      return existing.promise as Promise<T>;
+      const joined = existing.promise as Promise<T>;
+      return signal === undefined
+        ? joined
+        : this.#withAbort(joined, existing, url, loader, signal);
     }
 
     const fetchImpl = this.#fetch;
@@ -609,6 +828,7 @@ export class AssetManager implements Disposable {
     // `promise` is patched in below: the handlers close over `entry`, so the
     // object has to be built first. It is never observable unset — nothing can
     // read the cache between these two statements, because `byUrl.set` is last.
+    const handle = this.#abortController?.();
     const entry: CacheEntry = {
       url,
       promise: Promise.resolve(),
@@ -616,12 +836,19 @@ export class AssetManager implements Disposable {
       settled: false,
       value: undefined,
       evicted: false,
+      abort:
+        handle === undefined
+          ? undefined
+          : (): void => {
+              handle.abort();
+            },
     };
     const promise = this.#withDeadline(
-      this.#run(fetchImpl, url, loader),
+      this.#run(fetchImpl, url, loader, handle?.signal),
       timer,
       url,
       loader.name,
+      entry.abort,
     ).then(
       (value): T => {
         entry.settled = true;
@@ -642,7 +869,9 @@ export class AssetManager implements Disposable {
     );
     entry.promise = promise;
     byUrl.set(url, entry);
-    return promise;
+    return signal === undefined
+      ? promise
+      : this.#withAbort(promise, entry, url, loader, signal);
   }
 
   /**
@@ -693,8 +922,9 @@ export class AssetManager implements Disposable {
       disposeValue(entry.value);
     }
     // Otherwise the load is still running: `load`'s success handler evicts and
-    // disposes it, because there is nothing to dispose yet and nothing to
-    // abort (cancellation is staged — see the module comment).
+    // disposes it, because there is nothing to dispose yet. The request is
+    // deliberately *not* aborted here — see the module comment's rule 3,
+    // "`release` is not `abort`".
     return true;
   }
 
@@ -767,14 +997,108 @@ export class AssetManager implements Disposable {
   }
 
   /**
+   * One waiter's view of `shared`, cancellable by its own signal (§76).
+   *
+   * A separate promise per waiter is what makes rule 2 possible: rejecting the
+   * caller that aborted must not disturb the callers that did not, and they all
+   * hold the one coalesced `shared`. The `done` latch makes the two outcomes
+   * exclusive in both orders — including the genuine race where a signal fires
+   * synchronously after the load resolved but before this waiter's microtask
+   * runs, which resolves as an abort because that is the order the caller
+   * observed.
+   *
+   * `shared`'s own rejection is consumed by the handler installed here, so a
+   * waiter that aborts first never leaves an unhandled rejection behind.
+   */
+  #withAbort<T>(
+    shared: Promise<T>,
+    entry: CacheEntry,
+    url: string,
+    loader: AssetLoader<unknown>,
+    signal: AbortSignalLike,
+  ): Promise<T> {
+    let done = false;
+    // Definite assignment: the executor below runs synchronously, before
+    // anything can call `onAbort`.
+    let rejectAborted!: (reason: FourError) => void;
+    const finish = (): boolean => {
+      if (done) {
+        return false;
+      }
+      done = true;
+      signal.removeEventListener("abort", onAbort);
+      return true;
+    };
+    const onAbort = (): void => {
+      if (!finish()) {
+        return;
+      }
+      this.#detach(entry, url, loader);
+      rejectAborted(abortFailure(url, loader.name));
+    };
+    const aborted = new Promise<never>((_resolve, reject) => {
+      rejectAborted = reject;
+    });
+    signal.addEventListener("abort", onAbort);
+    // A race, exactly as the deadline is: this promise can only ever reject
+    // with the abort above, and `shared`'s own outcome passes through
+    // untouched — including its error, which is rethrown rather than
+    // reclassified.
+    return Promise.race([
+      shared.then(
+        (value): T => {
+          finish();
+          return value;
+        },
+        (error: unknown): never => {
+          finish();
+          throw error;
+        },
+      ),
+      aborted,
+    ]);
+  }
+
+  /**
+   * Hands back the one reference an aborted `load` took (§76 rule 1).
+   *
+   * Deliberately not {@link AssetManager.release}: that resolves the key through
+   * the cache, and this waiter's reference belongs to `entry` — which a `clear()`
+   * plus a fresh `load` may already have replaced in that slot. The refcount it
+   * decrements is therefore always the one it incremented.
+   *
+   * Reaching zero on a **pending** entry is the only case that differs from
+   * `release`, and it is rule 3's other half: nobody is waiting for these bytes
+   * any more, so the slot is freed at once — leaving it would let the next
+   * `load` coalesce onto a load that is about to be abandoned — and the request
+   * is aborted when the manager can. `evicted` is still set, so a response that
+   * beats the abort is disposed rather than cached.
+   */
+  #detach(entry: CacheEntry, url: string, loader: AssetLoader<unknown>): void {
+    entry.refCount -= 1;
+    if (entry.refCount > 0) {
+      return;
+    }
+    if (entry.settled) {
+      this.#evict(loader, url, entry);
+      disposeValue(entry.value);
+      return;
+    }
+    entry.evicted = true;
+    this.#evict(loader, url, entry);
+    entry.abort?.();
+  }
+
+  /**
    * Bounds `work` by {@link AssetManagerOptions.timeoutSeconds} (§96).
    *
    * The deadline covers transport *and* decode, because §96's requirement names
    * "expensive decoders" and both failure modes look identical to a caller. On
-   * expiry the returned promise rejects; `load`'s own rejection handler then
-   * evicts the entry, so the key is immediately retryable. `work` itself keeps
-   * running — see the module comment's cancellation note — but its result is
-   * discarded, and its settlement clears the timer either way.
+   * expiry the returned promise rejects, `abort` (when the manager has one)
+   * cancels the request, and `load`'s own rejection handler evicts the entry, so
+   * the key is immediately retryable. A decode that has already begun still runs
+   * to its end — no signal can reach inside a loader — but its result is
+   * discarded, and `work` settling clears the timer either way.
    *
    * An infinite timeout returns `work` untouched, so a manager that opted out
    * pays nothing: no timer, no extra promise, no behavioural difference from
@@ -785,6 +1109,7 @@ export class AssetManager implements Disposable {
     timer: TimerLike | undefined,
     url: string,
     loaderName: string,
+    abort: (() => void) | undefined,
   ): Promise<T> {
     const seconds = this.#timeoutSeconds;
     // A missing timer is only reachable with an infinite deadline — `load`
@@ -799,6 +1124,9 @@ export class AssetManager implements Disposable {
     // failures reach the caller through `work`, unwrapped and unreclassified.
     const deadline = new Promise<never>((_resolve, reject) => {
       handle = timer.setTimeout(() => {
+        // Cancel first, reject second: the caller's promise and the socket
+        // should not be able to observe each other in the wrong order.
+        abort?.();
         reject(
           new FourError(
             "ASSET_LOAD_FAILED",
@@ -827,13 +1155,14 @@ export class AssetManager implements Disposable {
 
   /** Fetch, status-check, decode — every failure normalized to `FourError`. */
   async #run<T>(
-    fetchImpl: FetchLike,
+    fetchImpl: ErasedFetch,
     url: string,
     loader: AssetLoader<T>,
+    signal: unknown,
   ): Promise<T> {
     let response: FetchResponse;
     try {
-      response = await fetchImpl(url);
+      response = await fetchImpl(url, signal);
     } catch (error) {
       throw assetLoadFailure(
         `Fetch failed for "${url}".`,
@@ -909,4 +1238,19 @@ function assetLoadFailure(
     return cause;
   }
   return new FourError("ASSET_LOAD_FAILED", message, { context, cause });
+}
+
+/**
+ * The rejection a cancelled load produces (§76).
+ *
+ * `context.reason` discriminates it from every other `ASSET_LOAD_FAILED` — a
+ * caller that retries on failure but not on cancellation needs that distinction,
+ * and §89's code list has no cancellation member to give it one.
+ */
+function abortFailure(url: string, loaderName: string): FourError {
+  return new FourError(
+    "ASSET_LOAD_FAILED",
+    `Loading "${url}" was aborted by the caller.`,
+    { context: { url, loader: loaderName, reason: "aborted" } },
+  );
 }

@@ -28,6 +28,40 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — A-18 abort half + A-9 `pointerType`.** Decisions worth keeping:
+  - **Cancellation semantics for `AssetManager` (A-18).** Three rules, in source as the
+    contract: (1) an aborted load never holds a reference — a pre-aborted signal is
+    refused before the cache is consulted, a later abort hands the reference back, and an
+    aborted load must therefore never be `release`d; (2) one waiter's abort is not the
+    others' — aborting decrements and the request is abandoned only at refcount zero;
+    (3) **`release` is not `abort`** — releasing the last reference to a pending load
+    still lets it settle. Rule 3 deviates from GAP v0's closure sketch ("the last release
+    of a pending load aborts it") on purpose: the caller still holds that promise, and
+    rejecting it turns a tidy teardown into an unhandled rejection in application code.
+    Cancellation has its own channel because it is the caller asking for the rejection.
+  - **A generic type parameter must not reach a class's instance type when the class is
+    named in another package's option type (measured).** `AssetManager<TSignal>` with
+    `#fetch: FetchLike<TSignal>` makes `AssetManager<AbortSignal>` unassignable to
+    `AssetManager`, breaking `ApplicationOptions.assets`. Fix: keep the parameter in the
+    _options_ interface (where it forces `fetch` and `abortController` to agree) and
+    erase it at the constructor. Generalizes to every future capability-typed seam.
+  - **`typeof fetch` IS assignable to `FetchLike<TSignal = never>` =
+    `(url, init?: { signal?: TSignal }) => …` (measured).** This supersedes nothing in
+    the 2026-08-07 note — that finding was about a _concrete_ structural
+    `AbortSignalLike` parameter, which does break it. Generic in, concrete out.
+  - **Unknown platform enum values are reported as absent, not refused (A-9).**
+    `SurfacePointerEvent.pointerType` is typed `string` (because `lib.dom` types
+    `PointerEvent.pointerType` as `string`, and narrowing the seam breaks structural
+    assignability — measured); the `"mouse" | "pen" | "touch"` union lives on the scene
+    event, and a vendor value or `""` yields an absent field. §85's refuse-don't-clamp
+    governs _configuration_, not hardware telemetry arriving mid-gesture: throwing there
+    would break input on a device newer than the union.
+  - **A pointer's teardown is a property of the device, not of the ending (A-9).** A
+    release forgets the pointer unless the device outlives its gesture _and_ has a hover
+    worth keeping (a mouse over a node). `pointercancel` ends every pointer regardless —
+    the platform withdrew it, and device knowledge must not override that. The retained
+    entry cannot re-open §83's leak: a mouse's `pointerId` is stable, and an entry with
+    no hover is dropped.
 - **2026-08-09 — R-23 §50 shape nodes.** Decisions worth keeping:
   - **The honest tier is fill-only, and the three stroke-only primitives get no class at
     all** — line, polyline and the open arc. Fifth application of

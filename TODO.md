@@ -195,11 +195,19 @@ changes in `CHANGELOG.md`.
       `decodeSceneDocument`/`decodeReplayRecording` over `parseUntrustedJson`
       (text-length + iterative depth limits), `UNTRUSTED_INPUT_REJECTED`, the
       security guide, and the CSP grep test
-- [ ] **A-18 half-remaining:** deadline + eviction closed by A-23; still open:
-      caller-driven cancellation and transport `AbortSignal` — the compatible design
-      (generic `FetchLike<TSignal>` + injected abort handle) is recorded in
-      `packages/assets/src/asset-manager.ts`; the naive `signal` parameter widening is
-      proven incompatible with `typeof fetch`
+- [x] **A-18 abort half DONE 2026-08-09** (§76): `load(url, loader, { signal })` over a
+      structural `AbortSignalLike`, refcounted (last waiter's abort abandons the load),
+      `AssetManagerOptions.abortController` + `canAbortTransport` for transport-level
+      abort, which the §96 deadline now uses too. The generic `FetchLike<TSignal>`
+      design recorded on 2026-08-07 was built as recorded; the variance trap it did not
+      foresee (a `TSignal` field breaks `AssetManager<AbortSignal>` → `AssetManager`) is
+      solved by erasing the parameter at the constructor, and both properties are
+      compile-time assertions in `tests/integration/asset-abort.test.ts`
+- [ ] **A-18 remainder:** streaming, dependency graphs, progress reporting, worker
+      decoding, hot reload, content hashing (the last still blocks `A-16`'s §79
+      manifest). Each needs a contract this packet does not have — progress needs a
+      byte-length channel `FetchLike` does not expose, dependency graphs need a loader
+      that can load, hot reload needs a dev-server protocol
 - [ ] **§96 residue:** decompression limits (needed the moment gzip/Draco/Basis lands —
       a size bound alone does not stop a zip bomb); shader/plugin trust boundaries
       (blocked on A-3)
@@ -292,9 +300,13 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       `docs/Architecture/API.md` and `docs/guides/digital-twin.md` were updated in an
       earlier pass; the gap-doc banner was fixed by the 2026-08-07 branch merge; API.md's
       adjacent stale "silently unsaved" claim corrected 2026-08-07 (A-15 made it throw)
-- [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
-      now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
-      Widening that structural interface would let the mouse keep its hover across a click
+- [x] **A-9 remainder DONE 2026-08-09:** `pointerType` runs end to end — platform
+      `string` in, `PointerDeviceType` (`"mouse" | "pen" | "touch"`) on every
+      `ScenePointerEvent`, unknown values reported as absent rather than refused. A
+      mouse now keeps its hover across its own release (a `@four/ui` button no longer
+      un-highlights when clicked — `tests/integration/pointer-type.test.ts`);
+      `pointercancel`, pen, and device-less sources keep the old teardown. Bounded:
+      10 000 mouse clicks leave `trackedPointerCount` at 1
 - [x] **A-16 remainder — done 2026-08-07:** `Renderable`, `Sprite`, both cameras and
       `DirectionalLight` have §79 node-type pairs (`registerRenderSerializers`, chained
       by `composeSceneNodeTypes`). Geometry/material are **references** resolved through
