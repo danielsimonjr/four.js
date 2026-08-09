@@ -1465,8 +1465,15 @@ function arcSweep(
   return wrapped < 0 ? wrapped + TAU : wrapped;
 }
 
-/** The point on an arc's ellipse at local angle `theta` (same-runtime). */
-function arcPoint(command: PathArcCommand, theta: number): Point2D {
+/**
+ * The point on an arc's ellipse at local angle `theta` (same-runtime).
+ *
+ * Package-internal, not part of the barrel: `svg-path.ts` needs an arc's start
+ * and end points to write §50's endpoint-parameterized `A` command, and a
+ * second copy of `centre + R(rotation)·(rx cos θ, ry sin θ)` living there would
+ * be a second place for the rotation's sign to be wrong.
+ */
+export function arcPoint(command: PathArcCommand, theta: number): Point2D {
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
   const localX = command.radiusX * cos;
@@ -1544,7 +1551,7 @@ function transformArc(
  * first point, not at the last point drawn, and a reader that tracked only the
  * current point would silently start it in the wrong place.
  */
-interface PathCursor {
+export interface PathCursor {
   x: number;
   y: number;
   startX: number;
@@ -1552,7 +1559,7 @@ interface PathCursor {
 }
 
 /** A cursor at the origin — where every command list starts. */
-function newCursor(): PathCursor {
+export function newCursor(): PathCursor {
   return { x: 0, y: 0, startX: 0, startY: 0 };
 }
 
@@ -1563,8 +1570,13 @@ function newCursor(): PathCursor {
  * `centre + r·(cos θ, sin θ)` and therefore same-runtime (§33) — which is why
  * an operation on a *Bézier that follows an arc* inherits that tier while the
  * same operation on a path of lines and Béziers does not.
+ *
+ * Package-internal like `arcPoint`, and exported for the same reason: §50's
+ * SVG writer has to know where each command starts, and "a `close` leaves you
+ * at the subpath's first point" is a rule that must have exactly one
+ * implementation.
  */
-function advance(command: PathCommand, cursor: PathCursor): void {
+export function advance(command: PathCommand, cursor: PathCursor): void {
   switch (command.kind) {
     case "move":
       cursor.x = command.x;

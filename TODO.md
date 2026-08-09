@@ -34,6 +34,19 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [ ] **R-26 follow-ups (path-data tier shipped 2026-08-09):** (a) the `<svg>` document
+      tier (`viewBox`, `transform`, `<g>`) is an owner decision — ship a small XML
+      tokenizer in `@four/geometry`, or take a host-parsed document through an injected
+      seam (`DOMParser` is browser-only and packages must stay node-safe per
+      `graph:check`); (b) SVG shape elements map onto R-23's classes and presentation
+      attributes (`fill`/`stroke`/`fill-rule`) onto R-16 when the document tier lands;
+      (c) residual: arc → arc seams still carry §51's sub-ulp implicit connecting
+      segment — tangentially continuous, no §52 refusal observed, but the general fix
+      needs §51 to express "this arc starts exactly here"; (d) a lossy
+      `formatSvgPathData` precision option is deliberately absent — the packet adding it
+      must decide what it does to `golden/svg-path.json`; (e) doc-truth gap found:
+      `tools/check-docs.mjs` does not scan `packages/*/README.md` — 24 unguarded prose
+      surfaces (geometry's was two days stale).
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
       R-13} - A-3 blocking sub-question: `ApplicationOptions.plugins` vs the same-day §40

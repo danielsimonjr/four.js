@@ -8,6 +8,69 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-26 closed (path-data tier): §50 SVG import/export
+
+#### Added
+
+- **§50 SVG path data (R-26)** — `parseSvgPathData(d, options?)` reads an SVG `d`
+  attribute into a §51 `Path`, `formatSvgPathData(path)` writes one back out, both in
+  `@four/geometry` (§98's placement: the `d` attribute is the serialized form of the
+  path model, so it lives beside the model — `render-svg` is a backend, `@four/assets`
+  owns SVG as a file). **Grammar coverage is complete**: all ten commands in both cases,
+  implicit argument-set repetition, the implicit lineto after a moveto, optional
+  separators (`1-2` is two numbers), the greedy scan that reads `1.5.5` as two, and arc
+  flags that abut what follows (`a1 1 0 011 1`). `B`/`b` (bearing, an SVG 2 draft removed
+  before CR) is refused. **No `fromCommands`** was needed or added — export reads
+  `Path.commands` and a cursor; the R-24 decision stands.
+- **Coordinates are transcribed, not flipped** — SVG's Y-down user space is not
+  reconciled with §7a's Y-up world by the parser, because the transform that would do it
+  (`y ↦ height − y`) needs the document's `viewBox`, which is not in the `d` attribute. A
+  bare flip would be _half_ a transform performed silently. The correction is one exact
+  `Path.transform` at the caller (a reflection is a similarity, so arcs survive it), and
+  the document tier will apply it because it is the tier that knows `height`.
+- **A format conformance rule is not an §85 clamp** — SVG 1.1 F.6.6 defines what a
+  conforming reader does with an out-of-range arc radius, so those rules are honoured
+  (negative radii → abs, zero radius → line, coincident endpoints → omitted, radii too
+  small → uniform `√Λ` scale-up) while malformed input is refused with a `SyntaxError`
+  naming the offset. Unlike an SVG viewer, nothing parsed before an error is kept.
+- **§96 hardening, checked rather than asserted** — no regular expressions anywhere (a
+  single forward character-code scan: O(n) on _every_ input, so no catastrophic
+  backtracking), one finite `maximumTextLength` bound (4 Mi code units, `FourError`
+  `UNTRUSTED_INPUT_REJECTED` with `limitName`/`limit`/`observed`), and totality proved by
+  30 000 fuzzed strings plus five ReDoS shapes.
+- **Second two-tier §33 golden** (`tests/determinism/golden/svg-path.json`) — `text`
+  claims cross-platform because ECMA-262 specifies decimal→double and `Number::toString`
+  _exactly_, proved mechanically (all 2 408 parsed coordinates are dyadic rationals, and
+  every case's text is a byte-for-byte fixed point of parse→format→parse); `arc` claims
+  same-runtime. The stated edge is ECMA-262's: a literal with more than 20 significant
+  digits may legally round two ways.
+- **`tests/integration/svg-path-pipeline.test.ts`** — the §50 → §51 → §52 claim proved
+  across packages against analytic areas: rectangle, rounded rectangle, circle, washer
+  and a smooth-shorthand blob all parse, group by fill rule, and tessellate.
+
+#### Fixed
+
+- **An arc's start is authoritative over the segment that reaches it.** SVG's `A` begins
+  at the current point by definition; §51's arc begins where its centre form lands, and
+  no centre makes that hit an arbitrary point exactly (measured: ~83% over 200 000 random
+  arcs, because `(a − b) + b` is not an identity in binary floating point). The two ulps
+  of disagreement became §51's implicit connecting segment, pointing _back_ along the line
+  that just arrived — a zero-area spike §52 correctly refuses, which made the rounded
+  rectangle (`L … A …`, four times) unfillable. The reader now holds each line, quadratic
+  and cubic back by one command and retargets its endpoint onto a following arc's computed
+  start. It is the only coordinate in this module that is not exactly what the document
+  said, and it is documented as such. Residual, stated: arc → arc seams still carry the
+  implicit segment; they are tangentially continuous and have produced no refusal.
+
+#### Changed
+
+- `packages/geometry/src/path.ts` exports `arcPoint`, `advance`, `newCursor` and
+  `PathCursor` **package-internally** (not through the barrel) so the SVG writer shares
+  one implementation of "where does a command start" and "a `close` leaves you at the
+  subpath's first point". No behaviour change; `golden/path.json` is unmoved.
+- `packages/geometry/README.md` corrected in place, dated: it still said the path model
+  and tessellation were "staged / not yet implemented" after R-24 and R-25 shipped.
+
 ### 2026-08-09 — R-18 closed (directional shadow-map tier): §69 shadows
 
 #### Added

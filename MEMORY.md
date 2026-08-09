@@ -28,6 +28,56 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-26 §50 SVG path data.** Decisions worth keeping:
+  - **A format conformance rule is not an §85 clamp.** SVG 1.1 F.6.6 _defines_ what a
+    reader does with a negative, zero, or too-small arc radius; refusing those would make
+    valid documents unreadable, which is the opposite of §50's requirement. The line is
+    drawn in a table in-source: format-defined normalizations are honoured, malformed
+    text is refused with a `SyntaxError` naming the offset. Corollary, and a deliberate
+    divergence from SVG: a viewer renders _up to_ the error; an importer must not, because
+    that turns a typo into silently missing geometry — nothing parsed is kept.
+  - **A `d` parser transcribes; it does not flip Y.** The transform that lands SVG in a
+    Y-up world is `y ↦ height − y`, and `height` lives in the `viewBox`, not in `d`.
+    Negating alone is _half_ a transform performed silently, and half a correction is
+    worse than none because none is visible. Transcription also makes
+    `format(parse(d))` a checkable identity — which is what §50's word _compatibility_
+    has to mean. The one-liner (`Matrix3().fromArray([1,0,0, 0,-1,0, 0,height,1])`) is
+    exact and arcs survive it, because a reflection is a similarity.
+  - **An arc's start is authoritative over the segment that reaches it — the finding that
+    changed the design.** SVG's `A` begins at the current point _by definition_; §51's arc
+    begins where `centre + R(rot)·(rx cos θ₁, ry sin θ₁)` lands, and no centre hits an
+    arbitrary point exactly (**measured: ~83% over 200 000 arcs**; `(a−b)+b` is not an
+    identity in binary FP). The two ulps became §51's implicit connecting segment pointing
+    _back_ along the arriving line — a zero-area spike §52 refuses, making the **rounded
+    rectangle** unfillable. Fix: the reader is one command behind and retargets the held
+    segment's endpoint onto the arc's start. This is the concrete, unavoidable form of
+    R-24's recorded "ulp trap" (an arc's analytic start never equals a hand-written
+    `lineTo` to the same coordinates) — an SVG document _always_ writes that `lineTo`, so
+    the trap is not avoidable by authoring convention on the import path.
+  - **`fromCommands` is still not needed** — export is a read of `Path.commands` plus a
+    cursor; import is builder calls. The R-24 decision stands, unamended. The single
+    temptation (`Path.ellipse` re-deriving the sweep as `(θ₁+Δ) − θ₁`, ±1 ulp) was
+    resisted: the quantity is already same-runtime tier.
+  - **A §33 cross-platform claim can rest on ECMA-262 rather than on geometry.**
+    `golden/svg-path.json`'s `text` half is exact because decimal→double (≤20 significant
+    digits) and `Number::toString` are _exactly specified_, which is why `String(value)`
+    is the writer's number format: cross-platform **and** lossless, where any
+    fixed-decimal format is neither. Proof is mechanical, two ways (all 2 408 coordinates
+    dyadic; every case a byte-for-byte text fixed point). The stated edge is ECMA-262's
+    > 20-significant-digit freedom.
+  - **A parser's §96 story is one bound plus a structural argument.** No regexes anywhere
+    (single forward character-code scan ⇒ O(n) on _every_ input, so ReDoS is impossible
+    rather than unlikely); one finite `maximumTextLength`, because the parser recurses
+    nowhere and allocates linearly, so bounding the text bounds time, stack and heap
+    together — a second limit would be a number with no independent meaning. Totality
+    (path-or-throw, three documented error types) is fuzzed, not asserted.
+  - Gotcha: **`pnpm graph:duplicates` counts only _exported_ names** (`collectOwnDefiners`
+    reads `file.exports`), so a module-private `TAU` beside `path.ts`'s costs nothing —
+    but any newly _exported_ helper must be checked repo-wide first.
+  - Doc-truth: `packages/geometry/README.md` still said the path model and tessellation
+    were "staged / not yet implemented" a day after R-24/R-25 shipped. Package READMEs are
+    **not** scanned by `tools/check-docs.mjs` (it walks the root list plus `docs/`) — the
+    24 package READMEs are an unguarded doc-truth surface.
 - **2026-08-09 — R-18 §69 shadows.** Decisions worth keeping:
   - **§69 ships one tier: the sun's map.** Point/spot carry no `castShadow` at all —
     §69's answer for them is a cube map and a per-light index the single-map tier has

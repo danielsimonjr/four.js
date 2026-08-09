@@ -48,6 +48,12 @@ export {
   MAX_SUBDIVISION_DEPTH,
   Path,
 } from "./path.js";
+export type { SvgPathParseOptions } from "./svg-path.js";
+export {
+  DEFAULT_MAXIMUM_PATH_DATA_LENGTH,
+  formatSvgPathData,
+  parseSvgPathData,
+} from "./svg-path.js";
 export type {
   BoxGeometryOptions,
   CircleGeometry2DOptions,
