@@ -75,9 +75,12 @@
 
 import type { Disposable } from "@four/core";
 import type { Matrix4, Vector3 } from "@four/math";
+import type { SceneLights } from "@four/render";
 
 import {
   MAP_TEXTURE_UNIT,
+  PUNCTUAL_LIGHT_GLSL,
+  PunctualLightUniforms,
   createLinkedProgram,
   matrixScratch,
   requireUniform,
@@ -145,6 +148,23 @@ void main() {
  * (R-19): a uniform rather than a shader variant, so a textured and an
  * untextured standard draw share one program and one pipeline binding. See
  * `FRAGMENT_SHADER_SOURCE` for the full argument.
+ *
+ * ## The light set (R-17, 2026-08-09)
+ *
+ * The direct term was one directional light; it is now that light plus a loop
+ * over the frame's point and spot lights, and the BRDF it evaluates has moved
+ * into `directLobe` so both consume the *same* one. The refactor is written to
+ * be arithmetically inert on the pre-existing path: `directLobe` returns
+ * `diffuseColor + specular` and each call site multiplies by
+ * `lightColor * nDotL` in that order, so the directional term is the identical
+ * expression, operation for operation, that this stage evaluated before. What
+ * moved out of the `nDotL > 0.0` branch — the view vector and the two `alpha`
+ * products — are values, not roundings: they depend on nothing the branch
+ * decides.
+ *
+ * With `punctualCount` at GL's initial `0` the loop never runs, which is the
+ * pixel half of the byte-identity claim `PunctualLightUniforms` makes about
+ * the GL half.
  */
 const STANDARD_FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -169,6 +189,34 @@ out vec4 fragColor;
 const float DIELECTRIC_F0 = 0.04;
 const float MIN_ROUGHNESS = 0.045;
 
+${PUNCTUAL_LIGHT_GLSL}
+vec3 directLobe(
+  vec3 n,
+  vec3 v,
+  vec3 l,
+  float nDotL,
+  vec3 diffuseColor,
+  vec3 f0,
+  float alpha2
+) {
+  vec3 h = normalize(l + v);
+  float nDotV = max(dot(n, v), 1e-4);
+  float nDotH = max(dot(n, h), 0.0);
+  float vDotH = clamp(dot(v, h), 0.0, 1.0);
+
+  float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
+  float distribution = alpha2 / max(denominator * denominator, 1e-8);
+
+  float visibilityV = nDotL * sqrt(nDotV * nDotV * (1.0 - alpha2) + alpha2);
+  float visibilityL = nDotV * sqrt(nDotL * nDotL * (1.0 - alpha2) + alpha2);
+  float visibility = 0.5 / max(visibilityV + visibilityL, 1e-6);
+
+  vec3 fresnel = f0 + (vec3(1.0) - f0) * pow(1.0 - vDotH, 5.0);
+  vec3 specular = vec3(distribution * visibility) * fresnel;
+
+  return diffuseColor + specular;
+}
+
 void main() {
   vec4 base = baseColor;
   if (useMap) {
@@ -183,30 +231,27 @@ void main() {
   float normalLength = length(vNormal);
   if (normalLength > 0.0) {
     vec3 n = vNormal / normalLength;
+    vec3 v = normalize(cameraPosition - vWorldPosition);
+
+    float alpha = max(roughness, MIN_ROUGHNESS);
+    alpha = alpha * alpha;
+    float alpha2 = alpha * alpha;
+
     vec3 l = -lightDirection;
     float nDotL = dot(n, l);
     if (nDotL > 0.0) {
-      vec3 v = normalize(cameraPosition - vWorldPosition);
-      vec3 h = normalize(l + v);
-      float nDotV = max(dot(n, v), 1e-4);
-      float nDotH = max(dot(n, h), 0.0);
-      float vDotH = clamp(dot(v, h), 0.0, 1.0);
+      shaded += directLobe(n, v, l, nDotL, diffuseColor, f0, alpha2)
+        * lightColor * nDotL;
+    }
 
-      float alpha = max(roughness, MIN_ROUGHNESS);
-      alpha = alpha * alpha;
-      float alpha2 = alpha * alpha;
-
-      float denominator = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
-      float distribution = alpha2 / max(denominator * denominator, 1e-8);
-
-      float visibilityV = nDotL * sqrt(nDotV * nDotV * (1.0 - alpha2) + alpha2);
-      float visibilityL = nDotV * sqrt(nDotL * nDotL * (1.0 - alpha2) + alpha2);
-      float visibility = 0.5 / max(visibilityV + visibilityL, 1e-6);
-
-      vec3 fresnel = f0 + (vec3(1.0) - f0) * pow(1.0 - vDotH, 5.0);
-      vec3 specular = vec3(distribution * visibility) * fresnel;
-
-      shaded += (diffuseColor + specular) * lightColor * nDotL;
+    for (int i = 0; i < punctualCount; i += 1) {
+      vec3 pl;
+      vec3 irradiance = punctualIrradiance(i, vWorldPosition, pl);
+      float pnDotL = dot(n, pl);
+      if (pnDotL > 0.0) {
+        shaded += directLobe(n, v, pl, pnDotL, diffuseColor, f0, alpha2)
+          * irradiance * pnDotL;
+      }
     }
   }
 
@@ -229,6 +274,7 @@ const vec3Scratch = new Float32Array(3);
  * program.setViewProjection(viewProjection);       // once per viewport
  * program.setAmbientLight(lights.ambientColor);    // once per viewport
  * program.setDirectionalLight(lights.direction, lights.directionalColor);
+ * program.setPunctualLights(lights);               // once per viewport
  * program.setCameraPosition(x, y, z);              // once per viewport
  * program.setFeatures(hasMap);                     // once per draw
  * program.setModel(item.worldMatrix);
@@ -273,6 +319,8 @@ export class StandardProgram implements Disposable {
 
   readonly #useMapLocation: GlUniformLocation;
 
+  readonly #punctual: PunctualLightUniforms;
+
   /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
   #useMap = false;
 
@@ -284,9 +332,11 @@ export class StandardProgram implements Disposable {
     gl: WebglContext,
     program: GlProgramHandle,
     locations: readonly GlUniformLocation[],
+    punctual: PunctualLightUniforms,
   ) {
     this.#gl = gl;
     this.#program = program;
+    this.#punctual = punctual;
     // Positionally, from the one array `create` builds: twelve uniforms is more
     // than a constructor parameter list can carry without every call site
     // becoming a puzzle, and the array is written once, next to the names it
@@ -338,6 +388,7 @@ export class StandardProgram implements Disposable {
         gl,
         program,
         names.map((name) => requireUniform(gl, program, name, "standard")),
+        PunctualLightUniforms.resolve(gl, program, "standard"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);
@@ -447,6 +498,15 @@ export class StandardProgram implements Disposable {
     vec3Scratch[1] = color[1];
     vec3Scratch[2] = color[2];
     this.#gl.uniform3fv(this.#lightColorLocation, vec3Scratch);
+  }
+
+  /**
+   * Uploads the frame's point and spot lights (§68, R-17) — or nothing, for a
+   * scene that has none. See `PunctualLightUniforms` for the contract and for
+   * why "nothing" is load-bearing.
+   */
+  setPunctualLights(lights: SceneLights): void {
+    this.#punctual.upload(lights);
   }
 
   /**

@@ -1495,6 +1495,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 sceneLights.direction,
                 sceneLights.directionalColor,
               );
+              // §68's point and spot lights (R-17). A scene with none issues
+              // no call here at all — see `PunctualLightUniforms`.
+              litProgram.setPunctualLights(sceneLights);
               litViewUploaded = true;
             }
             // §57's `map` (R-19): an albedo texture, bound and switched on for
@@ -1538,6 +1541,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 sceneLights.direction,
                 sceneLights.directionalColor,
               );
+              standardProgram.setPunctualLights(sceneLights);
               // The eye, read straight out of the camera's world matrix
               // translation column — `updateViewMatrix()` above resolved that
               // matrix, so this needs no second resolve and allocates nothing.

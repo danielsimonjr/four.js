@@ -40,11 +40,13 @@
 import { FourError, isFourError } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import {
+  MAX_PUNCTUAL_LIGHTS,
   PARTICLE_INSTANCE_FLOATS,
   RenderTarget,
   Renderable,
   Sprite,
   createRenderStatistics,
+  createSceneLights,
   particleQuadGeometry,
   type RenderStatistics,
   type LitRenderItem,
@@ -71,6 +73,7 @@ import {
   POSITION_ATTRIBUTE_LOCATION,
   ParticleBatchCache,
   ParticleProgram,
+  PunctualLightUniforms,
   RenderTargetCache,
   SpriteProgram,
   StandardProgram,
@@ -4000,7 +4003,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the eight uniforms", () => {
+  it("compiles both stages, links, and resolves the thirteen uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -4019,6 +4022,16 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
       // §57's albedo `map` and its switch (R-19, 2026-08-07).
       "map",
       "useMap",
+      // §68's light set (R-17, 2026-08-09). Resolving five more locations is
+      // the *only* thing R-17 costs a scene that has no point or spot light:
+      // it happens once, at program creation, and no frame that draws such a
+      // scene issues a single call for them (see the byte-identity suite).
+      // The array names carry the explicit `[0]` GLSL ES 3.00 names.
+      "punctualCount",
+      "punctualPosition[0]",
+      "punctualColor[0]",
+      "punctualDirection[0]",
+      "punctualParams[0]",
     ]);
     expect(program.disposed).toBe(false);
   });
@@ -6970,7 +6983,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the twelve uniforms", () => {
+  it("compiles both stages, links, and resolves the seventeen uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -6992,6 +7005,14 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
       "cameraPosition",
       "map",
       "useMap",
+      // §68's light set (R-17, 2026-08-09) — the same five names, in the same
+      // order, as the lit pipeline's, because both resolve them through the
+      // one `PunctualLightUniforms.resolve`.
+      "punctualCount",
+      "punctualPosition[0]",
+      "punctualColor[0]",
+      "punctualDirection[0]",
+      "punctualParams[0]",
     ]);
     expect(program.disposed).toBe(false);
   });
@@ -7667,5 +7688,182 @@ describe("WebglRenderer — §61 context-loss recovery (A-24)", () => {
     expect(canvas.listenerCount("webglcontextrestored")).toBe(0);
     // A loss event delivered after disposal reaches nothing at all.
     expect(canvas.dispatch("webglcontextlost")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §68's light set (R-17, 2026-08-09).
+//
+// The claim is the two-sided one every uniform switch in this backend makes: a
+// scene with point or spot lights gets them, and a scene with none costs the
+// frame **nothing at all** — no count upload, no array upload. The second half
+// is what keeps `FRAME_BEFORE_R13` and every pixel golden valid, and it is why
+// the count is an `int` uniform mirrored on the CPU at GL's own initial `0`
+// rather than a `#define` and a second linked program.
+// ---------------------------------------------------------------------------
+
+/** The light-set uniform handles of whichever program declares them. */
+function punctualUniforms(gl: FakeGl, marker: string): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has(marker) && perProgram.has("punctualCount")) {
+      return perProgram;
+    }
+  }
+  throw new Error(`no program resolved ${marker} and the light set`);
+}
+
+/** One point light in slot 0, as `collectSceneLights` would have packed it. */
+function oneLampSet(): ReturnType<typeof createSceneLights> {
+  const lights = createSceneLights();
+  lights.punctualCount = 1;
+  lights.punctualPositions[0] = 1;
+  lights.punctualPositions[1] = 2;
+  lights.punctualPositions[2] = 3;
+  lights.punctualColors[0] = 4;
+  lights.punctualColors[1] = 5;
+  lights.punctualColors[2] = 6;
+  lights.punctualParams[0] = 12;
+  return lights;
+}
+
+describe("PunctualLightUniforms — the light set (§68, R-17)", () => {
+  it("declares the five uniforms in both shaded pipelines' fragment stages", () => {
+    const builders = [
+      (gl: FakeGl) => LitProgram.create(gl),
+      (gl: FakeGl) => StandardProgram.create(gl),
+    ];
+    for (const create of builders) {
+      const gl = createFakeGl();
+      create(gl);
+      const fragment = String(gl.callsOf("shaderSource")[1].args[1]);
+
+      expect(fragment).toContain("uniform int punctualCount;");
+      expect(fragment).toContain(
+        `const int MAX_PUNCTUAL_LIGHTS = ${String(MAX_PUNCTUAL_LIGHTS)};`,
+      );
+      expect(fragment).toContain(
+        "uniform vec3 punctualPosition[MAX_PUNCTUAL_LIGHTS];",
+      );
+      expect(fragment).toContain(
+        "uniform vec4 punctualParams[MAX_PUNCTUAL_LIGHTS];",
+      );
+      // The loop is bounded by the *uniform*, which is what makes one linked
+      // program shade zero through MAX lamps.
+      expect(fragment).toContain("i < punctualCount");
+    }
+  });
+
+  it("carries the world position the falloff needs into the lit fragment stage", () => {
+    const gl = createFakeGl();
+    LitProgram.create(gl);
+    const [vertex, fragment] = gl
+      .callsOf("shaderSource")
+      .map((call) => String(call.args[1]));
+
+    expect(vertex).toContain("out vec3 vWorldPosition;");
+    // The clip-space product is left exactly as it was — a re-association
+    // into `viewProjection * (model * position)` would move pixels.
+    expect(vertex).toContain(
+      "gl_Position = viewProjection * model * vec4(position, 1.0);",
+    );
+    expect(fragment).toContain("in vec3 vWorldPosition;");
+  });
+
+  it("uploads nothing when the frame has no point or spot light", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    gl.reset();
+
+    program.setPunctualLights(createSceneLights());
+
+    // Not the count, not the arrays: the CPU mirror starts where GL's own
+    // `int` uniform starts, so there is nothing to say.
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("uploads the count and all four arrays once a light exists", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    gl.reset();
+
+    program.setPunctualLights(oneLampSet());
+
+    const uniforms = punctualUniforms(gl, "ambientLight");
+    expect(uploadsAt(gl, uniforms.get("punctualCount"))).toEqual([1]);
+    const positions = uploadsAt(
+      gl,
+      uniforms.get("punctualPosition[0]"),
+    )[0] as number[];
+    expect(positions).toHaveLength(MAX_PUNCTUAL_LIGHTS * 3);
+    expect(positions.slice(0, 3)).toEqual([1, 2, 3]);
+    expect(
+      (uploadsAt(gl, uniforms.get("punctualColor[0]"))[0] as number[]).slice(
+        0,
+        3,
+      ),
+    ).toEqual([4, 5, 6]);
+    expect(
+      (uploadsAt(gl, uniforms.get("punctualParams[0]"))[0] as number[])[0],
+    ).toBe(12);
+    expect(uploadsAt(gl, uniforms.get("punctualDirection[0]"))).toHaveLength(1);
+  });
+
+  it("re-uploads the arrays every frame but the count only on change", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    const lights = oneLampSet();
+    program.setPunctualLights(lights);
+    gl.reset();
+
+    // A lamp that moved: the arrays must go up again, the count must not.
+    program.setPunctualLights(lights);
+    expect(gl.countOf("uniform1i")).toBe(0);
+    expect(gl.countOf("uniform3fv")).toBe(3);
+    expect(gl.countOf("uniform4fv")).toBe(1);
+  });
+
+  it("puts the count back to zero when the last lamp leaves, and then goes quiet", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    program.use();
+    program.setPunctualLights(oneLampSet());
+    gl.reset();
+
+    program.setPunctualLights(createSceneLights());
+    const uniforms = punctualUniforms(gl, "ambientLight");
+    // The count is corrected; the arrays are not uploaded, because nothing
+    // reads them at count zero.
+    expect(uploadsAt(gl, uniforms.get("punctualCount"))).toEqual([0]);
+    expect(gl.countOf("uniform3fv")).toBe(0);
+    expect(gl.countOf("uniform4fv")).toBe(0);
+
+    gl.reset();
+    program.setPunctualLights(createSceneLights());
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("is the same class, with the same behaviour, on the standard pipeline", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    gl.reset();
+
+    program.setPunctualLights(createSceneLights());
+    expect(gl.calls).toHaveLength(0);
+
+    program.setPunctualLights(oneLampSet());
+    const uniforms = punctualUniforms(gl, "baseColor");
+    expect(uploadsAt(gl, uniforms.get("punctualCount"))).toEqual([1]);
+  });
+
+  it("refuses to build when a driver cannot resolve the array names (§89)", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+    const error = thrown(() => {
+      PunctualLightUniforms.resolve(gl, gl.createProgram()!, "lit");
+    });
+    expect(error.code).toBe("SHADER_COMPILATION_FAILED");
   });
 });

@@ -8,6 +8,45 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-17 closed (eight-lamp forward tier): §68 multi-light
+
+#### Added
+
+- **`PointLight` and `SpotLight` (R-17, §68)** — two new `@four/scene` nodes over a
+  shared `PunctualLight` base, collected by the existing `collectSceneLights` walk into
+  a bounded uniform-array light set (`MAX_PUNCTUAL_LIGHTS = 8` — a TS constant
+  interpolated into the GLSL so the two cannot disagree; a runtime `maxLights` would
+  mean recompiling inside a frame, which §61 forbids; 8 fits the GLES 3.0 _guaranteed_
+  uniform minimum with no capability query). Attenuation is `KHR_lights_punctual`'s
+  inverse-square with an optional range window (a **culling aid, not physics** —
+  `range: 0` = unbounded, the honest default); spot cones are glTF's inner/outer
+  half-angles in radians, precomputed CPU-side where the division lives (R-13's
+  placement rule). **The R-13 irradiance-over-π convention extends to distance**:
+  `color × intensity` is the irradiance at unit distance, so a point and a directional
+  light of equal intensity agree at 1 m and one scene mixes them — both shaded
+  pipelines consume the set through one shared GLSL chunk (~400 B instead of ~700).
+  Past the bound the **first eight in scene-graph order** win — authored order, never
+  nearest/brightest (both flicker, §33) — with a once-per-root warning (122 B,
+  measured). §79 pairs: `scene:point-light`, `scene:spot-light`.
+- **Byte-identity, with a new pixel half to the technique** (fourth confirmation of
+  the GL half): a directional-only scene issues byte-for-byte its old sequence
+  (`FRAME_BEFORE_R17`, **recorded on the reverted build** — a hand-copied transcript
+  was wrong in four plausible-looking places, now a recorded rule) — and the pixel
+  half requires the new term _added to_ the old expression in source order:
+  re-association (`viewProjection * (model * p)`) moves pixels. Deliberately not
+  widened: **still exactly one directional light** — a second sun needs a third entry
+  kind, which is the clustered/forward-plus path's job. Hemisphere staged (a
+  two-colour ambient term, not a punctual light); area lights staged (LTC). R-18
+  shadows now needs only R-4's samplable-depth residue.
+
+#### Changed
+
+- **Size budgets: first-3d-scene 28 → 29 kB, particles-demo 25 → 27 kB, ui-demo
+  33 → 35 kB** (measured A/B: the light set costs +1.10–1.17 kB gzip per shaded
+  bundle; the two tightest budgets had 50 B and 20 B of headroom before the packet, so
+  any bundle-touching change was going to overflow them — the bumps restore working
+  headroom per the R-13 precedent; §86's 150 kB untouched).
+
 ### 2026-08-09 — RFC 0004 drafted: 2D raster painting stack (owner-requested)
 
 #### Documentation

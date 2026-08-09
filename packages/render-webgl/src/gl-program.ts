@@ -50,6 +50,7 @@
 
 import { FourError, type Disposable } from "@four/core";
 import type { Matrix4, Vector3 } from "@four/math";
+import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@four/render";
 
 /**
  * The WebGL 2 / OpenGL ES 3.0 enumerants this package uses, by their normative
@@ -598,6 +599,185 @@ void main() {
 `;
 
 /**
+ * The **light set** every shaded fragment stage shares (§68, R-17 2026-08-09):
+ * the uniform array declarations and the one function that turns a light index
+ * plus a world position into an irradiance and a direction to shade with.
+ *
+ * One string, spliced into both `LIT_FRAGMENT_SHADER_SOURCE` and
+ * `gl-standard.ts`'s stage, rather than two copies: the falloff and the cone
+ * are one model and a scene mixing a `LitMaterial` with a `StandardMaterial`
+ * under the same lamp must not be able to disagree about it. It also ships the
+ * text once in a bundle instead of twice, which on this backend is real bytes
+ * (§86).
+ *
+ * ## Names, and why the count is an `int` uniform
+ *
+ * `punctualCount` is a *uniform*, not a `#define`, so one linked program shades
+ * a scene with any number of lamps from zero to
+ * {@link @four/render!MAX_PUNCTUAL_LIGHTS} — the uniform-switch argument
+ * `useMap` records, one size up. That it is an `int` uniform is also the whole
+ * byte-identity story: GL initializes it to `0`, so a program whose scene has
+ * no punctual light never uploads it, the loop below never runs, and the frame
+ * emits exactly the GL sequence it emitted before this chunk existed.
+ *
+ * ## The model (§68, "physically coherent units where practical")
+ *
+ * ```text
+ * d           = |lightPosition − p|
+ * attenuation = 1 / max(d², 1e-8)
+ *             × clamp(1 − (d / range)⁴, 0, 1)        when range > 0
+ *             × clamp((cos θ − cos outer) × z, 0, 1) when the light is a spot
+ * ```
+ *
+ * Inverse-square because a point emitter obeys it; the range window and the
+ * cone ramp are `KHR_lights_punctual`'s, so a loaded glTF light transfers
+ * without reinterpretation. `punctualParams[i].z` is the precomputed
+ * `1 / max(cos inner − cos outer, 1e-6)` — see `@four/render`'s `lights.ts`,
+ * which packs it.
+ *
+ * The `max(d², 1e-8)` is the same placement rule R-13 fixed for `roughness`:
+ * the guard lives where the division does. A surface at the light's exact
+ * position renders very bright, never `NaN`.
+ *
+ * No `1/π` appears anywhere, here or in either lobe that consumes this — the
+ * engine's light colour × intensity is an irradiance already divided by π
+ * (R-13, 2026-08-08), which is what lets a point light and the directional
+ * light add up to one lighting model.
+ */
+export const PUNCTUAL_LIGHT_GLSL = `const int MAX_PUNCTUAL_LIGHTS = ${String(
+  MAX_PUNCTUAL_LIGHTS,
+)};
+uniform int punctualCount;
+uniform vec3 punctualPosition[MAX_PUNCTUAL_LIGHTS];
+uniform vec3 punctualColor[MAX_PUNCTUAL_LIGHTS];
+uniform vec3 punctualDirection[MAX_PUNCTUAL_LIGHTS];
+uniform vec4 punctualParams[MAX_PUNCTUAL_LIGHTS];
+
+vec3 punctualIrradiance(int i, vec3 p, out vec3 l) {
+  vec3 offset = punctualPosition[i] - p;
+  float distanceSquared = max(dot(offset, offset), 1e-8);
+  float d = sqrt(distanceSquared);
+  l = offset / d;
+  vec4 params = punctualParams[i];
+  float attenuation = 1.0 / distanceSquared;
+  if (params.x > 0.0) {
+    float ratio = d / params.x;
+    float squared = ratio * ratio;
+    attenuation *= clamp(1.0 - squared * squared, 0.0, 1.0);
+  }
+  if (params.w > 0.0) {
+    float cosTheta = dot(punctualDirection[i], -l);
+    attenuation *= clamp((cosTheta - params.y) * params.z, 0.0, 1.0);
+  }
+  return punctualColor[i] * attenuation;
+}
+`;
+
+/**
+ * The five uniform names {@link PUNCTUAL_LIGHT_GLSL} declares, in the order
+ * {@link PunctualLightUniforms.resolve} looks them up.
+ *
+ * The array names carry an explicit `[0]` subscript. WebGL 2 accepts either
+ * spelling for the first element of a uniform array, and the subscripted one is
+ * what the GLSL ES 3.00 specification names as *the* form — worth a few
+ * characters, because a name that resolves to `null` on one driver and a
+ * location on another would turn into a §89 throw at initialization on exactly
+ * the machines nobody develops on.
+ */
+const PUNCTUAL_UNIFORM_NAMES = [
+  "punctualCount",
+  "punctualPosition[0]",
+  "punctualColor[0]",
+  "punctualDirection[0]",
+  "punctualParams[0]",
+] as const;
+
+/**
+ * One shaded pipeline's light-set uniforms: the five locations, and the CPU
+ * mirror that keeps a scene without point or spot lights emitting **no GL call
+ * at all** (R-17, 2026-08-09).
+ *
+ * Shared by {@link LitProgram} and `gl-standard.ts`'s `StandardProgram`
+ * because the upload is not a per-pipeline decision — the two stages consume
+ * the identical `SceneLights` arrays through the identical GLSL chunk, and a
+ * class each would be two places for the skip rule to drift apart.
+ *
+ * ## The skip rule, and why it is byte-identity rather than an optimisation
+ *
+ * `#count` starts at `0`, which is what GL initializes an `int` uniform to. A
+ * frame whose `SceneLights.punctualCount` is `0` while the mirror is `0`
+ * therefore uploads nothing — not the count, not the four arrays — so a scene
+ * lit by a directional light and an ambient term issues byte-for-byte the GL
+ * sequence it issued before this class existed. The same technique as R-15's
+ * `bool` encode switch and R-38's permissive layer mask; the third confirmation
+ * that *seeding a CPU mirror at GL's own initial value* is how a feature is
+ * added to this backend for free.
+ *
+ * When the count *is* non-zero the whole array is uploaded, dead tail included,
+ * rather than a live sub-range: `uniform3fv` over the record's own
+ * `Float32Array` copies nothing on the way (the reason `@four/render` packs
+ * those arrays as typed arrays), and a sub-range upload would need the
+ * `srcOffset`/`srcLength` overloads this backend's hand-written GL surface
+ * deliberately does not carry.
+ */
+export class PunctualLightUniforms {
+  readonly #gl: WebglContext;
+
+  readonly #locations: readonly GlUniformLocation[];
+
+  /** CPU mirror of `punctualCount`, seeded at GL's initial value. */
+  #count = 0;
+
+  private constructor(
+    gl: WebglContext,
+    locations: readonly GlUniformLocation[],
+  ) {
+    this.#gl = gl;
+    this.#locations = locations;
+  }
+
+  /**
+   * Looks the five locations up on a linked program, throwing the §89
+   * `SHADER_COMPILATION_FAILED` `requireUniform` throws if a driver optimised
+   * one away — which it cannot, since the loop bound is a uniform.
+   *
+   * @param label the pipeline name used in the failure message
+   */
+  static resolve(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    label: string,
+  ): PunctualLightUniforms {
+    return new PunctualLightUniforms(
+      gl,
+      PUNCTUAL_UNIFORM_NAMES.map((name) =>
+        requireUniform(gl, program, name, label),
+      ),
+    );
+  }
+
+  /**
+   * Uploads the frame's point and spot lights (§68), or nothing at all — see
+   * the class header for when, and for why "nothing at all" is the contract
+   * rather than a shortcut. Call once per viewport, beside the ambient and
+   * directional uploads.
+   */
+  upload(lights: SceneLights): void {
+    const count = lights.punctualCount;
+    if (count > 0) {
+      this.#gl.uniform3fv(this.#locations[1], lights.punctualPositions);
+      this.#gl.uniform3fv(this.#locations[2], lights.punctualColors);
+      this.#gl.uniform3fv(this.#locations[3], lights.punctualDirections);
+      this.#gl.uniform4fv(this.#locations[4], lights.punctualParams);
+    }
+    if (count !== this.#count) {
+      this.#gl.uniform1i(this.#locations[0], count);
+      this.#count = count;
+    }
+  }
+}
+
+/**
  * The lit vertex stage (§68): object space → clip space, plus the world-space
  * normal the fragment stage shades with.
  *
@@ -620,10 +800,12 @@ uniform mat4 viewProjection;
 uniform mat4 model;
 
 out vec3 vNormal;
+out vec3 vWorldPosition;
 out vec2 vUv;
 
 void main() {
   vNormal = transpose(inverse(mat3(model))) * normal;
+  vWorldPosition = (model * vec4(position, 1.0)).xyz;
   vUv = uv;
   gl_Position = viewProjection * model * vec4(position, 1.0);
 }
@@ -634,9 +816,18 @@ void main() {
  * one directional light, plus the scene ambient term.
  *
  * ```text
- * fragColor.rgb = color.rgb * (ambientLight + lightColor * max(dot(N, -L), 0))
+ * fragColor.rgb = color.rgb * (ambientLight
+ *                            + lightColor * max(dot(N, -L), 0)
+ *                            + Σᵢ irradianceᵢ * max(dot(N, Lᵢ), 0))
  * fragColor.a   = color.a
  * ```
+ *
+ * The sum runs over the frame's point and spot lights (R-17, 2026-08-09) —
+ * see {@link PUNCTUAL_LIGHT_GLSL} for the falloff and the cone. It is written
+ * as a term *added to* the pre-existing expression, in that order, rather than
+ * as a rewrite of it: with `punctualCount` at GL's initial `0` the loop never
+ * runs and the arithmetic is the arithmetic this stage performed before the
+ * light set existed, operation for operation.
  *
  * - `lightDirection` is the **direction the light travels** (world space,
  *   unit), so the surface term is `dot(N, -L)`; `lightColor` arrives
@@ -668,10 +859,12 @@ uniform vec3 lightDirection;
 uniform vec3 lightColor;
 
 in vec3 vNormal;
+in vec3 vWorldPosition;
 in vec2 vUv;
 
 out vec4 fragColor;
 
+${PUNCTUAL_LIGHT_GLSL}
 void main() {
   float len = length(vNormal);
   float diffuse = len > 0.0
@@ -681,7 +874,15 @@ void main() {
   if (useMap) {
     base *= texture(map, vUv);
   }
-  fragColor = vec4(base.rgb * (ambientLight + lightColor * diffuse), base.a);
+  vec3 lighting = ambientLight + lightColor * diffuse;
+  if (len > 0.0) {
+    vec3 n = vNormal / len;
+    for (int i = 0; i < punctualCount; i += 1) {
+      vec3 l;
+      lighting += punctualIrradiance(i, vWorldPosition, l) * max(dot(n, l), 0.0);
+    }
+  }
+  fragColor = vec4(base.rgb * lighting, base.a);
 }
 `;
 
@@ -1257,6 +1458,7 @@ export class SpriteProgram implements Disposable {
  *   lights.direction,                                 // once per viewport
  *   lights.directionalColor,
  * );
+ * program.setPunctualLights(lights);                  // once per viewport
  * program.setModel(item.worldMatrix);                 // once per draw
  * program.setColor(item.material.color);
  * ```
@@ -1266,10 +1468,11 @@ export class SpriteProgram implements Disposable {
  * the normal stream — when the geometry has one — at the fixed
  * {@link NORMAL_ATTRIBUTE_LOCATION}, so one geometry cache serves all four
  * programs. Light uniforms are per *frame* state uploaded per viewport (they
- * live in the program object, exactly like the view-projection): one
- * directional light plus the scene ambient, the §120 tier — multi-light,
- * shadows (§69), and tone mapping (§60a) are staged where `@four/scene`'s
- * `light.ts` records.
+ * live in the program object, exactly like the view-projection): the scene
+ * ambient term, one directional light, and up to
+ * {@link @four/render!MAX_PUNCTUAL_LIGHTS} point and spot lights (R-17,
+ * 2026-08-09). Shadows (§69), tone mapping (§60a), and §68's remaining light
+ * types are staged where `@four/scene`'s `light.ts` records.
  *
  * Owns its GL objects and nothing else; the renderer re-creates it on context
  * restore exactly as it re-creates the unlit one (§61).
@@ -1295,6 +1498,8 @@ export class LitProgram implements Disposable {
 
   readonly #useMapLocation: GlUniformLocation;
 
+  readonly #punctual: PunctualLightUniforms;
+
   /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
   #useMap = false;
 
@@ -1313,6 +1518,7 @@ export class LitProgram implements Disposable {
     lightColorLocation: GlUniformLocation,
     mapLocation: GlUniformLocation,
     useMapLocation: GlUniformLocation,
+    punctual: PunctualLightUniforms,
   ) {
     this.#gl = gl;
     this.#program = program;
@@ -1324,6 +1530,7 @@ export class LitProgram implements Disposable {
     this.#lightColorLocation = lightColorLocation;
     this.#mapLocation = mapLocation;
     this.#useMapLocation = useMapLocation;
+    this.#punctual = punctual;
   }
 
   /**
@@ -1351,6 +1558,7 @@ export class LitProgram implements Disposable {
         requireUniform(gl, program, "lightColor", "lit"),
         requireUniform(gl, program, "map", "lit"),
         requireUniform(gl, program, "useMap", "lit"),
+        PunctualLightUniforms.resolve(gl, program, "lit"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);
@@ -1436,6 +1644,15 @@ export class LitProgram implements Disposable {
     vec3Scratch[1] = color[1];
     vec3Scratch[2] = color[2];
     this.#gl.uniform3fv(this.#lightColorLocation, vec3Scratch);
+  }
+
+  /**
+   * Uploads the frame's point and spot lights (§68, R-17) — or nothing, for a
+   * scene that has none. See {@link PunctualLightUniforms} for the contract
+   * and for why "nothing" is load-bearing.
+   */
+  setPunctualLights(lights: SceneLights): void {
+    this.#punctual.upload(lights);
   }
 
   /**
