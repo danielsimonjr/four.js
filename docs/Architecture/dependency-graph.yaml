@@ -4,7 +4,7 @@ metadata:
   lastUpdated: "2026-08-09"
   totalFiles: 204
   totalModules: 24
-  totalExports: 1877
+  totalExports: 1911
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -937,6 +937,10 @@ modules:
         - FetchResponse
         - ResponseHeadersLike
         - TimerLike
+        - FetchInit
+        - AbortHandle
+        - AbortSignalLike
+        - AssetLoadOptions
         - AssetLoader
         - AssetManagerOptions
       constants:
@@ -963,8 +967,12 @@ modules:
           reExport: true
         - file: ./asset-manager.js
           imports:
+            - AbortHandle
+            - AbortSignalLike
+            - AssetLoadOptions
             - AssetLoader
             - AssetManagerOptions
+            - FetchInit
             - FetchLike
             - FetchResponse
             - ResponseHeadersLike
@@ -988,8 +996,12 @@ modules:
         - jsonLoader
         - textLoader
         - PACKAGE_NAME
+        - AbortHandle
+        - AbortSignalLike
+        - AssetLoadOptions
         - AssetLoader
         - AssetManagerOptions
+        - FetchInit
         - FetchLike
         - FetchResponse
         - ResponseHeadersLike
@@ -1005,8 +1017,12 @@ modules:
         - createImageLoader
         - jsonLoader
         - textLoader
+        - AbortHandle
+        - AbortSignalLike
+        - AssetLoadOptions
         - AssetLoader
         - AssetManagerOptions
+        - FetchInit
         - FetchLike
         - FetchResponse
         - ResponseHeadersLike
@@ -2560,10 +2576,13 @@ modules:
         - package: "@four/render"
           directory: packages/render
           imports:
+            - Arc
             - Circle
             - Ellipse
+            - Line
             - PathShape
             - Polygon
+            - Polyline
             - Rectangle
             - RegularPolygon
             - Renderable
@@ -2572,6 +2591,12 @@ modules:
             - Shape2D
             - Sprite
             - Star
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - ResolvedPaint
+            - ResolvedShapeFill
+            - ResolvedStrokeStyle
         - package: "@four/scene"
           directory: packages/scene
           imports:
@@ -2637,6 +2662,9 @@ modules:
         - SECTOR_NODE_TYPE
         - RING_NODE_TYPE
         - PATH_SHAPE_NODE_TYPE
+        - LINE_NODE_TYPE
+        - POLYLINE_NODE_TYPE
+        - ARC_NODE_TYPE
         - resourceCatalog
         - registerUISerializers
         - registerRenderSerializers
@@ -2683,6 +2711,9 @@ modules:
         - SECTOR_NODE_TYPE
         - RING_NODE_TYPE
         - PATH_SHAPE_NODE_TYPE
+        - LINE_NODE_TYPE
+        - POLYLINE_NODE_TYPE
+        - ARC_NODE_TYPE
     packages/four/src/scene.ts:
       description: scene module
       externalDependencies: []
@@ -2761,7 +2792,7 @@ modules:
         - GeometryBounds
         - BufferGeometryOptions
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 56 symbols)
+      description: Package entry point for @four/geometry (re-exports 64 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -2807,7 +2838,9 @@ modules:
           reExport: true
         - file: ./tessellation.js
           imports:
+            - DEFAULT_MITER_LIMIT
             - earClippingTessellator
+            - expandStroke
             - triangulatePolygon
           reExport: true
         - file: ./buffer-geometry.js
@@ -2864,6 +2897,12 @@ modules:
           imports:
             - Point2D
             - PolygonTessellator
+            - Polyline2D
+            - StrokeAlignment
+            - StrokeGeometryOptions
+            - StrokeLineCap
+            - StrokeLineJoin
+            - StrokeMesh
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -2890,7 +2929,9 @@ modules:
         - polygonGeometry2D
         - geometryMemoryBytes
         - liveGeometryCount
+        - DEFAULT_MITER_LIMIT
         - earClippingTessellator
+        - expandStroke
         - triangulatePolygon
         - PACKAGE_NAME
         - BufferGeometryOptions
@@ -2925,6 +2966,12 @@ modules:
         - PolygonGeometry2DOptions
         - Point2D
         - PolygonTessellator
+        - Polyline2D
+        - StrokeAlignment
+        - StrokeGeometryOptions
+        - StrokeLineCap
+        - StrokeLineJoin
+        - StrokeMesh
       reExported:
         - BufferGeometry
         - capsuleGeometry
@@ -2948,7 +2995,9 @@ modules:
         - polygonGeometry2D
         - geometryMemoryBytes
         - liveGeometryCount
+        - DEFAULT_MITER_LIMIT
         - earClippingTessellator
+        - expandStroke
         - triangulatePolygon
         - BufferGeometryOptions
         - GeometryBounds
@@ -2982,6 +3031,12 @@ modules:
         - PolygonGeometry2DOptions
         - Point2D
         - PolygonTessellator
+        - Polyline2D
+        - StrokeAlignment
+        - StrokeGeometryOptions
+        - StrokeLineCap
+        - StrokeLineJoin
+        - StrokeMesh
       constants:
         - PACKAGE_NAME
     packages/geometry/src/path.ts:
@@ -2995,6 +3050,7 @@ modules:
         - file: ./tessellation.js
           imports:
             - Point2D
+            - Polyline2D
           typeOnly: true
       workspaceDependencies:
         - package: "@four/math"
@@ -3187,17 +3243,25 @@ modules:
         - file: ./primitive-support.js
           imports:
             - createIndices
+            - requirePositive
       workspaceDependencies: []
       exports:
         - earClippingTessellator
+        - DEFAULT_MITER_LIMIT
         - triangulatePolygon
+        - expandStroke
       interfaces:
         - Point2D
         - PolygonTessellator
+        - Polyline2D
+        - StrokeGeometryOptions
+        - StrokeMesh
       functions:
         - triangulatePolygon
+        - expandStroke
       constants:
         - earClippingTessellator
+        - DEFAULT_MITER_LIMIT
   packages/input:
     packages/input/src/drag.ts:
       description: "Dragging (§72, §120): press a node, move the pointer, get world-space deltas."
@@ -3238,7 +3302,7 @@ modules:
       interfaces:
         - DragManagerOptions
     packages/input/src/index.ts:
-      description: Package entry point for @four/input (re-exports 34 symbols)
+      description: Package entry point for @four/input (re-exports 35 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3307,6 +3371,7 @@ modules:
           typeOnly: true
         - file: ./pointer-events.js
           imports:
+            - PointerDeviceType
             - PropagatingPointerEventType
             - ScenePointerEventInit
             - ScenePointerEventType
@@ -3350,6 +3415,7 @@ modules:
         - SurfaceKeyListener
         - PickHit
         - Pickable
+        - PointerDeviceType
         - PropagatingPointerEventType
         - ScenePointerEventInit
         - ScenePointerEventType
@@ -3385,6 +3451,7 @@ modules:
         - SurfaceKeyListener
         - PickHit
         - Pickable
+        - PointerDeviceType
         - PropagatingPointerEventType
         - ScenePointerEventInit
         - ScenePointerEventType
@@ -3526,6 +3593,7 @@ modules:
             - ScenePointerEvent
             - buildPropagationPath
             - dispatchPointerEvent
+            - PointerDeviceType
             - PropagatingPointerEventType
             - ScenePointerEventType
       workspaceDependencies:
@@ -7735,7 +7803,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 117 symbols)
+      description: Package entry point for @four/render (re-exports 130 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -7815,10 +7883,13 @@ modules:
           reExport: true
         - file: ./shape.js
           imports:
+            - Arc
             - Circle
             - Ellipse
+            - Line
             - PathShape
             - Polygon
+            - Polyline
             - Rectangle
             - RegularPolygon
             - Ring
@@ -7927,16 +7998,26 @@ modules:
           typeOnly: true
         - file: ./shape.js
           imports:
+            - ArcOptions
             - CircleOptions
             - EllipseOptions
+            - LineOptions
+            - Paint
             - PathShapeOptions
             - PolygonOptions
+            - PolylineOptions
             - RectangleOptions
             - RegularPolygonOptions
             - RingOptions
             - SectorOptions
+            - ResolvedPaint
+            - ResolvedShapeFill
+            - ResolvedStrokeStyle
             - Shape2DOptions
+            - ShapeFill
+            - SolidPaint
             - StarOptions
+            - StrokeStyle
           reExport: true
           typeOnly: true
         - file: ./sprite.js
@@ -7993,10 +8074,13 @@ modules:
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
+        - Arc
         - Circle
         - Ellipse
+        - Line
         - PathShape
         - Polygon
+        - Polyline
         - Rectangle
         - RegularPolygon
         - Ring
@@ -8057,16 +8141,26 @@ modules:
         - ResizeRecord
         - RenderStatistics
         - RenderStatisticsReporter
+        - ArcOptions
         - CircleOptions
         - EllipseOptions
+        - LineOptions
+        - Paint
         - PathShapeOptions
         - PolygonOptions
+        - PolylineOptions
         - RectangleOptions
         - RegularPolygonOptions
         - RingOptions
         - SectorOptions
+        - ResolvedPaint
+        - ResolvedShapeFill
+        - ResolvedStrokeStyle
         - Shape2DOptions
+        - ShapeFill
+        - SolidPaint
         - StarOptions
+        - StrokeStyle
         - SpriteFrame
         - SpriteOptions
         - TextureSource
@@ -8112,10 +8206,13 @@ modules:
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
+        - Arc
         - Circle
         - Ellipse
+        - Line
         - PathShape
         - Polygon
+        - Polyline
         - Rectangle
         - RegularPolygon
         - Ring
@@ -8175,16 +8272,26 @@ modules:
         - ResizeRecord
         - RenderStatistics
         - RenderStatisticsReporter
+        - ArcOptions
         - CircleOptions
         - EllipseOptions
+        - LineOptions
+        - Paint
         - PathShapeOptions
         - PolygonOptions
+        - PolylineOptions
         - RectangleOptions
         - RegularPolygonOptions
         - RingOptions
         - SectorOptions
+        - ResolvedPaint
+        - ResolvedShapeFill
+        - ResolvedStrokeStyle
         - Shape2DOptions
+        - ShapeFill
+        - SolidPaint
         - StarOptions
+        - StrokeStyle
         - SpriteFrame
         - SpriteOptions
         - TextureSource
@@ -8549,15 +8656,24 @@ modules:
           imports:
             - BufferGeometry
             - DEFAULT_FLATTEN_TOLERANCE
+            - expandStroke
             - Path
             - triangulatePolygon
             - GeometryIndexArray
             - PathFillRings
             - Point2D
+            - StrokeAlignment
+            - StrokeLineCap
+            - StrokeLineJoin
+            - StrokeMesh
         - package: "@four/materials"
           directory: packages/materials
           imports:
             - Material
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGBA
       exports:
         - Circle
         - Ellipse
@@ -8568,6 +8684,9 @@ modules:
         - Ring
         - Polygon
         - PathShape
+        - Line
+        - Polyline
+        - Arc
       classes:
         - Circle
         - Ellipse
@@ -8578,7 +8697,14 @@ modules:
         - Ring
         - Polygon
         - PathShape
+        - Line
+        - Polyline
+        - Arc
       interfaces:
+        - SolidPaint
+        - ResolvedPaint
+        - StrokeStyle
+        - ResolvedStrokeStyle
         - Shape2DOptions
         - CircleOptions
         - EllipseOptions
@@ -8589,6 +8715,9 @@ modules:
         - RingOptions
         - PolygonOptions
         - PathShapeOptions
+        - LineOptions
+        - PolylineOptions
+        - ArcOptions
     packages/render/src/sprite.ts:
       description: "`Sprite` (§55) — a textured, tinted quad in the scene graph."
       externalDependencies: []
@@ -11134,15 +11263,15 @@ dependencyGraph:
 statistics:
   totalTypeScriptFiles: 204
   totalModules: 24
-  totalLinesOfCode: 91171
-  totalExports: 1877
-  totalClasses: 124
-  totalInterfaces: 396
-  totalFunctions: 323
+  totalLinesOfCode: 93679
+  totalExports: 1911
+  totalClasses: 127
+  totalInterfaces: 410
+  totalFunctions: 324
   totalTypeGuards: 18
   totalEnums: 0
-  totalConstants: 244
-  totalReExports: 1208
+  totalConstants: 248
+  totalReExports: 1234
   totalTypeOnlyImports: 231
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 1

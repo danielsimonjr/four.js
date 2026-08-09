@@ -450,7 +450,7 @@ graph LR
 
 **Exports:**
 - Classes: `AssetManager`
-- Interfaces: `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `AssetLoader`, `AssetManagerOptions`
+- Interfaces: `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `FetchInit`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`
 - Types: `FetchLike`
 - Constants: `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`
 
@@ -463,12 +463,12 @@ graph LR
 |------|---------|------|
 | `./asset-manager.js` | `AssetManager, DEFAULT_MAXIMUM_BYTES, DEFAULT_TIMEOUT_SECONDS` | Re-export |
 | `./loaders.js` | `ImageAsset, binaryLoader, createImageLoader, jsonLoader, textLoader` | Re-export |
-| `./asset-manager.js` | `AssetLoader, AssetManagerOptions, FetchLike, FetchResponse, ResponseHeadersLike, TimerLike` | Re-export (type-only) |
+| `./asset-manager.js` | `AbortHandle, AbortSignalLike, AssetLoadOptions, AssetLoader, AssetManagerOptions, FetchInit, FetchLike, FetchResponse, ResponseHeadersLike, TimerLike` | Re-export (type-only) |
 | `./loaders.js` | `ImageBitmapLike, ImageDecodeLike` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AssetLoader`, `AssetManagerOptions`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `ImageBitmapLike`, `ImageDecodeLike`
+- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `FetchInit`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `ImageBitmapLike`, `ImageDecodeLike`
 
 ---
 
@@ -1046,7 +1046,8 @@ graph LR
 | `@four/materials` | `Material, SpriteMaterial` |
 | `@four/motion` | `KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, MOTION_COMPONENT_SERIALIZER, MotionComponent` |
 | `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody` |
-| `@four/render` | `Circle, Ellipse, PathShape, Polygon, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star` |
+| `@four/render` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star` |
+| `@four/render` | `ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle` |
 | `@four/scene` | `DirectionalLight, OrthographicCamera, PerspectiveCamera, PointLight, SpotLight, restoreNodeId, Node` |
 | `@four/serialization` | `ComponentSerializerRegistry, createDefaultComponentSerializers, InstantiateSceneOptions, SceneNodeDocument, SerializeSceneOptions` |
 | `@four/text` | `GlyphAtlas` |
@@ -1056,7 +1057,7 @@ graph LR
 - Interfaces: `SceneResourceCatalog`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneSerializationSupport`
 - Types: `UnknownResourcePolicy`
 - Functions: `resourceCatalog`, `registerUISerializers`, `registerRenderSerializers`, `registerShapeSerializers`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerSceneNodeTypes`
-- Constants: `PANEL_NODE_TYPE`, `LABEL_NODE_TYPE`, `BUTTON_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `SLIDER_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `IMAGE_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SPRITE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `POLYGON_NODE_TYPE`, `STAR_NODE_TYPE`, `SECTOR_NODE_TYPE`, `RING_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`
+- Constants: `PANEL_NODE_TYPE`, `LABEL_NODE_TYPE`, `BUTTON_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `SLIDER_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `IMAGE_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SPRITE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `POLYGON_NODE_TYPE`, `STAR_NODE_TYPE`, `SECTOR_NODE_TYPE`, `RING_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `LINE_NODE_TYPE`, `POLYLINE_NODE_TYPE`, `ARC_NODE_TYPE`
 
 ---
 
@@ -1132,7 +1133,7 @@ graph LR
 
 ---
 
-### `packages/geometry/src/index.ts` - Package entry point for @four/geometry (re-exports 56 symbols)
+### `packages/geometry/src/index.ts` - Package entry point for @four/geometry (re-exports 64 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1143,17 +1144,17 @@ graph LR
 | `./svg-path.js` | `DEFAULT_MAXIMUM_PATH_DATA_LENGTH, formatSvgPathData, parseSvgPathData` | Re-export |
 | `./primitives.js` | `boxGeometry, circleGeometry2D, planeGeometry, polygonGeometry2D` | Re-export |
 | `./resource-memory.js` | `geometryMemoryBytes, liveGeometryCount` | Re-export |
-| `./tessellation.js` | `earClippingTessellator, triangulatePolygon` | Re-export |
+| `./tessellation.js` | `DEFAULT_MITER_LIMIT, earClippingTessellator, expandStroke, triangulatePolygon` | Re-export |
 | `./buffer-geometry.js` | `BufferGeometryOptions, GeometryBounds, GeometryDrawMode, GeometryIndexArray` | Re-export (type-only) |
 | `./primitives-3d.js` | `CapsuleGeometryOptions, ExtrudeGeometryOptions, HeightFieldGeometryOptions, LatheGeometryOptions, Point3D, SphereGeometryOptions, TaperedGeometryOptions, TorusGeometryOptions, TubeGeometryOptions` | Re-export (type-only) |
 | `./path.js` | `FillRule, PathArcCommand, PathClosestPoint, PathCloseCommand, PathCommand, PathCubicCommand, PathFillRings, PathLineCommand, PathMoveCommand, PathOptions, PathQuadraticCommand, PathSegmentCommand` | Re-export (type-only) |
 | `./svg-path.js` | `SvgPathParseOptions` | Re-export (type-only) |
 | `./primitives.js` | `BoxGeometryOptions, CircleGeometry2DOptions, PlaneGeometryOptions, PolygonGeometry2DOptions` | Re-export (type-only) |
-| `./tessellation.js` | `Point2D, PolygonTessellator` | Re-export (type-only) |
+| `./tessellation.js` | `Point2D, PolygonTessellator, Polyline2D, StrokeAlignment, StrokeGeometryOptions, StrokeLineCap, StrokeLineJoin, StrokeMesh` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `BufferGeometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`, `Path`, `DEFAULT_MAXIMUM_PATH_DATA_LENGTH`, `formatSvgPathData`, `parseSvgPathData`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `earClippingTessellator`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `FillRule`, `PathArcCommand`, `PathClosestPoint`, `PathCloseCommand`, `PathCommand`, `PathCubicCommand`, `PathFillRings`, `PathLineCommand`, `PathMoveCommand`, `PathOptions`, `PathQuadraticCommand`, `PathSegmentCommand`, `SvgPathParseOptions`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`
+- Re-exports: `BufferGeometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`, `Path`, `DEFAULT_MAXIMUM_PATH_DATA_LENGTH`, `formatSvgPathData`, `parseSvgPathData`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `DEFAULT_MITER_LIMIT`, `earClippingTessellator`, `expandStroke`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `FillRule`, `PathArcCommand`, `PathClosestPoint`, `PathCloseCommand`, `PathCommand`, `PathCubicCommand`, `PathFillRings`, `PathLineCommand`, `PathMoveCommand`, `PathOptions`, `PathQuadraticCommand`, `PathSegmentCommand`, `SvgPathParseOptions`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`, `Polyline2D`, `StrokeAlignment`, `StrokeGeometryOptions`, `StrokeLineCap`, `StrokeLineJoin`, `StrokeMesh`
 
 ---
 
@@ -1168,7 +1169,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./primitive-support.js` | `requirePositive` | Import |
-| `./tessellation.js` | `Point2D` | Import (type-only) |
+| `./tessellation.js` | `Point2D, Polyline2D` | Import (type-only) |
 
 **Exports:**
 - Classes: `Path`
@@ -1249,12 +1250,13 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./buffer-geometry.js` | `GeometryIndexArray` | Import (type-only) |
-| `./primitive-support.js` | `createIndices` | Import |
+| `./primitive-support.js` | `createIndices, requirePositive` | Import |
 
 **Exports:**
-- Interfaces: `Point2D`, `PolygonTessellator`
-- Functions: `triangulatePolygon`
-- Constants: `earClippingTessellator`
+- Interfaces: `Point2D`, `PolygonTessellator`, `Polyline2D`, `StrokeGeometryOptions`, `StrokeMesh`
+- Types: `StrokeAlignment`, `StrokeLineCap`, `StrokeLineJoin`
+- Functions: `triangulatePolygon`, `expandStroke`
+- Constants: `earClippingTessellator`, `DEFAULT_MITER_LIMIT`
 
 ---
 
@@ -1285,7 +1287,7 @@ graph LR
 
 ---
 
-### `packages/input/src/index.ts` - Package entry point for @four/input (re-exports 34 symbols)
+### `packages/input/src/index.ts` - Package entry point for @four/input (re-exports 35 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1301,12 +1303,12 @@ graph LR
 | `./key-events.js` | `KeyDefaultSuppressor, KeyModifiers, SceneKeyEventInit, SceneKeyEventType` | Re-export (type-only) |
 | `./keyboard-input.js` | `KeySurface, KeyboardInputOptions, SurfaceKeyEvent, SurfaceKeyListener` | Re-export (type-only) |
 | `./pick.js` | `PickHit, Pickable` | Re-export (type-only) |
-| `./pointer-events.js` | `PropagatingPointerEventType, ScenePointerEventInit, ScenePointerEventType` | Re-export (type-only) |
+| `./pointer-events.js` | `PointerDeviceType, PropagatingPointerEventType, ScenePointerEventInit, ScenePointerEventType` | Re-export (type-only) |
 | `./pointer-input.js` | `PointerInputOptions, PointerSurface, SurfacePointerEvent, SurfacePointerListener, SurfaceRect` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DragManager`, `SceneKeyEvent`, `dispatchKeyEvent`, `KeyboardInput`, `createPickRay`, `pick`, `CAPTURE_KEY_PREFIX`, `ScenePointerEvent`, `dispatchPointerEvent`, `DEFAULT_CLICK_MOVE_THRESHOLD`, `PointerInput`, `SceneInputEvent`, `buildPropagationPath`, `dispatchThreePhase`, `DragListener`, `DragManagerOptions`, `KeyDefaultSuppressor`, `KeyModifiers`, `SceneKeyEventInit`, `SceneKeyEventType`, `KeySurface`, `KeyboardInputOptions`, `SurfaceKeyEvent`, `SurfaceKeyListener`, `PickHit`, `Pickable`, `PropagatingPointerEventType`, `ScenePointerEventInit`, `ScenePointerEventType`, `PointerInputOptions`, `PointerSurface`, `SurfacePointerEvent`, `SurfacePointerListener`, `SurfaceRect`
+- Re-exports: `DragManager`, `SceneKeyEvent`, `dispatchKeyEvent`, `KeyboardInput`, `createPickRay`, `pick`, `CAPTURE_KEY_PREFIX`, `ScenePointerEvent`, `dispatchPointerEvent`, `DEFAULT_CLICK_MOVE_THRESHOLD`, `PointerInput`, `SceneInputEvent`, `buildPropagationPath`, `dispatchThreePhase`, `DragListener`, `DragManagerOptions`, `KeyDefaultSuppressor`, `KeyModifiers`, `SceneKeyEventInit`, `SceneKeyEventType`, `KeySurface`, `KeyboardInputOptions`, `SurfaceKeyEvent`, `SurfaceKeyListener`, `PickHit`, `Pickable`, `PointerDeviceType`, `PropagatingPointerEventType`, `ScenePointerEventInit`, `ScenePointerEventType`, `PointerInputOptions`, `PointerSurface`, `SurfacePointerEvent`, `SurfacePointerListener`, `SurfaceRect`
 
 ---
 
@@ -1381,7 +1383,7 @@ graph LR
 **Exports:**
 - Classes: `ScenePointerEvent`
 - Interfaces: `ScenePointerEventInit`
-- Types: `PropagatingPointerEventType`, `ScenePointerEventType`
+- Types: `PropagatingPointerEventType`, `ScenePointerEventType`, `PointerDeviceType`
 - Functions: `dispatchPointerEvent`
 - Constants: `CAPTURE_KEY_PREFIX`
 - Re-exports: `buildPropagationPath`
@@ -1400,7 +1402,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./pick.js` | `pick, PickHit, Pickable` | Import |
-| `./pointer-events.js` | `ScenePointerEvent, buildPropagationPath, dispatchPointerEvent, PropagatingPointerEventType, ScenePointerEventType` | Import |
+| `./pointer-events.js` | `ScenePointerEvent, buildPropagationPath, dispatchPointerEvent, PointerDeviceType, PropagatingPointerEventType, ScenePointerEventType` | Import |
 
 **Exports:**
 - Classes: `PointerInput`
@@ -2694,7 +2696,7 @@ graph LR
 
 ---
 
-### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 117 symbols)
+### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 130 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2710,7 +2712,7 @@ graph LR
 | `./renderer.js` | `NullRenderer` | Re-export |
 | `./resource-memory.js` | `liveRenderTargetCount, liveTextureCount, textureMemoryBytes` | Re-export |
 | `./statistics.js` | `createRenderStatistics, resetRenderStatistics, supportsRenderStatistics` | Re-export |
-| `./shape.js` | `Circle, Ellipse, PathShape, Polygon, Rectangle, RegularPolygon, Ring, Sector, Shape2D, Star` | Re-export |
+| `./shape.js` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Ring, Sector, Shape2D, Star` | Re-export |
 | `./sprite.js` | `Sprite` | Re-export |
 | `./texture.js` | `Texture` | Re-export |
 | `./effect-pass.js` | `ColorGradeEffect, CopyEffect, EffectRenderPass, OutputTransformEffect, ScreenEffect, ScreenEffectKind, ScreenEffectRenderer` | Re-export (type-only) |
@@ -2723,13 +2725,13 @@ graph LR
 | `./renderer-registry.js` | `RendererFallbackReason, RendererFallbackReport, RendererRegistration, RendererResolveOptions, RendererSelection` | Re-export (type-only) |
 | `./renderer.js` | `RenderInterpolation, Renderer, RendererBackend, RendererCapabilities, RendererEventMap, RendererOptions, ResizeRecord` | Re-export (type-only) |
 | `./statistics.js` | `RenderStatistics, RenderStatisticsReporter` | Re-export (type-only) |
-| `./shape.js` | `CircleOptions, EllipseOptions, PathShapeOptions, PolygonOptions, RectangleOptions, RegularPolygonOptions, RingOptions, SectorOptions, Shape2DOptions, StarOptions` | Re-export (type-only) |
+| `./shape.js` | `ArcOptions, CircleOptions, EllipseOptions, LineOptions, Paint, PathShapeOptions, PolygonOptions, PolylineOptions, RectangleOptions, RegularPolygonOptions, RingOptions, SectorOptions, ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle, Shape2DOptions, ShapeFill, SolidPaint, StarOptions, StrokeStyle` | Re-export (type-only) |
 | `./sprite.js` | `SpriteFrame, SpriteOptions` | Re-export (type-only) |
 | `./texture.js` | `TextureSource` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Circle`, `Ellipse`, `PathShape`, `Polygon`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `CircleOptions`, `EllipseOptions`, `PathShapeOptions`, `PolygonOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `Shape2DOptions`, `StarOptions`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
+- Re-exports: `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
 
 ---
 
@@ -2906,8 +2908,9 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/core` | `Disposable` |
-| `@four/geometry` | `BufferGeometry, DEFAULT_FLATTEN_TOLERANCE, Path, triangulatePolygon, GeometryIndexArray, PathFillRings, Point2D` |
+| `@four/geometry` | `BufferGeometry, DEFAULT_FLATTEN_TOLERANCE, expandStroke, Path, triangulatePolygon, GeometryIndexArray, PathFillRings, Point2D, StrokeAlignment, StrokeLineCap, StrokeLineJoin, StrokeMesh` |
 | `@four/materials` | `Material` |
+| `@four/math` | `ColorRGBA` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2915,8 +2918,9 @@ graph LR
 | `./renderable.js` | `Renderable, RenderableOptions, SurfaceMaterial` | Import |
 
 **Exports:**
-- Classes: `Circle`, `Ellipse`, `Rectangle`, `RegularPolygon`, `Star`, `Sector`, `Ring`, `Polygon`, `PathShape`
-- Interfaces: `Shape2DOptions`, `CircleOptions`, `EllipseOptions`, `RectangleOptions`, `RegularPolygonOptions`, `StarOptions`, `SectorOptions`, `RingOptions`, `PolygonOptions`, `PathShapeOptions`
+- Classes: `Circle`, `Ellipse`, `Rectangle`, `RegularPolygon`, `Star`, `Sector`, `Ring`, `Polygon`, `PathShape`, `Line`, `Polyline`, `Arc`
+- Interfaces: `SolidPaint`, `ResolvedPaint`, `StrokeStyle`, `ResolvedStrokeStyle`, `Shape2DOptions`, `CircleOptions`, `EllipseOptions`, `RectangleOptions`, `RegularPolygonOptions`, `StarOptions`, `SectorOptions`, `RingOptions`, `PolygonOptions`, `PathShapeOptions`, `LineOptions`, `PolylineOptions`, `ArcOptions`
+- Types: `Paint`, `ShapeFill`, `ResolvedShapeFill`
 
 ---
 
@@ -4242,12 +4246,12 @@ graph TD
 |----------|-------|
 | Total TypeScript Files | 204 |
 | Total Modules | 24 |
-| Total Lines of Code | 91171 |
-| Total Exports | 1877 |
-| Total Re-exports | 1208 |
-| Total Classes | 124 |
-| Total Interfaces | 396 |
-| Total Functions | 323 |
+| Total Lines of Code | 93679 |
+| Total Exports | 1911 |
+| Total Re-exports | 1234 |
+| Total Classes | 127 |
+| Total Interfaces | 410 |
+| Total Functions | 324 |
 | Total Type Guards | 18 |
 | Total Enums | 0 |
 | Type-only Imports | 231 |

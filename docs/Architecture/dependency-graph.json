@@ -5,7 +5,7 @@
     "lastUpdated": "2026-08-09",
     "totalFiles": 204,
     "totalModules": 24,
-    "totalExports": 1877
+    "totalExports": 1911
   },
   "entryPoints": [
     {
@@ -1234,6 +1234,10 @@
           "FetchResponse",
           "ResponseHeadersLike",
           "TimerLike",
+          "FetchInit",
+          "AbortHandle",
+          "AbortSignalLike",
+          "AssetLoadOptions",
           "AssetLoader",
           "AssetManagerOptions"
         ],
@@ -1270,8 +1274,12 @@
           {
             "file": "./asset-manager.js",
             "imports": [
+              "AbortHandle",
+              "AbortSignalLike",
+              "AssetLoadOptions",
               "AssetLoader",
               "AssetManagerOptions",
+              "FetchInit",
               "FetchLike",
               "FetchResponse",
               "ResponseHeadersLike",
@@ -1301,8 +1309,12 @@
           "jsonLoader",
           "textLoader",
           "PACKAGE_NAME",
+          "AbortHandle",
+          "AbortSignalLike",
+          "AssetLoadOptions",
           "AssetLoader",
           "AssetManagerOptions",
+          "FetchInit",
           "FetchLike",
           "FetchResponse",
           "ResponseHeadersLike",
@@ -1319,8 +1331,12 @@
           "createImageLoader",
           "jsonLoader",
           "textLoader",
+          "AbortHandle",
+          "AbortSignalLike",
+          "AssetLoadOptions",
           "AssetLoader",
           "AssetManagerOptions",
+          "FetchInit",
           "FetchLike",
           "FetchResponse",
           "ResponseHeadersLike",
@@ -3314,10 +3330,13 @@
             "package": "@four/render",
             "directory": "packages/render",
             "imports": [
+              "Arc",
               "Circle",
               "Ellipse",
+              "Line",
               "PathShape",
               "Polygon",
+              "Polyline",
               "Rectangle",
               "RegularPolygon",
               "Renderable",
@@ -3326,6 +3345,15 @@
               "Shape2D",
               "Sprite",
               "Star"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "ResolvedPaint",
+              "ResolvedShapeFill",
+              "ResolvedStrokeStyle"
             ]
           },
           {
@@ -3406,6 +3434,9 @@
           "SECTOR_NODE_TYPE",
           "RING_NODE_TYPE",
           "PATH_SHAPE_NODE_TYPE",
+          "LINE_NODE_TYPE",
+          "POLYLINE_NODE_TYPE",
+          "ARC_NODE_TYPE",
           "resourceCatalog",
           "registerUISerializers",
           "registerRenderSerializers",
@@ -3454,7 +3485,10 @@
           "STAR_NODE_TYPE",
           "SECTOR_NODE_TYPE",
           "RING_NODE_TYPE",
-          "PATH_SHAPE_NODE_TYPE"
+          "PATH_SHAPE_NODE_TYPE",
+          "LINE_NODE_TYPE",
+          "POLYLINE_NODE_TYPE",
+          "ARC_NODE_TYPE"
         ]
       },
       "packages/four/src/scene.ts": {
@@ -3575,7 +3609,7 @@
         ]
       },
       "packages/geometry/src/index.ts": {
-        "description": "Package entry point for @four/geometry (re-exports 56 symbols)",
+        "description": "Package entry point for @four/geometry (re-exports 64 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -3640,7 +3674,9 @@
           {
             "file": "./tessellation.js",
             "imports": [
+              "DEFAULT_MITER_LIMIT",
               "earClippingTessellator",
+              "expandStroke",
               "triangulatePolygon"
             ],
             "reExport": true
@@ -3714,7 +3750,13 @@
             "file": "./tessellation.js",
             "imports": [
               "Point2D",
-              "PolygonTessellator"
+              "PolygonTessellator",
+              "Polyline2D",
+              "StrokeAlignment",
+              "StrokeGeometryOptions",
+              "StrokeLineCap",
+              "StrokeLineJoin",
+              "StrokeMesh"
             ],
             "reExport": true,
             "typeOnly": true
@@ -3744,7 +3786,9 @@
           "polygonGeometry2D",
           "geometryMemoryBytes",
           "liveGeometryCount",
+          "DEFAULT_MITER_LIMIT",
           "earClippingTessellator",
+          "expandStroke",
           "triangulatePolygon",
           "PACKAGE_NAME",
           "BufferGeometryOptions",
@@ -3778,7 +3822,13 @@
           "PlaneGeometryOptions",
           "PolygonGeometry2DOptions",
           "Point2D",
-          "PolygonTessellator"
+          "PolygonTessellator",
+          "Polyline2D",
+          "StrokeAlignment",
+          "StrokeGeometryOptions",
+          "StrokeLineCap",
+          "StrokeLineJoin",
+          "StrokeMesh"
         ],
         "reExported": [
           "BufferGeometry",
@@ -3803,7 +3853,9 @@
           "polygonGeometry2D",
           "geometryMemoryBytes",
           "liveGeometryCount",
+          "DEFAULT_MITER_LIMIT",
           "earClippingTessellator",
+          "expandStroke",
           "triangulatePolygon",
           "BufferGeometryOptions",
           "GeometryBounds",
@@ -3836,7 +3888,13 @@
           "PlaneGeometryOptions",
           "PolygonGeometry2DOptions",
           "Point2D",
-          "PolygonTessellator"
+          "PolygonTessellator",
+          "Polyline2D",
+          "StrokeAlignment",
+          "StrokeGeometryOptions",
+          "StrokeLineCap",
+          "StrokeLineJoin",
+          "StrokeMesh"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -3856,7 +3914,8 @@
           {
             "file": "./tessellation.js",
             "imports": [
-              "Point2D"
+              "Point2D",
+              "Polyline2D"
             ],
             "typeOnly": true
           }
@@ -4112,24 +4171,32 @@
           {
             "file": "./primitive-support.js",
             "imports": [
-              "createIndices"
+              "createIndices",
+              "requirePositive"
             ]
           }
         ],
         "workspaceDependencies": [],
         "exports": [
           "earClippingTessellator",
-          "triangulatePolygon"
+          "DEFAULT_MITER_LIMIT",
+          "triangulatePolygon",
+          "expandStroke"
         ],
         "interfaces": [
           "Point2D",
-          "PolygonTessellator"
+          "PolygonTessellator",
+          "Polyline2D",
+          "StrokeGeometryOptions",
+          "StrokeMesh"
         ],
         "functions": [
-          "triangulatePolygon"
+          "triangulatePolygon",
+          "expandStroke"
         ],
         "constants": [
-          "earClippingTessellator"
+          "earClippingTessellator",
+          "DEFAULT_MITER_LIMIT"
         ]
       }
     },
@@ -4197,7 +4264,7 @@
         ]
       },
       "packages/input/src/index.ts": {
-        "description": "Package entry point for @four/input (re-exports 34 symbols)",
+        "description": "Package entry point for @four/input (re-exports 35 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -4300,6 +4367,7 @@
           {
             "file": "./pointer-events.js",
             "imports": [
+              "PointerDeviceType",
               "PropagatingPointerEventType",
               "ScenePointerEventInit",
               "ScenePointerEventType"
@@ -4349,6 +4417,7 @@
           "SurfaceKeyListener",
           "PickHit",
           "Pickable",
+          "PointerDeviceType",
           "PropagatingPointerEventType",
           "ScenePointerEventInit",
           "ScenePointerEventType",
@@ -4385,6 +4454,7 @@
           "SurfaceKeyListener",
           "PickHit",
           "Pickable",
+          "PointerDeviceType",
           "PropagatingPointerEventType",
           "ScenePointerEventInit",
           "ScenePointerEventType",
@@ -4593,6 +4663,7 @@
               "ScenePointerEvent",
               "buildPropagationPath",
               "dispatchPointerEvent",
+              "PointerDeviceType",
               "PropagatingPointerEventType",
               "ScenePointerEventType"
             ]
@@ -10134,7 +10205,7 @@
         ]
       },
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 117 symbols)",
+        "description": "Package entry point for @four/render (re-exports 130 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -10248,10 +10319,13 @@
           {
             "file": "./shape.js",
             "imports": [
+              "Arc",
               "Circle",
               "Ellipse",
+              "Line",
               "PathShape",
               "Polygon",
+              "Polyline",
               "Rectangle",
               "RegularPolygon",
               "Ring",
@@ -10399,16 +10473,26 @@
           {
             "file": "./shape.js",
             "imports": [
+              "ArcOptions",
               "CircleOptions",
               "EllipseOptions",
+              "LineOptions",
+              "Paint",
               "PathShapeOptions",
               "PolygonOptions",
+              "PolylineOptions",
               "RectangleOptions",
               "RegularPolygonOptions",
               "RingOptions",
               "SectorOptions",
+              "ResolvedPaint",
+              "ResolvedShapeFill",
+              "ResolvedStrokeStyle",
               "Shape2DOptions",
-              "StarOptions"
+              "ShapeFill",
+              "SolidPaint",
+              "StarOptions",
+              "StrokeStyle"
             ],
             "reExport": true,
             "typeOnly": true
@@ -10474,10 +10558,13 @@
           "createRenderStatistics",
           "resetRenderStatistics",
           "supportsRenderStatistics",
+          "Arc",
           "Circle",
           "Ellipse",
+          "Line",
           "PathShape",
           "Polygon",
+          "Polyline",
           "Rectangle",
           "RegularPolygon",
           "Ring",
@@ -10538,16 +10625,26 @@
           "ResizeRecord",
           "RenderStatistics",
           "RenderStatisticsReporter",
+          "ArcOptions",
           "CircleOptions",
           "EllipseOptions",
+          "LineOptions",
+          "Paint",
           "PathShapeOptions",
           "PolygonOptions",
+          "PolylineOptions",
           "RectangleOptions",
           "RegularPolygonOptions",
           "RingOptions",
           "SectorOptions",
+          "ResolvedPaint",
+          "ResolvedShapeFill",
+          "ResolvedStrokeStyle",
           "Shape2DOptions",
+          "ShapeFill",
+          "SolidPaint",
           "StarOptions",
+          "StrokeStyle",
           "SpriteFrame",
           "SpriteOptions",
           "TextureSource"
@@ -10594,10 +10691,13 @@
           "createRenderStatistics",
           "resetRenderStatistics",
           "supportsRenderStatistics",
+          "Arc",
           "Circle",
           "Ellipse",
+          "Line",
           "PathShape",
           "Polygon",
+          "Polyline",
           "Rectangle",
           "RegularPolygon",
           "Ring",
@@ -10657,16 +10757,26 @@
           "ResizeRecord",
           "RenderStatistics",
           "RenderStatisticsReporter",
+          "ArcOptions",
           "CircleOptions",
           "EllipseOptions",
+          "LineOptions",
+          "Paint",
           "PathShapeOptions",
           "PolygonOptions",
+          "PolylineOptions",
           "RectangleOptions",
           "RegularPolygonOptions",
           "RingOptions",
           "SectorOptions",
+          "ResolvedPaint",
+          "ResolvedShapeFill",
+          "ResolvedStrokeStyle",
           "Shape2DOptions",
+          "ShapeFill",
+          "SolidPaint",
           "StarOptions",
+          "StrokeStyle",
           "SpriteFrame",
           "SpriteOptions",
           "TextureSource"
@@ -11191,11 +11301,16 @@
             "imports": [
               "BufferGeometry",
               "DEFAULT_FLATTEN_TOLERANCE",
+              "expandStroke",
               "Path",
               "triangulatePolygon",
               "GeometryIndexArray",
               "PathFillRings",
-              "Point2D"
+              "Point2D",
+              "StrokeAlignment",
+              "StrokeLineCap",
+              "StrokeLineJoin",
+              "StrokeMesh"
             ]
           },
           {
@@ -11203,6 +11318,13 @@
             "directory": "packages/materials",
             "imports": [
               "Material"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGBA"
             ]
           }
         ],
@@ -11215,7 +11337,10 @@
           "Sector",
           "Ring",
           "Polygon",
-          "PathShape"
+          "PathShape",
+          "Line",
+          "Polyline",
+          "Arc"
         ],
         "classes": [
           "Circle",
@@ -11226,9 +11351,16 @@
           "Sector",
           "Ring",
           "Polygon",
-          "PathShape"
+          "PathShape",
+          "Line",
+          "Polyline",
+          "Arc"
         ],
         "interfaces": [
+          "SolidPaint",
+          "ResolvedPaint",
+          "StrokeStyle",
+          "ResolvedStrokeStyle",
           "Shape2DOptions",
           "CircleOptions",
           "EllipseOptions",
@@ -11238,7 +11370,10 @@
           "SectorOptions",
           "RingOptions",
           "PolygonOptions",
-          "PathShapeOptions"
+          "PathShapeOptions",
+          "LineOptions",
+          "PolylineOptions",
+          "ArcOptions"
         ]
       },
       "packages/render/src/sprite.ts": {
@@ -14716,15 +14851,15 @@
   "statistics": {
     "totalTypeScriptFiles": 204,
     "totalModules": 24,
-    "totalLinesOfCode": 91171,
-    "totalExports": 1877,
-    "totalClasses": 124,
-    "totalInterfaces": 396,
-    "totalFunctions": 323,
+    "totalLinesOfCode": 93679,
+    "totalExports": 1911,
+    "totalClasses": 127,
+    "totalInterfaces": 410,
+    "totalFunctions": 324,
     "totalTypeGuards": 18,
     "totalEnums": 0,
-    "totalConstants": 244,
-    "totalReExports": 1208,
+    "totalConstants": 248,
+    "totalReExports": 1234,
     "totalTypeOnlyImports": 231,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 1,
