@@ -7,7 +7,6 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
 **Total files**: 453
-**Total files**: 446
 
 ## Disposition counts
 
@@ -22,15 +21,6 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `config` | 12 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 9 | An `examples/` or `docs/` reference/illustration source. |
 | **Total** | **453** | |
-| `reachable` | 152 | A `src/` file in the module graph, reachable from a root. |
-| `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
-| `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
-| `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 224 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
-| `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
-| `config` | 12 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
-| `example` | 9 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **446** | |
 
 ## Per-area counts
 
@@ -40,8 +30,6 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `examples` | 9 |
 | `src` | 202 |
 | `tests` | 229 |
-| `src` | 200 |
-| `tests` | 224 |
 | `tools` | 1 |
 
 ## Per-package counts
@@ -49,13 +37,11 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | Package | Files |
 | --- | --: |
 | `(root)` | 93 |
-| `(root)` | 89 |
 | `@four/animation` | 25 |
 | `@four/assets` | 7 |
 | `@four/core` | 20 |
 | `@four/diagnostics` | 17 |
 | `@four/geometry` | 14 |
-| `@four/geometry` | 12 |
 | `@four/input` | 12 |
 | `@four/materials` | 9 |
 | `@four/math` | 14 |
@@ -69,7 +55,6 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@four/render-canvas` | 2 |
 | `@four/render-svg` | 2 |
 | `@four/render-webgl` | 14 |
-| `@four/render-webgl` | 13 |
 | `@four/render-webgpu` | 2 |
 | `@four/scene` | 24 |
 | `@four/serialization` | 9 |

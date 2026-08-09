@@ -6,9 +6,6 @@
     "totalFiles": 202,
     "totalModules": 24,
     "totalExports": 1818
-    "totalFiles": 200,
-    "totalModules": 24,
-    "totalExports": 1788
   },
   "entryPoints": [
     {
@@ -3517,7 +3514,6 @@
       },
       "packages/geometry/src/index.ts": {
         "description": "Package entry point for @four/geometry (re-exports 52 symbols)",
-        "description": "Package entry point for @four/geometry (re-exports 37 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -10001,7 +9997,6 @@
       },
       "packages/render/src/index.ts": {
         "description": "Package entry point for @four/render (re-exports 97 symbols)",
-        "description": "Package entry point for @four/render (re-exports 96 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -11304,7 +11299,6 @@
           "SHADOW_TEXTURE_UNIT",
           "PUNCTUAL_LIGHT_GLSL",
           "SHADOW_GLSL",
-          "PUNCTUAL_LIGHT_GLSL",
           "matrixScratch",
           "createLinkedProgram",
           "requireUniform",
@@ -11338,7 +11332,6 @@
           "SHADOW_TEXTURE_UNIT",
           "PUNCTUAL_LIGHT_GLSL",
           "SHADOW_GLSL",
-          "PUNCTUAL_LIGHT_GLSL",
           "matrixScratch"
         ]
       },
@@ -12038,7 +12031,6 @@
       },
       "packages/scene/src/index.ts": {
         "description": "Package entry point for @four/scene (re-exports 59 symbols)",
-        "description": "Package entry point for @four/scene (re-exports 57 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -14433,7 +14425,7 @@
   "statistics": {
     "totalTypeScriptFiles": 202,
     "totalModules": 24,
-    "totalLinesOfCode": 87911,
+    "totalLinesOfCode": 87932,
     "totalExports": 1818,
     "totalClasses": 115,
     "totalInterfaces": 384,
@@ -14443,18 +14435,6 @@
     "totalConstants": 234,
     "totalReExports": 1174,
     "totalTypeOnlyImports": 229,
-    "totalTypeScriptFiles": 200,
-    "totalModules": 24,
-    "totalLinesOfCode": 84091,
-    "totalExports": 1788,
-    "totalClasses": 111,
-    "totalInterfaces": 373,
-    "totalFunctions": 317,
-    "totalTypeGuards": 18,
-    "totalEnums": 0,
-    "totalConstants": 230,
-    "totalReExports": 1152,
-    "totalTypeOnlyImports": 227,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 1,
     "unusedFilesCount": 0,
