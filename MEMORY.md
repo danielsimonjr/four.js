@@ -28,6 +28,98 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-8 §64 per-view lists + §87 culling (+ R-10 key 4).** Decisions worth
+  keeping:
+  - **The frame's list is the model; a view's list is a query over it.** The rejected
+    alternative (`buildRenderList` per view) loses on three independent grounds, and only
+    the third is about speed: (1) **traversal has side effects** — it calls
+    `updateParticleInstances()` and rebuilds a `Sprite`'s quad — so rebuilding per view
+    would make _the work a frame does_ depend on how many viewports were configured;
+    (2) **§69's shadow map is frame state**, and a base list no view has touched is what
+    makes R-18's pass expressible at all; (3) measured, `benchmarks/view-culling.mjs`:
+    the two arms are within noise at one view and the rebuild costs 1.34–1.39× at two,
+    1.90–2.65× at four. Generalizes: when a stage has side effects, "do it once and query
+    the result" is a correctness argument before it is a performance one.
+  - **A derived list is a subsequence, and that is the whole byte-identity argument.**
+    Items removed, never reordered, sharing the _same pooled objects_ — so a view that
+    filters nothing is the frame list item for item, and replacing the backend's inline
+    `item.layers & mask` test changed no GL call. `FRAME_BEFORE_R8` (54 calls, every
+    pipeline) recorded on the reverted build.
+  - **Culling is default-on and that is the honest reading of §64.** §64 lists culling as
+    a _stage_, not an option, and §49's `frustumCulled: true` default is meaningless
+    unless culling runs. A cull that removes nothing is byte-identical by construction;
+    one that removes something invisible changes no pixel — proved exactly rather than
+    within a tolerance: **0 of 76 800 pixels differ** on ANGLE/SwiftShader.
+    `batching.spec.ts` needs a tolerance because a batch re-evaluates a product; a cull
+    touches nothing it keeps.
+  - **A bound that is too small is a bug; a bound that is too loose is a draw.** The
+    cheap radius (local circumradius × longest matrix column) is **wrong**: the largest
+    singular value can exceed every column norm, so it can under-estimate. The shipped
+    radius is the circumradius of the world AABB obtained by the absolute-value transform
+    `|M|·e` — one `sqrt`, conservative by construction, pinned by a 64-angle rotation
+    sweep and an all-eight-corners containment test.
+  - **A sphere, not a box, and the reason is per-item cost.** A sphere is
+    rotation-invariant, so the derivation is a point transform plus a scalar with nothing
+    to cache and nothing to invalidate. §87's structures (BVH, quadtree, grid) are an
+    index; this tier is the _test at the bottom of all of them_, and §87's "the public
+    scene graph must not be forced to mirror a spatial tree" is what makes a linear scan
+    an honest first tier.
+  - **Every degenerate input fails towards drawing.** §61 forbids throwing in a frame, so
+    §85's refusals cannot apply: a zero-length plane normal is written as `(0,0,0,+∞)` (a
+    degenerate frustum culls _nothing_, never _everything_), a `NaN` centre or radius
+    makes `intersectsSphere` answer `true` by ordinary IEEE comparison, and
+    `computeWorldBoundingSphere` returns `false` for an empty geometry, a non-finite
+    matrix, or a geometry with no `computeBounds`. Written down because the opposite sign
+    on any one of them empties a viewport silently.
+  - **The particle exemption is data, not a `kind` check.** `buildRenderList` writes
+    `frustumCulled = false` on every particle item, because the item's `geometry` is the
+    shared unit quad the particles are _instanced_ from — its bounds are a square at the
+    emitter. The culler therefore has no §36 special case.
+  - **§66's key 4 is a verb for key 3's reason, and could not have been written
+    earlier.** "Needs a camera" was the weak reason; the real one was that one list
+    served every view, so a depth measured along one camera would have misordered the
+    rest — _wrong_, not disruptive. R-8 supplied the per-view list and the key shipped
+    the same day. It stays opt-in because under `LEQUAL` a depth sort permutes co-planar
+    opaque draws. Key 3 and key 4 are **alternatives** at this tier: §66 orders them
+    pipeline-then-depth, which gives depth ordering only within a material group and so
+    destroys the one thing depth sorting is for.
+  - **`R-37`'s `layerMask` was never `R-8`'s to ship** — `Viewport.layerMask` landed with
+    `R-38` on 2026-08-08. The gap document's `R-8` row said otherwise and was stale when
+    written. Rule: a blocker sentence naming _another row's_ residue has to be re-checked
+    against source, not inherited.
+  - **Pre-filtering lengthens batch runs, and that is correct.** `RenderBatcher.next`
+    stops at a masked-out item deliberately (a later view might draw it). Handed a list
+    already reduced to what _this_ view draws, it merges across the gap — the skipped
+    item is not submitted here at all. One recorded behaviour change; `next`'s mask
+    parameter stays for unfiltered callers, and `GlBatching` forwards `undefined` rather
+    than branching (a JS default parameter applies to an explicit `undefined` — worth
+    remembering, it removed the only uncovered branch in the file).
+  - **Finding: an options object whose fields the class does not have is silently
+    ignored, and `tests/` is outside every `tsc` project.**
+    `new OrthographicCamera({ height: 4, aspect: 1 })` in three integration harnesses
+    left the default unit box `[-1, 1]²`, so those suites had been asserting draw counts
+    for frames that produced **no pixels**; `render-batching.test.ts` hit the recorded
+    near-plane gotcha instead (camera at the origin, content at `z = 0`). Culling found
+    all three by removing the draws. Excess-property checking would have caught it — the
+    same hole `pnpm run docs` closes for package sources but not for `tests/`.
+  - **Gotcha, third confirmation:** a new required field on `RenderItemBase` breaks
+    hand-built item literals only under TypeDoc/tsc, never under Vitest. Two fields this
+    time (`frustumCulled`, `viewDepth`), one literal.
+  - **Gotcha, second confirmation of R-9's:** `TestGeometry` has no `computeBounds`, and
+    it was left that way on purpose — that keeps all 400+ existing backend tests on the
+    "cannot be bounded ⇒ drawn" path and makes the byte-identity argument structural. A
+    `BoundedTestGeometry` subclass opts the new suite in.
+  - **Measured: +0.77 kB gzip in every bundle** (first-3d 31.30 → 32.08, particles
+    28.70 → 29.45, ui-demo 36.73 → 37.50, first-2d 43.05 → 43.82, twin +0.79 kB), a
+    same-tree A/B. Comparable to R-6's 0.75 kB pipeline law and unavoidable while §64
+    stage 3 is a stage: the renderer references the culler unconditionally.
+    `sortRenderListByDepth` **does** tree-shake (`viewDepth` appears exactly three times
+    in the first-3d bundle — the three writes, none of the comparator's six reads).
+    Budgets bumped: first-3d 31.5 → 32.5, particles 29 → 30, ui-demo 37 → 38 kB.
+  - **The cull is not free, and the benchmark says so out loud:** 0.17–0.40 µs per item
+    per view. It buys back a draw call and its uniform uploads, which is backend work a
+    headless script cannot measure — so `benchmarks/view-culling.mjs` states the CPU
+    price and declines to claim a net win.
 - **2026-08-09 — PH-8 §26/§27 force fields for bodies + PH-12 §8 space modes.** Decisions
   worth keeping:
   - **The gap was the seam, not the halves.** §26's six methods shipped in Phase 5 and

@@ -8,6 +8,9 @@ export type {
 } from "./batch.js";
 export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
 
+export type { BoundingSphere } from "./bounds.js";
+export { computeWorldBoundingSphere } from "./bounds.js";
+
 export type {
   ColorGradeEffect,
   CopyEffect,
@@ -170,3 +173,5 @@ export type { SpriteFrame, SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type { TextureSource } from "./texture.js";
 export { Texture } from "./texture.js";
+export type { ViewRenderListOptions } from "./view-list.js";
+export { buildViewRenderList, sortRenderListByDepth } from "./view-list.js";

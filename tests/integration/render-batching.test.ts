@@ -69,6 +69,13 @@ async function createRig(): Promise<Rig> {
     bottom: -6,
     top: 6,
   });
+  // §87 (R-8, 2026-08-09): the camera sat at the origin, so every scene in this
+  // file drew at `z = 0` — *in front of* a near plane at `z = 4.9`, which GL
+  // clipped away entirely (the gotcha `examples/first-2d-scene` was moved to
+  // `z = 5` for on 2026-08-09). The draw counts below were therefore counts of
+  // invisible draws, and frustum culling made that visible by removing them.
+  // Moving the eye back is what makes this suite assert what it always meant.
+  camera.transform.position.set(0, 0, 5);
   return { renderer, recording, views: [createFullscreenViewport(camera)] };
 }
 

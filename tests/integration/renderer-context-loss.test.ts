@@ -155,7 +155,18 @@ async function harness(options: { stats?: boolean } = {}): Promise<Harness> {
     height: 256,
   });
 
-  const camera = new OrthographicCamera({ height: 8, aspect: 1 });
+  // §87 (R-8, 2026-08-09): this said `{ height: 8, aspect: 1 }` — two fields
+  // `OrthographicCameraOptions` does not have, silently ignored, leaving the
+  // default unit box `[-1, 1]²`. The orbiter circles at radius 2, so it was off
+  // screen for most of every orbit and the two-draw assertions below counted a
+  // draw that produced no pixels. See `frame-statistics.test.ts` for the same
+  // fixture bug and the reason it survived so long.
+  const camera = new OrthographicCamera({
+    left: -4,
+    right: 4,
+    bottom: -4,
+    top: 4,
+  });
   camera.transform.position.set(0, 0, 5);
   app.scene.add(camera);
   app.views.push(createFullscreenViewport(camera));

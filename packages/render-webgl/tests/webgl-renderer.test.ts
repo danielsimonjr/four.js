@@ -3208,6 +3208,12 @@ describe("WebglRenderer.render — sprites (§55, §66)", () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
     const node = sprite();
+    // §87 (R-8): `TestCamera`'s projection and view are both the identity, so
+    // its frustum is the NDC cube and a sprite interpolated to `x = 2` is
+    // genuinely off screen. This test is about which *model matrix* the
+    // interpolated list uploads, not about culling, so the node opts out —
+    // §49's flag doing exactly what it is for.
+    node.frustumCulled = false;
     root.add(node);
     const poses = new TestPoseBuffer().track(
       node,
@@ -3407,6 +3413,11 @@ function particleItem(
     // project, no lighting term to attenuate.
     castShadow: false,
     receiveShadow: false,
+    // §87 (R-8, 2026-08-09): never culled, because the item's `geometry` is the
+    // shared instance quad rather than a bound over the live particles.
+    frustumCulled: false,
+    // §66 key 4, unmeasured until a view sorts by it.
+    viewDepth: 0,
   };
 }
 
@@ -8837,7 +8848,7 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
     expect(gl.countOf("drawElements")).toBe(2);
   });
 
-  it("batches only what a view's §46 mask lets through", async () => {
+  it("merges across a masked-out item, because the view never draws it", async () => {
     const { renderer, gl, camera } = await initialized();
     renderer.batching = createGlBatching();
     const material = new TestMaterial();
@@ -8856,9 +8867,22 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
 
     renderer.render(root, [createView(camera, { layerMask: 1 })]);
 
-    // The masked item ends the run, so the two survivors draw individually
-    // rather than being merged across it.
-    expect(gl.countOf("drawElements")).toBe(2);
+    // One draw, not two — and the change is R-8's, recorded here because it is
+    // the only observable behaviour difference the per-view list produced.
+    //
+    // Before R-8 the backend tested each item's mask inside the draw loop and
+    // handed the batcher the **frame's** list, where a masked-out item sits
+    // between the two survivors and ends the run (`RenderBatcher.next` stops at
+    // it, deliberately: it is an item the scan cannot merge across because a
+    // later view might draw it). The backend now hands the batcher a list
+    // `buildViewRenderList` has already reduced to what *this* view draws, so
+    // the two survivors are adjacent and merge — which is exactly as correct,
+    // because the hidden item is not submitted into this view at all and the
+    // merged draws are consecutive in the only order that exists here.
+    //
+    // `RenderBatcher.next` keeps its mask parameter for a caller that batches
+    // over an unfiltered list; the renderer no longer passes one.
+    expect(gl.countOf("drawElements")).toBe(1);
   });
 
   it("drops its GL objects on context loss and rebuilds them on the next frame", async () => {
@@ -9016,5 +9040,168 @@ describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
     );
 
     expect(deleted).toEqual([{ kind: "index" }]);
+  });
+});
+
+/**
+ * A `TestGeometry` that can state its bounds (§53, §87; R-8).
+ *
+ * `TestGeometry` deliberately does **not** have `computeBounds`, and that is
+ * what keeps every other case in this file on the "cannot be bounded, therefore
+ * drawn" path — the shape `computeWorldBoundingSphere`'s probe exists for, and
+ * the evidence that a geometry double written before §87 still draws. This
+ * subclass opts a single suite in, so culling is exercised against a real
+ * bounding box without moving one existing assertion.
+ */
+class BoundedTestGeometry extends TestGeometry {
+  readonly #min = new Vector3(-0.5, -0.5, 0);
+
+  readonly #max = new Vector3(0.5, 0.5, 0);
+
+  constructor() {
+    super(
+      new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0]),
+      new Uint16Array([0, 1, 2]),
+    );
+  }
+
+  /** §53's cached local box, as `BufferGeometry` returns it. */
+  computeBounds(): { readonly min: Vector3; readonly max: Vector3 } {
+    return { min: this.#min, max: this.#max };
+  }
+}
+
+/**
+ * A bounded unit quad at `(x, 0, 0)` in world space.
+ *
+ * The world matrix is written directly, as every other positioned double in
+ * this file does: `resolveWorldTransforms` lives in `@four/scene`, which is
+ * outside this package's dependency matrix (plan §3.1, frozen).
+ */
+function boundedAt(x: number, material = new TestMaterial()): Renderable {
+  const node = new Renderable(
+    new BoundedTestGeometry().asGeometry,
+    material.asMaterial,
+  );
+  node.transform.worldMatrix.elements[12] = x;
+  return node;
+}
+
+describe("WebglRenderer.render — §87 per-view frustum culling (R-8)", () => {
+  it("draws what the view can see and drops what it cannot", async () => {
+    // `TestCamera`'s projection and view are both the identity, so its frustum
+    // is the NDC cube: `x ∈ [-1, 1]`. A quad at `x = 5` is wholly outside it.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(boundedAt(0), boundedAt(5));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("keeps a quad that only straddles a plane", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Centre one unit outside the right plane; the sphere's radius is
+    // `√2 / 2 ≈ 0.707`, so it does not reach in — but at `x = 1.5` it does.
+    root.add(boundedAt(1.5));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("honours §49's frustumCulled = false on the node", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const pinned = boundedAt(5);
+    pinned.frustumCulled = false;
+    root.add(boundedAt(0), pinned);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("draws a geometry that cannot state its bounds, wherever it is", async () => {
+    // The compatibility claim, as a frame: a `TestGeometry` at `x = 5` is off
+    // screen and still submitted, because a missing `computeBounds` reads as
+    // "cannot be culled" rather than as a `TypeError` inside a frame (§61).
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const node = renderable(quadGeometry());
+    node.transform.worldMatrix.elements[12] = 5;
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("culls per view: two cameras of one frame disagree", async () => {
+    // The property R-8 exists for. One frame list; the left camera sees the
+    // left quad only, the right camera the right quad only, so the frame issues
+    // two draws where a shared list filtered by nothing would have issued four.
+    const { renderer, gl } = await initialized();
+    const root = createRoot();
+    root.add(boundedAt(-5), boundedAt(5));
+    const left = new TestCamera();
+    left.viewMatrix.elements[12] = 5;
+    const right = new TestCamera();
+    right.viewMatrix.elements[12] = -5;
+    gl.reset();
+
+    renderer.render(root, [
+      createView(left, { id: "left", width: 0.5 }),
+      createView(right, { id: "right", x: 0.5, width: 0.5 }),
+    ]);
+
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("keeps a caster in the shadow map that no view can see (§69, §46)", async () => {
+    // R-18's argument, now load-bearing rather than merely recorded: the
+    // shadow pass consumes the **frame's** list before the view loop, so a
+    // caster outside every view still occludes. Had the pass been moved onto a
+    // view's list, this would be one depth draw instead of two — and a shadow
+    // would appear and disappear as its caster left the screen.
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight();
+    const onScreen = new Renderable(
+      new BoundedTestGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    const offScreen = new Renderable(
+      new BoundedTestGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    offScreen.transform.worldMatrix.elements[12] = 5;
+    root.add(light, onScreen, offScreen);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Two casters into the depth-only map, one survivor into the colour pass.
+    expect(gl.countOf("drawElements")).toBe(3);
+  });
+
+  it("draws an on-screen item into every view that can see it", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(boundedAt(0));
+    gl.reset();
+
+    renderer.render(root, [
+      createView(camera, { id: "left", width: 0.5 }),
+      createView(camera, { id: "right", x: 0.5, width: 0.5 }),
+    ]);
+
+    expect(gl.countOf("drawElements")).toBe(2);
   });
 });

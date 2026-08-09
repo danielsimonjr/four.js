@@ -9,6 +9,7 @@ Implements §7 and the §7b math conventions of [`docs/SPECIFICATION.md`](../../
 - **Vectors** — `Vector2`, `Vector3`, `Vector4`.
 - **`Quaternion`** — with shortest-arc slerp (decision D8).
 - **Matrices** — `Matrix3` and `Matrix4`, including depth-range-parameterized projections (`DepthRange`).
+- **`Frustum` (§87)** — the six clip planes of a view-projection matrix, with `setFromViewProjection` (both `DepthRange` conventions) and a conservative `intersectsSphere`. The one culling primitive; the world bounds it tests come from `@four/render`.
 - **`ColorRGBA`** — the shared color tuple type used by materials, animation, and particles.
 - **Allocation counter** — `constructionCount` / `resetConstructionCount` / `noteConstruction`, the test hook that keeps hot paths allocation-free.
 

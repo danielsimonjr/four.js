@@ -36,11 +36,12 @@
  */
 
 import { EventEmitter, FourError } from "@four/core";
-import { Matrix4 } from "@four/math";
+import { Frustum, Matrix4 } from "@four/math";
 import {
   RenderTarget,
   buildInterpolatedRenderList,
   buildRenderList,
+  buildViewRenderList,
   collectSceneLights,
   createSceneLights,
   isLitItem,
@@ -48,7 +49,6 @@ import {
   isRenderTargetTexture,
   isSpriteItem,
   isStandardItem,
-  viewLayerMask,
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
   type RenderItem,
@@ -265,8 +265,39 @@ const REQUIRED_CONTEXT_METHODS = [
  */
 const renderList: RenderItem[] = [];
 
+/**
+ * The **current view's** draws, derived from {@link renderList} once per view
+ * (§64 stages 2–3; R-8, 2026-08-09).
+ *
+ * One array for every view of every frame, and safe for a sharper reason than
+ * {@link renderList}'s: views are drawn strictly one after another, so a view's
+ * list is dead before the next view's is built. It holds *references* to the
+ * frame list's pooled items — `buildViewRenderList` copies nothing — so this
+ * array costs one pointer per surviving item and allocates nothing once it has
+ * grown to the largest view the application draws.
+ *
+ * Deliberately **not** used by the §69 shadow pass, which consumes
+ * {@link renderList} before the view loop: a shadow map is frame state shared
+ * by every view, and filtering it by one view's mask or frustum would make the
+ * shadows in view A depend on view B's viewport (R-18's §46 argument).
+ */
+const viewList: RenderItem[] = [];
+
 /** Scratch for `projection * view`; see {@link renderList} for the policy. */
 const viewProjection = new Matrix4();
+
+/**
+ * The current view's clip planes (§87), extracted from {@link viewProjection}
+ * once per view and reused exactly as it is (R-8).
+ */
+const viewFrustum = new Frustum();
+
+/**
+ * How the per-view derivation is asked to cull, allocated once so the view loop
+ * passes no fresh object per view. The `frustum` field is the module's own, so
+ * re-extracting the planes updates this record too.
+ */
+const viewListOptions = { frustum: viewFrustum };
 
 /**
  * The frame's collected lighting (§68), module-owned and reused exactly as
@@ -1485,28 +1516,32 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         let litViewUploaded = false;
         let standardViewUploaded = false;
 
-        // §46's per-view filter (R-38, 2026-08-08): `view.layerMask` when this
-        // view sets one, the camera's own `layers` otherwise — §48's fallback
-        // rule, resolved by `@four/render` so every backend spells it the same
-        // way. Both defaults are `ALL_LAYERS`, so a view that never mentions
-        // layers keeps every item and issues the GL sequence it always did.
+        // §64 stages 2–3, per view (R-8, 2026-08-09). The frame's list is built
+        // once, above; this derives *this view's* draws from it — §46's layer
+        // filter (`view.layerMask`, else the camera's `layers`, §48's fallback
+        // rule) and §87's frustum cull, both in `@four/render` so that every
+        // backend spells them the same way.
         //
-        // The filter lives here, per view, rather than in list construction,
-        // because this backend builds **one** list per frame and draws it into
-        // every view (§64 stage 2 vs. the per-view list of R-8). That is why
-        // `RenderItem` snapshots the node's mask. When R-8 lands, each view
-        // builds its own list with `buildRenderList(root, list, mask)` and this
-        // test becomes redundant rather than wrong.
-        const viewLayers = viewLayerMask(view);
+        // The filter used to be an inline `item.layers & mask` in the loop
+        // below, and the set it selects is unchanged: with no layers named and
+        // nothing off screen, this list is the frame's list, item for item, in
+        // order. What changed is that the cull now has somewhere to live — a
+        // per-view list — and that §66's key 4 has somewhere to be measured.
+        //
+        // The planes come from this view's own `viewProjection`, already
+        // composed above for the uniforms: culling costs one plane extraction
+        // per view, not a second matrix multiply. `Frustum` reads the WebGL 2
+        // clip convention by default, which is the one D8's projections write.
+        viewFrustum.setFromViewProjection(viewProjection);
+        const viewItems = buildViewRenderList(
+          items,
+          view,
+          viewList,
+          viewListOptions,
+        );
 
-        for (let index = 0; index < items.length; index += 1) {
-          const item = items[index];
-          // `layersMatch(item.layers, viewLayers)`, inlined: `@four/scene` is
-          // not a dependency of this package (plan §3.1, frozen), and the
-          // predicate is one bitwise AND.
-          if ((item.layers & viewLayers) === 0) {
-            continue;
-          }
+        for (let index = 0; index < viewItems.length; index += 1) {
+          const item = viewItems[index];
 
           // §65 (R-9), and only when the application assigned a batcher: does a
           // run of compatible draws start here? `batching` is `null` by
@@ -1515,8 +1550,16 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           // reordering. The check sits **above** `geometries.acquire` because a
           // batched run draws from the batcher's own buffers: acquiring the
           // per-item vertex arrays would upload geometry the frame never binds.
+          //
+          // No mask is passed any more: every item in `viewItems` is one this
+          // view draws, so the batcher's own layer test would be vacuous. A run
+          // may now span items the *frame* list had between them — a masked-out
+          // or culled draw no longer ends it — which is strictly better
+          // batching and exactly as correct: the skipped item is not submitted
+          // into this view at all, so the merged draws are consecutive in the
+          // only order that exists here (R-8).
           if (batching !== null) {
-            const batch = batching.next(items, index, viewLayers);
+            const batch = batching.next(viewItems, index);
             if (batch !== null) {
               // §55 and §57 resolve their texture from different fields; the
               // batch carries whichever one its material named (`batch.ts`).

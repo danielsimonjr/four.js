@@ -34,6 +34,19 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-8 DONE 2026-08-09** — §64 per-view render lists (`buildViewRenderList`, derive
+      not rebuild), §87 frustum culling (`Frustum` in `@four/math`,
+      `computeWorldBoundingSphere`, default-on, fails towards drawing), §49
+      `frustumCulled` (§79-serialized), and §66 key 4 (`sortRenderListByDepth`, opt-in
+      verb). Budgets bumped 32.5/30/38 kB with A/B measurements. Residue: occlusion
+      culling and a spatial index — neither blocks anything.
+- [ ] **R-8 follow-ups:** (a) one comparator carrying §66 keys 3 and 4 — a real design
+      question (which key wins for transparent content), staged rather than guessed;
+      (b) a bound over a §36 particle system's _live_ particles (today its item is
+      `frustumCulled: false` as data — the shared instance quad's bounds are a square at
+      the emitter); (c) sweep `tests/` for options objects with fields the target type
+      does not declare — three found in `tests/integration` by R-8; `tests/` sits
+      outside every tsc project, so excess-property checking never runs there.
 - [x] **PH-8 — §26/§27 force fields for rigid bodies.** Closed 2026-08-09: `ForceField` +
       `ForceFieldSystem` at §39's `PRIORITY_FORCES`, `PhysicsWorld.forEachActiveBody`,
       required per-field units, structural reuse of `@four/particles`' §27 field set with

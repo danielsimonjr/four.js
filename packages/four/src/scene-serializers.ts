@@ -522,28 +522,38 @@ function finiteOptions(
 }
 
 /**
- * §49's two shadow flags as document fields (§69; R-18, 2026-08-09).
+ * §49's boolean flags as document fields — the two shadow flags (§69; R-18,
+ * 2026-08-09) and `frustumCulled` (§87; R-8, 2026-08-09).
  *
  * Written **always**, not only when they differ from the default, for the
  * reason every other field here is: §79 documents state what a node *is*, and a
  * reader that has to know this build's defaults to interpret a document is a
- * reader that breaks the day a default changes. Both default to `true`, so a
- * document written before this build carries neither key, `readBoolean` answers
- * `undefined`, and the node restores casting and receiving — which is exactly
- * how a `Renderable` authored today behaves.
+ * reader that breaks the day a default changes. All three default to `true`, so
+ * a document written before this build carries none of the keys, `readBoolean`
+ * answers `undefined`, and the node restores casting, receiving, and being
+ * culled — which is exactly how a `Renderable` authored today behaves.
+ *
+ * One helper for all three because they land in the same place on the same
+ * classes and are read back into the same options record; splitting them per
+ * feature would put three spreads on every writer for no reader's benefit.
  */
-function shadowFlagsJson(node: {
+function renderableFlagsJson(node: {
   readonly castShadow: boolean;
   readonly receiveShadow: boolean;
+  readonly frustumCulled: boolean;
 }): Record<string, JsonValue> {
-  return { castShadow: node.castShadow, receiveShadow: node.receiveShadow };
+  return {
+    castShadow: node.castShadow,
+    receiveShadow: node.receiveShadow,
+    frustumCulled: node.frustumCulled,
+  };
 }
 
 /**
- * §49's shadow flags as `RenderableOptions` (§69), dropping whatever the
+ * §49's boolean flags as `RenderableOptions` (§69, §87), dropping whatever the
  * payload does not carry as a boolean.
  */
-function readShadowFlags(data: {
+function readRenderableFlags(data: {
   readonly [key: string]: JsonValue;
 }): Record<string, boolean> {
   const options: Record<string, boolean> = {};
@@ -551,6 +561,8 @@ function readShadowFlags(data: {
   if (castShadow !== undefined) options.castShadow = castShadow;
   const receiveShadow = readBoolean(data.receiveShadow);
   if (receiveShadow !== undefined) options.receiveShadow = receiveShadow;
+  const frustumCulled = readBoolean(data.frustumCulled);
+  if (frustumCulled !== undefined) options.frustumCulled = frustumCulled;
   return options;
 }
 
@@ -1167,11 +1179,14 @@ export function registerUISerializers(
  * ## What each one carries
  *
  * - **`Renderable`** — a `geometry` key, a `material` key (see the module
- *   header), `renderLayer`, and `renderOrder`. §49's `depthMode`,
- *   `castShadow`/`receiveShadow` and `frustumCulled` are not written because
- *   the class does not have them yet; they join the payload with the features.
+ *   header), `renderLayer`, `renderOrder`, `castShadow`/`receiveShadow` (§69,
+ *   R-18) and `frustumCulled` (§87, R-8). §49's `depthMode` is still not
+ *   written because the class does not have it yet; it joins the payload with
+ *   the feature. (This bullet claimed all four were unwritten until
+ *   2026-08-09 — it predated R-18.)
  * - **`Sprite`** — a `material` key, `width`, `height`, `anchor`,
- *   `renderLayer`, `renderOrder`, and **no geometry key at all**: a sprite
+ *   `renderLayer`, `renderOrder`, the same three §49 flags, and **no geometry
+ *   key at all**: a sprite
  *   derives its quad from the anchor and the size and owns it (§55), so the
  *   payload above rebuilds it exactly. Its `dispose()` state is not written —
  *   a disposed sprite is a released resource, not authored scene state.
@@ -1266,7 +1281,7 @@ export function registerRenderSerializers(
             ),
             renderLayer: renderable.renderLayer,
             renderOrder: renderable.renderOrder,
-            ...shadowFlagsJson(renderable),
+            ...renderableFlagsJson(renderable),
           };
         }
         if (constructor === Sprite) {
@@ -1284,7 +1299,7 @@ export function registerRenderSerializers(
             anchor: pairJson(sprite.anchor.x, sprite.anchor.y),
             renderLayer: sprite.renderLayer,
             renderOrder: sprite.renderOrder,
-            ...shadowFlagsJson(sprite),
+            ...renderableFlagsJson(sprite),
           };
         }
         if (constructor === PerspectiveCamera) {
@@ -1370,7 +1385,7 @@ export function registerRenderSerializers(
           // a node that draws exactly as it was authored to.
           return new Renderable<Material>(geometry, material, {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
-            ...readShadowFlags(data),
+            ...readRenderableFlags(data),
           });
         }
         if (document.type === SPRITE_NODE_TYPE) {
@@ -1384,7 +1399,7 @@ export function registerRenderSerializers(
           const anchor = readFinitePair(data.anchor);
           return new Sprite(requireSpriteMaterial(document, material), {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
-            ...readShadowFlags(data),
+            ...readRenderableFlags(data),
             // §85: the class refuses a non-positive extent, so a payload that
             // carries one restores the default rather than the whole scene
             // failing on one number.
@@ -2080,7 +2095,7 @@ export function registerShapeSerializers(
           tolerance: shape.tolerance,
           renderLayer: shape.renderLayer,
           renderOrder: shape.renderOrder,
-          ...shadowFlagsJson(shape),
+          ...renderableFlagsJson(shape),
         };
         // §58's two fields are written **only when they are not this class's
         // default** (`R-16`, 2026-08-09). That is what keeps the addition
@@ -2152,7 +2167,7 @@ export function registerShapeSerializers(
           material: resolveResource<Material>(document, "material", materials),
           ...positiveOptions(data, ["tolerance"]),
           ...finiteOptions(data, ["renderLayer", "renderOrder"]),
-          ...readShadowFlags(data),
+          ...readRenderableFlags(data),
           fill: readFill(
             data.fill,
             STROKE_ONLY_NODE_TYPES.has(document.type) ? "none" : "inherit",

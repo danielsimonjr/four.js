@@ -35,6 +35,7 @@ the module loads. The whole suite takes about **77 s** on the recorded host, dom
 | [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half)                        | `Panel.layout()` over 500–5 000 retained widgets, cold/incremental/warm      | **retained UI nodes: 5 000** — the layout-and-state half                                  |
 | [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)                     | `layoutText` at 1 000–50 000 drawn glyphs per frame                          | **animated glyphs: 20 000** — the layout half                                             |
 | [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half) | render-list build plus §65 batch assembly at 5 000–100 000 nodes             | **batched sprites: 100 000** and **simple batched shapes: 50 000** — the preparation half |
+| [`view-culling.mjs`](#view-cullingmjs--64s-per-view-lists-and-87s-frustum-cull)               | per-view list derivation and §87 culling at 10 000–100 000 nodes × 1–4 views | none — §86 has no culling row; this measures a design decision                            |
 
 Six §86 rows have honest headless numbers today — active rigid bodies, CPU particles, and
 the CPU halves of retained UI nodes, animated glyphs, batched sprites and batched shapes.
@@ -501,3 +502,43 @@ Findings, as shapes rather than values (2026-08-09, first record):
   "tens of percent" spread this file warns about, measured.
 - A number this file cannot give: whether either row meets §86 on **suitable modern desktop
   hardware** with a real driver on the other side of `drawElements`. Both remain half-rows.
+
+### `view-culling.mjs` — §64's per-view lists and §87's frustum cull
+
+```sh
+node benchmarks/view-culling.mjs
+```
+
+**Not a §86 row.** §86 lists no culling target, and this script exists for a different
+purpose: R-8 had a design decision to make and this is the measurement behind it. Nine
+scenarios — 10 000 / 50 000 / 100 000 §50 rectangles spread over **four times** the
+camera's area, drawn into 1, 2 and 4 viewports — each measured three ways:
+
+| arm          | what it does                                                       |
+| ------------ | ------------------------------------------------------------------ |
+| `filter ms`  | one traversal, then one `buildViewRenderList` per view, no frustum |
+| `derive ms`  | the same, with §87's cull — so `derive − filter` is the cull alone |
+| `rebuild ms` | the rejected alternative: `buildRenderList` once **per view**      |
+
+`filter` and `rebuild` produce the **same** per-view lists, so their ratio is the design
+decision and nothing else. The cull is reported separately because either design would have
+paid it.
+
+Findings, as shapes rather than values (2026-08-09, first record):
+
+- **Deriving wins as soon as there is more than one viewport, and only then.** At one view
+  the two arms are within noise of each other — both traverse once, and deriving adds one
+  linear pass. At two views the rejected alternative costs roughly 1.35×, and at four views
+  1.85–2.85×, because traversal is the expensive stage and it is the one being multiplied.
+  The structural arguments for deriving (traversal has side effects; §69's shadow map is
+  frame state no view may filter) are what make the decision at one view; this is what makes
+  it at four.
+- **The cull is not free, and its price is comparable to a traversal.** On this host the
+  frustum test costs roughly 0.3–0.5 µs per item per view — a `computeBounds` read, nine
+  multiply-adds for the world sphere, one `sqrt`, and up to six plane tests. It buys back a
+  draw call and its uniform uploads per removed item, which is backend work this script
+  cannot see, so nothing here says culling is a net win at a given node count; what it says
+  is what the CPU side costs.
+- **The run-to-run spread is the one this file warns about.** The `rebuild/filter` column
+  moves between 0.74× and 0.95× at one view across node counts, which is noise around 1.0,
+  not a trend. Read the column's growth with view count, not its absolute values.

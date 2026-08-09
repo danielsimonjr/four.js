@@ -22,10 +22,13 @@
  *
  * Not here, and why:
  *
- * - **Culling (stage 3).** Frustum culling needs a camera and per-item world
- *   bounds; cameras land in `@four/scene` with WP-3.1/3.2 and bounds
- *   transformation belongs with §87's spatial index. Building it now would mean
- *   inventing both. Every visible renderable is therefore submitted.
+ * - **Culling (stage 3).** Frustum culling needs a camera, and this module has
+ *   none: one list serves every view of the frame. It landed in `view-list.ts`
+ *   as a **derivation** of this list per view (R-8, 2026-08-09) — see that
+ *   module for why the frame builds one list and a view queries it rather than
+ *   building its own. What this module contributes is the item's
+ *   `frustumCulled` snapshot and, through `bounds.ts`, the world bounds §87
+ *   asks for; every visible renderable is still generated here.
  * - **Batching (stage 6).** §65 is a whole packet, and batching decisions
  *   depend on the backend's pipeline model (WP-3.5). The one exception is a
  *   particle system, which arrives *already* batched: one item carrying every
@@ -43,8 +46,9 @@
  * order, then scene-graph order** — keys 1, 2, and 5.
  *
  * Key 3 (pipeline and material compatibility) ships as
- * {@link groupRenderListByPipeline}, a **second verb** rather than a mode of the
- * builders, and key 4 (depth) is still deferred:
+ * {@link groupRenderListByPipeline} and key 4 (depth) as `view-list.ts`'s
+ * `sortRenderListByDepth` — both **second verbs** rather than modes of the
+ * builders:
  *
  * - key 3 cannot be the default order, and the reason is stronger than
  *   byte-identity (R-10, 2026-08-09). Grouping by pipeline permutes draws that
@@ -58,12 +62,14 @@
  *   key for content whose overlap is resolved by depth, and this engine's
  *   own 2D layer model is the case where that is untrue, so the key is offered
  *   and never imposed. See {@link groupRenderListByPipeline};
- * - depth sorting needs a camera (WP-3.1/3.2) to measure distance along, and a
- *   per-view render list to store the measurement in (§87 culling, R-8). One
- *   list serves every view in this engine today (see `RenderItem.layers`), so a
+ * - key 4 needs a camera to measure distance along and a **per-view** list to
+ *   store the measurement in, because one list serves every view of a frame: a
  *   depth key computed for one camera would order the others by the wrong
- *   number — a key 4 written now would be *wrong*, not merely disruptive.
- *   Deferred again 2026-08-09, on R-8 rather than on a byte-identity argument.
+ *   number. R-8's per-view derivation supplied both on 2026-08-09, and the key
+ *   ships there — on the derived list, never on this one. It is opt-in for key
+ *   3's reason, unchanged: under `LEQUAL` a depth sort permutes co-planar
+ *   opaque draws, and co-planar opaque draws are what a 2D scene is made of.
+ *   See `view-list.ts`'s `sortRenderListByDepth`.
  *
  * Key 2 landed on 2026-08-06 with §57's `transparent` flag (`material.ts`).
  * It is a **no-op for every scene that does not use it**: with the base's
@@ -194,11 +200,14 @@ interface RenderItemBase {
    *
    * Not a sort key and not read by the comparator — it is what lets **one**
    * render list serve several views with different masks, which is the shape
-   * this engine has until the per-view list arrives (R-8): the backend tests
-   * `item.layers & effectiveViewMask` once per item per view, before it touches
-   * a GPU resource. Filtering *at build time* is the other half and is
-   * {@link buildRenderList}'s `layerMask` parameter; the two compose, since an
-   * item that was never generated cannot be drawn into any view.
+   * this engine has: the frame builds one list and `view-list.ts`'s
+   * `buildViewRenderList` derives each view's from it, testing
+   * `item.layers & effectiveViewMask` once per item per view (R-8,
+   * 2026-08-09; the WebGL backend tested it inline before that). Filtering *at
+   * build time* is the other half and is {@link buildRenderList}'s `layerMask`
+   * parameter, for the caller whose views differ so much that a shared list
+   * would carry mostly-rejected items; the two compose, since an item that was
+   * never generated cannot be drawn into any view.
    *
    * On the item rather than reached through a node reference for the reason §64
    * gives for compact render items in the first place — and because a compact
@@ -265,6 +274,42 @@ interface RenderItemBase {
    * item, for the reason above.
    */
   receiveShadow: boolean;
+
+  /**
+   * §49's `frustumCulled`, snapshotted from the drawable node (§87; R-8,
+   * 2026-08-09).
+   *
+   * Read by `buildViewRenderList`, which tests an item's world bounds against
+   * the view's frustum only when this is `true`. On the item rather than
+   * reached through a node reference for the reason §64 gives for compact
+   * render items in the first place — and because a compact item has no node
+   * reference to reach through.
+   *
+   * Always **`false` on a particle item**, and that is a statement about §36
+   * rather than a default: a particle item's `geometry` is the shared unit quad
+   * that every particle is *instanced* from, so its bounds describe a square at
+   * the emitter and say nothing about where the particles are. Culling by them
+   * would make a wide, slow-moving system vanish the moment its emitter left
+   * the screen. A bound over the live particles is the fix, and it belongs to
+   * §36.
+   */
+  frustumCulled: boolean;
+
+  /**
+   * §66 sort key 4, in view space — written by `sortRenderListByDepth` and
+   * meaningless until it has run (R-8, 2026-08-09).
+   *
+   * Distance from the camera along its forward axis, larger meaning farther.
+   * The measurement lives on the item, like every other sort key, because a
+   * comparator runs O(n log n) times and must not transform a matrix per call
+   * (§64's compact-item rule).
+   *
+   * Reset to `0` by both builders, so the value a pooled slot carries is a fact
+   * of the item and not of whatever occupied the slot last frame — the hazard
+   * the `material` and `frame` resets in `collect` exist for. A caller reading
+   * it without having sorted reads that `0`.
+   */
+  viewDepth: number;
 }
 
 /** A draw generated from a `Renderable` (§49) — flat colour, no texture. */
@@ -587,6 +632,8 @@ function itemAt(
       materialId: "",
       castShadow: false,
       receiveShadow: false,
+      frustumCulled: true,
+      viewDepth: 0,
       id: "",
       count: 0,
       instances: EMPTY_INSTANCES,
@@ -833,6 +880,16 @@ function collect(
     // behaviour a `Renderable` authored today has.
     item.castShadow = node.castShadow !== false;
     item.receiveShadow = node.receiveShadow !== false;
+    // §49's culling flag (§87, R-8), snapshotted like every other field, with
+    // `!== false` for `castShadow`'s reason: it defaults to `true` on a
+    // `Renderable`, so a **structurally typed** drawable predating the field —
+    // a host's own minimal node — reports `undefined`, which must read as "may
+    // be culled", the behaviour a `Renderable` authored today has.
+    item.frustumCulled = node.frustumCulled !== false;
+    // §66 key 4 has no value until a view measures it (`view-list.ts`). Written
+    // rather than left, so a pooled slot cannot hand a stale depth to a caller
+    // that reads the field without sorting.
+    item.viewDepth = 0;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
@@ -887,6 +944,14 @@ function collect(
     // item, not of what last occupied the slot.
     item.castShadow = false;
     item.receiveShadow = false;
+    // §87 (R-8): a particle system is **never** frustum-culled at this tier.
+    // Its `geometry` is the shared unit quad the particles are instanced from,
+    // so the quad's bounds are a square at the emitter and describe nothing
+    // about where the particles actually are — culling by them would hide a
+    // wide system whose emitter left the screen. Written rather than left, for
+    // the reason the `material`, `frame` and shadow resets above are.
+    item.frustumCulled = false;
+    item.viewDepth = 0;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;
@@ -1063,8 +1128,10 @@ export function groupRenderListByPipeline(list: RenderItem[]): RenderItem[] {
  *
  * This is the **build-time** half of §46 filtering, for the caller that builds
  * one list per view. The other half is {@link RenderItem}'s `layers` snapshot,
- * which lets one shared list be filtered per view at draw time; the WebGL
- * backend uses that today because it builds one list per frame (R-8).
+ * which lets one shared list be filtered per view by `view-list.ts`'s
+ * `buildViewRenderList`; the WebGL backend takes that route, because a frame
+ * that traverses the scene once and derives per view is cheaper than one that
+ * traverses per view (R-8).
  *
  * @throws FourError `INVALID_SCENE_GRAPH` **in a development build** when
  * `layerMask` is not an integer in `[0, 0xffffffff]` (§85) — a `NaN` mask would

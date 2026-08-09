@@ -159,11 +159,18 @@ export interface RenderBatching {
    * Plans and assembles the batch starting at `items[from]`, or `null` when
    * that item does not start one. See `@four/render`'s `RenderBatcher.next`:
    * the returned record is pooled and valid until the next call.
+   *
+   * `layerMask` is **optional since R-8 (2026-08-09)**, and the renderer no
+   * longer passes one: it hands this method a list `buildViewRenderList` has
+   * already reduced to what the view draws, so the mask would be vacuous.
+   * Omitting it means every layer, which is what a pre-filtered list needs. It
+   * stays in the signature for a caller that batches over an unfiltered frame
+   * list, where a masked-out item must still end a run.
    */
   next(
     items: readonly RenderItem[],
     from: number,
-    layerMask: number,
+    layerMask?: number,
   ): RenderBatch | null;
 
   /**
@@ -237,8 +244,12 @@ export class GlBatching implements RenderBatching {
   next(
     items: readonly RenderItem[],
     from: number,
-    layerMask: number,
+    layerMask?: number,
   ): RenderBatch | null {
+    // Forwarded as-is, `undefined` included: a JavaScript default parameter
+    // applies to an explicit `undefined`, so `RenderBatcher.next`'s own
+    // `ALL_LAYERS` stays the single definition of "no mask" without this method
+    // growing a branch of its own to say so (R-8).
     return this.#batcher.next(items, from, layerMask);
   }
 

@@ -129,6 +129,11 @@ export const SUITE = Object.freeze(
       record: "render-batching",
       what: "§86's batched-sprite and batched-shape rows, preparation half",
     },
+    {
+      file: "view-culling.mjs",
+      record: "view-culling",
+      what: "§64's per-view lists and §87's frustum cull, preparation half",
+    },
   ].map((entry) => Object.freeze(entry)),
 );
 

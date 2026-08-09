@@ -8,6 +8,64 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-8 closed: §64 per-view render lists, §87 frustum culling, §66 key 4
+
+#### Added
+
+- **§64 per-view render lists and §87 frustum culling (gap `R-8`).** The frame builds
+  **one** render list and each viewport now _derives_ its own from it:
+  `buildViewRenderList(source, view, out, { frustum })` in `@four/render` applies §46's
+  layer mask (§48's `view.layerMask`-else-`camera.layers` fallback) and §87's frustum
+  test, keeping the surviving items in order and sharing the frame list's pooled item
+  objects, so a view costs one linear scan and no allocation. The substrate is
+  `@four/math`'s new **`Frustum`** — the six normalized clip planes of a view-projection
+  matrix, extracted for either `DepthRange` convention, with a conservative
+  `intersectsSphere` — and `@four/render`'s **`computeWorldBoundingSphere`**, which turns
+  §53's cached local box into a world-space sphere by the absolute-value transform (never
+  too small, so a cull can never remove something visible). §49's **`frustumCulled`**
+  lands on `Renderable`, defaults to `true`, and round-trips through §79. The WebGL 2
+  backend derives and culls per view; §69's shadow map is still built from the _frame's_
+  list before the view loop, so a caster no camera can see still occludes.
+- **§66 sort key 4 (gap `R-10`).** `sortRenderListByDepth(list, viewMatrix)` sorts a
+  view's own list by depth — opaque near-to-far, transparent far-to-near — under keys 1
+  and 2 and above key 5. A **verb, not a default**, for key 3's reason: under §61's
+  `LEQUAL` a depth sort permutes co-planar opaque draws, and co-planar opaque draws are
+  what a 2D scene is made of. It could not have been written before `R-8`: one list
+  served every view, so a depth measured along one camera would have misordered the rest.
+- `benchmarks/view-culling.mjs` + `benchmarks/results/view-culling.json` — not a §86 row;
+  the measurement behind `R-8`'s design decision (derive per view against traverse per
+  view, at 10 000–100 000 nodes × 1–4 viewports) and the CPU price of the cull itself.
+- `tests/browser/culling.spec.ts` (+ `fixtures/culling-page.ts`) — the pixel half: the
+  same scene drawn with §49's flag on and off, compared **exactly**. Measured on
+  ANGLE/SwiftShader: **0 of 76 800 pixels differ**, 19 draws → 10.
+
+#### Changed
+
+- `@four/render-webgl`'s view loop no longer tests `item.layers` inline; it draws the list
+  `buildViewRenderList` derived. Consequence, stated because it is observable: a batch run
+  may now span an item the _frame_ list had between its members — a masked-out or culled
+  draw no longer ends a run. This is strictly better batching and exactly as correct, since
+  the skipped item is not submitted into that view at all. `RenderBatching.next`'s
+  `layerMask` becomes optional and the renderer no longer passes one.
+- `RenderItem` carries two new snapshots, `frustumCulled` and `viewDepth`. Hand-built item
+  literals need both (a `tsc`-only break — Vitest does not typecheck).
+- **Bundle:** +0.77 kB gzip in every bundle carrying `WebglRenderer` (§64 lists culling as
+  a _stage_, not an option, so the culler is referenced unconditionally). Budgets bumped
+  with the same-tree A/B measurements: first-3d-scene 31.5 → 32.5 kB, particles-demo
+  29 → 30 kB, ui-demo 37 → 38 kB. `sortRenderListByDepth` tree-shakes out of bundles that
+  do not call it.
+
+#### Fixed
+
+- Three integration harnesses were rendering nothing and asserting draw counts for it.
+  `new OrthographicCamera({ height: 4, aspect: 1 })` names two fields
+  `OrthographicCameraOptions` does not have, so the object was accepted and every property
+  ignored, leaving the default unit box `[-1, 1]²`; `render-batching.test.ts`'s camera sat
+  at the origin with content at `z = 0`, in front of its own near plane. Culling made all
+  three visible by removing the draws. `frame-statistics.test.ts`,
+  `renderer-context-loss.test.ts` and `render-batching.test.ts` now use cameras that can
+  see their scenes.
+
 ### 2026-08-09 — PH-8 and PH-12 closed: §26/§27 force fields for bodies, §8 space modes
 
 #### Added
