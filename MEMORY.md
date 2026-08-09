@@ -28,6 +28,52 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-23 §50 shape nodes.** Decisions worth keeping:
+  - **The honest tier is fill-only, and the three stroke-only primitives get no class at
+    all** — line, polyline and the open arc. Fifth application of
+    absent-beats-accepted-and-ignored, and the first where the absence is a whole _class_
+    rather than a field. Three independent reasons, not one: §58 is silent, §52 puts
+    stroke expansion in `@four/geometry` by name, and a stroke without a join rule is
+    _wrong_ at every corner rather than merely plain.
+  - **A packet can close a gap by adding nothing to the frame path.** Shapes carry a
+    `SurfaceMaterial` and draw through the existing unlit pipeline, so `RenderItemKind`
+    was not widened, no pipeline was compiled, `render-webgl` was not opened, and the
+    byte-identity argument is a _code-path_ argument. The mechanical form: a scene of
+    shapes emits the identical GL transcript as a scene of plain `Renderable`s over the
+    same geometries. Reusable technique.
+  - **`ShapeMaterial` is deliberately unshipped** — without §58 it is `UnlitMaterial`
+    renamed, and it costs either a `RenderItemKind` arm (which RFC 0001 _and_ RFC 0003
+    both want, first-to-land owning `pipelineId`) plus 0.75–1.9 kB gzip in every
+    `WebglRenderer` bundle, or a discriminant that lies. §57's family list is not a build
+    order.
+  - **`Node.rotation` is taken** (the §15/§97 live-quaternion alias), so no node subclass
+    may have a scalar `rotation`. `tsc` refuses it; vitest does not — third confirmation
+    that `pnpm run docs` is the real type gate. The family's name is `startAngle`: where
+    the outline begins, from +X, for ellipse, regular polygon, star and sector alike.
+  - **§53's validate-against-current-attributes rule has no legal end to swap from** when
+    the vertex count changes: dropping indices leaves a non-indexed triangle geometry at
+    an arbitrary count, replacing positions leaves indices dangling. **An empty index
+    buffer is the configuration legal at every count** — the pivot every derived,
+    resizable geometry has to pass through.
+  - **§79's validating parse of a §51 path is the builder, replayed** (R-24's
+    no-`fromCommands` rule), so a malformed document fails exactly where a malformed call
+    sequence does. **Write the arc's _end_ angle, never its sweep**:
+    `fl(fl(s+d) − s) ≠ d` for 63% of samples (worst 1.8e-15 rad) and no end angle can fix
+    it, but `fl(s + arcSweep(s,e)) === e` in 500 000/500 000 — so the _document_ stays
+    byte-exact while the reloaded sweep may move a bit.
+  - **A shape parameter is required exactly when it _is_ the shape** (side count, star
+    radii, sector angles, ring hole, polygon points, path); everything with an obvious
+    unit size defaults to 1. The §79 read side follows the same line: defaulted fields
+    restore their default when corrupt, required ones are refused loudly — inventing a
+    triangle looks like a bug in the author's data.
+  - **A ring's hole is a winding decision, not a second draw**: outer CCW, inner CW, so
+    nonzero sees zero inside. Same-winding rings fill the middle twice — invisible under
+    an opaque fill, wrong under a translucent one.
+  - Measured: registering the nine §79 pairs pulls `Path` + the tessellator into any
+    bundle calling `registerSceneNodeTypes()` — **+10.46 kB gzip** on
+    `motor-digital-twin`, 0 B on the five examples that do not (hash-identical).
+    Composing the pair in anyway is deliberate: a shape that failed to match `nodeTypeOf`
+    would save as a bare `Node`, which is A-15's failure mode.
 - **2026-08-09 — R-26 §50 SVG path data.** Decisions worth keeping:
   - **A format conformance rule is not an §85 clamp.** SVG 1.1 F.6.6 _defines_ what a
     reader does with a negative, zero, or too-small arc radius; refusing those would make

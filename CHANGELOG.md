@@ -8,6 +8,56 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-23 closed (solid-fill tier): §50 native 2D shape nodes
+
+#### Added
+
+- **§50's shape family (R-23)** — `Shape2D` plus nine concrete nodes in `@four/render`,
+  beside `Renderable` and `Sprite`: `Circle`, `Ellipse`, `Rectangle` (square-cornered or
+  rounded — §50's own example passes `radius` to `Rectangle`, so §49's
+  `RoundedRectangle` is that class), `RegularPolygon`, `Polygon`, `Star`, `Sector`,
+  `Ring`, and `PathShape` (§50's "path" and "Bézier path" alike). **Eleven of §50's
+  fourteen primitives ship**, filled in one solid colour, entirely on the R-24/R-25
+  substrate: `toPath()` → `Path.fillRings` → `triangulatePolygon`.
+- **`Shape2D.toPath()`** — the family's one polymorphic operation, a fresh §51 `Path`
+  per call: the seam §50's SVG import/export (`R-26`), §51's booleans, and `A-11`'s
+  analytic picking all need, and the reason a consumer of a shape never has to learn
+  which shape it is holding.
+- **§79 pairs for all nine** (`render:circle` … `render:path`), through a new
+  `registerShapeSerializers` split out on the `registerPhysicsSerializers` precedent and
+  composed into `registerSceneNodeTypes`. No geometry key — a shape derives and owns its
+  fill (§83). A field the class defaults restores its default when corrupt; a parameter
+  that _is_ the shape is refused loudly rather than invented. Paths replay through §51's
+  builder, which is where the well-formedness invariant lives.
+
+#### Deliberately not shipped, with arguments in source
+
+- **No stroke, and therefore no `Line`, `Polyline`, or open `Arc` node.** §58's paint
+  model is `R-16`; §52 puts stroke expansion in `@four/geometry`'s tessellation module by
+  name; and a stroke without a join rule is wrong at every corner, not merely plain. A
+  node that draws nothing while claiming to draw something is worse than a missing one.
+- **No `ShapeMaterial`.** Without §58's paints it is `UnlitMaterial` renamed, and it costs
+  either a new `RenderItemKind` arm (a closed union RFC 0001 and RFC 0003 are both queued
+  to widen) plus a compiled-at-init pipeline measured at 0.75–1.9 kB gzip in every bundle
+  carrying `WebglRenderer`, or a discriminant that lies. Shapes carry a `SurfaceMaterial`
+  and draw through the flat-colour pipeline that already existed.
+
+#### Fixed / found
+
+- **`rotation` is not available as a shape parameter** — §6's `Node` publishes it as the
+  live alias of its transform quaternion (§15/§97), so an `Ellipse.rotation` shadows the
+  node's orientation. `tsc` refuses it; vitest would not have. The family's name is
+  `startAngle` throughout: where the outline begins, measured from +X.
+
+#### Unchanged, proven
+
+- **No backend edit, no render-item kind, no frame-path change.** A scene of shapes emits
+  the _identical_ GL call sequence as a scene of plain `Renderable`s holding the same
+  geometry, asserted call for call in `tests/integration/shape-rendering.test.ts`. Five of
+  six example bundles are hash-identical; only `motor-digital-twin` (the one example that
+  registers §79 node types) grows, +10.46 kB gzip to 933.34/1000 kB. Goldens unmoved;
+  59/59 browser gate.
+
 ### 2026-08-09 — R-26 closed (path-data tier): §50 SVG import/export
 
 #### Added

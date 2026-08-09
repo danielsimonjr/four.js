@@ -136,7 +136,7 @@
  */
 
 import { FourError, type JsonValue } from "@four/core";
-import type { BufferGeometry } from "@four/geometry";
+import { Path, type BufferGeometry, type Point2D } from "@four/geometry";
 import type { Material, SpriteMaterial } from "@four/materials";
 import {
   KINEMATIC_CONTROLLER_SERIALIZER,
@@ -150,7 +150,20 @@ import {
   RIGID_BODY_SERIALIZER,
   RigidBody,
 } from "@four/physics";
-import { Renderable, Sprite } from "@four/render";
+import {
+  Circle,
+  Ellipse,
+  PathShape,
+  Polygon,
+  Rectangle,
+  RegularPolygon,
+  Renderable,
+  Ring,
+  Sector,
+  Shape2D,
+  Sprite,
+  Star,
+} from "@four/render";
 import {
   DirectionalLight,
   OrthographicCamera,
@@ -237,6 +250,39 @@ export const POINT_LIGHT_NODE_TYPE = "scene:point-light";
 
 /** The document `type` a {@link SpotLight} serializes as (§68, R-17). */
 export const SPOT_LIGHT_NODE_TYPE = "scene:spot-light";
+
+/** The document `type` a {@link Circle} serializes as (§50; R-23). */
+export const CIRCLE_NODE_TYPE = "render:circle";
+
+/** The document `type` an {@link Ellipse} serializes as (§50; R-23). */
+export const ELLIPSE_NODE_TYPE = "render:ellipse";
+
+/**
+ * The document `type` a {@link Rectangle} serializes as — square-cornered or
+ * rounded, which is one class here (§50; R-23).
+ */
+export const RECTANGLE_NODE_TYPE = "render:rectangle";
+
+/** The document `type` a {@link RegularPolygon} serializes as (§50; R-23). */
+export const REGULAR_POLYGON_NODE_TYPE = "render:regular-polygon";
+
+/** The document `type` a {@link Polygon} serializes as (§50; R-23). */
+export const POLYGON_NODE_TYPE = "render:polygon";
+
+/** The document `type` a {@link Star} serializes as (§50; R-23). */
+export const STAR_NODE_TYPE = "render:star";
+
+/** The document `type` a {@link Sector} serializes as (§50; R-23). */
+export const SECTOR_NODE_TYPE = "render:sector";
+
+/** The document `type` a {@link Ring} serializes as (§50; R-23). */
+export const RING_NODE_TYPE = "render:ring";
+
+/**
+ * The document `type` a {@link PathShape} serializes as — §50's "path" and
+ * "Bézier path" alike (§50, §51; R-23).
+ */
+export const PATH_SHAPE_NODE_TYPE = "render:path";
 
 /**
  * What to do with a shared resource — a geometry, a material — that no
@@ -1384,6 +1430,570 @@ export function registerRenderSerializers(
   };
 }
 
+// --- §50's shape family (2026-08-09, R-23) -----------------------------------
+
+/** The constructors {@link registerShapeSerializers} matches, as a value type. */
+type ShapeClass = abstract new (...parameters: never[]) => Shape2D<Material>;
+
+/**
+ * Class → document type for every §50 shape (R-23, 2026-08-09).
+ *
+ * A map rather than the `if` chain the other pairs use: nine classes share one
+ * payload shape and one writer, so the chain would test the same constructor
+ * twice — once to decide the type name and once to decide the payload — and a
+ * tenth shape would have to be added in three places instead of one. It is also
+ * the enumeration `tests/integration/shape-serialization.test.ts` walks to prove
+ * that every `Shape2D` subclass the umbrella exports is registered, which is the
+ * mechanical guard §79 gets nothing else from.
+ */
+const SHAPE_NODE_TYPES: ReadonlyMap<ShapeClass, string> = new Map<
+  ShapeClass,
+  string
+>([
+  [Circle, CIRCLE_NODE_TYPE],
+  [Ellipse, ELLIPSE_NODE_TYPE],
+  [Rectangle, RECTANGLE_NODE_TYPE],
+  [RegularPolygon, REGULAR_POLYGON_NODE_TYPE],
+  [Polygon, POLYGON_NODE_TYPE],
+  [Star, STAR_NODE_TYPE],
+  [Sector, SECTOR_NODE_TYPE],
+  [Ring, RING_NODE_TYPE],
+  [PathShape, PATH_SHAPE_NODE_TYPE],
+]);
+
+/** The same nine names, for the read half's one-lookup rejection. */
+const SHAPE_NODE_TYPE_NAMES: ReadonlySet<string> = new Set(
+  SHAPE_NODE_TYPES.values(),
+);
+
+/** A finite, strictly positive number — every extent a shape carries (§85). */
+function isPositive(value: number): boolean {
+  return value > 0;
+}
+
+/** Any finite number: a sector's angles are unconstrained (§7b). */
+function anyFinite(): boolean {
+  return true;
+}
+
+/** An integer of at least `minimum` — a side or point count (§85). */
+function isCountAtLeast(minimum: number): (value: number) => boolean {
+  return (value: number): boolean =>
+    Number.isInteger(value) && value >= minimum;
+}
+
+/**
+ * {@link finiteOptions} for the fields a shape refuses at zero or below: a
+ * corrupted extent is simply absent, and the class default applies.
+ */
+function positiveOptions(
+  data: { readonly [key: string]: JsonValue },
+  keys: readonly string[],
+): Record<string, number> {
+  const options: Record<string, number> = {};
+  for (const key of keys) {
+    const value = readFinite(data[key]);
+    if (value !== undefined && value > 0) options[key] = value;
+  }
+  return options;
+}
+
+/** One positive number with a stated fallback. */
+function positiveOr(value: JsonValue | undefined, fallback: number): number {
+  const number_ = readFinite(value);
+  return number_ !== undefined && number_ > 0 ? number_ : fallback;
+}
+
+/**
+ * A parameter the shape's constructor requires, or a loud refusal (§79, §85).
+ *
+ * See {@link registerShapeSerializers} for why these are refused rather than
+ * defaulted: a shape whose defining parameter the document does not carry is a
+ * shape the document does not describe.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`
+ */
+function requireShapeNumber(
+  document: SceneNodeDocument,
+  field: string,
+  value: JsonValue | undefined,
+  accepts: (value: number) => boolean,
+): number {
+  const number_ = readFinite(value);
+  if (number_ === undefined || !accepts(number_)) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `Scene document node ${JSON.stringify(document.id ?? null)} of type ${JSON.stringify(document.type)} carries no usable ${field}; that parameter is what makes the shape the shape, so it is refused rather than invented (§50, §79).`,
+      { context: { node: document.id ?? null, type: document.type, field } },
+    );
+  }
+  return number_;
+}
+
+/** A polygon's ring as JSON — one `[x, y]` pair per vertex. */
+function pointsJson(points: readonly Point2D[]): JsonValue {
+  return points.map((point) => pairJson(point.x, point.y));
+}
+
+/**
+ * A polygon's ring, or a loud refusal (§79, §85) — at least three vertices,
+ * every coordinate finite, which is exactly what `Polygon` itself requires.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`
+ */
+function requireShapePoints(
+  document: SceneNodeDocument,
+  value: JsonValue | undefined,
+): Point2D[] {
+  const points: Point2D[] = [];
+  if (Array.isArray(value)) {
+    for (const entry of value as readonly JsonValue[]) {
+      const pair = readFinitePair(entry);
+      if (pair === undefined) {
+        points.length = 0;
+        break;
+      }
+      points.push({ x: pair[0], y: pair[1] });
+    }
+  }
+  if (points.length < 3) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `Scene document node ${JSON.stringify(document.id ?? null)} of type ${JSON.stringify(document.type)} carries no usable point ring; a polygon is its points, so they are refused rather than invented (§50, §79).`,
+      { context: { node: document.id ?? null, type: document.type } },
+    );
+  }
+  return points;
+}
+
+/**
+ * A §51 path as JSON: its fill rule and one compact array per command, tagged
+ * with the letter SVG uses for it (`M`, `L`, `Q`, `C`, `A`, `Z`).
+ *
+ * Arrays rather than records because a path is the one payload here whose size
+ * scales with the artwork — a glyph outline is hundreds of commands — and the
+ * letters rather than the model's own kind names because they are what §50's
+ * "SVG import/export compatibility" (`R-26`) will be reading and writing
+ * anyway. `A` carries §51's *centre* parameterization plus an **end** angle;
+ * see {@link registerShapeSerializers} for why the end angle and not the sweep.
+ */
+function pathJson(path: Path): JsonValue {
+  const commands: JsonValue[] = [];
+  for (const command of path.commands) {
+    switch (command.kind) {
+      case "move":
+        commands.push(["M", command.x, command.y]);
+        break;
+      case "line":
+        commands.push(["L", command.x, command.y]);
+        break;
+      case "quadratic":
+        commands.push([
+          "Q",
+          command.controlX,
+          command.controlY,
+          command.x,
+          command.y,
+        ]);
+        break;
+      case "cubic":
+        commands.push([
+          "C",
+          command.control1X,
+          command.control1Y,
+          command.control2X,
+          command.control2Y,
+          command.x,
+          command.y,
+        ]);
+        break;
+      case "arc":
+        commands.push([
+          "A",
+          command.centerX,
+          command.centerY,
+          command.radiusX,
+          command.radiusY,
+          command.rotation,
+          command.startAngle,
+          command.startAngle + command.deltaAngle,
+        ]);
+        break;
+      default:
+        commands.push(["Z"]);
+        break;
+    }
+  }
+  return { fillRule: path.fillRule, commands };
+}
+
+/** The finite numbers of one encoded command, or `undefined` if it is not one. */
+function commandNumbers(
+  parts: readonly JsonValue[],
+  count: number,
+): readonly number[] | undefined {
+  if (parts.length !== count + 1) return undefined;
+  const values: number[] = [];
+  for (let i = 1; i <= count; i += 1) {
+    const value = parts[i];
+    if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+    values.push(value);
+  }
+  return values;
+}
+
+/**
+ * A §51 path, replayed through the fluent builder (§79's validating parse).
+ *
+ * Through the builder and not around it: `Path` deliberately has no
+ * `fromCommands`, because the builder *is* the well-formedness invariant every
+ * reader of a path assumes (R-24's decision), and a document is exactly the
+ * untrusted input that invariant exists for. So a malformed command list fails
+ * the same way a malformed call sequence does — a `Z` closing nothing, an arc
+ * of zero radius — and the refusal is translated into the §89 error the rest of
+ * this module raises rather than escaping as a `RangeError` from three packages
+ * away.
+ *
+ * An **absent or empty** command list is not malformed: it is the empty path,
+ * which fills nothing and draws nothing, and is what a `PathShape` built from
+ * `new Path()` writes.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`
+ */
+function readPath(
+  document: SceneNodeDocument,
+  value: JsonValue | undefined,
+): Path {
+  const data = record(value);
+  const path = new Path({
+    fillRule: readString(data.fillRule) === "even-odd" ? "even-odd" : "nonzero",
+  });
+  const commands = Array.isArray(data.commands)
+    ? (data.commands as readonly JsonValue[])
+    : [];
+  let index = 0;
+  try {
+    for (; index < commands.length; index += 1) {
+      const entry = commands[index];
+      const parts: readonly JsonValue[] = Array.isArray(entry)
+        ? (entry as readonly JsonValue[])
+        : [];
+      const operation = parts[0];
+      let numbers: readonly number[] | undefined;
+      if (operation === "M" && (numbers = commandNumbers(parts, 2))) {
+        path.moveTo(numbers[0], numbers[1]);
+      } else if (operation === "L" && (numbers = commandNumbers(parts, 2))) {
+        path.lineTo(numbers[0], numbers[1]);
+      } else if (operation === "Q" && (numbers = commandNumbers(parts, 4))) {
+        path.quadraticCurveTo(numbers[0], numbers[1], numbers[2], numbers[3]);
+      } else if (operation === "C" && (numbers = commandNumbers(parts, 6))) {
+        path.cubicCurveTo(
+          numbers[0],
+          numbers[1],
+          numbers[2],
+          numbers[3],
+          numbers[4],
+          numbers[5],
+        );
+      } else if (operation === "A" && (numbers = commandNumbers(parts, 7))) {
+        // `counterclockwise` is the sign of the sweep the writer flattened into
+        // the end angle: a clockwise whole turn is `end = start − 2π`, which
+        // `arcSweep` recovers exactly through its early exit.
+        path.ellipse(
+          numbers[0],
+          numbers[1],
+          numbers[2],
+          numbers[3],
+          numbers[4],
+          numbers[5],
+          numbers[6],
+          numbers[6] < numbers[5],
+        );
+      } else if (operation === "Z" && parts.length === 1) {
+        path.close();
+      } else {
+        throw new RangeError(
+          `command ${String(index)} is not a valid §51 path command`,
+        );
+      }
+    }
+  } catch (error) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `Scene document node ${JSON.stringify(document.id ?? null)} of type ${JSON.stringify(document.type)} carries a path that is not well formed at command ${String(index)}: ${String(error)} (§51, §79).`,
+      {
+        context: { node: document.id ?? null, type: document.type, index },
+        cause: error,
+      },
+    );
+  }
+  return path;
+}
+
+/**
+ * The §79 node-type pair for §50's shape family — the nine classes `R-23`
+ * shipped on 2026-08-09 (`Circle`, `Ellipse`, `Rectangle`, `RegularPolygon`,
+ * `Polygon`, `Star`, `Sector`, `Ring`, `PathShape`).
+ *
+ * ```ts
+ * const io = registerSceneNodeTypes({
+ *   materials: resourceCatalog([["material/ink", ink]]),
+ * });
+ * ```
+ *
+ * Separated from {@link registerRenderSerializers} for
+ * {@link registerPhysicsSerializers}'s reason and no other: nine classes and
+ * the §51 path parser behind `PathShape` are a real bundle unit, and a 3D or
+ * UI application that saves scenes should not carry the 2D vector stack to do
+ * it (§91). {@link registerSceneNodeTypes} calls this, so an application that
+ * wants everything still makes one call.
+ *
+ * ## What a shape document carries
+ *
+ * A **material key** (see the module header — a shape points at a material it
+ * does not own), the two ordering fields, §49's two shadow flags, the
+ * flattening `tolerance`, and the shape's own parameters. There is deliberately
+ * **no geometry key**: a shape *derives* its fill from those parameters and
+ * owns it (§83), exactly as a `Sprite` derives its quad, so the payload rebuilds
+ * it exactly and a document that named one would be naming a resource the
+ * application never created.
+ *
+ * ## Two reading rules, and where the line between them is
+ *
+ * §96's rule is that data from outside is filtered rather than trusted, and the
+ * A-12/R-18 precedent is that a corrupted field restores its default rather than
+ * taking the whole scene down. That applies to every field the class itself
+ * defaults — `tolerance`, `radius`, `width`, `height`, `rotation`, a
+ * rectangle's corner radius, the ordering and shadow fields.
+ *
+ * The other rule covers the parameters a shape's constructor makes
+ * **required**, because they *are* the shape: a regular polygon's side count, a
+ * star's two radii, a sector's angles, a ring's hole, a polygon's points, a
+ * path's commands. A document that does not carry one of those, carries one the
+ * class would refuse, or carries a pair that contradicts itself, is refused
+ * loudly with a `FourError` — the same answer {@link registerRenderSerializers}
+ * gives a missing material key, and for the same reason: the alternative is to
+ * invent a shape the document never described and hand it back as if it had.
+ * A substituted triangle looks like a bug in the author's data; a refusal names
+ * the node, the type, and the field.
+ *
+ * ## Arcs, and the one number that is not bit-exact
+ *
+ * §51's arc command stores a signed **sweep**; §51's builder — the only parse
+ * that preserves the well-formedness every reader assumes, which is why `Path`
+ * has no `fromCommands` — takes a start angle and an **end** angle. So an arc
+ * is written as `[startAngle, endAngle]` and read back through `ellipse(…)`,
+ * which recomputes the sweep. The recomputed sweep can differ from the original
+ * by a few ulps when the start angle is large beside the sweep (measured: up to
+ * 1.8e-15 rad over 200 000 samples), because `fl(fl(s + d) − s)` is not `d` in
+ * general and no choice of end angle can make it one.
+ *
+ * Writing the **end** angle rather than the sweep is what keeps the *document*
+ * exact anyway: `fl(s + arcSweep(s, e))` is `e` for every pair measured
+ * (0 mismatches in 500 000), so a document round-trips byte for byte even
+ * though the path's stored sweep may move in its last bit. Whole turns and zero
+ * sweeps are exact in both, since `arcSweep` returns ±2π and 0 by early exit.
+ * Nothing else in the family is affected: the eight parametric shapes store
+ * their own parameters and restore them bit for bit.
+ *
+ * Matched by **exact class identity**, like every other pair here.
+ *
+ * @param options the material catalog and the unknown-resource policy
+ * @returns the writer and reader halves; pass both or neither
+ */
+export function registerShapeSerializers(
+  options: SceneNodeTypeOptions = {},
+): SceneNodeTypeSupport {
+  const materials = options.materials;
+  const policy = options.unknownResources ?? "throw";
+  return {
+    write: {
+      nodeTypeOf: (node: Node): string | undefined =>
+        SHAPE_NODE_TYPES.get(node.constructor as ShapeClass),
+      nodeDataOf: (node: Node): JsonValue | undefined => {
+        const constructor = node.constructor as ShapeClass;
+        if (!SHAPE_NODE_TYPES.has(constructor)) return undefined;
+        const shape = node as Shape2D<Material>;
+        const payload: Record<string, JsonValue> = {
+          material: resourceKeyJson<Material>(
+            node,
+            "material",
+            shape.material,
+            materials,
+            policy,
+          ),
+          tolerance: shape.tolerance,
+          renderLayer: shape.renderLayer,
+          renderOrder: shape.renderOrder,
+          ...shadowFlagsJson(shape),
+        };
+        if (constructor === Circle) {
+          payload.radius = (node as Circle<Material>).radius;
+        } else if (constructor === Ellipse) {
+          const ellipse = node as Ellipse<Material>;
+          payload.radiusX = ellipse.radiusX;
+          payload.radiusY = ellipse.radiusY;
+          payload.startAngle = ellipse.startAngle;
+        } else if (constructor === Rectangle) {
+          const rectangle = node as Rectangle<Material>;
+          payload.width = rectangle.width;
+          payload.height = rectangle.height;
+          payload.radius = rectangle.radius;
+        } else if (constructor === RegularPolygon) {
+          const polygon = node as RegularPolygon<Material>;
+          payload.sides = polygon.sides;
+          payload.radius = polygon.radius;
+          payload.startAngle = polygon.startAngle;
+        } else if (constructor === Polygon) {
+          payload.points = pointsJson((node as Polygon<Material>).points);
+        } else if (constructor === Star) {
+          const star = node as Star<Material>;
+          payload.points = star.points;
+          payload.innerRadius = star.innerRadius;
+          payload.outerRadius = star.outerRadius;
+          payload.startAngle = star.startAngle;
+        } else if (constructor === Sector) {
+          const sector = node as Sector<Material>;
+          payload.radius = sector.radius;
+          payload.startAngle = sector.startAngle;
+          payload.endAngle = sector.endAngle;
+        } else if (constructor === Ring) {
+          const ring = node as Ring<Material>;
+          payload.innerRadius = ring.innerRadius;
+          payload.outerRadius = ring.outerRadius;
+        } else {
+          payload.path = pathJson((node as PathShape<Material>).path);
+        }
+        return payload;
+      },
+    },
+    read: {
+      nodeFactory: (document: SceneNodeDocument): Node | undefined => {
+        if (!SHAPE_NODE_TYPE_NAMES.has(document.type)) return undefined;
+        const data = record(document.data);
+        const shared = {
+          material: resolveResource<Material>(document, "material", materials),
+          ...positiveOptions(data, ["tolerance"]),
+          ...finiteOptions(data, ["renderLayer", "renderOrder"]),
+          ...readShadowFlags(data),
+        };
+        switch (document.type) {
+          case CIRCLE_NODE_TYPE:
+            return new Circle({
+              ...shared,
+              ...positiveOptions(data, ["radius"]),
+            });
+          case ELLIPSE_NODE_TYPE:
+            return new Ellipse({
+              ...shared,
+              ...positiveOptions(data, ["radiusX", "radiusY"]),
+              ...finiteOptions(data, ["startAngle"]),
+            });
+          case RECTANGLE_NODE_TYPE: {
+            const width = positiveOr(data.width, 1);
+            const height = positiveOr(data.height, 1);
+            const radius = readFinite(data.radius) ?? 0;
+            return new Rectangle({
+              ...shared,
+              width,
+              height,
+              // The one cross-checked field with a default: a corner radius the
+              // extents cannot hold restores square corners, which every
+              // rectangle can be, rather than refusing the node.
+              radius:
+                radius >= 0 && radius <= Math.min(width, height) / 2
+                  ? radius
+                  : 0,
+            });
+          }
+          case REGULAR_POLYGON_NODE_TYPE:
+            return new RegularPolygon({
+              ...shared,
+              sides: requireShapeNumber(
+                document,
+                "sides",
+                data.sides,
+                isCountAtLeast(3),
+              ),
+              ...positiveOptions(data, ["radius"]),
+              ...finiteOptions(data, ["startAngle"]),
+            });
+          case POLYGON_NODE_TYPE:
+            return new Polygon({
+              ...shared,
+              points: requireShapePoints(document, data.points),
+            });
+          case STAR_NODE_TYPE: {
+            const innerRadius = requireShapeNumber(
+              document,
+              "innerRadius",
+              data.innerRadius,
+              isPositive,
+            );
+            return new Star({
+              ...shared,
+              points: requireShapeNumber(
+                document,
+                "points",
+                data.points,
+                isCountAtLeast(2),
+              ),
+              innerRadius,
+              outerRadius: requireShapeNumber(
+                document,
+                "outerRadius",
+                data.outerRadius,
+                (value) => value > innerRadius,
+              ),
+              ...finiteOptions(data, ["startAngle"]),
+            });
+          }
+          case SECTOR_NODE_TYPE:
+            return new Sector({
+              ...shared,
+              ...positiveOptions(data, ["radius"]),
+              startAngle: requireShapeNumber(
+                document,
+                "startAngle",
+                data.startAngle,
+                anyFinite,
+              ),
+              endAngle: requireShapeNumber(
+                document,
+                "endAngle",
+                data.endAngle,
+                anyFinite,
+              ),
+            });
+          case RING_NODE_TYPE: {
+            const innerRadius = requireShapeNumber(
+              document,
+              "innerRadius",
+              data.innerRadius,
+              isPositive,
+            );
+            return new Ring({
+              ...shared,
+              innerRadius,
+              outerRadius: requireShapeNumber(
+                document,
+                "outerRadius",
+                data.outerRadius,
+                (value) => value > innerRadius,
+              ),
+            });
+          }
+          default:
+            return new PathShape({
+              ...shared,
+              path: readPath(document, data.path),
+            });
+        }
+      },
+    },
+  };
+}
+
 /**
  * Chains node-type pairs into one, first answer winning (2026-08-07).
  *
@@ -1528,6 +2138,7 @@ export function registerSceneNodeTypes(
     ...composeSceneNodeTypes(
       registerUISerializers(options),
       registerRenderSerializers(options),
+      registerShapeSerializers(options),
     ),
   };
 }

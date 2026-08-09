@@ -120,6 +120,30 @@ export {
   resetRenderStatistics,
   supportsRenderStatistics,
 } from "./statistics.js";
+export type {
+  CircleOptions,
+  EllipseOptions,
+  PathShapeOptions,
+  PolygonOptions,
+  RectangleOptions,
+  RegularPolygonOptions,
+  RingOptions,
+  SectorOptions,
+  Shape2DOptions,
+  StarOptions,
+} from "./shape.js";
+export {
+  Circle,
+  Ellipse,
+  PathShape,
+  Polygon,
+  Rectangle,
+  RegularPolygon,
+  Ring,
+  Sector,
+  Shape2D,
+  Star,
+} from "./shape.js";
 export type { SpriteFrame, SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type { TextureSource } from "./texture.js";

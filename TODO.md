@@ -34,6 +34,19 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [ ] **R-16 — §58 paints, fills and strokes** _(after R-23, now the 2D vector stack's
+      single blocker)_. It owns, by name and in dated source notes: the `Paint` union,
+      `StrokeStyle`, `ShapeMaterial`, §50's `fill:`/`stroke:` constructor options,
+      fill/stroke opacity, stroke alignment, dashes, joins and caps, and the three
+      missing §50 primitives (`Line`, `Polyline`, the open `Arc`). Its geometry half is
+      §52's stroke expansion and AA fringe, in `@four/geometry`.
+- [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
+      R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
+      geometry operations (§51's four, the shared planar-subdivision packet), world
+      bounds (§87), analytic hit testing (`A-11`, whose §50 blocker fell — every shape
+      answers `toPath()`); (b) screen-space flattening tolerance — `Shape2D.tolerance`
+      is a world-space length by decision; a screen-space one needs a per-view render
+      list (`R-8`) and a rebuild inside the frame, which §61 forbids throwing in.
 - [ ] **R-26 follow-ups (path-data tier shipped 2026-08-09):** (a) the `<svg>` document
       tier (`viewBox`, `transform`, `<g>`) is an owner decision — ship a small XML
       tokenizer in `@four/geometry`, or take a host-parsed document through an injected
