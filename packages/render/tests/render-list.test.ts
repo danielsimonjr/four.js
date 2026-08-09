@@ -950,3 +950,87 @@ describe("§47/§48 — viewLayerMask (R-38)", () => {
     expect(viewLayerMask(view)).toBe(NO_LAYERS);
   });
 });
+
+describe("§49 shadow flags on the item (§69, R-18)", () => {
+  it("defaults a renderable to casting and receiving", () => {
+    const scene = new Scene();
+    const node = renderable("mesh");
+    scene.add(node);
+    resolveWorldTransforms(scene);
+
+    expect([node.castShadow, node.receiveShadow]).toEqual([true, true]);
+    const [item] = buildRenderList(scene, []);
+    expect([item.castShadow, item.receiveShadow]).toEqual([true, true]);
+  });
+
+  it("takes both flags from options and snapshots them onto the item", () => {
+    const scene = new Scene();
+    const floor = new Renderable(planeGeometry(), new LitMaterial(), {
+      castShadow: false,
+    });
+    const ghost = new Renderable(boxGeometry(), new LitMaterial(), {
+      receiveShadow: false,
+    });
+    scene.add(floor, ghost);
+    resolveWorldTransforms(scene);
+
+    const list = buildRenderList(scene, []);
+    expect([list[0].castShadow, list[0].receiveShadow]).toEqual([false, true]);
+    expect([list[1].castShadow, list[1].receiveShadow]).toEqual([true, false]);
+  });
+
+  it("follows a flag written after construction", () => {
+    const scene = new Scene();
+    const node = renderable("mesh");
+    scene.add(node);
+    resolveWorldTransforms(scene);
+    expect(buildRenderList(scene, [])[0].castShadow).toBe(true);
+
+    node.castShadow = false;
+    expect(buildRenderList(scene, [])[0].castShadow).toBe(false);
+  });
+
+  it("reads a drawable predating the fields as casting and receiving", () => {
+    // The `!== false` read, and the mirror of the layer-mask case above: a
+    // structurally typed drawable written before §69 reports `undefined`, which
+    // must mean what a `Renderable` authored today means, not "opted out".
+    const scene = new Scene();
+    const legacy = renderable("legacy");
+    (
+      legacy as unknown as {
+        castShadow: boolean | undefined;
+        receiveShadow: boolean | undefined;
+      }
+    ).castShadow = undefined;
+    (
+      legacy as unknown as { receiveShadow: boolean | undefined }
+    ).receiveShadow = undefined;
+    scene.add(legacy);
+    resolveWorldTransforms(scene);
+
+    const [item] = buildRenderList(scene, []);
+    expect([item.castShadow, item.receiveShadow]).toEqual([true, true]);
+  });
+
+  it("does not let a pooled slot leak one node's flags into another's", () => {
+    // The hazard `material = undefined` and `frame = null` exist for, one field
+    // family on: items are pooled and rewritten, so both flags are written on
+    // *every* renderable rather than only on the ones that opted out.
+    const scene = new Scene();
+    const first = new Renderable(planeGeometry(), new UnlitMaterial(), {
+      castShadow: false,
+      receiveShadow: false,
+    });
+    scene.add(first);
+    resolveWorldTransforms(scene);
+    const out: RenderItem[] = [];
+    buildRenderList(scene, out);
+    expect([out[0].castShadow, out[0].receiveShadow]).toEqual([false, false]);
+
+    scene.remove(first);
+    scene.add(renderable("second"));
+    resolveWorldTransforms(scene);
+    buildRenderList(scene, out);
+    expect([out[0].castShadow, out[0].receiveShadow]).toEqual([true, true]);
+  });
+});

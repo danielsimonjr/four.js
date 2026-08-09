@@ -1206,6 +1206,10 @@ describe("registerRenderSerializers — resource references are refused loudly",
       material: null,
       renderLayer: 0,
       renderOrder: 0,
+      // §49's shadow flags, always written (R-18, 2026-08-09) — see
+      // `shadowFlagsJson` for why the defaults are stated rather than omitted.
+      castShadow: true,
+      receiveShadow: true,
     });
     // The inspector case: the hierarchy saves. Loading it is still a refusal,
     // because a renderable without a geometry is not a renderable.
@@ -1307,6 +1311,8 @@ describe("registerRenderSerializers — resource references are refused loudly",
       material: "material/brick",
       renderLayer: 0,
       renderOrder: 0,
+      castShadow: true,
+      receiveShadow: true,
     });
     expect(
       codeOf(() =>

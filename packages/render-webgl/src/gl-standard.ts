@@ -81,6 +81,8 @@ import {
   MAP_TEXTURE_UNIT,
   PUNCTUAL_LIGHT_GLSL,
   PunctualLightUniforms,
+  SHADOW_GLSL,
+  ShadowUniforms,
   createLinkedProgram,
   matrixScratch,
   requireUniform,
@@ -165,6 +167,18 @@ void main() {
  * With `punctualCount` at GL's initial `0` the loop never runs, which is the
  * pixel half of the byte-identity claim `PunctualLightUniforms` makes about
  * the GL half.
+ *
+ * ## The shadow (R-18, 2026-08-09)
+ *
+ * §69's shadow attenuates the **directional** term only — the light set has no
+ * shadow maps at this tier (`SHADOW_GLSL`) — and it does so exactly as R-17's
+ * refactor added its loop: the pre-existing product is bound to a local, the
+ * shadow multiplies *that*, and the result is added. With `useShadow` at GL's
+ * initial `false` the term added to `shaded` is the identical expression this
+ * stage evaluated before, operation for operation. The normal-bias offsets
+ * along `n`, which is already normalized here — the same vector the BRDF
+ * shades with, so a receiver's bias and its shading agree about which way its
+ * surface faces.
  */
 const STANDARD_FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -190,6 +204,7 @@ const float DIELECTRIC_F0 = 0.04;
 const float MIN_ROUGHNESS = 0.045;
 
 ${PUNCTUAL_LIGHT_GLSL}
+${SHADOW_GLSL}
 vec3 directLobe(
   vec3 n,
   vec3 v,
@@ -240,8 +255,12 @@ void main() {
     vec3 l = -lightDirection;
     float nDotL = dot(n, l);
     if (nDotL > 0.0) {
-      shaded += directLobe(n, v, l, nDotL, diffuseColor, f0, alpha2)
+      vec3 direct = directLobe(n, v, l, nDotL, diffuseColor, f0, alpha2)
         * lightColor * nDotL;
+      if (useShadow) {
+        direct *= shadowFactor(vWorldPosition, n);
+      }
+      shaded += direct;
     }
 
     for (int i = 0; i < punctualCount; i += 1) {
@@ -321,6 +340,8 @@ export class StandardProgram implements Disposable {
 
   readonly #punctual: PunctualLightUniforms;
 
+  readonly #shadow: ShadowUniforms;
+
   /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
   #useMap = false;
 
@@ -333,10 +354,12 @@ export class StandardProgram implements Disposable {
     program: GlProgramHandle,
     locations: readonly GlUniformLocation[],
     punctual: PunctualLightUniforms,
+    shadow: ShadowUniforms,
   ) {
     this.#gl = gl;
     this.#program = program;
     this.#punctual = punctual;
+    this.#shadow = shadow;
     // Positionally, from the one array `create` builds: twelve uniforms is more
     // than a constructor parameter list can carry without every call site
     // becoming a puzzle, and the array is written once, next to the names it
@@ -389,6 +412,7 @@ export class StandardProgram implements Disposable {
         program,
         names.map((name) => requireUniform(gl, program, name, "standard")),
         PunctualLightUniforms.resolve(gl, program, "standard"),
+        ShadowUniforms.resolve(gl, program, "standard"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);
@@ -507,6 +531,24 @@ export class StandardProgram implements Disposable {
    */
   setPunctualLights(lights: SceneLights): void {
     this.#punctual.upload(lights);
+  }
+
+  /**
+   * Uploads the frame's shadow matrix, biases and tap size (§69, R-18) — or
+   * nothing, for a frame in which no light casts. Call once per viewport; see
+   * `ShadowUniforms` for the contract and for why "nothing" is load-bearing.
+   */
+  setShadow(lights: SceneLights): void {
+    this.#shadow.uploadView(lights);
+  }
+
+  /**
+   * Selects whether the draw about to be issued is shadowed (§49's
+   * `receiveShadow`, §69) — see `ShadowUniforms.setReceiving`, whose contract
+   * this is verbatim.
+   */
+  setReceivesShadow(receiving: boolean): void {
+    this.#shadow.setReceiving(receiving);
   }
 
   /**

@@ -19,6 +19,7 @@ export {
 export type {
   AmbientLightSource,
   DirectionalLightSource,
+  DirectionalShadowSource,
   PointLightSource,
   PunctualLightSource,
   PunctualLightSourceBase,

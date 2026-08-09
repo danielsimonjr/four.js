@@ -26,9 +26,14 @@
  *   rather than in the punctual set, and a rectangular area light needs the
  *   linearly-transformed-cosine machinery §68's "where supported" already
  *   hedges on. Both are absent rather than accepted-and-ignored;
- * - **shadows** (`castShadow` in §68's own example) are §69, a package of
- *   machinery (shadow maps, cascades, bias controls) this tier does not
- *   pretend to have — the option is absent rather than accepted-and-ignored;
+ * - **shadows** (`castShadow` in §68's own example) ship for the *directional*
+ *   light only, at §69's directional-shadow-map tier (R-18, 2026-08-09):
+ *   {@link DirectionalLight.castShadow} and {@link DirectionalLightShadow}.
+ *   A {@link PointLight} and a {@link SpotLight} carry no `castShadow` at all
+ *   — absent rather than accepted-and-ignored — because §69's answer for them
+ *   is a cube map and a per-light shadow index that the single-map tier has
+ *   nowhere to put. See {@link DirectionalLightShadow} for the whole staged
+ *   list (cascades, point and spot shadows, atlas, contact shadows);
  * - §68's **CSS color strings** denote sRGB values (§60a); §101's shipped-name
  *   mapping pins colours as linear tuples for this tier (R-15, 2026-08-08), so
  *   an author with a string decodes it first — see {@link ColorRGB};
@@ -77,7 +82,7 @@
  * can only catch it by test.
  */
 
-import { Vector3 } from "@four/math";
+import { Matrix4, Vector3 } from "@four/math";
 import type { ColorRGB } from "@four/math";
 
 import { Node } from "./node.js";
@@ -99,6 +104,288 @@ import { resolveWorldTransform } from "./world-transforms.js";
  */
 export type { ColorRGB } from "@four/math";
 
+/**
+ * How a {@link DirectionalLight} casts (§69) — the shadow-map resolution, the
+ * two bias controls, and the orthographic volume the map covers.
+ *
+ * ```ts
+ * const sun = new DirectionalLight({ intensity: 3, castShadow: true });
+ * sun.shadow.mapSize = 2048;
+ * sun.shadow.extent = 12;      // a 24 m × 24 m box about the light's position
+ * sun.shadow.bias = 0.002;
+ * ```
+ *
+ * Every property is a **validated accessor** (the F14 policy, 2026-08-07): the
+ * constructor's §85 check runs again on every write, so a `NaN` map size is a
+ * `RangeError` at the assignment that caused it rather than a black frame three
+ * systems later. Nothing here is clamped or reordered — WP-3.3's
+ * no-silent-rewrites rule — so an unusable value is *refused*, never quietly
+ * repaired.
+ *
+ * ## The volume, and why it is authored rather than fitted
+ *
+ * A directional light has no position as far as *lighting* is concerned (§68 —
+ * see {@link DirectionalLight.getWorldDirection}), but a shadow map is a
+ * rendering of a bounded volume and something has to bound it. This tier takes
+ * the volume from the light's own node: the map is rendered from the light's
+ * **world position**, looking along its **−Z axis**, through an orthographic
+ * box `2 × extent` wide and tall with the near and far planes below. Moving or
+ * aiming the light node therefore moves the shadow volume, which is the one
+ * control an author already has in their hands.
+ *
+ * The alternative — fitting the box to the scene's bounds every frame — is
+ * *not* this tier's, and deliberately: it needs a world-space bounds pass this
+ * engine does not yet run (§87's culling packet owns it), and a volume that
+ * silently resizes makes shadow texel density frame-dependent, which is the
+ * shimmer §33's determinism language exists to keep out of a recorded run.
+ *
+ * ## Staged, with the date (2026-08-09, R-18)
+ *
+ * §69 lists ten features; this settings object is sized for the one tier that
+ * ships. Named here rather than sketched, because each is public shape:
+ *
+ * - **cascaded shadow maps** — one map, one volume. Cascades need a split
+ *   scheme, a map per split, and a per-fragment cascade selection, and they
+ *   are what make a *large* outdoor volume workable; `extent` is the honest
+ *   single-cascade knob until then.
+ * - **point-light cubemap shadows** and **spot-light shadows** — neither
+ *   {@link PointLight} nor {@link SpotLight} carries `castShadow` at all (see
+ *   the module header). A cube map needs six passes and a `samplerCube`; a
+ *   spot needs a perspective shadow matrix and a *second* map slot, which is
+ *   the shadow-atlas item below.
+ * - **shadow atlas management** — one map, one caster light. An atlas is what
+ *   turns "a per-light shadow index" into something a bounded uniform set can
+ *   address.
+ * - **transparent shadow masks** — the depth-only pass writes geometry, not
+ *   alpha, so a sprite or a cut-out texture casts nothing here (§55 quads are
+ *   skipped by the caster pass entirely rather than casting a hard rectangle).
+ * - **contact shadows** — a screen-space effect, and so §70's business rather
+ *   than this record's.
+ */
+export class DirectionalLightShadow {
+  #mapSize: number;
+
+  #bias: number;
+
+  #normalBias: number;
+
+  #extent: number;
+
+  #near: number;
+
+  #far: number;
+
+  constructor(options: DirectionalLightShadowOptions = {}) {
+    this.#mapSize = requireMapSize(options.mapSize ?? DEFAULT_SHADOW_MAP_SIZE);
+    this.#bias = requireFinite("shadow bias", options.bias ?? DEFAULT_BIAS);
+    this.#normalBias = requireNonNegative(
+      "shadow normalBias",
+      options.normalBias ?? 0,
+    );
+    this.#extent = requirePositive(
+      "shadow extent",
+      options.extent ?? DEFAULT_SHADOW_EXTENT,
+    );
+    this.#near = requirePositive("shadow near", options.near ?? DEFAULT_NEAR);
+    this.#far = requirePositive("shadow far", options.far ?? DEFAULT_FAR);
+    requireOrderedPlanes(this.#near, this.#far);
+  }
+
+  /**
+   * Edge length of the square shadow map in texels (§69 "configurable
+   * resolution"). Defaults to `1024`.
+   *
+   * A finite integer of at least 1; anything else is refused (§85). It is
+   * **not** required to be a power of two — the map is sampled with
+   * `NEAREST` filtering and never mipmapped, so WebGL 2's non-power-of-two
+   * rules do not bite — but a device's `MAX_TEXTURE_SIZE` still does, and a
+   * size past it makes the backend's framebuffer incomplete, which skips the
+   * shadow rather than the frame (`gl-render-target.ts`).
+   */
+  get mapSize(): number {
+    return this.#mapSize;
+  }
+
+  set mapSize(value: number) {
+    this.#mapSize = requireMapSize(value);
+  }
+
+  /**
+   * Constant depth offset subtracted from a receiver's own depth before it is
+   * compared against the map (§69 "bias"), in **clip-space depth units**
+   * (0…1 across the near-to-far range). Defaults to `0.0015`.
+   *
+   * Too small and a lit surface shadows itself in stripes (acne); too large
+   * and a shadow detaches from its caster (peter-panning). The right value
+   * depends on `extent`, `far`, and the map's resolution, which is exactly why
+   * §69 makes it an author's control rather than a constant.
+   *
+   * Any finite number is accepted, negative ones included: a negative bias is
+   * a deliberate over-occlusion an author may want, and refusing it would be
+   * the silent rewrite WP-3.3 rules out.
+   */
+  get bias(): number {
+    return this.#bias;
+  }
+
+  set bias(value: number) {
+    this.#bias = requireFinite("shadow bias", value);
+  }
+
+  /**
+   * Distance, in metres (§40), that a receiver is pushed **along its own
+   * surface normal** before its shadow-map coordinate is computed (§69
+   * "normal-bias"). Defaults to `0` — off.
+   *
+   * The other half of the acne fix, and the half that scales with geometry
+   * rather than with depth precision: a slope facing away from the light needs
+   * an offset proportional to its own size, which a constant depth `bias`
+   * cannot express. Must be finite and non-negative — a *negative* normal bias
+   * would pull the receiver into its own caster, which is not a look, it is
+   * the artefact.
+   */
+  get normalBias(): number {
+    return this.#normalBias;
+  }
+
+  set normalBias(value: number) {
+    this.#normalBias = requireNonNegative("shadow normalBias", value);
+  }
+
+  /**
+   * Half-width and half-height of the orthographic shadow volume, in metres
+   * (§40). Defaults to `10`, i.e. a 20 m × 20 m box. Must be finite and
+   * positive.
+   *
+   * See the class header for what the volume is centred on and why it is
+   * authored rather than fitted to the scene.
+   */
+  get extent(): number {
+    return this.#extent;
+  }
+
+  set extent(value: number) {
+    this.#extent = requirePositive("shadow extent", value);
+  }
+
+  /**
+   * Distance in front of the light at which the shadow volume starts, in
+   * metres (§40). Defaults to `0.1`. Must be finite, positive, and less than
+   * {@link DirectionalLightShadow.far}.
+   */
+  get near(): number {
+    return this.#near;
+  }
+
+  set near(value: number) {
+    const near = requirePositive("shadow near", value);
+    requireOrderedPlanes(near, this.#far);
+    this.#near = near;
+  }
+
+  /**
+   * Distance in front of the light at which the shadow volume ends, in metres
+   * (§40). Defaults to `100`. Must be finite, positive, and greater than
+   * {@link DirectionalLightShadow.near}.
+   *
+   * A caster beyond `far`, or nearer than `near`, is simply not in the map;
+   * a *receiver* outside the volume is fully lit rather than fully shadowed
+   * (see `@four/render-webgl`'s shadow chunk), which is the choice that makes
+   * an under-sized volume read as "shadows stop here" rather than as "the
+   * world went black".
+   */
+  get far(): number {
+    return this.#far;
+  }
+
+  set far(value: number) {
+    const far = requirePositive("shadow far", value);
+    requireOrderedPlanes(this.#near, far);
+    this.#far = far;
+  }
+}
+
+/** Construction arguments of {@link DirectionalLightShadow} (§69). */
+export interface DirectionalLightShadowOptions {
+  /** Initial {@link DirectionalLightShadow.mapSize}. Defaults to `1024`. */
+  mapSize?: number;
+  /** Initial {@link DirectionalLightShadow.bias}. Defaults to `0.0015`. */
+  bias?: number;
+  /** Initial {@link DirectionalLightShadow.normalBias}. Defaults to `0`. */
+  normalBias?: number;
+  /** Initial {@link DirectionalLightShadow.extent}. Defaults to `10`. */
+  extent?: number;
+  /** Initial {@link DirectionalLightShadow.near}. Defaults to `0.1`. */
+  near?: number;
+  /** Initial {@link DirectionalLightShadow.far}. Defaults to `100`. */
+  far?: number;
+}
+
+/**
+ * Default shadow-map edge in texels. §69 states no number and Appendix A pins
+ * no shadow defaults, so this is a recorded decision: 1024² is one megatexel
+ * — a 4 MB depth attachment — which is the largest map that is unremarkable on
+ * every WebGL 2 device the §90 compatibility tables name, and the size at
+ * which a 20 m volume gives roughly 2 cm texels.
+ */
+const DEFAULT_SHADOW_MAP_SIZE = 1024;
+
+/**
+ * Default constant depth bias. Chosen against the other two defaults: a 20 m
+ * volume over a 100 m depth range on a 24-bit map needs about `1.5e-3` of
+ * clip-space depth to clear its own quantization on a moderately sloped
+ * surface. An author who changes `extent` or `far` by an order of magnitude
+ * should expect to revisit it — which is the reason §69 makes it a control.
+ */
+const DEFAULT_BIAS = 0.0015;
+
+/** Default half-extent of the shadow volume, in metres (§40). */
+const DEFAULT_SHADOW_EXTENT = 10;
+
+/** Default near plane of the shadow volume, matching §97's camera default. */
+const DEFAULT_NEAR = 0.1;
+
+/** Default far plane of the shadow volume, in metres (§40). */
+const DEFAULT_FAR = 100;
+
+/** Rejects a non-positive light parameter (§85); `requireFinite` runs first. */
+function requirePositive(name: string, value: number): number {
+  if (requireFinite(name, value) <= 0) {
+    throw new RangeError(
+      `Light ${name} must be positive; got ${String(value)} (§85).`,
+    );
+  }
+  return value;
+}
+
+/** Rejects a shadow-map size that is not a positive integer (§85). */
+function requireMapSize(value: number): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new RangeError(
+      "Light shadow mapSize must be a finite integer of at least 1; got " +
+        `${String(value)} (§69, §85).`,
+    );
+  }
+  return value;
+}
+
+/** Rejects a shadow volume whose planes do not bound anything (§85). */
+function requireOrderedPlanes(near: number, far: number): void {
+  if (!(near < far)) {
+    throw new RangeError(
+      `Light shadow near (${String(near)}) must be less than far ` +
+        `(${String(far)}); a volume of zero or negative depth projects ` +
+        "nothing (§69, §85).",
+    );
+  }
+}
+
+/**
+ * Scratch for {@link DirectionalLight.computeShadowMatrix} — the light's view
+ * matrix, composed once per call and never escaping (plan D7).
+ */
+const shadowViewScratch = new Matrix4();
+
 /** Construction arguments of {@link DirectionalLight} (§68). */
 export interface DirectionalLightOptions {
   /**
@@ -113,6 +400,18 @@ export interface DirectionalLightOptions {
    * defaults; `1` is the multiplicative identity).
    */
   intensity?: number;
+  /**
+   * Initial {@link DirectionalLight.castShadow} — §68's own example field,
+   * driving §69's machinery. Defaults to `false`; see the property.
+   */
+  castShadow?: boolean;
+  /**
+   * Initial {@link DirectionalLight.shadow} settings (§69). Omitted fields
+   * take {@link DirectionalLightShadow}'s documented defaults, and the record
+   * is constructed whether or not the light casts — so configuring a light
+   * before switching it on is a plain assignment rather than an allocation.
+   */
+  shadow?: DirectionalLightShadowOptions;
 }
 
 /** Rejects non-finite light parameters (§85). */
@@ -175,6 +474,48 @@ export class DirectionalLight extends Node {
    */
   intensity: number;
 
+  /**
+   * Whether this light casts shadows (§68's example field, §69's feature).
+   * **Defaults to `false`.**
+   *
+   * ```ts
+   * const sun = new DirectionalLight({ intensity: 3, castShadow: true });
+   * sun.shadow.extent = 15;
+   * ```
+   *
+   * `false` by default because a shadow map is a *whole extra pass* — a
+   * depth-only rendering of every caster into an off-screen surface, plus a
+   * comparison per shaded fragment — and §61 is explicit that a renderer does
+   * not silently spend that. It is also what makes the flag honest as a
+   * capability marker: a scene that never sets it emits, to the byte, the GL
+   * call sequence it emitted before §69 existed (`multi-light`'s technique,
+   * one packet on).
+   *
+   * At most **one** light casts in a frame, and it is the same one that lights
+   * it: `@four/render`'s `collectSceneLights` takes the first visible, enabled
+   * directional light in scene-graph order (§33 — authored order decides, not
+   * proximity or brightness) and reads this flag off *that* light. A second
+   * directional light with `castShadow` set is ignored exactly as its
+   * *lighting* is ignored; §69's shadow atlas is what changes that.
+   *
+   * A plain boolean, not an accessor: there is no invalid value, and R-12's
+   * "render state is read per draw, never cached" makes a version bump
+   * pointless (F14's rule for the §57 booleans, applied here).
+   */
+  castShadow: boolean;
+
+  /**
+   * Resolution, bias, and volume of this light's shadow map (§69) — see
+   * {@link DirectionalLightShadow}.
+   *
+   * Always present, whatever {@link DirectionalLight.castShadow} says, so that
+   * `light.shadow.mapSize = 2048` needs no null check and no allocation on the
+   * frame that first switches shadows on. The instance is `readonly` for the
+   * reason {@link DirectionalLight.color} is: the renderer may read it every
+   * frame, and replacing the object would leave a captured reference stale.
+   */
+  readonly shadow: DirectionalLightShadow;
+
   constructor(options: DirectionalLightOptions = {}) {
     super();
     const color = options.color ?? [1, 1, 1];
@@ -184,6 +525,57 @@ export class DirectionalLight extends Node {
       requireFinite("color blue", color[2]),
     ];
     this.intensity = requireFinite("intensity", options.intensity ?? 1);
+    this.castShadow = options.castShadow ?? false;
+    this.shadow = new DirectionalLightShadow(options.shadow);
+  }
+
+  /**
+   * Writes this light's **shadow view-projection** — the matrix that takes a
+   * world-space point into the shadow map's clip space — into `out` and
+   * returns it (§69, §7b's `out`-parameter convention).
+   *
+   * ```text
+   * out = orthographic(−extent, extent, −extent, extent, near, far)
+   *     · inverse(worldMatrix)
+   * ```
+   *
+   * The right factor is the light's **view matrix**, derived exactly as
+   * `Camera.updateViewMatrix` derives a camera's — the inverse of the resolved
+   * world matrix — so the map is rendered from the light's world position,
+   * along its −Z axis, with its +Y as up, and any rig that aims a camera aims
+   * this. The left factor is the orthographic box
+   * {@link DirectionalLightShadow} documents; a directional light's rays are
+   * parallel, so the projection is orthographic and nothing here needs a field
+   * of view.
+   *
+   * `depthRange` is WebGL 2's `[-1, 1]` (plan D8, §120's MVP backend), the
+   * default `Matrix4.setOrthographic` already applies; a `"zero-to-one"`
+   * backend gets its own overload with the packet that ships it.
+   *
+   * World transforms are resolved on demand, exactly as
+   * {@link DirectionalLight.getWorldDirection} resolves them. A degenerate
+   * light — zero scale up the chain — has a **singular** world matrix, and
+   * `Matrix4.invert` documents that it leaves such a matrix unchanged rather
+   * than producing `NaN`: the result is a finite matrix describing a collapsed
+   * volume that nothing can be inside, so the map comes out empty and every
+   * receiver reads as lit. Like a degenerate camera (§47), it costs the frame
+   * its shadow rather than its existence, and poisons nothing downstream.
+   *
+   * Allocates nothing: the view matrix is composed into module scratch.
+   */
+  computeShadowMatrix(out: Matrix4): Matrix4 {
+    const shadow = this.shadow;
+    shadowViewScratch.copy(resolveWorldTransform(this)).invert();
+    return out
+      .setOrthographic(
+        -shadow.extent,
+        shadow.extent,
+        -shadow.extent,
+        shadow.extent,
+        shadow.near,
+        shadow.far,
+      )
+      .multiply(shadowViewScratch);
   }
 
   /**

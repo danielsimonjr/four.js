@@ -89,6 +89,14 @@ export const GL = {
   TEXTURE_WRAP_S: 0x2802,
   /** `GL_TEXTURE_WRAP_T`. */
   TEXTURE_WRAP_T: 0x2803,
+  /**
+   * `GL_NEAREST` — point sampling. The one place this tier uses it is §69's
+   * shadow map (R-18): a `DEPTH_COMPONENT` texture is *not* filterable in
+   * GLES 3.0, so `LINEAR` would leave it incomplete and sample as black. The
+   * percentage-closer filter is therefore explicit taps in the shader rather
+   * than hardware filtering — see `gl-shadow.ts`.
+   */
+  NEAREST: 0x2600,
   /** `GL_LINEAR` — bilinear sampling; the MVP tier has no mipmaps (§77). */
   LINEAR: 0x2601,
   /** `GL_CCW` — counter-clockwise front faces (§7a right-handed, Y-up). */
@@ -113,6 +121,8 @@ export const GL = {
   UNSIGNED_INT: 0x1405,
   /** `GL_FLOAT` — the position attribute's component type. */
   FLOAT: 0x1406,
+  /** `GL_DEPTH_COMPONENT` — the texel *format* of a depth texture (R-18). */
+  DEPTH_COMPONENT: 0x1902,
   /** `GL_RGBA` — the texel upload format. */
   RGBA: 0x1908,
   /** `GL_CLAMP_TO_EDGE` — the wrap mode of every MVP-tier texture (§77). */
@@ -124,6 +134,14 @@ export const GL = {
    * depth-stencil are staged with §67 and §69 (see `gl-render-target.ts`).
    */
   DEPTH_COMPONENT16: 0x81a5,
+  /**
+   * `GL_DEPTH_COMPONENT24` — sized internal format of a *samplable* depth
+   * attachment (R-18, §69). Twenty-four bits rather than the renderbuffer's
+   * sixteen because a shadow map's whole content is a depth *comparison*, and
+   * 16-bit quantization over a 100 m volume shows as banded self-shadowing
+   * before any bias can help; WebGL 2 requires this format for textures.
+   */
+  DEPTH_COMPONENT24: 0x81a6,
   /** `GL_TEXTURE0` — the one texture unit the sprite pipeline samples from. */
   TEXTURE0: 0x84c0,
   /** `GL_RGBA8` — the sized internal format of an MVP-tier texture. */
@@ -431,6 +449,17 @@ export const COLOR_ATTRIBUTE_LOCATION = 3;
  * `webgl-renderer.ts` and the sampler upload here from drifting apart.
  */
 export const MAP_TEXTURE_UNIT = 0;
+
+/**
+ * The texture unit §69's shadow map is bound to (R-18, 2026-08-09).
+ *
+ * Unit **1**, permanently, and the one place this backend uses a unit other
+ * than 0: the map stays bound across draws that also bind an albedo texture to
+ * {@link MAP_TEXTURE_UNIT}, so the two cannot share. It is bound once per
+ * frame, before the view loop, and unbound in that frame's `finally` — see
+ * `webgl-renderer.ts`.
+ */
+export const SHADOW_TEXTURE_UNIT = 1;
 
 /**
  * The MVP vertex stage: object space → clip space, plus the two optional
@@ -778,6 +807,221 @@ export class PunctualLightUniforms {
 }
 
 /**
+ * The receiver chunk both shaded fragment stages splice in (§69; R-18,
+ * 2026-08-09) — the shared half of shadowing, exactly as
+ * {@link PUNCTUAL_LIGHT_GLSL} is the shared half of the light set.
+ *
+ * ```text
+ * p      = worldPosition + n · shadowNormalBias
+ * c      = (shadowMatrix · vec4(p, 1)).xyz / w,  mapped from [-1,1] to [0,1]
+ * factor = (1/9) Σ over the 3×3 texel neighbourhood of c.xy
+ *                [ c.z − shadowBias  ≤  depth(tap) ]
+ * ```
+ *
+ * Four properties are load-bearing and each is a decision:
+ *
+ * - **Outside the volume is lit, not shadowed.** A receiver whose mapped
+ *   coordinate leaves the unit cube on *any* axis — past the near or far plane,
+ *   or outside the map's own rectangle — returns `1.0`. One `any(lessThan) ||
+ *   any(greaterThan)` covers all three axes, which is both shorter and exactly
+ *   the claim. An under-sized `extent` then reads as "shadows stop here", which
+ *   an author can see and fix, rather than as "the world beyond the box went
+ *   black".
+ * - **The perspective divide is performed although this tier's projection is
+ *   orthographic** (`w` is 1). It costs one division per fragment and is what
+ *   lets §69's spot-light shadows reuse this chunk unchanged when they land.
+ * - **`shadowBias` is subtracted from the receiver rather than added to the
+ *   caster**, so the sign convention matches every other engine's: a positive
+ *   bias moves the surface *towards* the light.
+ * - **The normal bias offsets the sample position, not the depth.** It is a
+ *   world-space displacement (§40 metres), the only form that scales correctly
+ *   with a surface's slope; a constant depth bias cannot.
+ *
+ * ## Why explicit taps and not hardware PCF
+ *
+ * GLES 3.00 offers `sampler2DShadow` with `TEXTURE_COMPARE_MODE`, which gives a
+ * free 2×2 comparison-filtered tap. This tier uses a plain `sampler2D` with
+ * `NEAREST` filtering and nine explicit taps instead:
+ *
+ * - the comparison mode is *sampler state*, so it would have to be set on the
+ *   attachment `gl-render-target.ts` allocates — coupling that cache to what a
+ *   particular consumer intends to do with a depth texture, which is exactly
+ *   the coupling its design avoids;
+ * - a 2×2 hardware tap is a smaller filter than §69's "percentage-closer
+ *   filtering" suggests, and widening it later would mean nine *shadow* samples
+ *   rather than nine plain ones — no cheaper;
+ * - what the taps do is arithmetic this engine can state and test. What a
+ *   driver does inside a shadow sampler is not something a fake GL context can
+ *   assert anything about, and §33's language is worth the two instructions.
+ *
+ * The loop bounds are constants, so the nine taps unroll; the tap offset
+ * arrives as `shadowTexelSize = 1 / mapSize`, computed once per frame on the
+ * CPU rather than once per fragment here.
+ */
+export const SHADOW_GLSL = `uniform bool useShadow;
+uniform sampler2D shadowMap;
+uniform mat4 shadowMatrix;
+uniform float shadowBias;
+uniform float shadowNormalBias;
+uniform float shadowTexelSize;
+
+float shadowFactor(vec3 worldPosition, vec3 n) {
+  vec4 lightSpace = shadowMatrix * vec4(worldPosition + n * shadowNormalBias, 1.0);
+  vec3 c = (lightSpace.xyz / lightSpace.w) * 0.5 + 0.5;
+  if (any(lessThan(c, vec3(0.0))) || any(greaterThan(c, vec3(1.0)))) {
+    return 1.0;
+  }
+  float receiver = c.z - shadowBias;
+  float lit = 0.0;
+  for (int y = -1; y <= 1; y += 1) {
+    for (int x = -1; x <= 1; x += 1) {
+      float occluder = texture(shadowMap, c.xy + vec2(x, y) * shadowTexelSize).r;
+      lit += receiver <= occluder ? 1.0 : 0.0;
+    }
+  }
+  return lit / 9.0;
+}
+`;
+
+/**
+ * The six uniform names {@link SHADOW_GLSL} declares, in the order
+ * {@link ShadowUniforms.resolve} looks them up.
+ *
+ * None can be optimised away: `useShadow` gates a branch the compiler cannot
+ * resolve, and every other name is reached from inside it.
+ */
+const SHADOW_UNIFORM_NAMES = [
+  "useShadow",
+  "shadowMap",
+  "shadowMatrix",
+  "shadowBias",
+  "shadowNormalBias",
+  "shadowTexelSize",
+] as const;
+
+/**
+ * One shaded pipeline's shadow uniforms: the six locations, the sampler-unit
+ * upload, and the CPU mirror that keeps a frame with no casting light emitting
+ * **no GL call at all** (§69, R-18).
+ *
+ * ```ts
+ * const shadows = ShadowUniforms.resolve(gl, program, "lit");
+ * shadows.uploadView(lights);                            // once per viewport
+ * shadows.setReceiving(active && item.receiveShadow);    // once per draw
+ * ```
+ *
+ * Shared by {@link LitProgram} and `gl-standard.ts`'s `StandardProgram` for
+ * {@link PunctualLightUniforms}' reason: the two stages consume the identical
+ * `SceneLights` fields through the identical GLSL chunk, and a class each would
+ * be two places for the skip rule to drift apart.
+ *
+ * ## The skip rule, and why it is byte-identity rather than an optimisation
+ *
+ * `useShadow` is a `bool` uniform whose CPU mirror starts at `false`, which is
+ * what GL initializes a `bool` uniform to. A frame in which no light casts
+ * therefore uploads nothing at all — not the matrix, not the biases, not the
+ * sampler, not the switch — so a scene lit the way every scene was lit before
+ * §69 shipped issues byte-for-byte the GL sequence it always did. The
+ * mirror-at-GL-initial-0 technique on its fourth recorded use (R-15's `bool`
+ * encode switch, R-38's permissive layer mask, R-17's light count).
+ *
+ * The **pixel** half of that claim lives in the two shaded fragment stages, and
+ * is kept the way R-17 kept it: the shadow term multiplies the *existing*
+ * directional expression inside an `if (useShadow)`, so with the switch off the
+ * arithmetic is the arithmetic those stages performed before, operation for
+ * operation. Nothing is re-associated.
+ *
+ * The split between the two methods is the split between per-*view* state (the
+ * matrix and the biases, which belong to the light) and per-*draw* state (§49's
+ * `receiveShadow`, which belongs to the node).
+ */
+export class ShadowUniforms {
+  readonly #gl: WebglContext;
+
+  readonly #locations: readonly GlUniformLocation[];
+
+  /** CPU mirror of `useShadow`, seeded at GL's initial value. */
+  #receiving = false;
+
+  /** Whether the sampler unit has been uploaded; see {@link LitProgram.setFeatures}. */
+  #samplerUploaded = false;
+
+  private constructor(
+    gl: WebglContext,
+    locations: readonly GlUniformLocation[],
+  ) {
+    this.#gl = gl;
+    this.#locations = locations;
+  }
+
+  /**
+   * Looks the six locations up on a linked program, throwing the §89
+   * `SHADER_COMPILATION_FAILED` `requireUniform` throws if one is missing.
+   *
+   * @param label the pipeline name used in the failure message
+   */
+  static resolve(
+    gl: WebglContext,
+    program: GlProgramHandle,
+    label: string,
+  ): ShadowUniforms {
+    return new ShadowUniforms(
+      gl,
+      SHADOW_UNIFORM_NAMES.map((name) =>
+        requireUniform(gl, program, name, label),
+      ),
+    );
+  }
+
+  /**
+   * Uploads the frame's shadow matrix, biases and tap size — or nothing at
+   * all, when `lights.hasShadow` is `false`. Call once per viewport, beside the
+   * ambient and directional uploads.
+   *
+   * The sampler unit is uploaded lazily, on the first view that actually has a
+   * shadow, exactly as the albedo sampler is: a pipeline that never shades a
+   * shadowed frame never mentions the unit.
+   */
+  uploadView(lights: SceneLights): void {
+    if (!lights.hasShadow) {
+      return;
+    }
+    const gl = this.#gl;
+    if (!this.#samplerUploaded) {
+      gl.uniform1i(this.#locations[1], SHADOW_TEXTURE_UNIT);
+      this.#samplerUploaded = true;
+    }
+    matrixScratch.set(lights.shadowMatrix.elements);
+    gl.uniformMatrix4fv(this.#locations[2], false, matrixScratch);
+    gl.uniform1f(this.#locations[3], lights.shadowBias);
+    gl.uniform1f(this.#locations[4], lights.shadowNormalBias);
+    // `1 / mapSize`, computed once per frame here rather than once per fragment
+    // in the tap loop. `mapSize` is a positive integer — `@four/scene` refuses
+    // anything else — and `hasShadow` is only true for a light carrying a valid
+    // record, so this cannot divide by zero on the path that reaches it.
+    gl.uniform1f(this.#locations[5], 1 / lights.shadowMapSize);
+  }
+
+  /**
+   * Switches the shadow comparison on or off for the draw about to be issued
+   * (§49's `receiveShadow`, §69) — mirrored on the CPU and uploaded only on
+   * change, exactly as {@link LitProgram.setFeatures} mirrors `useMap`.
+   *
+   * Pass `lights.hasShadow && item.receiveShadow`: the two reasons a draw is
+   * not shadowed are "nothing casts" and "this node opted out", and folding
+   * them into one uniform is what keeps a shadowless frame at zero calls while
+   * a non-receiver inside a shadowed frame costs exactly one.
+   */
+  setReceiving(receiving: boolean): void {
+    if (receiving === this.#receiving) {
+      return;
+    }
+    this.#gl.uniform1i(this.#locations[0], receiving ? 1 : 0);
+    this.#receiving = receiving;
+  }
+}
+
+/**
  * The lit vertex stage (§68): object space → clip space, plus the world-space
  * normal the fragment stage shades with.
  *
@@ -847,6 +1091,26 @@ void main() {
  *   texture is an albedo and the lights shade it (R-19). Off, the expression
  *   below reduces to exactly the one this shader carried before, uniform switch
  *   and all — see `FRAGMENT_SHADER_SOURCE` for why a uniform, not a variant.
+ *
+ * ## The shadow (R-18, 2026-08-09)
+ *
+ * §69's shadow attenuates the **directional** term only — the light set has no
+ * shadow maps at this tier ({@link SHADOW_GLSL}, `@four/scene`'s
+ * `DirectionalLightShadow`) — and it does so as a multiplication *into* the
+ * pre-existing product, in source order:
+ *
+ * ```text
+ * direct   = lightColor * diffuse
+ * direct  *= shadowFactor(...)          only when useShadow
+ * lighting = ambientLight + direct
+ * ```
+ *
+ * With `useShadow` at GL's initial `false` that is `ambientLight + lightColor *
+ * diffuse`, the identical expression this stage evaluated before shadows
+ * existed, operation for operation — the pixel half of the byte-identity claim
+ * {@link ShadowUniforms} makes about the GL half. The `len > 0.0` guard rides
+ * along because the receiver's normal is what the normal-bias offsets, and a
+ * geometry with no normal stream has none to offset.
  */
 const LIT_FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
@@ -865,6 +1129,7 @@ in vec2 vUv;
 out vec4 fragColor;
 
 ${PUNCTUAL_LIGHT_GLSL}
+${SHADOW_GLSL}
 void main() {
   float len = length(vNormal);
   float diffuse = len > 0.0
@@ -874,7 +1139,11 @@ void main() {
   if (useMap) {
     base *= texture(map, vUv);
   }
-  vec3 lighting = ambientLight + lightColor * diffuse;
+  vec3 direct = lightColor * diffuse;
+  if (useShadow && len > 0.0) {
+    direct *= shadowFactor(vWorldPosition, vNormal / len);
+  }
+  vec3 lighting = ambientLight + direct;
   if (len > 0.0) {
     vec3 n = vNormal / len;
     for (int i = 0; i < punctualCount; i += 1) {
@@ -1500,6 +1769,8 @@ export class LitProgram implements Disposable {
 
   readonly #punctual: PunctualLightUniforms;
 
+  readonly #shadow: ShadowUniforms;
+
   /** CPU mirror of `useMap`; see `UnlitProgram`'s for the contract. */
   #useMap = false;
 
@@ -1519,6 +1790,7 @@ export class LitProgram implements Disposable {
     mapLocation: GlUniformLocation,
     useMapLocation: GlUniformLocation,
     punctual: PunctualLightUniforms,
+    shadow: ShadowUniforms,
   ) {
     this.#gl = gl;
     this.#program = program;
@@ -1531,6 +1803,7 @@ export class LitProgram implements Disposable {
     this.#mapLocation = mapLocation;
     this.#useMapLocation = useMapLocation;
     this.#punctual = punctual;
+    this.#shadow = shadow;
   }
 
   /**
@@ -1559,6 +1832,7 @@ export class LitProgram implements Disposable {
         requireUniform(gl, program, "map", "lit"),
         requireUniform(gl, program, "useMap", "lit"),
         PunctualLightUniforms.resolve(gl, program, "lit"),
+        ShadowUniforms.resolve(gl, program, "lit"),
       );
     } catch (error: unknown) {
       gl.deleteProgram(program);
@@ -1653,6 +1927,25 @@ export class LitProgram implements Disposable {
    */
   setPunctualLights(lights: SceneLights): void {
     this.#punctual.upload(lights);
+  }
+
+  /**
+   * Uploads the frame's shadow matrix, biases and tap size (§69, R-18) — or
+   * nothing, for a frame in which no light casts. Call once per viewport; see
+   * {@link ShadowUniforms} for the contract and for why "nothing" is
+   * load-bearing.
+   */
+  setShadow(lights: SceneLights): void {
+    this.#shadow.uploadView(lights);
+  }
+
+  /**
+   * Selects whether the draw about to be issued is shadowed (§49's
+   * `receiveShadow`, §69) — see {@link ShadowUniforms.setReceiving}, whose
+   * contract this is verbatim.
+   */
+  setReceivesShadow(receiving: boolean): void {
+    this.#shadow.setReceiving(receiving);
   }
 
   /**

@@ -15,7 +15,9 @@
  * ## What one entry holds
  *
  * A framebuffer, the colour texture attached to it, and — unless the target was
- * built with `depth: false` — a depth renderbuffer. Plus the size the three
+ * built with `depth: false` — a depth attachment: a renderbuffer by default, or
+ * a `DEPTH_COMPONENT24` **texture** when the target asked for the samplable
+ * form (R-18, §69's shadow maps). Plus the size the three
  * were allocated at, because that is what the renderer resolves a normalized
  * viewport rectangle against: reading it off the *record* rather than off the
  * `RenderTarget` guarantees the `viewport` call and the allocation agree even
@@ -114,8 +116,20 @@ export interface RenderTargetRecord {
   /** The colour attachment, bound when a material samples this target. */
   readonly texture: GlTexture;
 
-  /** The depth renderbuffer, or `null` for a target built with `depth: false`. */
+  /**
+   * The depth renderbuffer, or `null` — for a target built with `depth: false`
+   * *or* one that asked for the samplable form, which allocates
+   * {@link RenderTargetRecord.depthTexture} instead. At most one of the two is
+   * ever non-`null`.
+   */
   readonly depthBuffer: GlRenderbuffer | null;
+
+  /**
+   * The depth attachment as a **texture**, for a target built with
+   * `depthTexture: true` (R-18, §69) — what a later pass binds and samples.
+   * `null` for every other target.
+   */
+  readonly depthTexture: GlTexture | null;
 
   /** `RenderTarget.version` this record was allocated from. */
   readonly version: number;
@@ -267,8 +281,48 @@ export class RenderTargetCache {
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
     gl.bindTexture(GL.TEXTURE_2D, null);
 
+    // The depth attachment, in one of its two forms (R-18). A renderbuffer is
+    // what a pass writes and nothing reads; a texture is the samplable form
+    // §69's shadow comparison needs. Exactly one is allocated, so the rest of
+    // this cache — and the record it returns — carries two nullable handles of
+    // which at most one is live, rather than a discriminated union for a
+    // two-case choice fixed at the target's construction.
     let depthBuffer: GlRenderbuffer | null = null;
-    if (target.depth) {
+    let depthTexture: GlTexture | null = null;
+    if (target.depth && target.depthTexture) {
+      depthTexture = gl.createTexture();
+      if (depthTexture === null) {
+        gl.deleteTexture(texture);
+        return null;
+      }
+      gl.bindTexture(GL.TEXTURE_2D, depthTexture);
+      gl.texImage2D(
+        GL.TEXTURE_2D,
+        0,
+        GL.DEPTH_COMPONENT24,
+        width,
+        height,
+        0,
+        GL.DEPTH_COMPONENT,
+        GL.UNSIGNED_INT,
+        null,
+      );
+      // `NEAREST`, not the `LINEAR` every colour texture gets: a
+      // `DEPTH_COMPONENT` texture is not filterable in GLES 3.0, and a
+      // filterable-mode sampler over one makes the texture *incomplete* — it
+      // would sample as opaque black and every receiver would be in shadow.
+      // The percentage-closer filter is explicit taps instead (`gl-shadow.ts`).
+      gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST);
+      gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.NEAREST);
+      // Clamped for the reason every texture here is, and one more: a receiver
+      // outside the shadow volume samples the border, and clamping makes that
+      // the nearest edge texel rather than a wrap-around of the far side.
+      // The shader rejects out-of-volume coordinates before it ever samples,
+      // so this is the second line of defence, not the first.
+      gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+      gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+      gl.bindTexture(GL.TEXTURE_2D, null);
+    } else if (target.depth) {
       depthBuffer = gl.createRenderbuffer();
       if (depthBuffer === null) {
         gl.deleteTexture(texture);
@@ -290,6 +344,9 @@ export class RenderTargetCache {
       if (depthBuffer !== null) {
         gl.deleteRenderbuffer(depthBuffer);
       }
+      if (depthTexture !== null) {
+        gl.deleteTexture(depthTexture);
+      }
       return null;
     }
 
@@ -309,6 +366,15 @@ export class RenderTargetCache {
         depthBuffer,
       );
     }
+    if (depthTexture !== null) {
+      gl.framebufferTexture2D(
+        GL.FRAMEBUFFER,
+        GL.DEPTH_ATTACHMENT,
+        GL.TEXTURE_2D,
+        depthTexture,
+        0,
+      );
+    }
     const status = gl.checkFramebufferStatus(GL.FRAMEBUFFER);
     gl.bindFramebuffer(GL.FRAMEBUFFER, null);
 
@@ -318,6 +384,9 @@ export class RenderTargetCache {
       if (depthBuffer !== null) {
         gl.deleteRenderbuffer(depthBuffer);
       }
+      if (depthTexture !== null) {
+        gl.deleteTexture(depthTexture);
+      }
       return null;
     }
 
@@ -325,6 +394,7 @@ export class RenderTargetCache {
       framebuffer,
       texture,
       depthBuffer,
+      depthTexture,
       version: target.version,
       width,
       height,
@@ -338,6 +408,9 @@ export class RenderTargetCache {
     gl.deleteTexture(record.texture);
     if (record.depthBuffer !== null) {
       gl.deleteRenderbuffer(record.depthBuffer);
+    }
+    if (record.depthTexture !== null) {
+      gl.deleteTexture(record.depthTexture);
     }
   }
 }

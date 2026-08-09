@@ -458,6 +458,83 @@ function finiteOptions(
   return options;
 }
 
+/**
+ * §49's two shadow flags as document fields (§69; R-18, 2026-08-09).
+ *
+ * Written **always**, not only when they differ from the default, for the
+ * reason every other field here is: §79 documents state what a node *is*, and a
+ * reader that has to know this build's defaults to interpret a document is a
+ * reader that breaks the day a default changes. Both default to `true`, so a
+ * document written before this build carries neither key, `readBoolean` answers
+ * `undefined`, and the node restores casting and receiving — which is exactly
+ * how a `Renderable` authored today behaves.
+ */
+function shadowFlagsJson(node: {
+  readonly castShadow: boolean;
+  readonly receiveShadow: boolean;
+}): Record<string, JsonValue> {
+  return { castShadow: node.castShadow, receiveShadow: node.receiveShadow };
+}
+
+/**
+ * §49's shadow flags as `RenderableOptions` (§69), dropping whatever the
+ * payload does not carry as a boolean.
+ */
+function readShadowFlags(data: {
+  readonly [key: string]: JsonValue;
+}): Record<string, boolean> {
+  const options: Record<string, boolean> = {};
+  const castShadow = readBoolean(data.castShadow);
+  if (castShadow !== undefined) options.castShadow = castShadow;
+  const receiveShadow = readBoolean(data.receiveShadow);
+  if (receiveShadow !== undefined) options.receiveShadow = receiveShadow;
+  return options;
+}
+
+/**
+ * A `DirectionalLight`'s §69 shadow settings, filtered to the values
+ * `DirectionalLightShadow` will actually accept (R-18, 2026-08-09).
+ *
+ * The class refuses a non-integer `mapSize`, a negative `normalBias`, a
+ * non-positive `extent`/`near`/`far`, and planes that do not bound a volume
+ * (§85). This is the `Sprite` precedent, one record deeper: **a corrupted
+ * payload restores the default for the field it corrupted rather than taking
+ * the whole scene down with it**, because a document is data from outside and
+ * §96's rule is that outside data is filtered, not trusted.
+ *
+ * `near` and `far` are admitted **as a pair or not at all**: their check is a
+ * relation between them, so accepting one against the *other's default* is how
+ * a document with a legal `near` of 200 would throw on a default `far` of 100.
+ * Every document this module writes carries both.
+ */
+function readShadowOptions(value: JsonValue | undefined): {
+  readonly [key: string]: number;
+} {
+  const data = record(value);
+  const options: Record<string, number> = {};
+
+  const mapSize = readFinite(data.mapSize);
+  if (mapSize !== undefined && Number.isInteger(mapSize) && mapSize >= 1) {
+    options.mapSize = mapSize;
+  }
+  const bias = readFinite(data.bias);
+  if (bias !== undefined) options.bias = bias;
+  const normalBias = readFinite(data.normalBias);
+  if (normalBias !== undefined && normalBias >= 0) {
+    options.normalBias = normalBias;
+  }
+  const extent = readFinite(data.extent);
+  if (extent !== undefined && extent > 0) options.extent = extent;
+
+  const near = readFinite(data.near);
+  const far = readFinite(data.far);
+  if (near !== undefined && far !== undefined && near > 0 && near < far) {
+    options.near = near;
+    options.far = far;
+  }
+  return options;
+}
+
 /** §74 insets as the four-number record `applyInsets` accepts. */
 function insetsJson(insets: {
   top: number;
@@ -1126,6 +1203,7 @@ export function registerRenderSerializers(
             ),
             renderLayer: renderable.renderLayer,
             renderOrder: renderable.renderOrder,
+            ...shadowFlagsJson(renderable),
           };
         }
         if (constructor === Sprite) {
@@ -1143,6 +1221,7 @@ export function registerRenderSerializers(
             anchor: pairJson(sprite.anchor.x, sprite.anchor.y),
             renderLayer: sprite.renderLayer,
             renderOrder: sprite.renderOrder,
+            ...shadowFlagsJson(sprite),
           };
         }
         if (constructor === PerspectiveCamera) {
@@ -1170,6 +1249,20 @@ export function registerRenderSerializers(
           return {
             color: [light.color[0], light.color[1], light.color[2]],
             intensity: light.intensity,
+            // §69 (R-18, 2026-08-09) — additive, exactly as R-17's `range` and
+            // cone angles were. A document written before this build carries
+            // neither key; `readBoolean` answers `undefined` and the light
+            // restores with `castShadow: false` and the default settings, which
+            // is what that document meant.
+            castShadow: light.castShadow,
+            shadow: {
+              mapSize: light.shadow.mapSize,
+              bias: light.shadow.bias,
+              normalBias: light.shadow.normalBias,
+              extent: light.shadow.extent,
+              near: light.shadow.near,
+              far: light.shadow.far,
+            },
           };
         }
         if (constructor === PointLight) {
@@ -1212,11 +1305,10 @@ export function registerRenderSerializers(
           // list dispatches on the material's own kind (§57, §64), so a
           // document naming a material this build has never heard of restores
           // a node that draws exactly as it was authored to.
-          return new Renderable<Material>(
-            geometry,
-            material,
-            finiteOptions(data, ["renderLayer", "renderOrder"]),
-          );
+          return new Renderable<Material>(geometry, material, {
+            ...finiteOptions(data, ["renderLayer", "renderOrder"]),
+            ...readShadowFlags(data),
+          });
         }
         if (document.type === SPRITE_NODE_TYPE) {
           const material = resolveResource<Material>(
@@ -1229,6 +1321,7 @@ export function registerRenderSerializers(
           const anchor = readFinitePair(data.anchor);
           return new Sprite(requireSpriteMaterial(document, material), {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
+            ...readShadowFlags(data),
             // §85: the class refuses a non-positive extent, so a payload that
             // carries one restores the default rather than the whole scene
             // failing on one number.
@@ -1258,9 +1351,12 @@ export function registerRenderSerializers(
         }
         if (document.type === DIRECTIONAL_LIGHT_NODE_TYPE) {
           const color = readColor(data.color);
+          const castShadow = readBoolean(data.castShadow);
           return new DirectionalLight({
             ...finiteOptions(data, ["intensity"]),
             ...(color !== undefined ? { color } : {}),
+            ...(castShadow !== undefined ? { castShadow } : {}),
+            shadow: readShadowOptions(data.shadow),
           });
         }
         if (document.type === POINT_LIGHT_NODE_TYPE) {

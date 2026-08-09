@@ -85,9 +85,17 @@
  *   {@link RenderTargetFormat} is deliberately a one-member union rather than a
  *   `string`, so `format: "rgba16f"` is a compile error today instead of a
  *   silent no-op. Widening the union is how the format tier arrives.
- * - **Depth *textures*** — the depth buffer here is a renderbuffer: writable by
- *   the pass, not samplable afterwards. §69's shadow maps need the samplable
- *   form, and land with it.
+ * - ~~**Depth textures**~~ — **landed 2026-08-09 with §69's shadow maps
+ *   (R-18)**: {@link RenderTargetOptions.depthTexture} swaps the depth
+ *   renderbuffer for a `DEPTH_COMPONENT24` *texture*, which is what a shadow
+ *   comparison samples. What is still staged is the *material* half — a depth
+ *   attachment is not offered as a {@link RenderTargetTexture}, so it cannot
+ *   yet be assigned to a `map` slot. That needs an attachment discriminant on
+ *   the texture contract (a backend resolving one has to bind the depth
+ *   attachment, not the colour one) and a sampler policy of its own: a depth
+ *   texture is not filterable, so the `LINEAR` state every material texture
+ *   gets would make it incomplete. Both arrive with the packet that wants a
+ *   depth buffer on screen — a debug view, §70's depth-of-field.
  * - **`readPixels`** (§61, §92) — §61 types it `readPixels?(target,
  *   region?: Rectangle2)`, and `Rectangle2` does not exist in `@four/math`
  *   (R-4's own effort note names it). It stays on `renderer.ts`'s typed TODO;
@@ -143,10 +151,48 @@ export interface RenderTargetOptions {
    * avoid. Pass `false` for a pass that is provably flat (a full-screen
    * composite, a 2D UI layer) and save the allocation.
    *
-   * The depth buffer is a renderbuffer: written by the pass, not samplable
-   * afterwards. §69's samplable depth is staged — see the module header.
+   * The depth buffer is a renderbuffer unless
+   * {@link RenderTargetOptions.depthTexture} asks for the samplable form.
    */
   readonly depth?: boolean;
+
+  /**
+   * Whether the depth attachment is a **texture** rather than a renderbuffer —
+   * i.e. whether a later pass can *sample* the depth this pass wrote (§69;
+   * R-18, 2026-08-09). **Defaults to `false`.**
+   *
+   * ```ts
+   * const shadowMap = new RenderTarget({
+   *   width: 1024,
+   *   height: 1024,
+   *   depthTexture: true,
+   * });
+   * ```
+   *
+   * This is R-4's staged residue and §69's precondition: a shadow map *is* a
+   * depth attachment that something reads back, and a renderbuffer is by
+   * definition the attachment nothing reads. The two are the same surface to
+   * the pass writing it and different objects to the driver, which is why the
+   * choice is fixed at construction rather than discovered.
+   *
+   * Requires {@link RenderTargetOptions.depth}; `{ depth: false, depthTexture:
+   * true }` is refused (§85) rather than quietly promoted, because the two
+   * options would be saying opposite things and guessing which one the author
+   * meant is exactly the silent rewrite this engine does not do.
+   *
+   * The backend allocates `DEPTH_COMPONENT24` for a depth texture and
+   * `DEPTH_COMPONENT16` for a renderbuffer — the depth *comparison* a shadow
+   * map performs is the one place in this engine where 16 bits shows as
+   * banding, and 24-bit depth textures are required by WebGL 2 rather than
+   * optional. That is a per-texel byte difference, which
+   * {@link RenderTarget.byteLength} reports.
+   *
+   * Sampling it from a *material* is not part of this tier — see the module
+   * header for what that would additionally need. Within `@four/render-webgl`
+   * the attachment is reached through the backend's own render-target record,
+   * which is how the shadow pipeline binds it.
+   */
+  readonly depthTexture?: boolean;
 
   /**
    * The colour space the attachment's texels are in — §60a's "render targets
@@ -259,6 +305,20 @@ function validateFormat(format: RenderTargetFormat): void {
     throw new RangeError(
       `RenderTarget format ${JSON.stringify(format)} is not supported by this ` +
         'tier; the only value is "rgba8" (§62, §85).',
+    );
+  }
+}
+
+/**
+ * Runs the §85 check for the depth pair (R-18). A samplable depth attachment
+ * with no depth attachment at all is a contradiction, not a preference.
+ */
+function validateDepthAttachment(depth: boolean, depthTexture: boolean): void {
+  if (depthTexture && !depth) {
+    throw new RangeError(
+      "RenderTarget depthTexture requires depth; { depth: false, " +
+        "depthTexture: true } asks for a samplable copy of a buffer the " +
+        "target does not have (§69, §85).",
     );
   }
 }
@@ -386,6 +446,8 @@ export class RenderTarget implements Disposable {
 
   readonly #depth: boolean;
 
+  readonly #depthTexture: boolean;
+
   readonly #colorSpace: ColorSpace;
 
   #width: number;
@@ -404,6 +466,8 @@ export class RenderTarget implements Disposable {
     this.#height = options.height;
     this.#format = format;
     this.#depth = options.depth ?? true;
+    this.#depthTexture = options.depthTexture ?? false;
+    validateDepthAttachment(this.#depth, this.#depthTexture);
     this.#colorSpace = validateColorSpace(
       options.colorSpace ?? "linear",
       "RenderTarget",
@@ -436,6 +500,16 @@ export class RenderTarget implements Disposable {
   }
 
   /**
+   * Whether the depth attachment is a samplable texture rather than a
+   * renderbuffer (§69) — see {@link RenderTargetOptions.depthTexture}. Fixed
+   * at construction, exactly as {@link RenderTarget.depth} is: the two are one
+   * decision about what the framebuffer *is*.
+   */
+  get depthTexture(): boolean {
+    return this.#depthTexture;
+  }
+
+  /**
    * The colour space of the attachment's texels (§60a) — see
    * {@link RenderTargetOptions.colorSpace}. Fixed at construction, like
    * {@link RenderTarget.format}: a surface does not change what its bytes mean
@@ -463,11 +537,12 @@ export class RenderTarget implements Disposable {
   /**
    * Bytes this target's attachments describe (§83, §84's `textureMemory`).
    *
-   * Four bytes per texel for the `"rgba8"` colour attachment, plus **two** per
-   * texel for the depth buffer when {@link RenderTarget.depth} is on: the only
-   * depth storage this tier allocates is `DEPTH_COMPONENT16` (see
-   * `@four/render-webgl`'s `gl-render-target.ts`), and quoting the backend's
-   * actual format is the difference between accounting and guessing. The two
+   * Four bytes per texel for the `"rgba8"` colour attachment, plus the depth
+   * attachment when {@link RenderTarget.depth} is on: **two** per texel for a
+   * `DEPTH_COMPONENT16` renderbuffer, **four** for a `DEPTH_COMPONENT24`
+   * texture (R-18 — 24-bit depth occupies a 32-bit texel). Both formats are
+   * quoted from what `@four/render-webgl`'s `gl-render-target.ts` actually
+   * allocates, which is the difference between accounting and guessing. The
    * constants move together when §67's `DEPTH24_STENCIL8` and §62's
    * floating-point formats widen {@link RenderTargetFormat}.
    *
@@ -475,6 +550,8 @@ export class RenderTarget implements Disposable {
    * new RenderTarget({ width: 512, height: 512 }).byteLength; // 512*512*6
    * new RenderTarget({ width: 512, height: 512, depth: false }).byteLength;
    * // 512*512*4
+   * new RenderTarget({ width: 512, height: 512, depthTexture: true }).byteLength;
+   * // 512*512*8
    * ```
    *
    * **`0` once disposed** — one rule with `Texture.byteLength`: a disposed
@@ -484,7 +561,8 @@ export class RenderTarget implements Disposable {
     if (this.#disposed) {
       return 0;
     }
-    return this.#width * this.#height * (this.#depth ? 6 : 4);
+    const depthBytes = this.#depth ? (this.#depthTexture ? 4 : 2) : 0;
+    return this.#width * this.#height * (4 + depthBytes);
   }
 
   /**

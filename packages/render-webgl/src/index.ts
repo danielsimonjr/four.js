@@ -47,6 +47,9 @@ export {
   POSITION_ATTRIBUTE_LOCATION,
   PUNCTUAL_LIGHT_GLSL,
   PunctualLightUniforms,
+  SHADOW_GLSL,
+  SHADOW_TEXTURE_UNIT,
+  ShadowUniforms,
   SpriteProgram,
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
@@ -56,6 +59,7 @@ export type {
   RenderTargetRecord,
 } from "./gl-render-target.js";
 export { RenderTargetCache } from "./gl-render-target.js";
+export { ShadowProgram } from "./gl-shadow.js";
 export { StandardProgram } from "./gl-standard.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";
 export { TextureCache } from "./gl-texture.js";

@@ -13,7 +13,9 @@ changes in `CHANGELOG.md`.
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
 - [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
-      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69),
+      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 —
+      directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas,
+      transparent masks and contact shadows remain),
       §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
       strings on lights, light layers; hoist the lit shader's per-vertex
       inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a

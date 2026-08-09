@@ -8,6 +8,51 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-18 closed (directional shadow-map tier): §69 shadows
+
+#### Added
+
+- **§69 directional shadow maps (R-18)** — `DirectionalLight.castShadow` + a validated
+  `DirectionalLightShadow` settings object (`mapSize`, `bias`, `normalBias`, `extent`,
+  `near`, `far`; refuse-don't-clamp, F14 accessors), §49's `castShadow`/`receiveShadow`
+  on `Renderable` (both default `true` — the asymmetry with the light's `false` is the
+  point: switching a _light_ on buys a whole pass, switching a _node_ off is an
+  exclusion), a seventh depth-only `ShadowProgram`, and a 3×3 PCF comparison in both
+  shaded pipelines through one shared `SHADOW_GLSL` chunk. **Two of §69's ten features
+  ship**, plus configurable resolution and both bias controls; cascades, point/spot
+  shadows, the atlas, transparent masks and contact shadows are staged with named owners
+  in `DirectionalLightShadow`.
+- **R-4's samplable-depth residue closed** — `RenderTargetOptions.depthTexture` swaps the
+  `DEPTH_COMPONENT16` renderbuffer for a `DEPTH_COMPONENT24` texture;
+  `{ depth: false, depthTexture: true }` refused (§85); `byteLength` accounts 4 B/texel
+  for it. Material-slot sampling of a depth attachment stays staged (needs an attachment
+  discriminant + a non-filterable sampler policy).
+- **The shadow pass is backend-internal, not a §63 graph pass** — §63's diagram lists
+  shadow passes as a renderer stage, and the pass has no camera, viewport or
+  application-named target. R-5's transcript-identity property is untouched.
+- **Byte-identical for scenes whose light does not cast** — `FRAME_BEFORE_R18` recorded
+  on the reverted build at `dab68c9`, and byte-identical to R-17's independently recorded
+  transcript; 59/59 browser gate with goldens unmoved.
+
+#### Fixed
+
+- **F13 envelope widened (R-18):** the frame's `finally` unbound its framebuffer only for
+  off-screen frames. §69's caster pass binds one on the on-screen path too, so a
+  mid-frame throw could have left every later frame rendering into the shadow map. The
+  condition is now a flag; two tests pin it.
+
+#### Changed
+
+- §79: `scene:directional-light` gains `castShadow` + a `shadow` record;
+  `render:renderable` and `render:sprite` gain both §49 flags. Additive — a document
+  written before this build carries none of the keys and restores not-casting with the
+  documented defaults. A corrupted shadow value restores that field's default rather than
+  failing the scene (`near`/`far` admitted as a pair, since their check is a relation).
+- **Bundle:** +2.42 / +1.96 / +1.82 kB gzip (first-3d / particles / ui-demo), A/B
+  measured — ~1.9 kB of it is the seventh compiled-at-init pipeline in every bundle
+  carrying `WebglRenderer` (R-6's law at scale). Budgets bumped 29 → 31.5 kB,
+  27 → 29 kB, 35 → 37 kB with the measurements.
+
 ### 2026-08-09 — R-24 closed (model + flatten tier): the §51 path model
 
 #### Added

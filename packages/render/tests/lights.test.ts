@@ -1,4 +1,4 @@
-import { Vector3 } from "@four/math";
+import { Matrix4, Vector3 } from "@four/math";
 import {
   DirectionalLight,
   Group,
@@ -449,5 +449,130 @@ describe("collectSceneLights — past the bound (§68, §33)", () => {
     const out = collectSceneLights(scene, createSceneLights());
     expect(out.punctualCount).toBe(MAX_PUNCTUAL_LIGHTS);
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("collectSceneLights — §69 shadows (R-18)", () => {
+  it("reports no shadow for a scene whose light does not cast", () => {
+    const out = createSceneLights();
+    const scene = new Scene();
+    scene.add(new DirectionalLight({ intensity: 2 }));
+
+    collectSceneLights(scene, out);
+
+    // The whole feature is gated on this one flag; a `false` here is what makes
+    // a backend issue no shadow call at all (see `SceneLights.hasShadow`).
+    expect(out.hasShadow).toBe(false);
+    expect([out.shadowMapSize, out.shadowBias, out.shadowNormalBias]).toEqual([
+      0, 0, 0,
+    ]);
+    expect([...out.shadowMatrix.elements]).toEqual([...new Matrix4().elements]);
+  });
+
+  it("carries the casting light's matrix, map size and biases", () => {
+    const out = createSceneLights();
+    const scene = new Scene();
+    const sun = new DirectionalLight({
+      castShadow: true,
+      shadow: { mapSize: 512, bias: 0.004, normalBias: 0.02, extent: 6 },
+    });
+    sun.transform.position.set(0, 7, 0);
+    sun.transform.rotation.setFromAxisAngle(AXIS_X, -HALF_PI);
+    scene.add(sun);
+
+    collectSceneLights(scene, out);
+
+    expect(out.hasShadow).toBe(true);
+    expect(out.shadowMapSize).toBe(512);
+    expect(out.shadowBias).toBeCloseTo(0.004, 12);
+    expect(out.shadowNormalBias).toBeCloseTo(0.02, 12);
+    expect([...out.shadowMatrix.elements]).toEqual([
+      ...sun.computeShadowMatrix(new Matrix4()).elements,
+    ]);
+  });
+
+  it("clears the shadow between collections, matrix included", () => {
+    const out = createSceneLights();
+    const casting = new Scene();
+    casting.add(new DirectionalLight({ castShadow: true }));
+    collectSceneLights(casting, out);
+    expect(out.hasShadow).toBe(true);
+
+    // A second scene with nothing casting must not inherit the first's map:
+    // the record is pooled, so the reset is the contract.
+    collectSceneLights(new Scene(), out);
+    expect(out.hasShadow).toBe(false);
+    expect(out.shadowMapSize).toBe(0);
+    expect([...out.shadowMatrix.elements]).toEqual([...new Matrix4().elements]);
+  });
+
+  it("reads the flag off the *first* directional light, never a later one", () => {
+    const out = createSceneLights();
+    const scene = new Scene();
+    // Scene-graph order decides which light shades the frame (§33); the shadow
+    // belongs to that same light, so a second sun's `castShadow` is ignored
+    // exactly as its colour is.
+    scene.add(new DirectionalLight({ intensity: 1 }));
+    scene.add(new DirectionalLight({ intensity: 5, castShadow: true }));
+
+    collectSceneLights(scene, out);
+
+    expect(out.hasShadow).toBe(false);
+    expect(out.directionalColor).toEqual([1, 1, 1]);
+  });
+
+  it("ignores a casting light hidden by §6 visibility", () => {
+    const out = createSceneLights();
+    const scene = new Scene();
+    const rig = new Group();
+    rig.visible = false;
+    rig.add(new DirectionalLight({ castShadow: true }));
+    scene.add(rig);
+
+    collectSceneLights(scene, out);
+
+    expect(out.hasDirectionalLight).toBe(false);
+    expect(out.hasShadow).toBe(false);
+  });
+
+  it("does not cast for a structurally-typed light predating §69", () => {
+    // The compatibility contract the three optional members exist for: a
+    // double written before shadows existed offers none of them, and reads as
+    // "does not cast" rather than failing to satisfy the interface.
+    const legacy: DirectionalLightSource = {
+      isDirectionalLight: true,
+      color: [1, 1, 1],
+      intensity: 1,
+      getWorldDirection: (target) => target.set(0, 0, -1),
+    };
+    const out = createSceneLights();
+    const scene = new Scene();
+    scene.add(new Group());
+    Object.assign(scene.children[0], legacy);
+
+    collectSceneLights(scene, out);
+    expect(out.hasShadow).toBe(false);
+    expect(isDirectionalLightSource(legacy)).toBe(true);
+  });
+
+  it("does not cast when castShadow is set but no matrix can be computed", () => {
+    // All three members are checked, because a partially-formed light — a hand
+    // written double that set the flag and forgot the method — must skip the
+    // shadow rather than throw inside a frame (§61).
+    const out = createSceneLights();
+    const scene = new Scene();
+    const half = new Group() as unknown as Record<string, unknown>;
+    half.isDirectionalLight = true;
+    half.color = [1, 1, 1];
+    half.intensity = 1;
+    half.getWorldDirection = (target: Vector3): Vector3 => target.set(0, 0, -1);
+    half.castShadow = true;
+    half.shadow = { mapSize: 256, bias: 0, normalBias: 0 };
+    scene.add(half as unknown as Group);
+
+    collectSceneLights(scene, out);
+
+    expect(out.hasDirectionalLight).toBe(true);
+    expect(out.hasShadow).toBe(false);
   });
 });

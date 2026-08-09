@@ -28,6 +28,46 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-18 §69 shadows.** Decisions worth keeping:
+  - **§69 ships one tier: the sun's map.** Point/spot carry no `castShadow` at all —
+    §69's answer for them is a cube map and a per-light index the single-map tier has
+    nowhere to put. Absent beats accepted-and-ignored, fourth application of the rule.
+  - **A shadow volume must be authored, not fitted** — auto-fit needs §87's bounds pass
+    and makes texel density frame-dependent, which is shimmer §33 forbids. The volume is
+    the light's _node_: position matters for shadows even though §68 says it does not
+    matter for lighting.
+  - **`castShadow` defaults `false` on the light and `true` on the node.** Switching a
+    light on buys a whole pass (§61: a renderer does not silently spend that); switching
+    a node off is a per-object exclusion. The asymmetry is what makes "enable the sun and
+    shadows appear" true.
+  - **Byte-identity, fifth confirmation of mirror-at-GL-initial-0** — a `bool` uniform at
+    `false` plus a `hasShadow` flag suppressing the pass. The pixel half needs the shadow
+    to _multiply the existing product in place_, never a rewrite:
+    `direct = lightColor*diffuse; if (useShadow) direct *= f; lighting = ambient + direct`.
+  - **`targetRecord !== null` was never the right F13 condition** — it was only
+    accidentally right while off-screen frames were the only ones that bound a
+    framebuffer. Any new pass that binds one must extend the `framebufferBound` flag, not
+    add a second condition. (New instance class: an envelope condition that encodes _why_
+    a resource was bound rather than _that_ it was.)
+  - **Explicit PCF taps beat hardware `sampler2DShadow`** — compare mode is sampler
+    state, so it would couple `gl-render-target.ts`'s cache to what a consumer intends;
+    2×2 is a smaller filter than §69 asks for; and a fake GL context can assert
+    arithmetic but not what a driver does inside a shadow sampler.
+  - **Depth textures are not filterable** — `LINEAR` on `DEPTH_COMPONENT` makes the
+    texture incomplete and every receiver reads fully occluded. `NEAREST` is mandatory,
+    not a preference.
+  - **Measured:** a seventh compiled-at-init pipeline plus a pass costs **~1.9 kB gzip in
+    every bundle carrying `WebglRenderer`**, regardless of whether the app uses lights at
+    all — R-6's 0.75 kB law at scale. Making §69 opt-in needs a registration seam (A-4's
+    define/opt-in), not a smaller shader.
+  - **Gotcha (multi-agent, joins the ports set): `ss` is not installed in this
+    container**, so port checks must read `/proc/net/tcp`; and orphaned preview servers
+    do **not** match `pkill -f "vite preview"` — their cmdline is
+    `node .../vite.js preview`. A killed `pnpm test:browser` leaves all nine servers
+    running and the next run dies with "port 4173 is already used".
+  - **Gotcha, second confirmation of R-38's:** a new required field on `RenderItemBase`
+    breaks hand-built item literals only under TypeDoc/tsc, never under Vitest —
+    `pnpm run docs` was the gate that caught it.
 - **2026-08-09 — R-24 §51 Path.** Decisions worth keeping:
   - **A determinism tier is a property of the operation, not the module** — R-25's
     one-tier rule does not survive §51 (Béziers can be exact, arcs cannot); the honest
