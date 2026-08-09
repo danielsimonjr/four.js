@@ -1,62 +1,62 @@
 # Complete File Inventory
 
-**Generated**: 2026-08-07 (by tools/create-dependency-graph)
+**Generated**: 2026-08-09 (by tools/create-dependency-graph)
 
 Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-root cross-package `tests/`, `tools/`, build/test `*.config.ts`, `examples/`, and `docs/` reference sources — tagged with a disposition. A completeness census: no `.ts` may be silently missing. The self-check gate (`verifyFileCensus`) does a MAXIMAL, location-agnostic repo walk (broader than this census’s enumerated discovery) and HARD-FAILS `npm run docs:deps` if any `.ts` on disk is unaccounted, or if any `orphan` exists.
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 423
+**Total files**: 446
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 148 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 152 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 207 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 224 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
-| `config` | 11 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
-| `example` | 8 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **423** | |
+| `config` | 12 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
+| `example` | 9 | An `examples/` or `docs/` reference/illustration source. |
+| **Total** | **446** | |
 
 ## Per-area counts
 
 | Area | Files |
 | --- | --: |
-| `config` | 11 |
-| `examples` | 8 |
-| `src` | 196 |
-| `tests` | 207 |
+| `config` | 12 |
+| `examples` | 9 |
+| `src` | 200 |
+| `tests` | 224 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 75 |
+| `(root)` | 89 |
 | `@four/animation` | 25 |
 | `@four/assets` | 7 |
 | `@four/core` | 20 |
 | `@four/diagnostics` | 17 |
-| `@four/geometry` | 10 |
+| `@four/geometry` | 12 |
 | `@four/input` | 12 |
-| `@four/materials` | 8 |
-| `@four/math` | 13 |
+| `@four/materials` | 9 |
+| `@four/math` | 14 |
 | `@four/motion` | 28 |
 | `@four/particles` | 15 |
-| `@four/physics` | 36 |
+| `@four/physics` | 37 |
 | `@four/physics-box2d` | 2 |
-| `@four/physics-rapier` | 19 |
+| `@four/physics-rapier` | 20 |
 | `@four/physics-soft` | 2 |
 | `@four/render` | 26 |
 | `@four/render-canvas` | 2 |
 | `@four/render-svg` | 2 |
-| `@four/render-webgl` | 12 |
+| `@four/render-webgl` | 13 |
 | `@four/render-webgpu` | 2 |
-| `@four/scene` | 22 |
+| `@four/scene` | 24 |
 | `@four/serialization` | 9 |
 | `@four/text` | 6 |
 | `@four/ui` | 23 |
@@ -72,6 +72,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `examples/first-2d-scene/vite.config.ts` | (root) | config | config |
 | `examples/first-3d-scene/main.ts` | (root) | examples | example |
 | `examples/first-3d-scene/vite.config.ts` | (root) | config | config |
+| `examples/flagship/motor-digital-twin/main.ts` | (root) | examples | example |
+| `examples/flagship/motor-digital-twin/vite.config.ts` | (root) | config | config |
 | `examples/flagship/one-scene-everything-moves/main.ts` | (root) | examples | example |
 | `examples/flagship/one-scene-everything-moves/vite.config.ts` | (root) | config | config |
 | `examples/mechanism/main.ts` | (root) | examples | example |
@@ -187,10 +189,12 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/geometry/src/primitives-3d.ts` | @four/geometry | src | reachable |
 | `packages/geometry/src/primitives.ts` | @four/geometry | src | reachable |
 | `packages/geometry/src/resource-memory.ts` | @four/geometry | src | reachable |
+| `packages/geometry/src/tessellation.ts` | @four/geometry | src | reachable |
 | `packages/geometry/tests/geometry.test.ts` | @four/geometry | tests | test |
 | `packages/geometry/tests/primitives-3d.test.ts` | @four/geometry | tests | test |
 | `packages/geometry/tests/resource-memory.test.ts` | @four/geometry | tests | test |
 | `packages/geometry/tests/smoke.test.ts` | @four/geometry | tests | test |
+| `packages/geometry/tests/tessellation.test.ts` | @four/geometry | tests | test |
 | `packages/input/src/drag.ts` | @four/input | src | reachable |
 | `packages/input/src/index.ts` | @four/input | src | build-entry |
 | `packages/input/src/key-events.ts` | @four/input | src | reachable |
@@ -207,6 +211,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/materials/src/lit-material.ts` | @four/materials | src | reachable |
 | `packages/materials/src/material.ts` | @four/materials | src | reachable |
 | `packages/materials/src/sprite-material.ts` | @four/materials | src | reachable |
+| `packages/materials/src/standard-material.ts` | @four/materials | src | reachable |
 | `packages/materials/src/texture.ts` | @four/materials | src | reachable |
 | `packages/materials/src/unlit-material.ts` | @four/materials | src | reachable |
 | `packages/materials/tests/materials.test.ts` | @four/materials | tests | test |
@@ -220,6 +225,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/math/src/vector2.ts` | @four/math | src | reachable |
 | `packages/math/src/vector3.ts` | @four/math | src | reachable |
 | `packages/math/src/vector4.ts` | @four/math | src | reachable |
+| `packages/math/tests/color.test.ts` | @four/math | tests | test |
 | `packages/math/tests/matrices.test.ts` | @four/math | tests | test |
 | `packages/math/tests/quaternion.test.ts` | @four/math | tests | test |
 | `packages/math/tests/smoke.test.ts` | @four/math | tests | test |
@@ -281,6 +287,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/physics-rapier/tests/conversions3d.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-live-properties.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-retype.test.ts` | @four/physics-rapier | tests | test |
+| `packages/physics-rapier/tests/rapier-shapes.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier-world-tuning.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier2d-adapter.test.ts` | @four/physics-rapier | tests | test |
 | `packages/physics-rapier/tests/rapier2d-joints.test.ts` | @four/physics-rapier | tests | test |
@@ -322,6 +329,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/physics/tests/validation.test.ts` | @four/physics | tests | test |
 | `packages/physics/tests/world-blend.test.ts` | @four/physics | tests | test |
 | `packages/physics/tests/world-colliders.test.ts` | @four/physics | tests | test |
+| `packages/physics/tests/world-diagnostics.test.ts` | @four/physics | tests | test |
 | `packages/physics/tests/world-joints.test.ts` | @four/physics | tests | test |
 | `packages/physics/tests/world-properties.test.ts` | @four/physics | tests | test |
 | `packages/physics/tests/world-transitions.test.ts` | @four/physics | tests | test |
@@ -335,6 +343,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgl/src/gl-particles.ts` | @four/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-program.ts` | @four/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-render-target.ts` | @four/render-webgl | src | reachable |
+| `packages/render-webgl/src/gl-standard.ts` | @four/render-webgl | src | reachable |
 | `packages/render-webgl/src/gl-texture.ts` | @four/render-webgl | src | reachable |
 | `packages/render-webgl/src/index.ts` | @four/render-webgl | src | build-entry |
 | `packages/render-webgl/src/register.ts` | @four/render-webgl | src | reachable |
@@ -375,6 +384,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/scene/src/group.ts` | @four/scene | src | reachable |
 | `packages/scene/src/index.ts` | @four/scene | src | build-entry |
 | `packages/scene/src/interpolation.ts` | @four/scene | src | reachable |
+| `packages/scene/src/layers.ts` | @four/scene | src | reachable |
 | `packages/scene/src/light.ts` | @four/scene | src | reachable |
 | `packages/scene/src/node.ts` | @four/scene | src | reachable |
 | `packages/scene/src/pose-target.ts` | @four/scene | src | reachable |
@@ -385,6 +395,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/scene/tests/authority.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/camera.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/interpolation.test.ts` | @four/scene | tests | test |
+| `packages/scene/tests/layers.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/light.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/node.test.ts` | @four/scene | tests | test |
 | `packages/scene/tests/pose-target.test.ts` | @four/scene | tests | test |
@@ -433,10 +444,12 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `playwright.config.ts` | (root) | config | config |
 | `tests/browser/animation.spec.ts` | (root) | tests | test |
 | `tests/browser/blending.spec.ts` | (root) | tests | test |
+| `tests/browser/context-loss.spec.ts` | (root) | tests | test |
 | `tests/browser/example.spec.ts` | (root) | tests | test |
 | `tests/browser/first-3d-scene.spec.ts` | (root) | tests | test |
 | `tests/browser/interaction.spec.ts` | (root) | tests | test |
 | `tests/browser/mechanism.spec.ts` | (root) | tests | test |
+| `tests/browser/motor-digital-twin.spec.ts` | (root) | tests | test |
 | `tests/browser/one-scene-everything-moves.spec.ts` | (root) | tests | test |
 | `tests/browser/particles.spec.ts` | (root) | tests | test |
 | `tests/browser/playground.spec.ts` | (root) | tests | test |
@@ -452,6 +465,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/determinism/helpers/phase6-scenario.ts` | (root) | tests | test |
 | `tests/determinism/helpers/phase7-scenario.ts` | (root) | tests | test |
 | `tests/determinism/helpers/phase9-scenario.ts` | (root) | tests | test |
+| `tests/determinism/helpers/tessellation-scenario.ts` | (root) | tests | test |
 | `tests/determinism/phase1-headless-stepping.test.ts` | (root) | tests | test |
 | `tests/determinism/phase10-replay.test.ts` | (root) | tests | test |
 | `tests/determinism/phase2-motion.test.ts` | (root) | tests | test |
@@ -460,19 +474,24 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/determinism/phase6-joints.test.ts` | (root) | tests | test |
 | `tests/determinism/phase7-blending.test.ts` | (root) | tests | test |
 | `tests/determinism/phase9-particles.test.ts` | (root) | tests | test |
+| `tests/determinism/tessellation.test.ts` | (root) | tests | test |
+| `tests/integration/application-physics.test.ts` | (root) | tests | test |
 | `tests/integration/backend-selection.test.ts` | (root) | tests | test |
+| `tests/integration/color-management.test.ts` | (root) | tests | test |
 | `tests/integration/debug-overlay-render.test.ts` | (root) | tests | test |
 | `tests/integration/dev-build-mode.test.ts` | (root) | tests | test |
 | `tests/integration/examples-build-coverage.test.ts` | (root) | tests | test |
 | `tests/integration/frame-statistics.test.ts` | (root) | tests | test |
 | `tests/integration/helpers/blending-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/joint-scenarios.ts` | (root) | tests | test |
+| `tests/integration/helpers/losable-canvas.ts` | (root) | tests | test |
 | `tests/integration/helpers/motion-advanced-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/physics-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/recording-gl.ts` | (root) | tests | test |
 | `tests/integration/helpers/replay-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/roundtrip-scenarios.ts` | (root) | tests | test |
 | `tests/integration/motion-advanced.test.ts` | (root) | tests | test |
+| `tests/integration/multi-light.test.ts` | (root) | tests | test |
 | `tests/integration/physics-blending.test.ts` | (root) | tests | test |
 | `tests/integration/physics-joints.test.ts` | (root) | tests | test |
 | `tests/integration/physics-live-properties.test.ts` | (root) | tests | test |
@@ -482,8 +501,12 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/render-effects.test.ts` | (root) | tests | test |
 | `tests/integration/render-graph.test.ts` | (root) | tests | test |
 | `tests/integration/render-to-texture.test.ts` | (root) | tests | test |
+| `tests/integration/renderer-context-loss.test.ts` | (root) | tests | test |
+| `tests/integration/scene-layers.test.ts` | (root) | tests | test |
 | `tests/integration/scene-roundtrip.test.ts` | (root) | tests | test |
 | `tests/integration/security-csp.test.ts` | (root) | tests | test |
+| `tests/integration/sprite-frames.test.ts` | (root) | tests | test |
+| `tests/integration/standard-material.test.ts` | (root) | tests | test |
 | `tests/integration/units-display.test.ts` | (root) | tests | test |
 | `tests/visual/ui-demo.spec.ts` | (root) | tests | test |
 | `tools/create-dependency-graph/create-dependency-graph.ts` | (root) | tools | tool |

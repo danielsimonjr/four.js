@@ -8,6 +8,110 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-25 closed (polygon tier): §52 tessellation; the 2D vector stack begins
+
+#### Added
+
+- **§52 polygon tessellation (`packages/geometry/src/tessellation.ts`, R-25)** — the
+  load-bearing prerequisite of the entire 2D vector stack: `triangulatePolygon(outline,
+holes?)` (ear clipping with bridged holes, O(n²), no dependencies, nothing vendored),
+  the `PolygonTessellator` replaceability seam §52 demands, `earClippingTessellator`,
+  and `polygonGeometry2D` (§50's "arbitrary polygon" as a standard `BufferGeometry`).
+  **The deciding argument for ear clipping over monotone decomposition is determinism,
+  not simplicity** — sweep-line equal-y tie-breaking is exactly where a determinism
+  claim quietly stops being true; the seam makes the upgrade one export.
+- **The repo's first cross-platform-tier §33 claim**: only exactly-rounded IEEE ops
+  (`+ - * /`), squared distances, cross-product signs, integer tie-breaks — no
+  `atan2`/`sqrt`/`hypot` anywhere (the classic angle-sort tricks are precisely how a
+  tessellator acquires a platform dependency). Pinned by
+  `tests/determinism/tessellation.test.ts` + `golden/tessellation.json` (8 hand shapes
+  - 200 seeded integer-grid stars, refusals recorded too, fresh-process matched). Any
+    future edit introducing a transcendental there breaks a committed golden's _stated
+    tier_, not just its numbers.
+- **Simplicity is proved, not assumed**: ear clipping fed a pentagram succeeds
+  _wrongly_ (silently overlapping triangles), so the module proves the input simple
+  before clipping and refuses with both rings named (§85). The honest measured limit
+  is in-source: 60 000 adversarial fuzz cases against an area/winding oracle —
+  hole-free and single-hole inputs **never failed** (26 641 cases); ~2/1000 multi-hole
+  configurations are refused, **nothing was ever wrong**. Two real bugs the fuzz found
+  (bridge-seam self-veto, stacked bridges) are fixed — found by fuzzing against an
+  oracle, not by reasoning, because bridged rings are only weakly simple and the
+  two-ears theorem does not apply.
+- **`extrudeGeometry` no longer refuses concave capped outlines** — caps are
+  tessellated with one index list serving both ends (§52's index-buffer reuse), the
+  centroid vertex is gone (`2(n+1) → 2n`), and the superseded refusal is quoted in
+  place. Self-intersecting/zero-area outlines still refused pending §52's fill-rule
+  tier. Staged with dated notes naming their owners: stroke expansion + AA fringe →
+  R-16; adaptive subdivision + incremental rebuild → R-24; extrusion holes → the §50
+  shape-node question. **R-24's fill half now has no blocker; R-23 can build fill
+  geometry for all 14 §50 shapes via `polygonGeometry2D`.** Graph artifacts
+  regenerated (four new exports).
+
+### 2026-08-09 — R-17 closed (eight-lamp forward tier): §68 multi-light
+
+#### Added
+
+- **`PointLight` and `SpotLight` (R-17, §68)** — two new `@four/scene` nodes over a
+  shared `PunctualLight` base, collected by the existing `collectSceneLights` walk into
+  a bounded uniform-array light set (`MAX_PUNCTUAL_LIGHTS = 8` — a TS constant
+  interpolated into the GLSL so the two cannot disagree; a runtime `maxLights` would
+  mean recompiling inside a frame, which §61 forbids; 8 fits the GLES 3.0 _guaranteed_
+  uniform minimum with no capability query). Attenuation is `KHR_lights_punctual`'s
+  inverse-square with an optional range window (a **culling aid, not physics** —
+  `range: 0` = unbounded, the honest default); spot cones are glTF's inner/outer
+  half-angles in radians, precomputed CPU-side where the division lives (R-13's
+  placement rule). **The R-13 irradiance-over-π convention extends to distance**:
+  `color × intensity` is the irradiance at unit distance, so a point and a directional
+  light of equal intensity agree at 1 m and one scene mixes them — both shaded
+  pipelines consume the set through one shared GLSL chunk (~400 B instead of ~700).
+  Past the bound the **first eight in scene-graph order** win — authored order, never
+  nearest/brightest (both flicker, §33) — with a once-per-root warning (122 B,
+  measured). §79 pairs: `scene:point-light`, `scene:spot-light`.
+- **Byte-identity, with a new pixel half to the technique** (fourth confirmation of
+  the GL half): a directional-only scene issues byte-for-byte its old sequence
+  (`FRAME_BEFORE_R17`, **recorded on the reverted build** — a hand-copied transcript
+  was wrong in four plausible-looking places, now a recorded rule) — and the pixel
+  half requires the new term _added to_ the old expression in source order:
+  re-association (`viewProjection * (model * p)`) moves pixels. Deliberately not
+  widened: **still exactly one directional light** — a second sun needs a third entry
+  kind, which is the clustered/forward-plus path's job. Hemisphere staged (a
+  two-colour ambient term, not a punctual light); area lights staged (LTC). R-18
+  shadows now needs only R-4's samplable-depth residue.
+
+#### Changed
+
+- **Size budgets: first-3d-scene 28 → 29 kB, particles-demo 25 → 27 kB, ui-demo
+  33 → 35 kB** (measured A/B: the light set costs +1.10–1.17 kB gzip per shaded
+  bundle; the two tightest budgets had 50 B and 20 B of headroom before the packet, so
+  any bundle-touching change was going to overflow them — the bumps restore working
+  headroom per the R-13 precedent; §86's 150 kB untouched).
+
+### 2026-08-09 — RFC 0004 drafted: 2D raster painting stack (owner-requested)
+
+#### Documentation
+
+- **`docs/rfcs/0004-raster-painting-stack.md`** — proposes **§77a**: a structural,
+  DOM-free `RasterSource` seam (`paint()` takes **no parameter**, deliberately — a
+  parameter would be either an engine rasterizer duplicating the R-16/R-24/R-25 stack
+  or a named DOM type, both refused) and a `CanvasTexture` satisfying the existing
+  `MaterialTexture` contract — **no backend change, no new duck-typed contract, no
+  closed union widened** (R-4's seam decision paying off a second time). A
+  `CanvasViewWidget` for §73 that needs no drawing API in `@four/ui` and no new skin
+  hook — **the recorded §73 blocker is wrong, and the RFC corrects it**: `ImageWidget`
+  already established the widget-owns-identity/skin-owns-texture split, and a repaint
+  request is content with no layout transition, exactly what A-12's `onContentChange`
+  exists for. §33 rule transposed verbatim from §40: painted pixels are display
+  content, never simulation input, enforced in the `units-display.test.ts` pattern —
+  with the honest limit stated (a reachability rule, not a readability one).
+  Constant-size by refusal (the cheap answer to R-29's frame hazard; resize gates on
+  R-30, which this RFC makes load-bearing for the first time rather than claiming it
+  falls out). §62's Canvas 2D backend delineated as a different concern that stays a
+  stub. Alternatives A–F with "do nothing" argued at full strength — and its honest
+  consequence named: a "no" means _withdrawing the canvas view from §73 by amendment_,
+  because its blocker is wrong either way. **Owner decision pending** — first question
+  is whether raster painting is in the product's scope at all (the spec chose retained
+  mode; the RFC exists because the owner asked). Register rows 15–17 added to v1 §5.
+
 ### 2026-08-08 — Specification revision 1.8: the consolidated amendment pass
 
 #### Documentation

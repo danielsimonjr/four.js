@@ -155,6 +155,8 @@ import {
   DirectionalLight,
   OrthographicCamera,
   PerspectiveCamera,
+  PointLight,
+  SpotLight,
   restoreNodeId,
   type Node,
 } from "@four/scene";
@@ -229,6 +231,12 @@ export const ORTHOGRAPHIC_CAMERA_NODE_TYPE = "scene:orthographic-camera";
 
 /** The document `type` a {@link DirectionalLight} serializes as (§68). */
 export const DIRECTIONAL_LIGHT_NODE_TYPE = "scene:directional-light";
+
+/** The document `type` a {@link PointLight} serializes as (§68, R-17). */
+export const POINT_LIGHT_NODE_TYPE = "scene:point-light";
+
+/** The document `type` a {@link SpotLight} serializes as (§68, R-17). */
+export const SPOT_LIGHT_NODE_TYPE = "scene:spot-light";
 
 /**
  * What to do with a shared resource — a geometry, a material — that no
@@ -1035,6 +1043,12 @@ export function registerUISerializers(
  *   pin a scene to the backend that saved it.
  * - **`DirectionalLight`** — `color` and `intensity`. Its direction is its
  *   node's −Z axis (§68), which is the transform, not a payload.
+ * - **`PointLight`** — `color`, `intensity`, and `range`. Its *position* is
+ *   the node transform §79 already carries, so it is not a payload either
+ *   (R-17, 2026-08-09).
+ * - **`SpotLight`** — the point light's three, plus `innerConeAngle` and
+ *   `outerConeAngle` in radians (§7a). Its axis is the node's −Z, like a
+ *   directional light's: transform, not payload.
  *
  * A restored `Renderable` accepts **whatever material its key resolves to**;
  * only a `Sprite` insists on a `"sprite"` one. The asymmetry is the classes'
@@ -1087,6 +1101,8 @@ export function registerRenderSerializers(
         if (constructor === DirectionalLight) {
           return DIRECTIONAL_LIGHT_NODE_TYPE;
         }
+        if (constructor === PointLight) return POINT_LIGHT_NODE_TYPE;
+        if (constructor === SpotLight) return SPOT_LIGHT_NODE_TYPE;
         return undefined;
       },
       nodeDataOf: (node: Node): JsonValue | undefined => {
@@ -1154,6 +1170,24 @@ export function registerRenderSerializers(
           return {
             color: [light.color[0], light.color[1], light.color[2]],
             intensity: light.intensity,
+          };
+        }
+        if (constructor === PointLight) {
+          const light = node as PointLight;
+          return {
+            color: [light.color[0], light.color[1], light.color[2]],
+            intensity: light.intensity,
+            range: light.range,
+          };
+        }
+        if (constructor === SpotLight) {
+          const light = node as SpotLight;
+          return {
+            color: [light.color[0], light.color[1], light.color[2]],
+            intensity: light.intensity,
+            range: light.range,
+            innerConeAngle: light.innerConeAngle,
+            outerConeAngle: light.outerConeAngle,
           };
         }
         return undefined;
@@ -1226,6 +1260,25 @@ export function registerRenderSerializers(
           const color = readColor(data.color);
           return new DirectionalLight({
             ...finiteOptions(data, ["intensity"]),
+            ...(color !== undefined ? { color } : {}),
+          });
+        }
+        if (document.type === POINT_LIGHT_NODE_TYPE) {
+          const color = readColor(data.color);
+          return new PointLight({
+            ...finiteOptions(data, ["intensity", "range"]),
+            ...(color !== undefined ? { color } : {}),
+          });
+        }
+        if (document.type === SPOT_LIGHT_NODE_TYPE) {
+          const color = readColor(data.color);
+          return new SpotLight({
+            ...finiteOptions(data, [
+              "intensity",
+              "range",
+              "innerConeAngle",
+              "outerConeAngle",
+            ]),
             ...(color !== undefined ? { color } : {}),
           });
         }

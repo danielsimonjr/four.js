@@ -28,6 +28,49 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-25 §52 tessellation.** Decisions worth keeping:
+  - **§52 ships ear clipping, not monotone — the deciding argument is determinism**
+    (sweep-line equal-y tie-breaking is where a determinism claim quietly stops being
+    true), not simplicity; `PolygonTessellator` is the swap seam.
+  - **First cross-platform-tier §33 claim in the repo**: exactly-rounded IEEE ops only,
+    squared distances, cross-product signs, integer tie-breaks — no
+    `atan2`/`sqrt`/`hypot`. An edit introducing a transcendental there breaks the
+    golden's _stated tier_, not just its numbers.
+  - **A tessellator must prove its input simple before clipping** — ear clipping fed a
+    pentagram succeeds _wrongly_; the O(n²) pairwise proof costs nothing beside the
+    O(n²) clip and makes every §85 refusal precise.
+  - **Bridged rings are only weakly simple** — the two-ears theorem does not apply;
+    the two real bugs (bridge-seam self-veto, stacked bridges) were found by fuzzing
+    against an area/winding oracle, not by reasoning. The multi-hole residual
+    (~2/1000 refused, never wrong) is documented in-source with the fuzz table.
+  - `Point2D` now lives in `tessellation.ts` (export path unchanged). Third
+    shared-worktree incident class: **an agent's in-flight file can be silently
+    reverted to HEAD by a concurrent process** — verify with `md5sum` vs
+    `git show HEAD:` after any unexplained modification notice.
+
+- **2026-08-09 — R-17 §68 multi-light.** Decisions worth keeping:
+  - **The bound is the shader's, not the API's** — `MAX_PUNCTUAL_LIGHTS = 8` is a TS
+    constant interpolated into the GLSL so the two cannot disagree; a runtime
+    `maxLights` would recompile inside a frame (§61 forbids throwing there). Overflow
+    order is **authored** (scene-graph), never nearest/brightest — both flicker (§33).
+  - **The R-13 irradiance-over-π convention extends to distance**: `color × intensity`
+    is the irradiance at _unit distance_ for a punctual light — what lets point and
+    directional lights agree at 1 m and mix in one scene. The range window is a
+    culling aid, not physics; `range: 0` = unbounded is the honest default.
+  - **Byte-identity now has a pixel half**: the GL half is the mirror-at-GL-initial-0
+    technique (fourth confirmation); the pixel half requires adding the new term to
+    the old expression in source order — re-association moves pixels
+    (`viewProjection * model * p` must not become `viewProjection * (model * p)`).
+  - **A recorded transcript must be recorded on the reverted build**, never
+    hand-copied from a neighbouring packet (four plausible-looking errors).
+  - **Never `git stash` in the shared worktree** (now the fourth multi-agent incident
+    class): swap your own files with `git show HEAD:<f> > <f>` and restore from a
+    scratchpad copy. A shared GLSL chunk is worth real bytes (~400 vs ~700); one
+    ungated `console.warn` costs 122 B (vs R-29's five at 330 B).
+  - Still exactly one directional light — deliberately; a second sun needs a third
+    set-entry kind (the clustered/forward-plus path). Hemisphere is a two-colour
+    ambient term beside `Scene.ambientLight`, not a punctual light.
+
 - **2026-08-08 — Spec revision 1.8 (consolidated amendment pass).** All queued
   spec-revisit items applied in one pass; no new lettered sections, `ALLOWED_LETTERED`
   unchanged. Rules that emerged:

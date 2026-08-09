@@ -32,8 +32,18 @@ export {
   layersMatch,
   resetLayers,
 } from "./layers.js";
-export type { ColorRGB, DirectionalLightOptions } from "./light.js";
-export { DirectionalLight } from "./light.js";
+export type {
+  ColorRGB,
+  DirectionalLightOptions,
+  PunctualLightOptions,
+  SpotLightOptions,
+} from "./light.js";
+export {
+  DirectionalLight,
+  PointLight,
+  PunctualLight,
+  SpotLight,
+} from "./light.js";
 export type {
   PoseSnapshotSystem,
   SnapshotSystemOptions,

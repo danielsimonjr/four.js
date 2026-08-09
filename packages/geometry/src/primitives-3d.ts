@@ -57,14 +57,7 @@ import {
   writeCap,
   type IndexArray,
 } from "./primitive-support.js";
-
-/** A point in the XY plane, as the profile and outline builders take them. */
-export interface Point2D {
-  /** Horizontal coordinate. For {@link latheGeometry} this is a **radius**. */
-  readonly x: number;
-  /** Vertical coordinate. For {@link latheGeometry} this is the height. */
-  readonly y: number;
-}
+import { triangulatePolygon, type Point2D } from "./tessellation.js";
 
 /** A point in 3D space, as {@link tubeGeometry} takes its path. */
 export interface Point3D {
@@ -153,7 +146,9 @@ export interface ExtrudeGeometryOptions {
    * point is **not** repeated: the outline closes from the last back to the
    * first.
    *
-   * Must be **convex** while the caps are on; see {@link extrudeGeometry}.
+   * Concave outlines are fine, capped or not, as of the §52 tessellation
+   * packet (2026-08-09). The outline must be **simple** — no edge crossing
+   * another — while the caps are on; see {@link extrudeGeometry}.
    */
   shape: readonly Point2D[];
   /** Extent along Z; defaults to 1. The solid spans `[-depth/2, depth/2]`. */
@@ -735,52 +730,6 @@ function doubleSignedArea(points: readonly Point2D[]): number {
 }
 
 /**
- * Rejects an outline that {@link extrudeGeometry}'s fan-triangulated caps
- * cannot close correctly (§85).
- *
- * Two things are checked — the caller has already established that the points
- * are at least three and finite, which the *uncapped* path needs too:
- *
- * - a **non-zero enclosed area**, which also catches the degenerate
- *   figure-of-eight whose lobes cancel;
- * - **convexity**, every turn the same way round (a collinear triple turns
- *   neither way and is skipped).
- *
- * The convexity requirement is the honest statement of what a centroid fan can
- * do; see {@link extrudeGeometry} for why the fan is what this packet ships and
- * what lifts the restriction.
- */
-function requireConvexOutline(points: readonly Point2D[]): void {
-  if (doubleSignedArea(points) === 0) {
-    throw new RangeError(
-      "An extruded outline must enclose a non-zero area; this one encloses " +
-        "none (§85).",
-    );
-  }
-
-  let sign = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    const c = points[(i + 2) % points.length];
-    const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-    if (cross === 0) {
-      continue;
-    }
-    const turn = cross > 0 ? 1 : -1;
-    if (sign === 0) {
-      sign = turn;
-    } else if (turn !== sign) {
-      throw new RangeError(
-        "extrudeGeometry caps a concave outline with a centroid fan, which " +
-          "would fold; pass `capped: false`, or split the outline into convex " +
-          "pieces, until §52's tessellation module lands (§85).",
-      );
-    }
-  }
-}
-
-/**
  * A 2D outline extruded **linearly along Z**, centred on the origin (§53
  * "extrusion").
  *
@@ -796,7 +745,7 @@ function requireConvexOutline(points: readonly Point2D[]): void {
  * profile is drawn flat and given thickness towards the viewer, and one that
  * has to stand up is rotated by its node. The solid spans `[-depth/2, depth/2]`.
  *
- * ## Flat side walls, fan caps
+ * ## Flat side walls, tessellated caps
  *
  * Each outline edge becomes **its own quad with its own normal** — four
  * vertices, not two shared ones — because an extruded profile's edges are
@@ -805,12 +754,32 @@ function requireConvexOutline(points: readonly Point2D[]): void {
  * a counter-clockwise outline points out of the solid (the builder normalizes
  * either input winding to counter-clockwise first).
  *
- * The **caps are a centroid fan**, which is exact for a convex outline and
- * folds over itself for a concave one — so a concave outline with `capped: true`
- * is **rejected** (§85) rather than drawn wrongly. §52 makes tessellation an
- * isolated, replaceable module of this package with a stable interface; when it
- * lands, this restriction lifts and nothing else here changes. `capped: false`
- * has no restriction at all: the side walls are correct for any simple outline.
+ * The **caps are ear-clipped** by §52's tessellator (`tessellation.ts`), which
+ * is what makes a concave outline — an L, a star, a gear tooth, a letter — cap
+ * correctly. Until 2026-08-09 this paragraph read:
+ *
+ * > The **caps are a centroid fan**, which is exact for a convex outline and
+ * > folds over itself for a concave one — so a concave outline with
+ * > `capped: true` is **rejected** (§85) rather than drawn wrongly. §52 makes
+ * > tessellation an isolated, replaceable module of this package with a stable
+ * > interface; when it lands, this restriction lifts and nothing else here
+ * > changes.
+ *
+ * §52's module landed, and that is what happened: the fan and its centroid
+ * vertex are gone, one call to `triangulatePolygon` replaced them, and a capped
+ * extrusion now carries `2n` cap vertices rather than `2(n + 1)`. The **same**
+ * index list drives both caps (§52 "index-buffer reuse"), reversed for the `-Z`
+ * end so both face outwards. What is still refused is what the tessellator
+ * refuses — a **self-intersecting** outline, and one enclosing no area —
+ * because §52's "self-intersections where well-defined" tier needs a fill rule
+ * and a planar-subdivision pass this release does not ship, and refusing loudly
+ * beats emitting overlapping triangles (§85). `capped: false` has no
+ * restriction beyond finiteness: the side walls are correct for any outline.
+ *
+ * A cap with **holes** — a washer, an O — is not offered here: the hole would
+ * need its own inward-facing side walls, which is a §50 shape-node question
+ * rather than a §53 primitive one. `triangulatePolygon` already takes holes,
+ * and `polygonGeometry2D` is the builder that uses them (staged, 2026-08-09).
  *
  * Uv: the side wall's `u` is arc length around the outline normalized to the
  * perimeter, `v` runs `0` at `-Z` to `1` at `+Z`; each cap's uv is the
@@ -836,21 +805,24 @@ export function extrudeGeometry(
       );
     }
   }
-  if (capped) {
-    requireConvexOutline(source);
-  }
   // Normalize to counter-clockwise, so one winding rule serves both inputs.
   const shape =
     doubleSignedArea(source) < 0 ? [...source].reverse() : [...source];
 
+  // One triangulation, two caps (§52 "index-buffer reuse"). It runs before the
+  // buffers are sized because the cap triangle count is no longer `n`: the
+  // tessellator drops collinear vertices, so it is whatever the ear clip found.
+  const capIndices = capped ? triangulatePolygon(shape) : undefined;
+
   const n = shape.length;
   const halfDepth = depth / 2;
-  const capVertices = capped ? 2 * (n + 1) : 0;
+  const capVertices = capIndices === undefined ? 0 : 2 * n;
   const vertexCount = 4 * n + capVertices;
   const positions = new Float32Array(vertexCount * 3);
   const normals = new Float32Array(vertexCount * 3);
   const uvs = new Float32Array(vertexCount * 2);
-  const indexCount = 6 * n + (capped ? 2 * 3 * n : 0);
+  const indexCount =
+    6 * n + (capIndices === undefined ? 0 : 2 * capIndices.length);
   const indices = createIndices(indexCount, vertexCount);
 
   // Arc length around the outline, for the side wall's u.
@@ -911,22 +883,18 @@ export function extrudeGeometry(
     index += 6;
   }
 
-  if (capped) {
+  if (capIndices !== undefined) {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    let centroidX = 0;
-    let centroidY = 0;
     for (const point of shape) {
       minX = Math.min(minX, point.x);
       minY = Math.min(minY, point.y);
       maxX = Math.max(maxX, point.x);
       maxY = Math.max(maxY, point.y);
-      centroidX += point.x / n;
-      centroidY += point.y / n;
     }
-    // Both spans are strictly positive: `requireConvexOutline` has already
+    // Both spans are strictly positive: `triangulatePolygon` has already
     // rejected an outline enclosing no area, and a zero span in either axis
     // means a degenerate segment, which encloses none.
     const spanX = maxX - minX;
@@ -935,14 +903,7 @@ export function extrudeGeometry(
     for (const front of [true, false]) {
       const z = front ? halfDepth : -halfDepth;
       const sign = front ? 1 : -1;
-      const centre = vertex;
-      positions[vertex * 3] = centroidX;
-      positions[vertex * 3 + 1] = centroidY;
-      positions[vertex * 3 + 2] = z;
-      normals[vertex * 3 + 2] = sign;
-      uvs[vertex * 2] = (centroidX - minX) / spanX;
-      uvs[vertex * 2 + 1] = (centroidY - minY) / spanY;
-      vertex += 1;
+      const base = vertex;
       for (const point of shape) {
         positions[vertex * 3] = point.x;
         positions[vertex * 3 + 1] = point.y;
@@ -952,14 +913,12 @@ export function extrudeGeometry(
         uvs[vertex * 2 + 1] = (point.y - minY) / spanY;
         vertex += 1;
       }
-      for (let i = 0; i < n; i += 1) {
-        const first = centre + 1 + i;
-        const second = centre + 1 + ((i + 1) % n);
-        indices[index] = centre;
-        // The +Z cap keeps the outline's counter-clockwise order; the -Z cap
-        // mirrors it, so both face outwards (§7a).
-        indices[index + 1] = front ? first : second;
-        indices[index + 2] = front ? second : first;
+      for (let i = 0; i < capIndices.length; i += 3) {
+        indices[index] = base + capIndices[i];
+        // The +Z cap keeps the tessellator's counter-clockwise order; the -Z
+        // cap reverses each triangle, so both face outwards (§7a).
+        indices[index + 1] = base + capIndices[front ? i + 1 : i + 2];
+        indices[index + 2] = base + capIndices[front ? i + 2 : i + 1];
         index += 3;
       }
     }

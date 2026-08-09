@@ -19,12 +19,18 @@ export {
 export type {
   AmbientLightSource,
   DirectionalLightSource,
+  PointLightSource,
+  PunctualLightSource,
+  PunctualLightSourceBase,
   SceneLights,
+  SpotLightSource,
 } from "./lights.js";
 export {
+  MAX_PUNCTUAL_LIGHTS,
   collectSceneLights,
   createSceneLights,
   isDirectionalLightSource,
+  isPunctualLightSource,
 } from "./lights.js";
 export type { ParticleDrawable } from "./particles.js";
 export {

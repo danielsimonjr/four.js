@@ -25,6 +25,8 @@ import { Collider, RigidBody } from "@four/physics";
 import { Renderable, Sprite, Texture } from "@four/render";
 import {
   DirectionalLight,
+  PointLight,
+  SpotLight,
   Group,
   OrthographicCamera,
   PerspectiveCamera,
@@ -57,6 +59,8 @@ import {
   BUTTON_NODE_TYPE,
   CHECKBOX_NODE_TYPE,
   DIRECTIONAL_LIGHT_NODE_TYPE,
+  POINT_LIGHT_NODE_TYPE,
+  SPOT_LIGHT_NODE_TYPE,
   IMAGE_NODE_TYPE,
   LABEL_NODE_TYPE,
   ORTHOGRAPHIC_CAMERA_NODE_TYPE,
@@ -943,6 +947,19 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
       far: 50,
     });
     const light = new DirectionalLight({ color: [1, 0.98, 0.9], intensity: 3 });
+    const lamp = new PointLight({
+      color: [1, 0.85, 0.6],
+      intensity: 4,
+      range: 12,
+    });
+    lamp.transform.position.set(2, 3, -1);
+    const spot = new SpotLight({
+      color: [0.4, 0.7, 1],
+      intensity: 9,
+      range: 30,
+      innerConeAngle: Math.PI / 10,
+      outerConeAngle: Math.PI / 6,
+    });
     const floor = new Renderable(plane, brick, {
       renderLayer: 2,
       renderOrder: 7,
@@ -955,7 +972,7 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
       renderLayer: 1,
       renderOrder: -1,
     });
-    scene.add(camera, minimap, light, floor, badge);
+    scene.add(camera, minimap, light, lamp, spot, floor, badge);
     return scene;
   }
 
@@ -971,13 +988,16 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
       io.read,
     );
 
-    const [camera, minimap, light, floor, badge] = reloaded.children as [
-      PerspectiveCamera,
-      OrthographicCamera,
-      DirectionalLight,
-      Renderable,
-      Sprite,
-    ];
+    const [camera, minimap, light, lamp, spot, floor, badge] =
+      reloaded.children as [
+        PerspectiveCamera,
+        OrthographicCamera,
+        DirectionalLight,
+        PointLight,
+        SpotLight,
+        Renderable,
+        Sprite,
+      ];
 
     expect(camera).toBeInstanceOf(PerspectiveCamera);
     expect(camera.name).toBe("eye");
@@ -1007,6 +1027,25 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
     expect(light).toBeInstanceOf(DirectionalLight);
     expect([...light.color]).toEqual([1, 0.98, 0.9]);
     expect(light.intensity).toBe(3);
+
+    // §68's two positional lights (R-17). Their *placement* is the node
+    // transform §79 already carries, so only the photometry is a payload.
+    expect(lamp).toBeInstanceOf(PointLight);
+    expect([...lamp.color]).toEqual([1, 0.85, 0.6]);
+    expect([lamp.intensity, lamp.range]).toEqual([4, 12]);
+    expect([
+      lamp.transform.position.x,
+      lamp.transform.position.y,
+      lamp.transform.position.z,
+    ]).toEqual([2, 3, -1]);
+
+    expect(spot).toBeInstanceOf(SpotLight);
+    expect([...spot.color]).toEqual([0.4, 0.7, 1]);
+    expect([spot.intensity, spot.range]).toEqual([9, 30]);
+    expect([spot.innerConeAngle, spot.outerConeAngle]).toEqual([
+      Math.PI / 10,
+      Math.PI / 6,
+    ]);
 
     expect(floor).toBeInstanceOf(Renderable);
     // The point of the whole seam: the same instances, not copies of them.
@@ -1079,6 +1118,8 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
     expect(io.write.nodeTypeOf(new DirectionalLight())).toBe(
       DIRECTIONAL_LIGHT_NODE_TYPE,
     );
+    expect(io.write.nodeTypeOf(new PointLight())).toBe(POINT_LIGHT_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new SpotLight())).toBe(SPOT_LIGHT_NODE_TYPE);
     // A `Sprite` is a `Renderable` to `instanceof` and not to this pair, which
     // is what keeps an application's own subclass from being written out as
     // its base and reloaded as one.
@@ -1371,6 +1412,49 @@ describe("registerRenderSerializers — defensive reads", () => {
 
     expect([...light.color]).toEqual([0.2, 0.4, 0.6]);
     expect(light.intensity).toBe(2.5);
+  });
+
+  it("restores the punctual lights' defaults from a payload it cannot use", () => {
+    // The same rule the directional light follows: an unusable number falls
+    // back to the class default rather than failing the whole document.
+    const lamp = io.read.nodeFactory({
+      type: POINT_LIGHT_NODE_TYPE,
+      data: { color: "white", intensity: Infinity, range: Number.NaN },
+    }) as PointLight;
+    expect([...lamp.color]).toEqual([1, 1, 1]);
+    expect([lamp.intensity, lamp.range]).toEqual([1, 0]);
+
+    const spot = io.read.nodeFactory({
+      type: SPOT_LIGHT_NODE_TYPE,
+      data: { innerConeAngle: Number.NaN, outerConeAngle: null },
+    }) as SpotLight;
+    expect([spot.innerConeAngle, spot.outerConeAngle]).toEqual([
+      0,
+      Math.PI / 4,
+    ]);
+  });
+
+  it("reads punctual payloads a build wrote in full", () => {
+    const lamp = io.read.nodeFactory({
+      type: POINT_LIGHT_NODE_TYPE,
+      data: { color: [0.1, 0.2, 0.3], intensity: 6, range: 9 },
+    }) as PointLight;
+    expect([...lamp.color]).toEqual([0.1, 0.2, 0.3]);
+    expect([lamp.intensity, lamp.range]).toEqual([6, 9]);
+
+    const spot = io.read.nodeFactory({
+      type: SPOT_LIGHT_NODE_TYPE,
+      data: {
+        color: [1, 0, 0],
+        intensity: 2,
+        range: 5,
+        innerConeAngle: 0.25,
+        outerConeAngle: 0.5,
+      },
+    }) as SpotLight;
+    expect([...spot.color]).toEqual([1, 0, 0]);
+    expect([spot.intensity, spot.range]).toEqual([2, 5]);
+    expect([spot.innerConeAngle, spot.outerConeAngle]).toEqual([0.25, 0.5]);
   });
 });
 
