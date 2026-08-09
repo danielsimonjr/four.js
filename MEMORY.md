@@ -28,6 +28,61 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-16 §58 paints, fills and strokes.** Decisions worth keeping:
+  - **Two colours reach one draw as per-vertex colour**, not as two materials. §57's
+    pipelines already multiply `vertexColors` (`R-19`), so a fill and a stroke share one
+    geometry, one material and one `drawElements`: **no `RenderItemKind` arm, no
+    pipeline, no frame-path edit**, and `render-webgl` was never opened. Second
+    application of R-23's "a packet can close a gap by adding nothing to the frame
+    path", and the concrete reason §49's `material: Material[]` was _not_ needed for 2D.
+  - **A paint union widens by kind, not by ambition.** `Paint` has one member and that
+    member carries a discriminant, so `{ kind: "linear-gradient" }` is a compile error.
+    The deciding measurement is that per-vertex colour is **exact** for a solid and for a
+    _two-stop linear_ gradient and silently faceted for every other §58 kind — a union
+    whose members work for some of their own arguments is worse than one that is
+    honestly narrow. The exact tier is a pipeline: R-6/R-13/R-18's
+    ~1.9 kB-per-`WebglRenderer`-bundle law plus a `RenderItemKind` arm RFC 0001 _and_
+    RFC 0003 both want.
+  - **`ShapeMaterial` is unshipped a second time, and that is a finding.** R-23 left it
+    conditional on §58 giving it content; §58 landed and the answer did not change,
+    because §50's own example puts `fill`/`stroke` on the _shape constructor_ and a
+    stroke's width and joins are geometry, not shading. A conditional deferral has to be
+    re-decided out loud when its condition arrives, or it silently becomes a habit.
+  - **A getter and its setter should have two types when one of them resolves defaults.**
+    `shape.stroke = { width }` writes; `shape.stroke` reads `ResolvedStrokeStyle` with
+    `lineJoin: "miter"` rather than `undefined`. Saying that in the type system removed
+    the whole `?? default` family from both the shape and the §79 writer — which is also
+    what took `scene-serializers.ts` back to 100% branch coverage, since every one of
+    those `??`s was a dead arm.
+  - **`LEQUAL` is what makes a stroke paint over its fill.** Both sit at z = 0, index
+    order is draw order inside one geometry, and §61's depth func lets the later draw
+    through. Written down because a backend that "tightened" the comparison to `LESS`
+    would make every stroke vanish under its own fill with no test naming depth.
+  - **The join/cap overlap is documented, not removed** (the `fillRings` precedent):
+    joins and caps are outer-side only, the inner side of every corner is covered twice,
+    invisible under an opaque paint and double-blended under a translucent one. Measured
+    against analytic areas — a 496-segment stroked circle overshoots 10π by 0.785, which
+    is exactly 496 × (w/2)²·tan(θ/2). `alignment: "outside"` on a convex outline is the
+    escape.
+  - **§33, second two-tier module:** stroke expansion is **same-runtime** where the fill
+    tessellator is cross-platform, because offsetting needs a unit normal (`Math.sqrt`)
+    and a round join needs `Math.acos`/`cos`/`sin`. `tessellation.ts`'s determinism
+    section now scopes itself explicitly — a module-level tier claim goes stale the
+    moment the module grows an operation.
+  - **Alignment is named from the path's own direction**: `inside` is the band to the
+    _left_. On a counter-clockwise ring (every §50 shape) the interior _is_ the left, and
+    on a clockwise one (a `Ring`'s hole) the two swap — which is also correct, because an
+    annulus's material is outside its inner circle. One rule, no second case.
+  - **A lone point strokes to nothing** — `Path.flatten` explicitly declines to decide
+    whether a stray `moveTo` is a dot; `expandStroke` decides, and the answer is that a
+    dot is a `Circle`. Same rule kills zero-length dash "on" entries (so SVG's `[0, 4]`
+    dot pattern draws nothing here, stated on the option).
+  - Gotcha: **`0.27` is not a `Float32Array` value.** Vertex-colour assertions must use
+    exactly representable components (0.25, 0.5, 1) or `toBeCloseTo`; three tests were
+    written against the authored tuple and failed on the round trip.
+  - Gotcha, repeat: **`pnpm graph` rewrites `docs/Architecture/*` and will sweep a
+    sibling's in-flight exports into your diff.** Run it for `graph:duplicates`, then
+    `git checkout -- docs/Architecture/`.
 - **2026-08-09 — A-18 abort half + A-9 `pointerType`.** Decisions worth keeping:
   - **Cancellation semantics for `AssetManager` (A-18).** Three rules, in source as the
     contract: (1) an aborted load never holds a reference — a pre-aborted signal is

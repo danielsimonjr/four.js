@@ -20,38 +20,39 @@
  * ring.innerRadius = 0.8;   // validated, and rebuilt on the next read
  * ```
  *
- * ## The tier this ships, and the tier it does not (2026-08-09)
+ * ## The tier this ships, and the tier it does not (2026-08-09, R-16)
  *
- * **Fill, in one solid colour. No stroke.** That is the whole boundary, and it
- * is not a shortcut — it is where the dependency tree actually stops:
+ * **Fill and stroke, both, in solid colours.** `R-23` shipped this family at
+ * the fill-only tier and named §58 as the owner of everything it was missing;
+ * `R-16` is that owner, and what it brought is:
  *
- * - §58's paint model (`R-16`) is **silent in this repository**. Gradients,
- *   patterns, `StrokeStyle` with its alignment, caps, joins, miter limit and
- *   dash phase — none of it exists. A `stroke: { color, width }` option
- *   accepted today could honour the width and nothing else, and "absent beats
- *   accepted-and-ignored" is the standing rule — §69's point-light
- *   `castShadow` was its fourth recorded application, and this is its fifth.
- * - §52 puts **stroke expansion in `@four/geometry`'s tessellation module**,
- *   beside the fill tessellator, and that module's own header already stages it
- *   with `R-16` by name. Expanding a polyline into a triangle strip *here*
- *   would put a second tessellator in the render package, one section away from
- *   the module §52 names.
- * - A stroke without a join rule is not a cheaper stroke, it is a **wrong**
- *   one: every corner of every polyline leaves a wedge-shaped notch on the
- *   outside and a self-overlap on the inside. §50 lists miter, bevel and round
- *   joins as requirements in the same breath as the stroke itself.
+ * - {@link Paint} and {@link SolidPaint} — §58's paint model at its solid
+ *   tier, as a **closed one-member union** so the six staged kinds are a
+ *   compile error rather than a silently ignored object. See {@link Paint} for
+ *   why per-vertex colour is exact for a solid and for nothing else §58 lists,
+ *   and what the exact tier costs;
+ * - {@link StrokeStyle} — §58's interface, over §52's `expandStroke`: width,
+ *   `inside`/`center`/`outside` alignment, butt/round/square caps,
+ *   miter/round/bevel joins with a miter limit that falls back to a bevel, and
+ *   dashes with a phase offset. Every row of §50's "dashes and dash offset",
+ *   "miter, bevel, and round joins" and "butt, square and round caps";
+ * - {@link Shape2D.fill} and {@link Shape2D.stroke}, and the `fill:`/`stroke:`
+ *   constructor options §50's own example writes;
+ * - **{@link Line}, {@link Polyline} and {@link Arc}** — the three §50
+ *   primitives that had no class at all, because they are only a stroke. With
+ *   them the family covers **all fourteen** of §50's rows.
  *
- * So §50's `fill and stroke` ships at half, out loud, and the three primitives
- * that are *only* a stroke — **line**, **polyline**, and the open **arc**
- * curve — are deliberately **not classes here**. A `Line` node whose geometry
- * is an empty triangle set is a node that draws nothing while claiming to draw
- * something; the honest form of "this engine cannot draw a line yet" is that
- * the class is missing. They land with `R-16`, which is also what gives them
- * their width. (§50's "sector" and "ring" are the *filled* members of that
- * arc family and do ship, which is why the arc row's absence is about strokes
- * and not about arcs.)
+ * The stroke's geometry is not here. §52 puts stroke expansion in
+ * `@four/geometry`'s tessellation module by name, beside the fill
+ * tessellator, and that is where it went (`expandStroke`); this module
+ * decides what a stroke *is* and lets §52 decide where its triangles are.
  *
- * The other eleven §50 rows all ship:
+ * What §58 still asks for and this does not answer, each with a named owner:
+ * the six non-solid paints ({@link Paint} states the argument and the measured
+ * price), and §52's anti-alias fringe, which needs a coverage attribute no
+ * §57 pipeline reads. Both land with the `ShapeMaterial` packet below.
+ *
+ * The fourteen §50 rows and the classes that answer them:
  *
  * ```text
  * circle             Circle
@@ -61,6 +62,9 @@
  * regular polygon    RegularPolygon
  * arbitrary polygon  Polygon
  * star               Star
+ * line               Line
+ * polyline           Polyline
+ * arc                Arc
  * sector             Sector
  * ring               Ring
  * path               PathShape
@@ -96,13 +100,22 @@
  * flattening, tessellation, caching, dirtying, disposal — is in the abstract
  * base instead, which is where inheritance puts it.
  *
- * ## Material: `UnlitMaterial`, honestly, and **no `ShapeMaterial`**
+ * ## Material: `UnlitMaterial`, honestly, and **still no `ShapeMaterial`**
  *
- * §57's family lists `ShapeMaterial`, and this packet deliberately does not
- * ship it. What would distinguish a `ShapeMaterial` from `UnlitMaterial` is
- * §58's `Paint` and `StrokeStyle` — a fill that can be a gradient, a stroke
- * that can be dashed. Without `R-16` the class would carry a colour and an
- * opacity, which is `UnlitMaterial` under a second name, and it would cost:
+ * §57's family lists `ShapeMaterial`, and `R-23` did not ship it because
+ * without §58 it would be `UnlitMaterial` renamed. §58 has now landed and the
+ * answer is **unchanged**, which is worth stating rather than leaving to
+ * inference: at the solid-paint tier the paints are baked into the geometry's
+ * per-vertex colours, so a `ShapeMaterial` would still carry nothing a
+ * backend reads that `UnlitMaterial` does not. §58's fill and stroke live on
+ * the **node**, where §50's own example puts them
+ * (`new Four.Rectangle({ …, fill, stroke })` is a shape constructor, not a
+ * material one), and a stroke's width and joins are geometry rather than
+ * shading in any case.
+ *
+ * What would give the class content is the paint tier it cannot express —
+ * gradients, patterns, a coverage-aware anti-alias fringe — and that is a
+ * *pipeline*, which costs:
  *
  * - a new `RenderItemKind` arm, whose union is closed on purpose (`R-12`'s
  *   staging mechanism), *and* which `RFC 0001` and `RFC 0003` are both queued
@@ -113,13 +126,13 @@
  * The first also buys a backend pipeline compiled at renderer initialisation,
  * measured at **0.75–1.9 kB gzip in every bundle carrying `WebglRenderer`**
  * whether or not the application draws a shape (`R-6`, `R-13`, `R-18` all
- * measured it) — for a shader byte-identical to the unlit one. So a shape
- * carries a `SurfaceMaterial` and draws through the existing flat-colour
- * pipeline; `ShapeMaterial` ships with the paint model that gives it content.
- * The consequence worth stating plainly: **this module changes no backend, adds
- * no render-item kind, and touches no frame path.** A scene that draws no shape
- * issues exactly the GL calls it issued before, by construction rather than by
- * measurement.
+ * measured it). So a shape carries a `SurfaceMaterial` and draws through the
+ * existing flat-colour pipeline — with `vertexColors` doing the work, which is
+ * a uniform switch the pipeline already has. The consequence worth stating
+ * plainly, and now true of a *stroked* shape too: **this module changes no
+ * backend, adds no render-item kind, and touches no frame path.** A scene that
+ * draws no shape issues exactly the GL calls it issued before, by construction
+ * rather than by measurement.
  *
  * Like `Renderable`, every class here is generic in its material and defaults
  * to `SurfaceMaterial`, for that class's reason: the render list picks a
@@ -164,7 +177,6 @@
  *
  * ## What §50 still asks for, named rather than sketched
  *
- * Fill and stroke opacity, stroke alignment, dashes, joins and caps: `R-16`.
  * Clipping and masks: they need §57's `stencil`, which no backend reads.
  * Boolean geometry operations: §51's four booleans, staged by `R-24` for the
  * one planar-subdivision packet §52's self-intersection rule also waits on.
@@ -179,13 +191,19 @@ import type { Disposable } from "@four/core";
 import {
   BufferGeometry,
   DEFAULT_FLATTEN_TOLERANCE,
+  expandStroke,
   Path,
   triangulatePolygon,
   type GeometryIndexArray,
   type PathFillRings,
   type Point2D,
+  type StrokeAlignment,
+  type StrokeLineCap,
+  type StrokeLineJoin,
+  type StrokeMesh,
 } from "@four/geometry";
 import type { Material } from "@four/materials";
+import type { ColorRGBA } from "@four/math";
 
 import {
   Renderable,
@@ -242,6 +260,346 @@ function requireCount(name: string, value: number, minimum: number): number {
 }
 
 /**
+ * A flat colour (§58 "solid color") — the paint tier this release ships.
+ *
+ * ```ts
+ * const blue: SolidPaint = { kind: "solid", color: [0.27, 0.4, 1, 1] };
+ * ```
+ *
+ * The colour is linear-light straight RGBA, §60a's working space and the same
+ * tuple every material carries; `@four/math`'s `srgbToLinearRGBA(parseColor(…))`
+ * is the one-line path from §50's `"#4466ff"` (§101 pins tuples as the shipped
+ * spelling — see `R-15`).
+ */
+export interface SolidPaint {
+  /** Discriminant. See {@link Paint} for why a one-member union has one. */
+  readonly kind: "solid";
+  /** Straight, linear-light RGBA (§60a). Copied on assignment. */
+  readonly color: ColorRGBA;
+  /**
+   * A second, independent multiplier on the colour's alpha (§50 "fill opacity
+   * and stroke opacity"); finite, in 0…1, defaults to 1.
+   *
+   * §50 lists opacity as a requirement *beside* fill and stroke rather than
+   * inside them, and SVG and Canvas both carry the pair for the same reason:
+   * `fill-opacity` is the knob an author animates without touching the colour
+   * they authored. The drawn alpha is `color[3] × opacity`.
+   */
+  readonly opacity?: number;
+}
+
+/**
+ * What a shape's fill or stroke is painted with (§58).
+ *
+ * §58 lists seven kinds of paint — solid colour, linear, radial and conic
+ * gradients, image patterns, procedural shaders, and render-target textures.
+ * **This union has one member**, and the single member carries a discriminant
+ * precisely so widening it is additive and typechecked: `{ kind: "linear-
+ * gradient", … }` is a *compile error* today rather than an object silently
+ * ignored at rebuild time. That is `R-6`'s `ScreenEffect` staging mechanism,
+ * applied a second time.
+ *
+ * ## Why the other six are not here (decision, 2026-08-09)
+ *
+ * A shape's paints are baked into the geometry's per-vertex colours (see
+ * {@link Shape2D}), and per-vertex colour is *exact* for exactly one of §58's
+ * kinds beyond a solid: a **two-stop linear** gradient, which is an affine
+ * function of position and is therefore reproduced exactly by the barycentric
+ * interpolation a rasterizer already performs. Every other kind is not:
+ *
+ * - a linear gradient of **three or more stops** is piecewise affine, and the
+ *   pieces are only right if the triangulation has vertices exactly on the
+ *   stop lines — an ear-clipped fill does not, and cannot be made to without
+ *   re-tessellating per gradient;
+ * - a **radial** or **conic** gradient is not affine at all, so it comes out
+ *   as a faceted approximation whose error depends on how finely the shape
+ *   happened to be flattened;
+ * - **patterns**, **procedural** paints and **render-target** paints are
+ *   texture reads, which need §77's texture-unit allocator and a uv the shape
+ *   does not have.
+ *
+ * Shipping the first case alone would be a `Paint` union whose members work
+ * for some of their own arguments, which is worse than one that is honestly
+ * narrow. The exact tier for all six is a paint **pipeline** — a
+ * `ShapeMaterial` with a gradient-aware shader, or a generated gradient
+ * texture behind §77's allocator — and a new compiled-at-initialisation
+ * pipeline is measured at **~1.9 kB gzip in every bundle carrying
+ * `WebglRenderer`** whether or not the application draws a gradient (`R-6`
+ * 0.75 kB, `R-13`, `R-18` 1.9 kB — the standing bundle-cost law). It also
+ * needs a `RenderItemKind` arm, whose shape `RFC 0001` and `RFC 0003` are both
+ * queued to decide (first to land owns `pipelineId`). **Named owner: the
+ * `ShapeMaterial` packet that lands with that pipeline**, which is also where
+ * §52's anti-alias fringe goes.
+ */
+export type Paint = SolidPaint;
+
+/**
+ * A {@link SolidPaint} with every optional field resolved — what a shape
+ * **stores** and hands back, as opposed to what it accepts.
+ *
+ * Two types for one paint, and deliberately: `shape.fill = { kind: "solid",
+ * color }` should be writable without naming an opacity, and
+ * `shape.fill.opacity` should read `1` rather than `undefined`. Splitting the
+ * accessor's two halves says that in the type system instead of in a sentence
+ * nobody reads.
+ */
+export interface ResolvedPaint {
+  /** See {@link SolidPaint.kind}. */
+  readonly kind: "solid";
+  /** See {@link SolidPaint.color}; a copy of the authored tuple. */
+  readonly color: ColorRGBA;
+  /** See {@link SolidPaint.opacity}; `1` when none was authored. */
+  readonly opacity: number;
+}
+
+/**
+ * What fills a shape's interior (§50 "fill and stroke", §58).
+ *
+ * Three states, because there are three answers and two of them are not
+ * paints:
+ *
+ * - **`"inherit"`** — filled in the material's own colour, with no per-vertex
+ *   colour at all. The default for every closed §50 primitive, and *exactly*
+ *   what `R-23` shipped: a shape that names no paint produces the geometry it
+ *   produced before §58 existed, byte for byte.
+ * - **a {@link Paint}** — filled in that paint, which the geometry carries as
+ *   per-vertex colour (see {@link Shape2D}).
+ * - **`"none"`** — not filled. The default for the three stroke-only
+ *   primitives ({@link Line}, {@link Polyline}, {@link Arc}), and what an
+ *   outlined rectangle needs.
+ *
+ * The two words are SVG's, which §50's "SVG import/export compatibility" row
+ * makes the right vocabulary to borrow: `fill="none"` means the same thing
+ * here that it means there.
+ */
+export type ShapeFill = Paint | "inherit" | "none";
+
+/** {@link ShapeFill} as a shape stores it — see {@link ResolvedPaint}. */
+export type ResolvedShapeFill = ResolvedPaint | "inherit" | "none";
+
+/**
+ * §58's `StrokeStyle` — how a shape's outline is drawn.
+ *
+ * ```ts
+ * const outline: StrokeStyle = {
+ *   width: 0.04,
+ *   paint: { kind: "solid", color: [1, 1, 1, 1] },
+ *   lineJoin: "round",
+ *   dash: [0.2, 0.1],
+ * };
+ * ```
+ *
+ * §58 declares every field as required; this one defaults all but `width`,
+ * following the family's standing rule that a parameter is required exactly
+ * when it *is* the thing — a stroke is its width, and there is no width an
+ * engine can invent, while `miter`/`butt`/`center` are the answers SVG,
+ * Canvas and §58's own ordering already agree on. The defaults are named on
+ * each field and restated in Appendix A terms by `expandStroke`.
+ *
+ * The geometric half is `@four/geometry`'s `StrokeGeometryOptions`, which this
+ * interface re-declares minus its `tolerance` — a shape has its own
+ * {@link Shape2D.tolerance} and stroking at a different one than the
+ * flattening would put facets on a curve that has none — and plus §58's
+ * `paint`, which the geometry package cannot see because a colour is not
+ * geometry.
+ *
+ * Validated and **copied** on assignment (§85): reading gives a fresh record
+ * with every optional field resolved, so an in-place edit of the object you
+ * passed cannot desynchronise the geometry from the style that produced it —
+ * the hazard {@link Polygon.points} has to document instead.
+ */
+export interface StrokeStyle {
+  /**
+   * Total width of the band in world units; finite and positive (§85).
+   * **Required** — see the interface documentation.
+   */
+  readonly width: number;
+  /**
+   * What the band is painted with (§58). Omitted, the band is drawn in the
+   * material's own colour with no per-vertex colour — which is what a
+   * stroke-only shape like {@link Line} wants, and why it is optional.
+   */
+  readonly paint?: Paint;
+  /** Which side of the outline the band sits on; defaults to `"center"`. */
+  readonly alignment?: StrokeAlignment;
+  /** How open ends are finished; defaults to `"butt"`. */
+  readonly lineCap?: StrokeLineCap;
+  /** How corners are filled; defaults to `"miter"`. */
+  readonly lineJoin?: StrokeLineJoin;
+  /**
+   * Ratio of miter length to width past which a `"miter"` join is drawn as a
+   * `"bevel"`; at least 1, defaults to 4 (SVG's and Canvas's).
+   */
+  readonly miterLimit?: number;
+  /**
+   * Alternating on/off lengths in world units (§50 "dashes and dash offset").
+   * Omit for a solid stroke; an odd count is repeated, SVG's rule.
+   */
+  readonly dash?: readonly number[];
+  /** How far into the dash pattern the outline starts; defaults to 0. */
+  readonly dashOffset?: number;
+}
+
+/**
+ * A {@link StrokeStyle} with every optional field except `paint` and `dash`
+ * resolved — what a shape stores and hands back (see {@link ResolvedPaint} for
+ * why the accessor has two types).
+ *
+ * `paint` and `dash` stay optional because their absence *means* something —
+ * no paint of its own, and a solid rather than a dashed band — rather than
+ * standing in for a default value.
+ */
+export interface ResolvedStrokeStyle {
+  /** See {@link StrokeStyle.width}. */
+  readonly width: number;
+  /** See {@link StrokeStyle.paint}. */
+  readonly paint?: ResolvedPaint;
+  /** See {@link StrokeStyle.alignment}. */
+  readonly alignment: StrokeAlignment;
+  /** See {@link StrokeStyle.lineCap}. */
+  readonly lineCap: StrokeLineCap;
+  /** See {@link StrokeStyle.lineJoin}. */
+  readonly lineJoin: StrokeLineJoin;
+  /** See {@link StrokeStyle.miterLimit}. */
+  readonly miterLimit: number;
+  /** See {@link StrokeStyle.dash}; a copy of the authored pattern. */
+  readonly dash?: readonly number[];
+  /** See {@link StrokeStyle.dashOffset}. */
+  readonly dashOffset: number;
+}
+
+/** The colour a vertex carries when its half of the shape names no paint. */
+const UNPAINTED: ColorRGBA = [1, 1, 1, 1];
+
+/** Validates a §58 paint and copies its colour (§85). */
+function requirePaint(name: string, paint: Paint): ResolvedPaint {
+  if (paint.kind !== "solid") {
+    throw new RangeError(
+      `${name} must be a §58 paint; got kind ` +
+        `${JSON.stringify((paint as { kind: unknown }).kind)}. Only "solid" ` +
+        "ships today — see the Paint union for the six staged kinds (§58).",
+    );
+  }
+  const color = paint.color;
+  for (let i = 0; i < 4; i += 1) {
+    requireFinite(`${name}.color[${String(i)}]`, color[i]);
+  }
+  const opacity = paint.opacity ?? 1;
+  if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+    throw new RangeError(
+      `${name}.opacity must be a finite number between 0 and 1; got ` +
+        `${String(opacity)} (§85).`,
+    );
+  }
+  return {
+    kind: "solid",
+    color: [color[0], color[1], color[2], color[3]],
+    opacity,
+  };
+}
+
+/** Validates a {@link ShapeFill} (§85), copying any paint it carries. */
+function requireFill(value: ShapeFill): ResolvedShapeFill {
+  if (value === "inherit" || value === "none") {
+    return value;
+  }
+  return requirePaint("Shape2D fill", value);
+}
+
+/**
+ * Validates a {@link StrokeStyle} and returns a resolved copy (§85).
+ *
+ * Every check `expandStroke` would make is made here instead, at the write
+ * that caused it: a stroke whose miter limit is 0 is a mistake in the caller's
+ * code, and finding out about it on the next read of `geometry` — inside a
+ * frame, which §61 forbids throwing from — would name the wrong line.
+ */
+function requireStroke(value: StrokeStyle): ResolvedStrokeStyle {
+  const width = requirePositive("StrokeStyle width", value.width);
+  const miterLimit = value.miterLimit ?? 4;
+  if (!Number.isFinite(miterLimit) || miterLimit < 1) {
+    throw new RangeError(
+      `StrokeStyle miterLimit must be a finite number of at least 1; got ` +
+        `${String(miterLimit)} (§85).`,
+    );
+  }
+  const dashOffset = requireFinite(
+    "StrokeStyle dashOffset",
+    value.dashOffset ?? 0,
+  );
+  let dash: number[] | undefined;
+  if (value.dash !== undefined) {
+    dash = [];
+    let total = 0;
+    for (let i = 0; i < value.dash.length; i += 1) {
+      const length = value.dash[i];
+      if (!Number.isFinite(length) || length < 0) {
+        throw new RangeError(
+          `StrokeStyle dash[${String(i)}] must be a finite non-negative ` +
+            `number; got ${String(length)} (§85).`,
+        );
+      }
+      dash.push(length);
+      total += length;
+    }
+    if (total <= 0) {
+      throw new RangeError(
+        "StrokeStyle dash lengths must not all be zero — a pattern of length " +
+          "zero never advances (§85).",
+      );
+    }
+  }
+  return {
+    width,
+    ...(value.paint === undefined
+      ? {}
+      : { paint: requirePaint("StrokeStyle paint", value.paint) }),
+    alignment: value.alignment ?? "center",
+    lineCap: value.lineCap ?? "butt",
+    lineJoin: value.lineJoin ?? "miter",
+    miterLimit,
+    ...(dash === undefined ? {} : { dash }),
+    dashOffset,
+  };
+}
+
+/**
+ * A material that multiplies the geometry's per-vertex colours into its own —
+ * the one thing a shape needs to know about a material it does not own.
+ *
+ * Structural rather than `instanceof UnlitMaterial`, and read exactly where
+ * `buildRenderList` reads it (`item.material.vertexColors === true`): a
+ * consumer's own material kind that multiplies vertex colours satisfies §58's
+ * paints just as well, and a whitelist would refuse it.
+ */
+interface VertexColorMaterial {
+  readonly vertexColors?: boolean;
+}
+
+/**
+ * Refuses a paint the material cannot draw (§85).
+ *
+ * A shape expresses its paints as per-vertex colours, and a material that does
+ * not multiply them draws *both* the fill and the stroke in its own single
+ * colour — the fill would look right and the stroke would vanish into it,
+ * which is "accepted and ignored" wearing a disguise. The material is checked
+ * where the paint is authored, against the material the shape holds at that
+ * moment; a material assigned afterwards is the author's business, exactly as
+ * it is for every other geometry carrying a `colors` attribute.
+ */
+function requirePaintableMaterial(material: Material, paints: boolean): void {
+  if (!paints || (material as VertexColorMaterial).vertexColors === true) {
+    return;
+  }
+  throw new RangeError(
+    "A shape carrying a §58 paint needs a material that multiplies the " +
+      "geometry's per-vertex colours — pass `vertexColors: true` (§57, §58). " +
+      `Its material (kind ${JSON.stringify(material.kind)}) does not, so the ` +
+      "fill and the stroke would both draw the material's own colour.",
+  );
+}
+
+/**
  * Copies and validates a point list (§85), so a shape holds its own points and
  * a caller mutating the array it passed cannot desynchronise the geometry from
  * the parameters that produced it.
@@ -259,25 +617,47 @@ function copyPoints(name: string, points: readonly Point2D[]): Point2D[] {
 }
 
 /**
- * Rewrites `target` with the triangulated fill of `regions` (§52), in place.
+ * Rewrites `target` with the triangulated fill of `regions` (§52) followed by
+ * the triangles of `stroke`, in place.
  *
  * Vertex `i` is region 0's outline point `i`, then that region's holes, then
  * region 1's — the same concatenation `triangulatePolygon` indexes, extended
  * across regions because a §51 path fills as *several* regions (an island in a
  * hole is its own region, which is exactly how the middle of a letter "e"
- * survives). `polygonGeometry2D` is the single-region form of this and is
- * deliberately not called: it builds a whole geometry per region, and a shape
- * owns one.
+ * survives) — and then, after the last fill vertex, the whole stroke band.
+ * `polygonGeometry2D` is the single-region form of this and is deliberately
+ * not called: it builds a whole geometry per region, and a shape owns one.
  *
- * Uv is the union of the regions' bounding boxes normalized to `[0, 1]²`,
- * matching `polygonGeometry2D` and `extrudeGeometry`'s caps, so a texture lines
- * up on a filled shape and on the front of its extrusion. Both spans are
- * strictly positive whenever there is a vertex at all: `fillRings` drops every
- * ring enclosing zero area, so a surviving region cannot be a line.
+ * **The stroke's triangles come last, and that is load-bearing.** They occupy
+ * the same plane as the fill, so what decides which one is visible where they
+ * overlap is the depth comparison — and §61's backend contract fixes it at
+ * `LEQUAL`, so equal depths let the *later* draw through. Index order inside
+ * one geometry is draw order, so a stroke written after the fill paints over
+ * it, which is the way round every 2D system draws them.
+ *
+ * Uv is the bounding box of everything emitted, normalized to `[0, 1]²`,
+ * matching `polygonGeometry2D` and `extrudeGeometry`'s caps so a texture lines
+ * up on a filled shape and on the front of its extrusion. With no stroke that
+ * is exactly the box over the regions' outlines — holes are inside their
+ * outline by construction — which is why adding the stroke's vertices to it
+ * leaves an unstroked shape's uv stream byte for byte unchanged. Both spans
+ * stay strictly positive whenever there is a vertex at all: `fillRings` drops
+ * every ring enclosing zero area, and a stroke band is two-dimensional in both
+ * axes for any polyline it does not drop.
+ *
+ * `colors` is emitted **only** when a §58 paint was authored, and then for
+ * every vertex: the fill's half gets `fillColor`, the stroke's gets
+ * `strokeColor`, and whichever half named no paint gets the identity
+ * `(1, 1, 1, 1)` so the material's own colour reaches it unmultiplied. A shape
+ * with no paint at all therefore carries no colour stream, and its geometry is
+ * identical to the one `R-23` built before §58 existed.
  */
 function rebuildFill(
   target: BufferGeometry,
   regions: readonly PathFillRings[],
+  stroke: StrokeMesh | undefined,
+  fillColor: ColorRGBA | undefined,
+  strokeColor: ColorRGBA | undefined,
 ): void {
   const triangulations: GeometryIndexArray[] = [];
   let vertexCount = 0;
@@ -301,6 +681,21 @@ function rebuildFill(
       maxY = Math.max(maxY, point.y);
     }
   }
+  const fillVertexCount = vertexCount;
+  if (stroke !== undefined) {
+    vertexCount += stroke.positions.length;
+    indexCount += stroke.indices.length;
+    for (const point of stroke.positions) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+  }
+  const colors =
+    fillColor === undefined && strokeColor === undefined
+      ? undefined
+      : new Float32Array(vertexCount * 4);
 
   // §53 validates every buffer against the ones already on the geometry, so a
   // shape whose vertex count changed cannot simply assign its new arrays — it
@@ -312,13 +707,14 @@ function rebuildFill(
   //
   // An **empty index buffer** is the configuration that is legal at every
   // vertex count, in both directions: it indexes nothing, so it constrains
-  // nothing. Dropping `uvs` alongside it (they are index-aligned with
-  // `positions`, §53) leaves a geometry that accepts any new vertex count at
-  // all. That is the rule `applyDebugDrawStreams` records, one step further.
-  // Each assignment bumps the version; the version is a counter, and the
-  // backend re-uploads once per frame regardless.
+  // nothing. Dropping `uvs` and `colors` alongside it (both are index-aligned
+  // with `positions`, §53) leaves a geometry that accepts any new vertex count
+  // at all. That is the rule `applyDebugDrawStreams` records, one step
+  // further. Each assignment bumps the version; the version is a counter, and
+  // the backend re-uploads once per frame regardless.
   target.indices = EMPTY_INDICES;
   target.uvs = undefined;
+  target.colors = undefined;
   if (vertexCount === 0) {
     target.positions = EMPTY_POSITIONS;
     target.indices = undefined;
@@ -353,10 +749,60 @@ function rebuildFill(
       index += 1;
     }
   }
+  if (stroke !== undefined) {
+    for (const point of stroke.positions) {
+      positions[vertex * 3] = point.x;
+      positions[vertex * 3 + 1] = point.y;
+      positions[vertex * 3 + 2] = 0;
+      uvs[vertex * 2] = (point.x - minX) / spanX;
+      uvs[vertex * 2 + 1] = (point.y - minY) / spanY;
+      vertex += 1;
+    }
+    for (const local of stroke.indices) {
+      indices[index] = fillVertexCount + local;
+      index += 1;
+    }
+  }
+  if (colors !== undefined) {
+    writeVertexColors(colors, 0, fillVertexCount, fillColor ?? UNPAINTED);
+    writeVertexColors(
+      colors,
+      fillVertexCount,
+      vertexCount,
+      strokeColor ?? UNPAINTED,
+    );
+  }
 
   target.positions = positions;
   target.uvs = uvs;
+  if (colors !== undefined) {
+    target.colors = colors;
+  }
   target.indices = indices;
+}
+
+/** Fills `[from, to)` of a §53 colour stream with one straight RGBA. */
+function writeVertexColors(
+  colors: Float32Array,
+  from: number,
+  to: number,
+  color: ColorRGBA,
+): void {
+  for (let vertex = from; vertex < to; vertex += 1) {
+    colors[vertex * 4] = color[0];
+    colors[vertex * 4 + 1] = color[1];
+    colors[vertex * 4 + 2] = color[2];
+    colors[vertex * 4 + 3] = color[3];
+  }
+}
+
+/** A paint's drawn RGBA — its colour with its opacity folded into the alpha. */
+function paintColor(paint: ResolvedPaint | undefined): ColorRGBA | undefined {
+  if (paint === undefined) {
+    return undefined;
+  }
+  const color = paint.color;
+  return [color[0], color[1], color[2], color[3] * paint.opacity];
 }
 
 /**
@@ -373,9 +819,12 @@ export interface Shape2DOptions<
    * the mistake behind an invisible node and hand the application a resource it
    * never created and now owes a `dispose()` to (§83).
    *
-   * §50's example writes `fill: "#4466ff"` instead. That option is §58's
-   * `Paint` — a colour, a gradient, a pattern — and it lands with the paint
-   * model (`R-16`); until then the shape's fill *is* its material's colour.
+   * §50's example writes `fill: "#4466ff"` *instead of* a material. That
+   * remains deliberately unsupported: a shape that invented a material would
+   * hand the application a resource it never created and now owes a
+   * `dispose()` to, and §79 has no key to write for it. {@link
+   * Shape2DOptions.fill} is §58's paint and sits **beside** the material —
+   * see {@link Shape2D.fill}.
    */
   material: M;
   /**
@@ -383,54 +832,170 @@ export interface Shape2DOptions<
    * `DEFAULT_FLATTEN_TOLERANCE`.
    */
   tolerance?: number;
+  /**
+   * Initial {@link Shape2D.fill} (§58). Defaults to `"inherit"` — the
+   * material's own colour — for every closed primitive, and to `"none"` for
+   * the three stroke-only ones ({@link Line}, {@link Polyline}, {@link Arc}).
+   */
+  fill?: ShapeFill;
+  /**
+   * Initial {@link Shape2D.stroke} (§58). Defaults to `null`: no stroke.
+   */
+  stroke?: StrokeStyle | null;
 }
 
 /**
- * A filled 2D shape (§49, §50) — the abstract root of the shape family.
+ * A 2D shape (§49, §50) — the abstract root of the shape family.
  *
  * A subclass supplies validated parameters and a {@link Shape2D.toPath}; this
- * class owns everything downstream of it: flattening, tessellation, the derived
- * geometry, its dirtying, and its disposal. See the module header for the tier
- * this ships at, why there is no stroke, and why there is no `ShapeMaterial`.
+ * class owns everything downstream of it: flattening, tessellation, stroke
+ * expansion, the derived geometry, its dirtying, and its disposal. See the
+ * module header for the tier this ships at and why there is still no
+ * `ShapeMaterial`.
  *
  * Consumers can extend it: a class that answers `toPath()` with a §51 path is a
- * full member of the family, gets a rebuilt fill for free, and needs nothing
- * from this module that is not public.
+ * full member of the family, gets a rebuilt fill and stroke for free, and needs
+ * nothing from this module that is not public.
+ *
+ * ## How a paint reaches the screen (decision, `R-16`, 2026-08-09)
+ *
+ * A fill and a stroke are two colours, and a node draws **one** geometry with
+ * **one** material — §49's `material: Material[]` and the submesh ranges it
+ * needs are `R-27`'s residue, not this packet's. So the two colours travel as
+ * §53's **per-vertex colour stream**: the fill's triangles carry the fill
+ * paint, the stroke's carry the stroke paint, and the §57 pipelines already
+ * multiply `vertexColors` into the material's own colour
+ * (`fragment = color × vColor`, `R-19`). One geometry, one draw, one material,
+ * **no new render-item kind, no new backend pipeline, no frame-path edit** —
+ * `R-23`'s property, kept.
+ *
+ * Two consequences an author has to know, both refused rather than surprising:
+ *
+ * - a material that does not multiply vertex colours cannot draw a paint, so
+ *   authoring one on such a material throws (§85) naming `vertexColors: true`;
+ * - the drawn colour is `material.color × paint`, so a material left at its
+ *   `UnlitMaterial` default of white draws the paint exactly.
  */
 export abstract class Shape2D<M extends Material = SurfaceMaterial>
   extends Renderable<M>
   implements Disposable
 {
   /**
-   * The owned fill, kept privately as well as in the inherited `geometry` slot
-   * — so the override and the rebuild never read through the accessor they are
-   * overriding. Created once; its buffers are replaced, its id never changes.
+   * The owned geometry, kept privately as well as in the inherited `geometry`
+   * slot — so the override and the rebuild never read through the accessor they
+   * are overriding. Created once; its buffers are replaced, its id never
+   * changes.
    */
-  readonly #fill: BufferGeometry;
+  readonly #derived: BufferGeometry;
 
   #tolerance: number;
 
-  /** Whether the fill still matches the shape's parameters. */
+  #fill: ResolvedShapeFill;
+
+  #stroke: ResolvedStrokeStyle | null;
+
+  /** Whether the geometry still matches the shape's parameters. */
   #stale = true;
 
   #disposed = false;
 
   /**
-   * Builds the shared half of a shape. The fill geometry is created **before**
+   * Builds the shared half of a shape. The geometry is created **before**
    * `super()`, because `Renderable`'s constructor takes the geometry: a shape
    * owns its own rather than being handed one, so it hands its own to the base
    * and keeps the reference.
    */
   protected constructor(options: Shape2DOptions<M>) {
-    const fill = new BufferGeometry({
+    const derived = new BufferGeometry({
       positions: new Float32Array(0),
       mode: "triangles",
     });
-    super(fill, options.material, options);
-    this.#fill = fill;
+    super(derived, options.material, options);
+    this.#derived = derived;
     this.#tolerance = requirePositive(
       "Shape2D tolerance",
       options.tolerance ?? DEFAULT_FLATTEN_TOLERANCE,
+    );
+    this.#fill = requireFill(options.fill ?? "inherit");
+    this.#stroke =
+      options.stroke === undefined || options.stroke === null
+        ? null
+        : requireStroke(options.stroke);
+    requirePaintableMaterial(this.material, this.#paints);
+  }
+
+  /**
+   * What fills this shape's interior (§50 "fill and stroke", §58) — a
+   * {@link Paint}, `"inherit"` for the material's own colour, or `"none"`.
+   *
+   * ```ts
+   * // §50's own example, in this repository's colour convention
+   * const panel = new Rectangle({
+   *   width: 2,
+   *   height: 1,
+   *   radius: 0.12,
+   *   material: new UnlitMaterial({ vertexColors: true }),
+   *   fill: { kind: "solid", color: [0.27, 0.4, 1, 1] },
+   *   stroke: { width: 0.03, paint: { kind: "solid", color: [1, 1, 1, 1] } },
+   * });
+   * ```
+   *
+   * Validated and copied on assignment (§85); assigning rebuilds. `"none"`
+   * skips the tessellation entirely, which is what makes an outline-only
+   * rectangle cost no fill triangles rather than invisible ones.
+   *
+   * A shape whose path is **open** — {@link Line}, {@link Polyline},
+   * {@link Arc}, or a {@link PathShape} over an unclosed path — fills as if it
+   * were closed, SVG's and Canvas's rule, if you ask it to; the three
+   * stroke-only primitives simply default to `"none"` so that nobody asks by
+   * accident.
+   */
+  get fill(): ResolvedShapeFill {
+    return this.#fill;
+  }
+
+  set fill(value: ShapeFill) {
+    const fill = requireFill(value);
+    requirePaintableMaterial(
+      this.material,
+      fill !== "inherit" && fill !== "none",
+    );
+    this.#fill = fill;
+    this.markDirty();
+  }
+
+  /**
+   * How this shape's outline is drawn (§50, §58's `StrokeStyle`), or `null`
+   * for no stroke.
+   *
+   * Validated and **copied** on assignment (§85): what comes back is a fresh
+   * record with every optional field resolved, so `shape.stroke.lineJoin`
+   * reads `"miter"` rather than `undefined` and an in-place edit of the object
+   * you passed cannot desynchronise the geometry from the style that built it.
+   * Assigning rebuilds; there is deliberately no way to mutate a stroke in
+   * place, which is the one place this family does *not* follow
+   * {@link Polygon.points}' announce-it-yourself contract — a stroke is six
+   * fields that have to agree, not one array.
+   *
+   * The band is expanded by §52's `expandStroke` at this shape's
+   * {@link Shape2D.tolerance}, from the same flattening the fill uses.
+   */
+  get stroke(): ResolvedStrokeStyle | null {
+    return this.#stroke;
+  }
+
+  set stroke(value: StrokeStyle | null) {
+    const stroke = value === null ? null : requireStroke(value);
+    requirePaintableMaterial(this.material, stroke?.paint !== undefined);
+    this.#stroke = stroke;
+    this.markDirty();
+  }
+
+  /** Whether either half of this shape names a §58 paint of its own. */
+  get #paints(): boolean {
+    return (
+      (this.#fill !== "inherit" && this.#fill !== "none") ||
+      this.#stroke?.paint !== undefined
     );
   }
 
@@ -456,7 +1021,7 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
   }
 
   /**
-   * The fill this shape draws (§53), re-tessellated on read whenever a
+   * The fill and stroke this shape draws (§53), rebuilt on read whenever a
    * parameter has changed since the last one.
    *
    * Owned by the shape — do not dispose it yourself, and do not hand it to a
@@ -471,7 +1036,7 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
     if (this.#stale) {
       this.#rebuild();
     }
-    return this.#fill;
+    return this.#derived;
   }
 
   /** Whether {@link Shape2D.dispose} has run. */
@@ -505,7 +1070,7 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
   /**
    * Announces a parameter change the shape could not see — a write into a point
    * record handed to {@link Polygon}, or into the `Path` a {@link PathShape}
-   * was built from. The fill is re-tessellated on the next read of
+   * was built from. The geometry is rebuilt on the next read of
    * {@link Shape2D.geometry}, not here, so a burst of edits in one frame costs
    * one rebuild rather than one per edit.
    */
@@ -514,24 +1079,32 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
   }
 
   /**
-   * Releases the fill this shape owns (§83). Idempotent.
+   * Releases the geometry this shape owns (§83). Idempotent.
    *
    * **The material is not disposed**: it is shared, and §83 puts disposal on
-   * whoever created it. After disposal the fill has no vertices, so a backend
-   * meeting this shape in a render list skips it — the behaviour a disposed
-   * `BufferGeometry` already produces for a `Renderable`.
+   * whoever created it. After disposal the geometry has no vertices, so a
+   * backend meeting this shape in a render list skips it — the behaviour a
+   * disposed `BufferGeometry` already produces for a `Renderable`.
    */
   dispose(): void {
     if (this.#disposed) {
       return;
     }
     this.#disposed = true;
-    this.#fill.dispose();
+    this.#derived.dispose();
   }
 
   /**
    * Flattens this shape's path at the current tolerance, sorts the rings into
-   * filled regions (§51's fill rules), and tessellates each (§52).
+   * filled regions (§51's fill rules) and tessellates each (§52), then expands
+   * the outline into its stroke band (§52, §58).
+   *
+   * **One `toPath()` and one flattening feed both halves.** Fill and stroke
+   * disagreeing about where a curve is would show as a hairline of fill
+   * outside its own outline, and the only way they cannot disagree is for the
+   * flattening tolerance to be the shape's rather than the stroke's — which is
+   * why §58's `StrokeStyle` here has no `tolerance` field even though §52's
+   * `StrokeGeometryOptions` requires one.
    *
    * A disposed shape rebuilds nothing: `dispose()` is terminal and has already
    * emptied the geometry.
@@ -541,7 +1114,22 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
     if (this.#disposed) {
       return;
     }
-    rebuildFill(this.#fill, this.toPath().fillRings(this.#tolerance));
+    const path = this.toPath();
+    const stroke = this.#stroke;
+    rebuildFill(
+      this.#derived,
+      this.#fill === "none" ? [] : path.fillRings(this.#tolerance),
+      stroke === null
+        ? undefined
+        : expandStroke(path.polylines(this.#tolerance), {
+            ...stroke,
+            tolerance: this.#tolerance,
+          }),
+      this.#fill === "inherit" || this.#fill === "none"
+        ? undefined
+        : paintColor(this.#fill),
+      paintColor(stroke?.paint),
+    );
   }
 }
 
@@ -1350,4 +1938,264 @@ export class PathShape<
   override toPath(): Path {
     return this.#path.clone();
   }
+}
+
+/** Options of {@link Line} (§50 "line"). */
+export interface LineOptions<
+  M extends Material = SurfaceMaterial,
+> extends Shape2DOptions<M> {
+  /** Initial {@link Line.start}; required, copied. */
+  start: Point2D;
+  /** Initial {@link Line.end}; required, copied. */
+  end: Point2D;
+  /**
+   * How the segment is drawn (§58). **Required**, unlike every other shape's:
+   * a line *is* its stroke, and one that defaulted to `null` would be a node
+   * drawing nothing while claiming to draw a line — the failure mode whose
+   * absence `R-23` recorded as the reason this class did not exist yet.
+   */
+  stroke: StrokeStyle;
+  /** Initial {@link Shape2D.fill}; defaults to `"none"`. */
+  fill?: ShapeFill;
+}
+
+/**
+ * A straight segment between two points (§50 "line") — the first of the three
+ * stroke-only primitives.
+ *
+ * ```ts
+ * const axis = new Line({
+ *   start: { x: -1, y: 0 },
+ *   end: { x: 1, y: 0 },
+ *   stroke: { width: 0.02, lineCap: "round" },
+ *   material,
+ * });
+ * ```
+ *
+ * Both endpoints are in the node's own local space, like every other shape's
+ * parameters, so a line is moved either by editing them or by moving the node
+ * — and §42's transform authority is untouched either way.
+ *
+ * A zero-length line is legal and draws nothing: it is the state an author
+ * animating an endpoint through its partner passes through, and refusing it
+ * would be refusing a frame of an animation rather than a mistake. A dot at
+ * that point is a {@link Circle}; §52's expansion says so in the same words.
+ */
+export class Line<M extends Material = SurfaceMaterial> extends Shape2D<M> {
+  #start: Point2D;
+
+  #end: Point2D;
+
+  constructor(options: LineOptions<M>) {
+    super({ ...options, fill: options.fill ?? "none" });
+    this.#start = requirePoint("Line start", options.start);
+    this.#end = requirePoint("Line end", options.end);
+  }
+
+  /** Where the segment begins, in local space; copied on assignment (§85). */
+  get start(): Point2D {
+    return this.#start;
+  }
+
+  set start(value: Point2D) {
+    this.#start = requirePoint("Line start", value);
+    this.markDirty();
+  }
+
+  /** Where the segment ends, in local space; copied on assignment (§85). */
+  get end(): Point2D {
+    return this.#end;
+  }
+
+  set end(value: Point2D) {
+    this.#end = requirePoint("Line end", value);
+    this.markDirty();
+  }
+
+  override toPath(): Path {
+    return new Path()
+      .moveTo(this.#start.x, this.#start.y)
+      .lineTo(this.#end.x, this.#end.y);
+  }
+}
+
+/** Options of {@link Polyline} (§50 "polyline"). */
+export interface PolylineOptions<
+  M extends Material = SurfaceMaterial,
+> extends Shape2DOptions<M> {
+  /**
+   * Initial {@link Polyline.points}; required, at least two, copied into the
+   * shape's own records.
+   */
+  points: readonly Point2D[];
+  /** How the chain is drawn (§58). **Required**, for {@link Line}'s reason. */
+  stroke: StrokeStyle;
+  /** Initial {@link Shape2D.fill}; defaults to `"none"`. */
+  fill?: ShapeFill;
+}
+
+/**
+ * An open chain of segments (§50 "polyline") — {@link Polygon}'s unclosed
+ * sibling.
+ *
+ * ```ts
+ * const trace = new Polyline({
+ *   points: samples,
+ *   stroke: { width: 0.01, lineJoin: "round", lineCap: "round" },
+ *   material,
+ * });
+ * ```
+ *
+ * **Open, and that is the whole difference from `Polygon`.** No segment runs
+ * from the last point back to the first, so the two ends are capped and every
+ * interior vertex is joined — which is why §50 lists them as two primitives
+ * rather than one with a flag. Two points is the honest lower bound: a
+ * one-point chain has no segment and strokes to nothing.
+ *
+ * Its `fill` defaults to `"none"`, but a fill *is* expressible: like SVG's own
+ * `<polyline>`, an open ring fills as if closed, so `fill` on a chain that
+ * nearly meets itself paints the region it nearly encloses.
+ */
+export class Polyline<M extends Material = SurfaceMaterial> extends Shape2D<M> {
+  #points: Point2D[];
+
+  constructor(options: PolylineOptions<M>) {
+    super({ ...options, fill: options.fill ?? "none" });
+    this.#points = requirePolylinePoints(options.points);
+  }
+
+  /**
+   * The chain's vertices, in order — the shape's **own** records, rewritten
+   * only through this accessor.
+   *
+   * Reading gives the live array; writing into a point directly is legal and
+   * invisible, so call {@link Shape2D.markDirty} afterwards, exactly as
+   * {@link Polygon.points} documents. Assigning validates and copies (§85).
+   */
+  get points(): readonly Point2D[] {
+    return this.#points;
+  }
+
+  set points(value: readonly Point2D[]) {
+    this.#points = requirePolylinePoints(value);
+    this.markDirty();
+  }
+
+  override toPath(): Path {
+    const path = new Path().moveTo(this.#points[0].x, this.#points[0].y);
+    for (let i = 1; i < this.#points.length; i += 1) {
+      path.lineTo(this.#points[i].x, this.#points[i].y);
+    }
+    return path;
+  }
+}
+
+/** Options of {@link Arc} (§50 "arc"). */
+export interface ArcOptions<
+  M extends Material = SurfaceMaterial,
+> extends Shape2DOptions<M> {
+  /** Initial {@link Arc.startAngle} in radians; required. */
+  startAngle: number;
+  /** Initial {@link Arc.endAngle} in radians; required. */
+  endAngle: number;
+  /** Initial {@link Arc.radius}; defaults to 1. */
+  radius?: number;
+  /** How the curve is drawn (§58). **Required**, for {@link Line}'s reason. */
+  stroke: StrokeStyle;
+  /** Initial {@link Shape2D.fill}; defaults to `"none"`. */
+  fill?: ShapeFill;
+}
+
+/**
+ * An open circular arc about the node origin (§50 "arc") — the curve, not the
+ * region.
+ *
+ * ```ts
+ * const gauge = new Arc({
+ *   radius: 1,
+ *   startAngle: Math.PI,
+ *   endAngle: 2 * Math.PI,
+ *   stroke: { width: 0.06, lineCap: "round" },
+ *   material,
+ * });
+ * ```
+ *
+ * §50 lists "arc", "sector" and "ring" as three primitives, and this is the
+ * one of the three that is only a curve: {@link Sector} is the arc closed back
+ * through the centre and {@link Ring} the arc's annulus, and both of those
+ * ship a *region*. The parameters are {@link Sector}'s, deliberately — a
+ * `Sector` and an `Arc` written with the same three numbers describe the same
+ * curve, and the difference between them is exactly the two radii `Sector`
+ * adds.
+ *
+ * The sweep follows §51's Canvas rule, counter-clockwise from `startAngle` and
+ * wrapped into one turn, so `0 → 4π` and `0 → 2π` are both a whole circle. A
+ * zero sweep draws nothing, which is where a dial animating from empty starts.
+ */
+export class Arc<M extends Material = SurfaceMaterial> extends Shape2D<M> {
+  #radius: number;
+
+  #startAngle: number;
+
+  #endAngle: number;
+
+  constructor(options: ArcOptions<M>) {
+    super({ ...options, fill: options.fill ?? "none" });
+    this.#radius = requirePositive("Arc radius", options.radius ?? 1);
+    this.#startAngle = requireFinite("Arc startAngle", options.startAngle);
+    this.#endAngle = requireFinite("Arc endAngle", options.endAngle);
+  }
+
+  /** Radius in world units; strictly positive (§85). */
+  get radius(): number {
+    return this.#radius;
+  }
+
+  set radius(value: number) {
+    this.#radius = requirePositive("Arc radius", value);
+    this.markDirty();
+  }
+
+  /** Where the curve begins, in radians from +X (§7b). */
+  get startAngle(): number {
+    return this.#startAngle;
+  }
+
+  set startAngle(value: number) {
+    this.#startAngle = requireFinite("Arc startAngle", value);
+    this.markDirty();
+  }
+
+  /** Where the curve ends, in radians from +X, swept counter-clockwise (§7b). */
+  get endAngle(): number {
+    return this.#endAngle;
+  }
+
+  set endAngle(value: number) {
+    this.#endAngle = requireFinite("Arc endAngle", value);
+    this.markDirty();
+  }
+
+  override toPath(): Path {
+    return new Path().arc(0, 0, this.#radius, this.#startAngle, this.#endAngle);
+  }
+}
+
+/** Validates and copies one point (§85). */
+function requirePoint(name: string, point: Point2D): Point2D {
+  return {
+    x: requireFinite(`${name}.x`, point.x),
+    y: requireFinite(`${name}.y`, point.y),
+  };
+}
+
+/** Validates and copies a polyline's chain (§85). */
+function requirePolylinePoints(points: readonly Point2D[]): Point2D[] {
+  if (points.length < 2) {
+    throw new RangeError(
+      `Polyline points must contain at least 2 points; got ` +
+        `${String(points.length)} (§85).`,
+    );
+  }
+  return copyPoints("Polyline points", points);
 }

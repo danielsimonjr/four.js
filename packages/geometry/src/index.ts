@@ -67,5 +67,19 @@ export {
   polygonGeometry2D,
 } from "./primitives.js";
 export { geometryMemoryBytes, liveGeometryCount } from "./resource-memory.js";
-export type { Point2D, PolygonTessellator } from "./tessellation.js";
-export { earClippingTessellator, triangulatePolygon } from "./tessellation.js";
+export type {
+  Point2D,
+  PolygonTessellator,
+  Polyline2D,
+  StrokeAlignment,
+  StrokeGeometryOptions,
+  StrokeLineCap,
+  StrokeLineJoin,
+  StrokeMesh,
+} from "./tessellation.js";
+export {
+  DEFAULT_MITER_LIMIT,
+  earClippingTessellator,
+  expandStroke,
+  triangulatePolygon,
+} from "./tessellation.js";

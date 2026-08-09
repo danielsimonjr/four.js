@@ -8,6 +8,74 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-16 closed: §58 paints, fills and strokes; §50's family complete
+
+#### Added
+
+- **§58's paint model at its solid tier (`@four/render`)** — `Paint`/`SolidPaint` (linear-light
+  RGBA plus §50's separate `opacity`, which multiplies the alpha), `ShapeFill`
+  (`"inherit"` | a paint | `"none"`, SVG's vocabulary because §50 asks for SVG compatibility),
+  and `StrokeStyle`. `Paint` is a **closed one-member tagged union** so the six staged kinds are
+  a compile error rather than an object silently ignored at rebuild time (R-6's `ScreenEffect`
+  staging mechanism, second application). Reading `shape.fill` / `shape.stroke` gives a
+  **resolved** record (`ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`) — every
+  optional filled in, validated and copied, so an in-place edit of the object you passed cannot
+  desynchronise the geometry from the style that built it.
+- **§52 stroke expansion (`@four/geometry`, `tessellation.ts`)** — `expandStroke` widens
+  polylines into §58's band: `inside`/`center`/`outside` alignment, butt/round/square caps,
+  miter/round/bevel joins with a miter limit that falls back to a bevel, and dashes with a phase
+  offset walked by arc length. §52 puts stroke expansion in that module _by name_, beside the
+  fill tessellator, and that is where it went. `Path.polylines(tolerance)` is the flattening it
+  takes — `flatten()` plus the one bit a `Point2D[]` cannot carry.
+- **§50's last three primitives** — `Line`, `Polyline` and the open `Arc`, whose absence `R-23`
+  recorded as deliberate ("a stroke without a join rule is _wrong_ at every corner"). Their
+  `stroke` is **required** and their `fill` defaults to `"none"`; the family now covers **all
+  fourteen** §50 rows with twelve classes.
+- **§79 pairs, additive in both directions** — `render:line`, `render:polyline`, `render:arc`,
+  plus `fill`/`stroke` on every shape document. Both fields are written **only when they differ
+  from the class's own default**, so a shape naming no paint writes the byte-identical document
+  `R-23` wrote, and a pre-`R-16` document restores a fill-only shape with nothing missing.
+- **`tests/determinism/stroke.test.ts` + `golden/stroke.json`** — §52's **second** golden,
+  labelled `same-runtime` beside the fill tessellator's `cross-platform` one.
+
+#### Decided, and the alternative is recorded
+
+- **A fill and a stroke are two colours in one draw, carried as per-vertex colour.** The §57
+  pipelines already multiply `vertexColors` into the material's colour (`R-19`), so a stroked,
+  painted shape adds **no render-item kind, no backend pipeline and no frame-path edit** —
+  `R-23`'s property, kept, and `render-webgl` was never opened. A material that cannot multiply
+  vertex colours is refused (§85) naming `vertexColors: true`, because the alternative is a
+  stroke that vanishes into the fill.
+- **Gradients are staged, not approximated.** Per-vertex colour is exact for a solid and for a
+  two-stop _linear_ gradient and for nothing else §58 lists: a three-stop linear gradient needs
+  vertices on its stop lines, and radial and conic are not affine at all. The exact tier is a
+  paint pipeline, measured at **~1.9 kB gzip in every bundle carrying `WebglRenderer`** whether
+  or not the app draws one, plus a `RenderItemKind` arm `RFC 0001` and `RFC 0003` are both
+  queued to own.
+- **`ShapeMaterial` stays unshipped** — the answer is unchanged by §58's arrival rather than
+  unexamined: the paints live on the _node_, where §50's own example puts them, and a stroke's
+  width and joins are geometry rather than shading.
+- **The stroke's triangles come last in the index buffer**, which is load-bearing: §61 fixes the
+  depth comparison at `LEQUAL`, so equal depths let the later draw through and a stroke paints
+  over its fill.
+
+#### Measured
+
+- **Byte-identical for every scene that names no paint** — a full GL transcript plus the
+  `positions`/`uvs`/`colors`/`indices` of all nine `R-23` shapes, recorded on the reverted build
+  and on this one: identical (md5 `c957ce62…`). Five of six example bundles are hash-identical;
+  `motor-digital-twin` is **+3.62 kB gzip** (937.36/1000), paid only by the bundle that calls
+  `registerSceneNodeTypes()`.
+- **The overlap is documented, not removed.** Joins and caps are drawn on a corner's outer side
+  only; the inner side is covered twice by the two quads. Invisible under an opaque paint,
+  double-blended under a translucent one, and `alignment: "outside"` on a convex outline avoids
+  it entirely. The exact answer is the same planar-subdivision pass §52's self-intersection row
+  waits on.
+- **A lone point strokes to nothing.** `Path.flatten` says explicitly it is not the operation
+  that decides whether a stray `moveTo` is a dot; this is that operation deciding — a dot is a
+  `Circle`, and inventing one would make every stray `moveTo` in an imported document sprout a
+  blob.
+
 ### 2026-08-09 — A-18's abort half and A-9's `pointerType` closed
 
 #### Added

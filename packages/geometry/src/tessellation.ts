@@ -13,7 +13,7 @@
  *
  * ## What ships here, and what is staged (§52, 2026-08-09)
  *
- * §52 lists nine capabilities. Three are discharged by this module:
+ * §52 lists nine capabilities. Four are discharged by this module:
  *
  * - **concave polygons** — the whole point of the packet; the ear clipper
  *   handles any simple outline, convex or not;
@@ -22,18 +22,27 @@
  *   It creates no vertices and takes no view on attributes, so one
  *   triangulation serves both caps of an extrusion, a fill and its outline, or
  *   the same shape drawn twice with different uv layouts.
+ * - **stroke expansion** — {@link expandStroke} (added by `R-16`, 2026-08-09),
+ *   with §58's alignment, caps, joins, miter limit and dash phase. It is the
+ *   one operation here that has to place its own vertices, since a stroke's
+ *   vertices do not exist until the band is built; see the section header
+ *   above it for why it is a **same-runtime** §33 claim while the fill
+ *   tessellator is a cross-platform one.
  *
- * The other six are deliberately **not** here, each with a named home:
+ * The other five are deliberately **not** here, each with a named home:
  *
  * - **adaptive curve subdivision** belongs to §51's `Path` (`flatten`,
  *   `subdivide` are §51 operations, not §52 ones): the tessellator's input is
  *   already a polyline, and the flattening tolerance is a property of the curve
  *   being flattened, not of the triangulation. It lands with the `Path` model
  *   (gap `R-24`).
- * - **stroke expansion** and **anti-alias fringe generation** need §58's paint
- *   model — joins, caps, alignment, dash phase — to have anything to expand
- *   *to*. They land with the paint packet (gap `R-16`); this module's name says
- *   "tessellation" only until then.
+ * - **anti-alias fringe generation** is the half of `R-16` that did *not*
+ *   land: a fringe is a second band of triangles carrying a coverage ramp,
+ *   and a ramp needs somewhere to put per-vertex coverage — an attribute the
+ *   §57 pipelines do not read — plus blending semantics at the seam between
+ *   the fringe and the body. It is a pipeline decision, not a tessellation
+ *   one, and it is staged with the `ShapeMaterial` packet that owns that
+ *   pipeline.
  * - **incremental rebuild of modified path segments** needs a `Path` to hold
  *   the segment identity that would be rebuilt (gap `R-24`).
  * - **self-intersections where well-defined** needs a fill rule (§51 lists
@@ -63,7 +72,15 @@
  *
  * ## Determinism (§33) — cross-platform, not merely same-runtime
  *
- * Every geometric decision in this module is a comparison against a value built
+ * **This section is about the fill tessellator**, and stops being true at the
+ * stroke section below: a determinism tier is a property of the operation, not
+ * of the module (`R-24`'s rule, confirmed a second time here). Offsetting a
+ * polyline needs a unit normal and therefore `Math.sqrt`; everything from
+ * {@link expandStroke} down is stated as **same-runtime** where it lives, and
+ * the two are pinned by two goldens carrying two `_tier` labels rather than by
+ * one that would let a transcendental hide inside the stronger claim.
+ *
+ * Every geometric decision in the fill half is a comparison against a value built
  * from `+`, `-`, `*`, `/` on IEEE-754 doubles. Those four are the operations
  * ECMAScript defines as *exactly* rounded, so they produce identical bits on
  * every conforming engine. There is deliberately **no** `Math.atan2`,
@@ -163,7 +180,7 @@
  */
 
 import type { GeometryIndexArray } from "./buffer-geometry.js";
-import { createIndices } from "./primitive-support.js";
+import { createIndices, requirePositive } from "./primitive-support.js";
 
 /**
  * A point in the XY plane — the input currency of every 2D builder and of the
@@ -1102,4 +1119,773 @@ function isEar(node: RingNode): boolean {
     probe = probe.next;
   }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Stroke expansion (§52 "stroke expansion", the geometry half of §58)
+//
+// §58 describes a `StrokeStyle` — width, alignment, caps, joins, miter limit,
+// dash phase — and §52 says the expansion of a path into that band is a
+// tessellation-subsystem operation. Everything below is that operation and
+// nothing else: it takes polylines and numbers and answers triangles. No
+// paint, no colour, no material — §58's `Paint` lives in the render tier
+// because a colour is not geometry, and this module would otherwise have to
+// know what a texture is.
+//
+// Determinism (§33): **same-runtime tier**, unlike the fill tessellator above.
+// Offsetting a polyline by a fixed distance needs unit normals, so
+// `Math.sqrt` is unavoidable, and a round join needs `Math.acos` for its
+// sample count and `Math.cos`/`Math.sin` for its sample values — the same
+// three ECMA-262 leaves implementation-approximated that `flattenArc` names.
+// A miter or bevel join with butt caps uses none of them, but the tier is a
+// property of the operation, not of the option record, so it is stated once,
+// here, for all of it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Which side of the path the stroke band occupies (§58 `StrokeStyle`).
+ *
+ * The sides are named from the path's own direction of travel: **`inside`** is
+ * the band entirely to the *left* of it, **`outside`** entirely to the right,
+ * and `center` straddles it. On a ring wound counter-clockwise — the winding
+ * every §50 shape produces, and the one §7a's Y-up plane makes positive —
+ * the enclosed region *is* the left, so `inside` and `outside` mean what they
+ * say without a second rule; on a ring wound clockwise (a hole) they swap,
+ * which is also what they should do, because the material of an annulus is
+ * outside its inner circle.
+ */
+export type StrokeAlignment = "inside" | "center" | "outside";
+
+/** How an open polyline's two ends are finished (§58 `StrokeStyle.lineCap`). */
+export type StrokeLineCap = "butt" | "round" | "square";
+
+/** How two segments meet at a corner (§58 `StrokeStyle.lineJoin`). */
+export type StrokeLineJoin = "miter" | "round" | "bevel";
+
+/**
+ * Default {@link StrokeGeometryOptions.miterLimit} — 4, SVG's and Canvas's.
+ *
+ * The limit is the ratio of the miter's length to the stroke's width, so 4
+ * bevels a corner sharper than about 29°. It is a ratio rather than a length
+ * precisely so it does not have to be re-chosen when the width changes.
+ */
+export const DEFAULT_MITER_LIMIT = 4;
+
+/**
+ * A flattened polyline, and whether it closes back on its first point.
+ *
+ * The currency between §51's flattening and §52's expansion: `Path.polylines`
+ * produces these, {@link expandStroke} consumes them. `closed` is the one bit
+ * `Point2D[]` cannot carry and the one bit a stroke cannot do without — a
+ * closed ring is joined at every vertex and capped at none.
+ */
+export interface Polyline2D {
+  /** The polyline's points. A closed ring does **not** repeat its first. */
+  readonly points: readonly Point2D[];
+  /** Whether a segment runs from the last point back to the first. */
+  readonly closed: boolean;
+}
+
+/**
+ * The geometric half of §58's `StrokeStyle`: everything about a stroke that
+ * decides where its triangles are, and nothing about what colour they are.
+ *
+ * `@four/render`'s `StrokeStyle` is this record plus a §58 `Paint`, which is
+ * why the two halves have one name each rather than one type with a hole in
+ * it.
+ */
+export interface StrokeGeometryOptions {
+  /** Total width of the band in world units; finite and positive (§85). */
+  readonly width: number;
+  /**
+   * Greatest distance a round join or cap may stray from the true arc, in
+   * world units — the same quantity `Path.flatten` takes.
+   *
+   * **Required**, deliberately. A default here would be a second spelling of
+   * §51's `DEFAULT_FLATTEN_TOLERANCE` that has to be kept equal to it by hand,
+   * and §52's module is otherwise free of any dependency on §51's; more to the
+   * point, every caller already flattened something to get the polylines it is
+   * passing, and stroking at a coarser tolerance than that flattening puts
+   * visible facets on the joins of a curve that has none.
+   */
+  readonly tolerance: number;
+  /** Which side of the path the band sits on; defaults to `center`. */
+  readonly alignment?: StrokeAlignment;
+  /** How open ends are finished; defaults to `butt`. */
+  readonly lineCap?: StrokeLineCap;
+  /** How corners are filled; defaults to `miter`. */
+  readonly lineJoin?: StrokeLineJoin;
+  /**
+   * Ratio of miter length to stroke width past which a `miter` join is drawn
+   * as a `bevel`; at least 1, defaults to {@link DEFAULT_MITER_LIMIT}.
+   */
+  readonly miterLimit?: number;
+  /**
+   * Alternating on/off lengths in world units, walked along the path (§50
+   * "dashes and dash offset"). Omit for a solid stroke.
+   *
+   * An odd number of entries is repeated to make it even, SVG's rule: `[4]` is
+   * `[4, 4]`. Entries must be finite and non-negative and must not all be zero.
+   * A zero-length "on" entry draws **nothing** — SVG's `[0, 4]` dot pattern
+   * needs a lone point to become a round cap, and a lone point strokes to
+   * nothing here for the reason {@link expandStroke} states.
+   */
+  readonly dash?: readonly number[];
+  /** How far into the pattern the path starts; defaults to 0. May be negative. */
+  readonly dashOffset?: number;
+}
+
+/**
+ * An expanded stroke: vertices in the XY plane and the triangles over them.
+ *
+ * The same division of labour {@link triangulatePolygon} draws — this function
+ * has to place its own vertices, because a stroke's vertices do not exist
+ * until it is expanded — with the same guarantee about the triangles: every
+ * one is **counter-clockwise seen from +Z** (§7a).
+ */
+export interface StrokeMesh {
+  /** The band's vertices. */
+  readonly positions: readonly Point2D[];
+  /** Three indices into {@link StrokeMesh.positions} per triangle. */
+  readonly indices: GeometryIndexArray;
+}
+
+/**
+ * Expands polylines into the triangles of their stroke (§52 "stroke
+ * expansion", §58 `StrokeStyle`).
+ *
+ * ```ts
+ * const mesh = expandStroke(
+ *   [{ points: [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }], closed: false }],
+ *   { width: 0.2, tolerance: 0.01, lineJoin: "round", lineCap: "square" },
+ * );
+ * mesh.indices.length / 3; // triangles: two quads, a round join, two caps
+ * ```
+ *
+ * ## What it draws
+ *
+ * One quad per segment, offset to {@link StrokeGeometryOptions.alignment}'s
+ * side; one join at every interior vertex, and at *every* vertex of a closed
+ * ring; one cap at each end of an open polyline. Joins and caps are drawn on
+ * the corner's **outer** side only, which is the side a gap would otherwise
+ * appear on — the inner side of a corner is covered by the two quads already,
+ * twice.
+ *
+ * That double coverage is this function's one honest defect, and it is stated
+ * rather than worked around: under an opaque paint it is invisible, and under
+ * a translucent one the inside of every corner blends twice. The exact answer
+ * is a boolean union of the band with itself, which is the same
+ * planar-subdivision pass §52's self-intersection row waits on — see this
+ * module's header. `alignment: "outside"` on a convex outline avoids it
+ * entirely, because no corner's inner side is on the drawn side.
+ *
+ * ## Joins
+ *
+ * A `miter` join extends both outer edges to their intersection, and falls
+ * back to `bevel` when the resulting spike is longer than
+ * {@link StrokeGeometryOptions.miterLimit} times the width — the SVG rule,
+ * and the reason the limit exists at all: at a hairpin the intersection runs
+ * off to infinity. A `bevel` join is the one triangle across the gap; a
+ * `round` join is a fan whose chords stay within
+ * {@link StrokeGeometryOptions.tolerance} of the true arc, the same sagitta
+ * bound `Path.flatten` uses on an arc command.
+ *
+ * A hairpin — two segments doubling exactly back on each other — has no
+ * bevel and no miter, only a round join; with the other two it leaves the
+ * notch its geometry actually has, rather than a wedge nobody asked for.
+ *
+ * ## What contributes nothing
+ *
+ * A polyline of fewer than two distinct points strokes to **nothing**, and is
+ * dropped rather than refused: `Path.flatten` returns a lone `moveTo` as a
+ * single point and says explicitly that it is not the operation that gets to
+ * decide whether that is a dot, and this is that operation deciding — a dot is
+ * a `Circle`, and inventing one here would make every stray `moveTo` in an
+ * imported document sprout a blob. Consecutive duplicate points are dropped
+ * for the same reason: a zero-length segment has no direction to offset along.
+ * Non-finite coordinates are refused (§85).
+ *
+ * @param polylines The polylines to stroke, in any order; each is expanded
+ *   independently and their triangles are concatenated.
+ * @param options The band's geometry — see {@link StrokeGeometryOptions}.
+ */
+export function expandStroke(
+  polylines: readonly Polyline2D[],
+  options: StrokeGeometryOptions,
+): StrokeMesh {
+  const width = requirePositive("expandStroke width", options.width);
+  const tolerance = requirePositive(
+    "expandStroke tolerance",
+    options.tolerance,
+  );
+  const miterLimit = options.miterLimit ?? DEFAULT_MITER_LIMIT;
+  if (!Number.isFinite(miterLimit) || miterLimit < 1) {
+    throw new RangeError(
+      `expandStroke miterLimit must be a finite number of at least 1; got ` +
+        `${String(miterLimit)} (§85).`,
+    );
+  }
+  const dashOffset = options.dashOffset ?? 0;
+  if (!Number.isFinite(dashOffset)) {
+    throw new RangeError(
+      `expandStroke dashOffset must be finite; got ${String(dashOffset)} (§85).`,
+    );
+  }
+  const dash =
+    options.dash === undefined ? undefined : normalizeDash(options.dash);
+
+  // The band as two signed distances along the left normal. `inside` is the
+  // whole width to the left, `outside` the whole width to the right, `center`
+  // half of each — see StrokeAlignment for why left is the inside of a
+  // counter-clockwise ring.
+  const alignment = options.alignment ?? "center";
+  const left =
+    alignment === "inside" ? width : alignment === "outside" ? 0 : width / 2;
+  const right = left - width;
+
+  const builder = new StrokeBuilder(
+    left,
+    right,
+    options.lineCap ?? "butt",
+    options.lineJoin ?? "miter",
+    miterLimit,
+    tolerance,
+  );
+  for (const polyline of polylines) {
+    const cleaned = cleanPolyline(polyline);
+    if (cleaned === undefined) {
+      continue;
+    }
+    if (dash === undefined) {
+      builder.add(cleaned);
+    } else {
+      for (const piece of dashPolyline(cleaned, dash, dashOffset)) {
+        const cleanedPiece = cleanPolyline(piece);
+        if (cleanedPiece !== undefined) {
+          builder.add(cleanedPiece);
+        }
+      }
+    }
+  }
+  return builder.finish();
+}
+
+/** Validates a dash pattern and evens its length, SVG's rule (§85). */
+function normalizeDash(dash: readonly number[]): number[] {
+  if (dash.length === 0) {
+    throw new RangeError(
+      "expandStroke dash must contain at least one length; omit the option " +
+        "for a solid stroke (§85).",
+    );
+  }
+  let total = 0;
+  for (let i = 0; i < dash.length; i += 1) {
+    const value = dash[i];
+    if (!Number.isFinite(value) || value < 0) {
+      throw new RangeError(
+        `expandStroke dash[${String(i)}] must be a finite non-negative ` +
+          `number; got ${String(value)} (§85).`,
+      );
+    }
+    total += value;
+  }
+  if (total <= 0) {
+    throw new RangeError(
+      "expandStroke dash lengths must not all be zero — a pattern of length " +
+        "zero never advances (§85).",
+    );
+  }
+  return dash.length % 2 === 0 ? dash.slice() : dash.concat(dash);
+}
+
+/**
+ * Validates a polyline and drops what cannot be stroked (§85), or `undefined`
+ * when nothing is left: non-finite coordinates are refused, consecutive
+ * duplicates and a closed ring's repeated first point are removed.
+ */
+function cleanPolyline(polyline: Polyline2D): Polyline2D | undefined {
+  const points: Point2D[] = [];
+  for (let i = 0; i < polyline.points.length; i += 1) {
+    const point = polyline.points[i];
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      throw new RangeError(
+        `expandStroke point ${String(i)} must be finite; got ` +
+          `(${String(point.x)}, ${String(point.y)}) (§85).`,
+      );
+    }
+    const previous = points[points.length - 1];
+    if (
+      previous === undefined ||
+      previous.x !== point.x ||
+      previous.y !== point.y
+    ) {
+      points.push({ x: point.x, y: point.y });
+    }
+  }
+  // `if`, not `while`: two trailing points equal to the first would be equal
+  // to each other, and the loop above already dropped one of them.
+  if (
+    polyline.closed &&
+    points.length > 1 &&
+    points[0].x === points[points.length - 1].x &&
+    points[0].y === points[points.length - 1].y
+  ) {
+    points.pop();
+  }
+  return points.length < 2 ? undefined : { points, closed: polyline.closed };
+}
+
+/**
+ * Cuts a polyline into the "on" pieces of a dash pattern, walking arc length
+ * from `offset` (§50 "dashes and dash offset").
+ *
+ * The pieces are open even when the input ring is closed — a dashed circle is
+ * a sequence of arcs with two caps each. The one exception is a pattern that
+ * never toggles over the whole ring: it comes back as the ring itself, still
+ * closed, so a dash long enough to cover a circle draws a circle rather than a
+ * circle with a seam. When the pattern is "on" across the ring's seam the
+ * first and last pieces are joined for the same reason.
+ */
+function dashPolyline(
+  polyline: Polyline2D,
+  pattern: readonly number[],
+  offset: number,
+): Polyline2D[] {
+  const points = polyline.points;
+  const count = points.length;
+  const segments = polyline.closed ? count : count - 1;
+  let total = 0;
+  for (const value of pattern) {
+    total += value;
+  }
+
+  // Where in the pattern the path starts. A positive offset moves the pattern
+  // *backwards* along the path, SVG's sense: the dash that would have started
+  // at `offset` starts at 0.
+  let phase = offset % total;
+  if (phase < 0) {
+    phase += total;
+  }
+  let index = 0;
+  while (phase >= pattern[index]) {
+    phase -= pattern[index];
+    index = (index + 1) % pattern.length;
+  }
+  let remaining = pattern[index] - phase;
+  let on = index % 2 === 0;
+  const startedOn = on;
+
+  const pieces: Polyline2D[] = [];
+  let current: Point2D[] = on ? [points[0]] : [];
+  let toggled = false;
+  for (let s = 0; s < segments; s += 1) {
+    const a = points[s];
+    const b = points[(s + 1) % count];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    let walked = 0;
+    while (length - walked > remaining) {
+      walked += remaining;
+      const t = walked / length;
+      const cut = { x: a.x + dx * t, y: a.y + dy * t };
+      if (on) {
+        current.push(cut);
+        pieces.push({ points: current, closed: false });
+        current = [];
+      } else {
+        current = [cut];
+      }
+      on = !on;
+      toggled = true;
+      index = (index + 1) % pattern.length;
+      remaining = pattern[index];
+    }
+    remaining -= length - walked;
+    if (on) {
+      current.push(b);
+    }
+  }
+
+  if (!toggled) {
+    return on ? [polyline] : [];
+  }
+  if (current.length > 1) {
+    // A ring whose pattern is "on" across the seam: the tail belongs to the
+    // head, or it would be two dashes with two spurious caps at the join.
+    // `pieces` cannot be empty here — starting "on" means the first toggle
+    // closed a piece, and `toggled` says a toggle happened.
+    if (polyline.closed && startedOn) {
+      pieces[0] = {
+        points: current.concat(pieces[0].points.slice(1)),
+        closed: false,
+      };
+    } else {
+      pieces.push({ points: current, closed: false });
+    }
+  }
+  return pieces;
+}
+
+/**
+ * Accumulates one stroke's triangles.
+ *
+ * Vertices are created as they are needed and shared only inside the piece
+ * that created them — a quad shares its four, a round fan shares its centre.
+ * Sharing them *between* pieces would mean an index of the previous segment's
+ * end offsets, which are the same points only when the join is a miter that
+ * did not fall back; the bookkeeping costs more than the vertices.
+ */
+class StrokeBuilder {
+  readonly #positions: Point2D[] = [];
+
+  readonly #indices: number[] = [];
+
+  readonly #left: number;
+
+  readonly #right: number;
+
+  readonly #lineCap: StrokeLineCap;
+
+  readonly #lineJoin: StrokeLineJoin;
+
+  readonly #miterLimit: number;
+
+  readonly #tolerance: number;
+
+  constructor(
+    left: number,
+    right: number,
+    lineCap: StrokeLineCap,
+    lineJoin: StrokeLineJoin,
+    miterLimit: number,
+    tolerance: number,
+  ) {
+    this.#left = left;
+    this.#right = right;
+    this.#lineCap = lineCap;
+    this.#lineJoin = lineJoin;
+    this.#miterLimit = miterLimit;
+    this.#tolerance = tolerance;
+  }
+
+  /** Expands one cleaned polyline: quads, then joins, then caps. */
+  add(polyline: Polyline2D): void {
+    const points = polyline.points;
+    const count = points.length;
+    const segments = polyline.closed ? count : count - 1;
+
+    // Unit direction and left normal of every segment, once: the joins need
+    // both of their neighbours' and recomputing them is the only place this
+    // routine could disagree with itself about where an edge is.
+    const directionX: number[] = [];
+    const directionY: number[] = [];
+    for (let s = 0; s < segments; s += 1) {
+      const a = points[s];
+      const b = points[(s + 1) % count];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      directionX.push(dx / length);
+      directionY.push(dy / length);
+    }
+
+    for (let s = 0; s < segments; s += 1) {
+      const a = points[s];
+      const b = points[(s + 1) % count];
+      const nx = -directionY[s];
+      const ny = directionX[s];
+      this.#quad(
+        { x: a.x + nx * this.#left, y: a.y + ny * this.#left },
+        { x: a.x + nx * this.#right, y: a.y + ny * this.#right },
+        { x: b.x + nx * this.#left, y: b.y + ny * this.#left },
+        { x: b.x + nx * this.#right, y: b.y + ny * this.#right },
+      );
+    }
+
+    const first = polyline.closed ? 0 : 1;
+    const last = polyline.closed ? count - 1 : count - 2;
+    for (let v = first; v <= last; v += 1) {
+      const incoming = (v - 1 + segments) % segments;
+      this.#join(points[v], incoming, v % segments, directionX, directionY);
+    }
+
+    if (!polyline.closed) {
+      const end = segments - 1;
+      this.#cap(
+        points[0],
+        0,
+        -directionX[0],
+        -directionY[0],
+        directionX,
+        directionY,
+      );
+      this.#cap(
+        points[count - 1],
+        end,
+        directionX[end],
+        directionY[end],
+        directionX,
+        directionY,
+      );
+    }
+  }
+
+  /** The mesh, with the narrowest index type that can address it. */
+  finish(): StrokeMesh {
+    const indices = createIndices(this.#indices.length, this.#positions.length);
+    indices.set(this.#indices);
+    return { positions: this.#positions, indices };
+  }
+
+  /**
+   * Fills the outer side of the corner at `vertex` between two segments.
+   *
+   * Which side is outer is the sign of the turn: a left turn leaves the gap on
+   * the right. When the band does not reach that side at all — `inside`
+   * alignment at a right turn, `outside` at a left one — both offset points
+   * are the vertex itself and there is nothing to fill, which falls out of the
+   * arithmetic rather than needing a case.
+   */
+  #join(
+    vertex: Point2D,
+    incoming: number,
+    outgoing: number,
+    directionX: readonly number[],
+    directionY: readonly number[],
+  ): void {
+    const d0x = directionX[incoming];
+    const d0y = directionY[incoming];
+    const d1x = directionX[outgoing];
+    const d1y = directionY[outgoing];
+    const turn = d0x * d1y - d0y * d1x;
+    const cosine = d0x * d1x + d0y * d1y;
+    let offset = turn > 0 ? this.#right : this.#left;
+    if (offset === 0 && turn === 0 && cosine < 0) {
+      // A hairpin has no outer side — both bands double back through the same
+      // corner — so the join goes on whichever side the band occupies. Only
+      // `outside` alignment reaches here: a hairpin's `turn` is zero, so the
+      // offset above is the *left* edge, and the only alignment whose left
+      // edge is on the path is `outside`, whose band is on the right.
+      offset = this.#right;
+    }
+    if (offset === 0) {
+      return;
+    }
+    const n0x = -d0y;
+    const n0y = d0x;
+    const n1x = -d1y;
+    const n1y = d1x;
+    const a = { x: vertex.x + n0x * offset, y: vertex.y + n0y * offset };
+    const b = { x: vertex.x + n1x * offset, y: vertex.y + n1y * offset };
+
+    if (this.#lineJoin === "round") {
+      // The rotation taking `a - vertex` onto `b - vertex` is the rotation
+      // taking `n0` onto `n1`, whatever the offset scales them by: its sine is
+      // the turn and its cosine the segments' dot product. The `turn === 0`
+      // arm is the hairpin, whose half turn bulges past the tip.
+      const angle = arcAngle(cosine);
+      this.#arcFan(
+        vertex,
+        a,
+        turn > 0 || (turn === 0 && offset < 0) ? angle : -angle,
+      );
+      return;
+    }
+    if (this.#lineJoin === "miter") {
+      const mx = n0x + n1x;
+      const my = n0y + n1y;
+      const length = Math.sqrt(mx * mx + my * my);
+      if (length > 0) {
+        // `cosHalf` is the cosine of half the angle between the two outer
+        // normals, which is `sin(θ/2)` for the angle θ between the segments —
+        // so `1 / cosHalf` is exactly SVG's miter-length-over-width ratio. It
+        // is never negative (it is `√((1 + n0·n1) / 2)`), so the limit alone
+        // decides: at a hairpin it is zero, `1 / 0` is `Infinity`, and every
+        // finite limit bevels.
+        const cosHalf = (mx * n0x + my * n0y) / length;
+        if (1 / cosHalf <= this.#miterLimit) {
+          const scale = offset / cosHalf / length;
+          this.#triangle(vertex, a, {
+            x: vertex.x + mx * scale,
+            y: vertex.y + my * scale,
+          });
+          this.#triangle(
+            vertex,
+            { x: vertex.x + mx * scale, y: vertex.y + my * scale },
+            b,
+          );
+          return;
+        }
+      }
+    }
+    this.#triangle(vertex, a, b);
+  }
+
+  /**
+   * Finishes an open end at `point`, where `segment` is the segment reaching
+   * it and `outward` points away from the band along that segment.
+   *
+   * The cap is built on the band's **end edge**: the midpoint of that edge is
+   * the centre of a round cap and half the width is its radius, and a square
+   * cap extends the edge by the same half width. Stating it that way is what
+   * makes `inside` and `outside` alignment cap correctly without a second
+   * rule — the edge is wherever the alignment put it, and the cap follows.
+   */
+  #cap(
+    point: Point2D,
+    segment: number,
+    outwardX: number,
+    outwardY: number,
+    directionX: readonly number[],
+    directionY: readonly number[],
+  ): void {
+    if (this.#lineCap === "butt") {
+      return;
+    }
+    const nx = -directionY[segment];
+    const ny = directionX[segment];
+    const leftPoint = {
+      x: point.x + nx * this.#left,
+      y: point.y + ny * this.#left,
+    };
+    const rightPoint = {
+      x: point.x + nx * this.#right,
+      y: point.y + ny * this.#right,
+    };
+    const half = (this.#left - this.#right) / 2;
+    if (this.#lineCap === "square") {
+      const extentX = outwardX * half;
+      const extentY = outwardY * half;
+      this.#quad(
+        leftPoint,
+        rightPoint,
+        { x: leftPoint.x + extentX, y: leftPoint.y + extentY },
+        { x: rightPoint.x + extentX, y: rightPoint.y + extentY },
+      );
+      return;
+    }
+    // The half turn from the left edge to the right edge that bulges *outward*
+    // is the one whose sign is the sign of the turn from the band's normal
+    // onto `outward` — which is +1 at a start cap and −1 at an end one.
+    const turn = nx * outwardY - ny * outwardX;
+    this.#arcFan(
+      {
+        x: (leftPoint.x + rightPoint.x) / 2,
+        y: (leftPoint.y + rightPoint.y) / 2,
+      },
+      leftPoint,
+      turn > 0 ? Math.PI : -Math.PI,
+    );
+  }
+
+  /**
+   * Emits a triangle fan of `sweep` radians about `centre`, starting at
+   * `start`, with chords no further than the tolerance from the true arc.
+   */
+  #arcFan(centre: Point2D, start: Point2D, sweep: number): void {
+    const dx = start.x - centre.x;
+    const dy = start.y - centre.y;
+    const radius = Math.sqrt(dx * dx + dy * dy);
+    if (radius === 0 || sweep === 0) {
+      return;
+    }
+    const steps = Math.min(
+      MAX_FAN_STEPS,
+      Math.max(
+        1,
+        Math.ceil(Math.abs(sweep) / arcStep(radius, this.#tolerance)),
+      ),
+    );
+    const cosStep = Math.cos(sweep / steps);
+    const sinStep = Math.sin(sweep / steps);
+    let x = dx;
+    let y = dy;
+    const centreIndex = this.#push(centre);
+    let previous = this.#push(start);
+    for (let i = 0; i < steps; i += 1) {
+      const nextX = x * cosStep - y * sinStep;
+      const nextY = x * sinStep + y * cosStep;
+      x = nextX;
+      y = nextY;
+      const next = this.#push({ x: centre.x + x, y: centre.y + y });
+      this.#emit(centreIndex, previous, next);
+      previous = next;
+    }
+  }
+
+  /** Two triangles over four corners: `a`/`b` at one end, `c`/`d` at the other. */
+  #quad(a: Point2D, b: Point2D, c: Point2D, d: Point2D): void {
+    const ai = this.#push(a);
+    const bi = this.#push(b);
+    const ci = this.#push(c);
+    const di = this.#push(d);
+    this.#emit(ai, bi, di);
+    this.#emit(ai, di, ci);
+  }
+
+  /**
+   * One triangle over three fresh vertices, or nothing at all when the three
+   * are collinear — a bevel across a straight corner, or across a hairpin,
+   * whose two offset points sit on a diameter through the vertex.
+   */
+  #triangle(a: Point2D, b: Point2D, c: Point2D): void {
+    if (orient(a.x, a.y, b.x, b.y, c.x, c.y) === 0) {
+      return;
+    }
+    this.#emit(this.#push(a), this.#push(b), this.#push(c));
+  }
+
+  #push(point: Point2D): number {
+    this.#positions.push(point);
+    return this.#positions.length - 1;
+  }
+
+  /**
+   * Records one triangle wound counter-clockwise (§7a), whichever way round it
+   * was built — a fan swept negatively builds its triangles clockwise, and a
+   * bevel's winding follows the corner's.
+   */
+  #emit(i: number, j: number, k: number): void {
+    const a = this.#positions[i];
+    const b = this.#positions[j];
+    const c = this.#positions[k];
+    if (orient(a.x, a.y, b.x, b.y, c.x, c.y) < 0) {
+      this.#indices.push(i, k, j);
+    } else {
+      this.#indices.push(i, j, k);
+    }
+  }
+}
+
+/**
+ * Hard ceiling on the chords of one round join or cap — a **termination
+ * guarantee, not a quality target**, in `MAX_SUBDIVISION_DEPTH`'s sense.
+ *
+ * `arcStep` can only return zero when `tolerance / radius` underflows, which
+ * asks for a chord finer than the coordinates can express; without a cap the
+ * step count would be `Infinity` and the fan would never end.
+ */
+const MAX_FAN_STEPS = 4096;
+
+/**
+ * The angle whose cosine is `cosine`, clamped into `acos`'s domain — the
+ * cosine comes from a dot product of two unit vectors and may sit an ulp
+ * outside it.
+ */
+function arcAngle(cosine: number): number {
+  return Math.acos(Math.max(-1, Math.min(1, cosine)));
+}
+
+/**
+ * Largest angular step whose chord's sagitta stays within `tolerance` on a
+ * circle of radius `radius` — `flattenArc`'s bound, restated for a fan that
+ * has no path command to read it from, and capped at a third of a turn for the
+ * same reason (a full circle must not become a triangle).
+ */
+function arcStep(radius: number, tolerance: number): number {
+  const ratio = 1 - tolerance / radius;
+  return ratio <= -1
+    ? (Math.PI * 2) / 3
+    : Math.min((Math.PI * 2) / 3, 2 * Math.acos(ratio));
 }

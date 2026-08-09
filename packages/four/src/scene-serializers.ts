@@ -151,10 +151,13 @@ import {
   RigidBody,
 } from "@four/physics";
 import {
+  Arc,
   Circle,
   Ellipse,
+  Line,
   PathShape,
   Polygon,
+  Polyline,
   Rectangle,
   RegularPolygon,
   Renderable,
@@ -163,6 +166,11 @@ import {
   Shape2D,
   Sprite,
   Star,
+} from "@four/render";
+import type {
+  ResolvedPaint,
+  ResolvedShapeFill,
+  ResolvedStrokeStyle,
 } from "@four/render";
 import {
   DirectionalLight,
@@ -283,6 +291,15 @@ export const RING_NODE_TYPE = "render:ring";
  * "Bézier path" alike (§50, §51; R-23).
  */
 export const PATH_SHAPE_NODE_TYPE = "render:path";
+
+/** The document `type` a {@link Line} serializes as (§50, §58; R-16). */
+export const LINE_NODE_TYPE = "render:line";
+
+/** The document `type` a {@link Polyline} serializes as (§50, §58; R-16). */
+export const POLYLINE_NODE_TYPE = "render:polyline";
+
+/** The document `type` an {@link Arc} serializes as (§50, §58; R-16). */
+export const ARC_NODE_TYPE = "render:arc";
 
 /**
  * What to do with a shared resource — a geometry, a material — that no
@@ -1459,12 +1476,26 @@ const SHAPE_NODE_TYPES: ReadonlyMap<ShapeClass, string> = new Map<
   [Sector, SECTOR_NODE_TYPE],
   [Ring, RING_NODE_TYPE],
   [PathShape, PATH_SHAPE_NODE_TYPE],
+  [Line, LINE_NODE_TYPE],
+  [Polyline, POLYLINE_NODE_TYPE],
+  [Arc, ARC_NODE_TYPE],
 ]);
 
-/** The same nine names, for the read half's one-lookup rejection. */
+/** The same twelve names, for the read half's one-lookup rejection. */
 const SHAPE_NODE_TYPE_NAMES: ReadonlySet<string> = new Set(
   SHAPE_NODE_TYPES.values(),
 );
+
+/**
+ * The three §50 primitives that are only a stroke (`R-16`) — their `fill`
+ * defaults to `"none"` where every other shape's defaults to `"inherit"`, and
+ * their `stroke` is required where every other shape's is optional.
+ */
+const STROKE_ONLY_NODE_TYPES: ReadonlySet<string> = new Set([
+  LINE_NODE_TYPE,
+  POLYLINE_NODE_TYPE,
+  ARC_NODE_TYPE,
+]);
 
 /** A finite, strictly positive number — every extent a shape carries (§85). */
 function isPositive(value: number): boolean {
@@ -1528,6 +1559,214 @@ function requireShapeNumber(
     );
   }
   return number_;
+}
+
+/**
+ * A §58 paint as JSON — tagged, so widening {@link Paint} beyond its one
+ * member stays an additive read.
+ */
+function paintJson(paint: ResolvedPaint): JsonValue {
+  return {
+    kind: paint.kind,
+    color: [paint.color[0], paint.color[1], paint.color[2], paint.color[3]],
+    opacity: paint.opacity,
+  };
+}
+
+/**
+ * A §58 paint from a document, or `undefined` when it carries none this build
+ * can draw.
+ *
+ * A paint of an *unknown* kind reads as `undefined` rather than as a refusal:
+ * §58 lists seven and this release draws one, so a document written by a later
+ * build is a document whose gradient this build cannot honour — dropping the
+ * paint leaves a shape in its material's colour, which is visible and
+ * recoverable, where refusing the node would lose the artwork entirely. Every
+ * *malformed* field inside a solid paint restores that field's default, the
+ * A-12/R-18 rule.
+ */
+function readPaint(value: JsonValue | undefined): ResolvedPaint | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const source = value as { readonly [key: string]: JsonValue };
+  if (readString(source.kind) !== "solid") return undefined;
+  const color = readColorRGBA(source.color);
+  if (color === undefined) return undefined;
+  const opacity = readFinite(source.opacity);
+  return {
+    kind: "solid",
+    color,
+    opacity:
+      opacity !== undefined && opacity >= 0 && opacity <= 1 ? opacity : 1,
+  };
+}
+
+/** Four finite numbers, or `undefined` — a §60a linear-light RGBA. */
+function readColorRGBA(
+  value: JsonValue | undefined,
+): [number, number, number, number] | undefined {
+  if (!Array.isArray(value) || value.length !== 4) return undefined;
+  const channels: number[] = [];
+  for (const entry of value as readonly JsonValue[]) {
+    const channel = readFinite(entry);
+    if (channel === undefined) return undefined;
+    channels.push(channel);
+  }
+  return [channels[0], channels[1], channels[2], channels[3]];
+}
+
+/** A shape's fill as JSON: one of §58's two words, or a paint. */
+function fillJson(fill: ResolvedShapeFill): JsonValue {
+  return fill === "inherit" || fill === "none" ? fill : paintJson(fill);
+}
+
+/**
+ * A shape's fill from a document, defaulting to `fallback` — `"inherit"` for
+ * the nine closed primitives, `"none"` for the three stroke-only ones.
+ */
+function readFill(
+  value: JsonValue | undefined,
+  fallback: ResolvedShapeFill,
+): ResolvedShapeFill {
+  const word = readString(value);
+  if (word === "inherit" || word === "none") return word;
+  return readPaint(value) ?? fallback;
+}
+
+/** A §58 `StrokeStyle` as JSON — every field, already resolved by the shape. */
+function strokeJson(stroke: ResolvedStrokeStyle): JsonValue {
+  const payload: Record<string, JsonValue> = {
+    width: stroke.width,
+    alignment: stroke.alignment,
+    lineCap: stroke.lineCap,
+    lineJoin: stroke.lineJoin,
+    miterLimit: stroke.miterLimit,
+    dashOffset: stroke.dashOffset,
+  };
+  if (stroke.paint !== undefined) payload.paint = paintJson(stroke.paint);
+  if (stroke.dash !== undefined) payload.dash = stroke.dash.slice();
+  return payload;
+}
+
+/**
+ * A §58 `StrokeStyle` from a document, or `null` when it carries none.
+ *
+ * `width` follows the required half of the reading rule — a stroke *is* its
+ * width, and there is no width to invent — so a document that states a stroke
+ * without a usable one is refused by name. Everything else follows the
+ * defaulted half.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`
+ */
+function readStroke(
+  document: SceneNodeDocument,
+  value: JsonValue | undefined,
+): ResolvedStrokeStyle | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    if (!STROKE_ONLY_NODE_TYPES.has(document.type)) return null;
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `Scene document node ${JSON.stringify(document.id ?? null)} of type ${JSON.stringify(document.type)} carries no stroke; that shape is only a stroke, so it is refused rather than invented (§50, §58, §79).`,
+      {
+        context: {
+          node: document.id ?? null,
+          type: document.type,
+          field: "stroke",
+        },
+      },
+    );
+  }
+  const source = value as { readonly [key: string]: JsonValue };
+  const paint = readPaint(source.paint);
+  const alignment = readString(source.alignment);
+  const lineCap = readString(source.lineCap);
+  const lineJoin = readString(source.lineJoin);
+  const miterLimit = readFinite(source.miterLimit);
+  const dash = readDash(source.dash);
+  return {
+    width: requireShapeNumber(
+      document,
+      "stroke.width",
+      source.width,
+      isPositive,
+    ),
+    ...(paint === undefined ? {} : { paint }),
+    alignment:
+      alignment === "inside" ||
+      alignment === "outside" ||
+      alignment === "center"
+        ? alignment
+        : "center",
+    lineCap:
+      lineCap === "round" || lineCap === "square" || lineCap === "butt"
+        ? lineCap
+        : "butt",
+    lineJoin:
+      lineJoin === "round" || lineJoin === "bevel" || lineJoin === "miter"
+        ? lineJoin
+        : "miter",
+    miterLimit: miterLimit !== undefined && miterLimit >= 1 ? miterLimit : 4,
+    ...(dash === undefined ? {} : { dash }),
+    dashOffset: readFinite(source.dashOffset) ?? 0,
+  };
+}
+
+/** A dash pattern from a document, or `undefined` for a solid stroke. */
+function readDash(value: JsonValue | undefined): number[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  const dash: number[] = [];
+  let total = 0;
+  for (const entry of value as readonly JsonValue[]) {
+    const length = readFinite(entry);
+    if (length === undefined || length < 0) return undefined;
+    dash.push(length);
+    total += length;
+  }
+  return total > 0 ? dash : undefined;
+}
+
+/** A polyline's chain, or a loud refusal (§79, §85) — at least two vertices. */
+function requireChainPoints(
+  document: SceneNodeDocument,
+  value: JsonValue | undefined,
+): Point2D[] {
+  const points: Point2D[] = [];
+  if (Array.isArray(value)) {
+    for (const entry of value as readonly JsonValue[]) {
+      const pair = readFinitePair(entry);
+      if (pair === undefined) {
+        points.length = 0;
+        break;
+      }
+      points.push({ x: pair[0], y: pair[1] });
+    }
+  }
+  if (points.length < 2) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `Scene document node ${JSON.stringify(document.id ?? null)} of type ${JSON.stringify(document.type)} carries no usable point chain; a polyline is its points, so they are refused rather than invented (§50, §79).`,
+      { context: { node: document.id ?? null, type: document.type } },
+    );
+  }
+  return points;
+}
+
+/** One point, or a loud refusal (§79, §85) — a line is its two endpoints. */
+function requireShapePoint(
+  document: SceneNodeDocument,
+  field: string,
+  value: JsonValue | undefined,
+): Point2D {
+  const pair = readFinitePair(value);
+  if (pair === undefined) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `Scene document node ${JSON.stringify(document.id ?? null)} of type ${JSON.stringify(document.type)} carries no usable ${field}; that parameter is what makes the shape the shape, so it is refused rather than invented (§50, §79).`,
+      { context: { node: document.id ?? null, type: document.type, field } },
+    );
+  }
+  return { x: pair[0], y: pair[1] };
 }
 
 /** A polygon's ring as JSON — one `[x, y]` pair per vertex. */
@@ -1752,11 +1991,26 @@ function readPath(
  *
  * A **material key** (see the module header — a shape points at a material it
  * does not own), the two ordering fields, §49's two shadow flags, the
- * flattening `tolerance`, and the shape's own parameters. There is deliberately
- * **no geometry key**: a shape *derives* its fill from those parameters and
- * owns it (§83), exactly as a `Sprite` derives its quad, so the payload rebuilds
- * it exactly and a document that named one would be naming a resource the
- * application never created.
+ * flattening `tolerance`, §58's `fill` and `stroke`, and the shape's own
+ * parameters. There is deliberately **no geometry key**: a shape *derives* its
+ * fill and stroke from those parameters and owns the result (§83), exactly as a
+ * `Sprite` derives its quad, so the payload rebuilds it exactly and a document
+ * that named one would be naming a resource the application never created.
+ *
+ * ## §58 is additive in both directions (`R-16`, 2026-08-09)
+ *
+ * `fill` and `stroke` are written **only when they differ from the class's own
+ * default** — `"inherit"`/`null` for the nine closed primitives, `"none"` for
+ * the three stroke-only ones. So a shape that names no paint writes the
+ * byte-identical document `R-23` wrote, and a document written before §58
+ * existed restores a fill-only shape with no field missing. A paint of a kind
+ * this build does not draw (§58 lists seven; one ships) is **dropped rather
+ * than refused**: §58 lists seven paints and this release draws one, so a
+ * gradient written by a later build is one this build cannot honour — dropping
+ * it leaves a shape in its material's colour, which is visible and
+ * recoverable, where refusing the node would lose the artwork entirely. A
+ * paint the material cannot draw at all is a different matter and *is* refused,
+ * the way a `Sprite` whose material key resolves to a lit one is.
  *
  * ## Two reading rules, and where the line between them is
  *
@@ -1812,7 +2066,8 @@ export function registerShapeSerializers(
         SHAPE_NODE_TYPES.get(node.constructor as ShapeClass),
       nodeDataOf: (node: Node): JsonValue | undefined => {
         const constructor = node.constructor as ShapeClass;
-        if (!SHAPE_NODE_TYPES.has(constructor)) return undefined;
+        const type = SHAPE_NODE_TYPES.get(constructor);
+        if (type === undefined) return undefined;
         const shape = node as Shape2D<Material>;
         const payload: Record<string, JsonValue> = {
           material: resourceKeyJson<Material>(
@@ -1827,6 +2082,16 @@ export function registerShapeSerializers(
           renderOrder: shape.renderOrder,
           ...shadowFlagsJson(shape),
         };
+        // §58's two fields are written **only when they are not this class's
+        // default** (`R-16`, 2026-08-09). That is what keeps the addition
+        // additive in both directions: a shape authored before §58 existed
+        // writes the byte-identical document it wrote at `R-23`, and a
+        // pre-`R-16` document reads back as `fill: "inherit"`, `stroke: null`.
+        const defaultFill = STROKE_ONLY_NODE_TYPES.has(type)
+          ? "none"
+          : "inherit";
+        if (shape.fill !== defaultFill) payload.fill = fillJson(shape.fill);
+        if (shape.stroke !== null) payload.stroke = strokeJson(shape.stroke);
         if (constructor === Circle) {
           payload.radius = (node as Circle<Material>).radius;
         } else if (constructor === Ellipse) {
@@ -1861,6 +2126,17 @@ export function registerShapeSerializers(
           const ring = node as Ring<Material>;
           payload.innerRadius = ring.innerRadius;
           payload.outerRadius = ring.outerRadius;
+        } else if (constructor === Line) {
+          const line = node as Line<Material>;
+          payload.start = pairJson(line.start.x, line.start.y);
+          payload.end = pairJson(line.end.x, line.end.y);
+        } else if (constructor === Polyline) {
+          payload.points = pointsJson((node as Polyline<Material>).points);
+        } else if (constructor === Arc) {
+          const arc = node as Arc<Material>;
+          payload.radius = arc.radius;
+          payload.startAngle = arc.startAngle;
+          payload.endAngle = arc.endAngle;
         } else {
           payload.path = pathJson((node as PathShape<Material>).path);
         }
@@ -1871,12 +2147,19 @@ export function registerShapeSerializers(
       nodeFactory: (document: SceneNodeDocument): Node | undefined => {
         if (!SHAPE_NODE_TYPE_NAMES.has(document.type)) return undefined;
         const data = record(document.data);
+        const stroke = readStroke(document, data.stroke);
         const shared = {
           material: resolveResource<Material>(document, "material", materials),
           ...positiveOptions(data, ["tolerance"]),
           ...finiteOptions(data, ["renderLayer", "renderOrder"]),
           ...readShadowFlags(data),
+          fill: readFill(
+            data.fill,
+            STROKE_ONLY_NODE_TYPES.has(document.type) ? "none" : "inherit",
+          ),
+          stroke,
         };
+        const strokeOnly = { ...shared, stroke: stroke as ResolvedStrokeStyle };
         switch (document.type) {
           case CIRCLE_NODE_TYPE:
             return new Circle({
@@ -1983,6 +2266,34 @@ export function registerShapeSerializers(
               ),
             });
           }
+          case LINE_NODE_TYPE:
+            return new Line({
+              ...strokeOnly,
+              start: requireShapePoint(document, "start", data.start),
+              end: requireShapePoint(document, "end", data.end),
+            });
+          case POLYLINE_NODE_TYPE:
+            return new Polyline({
+              ...strokeOnly,
+              points: requireChainPoints(document, data.points),
+            });
+          case ARC_NODE_TYPE:
+            return new Arc({
+              ...strokeOnly,
+              ...positiveOptions(data, ["radius"]),
+              startAngle: requireShapeNumber(
+                document,
+                "startAngle",
+                data.startAngle,
+                anyFinite,
+              ),
+              endAngle: requireShapeNumber(
+                document,
+                "endAngle",
+                data.endAngle,
+                anyFinite,
+              ),
+            });
           default:
             return new PathShape({
               ...shared,

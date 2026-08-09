@@ -18,16 +18,20 @@ import { Path } from "@four/geometry";
 import { describe, expect, it } from "vitest";
 
 import {
+  Arc,
   Circle,
   Ellipse,
+  Line,
   PathShape,
   Polygon,
+  Polyline,
   Rectangle,
   RegularPolygon,
   Ring,
   Sector,
   Shape2D,
   Star,
+  type SolidPaint,
 } from "../src/shape.js";
 import { Renderable } from "../src/renderable.js";
 
@@ -664,5 +668,459 @@ describe("§50 path and Bézier path — PathShape", () => {
   it("fills nothing for an empty path", () => {
     const empty = new PathShape({ path: new Path(), material: material() });
     expect(empty.geometry.vertexCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §58 paints, fills and strokes (R-16, 2026-08-09)
+// ---------------------------------------------------------------------------
+
+/** A material that multiplies the geometry's per-vertex colours (§57, R-19). */
+const painted = (): UnlitMaterial => new UnlitMaterial({ vertexColors: true });
+
+// Exactly representable in `Float32Array`, so the assertions can be exact.
+const BLUE: SolidPaint = { kind: "solid", color: [0.25, 0.5, 1, 1] };
+const WHITE: SolidPaint = { kind: "solid", color: [1, 1, 1, 1] };
+
+/** Every vertex colour of a shape, as `[r, g, b, a]` tuples. */
+function vertexColors(shape: Shape2D): number[][] {
+  const colors = shape.geometry.colors;
+  if (colors === undefined) return [];
+  const out: number[][] = [];
+  for (let i = 0; i < colors.length; i += 4) {
+    out.push([colors[i], colors[i + 1], colors[i + 2], colors[i + 3]]);
+  }
+  return out;
+}
+
+/** The distinct vertex colours a shape carries, in first-seen order. */
+function distinctColors(shape: Shape2D): number[][] {
+  const seen: number[][] = [];
+  for (const color of vertexColors(shape)) {
+    if (!seen.some((entry) => entry.every((v, i) => v === color[i]))) {
+      seen.push(color);
+    }
+  }
+  return seen;
+}
+
+describe("§58 fill — the paint model at its solid tier", () => {
+  it("defaults to the material's own colour and carries no colour stream", () => {
+    const circle = new Circle({ radius: 1, material: material() });
+    expect(circle.fill).toBe("inherit");
+    expect(circle.stroke).toBeNull();
+    expect(circle.geometry.colors).toBeUndefined();
+  });
+
+  it("paints the fill through per-vertex colour when a paint is named", () => {
+    const circle = new Circle({ radius: 1, material: painted(), fill: BLUE });
+    expect(circle.fill).toEqual({ ...BLUE, opacity: 1 });
+    expect(distinctColors(circle)).toEqual([[0.25, 0.5, 1, 1]]);
+    expect(vertexColors(circle)).toHaveLength(
+      circle.geometry.positions.length / 3,
+    );
+  });
+
+  it("folds §50's separate opacity into the drawn alpha", () => {
+    const circle = new Circle({
+      radius: 1,
+      material: painted(),
+      fill: { kind: "solid", color: [1, 0, 0, 0.5], opacity: 0.5 },
+    });
+    expect(distinctColors(circle)).toEqual([[1, 0, 0, 0.25]]);
+  });
+
+  it("copies the paint, so editing the record you passed changes nothing", () => {
+    const authored = { kind: "solid", color: [1, 0, 0, 1] } as SolidPaint;
+    const circle = new Circle({
+      radius: 1,
+      material: painted(),
+      fill: authored,
+    });
+    (authored.color as number[])[0] = 0;
+    expect(distinctColors(circle)).toEqual([[1, 0, 0, 1]]);
+  });
+
+  it("draws nothing at all for `none`, and rebuilds when the fill changes", () => {
+    const circle = new Circle({
+      radius: 1,
+      material: material(),
+      fill: "none",
+    });
+    expect(circle.geometry.positions).toHaveLength(0);
+    expect(filledArea(circle)).toBe(0);
+    circle.fill = "inherit";
+    expectAreaJustUnder(circle, Math.PI, 0.05);
+    expect(circle.geometry.colors).toBeUndefined();
+  });
+
+  it("refuses a paint kind this build cannot draw, and a nonsense opacity", () => {
+    expect(
+      () =>
+        new Circle({
+          material: painted(),
+          fill: { kind: "linear-gradient" } as unknown as SolidPaint,
+        }),
+    ).toThrow(/§58/);
+    expect(
+      () =>
+        new Circle({
+          material: painted(),
+          fill: { kind: "solid", color: [1, 0, 0, Number.NaN] },
+        }),
+    ).toThrow(RangeError);
+    expect(
+      () =>
+        new Circle({
+          material: painted(),
+          fill: { kind: "solid", color: [1, 0, 0, 1], opacity: 2 },
+        }),
+    ).toThrow(/opacity/);
+  });
+
+  it("refuses a paint on a material that cannot multiply vertex colours", () => {
+    expect(() => new Circle({ material: material(), fill: BLUE })).toThrow(
+      /vertexColors/,
+    );
+    const circle = new Circle({ material: material() });
+    expect(() => {
+      circle.fill = BLUE;
+    }).toThrow(/vertexColors/);
+    // …and accepts the two words, which need no colour stream at all.
+    circle.fill = "none";
+    expect(circle.fill).toBe("none");
+  });
+});
+
+describe("§58 stroke — the band beside the fill", () => {
+  it("adds the band's triangles after the fill's, in one geometry", () => {
+    const filled = new Rectangle({ width: 4, height: 2, material: material() });
+    const stroked = new Rectangle({
+      width: 4,
+      height: 2,
+      material: material(),
+      stroke: { width: 0.5 },
+    });
+    // 12 of perimeter × 0.5 wide, plus four miter corners of (0.5/2)².
+    expect(filledArea(stroked) - filledArea(filled)).toBeCloseTo(
+      12 * 0.5 + 4 * 0.25 * 0.25,
+      9,
+    );
+    expect(stroked.geometry.colors).toBeUndefined();
+  });
+
+  it("resolves every optional field and hands back a copy", () => {
+    const shape = new Rectangle({
+      material: material(),
+      stroke: { width: 0.2 },
+    });
+    expect(shape.stroke).toEqual({
+      width: 0.2,
+      alignment: "center",
+      lineCap: "butt",
+      lineJoin: "miter",
+      miterLimit: 4,
+      dashOffset: 0,
+    });
+    const authored = { width: 0.2, dash: [1, 1] };
+    shape.stroke = authored;
+    authored.dash[0] = 5;
+    expect(shape.stroke?.dash).toEqual([1, 1]);
+  });
+
+  it("paints the fill and the stroke in two colours through one draw", () => {
+    const shape = new Rectangle({
+      width: 4,
+      height: 2,
+      material: painted(),
+      fill: BLUE,
+      stroke: { width: 0.2, paint: WHITE },
+    });
+    expect(distinctColors(shape)).toEqual([
+      [0.25, 0.5, 1, 1],
+      [1, 1, 1, 1],
+    ]);
+    expect(vertexColors(shape)).toHaveLength(
+      shape.geometry.positions.length / 3,
+    );
+  });
+
+  it("gives the unpainted half the identity, so the material's colour reaches it", () => {
+    const shape = new Rectangle({
+      width: 4,
+      height: 2,
+      material: painted(),
+      stroke: { width: 0.2, paint: WHITE },
+    });
+    expect(distinctColors(shape)).toEqual([[1, 1, 1, 1]]);
+    const outlined = new Rectangle({
+      width: 4,
+      height: 2,
+      material: painted(),
+      fill: BLUE,
+      stroke: { width: 0.2 },
+    });
+    expect(distinctColors(outlined)).toEqual([
+      [0.25, 0.5, 1, 1],
+      [1, 1, 1, 1],
+    ]);
+  });
+
+  it("strokes at the shape's own tolerance, so fill and stroke agree", () => {
+    const coarse = new Circle({
+      radius: 1,
+      material: material(),
+      tolerance: 0.2,
+      stroke: { width: 0.1, lineJoin: "round" },
+    });
+    const fine = new Circle({
+      radius: 1,
+      material: material(),
+      tolerance: 0.001,
+      stroke: { width: 0.1, lineJoin: "round" },
+    });
+    expect(fine.geometry.positions.length).toBeGreaterThan(
+      coarse.geometry.positions.length * 3,
+    );
+    coarse.tolerance = 0.001;
+    expect(coarse.geometry.positions.length).toBe(
+      fine.geometry.positions.length,
+    );
+  });
+
+  it("refuses a stroke it cannot expand, at the write that named it", () => {
+    const shape = new Rectangle({ material: material() });
+    expect(() => {
+      shape.stroke = { width: 0 };
+    }).toThrow(/width/);
+    expect(() => {
+      shape.stroke = { width: 1, miterLimit: 0 };
+    }).toThrow(/miterLimit/);
+    expect(() => {
+      shape.stroke = { width: 1, dashOffset: Number.NaN };
+    }).toThrow(/dashOffset/);
+    expect(() => {
+      shape.stroke = { width: 1, dash: [1, -1] };
+    }).toThrow(/dash\[1\]/);
+    expect(() => {
+      shape.stroke = { width: 1, dash: [1, Number.NaN] };
+    }).toThrow(/dash\[1\]/);
+    expect(() => {
+      shape.stroke = { width: 1, dash: [0, 0] };
+    }).toThrow(/not all be zero/);
+    expect(shape.stroke).toBeNull();
+  });
+
+  it("refuses a stroke paint on a material that cannot multiply vertex colours", () => {
+    const shape = new Rectangle({ material: material() });
+    expect(() => {
+      shape.stroke = { width: 1, paint: WHITE };
+    }).toThrow(/vertexColors/);
+    shape.stroke = { width: 1 };
+    expect(shape.stroke?.width).toBe(1);
+    shape.stroke = null;
+    expect(shape.stroke).toBeNull();
+  });
+
+  it("drops both streams when a rebuild empties the shape", () => {
+    const shape = new Rectangle({
+      width: 2,
+      height: 2,
+      material: painted(),
+      fill: BLUE,
+      stroke: { width: 0.1, paint: WHITE },
+    });
+    expect(shape.geometry.colors).toBeDefined();
+    shape.fill = "none";
+    shape.stroke = null;
+    expect(shape.geometry.positions).toHaveLength(0);
+    expect(shape.geometry.colors).toBeUndefined();
+    expect(shape.geometry.indices).toBeUndefined();
+  });
+});
+
+describe("§50 line, polyline, arc — the three stroke-only primitives", () => {
+  it("draws a line as its band, with no fill", () => {
+    const line = new Line({
+      start: { x: 0, y: 0 },
+      end: { x: 4, y: 0 },
+      stroke: { width: 0.5 },
+      material: material(),
+    });
+    expect(line.fill).toBe("none");
+    expect(filledArea(line)).toBeCloseTo(2, 9);
+    expect(line.start).toEqual({ x: 0, y: 0 });
+    expect(line.end).toEqual({ x: 4, y: 0 });
+    line.end = { x: 8, y: 0 };
+    expect(filledArea(line)).toBeCloseTo(4, 9);
+    line.start = { x: 4, y: 0 };
+    expect(filledArea(line)).toBeCloseTo(2, 9);
+  });
+
+  it("draws a zero-length line as nothing, rather than refusing it", () => {
+    const line = new Line({
+      start: { x: 1, y: 1 },
+      end: { x: 1, y: 1 },
+      stroke: { width: 0.5, lineCap: "round" },
+      material: material(),
+    });
+    expect(line.geometry.positions).toHaveLength(0);
+  });
+
+  it("refuses a line endpoint that is not finite (§85)", () => {
+    expect(
+      () =>
+        new Line({
+          start: { x: Number.NaN, y: 0 },
+          end: { x: 1, y: 0 },
+          stroke: { width: 1 },
+          material: material(),
+        }),
+    ).toThrow(/Line start/);
+    const line = new Line({
+      start: { x: 0, y: 0 },
+      end: { x: 1, y: 0 },
+      stroke: { width: 1 },
+      material: material(),
+    });
+    expect(() => {
+      line.end = { x: 0, y: Number.POSITIVE_INFINITY };
+    }).toThrow(/Line end/);
+  });
+
+  it("draws a polyline open — its two ends capped, its corner joined", () => {
+    const polyline = new Polyline({
+      points: [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+      ],
+      stroke: { width: 1 },
+      material: material(),
+    });
+    // 8 of length × 1 wide + one miter corner of 0.5², with no closing segment.
+    expect(filledArea(polyline)).toBeCloseTo(8 + 0.25, 9);
+    expect(polyline.points).toHaveLength(3);
+    polyline.points = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+    ];
+    expect(filledArea(polyline)).toBeCloseTo(2, 9);
+  });
+
+  it("fills a polyline as if closed, when asked — SVG's rule", () => {
+    const polyline = new Polyline({
+      points: [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+      ],
+      stroke: { width: 0.001 },
+      fill: "inherit",
+      material: material(),
+    });
+    expect(filledArea(polyline)).toBeGreaterThan(8);
+  });
+
+  it("refuses a polyline of fewer than two points (§85)", () => {
+    expect(
+      () =>
+        new Polyline({
+          points: [{ x: 0, y: 0 }],
+          stroke: { width: 1 },
+          material: material(),
+        }),
+    ).toThrow(/at least 2/);
+    const polyline = new Polyline({
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ],
+      stroke: { width: 1 },
+      material: material(),
+    });
+    expect(() => {
+      polyline.points = [];
+    }).toThrow(/at least 2/);
+  });
+
+  it("draws an arc as an open curve, not a region", () => {
+    const arc = new Arc({
+      radius: 2,
+      startAngle: 0,
+      endAngle: Math.PI,
+      stroke: { width: 0.2 },
+      material: material(),
+      tolerance: 1e-5,
+    });
+    expect(arc.radius).toBe(2);
+    expect(arc.startAngle).toBe(0);
+    expect(arc.endAngle).toBe(Math.PI);
+    // A half annulus: π(2.1² − 1.9²) / 2 = 0.4π, not the half disc a Sector
+    // of the same numbers would draw.
+    expect(filledArea(arc)).toBeGreaterThan(0.4 * Math.PI);
+    expect(filledArea(arc)).toBeLessThan(0.4 * Math.PI + 0.05);
+  });
+
+  it("rebuilds an arc on every parameter, and refuses what §85 refuses", () => {
+    const arc = new Arc({
+      startAngle: 0,
+      endAngle: Math.PI,
+      stroke: { width: 0.1 },
+      material: material(),
+    });
+    const before = filledArea(arc);
+    arc.radius = 3;
+    expect(filledArea(arc)).toBeGreaterThan(before);
+    arc.startAngle = 0.5;
+    arc.endAngle = 1;
+    expect(filledArea(arc)).toBeLessThan(before);
+    expect(() => {
+      arc.radius = 0;
+    }).toThrow(/Arc radius/);
+    expect(() => {
+      arc.startAngle = Number.NaN;
+    }).toThrow(/Arc startAngle/);
+    expect(() => {
+      arc.endAngle = Number.POSITIVE_INFINITY;
+    }).toThrow(/Arc endAngle/);
+  });
+
+  it("draws a zero-sweep arc as nothing", () => {
+    const arc = new Arc({
+      startAngle: 1,
+      endAngle: 1,
+      stroke: { width: 0.1 },
+      material: material(),
+    });
+    expect(arc.geometry.positions).toHaveLength(0);
+  });
+
+  it("answers toPath() with the open curve, for §51 and §79", () => {
+    const line = new Line({
+      start: { x: 0, y: 0 },
+      end: { x: 3, y: 4 },
+      stroke: { width: 1 },
+      material: material(),
+    });
+    expect(line.toPath().length()).toBeCloseTo(5, 9);
+    const polyline = new Polyline({
+      points: [
+        { x: 0, y: 0 },
+        { x: 3, y: 0 },
+        { x: 3, y: 4 },
+      ],
+      stroke: { width: 1 },
+      material: material(),
+    });
+    expect(polyline.toPath().length()).toBeCloseTo(7, 9);
+    const arc = new Arc({
+      radius: 2,
+      startAngle: 0,
+      endAngle: Math.PI,
+      stroke: { width: 1 },
+      material: material(),
+    });
+    expect(arc.toPath().length()).toBeCloseTo(2 * Math.PI, 1);
   });
 });

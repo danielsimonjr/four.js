@@ -16,10 +16,13 @@
 import { UnlitMaterial } from "@four/materials";
 import { Path } from "@four/geometry";
 import {
+  Arc,
   Circle,
   Ellipse,
+  Line,
   PathShape,
   Polygon,
+  Polyline,
   Rectangle,
   RegularPolygon,
   Ring,
@@ -35,13 +38,16 @@ import {
   serializeScene,
   type SceneNodeDocument,
 } from "@four/serialization";
-import { isFourError } from "@four/core";
+import { isFourError, type JsonValue } from "@four/core";
 import { describe, expect, it } from "vitest";
 
 import * as render from "../src/render.js";
 import {
+  ARC_NODE_TYPE,
   CIRCLE_NODE_TYPE,
   ELLIPSE_NODE_TYPE,
+  LINE_NODE_TYPE,
+  POLYLINE_NODE_TYPE,
   PATH_SHAPE_NODE_TYPE,
   POLYGON_NODE_TYPE,
   RECTANGLE_NODE_TYPE,
@@ -101,6 +107,28 @@ function everyShape(): Shape2D[] {
         .close(),
       material: ink,
     }),
+    new Line({
+      start: { x: -1, y: -2 },
+      end: { x: 3, y: 0.5 },
+      stroke: { width: 0.25, lineCap: "round" },
+      material: ink,
+    }),
+    new Polyline({
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 2 },
+        { x: 3, y: 1 },
+      ],
+      stroke: { width: 0.2, lineJoin: "bevel", dash: [0.5, 0.25] },
+      material: ink,
+    }),
+    new Arc({
+      radius: 2,
+      startAngle: 0.25,
+      endAngle: 2.5,
+      stroke: { width: 0.1, alignment: "outside" },
+      material: ink,
+    }),
   ];
 }
 
@@ -134,10 +162,13 @@ describe("registerShapeSerializers — every §50 shape is registered", () => {
       shapes.push(name);
     }
     expect(shapes.sort()).toEqual([
+      "Arc",
       "Circle",
       "Ellipse",
+      "Line",
       "PathShape",
       "Polygon",
+      "Polyline",
       "Rectangle",
       "RegularPolygon",
       "Ring",
@@ -223,7 +254,7 @@ describe("registerShapeSerializers — a document says what the shape is", () =>
       serializeScene(reloaded, io.components, io.write),
     );
     expect(second).toBe(first);
-    expect(reloaded.children).toHaveLength(9);
+    expect(reloaded.children).toHaveLength(12);
     // No `geometries` catalog was supplied and nothing was skipped: a shape
     // needs none, because its fill is a function of the payload above (§83).
   });
@@ -526,5 +557,344 @@ describe("registerShapeSerializers — reading a document that lies", () => {
     expect(() =>
       bare.write.nodeDataOf(new Circle({ material: ink })),
     ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §58's fill and stroke (R-16, 2026-08-09)
+// ---------------------------------------------------------------------------
+
+const paintedInk = new UnlitMaterial({ vertexColors: true });
+const paintedMaterials = resourceCatalog([
+  ["material/ink", ink],
+  ["material/painted", paintedInk],
+]);
+const paintedSupport = (): ReturnType<typeof registerShapeSerializers> =>
+  registerShapeSerializers({ materials: paintedMaterials });
+
+describe("registerShapeSerializers — §58 is additive in both directions", () => {
+  it("writes no fill or stroke key for a shape that names neither", () => {
+    const io = support();
+    const payload = io.write.nodeDataOf(
+      new Circle({ material: ink }),
+    ) as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("fill");
+    expect(payload).not.toHaveProperty("stroke");
+  });
+
+  it("restores a pre-R-16 document as a fill-only shape", () => {
+    const io = support();
+    const circle = io.read.nodeFactory({
+      type: CIRCLE_NODE_TYPE,
+      data: { material: "material/ink", radius: 3 },
+    }) as Circle;
+    expect(circle.fill).toBe("inherit");
+    expect(circle.stroke).toBeNull();
+    expect(circle.radius).toBe(3);
+  });
+
+  it("round-trips a paint, its opacity, and a whole stroke style", () => {
+    const io = paintedSupport();
+    const shape = new Rectangle({
+      width: 4,
+      height: 2,
+      material: paintedInk,
+      fill: { kind: "solid", color: [0.25, 0.5, 1, 0.75], opacity: 0.5 },
+      stroke: {
+        width: 0.2,
+        paint: { kind: "solid", color: [1, 1, 1, 1] },
+        alignment: "outside",
+        lineCap: "round",
+        lineJoin: "bevel",
+        miterLimit: 8,
+        dash: [1, 0.5],
+        dashOffset: 0.25,
+      },
+    });
+    const data = io.write.nodeDataOf(shape);
+    const reloaded = io.read.nodeFactory({
+      type: RECTANGLE_NODE_TYPE,
+      data,
+    }) as Rectangle;
+    expect(reloaded.fill).toEqual({
+      kind: "solid",
+      color: [0.25, 0.5, 1, 0.75],
+      opacity: 0.5,
+    });
+    expect(reloaded.stroke).toEqual(shape.stroke);
+    expect(io.write.nodeDataOf(reloaded)).toEqual(data);
+  });
+
+  it("writes a stroke with no paint and no dash without inventing either", () => {
+    const io = support();
+    const shape = new Circle({ material: ink, stroke: { width: 0.5 } });
+    const data = io.write.nodeDataOf(shape);
+    const stroke = (data as { readonly [key: string]: JsonValue }).stroke;
+    expect(stroke).not.toHaveProperty("paint");
+    expect(stroke).not.toHaveProperty("dash");
+    const reloaded = io.read.nodeFactory({
+      type: CIRCLE_NODE_TYPE,
+      data,
+    }) as Circle;
+    expect(reloaded.stroke?.paint).toBeUndefined();
+    expect(reloaded.stroke?.dash).toBeUndefined();
+  });
+
+  it("writes `none` for an outlined shape and reads it back", () => {
+    const io = support();
+    const shape = new Rectangle({
+      material: ink,
+      fill: "none",
+      stroke: { width: 0.1 },
+    });
+    const data = io.write.nodeDataOf(shape);
+    expect((data as { readonly [key: string]: JsonValue }).fill).toBe("none");
+    const reloaded = io.read.nodeFactory({
+      type: RECTANGLE_NODE_TYPE,
+      data,
+    }) as Rectangle;
+    expect(reloaded.fill).toBe("none");
+  });
+});
+
+describe("registerShapeSerializers — the three stroke-only shapes", () => {
+  it("round-trips a line, a polyline and an arc through text", () => {
+    const io = registerSceneNodeTypes({ materials });
+    const root = new Group();
+    root.add(
+      new Line({
+        start: { x: -1, y: -2 },
+        end: { x: 3, y: 0.5 },
+        stroke: { width: 0.25, lineCap: "square" },
+        material: ink,
+      }),
+    );
+    root.add(
+      new Polyline({
+        points: [
+          { x: 0, y: 0 },
+          { x: 1, y: 2 },
+          { x: 3, y: 1 },
+        ],
+        stroke: { width: 0.2, dash: [0.5, 0.25], dashOffset: 0.1 },
+        material: ink,
+      }),
+    );
+    root.add(
+      new Arc({
+        radius: 2,
+        startAngle: 0.25,
+        endAngle: 2.5,
+        stroke: { width: 0.1, alignment: "inside" },
+        material: ink,
+      }),
+    );
+    const first = encodeSceneDocument(
+      serializeScene(root, io.components, io.write),
+    );
+    const reloaded = instantiateScene(
+      decodeSceneDocument(first),
+      io.components,
+      io.read,
+    );
+    expect(
+      encodeSceneDocument(serializeScene(reloaded, io.components, io.write)),
+    ).toBe(first);
+    const [line, polyline, arc] = reloaded.children as [Line, Polyline, Arc];
+    expect(line.start).toEqual({ x: -1, y: -2 });
+    expect(line.end).toEqual({ x: 3, y: 0.5 });
+    expect(polyline.points).toHaveLength(3);
+    expect(arc.startAngle).toBe(0.25);
+    expect(arc.endAngle).toBe(2.5);
+    // Their fill is `"none"` by default, so no document writes the word.
+    expect(line.fill).toBe("none");
+  });
+
+  it("refuses a stroke-only document that carries no usable stroke", () => {
+    const io = support();
+    for (const type of [LINE_NODE_TYPE, POLYLINE_NODE_TYPE, ARC_NODE_TYPE]) {
+      expect(() =>
+        io.read.nodeFactory({
+          type,
+          data: { material: "material/ink" },
+        }),
+      ).toThrow(/only a stroke/);
+    }
+    expect(() =>
+      io.read.nodeFactory({
+        type: LINE_NODE_TYPE,
+        data: {
+          material: "material/ink",
+          stroke: { width: 0 },
+          start: [0, 0],
+          end: [1, 1],
+        },
+      }),
+    ).toThrow(/stroke\.width/);
+  });
+
+  it("refuses a line or polyline whose points the document does not carry", () => {
+    const io = support();
+    const stroke = { width: 1 };
+    expect(() =>
+      io.read.nodeFactory({
+        type: LINE_NODE_TYPE,
+        data: { material: "material/ink", stroke, end: [1, 1] },
+      }),
+    ).toThrow(/start/);
+    expect(() =>
+      io.read.nodeFactory({
+        type: LINE_NODE_TYPE,
+        data: {
+          material: "material/ink",
+          stroke,
+          start: [0, 0],
+          end: ["x", 1],
+        },
+      }),
+    ).toThrow(/end/);
+    expect(() =>
+      io.read.nodeFactory({
+        type: POLYLINE_NODE_TYPE,
+        data: { material: "material/ink", stroke, points: [[0, 0]] },
+      }),
+    ).toThrow(/point chain/);
+    expect(() =>
+      io.read.nodeFactory({
+        type: POLYLINE_NODE_TYPE,
+        data: {
+          material: "material/ink",
+          stroke,
+          points: [
+            [0, 0],
+            [1, "x"],
+            [2, 2],
+          ],
+        },
+      }),
+    ).toThrow(/point chain/);
+    expect(() =>
+      io.read.nodeFactory({
+        type: ARC_NODE_TYPE,
+        data: { material: "material/ink", stroke, endAngle: 1 },
+      }),
+    ).toThrow(/startAngle/);
+    expect(() =>
+      io.read.nodeFactory({
+        type: ARC_NODE_TYPE,
+        data: { material: "material/ink", stroke, startAngle: 0 },
+      }),
+    ).toThrow(/endAngle/);
+  });
+});
+
+describe("registerShapeSerializers — a §58 document that lies", () => {
+  const read = (data: Record<string, unknown>): Circle =>
+    paintedSupport().read.nodeFactory({
+      type: CIRCLE_NODE_TYPE,
+      data: { material: "material/painted", ...data },
+    }) as Circle;
+
+  it("refuses a document whose paint its material cannot draw", () => {
+    // The `assertSpriteMaterial` precedent: a node whose material key resolves
+    // to one it cannot draw through is refused by name rather than loaded in a
+    // state where half its document is inert.
+    expect(() =>
+      support().read.nodeFactory({
+        type: CIRCLE_NODE_TYPE,
+        data: {
+          material: "material/ink",
+          fill: { kind: "solid", color: [1, 0, 0, 1], opacity: 1 },
+        },
+      }),
+    ).toThrow(/vertexColors/);
+  });
+
+  it("drops a paint of a kind this build cannot draw, rather than the node", () => {
+    // §58 lists seven paints and one ships. A gradient written by a later
+    // build leaves a shape in its material's colour — visible and
+    // recoverable — where refusing the node would lose the artwork.
+    expect(read({ fill: { kind: "linear-gradient", stops: [] } }).fill).toBe(
+      "inherit",
+    );
+    expect(read({ fill: [1, 0, 0, 1] }).fill).toBe("inherit");
+    expect(read({ fill: "chartreuse" }).fill).toBe("inherit");
+    expect(read({ fill: { kind: "solid" } }).fill).toBe("inherit");
+    expect(read({ fill: { kind: "solid", color: [1, 0, 0] } }).fill).toBe(
+      "inherit",
+    );
+    expect(read({ fill: { kind: "solid", color: [1, 0, "x", 1] } }).fill).toBe(
+      "inherit",
+    );
+  });
+
+  it("restores a paint's opacity default when the document's is unusable", () => {
+    const shape = read({
+      fill: { kind: "solid", color: [1, 0, 0, 1], opacity: 5 },
+    });
+    expect(shape.fill).toEqual({
+      kind: "solid",
+      color: [1, 0, 0, 1],
+      opacity: 1,
+    });
+  });
+
+  it("restores each stroke field's default when the document's is unusable", () => {
+    const shape = read({
+      stroke: {
+        width: 2,
+        alignment: "sideways",
+        lineCap: 7,
+        lineJoin: null,
+        miterLimit: 0.5,
+        dashOffset: "x",
+        dash: [1, -1],
+        paint: { kind: "pattern" },
+      },
+    });
+    expect(shape.stroke).toEqual({
+      width: 2,
+      alignment: "center",
+      lineCap: "butt",
+      lineJoin: "miter",
+      miterLimit: 4,
+      dashOffset: 0,
+    });
+  });
+
+  it("drops a dash pattern that is empty, unusable or all zero", () => {
+    for (const dash of [[], [1, "x"], [0, 0], "solid", [1, -2]]) {
+      expect(read({ stroke: { width: 1, dash } }).stroke?.dash).toBeUndefined();
+    }
+    expect(read({ stroke: { width: 1, dash: [2, 1] } }).stroke?.dash).toEqual([
+      2, 1,
+    ]);
+  });
+
+  it("reads no stroke at all from a filled shape whose stroke is not a record", () => {
+    expect(read({ stroke: "thick" }).stroke).toBeNull();
+    expect(read({ stroke: [1, 2] }).stroke).toBeNull();
+    expect(read({ stroke: null }).stroke).toBeNull();
+  });
+
+  it("keeps every §58 field alive through a corrupted-but-legal document", () => {
+    const shape = read({
+      stroke: {
+        width: 3,
+        alignment: "inside",
+        lineCap: "round",
+        lineJoin: "round",
+        miterLimit: 2,
+        dashOffset: 1.5,
+      },
+    });
+    expect(shape.stroke).toEqual({
+      width: 3,
+      alignment: "inside",
+      lineCap: "round",
+      lineJoin: "round",
+      miterLimit: 2,
+      dashOffset: 1.5,
+    });
   });
 });

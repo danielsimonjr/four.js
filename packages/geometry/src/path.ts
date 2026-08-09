@@ -173,7 +173,7 @@
 import type { Matrix3 } from "@four/math";
 
 import { requirePositive } from "./primitive-support.js";
-import type { Point2D } from "./tessellation.js";
+import type { Point2D, Polyline2D } from "./tessellation.js";
 
 /** A full turn in radians — the period every arc sweep is normalized into. */
 const TAU = Math.PI * 2;
@@ -707,6 +707,43 @@ export class Path {
     return flattenSubpaths(this.#commands, tolerance).map(
       (subpath) => subpath.points,
     );
+  }
+
+  /**
+   * {@link Path.flatten}, keeping the one bit a `Point2D[]` cannot carry:
+   * whether each subpath closes back on its first point (§52 stroke
+   * expansion).
+   *
+   * ```ts
+   * const [outline] = new Path()
+   *   .moveTo(0, 0).lineTo(2, 0).lineTo(2, 2).close()
+   *   .polylines();
+   * outline.closed;         // true — the closing edge is implicit
+   * outline.points.length;  // 3 — the first point is not repeated
+   * ```
+   *
+   * The arrays and points are the same fresh, caller-owned ones
+   * {@link Path.flatten} hands back, under exactly the same rules; this is not
+   * a different flattening, it is the same one reported with its `closed`
+   * flag intact.
+   *
+   * It exists because a **stroke** is the one consumer for which the flag is
+   * load-bearing: a closed ring is joined at every vertex and capped at none,
+   * an open one is capped at both ends, and the difference is not recoverable
+   * from the points (a polyline that happens to end where it began is not a
+   * ring — `Path.flatten`'s own note about the ulp trap is the reason a
+   * coordinate comparison cannot be made to answer it). `fillRings` needs the
+   * opposite — an open subpath fills as if closed — which is why the fill path
+   * does not take this route.
+   *
+   * @param tolerance Flattening tolerance, as {@link Path.flatten}.
+   */
+  polylines(tolerance = DEFAULT_FLATTEN_TOLERANCE): Polyline2D[] {
+    requirePositive("tolerance", tolerance);
+    return flattenSubpaths(this.#commands, tolerance).map((subpath) => ({
+      points: subpath.points,
+      closed: subpath.closed,
+    }));
   }
 
   /**

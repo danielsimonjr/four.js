@@ -34,12 +34,20 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
-- [ ] **R-16 — §58 paints, fills and strokes** _(after R-23, now the 2D vector stack's
-      single blocker)_. It owns, by name and in dated source notes: the `Paint` union,
-      `StrokeStyle`, `ShapeMaterial`, §50's `fill:`/`stroke:` constructor options,
-      fill/stroke opacity, stroke alignment, dashes, joins and caps, and the three
-      missing §50 primitives (`Line`, `Polyline`, the open `Arc`). Its geometry half is
-      §52's stroke expansion and AA fringe, in `@four/geometry`.
+- [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
+      `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
+      fallback, dashes with phase offset) over `expandStroke` in §52's tessellation
+      module; `Line`/`Polyline`/`Arc` complete all fourteen §50 rows (twelve classes);
+      fill+stroke travel as per-vertex colour — no `RenderItemKind`, no pipeline, no
+      frame-path edit. **Group 5 (the 2D vector stack) is closed.**
+- [ ] **The shape paint pipeline** _(R-16 residue, blocked on RFC 0001/0003 deciding
+      `pipelineId` — first to land owns it)_: §58's six non-solid paints (linear /
+      radial / conic gradients, patterns, procedural, render-target) — per-vertex colour
+      is exact only for solids and two-stop linear gradients, so the exact tier is a
+      compiled pipeline at the measured ~1.9 kB-per-`WebglRenderer`-bundle price; §52's
+      anti-alias fringe (needs a per-vertex coverage attribute no §57 pipeline reads).
+      This is also what would finally give `ShapeMaterial` content (re-examined and
+      deliberately unshipped twice — R-23, R-16).
 - [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
       R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
       geometry operations (§51's four, the shared planar-subdivision packet), world
