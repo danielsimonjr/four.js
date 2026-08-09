@@ -132,7 +132,11 @@
  * one owner.
  */
 
-import { FourError } from "@four/core";
+import {
+  DEFAULT_SPACE_MODE,
+  FourError,
+  isSimulationSpaceMode,
+} from "@four/core";
 import { Quaternion, Vector2, Vector3 } from "@four/math";
 import {
   PRIORITY_ANIMATION_TARGETS,
@@ -289,6 +293,20 @@ const SUSPICIOUS_MASS_RATIO = 1000;
  * read from.
  */
 export type PhysicsWorldAdapter = PhysicsSolverAdapter & SolverBodyAccess;
+
+/**
+ * What {@link PhysicsWorld.forEachActiveBody} hands its caller for one body:
+ * the component, the node it is attached to, and the body's world-space centre
+ * of mass (§25).
+ *
+ * `centerOfMass` is a **shared** vector the world overwrites on every visit —
+ * read it or copy it inside the callback, never retain it (§7b).
+ */
+export type ActiveBodyVisitor = (
+  body: RigidBody,
+  node: Node,
+  centerOfMass: Vector3,
+) => void;
 
 /**
  * How a {@link PhysicsWorld} is constructed: §20's world options plus the
@@ -791,6 +809,12 @@ export class PhysicsWorld {
 
   #disposed = false;
 
+  /**
+   * The one vector {@link PhysicsWorld.forEachActiveBody} hands its visitor, so
+   * the walk allocates nothing (§7b, D7). Overwritten on every visit.
+   */
+  readonly #visitCenterOfMass = new Vector3();
+
   /** Checksum scratch, so a per-step checksum allocates nothing (§7b, D7). */
   readonly #checksumPosition = new Vector3();
 
@@ -1083,9 +1107,18 @@ export class PhysicsWorld {
    * (plan P7-3), and it is what §19's control-mode transitions go through.
    *
    * @returns the registered `RigidBody` component
+   * ## The frame the body is registered in (§8, PH-12)
+   *
+   * `"world"` — the frame every body is solved in unless its `RigidBody`
+   * declares otherwise through `RigidBody.space`. Any other §8 mode is
+   * **refused**, with a message that distinguishes §8's own prohibition on
+   * simulating screen-space content from `"local-plane"`'s unbuilt §21 mapping.
+   * See `#requireSimulationSpace`.
+   *
    * @throws FourError if the world is not initialized, if `node` has no
-   * `RigidBody`, if it is already registered, if a scanned collider has no body
-   * (§23), or if the body or a collider is invalid for this dimension (§21, §85)
+   * `RigidBody`, if it is already registered, if the body declares a §8 space
+   * mode this world cannot simulate, if a scanned collider has no body (§23),
+   * or if the body or a collider is invalid for this dimension (§21, §85)
    */
   addBody(node: Node): RigidBody {
     this.#requireReady();
@@ -1105,6 +1138,8 @@ export class PhysicsWorld {
         { context: { node: node.id } },
       );
     }
+
+    this.#requireSimulationSpace(node, body);
 
     // Validate everything before the adapter is touched, so a rejected
     // registration leaves no half-built body in the solver (§85).
@@ -1883,6 +1918,53 @@ export class PhysicsWorld {
   }
 
   /**
+   * Visits every registered body that is **dynamic and awake**, in registration
+   * order (§33), with its node and its world-space centre of mass (§25).
+   *
+   * ```ts
+   * world.forEachActiveBody((body, node, centerOfMass) => {
+   *   body.applyForce(wind.sample(centerOfMass, body.linearVelocity, t));
+   * });
+   * ```
+   *
+   * This is the iteration a §39 step-5 force generator walks —
+   * {@link ForceFieldSystem} is the one this package ships (§26, §27) — and it
+   * is public because "the bodies a per-step force can actually move" is a
+   * question every such generator asks and none of them should answer by
+   * re-deriving it:
+   *
+   * - **dynamic** (§22): a force on a static or kinematic body does nothing by
+   *   definition, so visiting one would be work whose result is discarded;
+   * - **awake** (§32): a non-zero force wakes a body — which is why `step`
+   *   skips zero-magnitude accumulations — so a generator that visited sleeping
+   *   bodies would wake every body every step and §32 would stop meaning
+   *   anything. Waking a settled body is `RigidBody.wake()`, an explicit
+   *   command, and deliberately not a side effect of ambient wind.
+   *
+   * The centre of mass, not the transform origin, because it is where §26's
+   * `applyForce` acts: for an off-centre or compound body (§24) the origin can
+   * be anywhere, including outside the shape, and a generator that sampled
+   * there would describe a different place from the one it pushes. It is read
+   * from the solver (`SolverBodyAccess.getBodyCenterOfMass`) after mass-property
+   * resolution, into **one shared vector that is overwritten on every visit** —
+   * copy it if you need it after the callback returns (§7b).
+   *
+   * Allocates nothing. The visitor may apply forces and impulses freely; adding
+   * or removing bodies during the walk is not supported — do it afterwards, as
+   * with any iteration over the registration order.
+   */
+  forEachActiveBody(visit: ActiveBodyVisitor): void {
+    const centerOfMass = this.#visitCenterOfMass;
+    for (const registration of this.#bodiesByNode.values()) {
+      if (registration.type !== "dynamic" || registration.body.sleeping) {
+        continue;
+      }
+      this.#adapter.getBodyCenterOfMass(registration.handle, centerOfMass);
+      visit(registration.body, registration.node, centerOfMass);
+    }
+  }
+
+  /**
    * Advances the simulation by exactly `deltaSeconds` (§10, §37, §39).
    *
    * Runs steps 1–6 of the pipeline in the module header and leaves the step's
@@ -2375,6 +2457,55 @@ export class PhysicsWorld {
   }
 
   // --- internals ------------------------------------------------------------
+
+  /**
+   * Enforces §8's one physics sentence at registration (PH-12, 2026-08-09).
+   *
+   * > Physics normally operates in world or local-plane space. Screen-space UI
+   * > should not automatically participate in physical simulation unless
+   * > explicitly mapped to a simulation plane.
+   *
+   * A body declares its frame with `RigidBody.space`, whose default is
+   * `"world"`, so **every scene written before this check passes it
+   * unchanged** — the check can only fire on a body that went out of its way to
+   * say it is solved somewhere else.
+   *
+   * ## Two refusals, for two different reasons
+   *
+   * - `"screen"`, `"viewport"`, `"camera"`, `"billboard"` are refused because
+   *   §8 says so. The sentence's escape hatch — "unless explicitly mapped to a
+   *   simulation plane" — is a mapping the author performs: build the body on a
+   *   node in the simulated frame and drive the presentation node from it. A
+   *   body silently simulated in pixels is precisely what §8 forbids.
+   * - `"local-plane"` is legal under §8 and is refused **here** because §21's
+   *   plane frame ("nodes simulating in local-plane space use the plane's own
+   *   2D frame, which the engine maps to the world XY frame of the `"2d"`
+   *   world") is not implemented. Accepting it would simulate the body in world
+   *   space while its author asked for a plane — accepted-and-ignored, which
+   *   this repository refuses on principle. The named seam is a plane
+   *   descriptor on the world plus a mapping in the publish pass; until it
+   *   exists, `"world"` is the only frame a body may be registered in.
+   *
+   * The two are told apart in the message, because the fixes are different: one
+   * is an authoring mistake, the other is an unbuilt feature. `@four/core`'s
+   * `isSimulationSpaceMode` is what separates them, and it answers §8's
+   * question rather than this world's — so a packet that implements §21's
+   * mapping edits this method and leaves the predicate alone.
+   */
+  #requireSimulationSpace(node: Node, body: RigidBody): void {
+    const mode = body.space;
+    if (mode === DEFAULT_SPACE_MODE) {
+      return;
+    }
+    const reason = isSimulationSpaceMode(mode)
+      ? `§8 permits it for physics, but §21's mapping from a local plane onto the "2d" world's XY frame is not implemented, so registering the body would silently simulate it in world space instead`
+      : `§8 states that screen-space content "should not automatically participate in physical simulation unless explicitly mapped to a simulation plane"`;
+    throw new FourError(
+      "INVALID_SCENE_GRAPH",
+      `The RigidBody on node ${node.id} declares space "${mode}", which this PhysicsWorld cannot simulate: ${reason}. Simulate a body whose space is "world" (the default) and drive the ${mode}-space node from it.`,
+      { context: { node: node.id, spaceMode: mode } },
+    );
+  }
 
   /**
    * Collects the colliders belonging to `body`: every `Collider` in the subtree

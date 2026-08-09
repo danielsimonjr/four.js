@@ -109,6 +109,17 @@ export type {
   TriggerEvent,
   TriggerPhase,
 } from "./events.js";
+// §26/§27 force generation for rigid bodies (PH-8, 2026-08-09) — §39's step-5
+// occupant. `ForceField` is §27's interface, structurally identical to
+// `@four/particles`' `ParticleForceField`, so a field written for either pillar
+// works in both with no dependency edge between them.
+export type {
+  ForceField,
+  ForceFieldEntry,
+  ForceFieldSystemOptions,
+  ForceFieldUnits,
+} from "./force-field.js";
+export { ForceFieldSystem } from "./force-field.js";
 export type {
   HingeJointOptions,
   JointBinding,
@@ -277,6 +288,7 @@ export {
   validateSphericalJointLimits,
 } from "./validation.js";
 export type {
+  ActiveBodyVisitor,
   BodyControlModeOptions,
   PhysicsSnapshot,
   PhysicsSnapshotConfiguration,

@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — PH-8 and PH-12 closed: §26/§27 force fields for bodies, §8 space modes
+
+#### Added
+
+- **§26/§27 force fields for rigid bodies (`PH-8`).** `@four/physics` gains `ForceField` — §27's
+  interface, transcribed — and `ForceFieldSystem`, the engine occupant of §39's step 5 ("force
+  generation") at `PRIORITY_FORCES`. It samples every registered field at every dynamic, awake
+  body once per fixed step and applies the sum through §26's `applyForce`. Units are declared per
+  field and the argument is **required**: `"force"` (newtons, as authored) or `"acceleration"`
+  (m/s², multiplied by the body's mass), because §27's own built-in list mixes the two.
+  `PhysicsWorld.forEachActiveBody(visit)` is the §22/§32-filtered, registration-ordered (§33)
+  iteration it walks, handing over each body's solver-read world-space centre of mass (§25).
+  `ParticleForceField` from `@four/particles` is structurally identical, so every built-in field
+  there works here with no adapter, no cast and **no new §3.1 dependency edge**;
+  `tests/integration/physics-force-fields.test.ts` is where the two declarations are type-checked
+  against each other. `world.step` was not edited — fields reach the solver through the same §26
+  command buffer user code uses — so every existing determinism golden is untouched by
+  construction. New golden `tests/determinism/golden/force-fields.json` (same-runtime tier, real
+  Rapier 2D, 300 steps, twelve bodies, four fields).
+- **§8 space modes (`PH-12`).** `@four/core` gains the §8 vocabulary — `SpaceMode`,
+  `SPACE_MODES`, `DEFAULT_SPACE_MODE`, `isSimulationSpaceMode` — and `@four/physics` gains
+  `RigidBody.space` (also `RigidBodyDescriptor.space`), the frame a body is solved in.
+  `PhysicsWorld.addBody` now enforces §8's sentence: the four presentation frames are refused
+  because "screen-space UI should not automatically participate in physical simulation unless
+  explicitly mapped to a simulation plane", and `"local-plane"` is refused separately because
+  §21's plane→XY mapping is unbuilt — two messages, because the fixes differ. The default is
+  `"world"` and `toDescriptor()` omits it there, so no existing body, descriptor, document or
+  solver call changes. The space round-trips through §79 (written only when non-default, read as
+  a defaulted field), because dropping it would turn a body every world refuses into one every
+  world accepts after a reload.
+
 ### 2026-08-09 — R-10 keys 3–4 and R-9 closed at tier: §66 pipeline grouping and §65 batching
 
 #### Added

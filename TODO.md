@@ -34,6 +34,29 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **PH-8 — §26/§27 force fields for rigid bodies.** Closed 2026-08-09: `ForceField` +
+      `ForceFieldSystem` at §39's `PRIORITY_FORCES`, `PhysicsWorld.forEachActiveBody`,
+      required per-field units, structural reuse of `@four/particles`' §27 field set with
+      no new §3.1 edge, new same-runtime golden
+      `tests/determinism/golden/force-fields.json`.
+- [x] **PH-12 — §8 space modes, physics tier.** Closed 2026-08-09: `SpaceMode` vocabulary
+      in `@four/core`, `RigidBody.space`, `PhysicsWorld.addBody` enforcing §8's sentence
+      with two distinct refusals, §79 round trip.
+- [ ] **§8 node-level `NodeSpace` component (PH-12 remainder).** One packet, three parts
+      that cannot be split: the component class, its §79 serializer, and its registration
+      in `registerSceneNodeTypes` (`packages/four/src/scene-serializers.ts`) — a
+      component with a `static typeName` and no registered serializer makes
+      `serializeScene` throw. Should land with the render-side consumer that gives
+      `screen`/`viewport`/`camera`/`billboard` a meaning (§47/§48/§74). Owner: whoever
+      takes the screen-space UI packet.
+- [ ] **§21 `"local-plane"` simulation frame (PH-12 remainder).** A plane descriptor on
+      the world plus a mapping in `PhysicsWorld`'s feed and publish passes; `addBody`
+      refuses the mode loudly until then. Touches the step path — needs its own
+      determinism golden.
+- [ ] **§27 field torque and field-driven waking (PH-8 remainders).** Both deliberately
+      absent with recorded reasons: §27's `sample` names no angular channel, and
+      automatic waking needs a per-entry `wakesSleepingBodies` flag plus a policy for two
+      entries that disagree.
 - [x] **R-10 keys 3–4 DONE 2026-08-09 (key 3 shipped, key 4 staged on R-8)** —
       `groupRenderListByPipeline` puts §66's key 3 in a second verb, stably, with
       `RenderItem.materialId` as its material half; `buildRenderList` untouched and every

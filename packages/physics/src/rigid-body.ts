@@ -109,10 +109,12 @@
  */
 
 import {
+  DEFAULT_SPACE_MODE,
   EventEmitter,
   FourError,
   type Component,
   type ComponentHost,
+  type SpaceMode,
 } from "@four/core";
 import { Matrix3, Quaternion, Vector3 } from "@four/math";
 
@@ -697,6 +699,37 @@ export class RigidBody
   };
 
   /**
+   * The §8 space this body is **solved in** (PH-12, 2026-08-09).
+   * `DEFAULT_SPACE_MODE` (`"world"`) unless the descriptor said otherwise, so
+   * every body written before PH-12 means exactly what it meant.
+   *
+   * §8 gives physics two legal frames — *"physics normally operates in world or
+   * local-plane space"* — and forbids a third case outright: *"screen-space UI
+   * should not automatically participate in physical simulation unless
+   * explicitly mapped to a simulation plane"*. {@link PhysicsWorld.addBody}
+   * therefore refuses everything but `"world"`, for two different reasons that
+   * its message keeps apart:
+   *
+   * - `"screen"`, `"viewport"`, `"camera"`, `"billboard"` — refused **because
+   *   §8 says so**. The sentence's escape hatch is a mapping the author
+   *   performs: simulate a body on a node in the simulated frame and drive the
+   *   presentation node from it.
+   * - `"local-plane"` — legal under §8, refused because §21's plane frame
+   *   (*"nodes simulating in local-plane space use the plane's own 2D frame,
+   *   which the engine maps to the world XY frame of the `"2d"` world"*) is not
+   *   implemented. Accepting it would solve the body in world space while its
+   *   author asked for a plane, which is accepted-and-ignored.
+   *
+   * Plain and mutable, with no change hook and no validation: `PhysicsWorld` is
+   * the only reader and it reads at registration, so writing it on an
+   * already-registered body does nothing until the body is registered again.
+   * `@four/core`'s `isSimulationSpaceMode` answers §8's own question about a
+   * mode; it deliberately does **not** answer this world's, because
+   * `"local-plane"` separates the two.
+   */
+  space: SpaceMode;
+
+  /**
    * Widening workspace for the §26 methods, so accumulating a load allocates
    * nothing (§7b, plan D7). Never escapes this class.
    */
@@ -715,6 +748,7 @@ export class RigidBody
 
     this.#type = descriptor.type;
     this.#mass = descriptor.mass;
+    this.space = descriptor.space ?? DEFAULT_SPACE_MODE;
     this.#ccdMode = resolveCCDMode(descriptor);
     this.#ccdPredictionDistance = descriptor.ccdPredictionDistance;
 
@@ -1526,6 +1560,13 @@ export class RigidBody
     }
     if (this.inertiaTensor !== undefined) {
       descriptor.inertiaTensor = this.inertiaTensor;
+    }
+    // Emitted only when it is not the default, so every descriptor a body
+    // produced before PH-12 is spelled exactly as it was — which is what keeps
+    // §79's documents and the §37 call sequence byte-identical for the frame
+    // every existing body is in.
+    if (this.space !== DEFAULT_SPACE_MODE) {
+      descriptor.space = this.space;
     }
     if (this.initialPosition !== undefined) {
       descriptor.position = this.initialPosition;

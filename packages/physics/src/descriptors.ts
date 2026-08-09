@@ -43,7 +43,7 @@
  * degrees.
  */
 
-import { DEFAULT_GRAVITY_Y, FourError } from "@four/core";
+import { DEFAULT_GRAVITY_Y, FourError, type SpaceMode } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import type { Matrix3 } from "@four/math";
 import type { Transform } from "@four/scene";
@@ -178,6 +178,27 @@ export interface RigidBodyDescriptor {
    * A positive finite number.
    */
   ccdPredictionDistance?: number;
+
+  /**
+   * The §8 space this body is **solved in**. Omitted means
+   * `DEFAULT_SPACE_MODE` (`"world"`), which is the only value a solver ever
+   * sees (PH-12, 2026-08-09).
+   *
+   * §8's two sentences are *"physics normally operates in world or local-plane
+   * space"* and *"screen-space UI should not automatically participate in
+   * physical simulation unless explicitly mapped to a simulation plane"*, so
+   * this field is where a body says which of §8's frames it means and
+   * `PhysicsWorld.addBody` is where every value it cannot honour is refused —
+   * see `RigidBody.space` for the two refusals and their different reasons.
+   *
+   * **Adapters may ignore it, and that is not accepted-and-ignored:** the world
+   * refuses anything but `"world"` *before* `createBody` is called, so an
+   * adapter can only ever be handed the one value it would have assumed. The
+   * field is on the descriptor rather than on the component alone because §79's
+   * document is derived from the descriptor — which is what stops the saved
+   * form and the authored form from drifting apart.
+   */
+  space?: SpaceMode;
 }
 
 /**

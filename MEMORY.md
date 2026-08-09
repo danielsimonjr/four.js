@@ -28,6 +28,82 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — PH-8 §26/§27 force fields for bodies + PH-12 §8 space modes.** Decisions
+  worth keeping:
+  - **The gap was the seam, not the halves.** §26's six methods shipped in Phase 5 and
+    §27's built-in field set shipped in WP-9.2; a field could push a _particle_ and not a
+    _body_. Generalizes: a row that reads "§X is silent" may mean "§X's two ends exist
+    and nothing joins them" — re-read the section before sizing the packet.
+  - **§39's own step list is the design.** Force generation is step 5 and the solve is
+    step 6, so the occupant is a **separate `SimulationSystem` at `PRIORITY_FORCES`**,
+    not a pass inside `PhysicsWorld.step`. Three things fall out free: `world.step` is
+    not edited, so every determinism golden is untouched _by construction_; §27's `time`
+    is `context.time.simulationTime`, so no world-side clock or accumulated time had to
+    be invented (§33); and a second generator orders against the first by number.
+    **Reusable technique** — the physics-tier form of R-23's "close a gap by adding
+    nothing to the frame path".
+  - **A field's units must be stated, and the argument is the reuse path.** §27's
+    built-in list mixes accelerations (uniform/radial gravity) with forces (wind, drag
+    volume), and `@four/particles` documents _every_ field as an acceleration because MVP
+    particles carry no mass. So `addField(field, units)` takes
+    `"force" | "acceleration"` as a **required** argument: a default would make the one
+    predictable unit error unwritable to notice on exactly the path the packet
+    advertises. §41's SI envelope applied to a seam rather than to a number.
+  - **`ParticleForceField` and `ForceField` reconcile structurally, as `types.ts`
+    predicted in 2026-08-02.** No adapter, no cast, no §3.1 edge; the check lives in
+    `tests/integration/physics-force-fields.test.ts` because that is the only file
+    allowed to import both packages — the same arrangement `phase9-particles` uses for
+    `ParticleSystem`/`SimulationSystem`. §27's "volume-based inclusion and filtering"
+    then needed **nothing**: inclusion is a property of a field, and `volumeField`
+    already composes onto any conforming one, in both directions.
+  - **A "which bodies can a force move" filter belongs in the world, not in each
+    generator.** `PhysicsWorld.forEachActiveBody` is dynamic (§22: a force on a static
+    body is discarded work) **and awake** (§32: a non-zero force wakes a body, so a
+    persistent field visiting sleepers would wake everything every step and §32 would
+    stop meaning anything). Waking is `RigidBody.wake()`, an explicit command. Secondary
+    benefit, and the reason it exists as a method at all: it hands over
+    `(body, node, centreOfMass)` with **no optional types**, so the generator has no
+    unreachable `undefined` branch — the pattern to reuse when a public getter's "cannot
+    happen" arm would otherwise cost 100% branch coverage.
+  - **Sample at the centre of mass, not the transform origin** — §26 splits `applyForce`
+    from `applyForceAtPoint`, and a generator that sampled the origin would describe a
+    different place from the one it pushes (a compound body's origin can sit outside its
+    shape).
+  - **§42: a force is not a transform write**, so `ForceFieldSystem` performs no
+    authority check. Consistent with R-36's finding from the other side: enforcement is
+    writer-side, and §26 is the sanctioned channel for influencing a solver-owned body.
+  - **Gotcha, now confirmed for a _simulation_ package: `@four/physics` may not import
+    `DEV`/`devWarn`/`devWarnOnce` at all.** `tests/integration/dev-build-mode.test.ts`
+    fails twice over (unlisted file, and "GATED names no simulation package"). The idiom
+    is `RigidBody`'s: plain `console.warn` with a lazily-allocated once-per-subject
+    `Set`.
+  - **PH-12: §8's honest home for the _mode_ is `@four/core`, and for the _declaration_
+    is `RigidBody.space`.** The vocabulary is hoisted for the `DEFAULT_GRAVITY_Y` reason
+    (§8's two halves serve pillars that cannot import each other). Two refusals with two
+    messages — the presentation frames because §8 forbids them, `"local-plane"` because
+    §21's plane→XY mapping is unbuilt — because the fixes differ (an authoring mistake
+    vs. an unbuilt feature). `isSimulationSpaceMode` answers **§8's** question and not
+    the world's; they differ exactly at `"local-plane"`, and a test pins the difference
+    so nobody "fixes" the predicate to match the implementation.
+  - **Blocker worth remembering: a new component class cannot land in one package
+    alone.** A `static typeName` is §79's key, `serializeScene` **throws** on a component
+    with no registered serializer, and `packages/four/tests/scene-serializers.test.ts`
+    enumerates every exported class carrying one. So class + serializer +
+    `registerSceneNodeTypes` registration are **one packet**, always — which is why
+    PH-12's node-level `NodeSpace` was built, measured against the gate, and withdrawn in
+    favour of `RigidBody.space`. New instance of the cross-package-packet class alongside
+    A-6's world-front-door and R-38's registry.
+  - **A refused value must still round-trip (§79).** `RigidBody.space` is written only
+    when non-default and read as a _defaulted_ field, because dropping it would turn a
+    body every world refuses into one every world accepts after a save-and-reload — the
+    same class of lie `derivedMass` was split out of `mass` to prevent.
+  - **Measured:** physics coverage stays 100×4 with `force-field.ts` and the new
+    `world.ts` method at 100%; core rises to 99.49/99.15. Bundle impact **0 B** on all
+    four tight budgets — none carries `@four/physics`, and the three new `@four/core`
+    exports are unreferenced named bindings under `"sideEffects": false`.
+  - Gotcha, repeat (third time recorded): **vitest does not typecheck.** Two test-only
+    errors (`ComponentSerializerShape.deserialize` takes `(data, node)`) surfaced only
+    under `typedoc`.
 - **2026-08-09 — R-10 keys 3–4 + R-9 §65 batching.** Decisions worth keeping:
   - **§66's key 3 cannot be a default, and the argument is correctness rather than
     byte-identity.** §61 fixes the depth func at `LEQUAL`, so of two _opaque_ co-planar
