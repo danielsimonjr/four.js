@@ -2,10 +2,10 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-07",
-    "totalFiles": 196,
+    "lastUpdated": "2026-08-09",
+    "totalFiles": 200,
     "totalModules": 24,
-    "totalExports": 1664
+    "totalExports": 1788
   },
   "entryPoints": [
     {
@@ -1957,7 +1957,6 @@
           "collectCentersOfMass",
           "collectContactPoints",
           "collectContactImpulses",
-          "solverStatistics",
           "solverJointStatistics",
           "DebugDrawBuffer"
         ],
@@ -1992,7 +1991,6 @@
           "collectCentersOfMass",
           "collectContactPoints",
           "collectContactImpulses",
-          "solverStatistics",
           "solverJointStatistics"
         ],
         "constants": [
@@ -2069,8 +2067,7 @@
               "collectContactImpulses",
               "collectContactPoints",
               "debugDrawStreams",
-              "solverJointStatistics",
-              "solverStatistics"
+              "solverJointStatistics"
             ],
             "reExport": true
           },
@@ -2092,7 +2089,8 @@
               "recordRenderStatistics",
               "recordResourceMemory",
               "recordSolverStatistics",
-              "resetFrameStats"
+              "resetFrameStats",
+              "solverStatistics"
             ],
             "reExport": true
           },
@@ -2220,7 +2218,6 @@
           "collectContactPoints",
           "debugDrawStreams",
           "solverJointStatistics",
-          "solverStatistics",
           "NO_RESOURCE_LEAKS",
           "auditResourceLeaks",
           "copyFrameStats",
@@ -2231,6 +2228,7 @@
           "recordResourceMemory",
           "recordSolverStatistics",
           "resetFrameStats",
+          "solverStatistics",
           "PACKAGE_NAME",
           "Checksum",
           "ReplayRecorderOptions",
@@ -2306,7 +2304,6 @@
           "collectContactPoints",
           "debugDrawStreams",
           "solverJointStatistics",
-          "solverStatistics",
           "NO_RESOURCE_LEAKS",
           "auditResourceLeaks",
           "copyFrameStats",
@@ -2317,6 +2314,7 @@
           "recordResourceMemory",
           "recordSolverStatistics",
           "resetFrameStats",
+          "solverStatistics",
           "Checksum",
           "ReplayRecorderOptions",
           "ReplaySnapshot",
@@ -2571,6 +2569,7 @@
           {
             "file": "./debug-draw.js",
             "imports": [
+              "DebugBodyAccess",
               "SolverStatistics"
             ],
             "typeOnly": true
@@ -2584,6 +2583,7 @@
           "copyFrameStats",
           "recordRenderStatistics",
           "recordResourceMemory",
+          "solverStatistics",
           "recordSolverStatistics",
           "createMonotonicClock"
         ],
@@ -2598,6 +2598,7 @@
           "copyFrameStats",
           "recordRenderStatistics",
           "recordResourceMemory",
+          "solverStatistics",
           "recordSolverStatistics",
           "createMonotonicClock"
         ],
@@ -2649,8 +2650,11 @@
               "monotonicNowSeconds",
               "recordRenderStatistics",
               "recordResourceMemory",
+              "recordSolverStatistics",
               "resetFrameStats",
-              "FrameStats"
+              "solverStatistics",
+              "FrameStats",
+              "SolverStatistics"
             ]
           },
           {
@@ -2666,10 +2670,12 @@
             "imports": [
               "DEFAULT_FIXED_DELTA_TIME",
               "DEFAULT_MAXIMUM_SUB_STEPS",
+              "PRIORITY_PHYSICS_SOLVE",
               "Scheduler",
               "SystemRegistry",
               "Detach",
-              "ReadonlyTimeState"
+              "ReadonlyTimeState",
+              "SimulationSystem"
             ]
           },
           {
@@ -2677,6 +2683,20 @@
             "directory": "packages/math",
             "imports": [
               "DepthRange"
+            ]
+          },
+          {
+            "package": "@four/assets",
+            "directory": "packages/assets",
+            "imports": [
+              "AssetManager"
+            ]
+          },
+          {
+            "package": "@four/physics",
+            "directory": "packages/physics",
+            "imports": [
+              "PhysicsWorld"
             ]
           },
           {
@@ -2720,6 +2740,7 @@
         ],
         "interfaces": [
           "ApplicationEventMap",
+          "PhysicsWorldContext",
           "ApplicationOptions"
         ]
       },
@@ -2822,10 +2843,12 @@
               "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
               "PANEL_NODE_TYPE",
               "PERSPECTIVE_CAMERA_NODE_TYPE",
+              "POINT_LIGHT_NODE_TYPE",
               "PROGRESS_NODE_TYPE",
               "RADIO_BUTTON_NODE_TYPE",
               "RENDERABLE_NODE_TYPE",
               "SLIDER_NODE_TYPE",
+              "SPOT_LIGHT_NODE_TYPE",
               "SPRITE_NODE_TYPE",
               "TOGGLE_NODE_TYPE",
               "composeSceneNodeTypes",
@@ -2842,7 +2865,11 @@
             "file": "./application.js",
             "imports": [
               "ApplicationEventMap",
-              "ApplicationOptions"
+              "ApplicationOptions",
+              "PhysicsWorldContext",
+              "PhysicsWorldFactory",
+              "SurfaceObserver",
+              "SurfaceResize"
             ],
             "reExport": true,
             "typeOnly": true
@@ -2871,10 +2898,12 @@
           "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
           "PANEL_NODE_TYPE",
           "PERSPECTIVE_CAMERA_NODE_TYPE",
+          "POINT_LIGHT_NODE_TYPE",
           "PROGRESS_NODE_TYPE",
           "RADIO_BUTTON_NODE_TYPE",
           "RENDERABLE_NODE_TYPE",
           "SLIDER_NODE_TYPE",
+          "SPOT_LIGHT_NODE_TYPE",
           "SPRITE_NODE_TYPE",
           "TOGGLE_NODE_TYPE",
           "composeSceneNodeTypes",
@@ -2886,6 +2915,10 @@
           "restoreNodeId",
           "ApplicationEventMap",
           "ApplicationOptions",
+          "PhysicsWorldContext",
+          "PhysicsWorldFactory",
+          "SurfaceObserver",
+          "SurfaceResize",
           "SceneNodeTypeOptions",
           "SceneNodeTypeSupport",
           "SceneResourceCatalog",
@@ -2902,10 +2935,12 @@
           "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
           "PANEL_NODE_TYPE",
           "PERSPECTIVE_CAMERA_NODE_TYPE",
+          "POINT_LIGHT_NODE_TYPE",
           "PROGRESS_NODE_TYPE",
           "RADIO_BUTTON_NODE_TYPE",
           "RENDERABLE_NODE_TYPE",
           "SLIDER_NODE_TYPE",
+          "SPOT_LIGHT_NODE_TYPE",
           "SPRITE_NODE_TYPE",
           "TOGGLE_NODE_TYPE",
           "composeSceneNodeTypes",
@@ -2917,6 +2952,10 @@
           "restoreNodeId",
           "ApplicationEventMap",
           "ApplicationOptions",
+          "PhysicsWorldContext",
+          "PhysicsWorldFactory",
+          "SurfaceObserver",
+          "SurfaceResize",
           "SceneNodeTypeOptions",
           "SceneNodeTypeSupport",
           "SceneResourceCatalog",
@@ -3254,6 +3293,8 @@
               "DirectionalLight",
               "OrthographicCamera",
               "PerspectiveCamera",
+              "PointLight",
+              "SpotLight",
               "restoreNodeId",
               "Node"
             ]
@@ -3312,6 +3353,8 @@
           "PERSPECTIVE_CAMERA_NODE_TYPE",
           "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
           "DIRECTIONAL_LIGHT_NODE_TYPE",
+          "POINT_LIGHT_NODE_TYPE",
+          "SPOT_LIGHT_NODE_TYPE",
           "resourceCatalog",
           "registerUISerializers",
           "registerRenderSerializers",
@@ -3347,7 +3390,9 @@
           "SPRITE_NODE_TYPE",
           "PERSPECTIVE_CAMERA_NODE_TYPE",
           "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
-          "DIRECTIONAL_LIGHT_NODE_TYPE"
+          "DIRECTIONAL_LIGHT_NODE_TYPE",
+          "POINT_LIGHT_NODE_TYPE",
+          "SPOT_LIGHT_NODE_TYPE"
         ]
       },
       "packages/four/src/scene.ts": {
@@ -3468,7 +3513,7 @@
         ]
       },
       "packages/geometry/src/index.ts": {
-        "description": "Package entry point for @four/geometry (re-exports 32 symbols)",
+        "description": "Package entry point for @four/geometry (re-exports 37 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -3499,7 +3544,8 @@
             "imports": [
               "boxGeometry",
               "circleGeometry2D",
-              "planeGeometry"
+              "planeGeometry",
+              "polygonGeometry2D"
             ],
             "reExport": true
           },
@@ -3508,6 +3554,14 @@
             "imports": [
               "geometryMemoryBytes",
               "liveGeometryCount"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./tessellation.js",
+            "imports": [
+              "earClippingTessellator",
+              "triangulatePolygon"
             ],
             "reExport": true
           },
@@ -3529,7 +3583,6 @@
               "ExtrudeGeometryOptions",
               "HeightFieldGeometryOptions",
               "LatheGeometryOptions",
-              "Point2D",
               "Point3D",
               "SphereGeometryOptions",
               "TaperedGeometryOptions",
@@ -3544,7 +3597,17 @@
             "imports": [
               "BoxGeometryOptions",
               "CircleGeometry2DOptions",
-              "PlaneGeometryOptions"
+              "PlaneGeometryOptions",
+              "PolygonGeometry2DOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./tessellation.js",
+            "imports": [
+              "Point2D",
+              "PolygonTessellator"
             ],
             "reExport": true,
             "typeOnly": true
@@ -3565,8 +3628,11 @@
           "boxGeometry",
           "circleGeometry2D",
           "planeGeometry",
+          "polygonGeometry2D",
           "geometryMemoryBytes",
           "liveGeometryCount",
+          "earClippingTessellator",
+          "triangulatePolygon",
           "PACKAGE_NAME",
           "BufferGeometryOptions",
           "GeometryBounds",
@@ -3576,7 +3642,6 @@
           "ExtrudeGeometryOptions",
           "HeightFieldGeometryOptions",
           "LatheGeometryOptions",
-          "Point2D",
           "Point3D",
           "SphereGeometryOptions",
           "TaperedGeometryOptions",
@@ -3584,7 +3649,10 @@
           "TubeGeometryOptions",
           "BoxGeometryOptions",
           "CircleGeometry2DOptions",
-          "PlaneGeometryOptions"
+          "PlaneGeometryOptions",
+          "PolygonGeometry2DOptions",
+          "Point2D",
+          "PolygonTessellator"
         ],
         "reExported": [
           "BufferGeometry",
@@ -3600,8 +3668,11 @@
           "boxGeometry",
           "circleGeometry2D",
           "planeGeometry",
+          "polygonGeometry2D",
           "geometryMemoryBytes",
           "liveGeometryCount",
+          "earClippingTessellator",
+          "triangulatePolygon",
           "BufferGeometryOptions",
           "GeometryBounds",
           "GeometryDrawMode",
@@ -3610,7 +3681,6 @@
           "ExtrudeGeometryOptions",
           "HeightFieldGeometryOptions",
           "LatheGeometryOptions",
-          "Point2D",
           "Point3D",
           "SphereGeometryOptions",
           "TaperedGeometryOptions",
@@ -3618,7 +3688,10 @@
           "TubeGeometryOptions",
           "BoxGeometryOptions",
           "CircleGeometry2DOptions",
-          "PlaneGeometryOptions"
+          "PlaneGeometryOptions",
+          "PolygonGeometry2DOptions",
+          "Point2D",
+          "PolygonTessellator"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -3669,6 +3742,13 @@
               "writeCap",
               "IndexArray"
             ]
+          },
+          {
+            "file": "./tessellation.js",
+            "imports": [
+              "triangulatePolygon",
+              "Point2D"
+            ]
           }
         ],
         "workspaceDependencies": [],
@@ -3684,7 +3764,6 @@
           "heightFieldGeometry"
         ],
         "interfaces": [
-          "Point2D",
           "Point3D",
           "SphereGeometryOptions",
           "TaperedGeometryOptions",
@@ -3724,23 +3803,33 @@
               "createIndices",
               "requirePositive"
             ]
+          },
+          {
+            "file": "./tessellation.js",
+            "imports": [
+              "triangulatePolygon",
+              "Point2D"
+            ]
           }
         ],
         "workspaceDependencies": [],
         "exports": [
           "boxGeometry",
           "planeGeometry",
-          "circleGeometry2D"
+          "circleGeometry2D",
+          "polygonGeometry2D"
         ],
         "interfaces": [
           "BoxGeometryOptions",
           "PlaneGeometryOptions",
-          "CircleGeometry2DOptions"
+          "CircleGeometry2DOptions",
+          "PolygonGeometry2DOptions"
         ],
         "functions": [
           "boxGeometry",
           "planeGeometry",
-          "circleGeometry2D"
+          "circleGeometry2D",
+          "polygonGeometry2D"
         ]
       },
       "packages/geometry/src/resource-memory.ts": {
@@ -3758,6 +3847,41 @@
           "noteGeometry",
           "geometryMemoryBytes",
           "liveGeometryCount"
+        ]
+      },
+      "packages/geometry/src/tessellation.ts": {
+        "description": "Polygon tessellation (§52) — the isolated module that turns a closed 2D",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./buffer-geometry.js",
+            "imports": [
+              "GeometryIndexArray"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./primitive-support.js",
+            "imports": [
+              "createIndices"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "earClippingTessellator",
+          "triangulatePolygon"
+        ],
+        "interfaces": [
+          "Point2D",
+          "PolygonTessellator"
+        ],
+        "functions": [
+          "triangulatePolygon"
+        ],
+        "constants": [
+          "earClippingTessellator"
         ]
       }
     },
@@ -4288,7 +4412,7 @@
     },
     "packages/materials": {
       "packages/materials/src/index.ts": {
-        "description": "Package entry point for @four/materials (re-exports 12 symbols)",
+        "description": "Package entry point for @four/materials (re-exports 15 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -4310,6 +4434,13 @@
             "file": "./sprite-material.js",
             "imports": [
               "SpriteMaterial"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./standard-material.js",
+            "imports": [
+              "StandardMaterial"
             ],
             "reExport": true
           },
@@ -4347,6 +4478,15 @@
             "typeOnly": true
           },
           {
+            "file": "./standard-material.js",
+            "imports": [
+              "ColorRGB",
+              "StandardMaterialOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./texture.js",
             "imports": [
               "MaterialTexture"
@@ -4369,6 +4509,7 @@
           "LitMaterial",
           "Material",
           "SpriteMaterial",
+          "StandardMaterial",
           "UnlitMaterial",
           "PACKAGE_NAME",
           "LitMaterialOptions",
@@ -4376,6 +4517,8 @@
           "MaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
+          "ColorRGB",
+          "StandardMaterialOptions",
           "MaterialTexture",
           "ColorRGBA",
           "UnlitMaterialOptions"
@@ -4384,12 +4527,15 @@
           "LitMaterial",
           "Material",
           "SpriteMaterial",
+          "StandardMaterial",
           "UnlitMaterial",
           "LitMaterialOptions",
           "BlendMode",
           "MaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
+          "ColorRGB",
+          "StandardMaterialOptions",
           "MaterialTexture",
           "ColorRGBA",
           "UnlitMaterialOptions"
@@ -4493,12 +4639,71 @@
           "SpriteMaterialOptions"
         ]
       },
+      "packages/materials/src/standard-material.ts": {
+        "description": "`StandardMaterial` (§59) — the metallic-roughness workflow, at the tier this",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./material.js",
+            "imports": [
+              "Material",
+              "MaterialOptions"
+            ]
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "MaterialTexture"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGB",
+              "ColorRGBA"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGB"
+            ]
+          }
+        ],
+        "exports": [
+          "StandardMaterial",
+          "ColorRGB"
+        ],
+        "reExported": [
+          "ColorRGB"
+        ],
+        "classes": [
+          "StandardMaterial"
+        ],
+        "interfaces": [
+          "StandardMaterialOptions"
+        ]
+      },
       "packages/materials/src/texture.ts": {
         "description": "The read surface of a texture as a **material** and a rendering backend see",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
-        "workspaceDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorSpace"
+            ]
+          }
+        ],
         "exports": [],
         "interfaces": [
           "MaterialTexture"
@@ -4574,15 +4779,34 @@
         ]
       },
       "packages/math/src/color.ts": {
-        "description": "The color value type shared by materials and animation (§60a, plan P4-2).",
+        "description": "Colour value types, the sRGB transfer functions, and CSS colour-string",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [],
-        "exports": []
+        "exports": [
+          "srgbToLinear",
+          "linearToSrgb",
+          "srgbToLinearRGB",
+          "linearToSrgbRGB",
+          "srgbToLinearRGBA",
+          "linearToSrgbRGBA",
+          "parseColor",
+          "parseColorRGB"
+        ],
+        "functions": [
+          "srgbToLinear",
+          "linearToSrgb",
+          "srgbToLinearRGB",
+          "linearToSrgbRGB",
+          "srgbToLinearRGBA",
+          "linearToSrgbRGBA",
+          "parseColor",
+          "parseColorRGB"
+        ]
       },
       "packages/math/src/index.ts": {
-        "description": "Package entry point for @four/math (re-exports 10 symbols)",
+        "description": "Package entry point for @four/math (re-exports 20 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -4591,6 +4815,20 @@
             "imports": [
               "constructionCount",
               "resetConstructionCount"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./color.js",
+            "imports": [
+              "linearToSrgb",
+              "linearToSrgbRGB",
+              "linearToSrgbRGBA",
+              "parseColor",
+              "parseColorRGB",
+              "srgbToLinear",
+              "srgbToLinearRGB",
+              "srgbToLinearRGBA"
             ],
             "reExport": true
           },
@@ -4639,7 +4877,9 @@
           {
             "file": "./color.js",
             "imports": [
-              "ColorRGBA"
+              "ColorRGB",
+              "ColorRGBA",
+              "ColorSpace"
             ],
             "reExport": true,
             "typeOnly": true
@@ -4657,6 +4897,14 @@
         "exports": [
           "constructionCount",
           "resetConstructionCount",
+          "linearToSrgb",
+          "linearToSrgbRGB",
+          "linearToSrgbRGBA",
+          "parseColor",
+          "parseColorRGB",
+          "srgbToLinear",
+          "srgbToLinearRGB",
+          "srgbToLinearRGBA",
           "Matrix3",
           "Matrix4",
           "Quaternion",
@@ -4664,19 +4912,31 @@
           "Vector3",
           "Vector4",
           "PACKAGE_NAME",
+          "ColorRGB",
           "ColorRGBA",
+          "ColorSpace",
           "DepthRange"
         ],
         "reExported": [
           "constructionCount",
           "resetConstructionCount",
+          "linearToSrgb",
+          "linearToSrgbRGB",
+          "linearToSrgbRGBA",
+          "parseColor",
+          "parseColorRGB",
+          "srgbToLinear",
+          "srgbToLinearRGB",
+          "srgbToLinearRGBA",
           "Matrix3",
           "Matrix4",
           "Quaternion",
           "Vector2",
           "Vector3",
           "Vector4",
+          "ColorRGB",
           "ColorRGBA",
+          "ColorSpace",
           "DepthRange"
         ],
         "constants": [
@@ -6920,8 +7180,12 @@
             "imports": [
               "COLLISION_SHAPE_TYPES_2D",
               "COLLISION_SHAPE_TYPES_3D",
+              "COMPOSITE_COLLISION_SHAPE_TYPES",
+              "shapeIsConvex",
+              "shapeMaximumExtent",
               "shapeSupportsDimension",
-              "validateCollisionShape"
+              "validateCollisionShape",
+              "validateQueryShape"
             ],
             "reExport": true
           },
@@ -7138,14 +7402,21 @@
             "imports": [
               "BoxShape",
               "CapsuleShape",
+              "ChainShape",
               "CircleShape",
               "CollisionShape",
               "CollisionShape2D",
               "CollisionShape3D",
               "CollisionShapeType",
+              "ConeShape",
+              "ConvexHullShape",
+              "CylinderShape",
+              "HeightFieldShape",
               "PolygonShape",
+              "PolylineShape",
               "RectangleShape",
-              "SphereShape"
+              "SphereShape",
+              "TriangleMeshShape"
             ],
             "reExport": true,
             "typeOnly": true
@@ -7250,8 +7521,12 @@
           "resolveSolver",
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
+          "COMPOSITE_COLLISION_SHAPE_TYPES",
+          "shapeIsConvex",
+          "shapeMaximumExtent",
           "shapeSupportsDimension",
           "validateCollisionShape",
+          "validateQueryShape",
           "BODY_TYPES",
           "CCD_MODES",
           "COMBINE_MODES",
@@ -7361,14 +7636,21 @@
           "SolverSelection",
           "BoxShape",
           "CapsuleShape",
+          "ChainShape",
           "CircleShape",
           "CollisionShape",
           "CollisionShape2D",
           "CollisionShape3D",
           "CollisionShapeType",
+          "ConeShape",
+          "ConvexHullShape",
+          "CylinderShape",
+          "HeightFieldShape",
           "PolygonShape",
+          "PolylineShape",
           "RectangleShape",
           "SphereShape",
+          "TriangleMeshShape",
           "AngularVelocityInput",
           "BodyType",
           "CCDMode",
@@ -7454,8 +7736,12 @@
           "resolveSolver",
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
+          "COMPOSITE_COLLISION_SHAPE_TYPES",
+          "shapeIsConvex",
+          "shapeMaximumExtent",
           "shapeSupportsDimension",
           "validateCollisionShape",
+          "validateQueryShape",
           "BODY_TYPES",
           "CCD_MODES",
           "COMBINE_MODES",
@@ -7564,14 +7850,21 @@
           "SolverSelection",
           "BoxShape",
           "CapsuleShape",
+          "ChainShape",
           "CircleShape",
           "CollisionShape",
           "CollisionShape2D",
           "CollisionShape3D",
           "CollisionShapeType",
+          "ConeShape",
+          "ConvexHullShape",
+          "CylinderShape",
+          "HeightFieldShape",
           "PolygonShape",
+          "PolylineShape",
           "RectangleShape",
           "SphereShape",
+          "TriangleMeshShape",
           "AngularVelocityInput",
           "BodyType",
           "CCDMode",
@@ -8163,7 +8456,11 @@
         "exports": [
           "COLLISION_SHAPE_TYPES_2D",
           "COLLISION_SHAPE_TYPES_3D",
+          "COMPOSITE_COLLISION_SHAPE_TYPES",
+          "shapeIsConvex",
           "shapeSupportsDimension",
+          "shapeMaximumExtent",
+          "validateQueryShape",
           "validateCollisionShape"
         ],
         "interfaces": [
@@ -8171,16 +8468,27 @@
           "RectangleShape",
           "CapsuleShape",
           "PolygonShape",
+          "PolylineShape",
+          "ChainShape",
           "SphereShape",
-          "BoxShape"
+          "BoxShape",
+          "CylinderShape",
+          "ConeShape",
+          "ConvexHullShape",
+          "TriangleMeshShape",
+          "HeightFieldShape"
         ],
         "functions": [
+          "shapeIsConvex",
           "shapeSupportsDimension",
+          "shapeMaximumExtent",
+          "validateQueryShape",
           "validateCollisionShape"
         ],
         "constants": [
           "COLLISION_SHAPE_TYPES_2D",
-          "COLLISION_SHAPE_TYPES_3D"
+          "COLLISION_SHAPE_TYPES_3D",
+          "COMPOSITE_COLLISION_SHAPE_TYPES"
         ]
       },
       "packages/physics/src/solver-registry.ts": {
@@ -8537,6 +8845,12 @@
             "typeOnly": true
           },
           {
+            "file": "./shapes.js",
+            "imports": [
+              "shapeMaximumExtent"
+            ]
+          },
+          {
             "file": "./solver-registry.js",
             "imports": [
               "SolverRegistry",
@@ -8763,7 +9077,8 @@
           "toRapierJointAxis2d",
           "packInteractionGroups",
           "createRapierShape",
-          "createRapierColliderDesc"
+          "createRapierColliderDesc",
+          "requireHullDesc"
         ],
         "functions": [
           "createRapierVector2",
@@ -8778,7 +9093,8 @@
           "toRapierJointAxis2d",
           "packInteractionGroups",
           "createRapierShape",
-          "createRapierColliderDesc"
+          "createRapierColliderDesc",
+          "requireHullDesc"
         ]
       },
       "packages/physics-rapier/src/conversions3d.ts": {
@@ -8863,6 +9179,7 @@
           "packInteractionGroups3d",
           "createRapierShape3d",
           "createRapierColliderDesc3d",
+          "requireHullDesc3d",
           "rotateVectorByRotation3",
           "RapierRotation3",
           "RapierVector3"
@@ -8884,6 +9201,7 @@
           "packInteractionGroups3d",
           "createRapierShape3d",
           "createRapierColliderDesc3d",
+          "requireHullDesc3d",
           "rotateVectorByRotation3"
         ]
       },
@@ -9261,9 +9579,9 @@
               "resolveSleepingConfig",
               "sortHitsByDistance",
               "validateColliderDescriptor",
-              "validateCollisionShape",
               "validateJointDescriptor",
               "validatePhysicsWorldOptions",
+              "validateQueryShape",
               "validateRigidBodyDescriptor"
             ]
           },
@@ -9412,9 +9730,9 @@
               "resolveSleepingConfig",
               "sortHitsByDistance",
               "validateColliderDescriptor",
-              "validateCollisionShape",
               "validateJointDescriptor",
               "validatePhysicsWorldOptions",
+              "validateQueryShape",
               "validateRigidBodyDescriptor"
             ]
           },
@@ -9544,6 +9862,7 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "OUTPUT_TRANSFORM_EFFECT",
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
           "supportsScreenEffects",
@@ -9552,6 +9871,7 @@
         "interfaces": [
           "CopyEffect",
           "ColorGradeEffect",
+          "OutputTransformEffect",
           "EffectRenderPass",
           "ScreenEffectRenderer"
         ],
@@ -9560,12 +9880,13 @@
           "validateEffectRenderPass"
         ],
         "constants": [
+          "OUTPUT_TRANSFORM_EFFECT",
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT"
         ]
       },
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 84 symbols)",
+        "description": "Package entry point for @four/render (re-exports 96 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -9574,6 +9895,7 @@
             "imports": [
               "COLOR_GRADE_DEFAULTS",
               "COPY_EFFECT",
+              "OUTPUT_TRANSFORM_EFFECT",
               "supportsScreenEffects",
               "validateEffectRenderPass"
             ],
@@ -9582,9 +9904,11 @@
           {
             "file": "./lights.js",
             "imports": [
+              "MAX_PUNCTUAL_LIGHTS",
               "collectSceneLights",
               "createSceneLights",
-              "isDirectionalLightSource"
+              "isDirectionalLightSource",
+              "isPunctualLightSource"
             ],
             "reExport": true
           },
@@ -9608,7 +9932,9 @@
               "isLitItem",
               "isParticlesItem",
               "isSpriteItem",
-              "isUnlitItem"
+              "isStandardItem",
+              "isUnlitItem",
+              "viewLayerMask"
             ],
             "reExport": true
           },
@@ -9691,6 +10017,7 @@
               "ColorGradeEffect",
               "CopyEffect",
               "EffectRenderPass",
+              "OutputTransformEffect",
               "ScreenEffect",
               "ScreenEffectKind",
               "ScreenEffectRenderer"
@@ -9703,7 +10030,11 @@
             "imports": [
               "AmbientLightSource",
               "DirectionalLightSource",
-              "SceneLights"
+              "PointLightSource",
+              "PunctualLightSource",
+              "PunctualLightSourceBase",
+              "SceneLights",
+              "SpotLightSource"
             ],
             "reExport": true,
             "typeOnly": true
@@ -9724,6 +10055,7 @@
               "RenderItem",
               "RenderItemKind",
               "SpriteRenderItem",
+              "StandardRenderItem",
               "UnlitRenderItem"
             ],
             "reExport": true,
@@ -9802,6 +10134,7 @@
           {
             "file": "./sprite.js",
             "imports": [
+              "SpriteFrame",
               "SpriteOptions"
             ],
             "reExport": true,
@@ -9820,11 +10153,14 @@
         "exports": [
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
+          "OUTPUT_TRANSFORM_EFFECT",
           "supportsScreenEffects",
           "validateEffectRenderPass",
+          "MAX_PUNCTUAL_LIGHTS",
           "collectSceneLights",
           "createSceneLights",
           "isDirectionalLightSource",
+          "isPunctualLightSource",
           "PARTICLE_COLOR_OFFSET",
           "PARTICLE_INSTANCE_FLOATS",
           "PARTICLE_POSITION_OFFSET",
@@ -9836,7 +10172,9 @@
           "isLitItem",
           "isParticlesItem",
           "isSpriteItem",
+          "isStandardItem",
           "isUnlitItem",
+          "viewLayerMask",
           "RenderGraph",
           "RenderTarget",
           "isRenderTargetTexture",
@@ -9860,18 +10198,24 @@
           "ColorGradeEffect",
           "CopyEffect",
           "EffectRenderPass",
+          "OutputTransformEffect",
           "ScreenEffect",
           "ScreenEffectKind",
           "ScreenEffectRenderer",
           "AmbientLightSource",
           "DirectionalLightSource",
+          "PointLightSource",
+          "PunctualLightSource",
+          "PunctualLightSourceBase",
           "SceneLights",
+          "SpotLightSource",
           "ParticleDrawable",
           "LitRenderItem",
           "ParticleRenderItem",
           "RenderItem",
           "RenderItemKind",
           "SpriteRenderItem",
+          "StandardRenderItem",
           "UnlitRenderItem",
           "AddPassOptions",
           "CustomRenderPass",
@@ -9901,17 +10245,21 @@
           "ResizeRecord",
           "RenderStatistics",
           "RenderStatisticsReporter",
+          "SpriteFrame",
           "SpriteOptions",
           "TextureSource"
         ],
         "reExported": [
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
+          "OUTPUT_TRANSFORM_EFFECT",
           "supportsScreenEffects",
           "validateEffectRenderPass",
+          "MAX_PUNCTUAL_LIGHTS",
           "collectSceneLights",
           "createSceneLights",
           "isDirectionalLightSource",
+          "isPunctualLightSource",
           "PARTICLE_COLOR_OFFSET",
           "PARTICLE_INSTANCE_FLOATS",
           "PARTICLE_POSITION_OFFSET",
@@ -9923,7 +10271,9 @@
           "isLitItem",
           "isParticlesItem",
           "isSpriteItem",
+          "isStandardItem",
           "isUnlitItem",
+          "viewLayerMask",
           "RenderGraph",
           "RenderTarget",
           "isRenderTargetTexture",
@@ -9946,18 +10296,24 @@
           "ColorGradeEffect",
           "CopyEffect",
           "EffectRenderPass",
+          "OutputTransformEffect",
           "ScreenEffect",
           "ScreenEffectKind",
           "ScreenEffectRenderer",
           "AmbientLightSource",
           "DirectionalLightSource",
+          "PointLightSource",
+          "PunctualLightSource",
+          "PunctualLightSourceBase",
           "SceneLights",
+          "SpotLightSource",
           "ParticleDrawable",
           "LitRenderItem",
           "ParticleRenderItem",
           "RenderItem",
           "RenderItemKind",
           "SpriteRenderItem",
+          "StandardRenderItem",
           "UnlitRenderItem",
           "AddPassOptions",
           "CustomRenderPass",
@@ -9987,6 +10343,7 @@
           "ResizeRecord",
           "RenderStatistics",
           "RenderStatisticsReporter",
+          "SpriteFrame",
           "SpriteOptions",
           "TextureSource"
         ],
@@ -10016,19 +10373,28 @@
           }
         ],
         "exports": [
+          "MAX_PUNCTUAL_LIGHTS",
           "isDirectionalLightSource",
+          "isPunctualLightSource",
           "createSceneLights",
           "collectSceneLights"
         ],
         "interfaces": [
           "DirectionalLightSource",
+          "PunctualLightSourceBase",
+          "PointLightSource",
+          "SpotLightSource",
           "AmbientLightSource",
           "SceneLights"
         ],
         "functions": [
           "isDirectionalLightSource",
+          "isPunctualLightSource",
           "createSceneLights",
           "collectSceneLights"
+        ],
+        "constants": [
+          "MAX_PUNCTUAL_LIGHTS"
         ]
       },
       "packages/render/src/particles.ts": {
@@ -10152,9 +10518,23 @@
             "imports": [
               "Renderable"
             ]
+          },
+          {
+            "file": "./sprite.js",
+            "imports": [
+              "SpriteFrame"
+            ],
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEV"
+            ]
+          },
           {
             "package": "@four/geometry",
             "directory": "packages/geometry",
@@ -10178,6 +10558,7 @@
               "LitMaterial",
               "Material",
               "SpriteMaterial",
+              "StandardMaterial",
               "UnlitMaterial"
             ]
           },
@@ -10185,8 +10566,15 @@
             "package": "@four/scene",
             "directory": "packages/scene",
             "imports": [
+              "ALL_LAYERS",
+              "DEFAULT_LAYER_MASK",
+              "assertLayerMask",
+              "isLayerMask",
+              "layersMatch",
+              "LayerMask",
               "Node",
-              "PoseBuffer"
+              "PoseBuffer",
+              "Viewport"
             ]
           }
         ],
@@ -10194,13 +10582,16 @@
           "isSpriteItem",
           "isUnlitItem",
           "isLitItem",
+          "isStandardItem",
           "isParticlesItem",
+          "viewLayerMask",
           "buildRenderList",
           "buildInterpolatedRenderList"
         ],
         "interfaces": [
           "UnlitRenderItem",
           "LitRenderItem",
+          "StandardRenderItem",
           "SpriteRenderItem",
           "ParticleRenderItem"
         ],
@@ -10208,7 +10599,9 @@
           "isSpriteItem",
           "isUnlitItem",
           "isLitItem",
+          "isStandardItem",
           "isParticlesItem",
+          "viewLayerMask",
           "buildRenderList",
           "buildInterpolatedRenderList"
         ]
@@ -10239,10 +10632,18 @@
             "imports": [
               "MaterialTexture"
             ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorSpace"
+            ]
           }
         ],
         "exports": [
           "isRenderTargetTexture",
+          "validateColorSpace",
           "RenderTarget"
         ],
         "classes": [
@@ -10253,7 +10654,8 @@
           "RenderTargetTexture"
         ],
         "functions": [
-          "isRenderTargetTexture"
+          "isRenderTargetTexture",
+          "validateColorSpace"
         ]
       },
       "packages/render/src/renderable.ts": {
@@ -10484,6 +10886,7 @@
           "Sprite"
         ],
         "interfaces": [
+          "SpriteFrame",
           "SpriteOptions"
         ]
       },
@@ -10514,6 +10917,12 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./render-target.js",
+            "imports": [
+              "validateColorSpace"
+            ]
+          },
+          {
             "file": "./resource-memory.js",
             "imports": [
               "noteTexture"
@@ -10533,6 +10942,13 @@
             "directory": "packages/materials",
             "imports": [
               "SpriteTexture"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorSpace"
             ]
           }
         ],
@@ -10579,7 +10995,7 @@
     },
     "packages/render-webgl": {
       "packages/render-webgl/src/gl-effect.ts": {
-        "description": "The full-screen effect pipeline for the WebGL 2 backend — §70's blit and",
+        "description": "The full-screen effect pipeline for the WebGL 2 backend — §70's blit, colour",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -10748,6 +11164,14 @@
               "Matrix4",
               "Vector3"
             ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "MAX_PUNCTUAL_LIGHTS",
+              "SceneLights"
+            ]
           }
         ],
         "exports": [
@@ -10757,14 +11181,17 @@
           "UV_ATTRIBUTE_LOCATION",
           "COLOR_ATTRIBUTE_LOCATION",
           "MAP_TEXTURE_UNIT",
+          "PUNCTUAL_LIGHT_GLSL",
           "matrixScratch",
           "createLinkedProgram",
           "requireUniform",
+          "PunctualLightUniforms",
           "UnlitProgram",
           "SpriteProgram",
           "LitProgram"
         ],
         "classes": [
+          "PunctualLightUniforms",
           "UnlitProgram",
           "SpriteProgram",
           "LitProgram"
@@ -10783,6 +11210,7 @@
           "UV_ATTRIBUTE_LOCATION",
           "COLOR_ATTRIBUTE_LOCATION",
           "MAP_TEXTURE_UNIT",
+          "PUNCTUAL_LIGHT_GLSL",
           "matrixScratch"
         ]
       },
@@ -10819,6 +11247,57 @@
         ],
         "interfaces": [
           "RenderTargetRecord"
+        ]
+      },
+      "packages/render-webgl/src/gl-standard.ts": {
+        "description": "The metallic-roughness pipeline (§59, §68) — this backend's sixth program,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./gl-program.js",
+            "imports": [
+              "MAP_TEXTURE_UNIT",
+              "PUNCTUAL_LIGHT_GLSL",
+              "PunctualLightUniforms",
+              "createLinkedProgram",
+              "matrixScratch",
+              "requireUniform",
+              "GlProgramHandle",
+              "GlUniformLocation",
+              "WebglContext"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Disposable"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix4",
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "SceneLights"
+            ]
+          }
+        ],
+        "exports": [
+          "StandardProgram"
+        ],
+        "classes": [
+          "StandardProgram"
         ]
       },
       "packages/render-webgl/src/gl-texture.ts": {
@@ -10894,6 +11373,8 @@
               "MAP_TEXTURE_UNIT",
               "NORMAL_ATTRIBUTE_LOCATION",
               "POSITION_ATTRIBUTE_LOCATION",
+              "PUNCTUAL_LIGHT_GLSL",
+              "PunctualLightUniforms",
               "SpriteProgram",
               "UV_ATTRIBUTE_LOCATION",
               "UnlitProgram"
@@ -10904,6 +11385,13 @@
             "file": "./gl-render-target.js",
             "imports": [
               "RenderTargetCache"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./gl-standard.js",
+            "imports": [
+              "StandardProgram"
             ],
             "reExport": true
           },
@@ -11015,10 +11503,13 @@
           "MAP_TEXTURE_UNIT",
           "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
+          "PUNCTUAL_LIGHT_GLSL",
+          "PunctualLightUniforms",
           "SpriteProgram",
           "UV_ATTRIBUTE_LOCATION",
           "UnlitProgram",
           "RenderTargetCache",
+          "StandardProgram",
           "TextureCache",
           "isWebgl2Supported",
           "registerWebglRenderer",
@@ -11060,10 +11551,13 @@
           "MAP_TEXTURE_UNIT",
           "NORMAL_ATTRIBUTE_LOCATION",
           "POSITION_ATTRIBUTE_LOCATION",
+          "PUNCTUAL_LIGHT_GLSL",
+          "PunctualLightUniforms",
           "SpriteProgram",
           "UV_ATTRIBUTE_LOCATION",
           "UnlitProgram",
           "RenderTargetCache",
+          "StandardProgram",
           "TextureCache",
           "isWebgl2Supported",
           "registerWebglRenderer",
@@ -11171,6 +11665,12 @@
             ]
           },
           {
+            "file": "./gl-standard.js",
+            "imports": [
+              "StandardProgram"
+            ]
+          },
+          {
             "file": "./gl-texture.js",
             "imports": [
               "TextureCache",
@@ -11206,6 +11706,8 @@
               "isParticlesItem",
               "isRenderTargetTexture",
               "isSpriteItem",
+              "isStandardItem",
+              "viewLayerMask",
               "COLOR_GRADE_DEFAULTS",
               "EffectRenderPass",
               "RenderItem",
@@ -11276,6 +11778,13 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./layers.js",
+            "imports": [
+              "ALL_LAYERS",
+              "LayerMask"
+            ]
+          },
+          {
             "file": "./node.js",
             "imports": [
               "Node"
@@ -11332,7 +11841,7 @@
         ]
       },
       "packages/scene/src/index.ts": {
-        "description": "Package entry point for @four/scene (re-exports 33 symbols)",
+        "description": "Package entry point for @four/scene (re-exports 57 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -11362,9 +11871,35 @@
             "reExport": true
           },
           {
+            "file": "./layers.js",
+            "imports": [
+              "ALL_LAYERS",
+              "DEFAULT_LAYER",
+              "DEFAULT_LAYER_MASK",
+              "DEFAULT_LAYER_NAME",
+              "LAYER_COUNT",
+              "NO_LAYERS",
+              "applyLayers",
+              "assertLayerMask",
+              "defineLayer",
+              "isLayerMask",
+              "layerIndex",
+              "layerMask",
+              "layerMaskNames",
+              "layerName",
+              "layerNames",
+              "layersMatch",
+              "resetLayers"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./light.js",
             "imports": [
-              "DirectionalLight"
+              "DirectionalLight",
+              "PointLight",
+              "PunctualLight",
+              "SpotLight"
             ],
             "reExport": true
           },
@@ -11440,10 +11975,21 @@
             "typeOnly": true
           },
           {
+            "file": "./layers.js",
+            "imports": [
+              "LayerMask",
+              "LayeredNode"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./light.js",
             "imports": [
               "ColorRGB",
-              "DirectionalLightOptions"
+              "DirectionalLightOptions",
+              "PunctualLightOptions",
+              "SpotLightOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -11494,7 +12040,27 @@
           "OrthographicCamera",
           "PerspectiveCamera",
           "Group",
+          "ALL_LAYERS",
+          "DEFAULT_LAYER",
+          "DEFAULT_LAYER_MASK",
+          "DEFAULT_LAYER_NAME",
+          "LAYER_COUNT",
+          "NO_LAYERS",
+          "applyLayers",
+          "assertLayerMask",
+          "defineLayer",
+          "isLayerMask",
+          "layerIndex",
+          "layerMask",
+          "layerMaskNames",
+          "layerName",
+          "layerNames",
+          "layersMatch",
+          "resetLayers",
           "DirectionalLight",
+          "PointLight",
+          "PunctualLight",
+          "SpotLight",
           "POSE_SNAPSHOT_PRIORITY",
           "PoseBuffer",
           "createSnapshotSystem",
@@ -11511,8 +12077,12 @@
           "TransformAuthority",
           "OrthographicCameraOptions",
           "PerspectiveCameraOptions",
+          "LayerMask",
+          "LayeredNode",
           "ColorRGB",
           "DirectionalLightOptions",
+          "PunctualLightOptions",
+          "SpotLightOptions",
           "PoseSnapshotSystem",
           "SnapshotSystemOptions",
           "NodeEventMap",
@@ -11530,7 +12100,27 @@
           "OrthographicCamera",
           "PerspectiveCamera",
           "Group",
+          "ALL_LAYERS",
+          "DEFAULT_LAYER",
+          "DEFAULT_LAYER_MASK",
+          "DEFAULT_LAYER_NAME",
+          "LAYER_COUNT",
+          "NO_LAYERS",
+          "applyLayers",
+          "assertLayerMask",
+          "defineLayer",
+          "isLayerMask",
+          "layerIndex",
+          "layerMask",
+          "layerMaskNames",
+          "layerName",
+          "layerNames",
+          "layersMatch",
+          "resetLayers",
           "DirectionalLight",
+          "PointLight",
+          "PunctualLight",
+          "SpotLight",
           "POSE_SNAPSHOT_PRIORITY",
           "PoseBuffer",
           "createSnapshotSystem",
@@ -11546,8 +12136,12 @@
           "TransformAuthority",
           "OrthographicCameraOptions",
           "PerspectiveCameraOptions",
+          "LayerMask",
+          "LayeredNode",
           "ColorRGB",
           "DirectionalLightOptions",
+          "PunctualLightOptions",
+          "SpotLightOptions",
           "PoseSnapshotSystem",
           "SnapshotSystemOptions",
           "NodeEventMap",
@@ -11603,8 +12197,66 @@
           "POSE_SNAPSHOT_PRIORITY"
         ]
       },
+      "packages/scene/src/layers.ts": {
+        "description": "Symbolic layers and their compiled masks (§46).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "LAYER_COUNT",
+          "DEFAULT_LAYER_NAME",
+          "DEFAULT_LAYER",
+          "DEFAULT_LAYER_MASK",
+          "ALL_LAYERS",
+          "NO_LAYERS",
+          "defineLayer",
+          "layerIndex",
+          "layerName",
+          "layerNames",
+          "layerMask",
+          "layerMaskNames",
+          "layersMatch",
+          "isLayerMask",
+          "assertLayerMask",
+          "applyLayers",
+          "resetLayers"
+        ],
+        "interfaces": [
+          "LayeredNode"
+        ],
+        "functions": [
+          "defineLayer",
+          "layerIndex",
+          "layerName",
+          "layerNames",
+          "layerMask",
+          "layerMaskNames",
+          "layersMatch",
+          "isLayerMask",
+          "assertLayerMask",
+          "applyLayers",
+          "resetLayers"
+        ],
+        "constants": [
+          "LAYER_COUNT",
+          "DEFAULT_LAYER_NAME",
+          "DEFAULT_LAYER",
+          "DEFAULT_LAYER_MASK",
+          "ALL_LAYERS",
+          "NO_LAYERS"
+        ]
+      },
       "packages/scene/src/light.ts": {
-        "description": "Lights (§68) — the MVP tier: one directional light node.",
+        "description": "Lights (§68) — the multi-light tier: directional, point, and spot nodes.",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -11628,16 +12280,40 @@
             "imports": [
               "Vector3"
             ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGB"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGB"
+            ]
           }
         ],
         "exports": [
-          "DirectionalLight"
+          "DirectionalLight",
+          "PointLight",
+          "SpotLight",
+          "ColorRGB"
+        ],
+        "reExported": [
+          "ColorRGB"
         ],
         "classes": [
-          "DirectionalLight"
+          "DirectionalLight",
+          "PointLight",
+          "SpotLight"
         ],
         "interfaces": [
-          "DirectionalLightOptions"
+          "DirectionalLightOptions",
+          "PunctualLightOptions",
+          "SpotLightOptions"
         ]
       },
       "packages/scene/src/node.ts": {
@@ -11650,6 +12326,13 @@
             "imports": [
               "DEFAULT_TRANSFORM_AUTHORITY",
               "TransformAuthority"
+            ]
+          },
+          {
+            "file": "./layers.js",
+            "imports": [
+              "DEFAULT_LAYER_MASK",
+              "LayerMask"
             ]
           },
           {
@@ -11800,6 +12483,13 @@
             "file": "./camera.js",
             "imports": [
               "Camera"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./layers.js",
+            "imports": [
+              "LayerMask"
             ],
             "typeOnly": true
           }
@@ -13301,7 +13991,8 @@
           "packages/geometry/src/primitive-support.ts",
           "packages/geometry/src/primitives-3d.ts",
           "packages/geometry/src/primitives.ts",
-          "packages/geometry/src/resource-memory.ts"
+          "packages/geometry/src/resource-memory.ts",
+          "packages/geometry/src/tessellation.ts"
         ]
       },
       {
@@ -13324,6 +14015,7 @@
           "packages/materials/src/lit-material.ts",
           "packages/materials/src/material.ts",
           "packages/materials/src/sprite-material.ts",
+          "packages/materials/src/standard-material.ts",
           "packages/materials/src/texture.ts",
           "packages/materials/src/unlit-material.ts"
         ]
@@ -13461,6 +14153,7 @@
           "packages/render-webgl/src/gl-particles.ts",
           "packages/render-webgl/src/gl-program.ts",
           "packages/render-webgl/src/gl-render-target.ts",
+          "packages/render-webgl/src/gl-standard.ts",
           "packages/render-webgl/src/gl-texture.ts",
           "packages/render-webgl/src/index.ts",
           "packages/render-webgl/src/register.ts",
@@ -13481,6 +14174,7 @@
           "packages/scene/src/group.ts",
           "packages/scene/src/index.ts",
           "packages/scene/src/interpolation.ts",
+          "packages/scene/src/layers.ts",
           "packages/scene/src/light.ts",
           "packages/scene/src/node.ts",
           "packages/scene/src/pose-target.ts",
@@ -13528,18 +14222,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 196,
+    "totalTypeScriptFiles": 200,
     "totalModules": 24,
-    "totalLinesOfCode": 77300,
-    "totalExports": 1664,
-    "totalClasses": 106,
-    "totalInterfaces": 353,
-    "totalFunctions": 287,
-    "totalTypeGuards": 15,
+    "totalLinesOfCode": 84091,
+    "totalExports": 1788,
+    "totalClasses": 111,
+    "totalInterfaces": 373,
+    "totalFunctions": 317,
+    "totalTypeGuards": 18,
     "totalEnums": 0,
-    "totalConstants": 217,
-    "totalReExports": 1076,
-    "totalTypeOnlyImports": 220,
+    "totalConstants": 230,
+    "totalReExports": 1152,
+    "totalTypeOnlyImports": 227,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 1,
     "unusedFilesCount": 0,

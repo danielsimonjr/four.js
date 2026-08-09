@@ -28,6 +28,26 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-25 §52 tessellation.** Decisions worth keeping:
+  - **§52 ships ear clipping, not monotone — the deciding argument is determinism**
+    (sweep-line equal-y tie-breaking is where a determinism claim quietly stops being
+    true), not simplicity; `PolygonTessellator` is the swap seam.
+  - **First cross-platform-tier §33 claim in the repo**: exactly-rounded IEEE ops only,
+    squared distances, cross-product signs, integer tie-breaks — no
+    `atan2`/`sqrt`/`hypot`. An edit introducing a transcendental there breaks the
+    golden's _stated tier_, not just its numbers.
+  - **A tessellator must prove its input simple before clipping** — ear clipping fed a
+    pentagram succeeds _wrongly_; the O(n²) pairwise proof costs nothing beside the
+    O(n²) clip and makes every §85 refusal precise.
+  - **Bridged rings are only weakly simple** — the two-ears theorem does not apply;
+    the two real bugs (bridge-seam self-veto, stacked bridges) were found by fuzzing
+    against an area/winding oracle, not by reasoning. The multi-hole residual
+    (~2/1000 refused, never wrong) is documented in-source with the fuzz table.
+  - `Point2D` now lives in `tessellation.ts` (export path unchanged). Third
+    shared-worktree incident class: **an agent's in-flight file can be silently
+    reverted to HEAD by a concurrent process** — verify with `md5sum` vs
+    `git show HEAD:` after any unexplained modification notice.
+
 - **2026-08-09 — R-17 §68 multi-light.** Decisions worth keeping:
   - **The bound is the shader's, not the API's** — `MAX_PUNCTUAL_LIGHTS = 8` is a TS
     constant interpolated into the GLSL so the two cannot disagree; a runtime

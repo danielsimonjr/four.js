@@ -12,7 +12,6 @@ export type {
   ExtrudeGeometryOptions,
   HeightFieldGeometryOptions,
   LatheGeometryOptions,
-  Point2D,
   Point3D,
   SphereGeometryOptions,
   TaperedGeometryOptions,
@@ -34,6 +33,14 @@ export type {
   BoxGeometryOptions,
   CircleGeometry2DOptions,
   PlaneGeometryOptions,
+  PolygonGeometry2DOptions,
 } from "./primitives.js";
-export { boxGeometry, circleGeometry2D, planeGeometry } from "./primitives.js";
+export {
+  boxGeometry,
+  circleGeometry2D,
+  planeGeometry,
+  polygonGeometry2D,
+} from "./primitives.js";
 export { geometryMemoryBytes, liveGeometryCount } from "./resource-memory.js";
+export type { Point2D, PolygonTessellator } from "./tessellation.js";
+export { earClippingTessellator, triangulatePolygon } from "./tessellation.js";

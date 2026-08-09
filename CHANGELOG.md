@@ -8,6 +8,45 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-25 closed (polygon tier): §52 tessellation; the 2D vector stack begins
+
+#### Added
+
+- **§52 polygon tessellation (`packages/geometry/src/tessellation.ts`, R-25)** — the
+  load-bearing prerequisite of the entire 2D vector stack: `triangulatePolygon(outline,
+holes?)` (ear clipping with bridged holes, O(n²), no dependencies, nothing vendored),
+  the `PolygonTessellator` replaceability seam §52 demands, `earClippingTessellator`,
+  and `polygonGeometry2D` (§50's "arbitrary polygon" as a standard `BufferGeometry`).
+  **The deciding argument for ear clipping over monotone decomposition is determinism,
+  not simplicity** — sweep-line equal-y tie-breaking is exactly where a determinism
+  claim quietly stops being true; the seam makes the upgrade one export.
+- **The repo's first cross-platform-tier §33 claim**: only exactly-rounded IEEE ops
+  (`+ - * /`), squared distances, cross-product signs, integer tie-breaks — no
+  `atan2`/`sqrt`/`hypot` anywhere (the classic angle-sort tricks are precisely how a
+  tessellator acquires a platform dependency). Pinned by
+  `tests/determinism/tessellation.test.ts` + `golden/tessellation.json` (8 hand shapes
+  - 200 seeded integer-grid stars, refusals recorded too, fresh-process matched). Any
+    future edit introducing a transcendental there breaks a committed golden's _stated
+    tier_, not just its numbers.
+- **Simplicity is proved, not assumed**: ear clipping fed a pentagram succeeds
+  _wrongly_ (silently overlapping triangles), so the module proves the input simple
+  before clipping and refuses with both rings named (§85). The honest measured limit
+  is in-source: 60 000 adversarial fuzz cases against an area/winding oracle —
+  hole-free and single-hole inputs **never failed** (26 641 cases); ~2/1000 multi-hole
+  configurations are refused, **nothing was ever wrong**. Two real bugs the fuzz found
+  (bridge-seam self-veto, stacked bridges) are fixed — found by fuzzing against an
+  oracle, not by reasoning, because bridged rings are only weakly simple and the
+  two-ears theorem does not apply.
+- **`extrudeGeometry` no longer refuses concave capped outlines** — caps are
+  tessellated with one index list serving both ends (§52's index-buffer reuse), the
+  centroid vertex is gone (`2(n+1) → 2n`), and the superseded refusal is quoted in
+  place. Self-intersecting/zero-area outlines still refused pending §52's fill-rule
+  tier. Staged with dated notes naming their owners: stroke expansion + AA fringe →
+  R-16; adaptive subdivision + incremental rebuild → R-24; extrusion holes → the §50
+  shape-node question. **R-24's fill half now has no blocker; R-23 can build fill
+  geometry for all 14 §50 shapes via `polygonGeometry2D`.** Graph artifacts
+  regenerated (four new exports).
+
 ### 2026-08-09 — R-17 closed (eight-lamp forward tier): §68 multi-light
 
 #### Added

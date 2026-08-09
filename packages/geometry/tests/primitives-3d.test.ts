@@ -613,17 +613,21 @@ describe("extrudeGeometry (§53)", () => {
     const open = extrudeGeometry({ shape: square, depth: 1, capped: false });
 
     expect(open.vertexCount).toBe(4 * 4);
-    expect(capped.vertexCount).toBe(open.vertexCount + 2 * 5);
+    // One rim per cap, no centroid: §52's tessellator triangulates the outline
+    // itself, so a square's cap is 2 triangles rather than a 4-triangle fan.
+    expect(capped.vertexCount).toBe(open.vertexCount + 2 * 4);
     expect(open.drawCount).toBe(4 * 6);
-    expect(capped.drawCount).toBe(4 * 6 + 2 * 3 * 4);
+    expect(capped.drawCount).toBe(4 * 6 + 2 * 3 * 2);
 
-    // The front cap's centre is the first vertex after the side walls.
-    const frontCentre = 4 * 4;
-    expect(normalAt(capped, frontCentre)).toEqual({ x: 0, y: 0, z: 1 });
-    expect(vertex(capped, frontCentre).z).toBeCloseTo(0.5, 6);
-    const backCentre = frontCentre + 5;
-    expect(normalAt(capped, backCentre)).toEqual({ x: 0, y: 0, z: -1 });
+    // The front cap's rim is the first block of vertices after the side walls.
+    const frontRim = 4 * 4;
+    expect(normalAt(capped, frontRim)).toEqual({ x: 0, y: 0, z: 1 });
+    expect(vertex(capped, frontRim).z).toBeCloseTo(0.5, 6);
+    const backRim = frontRim + 4;
+    expect(normalAt(capped, backRim)).toEqual({ x: 0, y: 0, z: -1 });
+    expect(vertex(capped, backRim).z).toBeCloseTo(-0.5, 6);
     assertSurface(open, "open extrude");
+    assertSurface(capped, "capped extrude");
   });
 
   it("normalizes a clockwise outline, so either winding extrudes outwards", () => {
@@ -655,15 +659,17 @@ describe("extrudeGeometry (§53)", () => {
     expect(uvAt(geometry, 1)[0]).toBeCloseTo(3 / 8, 6);
     expect(uvAt(geometry, 3)).toEqual([0, 1]);
 
-    // The front cap's rim starts one past its centre; vertex (0, 0) maps to
-    // (0, 0) and (3, 1) to (1, 1).
-    const rim = 4 * 4 + 1;
+    // The front cap's rim is the first block after the side walls: vertex
+    // (0, 0) maps to (0, 0) and (3, 1) to (1, 1).
+    const rim = 4 * 4;
     expect(uvAt(geometry, rim)).toEqual([0, 0]);
     expect(uvAt(geometry, rim + 2)).toEqual([1, 1]);
   });
 
-  it("rejects outlines a centroid fan cannot cap (§52 lifts this)", () => {
-    // An L: convex nowhere near its inner corner.
+  it("caps a concave outline — the restriction §52's tessellator lifted", () => {
+    // An L: convex nowhere near its inner corner. Until 2026-08-09 this was
+    // `expect(() => extrudeGeometry({ shape: concave })).toThrow(/concave/)`,
+    // because the caps were a centroid fan that folded over such an outline.
     const concave = [
       { x: 0, y: 0 },
       { x: 2, y: 0 },
@@ -673,12 +679,49 @@ describe("extrudeGeometry (§53)", () => {
       { x: 0, y: 2 },
     ];
 
-    expect(() => extrudeGeometry({ shape: concave })).toThrow(/concave/);
-    // Uncapped, the same outline is fine: the side walls are correct for any
-    // simple outline.
+    const capped = extrudeGeometry({ shape: concave, depth: 0.5 });
+    expect(capped.vertexCount).toBe(concave.length * 4 + 2 * concave.length);
+    // Six points, four cap triangles per end.
+    expect(capped.drawCount).toBe(6 * 6 + 2 * 3 * 4);
+    expect(assertSurface(capped, "concave extrude").degenerate).toBe(0);
+
+    // The caps really cover the L's 3 square units, twice, and no more: a
+    // folded fan would have covered the 4-unit bounding square instead.
+    const indices = capped.indices ?? new Uint16Array();
+    let capArea = 0;
+    for (let i = 6 * 6; i < indices.length; i += 3) {
+      const a = vertex(capped, indices[i]);
+      const b = vertex(capped, indices[i + 1]);
+      const c = vertex(capped, indices[i + 2]);
+      capArea +=
+        Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2;
+    }
+    expect(capArea).toBeCloseTo(2 * 3, 10);
+
+    // Uncapped, the same outline is still fine, as it always was.
     const walls = extrudeGeometry({ shape: concave, capped: false });
     expect(walls.vertexCount).toBe(concave.length * 4);
     assertSurface(walls, "concave walls");
+  });
+
+  it("still refuses a self-intersecting outline when capped (§52 tier)", () => {
+    // A pentagram: §52's "self-intersections where well-defined" needs a fill
+    // rule this release does not ship, so the tessellator refuses and the
+    // extrusion refuses with it.
+    const pentagram: { x: number; y: number }[] = [];
+    for (let i = 0; i < 5; i += 1) {
+      const angle = (Math.PI * 2 * ((i * 2) % 5)) / 5;
+      pentagram.push({
+        x: Math.round(Math.cos(angle) * 1000),
+        y: Math.round(Math.sin(angle) * 1000),
+      });
+    }
+
+    expect(() => extrudeGeometry({ shape: pentagram })).toThrow(/not simple/);
+    // Uncapped it extrudes: side walls need no triangulation at all.
+    expect(
+      extrudeGeometry({ shape: pentagram, capped: false }).vertexCount,
+    ).toBe(5 * 4);
   });
 
   it("rejects degenerate outlines and depths", () => {
@@ -710,7 +753,8 @@ describe("extrudeGeometry (§53)", () => {
         capped: false,
       }),
     ).toThrow(/not finite/);
-    // A symmetric bowtie encloses no area at all.
+    // A symmetric bowtie encloses no area at all. The message now comes from
+    // the tessellator, which says "ring" where the fan's check said "outline".
     expect(() =>
       extrudeGeometry({
         shape: [
@@ -757,7 +801,13 @@ describe("extrudeGeometry (§53)", () => {
       depth: 0.2,
     });
 
-    expect(geometry.vertexCount).toBe(5 * 4 + 2 * 6);
+    // Five outline points, so five side quads and five rim vertices per cap —
+    // a collinear vertex keeps its wall and its cap vertex. What it does not
+    // get is a cap *triangle*: the tessellator drops it before clipping, so
+    // the caps are the 2 triangles of the effective square, not 3 (§52).
+    expect(geometry.vertexCount).toBe(5 * 4 + 2 * 5);
+    expect(geometry.drawCount).toBe(5 * 6 + 2 * 3 * 2);
+    expect(assertSurface(geometry, "collinear extrude").degenerate).toBe(0);
   });
 });
 

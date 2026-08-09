@@ -1,10 +1,10 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-07"
-  totalFiles: 196
+  lastUpdated: "2026-08-09"
+  totalFiles: 200
   totalModules: 24
-  totalExports: 1664
+  totalExports: 1788
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -1503,7 +1503,6 @@ modules:
         - collectCentersOfMass
         - collectContactPoints
         - collectContactImpulses
-        - solverStatistics
         - solverJointStatistics
         - DebugDrawBuffer
       classes:
@@ -1535,7 +1534,6 @@ modules:
         - collectCentersOfMass
         - collectContactPoints
         - collectContactImpulses
-        - solverStatistics
         - solverJointStatistics
       constants:
         - DEBUG_VERTEX_FLOATS
@@ -1597,7 +1595,6 @@ modules:
             - collectContactPoints
             - debugDrawStreams
             - solverJointStatistics
-            - solverStatistics
           reExport: true
         - file: ./resource-audit.js
           imports:
@@ -1614,6 +1611,7 @@ modules:
             - recordResourceMemory
             - recordSolverStatistics
             - resetFrameStats
+            - solverStatistics
           reExport: true
         - file: ./checksum.js
           imports:
@@ -1717,7 +1715,6 @@ modules:
         - collectContactPoints
         - debugDrawStreams
         - solverJointStatistics
-        - solverStatistics
         - NO_RESOURCE_LEAKS
         - auditResourceLeaks
         - copyFrameStats
@@ -1728,6 +1725,7 @@ modules:
         - recordResourceMemory
         - recordSolverStatistics
         - resetFrameStats
+        - solverStatistics
         - PACKAGE_NAME
         - Checksum
         - ReplayRecorderOptions
@@ -1802,7 +1800,6 @@ modules:
         - collectContactPoints
         - debugDrawStreams
         - solverJointStatistics
-        - solverStatistics
         - NO_RESOURCE_LEAKS
         - auditResourceLeaks
         - copyFrameStats
@@ -1813,6 +1810,7 @@ modules:
         - recordResourceMemory
         - recordSolverStatistics
         - resetFrameStats
+        - solverStatistics
         - Checksum
         - ReplayRecorderOptions
         - ReplaySnapshot
@@ -2007,6 +2005,7 @@ modules:
       internalDependencies:
         - file: ./debug-draw.js
           imports:
+            - DebugBodyAccess
             - SolverStatistics
           typeOnly: true
       workspaceDependencies: []
@@ -2017,6 +2016,7 @@ modules:
         - copyFrameStats
         - recordRenderStatistics
         - recordResourceMemory
+        - solverStatistics
         - recordSolverStatistics
         - createMonotonicClock
       interfaces:
@@ -2029,6 +2029,7 @@ modules:
         - copyFrameStats
         - recordRenderStatistics
         - recordResourceMemory
+        - solverStatistics
         - recordSolverStatistics
         - createMonotonicClock
       constants:
@@ -2066,8 +2067,11 @@ modules:
             - monotonicNowSeconds
             - recordRenderStatistics
             - recordResourceMemory
+            - recordSolverStatistics
             - resetFrameStats
+            - solverStatistics
             - FrameStats
+            - SolverStatistics
         - package: "@four/geometry"
           directory: packages/geometry
           imports:
@@ -2077,14 +2081,24 @@ modules:
           imports:
             - DEFAULT_FIXED_DELTA_TIME
             - DEFAULT_MAXIMUM_SUB_STEPS
+            - PRIORITY_PHYSICS_SOLVE
             - Scheduler
             - SystemRegistry
             - Detach
             - ReadonlyTimeState
+            - SimulationSystem
         - package: "@four/math"
           directory: packages/math
           imports:
             - DepthRange
+        - package: "@four/assets"
+          directory: packages/assets
+          imports:
+            - AssetManager
+        - package: "@four/physics"
+          directory: packages/physics
+          imports:
+            - PhysicsWorld
         - package: "@four/scene"
           directory: packages/scene
           imports:
@@ -2114,6 +2128,7 @@ modules:
         - Application
       interfaces:
         - ApplicationEventMap
+        - PhysicsWorldContext
         - ApplicationOptions
     packages/four/src/assets.ts:
       description: assets module
@@ -2186,10 +2201,12 @@ modules:
             - ORTHOGRAPHIC_CAMERA_NODE_TYPE
             - PANEL_NODE_TYPE
             - PERSPECTIVE_CAMERA_NODE_TYPE
+            - POINT_LIGHT_NODE_TYPE
             - PROGRESS_NODE_TYPE
             - RADIO_BUTTON_NODE_TYPE
             - RENDERABLE_NODE_TYPE
             - SLIDER_NODE_TYPE
+            - SPOT_LIGHT_NODE_TYPE
             - SPRITE_NODE_TYPE
             - TOGGLE_NODE_TYPE
             - composeSceneNodeTypes
@@ -2204,6 +2221,10 @@ modules:
           imports:
             - ApplicationEventMap
             - ApplicationOptions
+            - PhysicsWorldContext
+            - PhysicsWorldFactory
+            - SurfaceObserver
+            - SurfaceResize
           reExport: true
           typeOnly: true
         - file: ./scene-serializers.js
@@ -2226,10 +2247,12 @@ modules:
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - PANEL_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
+        - POINT_LIGHT_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - RADIO_BUTTON_NODE_TYPE
         - RENDERABLE_NODE_TYPE
         - SLIDER_NODE_TYPE
+        - SPOT_LIGHT_NODE_TYPE
         - SPRITE_NODE_TYPE
         - TOGGLE_NODE_TYPE
         - composeSceneNodeTypes
@@ -2241,6 +2264,10 @@ modules:
         - restoreNodeId
         - ApplicationEventMap
         - ApplicationOptions
+        - PhysicsWorldContext
+        - PhysicsWorldFactory
+        - SurfaceObserver
+        - SurfaceResize
         - SceneNodeTypeOptions
         - SceneNodeTypeSupport
         - SceneResourceCatalog
@@ -2256,10 +2283,12 @@ modules:
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - PANEL_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
+        - POINT_LIGHT_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - RADIO_BUTTON_NODE_TYPE
         - RENDERABLE_NODE_TYPE
         - SLIDER_NODE_TYPE
+        - SPOT_LIGHT_NODE_TYPE
         - SPRITE_NODE_TYPE
         - TOGGLE_NODE_TYPE
         - composeSceneNodeTypes
@@ -2271,6 +2300,10 @@ modules:
         - restoreNodeId
         - ApplicationEventMap
         - ApplicationOptions
+        - PhysicsWorldContext
+        - PhysicsWorldFactory
+        - SurfaceObserver
+        - SurfaceResize
         - SceneNodeTypeOptions
         - SceneNodeTypeSupport
         - SceneResourceCatalog
@@ -2503,6 +2536,8 @@ modules:
             - DirectionalLight
             - OrthographicCamera
             - PerspectiveCamera
+            - PointLight
+            - SpotLight
             - restoreNodeId
             - Node
         - package: "@four/serialization"
@@ -2549,6 +2584,8 @@ modules:
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
+        - POINT_LIGHT_NODE_TYPE
+        - SPOT_LIGHT_NODE_TYPE
         - resourceCatalog
         - registerUISerializers
         - registerRenderSerializers
@@ -2582,6 +2619,8 @@ modules:
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
+        - POINT_LIGHT_NODE_TYPE
+        - SPOT_LIGHT_NODE_TYPE
     packages/four/src/scene.ts:
       description: scene module
       externalDependencies: []
@@ -2660,7 +2699,7 @@ modules:
         - GeometryBounds
         - BufferGeometryOptions
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 32 symbols)
+      description: Package entry point for @four/geometry (re-exports 37 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -2685,11 +2724,17 @@ modules:
             - boxGeometry
             - circleGeometry2D
             - planeGeometry
+            - polygonGeometry2D
           reExport: true
         - file: ./resource-memory.js
           imports:
             - geometryMemoryBytes
             - liveGeometryCount
+          reExport: true
+        - file: ./tessellation.js
+          imports:
+            - earClippingTessellator
+            - triangulatePolygon
           reExport: true
         - file: ./buffer-geometry.js
           imports:
@@ -2705,7 +2750,6 @@ modules:
             - ExtrudeGeometryOptions
             - HeightFieldGeometryOptions
             - LatheGeometryOptions
-            - Point2D
             - Point3D
             - SphereGeometryOptions
             - TaperedGeometryOptions
@@ -2718,6 +2762,13 @@ modules:
             - BoxGeometryOptions
             - CircleGeometry2DOptions
             - PlaneGeometryOptions
+            - PolygonGeometry2DOptions
+          reExport: true
+          typeOnly: true
+        - file: ./tessellation.js
+          imports:
+            - Point2D
+            - PolygonTessellator
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -2735,8 +2786,11 @@ modules:
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
+        - polygonGeometry2D
         - geometryMemoryBytes
         - liveGeometryCount
+        - earClippingTessellator
+        - triangulatePolygon
         - PACKAGE_NAME
         - BufferGeometryOptions
         - GeometryBounds
@@ -2746,7 +2800,6 @@ modules:
         - ExtrudeGeometryOptions
         - HeightFieldGeometryOptions
         - LatheGeometryOptions
-        - Point2D
         - Point3D
         - SphereGeometryOptions
         - TaperedGeometryOptions
@@ -2755,6 +2808,9 @@ modules:
         - BoxGeometryOptions
         - CircleGeometry2DOptions
         - PlaneGeometryOptions
+        - PolygonGeometry2DOptions
+        - Point2D
+        - PolygonTessellator
       reExported:
         - BufferGeometry
         - capsuleGeometry
@@ -2769,8 +2825,11 @@ modules:
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
+        - polygonGeometry2D
         - geometryMemoryBytes
         - liveGeometryCount
+        - earClippingTessellator
+        - triangulatePolygon
         - BufferGeometryOptions
         - GeometryBounds
         - GeometryDrawMode
@@ -2779,7 +2838,6 @@ modules:
         - ExtrudeGeometryOptions
         - HeightFieldGeometryOptions
         - LatheGeometryOptions
-        - Point2D
         - Point3D
         - SphereGeometryOptions
         - TaperedGeometryOptions
@@ -2788,6 +2846,9 @@ modules:
         - BoxGeometryOptions
         - CircleGeometry2DOptions
         - PlaneGeometryOptions
+        - PolygonGeometry2DOptions
+        - Point2D
+        - PolygonTessellator
       constants:
         - PACKAGE_NAME
     packages/geometry/src/primitive-support.ts:
@@ -2827,6 +2888,10 @@ modules:
             - requireSegments
             - writeCap
             - IndexArray
+        - file: ./tessellation.js
+          imports:
+            - triangulatePolygon
+            - Point2D
       workspaceDependencies: []
       exports:
         - sphereGeometry
@@ -2839,7 +2904,6 @@ modules:
         - tubeGeometry
         - heightFieldGeometry
       interfaces:
-        - Point2D
         - Point3D
         - SphereGeometryOptions
         - TaperedGeometryOptions
@@ -2871,19 +2935,26 @@ modules:
           imports:
             - createIndices
             - requirePositive
+        - file: ./tessellation.js
+          imports:
+            - triangulatePolygon
+            - Point2D
       workspaceDependencies: []
       exports:
         - boxGeometry
         - planeGeometry
         - circleGeometry2D
+        - polygonGeometry2D
       interfaces:
         - BoxGeometryOptions
         - PlaneGeometryOptions
         - CircleGeometry2DOptions
+        - PolygonGeometry2DOptions
       functions:
         - boxGeometry
         - planeGeometry
         - circleGeometry2D
+        - polygonGeometry2D
     packages/geometry/src/resource-memory.ts:
       description: §83 resource accounting for geometries — how many are live, and how many
       externalDependencies: []
@@ -2898,6 +2969,29 @@ modules:
         - noteGeometry
         - geometryMemoryBytes
         - liveGeometryCount
+    packages/geometry/src/tessellation.ts:
+      description: Polygon tessellation (§52) — the isolated module that turns a closed 2D
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./buffer-geometry.js
+          imports:
+            - GeometryIndexArray
+          typeOnly: true
+        - file: ./primitive-support.js
+          imports:
+            - createIndices
+      workspaceDependencies: []
+      exports:
+        - earClippingTessellator
+        - triangulatePolygon
+      interfaces:
+        - Point2D
+        - PolygonTessellator
+      functions:
+        - triangulatePolygon
+      constants:
+        - earClippingTessellator
   packages/input:
     packages/input/src/drag.ts:
       description: "Dragging (§72, §120): press a node, move the pointer, get world-space deltas."
@@ -3270,7 +3364,7 @@ modules:
         - dispatchThreePhase
   packages/materials:
     packages/materials/src/index.ts:
-      description: Package entry point for @four/materials (re-exports 12 symbols)
+      description: Package entry point for @four/materials (re-exports 15 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3285,6 +3379,10 @@ modules:
         - file: ./sprite-material.js
           imports:
             - SpriteMaterial
+          reExport: true
+        - file: ./standard-material.js
+          imports:
+            - StandardMaterial
           reExport: true
         - file: ./unlit-material.js
           imports:
@@ -3307,6 +3405,12 @@ modules:
             - SpriteTexture
           reExport: true
           typeOnly: true
+        - file: ./standard-material.js
+          imports:
+            - ColorRGB
+            - StandardMaterialOptions
+          reExport: true
+          typeOnly: true
         - file: ./texture.js
           imports:
             - MaterialTexture
@@ -3323,6 +3427,7 @@ modules:
         - LitMaterial
         - Material
         - SpriteMaterial
+        - StandardMaterial
         - UnlitMaterial
         - PACKAGE_NAME
         - LitMaterialOptions
@@ -3330,6 +3435,8 @@ modules:
         - MaterialOptions
         - SpriteMaterialOptions
         - SpriteTexture
+        - ColorRGB
+        - StandardMaterialOptions
         - MaterialTexture
         - ColorRGBA
         - UnlitMaterialOptions
@@ -3337,12 +3444,15 @@ modules:
         - LitMaterial
         - Material
         - SpriteMaterial
+        - StandardMaterial
         - UnlitMaterial
         - LitMaterialOptions
         - BlendMode
         - MaterialOptions
         - SpriteMaterialOptions
         - SpriteTexture
+        - ColorRGB
+        - StandardMaterialOptions
         - MaterialTexture
         - ColorRGBA
         - UnlitMaterialOptions
@@ -3409,12 +3519,48 @@ modules:
         - SpriteMaterial
       interfaces:
         - SpriteMaterialOptions
+    packages/materials/src/standard-material.ts:
+      description: "`StandardMaterial` (§59) — the metallic-roughness workflow, at the tier this"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./material.js
+          imports:
+            - Material
+            - MaterialOptions
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGB
+            - ColorRGBA
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGB
+      exports:
+        - StandardMaterial
+        - ColorRGB
+      reExported:
+        - ColorRGB
+      classes:
+        - StandardMaterial
+      interfaces:
+        - StandardMaterialOptions
     packages/materials/src/texture.ts:
       description: The read surface of a texture as a **material** and a rendering backend see
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
-      workspaceDependencies: []
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorSpace
       exports: []
       interfaces:
         - MaterialTexture
@@ -3465,14 +3611,31 @@ modules:
         - constructionCount
         - resetConstructionCount
     packages/math/src/color.ts:
-      description: The color value type shared by materials and animation (§60a, plan P4-2).
+      description: Colour value types, the sRGB transfer functions, and CSS colour-string
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
       workspaceDependencies: []
-      exports: []
+      exports:
+        - srgbToLinear
+        - linearToSrgb
+        - srgbToLinearRGB
+        - linearToSrgbRGB
+        - srgbToLinearRGBA
+        - linearToSrgbRGBA
+        - parseColor
+        - parseColorRGB
+      functions:
+        - srgbToLinear
+        - linearToSrgb
+        - srgbToLinearRGB
+        - linearToSrgbRGB
+        - srgbToLinearRGBA
+        - linearToSrgbRGBA
+        - parseColor
+        - parseColorRGB
     packages/math/src/index.ts:
-      description: Package entry point for @four/math (re-exports 10 symbols)
+      description: Package entry point for @four/math (re-exports 20 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3480,6 +3643,17 @@ modules:
           imports:
             - constructionCount
             - resetConstructionCount
+          reExport: true
+        - file: ./color.js
+          imports:
+            - linearToSrgb
+            - linearToSrgbRGB
+            - linearToSrgbRGBA
+            - parseColor
+            - parseColorRGB
+            - srgbToLinear
+            - srgbToLinearRGB
+            - srgbToLinearRGBA
           reExport: true
         - file: ./matrix3.js
           imports:
@@ -3507,7 +3681,9 @@ modules:
           reExport: true
         - file: ./color.js
           imports:
+            - ColorRGB
             - ColorRGBA
+            - ColorSpace
           reExport: true
           typeOnly: true
         - file: ./matrix4.js
@@ -3519,6 +3695,14 @@ modules:
       exports:
         - constructionCount
         - resetConstructionCount
+        - linearToSrgb
+        - linearToSrgbRGB
+        - linearToSrgbRGBA
+        - parseColor
+        - parseColorRGB
+        - srgbToLinear
+        - srgbToLinearRGB
+        - srgbToLinearRGBA
         - Matrix3
         - Matrix4
         - Quaternion
@@ -3526,18 +3710,30 @@ modules:
         - Vector3
         - Vector4
         - PACKAGE_NAME
+        - ColorRGB
         - ColorRGBA
+        - ColorSpace
         - DepthRange
       reExported:
         - constructionCount
         - resetConstructionCount
+        - linearToSrgb
+        - linearToSrgbRGB
+        - linearToSrgbRGBA
+        - parseColor
+        - parseColorRGB
+        - srgbToLinear
+        - srgbToLinearRGB
+        - srgbToLinearRGBA
         - Matrix3
         - Matrix4
         - Quaternion
         - Vector2
         - Vector3
         - Vector4
+        - ColorRGB
         - ColorRGBA
+        - ColorSpace
         - DepthRange
       constants:
         - PACKAGE_NAME
@@ -5218,8 +5414,12 @@ modules:
           imports:
             - COLLISION_SHAPE_TYPES_2D
             - COLLISION_SHAPE_TYPES_3D
+            - COMPOSITE_COLLISION_SHAPE_TYPES
+            - shapeIsConvex
+            - shapeMaximumExtent
             - shapeSupportsDimension
             - validateCollisionShape
+            - validateQueryShape
           reExport: true
         - file: ./types.js
           imports:
@@ -5388,14 +5588,21 @@ modules:
           imports:
             - BoxShape
             - CapsuleShape
+            - ChainShape
             - CircleShape
             - CollisionShape
             - CollisionShape2D
             - CollisionShape3D
             - CollisionShapeType
+            - ConeShape
+            - ConvexHullShape
+            - CylinderShape
+            - HeightFieldShape
             - PolygonShape
+            - PolylineShape
             - RectangleShape
             - SphereShape
+            - TriangleMeshShape
           reExport: true
           typeOnly: true
         - file: ./types.js
@@ -5491,8 +5698,12 @@ modules:
         - resolveSolver
         - COLLISION_SHAPE_TYPES_2D
         - COLLISION_SHAPE_TYPES_3D
+        - COMPOSITE_COLLISION_SHAPE_TYPES
+        - shapeIsConvex
+        - shapeMaximumExtent
         - shapeSupportsDimension
         - validateCollisionShape
+        - validateQueryShape
         - BODY_TYPES
         - CCD_MODES
         - COMBINE_MODES
@@ -5602,14 +5813,21 @@ modules:
         - SolverSelection
         - BoxShape
         - CapsuleShape
+        - ChainShape
         - CircleShape
         - CollisionShape
         - CollisionShape2D
         - CollisionShape3D
         - CollisionShapeType
+        - ConeShape
+        - ConvexHullShape
+        - CylinderShape
+        - HeightFieldShape
         - PolygonShape
+        - PolylineShape
         - RectangleShape
         - SphereShape
+        - TriangleMeshShape
         - AngularVelocityInput
         - BodyType
         - CCDMode
@@ -5694,8 +5912,12 @@ modules:
         - resolveSolver
         - COLLISION_SHAPE_TYPES_2D
         - COLLISION_SHAPE_TYPES_3D
+        - COMPOSITE_COLLISION_SHAPE_TYPES
+        - shapeIsConvex
+        - shapeMaximumExtent
         - shapeSupportsDimension
         - validateCollisionShape
+        - validateQueryShape
         - BODY_TYPES
         - CCD_MODES
         - COMBINE_MODES
@@ -5804,14 +6026,21 @@ modules:
         - SolverSelection
         - BoxShape
         - CapsuleShape
+        - ChainShape
         - CircleShape
         - CollisionShape
         - CollisionShape2D
         - CollisionShape3D
         - CollisionShapeType
+        - ConeShape
+        - ConvexHullShape
+        - CylinderShape
+        - HeightFieldShape
         - PolygonShape
+        - PolylineShape
         - RectangleShape
         - SphereShape
+        - TriangleMeshShape
         - AngularVelocityInput
         - BodyType
         - CCDMode
@@ -6234,21 +6463,36 @@ modules:
       exports:
         - COLLISION_SHAPE_TYPES_2D
         - COLLISION_SHAPE_TYPES_3D
+        - COMPOSITE_COLLISION_SHAPE_TYPES
+        - shapeIsConvex
         - shapeSupportsDimension
+        - shapeMaximumExtent
+        - validateQueryShape
         - validateCollisionShape
       interfaces:
         - CircleShape
         - RectangleShape
         - CapsuleShape
         - PolygonShape
+        - PolylineShape
+        - ChainShape
         - SphereShape
         - BoxShape
+        - CylinderShape
+        - ConeShape
+        - ConvexHullShape
+        - TriangleMeshShape
+        - HeightFieldShape
       functions:
+        - shapeIsConvex
         - shapeSupportsDimension
+        - shapeMaximumExtent
+        - validateQueryShape
         - validateCollisionShape
       constants:
         - COLLISION_SHAPE_TYPES_2D
         - COLLISION_SHAPE_TYPES_3D
+        - COMPOSITE_COLLISION_SHAPE_TYPES
     packages/physics/src/solver-registry.ts:
       description: "The §37 solver registry — how `solver: \"auto\"` becomes an adapter without"
       externalDependencies: []
@@ -6498,6 +6742,9 @@ modules:
           imports:
             - CollisionShape
           typeOnly: true
+        - file: ./shapes.js
+          imports:
+            - shapeMaximumExtent
         - file: ./solver-registry.js
           imports:
             - SolverRegistry
@@ -6656,6 +6903,7 @@ modules:
         - packInteractionGroups
         - createRapierShape
         - createRapierColliderDesc
+        - requireHullDesc
       functions:
         - createRapierVector2
         - toRapierVector2
@@ -6670,6 +6918,7 @@ modules:
         - packInteractionGroups
         - createRapierShape
         - createRapierColliderDesc
+        - requireHullDesc
     packages/physics-rapier/src/conversions3d.ts:
       description: The §21/P5-3 mapping between the engine's 3D-typed physics API and Rapier's
       externalDependencies: []
@@ -6729,6 +6978,7 @@ modules:
         - packInteractionGroups3d
         - createRapierShape3d
         - createRapierColliderDesc3d
+        - requireHullDesc3d
         - rotateVectorByRotation3
         - RapierRotation3
         - RapierVector3
@@ -6748,6 +6998,7 @@ modules:
         - packInteractionGroups3d
         - createRapierShape3d
         - createRapierColliderDesc3d
+        - requireHullDesc3d
         - rotateVectorByRotation3
     packages/physics-rapier/src/index.ts:
       description: "`@four/physics-rapier` — the Rapier solver adapters (§37, §102, §108)."
@@ -7047,9 +7298,9 @@ modules:
             - resolveSleepingConfig
             - sortHitsByDistance
             - validateColliderDescriptor
-            - validateCollisionShape
             - validateJointDescriptor
             - validatePhysicsWorldOptions
+            - validateQueryShape
             - validateRigidBodyDescriptor
         - package: "@four/physics"
           directory: packages/physics
@@ -7162,9 +7413,9 @@ modules:
             - resolveSleepingConfig
             - sortHitsByDistance
             - validateColliderDescriptor
-            - validateCollisionShape
             - validateJointDescriptor
             - validatePhysicsWorldOptions
+            - validateQueryShape
             - validateRigidBodyDescriptor
         - package: "@four/physics"
           directory: packages/physics
@@ -7259,6 +7510,7 @@ modules:
             - isRenderTargetTexture
       workspaceDependencies: []
       exports:
+        - OUTPUT_TRANSFORM_EFFECT
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - supportsScreenEffects
@@ -7266,16 +7518,18 @@ modules:
       interfaces:
         - CopyEffect
         - ColorGradeEffect
+        - OutputTransformEffect
         - EffectRenderPass
         - ScreenEffectRenderer
       functions:
         - supportsScreenEffects
         - validateEffectRenderPass
       constants:
+        - OUTPUT_TRANSFORM_EFFECT
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 84 symbols)
+      description: Package entry point for @four/render (re-exports 96 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -7283,14 +7537,17 @@ modules:
           imports:
             - COLOR_GRADE_DEFAULTS
             - COPY_EFFECT
+            - OUTPUT_TRANSFORM_EFFECT
             - supportsScreenEffects
             - validateEffectRenderPass
           reExport: true
         - file: ./lights.js
           imports:
+            - MAX_PUNCTUAL_LIGHTS
             - collectSceneLights
             - createSceneLights
             - isDirectionalLightSource
+            - isPunctualLightSource
           reExport: true
         - file: ./particles.js
           imports:
@@ -7308,7 +7565,9 @@ modules:
             - isLitItem
             - isParticlesItem
             - isSpriteItem
+            - isStandardItem
             - isUnlitItem
+            - viewLayerMask
           reExport: true
         - file: ./render-graph.js
           imports:
@@ -7361,6 +7620,7 @@ modules:
             - ColorGradeEffect
             - CopyEffect
             - EffectRenderPass
+            - OutputTransformEffect
             - ScreenEffect
             - ScreenEffectKind
             - ScreenEffectRenderer
@@ -7370,7 +7630,11 @@ modules:
           imports:
             - AmbientLightSource
             - DirectionalLightSource
+            - PointLightSource
+            - PunctualLightSource
+            - PunctualLightSourceBase
             - SceneLights
+            - SpotLightSource
           reExport: true
           typeOnly: true
         - file: ./particles.js
@@ -7385,6 +7649,7 @@ modules:
             - RenderItem
             - RenderItemKind
             - SpriteRenderItem
+            - StandardRenderItem
             - UnlitRenderItem
           reExport: true
           typeOnly: true
@@ -7442,6 +7707,7 @@ modules:
           typeOnly: true
         - file: ./sprite.js
           imports:
+            - SpriteFrame
             - SpriteOptions
           reExport: true
           typeOnly: true
@@ -7454,11 +7720,14 @@ modules:
       exports:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
+        - OUTPUT_TRANSFORM_EFFECT
         - supportsScreenEffects
         - validateEffectRenderPass
+        - MAX_PUNCTUAL_LIGHTS
         - collectSceneLights
         - createSceneLights
         - isDirectionalLightSource
+        - isPunctualLightSource
         - PARTICLE_COLOR_OFFSET
         - PARTICLE_INSTANCE_FLOATS
         - PARTICLE_POSITION_OFFSET
@@ -7470,7 +7739,9 @@ modules:
         - isLitItem
         - isParticlesItem
         - isSpriteItem
+        - isStandardItem
         - isUnlitItem
+        - viewLayerMask
         - RenderGraph
         - RenderTarget
         - isRenderTargetTexture
@@ -7494,18 +7765,24 @@ modules:
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
+        - OutputTransformEffect
         - ScreenEffect
         - ScreenEffectKind
         - ScreenEffectRenderer
         - AmbientLightSource
         - DirectionalLightSource
+        - PointLightSource
+        - PunctualLightSource
+        - PunctualLightSourceBase
         - SceneLights
+        - SpotLightSource
         - ParticleDrawable
         - LitRenderItem
         - ParticleRenderItem
         - RenderItem
         - RenderItemKind
         - SpriteRenderItem
+        - StandardRenderItem
         - UnlitRenderItem
         - AddPassOptions
         - CustomRenderPass
@@ -7535,16 +7812,20 @@ modules:
         - ResizeRecord
         - RenderStatistics
         - RenderStatisticsReporter
+        - SpriteFrame
         - SpriteOptions
         - TextureSource
       reExported:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
+        - OUTPUT_TRANSFORM_EFFECT
         - supportsScreenEffects
         - validateEffectRenderPass
+        - MAX_PUNCTUAL_LIGHTS
         - collectSceneLights
         - createSceneLights
         - isDirectionalLightSource
+        - isPunctualLightSource
         - PARTICLE_COLOR_OFFSET
         - PARTICLE_INSTANCE_FLOATS
         - PARTICLE_POSITION_OFFSET
@@ -7556,7 +7837,9 @@ modules:
         - isLitItem
         - isParticlesItem
         - isSpriteItem
+        - isStandardItem
         - isUnlitItem
+        - viewLayerMask
         - RenderGraph
         - RenderTarget
         - isRenderTargetTexture
@@ -7579,18 +7862,24 @@ modules:
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
+        - OutputTransformEffect
         - ScreenEffect
         - ScreenEffectKind
         - ScreenEffectRenderer
         - AmbientLightSource
         - DirectionalLightSource
+        - PointLightSource
+        - PunctualLightSource
+        - PunctualLightSourceBase
         - SceneLights
+        - SpotLightSource
         - ParticleDrawable
         - LitRenderItem
         - ParticleRenderItem
         - RenderItem
         - RenderItemKind
         - SpriteRenderItem
+        - StandardRenderItem
         - UnlitRenderItem
         - AddPassOptions
         - CustomRenderPass
@@ -7620,6 +7909,7 @@ modules:
         - ResizeRecord
         - RenderStatistics
         - RenderStatisticsReporter
+        - SpriteFrame
         - SpriteOptions
         - TextureSource
       constants:
@@ -7639,17 +7929,25 @@ modules:
           imports:
             - Node
       exports:
+        - MAX_PUNCTUAL_LIGHTS
         - isDirectionalLightSource
+        - isPunctualLightSource
         - createSceneLights
         - collectSceneLights
       interfaces:
         - DirectionalLightSource
+        - PunctualLightSourceBase
+        - PointLightSource
+        - SpotLightSource
         - AmbientLightSource
         - SceneLights
       functions:
         - isDirectionalLightSource
+        - isPunctualLightSource
         - createSceneLights
         - collectSceneLights
+      constants:
+        - MAX_PUNCTUAL_LIGHTS
     packages/render/src/particles.ts:
       description: The particle drawing contract (§36, §49, plan P9-3) — one batched render item
       externalDependencies: []
@@ -7733,7 +8031,15 @@ modules:
         - file: ./renderable.js
           imports:
             - Renderable
+        - file: ./sprite.js
+          imports:
+            - SpriteFrame
+          typeOnly: true
       workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
         - package: "@four/geometry"
           directory: packages/geometry
           imports:
@@ -7750,29 +8056,42 @@ modules:
             - LitMaterial
             - Material
             - SpriteMaterial
+            - StandardMaterial
             - UnlitMaterial
         - package: "@four/scene"
           directory: packages/scene
           imports:
+            - ALL_LAYERS
+            - DEFAULT_LAYER_MASK
+            - assertLayerMask
+            - isLayerMask
+            - layersMatch
+            - LayerMask
             - Node
             - PoseBuffer
+            - Viewport
       exports:
         - isSpriteItem
         - isUnlitItem
         - isLitItem
+        - isStandardItem
         - isParticlesItem
+        - viewLayerMask
         - buildRenderList
         - buildInterpolatedRenderList
       interfaces:
         - UnlitRenderItem
         - LitRenderItem
+        - StandardRenderItem
         - SpriteRenderItem
         - ParticleRenderItem
       functions:
         - isSpriteItem
         - isUnlitItem
         - isLitItem
+        - isStandardItem
         - isParticlesItem
+        - viewLayerMask
         - buildRenderList
         - buildInterpolatedRenderList
     packages/render/src/render-target.ts:
@@ -7792,8 +8111,13 @@ modules:
           directory: packages/materials
           imports:
             - MaterialTexture
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorSpace
       exports:
         - isRenderTargetTexture
+        - validateColorSpace
         - RenderTarget
       classes:
         - RenderTarget
@@ -7802,6 +8126,7 @@ modules:
         - RenderTargetTexture
       functions:
         - isRenderTargetTexture
+        - validateColorSpace
     packages/render/src/renderable.ts:
       description: "`Renderable` (§49) — the node that draws something."
       externalDependencies: []
@@ -7956,6 +8281,7 @@ modules:
       classes:
         - Sprite
       interfaces:
+        - SpriteFrame
         - SpriteOptions
     packages/render/src/statistics.ts:
       description: Per-frame render counters (§84's `drawCalls`/`triangles`/`instances`) — the
@@ -7979,6 +8305,9 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./render-target.js
+          imports:
+            - validateColorSpace
         - file: ./resource-memory.js
           imports:
             - noteTexture
@@ -7991,6 +8320,10 @@ modules:
           directory: packages/materials
           imports:
             - SpriteTexture
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorSpace
       exports:
         - Texture
       classes:
@@ -8021,7 +8354,7 @@ modules:
         - PACKAGE_NAME
   packages/render-webgl:
     packages/render-webgl/src/gl-effect.ts:
-      description: The full-screen effect pipeline for the WebGL 2 backend — §70's blit and
+      description: The full-screen effect pipeline for the WebGL 2 backend — §70's blit, colour
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -8139,6 +8472,11 @@ modules:
           imports:
             - Matrix4
             - Vector3
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - MAX_PUNCTUAL_LIGHTS
+            - SceneLights
       exports:
         - GL
         - POSITION_ATTRIBUTE_LOCATION
@@ -8146,13 +8484,16 @@ modules:
         - UV_ATTRIBUTE_LOCATION
         - COLOR_ATTRIBUTE_LOCATION
         - MAP_TEXTURE_UNIT
+        - PUNCTUAL_LIGHT_GLSL
         - matrixScratch
         - createLinkedProgram
         - requireUniform
+        - PunctualLightUniforms
         - UnlitProgram
         - SpriteProgram
         - LitProgram
       classes:
+        - PunctualLightUniforms
         - UnlitProgram
         - SpriteProgram
         - LitProgram
@@ -8168,6 +8509,7 @@ modules:
         - UV_ATTRIBUTE_LOCATION
         - COLOR_ATTRIBUTE_LOCATION
         - MAP_TEXTURE_UNIT
+        - PUNCTUAL_LIGHT_GLSL
         - matrixScratch
     packages/render-webgl/src/gl-render-target.ts:
       description: "GPU-side render targets for the WebGL 2 backend: one framebuffer object per"
@@ -8192,6 +8534,40 @@ modules:
         - RenderTargetCache
       interfaces:
         - RenderTargetRecord
+    packages/render-webgl/src/gl-standard.ts:
+      description: The metallic-roughness pipeline (§59, §68) — this backend's sixth program,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - MAP_TEXTURE_UNIT
+            - PUNCTUAL_LIGHT_GLSL
+            - PunctualLightUniforms
+            - createLinkedProgram
+            - matrixScratch
+            - requireUniform
+            - GlProgramHandle
+            - GlUniformLocation
+            - WebglContext
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - Disposable
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+            - Vector3
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - SceneLights
+      exports:
+        - StandardProgram
+      classes:
+        - StandardProgram
     packages/render-webgl/src/gl-texture.ts:
       description: "GPU-side textures for the WebGL 2 backend: one `WebGLTexture` per"
       externalDependencies: []
@@ -8243,6 +8619,8 @@ modules:
             - MAP_TEXTURE_UNIT
             - NORMAL_ATTRIBUTE_LOCATION
             - POSITION_ATTRIBUTE_LOCATION
+            - PUNCTUAL_LIGHT_GLSL
+            - PunctualLightUniforms
             - SpriteProgram
             - UV_ATTRIBUTE_LOCATION
             - UnlitProgram
@@ -8250,6 +8628,10 @@ modules:
         - file: ./gl-render-target.js
           imports:
             - RenderTargetCache
+          reExport: true
+        - file: ./gl-standard.js
+          imports:
+            - StandardProgram
           reExport: true
         - file: ./gl-texture.js
           imports:
@@ -8328,10 +8710,13 @@ modules:
         - MAP_TEXTURE_UNIT
         - NORMAL_ATTRIBUTE_LOCATION
         - POSITION_ATTRIBUTE_LOCATION
+        - PUNCTUAL_LIGHT_GLSL
+        - PunctualLightUniforms
         - SpriteProgram
         - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
         - RenderTargetCache
+        - StandardProgram
         - TextureCache
         - isWebgl2Supported
         - registerWebglRenderer
@@ -8372,10 +8757,13 @@ modules:
         - MAP_TEXTURE_UNIT
         - NORMAL_ATTRIBUTE_LOCATION
         - POSITION_ATTRIBUTE_LOCATION
+        - PUNCTUAL_LIGHT_GLSL
+        - PunctualLightUniforms
         - SpriteProgram
         - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
         - RenderTargetCache
+        - StandardProgram
         - TextureCache
         - isWebgl2Supported
         - registerWebglRenderer
@@ -8453,6 +8841,9 @@ modules:
           imports:
             - RenderTargetCache
             - RenderTargetRecord
+        - file: ./gl-standard.js
+          imports:
+            - StandardProgram
         - file: ./gl-texture.js
           imports:
             - TextureCache
@@ -8478,6 +8869,8 @@ modules:
             - isParticlesItem
             - isRenderTargetTexture
             - isSpriteItem
+            - isStandardItem
+            - viewLayerMask
             - COLOR_GRADE_DEFAULTS
             - EffectRenderPass
             - RenderItem
@@ -8530,6 +8923,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./layers.js
+          imports:
+            - ALL_LAYERS
+            - LayerMask
         - file: ./node.js
           imports:
             - Node
@@ -8565,7 +8962,7 @@ modules:
       classes:
         - Group
     packages/scene/src/index.ts:
-      description: Package entry point for @four/scene (re-exports 33 symbols)
+      description: Package entry point for @four/scene (re-exports 57 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -8585,9 +8982,32 @@ modules:
           imports:
             - Group
           reExport: true
+        - file: ./layers.js
+          imports:
+            - ALL_LAYERS
+            - DEFAULT_LAYER
+            - DEFAULT_LAYER_MASK
+            - DEFAULT_LAYER_NAME
+            - LAYER_COUNT
+            - NO_LAYERS
+            - applyLayers
+            - assertLayerMask
+            - defineLayer
+            - isLayerMask
+            - layerIndex
+            - layerMask
+            - layerMaskNames
+            - layerName
+            - layerNames
+            - layersMatch
+            - resetLayers
+          reExport: true
         - file: ./light.js
           imports:
             - DirectionalLight
+            - PointLight
+            - PunctualLight
+            - SpotLight
           reExport: true
         - file: ./interpolation.js
           imports:
@@ -8633,10 +9053,18 @@ modules:
             - PerspectiveCameraOptions
           reExport: true
           typeOnly: true
+        - file: ./layers.js
+          imports:
+            - LayerMask
+            - LayeredNode
+          reExport: true
+          typeOnly: true
         - file: ./light.js
           imports:
             - ColorRGB
             - DirectionalLightOptions
+            - PunctualLightOptions
+            - SpotLightOptions
           reExport: true
           typeOnly: true
         - file: ./interpolation.js
@@ -8672,7 +9100,27 @@ modules:
         - OrthographicCamera
         - PerspectiveCamera
         - Group
+        - ALL_LAYERS
+        - DEFAULT_LAYER
+        - DEFAULT_LAYER_MASK
+        - DEFAULT_LAYER_NAME
+        - LAYER_COUNT
+        - NO_LAYERS
+        - applyLayers
+        - assertLayerMask
+        - defineLayer
+        - isLayerMask
+        - layerIndex
+        - layerMask
+        - layerMaskNames
+        - layerName
+        - layerNames
+        - layersMatch
+        - resetLayers
         - DirectionalLight
+        - PointLight
+        - PunctualLight
+        - SpotLight
         - POSE_SNAPSHOT_PRIORITY
         - PoseBuffer
         - createSnapshotSystem
@@ -8689,8 +9137,12 @@ modules:
         - TransformAuthority
         - OrthographicCameraOptions
         - PerspectiveCameraOptions
+        - LayerMask
+        - LayeredNode
         - ColorRGB
         - DirectionalLightOptions
+        - PunctualLightOptions
+        - SpotLightOptions
         - PoseSnapshotSystem
         - SnapshotSystemOptions
         - NodeEventMap
@@ -8707,7 +9159,27 @@ modules:
         - OrthographicCamera
         - PerspectiveCamera
         - Group
+        - ALL_LAYERS
+        - DEFAULT_LAYER
+        - DEFAULT_LAYER_MASK
+        - DEFAULT_LAYER_NAME
+        - LAYER_COUNT
+        - NO_LAYERS
+        - applyLayers
+        - assertLayerMask
+        - defineLayer
+        - isLayerMask
+        - layerIndex
+        - layerMask
+        - layerMaskNames
+        - layerName
+        - layerNames
+        - layersMatch
+        - resetLayers
         - DirectionalLight
+        - PointLight
+        - PunctualLight
+        - SpotLight
         - POSE_SNAPSHOT_PRIORITY
         - PoseBuffer
         - createSnapshotSystem
@@ -8723,8 +9195,12 @@ modules:
         - TransformAuthority
         - OrthographicCameraOptions
         - PerspectiveCameraOptions
+        - LayerMask
+        - LayeredNode
         - ColorRGB
         - DirectionalLightOptions
+        - PunctualLightOptions
+        - SpotLightOptions
         - PoseSnapshotSystem
         - SnapshotSystemOptions
         - NodeEventMap
@@ -8763,8 +9239,57 @@ modules:
         - createSnapshotSystem
       constants:
         - POSE_SNAPSHOT_PRIORITY
+    packages/scene/src/layers.ts:
+      description: Symbolic layers and their compiled masks (§46).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+      exports:
+        - LAYER_COUNT
+        - DEFAULT_LAYER_NAME
+        - DEFAULT_LAYER
+        - DEFAULT_LAYER_MASK
+        - ALL_LAYERS
+        - NO_LAYERS
+        - defineLayer
+        - layerIndex
+        - layerName
+        - layerNames
+        - layerMask
+        - layerMaskNames
+        - layersMatch
+        - isLayerMask
+        - assertLayerMask
+        - applyLayers
+        - resetLayers
+      interfaces:
+        - LayeredNode
+      functions:
+        - defineLayer
+        - layerIndex
+        - layerName
+        - layerNames
+        - layerMask
+        - layerMaskNames
+        - layersMatch
+        - isLayerMask
+        - assertLayerMask
+        - applyLayers
+        - resetLayers
+      constants:
+        - LAYER_COUNT
+        - DEFAULT_LAYER_NAME
+        - DEFAULT_LAYER
+        - DEFAULT_LAYER_MASK
+        - ALL_LAYERS
+        - NO_LAYERS
     packages/scene/src/light.ts:
-      description: "Lights (§68) — the MVP tier: one directional light node."
+      description: "Lights (§68) — the multi-light tier: directional, point, and spot nodes."
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -8779,12 +9304,29 @@ modules:
           directory: packages/math
           imports:
             - Vector3
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGB
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGB
       exports:
         - DirectionalLight
+        - PointLight
+        - SpotLight
+        - ColorRGB
+      reExported:
+        - ColorRGB
       classes:
         - DirectionalLight
+        - PointLight
+        - SpotLight
       interfaces:
         - DirectionalLightOptions
+        - PunctualLightOptions
+        - SpotLightOptions
     packages/scene/src/node.ts:
       description: The unified node model (§6), its component delegation (§6a), and its event
       externalDependencies: []
@@ -8794,6 +9336,10 @@ modules:
           imports:
             - DEFAULT_TRANSFORM_AUTHORITY
             - TransformAuthority
+        - file: ./layers.js
+          imports:
+            - DEFAULT_LAYER_MASK
+            - LayerMask
         - file: ./transform.js
           imports:
             - Transform
@@ -8891,6 +9437,10 @@ modules:
         - file: ./camera.js
           imports:
             - Camera
+          typeOnly: true
+        - file: ./layers.js
+          imports:
+            - LayerMask
           typeOnly: true
       workspaceDependencies: []
       exports:
@@ -10004,6 +10554,7 @@ dependencyGraph:
         - packages/geometry/src/primitives-3d.ts
         - packages/geometry/src/primitives.ts
         - packages/geometry/src/resource-memory.ts
+        - packages/geometry/src/tessellation.ts
     - name: Packages/input
       files:
         - packages/input/src/drag.ts
@@ -10020,6 +10571,7 @@ dependencyGraph:
         - packages/materials/src/lit-material.ts
         - packages/materials/src/material.ts
         - packages/materials/src/sprite-material.ts
+        - packages/materials/src/standard-material.ts
         - packages/materials/src/texture.ts
         - packages/materials/src/unlit-material.ts
     - name: Packages/math
@@ -10124,6 +10676,7 @@ dependencyGraph:
         - packages/render-webgl/src/gl-particles.ts
         - packages/render-webgl/src/gl-program.ts
         - packages/render-webgl/src/gl-render-target.ts
+        - packages/render-webgl/src/gl-standard.ts
         - packages/render-webgl/src/gl-texture.ts
         - packages/render-webgl/src/index.ts
         - packages/render-webgl/src/register.ts
@@ -10138,6 +10691,7 @@ dependencyGraph:
         - packages/scene/src/group.ts
         - packages/scene/src/index.ts
         - packages/scene/src/interpolation.ts
+        - packages/scene/src/layers.ts
         - packages/scene/src/light.ts
         - packages/scene/src/node.ts
         - packages/scene/src/pose-target.ts
@@ -10172,18 +10726,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 196
+  totalTypeScriptFiles: 200
   totalModules: 24
-  totalLinesOfCode: 77300
-  totalExports: 1664
-  totalClasses: 106
-  totalInterfaces: 353
-  totalFunctions: 287
-  totalTypeGuards: 15
+  totalLinesOfCode: 84091
+  totalExports: 1788
+  totalClasses: 111
+  totalInterfaces: 373
+  totalFunctions: 317
+  totalTypeGuards: 18
   totalEnums: 0
-  totalConstants: 217
-  totalReExports: 1076
-  totalTypeOnlyImports: 220
+  totalConstants: 230
+  totalReExports: 1152
+  totalTypeOnlyImports: 227
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 1
   unusedFilesCount: 0

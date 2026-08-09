@@ -57,6 +57,7 @@
 
 import { BufferGeometry } from "./buffer-geometry.js";
 import { createIndices, requirePositive } from "./primitive-support.js";
+import { triangulatePolygon, type Point2D } from "./tessellation.js";
 
 /** Options of {@link boxGeometry}. All extents default to 1. */
 export interface BoxGeometryOptions {
@@ -87,6 +88,21 @@ export interface CircleGeometry2DOptions {
    * on-screen size. Must be a finite integer ≥ 3.
    */
   segments?: number;
+}
+
+/** Options of {@link polygonGeometry2D}. */
+export interface PolygonGeometry2DOptions {
+  /**
+   * The closed outer ring, in the XY plane, in either winding. At least three
+   * points; the last is **not** repeated.
+   */
+  outline: readonly Point2D[];
+  /**
+   * Closed inner rings cut out of {@link PolygonGeometry2DOptions.outline},
+   * each in either winding, each strictly inside it and disjoint from the
+   * others. Omitted means a solid shape.
+   */
+  holes?: readonly (readonly Point2D[])[];
 }
 
 /**
@@ -314,6 +330,88 @@ export function circleGeometry2D(
     indices[offset + 1] = i + 1;
     // Wraps the last triangle back onto the first rim vertex.
     indices[offset + 2] = ((i + 1) % segments) + 1;
+  }
+
+  return new BufferGeometry({ positions, uvs, indices, mode: "triangles" });
+}
+
+/**
+ * An **arbitrary polygon** filled in the XY plane, facing +Z — §50's "arbitrary
+ * polygon" row, built on §52's tessellator.
+ *
+ * ```ts
+ * const ring = polygonGeometry2D({
+ *   outline: [{ x: -1, y: -1 }, { x: 1, y: -1 }, { x: 1, y: 1 }, { x: -1, y: 1 }],
+ *   holes: [[{ x: -0.4, y: -0.4 }, { x: -0.4, y: 0.4 }, { x: 0.4, y: 0.4 }, { x: 0.4, y: -0.4 }]],
+ * });
+ * ```
+ *
+ * Concave, holed, either winding: the shape is whatever `triangulatePolygon`
+ * accepts, and everything it refuses (§85 — self-intersections, zero area, a
+ * hole outside its outline) this builder refuses with the same error, because
+ * it *is* the same error. See `tessellation.ts` for the full list and for why a
+ * self-intersecting outline is refused rather than approximated.
+ *
+ * ## Vertices are the caller's points, in the caller's order
+ *
+ * Vertex `i` is outline point `i`, then the first hole's points, then the
+ * second's — the concatenation §52's tessellator indexes. Nothing is inserted,
+ * merged, or moved, so a caller animating the outline can rewrite `positions`
+ * in place and keep the index buffer (§52 "index-buffer reuse"). A vertex the
+ * tessellator found redundant — one collinear with its neighbours — is still
+ * *there*; it simply appears in no triangle.
+ *
+ * ## Attributes
+ *
+ * Positions (`z = 0`) and uvs, no normals — the same choice
+ * {@link circleGeometry2D} makes and for the same reason: 2D shapes are unlit
+ * in the §120 tier, and a `(0, 0, 1)` repeated per vertex would be dead weight
+ * in every upload. Uv is the outline's **bounding box** normalized to
+ * `[0, 1]²`, matching `extrudeGeometry`'s caps, so the same texture lines up on
+ * a filled shape and on the front of its extrusion.
+ */
+export function polygonGeometry2D(
+  options: PolygonGeometry2DOptions,
+): BufferGeometry {
+  const { outline, holes } = options;
+  const indices = triangulatePolygon(outline, holes);
+
+  const rings: readonly (readonly Point2D[])[] = [outline, ...(holes ?? [])];
+  let vertexCount = 0;
+  for (const ring of rings) {
+    vertexCount += ring.length;
+  }
+
+  // The uv box is the *outline's*, not the union's: a hole lies inside its
+  // outline (§85 refuses anything else), so the two boxes agree, and naming
+  // the outline says which ring the mapping follows if that ever stops holding.
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const point of outline) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  // Both spans are strictly positive: a zero span in either axis puts every
+  // point on one line, which encloses no area, which the tessellator refused.
+  const spanX = maxX - minX;
+  const spanY = maxY - minY;
+
+  const positions = new Float32Array(vertexCount * 3);
+  const uvs = new Float32Array(vertexCount * 2);
+  let vertex = 0;
+  for (const ring of rings) {
+    for (const point of ring) {
+      positions[vertex * 3] = point.x;
+      positions[vertex * 3 + 1] = point.y;
+      positions[vertex * 3 + 2] = 0;
+      uvs[vertex * 2] = (point.x - minX) / spanX;
+      uvs[vertex * 2 + 1] = (point.y - minY) / spanY;
+      vertex += 1;
+    }
   }
 
   return new BufferGeometry({ positions, uvs, indices, mode: "triangles" });
