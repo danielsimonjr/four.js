@@ -31,9 +31,11 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  PARTICLE_INSTANCE_FLOATS,
   Renderable,
   buildInterpolatedRenderList,
   buildRenderList,
+  groupRenderListByPipeline,
   isLitItem,
   isStandardItem,
   isUnlitItem,
@@ -1032,5 +1034,220 @@ describe("§49 shadow flags on the item (§69, R-18)", () => {
     resolveWorldTransforms(scene);
     buildRenderList(scene, out);
     expect([out[0].castShadow, out[0].receiveShadow]).toEqual([true, true]);
+  });
+});
+
+/** §36's structural drawable contract, reduced to what a render list reads. */
+class ParticlesDouble extends Group {
+  readonly isParticleDrawable = true;
+
+  particleCount = 1;
+
+  readonly particleInstances = new Float32Array(PARTICLE_INSTANCE_FLOATS);
+
+  updateParticleInstances(): void {
+    // Nothing to repack: this double exists for the item's own fields.
+  }
+}
+
+describe("§66 sort key 3 — pipeline and material grouping (R-10)", () => {
+  /** A renderable carrying a named material, so the grouping is observable. */
+  function surface(name: string, material: Material): Renderable<Material> {
+    const node = new Renderable(planeGeometry(), material);
+    node.name = name;
+    return node;
+  }
+
+  it("snapshots the material's id onto the item, and empty for a particle system", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    scene.add(new Renderable(planeGeometry(), material));
+    resolveWorldTransforms(scene);
+
+    const [item] = buildRenderList(scene, []);
+
+    expect(item.materialId).toBe(material.id);
+    expect(material.id).not.toBe("");
+  });
+
+  it("reads a material double predating §57's id as one ungrouped group", () => {
+    // `undefined < undefined` is false in both directions, which is not a total
+    // order — the `?? ""` collapses such doubles into one group instead.
+    const scene = new Scene();
+    const legacy = new UnlitMaterial();
+    (legacy as unknown as { id: string | undefined }).id = undefined;
+    scene.add(new Renderable(planeGeometry(), legacy));
+    resolveWorldTransforms(scene);
+
+    expect(buildRenderList(scene, [])[0].materialId).toBe("");
+  });
+
+  it("does not let a pooled slot leak one item's material id into a particle's", () => {
+    // The hazard `material = undefined` and `frame = null` exist for, one field
+    // on: the slot that carried a surface must not group a particle system with
+    // it.
+    const scene = new Scene();
+    const first = new Renderable(planeGeometry(), new UnlitMaterial());
+    scene.add(first);
+    resolveWorldTransforms(scene);
+    const out: RenderItem[] = [];
+    buildRenderList(scene, out);
+    expect(out[0].materialId).not.toBe("");
+
+    scene.remove(first);
+    scene.add(new ParticlesDouble());
+    resolveWorldTransforms(scene);
+    buildRenderList(scene, out);
+    expect(out[0].kind).toBe("particles");
+    expect(out[0].materialId).toBe("");
+  });
+
+  it("leaves buildRenderList's own order alone — key 3 is a second verb", () => {
+    const scene = new Scene();
+    const sprites = new UnlitMaterial();
+    const solid = new UnlitMaterial();
+    scene.add(
+      surface("a", sprites),
+      surface("b", solid),
+      surface("c", sprites),
+      surface("d", solid),
+    );
+    resolveWorldTransforms(scene);
+
+    expect(names(buildRenderList(scene, []), scene)).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+    ]);
+  });
+
+  it("groups by material inside a layer, preserving order within each group", () => {
+    const scene = new Scene();
+    const first = new UnlitMaterial();
+    const second = new UnlitMaterial();
+    scene.add(
+      surface("a", first),
+      surface("b", second),
+      surface("c", first),
+      surface("d", second),
+    );
+    resolveWorldTransforms(scene);
+
+    const list = groupRenderListByPipeline(buildRenderList(scene, []));
+
+    // Ids ascend with construction order, so `first`'s group leads.
+    expect(names(list, scene)).toEqual(["a", "c", "b", "d"]);
+  });
+
+  it("groups by pipeline before material — the two halves of key 3", () => {
+    const scene = new Scene();
+    const unlit = new UnlitMaterial();
+    const lit = new LitMaterial();
+    scene.add(
+      surface("unlit-1", unlit),
+      surface("lit-1", lit),
+      surface("unlit-2", unlit),
+      surface("lit-2", lit),
+    );
+    resolveWorldTransforms(scene);
+
+    const list = groupRenderListByPipeline(buildRenderList(scene, []));
+
+    // `"lit"` sorts before `"unlit"` as a string, which is all §66 asks for:
+    // equal pipelines adjacent, in *some* deterministic order.
+    expect(names(list, scene)).toEqual([
+      "lit-1",
+      "lit-2",
+      "unlit-1",
+      "unlit-2",
+    ]);
+  });
+
+  it("keeps keys 1 and 2 above it", () => {
+    const scene = new Scene();
+    const opaque = new UnlitMaterial();
+    const blended = new UnlitMaterial({ transparent: true });
+    const overlay = surface("overlay", opaque);
+    overlay.renderLayer = 1;
+    scene.add(overlay, surface("glass", blended), surface("wall", opaque));
+    resolveWorldTransforms(scene);
+
+    const list = groupRenderListByPipeline(buildRenderList(scene, []));
+
+    expect(names(list, scene)).toEqual(["wall", "glass", "overlay"]);
+  });
+
+  it("is a whole sort, not a refinement — key 2 holds however the list arrived", () => {
+    // The list `buildRenderList` hands over is already ordered by keys 1 and 2,
+    // so grouping only ever *refines* it in practice. This asserts the stronger
+    // property the comparator actually has, by handing it the same items in the
+    // opposite order: every opaque draw still precedes every blended one.
+    const scene = new Scene();
+    const opaque = new UnlitMaterial();
+    const blended = new UnlitMaterial({ transparent: true });
+    scene.add(
+      surface("wall-1", opaque),
+      surface("glass-1", blended),
+      surface("wall-2", opaque),
+      surface("glass-2", blended),
+    );
+    resolveWorldTransforms(scene);
+    const list = buildRenderList(scene, []);
+    list.reverse();
+
+    expect(names(groupRenderListByPipeline(list), scene)).toEqual([
+      "wall-2",
+      "wall-1",
+      "glass-2",
+      "glass-1",
+    ]);
+  });
+
+  it("sorts by explicit render order inside one pipeline and material", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    const late = surface("late", material);
+    late.renderOrder = 5;
+    const early = surface("early", material);
+    early.renderOrder = -1;
+    scene.add(late, early);
+    resolveWorldTransforms(scene);
+
+    const list = groupRenderListByPipeline(buildRenderList(scene, []));
+
+    expect(names(list, scene)).toEqual(["early", "late"]);
+  });
+
+  it("is idempotent, and returns the caller's own array", () => {
+    const scene = new Scene();
+    const first = new UnlitMaterial();
+    const second = new UnlitMaterial();
+    scene.add(surface("a", first), surface("b", second), surface("c", first));
+    resolveWorldTransforms(scene);
+    const out: RenderItem[] = [];
+    buildRenderList(scene, out);
+
+    const once = groupRenderListByPipeline(out);
+    const grouped = names(once, scene);
+    const twice = groupRenderListByPipeline(once);
+
+    expect(once).toBe(out);
+    expect(names(twice, scene)).toEqual(grouped);
+  });
+
+  it("changes nothing for a scene of one pipeline and one material", () => {
+    const scene = new Scene();
+    const material = new UnlitMaterial();
+    scene.add(
+      surface("a", material),
+      surface("b", material),
+      surface("c", material),
+    );
+    resolveWorldTransforms(scene);
+
+    const list = groupRenderListByPipeline(buildRenderList(scene, []));
+
+    expect(names(list, scene)).toEqual(["a", "b", "c"]);
   });
 });

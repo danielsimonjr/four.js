@@ -1,0 +1,148 @@
+/**
+ * The page `tests/browser/batching.spec.ts` drives — §65's batched draw path
+ * against a **real** WebGL 2 context (R-9, 2026-08-09).
+ *
+ * This file is not an example and is not served: the spec bundles it with
+ * Vite's JavaScript API and injects the result into a page, because a batching
+ * demonstration is a gate fixture rather than a site anyone should visit. That
+ * is also why it lives under `tests/browser/` — see the spec's header for the
+ * whole argument.
+ *
+ * It publishes exactly one function on `window`:
+ *
+ * ```ts
+ * fourBatchingProbe(batched: boolean): { pixels: number[]; drawCalls: number }
+ * ```
+ *
+ * which renders the same scene with §65 batching on or off and reads the
+ * framebuffer back **inside the same call**, before the compositor can see it —
+ * so no `preserveDrawingBuffer` is needed and the two reads are of the same
+ * surface under the same driver.
+ */
+
+import { Vector3 } from "@four/math";
+import { UnlitMaterial, SpriteMaterial } from "@four/materials";
+import {
+  Rectangle,
+  Renderable,
+  Sprite,
+  Texture,
+  createRenderStatistics,
+  resetRenderStatistics,
+} from "@four/render";
+import { WebglRenderer, createGlBatching } from "@four/render-webgl";
+import {
+  OrthographicCamera,
+  Scene,
+  createFullscreenViewport,
+  resolveWorldTransforms,
+} from "@four/scene";
+import { planeGeometry } from "@four/geometry";
+
+/** Canvas size the spec creates and this file reads back. */
+const WIDTH = 320;
+const HEIGHT = 240;
+
+/** The axis every sprite in the row is spun about, so the batch bakes a rotation. */
+const AXIS_Z = new Vector3(0, 0, 1);
+
+/** A 4 × 4 checker, opaque, so a sprite's uv mapping is visible in the pixels. */
+function checker(): Texture {
+  const data = new Uint8Array(4 * 4 * 4);
+  for (let i = 0; i < 16; i += 1) {
+    const on = ((i % 4) + Math.floor(i / 4)) % 2 === 0;
+    data[i * 4] = on ? 255 : 40;
+    data[i * 4 + 1] = on ? 90 : 200;
+    data[i * 4 + 2] = on ? 40 : 220;
+    data[i * 4 + 3] = 255;
+  }
+  return new Texture({ width: 4, height: 4, data });
+}
+
+/**
+ * The scene: a row of rectangles over one material, a row of sprites over one
+ * atlas material, and one lone rectangle over a material of its own — so the
+ * frame contains two batchable runs and one draw that can never join either.
+ */
+function buildScene(): Scene {
+  const scene = new Scene();
+  const shapeMaterial = new UnlitMaterial({ color: [0.95, 0.35, 0.2, 1] });
+  for (let i = 0; i < 6; i += 1) {
+    const shape = new Rectangle({
+      material: shapeMaterial,
+      width: 1.1,
+      height: 1.1,
+    });
+    shape.transform.position.set(i * 1.3 - 3.2, 1.4, 0);
+    scene.add(shape);
+  }
+
+  const spriteMaterial = new SpriteMaterial({ texture: checker() });
+  for (let i = 0; i < 6; i += 1) {
+    const quad = new Sprite(spriteMaterial, { width: 1.1, height: 1.1 });
+    quad.transform.position.set(i * 1.3 - 3.2, -0.2, 0);
+    quad.transform.rotation.setFromAxisAngle(AXIS_Z, i * 0.2);
+    scene.add(quad);
+  }
+
+  const lone = new Renderable(
+    planeGeometry({ width: 2, height: 0.8 }),
+    new UnlitMaterial({ color: [0.2, 0.4, 0.95, 1] }),
+  );
+  lone.transform.position.set(0, -1.8, 0);
+  scene.add(lone);
+
+  resolveWorldTransforms(scene);
+  return scene;
+}
+
+declare global {
+  interface Window {
+    fourBatchingProbe?: (batched: boolean) => {
+      pixels: number[];
+      drawCalls: number;
+    };
+  }
+}
+
+const canvas = document.createElement("canvas");
+canvas.width = WIDTH;
+canvas.height = HEIGHT;
+canvas.id = "batching-canvas";
+document.body.append(canvas);
+
+const renderer = new WebglRenderer();
+const statistics = createRenderStatistics();
+renderer.statistics = statistics;
+const scene = buildScene();
+const camera = new OrthographicCamera({
+  left: -4,
+  right: 4,
+  bottom: -3,
+  top: 3,
+  near: 0.1,
+  far: 10,
+});
+// A camera is a node: content at z = 0 is only in front of it once it is moved
+// back past its own near plane (§47), exactly as `examples/first-2d-scene` does.
+camera.transform.position.set(0, 0, 5);
+camera.updateProjectionMatrix();
+resolveWorldTransforms(camera);
+const views = [createFullscreenViewport(camera, { clearColor: [0, 0, 0, 1] })];
+const batching = createGlBatching();
+
+void renderer.initialize({ canvas }).then(() => {
+  const gl = canvas.getContext("webgl2");
+  window.fourBatchingProbe = (batched: boolean) => {
+    renderer.batching = batched ? batching : null;
+    resetRenderStatistics(statistics);
+    renderer.render(scene, views);
+    const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
+    // Read back **now**: the drawing buffer is still intact inside the same
+    // task, so no `preserveDrawingBuffer` is needed and both probes read the
+    // same surface.
+    gl?.readPixels(0, 0, WIDTH, HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    return { pixels: Array.from(pixels), drawCalls: statistics.drawCalls };
+  };
+  document.body.dataset["batchingReady"] = "1";
+});

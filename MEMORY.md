@@ -28,6 +28,72 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-10 keys 3–4 + R-9 §65 batching.** Decisions worth keeping:
+  - **§66's key 3 cannot be a default, and the argument is correctness rather than
+    byte-identity.** §61 fixes the depth func at `LEQUAL`, so of two _opaque_ co-planar
+    surfaces the later draw wins — which is what makes a §58 stroke cover its fill (R-16)
+    and a later sibling cover an earlier one. All 2D content sits at one depth, so
+    grouping by material **repaints** a 2D scene rather than merely permuting its GL
+    calls. §66 lists key 3 for depth-resolved content and no item property distinguishes
+    that from co-planar 2D. Shipped as a **second verb** (`groupRenderListByPipeline`),
+    R-6's technique reused: the first verb stays byte-identical by not being edited at
+    all.
+  - **Key 4 was deferred for the wrong reason until now.** "Needs a camera" is weak; the
+    real blocker is R-8 — one list serves every view, so a depth key measured along one
+    camera orders the others by the wrong number. A key written before R-8 would be
+    _wrong_, not disruptive. Generalizes: a deferral whose stated reason is weaker than
+    the real one invites someone to ship it the day the weak reason expires.
+  - **Batching consecutive same-material runs is exact, not approximate.** GL rasterises
+    a draw call's primitives in submission order and blending/depth respect it, so
+    merging N consecutive draws that share all state into one, primitives concatenated in
+    order, is the same picture — the `LEQUAL` case included. "Same material **instance**"
+    (`===`) is what makes it checkable in one comparison: every §57 state field lives on
+    that object, so a run cannot straddle a state change. **Measured on ANGLE/SwiftShader:
+    0 of 76 800 pixels differ**, with a rotated sprite row and a §55 atlas.
+  - **A batch needs no new pipeline.** Sprites batch through the **unlit** program with
+    the tint as `color` and uv per vertex; `tint × texel` and `texel × tint` are
+    bit-identical (float multiply is commutative). Second application of R-23's "close a
+    gap by adding nothing to the frame path" to a _backend_: no shader was edited, so the
+    goldens were never at risk. The uv-per-vertex move is the one `render-list.ts`
+    predicted in 2026-08-08.
+  - **The one divergence is stated, not hidden**: a batch has one model matrix, so world
+    transforms are baked on the CPU. Geometrically identical, not _claimed_
+    bit-identical — and the browser gate compares a batched scene against itself rather
+    than against an unbatched golden, because the guarantee is about the design and not
+    about one rasteriser's luck.
+  - **A capability can be opt-in and still tree-shake to zero.** `WebglRenderer.batching`
+    is an `import type`-only field assigned by the application (`createGlBatching()`), so
+    a bundle that never calls the factory links neither `gl-batch.ts` nor
+    `@four/render`'s planner: **0 B**, measured both ways. The seam itself still costs
+    **+0.17 kB gzip in every bundle** (field, branch, `materialId`) — an order of
+    magnitude cheaper than R-6/R-13/R-18's 0.75–1.9 kB pipeline law, and the price of not
+    paying that law again. A-4's build-time pipeline-selection seam remains the fix that
+    would make batching the default.
+  - **§33: batch assembly is a left-to-right scan with no `Map`, no `Set` and no
+    object-key iteration**; the GL side indexes four vertex arrays by a two-bit layout
+    number for the same reason. Layouts get one vertex array each rather than one
+    re-specified array — attribute pointers are VAO state, and an array that is
+    re-specified is an array someone must remember to disable attributes on.
+  - **§86's two batching rows are now bounded by CPU preparation, not by draw calls.**
+    100 000 sprites → 7 draw calls (14 286×) but 78 ms of preparation, of which ~34 ms is
+    `buildRenderList` — which the unbatched frame pays too. Both stay `half` rows; the
+    finding is that closing the draw-call gap moved the bottleneck rather than removing
+    it.
+  - **`R-28`'s "to be _good_" dependency on `R-9` has fallen**: glyphs that are sprites
+    over one atlas material batch with no further work, so R-28 is blocked on `R-30`
+    alone.
+  - Gotcha (test doubles): the WebGL backend's `TestGeometry` had no `vertexCount` — the
+    backend never needed it and the batcher does. A structural double is only as complete
+    as the last consumer that read it; adding a reader means auditing the doubles, and
+    the failure is a silently _unbatched_ frame, not a type error.
+  - Gotcha (browser gates): a page with content at `z = 0` and an orthographic camera
+    left at the origin renders **nothing** — the near plane clips it. Cost one debugging
+    cycle in the new gate; `examples/first-2d-scene` moves its camera to `z = 5` for this
+    reason.
+  - Technique worth reusing: a browser gate can build **its own fixture** with Vite's JS
+    API and inject it into a page served by an existing example's server. That buys
+    real-GL evidence for a feature that does not deserve a tenth example site or a tenth
+    preview server.
 - **2026-08-09 — R-36 `lookAt` and orientation helpers (helper tier).** Decisions worth
   keeping:
   - **−Z is every node's forward, not a camera's privilege.** `Node.lookAt` /

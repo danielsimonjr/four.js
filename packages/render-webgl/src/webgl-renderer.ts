@@ -61,6 +61,13 @@ import {
   type ScreenEffectRenderer,
 } from "@four/render";
 
+// Type-only, and load-bearingly so: naming `GlBatching` as a *value* here would
+// link §65's batcher — and `@four/render`'s planner behind it — into every
+// bundle that carries this renderer, whether the application batches or not
+// (see `WebglRenderer.batching` and `gl-batch.ts`'s header). The context this
+// backend narrows to (`ParticleGlContext`) already satisfies the batcher's own
+// `BatchGlContext` structurally, so no second narrowing is needed either.
+import type { RenderBatching } from "./gl-batch.js";
 import {
   EFFECT_TEXTURE_UNIT,
   EFFECT_VERTEX_COUNT,
@@ -985,6 +992,35 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    */
   statistics: RenderStatistics | null = null;
 
+  /**
+   * §65 batching, or `null` (the default) to batch nothing — the opt-in
+   * capability (R-9, 2026-08-09; see `gl-batch.ts`).
+   *
+   * ```ts
+   * import { createGlBatching } from "@four/render-webgl";
+   * renderer.batching = createGlBatching();
+   * ```
+   *
+   * With one assigned, consecutive render items that share a pipeline and a
+   * **material instance** are merged into one `drawElements` — §65's sprite
+   * batching and compatible shape batching, over the unlit and sprite
+   * pipelines. With none, this backend issues exactly the GL sequence it issued
+   * before batching existed, to the byte: the field is read **once per frame**,
+   * and the whole of the no-batching cost is one `null` comparison per render
+   * item — no allocation, no GL call, no reordering (asserted as a full
+   * transcript in `tests/integration/render-batching.test.ts`).
+   *
+   * **Assigned rather than constructed here on purpose.** Nothing reachable
+   * from a class method tree-shakes, so naming `GlBatching` in this file would
+   * put the batcher in every bundle that carries this renderer — the measured
+   * law R-6, R-13 and R-18 each paid. The type is imported `import type`, so an
+   * application that never calls `createGlBatching` does not link the module.
+   *
+   * Assign it between frames, as {@link WebglRenderer.statistics} asks: `render`
+   * reads it once per call.
+   */
+  batching: RenderBatching | null = null;
+
   #contextLost = false;
 
   #disposed = false;
@@ -1022,6 +1058,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#textures?.forget();
     this.#renderTargets?.forget();
     this.#particleBatches?.forget();
+    // §65's batcher, when the application assigned one (R-9). Its two buffers
+    // and its vertex array died with the context like every other handle; the
+    // next batched draw recreates them.
+    this.batching?.forget();
     this.events.emit("contextlost", { renderer: this });
   };
 
@@ -1270,6 +1310,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // reordered. Read *after* the early returns above, so a frame this backend
     // declines to draw counts nothing.
     const statistics = this.statistics;
+    // §65's batcher (R-9), read once for the frame exactly as `statistics` is,
+    // and `null` by default: a renderer that never opted in adds one comparison
+    // per item to its draw loop and not a single GL call — the same
+    // byte-identity contract A-1's counters make.
+    const batching = this.batching;
     // Whether a texture is bound to unit 0 — the sprite path binds one, and
     // since R-19 so does an unlit or lit draw whose material carries a `map`,
     // so a frame of particles and untextured geometry still has nothing to
@@ -1454,12 +1499,80 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         // test becomes redundant rather than wrong.
         const viewLayers = viewLayerMask(view);
 
-        for (const item of items) {
+        for (let index = 0; index < items.length; index += 1) {
+          const item = items[index];
           // `layersMatch(item.layers, viewLayers)`, inlined: `@four/scene` is
           // not a dependency of this package (plan §3.1, frozen), and the
           // predicate is one bitwise AND.
           if ((item.layers & viewLayers) === 0) {
             continue;
+          }
+
+          // §65 (R-9), and only when the application assigned a batcher: does a
+          // run of compatible draws start here? `batching` is `null` by
+          // default, so a renderer that never opted in pays this one comparison
+          // per item and nothing else — no allocation, no GL call, no
+          // reordering. The check sits **above** `geometries.acquire` because a
+          // batched run draws from the batcher's own buffers: acquiring the
+          // per-item vertex arrays would upload geometry the frame never binds.
+          if (batching !== null) {
+            const batch = batching.next(items, index, viewLayers);
+            if (batch !== null) {
+              // §55 and §57 resolve their texture from different fields; the
+              // batch carries whichever one its material named (`batch.ts`).
+              const batchTexture =
+                batch.texture === null
+                  ? null
+                  : resolveTexture(
+                      textures,
+                      renderTargets,
+                      activeTarget,
+                      batch.texture,
+                    );
+              // A sprite whose texture will not resolve is skipped, exactly as
+              // the unbatched sprite path skips it — one rule, applied to the
+              // whole run because the run shares the material that named it. An
+              // unlit batch draws on untextured instead, which is what R-5
+              // recorded as that pipeline's answer to the same question.
+              if (batch.kind !== "sprite" || batchTexture !== null) {
+                if (activeKind !== "unlit") {
+                  program.use();
+                  activeKind = "unlit";
+                }
+                // §55's pipeline blends by construction, so a sprite batch does
+                // too; everything else is the shared material's §57 state.
+                applyMaterialState(
+                  gl,
+                  state,
+                  batch.material,
+                  batch.kind === "sprite",
+                );
+                if (batchTexture !== null) {
+                  if (!mapUnitActive) {
+                    gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                    mapUnitActive = true;
+                  }
+                  gl.bindTexture(GL.TEXTURE_2D, batchTexture);
+                  textureBound = true;
+                }
+                batching.draw(gl, program, batch, batchTexture !== null);
+                if (statistics !== null) {
+                  // One draw call for `batch.items` items — which is exactly
+                  // what §65 asks a diagnostic to make visible (§84): the
+                  // triangle count is unchanged and `drawCalls` falls.
+                  countDraw(
+                    statistics,
+                    batch.mode === "lines" ? GL.LINES : GL.TRIANGLES,
+                    batch.indexCount,
+                    1,
+                  );
+                }
+              }
+              // Consumed either way: a run skipped for an unresolvable texture
+              // is skipped item by item in the unbatched path too.
+              index += batch.items - 1;
+              continue;
+            }
           }
 
           const record = geometries.acquire(item.geometry);
@@ -2025,6 +2138,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
       this.#particleBatches?.dispose();
+      this.batching?.dispose();
     }
 
     this.#program = null;

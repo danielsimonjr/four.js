@@ -14,6 +14,8 @@
 
 export const PACKAGE_NAME = "@four/render-webgl";
 
+export type { BatchGlContext, RenderBatching } from "./gl-batch.js";
+export { GlBatching, createGlBatching } from "./gl-batch.js";
 export {
   EFFECT_TEXTURE_UNIT,
   EFFECT_VERTEX_COUNT,

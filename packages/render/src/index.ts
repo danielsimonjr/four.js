@@ -1,6 +1,14 @@
 export const PACKAGE_NAME = "@four/render";
 
 export type {
+  BatchableItem,
+  BatchableMaterial,
+  RenderBatch,
+  RenderBatchOptions,
+} from "./batch.js";
+export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
+
+export type {
   ColorGradeEffect,
   CopyEffect,
   EffectRenderPass,
@@ -54,6 +62,7 @@ export type {
 export {
   buildInterpolatedRenderList,
   buildRenderList,
+  groupRenderListByPipeline,
   isLitItem,
   isParticlesItem,
   isSpriteItem,

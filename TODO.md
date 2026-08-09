@@ -34,6 +34,30 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-10 keys 3–4 DONE 2026-08-09 (key 3 shipped, key 4 staged on R-8)** —
+      `groupRenderListByPipeline` puts §66's key 3 in a second verb, stably, with
+      `RenderItem.materialId` as its material half; `buildRenderList` untouched and every
+      existing scene byte-identical. Key 4 deferred on `R-8`'s per-view list with a dated
+      argument (one list, many views ⇒ a depth key would be wrong, not merely
+      disruptive).
+- [x] **R-9 DONE 2026-08-09 (consecutive-run tier)** — §65 sprite and compatible-shape
+      batching: `RenderBatcher` (`@four/render`) + `createGlBatching()`
+      (`@four/render-webgl`), opt-in per renderer and 0 B in bundles that do not ask.
+      Drawn through the existing unlit program (no new pipeline, no shader edit); pixel-
+      identical on SwiftShader (0/76 800 differ, 13 draws → 3); 100 k sprites → 7 draws,
+      50 k shapes → 4. Two §86 rows moved from feature-blocked to half-measured.
+- [ ] Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09):
+      instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals);
+      glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas
+      material batch as they are); texture-atlas _grouping_ of distinct textures (needs a
+      packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's
+      idle-scene row — today a batched run re-uploads every frame); making batching the
+      default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
+      already costs every bundle +0.17 kB).
+- [ ] `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation
+      (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win
+      is in list construction, not in batching. Worth a look together with `R-8`'s
+      per-view restructure.
 - [x] **R-36 DONE 2026-08-09 (helper tier)** — `Node.lookAt(target, up?)` +
       `Node.getWorldDirection(out)` over `Quaternion.setFromLookDirection`; −Z confirmed
       as every node's forward, world-space target with the parent rotation divided out,

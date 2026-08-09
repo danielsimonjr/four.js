@@ -124,6 +124,11 @@ export const SUITE = Object.freeze(
       record: "text-layout",
       what: "§86's 20 000-animated-glyph row, layout half",
     },
+    {
+      file: "render-batching.mjs",
+      record: "render-batching",
+      what: "§86's batched-sprite and batched-shape rows, preparation half",
+    },
   ].map((entry) => Object.freeze(entry)),
 );
 

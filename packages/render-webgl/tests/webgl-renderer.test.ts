@@ -48,6 +48,8 @@ import {
   createRenderStatistics,
   createSceneLights,
   particleQuadGeometry,
+  resetRenderStatistics,
+  type RenderBatch,
   type RenderStatistics,
   type LitRenderItem,
   type ParticleRenderItem,
@@ -84,6 +86,8 @@ import {
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
   WebglRenderer,
+  createGlBatching,
+  type BatchGlContext,
   type ParticleGlContext,
   type WebglCanvas,
   type WebglContextAttributes,
@@ -653,6 +657,11 @@ class TestGeometry {
     this.normals = normals;
     this.uvs = uvs;
     this.colors = colors;
+  }
+
+  /** §53's vertex count — `positions.length / 3`, as `BufferGeometry` has it. */
+  get vertexCount(): number {
+    return this.positions.length / 3;
   }
 
   get drawCount(): number {
@@ -3391,6 +3400,9 @@ function particleItem(
     // pipeline blends by construction but the item classifies opaque, so the
     // sort leaves particle scenes in the order they were authored in.
     transparent: false,
+    // §66 key 3's material half (R-10, 2026-08-09): a particle system has no
+    // material, so it has no material identity to group by.
+    materialId: "",
     // §69 (R-18): §36's billboards neither cast nor receive — no surface to
     // project, no lighting term to attenuate.
     castShadow: false,
@@ -8537,5 +8549,472 @@ describe("WebglRenderer.render — the shadow pass inside the F13 envelope (R-18
     const units = gl.callsOf("activeTexture").map((call) => call.args[0]);
     expect(units.at(-1)).toBe(GL.TEXTURE0);
     expect(gl.callsOf("bindTexture").at(-1)?.args[1]).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §65 batching (R-9, 2026-08-09).
+// ---------------------------------------------------------------------------
+
+/**
+ * A scene of `count` renderables over one material — the shape §65 batches, and
+ * the shape §86's sprite and shape rows are written in.
+ */
+function batchableRoot(
+  count: number,
+  material: TestMaterial | TestSpriteMaterial = new TestMaterial(),
+  geometry: () => TestGeometry = quadGeometry,
+): Renderable {
+  const root = createRoot();
+  for (let i = 0; i < count; i += 1) {
+    root.add(
+      new Renderable(
+        geometry().asGeometry,
+        material.asMaterial as ItemMaterial,
+      ),
+    );
+  }
+  return root;
+}
+
+describe("WebglRenderer — §65 batching, opt-in (R-9)", () => {
+  it("batches nothing by default: the field is null and the frame is unchanged", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = batchableRoot(3);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(renderer.batching).toBeNull();
+    expect(gl.countOf("drawElements")).toBe(3);
+    expect(gl.countOf("bufferSubData")).toBe(0);
+  });
+
+  it("merges a run of items sharing one material into one draw call", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = batchableRoot(3);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Three indexed quads: 18 indices, one draw, 32-bit indices.
+    expect(gl.callsOf("drawElements")).toHaveLength(1);
+    expect(gl.callsOf("drawElements")[0].args).toEqual([
+      GL.TRIANGLES,
+      18,
+      GL.UNSIGNED_INT,
+      0,
+    ]);
+  });
+
+  it("uploads the merged streams and specifies the interleaved layout once", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = batchableRoot(2);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Two buffers and one vertex array for the whole batch path.
+    expect(gl.countOf("createVertexArray")).toBe(1);
+    const pointers = gl.callsOf("vertexAttribPointer");
+    expect(pointers).toHaveLength(1);
+    expect(pointers[0].args).toEqual([
+      POSITION_ATTRIBUTE_LOCATION,
+      3,
+      GL.FLOAT,
+      false,
+      12,
+      0,
+    ]);
+    // The first frame allocates the stores; the second only writes into them.
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("bufferData")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+    const uploads = gl.callsOf("bufferSubData");
+    expect(uploads).toHaveLength(2);
+    expect(uploads[0].args[0]).toBe(GL.ARRAY_BUFFER);
+    expect(uploads[0].args[4]).toBe(24);
+    expect(uploads[1].args[0]).toBe(GL.ELEMENT_ARRAY_BUFFER);
+    expect(uploads[1].args[4]).toBe(12);
+  });
+
+  it("uploads the identity model matrix, because positions arrive in world space", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = createRoot();
+    const material = new TestMaterial();
+    const near = new Renderable(quadGeometry().asGeometry, material.asMaterial);
+    const far = new Renderable(quadGeometry().asGeometry, material.asMaterial);
+    // The §7 resolve pass lives in `@four/scene`, which is not a dependency of
+    // this package, so the world matrix is written the way every other test in
+    // this file writes one.
+    far.transform.worldMatrix.fromArray([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1,
+    ]);
+    root.add(near, far);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(modelUploads(gl)).toEqual([
+      [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    ]);
+    // …and the far quad's own translation is in the vertex stream instead.
+    const vertices = gl.callsOf("bufferData")[0].args[1] as number[];
+    expect(vertices.slice(12, 15)).toEqual([5, 0, 0]);
+  });
+
+  it("draws a sprite run through the unlit program with the tint as its colour", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const material = new TestSpriteMaterial(new TestTexture(), [1, 0.5, 0, 1]);
+    const root = createRoot();
+    root.add(sprite(material), sprite(material));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = unlitUniforms(gl);
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(gl.callsOf("drawElements")[0].args[1]).toBe(12);
+    expect(uploadsAt(gl, uniforms.get("color"))).toEqual([[1, 0.5, 0, 1]]);
+    // uv per vertex is what a batched sprite carries instead of the `quad`
+    // uniform, so the sprite program is never used at all.
+    expect(uploadsAt(gl, spriteUniforms(gl).get("quad"))).toEqual([]);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(gl.countOf("bindTexture")).toBeGreaterThan(0);
+  });
+
+  it("skips a whole sprite run whose texture will not resolve, as the single-sprite path skips one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const texture = new TestTexture();
+    const material = new TestSpriteMaterial(texture);
+    const root = createRoot();
+    root.add(sprite(material), sprite(material));
+    texture.dispose();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("keeps one vertex array per interleaved layout", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const plain = new TestMaterial();
+    const coloured = new TestMaterial();
+    coloured.vertexColors = true;
+    const root = createRoot();
+    root.add(
+      new Renderable(quadGeometry().asGeometry, plain.asMaterial),
+      new Renderable(quadGeometry().asGeometry, plain.asMaterial),
+      new Renderable(quadGeometry().asGeometry, coloured.asMaterial),
+      new Renderable(quadGeometry().asGeometry, coloured.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(2);
+    expect(gl.countOf("createVertexArray")).toBe(2);
+    // Position-only, then position plus colour at stride 28.
+    const pointers = gl.callsOf("vertexAttribPointer");
+    expect(pointers.map((call) => call.args[0])).toEqual([
+      POSITION_ATTRIBUTE_LOCATION,
+      POSITION_ATTRIBUTE_LOCATION,
+      COLOR_ATTRIBUTE_LOCATION,
+    ]);
+    expect(pointers[2].args).toEqual([
+      COLOR_ATTRIBUTE_LOCATION,
+      4,
+      GL.FLOAT,
+      false,
+      28,
+      12,
+    ]);
+    // A second frame reuses both arrays and re-specifies neither.
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+    expect(gl.countOf("vertexAttribPointer")).toBe(0);
+  });
+
+  it("points a textured layout's uv attribute past the position stream", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const material = new TestMaterial();
+    material.map = new TestTexture().asTexture;
+    const root = createRoot();
+    root.add(
+      new Renderable(uvTriangleGeometry().asGeometry, material.asMaterial),
+      new Renderable(uvTriangleGeometry().asGeometry, material.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("vertexAttribPointer")[1].args).toEqual([
+      UV_ATTRIBUTE_LOCATION,
+      2,
+      GL.FLOAT,
+      false,
+      20,
+      12,
+    ]);
+  });
+
+  it("counts one draw call and the same triangles §84 counted before (§65 diagnostics)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    const root = batchableRoot(4);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    const unbatched = {
+      drawCalls: statistics.drawCalls,
+      triangles: statistics.triangles,
+    };
+
+    resetRenderStatistics(statistics);
+    renderer.batching = createGlBatching();
+    renderer.render(root, [createView(camera)]);
+
+    expect(unbatched).toEqual({ drawCalls: 4, triangles: 8 });
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(8);
+    expect(statistics.instances).toBe(1);
+  });
+
+  it("leaves an unbatchable item on exactly the path it was on", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const shared = new TestMaterial();
+    const alone = new TestMaterial();
+    const root = createRoot();
+    root.add(
+      new Renderable(quadGeometry().asGeometry, shared.asMaterial),
+      new Renderable(quadGeometry().asGeometry, shared.asMaterial),
+      new Renderable(triangleGeometry().asGeometry, alone.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // One merged `drawElements` plus the lone triangle's own `drawArrays`.
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("splits a run at the configured vertex cap", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching({ maxVertices: 8 });
+    const root = batchableRoot(4);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("draws the same batch into every view of the frame", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = batchableRoot(2);
+    gl.reset();
+
+    renderer.render(root, [
+      createView(camera, { id: "left", width: 0.5 }),
+      createView(camera, { id: "right", x: 0.5, width: 0.5 }),
+    ]);
+
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("batches only what a view's §46 mask lets through", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const material = new TestMaterial();
+    const root = createRoot();
+    const hidden = new Renderable(
+      quadGeometry().asGeometry,
+      material.asMaterial,
+    );
+    hidden.layers = 2;
+    root.add(
+      new Renderable(quadGeometry().asGeometry, material.asMaterial),
+      hidden,
+      new Renderable(quadGeometry().asGeometry, material.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera, { layerMask: 1 })]);
+
+    // The masked item ends the run, so the two survivors draw individually
+    // rather than being merged across it.
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("drops its GL objects on context loss and rebuilds them on the next frame", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const root = batchableRoot(2);
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    canvas.dispatch("webglcontextlost");
+
+    expect(gl.countOf("deleteBuffer")).toBe(0);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("createVertexArray")).toBe(1);
+    expect(gl.countOf("drawElements")).toBe(1);
+  });
+
+  it("deletes its GL objects on dispose, and tolerates never having drawn", async () => {
+    const drawn = await initialized();
+    drawn.renderer.batching = createGlBatching();
+    drawn.renderer.render(batchableRoot(2), [createView(drawn.camera)]);
+    drawn.gl.reset();
+    drawn.renderer.dispose();
+
+    expect(drawn.gl.countOf("deleteVertexArray")).toBeGreaterThan(0);
+    expect(drawn.gl.countOf("deleteBuffer")).toBeGreaterThan(0);
+
+    const untouched = await initialized();
+    untouched.renderer.batching = createGlBatching();
+    untouched.gl.reset();
+
+    expect(() => {
+      untouched.renderer.dispose();
+    }).not.toThrow();
+  });
+
+  it("skips the batch rather than throwing when GL will not allocate", async () => {
+    const { renderer, gl, camera } = await initialized({
+      allocateVertexArrays: false,
+    });
+    renderer.batching = createGlBatching();
+    gl.reset();
+
+    expect(() => {
+      renderer.render(batchableRoot(2), [createView(camera)]);
+    }).not.toThrow();
+    expect(gl.countOf("drawElements")).toBe(0);
+  });
+
+  it("switches back to the unlit program when a batch follows another pipeline", async () => {
+    const { renderer, gl, camera } = await initialized();
+    renderer.batching = createGlBatching();
+    const material = new TestMaterial();
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        quadGeometry().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+      new Renderable(quadGeometry().asGeometry, material.asMaterial),
+      new Renderable(quadGeometry().asGeometry, material.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The frame starts on the unlit program, the lit draw takes its own, and
+    // the batch takes the unlit one back — three `useProgram` calls, the last
+    // of them the batch's.
+    expect(gl.countOf("useProgram")).toBe(3);
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("batches a run of line geometries, counting no triangles (§84)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    renderer.batching = createGlBatching();
+    const material = new TestMaterial();
+    const lines = (): TestGeometry =>
+      new TestGeometry(
+        new Float32Array([0, 0, 0, 1, 0, 0]),
+        undefined,
+        "lines",
+      );
+    const root = createRoot();
+    root.add(
+      new Renderable(lines().asGeometry, material.asMaterial),
+      new Renderable(lines().asGeometry, material.asMaterial),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("drawElements")[0].args).toEqual([
+      GL.LINES,
+      4,
+      GL.UNSIGNED_INT,
+      0,
+    ]);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(0);
+  });
+
+  it("does not leak the survivor when only one of the two buffers is allocated", () => {
+    let created = 0;
+    const deleted: unknown[] = [];
+    // Only two entry points are reached: the buffers are acquired before
+    // anything else, and a half-built pair returns before the vertex array,
+    // the uploads, or the draw.
+    const failing = {
+      createBuffer: () => {
+        created += 1;
+        return created === 1 ? { kind: "buffer" } : null;
+      },
+      deleteBuffer: (buffer: unknown) => {
+        deleted.push(buffer);
+      },
+    } as unknown as BatchGlContext;
+
+    expect(() => {
+      createGlBatching().draw(
+        failing,
+        {} as unknown as UnlitProgram,
+        {} as unknown as RenderBatch,
+        false,
+      );
+    }).not.toThrow();
+    expect(created).toBe(2);
+    expect(deleted).toEqual([{ kind: "buffer" }]);
+
+    // The mirror image: the vertex buffer fails and the index buffer is the one
+    // handed back.
+    created = 0;
+    deleted.length = 0;
+    const other = {
+      createBuffer: () => {
+        created += 1;
+        return created === 1 ? null : { kind: "index" };
+      },
+      deleteBuffer: (buffer: unknown) => {
+        deleted.push(buffer);
+      },
+    } as unknown as BatchGlContext;
+    createGlBatching().draw(
+      other,
+      {} as unknown as UnlitProgram,
+      {} as unknown as RenderBatch,
+      false,
+    );
+
+    expect(deleted).toEqual([{ kind: "index" }]);
   });
 });

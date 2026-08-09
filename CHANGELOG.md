@@ -8,6 +8,81 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-10 keys 3–4 and R-9 closed at tier: §66 pipeline grouping and §65 batching
+
+#### Added
+
+- **`groupRenderListByPipeline(list)` (`@four/render`)** — §66's **sort key 3**, pipeline
+  and material compatibility, as a **second verb** rather than a mode of `buildRenderList`.
+  It re-sorts an already-built list with key 3 inserted between keys 2 and 5, stably, so a
+  scene already grouped is unchanged and a scene of one pipeline and one material is left
+  exactly as it was. `buildRenderList` is untouched, so every existing scene keeps the order
+  it has had since 2026-08-06 — byte for byte. The reason key 3 is offered and never imposed
+  is recorded in source and is a **correctness** argument, not a byte-identity one: §61 fixes
+  the depth comparison at `LEQUAL`, so of two opaque surfaces at one depth the later draw
+  wins, and all of this engine's 2D content sits at one depth. Grouping by material would
+  therefore _repaint_ a 2D scene — it is what makes a §58 stroke cover its own fill (R-16)
+  and a later sibling cover an earlier one.
+- **`RenderItem.materialId` (`@four/render`)** — the material half of key 3, snapshotted at
+  generation time; `kind` was already the pipeline half. Two fields rather than one
+  concatenated key, because `${kind}:${id}` would allocate a string per item per frame.
+  `""` for a particle system, which has no material, and for a structural material double
+  predating §57's `id` — `undefined < undefined` is false in both directions, which is not a
+  total order.
+- **§65 batching (`RenderBatcher` in `@four/render`, `createGlBatching()` in
+  `@four/render-webgl`)** — **sprite batching and compatible shape batching**: consecutive
+  render items sharing a pipeline **and a material instance** merge into one `drawElements`.
+  The planner concatenates a run into one interleaved vertex stream (position, then uv iff
+  the material samples, then colour iff it declares `vertexColors`) plus one 32-bit index
+  stream, baking each item's world transform into its vertices; the backend owns two buffers
+  and one vertex array per layout and issues the single draw. A batch draws through the
+  **existing unlit program** — no sixth pipeline is compiled and no shader was edited: a
+  sprite batch uploads its tint as `color` and carries uv per vertex, and `tint × texel`
+  versus `texel × tint` is bit-identical arithmetic.
+- **`WebglRenderer.batching`** — the opt-in field, `null` by default (the
+  `WebglRenderer.statistics` precedent). With none assigned the backend issues exactly the
+  GL sequence it always did: the field is read once per frame and costs one `null`
+  comparison per item. Opt-in because nothing reachable from a class method tree-shakes, and
+  three of the six size budgets sit within 1 kB of their limit; the type is imported
+  `import type`, so a bundle that never calls `createGlBatching` links neither module and
+  pays **0 B** (measured both ways).
+- **`benchmarks/render-batching.mjs`** and its record — §86's _batched sprites (100 000)_ and
+  _simple batched shapes (50 000)_ rows, preparation half. Both rows leave the **feature**
+  column of `benchmarks/README.md` for **half**.
+- **`tests/browser/batching.spec.ts`** — the pixel half, against ANGLE/SwiftShader: the same
+  scene rendered batched and unbatched into one canvas, read back in the same task.
+  **0 of 76 800 pixels differ**, 13 draw calls become 3. The spec bundles its own fixture
+  with Vite's JS API rather than adding a tenth example site and a tenth preview server.
+- **`tests/integration/render-batching.test.ts`** — the three claims that live only in the
+  composition: identical GL transcripts with and without a batcher over a scene that has
+  nothing to batch, the merged stream equal to the world-space geometry of the draws it
+  replaced, and §66 key 3 turning an interleaved scene from four unbatchable draws into two
+  batches (the recorded `R-10 → R-9` dependency, demonstrated).
+
+#### Changed
+
+- **§66 key 4 (depth) is deferred on `R-8`, not on "needs a camera".** The note in
+  `render-list.ts` now says why the old reason was too weak: this backend builds one list per
+  frame and draws it into every view, so a depth key measured along one camera would order
+  the others by the wrong number. A key 4 written today would be _wrong_, not merely
+  disruptive.
+- **`benchmarks/README.md`** — eight scripts; the batched-sprite and batched-shape rows are
+  rewritten from "there is no sprite batching" / "there is no shape system to batch" to
+  **half** rows, and the summary sentence moves from "five measured … three feature-blocked"
+  to "seven measured or partly measured … one feature-blocked (mesh instancing)".
+
+#### Measured
+
+- **The batcher costs the bundles that do not use it +0.17 kB gzip**, all of it the seam (the
+  field, the branch in the draw loop, `materialId`) — the batcher itself tree-shakes away.
+  first-2d 42.88 → 43.05, first-3d 31.11 → 31.30, particles 28.55 → 28.70, ui-demo
+  36.56 → 36.73, motor-twin 937.81 → 937.99 kB; every budget still met, none moved.
+- **100 000 atlas sprites become 7 draw calls and 50 000 rectangles become 4** — one per
+  65 536 vertices, which is the only thing that splits a run of one material. On the recorded
+  (GPU-less, shared) host their _preparation_ costs 78.4 ms and 38.7 ms per frame, so both
+  §86 rows remain unmet as whole rows and are now bounded by CPU preparation rather than by
+  draw calls; about half of that is `buildRenderList`, which the unbatched frame pays too.
+
 ### 2026-08-09 — R-36 closed (helper tier): §44/§47's `lookAt` and orientation helpers
 
 #### Added

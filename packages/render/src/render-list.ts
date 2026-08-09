@@ -38,19 +38,32 @@
  * ## Ordering (§66 subset)
  *
  * §66's full order is: render layer, opaque versus transparent, pipeline and
- * material compatibility, depth, explicit render order. This packet sorts by
- * **render layer, then opaque before transparent, then explicit render order,
- * then scene-graph order** — keys 1, 2, and 5 — and defers keys 3 and 4:
+ * material compatibility, depth, explicit render order. {@link buildRenderList}
+ * sorts by **render layer, then opaque before transparent, then explicit render
+ * order, then scene-graph order** — keys 1, 2, and 5.
  *
- * - material and pipeline sorting needs the backend's notion of a pipeline
- *   (WP-3.5) — sorting by `material.id` here would encode an ordering the
- *   backend then has to fight — and, unlike key 2, it **reorders scenes that
- *   never asked for it**: every existing scene would have its draws permuted by
- *   material identity, which is exactly what a pixel-golden gate refuses.
- *   Deferred 2026-08-06 with that reason, and it wants `pipelineKey` on
- *   `RenderItemBase` (R-10, R-9);
+ * Key 3 (pipeline and material compatibility) ships as
+ * {@link groupRenderListByPipeline}, a **second verb** rather than a mode of the
+ * builders, and key 4 (depth) is still deferred:
+ *
+ * - key 3 cannot be the default order, and the reason is stronger than
+ *   byte-identity (R-10, 2026-08-09). Grouping by pipeline permutes draws that
+ *   were tied under keys 1, 2 and 5 — which, in this engine, is most of a 2D
+ *   scene — and **co-planar opaque draws are order-dependent**: §61 fixes the
+ *   depth function at `LEQUAL`, so of two surfaces at the same depth the one
+ *   submitted *later* wins. That is not an accident to be fixed; it is what
+ *   makes a §58 stroke paint over its own fill (R-16) and what makes a later
+ *   sibling draw on top in every 2D scene. A default-on key 3 would therefore
+ *   repaint existing scenes, not merely reorder their GL calls. §66 lists the
+ *   key for content whose overlap is resolved by depth, and this engine's
+ *   own 2D layer model is the case where that is untrue, so the key is offered
+ *   and never imposed. See {@link groupRenderListByPipeline};
  * - depth sorting needs a camera (WP-3.1/3.2) to measure distance along, and a
- *   per-view render list to measure it in (§87 culling, R-8).
+ *   per-view render list to store the measurement in (§87 culling, R-8). One
+ *   list serves every view in this engine today (see `RenderItem.layers`), so a
+ *   depth key computed for one camera would order the others by the wrong
+ *   number — a key 4 written now would be *wrong*, not merely disruptive.
+ *   Deferred again 2026-08-09, on R-8 rather than on a byte-identity argument.
  *
  * Key 2 landed on 2026-08-06 with §57's `transparent` flag (`material.ts`).
  * It is a **no-op for every scene that does not use it**: with the base's
@@ -205,6 +218,27 @@ interface RenderItemBase {
    * call — and because a particle item has no material to ask.
    */
   transparent: boolean;
+  /**
+   * The item's material's stable `id` (§57), snapshotted at generation time —
+   * the *material* half of §66's sort key 3 (R-10, 2026-08-09). `""` for a
+   * particle item, which has no material.
+   *
+   * Key 3 is "pipeline **and** material compatibility", and this item carries it
+   * as two fields rather than one: `kind` is the pipeline and this is the
+   * material. Not one concatenated key, because building `${kind}:${id}` would
+   * allocate a string per item per frame, which is exactly what the pooled item
+   * exists to avoid (plan D7). Not read through `material.id` inside the
+   * comparator either, for the reason §64 gives for compact render items — a
+   * comparator runs O(n log n) times and must not chase a reference per call.
+   *
+   * Ids are assigned from `Material`'s monotonic counter in construction order,
+   * so ordering by them is a deterministic function of the program that built
+   * the scene (§33) — the property {@link groupRenderListByPipeline} rests on.
+   * They are compared as strings, so the order is lexicographic
+   * (`material-10` before `material-9`) rather than numeric: §66 asks for
+   * *grouping*, and any total order that puts equal ids together satisfies it.
+   */
+  materialId: string;
   /**
    * §49's `castShadow`, snapshotted from the drawable node (§69; R-18,
    * 2026-08-09).
@@ -550,6 +584,7 @@ function itemAt(
       renderLayer: 0,
       layers: DEFAULT_LAYER_MASK,
       transparent: false,
+      materialId: "",
       castShadow: false,
       receiveShadow: false,
       id: "",
@@ -781,6 +816,15 @@ function collect(
     // `undefined`, which classifies opaque — the behaviour every scene had
     // before the key landed.
     item.transparent = material.transparent === true;
+    // §66 key 3's material half (R-10), snapshotted like every other field.
+    // `?? ""` for `transparent`'s reason, with a sharper consequence: a
+    // **structurally typed** material double predating §57's `id` reports
+    // `undefined`, and `undefined < undefined` is `false` in both directions —
+    // a comparator reading it would answer "after" for both orders, which is
+    // not a total order and makes the sort's result implementation-defined.
+    // `""` collapses every such double into one group that keeps scene order,
+    // which is what those items had before key 3 existed.
+    item.materialId = material.id ?? "";
     // §49's two shadow flags (§69, R-18), snapshotted like every other field.
     // `!== false` rather than a truthy read, for `transparent`'s reason turned
     // around: both default to `true` on a `Renderable`, so a **structurally
@@ -829,6 +873,11 @@ function collect(
     // order they drew in before the key existed; giving §36 a render-state
     // carrier of its own is the follow-up (2026-08-06).
     item.transparent = false;
+    // §66 key 3's material half (R-10): a particle system has no material, so
+    // it has no material identity either. Written rather than left, for the
+    // reason `material` and `frame` above are — the pooled slot must not keep a
+    // `Renderable`'s id and group this system with a surface.
+    item.materialId = "";
     // §69 (R-18): a particle system neither casts nor receives. §36's
     // billboards are camera-facing quads with no surface to project into a
     // shadow map and no lighting term to attenuate, and the pooled slot must
@@ -876,6 +925,93 @@ function compareRenderItems(a: RenderItem, b: RenderItem): number {
     return a.transparent ? 1 : -1;
   }
   return a.renderOrder - b.renderOrder;
+}
+
+/**
+ * §66's comparator with **key 3 in place**: layer, opaque before transparent,
+ * pipeline and material compatibility, explicit render order — and scene-graph
+ * order under all of them, from the stable sort.
+ *
+ * Key 3 sits above key 5 because §66 lists it there. The consequence is worth
+ * stating rather than discovering: under this comparator a scene's own
+ * `renderOrder` no longer separates draws that use different materials inside
+ * one layer, so an author who needs a specific painting order across materials
+ * uses `renderLayer` (key 1), which outranks everything here.
+ *
+ * The pipeline half compares `kind` — the item's own field, one property load,
+ * already there — and the material half compares {@link RenderItem.materialId}.
+ * Both are compared as strings, so the *groups* are the ones §66 asks for and
+ * their relative order is lexicographic. Nothing here reads a material, a node,
+ * or a camera, so the result is a pure function of the list (§33).
+ */
+function comparePipelineGroupedItems(a: RenderItem, b: RenderItem): number {
+  if (a.renderLayer !== b.renderLayer) {
+    return a.renderLayer - b.renderLayer;
+  }
+  if (a.transparent !== b.transparent) {
+    return a.transparent ? 1 : -1;
+  }
+  if (a.kind !== b.kind) {
+    return a.kind < b.kind ? -1 : 1;
+  }
+  if (a.materialId !== b.materialId) {
+    return a.materialId < b.materialId ? -1 : 1;
+  }
+  return a.renderOrder - b.renderOrder;
+}
+
+/**
+ * Re-sorts an already-built render list with §66's **sort key 3** — pipeline and
+ * material compatibility — inserted between key 2 and key 5, in place, and
+ * returns it (R-10, 2026-08-09).
+ *
+ * ```ts
+ * buildRenderList(scene, list);       // keys 1, 2, 5 — the order every scene has
+ * groupRenderListByPipeline(list);    // keys 1, 2, 3, 5 — draws grouped for §65
+ * ```
+ *
+ * The point of key 3 is that a batcher can only merge draws that are already
+ * **adjacent**: grouping is what turns an interleaved scene into runs
+ * `@four/render-webgl`'s batcher can collapse (§65, R-9). A scene authored in
+ * groups already — a thousand sprites parented to one node, sharing one atlas —
+ * needs none of this, which is why the builders do not do it.
+ *
+ * ## Why this is a second verb and not a parameter (decision, R-10)
+ *
+ * Because the reordering is **not always safe**, and a default, a flag, or an
+ * option would all put the unsafe case one keystroke from an author who never
+ * read this paragraph:
+ *
+ * - §61 fixes the depth comparison at `LEQUAL`, so where two opaque surfaces
+ *   sit at the same depth the one drawn *later* wins. All of this engine's 2D
+ *   content sits at one depth. Grouping by material therefore **changes the
+ *   picture** of a 2D scene, rather than only changing the order of its GL
+ *   calls — a §58 fill and its stroke, two overlapping shapes, a sprite over a
+ *   background quad.
+ * - §66 lists key 3 for content whose overlap is resolved by the depth buffer.
+ *   That is true of the 3D half of this engine and false of the 2D half, and no
+ *   property of a render item distinguishes them.
+ *
+ * So the caller who knows their content is depth-resolved (or who is drawing
+ * one flat layer of same-depth-independent sprites) asks for the grouping, and
+ * everybody else keeps the order they have had since 2026-08-06 — byte for
+ * byte, since {@link buildRenderList} is untouched by this function's existence.
+ *
+ * ## Stability
+ *
+ * `Array.prototype.sort` is stable (ES2019), so items that compare equal keep
+ * their relative order — which, after {@link buildRenderList}, is scene-graph
+ * order. Two consequences: sorting a list that is *already* grouped changes
+ * nothing at all, and a scene where every item shares one pipeline and one
+ * material is left exactly as it was.
+ *
+ * @param list a list produced by {@link buildRenderList} or
+ * {@link buildInterpolatedRenderList}; sorted in place and returned, so the
+ * pooled items and the caller's array are the same objects afterwards.
+ */
+export function groupRenderListByPipeline(list: RenderItem[]): RenderItem[] {
+  list.sort(comparePipelineGroupedItems);
+  return list;
 }
 
 /**
