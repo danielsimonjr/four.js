@@ -13,7 +13,9 @@ changes in `CHANGELOG.md`.
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
 - [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +
-      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69),
+      point/spot/hemisphere/area (§68 uniform arrays / clustered path), shadows (§69 —
+      directional tier shipped 2026-08-09; cascades, point/spot maps, the atlas,
+      transparent masks and contact shadows remain),
       §59 StandardMaterial/PBR, §60a color management + tone mapping + CSS color
       strings on lights, light layers; hoist the lit shader's per-vertex
       inverse-transpose to a per-draw normal-matrix uniform when @four/math grows a
@@ -32,6 +34,40 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
+      `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
+      fallback, dashes with phase offset) over `expandStroke` in §52's tessellation
+      module; `Line`/`Polyline`/`Arc` complete all fourteen §50 rows (twelve classes);
+      fill+stroke travel as per-vertex colour — no `RenderItemKind`, no pipeline, no
+      frame-path edit. **Group 5 (the 2D vector stack) is closed.**
+- [ ] **The shape paint pipeline** _(R-16 residue, blocked on RFC 0001/0003 deciding
+      `pipelineId` — first to land owns it)_: §58's six non-solid paints (linear /
+      radial / conic gradients, patterns, procedural, render-target) — per-vertex colour
+      is exact only for solids and two-stop linear gradients, so the exact tier is a
+      compiled pipeline at the measured ~1.9 kB-per-`WebglRenderer`-bundle price; §52's
+      anti-alias fringe (needs a per-vertex coverage attribute no §57 pipeline reads).
+      This is also what would finally give `ShapeMaterial` content (re-examined and
+      deliberately unshipped twice — R-23, R-16).
+- [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
+      R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
+      geometry operations (§51's four, the shared planar-subdivision packet), world
+      bounds (§87), analytic hit testing (`A-11`, whose §50 blocker fell — every shape
+      answers `toPath()`); (b) screen-space flattening tolerance — `Shape2D.tolerance`
+      is a world-space length by decision; a screen-space one needs a per-view render
+      list (`R-8`) and a rebuild inside the frame, which §61 forbids throwing in.
+- [ ] **R-26 follow-ups (path-data tier shipped 2026-08-09):** (a) the `<svg>` document
+      tier (`viewBox`, `transform`, `<g>`) is an owner decision — ship a small XML
+      tokenizer in `@four/geometry`, or take a host-parsed document through an injected
+      seam (`DOMParser` is browser-only and packages must stay node-safe per
+      `graph:check`); (b) SVG shape elements map onto R-23's classes and presentation
+      attributes (`fill`/`stroke`/`fill-rule`) onto R-16 when the document tier lands;
+      (c) residual: arc → arc seams still carry §51's sub-ulp implicit connecting
+      segment — tangentially continuous, no §52 refusal observed, but the general fix
+      needs §51 to express "this arc starts exactly here"; (d) a lossy
+      `formatSvgPathData` precision option is deliberately absent — the packet adding it
+      must decide what it does to `golden/svg-path.json`; (e) doc-truth gap found:
+      `tools/check-docs.mjs` does not scan `packages/*/README.md` — 24 unguarded prose
+      surfaces (geometry's was two days stale).
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
       R-13} - A-3 blocking sub-question: `ApplicationOptions.plugins` vs the same-day §40
@@ -167,11 +203,19 @@ changes in `CHANGELOG.md`.
       `decodeSceneDocument`/`decodeReplayRecording` over `parseUntrustedJson`
       (text-length + iterative depth limits), `UNTRUSTED_INPUT_REJECTED`, the
       security guide, and the CSP grep test
-- [ ] **A-18 half-remaining:** deadline + eviction closed by A-23; still open:
-      caller-driven cancellation and transport `AbortSignal` — the compatible design
-      (generic `FetchLike<TSignal>` + injected abort handle) is recorded in
-      `packages/assets/src/asset-manager.ts`; the naive `signal` parameter widening is
-      proven incompatible with `typeof fetch`
+- [x] **A-18 abort half DONE 2026-08-09** (§76): `load(url, loader, { signal })` over a
+      structural `AbortSignalLike`, refcounted (last waiter's abort abandons the load),
+      `AssetManagerOptions.abortController` + `canAbortTransport` for transport-level
+      abort, which the §96 deadline now uses too. The generic `FetchLike<TSignal>`
+      design recorded on 2026-08-07 was built as recorded; the variance trap it did not
+      foresee (a `TSignal` field breaks `AssetManager<AbortSignal>` → `AssetManager`) is
+      solved by erasing the parameter at the constructor, and both properties are
+      compile-time assertions in `tests/integration/asset-abort.test.ts`
+- [ ] **A-18 remainder:** streaming, dependency graphs, progress reporting, worker
+      decoding, hot reload, content hashing (the last still blocks `A-16`'s §79
+      manifest). Each needs a contract this packet does not have — progress needs a
+      byte-length channel `FetchLike` does not expose, dependency graphs need a loader
+      that can load, hot reload needs a dev-server protocol
 - [ ] **§96 residue:** decompression limits (needed the moment gzip/Draco/Basis lands —
       a size bound alone does not stop a zip bomb); shader/plugin trust boundaries
       (blocked on A-3)
@@ -264,9 +308,13 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       `docs/Architecture/API.md` and `docs/guides/digital-twin.md` were updated in an
       earlier pass; the gap-doc banner was fixed by the 2026-08-07 branch merge; API.md's
       adjacent stale "silently unsaved" claim corrected 2026-08-07 (A-15 made it throw)
-- [ ] **A-9 remainder:** `SurfacePointerEvent` carries no `pointerType`, so a mouse release
-      now ends its hover like a touch does (fires `pointerleave`; the next move re-enters).
-      Widening that structural interface would let the mouse keep its hover across a click
+- [x] **A-9 remainder DONE 2026-08-09:** `pointerType` runs end to end — platform
+      `string` in, `PointerDeviceType` (`"mouse" | "pen" | "touch"`) on every
+      `ScenePointerEvent`, unknown values reported as absent rather than refused. A
+      mouse now keeps its hover across its own release (a `@four/ui` button no longer
+      un-highlights when clicked — `tests/integration/pointer-type.test.ts`);
+      `pointercancel`, pen, and device-less sources keep the old teardown. Bounded:
+      10 000 mouse clicks leave `trackedPointerCount` at 1
 - [x] **A-16 remainder — done 2026-08-07:** `Renderable`, `Sprite`, both cameras and
       `DirectionalLight` have §79 node-type pairs (`registerRenderSerializers`, chained
       by `composeSceneNodeTypes`). Geometry/material are **references** resolved through

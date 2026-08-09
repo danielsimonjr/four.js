@@ -140,6 +140,20 @@ export type PropagatingPointerEventType =
 export type ScenePointerEventType =
   PropagatingPointerEventType | "pointerenter" | "pointerleave";
 
+/**
+ * The three pointing devices §72 distinguishes — the DOM's `pointerType`
+ * vocabulary, exactly (2026-08-09, A-9).
+ *
+ * A closed union rather than `string`, because a handler that switches on it
+ * should be exhaustive and a typo should be a compile error. The platform's own
+ * field is *not* closed — the Pointer Events specification permits
+ * vendor-defined values and the empty string for "unknown" — so the widening
+ * lives at the platform seam (`SurfacePointerEvent.pointerType`, typed `string`
+ * for assignability) and a value outside this union arrives here as
+ * **absence**, never as a guess. See `pointer-input.ts` for that measurement.
+ */
+export type PointerDeviceType = "mouse" | "pen" | "touch";
+
 /** Construction arguments for a {@link ScenePointerEvent}. */
 export interface ScenePointerEventInit {
   /** Which event this is. */
@@ -149,6 +163,11 @@ export interface ScenePointerEventInit {
    * produced the event. Distinct simultaneous pointers carry distinct ids.
    */
   readonly pointerId: number;
+  /**
+   * Which kind of device this pointer is, when the source knew; see
+   * {@link ScenePointerEvent.pointerType}.
+   */
+  readonly pointerType?: PointerDeviceType;
   /** Horizontal normalized device coordinate, `[-1, 1]`, +X right (§7a). */
   readonly ndcX: number;
   /** Vertical normalized device coordinate, `[-1, 1]`, **+Y up** (§7a). */
@@ -181,6 +200,23 @@ export class ScenePointerEvent extends SceneInputEvent {
   /** See {@link ScenePointerEventInit.pointerId}. */
   readonly pointerId: number;
 
+  /**
+   * The device behind this pointer — `"mouse"`, `"pen"`, or `"touch"` (§72).
+   *
+   * **Absent means "the source did not say"**, which covers both a pointer
+   * source that reports no device (a synthetic gesture, an XR cursor, a unit
+   * test) and a platform value outside {@link PointerDeviceType}. Absence is
+   * therefore never a claim that the device is a mouse: code that widens a hit
+   * area for touch, or keeps a hover for a mouse, must decide what to do when
+   * it does not know, and the field makes that decision explicit rather than
+   * hiding it behind a default.
+   *
+   * The engine reads it in exactly one place — a mouse keeps its hover across
+   * its own release, where a finger does not, because a finger has ceased to
+   * exist and a mouse has not (see `PointerInput`).
+   */
+  readonly pointerType?: PointerDeviceType;
+
   /** Horizontal normalized device coordinate, `[-1, 1]`, +X right (§7a). */
   readonly ndcX: number;
 
@@ -205,6 +241,9 @@ export class ScenePointerEvent extends SceneInputEvent {
     this.pointerId = init.pointerId;
     this.ndcX = init.ndcX;
     this.ndcY = init.ndcY;
+    if (init.pointerType !== undefined) {
+      this.pointerType = init.pointerType;
+    }
     if (init.worldPoint !== undefined) {
       this.worldPoint = init.worldPoint;
     }

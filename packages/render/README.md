@@ -11,6 +11,10 @@ Implements the MVP tier of §61–66 in [`docs/SPECIFICATION.md`](../../docs/SPE
 - **`Renderable`** — the geometry + material scene attachment.
 - **`Sprite` and `Texture`** — the §55/§77 MVP tier (`TextureSource` accepts what `@four/text`'s glyph atlas emits).
 - **Particle contract** — `ParticleDrawable` (duck-typed toward `@four/particles`; the dependency matrix forbids the direct edge), `particleQuadGeometry`, and the stride-8 instance layout constants (`PARTICLE_INSTANCE_FLOATS` and offsets).
+- **`Shape2D` and §50's twelve shape nodes** — `Circle`, `Ellipse`, `Rectangle` (rounded or not), `RegularPolygon`, `Polygon`, `Star`, `Sector`, `Ring`, `PathShape`, and the three stroke-only primitives `Line`, `Polyline`, `Arc`. Every one derives and owns its geometry from a §51 `Path`.
+- **§58 paints, fills and strokes** — `Paint`/`SolidPaint` at the solid tier, `ShapeFill`, and `StrokeStyle` over §52's `expandStroke`. The two colours travel as per-vertex colour through the existing unlit pipeline, so a stroked, painted shape is still one draw with no new render-item kind. Gradients, patterns and the anti-alias fringe are staged with the `ShapeMaterial` pipeline that would give them an exact tier.
+
+_Added 2026-08-09 (gaps `R-23`, `R-16`): the two sections above listed neither the shape family nor the paint model._
 
 ## Staged / not yet implemented
 

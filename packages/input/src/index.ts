@@ -19,6 +19,7 @@ export { KeyboardInput } from "./keyboard-input.js";
 export type { PickHit, Pickable } from "./pick.js";
 export { createPickRay, pick } from "./pick.js";
 export type {
+  PointerDeviceType,
   PropagatingPointerEventType,
   ScenePointerEventInit,
   ScenePointerEventType,

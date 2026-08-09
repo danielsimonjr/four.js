@@ -38,6 +38,7 @@
 import { EventEmitter, FourError } from "@four/core";
 import { Matrix4 } from "@four/math";
 import {
+  RenderTarget,
   buildInterpolatedRenderList,
   buildRenderList,
   collectSceneLights,
@@ -75,6 +76,7 @@ import {
   GL,
   LitProgram,
   MAP_TEXTURE_UNIT,
+  SHADOW_TEXTURE_UNIT,
   SpriteProgram,
   UnlitProgram,
   type GlTexture,
@@ -83,6 +85,7 @@ import {
   RenderTargetCache,
   type RenderTargetRecord,
 } from "./gl-render-target.js";
+import { ShadowProgram } from "./gl-shadow.js";
 import { StandardProgram } from "./gl-standard.js";
 import { TextureCache, type CacheableTexture } from "./gl-texture.js";
 
@@ -918,6 +921,39 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    */
   #effectProgram: EffectProgram | null = null;
 
+  /**
+   * §69's depth-only caster pipeline (R-18, 2026-08-09), or `null` before
+   * initialization and while the context is lost.
+   *
+   * Compiled by {@link WebglRenderer.initialize} with the other six, for the
+   * reason every one of them states: a shader compile can throw for a driver
+   * reason no application can pre-empt, and §61 forbids `render` from throwing.
+   * The cost is one program per renderer whose scenes never cast — the deal the
+   * lit, standard, particle and effect pipelines already offer, measured with
+   * this packet rather than assumed.
+   */
+  #shadowProgram: ShadowProgram | null = null;
+
+  /**
+   * The off-screen surface §69's shadow map is rendered into (R-18), or `null`
+   * until the first frame in which something casts.
+   *
+   * **Renderer-owned, and allocated lazily** — the one `RenderTarget` this
+   * backend creates for itself. Lazily because a scene that never casts must
+   * pay nothing at all, not even a descriptor (and the §83 totals a target
+   * reports would otherwise show a megatexel every application allocates and
+   * no application asked for); renderer-owned because the map is an
+   * *implementation* of `castShadow`, not a surface an application composes
+   * with — nothing outside this class may draw into it or sample it.
+   *
+   * It is re-`resize`d, never re-created, when the light's `mapSize` changes:
+   * a resize bumps the target's version, which is exactly what makes the
+   * framebuffer cache re-allocate at the new size on the next frame (R-4). It
+   * survives context loss for the same reason the application's own targets do
+   * — the descriptor is CPU-side, and only the cache's handles died.
+   */
+  #shadowTarget: RenderTarget | null = null;
+
   #geometries: GeometryCache | null = null;
 
   #textures: TextureCache | null = null;
@@ -981,6 +1017,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#litProgram = null;
     this.#standardProgram = null;
     this.#effectProgram = null;
+    this.#shadowProgram = null;
     this.#geometries?.forget();
     this.#textures?.forget();
     this.#renderTargets?.forget();
@@ -1002,6 +1039,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#litProgram = LitProgram.create(gl);
     this.#standardProgram = StandardProgram.create(gl);
     this.#effectProgram = EffectProgram.create(gl);
+    this.#shadowProgram = ShadowProgram.create(gl);
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
     this.#renderTargets = new RenderTargetCache(gl);
@@ -1181,6 +1219,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     const particleProgram = this.#particleProgram;
     const litProgram = this.#litProgram;
     const standardProgram = this.#standardProgram;
+    const shadowProgram = this.#shadowProgram;
     const geometries = this.#geometries;
     const textures = this.#textures;
     const renderTargets = this.#renderTargets;
@@ -1191,6 +1230,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       particleProgram === null ||
       litProgram === null ||
       standardProgram === null ||
+      shadowProgram === null ||
       geometries === null ||
       textures === null ||
       renderTargets === null ||
@@ -1240,6 +1280,19 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // mapped unlit or lit draw selects it once, on the first one — both target
     // the same unit, so a frame that mixes them issues one call either way.
     let mapUnitActive = false;
+    // §69 (R-18): whether this frame bound a shadow map to
+    // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
+    // unbind. A frame in which nothing casts never touches unit 1 at all.
+    let shadowBound = false;
+    // Whether **anything** in this frame has bound a framebuffer (F13, R-4,
+    // extended by R-18). `targetRecord !== null` stopped being the answer when
+    // §69's caster pass arrived: that pass binds a framebuffer on the
+    // *on-screen* path too, and a draw that throws inside it must not leave
+    // every later frame — this renderer's on-screen ones included — rendering
+    // into a shadow map nobody is looking at. `false` for a frame that casts
+    // nothing and draws on screen, which is what keeps that frame's GL
+    // sequence free of framebuffer calls entirely.
+    let framebufferBound = targetRecord !== null;
 
     try {
       // Inside the envelope on purpose (R-4): the `finally` below unbinds it,
@@ -1278,6 +1331,60 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       }
       if (hasLitItems) {
         collectSceneLights(root, sceneLights);
+      }
+
+      // §69's shadow map (R-18), rendered **before** the view loop: §63's own
+      // pipeline diagram puts "Shadow Passes" between scene preparation and the
+      // opaque world, and the map is per-*frame* state — one light, one volume,
+      // shared by every view of the frame — exactly as `sceneLights` is.
+      //
+      // Deliberately backend-internal rather than a `RenderGraph` pass (R-5).
+      // A graph pass is one `renderer.render(root, views, interpolation,
+      // target)`, and this has no camera, no viewport, and no target the
+      // application named; expressing it there would mean synthesizing all
+      // three and making the light's projection an author's problem. §63 lists
+      // shadow passes as a stage of the renderer's pipeline, not as one of the
+      // `addPass` examples, and every one of those examples is a colour pass
+      // composited by name.
+      //
+      // `sceneLights.hasShadow` is `false` for every scene that does not ask
+      // for shadows, so this whole block — target, framebuffer, program, draws,
+      // texture bind — issues **no GL call at all** in such a frame. That is
+      // the byte-identity contract, not an optimisation.
+      let shadowRecord: RenderTargetRecord | null = null;
+      if (hasLitItems && sceneLights.hasShadow) {
+        // Set *before* the call, not after it: from here on the `finally` owes
+        // an unbind whatever happens inside, including a throw between the
+        // pass's own bind and its rebind below.
+        framebufferBound = true;
+        shadowRecord = this.#renderShadowMap(
+          gl,
+          items,
+          renderTargets,
+          geometries,
+          shadowProgram,
+          state,
+          statistics,
+        );
+        // Back to the surface this frame is actually drawing into. The
+        // on-screen path is `null`, which is where the shadow pass found the
+        // binding; an off-screen frame re-binds its own target.
+        gl.bindFramebuffer(GL.FRAMEBUFFER, targetRecord?.framebuffer ?? null);
+      }
+      // Whether the shaded pipelines may compare against a map this frame: the
+      // light asked *and* the backend actually produced one. A shadow target
+      // GL would not allocate skips the shadow, never the frame (§61).
+      const shadowActive = shadowRecord !== null;
+      if (shadowRecord !== null && shadowRecord.depthTexture !== null) {
+        // Bound once, before anything selects unit 0, and left bound for the
+        // whole frame — a shadow map is per-frame state that every shaded draw
+        // samples. Selecting unit 1 here is safe precisely because
+        // `mapUnitActive` is still `false`: the first draw that wants an albedo
+        // texture re-selects unit 0, so the `finally`'s unit-0 unbind can never
+        // land on the wrong unit.
+        gl.activeTexture(GL.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+        gl.bindTexture(GL.TEXTURE_2D, shadowRecord.depthTexture);
+        shadowBound = true;
       }
 
       // The unlit pipeline is the frame's starting state, so a scene with no
@@ -1498,6 +1605,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // §68's point and spot lights (R-17). A scene with none issues
               // no call here at all — see `PunctualLightUniforms`.
               litProgram.setPunctualLights(sceneLights);
+              // §69's shadow matrix, biases and tap size (R-18). A frame in
+              // which nothing casts issues no call here at all — see
+              // `ShadowUniforms`.
+              litProgram.setShadow(sceneLights);
               litViewUploaded = true;
             }
             // §57's `map` (R-19): an albedo texture, bound and switched on for
@@ -1518,6 +1629,12 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               textureBound = true;
             }
             litProgram.setFeatures(litTexture !== null);
+            // §49's `receiveShadow` (§69, R-18), folded together with "does
+            // anything cast at all": both are reasons this draw is not
+            // shadowed, and one mirrored uniform says so. `false` on every
+            // draw of a shadowless frame, which is the mirror's initial value,
+            // so no call is issued.
+            litProgram.setReceivesShadow(shadowActive && item.receiveShadow);
             litProgram.setModel(item.worldMatrix);
             litProgram.setColor(item.material.color, opacityOf(item.material));
           } else if (isStandardItem(item)) {
@@ -1542,6 +1659,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 sceneLights.directionalColor,
               );
               standardProgram.setPunctualLights(sceneLights);
+              // §69 (R-18), exactly as the lit branch above: nothing at all for
+              // a frame in which no light casts.
+              standardProgram.setShadow(sceneLights);
               // The eye, read straight out of the camera's world matrix
               // translation column — `updateViewMatrix()` above resolved that
               // matrix, so this needs no second resolve and allocates nothing.
@@ -1572,6 +1692,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               textureBound = true;
             }
             standardProgram.setFeatures(standardTexture !== null);
+            standardProgram.setReceivesShadow(
+              shadowActive && item.receiveShadow,
+            );
             standardProgram.setModel(item.worldMatrix);
             standardProgram.setBaseColor(
               item.material.baseColor,
@@ -1644,13 +1767,25 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         gl.bindTexture(GL.TEXTURE_2D, null);
       }
       gl.bindVertexArray(null);
-      // Back to the default drawing buffer (R-4). Same argument as the two
-      // unbinds above, one step stronger: a framebuffer left bound by a frame
-      // that threw would send *every later frame* — this renderer's on-screen
-      // ones included — into an off-screen surface nobody is looking at, with
-      // nothing on screen and no error anywhere to explain it.
-      if (targetRecord !== null) {
+      // Back to the default drawing buffer (R-4, widened by R-18). Same
+      // argument as the two unbinds above, one step stronger: a framebuffer
+      // left bound by a frame that threw would send *every later frame* — this
+      // renderer's on-screen ones included — into an off-screen surface nobody
+      // is looking at, with nothing on screen and no error anywhere to explain
+      // it. Since §69 that surface can be a shadow map on an otherwise
+      // on-screen frame, which is why the condition is a flag rather than
+      // `targetRecord !== null`.
+      if (framebufferBound) {
         gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      }
+      // Unit 1's shadow map (R-18), released on the same terms as unit 0's
+      // albedo above — and after it, so the active unit is left at 0, which is
+      // GL's own initial value and what every path that binds a texture
+      // re-selects anyway.
+      if (shadowBound) {
+        gl.activeTexture(GL.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+        gl.activeTexture(GL.TEXTURE0);
       }
     }
   }
@@ -1885,6 +2020,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#litProgram?.dispose();
       this.#standardProgram?.dispose();
       this.#effectProgram?.dispose();
+      this.#shadowProgram?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
@@ -1897,6 +2033,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#litProgram = null;
     this.#standardProgram = null;
     this.#effectProgram = null;
+    this.#shadowProgram = null;
+    // The one `RenderTarget` this renderer created for itself (R-18), so the
+    // one it owes a `dispose()` to (§83) — its bytes leave the process-wide
+    // totals here. The framebuffer behind it is the cache's and was released
+    // above; an application's own targets are untouched, because the renderer
+    // did not create them.
+    this.#shadowTarget?.dispose();
+    this.#shadowTarget = null;
     this.#geometries = null;
     this.#textures = null;
     this.#renderTargets = null;
@@ -1936,7 +2080,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       );
     }
 
-    // All six programs are built before anything is stored, so a shader
+    // All seven programs are built before anything is stored, so a shader
     // failure leaves the renderer uninitialized rather than half-initialized —
     // and each failure disposes the ones already built.
     const program = UnlitProgram.create(gl);
@@ -1992,6 +2136,24 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       throw error;
     }
 
+    // §69's caster pipeline, compiled **last** (R-18, 2026-08-09). Last on
+    // purpose: `initialize` builds its pipelines in a fixed order, and the
+    // failure-path tests reach the partial-disposal branches by index, so a
+    // seventh program appended to the end leaves every existing index — and
+    // every recorded frame's `createProgram#n` aliasing — exactly where it was.
+    let shadowProgram: ShadowProgram;
+    try {
+      shadowProgram = ShadowProgram.create(gl);
+    } catch (error: unknown) {
+      effectProgram.dispose();
+      standardProgram.dispose();
+      litProgram.dispose();
+      particleProgram.dispose();
+      spriteProgram.dispose();
+      program.dispose();
+      throw error;
+    }
+
     this.#canvas = canvas;
     this.#gl = gl;
     this.#program = program;
@@ -2000,6 +2162,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#litProgram = litProgram;
     this.#standardProgram = standardProgram;
     this.#effectProgram = effectProgram;
+    this.#shadowProgram = shadowProgram;
     this.#geometries = new GeometryCache(gl);
     this.#textures = new TextureCache(gl);
     this.#renderTargets = new RenderTargetCache(gl);
@@ -2018,6 +2181,125 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
     canvas.addEventListener("webglcontextlost", this.#onContextLost);
     canvas.addEventListener("webglcontextrestored", this.#onContextRestored);
+  }
+
+  /**
+   * Renders §69's directional shadow map and returns the framebuffer record it
+   * drew into, or `null` if the map could not be produced (R-18, 2026-08-09).
+   *
+   * Called from inside {@link WebglRenderer.render}'s F13 envelope, once per
+   * frame, before the view loop — see the call site for why this is
+   * backend-internal rather than a §63 graph pass. **Never throws**, on the
+   * same terms as the rest of the frame (§61): a target GL will not allocate,
+   * or a framebuffer that is not complete, costs the frame its shadows and
+   * nothing else.
+   *
+   * ## What it draws
+   *
+   * The frame's own render list, filtered twice: to the items whose node set
+   * §49's `castShadow`, and to the three *surface* kinds. Sprites are excluded
+   * because a depth-only pass writes geometry rather than alpha, so a §55 quad
+   * would cast its rectangle instead of its texture — §69's transparent shadow
+   * masks are what fix that, and they are staged. Particle items carry
+   * `castShadow: false` from the list builder and are excluded by that.
+   *
+   * Drawing from the *list* rather than re-walking the scene is what makes the
+   * caster pass and the colour pass agree by construction: same items, same
+   * order, same `worldMatrix` — including §43's interpolated render pose, which
+   * the list already resolved. That is also the whole of the pass's §33 story
+   * (`gl-shadow.ts`).
+   *
+   * §46's layer masks are deliberately **not** applied here, and that is a
+   * decision rather than an omission: a layer mask belongs to a *view* (§48),
+   * while this map is frame state shared by every view of the frame. Filtering
+   * by one view's mask would make the shadows in the other views depend on
+   * which viewport happened to be first. A caster that no camera can see still
+   * occludes; hiding it from the map is `castShadow`'s job, which is per-node
+   * and therefore view-independent.
+   *
+   * ## State
+   *
+   * It borrows the framebuffer binding, the viewport and scissor rectangles,
+   * and the current program; the caller re-binds the framebuffer, and the view
+   * loop rewrites the rectangles and the program before its first draw, exactly
+   * as it does after `renderEffect`. §57's blend and depth/colour mirror is
+   * moved through `applyMaterialState` with no material, i.e. to the opaque,
+   * depth-writing state a frame starts in — which issues no call, since that is
+   * where the frame already is.
+   */
+  #renderShadowMap(
+    gl: ParticleGlContext,
+    items: readonly RenderItem[],
+    renderTargets: RenderTargetCache,
+    geometries: GeometryCache,
+    shadowProgram: ShadowProgram,
+    state: GlState,
+    statistics: RenderStatistics | null,
+  ): RenderTargetRecord | null {
+    const size = sceneLights.shadowMapSize;
+    let target = this.#shadowTarget;
+    if (target === null) {
+      // The one target this renderer owns, described the first time a frame
+      // asks for a shadow. `depthTexture` is the whole point (R-4's residue):
+      // the pass writes depth and the shaded pipelines sample it.
+      target = new RenderTarget({
+        width: size,
+        height: size,
+        depthTexture: true,
+      });
+      this.#shadowTarget = target;
+    } else if (target.width !== size) {
+      // `mapSize` changed. Resizing bumps the version, which is what makes the
+      // framebuffer cache re-allocate at the new size on this very frame (R-4)
+      // — a new `RenderTarget` would leak the old one's §83 accounting instead.
+      target.resize(size, size);
+    }
+
+    const record = renderTargets.acquire(target);
+    if (record === null || record.depthTexture === null) {
+      return null;
+    }
+
+    gl.bindFramebuffer(GL.FRAMEBUFFER, record.framebuffer);
+    // The whole map, always: unlike a view, a shadow pass has no sub-rectangle
+    // to honour, and the scissor has to be opened to the full attachment or the
+    // clear below would only reach the previous view's rectangle
+    // (`SCISSOR_TEST` is enabled for the renderer's lifetime).
+    gl.scissor(0, 0, record.width, record.height);
+    gl.viewport(0, 0, record.width, record.height);
+    applyMaterialState(gl, state, undefined, false);
+    gl.clearDepth(1);
+    // Depth only. The colour attachment is written by the caster stage and read
+    // by nothing (`gl-shadow.ts`), so clearing it would be a call whose result
+    // no one can observe.
+    gl.clear(GL.DEPTH_BUFFER_BIT);
+
+    shadowProgram.use();
+    shadowProgram.setViewProjection(sceneLights.shadowMatrix);
+    for (const item of items) {
+      if (!item.castShadow || item.kind === "sprite") {
+        continue;
+      }
+      const geometry = geometries.acquire(item.geometry);
+      if (geometry === null) {
+        continue;
+      }
+      shadowProgram.setModel(item.worldMatrix);
+      gl.bindVertexArray(geometry.vertexArray);
+      if (geometry.indexType === null) {
+        gl.drawArrays(geometry.mode, 0, geometry.count);
+      } else {
+        gl.drawElements(geometry.mode, geometry.count, geometry.indexType, 0);
+      }
+      if (statistics !== null) {
+        // A caster pass draw is a draw (§84): it costs a submission and its
+        // triangles, and a frame that suddenly doubled its draw calls should
+        // say so rather than hide the second pass from the counter that exists
+        // to find it.
+        countDraw(statistics, geometry.mode, geometry.count, 1);
+      }
+    }
+    return record;
   }
 
   /** The fixed GL state — see the class documentation for each choice. */

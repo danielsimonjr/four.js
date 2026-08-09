@@ -66,15 +66,44 @@
  * is read before anything is dispatched, so a listener that starts a new
  * interaction cannot rewrite this one's history.
  *
- * **Known consequence, stated rather than hidden.** A `pointerup` therefore
- * ends hover as well: a mouse that presses and releases without moving fires
- * `pointerleave`, and the next `pointermove` fires `pointerenter` again. That
- * is right for touch and pen, where the contact really has ceased to exist,
- * and it is a behavioural change for the mouse, whose pointer persists.
- * Distinguishing the two needs `pointerType` on
- * {@link SurfacePointerEvent} — which the platform event carries and this
- * three-field structural subset does not — so retaining a mouse's hover across
- * its own release is left to the packet that widens that interface.
+ * ## The one exception: a mouse keeps its hover (2026-08-09, A-9)
+ *
+ * Until `pointerType` reached this module, a `pointerup` ended hover for every
+ * device: a mouse that pressed and released without moving fired
+ * `pointerleave`, and the next `pointermove` fired `pointerenter` again — a
+ * visible flicker on every click, wrong for a device whose pointer plainly did
+ * not stop existing.
+ *
+ * With {@link SurfacePointerEvent.pointerType} in hand the rule is the one the
+ * teardown always wanted: **a release forgets the pointer unless the device
+ * outlives its own gesture and there is a hover to keep.** In practice that is
+ * `pointerType === "mouse"` with a hovered node — the entry survives, carrying
+ * nothing but that hover (the press, the click origin, and the capture are all
+ * cleared exactly as before), and hover changes normally on the next move. A
+ * mouse over nothing is forgotten like any other pointer, so the retained entry
+ * always has a reason to exist, and a mouse's `pointerId` is stable and reused,
+ * so the §83 leak A-9 closed cannot come back through this door: the map is
+ * still bounded by the number of *live* pointers.
+ *
+ * Three deliberate non-generalizations:
+ *
+ * - **`pointercancel` still ends every pointer, mouse included.** The platform
+ *   said this pointer will produce no further events; overriding that with the
+ *   engine's own idea of which devices persist would be a guess, and the
+ *   conservative teardown (fire the pending leave, forget everything) is what
+ *   makes "cancel forgets everything" a single rule.
+ * - **Pen is not treated as persistent.** A stylus that has left the digitizer
+ *   is gone; a hovering one produces its own events, and the platform issues a
+ *   fresh `pointerId` per contact, so nothing is lost by forgetting it.
+ * - **An unknown device is treated as non-persistent.** A source that reports
+ *   no `pointerType` keeps exactly the behaviour it had before this change, so
+ *   the widening cannot alter anyone's semantics without the information that
+ *   justifies it.
+ *
+ * The one thing this input still cannot know is that a mouse left the surface
+ * entirely: nothing subscribes to the DOM's own `pointerout`/`pointerleave`, so
+ * a retained hover ends at the next move over something else (as it did before
+ * for a mouse that never pressed).
  */
 
 import { Vector3, type DepthRange } from "@four/math";
@@ -85,12 +114,13 @@ import {
   ScenePointerEvent,
   buildPropagationPath,
   dispatchPointerEvent,
+  type PointerDeviceType,
   type PropagatingPointerEventType,
   type ScenePointerEventType,
 } from "./pointer-events.js";
 
 /**
- * The platform pointer event this module reads — three fields out of the DOM's
+ * The platform pointer event this module reads — four fields out of the DOM's
  * `PointerEvent`.
  *
  * Structural on purpose: a browser `PointerEvent`, a Playwright-synthesized
@@ -104,6 +134,31 @@ export interface SurfacePointerEvent {
   readonly clientY: number;
   /** Which pointer this is: mouse, finger, or stylus. */
   readonly pointerId: number;
+  /**
+   * Which *kind* of device it is, verbatim from the platform (2026-08-09, A-9).
+   *
+   * Typed `string`, not {@link PointerDeviceType}, and the difference is
+   * measured rather than defensive: `lib.dom`'s `PointerEvent.pointerType` is
+   * declared `string`, so narrowing this field makes a real `PointerEvent` stop
+   * satisfying this interface — *"Type 'string' is not assignable to type
+   * '"mouse" | "pen" | "touch" | undefined'"* — and the structural seam's whole
+   * promise (a browser event needs no adapter) would be gone. The Pointer
+   * Events specification agrees with the DOM's typing: it permits
+   * vendor-defined values and `""` for a device the platform cannot classify.
+   *
+   * The narrowing therefore happens *inside* this module, once, and an
+   * unrecognized value becomes an absent
+   * {@link ScenePointerEvent.pointerType} rather than a rejected event. Refusing
+   * it outright would be the §85 reflex applied to the wrong kind of input: §85
+   * refuses a *configuration* the application got wrong, where failing loudly
+   * costs nothing; this is hardware telemetry arriving mid-gesture, where a
+   * throw would break input on a device whose only sin is being newer than the
+   * union. Reporting "unknown" is neither a clamp nor a guess.
+   *
+   * Optional so that a source with nothing to report — and every call site that
+   * predates this field — stays valid.
+   */
+  readonly pointerType?: string;
 }
 
 /**
@@ -428,7 +483,9 @@ export class PointerInput {
       this.#dispatch("click", resolved);
     }
 
-    this.#endPointer(state, resolved);
+    // A mouse is the one device whose pointer outlives its own gesture, so it
+    // is the one device whose hover survives its own release (A-9, 2026-08-09).
+    this.#endPointer(state, resolved, resolved.pointerType === "mouse");
   }
 
   /**
@@ -436,7 +493,8 @@ export class PointerInput {
    * a touch turned into a browser scroll, the stylus left the digitizer, the
    * window lost the pointer.
    *
-   * The same teardown as a release, minus the click — the gesture did not
+   * The same teardown as a release, minus the click and minus the mouse's
+   * hover retention — the gesture did not
    * complete, and synthesizing "the user tapped this" for a tap the user never
    * finished is the one thing a cancel must not do. Hover is not updated before
    * the dispatch either: a cancelled pointer has not crossed anything, it has
@@ -447,14 +505,23 @@ export class PointerInput {
     const state = this.#stateFor(event.pointerId);
     const resolved = this.#resolve(event, state);
 
+    // Never persistent, whatever the device: the platform withdrew this
+    // pointer, and the module header says why that is not second-guessed.
     this.#dispatch("pointercancel", resolved);
-    this.#endPointer(state, resolved);
+    this.#endPointer(state, resolved, false);
   }
 
   /**
    * Forgets `pointerId` entirely — the shared tail of `pointerup` and
    * `pointercancel` (2026-08-06, A-9; see the module header for why the entry
    * must not survive its pointer).
+   *
+   * `persistent` is the one exception (2026-08-09): a device whose pointer
+   * outlives its gesture — a mouse — keeps its entry when there is a hover in
+   * it worth keeping, so a click no longer flickers the hover off and on. The
+   * gesture itself is still fully undone (press, click origin, capture), and
+   * the entry is *not* marked `ending`, because it is not: the next event from
+   * this `pointerId` is the same live pointer and belongs in the same state.
    *
    * Order matters. The capture is released *first*, because `#updateHover`
    * deliberately does nothing while a pointer is captured and the pending
@@ -482,14 +549,22 @@ export class PointerInput {
    * which are two ways of saying the same thing: the map always answers with
    * the live pointer, never with a dead one.
    */
-  #endPointer(state: PointerState, resolved: Resolution): void {
+  #endPointer(
+    state: PointerState,
+    resolved: Resolution,
+    persistent: boolean,
+  ): void {
     state.downTarget = null;
     state.moved = false;
     // Implicit release, as in the DOM: a capture never outlives its gesture.
     state.captured = null;
+    if (persistent && state.hovered !== null) {
+      return;
+    }
     state.ending = true;
     this.#updateHover(state, {
       pointerId: resolved.pointerId,
+      pointerType: resolved.pointerType,
       ndcX: resolved.ndcX,
       ndcY: resolved.ndcY,
       target: null,
@@ -515,9 +590,11 @@ export class PointerInput {
     const ndc = this.#ndc;
     this.toNdc(event.clientX, event.clientY, ndc);
 
+    const pointerType = narrowPointerType(event.pointerType);
     if (state.captured !== null) {
       return {
         pointerId: event.pointerId,
+        pointerType,
         ndcX: ndc[0],
         ndcY: ndc[1],
         target: state.captured,
@@ -535,6 +612,7 @@ export class PointerInput {
     );
     return {
       pointerId: event.pointerId,
+      pointerType,
       ndcX: ndc[0],
       ndcY: ndc[1],
       target: hits.length === 0 ? null : hits[0].node,
@@ -564,6 +642,7 @@ export class PointerInput {
         new ScenePointerEvent({
           type: "pointerleave",
           pointerId: resolved.pointerId,
+          pointerType: resolved.pointerType,
           ndcX: resolved.ndcX,
           ndcY: resolved.ndcY,
           target: previous,
@@ -621,11 +700,35 @@ export class PointerInput {
 /** One platform event, normalized and resolved against the scene. */
 interface Resolution {
   readonly pointerId: number;
+  /** The device, once narrowed; `undefined` when the source did not say. */
+  readonly pointerType: PointerDeviceType | undefined;
   readonly ndcX: number;
   readonly ndcY: number;
   readonly target: Node | null;
   /** World-space hit point, already copied out of the picking pool. */
   readonly point: Vector3 | null;
+}
+
+/**
+ * Narrows the platform's open `pointerType` string to the three devices §72
+ * names, or to `undefined` for everything else.
+ *
+ * A `switch` rather than a set membership test, so the narrowing is the
+ * compiler's and adding a member to {@link PointerDeviceType} cannot silently
+ * forget this function. See {@link SurfacePointerEvent.pointerType} for why an
+ * unrecognized value is reported as unknown instead of refused.
+ */
+function narrowPointerType(
+  value: string | undefined,
+): PointerDeviceType | undefined {
+  switch (value) {
+    case "mouse":
+    case "pen":
+    case "touch":
+      return value;
+    default:
+      return undefined;
+  }
 }
 
 /** Builds a scene event of `type` at a resolved pointer position. */
@@ -639,6 +742,9 @@ function createEvent(
     ndcX: resolved.ndcX,
     ndcY: resolved.ndcY,
     target: resolved.target,
+    // `pointerType` is optional and may legitimately be unknown, so it is
+    // passed as-is; the event constructor leaves an `undefined` one absent.
+    pointerType: resolved.pointerType,
   };
   if (resolved.point === null) {
     return new ScenePointerEvent(init);

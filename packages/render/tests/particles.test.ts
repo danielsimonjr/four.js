@@ -435,3 +435,23 @@ describe("§46 layer filtering of a particle system (R-38)", () => {
     expect(node.updateCalls).toBe(1);
   });
 });
+
+describe("particle items and §69 shadows (R-18)", () => {
+  it("neither casts nor receives, whatever occupied the pooled slot before", () => {
+    // §36's billboards are camera-facing quads: no surface to project into a
+    // map, no lighting term to attenuate. Written rather than left, so a slot
+    // that carried a `Renderable` last frame cannot hand its flags on.
+    const out: RenderItem[] = [];
+    const mesh = new Scene();
+    mesh.add(new Renderable(planeGeometry(), new UnlitMaterial()));
+    resolveWorldTransforms(mesh);
+    buildRenderList(mesh, out);
+    expect([out[0].castShadow, out[0].receiveShadow]).toEqual([true, true]);
+
+    const scene = sceneWith(new TestParticles(4));
+    resolveWorldTransforms(scene);
+    buildRenderList(scene, out);
+    const item = particlesAt(out, 0);
+    expect([item.castShadow, item.receiveShadow]).toEqual([false, false]);
+  });
+});

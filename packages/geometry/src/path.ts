@@ -173,7 +173,7 @@
 import type { Matrix3 } from "@four/math";
 
 import { requirePositive } from "./primitive-support.js";
-import type { Point2D } from "./tessellation.js";
+import type { Point2D, Polyline2D } from "./tessellation.js";
 
 /** A full turn in radians — the period every arc sweep is normalized into. */
 const TAU = Math.PI * 2;
@@ -707,6 +707,43 @@ export class Path {
     return flattenSubpaths(this.#commands, tolerance).map(
       (subpath) => subpath.points,
     );
+  }
+
+  /**
+   * {@link Path.flatten}, keeping the one bit a `Point2D[]` cannot carry:
+   * whether each subpath closes back on its first point (§52 stroke
+   * expansion).
+   *
+   * ```ts
+   * const [outline] = new Path()
+   *   .moveTo(0, 0).lineTo(2, 0).lineTo(2, 2).close()
+   *   .polylines();
+   * outline.closed;         // true — the closing edge is implicit
+   * outline.points.length;  // 3 — the first point is not repeated
+   * ```
+   *
+   * The arrays and points are the same fresh, caller-owned ones
+   * {@link Path.flatten} hands back, under exactly the same rules; this is not
+   * a different flattening, it is the same one reported with its `closed`
+   * flag intact.
+   *
+   * It exists because a **stroke** is the one consumer for which the flag is
+   * load-bearing: a closed ring is joined at every vertex and capped at none,
+   * an open one is capped at both ends, and the difference is not recoverable
+   * from the points (a polyline that happens to end where it began is not a
+   * ring — `Path.flatten`'s own note about the ulp trap is the reason a
+   * coordinate comparison cannot be made to answer it). `fillRings` needs the
+   * opposite — an open subpath fills as if closed — which is why the fill path
+   * does not take this route.
+   *
+   * @param tolerance Flattening tolerance, as {@link Path.flatten}.
+   */
+  polylines(tolerance = DEFAULT_FLATTEN_TOLERANCE): Polyline2D[] {
+    requirePositive("tolerance", tolerance);
+    return flattenSubpaths(this.#commands, tolerance).map((subpath) => ({
+      points: subpath.points,
+      closed: subpath.closed,
+    }));
   }
 
   /**
@@ -1465,8 +1502,15 @@ function arcSweep(
   return wrapped < 0 ? wrapped + TAU : wrapped;
 }
 
-/** The point on an arc's ellipse at local angle `theta` (same-runtime). */
-function arcPoint(command: PathArcCommand, theta: number): Point2D {
+/**
+ * The point on an arc's ellipse at local angle `theta` (same-runtime).
+ *
+ * Package-internal, not part of the barrel: `svg-path.ts` needs an arc's start
+ * and end points to write §50's endpoint-parameterized `A` command, and a
+ * second copy of `centre + R(rotation)·(rx cos θ, ry sin θ)` living there would
+ * be a second place for the rotation's sign to be wrong.
+ */
+export function arcPoint(command: PathArcCommand, theta: number): Point2D {
   const cos = Math.cos(theta);
   const sin = Math.sin(theta);
   const localX = command.radiusX * cos;
@@ -1544,7 +1588,7 @@ function transformArc(
  * first point, not at the last point drawn, and a reader that tracked only the
  * current point would silently start it in the wrong place.
  */
-interface PathCursor {
+export interface PathCursor {
   x: number;
   y: number;
   startX: number;
@@ -1552,7 +1596,7 @@ interface PathCursor {
 }
 
 /** A cursor at the origin — where every command list starts. */
-function newCursor(): PathCursor {
+export function newCursor(): PathCursor {
   return { x: 0, y: 0, startX: 0, startY: 0 };
 }
 
@@ -1563,8 +1607,13 @@ function newCursor(): PathCursor {
  * `centre + r·(cos θ, sin θ)` and therefore same-runtime (§33) — which is why
  * an operation on a *Bézier that follows an arc* inherits that tier while the
  * same operation on a path of lines and Béziers does not.
+ *
+ * Package-internal like `arcPoint`, and exported for the same reason: §50's
+ * SVG writer has to know where each command starts, and "a `close` leaves you
+ * at the subpath's first point" is a rule that must have exactly one
+ * implementation.
  */
-function advance(command: PathCommand, cursor: PathCursor): void {
+export function advance(command: PathCommand, cursor: PathCursor): void {
   switch (command.kind) {
     case "move":
       cursor.x = command.x;

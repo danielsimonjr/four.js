@@ -1,0 +1,12 @@
+{
+  "_warning": "IMMUTABLE. These digests are gap R-16 (§52 stroke expansion) recorded on 2026-08-09 from an actual run of tests/determinism/helpers/stroke-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means expandStroke changed what it emits — a different offset, a different join fallback, a different fan step, a different dash phase. Find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper (or to intended stroke semantics) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js strokes the same path the same way twice.",
+  "_scenario": "Eighteen hand-written cases — an open chain and a closed ring under every alignment, cap and join, a miter that fires and the same corner bevelled by its limit, a hairpin under both, a dashed staircase, a dash crossing a ring's seam, an odd dash pattern, two polylines in one call, and two §51-flattened curves — followed by 40 integer-grid chains generated from SeededRandom(SEED) with a cycling alignment/cap/join set. Each is passed to expandStroke; every emitted coordinate and index is checksummed per D6 and the per-case (triangles, vertices, digest) triples are checksummed in order.",
+  "_tier": "same-runtime (§33), deliberately weaker than golden/tessellation.json's cross-platform claim and for a stated reason: offsetting a polyline needs a unit normal and therefore Math.sqrt, and a round join or cap needs Math.acos for its sample count and Math.cos/Math.sin for its sample values — all four implementation-approximated by ECMA-262. A determinism tier is a property of the operation, not of the module (R-24), so the fill half keeps its stronger golden and the stroke half gets this one rather than the two being merged.",
+  "seed": 380675029,
+  "strokes": 58,
+  "triangles": 1554,
+  "vertices": 2918,
+  "summaryDigest": 2574389960,
+  "firstStrokeDigest": 1868386235,
+  "lastStrokeDigest": 3342804531
+}

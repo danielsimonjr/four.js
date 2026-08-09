@@ -20,9 +20,15 @@
  * - up to {@link MAX_PUNCTUAL_LIGHTS} **point and spot** lights, flattened
  *   into the four packed arrays a backend uploads as uniform arrays.
  *
- * §68's hemisphere and rectangular-area types are staged, and so are shadows
- * (§69), light layers, IBL, and the clustered/forward-plus path for *many*
- * lights — see `@four/scene`'s `light.ts`, which owns that list.
+ * and, since R-18 (2026-08-09), the **shadow** the directional light casts
+ * when it is asked to (§69): a view-projection, a map size, and two biases,
+ * which together are everything a backend needs to render a depth map and
+ * compare against it. Only the *directional* light casts at this tier — see
+ * `@four/scene`'s `DirectionalLightShadow` for §69's staged remainder.
+ *
+ * §68's hemisphere and rectangular-area types are staged, and so are light
+ * layers, IBL, and the clustered/forward-plus path for *many* lights — see
+ * `@four/scene`'s `light.ts`, which owns that list.
  *
  * ## Order, and what happens past the bound
  *
@@ -56,7 +62,7 @@
  * assignments.
  */
 
-import { Vector3 } from "@four/math";
+import { Matrix4, Vector3 } from "@four/math";
 import type { Node } from "@four/scene";
 
 /**
@@ -88,6 +94,59 @@ export interface DirectionalLightSource {
    * node's world −Z axis; a double supplies whatever the test needs.
    */
   getWorldDirection(out: Vector3): Vector3;
+
+  /**
+   * Whether this light casts shadows (§69; R-18, 2026-08-09). Absent — like
+   * every member below — reads as `false`.
+   *
+   * **Optional, and that is the compatibility contract**, not laziness: this
+   * interface is satisfied structurally, and the doubles `@four/render-webgl`'s
+   * unit tests build were written before §69 existed. A required member here
+   * would have broken every one of them at *compile* time, and a host's own
+   * minimal light object at run time — while an optional one reads `undefined`,
+   * which {@link collectSceneLights} resolves to "does not cast", i.e. exactly
+   * the behaviour every scene had before this field.
+   */
+  readonly castShadow?: boolean;
+
+  /**
+   * Resolution and bias of this light's shadow map (§69) — the half
+   * {@link SceneLights} carries through to a backend. `@four/scene`'s
+   * `DirectionalLightShadow` satisfies it; the volume controls it also carries
+   * (`extent`, `near`, `far`) are consumed by
+   * {@link DirectionalLightSource.computeShadowMatrix} and never reach a
+   * backend, which is why they are not declared here.
+   */
+  readonly shadow?: DirectionalShadowSource;
+
+  /**
+   * Writes the light's world-space **shadow view-projection** into `out` and
+   * returns it (§69) — see `@four/scene`'s `DirectionalLight` for the
+   * derivation. A light that offers no such method never casts, whatever
+   * {@link DirectionalLightSource.castShadow} says: the matrix is the shadow.
+   */
+  computeShadowMatrix?(out: Matrix4): Matrix4;
+}
+
+/**
+ * The two shadow numbers a backend needs per frame (§69) — the structural half
+ * of `@four/scene`'s `DirectionalLightShadow`.
+ *
+ * `mapSize` is here rather than derived because a backend has to *allocate* a
+ * surface of that size before it can render into one, and `bias`/`normalBias`
+ * because both are consumed by the fragment stage that samples it. Everything
+ * else on §69's settings object shapes the matrix, which arrives already
+ * multiplied out.
+ */
+export interface DirectionalShadowSource {
+  /** Edge of the square shadow map in texels (§69 "configurable resolution"). */
+  readonly mapSize: number;
+
+  /** Constant depth offset, in clip-space depth units (§69 "bias"). */
+  readonly bias: number;
+
+  /** Offset along the receiver's normal, in metres (§69 "normal-bias"). */
+  readonly normalBias: number;
 }
 
 /**
@@ -278,6 +337,40 @@ export interface SceneLights {
    * (see `@four/scene`'s `SpotLight`).
    */
   readonly punctualParams: Float32Array;
+
+  /**
+   * Whether the frame's directional light casts a shadow map (§69; R-18,
+   * 2026-08-09) — `true` only when that light exists, sets `castShadow`, and
+   * offers a `computeShadowMatrix`.
+   *
+   * **A backend that sees `false` here must issue no shadow call at all** —
+   * not a framebuffer bind, not a uniform, not a texture. That is the same
+   * compatibility contract {@link SceneLights.punctualCount} states, kept the
+   * same way: a `bool` uniform's initial value in GL is `false`, so a scene lit
+   * the way every scene was lit before §69 shipped emits byte-for-byte the GL
+   * sequence it always did.
+   */
+  hasShadow: boolean;
+
+  /**
+   * World space → shadow-map clip space (§69), written by the casting light's
+   * own `computeShadowMatrix`. Identity when {@link SceneLights.hasShadow} is
+   * `false`, and owned by the record — read it, upload it, do not mutate it.
+   */
+  readonly shadowMatrix: Matrix4;
+
+  /**
+   * Edge of the square shadow map in texels; `0` when nothing casts. The
+   * backend allocates its off-screen depth surface at this size and derives
+   * the PCF tap offset (`1 / shadowMapSize`) from it.
+   */
+  shadowMapSize: number;
+
+  /** Constant depth bias, in clip-space depth units (§69); `0` when nothing casts. */
+  shadowBias: number;
+
+  /** Normal-space bias, in metres (§69, §40); `0` when nothing casts. */
+  shadowNormalBias: number;
 }
 
 /** Narrows any value to a {@link DirectionalLightSource} — see `isParticleDrawable`. */
@@ -345,6 +438,11 @@ export function createSceneLights(): SceneLights {
     punctualColors: new Float32Array(MAX_PUNCTUAL_LIGHTS * 3),
     punctualDirections: new Float32Array(MAX_PUNCTUAL_LIGHTS * 3),
     punctualParams: new Float32Array(MAX_PUNCTUAL_LIGHTS * 4),
+    hasShadow: false,
+    shadowMatrix: new Matrix4(),
+    shadowMapSize: 0,
+    shadowBias: 0,
+    shadowNormalBias: 0,
   };
 }
 
@@ -367,6 +465,15 @@ function clearSceneLights(out: SceneLights): void {
   out.punctualColors.fill(0);
   out.punctualDirections.fill(0);
   out.punctualParams.fill(0);
+  // §69, and the same argument as the array fills above: the shadow matrix is
+  // uploaded whole whenever it is uploaded at all, so leaving last frame's
+  // numbers in it would make the upload depend on history. `identity()` costs
+  // sixteen stores on a path that already zeroes 104 floats.
+  out.hasShadow = false;
+  out.shadowMatrix.identity();
+  out.shadowMapSize = 0;
+  out.shadowBias = 0;
+  out.shadowNormalBias = 0;
 }
 
 /** Scratch for the world position and axis reads below (plan D7). */
@@ -520,6 +627,28 @@ export function collectSceneLights(root: Node, out: SceneLights): SceneLights {
     out.directionalColor[0] = light.color[0] * light.intensity;
     out.directionalColor[1] = light.color[1] * light.intensity;
     out.directionalColor[2] = light.color[2] * light.intensity;
+    // §69 (R-18). The shadow belongs to the *same* light that lights the frame
+    // — the first one in scene-graph order — so this is read here rather than
+    // in the walk: a second directional light's `castShadow` is ignored exactly
+    // as its colour is, and for the same recorded reason (§33: authored order
+    // decides, never proximity or brightness).
+    //
+    // All three members are optional on the contract, so all three are checked:
+    // a structurally-typed light double predating §69 offers none of them and
+    // resolves to "does not cast", which is what keeps a pre-R-18 scene on the
+    // pre-R-18 path.
+    const shadow = light.shadow;
+    if (
+      light.castShadow === true &&
+      shadow !== undefined &&
+      typeof light.computeShadowMatrix === "function"
+    ) {
+      out.hasShadow = true;
+      light.computeShadowMatrix(out.shadowMatrix);
+      out.shadowMapSize = shadow.mapSize;
+      out.shadowBias = shadow.bias;
+      out.shadowNormalBias = shadow.normalBias;
+    }
   }
 
   if (

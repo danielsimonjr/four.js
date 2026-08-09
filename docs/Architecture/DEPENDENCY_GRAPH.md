@@ -51,8 +51,7 @@ The codebase is organized into the following modules:
 - **packages/core**: 11 files
 - **packages/diagnostics**: 8 files
 - **packages/four**: 26 files
-- **packages/geometry**: 8 files
-- **packages/geometry**: 7 files
+- **packages/geometry**: 9 files
 - **packages/input**: 8 files
 - **packages/materials**: 7 files
 - **packages/math**: 9 files
@@ -62,11 +61,10 @@ The codebase is organized into the following modules:
 - **packages/physics-box2d**: 1 file
 - **packages/physics-rapier**: 8 files
 - **packages/physics-soft**: 1 file
-- **packages/render**: 14 files
+- **packages/render**: 15 files
 - **packages/render-canvas**: 1 file
 - **packages/render-svg**: 1 file
 - **packages/render-webgl**: 11 files
-- **packages/render-webgl**: 10 files
 - **packages/render-webgpu**: 1 file
 - **packages/scene**: 13 files
 - **packages/serialization**: 4 files
@@ -85,8 +83,7 @@ The codebase is organized into the following modules:
 | `@four/core` (`packages/core/`) | (none) | 11 | 0 |
 | `@four/diagnostics` (`packages/diagnostics/`) | `@four/math`, `@four/core` | 8 | 0 |
 | `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/diagnostics`, `@four/geometry`, `@four/motion`, `@four/math`, `@four/assets`, `@four/physics`, `@four/scene`, `@four/render`, `@four/input`, `@four/materials`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/serialization`, `@four/text`, `@four/ui` | 26 | 0 |
-| `@four/geometry` (`packages/geometry/`) | `@four/core`, `@four/math` | 8 | 0 |
-| `@four/geometry` (`packages/geometry/`) | `@four/core`, `@four/math` | 7 | 0 |
+| `@four/geometry` (`packages/geometry/`) | `@four/core`, `@four/math` | 9 | 0 |
 | `@four/input` (`packages/input/`) | `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
 | `@four/materials` (`packages/materials/`) | `@four/core`, `@four/math` | 7 | 0 |
 | `@four/math` (`packages/math/`) | (none) | 9 | 0 |
@@ -96,11 +93,10 @@ The codebase is organized into the following modules:
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
 | `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/physics`, `@four/core`, `@four/math` | 8 | 0 |
 | `@four/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
-| `@four/render` (`packages/render/`) | `@four/math`, `@four/scene`, `@four/geometry`, `@four/core`, `@four/materials` | 14 | 0 |
+| `@four/render` (`packages/render/`) | `@four/math`, `@four/scene`, `@four/geometry`, `@four/core`, `@four/materials` | 15 | 0 |
 | `@four/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
 | `@four/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
 | `@four/render-webgl` (`packages/render-webgl/`) | `@four/core`, `@four/render`, `@four/math` | 11 | 0 |
-| `@four/render-webgl` (`packages/render-webgl/`) | `@four/core`, `@four/render`, `@four/math` | 10 | 0 |
 | `@four/render-webgpu` (`packages/render-webgpu/`) | (none) | 1 | 0 |
 | `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 13 | 0 |
 | `@four/serialization` (`packages/serialization/`) | `@four/core`, `@four/scene`, `@four/math` | 4 | 0 |
@@ -454,7 +450,7 @@ graph LR
 
 **Exports:**
 - Classes: `AssetManager`
-- Interfaces: `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `AssetLoader`, `AssetManagerOptions`
+- Interfaces: `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `FetchInit`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`
 - Types: `FetchLike`
 - Constants: `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`
 
@@ -467,12 +463,12 @@ graph LR
 |------|---------|------|
 | `./asset-manager.js` | `AssetManager, DEFAULT_MAXIMUM_BYTES, DEFAULT_TIMEOUT_SECONDS` | Re-export |
 | `./loaders.js` | `ImageAsset, binaryLoader, createImageLoader, jsonLoader, textLoader` | Re-export |
-| `./asset-manager.js` | `AssetLoader, AssetManagerOptions, FetchLike, FetchResponse, ResponseHeadersLike, TimerLike` | Re-export (type-only) |
+| `./asset-manager.js` | `AbortHandle, AbortSignalLike, AssetLoadOptions, AssetLoader, AssetManagerOptions, FetchInit, FetchLike, FetchResponse, ResponseHeadersLike, TimerLike` | Re-export (type-only) |
 | `./loaders.js` | `ImageBitmapLike, ImageDecodeLike` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AssetLoader`, `AssetManagerOptions`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `ImageBitmapLike`, `ImageDecodeLike`
+- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `FetchInit`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `ImageBitmapLike`, `ImageDecodeLike`
 
 ---
 
@@ -863,12 +859,12 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./application.js` | `Application` | Re-export |
-| `./scene-serializers.js` | `BUTTON_NODE_TYPE, CHECKBOX_NODE_TYPE, DIRECTIONAL_LIGHT_NODE_TYPE, IMAGE_NODE_TYPE, LABEL_NODE_TYPE, ORTHOGRAPHIC_CAMERA_NODE_TYPE, PANEL_NODE_TYPE, PERSPECTIVE_CAMERA_NODE_TYPE, POINT_LIGHT_NODE_TYPE, PROGRESS_NODE_TYPE, RADIO_BUTTON_NODE_TYPE, RENDERABLE_NODE_TYPE, SLIDER_NODE_TYPE, SPOT_LIGHT_NODE_TYPE, SPRITE_NODE_TYPE, TOGGLE_NODE_TYPE, composeSceneNodeTypes, registerPhysicsSerializers, registerRenderSerializers, registerSceneNodeTypes, registerUISerializers, resourceCatalog, restoreNodeId` | Re-export |
+| `./scene-serializers.js` | `BUTTON_NODE_TYPE, CHECKBOX_NODE_TYPE, CIRCLE_NODE_TYPE, DIRECTIONAL_LIGHT_NODE_TYPE, ELLIPSE_NODE_TYPE, IMAGE_NODE_TYPE, LABEL_NODE_TYPE, ORTHOGRAPHIC_CAMERA_NODE_TYPE, PANEL_NODE_TYPE, PATH_SHAPE_NODE_TYPE, PERSPECTIVE_CAMERA_NODE_TYPE, POINT_LIGHT_NODE_TYPE, POLYGON_NODE_TYPE, PROGRESS_NODE_TYPE, RADIO_BUTTON_NODE_TYPE, RECTANGLE_NODE_TYPE, REGULAR_POLYGON_NODE_TYPE, RENDERABLE_NODE_TYPE, RING_NODE_TYPE, SECTOR_NODE_TYPE, SLIDER_NODE_TYPE, SPOT_LIGHT_NODE_TYPE, SPRITE_NODE_TYPE, STAR_NODE_TYPE, TOGGLE_NODE_TYPE, composeSceneNodeTypes, registerPhysicsSerializers, registerRenderSerializers, registerSceneNodeTypes, registerShapeSerializers, registerUISerializers, resourceCatalog, restoreNodeId` | Re-export |
 | `./application.js` | `ApplicationEventMap, ApplicationOptions, PhysicsWorldContext, PhysicsWorldFactory, SurfaceObserver, SurfaceResize` | Re-export (type-only) |
 | `./scene-serializers.js` | `SceneNodeTypeOptions, SceneNodeTypeSupport, SceneResourceCatalog, SceneSerializationSupport, UnknownResourcePolicy` | Re-export (type-only) |
 
 **Exports:**
-- Re-exports: `Application`, `BUTTON_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `IMAGE_NODE_TYPE`, `LABEL_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `PANEL_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SLIDER_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `SPRITE_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerRenderSerializers`, `registerSceneNodeTypes`, `registerUISerializers`, `resourceCatalog`, `restoreNodeId`, `ApplicationEventMap`, `ApplicationOptions`, `PhysicsWorldContext`, `PhysicsWorldFactory`, `SurfaceObserver`, `SurfaceResize`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneResourceCatalog`, `SceneSerializationSupport`, `UnknownResourcePolicy`
+- Re-exports: `Application`, `BUTTON_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `IMAGE_NODE_TYPE`, `LABEL_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `PANEL_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `POLYGON_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `RING_NODE_TYPE`, `SECTOR_NODE_TYPE`, `SLIDER_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `SPRITE_NODE_TYPE`, `STAR_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerRenderSerializers`, `registerSceneNodeTypes`, `registerShapeSerializers`, `registerUISerializers`, `resourceCatalog`, `restoreNodeId`, `ApplicationEventMap`, `ApplicationOptions`, `PhysicsWorldContext`, `PhysicsWorldFactory`, `SurfaceObserver`, `SurfaceResize`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneResourceCatalog`, `SceneSerializationSupport`, `UnknownResourcePolicy`
 
 ---
 
@@ -1046,11 +1042,12 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/core` | `FourError, JsonValue` |
-| `@four/geometry` | `BufferGeometry` |
+| `@four/geometry` | `Path, BufferGeometry, Point2D` |
 | `@four/materials` | `Material, SpriteMaterial` |
 | `@four/motion` | `KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, MOTION_COMPONENT_SERIALIZER, MotionComponent` |
 | `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody` |
-| `@four/render` | `Renderable, Sprite` |
+| `@four/render` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star` |
+| `@four/render` | `ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle` |
 | `@four/scene` | `DirectionalLight, OrthographicCamera, PerspectiveCamera, PointLight, SpotLight, restoreNodeId, Node` |
 | `@four/serialization` | `ComponentSerializerRegistry, createDefaultComponentSerializers, InstantiateSceneOptions, SceneNodeDocument, SerializeSceneOptions` |
 | `@four/text` | `GlyphAtlas` |
@@ -1059,8 +1056,8 @@ graph LR
 **Exports:**
 - Interfaces: `SceneResourceCatalog`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneSerializationSupport`
 - Types: `UnknownResourcePolicy`
-- Functions: `resourceCatalog`, `registerUISerializers`, `registerRenderSerializers`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerSceneNodeTypes`
-- Constants: `PANEL_NODE_TYPE`, `LABEL_NODE_TYPE`, `BUTTON_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `SLIDER_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `IMAGE_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SPRITE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`
+- Functions: `resourceCatalog`, `registerUISerializers`, `registerRenderSerializers`, `registerShapeSerializers`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerSceneNodeTypes`
+- Constants: `PANEL_NODE_TYPE`, `LABEL_NODE_TYPE`, `BUTTON_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `SLIDER_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `IMAGE_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SPRITE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `POLYGON_NODE_TYPE`, `STAR_NODE_TYPE`, `SECTOR_NODE_TYPE`, `RING_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `LINE_NODE_TYPE`, `POLYLINE_NODE_TYPE`, `ARC_NODE_TYPE`
 
 ---
 
@@ -1136,8 +1133,7 @@ graph LR
 
 ---
 
-### `packages/geometry/src/index.ts` - Package entry point for @four/geometry (re-exports 52 symbols)
-### `packages/geometry/src/index.ts` - Package entry point for @four/geometry (re-exports 37 symbols)
+### `packages/geometry/src/index.ts` - Package entry point for @four/geometry (re-exports 64 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1145,18 +1141,20 @@ graph LR
 | `./buffer-geometry.js` | `BufferGeometry` | Re-export |
 | `./primitives-3d.js` | `capsuleGeometry, coneGeometry, cylinderGeometry, extrudeGeometry, heightFieldGeometry, latheGeometry, sphereGeometry, torusGeometry, tubeGeometry` | Re-export |
 | `./path.js` | `DEFAULT_FLATTEN_TOLERANCE, MAX_SUBDIVISION_DEPTH, Path` | Re-export |
+| `./svg-path.js` | `DEFAULT_MAXIMUM_PATH_DATA_LENGTH, formatSvgPathData, parseSvgPathData` | Re-export |
 | `./primitives.js` | `boxGeometry, circleGeometry2D, planeGeometry, polygonGeometry2D` | Re-export |
 | `./resource-memory.js` | `geometryMemoryBytes, liveGeometryCount` | Re-export |
-| `./tessellation.js` | `earClippingTessellator, triangulatePolygon` | Re-export |
+| `./tessellation.js` | `DEFAULT_MITER_LIMIT, earClippingTessellator, expandStroke, triangulatePolygon` | Re-export |
 | `./buffer-geometry.js` | `BufferGeometryOptions, GeometryBounds, GeometryDrawMode, GeometryIndexArray` | Re-export (type-only) |
 | `./primitives-3d.js` | `CapsuleGeometryOptions, ExtrudeGeometryOptions, HeightFieldGeometryOptions, LatheGeometryOptions, Point3D, SphereGeometryOptions, TaperedGeometryOptions, TorusGeometryOptions, TubeGeometryOptions` | Re-export (type-only) |
 | `./path.js` | `FillRule, PathArcCommand, PathClosestPoint, PathCloseCommand, PathCommand, PathCubicCommand, PathFillRings, PathLineCommand, PathMoveCommand, PathOptions, PathQuadraticCommand, PathSegmentCommand` | Re-export (type-only) |
+| `./svg-path.js` | `SvgPathParseOptions` | Re-export (type-only) |
 | `./primitives.js` | `BoxGeometryOptions, CircleGeometry2DOptions, PlaneGeometryOptions, PolygonGeometry2DOptions` | Re-export (type-only) |
-| `./tessellation.js` | `Point2D, PolygonTessellator` | Re-export (type-only) |
+| `./tessellation.js` | `Point2D, PolygonTessellator, Polyline2D, StrokeAlignment, StrokeGeometryOptions, StrokeLineCap, StrokeLineJoin, StrokeMesh` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `BufferGeometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`, `Path`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `earClippingTessellator`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `FillRule`, `PathArcCommand`, `PathClosestPoint`, `PathCloseCommand`, `PathCommand`, `PathCubicCommand`, `PathFillRings`, `PathLineCommand`, `PathMoveCommand`, `PathOptions`, `PathQuadraticCommand`, `PathSegmentCommand`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`
+- Re-exports: `BufferGeometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`, `Path`, `DEFAULT_MAXIMUM_PATH_DATA_LENGTH`, `formatSvgPathData`, `parseSvgPathData`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `DEFAULT_MITER_LIMIT`, `earClippingTessellator`, `expandStroke`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `FillRule`, `PathArcCommand`, `PathClosestPoint`, `PathCloseCommand`, `PathCommand`, `PathCubicCommand`, `PathFillRings`, `PathLineCommand`, `PathMoveCommand`, `PathOptions`, `PathQuadraticCommand`, `PathSegmentCommand`, `SvgPathParseOptions`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`, `Polyline2D`, `StrokeAlignment`, `StrokeGeometryOptions`, `StrokeLineCap`, `StrokeLineJoin`, `StrokeMesh`
 
 ---
 
@@ -1171,14 +1169,14 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./primitive-support.js` | `requirePositive` | Import |
-| `./tessellation.js` | `Point2D` | Import (type-only) |
+| `./tessellation.js` | `Point2D, Polyline2D` | Import (type-only) |
 
 **Exports:**
 - Classes: `Path`
-- Interfaces: `PathMoveCommand`, `PathLineCommand`, `PathQuadraticCommand`, `PathCubicCommand`, `PathArcCommand`, `PathCloseCommand`, `PathOptions`, `PathFillRings`, `PathClosestPoint`
+- Interfaces: `PathMoveCommand`, `PathLineCommand`, `PathQuadraticCommand`, `PathCubicCommand`, `PathArcCommand`, `PathCloseCommand`, `PathOptions`, `PathFillRings`, `PathClosestPoint`, `PathCursor`
 - Types: `FillRule`, `PathSegmentCommand`, `PathCommand`
+- Functions: `arcPoint`, `newCursor`, `advance`
 - Constants: `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`
-- Re-exports: `BufferGeometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `earClippingTessellator`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`
 
 ---
 
@@ -1227,18 +1225,38 @@ graph LR
 
 ---
 
+### `packages/geometry/src/svg-path.ts` - §50's *"SVG import/export compatibility"*, at the **path-data tier**: the
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `FourError` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./path.js` | `Path, advance, arcPoint, newCursor, PathArcCommand, PathCursor` | Import |
+
+**Exports:**
+- Interfaces: `SvgPathParseOptions`
+- Functions: `parseSvgPathData`, `formatSvgPathData`
+- Constants: `DEFAULT_MAXIMUM_PATH_DATA_LENGTH`
+
+---
+
 ### `packages/geometry/src/tessellation.ts` - Polygon tessellation (§52) — the isolated module that turns a closed 2D
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
 | `./buffer-geometry.js` | `GeometryIndexArray` | Import (type-only) |
-| `./primitive-support.js` | `createIndices` | Import |
+| `./primitive-support.js` | `createIndices, requirePositive` | Import |
 
 **Exports:**
-- Interfaces: `Point2D`, `PolygonTessellator`
-- Functions: `triangulatePolygon`
-- Constants: `earClippingTessellator`
+- Interfaces: `Point2D`, `PolygonTessellator`, `Polyline2D`, `StrokeGeometryOptions`, `StrokeMesh`
+- Types: `StrokeAlignment`, `StrokeLineCap`, `StrokeLineJoin`
+- Functions: `triangulatePolygon`, `expandStroke`
+- Constants: `earClippingTessellator`, `DEFAULT_MITER_LIMIT`
 
 ---
 
@@ -1269,7 +1287,7 @@ graph LR
 
 ---
 
-### `packages/input/src/index.ts` - Package entry point for @four/input (re-exports 34 symbols)
+### `packages/input/src/index.ts` - Package entry point for @four/input (re-exports 35 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1285,12 +1303,12 @@ graph LR
 | `./key-events.js` | `KeyDefaultSuppressor, KeyModifiers, SceneKeyEventInit, SceneKeyEventType` | Re-export (type-only) |
 | `./keyboard-input.js` | `KeySurface, KeyboardInputOptions, SurfaceKeyEvent, SurfaceKeyListener` | Re-export (type-only) |
 | `./pick.js` | `PickHit, Pickable` | Re-export (type-only) |
-| `./pointer-events.js` | `PropagatingPointerEventType, ScenePointerEventInit, ScenePointerEventType` | Re-export (type-only) |
+| `./pointer-events.js` | `PointerDeviceType, PropagatingPointerEventType, ScenePointerEventInit, ScenePointerEventType` | Re-export (type-only) |
 | `./pointer-input.js` | `PointerInputOptions, PointerSurface, SurfacePointerEvent, SurfacePointerListener, SurfaceRect` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DragManager`, `SceneKeyEvent`, `dispatchKeyEvent`, `KeyboardInput`, `createPickRay`, `pick`, `CAPTURE_KEY_PREFIX`, `ScenePointerEvent`, `dispatchPointerEvent`, `DEFAULT_CLICK_MOVE_THRESHOLD`, `PointerInput`, `SceneInputEvent`, `buildPropagationPath`, `dispatchThreePhase`, `DragListener`, `DragManagerOptions`, `KeyDefaultSuppressor`, `KeyModifiers`, `SceneKeyEventInit`, `SceneKeyEventType`, `KeySurface`, `KeyboardInputOptions`, `SurfaceKeyEvent`, `SurfaceKeyListener`, `PickHit`, `Pickable`, `PropagatingPointerEventType`, `ScenePointerEventInit`, `ScenePointerEventType`, `PointerInputOptions`, `PointerSurface`, `SurfacePointerEvent`, `SurfacePointerListener`, `SurfaceRect`
+- Re-exports: `DragManager`, `SceneKeyEvent`, `dispatchKeyEvent`, `KeyboardInput`, `createPickRay`, `pick`, `CAPTURE_KEY_PREFIX`, `ScenePointerEvent`, `dispatchPointerEvent`, `DEFAULT_CLICK_MOVE_THRESHOLD`, `PointerInput`, `SceneInputEvent`, `buildPropagationPath`, `dispatchThreePhase`, `DragListener`, `DragManagerOptions`, `KeyDefaultSuppressor`, `KeyModifiers`, `SceneKeyEventInit`, `SceneKeyEventType`, `KeySurface`, `KeyboardInputOptions`, `SurfaceKeyEvent`, `SurfaceKeyListener`, `PickHit`, `Pickable`, `PointerDeviceType`, `PropagatingPointerEventType`, `ScenePointerEventInit`, `ScenePointerEventType`, `PointerInputOptions`, `PointerSurface`, `SurfacePointerEvent`, `SurfacePointerListener`, `SurfaceRect`
 
 ---
 
@@ -1365,7 +1383,7 @@ graph LR
 **Exports:**
 - Classes: `ScenePointerEvent`
 - Interfaces: `ScenePointerEventInit`
-- Types: `PropagatingPointerEventType`, `ScenePointerEventType`
+- Types: `PropagatingPointerEventType`, `ScenePointerEventType`, `PointerDeviceType`
 - Functions: `dispatchPointerEvent`
 - Constants: `CAPTURE_KEY_PREFIX`
 - Re-exports: `buildPropagationPath`
@@ -1384,7 +1402,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./pick.js` | `pick, PickHit, Pickable` | Import |
-| `./pointer-events.js` | `ScenePointerEvent, buildPropagationPath, dispatchPointerEvent, PropagatingPointerEventType, ScenePointerEventType` | Import |
+| `./pointer-events.js` | `ScenePointerEvent, buildPropagationPath, dispatchPointerEvent, PointerDeviceType, PropagatingPointerEventType, ScenePointerEventType` | Import |
 
 **Exports:**
 - Classes: `PointerInput`
@@ -2678,8 +2696,7 @@ graph LR
 
 ---
 
-### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 97 symbols)
-### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 96 symbols)
+### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 130 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -2695,11 +2712,11 @@ graph LR
 | `./renderer.js` | `NullRenderer` | Re-export |
 | `./resource-memory.js` | `liveRenderTargetCount, liveTextureCount, textureMemoryBytes` | Re-export |
 | `./statistics.js` | `createRenderStatistics, resetRenderStatistics, supportsRenderStatistics` | Re-export |
+| `./shape.js` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Ring, Sector, Shape2D, Star` | Re-export |
 | `./sprite.js` | `Sprite` | Re-export |
 | `./texture.js` | `Texture` | Re-export |
 | `./effect-pass.js` | `ColorGradeEffect, CopyEffect, EffectRenderPass, OutputTransformEffect, ScreenEffect, ScreenEffectKind, ScreenEffectRenderer` | Re-export (type-only) |
 | `./lights.js` | `AmbientLightSource, DirectionalLightSource, DirectionalShadowSource, PointLightSource, PunctualLightSource, PunctualLightSourceBase, SceneLights, SpotLightSource` | Re-export (type-only) |
-| `./lights.js` | `AmbientLightSource, DirectionalLightSource, PointLightSource, PunctualLightSource, PunctualLightSourceBase, SceneLights, SpotLightSource` | Re-export (type-only) |
 | `./particles.js` | `ParticleDrawable` | Re-export (type-only) |
 | `./render-list.js` | `LitRenderItem, ParticleRenderItem, RenderItem, RenderItemKind, SpriteRenderItem, StandardRenderItem, UnlitRenderItem` | Re-export (type-only) |
 | `./render-graph.js` | `AddPassOptions, CustomRenderPass, RenderGraphIssue, RenderGraphIssueCode, RenderGraphIssueSeverity, RenderGraphPass, RenderPass, RenderPassContext, SceneRenderPass` | Re-export (type-only) |
@@ -2708,13 +2725,13 @@ graph LR
 | `./renderer-registry.js` | `RendererFallbackReason, RendererFallbackReport, RendererRegistration, RendererResolveOptions, RendererSelection` | Re-export (type-only) |
 | `./renderer.js` | `RenderInterpolation, Renderer, RendererBackend, RendererCapabilities, RendererEventMap, RendererOptions, ResizeRecord` | Re-export (type-only) |
 | `./statistics.js` | `RenderStatistics, RenderStatisticsReporter` | Re-export (type-only) |
+| `./shape.js` | `ArcOptions, CircleOptions, EllipseOptions, LineOptions, Paint, PathShapeOptions, PolygonOptions, PolylineOptions, RectangleOptions, RegularPolygonOptions, RingOptions, SectorOptions, ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle, Shape2DOptions, ShapeFill, SolidPaint, StarOptions, StrokeStyle` | Re-export (type-only) |
 | `./sprite.js` | `SpriteFrame, SpriteOptions` | Re-export (type-only) |
 | `./texture.js` | `TextureSource` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Sprite`, `Texture`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
-- Re-exports: `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Sprite`, `Texture`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
+- Re-exports: `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
 
 ---
 
@@ -2728,7 +2745,6 @@ graph LR
 
 **Exports:**
 - Interfaces: `DirectionalLightSource`, `DirectionalShadowSource`, `PunctualLightSourceBase`, `PointLightSource`, `SpotLightSource`, `AmbientLightSource`, `SceneLights`
-- Interfaces: `DirectionalLightSource`, `PunctualLightSourceBase`, `PointLightSource`, `SpotLightSource`, `AmbientLightSource`, `SceneLights`
 - Types: `PunctualLightSource`
 - Functions: `isDirectionalLightSource`, `isPunctualLightSource`, `createSceneLights`, `collectSceneLights`
 - Constants: `MAX_PUNCTUAL_LIGHTS`
@@ -2886,6 +2902,28 @@ graph LR
 
 ---
 
+### `packages/render/src/shape.ts` - §50's native 2D shape system — the node tier (R-23, 2026-08-09).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `Disposable` |
+| `@four/geometry` | `BufferGeometry, DEFAULT_FLATTEN_TOLERANCE, expandStroke, Path, triangulatePolygon, GeometryIndexArray, PathFillRings, Point2D, StrokeAlignment, StrokeLineCap, StrokeLineJoin, StrokeMesh` |
+| `@four/materials` | `Material` |
+| `@four/math` | `ColorRGBA` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./renderable.js` | `Renderable, RenderableOptions, SurfaceMaterial` | Import |
+
+**Exports:**
+- Classes: `Circle`, `Ellipse`, `Rectangle`, `RegularPolygon`, `Star`, `Sector`, `Ring`, `Polygon`, `PathShape`, `Line`, `Polyline`, `Arc`
+- Interfaces: `SolidPaint`, `ResolvedPaint`, `StrokeStyle`, `ResolvedStrokeStyle`, `Shape2DOptions`, `CircleOptions`, `EllipseOptions`, `RectangleOptions`, `RegularPolygonOptions`, `StarOptions`, `SectorOptions`, `RingOptions`, `PolygonOptions`, `PathShapeOptions`, `LineOptions`, `PolylineOptions`, `ArcOptions`
+- Types: `Paint`, `ShapeFill`, `ResolvedShapeFill`
+
+---
+
 ### `packages/render/src/sprite.ts` - `Sprite` (§55) — a textured, tinted quad in the scene graph.
 
 **Workspace Dependencies:**
@@ -3036,11 +3074,6 @@ graph LR
 - Types: `GlShader`, `GlProgramHandle`, `GlBuffer`, `GlVertexArray`, `GlUniformLocation`, `GlTexture`, `GlFramebuffer`, `GlRenderbuffer`
 - Functions: `createLinkedProgram`, `requireUniform`
 - Constants: `GL`, `POSITION_ATTRIBUTE_LOCATION`, `NORMAL_ATTRIBUTE_LOCATION`, `UV_ATTRIBUTE_LOCATION`, `COLOR_ATTRIBUTE_LOCATION`, `MAP_TEXTURE_UNIT`, `SHADOW_TEXTURE_UNIT`, `PUNCTUAL_LIGHT_GLSL`, `SHADOW_GLSL`, `matrixScratch`
-- Classes: `PunctualLightUniforms`, `UnlitProgram`, `SpriteProgram`, `LitProgram`
-- Interfaces: `WebglContext`
-- Types: `GlShader`, `GlProgramHandle`, `GlBuffer`, `GlVertexArray`, `GlUniformLocation`, `GlTexture`, `GlFramebuffer`, `GlRenderbuffer`
-- Functions: `createLinkedProgram`, `requireUniform`
-- Constants: `GL`, `POSITION_ATTRIBUTE_LOCATION`, `NORMAL_ATTRIBUTE_LOCATION`, `UV_ATTRIBUTE_LOCATION`, `COLOR_ATTRIBUTE_LOCATION`, `MAP_TEXTURE_UNIT`, `PUNCTUAL_LIGHT_GLSL`, `matrixScratch`
 
 ---
 
@@ -3094,7 +3127,6 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./gl-program.js` | `MAP_TEXTURE_UNIT, PUNCTUAL_LIGHT_GLSL, PunctualLightUniforms, SHADOW_GLSL, ShadowUniforms, createLinkedProgram, matrixScratch, requireUniform, GlProgramHandle, GlUniformLocation, WebglContext` | Import |
-| `./gl-program.js` | `MAP_TEXTURE_UNIT, PUNCTUAL_LIGHT_GLSL, PunctualLightUniforms, createLinkedProgram, matrixScratch, requireUniform, GlProgramHandle, GlUniformLocation, WebglContext` | Import |
 
 **Exports:**
 - Classes: `StandardProgram`
@@ -3131,8 +3163,6 @@ graph LR
 | `./gl-program.js` | `COLOR_ATTRIBUTE_LOCATION, GL, LitProgram, MAP_TEXTURE_UNIT, NORMAL_ATTRIBUTE_LOCATION, POSITION_ATTRIBUTE_LOCATION, PUNCTUAL_LIGHT_GLSL, PunctualLightUniforms, SHADOW_GLSL, SHADOW_TEXTURE_UNIT, ShadowUniforms, SpriteProgram, UV_ATTRIBUTE_LOCATION, UnlitProgram` | Re-export |
 | `./gl-render-target.js` | `RenderTargetCache` | Re-export |
 | `./gl-shadow.js` | `ShadowProgram` | Re-export |
-| `./gl-program.js` | `COLOR_ATTRIBUTE_LOCATION, GL, LitProgram, MAP_TEXTURE_UNIT, NORMAL_ATTRIBUTE_LOCATION, POSITION_ATTRIBUTE_LOCATION, PUNCTUAL_LIGHT_GLSL, PunctualLightUniforms, SpriteProgram, UV_ATTRIBUTE_LOCATION, UnlitProgram` | Re-export |
-| `./gl-render-target.js` | `RenderTargetCache` | Re-export |
 | `./gl-standard.js` | `StandardProgram` | Re-export |
 | `./gl-texture.js` | `TextureCache` | Re-export |
 | `./register.js` | `isWebgl2Supported, registerWebglRenderer` | Re-export |
@@ -3148,7 +3178,6 @@ graph LR
 **Exports:**
 - Constants: `PACKAGE_NAME`
 - Re-exports: `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `EffectProgram`, `GeometryCache`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_GL`, `ParticleBatchCache`, `ParticleProgram`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `RenderTargetCache`, `ShadowProgram`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `CacheableGeometry`, `GeometryRecord`, `ParticleBatchRecord`, `ParticleGlContext`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `CacheableRenderTarget`, `RenderTargetRecord`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
-- Re-exports: `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `EffectProgram`, `GeometryCache`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_GL`, `ParticleBatchCache`, `ParticleProgram`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `RenderTargetCache`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `CacheableGeometry`, `GeometryRecord`, `ParticleBatchRecord`, `ParticleGlContext`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `CacheableRenderTarget`, `RenderTargetRecord`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
 
 ---
 
@@ -3177,7 +3206,6 @@ graph LR
 | `@four/core` | `EventEmitter, FourError` |
 | `@four/math` | `Matrix4` |
 | `@four/render` | `RenderTarget, buildInterpolatedRenderList, buildRenderList, collectSceneLights, createSceneLights, isLitItem, isParticlesItem, isRenderTargetTexture, isSpriteItem, isStandardItem, viewLayerMask, COLOR_GRADE_DEFAULTS, EffectRenderPass, RenderItem, RenderItemKind, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions, ScreenEffectRenderer` |
-| `@four/render` | `buildInterpolatedRenderList, buildRenderList, collectSceneLights, createSceneLights, isLitItem, isParticlesItem, isRenderTargetTexture, isSpriteItem, isStandardItem, viewLayerMask, COLOR_GRADE_DEFAULTS, EffectRenderPass, RenderItem, RenderItemKind, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions, ScreenEffectRenderer` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3255,7 +3283,6 @@ graph LR
 ---
 
 ### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 59 symbols)
-### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 57 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3265,7 +3292,6 @@ graph LR
 | `./group.js` | `Group` | Re-export |
 | `./layers.js` | `ALL_LAYERS, DEFAULT_LAYER, DEFAULT_LAYER_MASK, DEFAULT_LAYER_NAME, LAYER_COUNT, NO_LAYERS, applyLayers, assertLayerMask, defineLayer, isLayerMask, layerIndex, layerMask, layerMaskNames, layerName, layerNames, layersMatch, resetLayers` | Re-export |
 | `./light.js` | `DirectionalLight, DirectionalLightShadow, PointLight, PunctualLight, SpotLight` | Re-export |
-| `./light.js` | `DirectionalLight, PointLight, PunctualLight, SpotLight` | Re-export |
 | `./interpolation.js` | `POSE_SNAPSHOT_PRIORITY, PoseBuffer, createSnapshotSystem` | Re-export |
 | `./node.js` | `Node, restoreNodeId` | Re-export |
 | `./pose-target.js` | `PoseTarget` | Re-export |
@@ -3277,7 +3303,6 @@ graph LR
 | `./camera.js` | `OrthographicCameraOptions, PerspectiveCameraOptions` | Re-export (type-only) |
 | `./layers.js` | `LayerMask, LayeredNode` | Re-export (type-only) |
 | `./light.js` | `ColorRGB, DirectionalLightOptions, DirectionalLightShadowOptions, PunctualLightOptions, SpotLightOptions` | Re-export (type-only) |
-| `./light.js` | `ColorRGB, DirectionalLightOptions, PunctualLightOptions, SpotLightOptions` | Re-export (type-only) |
 | `./interpolation.js` | `PoseSnapshotSystem, SnapshotSystemOptions` | Re-export (type-only) |
 | `./node.js` | `NodeEventMap, NodeHierarchyEvent, NodeOptions, NodeType` | Re-export (type-only) |
 | `./viewport.js` | `Viewport` | Re-export (type-only) |
@@ -3286,7 +3311,6 @@ graph LR
 **Exports:**
 - Constants: `PACKAGE_NAME`
 - Re-exports: `DEFAULT_TRANSFORM_AUTHORITY`, `TRANSFORM_AUTHORITIES`, `warnAuthorityConflict`, `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Group`, `ALL_LAYERS`, `DEFAULT_LAYER`, `DEFAULT_LAYER_MASK`, `DEFAULT_LAYER_NAME`, `LAYER_COUNT`, `NO_LAYERS`, `applyLayers`, `assertLayerMask`, `defineLayer`, `isLayerMask`, `layerIndex`, `layerMask`, `layerMaskNames`, `layerName`, `layerNames`, `layersMatch`, `resetLayers`, `DirectionalLight`, `DirectionalLightShadow`, `PointLight`, `PunctualLight`, `SpotLight`, `POSE_SNAPSHOT_PRIORITY`, `PoseBuffer`, `createSnapshotSystem`, `Node`, `restoreNodeId`, `PoseTarget`, `Scene`, `Transform`, `createFullscreenViewport`, `resolveWorldTransform`, `resolveWorldTransforms`, `AuthorityNode`, `TransformAuthority`, `OrthographicCameraOptions`, `PerspectiveCameraOptions`, `LayerMask`, `LayeredNode`, `ColorRGB`, `DirectionalLightOptions`, `DirectionalLightShadowOptions`, `PunctualLightOptions`, `SpotLightOptions`, `PoseSnapshotSystem`, `SnapshotSystemOptions`, `NodeEventMap`, `NodeHierarchyEvent`, `NodeOptions`, `NodeType`, `Viewport`, `WorldTransformStats`
-- Re-exports: `DEFAULT_TRANSFORM_AUTHORITY`, `TRANSFORM_AUTHORITIES`, `warnAuthorityConflict`, `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Group`, `ALL_LAYERS`, `DEFAULT_LAYER`, `DEFAULT_LAYER_MASK`, `DEFAULT_LAYER_NAME`, `LAYER_COUNT`, `NO_LAYERS`, `applyLayers`, `assertLayerMask`, `defineLayer`, `isLayerMask`, `layerIndex`, `layerMask`, `layerMaskNames`, `layerName`, `layerNames`, `layersMatch`, `resetLayers`, `DirectionalLight`, `PointLight`, `PunctualLight`, `SpotLight`, `POSE_SNAPSHOT_PRIORITY`, `PoseBuffer`, `createSnapshotSystem`, `Node`, `restoreNodeId`, `PoseTarget`, `Scene`, `Transform`, `createFullscreenViewport`, `resolveWorldTransform`, `resolveWorldTransforms`, `AuthorityNode`, `TransformAuthority`, `OrthographicCameraOptions`, `PerspectiveCameraOptions`, `LayerMask`, `LayeredNode`, `ColorRGB`, `DirectionalLightOptions`, `PunctualLightOptions`, `SpotLightOptions`, `PoseSnapshotSystem`, `SnapshotSystemOptions`, `NodeEventMap`, `NodeHierarchyEvent`, `NodeOptions`, `NodeType`, `Viewport`, `WorldTransformStats`
 
 ---
 
@@ -3330,23 +3354,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `FourError` |
-
-**Exports:**
-- Interfaces: `LayeredNode`
-- Types: `LayerMask`
-- Functions: `defineLayer`, `layerIndex`, `layerName`, `layerNames`, `layerMask`, `layerMaskNames`, `layersMatch`, `isLayerMask`, `assertLayerMask`, `applyLayers`, `resetLayers`
-- Constants: `LAYER_COUNT`, `DEFAULT_LAYER_NAME`, `DEFAULT_LAYER`, `DEFAULT_LAYER_MASK`, `ALL_LAYERS`, `NO_LAYERS`
-
----
-
-### `packages/scene/src/light.ts` - Lights (§68) — the multi-light tier: directional, point, and spot nodes.
-
-**Workspace Dependencies:**
-| Package | Import |
-|---------|--------|
 | `@four/math` | `Matrix4, Vector3` |
-| `@four/math` | `Vector3` |
 | `@four/math` | `ColorRGB` |
 | `@four/math` | `ColorRGB` |
 
@@ -3359,8 +3367,6 @@ graph LR
 **Exports:**
 - Classes: `DirectionalLightShadow`, `DirectionalLight`, `PointLight`, `SpotLight`
 - Interfaces: `DirectionalLightShadowOptions`, `DirectionalLightOptions`, `PunctualLightOptions`, `SpotLightOptions`
-- Classes: `DirectionalLight`, `PointLight`, `SpotLight`
-- Interfaces: `DirectionalLightOptions`, `PunctualLightOptions`, `SpotLightOptions`
 - Re-exports: `ColorRGB`
 
 ---
@@ -3850,7 +3856,7 @@ graph LR
 | `packages/physics/src/types` | 0 files | 15 files |
 | `packages/physics/src/world` | 12 files | 3 files |
 | `packages/motion/src/index` | 14 files | 0 files |
-| `packages/render/src/index` | 13 files | 0 files |
+| `packages/render/src/index` | 14 files | 0 files |
 | `packages/physics/src/descriptors` | 3 files | 9 files |
 | `packages/scene/src/index` | 12 files | 0 files |
 | `packages/physics/src/collider` | 8 files | 3 files |
@@ -3862,20 +3868,15 @@ graph LR
 | `packages/ui/src/index` | 10 files | 0 files |
 | `packages/physics/src/rigid-body` | 4 files | 5 files |
 | `packages/render-webgl/src/gl-program` | 0 files | 9 files |
-| `packages/scene/src/node` | 3 files | 7 files |
-| `packages/ui/src/index` | 10 files | 0 files |
-| `packages/physics/src/rigid-body` | 4 files | 5 files |
-| `packages/render-webgl/src/index` | 9 files | 0 files |
-| `packages/render-webgl/src/webgl-renderer` | 7 files | 2 files |
 | `packages/math/src/index` | 8 files | 0 files |
 | `packages/physics/src/joints` | 6 files | 2 files |
 | `packages/physics/src/serializers` | 7 files | 1 file |
 | `packages/physics/src/shapes` | 1 file | 7 files |
 | `packages/physics/src/validation` | 3 files | 5 files |
-| `packages/render-webgl/src/gl-program` | 0 files | 8 files |
 | `packages/animation/src/controller` | 6 files | 1 file |
 | `packages/animation/src/tween` | 3 files | 4 files |
 | `packages/diagnostics/src/index` | 7 files | 0 files |
+| `packages/geometry/src/index` | 7 files | 0 files |
 | `packages/input/src/index` | 7 files | 0 files |
 | `packages/math/src/alloc-counter` | 0 files | 7 files |
 | `packages/particles/src/index` | 7 files | 0 files |
@@ -3884,7 +3885,6 @@ graph LR
 | `packages/physics/src/queries` | 2 files | 5 files |
 | `packages/animation/src/mixer` | 5 files | 1 file |
 | `packages/animation/src/values` | 0 files | 6 files |
-| `packages/geometry/src/index` | 6 files | 0 files |
 | `packages/geometry/src/tessellation` | 2 files | 4 files |
 | `packages/materials/src/index` | 6 files | 0 files |
 | `packages/physics/src/solver-registry` | 4 files | 2 files |
@@ -3892,8 +3892,6 @@ graph LR
 | `packages/physics-rapier/src/rapier2d-adapter` | 3 files | 3 files |
 | `packages/physics-rapier/src/rapier3d-adapter` | 4 files | 2 files |
 | `packages/render/src/render-target` | 1 file | 5 files |
-| `packages/render/src/renderer` | 3 files | 3 files |
-| `packages/ui/src/widget` | 0 files | 6 files |
 
 ---
 
@@ -3985,357 +3983,181 @@ graph TD
         N48[primitives-3d]
         N49[primitives]
         N50[resource-memory]
-        N51[tessellation]
+        N51[svg-path]
+        N52[tessellation]
     end
 
     subgraph Packages/input
-        N52[drag]
-        N53[index]
-        N54[key-events]
-        N55[keyboard-input]
-        N56[pick]
-        N57[pointer-events]
-        N58[pointer-input]
-        N59[propagation]
+        N53[drag]
+        N54[index]
+        N55[key-events]
+        N56[keyboard-input]
+        N57[pick]
+        N58[pointer-events]
+        N59[pointer-input]
+        N60[propagation]
     end
 
     subgraph Packages/materials
-        N60[index]
-        N61[lit-material]
-        N62[material]
-        N63[sprite-material]
-        N64[standard-material]
-        N65[texture]
-        N66[unlit-material]
+        N61[index]
+        N62[lit-material]
+        N63[material]
+        N64[sprite-material]
+        N65[standard-material]
+        N66[texture]
+        N67[unlit-material]
     end
 
     subgraph Packages/math
-        N67[alloc-counter]
-        N68[color]
-        N69[index]
-        N70[matrix3]
-        N71[matrix4]
-        N72[quaternion]
-        N73[vector2]
-        N74[vector3]
-        N75[vector4]
+        N68[alloc-counter]
+        N69[color]
+        N70[index]
+        N71[matrix3]
+        N72[matrix4]
+        N73[quaternion]
+        N74[vector2]
+        N75[vector3]
+        N76[vector4]
     end
 
     subgraph Packages/motion
-        N76[clock]
-        N77[ik]
-        N78[index]
-        N79[integrators]
-        N80[kinematic-controller]
-        N81[motion-component]
-        N82[pid]
-        N83[prediction]
-        N84[random]
-        N85[scheduler]
-        N86[...5 more]
+        N77[clock]
+        N78[ik]
+        N79[index]
+        N80[integrators]
+        N81[kinematic-controller]
+        N82[motion-component]
+        N83[pid]
+        N84[prediction]
+        N85[random]
+        N86[scheduler]
+        N87[...5 more]
     end
 
     subgraph Packages/particles
-        N87[emitter]
-        N88[fields]
-        N89[index]
-        N90[particle-renderable]
-        N91[particle-system]
-        N92[pool]
-        N93[random]
-        N94[types]
+        N88[emitter]
+        N89[fields]
+        N90[index]
+        N91[particle-renderable]
+        N92[particle-system]
+        N93[pool]
+        N94[random]
+        N95[types]
     end
 
     subgraph Packages/physics
-        N95[adapter]
-        N96[body-access]
-        N97[collider]
-        N98[descriptors]
-        N99[events]
-        N100[index]
-        N101[joints]
-        N102[material]
-        N103[physics-system]
-        N104[queries]
-        N105[...7 more]
+        N96[adapter]
+        N97[body-access]
+        N98[collider]
+        N99[descriptors]
+        N100[events]
+        N101[index]
+        N102[joints]
+        N103[material]
+        N104[physics-system]
+        N105[queries]
+        N106[...7 more]
     end
 
     subgraph Packages/physics-box2d
-        N106[index]
+        N107[index]
     end
 
     subgraph Packages/physics-rapier
-        N107[ccd]
-        N108[conversions2d]
-        N109[conversions3d]
-        N110[index]
-        N111[init]
-        N112[rapier2d-adapter]
-        N113[rapier3d-adapter]
-        N114[register]
+        N108[ccd]
+        N109[conversions2d]
+        N110[conversions3d]
+        N111[index]
+        N112[init]
+        N113[rapier2d-adapter]
+        N114[rapier3d-adapter]
+        N115[register]
     end
 
     subgraph Packages/physics-soft
-        N115[index]
+        N116[index]
     end
 
     subgraph Packages/render
-        N116[effect-pass]
-        N117[index]
-        N118[lights]
-        N119[particles]
-        N120[render-graph]
-        N121[render-list]
-        N122[render-target]
-        N123[renderable]
-        N124[renderer-registry]
-        N125[renderer]
-        N126[...4 more]
+        N117[effect-pass]
+        N118[index]
+        N119[lights]
+        N120[particles]
+        N121[render-graph]
+        N122[render-list]
+        N123[render-target]
+        N124[renderable]
+        N125[renderer-registry]
+        N126[renderer]
+        N127[...5 more]
     end
 
     subgraph Packages/render-canvas
-        N127[index]
-    end
-
-    subgraph Packages/render-svg
         N128[index]
     end
 
-    subgraph Packages/render-webgl
-        N129[gl-effect]
-        N130[gl-geometry]
-        N131[gl-particles]
-        N132[gl-program]
-        N133[gl-render-target]
-        N134[gl-shadow]
-        N135[gl-standard]
-        N136[gl-texture]
-        N137[index]
-        N138[register]
-        N139[...1 more]
-    end
-
-    subgraph Packages/render-webgpu
-        N140[index]
-    end
-
-    subgraph Packages/scene
-        N141[authority]
-        N142[camera]
-        N143[group]
-        N144[index]
-        N145[interpolation]
-        N146[layers]
-        N147[light]
-        N148[node]
-        N149[pose-target]
-        N150[scene]
-        N151[...3 more]
-    end
-
-    subgraph Packages/serialization
-        N152[format]
-        N153[index]
-        N154[migration]
-        N155[serializer]
-    end
-
-    subgraph Packages/text
-        N156[bitmap-font]
-        N157[glyph-atlas]
-        N158[index]
-        N159[text-layout]
-    end
-
-    subgraph Packages/ui
-        N160[button]
-        N161[checkable]
-        N162[image]
-        N163[index]
-        N164[keyboard]
-        N165[label]
-        N166[numbers]
-        N167[panel]
-        N168[progress]
-        N169[radio]
-        N170[...2 more]
-        N46[primitive-support]
-        N47[primitives-3d]
-        N48[primitives]
-        N49[resource-memory]
-        N50[tessellation]
-    end
-
-    subgraph Packages/input
-        N51[drag]
-        N52[index]
-        N53[key-events]
-        N54[keyboard-input]
-        N55[pick]
-        N56[pointer-events]
-        N57[pointer-input]
-        N58[propagation]
-    end
-
-    subgraph Packages/materials
-        N59[index]
-        N60[lit-material]
-        N61[material]
-        N62[sprite-material]
-        N63[standard-material]
-        N64[texture]
-        N65[unlit-material]
-    end
-
-    subgraph Packages/math
-        N66[alloc-counter]
-        N67[color]
-        N68[index]
-        N69[matrix3]
-        N70[matrix4]
-        N71[quaternion]
-        N72[vector2]
-        N73[vector3]
-        N74[vector4]
-    end
-
-    subgraph Packages/motion
-        N75[clock]
-        N76[ik]
-        N77[index]
-        N78[integrators]
-        N79[kinematic-controller]
-        N80[motion-component]
-        N81[pid]
-        N82[prediction]
-        N83[random]
-        N84[scheduler]
-        N85[...5 more]
-    end
-
-    subgraph Packages/particles
-        N86[emitter]
-        N87[fields]
-        N88[index]
-        N89[particle-renderable]
-        N90[particle-system]
-        N91[pool]
-        N92[random]
-        N93[types]
-    end
-
-    subgraph Packages/physics
-        N94[adapter]
-        N95[body-access]
-        N96[collider]
-        N97[descriptors]
-        N98[events]
-        N99[index]
-        N100[joints]
-        N101[material]
-        N102[physics-system]
-        N103[queries]
-        N104[...7 more]
-    end
-
-    subgraph Packages/physics-box2d
-        N105[index]
-    end
-
-    subgraph Packages/physics-rapier
-        N106[ccd]
-        N107[conversions2d]
-        N108[conversions3d]
-        N109[index]
-        N110[init]
-        N111[rapier2d-adapter]
-        N112[rapier3d-adapter]
-        N113[register]
-    end
-
-    subgraph Packages/physics-soft
-        N114[index]
-    end
-
-    subgraph Packages/render
-        N115[effect-pass]
-        N116[index]
-        N117[lights]
-        N118[particles]
-        N119[render-graph]
-        N120[render-list]
-        N121[render-target]
-        N122[renderable]
-        N123[renderer-registry]
-        N124[renderer]
-        N125[...4 more]
-    end
-
-    subgraph Packages/render-canvas
-        N126[index]
-    end
-
     subgraph Packages/render-svg
-        N127[index]
+        N129[index]
     end
 
     subgraph Packages/render-webgl
-        N128[gl-effect]
-        N129[gl-geometry]
-        N130[gl-particles]
-        N131[gl-program]
-        N132[gl-render-target]
-        N133[gl-standard]
-        N134[gl-texture]
-        N135[index]
-        N136[register]
-        N137[webgl-renderer]
+        N130[gl-effect]
+        N131[gl-geometry]
+        N132[gl-particles]
+        N133[gl-program]
+        N134[gl-render-target]
+        N135[gl-shadow]
+        N136[gl-standard]
+        N137[gl-texture]
+        N138[index]
+        N139[register]
+        N140[...1 more]
     end
 
     subgraph Packages/render-webgpu
-        N138[index]
+        N141[index]
     end
 
     subgraph Packages/scene
-        N139[authority]
-        N140[camera]
-        N141[group]
-        N142[index]
-        N143[interpolation]
-        N144[layers]
-        N145[light]
-        N146[node]
-        N147[pose-target]
-        N148[scene]
-        N149[...3 more]
+        N142[authority]
+        N143[camera]
+        N144[group]
+        N145[index]
+        N146[interpolation]
+        N147[layers]
+        N148[light]
+        N149[node]
+        N150[pose-target]
+        N151[scene]
+        N152[...3 more]
     end
 
     subgraph Packages/serialization
-        N150[format]
-        N151[index]
-        N152[migration]
-        N153[serializer]
+        N153[format]
+        N154[index]
+        N155[migration]
+        N156[serializer]
     end
 
     subgraph Packages/text
-        N154[bitmap-font]
-        N155[glyph-atlas]
-        N156[index]
-        N157[text-layout]
+        N157[bitmap-font]
+        N158[glyph-atlas]
+        N159[index]
+        N160[text-layout]
     end
 
     subgraph Packages/ui
-        N158[button]
-        N159[checkable]
-        N160[image]
-        N161[index]
-        N162[keyboard]
-        N163[label]
-        N164[numbers]
-        N165[panel]
-        N166[progress]
-        N167[radio]
-        N168[...2 more]
+        N161[button]
+        N162[checkable]
+        N163[image]
+        N164[index]
+        N165[keyboard]
+        N166[label]
+        N167[numbers]
+        N168[panel]
+        N169[progress]
+        N170[radio]
+        N171[...2 more]
     end
 
     N2 --> N8
@@ -4392,46 +4214,27 @@ graph TD
     N45 --> N44
     N45 --> N48
     N45 --> N46
+    N45 --> N51
     N45 --> N49
     N45 --> N50
-    N45 --> N51
+    N45 --> N52
     N46 --> N47
-    N46 --> N51
+    N46 --> N52
     N48 --> N44
     N48 --> N47
-    N48 --> N51
+    N48 --> N52
     N49 --> N44
     N49 --> N47
-    N49 --> N51
-    N51 --> N44
-    N51 --> N47
-    N52 --> N56
-    N52 --> N57
-    N52 --> N58
-    N53 --> N52
-    N53 --> N54
-    N53 --> N55
-    N53 --> N56
+    N49 --> N52
+    N51 --> N46
+    N52 --> N44
+    N52 --> N47
     N53 --> N57
-    N47 --> N44
-    N47 --> N46
-    N47 --> N50
-    N48 --> N44
-    N48 --> N46
-    N48 --> N50
-    N50 --> N44
-    N50 --> N46
-    N51 --> N55
-    N51 --> N56
-    N51 --> N57
-    N52 --> N51
-    N52 --> N53
-    N52 --> N54
-    N52 --> N55
-    N52 --> N56
-    N52 --> N57
-    N52 --> N58
     N53 --> N58
+    N53 --> N59
+    N54 --> N53
+    N54 --> N55
+    N54 --> N56
 ```
 
 ---
@@ -4441,28 +4244,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 202 |
+| Total TypeScript Files | 204 |
 | Total Modules | 24 |
-| Total Lines of Code | 87911 |
-| Total Exports | 1818 |
-| Total Re-exports | 1174 |
-| Total Classes | 115 |
-| Total Interfaces | 384 |
-| Total Functions | 317 |
+| Total Lines of Code | 93679 |
+| Total Exports | 1911 |
+| Total Re-exports | 1234 |
+| Total Classes | 127 |
+| Total Interfaces | 410 |
+| Total Functions | 324 |
 | Total Type Guards | 18 |
 | Total Enums | 0 |
-| Type-only Imports | 229 |
-| Total TypeScript Files | 200 |
-| Total Modules | 24 |
-| Total Lines of Code | 84091 |
-| Total Exports | 1788 |
-| Total Re-exports | 1152 |
-| Total Classes | 111 |
-| Total Interfaces | 373 |
-| Total Functions | 317 |
-| Total Type Guards | 18 |
-| Total Enums | 0 |
-| Type-only Imports | 227 |
+| Type-only Imports | 231 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 1 |
 

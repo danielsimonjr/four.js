@@ -35,11 +35,13 @@ export {
 export type {
   ColorRGB,
   DirectionalLightOptions,
+  DirectionalLightShadowOptions,
   PunctualLightOptions,
   SpotLightOptions,
 } from "./light.js";
 export {
   DirectionalLight,
+  DirectionalLightShadow,
   PointLight,
   PunctualLight,
   SpotLight,

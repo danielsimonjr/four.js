@@ -205,6 +205,32 @@ interface RenderItemBase {
    * call — and because a particle item has no material to ask.
    */
   transparent: boolean;
+  /**
+   * §49's `castShadow`, snapshotted from the drawable node (§69; R-18,
+   * 2026-08-09).
+   *
+   * Read by the backend's **depth-only shadow pass**, which walks this same
+   * list before the view loop and draws the items carrying `true` — of the
+   * three *surface* kinds only, since a §55 quad would cast its rectangle
+   * rather than its texture (see `Renderable.castShadow`). On
+   * the item rather than reached through a node reference for the reason §64
+   * gives for compact render items in the first place — and because a compact
+   * item has no node reference to reach through.
+   *
+   * Always `false` on a particle item: §36's billboards have no surface to
+   * project (see {@link ParticleRenderItem}).
+   */
+  castShadow: boolean;
+  /**
+   * §49's `receiveShadow`, snapshotted from the drawable node (§69; R-18,
+   * 2026-08-09).
+   *
+   * Read by the two **shaded** pipelines, which switch the shadow comparison
+   * off for a draw carrying `false`; the unlit and sprite pipelines have no
+   * lighting term to attenuate and never ask. Always `false` on a particle
+   * item, for the reason above.
+   */
+  receiveShadow: boolean;
 }
 
 /** A draw generated from a `Renderable` (§49) — flat colour, no texture. */
@@ -524,6 +550,8 @@ function itemAt(
       renderLayer: 0,
       layers: DEFAULT_LAYER_MASK,
       transparent: false,
+      castShadow: false,
+      receiveShadow: false,
       id: "",
       count: 0,
       instances: EMPTY_INSTANCES,
@@ -753,6 +781,14 @@ function collect(
     // `undefined`, which classifies opaque — the behaviour every scene had
     // before the key landed.
     item.transparent = material.transparent === true;
+    // §49's two shadow flags (§69, R-18), snapshotted like every other field.
+    // `!== false` rather than a truthy read, for `transparent`'s reason turned
+    // around: both default to `true` on a `Renderable`, so a **structurally
+    // typed** drawable predating the fields — a host's own minimal node —
+    // reports `undefined`, which must read as "casts and receives", the
+    // behaviour a `Renderable` authored today has.
+    item.castShadow = node.castShadow !== false;
+    item.receiveShadow = node.receiveShadow !== false;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
@@ -793,6 +829,15 @@ function collect(
     // order they drew in before the key existed; giving §36 a render-state
     // carrier of its own is the follow-up (2026-08-06).
     item.transparent = false;
+    // §69 (R-18): a particle system neither casts nor receives. §36's
+    // billboards are camera-facing quads with no surface to project into a
+    // shadow map and no lighting term to attenuate, and the pooled slot must
+    // not keep a `Renderable`'s flags from an earlier frame — the same hazard
+    // the `material` and `frame` resets above exist for. Both are written
+    // rather than left, so a particle item's shadow state is a fact of the
+    // item, not of what last occupied the slot.
+    item.castShadow = false;
+    item.receiveShadow = false;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;

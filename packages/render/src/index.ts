@@ -19,6 +19,7 @@ export {
 export type {
   AmbientLightSource,
   DirectionalLightSource,
+  DirectionalShadowSource,
   PointLightSource,
   PunctualLightSource,
   PunctualLightSourceBase,
@@ -119,6 +120,43 @@ export {
   resetRenderStatistics,
   supportsRenderStatistics,
 } from "./statistics.js";
+export type {
+  ArcOptions,
+  CircleOptions,
+  EllipseOptions,
+  LineOptions,
+  Paint,
+  PathShapeOptions,
+  PolygonOptions,
+  PolylineOptions,
+  RectangleOptions,
+  RegularPolygonOptions,
+  RingOptions,
+  SectorOptions,
+  ResolvedPaint,
+  ResolvedShapeFill,
+  ResolvedStrokeStyle,
+  Shape2DOptions,
+  ShapeFill,
+  SolidPaint,
+  StarOptions,
+  StrokeStyle,
+} from "./shape.js";
+export {
+  Arc,
+  Circle,
+  Ellipse,
+  Line,
+  PathShape,
+  Polygon,
+  Polyline,
+  Rectangle,
+  RegularPolygon,
+  Ring,
+  Sector,
+  Shape2D,
+  Star,
+} from "./shape.js";
 export type { SpriteFrame, SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type { TextureSource } from "./texture.js";

@@ -12,13 +12,22 @@
  * ({@link DEFAULT_MAXIMUM_BYTES}) and a whole-load deadline
  * ({@link DEFAULT_TIMEOUT_SECONDS}), both finite by default, both overridable
  * per manager. See `docs/guides/security-and-untrusted-content.md`.
+ *
+ * §76's cancellation landed on 2026-08-09: `load(url, loader, { signal })`
+ * rejects and gives back its reference, and — when the manager was built with an
+ * {@link AssetManagerOptions.abortController} — the last waiter's abort cancels
+ * the request itself. The rules are in `asset-manager.ts`'s module comment.
  */
 
 export const PACKAGE_NAME = "@four/assets";
 
 export type {
+  AbortHandle,
+  AbortSignalLike,
+  AssetLoadOptions,
   AssetLoader,
   AssetManagerOptions,
+  FetchInit,
   FetchLike,
   FetchResponse,
   ResponseHeadersLike,

@@ -49,10 +49,14 @@
  * item with a `RenderItemKind` discriminant; it costs the backend no
  * `instanceof`.
  *
+ * `castShadow` and `receiveShadow` joined on 2026-08-09 with §69's directional
+ * shadow-map tier (R-18) — see the two properties for what each drives and
+ * what still ignores them.
+ *
  * Deferred with their features, not silently dropped: `depthMode` (§49's
  * four-state field — §57's `depthTest`/`depthWrite` now carry the two states
  * the backend can honour, and the rest needs the §61 depth-state contract),
- * `castShadow`/`receiveShadow` (§69), and `frustumCulled` (§87 culling — the
+ * and `frustumCulled` (§87 culling — the
  * render list does no culling yet, so the flag would have nothing to switch
  * off). `material` is a single material rather than §49's `Material |
  * Material[]`: multi-material submeshes need §54's submesh ranges, which no
@@ -76,6 +80,10 @@ export interface RenderableOptions {
   renderLayer?: number;
   /** Initial {@link Renderable.renderOrder}; defaults to 0. */
   renderOrder?: number;
+  /** Initial {@link Renderable.castShadow}; defaults to `true` (§69). */
+  castShadow?: boolean;
+  /** Initial {@link Renderable.receiveShadow}; defaults to `true` (§69). */
+  receiveShadow?: boolean;
 }
 
 /**
@@ -143,6 +151,44 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
   renderOrder = 0;
 
   /**
+   * Whether this renderable is drawn into a shadow map (§49, §69). **Defaults
+   * to `true`.**
+   *
+   * ```ts
+   * floor.castShadow = false;   // a ground plane occludes nothing useful
+   * ```
+   *
+   * `true` by default, unlike the light's own `castShadow`, and the asymmetry
+   * is the point: switching a *light* on is a decision to pay for a whole extra
+   * pass, while switching a *node* off is a per-object exclusion. With the
+   * light's flag at `false` — every scene that predates §69 — these two never
+   * run at all, so the default costs nothing until an author asks for shadows,
+   * and when they do the answer is "everything casts", which is what an author
+   * who just enabled a sun expects to see.
+   *
+   * Honoured by the shadow pass for the three surface pipelines (unlit, lit,
+   * standard). A §55 `Sprite` never casts whatever this says: a depth-only pass
+   * writes geometry, not alpha, so a textured quad would cast its *rectangle* —
+   * §69's transparent shadow masks are what fix that, and they are staged (see
+   * `@four/scene`'s `DirectionalLightShadow`).
+   */
+  castShadow = true;
+
+  /**
+   * Whether this renderable is darkened where a shadow map says it is occluded
+   * (§49, §69). **Defaults to `true`**, for {@link Renderable.castShadow}'s
+   * reason.
+   *
+   * Honoured by the two *shaded* pipelines — §57's `LitMaterial` and §59's
+   * `StandardMaterial` — because a shadow attenuates a lighting term and an
+   * unlit surface has none to attenuate. Setting it on an unlit or sprite
+   * renderable is therefore accepted and inert, which is the honest reading of
+   * §49 putting the flag on the family root: it is a property of the node, and
+   * whether a given pipeline can act on it is the pipeline's business.
+   */
+  receiveShadow = true;
+
+  /**
    * Builds a renderable for `geometry` and `material`. Both are required: a
    * renderable without either draws nothing, and defaulting them would hide the
    * mistake behind an invisible node rather than a type error.
@@ -157,6 +203,8 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
     this.material = material;
     this.renderLayer = options.renderLayer ?? 0;
     this.renderOrder = options.renderOrder ?? 0;
+    this.castShadow = options.castShadow ?? true;
+    this.receiveShadow = options.receiveShadow ?? true;
   }
 
   /**

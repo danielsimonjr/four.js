@@ -75,6 +75,9 @@ import {
   ParticleProgram,
   PunctualLightUniforms,
   RenderTargetCache,
+  SHADOW_GLSL,
+  SHADOW_TEXTURE_UNIT,
+  ShadowProgram,
   SpriteProgram,
   StandardProgram,
   TextureCache,
@@ -2407,10 +2410,11 @@ describe("WebglRenderer — context loss and restore (§61)", () => {
     canvas.dispatch("webglcontextrestored");
 
     // Unlit, sprite (WP-3a.3), particles (WP-9.3), lit (§68, 2026-08-04),
-    // standard (§59, R-13, 2026-08-08), and the §70 effect pipeline (R-6,
-    // 2026-08-07): §61 requires engine-owned GPU resources to be re-created
-    // before `contextrestored` is emitted, and every pipeline is.
-    expect(gl.countOf("createProgram")).toBe(6);
+    // standard (§59, R-13, 2026-08-08), the §70 effect pipeline (R-6,
+    // 2026-08-07), and §69's depth-only caster pipeline (R-18, 2026-08-09):
+    // §61 requires engine-owned GPU resources to be re-created before
+    // `contextrestored` is emitted, and every pipeline is.
+    expect(gl.countOf("createProgram")).toBe(7);
     expect(gl.callsOf("enable").map((call) => call.args[0])).toEqual([
       GL.DEPTH_TEST,
       GL.SCISSOR_TEST,
@@ -2516,7 +2520,7 @@ describe("WebglRenderer — disposal (§83)", () => {
 
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(6);
+    expect(gl.countOf("deleteProgram")).toBe(7);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(3);
     expect(renderer.disposed).toBe(true);
@@ -2540,7 +2544,7 @@ describe("WebglRenderer — disposal (§83)", () => {
     renderer.dispose();
     renderer.dispose();
 
-    expect(gl.countOf("deleteProgram")).toBe(6);
+    expect(gl.countOf("deleteProgram")).toBe(7);
   });
 
   it("succeeds during a lost context, without touching the context", async () => {
@@ -3387,6 +3391,10 @@ function particleItem(
     // pipeline blends by construction but the item classifies opaque, so the
     // sort leaves particle scenes in the order they were authored in.
     transparent: false,
+    // §69 (R-18): §36's billboards neither cast nor receive — no surface to
+    // project, no lighting term to attenuate.
+    castShadow: false,
+    receiveShadow: false,
   };
 }
 
@@ -4003,7 +4011,7 @@ function litRenderable(
 }
 
 describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
-  it("compiles both stages, links, and resolves the thirteen uniforms", () => {
+  it("compiles both stages, links, and resolves the nineteen uniforms", () => {
     const gl = createFakeGl();
 
     const program = LitProgram.create(gl);
@@ -4032,6 +4040,16 @@ describe("LitProgram — compilation and linking (§61, §68, §89)", () => {
       "punctualColor[0]",
       "punctualDirection[0]",
       "punctualParams[0]",
+      // §69's shadow map (R-18, 2026-08-09). Six more locations resolved once,
+      // at program creation, and — exactly as R-17's five — not one call
+      // issued by a frame in which no light casts (see the byte-identity
+      // suite in `tests/integration/shadows.test.ts`).
+      "useShadow",
+      "shadowMap",
+      "shadowMatrix",
+      "shadowBias",
+      "shadowNormalBias",
+      "shadowTexelSize",
     ]);
     expect(program.disposed).toBe(false);
   });
@@ -6582,6 +6600,8 @@ describe("WebglRenderer.initialize — a partial pipeline failure (R-6)", () => 
     ["lit", 4, 3],
     ["standard", 5, 4],
     ["effect", 6, 5],
+    // §69's caster pipeline is built last (R-18), so it disposes all six.
+    ["shadow", 7, 6],
   ])(
     "disposes the programs already built when the %s one will not allocate",
     async (_name, failProgramAt, alreadyBuilt) => {
@@ -6983,7 +7003,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the seventeen uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty-three uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -7013,6 +7033,15 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
       "punctualColor[0]",
       "punctualDirection[0]",
       "punctualParams[0]",
+      // §69's shadow map (R-18, 2026-08-09) — the same six names, in the same
+      // order, as the lit pipeline's, because both resolve them through the
+      // one `ShadowUniforms.resolve`.
+      "useShadow",
+      "shadowMap",
+      "shadowMatrix",
+      "shadowBias",
+      "shadowNormalBias",
+      "shadowTexelSize",
     ]);
     expect(program.disposed).toBe(false);
   });
@@ -7514,7 +7543,7 @@ describe("WebglRenderer — §61 context-loss recovery (A-24)", () => {
     // could throw where §61 forbids throwing; everything keyed by an
     // application object comes back on the next draw that asks for it, because
     // the caches cannot know which of them the next frame will use.
-    expect(gl.countOf("createProgram")).toBe(6);
+    expect(gl.countOf("createProgram")).toBe(7);
     for (const allocator of RESOURCE_ALLOCATORS) {
       expect([allocator, gl.countOf(allocator)]).toEqual([allocator, 0]);
     }
@@ -7865,5 +7894,648 @@ describe("PunctualLightUniforms — the light set (§68, R-17)", () => {
       PunctualLightUniforms.resolve(gl, gl.createProgram()!, "lit");
     });
     expect(error.code).toBe("SHADER_COMPILATION_FAILED");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §69 — shadow maps (R-18, 2026-08-09).
+// ---------------------------------------------------------------------------
+
+/**
+ * A directional light double that *casts* — {@link TestLight} plus the three
+ * optional members `DirectionalLightSource` declares for §69.
+ *
+ * The matrix it hands back is a plain scale, not a real orthographic volume:
+ * `@four/scene` owns the derivation and tests it, and what this package has to
+ * prove is that whatever matrix arrives is the one uploaded, unchanged.
+ */
+class TestShadowLight extends TestLight {
+  castShadow = true;
+
+  shadow = { mapSize: 8, bias: 0.002, normalBias: 0.03 };
+
+  /** The value written by {@link TestShadowLight.computeShadowMatrix}. */
+  readonly matrix = new Matrix4();
+
+  /** How many times the collector asked for the matrix. */
+  matrixReads = 0;
+
+  constructor(mapSize = 8) {
+    super();
+    this.shadow.mapSize = mapSize;
+    this.matrix.elements[0] = 2;
+    this.matrix.elements[12] = 5;
+  }
+
+  computeShadowMatrix(out: Matrix4): Matrix4 {
+    this.matrixReads += 1;
+    return out.copy(this.matrix);
+  }
+}
+
+/** The shadow program's uniform handles — see {@link spriteUniforms}. */
+function shadowUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("shadowViewProjection")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the shadow program never resolved its uniforms");
+}
+
+/** Just the call names, for asserting the shape of a pass. */
+function names(calls: readonly RecordedCall[]): string[] {
+  return calls.map((call) => call.name);
+}
+
+describe("ShadowProgram — the §69 caster pipeline (R-18)", () => {
+  it("compiles both stages, links, and resolves its two uniforms", () => {
+    const gl = createFakeGl();
+
+    const program = ShadowProgram.create(gl);
+
+    expect(gl.countOf("createShader")).toBe(2);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["shadowViewProjection", "model"]);
+    expect(program.disposed).toBe(false);
+  });
+
+  it("declares position only — no normal, no uv, no colour", () => {
+    const gl = createFakeGl();
+
+    ShadowProgram.create(gl);
+
+    const sources = gl
+      .callsOf("shaderSource")
+      .map((call) => String(call.args[1]));
+    expect(
+      sources[0].includes(
+        `layout(location = ${String(POSITION_ATTRIBUTE_LOCATION)}) in vec3 position;`,
+      ),
+    ).toBe(true);
+    expect(sources[0]).not.toContain("in vec3 normal");
+    expect(sources[0]).not.toContain("in vec2 uv");
+    // The product association is the lit stage's, deliberately: the depth a
+    // receiver computes and the depth the map holds must agree.
+    expect(sources[0]).toContain(
+      "gl_Position = shadowViewProjection * model * vec4(position, 1.0);",
+    );
+    // A defined colour write rather than an undeclared output.
+    expect(sources[1]).toContain("fragColor = vec4(1.0);");
+  });
+
+  it("throws SHADER_COMPILATION_FAILED and cleans up exactly as the unlit program does", () => {
+    const failing = createFakeGl({ compileStatus: false });
+    expect(thrown(() => ShadowProgram.create(failing)).code).toBe(
+      "SHADER_COMPILATION_FAILED",
+    );
+    expect(thrown(() => ShadowProgram.create(failing)).message).toContain(
+      "shadow",
+    );
+
+    // A linked program whose uniforms cannot be resolved is deleted, never
+    // returned half-built.
+    const unresolvable = createFakeGl({ resolveUniforms: false });
+    expect(thrown(() => ShadowProgram.create(unresolvable)).code).toBe(
+      "SHADER_COMPILATION_FAILED",
+    );
+    expect(unresolvable.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("uploads both matrices out of copied scratch and disposes idempotently", () => {
+    const gl = createFakeGl();
+    const program = ShadowProgram.create(gl);
+    const uniforms = shadowUniforms(gl);
+    gl.reset();
+
+    program.use();
+    const view = new Matrix4();
+    view.elements[0] = 3;
+    program.setViewProjection(view);
+    const model = new Matrix4();
+    model.elements[12] = 7;
+    program.setModel(model);
+
+    expect(names(gl.calls)).toEqual([
+      "useProgram",
+      "uniformMatrix4fv",
+      "uniformMatrix4fv",
+    ]);
+    expect(gl.calls[1].args[0]).toBe(uniforms.get("shadowViewProjection"));
+    expect((gl.calls[1].args[2] as Float32Array)[0]).toBe(3);
+    expect(gl.calls[2].args[0]).toBe(uniforms.get("model"));
+    expect((gl.calls[2].args[2] as Float32Array)[12]).toBe(7);
+
+    gl.reset();
+    program.dispose();
+    program.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("ShadowUniforms — the receiver half (§69, R-18)", () => {
+  it("uploads nothing at all when no light casts", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    const lights = createSceneLights();
+    gl.reset();
+
+    program.setShadow(lights);
+    program.setReceivesShadow(false);
+
+    // The byte-identity contract: `useShadow` mirrors GL's initial `false`, so
+    // a shadowless frame's shaded pipeline is the one it was before §69.
+    expect(gl.calls).toHaveLength(0);
+  });
+
+  it("uploads the sampler once, then the matrix and three scalars per view", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    const uniforms = litUniforms(gl);
+    const lights = createSceneLights();
+    lights.hasShadow = true;
+    lights.shadowMatrix.elements[5] = 4;
+    lights.shadowMapSize = 256;
+    lights.shadowBias = 0.001;
+    lights.shadowNormalBias = 0.05;
+    gl.reset();
+
+    program.setShadow(lights);
+    program.setShadow(lights);
+
+    expect(names(gl.calls)).toEqual([
+      // The sampler unit, lazily and once.
+      "uniform1i",
+      "uniformMatrix4fv",
+      "uniform1f",
+      "uniform1f",
+      "uniform1f",
+      // Second view: everything but the sampler.
+      "uniformMatrix4fv",
+      "uniform1f",
+      "uniform1f",
+      "uniform1f",
+    ]);
+    expect(gl.calls[0].args).toEqual([
+      uniforms.get("shadowMap"),
+      SHADOW_TEXTURE_UNIT,
+    ]);
+    expect((gl.calls[1].args[2] as Float32Array)[5]).toBe(4);
+    expect(gl.calls[2].args).toEqual([uniforms.get("shadowBias"), 0.001]);
+    expect(gl.calls[3].args).toEqual([uniforms.get("shadowNormalBias"), 0.05]);
+    // The tap offset: one reciprocal per frame, not one per fragment.
+    expect(gl.calls[4].args).toEqual([
+      uniforms.get("shadowTexelSize"),
+      1 / 256,
+    ]);
+  });
+
+  it("switches receiving per draw, and only on change", () => {
+    const gl = createFakeGl();
+    const program = LitProgram.create(gl);
+    const uniforms = litUniforms(gl);
+    gl.reset();
+
+    program.setReceivesShadow(true);
+    program.setReceivesShadow(true);
+    program.setReceivesShadow(false);
+
+    expect(gl.calls).toHaveLength(2);
+    expect(gl.calls[0].args).toEqual([uniforms.get("useShadow"), 1]);
+    expect(gl.calls[1].args).toEqual([uniforms.get("useShadow"), 0]);
+  });
+
+  it("is the same class for both shaded pipelines", () => {
+    // Not "they behave alike" — one implementation, so the skip rule cannot
+    // drift apart between them.
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    const uniforms = standardUniforms(gl);
+    gl.reset();
+
+    program.setShadow(createSceneLights());
+    expect(gl.calls).toHaveLength(0);
+
+    program.setReceivesShadow(true);
+    expect(gl.calls[0].args).toEqual([uniforms.get("useShadow"), 1]);
+  });
+
+  it("splices the receiver chunk into both shaded fragment stages", () => {
+    const gl = createFakeGl();
+    LitProgram.create(gl);
+    const litFragment = String(gl.callsOf("shaderSource")[1].args[1]);
+    gl.reset();
+    StandardProgram.create(gl);
+    const standardFragment = String(gl.callsOf("shaderSource")[1].args[1]);
+
+    for (const source of [litFragment, standardFragment]) {
+      expect(source).toContain(SHADOW_GLSL);
+      // Outside the volume is lit, not shadowed.
+      expect(source).toContain("return 1.0;");
+    }
+    // The shadow multiplies the *existing* directional product, in place —
+    // the pixel half of byte-identity (see `ShadowUniforms`).
+    expect(litFragment).toContain("vec3 direct = lightColor * diffuse;");
+    expect(litFragment).toContain("vec3 lighting = ambientLight + direct;");
+    expect(standardFragment).toContain("shaded += direct;");
+  });
+});
+
+describe("RenderTargetCache — samplable depth (§69, R-18)", () => {
+  it("allocates a DEPTH_COMPONENT24 texture instead of a renderbuffer", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({
+      width: 4,
+      height: 4,
+      depthTexture: true,
+    });
+
+    const record = cache.acquire(target);
+
+    expect(record?.depthBuffer).toBeNull();
+    expect(record?.depthTexture).not.toBeNull();
+    expect(gl.countOf("createRenderbuffer")).toBe(0);
+    const depthUpload = gl.callsOf("texImage2D")[1];
+    expect(depthUpload.args[2]).toBe(GL.DEPTH_COMPONENT24);
+    expect(depthUpload.args[6]).toBe(GL.DEPTH_COMPONENT);
+    expect(depthUpload.args[7]).toBe(GL.UNSIGNED_INT);
+    // Not filterable in GLES 3.0 — `LINEAR` would make the texture incomplete
+    // and every receiver would read as fully occluded.
+    const filters = gl
+      .callsOf("texParameteri")
+      .slice(4)
+      .map((call) => call.args[2]);
+    expect(filters).toEqual([
+      GL.NEAREST,
+      GL.NEAREST,
+      GL.CLAMP_TO_EDGE,
+      GL.CLAMP_TO_EDGE,
+    ]);
+    // Attached to the depth slot as a texture, not as a renderbuffer.
+    const attach = gl.callsOf("framebufferTexture2D")[1];
+    expect(attach.args[1]).toBe(GL.DEPTH_ATTACHMENT);
+    expect(gl.countOf("framebufferRenderbuffer")).toBe(0);
+  });
+
+  it("deletes the depth texture with the rest of the record", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({
+      width: 4,
+      height: 4,
+      depthTexture: true,
+    });
+    cache.acquire(target);
+    gl.reset();
+
+    cache.dispose();
+
+    // Colour and depth, plus the framebuffer.
+    expect(gl.countOf("deleteTexture")).toBe(2);
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(gl.countOf("deleteRenderbuffer")).toBe(0);
+  });
+
+  it("frees the depth texture when the framebuffer will not allocate", () => {
+    const gl = createFakeGl({ allocateFramebuffers: false });
+    const cache = new RenderTargetCache(gl);
+
+    expect(
+      cache.acquire(
+        new RenderTarget({ width: 4, height: 4, depthTexture: true }),
+      ),
+    ).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(2);
+  });
+
+  it("frees the colour texture when the depth texture will not allocate", () => {
+    // `allocateTextures: false` fails the *first* texture, so the second
+    // allocation is unreachable that way; a cache miss on the depth texture is
+    // reached by failing every texture after the first.
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    let created = 0;
+    const realCreateTexture = gl.createTexture.bind(gl);
+    gl.createTexture = (): object | null => {
+      created += 1;
+      return created > 1 ? null : realCreateTexture();
+    };
+
+    expect(
+      cache.acquire(
+        new RenderTarget({ width: 4, height: 4, depthTexture: true }),
+      ),
+    ).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(1);
+  });
+
+  it("deletes the depth texture when the framebuffer is incomplete", () => {
+    const gl = createFakeGl({ framebufferStatus: 0x8cd6 });
+    const cache = new RenderTargetCache(gl);
+
+    expect(
+      cache.acquire(
+        new RenderTarget({ width: 4, height: 4, depthTexture: true }),
+      ),
+    ).toBeNull();
+    expect(gl.countOf("deleteTexture")).toBe(2);
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — the §69 shadow pass (R-18)", () => {
+  /** A lit root under a casting light, plus the two doubles a test steers. */
+  function shadowScene(mapSize = 8): {
+    root: AmbientRoot;
+    light: TestShadowLight;
+    caster: Renderable;
+    receiver: Renderable;
+  } {
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(mapSize);
+    const caster = litRenderable();
+    const receiver = litRenderable();
+    root.add(light, caster, receiver);
+    return { root, light, caster, receiver };
+  }
+
+  it("issues no shadow call at all when nothing casts", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, light } = shadowScene();
+    light.castShadow = false;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // The byte-identity contract, at the frame level: no framebuffer, no
+    // second texture unit, no `useShadow`.
+    expect(gl.countOf("bindFramebuffer")).toBe(0);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+    expect(gl.countOf("activeTexture")).toBe(0);
+    const useShadow = litUniforms(gl).get("useShadow");
+    expect(uploadsAt(gl, useShadow)).toEqual([]);
+  });
+
+  it("renders the map, then binds it to unit 1 for the view loop", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, light } = shadowScene(16);
+    const views = [createView(camera)];
+    // One warm-up frame, so the framebuffer cache's own bind/unbind during
+    // allocation is not confused with the pass's.
+    renderer.render(root, views);
+    gl.reset();
+
+    renderer.render(root, views);
+
+    const framebuffers = gl.callsOf("bindFramebuffer").map((c) => c.args[1]);
+    // Into the map, back to the drawing buffer after the pass, and the
+    // envelope's own unbind in the `finally` (F13 — the pass binds a
+    // framebuffer on the on-screen path, so the frame owes an unbind whether
+    // or not it also drew into a target).
+    expect(framebuffers).toHaveLength(3);
+    expect(framebuffers[0]).not.toBeNull();
+    expect(framebuffers[1]).toBeNull();
+    expect(framebuffers[2]).toBeNull();
+
+    // The pass opens the scissor to the whole attachment before clearing:
+    // `SCISSOR_TEST` is on for the renderer's lifetime, so a stale rectangle
+    // would clear only part of the map.
+    const scissor = gl.callsOf("scissor")[0];
+    expect(scissor.args).toEqual([0, 0, 16, 16]);
+    expect(gl.callsOf("viewport")[0].args).toEqual([0, 0, 16, 16]);
+    // Depth only: the colour attachment is written and read by nothing.
+    expect(gl.callsOf("clear")[0].args).toEqual([GL.DEPTH_BUFFER_BIT]);
+
+    // The light's own matrix, unchanged.
+    const shadowView = shadowUniforms(gl).get("shadowViewProjection");
+    expect((uploadsAt(gl, shadowView)[0] as Float32Array)[0]).toBe(2);
+    expect(light.matrixReads).toBe(2);
+
+    // The map, on the unit the shaded stages sample from.
+    const activeUnits = gl.callsOf("activeTexture").map((call) => call.args[0]);
+    expect(activeUnits[0]).toBe(GL.TEXTURE0 + SHADOW_TEXTURE_UNIT);
+    // …and released at the end of the frame, leaving unit 0 selected.
+    expect(activeUnits[activeUnits.length - 1]).toBe(GL.TEXTURE0);
+    const binds = gl.callsOf("bindTexture");
+    expect(binds[binds.length - 1].args[1]).toBeNull();
+  });
+
+  it("draws every caster once, and skips the ones that opted out", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, caster, receiver } = shadowScene();
+    receiver.castShadow = false;
+    // A §55 quad never casts: a depth-only pass writes geometry, not alpha.
+    root.add(sprite());
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // One model upload, one caster: the opted-out mesh and the sprite are both
+    // out, and the two empty-geometry container nodes never had a draw.
+    const shadowModel = shadowUniforms(gl).get("model");
+    expect(uploadsAt(gl, shadowModel)).toHaveLength(1);
+    expect(caster.castShadow).toBe(true);
+  });
+
+  it("switches the comparison off for a non-receiving draw only", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, receiver } = shadowScene();
+    receiver.receiveShadow = false;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // One draw receives, the next does not: on, then off — and nothing more,
+    // because the uniform is mirrored.
+    expect(uploadsAt(gl, litUniforms(gl).get("useShadow"))).toEqual([1, 0]);
+  });
+
+  it("re-uses one target, resizing it when the light's map size changes", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root, light } = shadowScene(8);
+    const views = [createView(camera)];
+    renderer.render(root, views);
+    gl.reset();
+
+    // Same size: the framebuffer cache hands back the record it already has.
+    renderer.render(root, views);
+    expect(gl.countOf("createFramebuffer")).toBe(0);
+
+    light.shadow.mapSize = 32;
+    gl.reset();
+    renderer.render(root, views);
+    // A resize bumps the target's version, which is what re-allocates it —
+    // and a *new* `RenderTarget` would have leaked the old one's §83 bytes.
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.callsOf("viewport")[0].args).toEqual([0, 0, 32, 32]);
+  });
+
+  it("skips the shadow, not the frame, when the framebuffer is incomplete", async () => {
+    const { renderer, gl, camera } = await initialized({
+      framebufferStatus: 0x8cd6,
+    });
+    const { root } = shadowScene();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // §61: nothing throws inside a frame. The scene still draws, unshadowed.
+    expect(gl.countOf("drawArrays") + gl.countOf("drawElements")).toBe(2);
+    expect(uploadsAt(gl, litUniforms(gl).get("useShadow"))).toEqual([]);
+  });
+
+  it("counts caster draws in §84's statistics", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root } = shadowScene();
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Two casters drawn twice: once into the map, once on screen. A frame that
+    // doubled its draw calls should say so.
+    expect(statistics.drawCalls).toBe(4);
+  });
+
+  it("restores the off-screen target's framebuffer after the pass", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root } = shadowScene();
+    const target = new RenderTarget({ width: 16, height: 16 });
+    gl.reset();
+
+    renderer.render(root, [createView(camera)], undefined, target);
+
+    const binds = gl.callsOf("bindFramebuffer").map((call) => call.args[1]);
+    // Target, map, back to the target, and `null` at the end of the frame.
+    expect(binds[0]).toBe(binds[2]);
+    expect(binds[1]).not.toBe(binds[0]);
+    expect(binds[binds.length - 1]).toBeNull();
+  });
+
+  it("disposes the target it created for itself (§83)", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const { root } = shadowScene();
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Colour texture, depth texture, framebuffer — plus the caches' own.
+    expect(gl.countOf("deleteFramebuffer")).toBe(1);
+    expect(renderer.disposed).toBe(true);
+    // Disposing twice must not subtract the target's §83 bytes twice.
+    expect(() => {
+      renderer.dispose();
+    }).not.toThrow();
+  });
+
+  it("re-allocates the map after a context loss, from the same descriptor", async () => {
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = shadowScene();
+    const views = [createView(camera)];
+    renderer.render(root, views);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    renderer.render(root, views);
+
+    // The descriptor is CPU-side and survived; only the cache's handles died,
+    // so the map is re-allocated (two binds inside `#allocate`) and then used
+    // (bind, back to the drawing buffer, and the envelope's unbind).
+    expect(gl.countOf("createFramebuffer")).toBe(1);
+    expect(gl.countOf("bindFramebuffer")).toBe(5);
+  });
+});
+
+describe("WebglRenderer.render — the caster pass across the surface kinds (R-18)", () => {
+  it("draws indexed and non-indexed casters through the one pipeline", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    root.add(
+      new TestShadowLight(8),
+      // `litRenderable`'s geometry is non-indexed, `quadGeometry`'s is indexed:
+      // one program draws every caster whatever shades it on screen, and both
+      // draw entry points are reachable from it.
+      litRenderable(),
+      renderable(quadGeometry(), new TestMaterial()),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Two casters into the map, the same two on screen.
+    expect(gl.countOf("drawArrays")).toBe(2);
+    expect(gl.countOf("drawElements")).toBe(2);
+  });
+
+  it("compares a §59 standard receiver against the map too", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const receiver = standardRenderable();
+    const opted = standardRenderable();
+    opted.receiveShadow = false;
+    root.add(new TestShadowLight(8), receiver, opted);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Both shaded pipelines resolve the switch through the one `ShadowUniforms`
+    // — on for the receiver, off for the node that opted out.
+    expect(uploadsAt(gl, standardUniforms(gl).get("useShadow"))).toEqual([
+      1, 0,
+    ]);
+  });
+});
+
+describe("WebglRenderer.render — the shadow pass inside the F13 envelope (R-18)", () => {
+  it("unbinds the shadow framebuffer when an on-screen draw throws", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    // A casting light, a caster, and then a draw whose material accessor
+    // raises — the F13 case, on the **on-screen** path, which before §69 could
+    // not have a framebuffer bound at all.
+    root.add(
+      new TestShadowLight(8),
+      litRenderable(),
+      throwingRenderable(BORROWS_EVERYTHING),
+    );
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, [createView(camera)]);
+    }).toThrow(/material accessor raised/);
+
+    // The map really was bound, and the drawing buffer really was given back:
+    // without this the next on-screen frame would render into the shadow map
+    // and the canvas would simply stop updating, with no error to explain it.
+    const binds = gl.callsOf("bindFramebuffer");
+    expect(binds.some((call) => call.args[1] !== null)).toBe(true);
+    expect(binds.at(-1)?.args[1]).toBeNull();
+    expect(effectiveGlState(gl)).toEqual(RESTING_GL_STATE);
+  });
+
+  it("releases the shadow texture unit and leaves unit 0 selected on a throw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    root.add(
+      new TestShadowLight(8),
+      litRenderable(),
+      throwingRenderable(BORROWS_EVERYTHING),
+    );
+    gl.reset();
+
+    expect(() => {
+      renderer.render(root, [createView(camera)]);
+    }).toThrow();
+
+    const units = gl.callsOf("activeTexture").map((call) => call.args[0]);
+    expect(units.at(-1)).toBe(GL.TEXTURE0);
+    expect(gl.callsOf("bindTexture").at(-1)?.args[1]).toBeNull();
   });
 });

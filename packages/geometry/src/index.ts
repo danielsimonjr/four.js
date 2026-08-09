@@ -48,6 +48,12 @@ export {
   MAX_SUBDIVISION_DEPTH,
   Path,
 } from "./path.js";
+export type { SvgPathParseOptions } from "./svg-path.js";
+export {
+  DEFAULT_MAXIMUM_PATH_DATA_LENGTH,
+  formatSvgPathData,
+  parseSvgPathData,
+} from "./svg-path.js";
 export type {
   BoxGeometryOptions,
   CircleGeometry2DOptions,
@@ -61,5 +67,19 @@ export {
   polygonGeometry2D,
 } from "./primitives.js";
 export { geometryMemoryBytes, liveGeometryCount } from "./resource-memory.js";
-export type { Point2D, PolygonTessellator } from "./tessellation.js";
-export { earClippingTessellator, triangulatePolygon } from "./tessellation.js";
+export type {
+  Point2D,
+  PolygonTessellator,
+  Polyline2D,
+  StrokeAlignment,
+  StrokeGeometryOptions,
+  StrokeLineCap,
+  StrokeLineJoin,
+  StrokeMesh,
+} from "./tessellation.js";
+export {
+  DEFAULT_MITER_LIMIT,
+  earClippingTessellator,
+  expandStroke,
+  triangulatePolygon,
+} from "./tessellation.js";

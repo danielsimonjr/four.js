@@ -28,6 +28,231 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-16 §58 paints, fills and strokes.** Decisions worth keeping:
+  - **Two colours reach one draw as per-vertex colour**, not as two materials. §57's
+    pipelines already multiply `vertexColors` (`R-19`), so a fill and a stroke share one
+    geometry, one material and one `drawElements`: **no `RenderItemKind` arm, no
+    pipeline, no frame-path edit**, and `render-webgl` was never opened. Second
+    application of R-23's "a packet can close a gap by adding nothing to the frame
+    path", and the concrete reason §49's `material: Material[]` was _not_ needed for 2D.
+  - **A paint union widens by kind, not by ambition.** `Paint` has one member and that
+    member carries a discriminant, so `{ kind: "linear-gradient" }` is a compile error.
+    The deciding measurement is that per-vertex colour is **exact** for a solid and for a
+    _two-stop linear_ gradient and silently faceted for every other §58 kind — a union
+    whose members work for some of their own arguments is worse than one that is
+    honestly narrow. The exact tier is a pipeline: R-6/R-13/R-18's
+    ~1.9 kB-per-`WebglRenderer`-bundle law plus a `RenderItemKind` arm RFC 0001 _and_
+    RFC 0003 both want.
+  - **`ShapeMaterial` is unshipped a second time, and that is a finding.** R-23 left it
+    conditional on §58 giving it content; §58 landed and the answer did not change,
+    because §50's own example puts `fill`/`stroke` on the _shape constructor_ and a
+    stroke's width and joins are geometry, not shading. A conditional deferral has to be
+    re-decided out loud when its condition arrives, or it silently becomes a habit.
+  - **A getter and its setter should have two types when one of them resolves defaults.**
+    `shape.stroke = { width }` writes; `shape.stroke` reads `ResolvedStrokeStyle` with
+    `lineJoin: "miter"` rather than `undefined`. Saying that in the type system removed
+    the whole `?? default` family from both the shape and the §79 writer — which is also
+    what took `scene-serializers.ts` back to 100% branch coverage, since every one of
+    those `??`s was a dead arm.
+  - **`LEQUAL` is what makes a stroke paint over its fill.** Both sit at z = 0, index
+    order is draw order inside one geometry, and §61's depth func lets the later draw
+    through. Written down because a backend that "tightened" the comparison to `LESS`
+    would make every stroke vanish under its own fill with no test naming depth.
+  - **The join/cap overlap is documented, not removed** (the `fillRings` precedent):
+    joins and caps are outer-side only, the inner side of every corner is covered twice,
+    invisible under an opaque paint and double-blended under a translucent one. Measured
+    against analytic areas — a 496-segment stroked circle overshoots 10π by 0.785, which
+    is exactly 496 × (w/2)²·tan(θ/2). `alignment: "outside"` on a convex outline is the
+    escape.
+  - **§33, second two-tier module:** stroke expansion is **same-runtime** where the fill
+    tessellator is cross-platform, because offsetting needs a unit normal (`Math.sqrt`)
+    and a round join needs `Math.acos`/`cos`/`sin`. `tessellation.ts`'s determinism
+    section now scopes itself explicitly — a module-level tier claim goes stale the
+    moment the module grows an operation.
+  - **Alignment is named from the path's own direction**: `inside` is the band to the
+    _left_. On a counter-clockwise ring (every §50 shape) the interior _is_ the left, and
+    on a clockwise one (a `Ring`'s hole) the two swap — which is also correct, because an
+    annulus's material is outside its inner circle. One rule, no second case.
+  - **A lone point strokes to nothing** — `Path.flatten` explicitly declines to decide
+    whether a stray `moveTo` is a dot; `expandStroke` decides, and the answer is that a
+    dot is a `Circle`. Same rule kills zero-length dash "on" entries (so SVG's `[0, 4]`
+    dot pattern draws nothing here, stated on the option).
+  - Gotcha: **`0.27` is not a `Float32Array` value.** Vertex-colour assertions must use
+    exactly representable components (0.25, 0.5, 1) or `toBeCloseTo`; three tests were
+    written against the authored tuple and failed on the round trip.
+  - Gotcha, repeat: **`pnpm graph` rewrites `docs/Architecture/*` and will sweep a
+    sibling's in-flight exports into your diff.** Run it for `graph:duplicates`, then
+    `git checkout -- docs/Architecture/`.
+- **2026-08-09 — A-18 abort half + A-9 `pointerType`.** Decisions worth keeping:
+  - **Cancellation semantics for `AssetManager` (A-18).** Three rules, in source as the
+    contract: (1) an aborted load never holds a reference — a pre-aborted signal is
+    refused before the cache is consulted, a later abort hands the reference back, and an
+    aborted load must therefore never be `release`d; (2) one waiter's abort is not the
+    others' — aborting decrements and the request is abandoned only at refcount zero;
+    (3) **`release` is not `abort`** — releasing the last reference to a pending load
+    still lets it settle. Rule 3 deviates from GAP v0's closure sketch ("the last release
+    of a pending load aborts it") on purpose: the caller still holds that promise, and
+    rejecting it turns a tidy teardown into an unhandled rejection in application code.
+    Cancellation has its own channel because it is the caller asking for the rejection.
+  - **A generic type parameter must not reach a class's instance type when the class is
+    named in another package's option type (measured).** `AssetManager<TSignal>` with
+    `#fetch: FetchLike<TSignal>` makes `AssetManager<AbortSignal>` unassignable to
+    `AssetManager`, breaking `ApplicationOptions.assets`. Fix: keep the parameter in the
+    _options_ interface (where it forces `fetch` and `abortController` to agree) and
+    erase it at the constructor. Generalizes to every future capability-typed seam.
+  - **`typeof fetch` IS assignable to `FetchLike<TSignal = never>` =
+    `(url, init?: { signal?: TSignal }) => …` (measured).** This supersedes nothing in
+    the 2026-08-07 note — that finding was about a _concrete_ structural
+    `AbortSignalLike` parameter, which does break it. Generic in, concrete out.
+  - **Unknown platform enum values are reported as absent, not refused (A-9).**
+    `SurfacePointerEvent.pointerType` is typed `string` (because `lib.dom` types
+    `PointerEvent.pointerType` as `string`, and narrowing the seam breaks structural
+    assignability — measured); the `"mouse" | "pen" | "touch"` union lives on the scene
+    event, and a vendor value or `""` yields an absent field. §85's refuse-don't-clamp
+    governs _configuration_, not hardware telemetry arriving mid-gesture: throwing there
+    would break input on a device newer than the union.
+  - **A pointer's teardown is a property of the device, not of the ending (A-9).** A
+    release forgets the pointer unless the device outlives its gesture _and_ has a hover
+    worth keeping (a mouse over a node). `pointercancel` ends every pointer regardless —
+    the platform withdrew it, and device knowledge must not override that. The retained
+    entry cannot re-open §83's leak: a mouse's `pointerId` is stable, and an entry with
+    no hover is dropped.
+- **2026-08-09 — R-23 §50 shape nodes.** Decisions worth keeping:
+  - **The honest tier is fill-only, and the three stroke-only primitives get no class at
+    all** — line, polyline and the open arc. Fifth application of
+    absent-beats-accepted-and-ignored, and the first where the absence is a whole _class_
+    rather than a field. Three independent reasons, not one: §58 is silent, §52 puts
+    stroke expansion in `@four/geometry` by name, and a stroke without a join rule is
+    _wrong_ at every corner rather than merely plain.
+  - **A packet can close a gap by adding nothing to the frame path.** Shapes carry a
+    `SurfaceMaterial` and draw through the existing unlit pipeline, so `RenderItemKind`
+    was not widened, no pipeline was compiled, `render-webgl` was not opened, and the
+    byte-identity argument is a _code-path_ argument. The mechanical form: a scene of
+    shapes emits the identical GL transcript as a scene of plain `Renderable`s over the
+    same geometries. Reusable technique.
+  - **`ShapeMaterial` is deliberately unshipped** — without §58 it is `UnlitMaterial`
+    renamed, and it costs either a `RenderItemKind` arm (which RFC 0001 _and_ RFC 0003
+    both want, first-to-land owning `pipelineId`) plus 0.75–1.9 kB gzip in every
+    `WebglRenderer` bundle, or a discriminant that lies. §57's family list is not a build
+    order.
+  - **`Node.rotation` is taken** (the §15/§97 live-quaternion alias), so no node subclass
+    may have a scalar `rotation`. `tsc` refuses it; vitest does not — third confirmation
+    that `pnpm run docs` is the real type gate. The family's name is `startAngle`: where
+    the outline begins, from +X, for ellipse, regular polygon, star and sector alike.
+  - **§53's validate-against-current-attributes rule has no legal end to swap from** when
+    the vertex count changes: dropping indices leaves a non-indexed triangle geometry at
+    an arbitrary count, replacing positions leaves indices dangling. **An empty index
+    buffer is the configuration legal at every count** — the pivot every derived,
+    resizable geometry has to pass through.
+  - **§79's validating parse of a §51 path is the builder, replayed** (R-24's
+    no-`fromCommands` rule), so a malformed document fails exactly where a malformed call
+    sequence does. **Write the arc's _end_ angle, never its sweep**:
+    `fl(fl(s+d) − s) ≠ d` for 63% of samples (worst 1.8e-15 rad) and no end angle can fix
+    it, but `fl(s + arcSweep(s,e)) === e` in 500 000/500 000 — so the _document_ stays
+    byte-exact while the reloaded sweep may move a bit.
+  - **A shape parameter is required exactly when it _is_ the shape** (side count, star
+    radii, sector angles, ring hole, polygon points, path); everything with an obvious
+    unit size defaults to 1. The §79 read side follows the same line: defaulted fields
+    restore their default when corrupt, required ones are refused loudly — inventing a
+    triangle looks like a bug in the author's data.
+  - **A ring's hole is a winding decision, not a second draw**: outer CCW, inner CW, so
+    nonzero sees zero inside. Same-winding rings fill the middle twice — invisible under
+    an opaque fill, wrong under a translucent one.
+  - Measured: registering the nine §79 pairs pulls `Path` + the tessellator into any
+    bundle calling `registerSceneNodeTypes()` — **+10.46 kB gzip** on
+    `motor-digital-twin`, 0 B on the five examples that do not (hash-identical).
+    Composing the pair in anyway is deliberate: a shape that failed to match `nodeTypeOf`
+    would save as a bare `Node`, which is A-15's failure mode.
+- **2026-08-09 — R-26 §50 SVG path data.** Decisions worth keeping:
+  - **A format conformance rule is not an §85 clamp.** SVG 1.1 F.6.6 _defines_ what a
+    reader does with a negative, zero, or too-small arc radius; refusing those would make
+    valid documents unreadable, which is the opposite of §50's requirement. The line is
+    drawn in a table in-source: format-defined normalizations are honoured, malformed
+    text is refused with a `SyntaxError` naming the offset. Corollary, and a deliberate
+    divergence from SVG: a viewer renders _up to_ the error; an importer must not, because
+    that turns a typo into silently missing geometry — nothing parsed is kept.
+  - **A `d` parser transcribes; it does not flip Y.** The transform that lands SVG in a
+    Y-up world is `y ↦ height − y`, and `height` lives in the `viewBox`, not in `d`.
+    Negating alone is _half_ a transform performed silently, and half a correction is
+    worse than none because none is visible. Transcription also makes
+    `format(parse(d))` a checkable identity — which is what §50's word _compatibility_
+    has to mean. The one-liner (`Matrix3().fromArray([1,0,0, 0,-1,0, 0,height,1])`) is
+    exact and arcs survive it, because a reflection is a similarity.
+  - **An arc's start is authoritative over the segment that reaches it — the finding that
+    changed the design.** SVG's `A` begins at the current point _by definition_; §51's arc
+    begins where `centre + R(rot)·(rx cos θ₁, ry sin θ₁)` lands, and no centre hits an
+    arbitrary point exactly (**measured: ~83% over 200 000 arcs**; `(a−b)+b` is not an
+    identity in binary FP). The two ulps became §51's implicit connecting segment pointing
+    _back_ along the arriving line — a zero-area spike §52 refuses, making the **rounded
+    rectangle** unfillable. Fix: the reader is one command behind and retargets the held
+    segment's endpoint onto the arc's start. This is the concrete, unavoidable form of
+    R-24's recorded "ulp trap" (an arc's analytic start never equals a hand-written
+    `lineTo` to the same coordinates) — an SVG document _always_ writes that `lineTo`, so
+    the trap is not avoidable by authoring convention on the import path.
+  - **`fromCommands` is still not needed** — export is a read of `Path.commands` plus a
+    cursor; import is builder calls. The R-24 decision stands, unamended. The single
+    temptation (`Path.ellipse` re-deriving the sweep as `(θ₁+Δ) − θ₁`, ±1 ulp) was
+    resisted: the quantity is already same-runtime tier.
+  - **A §33 cross-platform claim can rest on ECMA-262 rather than on geometry.**
+    `golden/svg-path.json`'s `text` half is exact because decimal→double (≤20 significant
+    digits) and `Number::toString` are _exactly specified_, which is why `String(value)`
+    is the writer's number format: cross-platform **and** lossless, where any
+    fixed-decimal format is neither. Proof is mechanical, two ways (all 2 408 coordinates
+    dyadic; every case a byte-for-byte text fixed point). The stated edge is ECMA-262's
+    > 20-significant-digit freedom.
+  - **A parser's §96 story is one bound plus a structural argument.** No regexes anywhere
+    (single forward character-code scan ⇒ O(n) on _every_ input, so ReDoS is impossible
+    rather than unlikely); one finite `maximumTextLength`, because the parser recurses
+    nowhere and allocates linearly, so bounding the text bounds time, stack and heap
+    together — a second limit would be a number with no independent meaning. Totality
+    (path-or-throw, three documented error types) is fuzzed, not asserted.
+  - Gotcha: **`pnpm graph:duplicates` counts only _exported_ names** (`collectOwnDefiners`
+    reads `file.exports`), so a module-private `TAU` beside `path.ts`'s costs nothing —
+    but any newly _exported_ helper must be checked repo-wide first.
+  - Doc-truth: `packages/geometry/README.md` still said the path model and tessellation
+    were "staged / not yet implemented" a day after R-24/R-25 shipped. Package READMEs are
+    **not** scanned by `tools/check-docs.mjs` (it walks the root list plus `docs/`) — the
+    24 package READMEs are an unguarded doc-truth surface.
+- **2026-08-09 — R-18 §69 shadows.** Decisions worth keeping:
+  - **§69 ships one tier: the sun's map.** Point/spot carry no `castShadow` at all —
+    §69's answer for them is a cube map and a per-light index the single-map tier has
+    nowhere to put. Absent beats accepted-and-ignored, fourth application of the rule.
+  - **A shadow volume must be authored, not fitted** — auto-fit needs §87's bounds pass
+    and makes texel density frame-dependent, which is shimmer §33 forbids. The volume is
+    the light's _node_: position matters for shadows even though §68 says it does not
+    matter for lighting.
+  - **`castShadow` defaults `false` on the light and `true` on the node.** Switching a
+    light on buys a whole pass (§61: a renderer does not silently spend that); switching
+    a node off is a per-object exclusion. The asymmetry is what makes "enable the sun and
+    shadows appear" true.
+  - **Byte-identity, fifth confirmation of mirror-at-GL-initial-0** — a `bool` uniform at
+    `false` plus a `hasShadow` flag suppressing the pass. The pixel half needs the shadow
+    to _multiply the existing product in place_, never a rewrite:
+    `direct = lightColor*diffuse; if (useShadow) direct *= f; lighting = ambient + direct`.
+  - **`targetRecord !== null` was never the right F13 condition** — it was only
+    accidentally right while off-screen frames were the only ones that bound a
+    framebuffer. Any new pass that binds one must extend the `framebufferBound` flag, not
+    add a second condition. (New instance class: an envelope condition that encodes _why_
+    a resource was bound rather than _that_ it was.)
+  - **Explicit PCF taps beat hardware `sampler2DShadow`** — compare mode is sampler
+    state, so it would couple `gl-render-target.ts`'s cache to what a consumer intends;
+    2×2 is a smaller filter than §69 asks for; and a fake GL context can assert
+    arithmetic but not what a driver does inside a shadow sampler.
+  - **Depth textures are not filterable** — `LINEAR` on `DEPTH_COMPONENT` makes the
+    texture incomplete and every receiver reads fully occluded. `NEAREST` is mandatory,
+    not a preference.
+  - **Measured:** a seventh compiled-at-init pipeline plus a pass costs **~1.9 kB gzip in
+    every bundle carrying `WebglRenderer`**, regardless of whether the app uses lights at
+    all — R-6's 0.75 kB law at scale. Making §69 opt-in needs a registration seam (A-4's
+    define/opt-in), not a smaller shader.
+  - **Gotcha (multi-agent, joins the ports set): `ss` is not installed in this
+    container**, so port checks must read `/proc/net/tcp`; and orphaned preview servers
+    do **not** match `pkill -f "vite preview"` — their cmdline is
+    `node .../vite.js preview`. A killed `pnpm test:browser` leaves all nine servers
+    running and the next run dies with "port 4173 is already used".
+  - **Gotcha, second confirmation of R-38's:** a new required field on `RenderItemBase`
+    breaks hand-built item literals only under TypeDoc/tsc, never under Vitest —
+    `pnpm run docs` was the gate that caught it.
 - **2026-08-09 — R-24 §51 Path.** Decisions worth keeping:
   - **A determinism tier is a property of the operation, not the module** — R-25's
     one-tier rule does not survive §51 (Béziers can be exact, arcs cannot); the honest

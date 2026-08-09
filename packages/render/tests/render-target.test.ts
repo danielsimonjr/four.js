@@ -304,3 +304,65 @@ describe("isRenderTargetTexture (R-4)", () => {
     expect(isRenderTargetTexture({ renderTarget: {} })).toBe(false);
   });
 });
+
+describe("RenderTarget — samplable depth (§69, R-18)", () => {
+  it("defaults to a renderbuffer depth attachment", () => {
+    const target = new RenderTarget({ width: 8, height: 8 });
+
+    expect(target.depth).toBe(true);
+    expect(target.depthTexture).toBe(false);
+  });
+
+  it("asks for a depth texture when told to", () => {
+    const target = new RenderTarget({
+      width: 1024,
+      height: 1024,
+      depthTexture: true,
+    });
+
+    expect([target.depth, target.depthTexture]).toEqual([true, true]);
+  });
+
+  it("refuses a samplable copy of a buffer the target does not have (§85)", () => {
+    expect(
+      () =>
+        new RenderTarget({
+          width: 8,
+          height: 8,
+          depth: false,
+          depthTexture: true,
+        }),
+    ).toThrow(/depthTexture requires depth/);
+  });
+
+  it("accounts a depth texture at four bytes per texel, not two (§83)", () => {
+    const size = 64 * 64;
+    expect(new RenderTarget({ width: 64, height: 64 }).byteLength).toBe(
+      size * 6,
+    );
+    expect(
+      new RenderTarget({ width: 64, height: 64, depth: false }).byteLength,
+    ).toBe(size * 4);
+    // `DEPTH_COMPONENT24` occupies a 32-bit texel — the backend's actual
+    // format, quoted rather than guessed (`gl-render-target.ts`).
+    expect(
+      new RenderTarget({ width: 64, height: 64, depthTexture: true })
+        .byteLength,
+    ).toBe(size * 8);
+  });
+
+  it("keeps the attachment choice across a resize and reports 0 once disposed", () => {
+    const target = new RenderTarget({
+      width: 16,
+      height: 16,
+      depthTexture: true,
+    });
+    target.resize(32, 32);
+    expect(target.depthTexture).toBe(true);
+    expect(target.byteLength).toBe(32 * 32 * 8);
+
+    target.dispose();
+    expect(target.byteLength).toBe(0);
+    expect(target.depthTexture).toBe(true);
+  });
+});

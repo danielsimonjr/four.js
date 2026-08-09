@@ -2,12 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-09"
-  totalFiles: 202
+  totalFiles: 204
   totalModules: 24
-  totalExports: 1818
-  totalFiles: 200
-  totalModules: 24
-  totalExports: 1788
+  totalExports: 1911
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -940,6 +937,10 @@ modules:
         - FetchResponse
         - ResponseHeadersLike
         - TimerLike
+        - FetchInit
+        - AbortHandle
+        - AbortSignalLike
+        - AssetLoadOptions
         - AssetLoader
         - AssetManagerOptions
       constants:
@@ -966,8 +967,12 @@ modules:
           reExport: true
         - file: ./asset-manager.js
           imports:
+            - AbortHandle
+            - AbortSignalLike
+            - AssetLoadOptions
             - AssetLoader
             - AssetManagerOptions
+            - FetchInit
             - FetchLike
             - FetchResponse
             - ResponseHeadersLike
@@ -991,8 +996,12 @@ modules:
         - jsonLoader
         - textLoader
         - PACKAGE_NAME
+        - AbortHandle
+        - AbortSignalLike
+        - AssetLoadOptions
         - AssetLoader
         - AssetManagerOptions
+        - FetchInit
         - FetchLike
         - FetchResponse
         - ResponseHeadersLike
@@ -1008,8 +1017,12 @@ modules:
         - createImageLoader
         - jsonLoader
         - textLoader
+        - AbortHandle
+        - AbortSignalLike
+        - AssetLoadOptions
         - AssetLoader
         - AssetManagerOptions
+        - FetchInit
         - FetchLike
         - FetchResponse
         - ResponseHeadersLike
@@ -2198,24 +2211,34 @@ modules:
           imports:
             - BUTTON_NODE_TYPE
             - CHECKBOX_NODE_TYPE
+            - CIRCLE_NODE_TYPE
             - DIRECTIONAL_LIGHT_NODE_TYPE
+            - ELLIPSE_NODE_TYPE
             - IMAGE_NODE_TYPE
             - LABEL_NODE_TYPE
             - ORTHOGRAPHIC_CAMERA_NODE_TYPE
             - PANEL_NODE_TYPE
+            - PATH_SHAPE_NODE_TYPE
             - PERSPECTIVE_CAMERA_NODE_TYPE
             - POINT_LIGHT_NODE_TYPE
+            - POLYGON_NODE_TYPE
             - PROGRESS_NODE_TYPE
             - RADIO_BUTTON_NODE_TYPE
+            - RECTANGLE_NODE_TYPE
+            - REGULAR_POLYGON_NODE_TYPE
             - RENDERABLE_NODE_TYPE
+            - RING_NODE_TYPE
+            - SECTOR_NODE_TYPE
             - SLIDER_NODE_TYPE
             - SPOT_LIGHT_NODE_TYPE
             - SPRITE_NODE_TYPE
+            - STAR_NODE_TYPE
             - TOGGLE_NODE_TYPE
             - composeSceneNodeTypes
             - registerPhysicsSerializers
             - registerRenderSerializers
             - registerSceneNodeTypes
+            - registerShapeSerializers
             - registerUISerializers
             - resourceCatalog
             - restoreNodeId
@@ -2244,24 +2267,34 @@ modules:
         - Application
         - BUTTON_NODE_TYPE
         - CHECKBOX_NODE_TYPE
+        - CIRCLE_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
+        - ELLIPSE_NODE_TYPE
         - IMAGE_NODE_TYPE
         - LABEL_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - PANEL_NODE_TYPE
+        - PATH_SHAPE_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
+        - POLYGON_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - RADIO_BUTTON_NODE_TYPE
+        - RECTANGLE_NODE_TYPE
+        - REGULAR_POLYGON_NODE_TYPE
         - RENDERABLE_NODE_TYPE
+        - RING_NODE_TYPE
+        - SECTOR_NODE_TYPE
         - SLIDER_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
         - SPRITE_NODE_TYPE
+        - STAR_NODE_TYPE
         - TOGGLE_NODE_TYPE
         - composeSceneNodeTypes
         - registerPhysicsSerializers
         - registerRenderSerializers
         - registerSceneNodeTypes
+        - registerShapeSerializers
         - registerUISerializers
         - resourceCatalog
         - restoreNodeId
@@ -2280,24 +2313,34 @@ modules:
         - Application
         - BUTTON_NODE_TYPE
         - CHECKBOX_NODE_TYPE
+        - CIRCLE_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
+        - ELLIPSE_NODE_TYPE
         - IMAGE_NODE_TYPE
         - LABEL_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
         - PANEL_NODE_TYPE
+        - PATH_SHAPE_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
+        - POLYGON_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - RADIO_BUTTON_NODE_TYPE
+        - RECTANGLE_NODE_TYPE
+        - REGULAR_POLYGON_NODE_TYPE
         - RENDERABLE_NODE_TYPE
+        - RING_NODE_TYPE
+        - SECTOR_NODE_TYPE
         - SLIDER_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
         - SPRITE_NODE_TYPE
+        - STAR_NODE_TYPE
         - TOGGLE_NODE_TYPE
         - composeSceneNodeTypes
         - registerPhysicsSerializers
         - registerRenderSerializers
         - registerSceneNodeTypes
+        - registerShapeSerializers
         - registerUISerializers
         - resourceCatalog
         - restoreNodeId
@@ -2508,7 +2551,9 @@ modules:
         - package: "@four/geometry"
           directory: packages/geometry
           imports:
+            - Path
             - BufferGeometry
+            - Point2D
         - package: "@four/materials"
           directory: packages/materials
           imports:
@@ -2531,8 +2576,27 @@ modules:
         - package: "@four/render"
           directory: packages/render
           imports:
+            - Arc
+            - Circle
+            - Ellipse
+            - Line
+            - PathShape
+            - Polygon
+            - Polyline
+            - Rectangle
+            - RegularPolygon
             - Renderable
+            - Ring
+            - Sector
+            - Shape2D
             - Sprite
+            - Star
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - ResolvedPaint
+            - ResolvedShapeFill
+            - ResolvedStrokeStyle
         - package: "@four/scene"
           directory: packages/scene
           imports:
@@ -2589,9 +2653,22 @@ modules:
         - DIRECTIONAL_LIGHT_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
+        - CIRCLE_NODE_TYPE
+        - ELLIPSE_NODE_TYPE
+        - RECTANGLE_NODE_TYPE
+        - REGULAR_POLYGON_NODE_TYPE
+        - POLYGON_NODE_TYPE
+        - STAR_NODE_TYPE
+        - SECTOR_NODE_TYPE
+        - RING_NODE_TYPE
+        - PATH_SHAPE_NODE_TYPE
+        - LINE_NODE_TYPE
+        - POLYLINE_NODE_TYPE
+        - ARC_NODE_TYPE
         - resourceCatalog
         - registerUISerializers
         - registerRenderSerializers
+        - registerShapeSerializers
         - composeSceneNodeTypes
         - registerPhysicsSerializers
         - registerSceneNodeTypes
@@ -2604,6 +2681,7 @@ modules:
         - resourceCatalog
         - registerUISerializers
         - registerRenderSerializers
+        - registerShapeSerializers
         - composeSceneNodeTypes
         - registerPhysicsSerializers
         - registerSceneNodeTypes
@@ -2624,6 +2702,18 @@ modules:
         - DIRECTIONAL_LIGHT_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
+        - CIRCLE_NODE_TYPE
+        - ELLIPSE_NODE_TYPE
+        - RECTANGLE_NODE_TYPE
+        - REGULAR_POLYGON_NODE_TYPE
+        - POLYGON_NODE_TYPE
+        - STAR_NODE_TYPE
+        - SECTOR_NODE_TYPE
+        - RING_NODE_TYPE
+        - PATH_SHAPE_NODE_TYPE
+        - LINE_NODE_TYPE
+        - POLYLINE_NODE_TYPE
+        - ARC_NODE_TYPE
     packages/four/src/scene.ts:
       description: scene module
       externalDependencies: []
@@ -2702,8 +2792,7 @@ modules:
         - GeometryBounds
         - BufferGeometryOptions
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 52 symbols)
-      description: Package entry point for @four/geometry (re-exports 37 symbols)
+      description: Package entry point for @four/geometry (re-exports 64 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -2729,6 +2818,12 @@ modules:
             - MAX_SUBDIVISION_DEPTH
             - Path
           reExport: true
+        - file: ./svg-path.js
+          imports:
+            - DEFAULT_MAXIMUM_PATH_DATA_LENGTH
+            - formatSvgPathData
+            - parseSvgPathData
+          reExport: true
         - file: ./primitives.js
           imports:
             - boxGeometry
@@ -2743,7 +2838,9 @@ modules:
           reExport: true
         - file: ./tessellation.js
           imports:
+            - DEFAULT_MITER_LIMIT
             - earClippingTessellator
+            - expandStroke
             - triangulatePolygon
           reExport: true
         - file: ./buffer-geometry.js
@@ -2783,6 +2880,11 @@ modules:
             - PathSegmentCommand
           reExport: true
           typeOnly: true
+        - file: ./svg-path.js
+          imports:
+            - SvgPathParseOptions
+          reExport: true
+          typeOnly: true
         - file: ./primitives.js
           imports:
             - BoxGeometryOptions
@@ -2795,6 +2897,12 @@ modules:
           imports:
             - Point2D
             - PolygonTessellator
+            - Polyline2D
+            - StrokeAlignment
+            - StrokeGeometryOptions
+            - StrokeLineCap
+            - StrokeLineJoin
+            - StrokeMesh
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -2812,13 +2920,18 @@ modules:
         - DEFAULT_FLATTEN_TOLERANCE
         - MAX_SUBDIVISION_DEPTH
         - Path
+        - DEFAULT_MAXIMUM_PATH_DATA_LENGTH
+        - formatSvgPathData
+        - parseSvgPathData
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
         - polygonGeometry2D
         - geometryMemoryBytes
         - liveGeometryCount
+        - DEFAULT_MITER_LIMIT
         - earClippingTessellator
+        - expandStroke
         - triangulatePolygon
         - PACKAGE_NAME
         - BufferGeometryOptions
@@ -2846,12 +2959,19 @@ modules:
         - PathOptions
         - PathQuadraticCommand
         - PathSegmentCommand
+        - SvgPathParseOptions
         - BoxGeometryOptions
         - CircleGeometry2DOptions
         - PlaneGeometryOptions
         - PolygonGeometry2DOptions
         - Point2D
         - PolygonTessellator
+        - Polyline2D
+        - StrokeAlignment
+        - StrokeGeometryOptions
+        - StrokeLineCap
+        - StrokeLineJoin
+        - StrokeMesh
       reExported:
         - BufferGeometry
         - capsuleGeometry
@@ -2866,13 +2986,18 @@ modules:
         - DEFAULT_FLATTEN_TOLERANCE
         - MAX_SUBDIVISION_DEPTH
         - Path
+        - DEFAULT_MAXIMUM_PATH_DATA_LENGTH
+        - formatSvgPathData
+        - parseSvgPathData
         - boxGeometry
         - circleGeometry2D
         - planeGeometry
         - polygonGeometry2D
         - geometryMemoryBytes
         - liveGeometryCount
+        - DEFAULT_MITER_LIMIT
         - earClippingTessellator
+        - expandStroke
         - triangulatePolygon
         - BufferGeometryOptions
         - GeometryBounds
@@ -2899,12 +3024,19 @@ modules:
         - PathOptions
         - PathQuadraticCommand
         - PathSegmentCommand
+        - SvgPathParseOptions
         - BoxGeometryOptions
         - CircleGeometry2DOptions
         - PlaneGeometryOptions
         - PolygonGeometry2DOptions
         - Point2D
         - PolygonTessellator
+        - Polyline2D
+        - StrokeAlignment
+        - StrokeGeometryOptions
+        - StrokeLineCap
+        - StrokeLineJoin
+        - StrokeMesh
       constants:
         - PACKAGE_NAME
     packages/geometry/src/path.ts:
@@ -2918,6 +3050,7 @@ modules:
         - file: ./tessellation.js
           imports:
             - Point2D
+            - Polyline2D
           typeOnly: true
       workspaceDependencies:
         - package: "@four/math"
@@ -2927,6 +3060,9 @@ modules:
       exports:
         - DEFAULT_FLATTEN_TOLERANCE
         - MAX_SUBDIVISION_DEPTH
+        - arcPoint
+        - newCursor
+        - advance
         - Path
       classes:
         - Path
@@ -2940,6 +3076,11 @@ modules:
         - PathOptions
         - PathFillRings
         - PathClosestPoint
+        - PathCursor
+      functions:
+        - arcPoint
+        - newCursor
+        - advance
       constants:
         - DEFAULT_FLATTEN_TOLERANCE
         - MAX_SUBDIVISION_DEPTH
@@ -3061,6 +3202,35 @@ modules:
         - noteGeometry
         - geometryMemoryBytes
         - liveGeometryCount
+    packages/geometry/src/svg-path.ts:
+      description: "§50's *\"SVG import/export compatibility\"*, at the **path-data tier**: the"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./path.js
+          imports:
+            - Path
+            - advance
+            - arcPoint
+            - newCursor
+            - PathArcCommand
+            - PathCursor
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+      exports:
+        - DEFAULT_MAXIMUM_PATH_DATA_LENGTH
+        - parseSvgPathData
+        - formatSvgPathData
+      interfaces:
+        - SvgPathParseOptions
+      functions:
+        - parseSvgPathData
+        - formatSvgPathData
+      constants:
+        - DEFAULT_MAXIMUM_PATH_DATA_LENGTH
     packages/geometry/src/tessellation.ts:
       description: Polygon tessellation (§52) — the isolated module that turns a closed 2D
       externalDependencies: []
@@ -3073,17 +3243,25 @@ modules:
         - file: ./primitive-support.js
           imports:
             - createIndices
+            - requirePositive
       workspaceDependencies: []
       exports:
         - earClippingTessellator
+        - DEFAULT_MITER_LIMIT
         - triangulatePolygon
+        - expandStroke
       interfaces:
         - Point2D
         - PolygonTessellator
+        - Polyline2D
+        - StrokeGeometryOptions
+        - StrokeMesh
       functions:
         - triangulatePolygon
+        - expandStroke
       constants:
         - earClippingTessellator
+        - DEFAULT_MITER_LIMIT
   packages/input:
     packages/input/src/drag.ts:
       description: "Dragging (§72, §120): press a node, move the pointer, get world-space deltas."
@@ -3124,7 +3302,7 @@ modules:
       interfaces:
         - DragManagerOptions
     packages/input/src/index.ts:
-      description: Package entry point for @four/input (re-exports 34 symbols)
+      description: Package entry point for @four/input (re-exports 35 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3193,6 +3371,7 @@ modules:
           typeOnly: true
         - file: ./pointer-events.js
           imports:
+            - PointerDeviceType
             - PropagatingPointerEventType
             - ScenePointerEventInit
             - ScenePointerEventType
@@ -3236,6 +3415,7 @@ modules:
         - SurfaceKeyListener
         - PickHit
         - Pickable
+        - PointerDeviceType
         - PropagatingPointerEventType
         - ScenePointerEventInit
         - ScenePointerEventType
@@ -3271,6 +3451,7 @@ modules:
         - SurfaceKeyListener
         - PickHit
         - Pickable
+        - PointerDeviceType
         - PropagatingPointerEventType
         - ScenePointerEventInit
         - ScenePointerEventType
@@ -3412,6 +3593,7 @@ modules:
             - ScenePointerEvent
             - buildPropagationPath
             - dispatchPointerEvent
+            - PointerDeviceType
             - PropagatingPointerEventType
             - ScenePointerEventType
       workspaceDependencies:
@@ -7621,8 +7803,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 97 symbols)
-      description: Package entry point for @four/render (re-exports 96 symbols)
+      description: Package entry point for @four/render (re-exports 130 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -7699,6 +7880,22 @@ modules:
             - createRenderStatistics
             - resetRenderStatistics
             - supportsRenderStatistics
+          reExport: true
+        - file: ./shape.js
+          imports:
+            - Arc
+            - Circle
+            - Ellipse
+            - Line
+            - PathShape
+            - Polygon
+            - Polyline
+            - Rectangle
+            - RegularPolygon
+            - Ring
+            - Sector
+            - Shape2D
+            - Star
           reExport: true
         - file: ./sprite.js
           imports:
@@ -7799,6 +7996,30 @@ modules:
             - RenderStatisticsReporter
           reExport: true
           typeOnly: true
+        - file: ./shape.js
+          imports:
+            - ArcOptions
+            - CircleOptions
+            - EllipseOptions
+            - LineOptions
+            - Paint
+            - PathShapeOptions
+            - PolygonOptions
+            - PolylineOptions
+            - RectangleOptions
+            - RegularPolygonOptions
+            - RingOptions
+            - SectorOptions
+            - ResolvedPaint
+            - ResolvedShapeFill
+            - ResolvedStrokeStyle
+            - Shape2DOptions
+            - ShapeFill
+            - SolidPaint
+            - StarOptions
+            - StrokeStyle
+          reExport: true
+          typeOnly: true
         - file: ./sprite.js
           imports:
             - SpriteFrame
@@ -7853,6 +8074,19 @@ modules:
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
+        - Arc
+        - Circle
+        - Ellipse
+        - Line
+        - PathShape
+        - Polygon
+        - Polyline
+        - Rectangle
+        - RegularPolygon
+        - Ring
+        - Sector
+        - Shape2D
+        - Star
         - Sprite
         - Texture
         - PACKAGE_NAME
@@ -7907,6 +8141,26 @@ modules:
         - ResizeRecord
         - RenderStatistics
         - RenderStatisticsReporter
+        - ArcOptions
+        - CircleOptions
+        - EllipseOptions
+        - LineOptions
+        - Paint
+        - PathShapeOptions
+        - PolygonOptions
+        - PolylineOptions
+        - RectangleOptions
+        - RegularPolygonOptions
+        - RingOptions
+        - SectorOptions
+        - ResolvedPaint
+        - ResolvedShapeFill
+        - ResolvedStrokeStyle
+        - Shape2DOptions
+        - ShapeFill
+        - SolidPaint
+        - StarOptions
+        - StrokeStyle
         - SpriteFrame
         - SpriteOptions
         - TextureSource
@@ -7952,6 +8206,19 @@ modules:
         - createRenderStatistics
         - resetRenderStatistics
         - supportsRenderStatistics
+        - Arc
+        - Circle
+        - Ellipse
+        - Line
+        - PathShape
+        - Polygon
+        - Polyline
+        - Rectangle
+        - RegularPolygon
+        - Ring
+        - Sector
+        - Shape2D
+        - Star
         - Sprite
         - Texture
         - ColorGradeEffect
@@ -8005,6 +8272,26 @@ modules:
         - ResizeRecord
         - RenderStatistics
         - RenderStatisticsReporter
+        - ArcOptions
+        - CircleOptions
+        - EllipseOptions
+        - LineOptions
+        - Paint
+        - PathShapeOptions
+        - PolygonOptions
+        - PolylineOptions
+        - RectangleOptions
+        - RegularPolygonOptions
+        - RingOptions
+        - SectorOptions
+        - ResolvedPaint
+        - ResolvedShapeFill
+        - ResolvedStrokeStyle
+        - Shape2DOptions
+        - ShapeFill
+        - SolidPaint
+        - StarOptions
+        - StrokeStyle
         - SpriteFrame
         - SpriteOptions
         - TextureSource
@@ -8349,6 +8636,88 @@ modules:
         - textureMemoryBytes
         - liveTextureCount
         - liveRenderTargetCount
+    packages/render/src/shape.ts:
+      description: §50's native 2D shape system — the node tier (R-23, 2026-08-09).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./renderable.js
+          imports:
+            - Renderable
+            - RenderableOptions
+            - SurfaceMaterial
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - Disposable
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - BufferGeometry
+            - DEFAULT_FLATTEN_TOLERANCE
+            - expandStroke
+            - Path
+            - triangulatePolygon
+            - GeometryIndexArray
+            - PathFillRings
+            - Point2D
+            - StrokeAlignment
+            - StrokeLineCap
+            - StrokeLineJoin
+            - StrokeMesh
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - Material
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGBA
+      exports:
+        - Circle
+        - Ellipse
+        - Rectangle
+        - RegularPolygon
+        - Star
+        - Sector
+        - Ring
+        - Polygon
+        - PathShape
+        - Line
+        - Polyline
+        - Arc
+      classes:
+        - Circle
+        - Ellipse
+        - Rectangle
+        - RegularPolygon
+        - Star
+        - Sector
+        - Ring
+        - Polygon
+        - PathShape
+        - Line
+        - Polyline
+        - Arc
+      interfaces:
+        - SolidPaint
+        - ResolvedPaint
+        - StrokeStyle
+        - ResolvedStrokeStyle
+        - Shape2DOptions
+        - CircleOptions
+        - EllipseOptions
+        - RectangleOptions
+        - RegularPolygonOptions
+        - StarOptions
+        - SectorOptions
+        - RingOptions
+        - PolygonOptions
+        - PathShapeOptions
+        - LineOptions
+        - PolylineOptions
+        - ArcOptions
     packages/render/src/sprite.ts:
       description: "`Sprite` (§55) — a textured, tinted quad in the scene graph."
       externalDependencies: []
@@ -8585,7 +8954,6 @@ modules:
         - SHADOW_TEXTURE_UNIT
         - PUNCTUAL_LIGHT_GLSL
         - SHADOW_GLSL
-        - PUNCTUAL_LIGHT_GLSL
         - matrixScratch
         - createLinkedProgram
         - requireUniform
@@ -8615,7 +8983,6 @@ modules:
         - SHADOW_TEXTURE_UNIT
         - PUNCTUAL_LIGHT_GLSL
         - SHADOW_GLSL
-        - PUNCTUAL_LIGHT_GLSL
         - matrixScratch
     packages/render-webgl/src/gl-render-target.ts:
       description: "GPU-side render targets for the WebGL 2 backend: one framebuffer object per"
@@ -9117,7 +9484,6 @@ modules:
         - Group
     packages/scene/src/index.ts:
       description: Package entry point for @four/scene (re-exports 59 symbols)
-      description: Package entry point for @four/scene (re-exports 57 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -10720,6 +11086,7 @@ dependencyGraph:
         - packages/geometry/src/primitives-3d.ts
         - packages/geometry/src/primitives.ts
         - packages/geometry/src/resource-memory.ts
+        - packages/geometry/src/svg-path.ts
         - packages/geometry/src/tessellation.ts
     - name: Packages/input
       files:
@@ -10826,6 +11193,7 @@ dependencyGraph:
         - packages/render/src/renderer-registry.ts
         - packages/render/src/renderer.ts
         - packages/render/src/resource-memory.ts
+        - packages/render/src/shape.ts
         - packages/render/src/sprite.ts
         - packages/render/src/statistics.ts
         - packages/render/src/texture.ts
@@ -10893,30 +11261,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 202
+  totalTypeScriptFiles: 204
   totalModules: 24
-  totalLinesOfCode: 87911
-  totalExports: 1818
-  totalClasses: 115
-  totalInterfaces: 384
-  totalFunctions: 317
+  totalLinesOfCode: 93679
+  totalExports: 1911
+  totalClasses: 127
+  totalInterfaces: 410
+  totalFunctions: 324
   totalTypeGuards: 18
   totalEnums: 0
-  totalConstants: 234
-  totalReExports: 1174
-  totalTypeOnlyImports: 229
-  totalTypeScriptFiles: 200
-  totalModules: 24
-  totalLinesOfCode: 84091
-  totalExports: 1788
-  totalClasses: 111
-  totalInterfaces: 373
-  totalFunctions: 317
-  totalTypeGuards: 18
-  totalEnums: 0
-  totalConstants: 230
-  totalReExports: 1152
-  totalTypeOnlyImports: 227
+  totalConstants: 248
+  totalReExports: 1234
+  totalTypeOnlyImports: 231
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 1
   unusedFilesCount: 0
