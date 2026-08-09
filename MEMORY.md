@@ -28,6 +28,26 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-24 §51 Path.** Decisions worth keeping:
+  - **A determinism tier is a property of the operation, not the module** — R-25's
+    one-tier rule does not survive §51 (Béziers can be exact, arcs cannot); the honest
+    answer is two goldens with two `_tier` labels, because merging them lets a
+    transcendental hide inside the weaker claim.
+  - **The dyadic-rational assertion is a better tier proof than a digest** — integer
+    inputs + power-of-two tolerances make "cross-platform" _checkable_ (`x·2²⁴ ∈ ℤ`),
+    not argued.
+  - **A canonical model beats a faithful one** — storing the signed sweep instead of
+    the raw end angle makes reverse/subdivide/transform one line each.
+  - **Analytic-area oracles find winding-sign bugs that reading does not** — all three
+    real bugs came from the area tests. The ulp trap: an arc's analytic start never
+    equals a hand-written `lineTo` to the same coordinates — author arc-bearing shapes
+    with implicit connecting segments. After `close()` the current point is the
+    subpath's first point — a _disjoint_ ring needs an explicit `moveTo` (hit twice).
+  - **No `fromCommands`** — the builder is the well-formedness invariant every reader
+    assumes; §79 gets the validating parse. Offset paths belong to R-16 (an offset at
+    a concave corner _is_ the §58 join rule); the four booleans belong to the one
+    planar-subdivision packet §52 also needs.
+
 - **2026-08-09 — R-25 §52 tessellation.** Decisions worth keeping:
   - **§52 ships ear clipping, not monotone — the deciding argument is determinism**
     (sweep-line equal-y tie-breaking is where a determinism claim quietly stops being

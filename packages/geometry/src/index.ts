@@ -30,6 +30,25 @@ export {
   tubeGeometry,
 } from "./primitives-3d.js";
 export type {
+  FillRule,
+  PathArcCommand,
+  PathClosestPoint,
+  PathCloseCommand,
+  PathCommand,
+  PathCubicCommand,
+  PathFillRings,
+  PathLineCommand,
+  PathMoveCommand,
+  PathOptions,
+  PathQuadraticCommand,
+  PathSegmentCommand,
+} from "./path.js";
+export {
+  DEFAULT_FLATTEN_TOLERANCE,
+  MAX_SUBDIVISION_DEPTH,
+  Path,
+} from "./path.js";
+export type {
   BoxGeometryOptions,
   CircleGeometry2DOptions,
   PlaneGeometryOptions,
