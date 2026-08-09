@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — RFC 0004 drafted: 2D raster painting stack (owner-requested)
+
+#### Documentation
+
+- **`docs/rfcs/0004-raster-painting-stack.md`** — proposes **§77a**: a structural,
+  DOM-free `RasterSource` seam (`paint()` takes **no parameter**, deliberately — a
+  parameter would be either an engine rasterizer duplicating the R-16/R-24/R-25 stack
+  or a named DOM type, both refused) and a `CanvasTexture` satisfying the existing
+  `MaterialTexture` contract — **no backend change, no new duck-typed contract, no
+  closed union widened** (R-4's seam decision paying off a second time). A
+  `CanvasViewWidget` for §73 that needs no drawing API in `@four/ui` and no new skin
+  hook — **the recorded §73 blocker is wrong, and the RFC corrects it**: `ImageWidget`
+  already established the widget-owns-identity/skin-owns-texture split, and a repaint
+  request is content with no layout transition, exactly what A-12's `onContentChange`
+  exists for. §33 rule transposed verbatim from §40: painted pixels are display
+  content, never simulation input, enforced in the `units-display.test.ts` pattern —
+  with the honest limit stated (a reachability rule, not a readability one).
+  Constant-size by refusal (the cheap answer to R-29's frame hazard; resize gates on
+  R-30, which this RFC makes load-bearing for the first time rather than claiming it
+  falls out). §62's Canvas 2D backend delineated as a different concern that stays a
+  stub. Alternatives A–F with "do nothing" argued at full strength — and its honest
+  consequence named: a "no" means _withdrawing the canvas view from §73 by amendment_,
+  because its blocker is wrong either way. **Owner decision pending** — first question
+  is whether raster painting is in the product's scope at all (the spec chose retained
+  mode; the RFC exists because the owner asked). Register rows 15–17 added to v1 §5.
+
 ### 2026-08-08 — Specification revision 1.8: the consolidated amendment pass
 
 #### Documentation
