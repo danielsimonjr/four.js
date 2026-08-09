@@ -38,7 +38,7 @@ import {
   type ComponentHost,
   type ComponentType,
 } from "@four/core";
-import type { Quaternion, Vector3 } from "@four/math";
+import { Quaternion, Vector3 } from "@four/math";
 
 import {
   DEFAULT_TRANSFORM_AUTHORITY,
@@ -46,6 +46,7 @@ import {
 } from "./authority.js";
 import { DEFAULT_LAYER_MASK, type LayerMask } from "./layers.js";
 import { Transform } from "./transform.js";
+import { resolveWorldTransform } from "./world-transforms.js";
 
 /**
  * Payload of the `added` and `removed` events.
@@ -100,6 +101,46 @@ let nextNodeId = 1;
 
 /** The shape of an engine-assigned id: `node-` and a decimal counter value. */
 const ENGINE_NODE_ID = /^node-(\d+)$/;
+
+/**
+ * Default `up` reference for {@link Node.lookAt}: world +Y, because §7a makes
+ * the world right-handed and +Y up **in both 2D and 3D**. Frozen shape by
+ * convention — nothing writes into it, and `lookAt` only reads its components.
+ */
+const WORLD_UP = /* @__PURE__ */ new Vector3(0, 1, 0);
+
+/**
+ * Scratch for {@link Node.lookAt}: the world-space aim, the world rotation it
+ * implies, and the parent's world rotation it is expressed relative to. Three
+ * objects for the process, allocated at module load, mutated forever after —
+ * `lookAt` allocates nothing per call (§7b), and none of them carries a change
+ * hook, so writing them marks nothing dirty.
+ *
+ * Safe as module state because `lookAt` is synchronous, non-re-entrant, and
+ * fully writes each scratch before reading it (the same rule the render
+ * package's frame scratch follows).
+ */
+const aimScratch = /* @__PURE__ */ new Vector3();
+const worldRotationScratch = /* @__PURE__ */ new Quaternion();
+const parentRotationScratch = /* @__PURE__ */ new Quaternion();
+const decomposeScratch = /* @__PURE__ */ new Vector3();
+
+/**
+ * Builds {@link Node.lookAt}'s refusal (§85, §89) — one function for both
+ * degenerate cases so the shared code and the shared error code live in one
+ * place rather than twice inside the method.
+ *
+ * `reason` completes the sentence "Node.lookAt was refused because …". The
+ * offending values are not repeated in `context`: the node id locates the
+ * call, and the caller already holds the `target` and `up` it passed.
+ */
+function refuseLookAt(node: Node, reason: string): FourError {
+  return new FourError(
+    "INVALID_SCENE_GRAPH",
+    `Node.lookAt was refused because ${reason} (§85: singular transforms).`,
+    { context: { node: node.id } },
+  );
+}
 
 /**
  * Records that `id` is taken, so the counter never issues it again (§79,
@@ -378,6 +419,167 @@ export abstract class Node
    */
   get scale(): Vector3 {
     return this.transform.scale;
+  }
+
+  // --- Orientation helpers (§44, §47) ---------------------------------------
+
+  /**
+   * Writes the world-space unit vector this node faces — its **−Z axis** — into
+   * `out` and returns it (§7b's `out`-parameter convention; nothing allocates).
+   *
+   * −Z is the engine's one forward direction, for every node rather than for
+   * cameras alone: a camera looks down it (`Camera.viewMatrix`,
+   * `Matrix4.setPerspective`), a directional or spot light shines along it
+   * (§68), and {@link Node.lookAt} aims it. The inverse of `lookAt`, and the
+   * cheapest way to ask where something ended up pointing.
+   *
+   * World transforms are resolved on demand (`resolveWorldTransform(this)`),
+   * exactly as `Camera.updateViewMatrix` resolves — O(depth), version-cached,
+   * so the render path's prior resolve pass makes this a few comparisons. The
+   * basis column is normalized, so ancestor scale does not stretch the
+   * direction.
+   *
+   * A degenerate node — zero scale somewhere up the chain — yields the zero
+   * vector rather than `NaN` (`Vector3.normalize`'s documented zero-length
+   * behaviour): like a degenerate camera (§47), it poisons nothing downstream
+   * and raises no error on a per-frame path.
+   */
+  getWorldDirection(out: Vector3): Vector3 {
+    const elements = resolveWorldTransform(this).elements;
+    // Column-major Matrix4 (§7b): column 2 — elements 8, 9, 10 — is this
+    // node's local +Z axis in world space; the node faces along −Z.
+    out.set(-elements[8], -elements[9], -elements[10]);
+    return out.normalize();
+  }
+
+  /**
+   * Turns this node so that its **−Z axis points at `target`**, with its +Y
+   * axis as close to `up` as the aim allows (§44/§47's orientation helper —
+   * "aiming a camera or a light" without hand-composing quaternions). Returns
+   * `this`.
+   *
+   * ```ts
+   * camera.position.set(0, 2, 6);
+   * camera.lookAt(new Vector3(0, 0.5, 0));   // §7a's world +Y is the default up
+   * sun.lookAt(target, new Vector3(0, 0, 1)); // a light is aimed the same way
+   * ```
+   *
+   * ## `target` is in **world space**
+   *
+   * Always, whatever this node is parented to (decision, R-36). A world-space
+   * target is the contract that makes the call mean the same thing when a node
+   * is later reparented onto a moving rig — the case §44's follow rigs and
+   * spring arms exist for — and it is the only one under which "point the
+   * camera at the player" is a single call. The local rotation is derived from
+   * it: this node's world position comes from its resolved world matrix, the
+   * world rotation is built from the aim, and the parent's world rotation is
+   * divided out
+   *
+   * ```text
+   * localRotation = conjugate(parentWorldRotation) · worldRotation
+   * ```
+   *
+   * so a node under a rotated, translated, or uniformly scaled parent aims
+   * correctly. A parent with **non-uniform** scale has no exact rotation to
+   * divide out; `Matrix4.decompose`'s closest-rotation reading is used, with
+   * the shear it cannot represent left in — the same documented limitation
+   * every decomposition in the engine carries. A parent with a **zero** scale
+   * component decomposes to the identity, so the aim lands in world terms.
+   *
+   * The node's own scale and pivot are irrelevant to the result: only the
+   * rotation is written, through `transform.rotation.copy(...)`, so the version
+   * bumps exactly once (plan D3) and dependent caches invalidate exactly as
+   * they do for any other transform write.
+   *
+   * ## Transform authority (§42)
+   *
+   * This is an ordinary **manual** transform write, identical in every respect
+   * to `node.rotation.setFromAxisAngle(...)`, and like every direct write it
+   * neither checks nor warns about {@link Node.transformAuthority} (decision,
+   * R-36). §42's enforcement is deliberately *writer-side* — a system tests
+   * ownership once per node per step, immediately before it would write (see
+   * `warnAuthorityConflict`) — and `Node.lookAt` is not a system: it is the
+   * application, i.e. the `"manual"` authority itself. Warning here would make
+   * this the only transform write in the engine that self-polices, and it would
+   * fire on the most ordinary setup there is — aiming a `"physics"`-owned body
+   * or a `"kinematic"`-driven turret at its starting pose before the owning
+   * system has stepped. A rig that wants to aim a node *every frame* under a
+   * non-manual authority has the same obligation as any other writer: claim the
+   * authority, or let the owner do the writing.
+   *
+   * ## Degenerate aims are refused (§85)
+   *
+   * `FourError("INVALID_SCENE_GRAPH")` is thrown, and nothing is written, when
+   *
+   * - `target` coincides with this node's world position (or either is
+   *   non-finite): there is no direction to face; and
+   * - `up` is zero, parallel to the aim, or non-finite: the aim leaves the roll
+   *   about it completely undetermined — the top-down `lookAt` from directly
+   *   above with the default +Y `up` is exactly this case, and wants an
+   *   explicit `up` such as world −Z.
+   *
+   * Refusing rather than substituting is §85's "detect singular transforms"
+   * applied at the point of authoring, reported under the same code
+   * {@link Node.add} uses for §85's scene-graph rule so one `catch` covers both.
+   * Silently picking a fallback `up` — the usual engine behaviour — would
+   * rewrite the orientation the caller asked for and hide the mistake behind a
+   * plausible-looking roll; leaving the node unturned would be indistinguishable
+   * from a frozen rig. A rig that can reach a degenerate configuration (an orbit
+   * at zero radius, a follow target that catches its camera) must guard the
+   * call, exactly as it must guard a division by its own radius.
+   *
+   * Allocates nothing: the aim, the world rotation, and the parent's rotation
+   * live in module scratch.
+   */
+  lookAt(target: Vector3, up: Vector3 = WORLD_UP): this {
+    const world = resolveWorldTransform(this).elements;
+    const aimX = target.x - world[12];
+    const aimY = target.y - world[13];
+    const aimZ = target.z - world[14];
+    if (!(aimX * aimX + aimY * aimY + aimZ * aimZ > 0)) {
+      throw refuseLookAt(
+        this,
+        "the target coincides with the node's own world position, or is " +
+          "not finite",
+      );
+    }
+
+    // up × aim vanishes exactly when `up` is zero or parallel to the aim —
+    // the same test `Quaternion.setFromLookDirection` makes on the negated
+    // aim, so a node never reaches that method's silent branch.
+    const crossX = up.y * aimZ - up.z * aimY;
+    const crossY = up.z * aimX - up.x * aimZ;
+    const crossZ = up.x * aimY - up.y * aimX;
+    if (!(crossX * crossX + crossY * crossY + crossZ * crossZ > 0)) {
+      throw refuseLookAt(
+        this,
+        "`up` is zero, not finite, or parallel to the aim, so the roll is " +
+          "undetermined; aiming straight up or down needs an explicit `up`",
+      );
+    }
+
+    aimScratch.set(aimX, aimY, aimZ);
+    worldRotationScratch.setFromLookDirection(aimScratch, up);
+
+    const parent = this.#parent;
+    if (parent === null) {
+      this.transform.rotation.copy(worldRotationScratch);
+      return this;
+    }
+
+    // The chain above this node is already resolved (`resolveWorldTransform`
+    // walks it), so the parent's world matrix is current. One Vector3 serves
+    // as both decompose outs: neither is read back, and `decompose` reads its
+    // scale from locals rather than from the vector it wrote.
+    parent.transform.worldMatrix.decompose(
+      decomposeScratch,
+      parentRotationScratch,
+      decomposeScratch,
+    );
+    this.transform.rotation.copy(
+      parentRotationScratch.conjugate().multiply(worldRotationScratch),
+    );
+    return this;
   }
 
   // --- Transform authority (§42) --------------------------------------------

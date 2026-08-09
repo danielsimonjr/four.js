@@ -8,6 +8,85 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-36 closed (helper tier): §44/§47's `lookAt` and orientation helpers
+
+#### Added
+
+- **`Node.lookAt(target, up?)` (`@four/scene`)** — the §44/§47 helper the tree had nowhere
+  at all: aiming a camera or a light meant hand-composing quaternions, which the
+  `first-3d-scene` packet recorded as the roughest edge of writing a 3D scene. It turns the
+  node so its **−Z axis** points at a **world-space** `target`, with +Y as near `up` as the
+  aim allows (`up` defaults to world +Y, §7a). It lives on `Node` rather than on `Camera`
+  because −Z is _every_ node's forward, not a camera's privilege — the same call aims a
+  `DirectionalLight` or a `SpotLight` (§68). Under a parent the local rotation is derived as
+  `conjugate(parentWorldRotation) · worldRotation`, so a node on a rotated, translated, or
+  uniformly scaled rig aims correctly; a non-uniformly scaled parent inherits
+  `Matrix4.decompose`'s documented closest-rotation limitation, and a zero-scaled one
+  decomposes to the identity so the aim lands in world terms.
+- **`Node.getWorldDirection(out)` (`@four/scene`)** — the inverse: the world-space unit
+  vector a node faces. **Hoisted** from `DirectionalLight` and `SpotLight`, which carried two
+  byte-identical copies; both are deleted and both classes inherit it unchanged, so the
+  `@four/render` structural light contract is untouched and the bundle is one copy lighter.
+- **`Quaternion.setFromLookDirection(direction, up)` (`@four/math`)** — the primitive under
+  both. Neither argument need be unit and `up` need not be perpendicular; the basis is
+  `z = normalize(−direction)`, `x = normalize(up × z)`, `y = z × x`, converted with
+  Shepperd's method. Allocation-free (the basis lives in plain scalars) and the change hook
+  fires exactly once.
+- **`packages/scene/tests/look-at.test.ts` (28 tests)** and
+  **`tests/integration/look-at.test.ts` (8 tests)** — the integration suite pins the four
+  claims no single package can: the aim survives the §7 → §47 chain (a lookAt'd camera
+  projects its target to the centre of clip space), `@four/render`'s `collectSceneLights`
+  reads the same axis, the umbrella barrel exposes it, and it is a `"manual"` write a §42
+  owner then drives without either side warning.
+
+#### Changed
+
+- **`Matrix4.decompose` and `Quaternion.setFromLookDirection` share one Shepperd
+  implementation** (`setQuaternionFromBasis`, module-internal to `quaternion.ts`, not in the
+  barrel). The arithmetic and branch order moved verbatim — every `tests/determinism/*`
+  golden is unchanged, bit for bit — and `matrix4.ts` coverage rose 98.58% → 100% because the
+  look-at tests reach the branch its own suite never did.
+
+#### Decisions
+
+- **Forward is −Z for every node.** Verified against `Matrix4.setPerspective`,
+  `Camera.updateViewMatrix` (`inverse(worldMatrix)`), and §68's light axis rather than
+  asserted; a test builds the classic gluLookAt view matrix independently and compares all
+  sixteen elements, so `lookAt` produces exactly what `updateViewMatrix` inverts.
+- **The target is world-space, always.** It is the only contract under which "point the
+  camera at the player" is one call and under which the call keeps meaning the same thing
+  when the node is reparented onto a moving rig — §44's follow-rig and spring-arm case.
+- **Degenerate aims are refused, not repaired (§85).** `Node.lookAt` throws
+  `FourError("INVALID_SCENE_GRAPH")` — the code `Node.add` already uses for §85's
+  scene-graph rule — when the target coincides with the node's world position or when `up`
+  is zero, non-finite, or parallel to the aim (the top-down aim with the default +Y is
+  exactly this case, and wants an explicit `up` such as world −Z). Picking a fallback `up`
+  would silently rewrite the orientation the caller asked for; leaving the node unturned
+  would be indistinguishable from a frozen rig. The **math** primitive, by contrast,
+  validates nothing and leaves its quaternion untouched on degenerate input without firing
+  the hook — the layer split `Matrix4.setPerspective` already states.
+- **`lookAt` neither checks nor warns about §42 authority.** It is an ordinary _manual_
+  transform write, identical to `node.rotation.setFromAxisAngle(...)`, and §42's enforcement
+  is writer-side by design. Warning would make it the only self-policing write in the engine
+  and would fire on aiming a `"physics"`-owned body at its starting pose.
+- **§33 tier: `same-runtime`.** Pure quaternion arithmetic from exact inputs — bit-identical
+  across repeated calls and bit-idempotent on re-aim (both asserted with `toBe`) — but
+  `sqrt` on the path keeps the claim at §33's initial tier.
+
+#### Known / deferred
+
+- **§44/§47's camera rigs are still unshipped** (orbit, fly, first-person, trackball, follow,
+  spring arm, shake, path animation, physics attachment). `lookAt` is the primitive they will
+  be built on, not a substitute — `R-36`'s rig half and all of `PH-11` remain open.
+- **The examples still hand-roll their orientations.** `examples/first-3d-scene/main.ts`
+  aims its camera and sun with `setFromAxisAngle`; replacing them derives the quaternion
+  through `sqrt` where the current code uses `sin`/`cos`, which could move a pixel golden.
+  Deferred to a packet that can run the browser gate.
+- **Bundle cost**: +0.50 kB gzip in every bundle that carries `@four/scene` (measured A/B:
+  first-3d 30.80 → 31.30 against a 31.5 kB budget; ui-demo 36.23 → 36.73 against 37;
+  particles 28.20 → 28.70 against 29). All budgets pass; the headroom left is 0.20–0.30 kB
+  and a bump is proposed in `TODO.md`.
+
 ### 2026-08-09 — R-16 closed: §58 paints, fills and strokes; §50's family complete
 
 #### Added

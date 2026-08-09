@@ -17,6 +17,55 @@ import type { Vector3 } from "./vector3.js";
 const SLERP_LINEAR_THRESHOLD = 0.9995;
 
 /**
+ * Writes the rotation described by an **orthonormal, right-handed** basis into
+ * `out` and returns it, using Shepperd's method: pick the branch whose divisor
+ * is largest so the square root never operates on a value near zero.
+ *
+ * The nine scalars are the basis **columns** in `Matrix4`'s naming
+ * (`m<row><column>`), i.e. column 1 is `(m11, m21, m31)` — the image of local
+ * +X — column 2 the image of +Y, and column 3 the image of +Z.
+ *
+ * Module-internal and deliberately not re-exported from the package barrel: it
+ * is the one implementation of the matrix→quaternion conversion, shared by
+ * `Matrix4.decompose` (which normalizes its columns first) and by
+ * {@link Quaternion.setFromLookDirection} (which builds its columns from cross
+ * products). Nothing here validates orthonormality — a caller that passes a
+ * sheared or scaled basis gets a meaningless rotation, exactly as it did when
+ * each caller carried its own copy.
+ *
+ * `out` is written through a single `set(...)`, so its change hook fires
+ * exactly once.
+ */
+export function setQuaternionFromBasis(
+  out: Quaternion,
+  m11: number,
+  m21: number,
+  m31: number,
+  m12: number,
+  m22: number,
+  m32: number,
+  m13: number,
+  m23: number,
+  m33: number,
+): Quaternion {
+  const trace = m11 + m22 + m33;
+  if (trace > 0) {
+    const s = 0.5 / Math.sqrt(trace + 1);
+    return out.set((m32 - m23) * s, (m13 - m31) * s, (m21 - m12) * s, 0.25 / s);
+  }
+  if (m11 > m22 && m11 > m33) {
+    const s = 2 * Math.sqrt(1 + m11 - m22 - m33);
+    return out.set(0.25 * s, (m12 + m21) / s, (m13 + m31) / s, (m32 - m23) / s);
+  }
+  if (m22 > m33) {
+    const s = 2 * Math.sqrt(1 + m22 - m11 - m33);
+    return out.set((m12 + m21) / s, 0.25 * s, (m23 + m32) / s, (m13 - m31) / s);
+  }
+  const s = 2 * Math.sqrt(1 + m33 - m11 - m22);
+  return out.set((m13 + m31) / s, (m23 + m32) / s, 0.25 * s, (m21 - m12) / s);
+}
+
+/**
  * Mutable unit quaternion `(x, y, z, w)` representing a 3D rotation (§7b). The
  * world is right-handed with +Y up (§7a) and **every angle is radians**;
  * quaternions compose with the Hamilton product, so `a.multiply(b)` yields the
@@ -125,6 +174,85 @@ export class Quaternion {
       this.w = 1;
     }
     this.onChanged?.();
+    return this;
+  }
+
+  /**
+   * Sets this quaternion to the rotation that aims the **−Z axis** along
+   * `direction` while keeping the +Y axis as close to `up` as the aim allows
+   * (§7a: right-handed, +Y up; §7b: radians and mutable math types).
+   *
+   * −Z is the engine's one "forward" for every node, not a camera special case:
+   * `Matrix4.setPerspective` projects down −Z (plan D8), `Camera.viewMatrix` is
+   * the inverse of a world matrix built on that basis, and a directional or
+   * spot light shines along its node's −Z (§68). One convention means a rig
+   * aims a camera and a light with the same call.
+   *
+   * Neither argument need be unit length and `up` need not be perpendicular to
+   * `direction`: the basis is built as
+   *
+   * ```text
+   * zAxis = normalize(−direction)      // local +Z, opposite the aim
+   * xAxis = normalize(up × zAxis)      // local +X
+   * yAxis = zAxis × xAxis              // local +Y, already unit
+   * ```
+   *
+   * and converted with Shepperd's method, so the result is a unit quaternion
+   * built from an exactly orthonormal basis. Allocates nothing — the basis
+   * lives in plain scalars — and writes through a single `set(...)`, so the
+   * change hook fires exactly once.
+   *
+   * ## Degenerate input leaves this quaternion **unchanged**
+   *
+   * A zero-length `direction`, a zero-length `up`, an `up` parallel to
+   * `direction`, or a non-finite component of either leaves every component
+   * alone and does **not** fire the change hook: there is no rotation those
+   * inputs describe, and the two rejected alternatives are both worse.
+   * Resetting to the identity substitutes a different, plausible-looking
+   * orientation for the failure (the reasoning `Matrix4.invert` already gives
+   * for refusing a singular matrix); picking a fallback `up` silently rewrites
+   * the aim the caller asked for. Leaving the previous aim in place is the only
+   * outcome that neither invents nor destroys information.
+   *
+   * The math package validates nothing (see `Matrix4.setPerspective`), so this
+   * method reports nothing either. `Node.lookAt` in `@four/scene` is the policy
+   * layer: it makes the same two tests on its own inputs and throws, so a scene
+   * node never reaches the silent branch.
+   */
+  setFromLookDirection(direction: Vector3, up: Vector3): this {
+    // Local +Z is opposite the aim: the frame looks down its own −Z.
+    const zx = -direction.x;
+    const zy = -direction.y;
+    const zz = -direction.z;
+    const zLengthSquared = zx * zx + zy * zy + zz * zz;
+    if (!(zLengthSquared > 0)) {
+      return this;
+    }
+    const inverseZLength = 1 / Math.sqrt(zLengthSquared);
+    const m13 = zx * inverseZLength;
+    const m23 = zy * inverseZLength;
+    const m33 = zz * inverseZLength;
+
+    // xAxis = up × zAxis, zero exactly when `up` is parallel to the aim.
+    const xx = up.y * m33 - up.z * m23;
+    const xy = up.z * m13 - up.x * m33;
+    const xz = up.x * m23 - up.y * m13;
+    const xLengthSquared = xx * xx + xy * xy + xz * xz;
+    if (!(xLengthSquared > 0)) {
+      return this;
+    }
+    const inverseXLength = 1 / Math.sqrt(xLengthSquared);
+    const m11 = xx * inverseXLength;
+    const m21 = xy * inverseXLength;
+    const m31 = xz * inverseXLength;
+
+    // yAxis = zAxis × xAxis; unit already, both operands being unit and
+    // perpendicular.
+    const m12 = m23 * m31 - m33 * m21;
+    const m22 = m33 * m11 - m13 * m31;
+    const m32 = m13 * m21 - m23 * m11;
+
+    setQuaternionFromBasis(this, m11, m21, m31, m12, m22, m32, m13, m23, m33);
     return this;
   }
 

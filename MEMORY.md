@@ -28,6 +28,71 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-36 `lookAt` and orientation helpers (helper tier).** Decisions worth
+  keeping:
+  - **−Z is every node's forward, not a camera's privilege.** `Node.lookAt` /
+    `Node.getWorldDirection` therefore live on `Node`, and one call aims a camera, a
+    `DirectionalLight`, or a `SpotLight`. The claim was _verified_ against three existing
+    sites (`Matrix4.setPerspective`, `Camera.updateViewMatrix = inverse(worldMatrix)`,
+    §68's light axis) and is pinned by a test that builds the classic gluLookAt matrix
+    independently and compares all sixteen elements — so `lookAt` produces exactly what
+    `updateViewMatrix` inverts, by test rather than by assertion.
+  - **`lookAt`'s target is world-space, always.** Under a parent the local rotation is
+    `conjugate(parentWorldRotation) · worldRotation`, the parent's rotation read via
+    `Matrix4.decompose` of its already-resolved world matrix. It is the only contract
+    under which the call survives reparenting onto a moving rig, which is §44's whole
+    follow-rig case. Non-uniform parent scale inherits `decompose`'s closest-rotation
+    limitation; zero parent scale decomposes to identity, so the aim lands in world terms.
+  - **The validation split follows the layer, not the call.** `@four/math` validates
+    nothing (the rule `Matrix4.setPerspective` already states): `setFromLookDirection`
+    leaves its quaternion **untouched and unhooked** on a zero/NaN direction or a
+    zero/parallel/NaN up — `Matrix4.invert`'s "refusing beats substituting a
+    plausible-looking wrong answer". `@four/scene` is the policy layer: `Node.lookAt`
+    makes the _same two tests_ on its own inputs and throws
+    `FourError("INVALID_SCENE_GRAPH")`, so a scene node never reaches the silent branch.
+    The top-down aim with the default +Y up is a **throw**, not a fallback roll — a
+    silent fallback rewrites the orientation the caller asked for and hides the mistake
+    (WP-3.3's no-silent-rewrites rule).
+  - **`Node.lookAt` does not check §42 authority, and that is the consistent answer, not
+    a shortcut.** Enforcement is writer-side everywhere in the engine
+    (`warnAuthorityConflict` is called by `MotionSystem`/`KinematicSystem`/`Tween`/
+    `AnimationMixer`/`AnimationController`, never by `Transform`), and **direct writes
+    never warn** — `node.rotation.setFromAxisAngle(...)` on a `"physics"` node is silent
+    today. `lookAt` _is_ the `"manual"` authority. Warning would make it the only
+    self-policing write in the engine and would fire on aiming a physics-owned body at
+    its starting pose. Pinned by two tests (helper silent under three foreign
+    authorities; the _system_ warns once).
+  - **One Shepperd implementation.** `setQuaternionFromBasis` (module-internal to
+    `quaternion.ts`, deliberately not in the barrel) is now shared by `Matrix4.decompose`
+    and `setFromLookDirection`. The arithmetic moved verbatim, so every determinism
+    golden is bit-identical — and `matrix4.ts` coverage rose 98.58% → **100%** because
+    the look-at tests reach a branch its own suite never did. **Gotcha for reviewers:**
+    any future edit to that function is a change to the physics/animation decomposition
+    path; the `tests/determinism/*` goldens are the guard.
+  - **`getWorldDirection` was hoisted, not duplicated.** `DirectionalLight` and
+    `SpotLight` carried two byte-identical copies; both were deleted and the doc
+    references retargeted to `Node.getWorldDirection`. `@four/render`'s structural light
+    predicates are unaffected — both are gated on the brand _before_ they probe for the
+    method, so every node now carrying `getWorldDirection` cannot misclassify.
+  - **Bundle gotcha: class methods on `Node`/`Quaternion` are never tree-shaken**, so a
+    helper on either is paid by _every_ bundle whether or not it is called. R-36 measured
+    **+0.50 kB gzip** across first-3d (30.80 → 31.30 / 31.5), ui-demo
+    (36.23 → 36.73 / 37) and particles-demo (28.20 → 28.70 / 29) in a same-tree A/B. All
+    pass; 0.20–0.30 kB of headroom is left, and the only lever that would have avoided
+    the cost — a free function `lookAt(node, target, up?)` — is exactly the ergonomics
+    R-36 exists to fix.
+  - **PH-11 is not this packet, and the reason is §42.** §12 calls it a look-at
+    _constraint_; §42 gives constraints the `"constraint"` authority, which still has no
+    producing system. A `faceTo` on `KinematicController` would write as `"kinematic"`
+    and pre-empt that design, and `steering.ts` has no node access by construction (pure
+    acceleration functions, no scratch) and should keep it. Named seam: a
+    `LookAtConstraint` component + a system at `PRIORITY_CONSTRAINTS` (empty today,
+    PH-21) calling `setFromLookDirection` per step under `"constraint"` authority.
+  - **Multi-agent note:** `pnpm lint`, `pnpm run docs` and repo-wide `prettier --check .`
+    can all be red from a _sibling's_ in-flight work while the tree is shared.
+    Scope-restricted runs are the honest gate when a sibling holds the tree:
+    `eslint <my paths>`, `typedoc --entryPoints <my packages>`,
+    `prettier --check <my paths>`.
 - **2026-08-09 — R-16 §58 paints, fills and strokes.** Decisions worth keeping:
   - **Two colours reach one draw as per-vertex colour**, not as two materials. §57's
     pipelines already multiply `vertexColors` (`R-19`), so a fill and a stroke share one

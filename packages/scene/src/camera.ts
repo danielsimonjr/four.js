@@ -35,6 +35,18 @@
  * into camera space, which is what a renderer multiplies its model matrices by.
  * Cameras look down their own −Z with +Y up (§7a, D8).
  *
+ * ## Aiming a camera (R-36, 2026-08-09)
+ *
+ * {@link Node.lookAt} is the orientation helper §44/§47 ask for, and it lives
+ * on `Node` rather than here because −Z is every node's forward, not a camera's
+ * privilege — the same call aims a directional or spot light (§68). It writes
+ * exactly the orientation {@link Camera.updateViewMatrix} inverts, so
+ * `camera.lookAt(target); camera.updateViewMatrix();` yields the classic
+ * look-at view matrix. {@link Node.getWorldDirection} reads the aim back.
+ * §44's *rigs* — orbit, fly, first-person, trackball, follow, spring arm,
+ * shake — are still unshipped; `lookAt` is the primitive they will be built on,
+ * not a substitute for them.
+ *
  * ## Explicit recomputation (decision, WP-3.1)
  *
  * Mutating a projection parameter — `camera.fieldOfView = 1.2`, `camera.aspect

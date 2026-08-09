@@ -82,8 +82,8 @@
  * can only catch it by test.
  */
 
-import { Matrix4, Vector3 } from "@four/math";
-import type { ColorRGB } from "@four/math";
+import { Matrix4 } from "@four/math";
+import type { ColorRGB, Vector3 } from "@four/math";
 
 import { Node } from "./node.js";
 import { resolveWorldTransform } from "./world-transforms.js";
@@ -125,7 +125,7 @@ export type { ColorRGB } from "@four/math";
  * ## The volume, and why it is authored rather than fitted
  *
  * A directional light has no position as far as *lighting* is concerned (§68 —
- * see {@link DirectionalLight.getWorldDirection}), but a shadow map is a
+ * see {@link Node.getWorldDirection}), but a shadow map is a
  * rendering of a bounded volume and something has to bound it. This tier takes
  * the volume from the light's own node: the map is rendered from the light's
  * **world position**, looking along its **−Z axis**, through an orthographic
@@ -553,7 +553,7 @@ export class DirectionalLight extends Node {
    * backend gets its own overload with the packet that ships it.
    *
    * World transforms are resolved on demand, exactly as
-   * {@link DirectionalLight.getWorldDirection} resolves them. A degenerate
+   * {@link Node.getWorldDirection} resolves them. A degenerate
    * light — zero scale up the chain — has a **singular** world matrix, and
    * `Matrix4.invert` documents that it leaves such a matrix unchanged rather
    * than producing `NaN`: the result is a finite matrix describing a collapsed
@@ -576,30 +576,6 @@ export class DirectionalLight extends Node {
         shadow.far,
       )
       .multiply(shadowViewScratch);
-  }
-
-  /**
-   * Writes the world-space unit vector this light travels along — the node's
-   * −Z axis — into `out` and returns it (§7b's `out`-parameter convention).
-   *
-   * World transforms are resolved on demand (`resolveWorldTransform(this)`),
-   * exactly as `Camera.updateViewMatrix` resolves — O(depth), version-cached,
-   * so the render path's prior resolve pass makes this a few comparisons.
-   * The −Z basis column is read straight out of the world matrix and
-   * normalized, so ancestor scale does not stretch the direction.
-   *
-   * A degenerate light — zero scale somewhere up the chain — yields the zero
-   * vector rather than `NaN` (`Vector3.normalize`'s documented zero-length
-   * behaviour), and a zero direction lights nothing: like a degenerate
-   * camera (§47), it poisons nothing downstream and raises no error on a
-   * per-frame path.
-   */
-  getWorldDirection(out: Vector3): Vector3 {
-    const elements = resolveWorldTransform(this).elements;
-    // Column-major Matrix4 (§7b): column 2 — elements 8, 9, 10 — is the
-    // node's local +Z axis in world space; the light travels along −Z.
-    out.set(-elements[8], -elements[9], -elements[10]);
-    return out.normalize();
   }
 }
 
@@ -716,7 +692,7 @@ export abstract class PunctualLight extends Node {
    * matrix.
    *
    * World transforms are resolved on demand, exactly as
-   * {@link DirectionalLight.getWorldDirection} resolves them: O(depth),
+   * {@link Node.getWorldDirection} resolves them: O(depth),
    * version-cached, so the render path's prior resolve pass makes this a few
    * comparisons. Unlike a direction, a position needs no normalization and has
    * no degenerate case — a light under a zero scale still sits somewhere.
@@ -819,22 +795,5 @@ export class SpotLight extends PunctualLight {
       "outerConeAngle",
       options.outerConeAngle ?? Math.PI / 4,
     );
-  }
-
-  /**
-   * Writes the world-space unit vector this light's cone points along — the
-   * node's −Z axis — into `out` and returns it.
-   *
-   * Identical in contract, convention, and degenerate behaviour to
-   * {@link DirectionalLight.getWorldDirection}: the same axis, so the same rig
-   * aims either kind, and a zero-scaled ancestor yields the zero vector rather
-   * than `NaN`. A zero axis makes `cos θ` zero for every surface, which the
-   * cone term then resolves against the authored angles — nothing downstream
-   * is poisoned.
-   */
-  getWorldDirection(out: Vector3): Vector3 {
-    const elements = resolveWorldTransform(this).elements;
-    out.set(-elements[8], -elements[9], -elements[10]);
-    return out.normalize();
   }
 }

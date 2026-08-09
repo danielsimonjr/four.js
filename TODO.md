@@ -34,6 +34,28 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-36 DONE 2026-08-09 (helper tier)** — `Node.lookAt(target, up?)` +
+      `Node.getWorldDirection(out)` over `Quaternion.setFromLookDirection`; −Z confirmed
+      as every node's forward, world-space target with the parent rotation divided out,
+      §85 refusals, `same-runtime` determinism. `getWorldDirection` hoisted off the two
+      light classes; `Matrix4.decompose` now shares one Shepperd implementation (goldens
+      bit-identical, `matrix4.ts` to 100%). 36 tests. **Rig half still open.**
+- [ ] **§44/§47 camera rigs (R-36 rig half + PH-11)** — orbit, fly, first-person,
+      trackball, follow target, spring arm, shake/impulse, path animation, physics
+      attachment; plus §12's orbit motion and character controllers. Build on
+      `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
+      which has no producing system: seam is a `LookAtConstraint` component + a system
+      at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
+- [ ] **Examples still hand-roll their orientations (R-36 follow-up)** —
+      `examples/first-3d-scene/main.ts:151` (camera pitch) and `:219-220` (sun yaw∘pitch)
+      are the code `lookAt` exists to replace. Left in place deliberately: `lookAt`
+      derives the quaternion through `sqrt` where these use `sin`/`cos`, so the swap
+      could move a pixel golden. Needs a packet that can run `pnpm test:browser`.
+- [ ] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — first-3d
+      31.30/31.5, ui-demo 36.73/37, particles-demo 28.70/29 (each +0.50 kB gzip;
+      `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed
+      bumps, owner call: first-3d → 32 kB, ui-demo → 37.5 kB, particles-demo → 29.5 kB.
+      The concurrent render batching work is consuming the same headroom.
 - [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
       `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
       fallback, dashes with phase offset) over `expandStroke` in §52's tessellation

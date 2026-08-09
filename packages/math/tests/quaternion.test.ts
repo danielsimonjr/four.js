@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   constructionCount,
+  Matrix4,
   Quaternion,
   resetConstructionCount,
   Vector3,
@@ -467,6 +468,165 @@ describe("Quaternion.rotateVector3", () => {
     expect(q.rotateVector3(shared, shared)).toBe(shared);
     expectVectorCloseTo(shared, separate.x, separate.y, separate.z);
     expectVectorCloseTo(shared, 3, 2, -1);
+  });
+});
+
+describe("Quaternion.setFromLookDirection (§44/§47, R-36)", () => {
+  const FORWARD = new Vector3(0, 0, -1);
+
+  /** Where a rotation sends the engine's forward axis (−Z, §7a/D8). */
+  function facing(q: Quaternion): Vector3 {
+    return rotated(q, FORWARD);
+  }
+
+  it("leaves the identity alone when already aimed down −Z", () => {
+    const q = new Quaternion(1, 2, 3, 4);
+    expect(q.setFromLookDirection(FORWARD, AXIS_Y)).toBe(q);
+    expectQuaternionCloseTo(q, 0, 0, 0, 1);
+  });
+
+  it("aims −Z along the direction and keeps +Y near up, for each axis", () => {
+    const cases: readonly (readonly [number, number, number])[] = [
+      [1, 0, 0],
+      [-1, 0, 0],
+      [0, 0, 1],
+      [0, 0, -1],
+      [3, -4, 5],
+      [-2, 7, -1],
+    ];
+    const q = new Quaternion();
+    for (const [x, y, z] of cases) {
+      const direction = new Vector3(x, y, z);
+      q.setFromLookDirection(direction, AXIS_Y);
+
+      const unit = direction.clone().normalize();
+      expectVectorCloseTo(facing(q), unit.x, unit.y, unit.z);
+      expect(length(q)).toBeCloseTo(1, 12);
+
+      // +Y stays on the same side of the aim as the reference up: the local
+      // up has a non-negative dot with world +Y for any aim that is not
+      // straight up or down.
+      expect(rotated(q, AXIS_Y).dot(AXIS_Y)).toBeGreaterThan(0);
+      // Local +X is perpendicular to world up when up is world +Y.
+      expect(rotated(q, AXIS_X).dot(AXIS_Y)).toBeCloseTo(0, 12);
+    }
+  });
+
+  it("produces a right-handed orthonormal frame", () => {
+    const q = new Quaternion().setFromLookDirection(
+      new Vector3(1, 2, -3),
+      new Vector3(0.2, 1, 0.1),
+    );
+    const x = rotated(q, AXIS_X);
+    const y = rotated(q, AXIS_Y);
+    const z = rotated(q, AXIS_Z);
+    expect(x.dot(y)).toBeCloseTo(0, 12);
+    expect(y.dot(z)).toBeCloseTo(0, 12);
+    expect(z.dot(x)).toBeCloseTo(0, 12);
+    const cross = x.clone().cross(y);
+    expectVectorCloseTo(cross, z.x, z.y, z.z);
+  });
+
+  it("ignores the lengths of direction and up", () => {
+    const scaled = new Quaternion().setFromLookDirection(
+      new Vector3(300, -400, 500),
+      new Vector3(0, 17, 0),
+    );
+    const unit = new Quaternion().setFromLookDirection(
+      new Vector3(3, -4, 5),
+      AXIS_Y,
+    );
+    expectQuaternionCloseTo(scaled, unit.x, unit.y, unit.z, unit.w);
+  });
+
+  it("accepts an up that is not perpendicular to the direction", () => {
+    const tilted = new Quaternion().setFromLookDirection(
+      FORWARD,
+      new Vector3(0, 1, -5),
+    );
+    // The up hint's component along the aim is projected out, so the frame is
+    // the same one world +Y gives.
+    expectQuaternionCloseTo(tilted, 0, 0, 0, 1);
+  });
+
+  it("hits every Shepperd branch and stays unit length", () => {
+    // Each aim/up pair selects a different largest-divisor branch.
+    const pairs: readonly (readonly [Vector3, Vector3])[] = [
+      [FORWARD, AXIS_Y], // trace > 0
+      [new Vector3(0, 0, 1), AXIS_Y], // m11 branch (180° about Y)
+      [new Vector3(0, 0, 1), new Vector3(0, -1, 0)], // m22 branch
+      [new Vector3(0, 1, 0), new Vector3(0, 0, 1)], // m33 branch
+    ];
+    for (const [direction, up] of pairs) {
+      const q = new Quaternion().setFromLookDirection(direction, up);
+      expect(length(q)).toBeCloseTo(1, 12);
+      const unit = direction.clone().normalize();
+      expectVectorCloseTo(facing(q), unit.x, unit.y, unit.z);
+    }
+  });
+
+  it("agrees with Matrix4.decompose of the composed transform", () => {
+    const q = new Quaternion().setFromLookDirection(
+      new Vector3(2, -1, 4),
+      new Vector3(0, 1, 0),
+    );
+    const composed = new Matrix4().compose(
+      new Vector3(5, 6, 7),
+      q,
+      new Vector3(1, 1, 1),
+      new Vector3(),
+    );
+    const back = new Quaternion();
+    composed.decompose(new Vector3(), back, new Vector3());
+    expectQuaternionCloseTo(back, q.x, q.y, q.z, q.w);
+  });
+
+  it("leaves the quaternion untouched for a zero or non-finite direction", () => {
+    for (const bad of [
+      new Vector3(0, 0, 0),
+      new Vector3(Number.NaN, 0, 0),
+      new Vector3(0, Number.POSITIVE_INFINITY, 0),
+    ]) {
+      const q = new Quaternion(0.1, 0.2, 0.3, 0.4);
+      let calls = 0;
+      q.onChanged = (): void => {
+        calls += 1;
+      };
+      expect(q.setFromLookDirection(bad, AXIS_Y)).toBe(q);
+      expect([q.x, q.y, q.z, q.w]).toEqual([0.1, 0.2, 0.3, 0.4]);
+      expect(calls).toBe(0);
+    }
+  });
+
+  it("leaves the quaternion untouched for a zero, parallel, or NaN up", () => {
+    for (const bad of [
+      new Vector3(0, 0, 0),
+      new Vector3(0, 0, -1),
+      new Vector3(0, 0, 2),
+      new Vector3(Number.NaN, 1, 0),
+    ]) {
+      const q = new Quaternion(0.1, 0.2, 0.3, 0.4);
+      let calls = 0;
+      q.onChanged = (): void => {
+        calls += 1;
+      };
+      expect(q.setFromLookDirection(FORWARD, bad)).toBe(q);
+      expect([q.x, q.y, q.z, q.w]).toEqual([0.1, 0.2, 0.3, 0.4]);
+      expect(calls).toBe(0);
+    }
+  });
+
+  it("fires the change hook exactly once and allocates nothing", () => {
+    const q = new Quaternion();
+    let calls = 0;
+    q.onChanged = (): void => {
+      calls += 1;
+    };
+    const direction = new Vector3(1, 2, 3);
+    resetConstructionCount();
+    q.setFromLookDirection(direction, AXIS_Y);
+    expect(constructionCount()).toBe(0);
+    expect(calls).toBe(1);
   });
 });
 
