@@ -7,6 +7,13 @@
     "test-only": 0,
     "orphan": 0,
     "test": 229,
+  "totalFiles": 446,
+  "byDisposition": {
+    "reachable": 152,
+    "build-entry": 48,
+    "test-only": 0,
+    "orphan": 0,
+    "test": 224,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -20,12 +27,19 @@
   },
   "byPackage": {
     "(root)": 93,
+    "src": 200,
+    "tests": 224,
+    "tools": 1
+  },
+  "byPackage": {
+    "(root)": 89,
     "@four/animation": 25,
     "@four/assets": 7,
     "@four/core": 20,
     "@four/diagnostics": 17,
     "four": 30,
     "@four/geometry": 14,
+    "@four/geometry": 12,
     "@four/input": 12,
     "@four/materials": 9,
     "@four/math": 14,
@@ -38,6 +52,7 @@
     "@four/render-canvas": 2,
     "@four/render-svg": 2,
     "@four/render-webgl": 14,
+    "@four/render-webgl": 13,
     "@four/render-webgpu": 2,
     "@four/render": 26,
     "@four/scene": 24,
@@ -808,6 +823,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 1544
+      "loc": 1448
     },
     {
       "file": "packages/four/src/scene.ts",
@@ -857,6 +873,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 1561
+      "loc": 1555
     },
     {
       "file": "packages/four/tests/smoke.test.ts",
@@ -885,6 +902,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 2135
+      "loc": 47
     },
     {
       "file": "packages/geometry/src/primitive-support.ts",
@@ -1991,6 +2009,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 1985
+      "loc": 1689
     },
     {
       "file": "packages/render-webgl/src/gl-render-target.ts",
@@ -2014,6 +2033,13 @@
       "loc": 600
     },
     {
+      "file": "packages/render-webgl/src/gl-standard.ts",
+      "package": "@four/render-webgl",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 558
+    },
+    {
       "file": "packages/render-webgl/src/gl-texture.ts",
       "package": "@four/render-webgl",
       "area": "src",
@@ -2026,6 +2052,7 @@
       "area": "src",
       "disposition": "build-entry",
       "loc": 73
+      "loc": 69
     },
     {
       "file": "packages/render-webgl/src/register.ts",
@@ -2040,6 +2067,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 2330
+      "loc": 2072
     },
     {
       "file": "packages/render-webgl/tests/register.test.ts",
@@ -2061,6 +2089,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 8487
+      "loc": 7870
     },
     {
       "file": "packages/render-webgpu/src/index.ts",
@@ -2089,6 +2118,7 @@
       "area": "src",
       "disposition": "build-entry",
       "loc": 127
+      "loc": 126
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -2096,6 +2126,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 669
+      "loc": 540
     },
     {
       "file": "packages/render/src/particles.ts",
@@ -2117,6 +2148,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 1003
+      "loc": 958
     },
     {
       "file": "packages/render/src/render-target.ts",
@@ -2124,6 +2156,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 630
+      "loc": 552
     },
     {
       "file": "packages/render/src/renderable.ts",
@@ -2187,6 +2220,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 579
+      "loc": 454
     },
     {
       "file": "packages/render/tests/particles.test.ts",
@@ -2194,6 +2228,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 458
+      "loc": 438
     },
     {
       "file": "packages/render/tests/render-graph.test.ts",
@@ -2208,6 +2243,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 1037
+      "loc": 953
     },
     {
       "file": "packages/render/tests/render-target.test.ts",
@@ -2215,6 +2251,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 369
+      "loc": 307
     },
     {
       "file": "packages/render/tests/renderer-registry.test.ts",
@@ -2285,6 +2322,7 @@
       "area": "src",
       "disposition": "build-entry",
       "loc": 75
+      "loc": 73
     },
     {
       "file": "packages/scene/src/interpolation.ts",
@@ -2306,6 +2344,7 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 841
+      "loc": 449
     },
     {
       "file": "packages/scene/src/node.ts",
@@ -2383,6 +2422,7 @@
       "area": "tests",
       "disposition": "test",
       "loc": 577
+      "loc": 325
     },
     {
       "file": "packages/scene/tests/node.test.ts",
