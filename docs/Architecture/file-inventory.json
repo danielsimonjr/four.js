@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-09",
-  "totalFiles": 453,
+  "totalFiles": 462,
   "byDisposition": {
-    "reachable": 154,
+    "reachable": 156,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 229,
+    "test": 236,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -14,18 +14,18 @@
   "byArea": {
     "examples": 9,
     "config": 12,
-    "src": 202,
-    "tests": 229,
+    "src": 204,
+    "tests": 236,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 93,
+    "(root)": 97,
     "@four/animation": 25,
     "@four/assets": 7,
     "@four/core": 20,
     "@four/diagnostics": 17,
-    "four": 30,
-    "@four/geometry": 14,
+    "four": 31,
+    "@four/geometry": 16,
     "@four/input": 12,
     "@four/materials": 9,
     "@four/math": 14,
@@ -39,7 +39,7 @@
     "@four/render-svg": 2,
     "@four/render-webgl": 14,
     "@four/render-webgpu": 2,
-    "@four/render": 26,
+    "@four/render": 28,
     "@four/scene": 24,
     "@four/serialization": 9,
     "@four/text": 6,
@@ -702,7 +702,7 @@
       "package": "four",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 78
+      "loc": 88
     },
     {
       "file": "packages/four/src/input.ts",
@@ -807,7 +807,7 @@
       "package": "four",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1544
+      "loc": 2155
     },
     {
       "file": "packages/four/src/scene.ts",
@@ -859,6 +859,13 @@
       "loc": 1561
     },
     {
+      "file": "packages/four/tests/shape-serializers.test.ts",
+      "package": "four",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 531
+    },
+    {
       "file": "packages/four/tests/smoke.test.ts",
       "package": "four",
       "area": "tests",
@@ -877,14 +884,14 @@
       "package": "@four/geometry",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 66
+      "loc": 72
     },
     {
       "file": "packages/geometry/src/path.ts",
       "package": "@four/geometry",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2135
+      "loc": 2147
     },
     {
       "file": "packages/geometry/src/primitive-support.ts",
@@ -913,6 +920,13 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 112
+    },
+    {
+      "file": "packages/geometry/src/svg-path.ts",
+      "package": "@four/geometry",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 1222
     },
     {
       "file": "packages/geometry/src/tessellation.ts",
@@ -955,6 +969,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 10
+    },
+    {
+      "file": "packages/geometry/tests/svg-path.test.ts",
+      "package": "@four/geometry",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 791
     },
     {
       "file": "packages/geometry/tests/tessellation.test.ts",
@@ -2088,7 +2109,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 127
+      "loc": 151
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -2152,6 +2173,13 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 111
+    },
+    {
+      "file": "packages/render/src/shape.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 1354
     },
     {
       "file": "packages/render/src/sprite.ts",
@@ -2236,6 +2264,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 161
+    },
+    {
+      "file": "packages/render/tests/shape.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 669
     },
     {
       "file": "packages/render/tests/smoke.test.ts",
@@ -2868,6 +2903,13 @@
       "loc": 476
     },
     {
+      "file": "tests/determinism/helpers/svg-path-scenario.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 385
+    },
+    {
       "file": "tests/determinism/helpers/tessellation-scenario.ts",
       "package": "(root)",
       "area": "tests",
@@ -2936,6 +2978,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 349
+    },
+    {
+      "file": "tests/determinism/svg-path.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 270
     },
     {
       "file": "tests/determinism/tessellation.test.ts",
@@ -3169,6 +3218,13 @@
       "loc": 589
     },
     {
+      "file": "tests/integration/shape-rendering.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 242
+    },
+    {
       "file": "tests/integration/sprite-frames.test.ts",
       "package": "(root)",
       "area": "tests",
@@ -3181,6 +3237,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 470
+    },
+    {
+      "file": "tests/integration/svg-path-pipeline.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 194
     },
     {
       "file": "tests/integration/units-display.test.ts",
