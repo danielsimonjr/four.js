@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-09"
-  totalFiles: 206
+  totalFiles: 211
   totalModules: 24
-  totalExports: 1928
+  totalExports: 1952
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -1195,6 +1195,12 @@ modules:
           imports:
             - EventEmitter
           reExport: true
+        - file: ./space.js
+          imports:
+            - DEFAULT_SPACE_MODE
+            - SPACE_MODES
+            - isSimulationSpaceMode
+          reExport: true
         - file: ./units.js
           imports:
             - SI_UNITS
@@ -1253,6 +1259,11 @@ modules:
             - Unsubscribe
           reExport: true
           typeOnly: true
+        - file: ./space.js
+          imports:
+            - SpaceMode
+          reExport: true
+          typeOnly: true
         - file: ./units.js
           imports:
             - AngleUnit
@@ -1285,6 +1296,9 @@ modules:
         - FourError
         - isFourError
         - EventEmitter
+        - DEFAULT_SPACE_MODE
+        - SPACE_MODES
+        - isSimulationSpaceMode
         - SI_UNITS
         - angleFromDisplay
         - angleToDisplay
@@ -1318,6 +1332,7 @@ modules:
         - FourErrorOptions
         - EventListener
         - Unsubscribe
+        - SpaceMode
         - AngleUnit
         - LengthUnit
         - MassUnit
@@ -1341,6 +1356,9 @@ modules:
         - FourError
         - isFourError
         - EventEmitter
+        - DEFAULT_SPACE_MODE
+        - SPACE_MODES
+        - isSimulationSpaceMode
         - SI_UNITS
         - angleFromDisplay
         - angleToDisplay
@@ -1373,6 +1391,7 @@ modules:
         - FourErrorOptions
         - EventListener
         - Unsubscribe
+        - SpaceMode
         - AngleUnit
         - LengthUnit
         - MassUnit
@@ -1404,6 +1423,21 @@ modules:
         - SeededRandom
       classes:
         - SeededRandom
+    packages/core/src/space.ts:
+      description: §8 *Space Modes* — the vocabulary, and the one rule §8 states (PH-12,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - DEFAULT_SPACE_MODE
+        - SPACE_MODES
+        - isSimulationSpaceMode
+      functions:
+        - isSimulationSpaceMode
+      constants:
+        - DEFAULT_SPACE_MODE
+        - SPACE_MODES
     packages/core/src/units.ts:
       description: The §40 unit system — **display and authoring conversion only** (§40, §98).
       externalDependencies: []
@@ -3908,8 +3942,27 @@ modules:
         - linearToSrgbRGBA
         - parseColor
         - parseColorRGB
+    packages/math/src/frustum.ts:
+      description: The six clip planes of a view-projection matrix (§87) — the primitive a
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./matrix4.js
+          imports:
+            - DepthRange
+            - Matrix4
+          typeOnly: true
+        - file: ./vector3.js
+          imports:
+            - Vector3
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - Frustum
+      classes:
+        - Frustum
     packages/math/src/index.ts:
-      description: Package entry point for @four/math (re-exports 20 symbols)
+      description: Package entry point for @four/math (re-exports 21 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3928,6 +3981,10 @@ modules:
             - srgbToLinear
             - srgbToLinearRGB
             - srgbToLinearRGBA
+          reExport: true
+        - file: ./frustum.js
+          imports:
+            - Frustum
           reExport: true
         - file: ./matrix3.js
           imports:
@@ -3977,6 +4034,7 @@ modules:
         - srgbToLinear
         - srgbToLinearRGB
         - srgbToLinearRGBA
+        - Frustum
         - Matrix3
         - Matrix4
         - Quaternion
@@ -3999,6 +4057,7 @@ modules:
         - srgbToLinear
         - srgbToLinearRGB
         - srgbToLinearRGBA
+        - Frustum
         - Matrix3
         - Matrix4
         - Quaternion
@@ -5510,6 +5569,7 @@ modules:
           imports:
             - DEFAULT_GRAVITY_Y
             - FourError
+            - SpaceMode
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -5593,6 +5653,38 @@ modules:
         - TriggerEvent
         - SleepEvent
         - JointBreakEvent
+    packages/physics/src/force-field.ts:
+      description: §27 force fields for rigid bodies, through §26's force API (PH-8,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./rigid-body.js
+          imports:
+            - RigidBody
+          typeOnly: true
+        - file: ./world.js
+          imports:
+            - PhysicsWorld
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Vector3
+        - package: "@four/motion"
+          directory: packages/motion
+          imports:
+            - PRIORITY_FORCES
+            - FixedUpdateContext
+            - SimulationSystem
+      exports:
+        - ForceFieldSystem
+      classes:
+        - ForceFieldSystem
+      interfaces:
+        - ForceField
+        - ForceFieldEntry
+        - ForceFieldSystemOptions
     packages/physics/src/index.ts:
       description: "`@four/physics` — the stable, solver-independent physics API (§101, Part IV)."
       externalDependencies: []
@@ -5628,6 +5720,10 @@ modules:
             - resolveRotation
             - resolveSleepingConfig
             - widenToVector3
+          reExport: true
+        - file: ./force-field.js
+          imports:
+            - ForceFieldSystem
           reExport: true
         - file: ./joints.js
           imports:
@@ -5791,6 +5887,14 @@ modules:
             - TriggerPhase
           reExport: true
           typeOnly: true
+        - file: ./force-field.js
+          imports:
+            - ForceField
+            - ForceFieldEntry
+            - ForceFieldSystemOptions
+            - ForceFieldUnits
+          reExport: true
+          typeOnly: true
         - file: ./joints.js
           imports:
             - HingeJointOptions
@@ -5901,6 +6005,7 @@ modules:
           typeOnly: true
         - file: ./world.js
           imports:
+            - ActiveBodyVisitor
             - BodyControlModeOptions
             - PhysicsSnapshot
             - PhysicsSnapshotConfiguration
@@ -5936,6 +6041,7 @@ modules:
         - resolveRotation
         - resolveSleepingConfig
         - widenToVector3
+        - ForceFieldSystem
         - BallJoint
         - FixedJoint
         - HingeJoint
@@ -6046,6 +6152,10 @@ modules:
         - SleepPhase
         - TriggerEvent
         - TriggerPhase
+        - ForceField
+        - ForceFieldEntry
+        - ForceFieldSystemOptions
+        - ForceFieldUnits
         - HingeJointOptions
         - JointBinding
         - JointBreakPayload
@@ -6118,6 +6228,7 @@ modules:
         - RotationInput
         - SleepingConfig
         - Vector3Input
+        - ActiveBodyVisitor
         - BodyControlModeOptions
         - PhysicsSnapshot
         - PhysicsSnapshotConfiguration
@@ -6150,6 +6261,7 @@ modules:
         - resolveRotation
         - resolveSleepingConfig
         - widenToVector3
+        - ForceFieldSystem
         - BallJoint
         - FixedJoint
         - HingeJoint
@@ -6259,6 +6371,10 @@ modules:
         - SleepPhase
         - TriggerEvent
         - TriggerPhase
+        - ForceField
+        - ForceFieldEntry
+        - ForceFieldSystemOptions
+        - ForceFieldUnits
         - HingeJointOptions
         - JointBinding
         - JointBreakPayload
@@ -6331,6 +6447,7 @@ modules:
         - RotationInput
         - SleepingConfig
         - Vector3Input
+        - ActiveBodyVisitor
         - BodyControlModeOptions
         - PhysicsSnapshot
         - PhysicsSnapshotConfiguration
@@ -6601,10 +6718,12 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - DEFAULT_SPACE_MODE
             - EventEmitter
             - FourError
             - Component
             - ComponentHost
+            - SpaceMode
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -6686,8 +6805,10 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - SPACE_MODES
             - FourError
             - JsonValue
+            - SpaceMode
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -7057,7 +7178,9 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - DEFAULT_SPACE_MODE
             - FourError
+            - isSimulationSpaceMode
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -7817,6 +7940,27 @@ modules:
         - RenderBatch
       constants:
         - DEFAULT_MAX_BATCH_VERTICES
+    packages/render/src/bounds.ts:
+      description: World-space bounds of a drawable (§87) — the substrate a frustum test needs.
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - BufferGeometry
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+            - Vector3
+      exports:
+        - computeWorldBoundingSphere
+      interfaces:
+        - BoundingSphere
+      functions:
+        - computeWorldBoundingSphere
     packages/render/src/effect-pass.ts:
       description: "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):"
       externalDependencies: []
@@ -7851,7 +7995,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 137 symbols)
+      description: Package entry point for @four/render (re-exports 142 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -7859,6 +8003,10 @@ modules:
           imports:
             - DEFAULT_MAX_BATCH_VERTICES
             - RenderBatcher
+          reExport: true
+        - file: ./bounds.js
+          imports:
+            - computeWorldBoundingSphere
           reExport: true
         - file: ./effect-pass.js
           imports:
@@ -7959,12 +8107,22 @@ modules:
           imports:
             - Texture
           reExport: true
+        - file: ./view-list.js
+          imports:
+            - buildViewRenderList
+            - sortRenderListByDepth
+          reExport: true
         - file: ./batch.js
           imports:
             - BatchableItem
             - BatchableMaterial
             - RenderBatch
             - RenderBatchOptions
+          reExport: true
+          typeOnly: true
+        - file: ./bounds.js
+          imports:
+            - BoundingSphere
           reExport: true
           typeOnly: true
         - file: ./effect-pass.js
@@ -8093,10 +8251,16 @@ modules:
             - TextureSource
           reExport: true
           typeOnly: true
+        - file: ./view-list.js
+          imports:
+            - ViewRenderListOptions
+          reExport: true
+          typeOnly: true
       workspaceDependencies: []
       exports:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
+        - computeWorldBoundingSphere
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -8154,11 +8318,14 @@ modules:
         - Star
         - Sprite
         - Texture
+        - buildViewRenderList
+        - sortRenderListByDepth
         - PACKAGE_NAME
         - BatchableItem
         - BatchableMaterial
         - RenderBatch
         - RenderBatchOptions
+        - BoundingSphere
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -8233,9 +8400,11 @@ modules:
         - SpriteFrame
         - SpriteOptions
         - TextureSource
+        - ViewRenderListOptions
       reExported:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
+        - computeWorldBoundingSphere
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -8293,10 +8462,13 @@ modules:
         - Star
         - Sprite
         - Texture
+        - buildViewRenderList
+        - sortRenderListByDepth
         - BatchableItem
         - BatchableMaterial
         - RenderBatch
         - RenderBatchOptions
+        - BoundingSphere
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -8371,6 +8543,7 @@ modules:
         - SpriteFrame
         - SpriteOptions
         - TextureSource
+        - ViewRenderListOptions
       constants:
         - PACKAGE_NAME
     packages/render/src/lights.ts:
@@ -8875,6 +9048,39 @@ modules:
         - Texture
       interfaces:
         - TextureSource
+    packages/render/src/view-list.ts:
+      description: Per-view render lists (§64 stages 2–3, §66 sort key 4; R-8) — the frame's one
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./bounds.js
+          imports:
+            - computeWorldBoundingSphere
+            - BoundingSphere
+        - file: ./render-list.js
+          imports:
+            - viewLayerMask
+            - RenderItem
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Frustum
+            - Matrix4
+            - Vector3
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - layersMatch
+            - Viewport
+      exports:
+        - buildViewRenderList
+        - sortRenderListByDepth
+      interfaces:
+        - ViewRenderListOptions
+      functions:
+        - buildViewRenderList
+        - sortRenderListByDepth
   packages/render-canvas:
     packages/render-canvas/src/index.ts:
       description: Entry point exporting 1 symbols
@@ -9515,6 +9721,7 @@ modules:
         - package: "@four/math"
           directory: packages/math
           imports:
+            - Frustum
             - Matrix4
         - package: "@four/render"
           directory: packages/render
@@ -9522,6 +9729,7 @@ modules:
             - RenderTarget
             - buildInterpolatedRenderList
             - buildRenderList
+            - buildViewRenderList
             - collectSceneLights
             - createSceneLights
             - isLitItem
@@ -9529,7 +9737,6 @@ modules:
             - isRenderTargetTexture
             - isSpriteItem
             - isStandardItem
-            - viewLayerMask
             - COLOR_GRADE_DEFAULTS
             - EffectRenderPass
             - RenderItem
@@ -11181,6 +11388,7 @@ dependencyGraph:
         - packages/core/src/index.ts
         - packages/core/src/json.ts
         - packages/core/src/random.ts
+        - packages/core/src/space.ts
         - packages/core/src/units.ts
         - packages/core/src/untrusted.ts
     - name: Packages/diagnostics
@@ -11255,6 +11463,7 @@ dependencyGraph:
       files:
         - packages/math/src/alloc-counter.ts
         - packages/math/src/color.ts
+        - packages/math/src/frustum.ts
         - packages/math/src/index.ts
         - packages/math/src/matrix3.ts
         - packages/math/src/matrix4.ts
@@ -11296,6 +11505,7 @@ dependencyGraph:
         - packages/physics/src/collider.ts
         - packages/physics/src/descriptors.ts
         - packages/physics/src/events.ts
+        - packages/physics/src/force-field.ts
         - packages/physics/src/index.ts
         - packages/physics/src/joints.ts
         - packages/physics/src/material.ts
@@ -11327,6 +11537,7 @@ dependencyGraph:
     - name: Packages/render
       files:
         - packages/render/src/batch.ts
+        - packages/render/src/bounds.ts
         - packages/render/src/effect-pass.ts
         - packages/render/src/index.ts
         - packages/render/src/lights.ts
@@ -11342,6 +11553,7 @@ dependencyGraph:
         - packages/render/src/sprite.ts
         - packages/render/src/statistics.ts
         - packages/render/src/texture.ts
+        - packages/render/src/view-list.ts
     - name: Packages/render-canvas
       files:
         - packages/render-canvas/src/index.ts
@@ -11407,18 +11619,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 206
+  totalTypeScriptFiles: 211
   totalModules: 24
-  totalLinesOfCode: 95385
-  totalExports: 1928
-  totalClasses: 129
-  totalInterfaces: 414
-  totalFunctions: 327
-  totalTypeGuards: 18
+  totalLinesOfCode: 97104
+  totalExports: 1952
+  totalClasses: 131
+  totalInterfaces: 419
+  totalFunctions: 331
+  totalTypeGuards: 19
   totalEnums: 0
-  totalConstants: 249
-  totalReExports: 1245
-  totalTypeOnlyImports: 235
+  totalConstants: 251
+  totalReExports: 1261
+  totalTypeOnlyImports: 243
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 2
   unusedFilesCount: 0
