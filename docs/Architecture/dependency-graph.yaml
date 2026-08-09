@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-09"
-  totalFiles: 204
+  totalFiles: 206
   totalModules: 24
-  totalExports: 1911
+  totalExports: 1928
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -4034,8 +4034,8 @@ modules:
             - noteConstruction
         - file: ./quaternion.js
           imports:
+            - setQuaternionFromBasis
             - Quaternion
-          typeOnly: true
         - file: ./vector3.js
           imports:
             - Vector3
@@ -4059,9 +4059,12 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - setQuaternionFromBasis
         - Quaternion
       classes:
         - Quaternion
+      functions:
+        - setQuaternionFromBasis
     packages/math/src/vector2.ts:
       description: Default tolerance for {@link Vector2.equalsApprox}. Chosen to sit a little
       externalDependencies: []
@@ -7769,6 +7772,51 @@ modules:
       constants:
         - PACKAGE_NAME
   packages/render:
+    packages/render/src/batch.ts:
+      description: §65 batching — merging consecutive compatible draws into one (R-9,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-list.js
+          imports:
+            - RenderItem
+            - SpriteRenderItem
+            - UnlitRenderItem
+          typeOnly: true
+        - file: ./sprite.js
+          imports:
+            - SpriteFrame
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - BufferGeometry
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - MaterialTexture
+            - SpriteMaterial
+            - UnlitMaterial
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGBA
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - ALL_LAYERS
+            - LayerMask
+      exports:
+        - DEFAULT_MAX_BATCH_VERTICES
+        - RenderBatcher
+      classes:
+        - RenderBatcher
+      interfaces:
+        - RenderBatchOptions
+        - RenderBatch
+      constants:
+        - DEFAULT_MAX_BATCH_VERTICES
     packages/render/src/effect-pass.ts:
       description: "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):"
       externalDependencies: []
@@ -7803,10 +7851,15 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 130 symbols)
+      description: Package entry point for @four/render (re-exports 137 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./batch.js
+          imports:
+            - DEFAULT_MAX_BATCH_VERTICES
+            - RenderBatcher
+          reExport: true
         - file: ./effect-pass.js
           imports:
             - COLOR_GRADE_DEFAULTS
@@ -7836,6 +7889,7 @@ modules:
           imports:
             - buildInterpolatedRenderList
             - buildRenderList
+            - groupRenderListByPipeline
             - isLitItem
             - isParticlesItem
             - isSpriteItem
@@ -7905,6 +7959,14 @@ modules:
           imports:
             - Texture
           reExport: true
+        - file: ./batch.js
+          imports:
+            - BatchableItem
+            - BatchableMaterial
+            - RenderBatch
+            - RenderBatchOptions
+          reExport: true
+          typeOnly: true
         - file: ./effect-pass.js
           imports:
             - ColorGradeEffect
@@ -8033,6 +8095,8 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - DEFAULT_MAX_BATCH_VERTICES
+        - RenderBatcher
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -8051,6 +8115,7 @@ modules:
         - particleQuadGeometry
         - buildInterpolatedRenderList
         - buildRenderList
+        - groupRenderListByPipeline
         - isLitItem
         - isParticlesItem
         - isSpriteItem
@@ -8090,6 +8155,10 @@ modules:
         - Sprite
         - Texture
         - PACKAGE_NAME
+        - BatchableItem
+        - BatchableMaterial
+        - RenderBatch
+        - RenderBatchOptions
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -8165,6 +8234,8 @@ modules:
         - SpriteOptions
         - TextureSource
       reExported:
+        - DEFAULT_MAX_BATCH_VERTICES
+        - RenderBatcher
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -8183,6 +8254,7 @@ modules:
         - particleQuadGeometry
         - buildInterpolatedRenderList
         - buildRenderList
+        - groupRenderListByPipeline
         - isLitItem
         - isParticlesItem
         - isSpriteItem
@@ -8221,6 +8293,10 @@ modules:
         - Star
         - Sprite
         - Texture
+        - BatchableItem
+        - BatchableMaterial
+        - RenderBatch
+        - RenderBatchOptions
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -8462,6 +8538,7 @@ modules:
         - isStandardItem
         - isParticlesItem
         - viewLayerMask
+        - groupRenderListByPipeline
         - buildRenderList
         - buildInterpolatedRenderList
       interfaces:
@@ -8477,6 +8554,7 @@ modules:
         - isStandardItem
         - isParticlesItem
         - viewLayerMask
+        - groupRenderListByPipeline
         - buildRenderList
         - buildInterpolatedRenderList
     packages/render/src/render-target.ts:
@@ -8820,6 +8898,43 @@ modules:
       constants:
         - PACKAGE_NAME
   packages/render-webgl:
+    packages/render-webgl/src/gl-batch.ts:
+      description: §65 batching for the WebGL 2 backend — the GPU half of `@four/render`'s
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - COLOR_ATTRIBUTE_LOCATION
+            - GL
+            - POSITION_ATTRIBUTE_LOCATION
+            - UV_ATTRIBUTE_LOCATION
+            - GlBuffer
+            - GlVertexArray
+            - UnlitProgram
+            - WebglContext
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderBatcher
+            - RenderBatch
+            - RenderBatchOptions
+            - RenderItem
+      exports:
+        - createGlBatching
+        - GlBatching
+      classes:
+        - GlBatching
+      interfaces:
+        - BatchGlContext
+        - RenderBatching
+      functions:
+        - createGlBatching
     packages/render-webgl/src/gl-effect.ts:
       description: The full-screen effect pipeline for the WebGL 2 backend — §70's blit, colour
       externalDependencies: []
@@ -9095,6 +9210,11 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./gl-batch.js
+          imports:
+            - GlBatching
+            - createGlBatching
+          reExport: true
         - file: ./gl-effect.js
           imports:
             - EFFECT_TEXTURE_UNIT
@@ -9154,6 +9274,12 @@ modules:
           imports:
             - WebglRenderer
           reExport: true
+        - file: ./gl-batch.js
+          imports:
+            - BatchGlContext
+            - RenderBatching
+          reExport: true
+          typeOnly: true
         - file: ./gl-geometry.js
           imports:
             - CacheableGeometry
@@ -9204,6 +9330,8 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - GlBatching
+        - createGlBatching
         - EFFECT_TEXTURE_UNIT
         - EFFECT_VERTEX_COUNT
         - EffectProgram
@@ -9234,6 +9362,8 @@ modules:
         - registerWebglRenderer
         - WebglRenderer
         - PACKAGE_NAME
+        - BatchGlContext
+        - RenderBatching
         - CacheableGeometry
         - GeometryRecord
         - ParticleBatchRecord
@@ -9255,6 +9385,8 @@ modules:
         - WebglContextAttributes
         - WebglContextEventLike
       reExported:
+        - GlBatching
+        - createGlBatching
         - EFFECT_TEXTURE_UNIT
         - EFFECT_VERTEX_COUNT
         - EffectProgram
@@ -9284,6 +9416,8 @@ modules:
         - isWebgl2Supported
         - registerWebglRenderer
         - WebglRenderer
+        - BatchGlContext
+        - RenderBatching
         - CacheableGeometry
         - GeometryRecord
         - ParticleBatchRecord
@@ -9332,6 +9466,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./gl-batch.js
+          imports:
+            - RenderBatching
+          typeOnly: true
         - file: ./gl-effect.js
           imports:
             - EFFECT_TEXTURE_UNIT
@@ -9831,11 +9969,11 @@ modules:
           directory: packages/math
           imports:
             - Matrix4
-            - Vector3
         - package: "@four/math"
           directory: packages/math
           imports:
             - ColorRGB
+            - Vector3
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -9874,6 +10012,9 @@ modules:
         - file: ./transform.js
           imports:
             - Transform
+        - file: ./world-transforms.js
+          imports:
+            - resolveWorldTransform
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -11004,9 +11145,12 @@ dependencyGraph:
       - - packages/physics/src/world.ts
         - packages/physics/src/solver-registry.ts
         - packages/physics/src/world.ts
-    total: 1
+      - - packages/scene/src/node.ts
+        - packages/scene/src/world-transforms.ts
+        - packages/scene/src/node.ts
+    total: 2
     runtimeCount: 0
-    typeOnlyCount: 1
+    typeOnlyCount: 2
   layers:
     - name: Packages/animation
       files:
@@ -11182,6 +11326,7 @@ dependencyGraph:
         - packages/physics-soft/src/index.ts
     - name: Packages/render
       files:
+        - packages/render/src/batch.ts
         - packages/render/src/effect-pass.ts
         - packages/render/src/index.ts
         - packages/render/src/lights.ts
@@ -11205,6 +11350,7 @@ dependencyGraph:
         - packages/render-svg/src/index.ts
     - name: Packages/render-webgl
       files:
+        - packages/render-webgl/src/gl-batch.ts
         - packages/render-webgl/src/gl-effect.ts
         - packages/render-webgl/src/gl-geometry.ts
         - packages/render-webgl/src/gl-particles.ts
@@ -11261,19 +11407,19 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 204
+  totalTypeScriptFiles: 206
   totalModules: 24
-  totalLinesOfCode: 93679
-  totalExports: 1911
-  totalClasses: 127
-  totalInterfaces: 410
-  totalFunctions: 324
+  totalLinesOfCode: 95385
+  totalExports: 1928
+  totalClasses: 129
+  totalInterfaces: 414
+  totalFunctions: 327
   totalTypeGuards: 18
   totalEnums: 0
-  totalConstants: 248
-  totalReExports: 1234
-  totalTypeOnlyImports: 231
+  totalConstants: 249
+  totalReExports: 1245
+  totalTypeOnlyImports: 235
   runtimeCircularDeps: 0
-  typeOnlyCircularDeps: 1
+  typeOnlyCircularDeps: 2
   unusedFilesCount: 0
   unusedExportsCount: 0

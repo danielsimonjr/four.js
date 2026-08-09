@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-09",
-  "totalFiles": 470,
+  "totalFiles": 478,
   "byDisposition": {
-    "reachable": 156,
+    "reachable": 158,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 244,
+    "test": 250,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -14,12 +14,12 @@
   "byArea": {
     "examples": 9,
     "config": 12,
-    "src": 204,
-    "tests": 244,
+    "src": 206,
+    "tests": 250,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 102,
+    "(root)": 106,
     "@four/animation": 25,
     "@four/assets": 8,
     "@four/core": 20,
@@ -37,10 +37,10 @@
     "@four/physics": 37,
     "@four/render-canvas": 2,
     "@four/render-svg": 2,
-    "@four/render-webgl": 14,
+    "@four/render-webgl": 15,
     "@four/render-webgpu": 2,
-    "@four/render": 28,
-    "@four/scene": 24,
+    "@four/render": 30,
+    "@four/scene": 25,
     "@four/serialization": 9,
     "@four/text": 6,
     "@four/ui": 23
@@ -1185,14 +1185,14 @@
       "package": "@four/math",
       "area": "src",
       "disposition": "reachable",
-      "loc": 733
+      "loc": 712
     },
     {
       "file": "packages/math/src/quaternion.ts",
       "package": "@four/math",
       "area": "src",
       "disposition": "reachable",
-      "loc": 295
+      "loc": 423
     },
     {
       "file": "packages/math/src/vector2.ts",
@@ -1234,7 +1234,7 @@
       "package": "@four/math",
       "area": "tests",
       "disposition": "test",
-      "loc": 582
+      "loc": 742
     },
     {
       "file": "packages/math/tests/smoke.test.ts",
@@ -2007,6 +2007,13 @@
       "loc": 10
     },
     {
+      "file": "packages/render-webgl/src/gl-batch.ts",
+      "package": "@four/render-webgl",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 464
+    },
+    {
       "file": "packages/render-webgl/src/gl-effect.ts",
       "package": "@four/render-webgl",
       "area": "src",
@@ -2067,7 +2074,7 @@
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 73
+      "loc": 75
     },
     {
       "file": "packages/render-webgl/src/register.ts",
@@ -2081,7 +2088,7 @@
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2354
+      "loc": 2468
     },
     {
       "file": "packages/render-webgl/tests/register.test.ts",
@@ -2102,7 +2109,7 @@
       "package": "@four/render-webgl",
       "area": "tests",
       "disposition": "test",
-      "loc": 8542
+      "loc": 9021
     },
     {
       "file": "packages/render-webgpu/src/index.ts",
@@ -2119,6 +2126,13 @@
       "loc": 10
     },
     {
+      "file": "packages/render/src/batch.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 701
+    },
+    {
       "file": "packages/render/src/effect-pass.ts",
       "package": "@four/render",
       "area": "src",
@@ -2130,7 +2144,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 164
+      "loc": 173
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -2158,7 +2172,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1003
+      "loc": 1139
     },
     {
       "file": "packages/render/src/render-target.ts",
@@ -2224,6 +2238,13 @@
       "loc": 397
     },
     {
+      "file": "packages/render/tests/batch.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 646
+    },
+    {
       "file": "packages/render/tests/effect-pass.test.ts",
       "package": "@four/render",
       "area": "tests",
@@ -2256,7 +2277,7 @@
       "package": "@four/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 1037
+      "loc": 1254
     },
     {
       "file": "packages/render/tests/render-target.test.ts",
@@ -2326,7 +2347,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "reachable",
-      "loc": 374
+      "loc": 386
     },
     {
       "file": "packages/scene/src/group.ts",
@@ -2361,14 +2382,14 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "reachable",
-      "loc": 841
+      "loc": 800
     },
     {
       "file": "packages/scene/src/node.ts",
       "package": "@four/scene",
       "area": "src",
       "disposition": "reachable",
-      "loc": 580
+      "loc": 782
     },
     {
       "file": "packages/scene/src/pose-target.ts",
@@ -2439,6 +2460,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 577
+    },
+    {
+      "file": "packages/scene/tests/look-at.test.ts",
+      "package": "@four/scene",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 480
     },
     {
       "file": "packages/scene/tests/node.test.ts",
@@ -2763,6 +2791,13 @@
       "loc": 952
     },
     {
+      "file": "tests/browser/batching.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 194
+    },
+    {
       "file": "tests/browser/blending.spec.ts",
       "package": "(root)",
       "area": "tests",
@@ -2789,6 +2824,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 750
+    },
+    {
+      "file": "tests/browser/fixtures/batching-page.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 149
     },
     {
       "file": "tests/browser/interaction.spec.ts",
@@ -3141,6 +3183,13 @@
       "loc": 612
     },
     {
+      "file": "tests/integration/look-at.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 236
+    },
+    {
       "file": "tests/integration/motion-advanced.test.ts",
       "package": "(root)",
       "area": "tests",
@@ -3209,6 +3258,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 152
+    },
+    {
+      "file": "tests/integration/render-batching.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 289
     },
     {
       "file": "tests/integration/render-effects.test.ts",

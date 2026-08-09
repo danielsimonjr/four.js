@@ -61,10 +61,10 @@ The codebase is organized into the following modules:
 - **packages/physics-box2d**: 1 file
 - **packages/physics-rapier**: 8 files
 - **packages/physics-soft**: 1 file
-- **packages/render**: 15 files
+- **packages/render**: 16 files
 - **packages/render-canvas**: 1 file
 - **packages/render-svg**: 1 file
-- **packages/render-webgl**: 11 files
+- **packages/render-webgl**: 12 files
 - **packages/render-webgpu**: 1 file
 - **packages/scene**: 13 files
 - **packages/serialization**: 4 files
@@ -93,10 +93,10 @@ The codebase is organized into the following modules:
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
 | `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/physics`, `@four/core`, `@four/math` | 8 | 0 |
 | `@four/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
-| `@four/render` (`packages/render/`) | `@four/math`, `@four/scene`, `@four/geometry`, `@four/core`, `@four/materials` | 15 | 0 |
+| `@four/render` (`packages/render/`) | `@four/geometry`, `@four/materials`, `@four/math`, `@four/scene`, `@four/core` | 16 | 0 |
 | `@four/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
 | `@four/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
-| `@four/render-webgl` (`packages/render-webgl/`) | `@four/core`, `@four/render`, `@four/math` | 11 | 0 |
+| `@four/render-webgl` (`packages/render-webgl/`) | `@four/math`, `@four/render`, `@four/core` | 12 | 0 |
 | `@four/render-webgpu` (`packages/render-webgpu/`) | (none) | 1 | 0 |
 | `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 13 | 0 |
 | `@four/serialization` (`packages/serialization/`) | `@four/core`, `@four/scene`, `@four/math` | 4 | 0 |
@@ -181,14 +181,14 @@ graph LR
     P13 --> P11
     P13 --> P2
     P13 --> P8
+    P15 --> P5
+    P15 --> P7
     P15 --> P8
     P15 --> P20
-    P15 --> P5
     P15 --> P2
-    P15 --> P7
-    P18 --> P2
-    P18 --> P15
     P18 --> P8
+    P18 --> P15
+    P18 --> P2
     P20 --> P8
     P20 --> P2
     P21 --> P2
@@ -1608,7 +1608,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./alloc-counter.js` | `noteConstruction` | Import |
-| `./quaternion.js` | `Quaternion` | Import (type-only) |
+| `./quaternion.js` | `setQuaternionFromBasis, Quaternion` | Import |
 | `./vector3.js` | `Vector3` | Import (type-only) |
 
 **Exports:**
@@ -1627,6 +1627,7 @@ graph LR
 
 **Exports:**
 - Classes: `Quaternion`
+- Functions: `setQuaternionFromBasis`
 
 ---
 
@@ -2680,6 +2681,30 @@ graph LR
 
 ## Packages/render Dependencies
 
+### `packages/render/src/batch.ts` - §65 batching — merging consecutive compatible draws into one (R-9,
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/geometry` | `BufferGeometry` |
+| `@four/materials` | `MaterialTexture, SpriteMaterial, UnlitMaterial` |
+| `@four/math` | `ColorRGBA` |
+| `@four/scene` | `ALL_LAYERS, LayerMask` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./render-list.js` | `RenderItem, SpriteRenderItem, UnlitRenderItem` | Import (type-only) |
+| `./sprite.js` | `SpriteFrame` | Import (type-only) |
+
+**Exports:**
+- Classes: `RenderBatcher`
+- Interfaces: `RenderBatchOptions`, `RenderBatch`
+- Types: `BatchableMaterial`, `BatchableItem`
+- Constants: `DEFAULT_MAX_BATCH_VERTICES`
+
+---
+
 ### `packages/render/src/effect-pass.ts` - §70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):
 
 **Internal Dependencies:**
@@ -2696,15 +2721,16 @@ graph LR
 
 ---
 
-### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 130 symbols)
+### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 137 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./batch.js` | `DEFAULT_MAX_BATCH_VERTICES, RenderBatcher` | Re-export |
 | `./effect-pass.js` | `COLOR_GRADE_DEFAULTS, COPY_EFFECT, OUTPUT_TRANSFORM_EFFECT, supportsScreenEffects, validateEffectRenderPass` | Re-export |
 | `./lights.js` | `MAX_PUNCTUAL_LIGHTS, collectSceneLights, createSceneLights, isDirectionalLightSource, isPunctualLightSource` | Re-export |
 | `./particles.js` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_SIZE_OFFSET, isParticleDrawable, particleQuadGeometry` | Re-export |
-| `./render-list.js` | `buildInterpolatedRenderList, buildRenderList, isLitItem, isParticlesItem, isSpriteItem, isStandardItem, isUnlitItem, viewLayerMask` | Re-export |
+| `./render-list.js` | `buildInterpolatedRenderList, buildRenderList, groupRenderListByPipeline, isLitItem, isParticlesItem, isSpriteItem, isStandardItem, isUnlitItem, viewLayerMask` | Re-export |
 | `./render-graph.js` | `RenderGraph` | Re-export |
 | `./render-target.js` | `RenderTarget, isRenderTargetTexture` | Re-export |
 | `./renderable.js` | `Renderable` | Re-export |
@@ -2715,6 +2741,7 @@ graph LR
 | `./shape.js` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Ring, Sector, Shape2D, Star` | Re-export |
 | `./sprite.js` | `Sprite` | Re-export |
 | `./texture.js` | `Texture` | Re-export |
+| `./batch.js` | `BatchableItem, BatchableMaterial, RenderBatch, RenderBatchOptions` | Re-export (type-only) |
 | `./effect-pass.js` | `ColorGradeEffect, CopyEffect, EffectRenderPass, OutputTransformEffect, ScreenEffect, ScreenEffectKind, ScreenEffectRenderer` | Re-export (type-only) |
 | `./lights.js` | `AmbientLightSource, DirectionalLightSource, DirectionalShadowSource, PointLightSource, PunctualLightSource, PunctualLightSourceBase, SceneLights, SpotLightSource` | Re-export (type-only) |
 | `./particles.js` | `ParticleDrawable` | Re-export (type-only) |
@@ -2731,7 +2758,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
+- Re-exports: `DEFAULT_MAX_BATCH_VERTICES`, `RenderBatcher`, `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `groupRenderListByPipeline`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `BatchableItem`, `BatchableMaterial`, `RenderBatch`, `RenderBatchOptions`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureSource`
 
 ---
 
@@ -2809,7 +2836,7 @@ graph LR
 **Exports:**
 - Interfaces: `UnlitRenderItem`, `LitRenderItem`, `StandardRenderItem`, `SpriteRenderItem`, `ParticleRenderItem`
 - Types: `RenderItemKind`, `RenderItem`
-- Functions: `isSpriteItem`, `isUnlitItem`, `isLitItem`, `isStandardItem`, `isParticlesItem`, `viewLayerMask`, `buildRenderList`, `buildInterpolatedRenderList`
+- Functions: `isSpriteItem`, `isUnlitItem`, `isLitItem`, `isStandardItem`, `isParticlesItem`, `viewLayerMask`, `groupRenderListByPipeline`, `buildRenderList`, `buildInterpolatedRenderList`
 
 ---
 
@@ -3000,6 +3027,26 @@ graph LR
 
 ## Packages/render webgl Dependencies
 
+### `packages/render-webgl/src/gl-batch.ts` - §65 batching for the WebGL 2 backend — the GPU half of `@four/render`'s
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/math` | `Matrix4` |
+| `@four/render` | `RenderBatcher, RenderBatch, RenderBatchOptions, RenderItem` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./gl-program.js` | `COLOR_ATTRIBUTE_LOCATION, GL, POSITION_ATTRIBUTE_LOCATION, UV_ATTRIBUTE_LOCATION, GlBuffer, GlVertexArray, UnlitProgram, WebglContext` | Import |
+
+**Exports:**
+- Classes: `GlBatching`
+- Interfaces: `BatchGlContext`, `RenderBatching`
+- Functions: `createGlBatching`
+
+---
+
 ### `packages/render-webgl/src/gl-effect.ts` - The full-screen effect pipeline for the WebGL 2 backend — §70's blit, colour
 
 **Workspace Dependencies:**
@@ -3157,6 +3204,7 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./gl-batch.js` | `GlBatching, createGlBatching` | Re-export |
 | `./gl-effect.js` | `EFFECT_TEXTURE_UNIT, EFFECT_VERTEX_COUNT, EffectProgram` | Re-export |
 | `./gl-geometry.js` | `GeometryCache` | Re-export |
 | `./gl-particles.js` | `PARTICLE_ATTRIBUTE_LOCATIONS, PARTICLE_GL, ParticleBatchCache, ParticleProgram` | Re-export |
@@ -3167,6 +3215,7 @@ graph LR
 | `./gl-texture.js` | `TextureCache` | Re-export |
 | `./register.js` | `isWebgl2Supported, registerWebglRenderer` | Re-export |
 | `./webgl-renderer.js` | `WebglRenderer` | Re-export |
+| `./gl-batch.js` | `BatchGlContext, RenderBatching` | Re-export (type-only) |
 | `./gl-geometry.js` | `CacheableGeometry, GeometryRecord` | Re-export (type-only) |
 | `./gl-particles.js` | `ParticleBatchRecord, ParticleGlContext` | Re-export (type-only) |
 | `./gl-program.js` | `GlBuffer, GlProgramHandle, GlShader, GlTexture, GlUniformLocation, GlVertexArray, WebglContext` | Re-export (type-only) |
@@ -3177,7 +3226,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `EffectProgram`, `GeometryCache`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_GL`, `ParticleBatchCache`, `ParticleProgram`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `RenderTargetCache`, `ShadowProgram`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `CacheableGeometry`, `GeometryRecord`, `ParticleBatchRecord`, `ParticleGlContext`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `CacheableRenderTarget`, `RenderTargetRecord`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
+- Re-exports: `GlBatching`, `createGlBatching`, `EFFECT_TEXTURE_UNIT`, `EFFECT_VERTEX_COUNT`, `EffectProgram`, `GeometryCache`, `PARTICLE_ATTRIBUTE_LOCATIONS`, `PARTICLE_GL`, `ParticleBatchCache`, `ParticleProgram`, `COLOR_ATTRIBUTE_LOCATION`, `GL`, `LitProgram`, `MAP_TEXTURE_UNIT`, `NORMAL_ATTRIBUTE_LOCATION`, `POSITION_ATTRIBUTE_LOCATION`, `PUNCTUAL_LIGHT_GLSL`, `PunctualLightUniforms`, `SHADOW_GLSL`, `SHADOW_TEXTURE_UNIT`, `ShadowUniforms`, `SpriteProgram`, `UV_ATTRIBUTE_LOCATION`, `UnlitProgram`, `RenderTargetCache`, `ShadowProgram`, `StandardProgram`, `TextureCache`, `isWebgl2Supported`, `registerWebglRenderer`, `WebglRenderer`, `BatchGlContext`, `RenderBatching`, `CacheableGeometry`, `GeometryRecord`, `ParticleBatchRecord`, `ParticleGlContext`, `GlBuffer`, `GlProgramHandle`, `GlShader`, `GlTexture`, `GlUniformLocation`, `GlVertexArray`, `WebglContext`, `GlFramebuffer`, `GlRenderbuffer`, `CacheableRenderTarget`, `RenderTargetRecord`, `CacheableTexture`, `TextureRecord`, `WebglCanvas`, `WebglContextAttributes`, `WebglContextEventLike`
 
 ---
 
@@ -3210,6 +3259,7 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./gl-batch.js` | `RenderBatching` | Import (type-only) |
 | `./gl-effect.js` | `EFFECT_TEXTURE_UNIT, EFFECT_VERTEX_COUNT, EffectProgram` | Import |
 | `./gl-geometry.js` | `GeometryCache` | Import |
 | `./gl-particles.js` | `ParticleBatchCache, ParticleProgram, ParticleGlContext` | Import |
@@ -3354,8 +3404,8 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/math` | `Matrix4, Vector3` |
-| `@four/math` | `ColorRGB` |
+| `@four/math` | `Matrix4` |
+| `@four/math` | `ColorRGB, Vector3` |
 | `@four/math` | `ColorRGB` |
 
 **Internal Dependencies:**
@@ -3385,6 +3435,7 @@ graph LR
 | `./authority.js` | `DEFAULT_TRANSFORM_AUTHORITY, TransformAuthority` | Import |
 | `./layers.js` | `DEFAULT_LAYER_MASK, LayerMask` | Import |
 | `./transform.js` | `Transform` | Import |
+| `./world-transforms.js` | `resolveWorldTransform` | Import |
 
 **Exports:**
 - Interfaces: `NodeHierarchyEvent`, `NodeEventMap`, `NodeOptions`
@@ -3855,19 +3906,19 @@ graph LR
 | `packages/physics/src/index` | 16 files | 0 files |
 | `packages/physics/src/types` | 0 files | 15 files |
 | `packages/physics/src/world` | 12 files | 3 files |
+| `packages/render/src/index` | 15 files | 0 files |
 | `packages/motion/src/index` | 14 files | 0 files |
-| `packages/render/src/index` | 14 files | 0 files |
 | `packages/physics/src/descriptors` | 3 files | 9 files |
 | `packages/scene/src/index` | 12 files | 0 files |
 | `packages/physics/src/collider` | 8 files | 3 files |
+| `packages/render-webgl/src/index` | 11 files | 0 files |
+| `packages/render-webgl/src/webgl-renderer` | 9 files | 2 files |
+| `packages/scene/src/node` | 4 files | 7 files |
 | `packages/animation/src/index` | 10 files | 0 files |
 | `packages/core/src/index` | 10 files | 0 files |
-| `packages/render-webgl/src/index` | 10 files | 0 files |
-| `packages/render-webgl/src/webgl-renderer` | 8 files | 2 files |
-| `packages/scene/src/node` | 3 files | 7 files |
+| `packages/render-webgl/src/gl-program` | 0 files | 10 files |
 | `packages/ui/src/index` | 10 files | 0 files |
 | `packages/physics/src/rigid-body` | 4 files | 5 files |
-| `packages/render-webgl/src/gl-program` | 0 files | 9 files |
 | `packages/math/src/index` | 8 files | 0 files |
 | `packages/physics/src/joints` | 6 files | 2 files |
 | `packages/physics/src/serializers` | 7 files | 1 file |
@@ -3891,23 +3942,24 @@ graph LR
 | `packages/physics-rapier/src/index` | 6 files | 0 files |
 | `packages/physics-rapier/src/rapier2d-adapter` | 3 files | 3 files |
 | `packages/physics-rapier/src/rapier3d-adapter` | 4 files | 2 files |
-| `packages/render/src/render-target` | 1 file | 5 files |
+| `packages/render/src/render-list` | 3 files | 3 files |
 
 ---
 
 <a id="circular-dependency-analysis"></a>
 ## Circular Dependency Analysis
 
-**1 circular dependencies detected:**
+**2 circular dependencies detected:**
 
 - **Runtime cycles**: 0 (require attention)
-- **Type-only cycles**: 1 (safe, no runtime impact)
+- **Type-only cycles**: 2 (safe, no runtime impact)
 
 ### Type-Only Circular Dependencies
 
 These cycles only involve type imports and are safe (erased at runtime):
 
 - packages/physics/src/world.ts -> packages/physics/src/solver-registry.ts -> packages/physics/src/world.ts
+- packages/scene/src/node.ts -> packages/scene/src/world-transforms.ts -> packages/scene/src/node.ts
 
 ---
 
@@ -4079,17 +4131,17 @@ graph TD
     end
 
     subgraph Packages/render
-        N117[effect-pass]
-        N118[index]
-        N119[lights]
-        N120[particles]
-        N121[render-graph]
-        N122[render-list]
-        N123[render-target]
-        N124[renderable]
-        N125[renderer-registry]
-        N126[renderer]
-        N127[...5 more]
+        N117[batch]
+        N118[effect-pass]
+        N119[index]
+        N120[lights]
+        N121[particles]
+        N122[render-graph]
+        N123[render-list]
+        N124[render-target]
+        N125[renderable]
+        N126[renderer-registry]
+        N127[...6 more]
     end
 
     subgraph Packages/render-canvas
@@ -4101,17 +4153,17 @@ graph TD
     end
 
     subgraph Packages/render-webgl
-        N130[gl-effect]
-        N131[gl-geometry]
-        N132[gl-particles]
-        N133[gl-program]
-        N134[gl-render-target]
-        N135[gl-shadow]
-        N136[gl-standard]
-        N137[gl-texture]
-        N138[index]
-        N139[register]
-        N140[...1 more]
+        N130[gl-batch]
+        N131[gl-effect]
+        N132[gl-geometry]
+        N133[gl-particles]
+        N134[gl-program]
+        N135[gl-render-target]
+        N136[gl-shadow]
+        N137[gl-standard]
+        N138[gl-texture]
+        N139[index]
+        N140[...2 more]
     end
 
     subgraph Packages/render-webgpu
@@ -4244,19 +4296,19 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 204 |
+| Total TypeScript Files | 206 |
 | Total Modules | 24 |
-| Total Lines of Code | 93679 |
-| Total Exports | 1911 |
-| Total Re-exports | 1234 |
-| Total Classes | 127 |
-| Total Interfaces | 410 |
-| Total Functions | 324 |
+| Total Lines of Code | 95385 |
+| Total Exports | 1928 |
+| Total Re-exports | 1245 |
+| Total Classes | 129 |
+| Total Interfaces | 414 |
+| Total Functions | 327 |
 | Total Type Guards | 18 |
 | Total Enums | 0 |
-| Type-only Imports | 231 |
+| Type-only Imports | 235 |
 | Runtime Circular Deps | 0 |
-| Type-only Circular Deps | 1 |
+| Type-only Circular Deps | 2 |
 
 ---
 
