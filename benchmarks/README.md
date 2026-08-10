@@ -10,14 +10,14 @@ library — warm up, measure, reduce to order statistics, stamp the host, write 
 record, print a report — extracted unchanged in substance from `particles-100k.mjs`, the
 Phase 9 script that was deliberately written without a framework until there was more than
 one script to design around. A benchmark here is still a plain `node` script that imports a
-handful of small functions; `run-all.mjs` drives all seven of them and is the whole of the
+handful of small functions; `run-all.mjs` drives all eight of them and is the whole of the
 scheduling. (Until 2026-08-08 this paragraph read _"There is still no runner and no CI
 integration"_; the runner landed with A-27's two CPU benchmarks, and **CI integration is
 still absent** — see [The runner](#the-runner).)
 
 ```sh
 pnpm run build               # every script imports the built dist, not src
-pnpm bench                   # runs all seven, one process each
+pnpm bench                   # runs all eight, one process each
 node benchmarks/harness.mjs  # prints the suite index and how to run it
 ```
 
@@ -25,20 +25,23 @@ node benchmarks/harness.mjs  # prints the suite index and how to run it
 the module loads. The whole suite takes about **77 s** on the recorded host, dominated by
 `physics-step.mjs` (~40 s) and `particles-100k.mjs` (~15 s).
 
-| script                                                                         | what it measures                                                             | §86 row                                                   |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
-| [`math-ops.mjs`](#math-opsmjs--7b-math-throughput-and-allocation)              | `Vector3`/`Quaternion`/`Matrix4` throughput **and per-operation allocation** | none — the foundation the rows sit on                     |
-| [`scene-propagation.mjs`](#scene-propagationmjs--7-world-transform-resolution) | `resolveWorldTransforms` over deep and wide trees, dirty and clean           | _idle scene_, for the scene graph                         |
-| [`physics-step.mjs`](#physics-stepmjs--86s-5-000-active-rigid-bodies)          | Rapier 3D fixed step at 500–5 000 **active** bodies                          | **active rigid bodies: 5 000 simple bodies baseline**     |
-| [`animation-sampling.mjs`](#animation-samplingmjs--17-mixer-sampling)          | `AnimationMixer.advance` over N instances of a 4-track clip                  | none — _animated glyphs_ is a text row, not a mixer row   |
-| [`particles-100k.mjs`](#particles-100kmjs--112s-particle-budget-wp-94-phase-9) | 100 000 CPU particles under a 3-field §27 stack                              | **CPU particles** (at 4× §86's 25 000 baseline, per §112) |
-| [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half)         | `Panel.layout()` over 500–5 000 retained widgets, cold/incremental/warm      | **retained UI nodes: 5 000** — the layout-and-state half  |
-| [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)      | `layoutText` at 1 000–50 000 drawn glyphs per frame                          | **animated glyphs: 20 000** — the layout half             |
+| script                                                                                        | what it measures                                                             | §86 row                                                                                   |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`math-ops.mjs`](#math-opsmjs--7b-math-throughput-and-allocation)                             | `Vector3`/`Quaternion`/`Matrix4` throughput **and per-operation allocation** | none — the foundation the rows sit on                                                     |
+| [`scene-propagation.mjs`](#scene-propagationmjs--7-world-transform-resolution)                | `resolveWorldTransforms` over deep and wide trees, dirty and clean           | _idle scene_, for the scene graph                                                         |
+| [`physics-step.mjs`](#physics-stepmjs--86s-5-000-active-rigid-bodies)                         | Rapier 3D fixed step at 500–5 000 **active** bodies                          | **active rigid bodies: 5 000 simple bodies baseline**                                     |
+| [`animation-sampling.mjs`](#animation-samplingmjs--17-mixer-sampling)                         | `AnimationMixer.advance` over N instances of a 4-track clip                  | none — _animated glyphs_ is a text row, not a mixer row                                   |
+| [`particles-100k.mjs`](#particles-100kmjs--112s-particle-budget-wp-94-phase-9)                | 100 000 CPU particles under a 3-field §27 stack                              | **CPU particles** (at 4× §86's 25 000 baseline, per §112)                                 |
+| [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half)                        | `Panel.layout()` over 500–5 000 retained widgets, cold/incremental/warm      | **retained UI nodes: 5 000** — the layout-and-state half                                  |
+| [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)                     | `layoutText` at 1 000–50 000 drawn glyphs per frame                          | **animated glyphs: 20 000** — the layout half                                             |
+| [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half) | render-list build plus §65 batch assembly at 5 000–100 000 nodes             | **batched sprites: 100 000** and **simple batched shapes: 50 000** — the preparation half |
+| [`view-culling.mjs`](#view-cullingmjs--64s-per-view-lists-and-87s-frustum-cull)               | per-view list derivation and §87 culling at 10 000–100 000 nodes × 1–4 views | none — §86 has no culling row; this measures a design decision                            |
 
-Four §86 rows have honest headless numbers today — active rigid bodies, CPU particles, and
-the CPU halves of retained UI nodes and animated glyphs. The first two are **over** the
-60 Hz fixed-step budget on this host; the two CPU halves are **inside** a 60 Hz frame on it,
-with the caveat that neither is the whole row. §86's clause is _"suitable modern desktop
+Six §86 rows have honest headless numbers today — active rigid bodies, CPU particles, and
+the CPU halves of retained UI nodes, animated glyphs, batched sprites and batched shapes.
+The first two are **over** the 60 Hz fixed-step budget on this host; the retained-UI and
+glyph halves are **inside** a 60 Hz frame on it; the two batching halves are **over** it at
+their §86 counts (2026-08-09, R-9 — see the script). None of them is a whole row. §86's clause is _"suitable modern desktop
 hardware"_, which a shared CI container without a GPU is not, so no result here is a §86
 verdict; see each script's header.
 
@@ -60,19 +63,21 @@ keeps its **feature** block for the drawing half and gains a measured layout hal
 [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half). Both rows are
 **partly** measured — a half-row is stated as a half-row here and in each script's record.
 
-| §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ----------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 100 000 batched sprites | **feature** | There is no sprite batching. `webgl-renderer.ts` issues one `setModel`/`setQuad`/`setTint` plus one `drawArrays`/`drawElements` **per sprite**; only the program bind and the view-projection upload amortise. The §55 `frame` sub-rectangle that an atlas needs has not landed either (`docs/AUDIT-120.md`, sprites row)                                                                                                                     |
-| 50 000 batched shapes   | **feature** | There is no shape system to batch. §50's catalogue and §51's `Path` are staged (`docs/AUDIT-120.md` S-4); the shipped 2D geometry is `circleGeometry2D` and `planeGeometry`                                                                                                                                                                                                                                                                   |
-| mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                                                                                                                                         |
-| animated glyphs         | **half**    | The **layout** half is measured (`text-layout.mjs`): `layoutText` produces the quads on the CPU. The **draw** half stays **feature**-blocked — §56 ships a bitmap tier whose atlas cannot be addressed per glyph, so drawing one cell means cutting it into its own `Texture` (the documented workaround in `examples/first-2d-scene` and `examples/ui-demo`) and a glyph is a texture bind and a draw call. Shaping and SDF are staged (S-6) |
-| 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                                                                                                                                        |
-| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@four/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader, and pays the same per-glyph texture cut as the row above                                                                                                                        |
-| bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                                                                                                                                                   |
-| idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                                                                                                                                           |
+| §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 100 000 batched sprites | **half**    | **Amended 2026-08-09 (R-9).** Read _"There is no sprite batching"_ until then, which stopped being true when `RenderBatcher` and `createGlBatching` landed: consecutive sprites over one atlas material now merge into one `drawElements`. The **preparation** half is measured by [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half); the **submission** half needs a GPU. §55's `frame` landed with R-29 |
+| 50 000 batched shapes   | **half**    | **Amended 2026-08-09 (R-9).** Read _"There is no shape system to batch"_ until then; §50's catalogue landed with R-23/R-24/R-25 and §58's paints with R-16, and consecutive shapes over one material merge exactly as sprites do. Same split: preparation measured, submission GPU-blocked                                                                                                                                                            |
+| mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                                                                                                                                                 |
+| animated glyphs         | **half**    | The **layout** half is measured (`text-layout.mjs`): `layoutText` produces the quads on the CPU. The **draw** half stays **feature**-blocked — §56 ships a bitmap tier whose atlas cannot be addressed per glyph, so drawing one cell means cutting it into its own `Texture` (the documented workaround in `examples/first-2d-scene` and `examples/ui-demo`) and a glyph is a texture bind and a draw call. Shaping and SDF are staged (S-6)         |
+| 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                                                                                                                                                |
+| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@four/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader, and pays the same per-glyph texture cut as the row above                                                                                                                                |
+| bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                                                                                                                                                           |
+| idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                                                                                                                                                   |
 
-So the honest summary is: one §86 row is gated, five are measured or partly measured, one
-waits on hardware, and three wait on engine features. Measuring the feature-blocked rows
+So the honest summary is: one §86 row is gated, seven are measured or partly measured, one
+waits on hardware, and one waits on an engine feature (mesh instancing). That sentence read
+_"five … and three wait on engine features"_ until 2026-08-09, when R-9's batching moved the
+two batching rows out of the **feature** column and into **half**. Measuring the feature-blocked rows
 headless today would produce numbers about the wrong thing — a per-sprite draw loop timed
 as if it were a batch is worse than no number.
 
@@ -132,7 +137,7 @@ check before quoting anything above it.
 name: no configuration, no new dependency, no scheduling beyond a `for` loop.
 
 ```sh
-pnpm bench                        # all seven, in SUITE order
+pnpm bench                        # all eight, in SUITE order
 pnpm bench ui-layout text-layout  # a subset, named by record or by filename
 pnpm bench --list                 # what would run, and which record each writes
 ```
@@ -462,3 +467,78 @@ perGlyph` fits with **perCall on the order of 120–140 ns** and perGlyph as abo
 - **Building the atlas is setup, and is timed as such**: `buildGlyphAtlas()` on the built-in
   6 × 12 face costs a couple of milliseconds once, and is deliberately excluded from every
   throughput number above.
+
+### `render-batching.mjs` — §86's batched sprites and shapes (preparation half)
+
+```sh
+node benchmarks/render-batching.mjs
+```
+
+Six scenarios — 10 000 / 50 000 / 100 000 sprites over one atlas material, and 5 000 /
+25 000 / 50 000 §50 rectangles over one `UnlitMaterial` — each measured twice: the render
+list alone (`buildRenderList`, §64 stages 1–2 and 4–5) and the same frame **plus** §65's
+batch assembly (`RenderBatcher.next` over the whole list, writing every merged vertex). The
+difference between the two is the batching pass, reported as its own column.
+
+The one number here that is not a timing is the draw-call collapse: `drawCallsUnbatched` is
+one call per render item, which is what `webgl-renderer.ts` issues today with no batcher
+assigned, and `drawCallsBatched` is one per batch the planner produced. Counting it needs no
+GPU.
+
+Findings, as shapes rather than values (2026-08-09, first record):
+
+- **The draw-call reduction is four orders of magnitude.** 100 000 sprites become **7**
+  draw calls and 50 000 rectangles become **4** — one per `DEFAULT_MAX_BATCH_VERTICES`
+  (65 536) worth of vertices, which is the only thing that splits a run of one material.
+- **Preparation, not submission, is now the bound on this host.** Both §86 counts are
+  **over** a 16.667 ms frame in preparation alone, and roughly half of that cost is
+  `buildRenderList` — which the unbatched frame pays too. The batching pass adds about the
+  same again, because it transforms every vertex on the CPU (`batch.ts` states that
+  trade-off and why the tier makes it).
+- **The cost is linear in the node count** — the per-node figure moves by well under a
+  factor of two across a 10× sweep in both scenarios, so nothing here is super-linear. Its
+  absolute value is not stable enough to quote: two consecutive runs on this shared host
+  put the 100 000-sprite row at 61 ms and 78 ms (600 and 780 ns per node), which is the
+  "tens of percent" spread this file warns about, measured.
+- A number this file cannot give: whether either row meets §86 on **suitable modern desktop
+  hardware** with a real driver on the other side of `drawElements`. Both remain half-rows.
+
+### `view-culling.mjs` — §64's per-view lists and §87's frustum cull
+
+```sh
+node benchmarks/view-culling.mjs
+```
+
+**Not a §86 row.** §86 lists no culling target, and this script exists for a different
+purpose: R-8 had a design decision to make and this is the measurement behind it. Nine
+scenarios — 10 000 / 50 000 / 100 000 §50 rectangles spread over **four times** the
+camera's area, drawn into 1, 2 and 4 viewports — each measured three ways:
+
+| arm          | what it does                                                       |
+| ------------ | ------------------------------------------------------------------ |
+| `filter ms`  | one traversal, then one `buildViewRenderList` per view, no frustum |
+| `derive ms`  | the same, with §87's cull — so `derive − filter` is the cull alone |
+| `rebuild ms` | the rejected alternative: `buildRenderList` once **per view**      |
+
+`filter` and `rebuild` produce the **same** per-view lists, so their ratio is the design
+decision and nothing else. The cull is reported separately because either design would have
+paid it.
+
+Findings, as shapes rather than values (2026-08-09, first record):
+
+- **Deriving wins as soon as there is more than one viewport, and only then.** At one view
+  the two arms are within noise of each other — both traverse once, and deriving adds one
+  linear pass. At two views the rejected alternative costs roughly 1.35×, and at four views
+  1.85–2.85×, because traversal is the expensive stage and it is the one being multiplied.
+  The structural arguments for deriving (traversal has side effects; §69's shadow map is
+  frame state no view may filter) are what make the decision at one view; this is what makes
+  it at four.
+- **The cull is not free, and its price is comparable to a traversal.** On this host the
+  frustum test costs roughly 0.3–0.5 µs per item per view — a `computeBounds` read, nine
+  multiply-adds for the world sphere, one `sqrt`, and up to six plane tests. It buys back a
+  draw call and its uniform uploads per removed item, which is backend work this script
+  cannot see, so nothing here says culling is a net win at a given node count; what it says
+  is what the CPU side costs.
+- **The run-to-run spread is the one this file warns about.** The `rebuild/filter` column
+  moves between 0.74× and 0.95× at one view across node counts, which is noise around 1.0,
+  not a trend. Read the column's growth with view count, not its absolute values.

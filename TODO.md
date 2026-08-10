@@ -34,6 +34,88 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-8 DONE 2026-08-09** — §64 per-view render lists (`buildViewRenderList`, derive
+      not rebuild), §87 frustum culling (`Frustum` in `@four/math`,
+      `computeWorldBoundingSphere`, default-on, fails towards drawing), §49
+      `frustumCulled` (§79-serialized), and §66 key 4 (`sortRenderListByDepth`, opt-in
+      verb). Budgets bumped 32.5/30/38 kB with A/B measurements. Residue: occlusion
+      culling and a spatial index — neither blocks anything.
+- [ ] **R-8 follow-ups:** (a) one comparator carrying §66 keys 3 and 4 — a real design
+      question (which key wins for transparent content), staged rather than guessed;
+      (b) a bound over a §36 particle system's _live_ particles (today its item is
+      `frustumCulled: false` as data — the shared instance quad's bounds are a square at
+      the emitter); (c) sweep `tests/` for options objects with fields the target type
+      does not declare — three found in `tests/integration` by R-8; `tests/` sits
+      outside every tsc project, so excess-property checking never runs there.
+- [x] **PH-8 — §26/§27 force fields for rigid bodies.** Closed 2026-08-09: `ForceField` +
+      `ForceFieldSystem` at §39's `PRIORITY_FORCES`, `PhysicsWorld.forEachActiveBody`,
+      required per-field units, structural reuse of `@four/particles`' §27 field set with
+      no new §3.1 edge, new same-runtime golden
+      `tests/determinism/golden/force-fields.json`.
+- [x] **PH-12 — §8 space modes, physics tier.** Closed 2026-08-09: `SpaceMode` vocabulary
+      in `@four/core`, `RigidBody.space`, `PhysicsWorld.addBody` enforcing §8's sentence
+      with two distinct refusals, §79 round trip.
+- [ ] **§8 node-level `NodeSpace` component (PH-12 remainder).** One packet, three parts
+      that cannot be split: the component class, its §79 serializer, and its registration
+      in `registerSceneNodeTypes` (`packages/four/src/scene-serializers.ts`) — a
+      component with a `static typeName` and no registered serializer makes
+      `serializeScene` throw. Should land with the render-side consumer that gives
+      `screen`/`viewport`/`camera`/`billboard` a meaning (§47/§48/§74). Owner: whoever
+      takes the screen-space UI packet.
+- [ ] **§21 `"local-plane"` simulation frame (PH-12 remainder).** A plane descriptor on
+      the world plus a mapping in `PhysicsWorld`'s feed and publish passes; `addBody`
+      refuses the mode loudly until then. Touches the step path — needs its own
+      determinism golden.
+- [ ] **§27 field torque and field-driven waking (PH-8 remainders).** Both deliberately
+      absent with recorded reasons: §27's `sample` names no angular channel, and
+      automatic waking needs a per-entry `wakesSleepingBodies` flag plus a policy for two
+      entries that disagree.
+- [x] **R-10 keys 3–4 DONE 2026-08-09 (key 3 shipped, key 4 staged on R-8)** —
+      `groupRenderListByPipeline` puts §66's key 3 in a second verb, stably, with
+      `RenderItem.materialId` as its material half; `buildRenderList` untouched and every
+      existing scene byte-identical. Key 4 deferred on `R-8`'s per-view list with a dated
+      argument (one list, many views ⇒ a depth key would be wrong, not merely
+      disruptive).
+- [x] **R-9 DONE 2026-08-09 (consecutive-run tier)** — §65 sprite and compatible-shape
+      batching: `RenderBatcher` (`@four/render`) + `createGlBatching()`
+      (`@four/render-webgl`), opt-in per renderer and 0 B in bundles that do not ask.
+      Drawn through the existing unlit program (no new pipeline, no shader edit); pixel-
+      identical on SwiftShader (0/76 800 differ, 13 draws → 3); 100 k sprites → 7 draws,
+      50 k shapes → 4. Two §86 rows moved from feature-blocked to half-measured.
+- [ ] Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09):
+      instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals);
+      glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas
+      material batch as they are); texture-atlas _grouping_ of distinct textures (needs a
+      packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's
+      idle-scene row — today a batched run re-uploads every frame); making batching the
+      default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
+      already costs every bundle +0.17 kB).
+- [ ] `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation
+      (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win
+      is in list construction, not in batching. Worth a look together with `R-8`'s
+      per-view restructure.
+- [x] **R-36 DONE 2026-08-09 (helper tier)** — `Node.lookAt(target, up?)` +
+      `Node.getWorldDirection(out)` over `Quaternion.setFromLookDirection`; −Z confirmed
+      as every node's forward, world-space target with the parent rotation divided out,
+      §85 refusals, `same-runtime` determinism. `getWorldDirection` hoisted off the two
+      light classes; `Matrix4.decompose` now shares one Shepperd implementation (goldens
+      bit-identical, `matrix4.ts` to 100%). 36 tests. **Rig half still open.**
+- [ ] **§44/§47 camera rigs (R-36 rig half + PH-11)** — orbit, fly, first-person,
+      trackball, follow target, spring arm, shake/impulse, path animation, physics
+      attachment; plus §12's orbit motion and character controllers. Build on
+      `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
+      which has no producing system: seam is a `LookAtConstraint` component + a system
+      at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
+- [ ] **Examples still hand-roll their orientations (R-36 follow-up)** —
+      `examples/first-3d-scene/main.ts:151` (camera pitch) and `:219-220` (sun yaw∘pitch)
+      are the code `lookAt` exists to replace. Left in place deliberately: `lookAt`
+      derives the quaternion through `sqrt` where these use `sin`/`cos`, so the swap
+      could move a pixel golden. Needs a packet that can run `pnpm test:browser`.
+- [ ] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — first-3d
+      31.30/31.5, ui-demo 36.73/37, particles-demo 28.70/29 (each +0.50 kB gzip;
+      `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed
+      bumps, owner call: first-3d → 32 kB, ui-demo → 37.5 kB, particles-demo → 29.5 kB.
+      The concurrent render batching work is consuming the same headroom.
 - [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
       `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
       fallback, dashes with phase offset) over `expandStroke` in §52's tessellation

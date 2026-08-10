@@ -8,6 +8,249 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — R-8 closed: §64 per-view render lists, §87 frustum culling, §66 key 4
+
+#### Added
+
+- **§64 per-view render lists and §87 frustum culling (gap `R-8`).** The frame builds
+  **one** render list and each viewport now _derives_ its own from it:
+  `buildViewRenderList(source, view, out, { frustum })` in `@four/render` applies §46's
+  layer mask (§48's `view.layerMask`-else-`camera.layers` fallback) and §87's frustum
+  test, keeping the surviving items in order and sharing the frame list's pooled item
+  objects, so a view costs one linear scan and no allocation. The substrate is
+  `@four/math`'s new **`Frustum`** — the six normalized clip planes of a view-projection
+  matrix, extracted for either `DepthRange` convention, with a conservative
+  `intersectsSphere` — and `@four/render`'s **`computeWorldBoundingSphere`**, which turns
+  §53's cached local box into a world-space sphere by the absolute-value transform (never
+  too small, so a cull can never remove something visible). §49's **`frustumCulled`**
+  lands on `Renderable`, defaults to `true`, and round-trips through §79. The WebGL 2
+  backend derives and culls per view; §69's shadow map is still built from the _frame's_
+  list before the view loop, so a caster no camera can see still occludes.
+- **§66 sort key 4 (gap `R-10`).** `sortRenderListByDepth(list, viewMatrix)` sorts a
+  view's own list by depth — opaque near-to-far, transparent far-to-near — under keys 1
+  and 2 and above key 5. A **verb, not a default**, for key 3's reason: under §61's
+  `LEQUAL` a depth sort permutes co-planar opaque draws, and co-planar opaque draws are
+  what a 2D scene is made of. It could not have been written before `R-8`: one list
+  served every view, so a depth measured along one camera would have misordered the rest.
+- `benchmarks/view-culling.mjs` + `benchmarks/results/view-culling.json` — not a §86 row;
+  the measurement behind `R-8`'s design decision (derive per view against traverse per
+  view, at 10 000–100 000 nodes × 1–4 viewports) and the CPU price of the cull itself.
+- `tests/browser/culling.spec.ts` (+ `fixtures/culling-page.ts`) — the pixel half: the
+  same scene drawn with §49's flag on and off, compared **exactly**. Measured on
+  ANGLE/SwiftShader: **0 of 76 800 pixels differ**, 19 draws → 10.
+
+#### Changed
+
+- `@four/render-webgl`'s view loop no longer tests `item.layers` inline; it draws the list
+  `buildViewRenderList` derived. Consequence, stated because it is observable: a batch run
+  may now span an item the _frame_ list had between its members — a masked-out or culled
+  draw no longer ends a run. This is strictly better batching and exactly as correct, since
+  the skipped item is not submitted into that view at all. `RenderBatching.next`'s
+  `layerMask` becomes optional and the renderer no longer passes one.
+- `RenderItem` carries two new snapshots, `frustumCulled` and `viewDepth`. Hand-built item
+  literals need both (a `tsc`-only break — Vitest does not typecheck).
+- **Bundle:** +0.77 kB gzip in every bundle carrying `WebglRenderer` (§64 lists culling as
+  a _stage_, not an option, so the culler is referenced unconditionally). Budgets bumped
+  with the same-tree A/B measurements: first-3d-scene 31.5 → 32.5 kB, particles-demo
+  29 → 30 kB, ui-demo 37 → 38 kB. `sortRenderListByDepth` tree-shakes out of bundles that
+  do not call it.
+
+#### Fixed
+
+- Three integration harnesses were rendering nothing and asserting draw counts for it.
+  `new OrthographicCamera({ height: 4, aspect: 1 })` names two fields
+  `OrthographicCameraOptions` does not have, so the object was accepted and every property
+  ignored, leaving the default unit box `[-1, 1]²`; `render-batching.test.ts`'s camera sat
+  at the origin with content at `z = 0`, in front of its own near plane. Culling made all
+  three visible by removing the draws. `frame-statistics.test.ts`,
+  `renderer-context-loss.test.ts` and `render-batching.test.ts` now use cameras that can
+  see their scenes.
+
+### 2026-08-09 — PH-8 and PH-12 closed: §26/§27 force fields for bodies, §8 space modes
+
+#### Added
+
+- **§26/§27 force fields for rigid bodies (`PH-8`).** `@four/physics` gains `ForceField` — §27's
+  interface, transcribed — and `ForceFieldSystem`, the engine occupant of §39's step 5 ("force
+  generation") at `PRIORITY_FORCES`. It samples every registered field at every dynamic, awake
+  body once per fixed step and applies the sum through §26's `applyForce`. Units are declared per
+  field and the argument is **required**: `"force"` (newtons, as authored) or `"acceleration"`
+  (m/s², multiplied by the body's mass), because §27's own built-in list mixes the two.
+  `PhysicsWorld.forEachActiveBody(visit)` is the §22/§32-filtered, registration-ordered (§33)
+  iteration it walks, handing over each body's solver-read world-space centre of mass (§25).
+  `ParticleForceField` from `@four/particles` is structurally identical, so every built-in field
+  there works here with no adapter, no cast and **no new §3.1 dependency edge**;
+  `tests/integration/physics-force-fields.test.ts` is where the two declarations are type-checked
+  against each other. `world.step` was not edited — fields reach the solver through the same §26
+  command buffer user code uses — so every existing determinism golden is untouched by
+  construction. New golden `tests/determinism/golden/force-fields.json` (same-runtime tier, real
+  Rapier 2D, 300 steps, twelve bodies, four fields).
+- **§8 space modes (`PH-12`).** `@four/core` gains the §8 vocabulary — `SpaceMode`,
+  `SPACE_MODES`, `DEFAULT_SPACE_MODE`, `isSimulationSpaceMode` — and `@four/physics` gains
+  `RigidBody.space` (also `RigidBodyDescriptor.space`), the frame a body is solved in.
+  `PhysicsWorld.addBody` now enforces §8's sentence: the four presentation frames are refused
+  because "screen-space UI should not automatically participate in physical simulation unless
+  explicitly mapped to a simulation plane", and `"local-plane"` is refused separately because
+  §21's plane→XY mapping is unbuilt — two messages, because the fixes differ. The default is
+  `"world"` and `toDescriptor()` omits it there, so no existing body, descriptor, document or
+  solver call changes. The space round-trips through §79 (written only when non-default, read as
+  a defaulted field), because dropping it would turn a body every world refuses into one every
+  world accepts after a reload.
+
+### 2026-08-09 — R-10 keys 3–4 and R-9 closed at tier: §66 pipeline grouping and §65 batching
+
+#### Added
+
+- **`groupRenderListByPipeline(list)` (`@four/render`)** — §66's **sort key 3**, pipeline
+  and material compatibility, as a **second verb** rather than a mode of `buildRenderList`.
+  It re-sorts an already-built list with key 3 inserted between keys 2 and 5, stably, so a
+  scene already grouped is unchanged and a scene of one pipeline and one material is left
+  exactly as it was. `buildRenderList` is untouched, so every existing scene keeps the order
+  it has had since 2026-08-06 — byte for byte. The reason key 3 is offered and never imposed
+  is recorded in source and is a **correctness** argument, not a byte-identity one: §61 fixes
+  the depth comparison at `LEQUAL`, so of two opaque surfaces at one depth the later draw
+  wins, and all of this engine's 2D content sits at one depth. Grouping by material would
+  therefore _repaint_ a 2D scene — it is what makes a §58 stroke cover its own fill (R-16)
+  and a later sibling cover an earlier one.
+- **`RenderItem.materialId` (`@four/render`)** — the material half of key 3, snapshotted at
+  generation time; `kind` was already the pipeline half. Two fields rather than one
+  concatenated key, because `${kind}:${id}` would allocate a string per item per frame.
+  `""` for a particle system, which has no material, and for a structural material double
+  predating §57's `id` — `undefined < undefined` is false in both directions, which is not a
+  total order.
+- **§65 batching (`RenderBatcher` in `@four/render`, `createGlBatching()` in
+  `@four/render-webgl`)** — **sprite batching and compatible shape batching**: consecutive
+  render items sharing a pipeline **and a material instance** merge into one `drawElements`.
+  The planner concatenates a run into one interleaved vertex stream (position, then uv iff
+  the material samples, then colour iff it declares `vertexColors`) plus one 32-bit index
+  stream, baking each item's world transform into its vertices; the backend owns two buffers
+  and one vertex array per layout and issues the single draw. A batch draws through the
+  **existing unlit program** — no sixth pipeline is compiled and no shader was edited: a
+  sprite batch uploads its tint as `color` and carries uv per vertex, and `tint × texel`
+  versus `texel × tint` is bit-identical arithmetic.
+- **`WebglRenderer.batching`** — the opt-in field, `null` by default (the
+  `WebglRenderer.statistics` precedent). With none assigned the backend issues exactly the
+  GL sequence it always did: the field is read once per frame and costs one `null`
+  comparison per item. Opt-in because nothing reachable from a class method tree-shakes, and
+  three of the six size budgets sit within 1 kB of their limit; the type is imported
+  `import type`, so a bundle that never calls `createGlBatching` links neither module and
+  pays **0 B** (measured both ways).
+- **`benchmarks/render-batching.mjs`** and its record — §86's _batched sprites (100 000)_ and
+  _simple batched shapes (50 000)_ rows, preparation half. Both rows leave the **feature**
+  column of `benchmarks/README.md` for **half**.
+- **`tests/browser/batching.spec.ts`** — the pixel half, against ANGLE/SwiftShader: the same
+  scene rendered batched and unbatched into one canvas, read back in the same task.
+  **0 of 76 800 pixels differ**, 13 draw calls become 3. The spec bundles its own fixture
+  with Vite's JS API rather than adding a tenth example site and a tenth preview server.
+- **`tests/integration/render-batching.test.ts`** — the three claims that live only in the
+  composition: identical GL transcripts with and without a batcher over a scene that has
+  nothing to batch, the merged stream equal to the world-space geometry of the draws it
+  replaced, and §66 key 3 turning an interleaved scene from four unbatchable draws into two
+  batches (the recorded `R-10 → R-9` dependency, demonstrated).
+
+#### Changed
+
+- **§66 key 4 (depth) is deferred on `R-8`, not on "needs a camera".** The note in
+  `render-list.ts` now says why the old reason was too weak: this backend builds one list per
+  frame and draws it into every view, so a depth key measured along one camera would order
+  the others by the wrong number. A key 4 written today would be _wrong_, not merely
+  disruptive.
+- **`benchmarks/README.md`** — eight scripts; the batched-sprite and batched-shape rows are
+  rewritten from "there is no sprite batching" / "there is no shape system to batch" to
+  **half** rows, and the summary sentence moves from "five measured … three feature-blocked"
+  to "seven measured or partly measured … one feature-blocked (mesh instancing)".
+
+#### Measured
+
+- **The batcher costs the bundles that do not use it +0.17 kB gzip**, all of it the seam (the
+  field, the branch in the draw loop, `materialId`) — the batcher itself tree-shakes away.
+  first-2d 42.88 → 43.05, first-3d 31.11 → 31.30, particles 28.55 → 28.70, ui-demo
+  36.56 → 36.73, motor-twin 937.81 → 937.99 kB; every budget still met, none moved.
+- **100 000 atlas sprites become 7 draw calls and 50 000 rectangles become 4** — one per
+  65 536 vertices, which is the only thing that splits a run of one material. On the recorded
+  (GPU-less, shared) host their _preparation_ costs 78.4 ms and 38.7 ms per frame, so both
+  §86 rows remain unmet as whole rows and are now bounded by CPU preparation rather than by
+  draw calls; about half of that is `buildRenderList`, which the unbatched frame pays too.
+
+### 2026-08-09 — R-36 closed (helper tier): §44/§47's `lookAt` and orientation helpers
+
+#### Added
+
+- **`Node.lookAt(target, up?)` (`@four/scene`)** — the §44/§47 helper the tree had nowhere
+  at all: aiming a camera or a light meant hand-composing quaternions, which the
+  `first-3d-scene` packet recorded as the roughest edge of writing a 3D scene. It turns the
+  node so its **−Z axis** points at a **world-space** `target`, with +Y as near `up` as the
+  aim allows (`up` defaults to world +Y, §7a). It lives on `Node` rather than on `Camera`
+  because −Z is _every_ node's forward, not a camera's privilege — the same call aims a
+  `DirectionalLight` or a `SpotLight` (§68). Under a parent the local rotation is derived as
+  `conjugate(parentWorldRotation) · worldRotation`, so a node on a rotated, translated, or
+  uniformly scaled rig aims correctly; a non-uniformly scaled parent inherits
+  `Matrix4.decompose`'s documented closest-rotation limitation, and a zero-scaled one
+  decomposes to the identity so the aim lands in world terms.
+- **`Node.getWorldDirection(out)` (`@four/scene`)** — the inverse: the world-space unit
+  vector a node faces. **Hoisted** from `DirectionalLight` and `SpotLight`, which carried two
+  byte-identical copies; both are deleted and both classes inherit it unchanged, so the
+  `@four/render` structural light contract is untouched and the bundle is one copy lighter.
+- **`Quaternion.setFromLookDirection(direction, up)` (`@four/math`)** — the primitive under
+  both. Neither argument need be unit and `up` need not be perpendicular; the basis is
+  `z = normalize(−direction)`, `x = normalize(up × z)`, `y = z × x`, converted with
+  Shepperd's method. Allocation-free (the basis lives in plain scalars) and the change hook
+  fires exactly once.
+- **`packages/scene/tests/look-at.test.ts` (28 tests)** and
+  **`tests/integration/look-at.test.ts` (8 tests)** — the integration suite pins the four
+  claims no single package can: the aim survives the §7 → §47 chain (a lookAt'd camera
+  projects its target to the centre of clip space), `@four/render`'s `collectSceneLights`
+  reads the same axis, the umbrella barrel exposes it, and it is a `"manual"` write a §42
+  owner then drives without either side warning.
+
+#### Changed
+
+- **`Matrix4.decompose` and `Quaternion.setFromLookDirection` share one Shepperd
+  implementation** (`setQuaternionFromBasis`, module-internal to `quaternion.ts`, not in the
+  barrel). The arithmetic and branch order moved verbatim — every `tests/determinism/*`
+  golden is unchanged, bit for bit — and `matrix4.ts` coverage rose 98.58% → 100% because the
+  look-at tests reach the branch its own suite never did.
+
+#### Decisions
+
+- **Forward is −Z for every node.** Verified against `Matrix4.setPerspective`,
+  `Camera.updateViewMatrix` (`inverse(worldMatrix)`), and §68's light axis rather than
+  asserted; a test builds the classic gluLookAt view matrix independently and compares all
+  sixteen elements, so `lookAt` produces exactly what `updateViewMatrix` inverts.
+- **The target is world-space, always.** It is the only contract under which "point the
+  camera at the player" is one call and under which the call keeps meaning the same thing
+  when the node is reparented onto a moving rig — §44's follow-rig and spring-arm case.
+- **Degenerate aims are refused, not repaired (§85).** `Node.lookAt` throws
+  `FourError("INVALID_SCENE_GRAPH")` — the code `Node.add` already uses for §85's
+  scene-graph rule — when the target coincides with the node's world position or when `up`
+  is zero, non-finite, or parallel to the aim (the top-down aim with the default +Y is
+  exactly this case, and wants an explicit `up` such as world −Z). Picking a fallback `up`
+  would silently rewrite the orientation the caller asked for; leaving the node unturned
+  would be indistinguishable from a frozen rig. The **math** primitive, by contrast,
+  validates nothing and leaves its quaternion untouched on degenerate input without firing
+  the hook — the layer split `Matrix4.setPerspective` already states.
+- **`lookAt` neither checks nor warns about §42 authority.** It is an ordinary _manual_
+  transform write, identical to `node.rotation.setFromAxisAngle(...)`, and §42's enforcement
+  is writer-side by design. Warning would make it the only self-policing write in the engine
+  and would fire on aiming a `"physics"`-owned body at its starting pose.
+- **§33 tier: `same-runtime`.** Pure quaternion arithmetic from exact inputs — bit-identical
+  across repeated calls and bit-idempotent on re-aim (both asserted with `toBe`) — but
+  `sqrt` on the path keeps the claim at §33's initial tier.
+
+#### Known / deferred
+
+- **§44/§47's camera rigs are still unshipped** (orbit, fly, first-person, trackball, follow,
+  spring arm, shake, path animation, physics attachment). `lookAt` is the primitive they will
+  be built on, not a substitute — `R-36`'s rig half and all of `PH-11` remain open.
+- **The examples still hand-roll their orientations.** `examples/first-3d-scene/main.ts`
+  aims its camera and sun with `setFromAxisAngle`; replacing them derives the quaternion
+  through `sqrt` where the current code uses `sin`/`cos`, which could move a pixel golden.
+  Deferred to a packet that can run the browser gate.
+- **Bundle cost**: +0.50 kB gzip in every bundle that carries `@four/scene` (measured A/B:
+  first-3d 30.80 → 31.30 against a 31.5 kB budget; ui-demo 36.23 → 36.73 against 37;
+  particles 28.20 → 28.70 against 29). All budgets pass; the headroom left is 0.20–0.30 kB
+  and a bump is proposed in `TODO.md`.
+
 ### 2026-08-09 — R-16 closed: §58 paints, fills and strokes; §50's family complete
 
 #### Added

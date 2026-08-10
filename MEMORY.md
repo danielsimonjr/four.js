@@ -28,6 +28,305 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-09 — R-8 §64 per-view lists + §87 culling (+ R-10 key 4).** Decisions worth
+  keeping:
+  - **The frame's list is the model; a view's list is a query over it.** The rejected
+    alternative (`buildRenderList` per view) loses on three independent grounds, and only
+    the third is about speed: (1) **traversal has side effects** — it calls
+    `updateParticleInstances()` and rebuilds a `Sprite`'s quad — so rebuilding per view
+    would make _the work a frame does_ depend on how many viewports were configured;
+    (2) **§69's shadow map is frame state**, and a base list no view has touched is what
+    makes R-18's pass expressible at all; (3) measured, `benchmarks/view-culling.mjs`:
+    the two arms are within noise at one view and the rebuild costs 1.34–1.39× at two,
+    1.90–2.65× at four. Generalizes: when a stage has side effects, "do it once and query
+    the result" is a correctness argument before it is a performance one.
+  - **A derived list is a subsequence, and that is the whole byte-identity argument.**
+    Items removed, never reordered, sharing the _same pooled objects_ — so a view that
+    filters nothing is the frame list item for item, and replacing the backend's inline
+    `item.layers & mask` test changed no GL call. `FRAME_BEFORE_R8` (54 calls, every
+    pipeline) recorded on the reverted build.
+  - **Culling is default-on and that is the honest reading of §64.** §64 lists culling as
+    a _stage_, not an option, and §49's `frustumCulled: true` default is meaningless
+    unless culling runs. A cull that removes nothing is byte-identical by construction;
+    one that removes something invisible changes no pixel — proved exactly rather than
+    within a tolerance: **0 of 76 800 pixels differ** on ANGLE/SwiftShader.
+    `batching.spec.ts` needs a tolerance because a batch re-evaluates a product; a cull
+    touches nothing it keeps.
+  - **A bound that is too small is a bug; a bound that is too loose is a draw.** The
+    cheap radius (local circumradius × longest matrix column) is **wrong**: the largest
+    singular value can exceed every column norm, so it can under-estimate. The shipped
+    radius is the circumradius of the world AABB obtained by the absolute-value transform
+    `|M|·e` — one `sqrt`, conservative by construction, pinned by a 64-angle rotation
+    sweep and an all-eight-corners containment test.
+  - **A sphere, not a box, and the reason is per-item cost.** A sphere is
+    rotation-invariant, so the derivation is a point transform plus a scalar with nothing
+    to cache and nothing to invalidate. §87's structures (BVH, quadtree, grid) are an
+    index; this tier is the _test at the bottom of all of them_, and §87's "the public
+    scene graph must not be forced to mirror a spatial tree" is what makes a linear scan
+    an honest first tier.
+  - **Every degenerate input fails towards drawing.** §61 forbids throwing in a frame, so
+    §85's refusals cannot apply: a zero-length plane normal is written as `(0,0,0,+∞)` (a
+    degenerate frustum culls _nothing_, never _everything_), a `NaN` centre or radius
+    makes `intersectsSphere` answer `true` by ordinary IEEE comparison, and
+    `computeWorldBoundingSphere` returns `false` for an empty geometry, a non-finite
+    matrix, or a geometry with no `computeBounds`. Written down because the opposite sign
+    on any one of them empties a viewport silently.
+  - **The particle exemption is data, not a `kind` check.** `buildRenderList` writes
+    `frustumCulled = false` on every particle item, because the item's `geometry` is the
+    shared unit quad the particles are _instanced_ from — its bounds are a square at the
+    emitter. The culler therefore has no §36 special case.
+  - **§66's key 4 is a verb for key 3's reason, and could not have been written
+    earlier.** "Needs a camera" was the weak reason; the real one was that one list
+    served every view, so a depth measured along one camera would have misordered the
+    rest — _wrong_, not disruptive. R-8 supplied the per-view list and the key shipped
+    the same day. It stays opt-in because under `LEQUAL` a depth sort permutes co-planar
+    opaque draws. Key 3 and key 4 are **alternatives** at this tier: §66 orders them
+    pipeline-then-depth, which gives depth ordering only within a material group and so
+    destroys the one thing depth sorting is for.
+  - **`R-37`'s `layerMask` was never `R-8`'s to ship** — `Viewport.layerMask` landed with
+    `R-38` on 2026-08-08. The gap document's `R-8` row said otherwise and was stale when
+    written. Rule: a blocker sentence naming _another row's_ residue has to be re-checked
+    against source, not inherited.
+  - **Pre-filtering lengthens batch runs, and that is correct.** `RenderBatcher.next`
+    stops at a masked-out item deliberately (a later view might draw it). Handed a list
+    already reduced to what _this_ view draws, it merges across the gap — the skipped
+    item is not submitted here at all. One recorded behaviour change; `next`'s mask
+    parameter stays for unfiltered callers, and `GlBatching` forwards `undefined` rather
+    than branching (a JS default parameter applies to an explicit `undefined` — worth
+    remembering, it removed the only uncovered branch in the file).
+  - **Finding: an options object whose fields the class does not have is silently
+    ignored, and `tests/` is outside every `tsc` project.**
+    `new OrthographicCamera({ height: 4, aspect: 1 })` in three integration harnesses
+    left the default unit box `[-1, 1]²`, so those suites had been asserting draw counts
+    for frames that produced **no pixels**; `render-batching.test.ts` hit the recorded
+    near-plane gotcha instead (camera at the origin, content at `z = 0`). Culling found
+    all three by removing the draws. Excess-property checking would have caught it — the
+    same hole `pnpm run docs` closes for package sources but not for `tests/`.
+  - **Gotcha, third confirmation:** a new required field on `RenderItemBase` breaks
+    hand-built item literals only under TypeDoc/tsc, never under Vitest. Two fields this
+    time (`frustumCulled`, `viewDepth`), one literal.
+  - **Gotcha, second confirmation of R-9's:** `TestGeometry` has no `computeBounds`, and
+    it was left that way on purpose — that keeps all 400+ existing backend tests on the
+    "cannot be bounded ⇒ drawn" path and makes the byte-identity argument structural. A
+    `BoundedTestGeometry` subclass opts the new suite in.
+  - **Measured: +0.77 kB gzip in every bundle** (first-3d 31.30 → 32.08, particles
+    28.70 → 29.45, ui-demo 36.73 → 37.50, first-2d 43.05 → 43.82, twin +0.79 kB), a
+    same-tree A/B. Comparable to R-6's 0.75 kB pipeline law and unavoidable while §64
+    stage 3 is a stage: the renderer references the culler unconditionally.
+    `sortRenderListByDepth` **does** tree-shake (`viewDepth` appears exactly three times
+    in the first-3d bundle — the three writes, none of the comparator's six reads).
+    Budgets bumped: first-3d 31.5 → 32.5, particles 29 → 30, ui-demo 37 → 38 kB.
+  - **The cull is not free, and the benchmark says so out loud:** 0.17–0.40 µs per item
+    per view. It buys back a draw call and its uniform uploads, which is backend work a
+    headless script cannot measure — so `benchmarks/view-culling.mjs` states the CPU
+    price and declines to claim a net win.
+- **2026-08-09 — PH-8 §26/§27 force fields for bodies + PH-12 §8 space modes.** Decisions
+  worth keeping:
+  - **The gap was the seam, not the halves.** §26's six methods shipped in Phase 5 and
+    §27's built-in field set shipped in WP-9.2; a field could push a _particle_ and not a
+    _body_. Generalizes: a row that reads "§X is silent" may mean "§X's two ends exist
+    and nothing joins them" — re-read the section before sizing the packet.
+  - **§39's own step list is the design.** Force generation is step 5 and the solve is
+    step 6, so the occupant is a **separate `SimulationSystem` at `PRIORITY_FORCES`**,
+    not a pass inside `PhysicsWorld.step`. Three things fall out free: `world.step` is
+    not edited, so every determinism golden is untouched _by construction_; §27's `time`
+    is `context.time.simulationTime`, so no world-side clock or accumulated time had to
+    be invented (§33); and a second generator orders against the first by number.
+    **Reusable technique** — the physics-tier form of R-23's "close a gap by adding
+    nothing to the frame path".
+  - **A field's units must be stated, and the argument is the reuse path.** §27's
+    built-in list mixes accelerations (uniform/radial gravity) with forces (wind, drag
+    volume), and `@four/particles` documents _every_ field as an acceleration because MVP
+    particles carry no mass. So `addField(field, units)` takes
+    `"force" | "acceleration"` as a **required** argument: a default would make the one
+    predictable unit error unwritable to notice on exactly the path the packet
+    advertises. §41's SI envelope applied to a seam rather than to a number.
+  - **`ParticleForceField` and `ForceField` reconcile structurally, as `types.ts`
+    predicted in 2026-08-02.** No adapter, no cast, no §3.1 edge; the check lives in
+    `tests/integration/physics-force-fields.test.ts` because that is the only file
+    allowed to import both packages — the same arrangement `phase9-particles` uses for
+    `ParticleSystem`/`SimulationSystem`. §27's "volume-based inclusion and filtering"
+    then needed **nothing**: inclusion is a property of a field, and `volumeField`
+    already composes onto any conforming one, in both directions.
+  - **A "which bodies can a force move" filter belongs in the world, not in each
+    generator.** `PhysicsWorld.forEachActiveBody` is dynamic (§22: a force on a static
+    body is discarded work) **and awake** (§32: a non-zero force wakes a body, so a
+    persistent field visiting sleepers would wake everything every step and §32 would
+    stop meaning anything). Waking is `RigidBody.wake()`, an explicit command. Secondary
+    benefit, and the reason it exists as a method at all: it hands over
+    `(body, node, centreOfMass)` with **no optional types**, so the generator has no
+    unreachable `undefined` branch — the pattern to reuse when a public getter's "cannot
+    happen" arm would otherwise cost 100% branch coverage.
+  - **Sample at the centre of mass, not the transform origin** — §26 splits `applyForce`
+    from `applyForceAtPoint`, and a generator that sampled the origin would describe a
+    different place from the one it pushes (a compound body's origin can sit outside its
+    shape).
+  - **§42: a force is not a transform write**, so `ForceFieldSystem` performs no
+    authority check. Consistent with R-36's finding from the other side: enforcement is
+    writer-side, and §26 is the sanctioned channel for influencing a solver-owned body.
+  - **Gotcha, now confirmed for a _simulation_ package: `@four/physics` may not import
+    `DEV`/`devWarn`/`devWarnOnce` at all.** `tests/integration/dev-build-mode.test.ts`
+    fails twice over (unlisted file, and "GATED names no simulation package"). The idiom
+    is `RigidBody`'s: plain `console.warn` with a lazily-allocated once-per-subject
+    `Set`.
+  - **PH-12: §8's honest home for the _mode_ is `@four/core`, and for the _declaration_
+    is `RigidBody.space`.** The vocabulary is hoisted for the `DEFAULT_GRAVITY_Y` reason
+    (§8's two halves serve pillars that cannot import each other). Two refusals with two
+    messages — the presentation frames because §8 forbids them, `"local-plane"` because
+    §21's plane→XY mapping is unbuilt — because the fixes differ (an authoring mistake
+    vs. an unbuilt feature). `isSimulationSpaceMode` answers **§8's** question and not
+    the world's; they differ exactly at `"local-plane"`, and a test pins the difference
+    so nobody "fixes" the predicate to match the implementation.
+  - **Blocker worth remembering: a new component class cannot land in one package
+    alone.** A `static typeName` is §79's key, `serializeScene` **throws** on a component
+    with no registered serializer, and `packages/four/tests/scene-serializers.test.ts`
+    enumerates every exported class carrying one. So class + serializer +
+    `registerSceneNodeTypes` registration are **one packet**, always — which is why
+    PH-12's node-level `NodeSpace` was built, measured against the gate, and withdrawn in
+    favour of `RigidBody.space`. New instance of the cross-package-packet class alongside
+    A-6's world-front-door and R-38's registry.
+  - **A refused value must still round-trip (§79).** `RigidBody.space` is written only
+    when non-default and read as a _defaulted_ field, because dropping it would turn a
+    body every world refuses into one every world accepts after a save-and-reload — the
+    same class of lie `derivedMass` was split out of `mass` to prevent.
+  - **Measured:** physics coverage stays 100×4 with `force-field.ts` and the new
+    `world.ts` method at 100%; core rises to 99.49/99.15. Bundle impact **0 B** on all
+    four tight budgets — none carries `@four/physics`, and the three new `@four/core`
+    exports are unreferenced named bindings under `"sideEffects": false`.
+  - Gotcha, repeat (third time recorded): **vitest does not typecheck.** Two test-only
+    errors (`ComponentSerializerShape.deserialize` takes `(data, node)`) surfaced only
+    under `typedoc`.
+- **2026-08-09 — R-10 keys 3–4 + R-9 §65 batching.** Decisions worth keeping:
+  - **§66's key 3 cannot be a default, and the argument is correctness rather than
+    byte-identity.** §61 fixes the depth func at `LEQUAL`, so of two _opaque_ co-planar
+    surfaces the later draw wins — which is what makes a §58 stroke cover its fill (R-16)
+    and a later sibling cover an earlier one. All 2D content sits at one depth, so
+    grouping by material **repaints** a 2D scene rather than merely permuting its GL
+    calls. §66 lists key 3 for depth-resolved content and no item property distinguishes
+    that from co-planar 2D. Shipped as a **second verb** (`groupRenderListByPipeline`),
+    R-6's technique reused: the first verb stays byte-identical by not being edited at
+    all.
+  - **Key 4 was deferred for the wrong reason until now.** "Needs a camera" is weak; the
+    real blocker is R-8 — one list serves every view, so a depth key measured along one
+    camera orders the others by the wrong number. A key written before R-8 would be
+    _wrong_, not disruptive. Generalizes: a deferral whose stated reason is weaker than
+    the real one invites someone to ship it the day the weak reason expires.
+  - **Batching consecutive same-material runs is exact, not approximate.** GL rasterises
+    a draw call's primitives in submission order and blending/depth respect it, so
+    merging N consecutive draws that share all state into one, primitives concatenated in
+    order, is the same picture — the `LEQUAL` case included. "Same material **instance**"
+    (`===`) is what makes it checkable in one comparison: every §57 state field lives on
+    that object, so a run cannot straddle a state change. **Measured on ANGLE/SwiftShader:
+    0 of 76 800 pixels differ**, with a rotated sprite row and a §55 atlas.
+  - **A batch needs no new pipeline.** Sprites batch through the **unlit** program with
+    the tint as `color` and uv per vertex; `tint × texel` and `texel × tint` are
+    bit-identical (float multiply is commutative). Second application of R-23's "close a
+    gap by adding nothing to the frame path" to a _backend_: no shader was edited, so the
+    goldens were never at risk. The uv-per-vertex move is the one `render-list.ts`
+    predicted in 2026-08-08.
+  - **The one divergence is stated, not hidden**: a batch has one model matrix, so world
+    transforms are baked on the CPU. Geometrically identical, not _claimed_
+    bit-identical — and the browser gate compares a batched scene against itself rather
+    than against an unbatched golden, because the guarantee is about the design and not
+    about one rasteriser's luck.
+  - **A capability can be opt-in and still tree-shake to zero.** `WebglRenderer.batching`
+    is an `import type`-only field assigned by the application (`createGlBatching()`), so
+    a bundle that never calls the factory links neither `gl-batch.ts` nor
+    `@four/render`'s planner: **0 B**, measured both ways. The seam itself still costs
+    **+0.17 kB gzip in every bundle** (field, branch, `materialId`) — an order of
+    magnitude cheaper than R-6/R-13/R-18's 0.75–1.9 kB pipeline law, and the price of not
+    paying that law again. A-4's build-time pipeline-selection seam remains the fix that
+    would make batching the default.
+  - **§33: batch assembly is a left-to-right scan with no `Map`, no `Set` and no
+    object-key iteration**; the GL side indexes four vertex arrays by a two-bit layout
+    number for the same reason. Layouts get one vertex array each rather than one
+    re-specified array — attribute pointers are VAO state, and an array that is
+    re-specified is an array someone must remember to disable attributes on.
+  - **§86's two batching rows are now bounded by CPU preparation, not by draw calls.**
+    100 000 sprites → 7 draw calls (14 286×) but 78 ms of preparation, of which ~34 ms is
+    `buildRenderList` — which the unbatched frame pays too. Both stay `half` rows; the
+    finding is that closing the draw-call gap moved the bottleneck rather than removing
+    it.
+  - **`R-28`'s "to be _good_" dependency on `R-9` has fallen**: glyphs that are sprites
+    over one atlas material batch with no further work, so R-28 is blocked on `R-30`
+    alone.
+  - Gotcha (test doubles): the WebGL backend's `TestGeometry` had no `vertexCount` — the
+    backend never needed it and the batcher does. A structural double is only as complete
+    as the last consumer that read it; adding a reader means auditing the doubles, and
+    the failure is a silently _unbatched_ frame, not a type error.
+  - Gotcha (browser gates): a page with content at `z = 0` and an orthographic camera
+    left at the origin renders **nothing** — the near plane clips it. Cost one debugging
+    cycle in the new gate; `examples/first-2d-scene` moves its camera to `z = 5` for this
+    reason.
+  - Technique worth reusing: a browser gate can build **its own fixture** with Vite's JS
+    API and inject it into a page served by an existing example's server. That buys
+    real-GL evidence for a feature that does not deserve a tenth example site or a tenth
+    preview server.
+- **2026-08-09 — R-36 `lookAt` and orientation helpers (helper tier).** Decisions worth
+  keeping:
+  - **−Z is every node's forward, not a camera's privilege.** `Node.lookAt` /
+    `Node.getWorldDirection` therefore live on `Node`, and one call aims a camera, a
+    `DirectionalLight`, or a `SpotLight`. The claim was _verified_ against three existing
+    sites (`Matrix4.setPerspective`, `Camera.updateViewMatrix = inverse(worldMatrix)`,
+    §68's light axis) and is pinned by a test that builds the classic gluLookAt matrix
+    independently and compares all sixteen elements — so `lookAt` produces exactly what
+    `updateViewMatrix` inverts, by test rather than by assertion.
+  - **`lookAt`'s target is world-space, always.** Under a parent the local rotation is
+    `conjugate(parentWorldRotation) · worldRotation`, the parent's rotation read via
+    `Matrix4.decompose` of its already-resolved world matrix. It is the only contract
+    under which the call survives reparenting onto a moving rig, which is §44's whole
+    follow-rig case. Non-uniform parent scale inherits `decompose`'s closest-rotation
+    limitation; zero parent scale decomposes to identity, so the aim lands in world terms.
+  - **The validation split follows the layer, not the call.** `@four/math` validates
+    nothing (the rule `Matrix4.setPerspective` already states): `setFromLookDirection`
+    leaves its quaternion **untouched and unhooked** on a zero/NaN direction or a
+    zero/parallel/NaN up — `Matrix4.invert`'s "refusing beats substituting a
+    plausible-looking wrong answer". `@four/scene` is the policy layer: `Node.lookAt`
+    makes the _same two tests_ on its own inputs and throws
+    `FourError("INVALID_SCENE_GRAPH")`, so a scene node never reaches the silent branch.
+    The top-down aim with the default +Y up is a **throw**, not a fallback roll — a
+    silent fallback rewrites the orientation the caller asked for and hides the mistake
+    (WP-3.3's no-silent-rewrites rule).
+  - **`Node.lookAt` does not check §42 authority, and that is the consistent answer, not
+    a shortcut.** Enforcement is writer-side everywhere in the engine
+    (`warnAuthorityConflict` is called by `MotionSystem`/`KinematicSystem`/`Tween`/
+    `AnimationMixer`/`AnimationController`, never by `Transform`), and **direct writes
+    never warn** — `node.rotation.setFromAxisAngle(...)` on a `"physics"` node is silent
+    today. `lookAt` _is_ the `"manual"` authority. Warning would make it the only
+    self-policing write in the engine and would fire on aiming a physics-owned body at
+    its starting pose. Pinned by two tests (helper silent under three foreign
+    authorities; the _system_ warns once).
+  - **One Shepperd implementation.** `setQuaternionFromBasis` (module-internal to
+    `quaternion.ts`, deliberately not in the barrel) is now shared by `Matrix4.decompose`
+    and `setFromLookDirection`. The arithmetic moved verbatim, so every determinism
+    golden is bit-identical — and `matrix4.ts` coverage rose 98.58% → **100%** because
+    the look-at tests reach a branch its own suite never did. **Gotcha for reviewers:**
+    any future edit to that function is a change to the physics/animation decomposition
+    path; the `tests/determinism/*` goldens are the guard.
+  - **`getWorldDirection` was hoisted, not duplicated.** `DirectionalLight` and
+    `SpotLight` carried two byte-identical copies; both were deleted and the doc
+    references retargeted to `Node.getWorldDirection`. `@four/render`'s structural light
+    predicates are unaffected — both are gated on the brand _before_ they probe for the
+    method, so every node now carrying `getWorldDirection` cannot misclassify.
+  - **Bundle gotcha: class methods on `Node`/`Quaternion` are never tree-shaken**, so a
+    helper on either is paid by _every_ bundle whether or not it is called. R-36 measured
+    **+0.50 kB gzip** across first-3d (30.80 → 31.30 / 31.5), ui-demo
+    (36.23 → 36.73 / 37) and particles-demo (28.20 → 28.70 / 29) in a same-tree A/B. All
+    pass; 0.20–0.30 kB of headroom is left, and the only lever that would have avoided
+    the cost — a free function `lookAt(node, target, up?)` — is exactly the ergonomics
+    R-36 exists to fix.
+  - **PH-11 is not this packet, and the reason is §42.** §12 calls it a look-at
+    _constraint_; §42 gives constraints the `"constraint"` authority, which still has no
+    producing system. A `faceTo` on `KinematicController` would write as `"kinematic"`
+    and pre-empt that design, and `steering.ts` has no node access by construction (pure
+    acceleration functions, no scratch) and should keep it. Named seam: a
+    `LookAtConstraint` component + a system at `PRIORITY_CONSTRAINTS` (empty today,
+    PH-21) calling `setFromLookDirection` per step under `"constraint"` authority.
+  - **Multi-agent note:** `pnpm lint`, `pnpm run docs` and repo-wide `prettier --check .`
+    can all be red from a _sibling's_ in-flight work while the tree is shared.
+    Scope-restricted runs are the honest gate when a sibling holds the tree:
+    `eslint <my paths>`, `typedoc --entryPoints <my packages>`,
+    `prettier --check <my paths>`.
 - **2026-08-09 — R-16 §58 paints, fills and strokes.** Decisions worth keeping:
   - **Two colours reach one draw as per-vertex colour**, not as two materials. §57's
     pipelines already multiply `vertexColors` (`R-19`), so a fill and a stroke share one

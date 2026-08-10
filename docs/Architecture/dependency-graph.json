@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-09",
-    "totalFiles": 204,
+    "totalFiles": 211,
     "totalModules": 24,
-    "totalExports": 1911
+    "totalExports": 1952
   },
   "entryPoints": [
     {
@@ -1585,6 +1585,15 @@
             "reExport": true
           },
           {
+            "file": "./space.js",
+            "imports": [
+              "DEFAULT_SPACE_MODE",
+              "SPACE_MODES",
+              "isSimulationSpaceMode"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./units.js",
             "imports": [
               "SI_UNITS",
@@ -1664,6 +1673,14 @@
             "typeOnly": true
           },
           {
+            "file": "./space.js",
+            "imports": [
+              "SpaceMode"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./units.js",
             "imports": [
               "AngleUnit",
@@ -1702,6 +1719,9 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "DEFAULT_SPACE_MODE",
+          "SPACE_MODES",
+          "isSimulationSpaceMode",
           "SI_UNITS",
           "angleFromDisplay",
           "angleToDisplay",
@@ -1735,6 +1755,7 @@
           "FourErrorOptions",
           "EventListener",
           "Unsubscribe",
+          "SpaceMode",
           "AngleUnit",
           "LengthUnit",
           "MassUnit",
@@ -1759,6 +1780,9 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "DEFAULT_SPACE_MODE",
+          "SPACE_MODES",
+          "isSimulationSpaceMode",
           "SI_UNITS",
           "angleFromDisplay",
           "angleToDisplay",
@@ -1791,6 +1815,7 @@
           "FourErrorOptions",
           "EventListener",
           "Unsubscribe",
+          "SpaceMode",
           "AngleUnit",
           "LengthUnit",
           "MassUnit",
@@ -1829,6 +1854,25 @@
         ],
         "classes": [
           "SeededRandom"
+        ]
+      },
+      "packages/core/src/space.ts": {
+        "description": "§8 *Space Modes* — the vocabulary, and the one rule §8 states (PH-12,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "DEFAULT_SPACE_MODE",
+          "SPACE_MODES",
+          "isSimulationSpaceMode"
+        ],
+        "functions": [
+          "isSimulationSpaceMode"
+        ],
+        "constants": [
+          "DEFAULT_SPACE_MODE",
+          "SPACE_MODES"
         ]
       },
       "packages/core/src/units.ts": {
@@ -5124,8 +5168,37 @@
           "parseColorRGB"
         ]
       },
+      "packages/math/src/frustum.ts": {
+        "description": "The six clip planes of a view-projection matrix (§87) — the primitive a",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./matrix4.js",
+            "imports": [
+              "DepthRange",
+              "Matrix4"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./vector3.js",
+            "imports": [
+              "Vector3"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "Frustum"
+        ],
+        "classes": [
+          "Frustum"
+        ]
+      },
       "packages/math/src/index.ts": {
-        "description": "Package entry point for @four/math (re-exports 20 symbols)",
+        "description": "Package entry point for @four/math (re-exports 21 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -5148,6 +5221,13 @@
               "srgbToLinear",
               "srgbToLinearRGB",
               "srgbToLinearRGBA"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./frustum.js",
+            "imports": [
+              "Frustum"
             ],
             "reExport": true
           },
@@ -5224,6 +5304,7 @@
           "srgbToLinear",
           "srgbToLinearRGB",
           "srgbToLinearRGBA",
+          "Frustum",
           "Matrix3",
           "Matrix4",
           "Quaternion",
@@ -5247,6 +5328,7 @@
           "srgbToLinear",
           "srgbToLinearRGB",
           "srgbToLinearRGBA",
+          "Frustum",
           "Matrix3",
           "Matrix4",
           "Quaternion",
@@ -5296,9 +5378,9 @@
           {
             "file": "./quaternion.js",
             "imports": [
+              "setQuaternionFromBasis",
               "Quaternion"
-            ],
-            "typeOnly": true
+            ]
           },
           {
             "file": "./vector3.js",
@@ -5337,10 +5419,14 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "setQuaternionFromBasis",
           "Quaternion"
         ],
         "classes": [
           "Quaternion"
+        ],
+        "functions": [
+          "setQuaternionFromBasis"
         ]
       },
       "packages/math/src/vector2.ts": {
@@ -7252,7 +7338,8 @@
             "directory": "packages/core",
             "imports": [
               "DEFAULT_GRAVITY_Y",
-              "FourError"
+              "FourError",
+              "SpaceMode"
             ]
           },
           {
@@ -7367,6 +7454,56 @@
           "JointBreakEvent"
         ]
       },
+      "packages/physics/src/force-field.ts": {
+        "description": "§27 force fields for rigid bodies, through §26's force API (PH-8,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./rigid-body.js",
+            "imports": [
+              "RigidBody"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./world.js",
+            "imports": [
+              "PhysicsWorld"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/motion",
+            "directory": "packages/motion",
+            "imports": [
+              "PRIORITY_FORCES",
+              "FixedUpdateContext",
+              "SimulationSystem"
+            ]
+          }
+        ],
+        "exports": [
+          "ForceFieldSystem"
+        ],
+        "classes": [
+          "ForceFieldSystem"
+        ],
+        "interfaces": [
+          "ForceField",
+          "ForceFieldEntry",
+          "ForceFieldSystemOptions"
+        ]
+      },
       "packages/physics/src/index.ts": {
         "description": "`@four/physics` — the stable, solver-independent physics API (§101, Part IV).",
         "externalDependencies": [],
@@ -7412,6 +7549,13 @@
               "resolveRotation",
               "resolveSleepingConfig",
               "widenToVector3"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./force-field.js",
+            "imports": [
+              "ForceFieldSystem"
             ],
             "reExport": true
           },
@@ -7626,6 +7770,17 @@
             "typeOnly": true
           },
           {
+            "file": "./force-field.js",
+            "imports": [
+              "ForceField",
+              "ForceFieldEntry",
+              "ForceFieldSystemOptions",
+              "ForceFieldUnits"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./joints.js",
             "imports": [
               "HingeJointOptions",
@@ -7763,6 +7918,7 @@
           {
             "file": "./world.js",
             "imports": [
+              "ActiveBodyVisitor",
               "BodyControlModeOptions",
               "PhysicsSnapshot",
               "PhysicsSnapshotConfiguration",
@@ -7801,6 +7957,7 @@
           "resolveRotation",
           "resolveSleepingConfig",
           "widenToVector3",
+          "ForceFieldSystem",
           "BallJoint",
           "FixedJoint",
           "HingeJoint",
@@ -7911,6 +8068,10 @@
           "SleepPhase",
           "TriggerEvent",
           "TriggerPhase",
+          "ForceField",
+          "ForceFieldEntry",
+          "ForceFieldSystemOptions",
+          "ForceFieldUnits",
           "HingeJointOptions",
           "JointBinding",
           "JointBreakPayload",
@@ -7983,6 +8144,7 @@
           "RotationInput",
           "SleepingConfig",
           "Vector3Input",
+          "ActiveBodyVisitor",
           "BodyControlModeOptions",
           "PhysicsSnapshot",
           "PhysicsSnapshotConfiguration",
@@ -8016,6 +8178,7 @@
           "resolveRotation",
           "resolveSleepingConfig",
           "widenToVector3",
+          "ForceFieldSystem",
           "BallJoint",
           "FixedJoint",
           "HingeJoint",
@@ -8125,6 +8288,10 @@
           "SleepPhase",
           "TriggerEvent",
           "TriggerPhase",
+          "ForceField",
+          "ForceFieldEntry",
+          "ForceFieldSystemOptions",
+          "ForceFieldUnits",
           "HingeJointOptions",
           "JointBinding",
           "JointBreakPayload",
@@ -8197,6 +8364,7 @@
           "RotationInput",
           "SleepingConfig",
           "Vector3Input",
+          "ActiveBodyVisitor",
           "BodyControlModeOptions",
           "PhysicsSnapshot",
           "PhysicsSnapshotConfiguration",
@@ -8570,10 +8738,12 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
+              "DEFAULT_SPACE_MODE",
               "EventEmitter",
               "FourError",
               "Component",
-              "ComponentHost"
+              "ComponentHost",
+              "SpaceMode"
             ]
           },
           {
@@ -8693,8 +8863,10 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
+              "SPACE_MODES",
               "FourError",
-              "JsonValue"
+              "JsonValue",
+              "SpaceMode"
             ]
           },
           {
@@ -9221,7 +9393,9 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
-              "FourError"
+              "DEFAULT_SPACE_MODE",
+              "FourError",
+              "isSimulationSpaceMode"
             ]
           },
           {
@@ -10159,6 +10333,108 @@
       }
     },
     "packages/render": {
+      "packages/render/src/batch.ts": {
+        "description": "§65 batching — merging consecutive compatible draws into one (R-9,",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./render-list.js",
+            "imports": [
+              "RenderItem",
+              "SpriteRenderItem",
+              "UnlitRenderItem"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./sprite.js",
+            "imports": [
+              "SpriteFrame"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/geometry",
+            "directory": "packages/geometry",
+            "imports": [
+              "BufferGeometry"
+            ]
+          },
+          {
+            "package": "@four/materials",
+            "directory": "packages/materials",
+            "imports": [
+              "MaterialTexture",
+              "SpriteMaterial",
+              "UnlitMaterial"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGBA"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "ALL_LAYERS",
+              "LayerMask"
+            ]
+          }
+        ],
+        "exports": [
+          "DEFAULT_MAX_BATCH_VERTICES",
+          "RenderBatcher"
+        ],
+        "classes": [
+          "RenderBatcher"
+        ],
+        "interfaces": [
+          "RenderBatchOptions",
+          "RenderBatch"
+        ],
+        "constants": [
+          "DEFAULT_MAX_BATCH_VERTICES"
+        ]
+      },
+      "packages/render/src/bounds.ts": {
+        "description": "World-space bounds of a drawable (§87) — the substrate a frustum test needs.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/geometry",
+            "directory": "packages/geometry",
+            "imports": [
+              "BufferGeometry"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix4",
+              "Vector3"
+            ]
+          }
+        ],
+        "exports": [
+          "computeWorldBoundingSphere"
+        ],
+        "interfaces": [
+          "BoundingSphere"
+        ],
+        "functions": [
+          "computeWorldBoundingSphere"
+        ]
+      },
       "packages/render/src/effect-pass.ts": {
         "description": "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):",
         "externalDependencies": [],
@@ -10205,10 +10481,25 @@
         ]
       },
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 130 symbols)",
+        "description": "Package entry point for @four/render (re-exports 142 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./batch.js",
+            "imports": [
+              "DEFAULT_MAX_BATCH_VERTICES",
+              "RenderBatcher"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./bounds.js",
+            "imports": [
+              "computeWorldBoundingSphere"
+            ],
+            "reExport": true
+          },
           {
             "file": "./effect-pass.js",
             "imports": [
@@ -10248,6 +10539,7 @@
             "imports": [
               "buildInterpolatedRenderList",
               "buildRenderList",
+              "groupRenderListByPipeline",
               "isLitItem",
               "isParticlesItem",
               "isSpriteItem",
@@ -10348,6 +10640,33 @@
               "Texture"
             ],
             "reExport": true
+          },
+          {
+            "file": "./view-list.js",
+            "imports": [
+              "buildViewRenderList",
+              "sortRenderListByDepth"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./batch.js",
+            "imports": [
+              "BatchableItem",
+              "BatchableMaterial",
+              "RenderBatch",
+              "RenderBatchOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./bounds.js",
+            "imports": [
+              "BoundingSphere"
+            ],
+            "reExport": true,
+            "typeOnly": true
           },
           {
             "file": "./effect-pass.js",
@@ -10513,10 +10832,21 @@
             ],
             "reExport": true,
             "typeOnly": true
+          },
+          {
+            "file": "./view-list.js",
+            "imports": [
+              "ViewRenderListOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [],
         "exports": [
+          "DEFAULT_MAX_BATCH_VERTICES",
+          "RenderBatcher",
+          "computeWorldBoundingSphere",
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
           "OUTPUT_TRANSFORM_EFFECT",
@@ -10535,6 +10865,7 @@
           "particleQuadGeometry",
           "buildInterpolatedRenderList",
           "buildRenderList",
+          "groupRenderListByPipeline",
           "isLitItem",
           "isParticlesItem",
           "isSpriteItem",
@@ -10573,7 +10904,14 @@
           "Star",
           "Sprite",
           "Texture",
+          "buildViewRenderList",
+          "sortRenderListByDepth",
           "PACKAGE_NAME",
+          "BatchableItem",
+          "BatchableMaterial",
+          "RenderBatch",
+          "RenderBatchOptions",
+          "BoundingSphere",
           "ColorGradeEffect",
           "CopyEffect",
           "EffectRenderPass",
@@ -10647,9 +10985,13 @@
           "StrokeStyle",
           "SpriteFrame",
           "SpriteOptions",
-          "TextureSource"
+          "TextureSource",
+          "ViewRenderListOptions"
         ],
         "reExported": [
+          "DEFAULT_MAX_BATCH_VERTICES",
+          "RenderBatcher",
+          "computeWorldBoundingSphere",
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
           "OUTPUT_TRANSFORM_EFFECT",
@@ -10668,6 +11010,7 @@
           "particleQuadGeometry",
           "buildInterpolatedRenderList",
           "buildRenderList",
+          "groupRenderListByPipeline",
           "isLitItem",
           "isParticlesItem",
           "isSpriteItem",
@@ -10706,6 +11049,13 @@
           "Star",
           "Sprite",
           "Texture",
+          "buildViewRenderList",
+          "sortRenderListByDepth",
+          "BatchableItem",
+          "BatchableMaterial",
+          "RenderBatch",
+          "RenderBatchOptions",
+          "BoundingSphere",
           "ColorGradeEffect",
           "CopyEffect",
           "EffectRenderPass",
@@ -10779,7 +11129,8 @@
           "StrokeStyle",
           "SpriteFrame",
           "SpriteOptions",
-          "TextureSource"
+          "TextureSource",
+          "ViewRenderListOptions"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -11021,6 +11372,7 @@
           "isStandardItem",
           "isParticlesItem",
           "viewLayerMask",
+          "groupRenderListByPipeline",
           "buildRenderList",
           "buildInterpolatedRenderList"
         ],
@@ -11038,6 +11390,7 @@
           "isStandardItem",
           "isParticlesItem",
           "viewLayerMask",
+          "groupRenderListByPipeline",
           "buildRenderList",
           "buildInterpolatedRenderList"
         ]
@@ -11500,6 +11853,57 @@
         "interfaces": [
           "TextureSource"
         ]
+      },
+      "packages/render/src/view-list.ts": {
+        "description": "Per-view render lists (§64 stages 2–3, §66 sort key 4; R-8) — the frame's one",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./bounds.js",
+            "imports": [
+              "computeWorldBoundingSphere",
+              "BoundingSphere"
+            ]
+          },
+          {
+            "file": "./render-list.js",
+            "imports": [
+              "viewLayerMask",
+              "RenderItem"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Frustum",
+              "Matrix4",
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "layersMatch",
+              "Viewport"
+            ]
+          }
+        ],
+        "exports": [
+          "buildViewRenderList",
+          "sortRenderListByDepth"
+        ],
+        "interfaces": [
+          "ViewRenderListOptions"
+        ],
+        "functions": [
+          "buildViewRenderList",
+          "sortRenderListByDepth"
+        ]
       }
     },
     "packages/render-canvas": {
@@ -11533,6 +11937,59 @@
       }
     },
     "packages/render-webgl": {
+      "packages/render-webgl/src/gl-batch.ts": {
+        "description": "§65 batching for the WebGL 2 backend — the GPU half of `@four/render`'s",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./gl-program.js",
+            "imports": [
+              "COLOR_ATTRIBUTE_LOCATION",
+              "GL",
+              "POSITION_ATTRIBUTE_LOCATION",
+              "UV_ATTRIBUTE_LOCATION",
+              "GlBuffer",
+              "GlVertexArray",
+              "UnlitProgram",
+              "WebglContext"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix4"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "RenderBatcher",
+              "RenderBatch",
+              "RenderBatchOptions",
+              "RenderItem"
+            ]
+          }
+        ],
+        "exports": [
+          "createGlBatching",
+          "GlBatching"
+        ],
+        "classes": [
+          "GlBatching"
+        ],
+        "interfaces": [
+          "BatchGlContext",
+          "RenderBatching"
+        ],
+        "functions": [
+          "createGlBatching"
+        ]
+      },
       "packages/render-webgl/src/gl-effect.ts": {
         "description": "The full-screen effect pipeline for the WebGL 2 backend — §70's blit, colour",
         "externalDependencies": [],
@@ -11926,6 +12383,14 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./gl-batch.js",
+            "imports": [
+              "GlBatching",
+              "createGlBatching"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./gl-effect.js",
             "imports": [
               "EFFECT_TEXTURE_UNIT",
@@ -12015,6 +12480,15 @@
             "reExport": true
           },
           {
+            "file": "./gl-batch.js",
+            "imports": [
+              "BatchGlContext",
+              "RenderBatching"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./gl-geometry.js",
             "imports": [
               "CacheableGeometry",
@@ -12086,6 +12560,8 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "GlBatching",
+          "createGlBatching",
           "EFFECT_TEXTURE_UNIT",
           "EFFECT_VERTEX_COUNT",
           "EffectProgram",
@@ -12116,6 +12592,8 @@
           "registerWebglRenderer",
           "WebglRenderer",
           "PACKAGE_NAME",
+          "BatchGlContext",
+          "RenderBatching",
           "CacheableGeometry",
           "GeometryRecord",
           "ParticleBatchRecord",
@@ -12138,6 +12616,8 @@
           "WebglContextEventLike"
         ],
         "reExported": [
+          "GlBatching",
+          "createGlBatching",
           "EFFECT_TEXTURE_UNIT",
           "EFFECT_VERTEX_COUNT",
           "EffectProgram",
@@ -12167,6 +12647,8 @@
           "isWebgl2Supported",
           "registerWebglRenderer",
           "WebglRenderer",
+          "BatchGlContext",
+          "RenderBatching",
           "CacheableGeometry",
           "GeometryRecord",
           "ParticleBatchRecord",
@@ -12229,6 +12711,13 @@
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./gl-batch.js",
+            "imports": [
+              "RenderBatching"
+            ],
+            "typeOnly": true
+          },
           {
             "file": "./gl-effect.js",
             "imports": [
@@ -12303,6 +12792,7 @@
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
+              "Frustum",
               "Matrix4"
             ]
           },
@@ -12313,6 +12803,7 @@
               "RenderTarget",
               "buildInterpolatedRenderList",
               "buildRenderList",
+              "buildViewRenderList",
               "collectSceneLights",
               "createSceneLights",
               "isLitItem",
@@ -12320,7 +12811,6 @@
               "isRenderTargetTexture",
               "isSpriteItem",
               "isStandardItem",
-              "viewLayerMask",
               "COLOR_GRADE_DEFAULTS",
               "EffectRenderPass",
               "RenderItem",
@@ -12897,15 +13387,15 @@
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
-              "Matrix4",
-              "Vector3"
+              "Matrix4"
             ]
           },
           {
             "package": "@four/math",
             "directory": "packages/math",
             "imports": [
-              "ColorRGB"
+              "ColorRGB",
+              "Vector3"
             ]
           },
           {
@@ -12962,6 +13452,12 @@
             "file": "./transform.js",
             "imports": [
               "Transform"
+            ]
+          },
+          {
+            "file": "./world-transforms.js",
+            "imports": [
+              "resolveWorldTransform"
             ]
           }
         ],
@@ -14515,11 +15011,16 @@
           "packages/physics/src/world.ts",
           "packages/physics/src/solver-registry.ts",
           "packages/physics/src/world.ts"
+        ],
+        [
+          "packages/scene/src/node.ts",
+          "packages/scene/src/world-transforms.ts",
+          "packages/scene/src/node.ts"
         ]
       ],
-      "total": 1,
+      "total": 2,
       "runtimeCount": 0,
-      "typeOnlyCount": 1
+      "typeOnlyCount": 2
     },
     "layers": [
       {
@@ -14558,6 +15059,7 @@
           "packages/core/src/index.ts",
           "packages/core/src/json.ts",
           "packages/core/src/random.ts",
+          "packages/core/src/space.ts",
           "packages/core/src/units.ts",
           "packages/core/src/untrusted.ts"
         ]
@@ -14650,6 +15152,7 @@
         "files": [
           "packages/math/src/alloc-counter.ts",
           "packages/math/src/color.ts",
+          "packages/math/src/frustum.ts",
           "packages/math/src/index.ts",
           "packages/math/src/matrix3.ts",
           "packages/math/src/matrix4.ts",
@@ -14700,6 +15203,7 @@
           "packages/physics/src/collider.ts",
           "packages/physics/src/descriptors.ts",
           "packages/physics/src/events.ts",
+          "packages/physics/src/force-field.ts",
           "packages/physics/src/index.ts",
           "packages/physics/src/joints.ts",
           "packages/physics/src/material.ts",
@@ -14742,6 +15246,8 @@
       {
         "name": "Packages/render",
         "files": [
+          "packages/render/src/batch.ts",
+          "packages/render/src/bounds.ts",
           "packages/render/src/effect-pass.ts",
           "packages/render/src/index.ts",
           "packages/render/src/lights.ts",
@@ -14756,7 +15262,8 @@
           "packages/render/src/shape.ts",
           "packages/render/src/sprite.ts",
           "packages/render/src/statistics.ts",
-          "packages/render/src/texture.ts"
+          "packages/render/src/texture.ts",
+          "packages/render/src/view-list.ts"
         ]
       },
       {
@@ -14774,6 +15281,7 @@
       {
         "name": "Packages/render-webgl",
         "files": [
+          "packages/render-webgl/src/gl-batch.ts",
           "packages/render-webgl/src/gl-effect.ts",
           "packages/render-webgl/src/gl-geometry.ts",
           "packages/render-webgl/src/gl-particles.ts",
@@ -14849,20 +15357,20 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 204,
+    "totalTypeScriptFiles": 211,
     "totalModules": 24,
-    "totalLinesOfCode": 93679,
-    "totalExports": 1911,
-    "totalClasses": 127,
-    "totalInterfaces": 410,
-    "totalFunctions": 324,
-    "totalTypeGuards": 18,
+    "totalLinesOfCode": 97104,
+    "totalExports": 1952,
+    "totalClasses": 131,
+    "totalInterfaces": 419,
+    "totalFunctions": 331,
+    "totalTypeGuards": 19,
     "totalEnums": 0,
-    "totalConstants": 248,
-    "totalReExports": 1234,
-    "totalTypeOnlyImports": 231,
+    "totalConstants": 251,
+    "totalReExports": 1261,
+    "totalTypeOnlyImports": 243,
     "runtimeCircularDeps": 0,
-    "typeOnlyCircularDeps": 1,
+    "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,
     "unusedExportsCount": 0
   }

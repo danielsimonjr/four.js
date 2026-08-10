@@ -27,6 +27,15 @@ export type { FourErrorCode, FourErrorOptions } from "./errors.js";
 export { FourError, isFourError } from "./errors.js";
 export type { EventListener, Unsubscribe } from "./events.js";
 export { EventEmitter } from "./events.js";
+// §8 space modes (PH-12, 2026-08-09). The vocabulary lives here because §8's
+// two halves belong to two pillars that may not import each other; see
+// `space.ts` for what declaring a mode does and does not do today.
+export type { SpaceMode } from "./space.js";
+export {
+  DEFAULT_SPACE_MODE,
+  SPACE_MODES,
+  isSimulationSpaceMode,
+} from "./space.js";
 export type {
   AngleUnit,
   LengthUnit,

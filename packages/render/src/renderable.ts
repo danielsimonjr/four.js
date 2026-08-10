@@ -53,14 +53,14 @@
  * shadow-map tier (R-18) — see the two properties for what each drives and
  * what still ignores them.
  *
- * Deferred with their features, not silently dropped: `depthMode` (§49's
+ * `frustumCulled` joined on 2026-08-09 with §87's per-view culling tier (R-8).
+ *
+ * Deferred with its feature, not silently dropped: `depthMode` (§49's
  * four-state field — §57's `depthTest`/`depthWrite` now carry the two states
- * the backend can honour, and the rest needs the §61 depth-state contract),
- * and `frustumCulled` (§87 culling — the
- * render list does no culling yet, so the flag would have nothing to switch
- * off). `material` is a single material rather than §49's `Material |
- * Material[]`: multi-material submeshes need §54's submesh ranges, which no
- * geometry carries.
+ * the backend can honour, and the rest needs the §61 depth-state contract).
+ * `material` is a single material rather than §49's `Material | Material[]`:
+ * multi-material submeshes need §54's submesh ranges, which no geometry
+ * carries.
  *
  * ## Ownership
  *
@@ -84,6 +84,8 @@ export interface RenderableOptions {
   castShadow?: boolean;
   /** Initial {@link Renderable.receiveShadow}; defaults to `true` (§69). */
   receiveShadow?: boolean;
+  /** Initial {@link Renderable.frustumCulled}; defaults to `true` (§87). */
+  frustumCulled?: boolean;
 }
 
 /**
@@ -189,6 +191,35 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
   receiveShadow = true;
 
   /**
+   * Whether this renderable may be dropped from a view whose frustum its world
+   * bounds lie entirely outside (§49, §87). **Defaults to `true`.**
+   *
+   * ```ts
+   * skybox.frustumCulled = false;   // its bounds do not describe where it draws
+   * ```
+   *
+   * `true` by default because culling is an optimisation that is invisible when
+   * it is right: a view drops draws it could not have shown, and every pixel is
+   * where it was. The flag exists for the cases where the *bounds* are the
+   * thing that is wrong — geometry a vertex shader displaces, a skybox drawn at
+   * the origin but meant to fill the view, a node whose geometry is a
+   * placeholder for something drawn elsewhere. Setting it `false` says "trust
+   * me, draw this", and the engine does, in every view.
+   *
+   * The bound tested is a **world-space sphere** derived from §53's cached
+   * local box (see `bounds.ts`), so it is conservative: an item is dropped only
+   * when that sphere lies wholly beyond one of the six planes. A geometry that
+   * cannot state its bounds — an empty one, or a structurally-typed geometry
+   * with no `computeBounds` — is drawn whatever this says.
+   *
+   * Honoured by `view-list.ts`'s `buildViewRenderList`, which is what the
+   * WebGL 2 backend derives each view's draws with. §36's particle systems are
+   * exempt whatever their node says, and the reason is on
+   * `RenderItem.frustumCulled`.
+   */
+  frustumCulled = true;
+
+  /**
    * Builds a renderable for `geometry` and `material`. Both are required: a
    * renderable without either draws nothing, and defaulting them would hide the
    * mistake behind an invisible node rather than a type error.
@@ -205,6 +236,7 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
     this.renderOrder = options.renderOrder ?? 0;
     this.castShadow = options.castShadow ?? true;
     this.receiveShadow = options.receiveShadow ?? true;
+    this.frustumCulled = options.frustumCulled ?? true;
   }
 
   /**

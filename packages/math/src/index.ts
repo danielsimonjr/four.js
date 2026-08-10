@@ -12,6 +12,7 @@ export {
   srgbToLinearRGB,
   srgbToLinearRGBA,
 } from "./color.js";
+export { Frustum } from "./frustum.js";
 export { Matrix3 } from "./matrix3.js";
 export { Matrix4 } from "./matrix4.js";
 export type { DepthRange } from "./matrix4.js";

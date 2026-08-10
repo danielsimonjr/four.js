@@ -122,7 +122,12 @@
  * than being quietly written as the `null` `JSON.stringify` would produce.
  */
 
-import { FourError, type JsonValue } from "@four/core";
+import {
+  SPACE_MODES,
+  FourError,
+  type JsonValue,
+  type SpaceMode,
+} from "@four/core";
 import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
 import type { ComponentSerializerShape } from "@four/motion";
 import { Transform } from "@four/scene";
@@ -257,6 +262,26 @@ function readBodyType(value: JsonValue | undefined): BodyType {
     `A rigid-body document's "type" is ${JSON.stringify(value ?? null)}, which is not one of §22's body types (${BODY_TYPES.join(", ")}). A body type has no defensible default — guessing one would change what is simulated — so the document is refused (§22, §79).`,
     { field: "type", value: value ?? null },
   );
+}
+
+/**
+ * Narrows a document value to a §8 space mode (PH-12).
+ *
+ * A **defaulted** field, unlike `type` and `ccdMode` above: absent or
+ * unrecognized restores `"world"`, because `"world"` is the frame every world
+ * can honour and is what a document written before the field existed means. The
+ * asymmetry with the two refused tags is deliberate and is the module's own
+ * rule — a guessed body type drops the ground out of the world, whereas a
+ * guessed space is the one value that can never turn a refusal into silent
+ * acceptance.
+ */
+function isSpaceMode(value: JsonValue | undefined): value is SpaceMode {
+  for (const mode of SPACE_MODES) {
+    if (mode === value) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -532,6 +557,18 @@ export interface RigidBodyDocument {
   readonly ccdMode: CCDMode;
   /** §31 speculative prediction distance, when the body authored one. */
   readonly ccdPredictionDistance?: number;
+  /**
+   * The §8 space the body is solved in, present only when it is **not**
+   * `"world"` (PH-12).
+   *
+   * Absent is the default, so every document written before PH-12 reloads
+   * unchanged and a `"world"` body still writes no field. It round-trips even
+   * though `PhysicsWorld.addBody` refuses every non-`"world"` value: dropping
+   * it would turn a body a world refuses into one it silently accepts after a
+   * save-and-reload, which is the class of lie §79's authoredness rules exist
+   * to prevent.
+   */
+  readonly space?: SpaceMode;
   /** §19 solver share of a `"blended"` pose. */
   readonly physicsWeight: number;
   /** §19 animated share of a `"blended"` pose. */
@@ -606,6 +643,11 @@ export const RIGID_BODY_SERIALIZER: ComponentSerializerShape<RigidBody> = {
     if (descriptor.ccdPredictionDistance !== undefined) {
       document.ccdPredictionDistance = descriptor.ccdPredictionDistance;
     }
+    // The descriptor decides presence here too: `toDescriptor` emits `space`
+    // exactly when it is not `"world"`.
+    if (descriptor.space !== undefined) {
+      document.space = descriptor.space;
+    }
     if (body.inertiaTensor !== undefined) {
       document.inertiaTensor = matrix3Json(body.inertiaTensor);
     }
@@ -643,6 +685,13 @@ export const RIGID_BODY_SERIALIZER: ComponentSerializerShape<RigidBody> = {
     }
     if (typeof source.ccdPredictionDistance === "number") {
       descriptor.ccdPredictionDistance = source.ccdPredictionDistance;
+    }
+    // A defaulted field, so a corrupt or unknown value restores the default
+    // rather than refusing the scene (the module's read-side rule): `"world"`
+    // is a frame every world can honour, so the reader can never turn a bad
+    // document into a body that is silently somewhere else.
+    if (isSpaceMode(source.space)) {
+      descriptor.space = source.space;
     }
     if (source.position !== undefined) {
       descriptor.position = readVector3(source.position, new Vector3());

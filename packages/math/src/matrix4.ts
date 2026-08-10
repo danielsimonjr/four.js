@@ -1,5 +1,5 @@
 import { noteConstruction } from "./alloc-counter.js";
-import type { Quaternion } from "./quaternion.js";
+import { setQuaternionFromBasis, type Quaternion } from "./quaternion.js";
 import type { Vector3 } from "./vector3.js";
 
 /**
@@ -573,42 +573,21 @@ export class Matrix4 {
     const m23 = e[9] * inverseSz;
     const m33 = e[10] * inverseSz;
 
-    // Shepperd's method: pick the branch whose divisor is largest so the
-    // square root never operates on a value near zero.
-    const trace = m11 + m22 + m33;
-    if (trace > 0) {
-      const s = 0.5 / Math.sqrt(trace + 1);
-      outRotation.set(
-        (m32 - m23) * s,
-        (m13 - m31) * s,
-        (m21 - m12) * s,
-        0.25 / s,
-      );
-    } else if (m11 > m22 && m11 > m33) {
-      const s = 2 * Math.sqrt(1 + m11 - m22 - m33);
-      outRotation.set(
-        0.25 * s,
-        (m12 + m21) / s,
-        (m13 + m31) / s,
-        (m32 - m23) / s,
-      );
-    } else if (m22 > m33) {
-      const s = 2 * Math.sqrt(1 + m22 - m11 - m33);
-      outRotation.set(
-        (m12 + m21) / s,
-        0.25 * s,
-        (m23 + m32) / s,
-        (m13 - m31) / s,
-      );
-    } else {
-      const s = 2 * Math.sqrt(1 + m33 - m11 - m22);
-      outRotation.set(
-        (m13 + m31) / s,
-        (m23 + m32) / s,
-        0.25 * s,
-        (m21 - m12) / s,
-      );
-    }
+    // Shepperd's method, shared with `Quaternion.setFromLookDirection` — see
+    // `setQuaternionFromBasis`, which owns the branch selection and the
+    // arithmetic this method used to carry inline.
+    setQuaternionFromBasis(
+      outRotation,
+      m11,
+      m21,
+      m31,
+      m12,
+      m22,
+      m32,
+      m13,
+      m23,
+      m33,
+    );
 
     return this;
   }
