@@ -15,13 +15,19 @@
  * 1. **Producing the quads** — `layoutText(string, atlas, options)` turning a
  *    string into one positioned, uv-mapped rectangle per drawn glyph. Pure
  *    arithmetic, no engine objects, no renderer, no DOM. That is this file.
- * 2. **Drawing them.** Still blocked, and not on hardware: §56's bitmap tier
- *    ships an atlas that cannot be addressed per glyph, so the documented
- *    workaround (`examples/first-2d-scene`, `examples/ui-demo`) cuts every
- *    glyph cell into its own `Texture` — a texture bind and a draw call per
- *    glyph. §55's `frame` sub-rectangle and §65 batching are the two packets
- *    that unblock it. `benchmarks/README.md` files that half under *feature*,
- *    and this script does not change that entry.
+ * 2. **Drawing them.** Blocked until 2026-08-13, and not on hardware: §56's
+ *    bitmap tier shipped an atlas that could not be addressed per glyph, so the
+ *    documented workaround (`examples/first-2d-scene`, `examples/ui-demo`) cut
+ *    every glyph cell into its own `Texture` — a texture bind and a draw call
+ *    per glyph. **R-29's §55 `frame` and R-28's `Text` node closed that**, and
+ *    the second half of this script measures what replaced it: `Text` turns a
+ *    layout into **one** indexed vertex buffer over **one** atlas material, so
+ *    20 000 glyphs are one `drawElements` and the CPU cost is the buffer build.
+ *
+ * The *submission* of that draw is still GPU work a headless script cannot
+ * measure, exactly as `render-batching.mjs` says of its own rows — so the row
+ * moves from **feature**-blocked to **half**-measured in both halves' sense:
+ * preparation measured, submission GPU-blocked.
  *
  * ## What "animated" costs, honestly
  *
@@ -72,7 +78,10 @@
  * Recorded, never gated — see `benchmarks/README.md`.
  */
 
+import { UnlitMaterial } from "@four/materials";
+import { Texture } from "@four/render";
 import { buildGlyphAtlas, layoutText } from "@four/text";
+import { Text } from "four";
 
 import {
   MEASUREMENT_NOTE,
@@ -305,6 +314,95 @@ function runFreezeControl() {
   };
 }
 
+/**
+ * The geometry half of §86's row (R-28, 2026-08-13) — what it costs to turn a
+ * layout into the vertex buffers a frame actually draws, and how many draw
+ * calls that is.
+ *
+ * One iteration is: assign a new string to every `Text` node in the corpus and
+ * read `geometry` back, which is one `layoutText` plus one positions / uv /
+ * index rebuild per node. That is the **whole** CPU cost of an animated-glyph
+ * frame whose content changed — the row's worst case, for the reason the
+ * module header gives — and it is strictly more than the layout rows above,
+ * which stop at the quads.
+ *
+ * The number that closes the old blocker is not a millisecond, though: it is
+ * `drawCalls`. Twenty thousand glyphs over one atlas material are **one**
+ * `drawElements`, where the pre-R-28 workaround was one texture bind and one
+ * draw call each. Submitting that draw is GPU work this script cannot measure,
+ * which is what keeps the row at `half`.
+ */
+function runGeometryScenario(glyphs, length) {
+  const { strings, drawnGlyphs } = buildCorpus(glyphs, length);
+  const alternate = buildCorpus(glyphs, length).strings.map(
+    (text) => `${text.slice(1)}${text[0]}`,
+  );
+
+  // One atlas, one texture, one material — shared by every node, which is what
+  // makes the whole corpus a single §65 batchable run.
+  const material = new UnlitMaterial({
+    map: new Texture({ ...ATLAS, filter: "nearest" }),
+    transparent: true,
+  });
+  const nodes = strings.map(
+    (text) => new Text(ATLAS, material, { text, size: TEXT_SIZE }),
+  );
+
+  let vertices = 0;
+  for (const node of nodes) vertices += node.geometry.vertexCount;
+  if (vertices !== drawnGlyphs * 4) {
+    throw new Error(
+      `text-layout invalid (geometry ${glyphs}×${length}): ${vertices} vertices, expected ${drawnGlyphs * 4}`,
+    );
+  }
+
+  let lastVertices = 0;
+  const { warmup, measured } = measure(
+    (index) => {
+      const source = index % 2 === 0 ? alternate : strings;
+      let total = 0;
+      for (let i = 0; i < nodes.length; i += 1) {
+        nodes[i].text = source[i];
+        total += nodes[i].geometry.vertexCount;
+      }
+      lastVertices = total;
+      keepAlive(total);
+    },
+    { warmupIterations: WARMUP_FRAMES, measuredIterations: MEASURED_FRAMES },
+  );
+
+  if (lastVertices !== drawnGlyphs * 4) {
+    throw new Error(
+      `text-layout invalid (geometry ${glyphs}×${length}): rebuilt to ${lastVertices} vertices, expected ${drawnGlyphs * 4}`,
+    );
+  }
+
+  for (const node of nodes) node.dispose();
+  material.map.dispose();
+  material.dispose();
+
+  const summary = summarize(measured);
+  return {
+    glyphs: drawnGlyphs,
+    charactersPerString: length,
+    nodes: nodes.length,
+    verticesPerFrame: drawnGlyphs * 4,
+    indicesPerFrame: drawnGlyphs * 6,
+    // The number that closed the blocker: one draw per `Text`, and one for the
+    // whole corpus once §65 batching is switched on (they share a material).
+    drawCallsUnbatched: nodes.length,
+    drawCallsBatched: 1,
+    drawCallsBeforeR28: drawnGlyphs,
+    measuredFrames: MEASURED_FRAMES,
+    warmupMeanMsPerFrame: round(summarize(warmup).meanMs, MS_DIGITS),
+    medianMsPerFrame: round(summary.medianMs, MS_DIGITS),
+    p95MsPerFrame: round(summary.p95Ms, MS_DIGITS),
+    nanosecondsPerGlyph: round((summary.medianMs * 1e6) / drawnGlyphs, 1),
+    meanFractionOfFrameBudget: round(summary.meanMs / FRAME_BUDGET_MS, 4),
+    insideFrameBudgetAtP95: summary.p95Ms <= FRAME_BUDGET_MS,
+  };
+}
+
 // --- the run -----------------------------------------------------------------
 
 const headline = GLYPH_COUNTS.map((glyphs) =>
@@ -314,6 +412,9 @@ const attribution = ATTRIBUTION_LENGTHS.map((length) =>
   runScenario(ATTRIBUTION_GLYPHS, length),
 );
 const freezeControl = runFreezeControl();
+const geometry = GLYPH_COUNTS.map((glyphs) =>
+  runGeometryScenario(glyphs, HEADLINE_LENGTH),
+);
 
 const shortest = attribution.find(
   (row) => row.charactersPerString === ATTRIBUTION_LENGTHS[0],
@@ -365,6 +466,9 @@ const modelResidual = round(
 );
 
 const target = headline.find((row) => row.glyphs === ATTRIBUTION_GLYPHS);
+const geometryTarget = geometry.find(
+  (row) => row.glyphs === ATTRIBUTION_GLYPHS,
+);
 
 /**
  * The freeze control as a fraction of the per-glyph cost at the same count. An
@@ -388,7 +492,7 @@ const record = {
   iteration:
     "one iteration is one layoutText call per string in the corpus — a frame in which every string's content changed",
   rowNote:
-    "This is the layout half of §86's animated-glyph row. The drawing half stays blocked on a feature, not on hardware: §56's bitmap atlas cannot be addressed per glyph, so the shipped path cuts one Texture per glyph cell and issues a draw call each (§55 frame sub-rectangle, §65 batching). benchmarks/README.md's 'feature' entry for this row is unchanged.",
+    "Both CPU halves of §86's animated-glyph row. The layout half (scenarios/attribution) is layoutText producing quads; the geometry half (geometryScenarios, R-28 2026-08-13) is §49's Text node turning those quads into one indexed vertex buffer over one atlas material. The row moved from feature-blocked to half-measured on 2026-08-13: what remains unmeasured is GPU submission, exactly as render-batching.mjs says of its own rows. Before R-28 the shipped path cut one Texture per glyph cell and issued a draw call each; it is now one drawElements per label, and one for a whole run of labels under §65 batching.",
   animationNote:
     "A glyph that only moves is laid out once — animating a node's transform never re-enters layoutText. These numbers are the worst case for the row (content changing every frame), not its normal case.",
   targetNote:
@@ -402,7 +506,9 @@ const record = {
   atlasBuildMs: round(ATLAS_BUILD_MS, 4),
   atlasBuildNote: `buildGlyphAtlas() on the built-in 6 × 12 face, ${ATLAS.width} × ${ATLAS.height} texels, ${ATLAS.glyphs.size} covered characters. One-off setup, deliberately excluded from every throughput number.`,
   scenarios: headline,
-  attribution,
+  geometryScenarios: geometry,
+  geometryNote:
+    "One iteration assigns a new string to every Text node and reads its geometry back: one layoutText plus one positions/uv/index rebuild per node, which is the whole CPU cost of a frame whose text content changed. drawCallsBeforeR28 is what the same frame cost through the pre-R-28 workaround (one Texture and one draw per glyph cell); drawCallsBatched is what it costs today with §65 batching switched on, since every node shares one material.",
   attributionNote: `The same ${ATTRIBUTION_GLYPHS} glyphs laid out as ${ATTRIBUTION_LENGTHS.map((n) => `${ATTRIBUTION_GLYPHS / n} × ${n}`).join(", ")} characters. The glyph term is identical across the rows, so their spread is the per-call cost.`,
   nanosecondsPerCall,
   nanosecondsPerGlyph,
@@ -416,7 +522,7 @@ const record = {
   keepAliveTotal: round(keepAliveTotal(), 6),
   ...host,
   hostCaveat:
-    "CI container, no GPU, shared host; run-to-run spread is tens of percent. §86's 'suitable modern desktop hardware' is not this machine, so nothing here is a §86 verdict — and this row's drawing half is not measured at all.",
+    "CI container, no GPU, shared host; run-to-run spread is tens of percent. §86's 'suitable modern desktop hardware' is not this machine, so nothing here is a §86 verdict — and this row's GPU submission is not measured at all.",
 };
 
 const path = writeResult("text-layout", record);
@@ -455,12 +561,31 @@ printReport([
   `                          (fitted from the two extreme rows; misses the others by up to ${round(modelResidual * 100, 1)}%)`,
   `  freeze control          ${ATTRIBUTION_GLYPHS.toLocaleString("en-US")} frozen object literals, no engine code: ${freezeControl.medianMsPerFrame} ms (${freezeControl.nanosecondsPerObject} ns each)`,
   `                          — an upper bound of ${round(freezeShare * 100, 1)}% on the allocate-and-freeze share of the row above`,
+  "",
+  "  geometry half (R-28): Text nodes rebuilt from changed strings",
+  "    glyphs      nodes   median ms      p95 ms   ns/glyph        draws now   draws pre-R-28",
+  ...geometry.map((row) =>
+    [
+      String(row.glyphs).padStart(10),
+      String(row.nodes).padStart(11),
+      String(row.medianMsPerFrame).padStart(12),
+      String(row.p95MsPerFrame).padStart(12),
+      String(row.nanosecondsPerGlyph).padStart(11),
+      `${row.drawCallsUnbatched} (${row.drawCallsBatched} batched)`.padStart(
+        17,
+      ),
+      String(row.drawCallsBeforeR28).padStart(17),
+    ].join(""),
+  ),
+  `  the closed blocker      ${ATTRIBUTION_GLYPHS.toLocaleString("en-US")} glyphs are ${geometryTarget.drawCallsUnbatched} draw calls (1 batched), not ${geometryTarget.drawCallsBeforeR28}`,
+  `                          rebuild costs ${geometryTarget.medianMsPerFrame} ms — ${geometryTarget.insideFrameBudgetAtP95 ? "inside" : "OVER"} the 16.667 ms budget at p95; submission is GPU work, unmeasured`,
+  "",
   `  atlas build             ${round(ATLAS_BUILD_MS, 3)} ms once, for ${ATLAS.width} × ${ATLAS.height} texels — setup, not in any number above`,
   `  keep-alive fold         ${round(keepAliveTotal(), 6)} (proof the layouts were not optimised away; not a checksum)`,
   "",
   ...hostLines(
     host,
-    "shared CI container; §86's drawing half of this row is feature-blocked and not measured — see the record's rowNote.",
+    "shared CI container; the GPU submission of this row's draws is not measured — see the record's rowNote.",
   ),
   "",
   `  written                 ${path}`,

@@ -75,13 +75,21 @@ export {
   SPOT_LIGHT_NODE_TYPE,
   SPRITE_NODE_TYPE,
   STAR_NODE_TYPE,
+  TEXT_NODE_TYPE,
   TOGGLE_NODE_TYPE,
   composeSceneNodeTypes,
   registerPhysicsSerializers,
   registerRenderSerializers,
   registerSceneNodeTypes,
   registerShapeSerializers,
+  registerTextSerializers,
   registerUISerializers,
   resourceCatalog,
   restoreNodeId,
 } from "./scene-serializers.js";
+
+// §49/§56's `Text` node (R-28, 2026-08-13) — the second API this package owns
+// rather than re-exports, and `text-node.ts` records why the frozen §3.1 matrix
+// leaves the umbrella as its only legal home.
+export type { TextOptions } from "./text-node.js";
+export { Text } from "./text-node.js";

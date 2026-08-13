@@ -41,6 +41,29 @@
 import type { ColorSpace } from "@four/math";
 
 /**
+ * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
+ * 2026-08-13) — the read side of `@four/render`'s `TextureFilter`.
+ *
+ * Two values because this tier has no mip levels: §77's remaining filter modes
+ * (`*_MIPMAP_*`) name a choice between mip levels, and a texture with one level
+ * has none to choose between. They arrive with mipmaps, and with them the
+ * separate `minFilter`/`magFilter` split — see `@four/render`'s `TextureSource`.
+ */
+export type MaterialTextureFilter = "nearest" | "linear";
+
+/**
+ * How a texture is addressed outside `[0, 1]` (§77's "wrap modes"; R-30,
+ * 2026-08-13) — the read side of `@four/render`'s `TextureWrap`.
+ *
+ * One value for both axes: a per-axis split is meaningful, but nothing in the
+ * engine authors anisotropic addressing today and a field with no reader is a
+ * field that goes wrong silently. It widens to `wrapS`/`wrapT` without moving
+ * this one, because `wrap` is exactly "both axes".
+ */
+export type MaterialTextureWrap =
+  "clamp-to-edge" | "repeat" | "mirrored-repeat";
+
+/**
  * The read surface of a texture, as a material and a rendering backend see it
  * (§77) — see the module header for why it is declared in this package rather
  * than imported from the package that owns the class.
@@ -100,4 +123,29 @@ export interface MaterialTexture {
    * `texture.colorSpace ?? "linear"`.
    */
   readonly colorSpace?: ColorSpace;
+
+  /**
+   * How the backend samples between texel centres (§77; R-30, 2026-08-13).
+   *
+   * **Optional, and absent means `"linear"`** — the value this tier hard-coded
+   * before the field existed, so every texture written against an earlier build
+   * and every test double keeps issuing the identical `texParameteri` pair.
+   * Read it as `texture.filter ?? "linear"`, exactly as
+   * {@link MaterialTexture.colorSpace} is read.
+   *
+   * `"nearest"` is what a bitmap glyph atlas and pixel art want: a texel drawn
+   * at or above 1:1 stays a square instead of being blurred across its
+   * neighbours.
+   */
+  readonly filter?: MaterialTextureFilter;
+
+  /**
+   * How the backend addresses texture coordinates outside `[0, 1]` (§77;
+   * R-30, 2026-08-13).
+   *
+   * **Optional, and absent means `"clamp-to-edge"`** — this tier's previous
+   * fixed choice, for {@link MaterialTexture.filter}'s reason. Read it as
+   * `texture.wrap ?? "clamp-to-edge"`.
+   */
+  readonly wrap?: MaterialTextureWrap;
 }

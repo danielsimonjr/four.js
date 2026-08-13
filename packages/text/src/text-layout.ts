@@ -41,16 +41,35 @@
  * different heights per face, which is precisely the CSS behaviour that forces
  * everyone to measure.
  *
+ * ## Horizontal alignment (R-28, 2026-08-13)
+ *
+ * {@link TextLayoutOptions.align} shifts each line within the widest line's
+ * extent: `"left"` (the default) leaves the pen where it was, `"center"` and
+ * `"right"` translate a line by `(width − lineWidth) · f` with `f = 0.5` and
+ * `f = 1`. It is applied *after* the pen walk, because a line's own width is not
+ * known until the line ends — which is also why the previous note here said an
+ * alignment is "computed from this function's output". That note was right about
+ * the arithmetic and wrong about the home: doing it outside would require the
+ * caller to re-derive per-line widths that this function has already discarded,
+ * so every caller would rebuild the same table. The output *shape* is unchanged,
+ * exactly as predicted.
+ *
+ * `"left"` is not merely the default, it is a distinct code path: the shift loop
+ * does not run at all, so a layout that does not ask for alignment produces the
+ * numbers it produced before this option existed, bit for bit.
+ *
  * ## What this tier does not do (§56, staged)
  *
  * Line **breaking** and wrapping (only an explicit `\n` breaks a line here),
- * horizontal and vertical **alignment**, word spacing, rich-text spans, text on
+ * **vertical** alignment, word spacing, rich-text spans, text on
  * paths, bidirectional reordering, shaping, ligatures, and kerning. §56 stages
  * shaping/bidi/ligatures behind a shaping-engine decision recorded by amendment;
- * wrapping and alignment are not blocked by that, they are simply the next
- * packet — and both are computed *from* this function's output (a wrap needs
- * per-glyph advances; an alignment needs per-line widths), so neither changes
- * the shape of {@link TextLayout}.
+ * wrapping is not blocked by that, it is simply the next packet — and it is a
+ * *different* kind of change from alignment, because a wrap decides where lines
+ * end (a word-breaking rule, i.e. UAX #14 and a language) rather than where a
+ * finished line sits. Vertical alignment is a one-line offset the caller
+ * already has the numbers for ({@link TextLayout.height}), and putting it here
+ * would be inventing an origin convention that §56 does not state.
  */
 
 import type { GlyphAtlas, GlyphAtlasEntry } from "./glyph-atlas.js";
@@ -90,6 +109,15 @@ export interface TextQuad {
   readonly v1: number;
 }
 
+/**
+ * §56's horizontal alignment, as this tier ships it (R-28, 2026-08-13).
+ *
+ * Named from the *reading* direction and not from the axis, so `"left"` is the
+ * side the pen starts on. A bidirectional tier gives the same three names a
+ * `"start"`/`"end"` pair beside them; it does not change what these mean.
+ */
+export type TextAlign = "left" | "center" | "right";
+
 /** Arguments of {@link layoutText}. */
 export interface TextLayoutOptions {
   /**
@@ -110,6 +138,22 @@ export interface TextLayoutOptions {
    * centred CSS text with wide tracking looks a touch left of centre).
    */
   letterSpacing?: number;
+
+  /**
+   * How each line sits within {@link TextLayout.width} — §56's "horizontal
+   * alignment" (R-28, 2026-08-13). Defaults to `"left"`.
+   *
+   * ```ts
+   * layoutText("Motor\n42 C", atlas, { size: 0.5, align: "center" });
+   * // the short line is inset by (width − lineWidth) / 2
+   * ```
+   *
+   * The block's own origin does not move: alignment is *within* the text, so
+   * `x = 0` is still the left edge of the widest line, {@link TextLayout.width}
+   * is still the true extent, and a caller centring the whole block on a node
+   * subtracts `width / 2` exactly as before.
+   */
+  align?: TextAlign;
 }
 
 /** What {@link layoutText} produces. */
@@ -144,6 +188,24 @@ export interface TextLayout {
    * (decision, WP-3a.4).
    */
   readonly lineCount: number;
+}
+
+/**
+ * A quad while {@link layoutText} is still deciding where it goes.
+ *
+ * Alignment shifts a line only once the line has ended, so the quads are built
+ * mutable and frozen in one pass at the end — the same objects the caller
+ * receives, and the same numbers the pre-R-28 code froze at push time.
+ */
+interface MutableTextQuad {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  u0: number;
+  v0: number;
+  u1: number;
+  v1: number;
 }
 
 /** Validates one numeric option (§85). */
@@ -184,10 +246,20 @@ function requireFinite(name: string, value: number): number {
  *   missing script or a stray control byte diagnosable (§56's "font fallback"
  *   at this tier).
  *
- * ## Determinism (§33)
+ * ## Determinism (§33) — **cross-platform tier** (stated 2026-08-13, R-28)
  *
  * Pure: same string, same atlas, same options → identical numbers, always. No
  * clock, no randomness, no measurement of the environment.
+ *
+ * The claim is stronger than "same runtime", and mechanically so: every
+ * arithmetic operation here is one of IEEE-754's **exactly rounded** ones —
+ * `+`, `−`, `×`, `÷` and `Math.max` — over doubles, with no `sqrt`, no
+ * transcendental, no `Math.fround`, and no iteration over a hash order (the
+ * atlas is consulted with `Map.get`, never walked). Two conforming engines
+ * therefore produce bit-identical quads, which is the tier `@four/geometry`'s
+ * `triangulatePolygon` reached and `Path`'s arcs deliberately did not. An edit
+ * that introduces a transcendental — a rotation, an italic shear, a
+ * `Math.round` to whole texels — breaks this *stated tier*, not merely a number.
  */
 export function layoutText(
   text: string,
@@ -206,10 +278,12 @@ export function layoutText(
     options.letterSpacing ?? 0,
   );
 
-  const quads: TextQuad[] = [];
+  const align = options.align ?? "left";
+
+  const quads: MutableTextQuad[] = [];
   if (text === "") {
     return Object.freeze<TextLayout>({
-      quads: Object.freeze(quads),
+      quads: Object.freeze(quads as TextQuad[]),
       width: 0,
       height: 0,
       lineCount: 0,
@@ -231,12 +305,22 @@ export function layoutText(
   let glyphsOnLine = 0;
   let width = 0;
 
+  // Alignment's two bookkeeping arrays: where each line's quads start, and how
+  // wide each line turned out. Both are filled on the same walk that emits the
+  // quads, because a line's width is only known when the line ends and the
+  // alternative — handing the caller the quads and asking it to re-derive the
+  // widths — makes every caller rebuild this table (see the module header).
+  const lineStarts: number[] = [0];
+  const lineWidths: number[] = [];
+
   for (const char of text) {
     if (char === "\r") {
       continue;
     }
     if (char === "\n") {
       width = Math.max(width, penX);
+      lineWidths.push(penX);
+      lineStarts.push(quads.length);
       penX = 0;
       baselineY -= size;
       lineCount += 1;
@@ -251,26 +335,51 @@ export function layoutText(
 
     const entry: GlyphAtlasEntry = atlas.glyphs.get(char) ?? atlas.fallback;
     if (!entry.blank) {
-      quads.push(
-        Object.freeze<TextQuad>({
-          x0: penX,
-          y0: baselineY - bottom,
-          x1: penX + cellWidth,
-          y1: baselineY + top,
-          u0: entry.u0,
-          v0: entry.v0,
-          u1: entry.u1,
-          v1: entry.v1,
-        }),
-      );
+      quads.push({
+        x0: penX,
+        y0: baselineY - bottom,
+        x1: penX + cellWidth,
+        y1: baselineY + top,
+        u0: entry.u0,
+        v0: entry.v0,
+        u1: entry.u1,
+        v1: entry.v1,
+      });
     }
     penX += entry.advance * scale;
   }
 
   width = Math.max(width, penX);
+  lineWidths.push(penX);
+
+  // §56's horizontal alignment. `"left"` never enters this block at all, which
+  // is what makes an unaligned layout bit-identical to the pre-R-28 one rather
+  // than merely equal to it: no `x + 0` is evaluated, so no `-0` can become
+  // `+0` and no line is touched. The widest line is skipped for the same reason
+  // even when alignment is asked for — its offset is exactly zero.
+  if (align !== "left") {
+    const factor = align === "center" ? 0.5 : 1;
+    for (let line = 0; line < lineWidths.length; line += 1) {
+      const offset = (width - lineWidths[line]) * factor;
+      if (offset === 0) {
+        continue;
+      }
+      const end =
+        line + 1 < lineStarts.length ? lineStarts[line + 1] : quads.length;
+      for (let i = lineStarts[line]; i < end; i += 1) {
+        const quad = quads[i];
+        quad.x0 += offset;
+        quad.x1 += offset;
+      }
+    }
+  }
+
+  for (const quad of quads) {
+    Object.freeze(quad);
+  }
 
   return Object.freeze<TextLayout>({
-    quads: Object.freeze(quads),
+    quads: Object.freeze(quads as TextQuad[]),
     width,
     height: lineCount * size,
     lineCount,

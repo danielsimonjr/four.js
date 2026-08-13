@@ -28,6 +28,11 @@
  * `@four/render`'s `TextureSource` accepts, and the layout in the shape a quad
  * builder wants; the package that owns nodes assembles the two. See
  * `glyph-atlas.ts` for why that seam is structural rather than an import.
+ *
+ * **The package that owns nodes is the umbrella `four`, since 2026-08-13**
+ * (R-28): `new Text(atlas, material, { text, size })` is a §49 `Renderable`
+ * that draws a whole string as one geometry over one atlas material. This
+ * package is still what computes where the glyphs go.
  */
 
 export const PACKAGE_NAME = "@four/text";
@@ -53,4 +58,9 @@ export type {
 } from "./glyph-atlas.js";
 
 export { layoutText } from "./text-layout.js";
-export type { TextLayout, TextLayoutOptions, TextQuad } from "./text-layout.js";
+export type {
+  TextAlign,
+  TextLayout,
+  TextLayoutOptions,
+  TextQuad,
+} from "./text-layout.js";

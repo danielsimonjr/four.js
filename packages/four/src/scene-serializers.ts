@@ -42,16 +42,17 @@
  * key); the five drawing-tier node classes A-16 named, added 2026-08-07 —
  * §49's `Renderable`, §55's `Sprite`, §47's `PerspectiveCamera` and
  * `OrthographicCamera`, and §68's `DirectionalLight`
- * ({@link registerRenderSerializers}); `MotionComponent` (§11) and
- * `KinematicController` (§12, added 2026-08-07), through the serializers
- * `@four/motion` itself exports; and `RigidBody` and `Collider` (§23–§25),
+ * ({@link registerRenderSerializers}); `MotionComponent` (§11),
+ * `KinematicController` (§12, added 2026-08-07) and the §44/§12 rig components
+ * `OrbitRig`, `FollowRig` and `LookAtConstraint` (added 2026-08-13), through the
+ * serializers `@four/motion` itself exports; and `RigidBody` and `Collider` (§23–§25),
  * through the pair `@four/physics` exports (`RIGID_BODY_SERIALIZER` /
  * `COLLIDER_SERIALIZER`, 2026-08-06 — the `PH-17` remainder). All three
  * packages declare their serializers against the same structural
  * `ComponentSerializer` shape, so registering them here adds no §3.1 edge
  * anywhere.
  *
- * That is **every** component class the engine ships — the five with a
+ * That is **every** component class the engine ships — the eight with a
  * `static typeName`, counting `PoseTarget`, which `@four/serialization` seeds
  * itself. `tests/scene-serializers.test.ts` enumerates them off the umbrella's
  * own barrels and fails if one is missing, because an unregistered component
@@ -137,12 +138,18 @@
 
 import { FourError, type JsonValue } from "@four/core";
 import { Path, type BufferGeometry, type Point2D } from "@four/geometry";
-import type { Material, SpriteMaterial } from "@four/materials";
+import type { Material, SpriteMaterial, UnlitMaterial } from "@four/materials";
 import {
+  FOLLOW_RIG_SERIALIZER,
+  FollowRig,
   KINEMATIC_CONTROLLER_SERIALIZER,
   KinematicController,
+  LOOK_AT_CONSTRAINT_SERIALIZER,
+  LookAtConstraint,
   MOTION_COMPONENT_SERIALIZER,
   MotionComponent,
+  ORBIT_RIG_SERIALIZER,
+  OrbitRig,
 } from "@four/motion";
 import {
   COLLIDER_SERIALIZER,
@@ -188,7 +195,7 @@ import {
   type SceneNodeDocument,
   type SerializeSceneOptions,
 } from "@four/serialization";
-import type { GlyphAtlas } from "@four/text";
+import type { GlyphAtlas, TextAlign } from "@four/text";
 import {
   Button,
   Checkbox,
@@ -204,6 +211,8 @@ import {
   type UIWidgetOptions,
   type WidgetAccessibility,
 } from "@four/ui";
+
+import { Text } from "./text-node.js";
 
 /** The document `type` a {@link Panel} serializes as. */
 export const PANEL_NODE_TYPE = "ui:panel";
@@ -243,6 +252,19 @@ export const RENDERABLE_NODE_TYPE = "render:renderable";
 
 /** The document `type` a {@link Sprite} serializes as (§55). */
 export const SPRITE_NODE_TYPE = "render:sprite";
+
+/**
+ * The document `type` a {@link Text} serializes as (§49, §56; R-28,
+ * 2026-08-13).
+ *
+ * `render:text`, not `four:text`, and the prefix rule above says why: it is a
+ * namespace, not an import path. §49 puts `Text` in the drawing family beside
+ * `Sprite`; the class lives in this package only because the frozen §3.1 matrix
+ * forbids `@four/render` from importing `@four/text` (see `text-node.ts`), and
+ * a document must not record that accident of layering — the class could move
+ * the day the matrix allows it, and the name has to survive the move.
+ */
+export const TEXT_NODE_TYPE = "render:text";
 
 /** The document `type` a {@link PerspectiveCamera} serializes as (§47). */
 export const PERSPECTIVE_CAMERA_NODE_TYPE = "scene:perspective-camera";
@@ -2321,6 +2343,154 @@ export function registerShapeSerializers(
 }
 
 /**
+ * Refuses a material a {@link Text} cannot be built from (§56, §57).
+ *
+ * Checked on §57's `kind` discriminant rather than with `instanceof`, exactly as
+ * {@link requireSpriteMaterial} is and for the same reason: the pipeline is
+ * chosen by the material's kind, never by the node's class. A label draws
+ * through the **unlit** pipeline with the atlas as §57's `map` and the ink
+ * colour as §57's `color` (see `text-node.ts`), so a key resolving to a
+ * `"sprite"` or `"standard"` material is a run-time type error that would draw
+ * nothing.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`
+ */
+function requireUnlitMaterial(
+  document: SceneNodeDocument,
+  material: Material,
+): UnlitMaterial {
+  if (material.kind === "unlit") {
+    // Sound behind the discriminant, which is §57's own contract for what a
+    // material *is* — the same read `buildRenderList` makes.
+    return material as UnlitMaterial;
+  }
+  const node = document.id ?? null;
+  throw new FourError(
+    "INVALID_APPLICATION_STATE",
+    `Scene document node ${JSON.stringify(node)} of type ${JSON.stringify(document.type)} resolves to a ${JSON.stringify(material.kind)} material, but a text node draws an "unlit" material — it samples that material's glyph atlas as \`map\` (§56, §57).`,
+    { context: { node, type: document.type, kind: material.kind } },
+  );
+}
+
+/**
+ * The §79 node-type pair for §49/§56's `Text` (R-28, 2026-08-13).
+ *
+ * ```ts
+ * const io = registerSceneNodeTypes({
+ *   atlas: buildGlyphAtlas(),
+ *   materials: resourceCatalog([["material/ink", ink]]),
+ * });
+ * ```
+ *
+ * ## What a text document carries
+ *
+ * A `material` key, `text`, `size`, `letterSpacing`, `align`, `renderLayer`,
+ * `renderOrder`, and §49's three boolean flags — and **no geometry key**, for
+ * `Sprite`'s reason: a `Text` derives its glyph quads from the four fields above
+ * and owns them, so that payload rebuilds the geometry exactly.
+ *
+ * The **font is not in the document**, for the reason a `Label`'s is not
+ * (module header): a `GlyphAtlas` is a loaded resource, and §79 references
+ * resources rather than inlining them. It arrives through
+ * {@link SceneNodeTypeOptions.atlas} — the option that already exists for
+ * labels, reused rather than duplicated, so an application that draws both
+ * passes one atlas and gets both back.
+ *
+ * ## Why a missing atlas is refused rather than defaulted
+ *
+ * A `Label` restored without an atlas measures `0 × 0`, which is what a label
+ * with no atlas *is*. A `Text` has no such state: its constructor requires a
+ * font, because there is no layout without one and no honest empty face to
+ * substitute. So a document naming a text node loaded with no `atlas` option
+ * throws, in the same voice and with the same fix-naming shape `resolveResource`
+ * uses for an unresolvable material key. Inventing a
+ * built-in face here would be worse than either: it would reload someone's
+ * scene in a font they never chose and never asked about.
+ *
+ * ## Separated from the other pairs, and what that buys
+ *
+ * A pair of its own for {@link registerShapeSerializers}'s reason: registering
+ * it is what pulls `Text` — and with it `@four/text`'s `layoutText` — into a
+ * bundle, and an application whose scenes carry no text should not pay for the
+ * layout engine to save one. {@link registerSceneNodeTypes} calls it, so an
+ * application that wants everything still makes one call.
+ *
+ * Matched by **exact class identity**, like every other pair here.
+ *
+ * @param options the glyph atlas restored text nodes are given, and the §79
+ * material catalog they resolve through
+ * @returns the writer and reader halves; pass both or neither
+ */
+export function registerTextSerializers(
+  options: SceneNodeTypeOptions = {},
+): SceneNodeTypeSupport {
+  const atlas = options.atlas;
+  const materials = options.materials;
+  const policy = options.unknownResources ?? "throw";
+  return {
+    write: {
+      nodeTypeOf: (node: Node): string | undefined =>
+        node.constructor === Text ? TEXT_NODE_TYPE : undefined,
+      nodeDataOf: (node: Node): JsonValue | undefined => {
+        if (node.constructor !== Text) return undefined;
+        const text = node as Text;
+        return {
+          material: resourceKeyJson<Material>(
+            node,
+            "material",
+            text.material,
+            materials,
+            policy,
+          ),
+          text: text.text,
+          size: text.size,
+          letterSpacing: text.letterSpacing,
+          align: text.align,
+          renderLayer: text.renderLayer,
+          renderOrder: text.renderOrder,
+          ...renderableFlagsJson(text),
+        };
+      },
+    },
+    read: {
+      nodeFactory: (document: SceneNodeDocument): Node | undefined => {
+        if (document.type !== TEXT_NODE_TYPE) return undefined;
+        if (atlas === undefined) {
+          throw new FourError(
+            "INVALID_APPLICATION_STATE",
+            `Scene document node ${JSON.stringify(document.id ?? null)} is a text node, but no glyph atlas was supplied to restore it with; pass registerSceneNodeTypes's \`atlas\` option (§56, §79).`,
+            { context: { node: document.id ?? null, type: document.type } },
+          );
+        }
+        const data = record(document.data);
+        const material = requireUnlitMaterial(
+          document,
+          resolveResource<Material>(document, "material", materials),
+        );
+        // §85, the `Sprite` precedent: the class refuses a non-positive size
+        // and an unknown alignment, so a payload carrying one restores the
+        // class default rather than taking the whole scene down over one field.
+        const size = readFinite(data.size);
+        const align = readString(data.align);
+        return new Text(atlas, material, {
+          ...finiteOptions(data, [
+            "letterSpacing",
+            "renderLayer",
+            "renderOrder",
+          ]),
+          ...readRenderableFlags(data),
+          text: readString(data.text) ?? "",
+          ...(size !== undefined && size > 0 ? { size } : {}),
+          ...(align === "left" || align === "center" || align === "right"
+            ? { align: align satisfies TextAlign }
+            : {}),
+        });
+      },
+    },
+  };
+}
+
+/**
  * Chains node-type pairs into one, first answer winning (2026-08-07).
  *
  * The composition {@link registerSceneNodeTypes} performs on the pairs above,
@@ -2458,6 +2628,12 @@ export function registerSceneNodeTypes(
   // not be saved at all, because an unregistered component throws (A-15). Its
   // payload is empty by design — see `KINEMATIC_CONTROLLER_SERIALIZER`.
   components.register(KinematicController, KINEMATIC_CONTROLLER_SERIALIZER);
+  // §44's camera rigs and §12's look-at constraint, added 2026-08-13 with the
+  // system that drives them. Their live `Node` targets are dropped on write and
+  // re-bound by the application — see the serializers in `@four/motion`.
+  components.register(OrbitRig, ORBIT_RIG_SERIALIZER);
+  components.register(FollowRig, FOLLOW_RIG_SERIALIZER);
+  components.register(LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,
@@ -2465,6 +2641,11 @@ export function registerSceneNodeTypes(
       registerUISerializers(options),
       registerRenderSerializers(options),
       registerShapeSerializers(options),
+      // §49/§56's `Text`, added 2026-08-13 with the node (R-28). Last in the
+      // chain because it is the newest and the order is only a fall-through
+      // order — every pair matches on exact class identity, so no two of them
+      // can claim the same node.
+      registerTextSerializers(options),
     ),
   };
 }

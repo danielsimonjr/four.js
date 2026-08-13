@@ -8,6 +8,85 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-13 — R-28 closed, R-30 advanced: the §49/§56 `Text` node and §77 sampler state
+
+#### Added
+
+- **§77 texture sampler state (R-30, sampler-state tier).** `TextureSource.filter`
+  (`"nearest" | "linear"`) and `TextureSource.wrap`
+  (`"clamp-to-edge" | "repeat" | "mirrored-repeat"`), resolved on `Texture.filter` /
+  `Texture.wrap`, mirrored as optional `MaterialTexture.filter` / `.wrap`, and applied by
+  `@four/render-webgl`'s `TextureCache` at upload time. Both default to the pair this tier
+  hard-coded before 2026-08-13, so every already-authored texture issues the identical four
+  `texParameteri` calls with the identical enums — byte-identity is structural, not
+  numerical. One field rather than `minFilter`/`magFilter` because the other four GL filter
+  values name a choice between mip levels and this tier generates none; one field for both
+  wrap axes because nothing authors anisotropic addressing yet. §85 refuses an unknown value
+  and never substitutes. §77's mipmaps, anisotropy, cube/array/3D targets, compressed
+  containers, video and `ImageBitmap` sources remain deferred and named.
+- **§49/§56 `Text` node (R-28).** `new Text(atlas, material, { text, size, letterSpacing,
+align })` — a `Renderable<UnlitMaterial>` in the umbrella package `four` that turns a
+  string into **one** indexed vertex buffer of glyph quads with per-vertex uv over **one**
+  atlas material. One draw call per label unconditionally; consecutive labels sharing a
+  material merge into one draw under §65 batching, which closes §65's glyph-batching
+  strategy at the label level with nothing added to `batch.ts`. It costs the frame path
+  nothing: no `RenderItemKind` arm, no new pipeline, no shader edit. Geometry is derived,
+  owned, rebuilt lazily behind a stable id, and resizes through R-23's empty-index pivot.
+  §79 pair `render:text` (`registerTextSerializers`, chained by `registerSceneNodeTypes`),
+  with the font supplied through the `atlas` option `Label` already used and a **loud
+  refusal** when it is absent. `castShadow` defaults `false` on this class alone — a
+  depth-only pass writes geometry, not alpha, so a label would cast its rectangles.
+- **§56 horizontal alignment.** `layoutText`'s new `align: "left" | "center" | "right"`
+  (`TextAlign`), applied per line within the widest line's extent. `"left"` — the default —
+  never enters the shift loop, so an unaligned layout is bit-identical to the previous one.
+  `layoutText`'s §33 tier is now stated as **cross-platform**: every operation is one of
+  IEEE-754's exactly-rounded five, with no transcendental and no hash-order iteration.
+- **Gates.** `tests/integration/text-rendering.test.ts` (a label is one draw and emits the
+  transcript of a plain textured `Renderable`), `tests/browser/text.spec.ts` +
+  `fixtures/text-page.ts` (glyphs on a real WebGL 2 driver; `NEAREST` and `LINEAR` differ),
+  and `tests/visual/text.spec.ts` with a new golden — the one text assertion that is a pixel
+  match, because a v-flip or an off-by-one-cell uv keeps ink count, row structure and draw
+  count intact.
+
+#### Changed
+
+- `benchmarks/text-layout.mjs` measures **both** CPU halves of §86's animated-glyph row: the
+  layout (~2.1 ms at 20 000 glyphs) and the `Text` geometry rebuild (~14 ms, ~700 ns/glyph,
+  800 draw calls — 1 batched — against 20 000 before R-28). `benchmarks/README.md`'s
+  `feature` block on the row's drawing half is amended in place.
+- Doc-truth: `@four/text`'s "a `Text` node … is not this package's to write" and
+  `@four/render`'s `Renderable` family note now name where `Text` landed and why the frozen
+  §3.1 matrix put it there.
+
+### 2026-08-09 — R-36 rig half + PH-11 closed: §44/§47 camera rigs, §42's first constraint producer
+
+#### Added
+
+- **§44/§47 camera rigs and §12 look-at constraints (`R-36` rig half + `PH-11`).**
+  `@four/motion` gains `OrbitRig` (§44 orbit control), `FollowRig` (§44 follow target
+  and spring arm — one class, switched by `frame: "world" | "target"`, smoothed by an
+  optional `SpringDamper`, with `resetSmoothing()` so a teleported target does not send
+  the camera sailing), `LookAtConstraint` (§12) and `ConstraintSystem`, the first
+  producing system §42's `"constraint"` transform authority has ever had, at §39 step 7
+  (`PRIORITY_CONSTRAINTS`). A rig **places** and a constraint **aims**, both in one
+  system under one authority, because §42 allows a node exactly one owner. The aim is
+  `Node.lookAt` on a clock, with an optional `maxAngularSpeed` slew limit in
+  `MotionComponent`'s spelling (radians per second, absent means unlimited). Rigs never
+  read `@four/input` — the frozen §3.1 matrix has no `motion → input` edge, so
+  `orbit(yawDelta, pitchDelta)` and `dolly(delta)` take deltas the application feeds,
+  which is also what makes a rig replayable (§33/§34). §85 refusals on authored values
+  (non-finite angles, non-positive distances, a zero or non-finite `up`, inconsistent
+  limits); a mid-simulation degeneracy is a **counted skip** on `skippedSteps` rather
+  than a throw inside a fixed step. All three components ship with their §79 serializers,
+  registered in `registerSceneNodeTypes`. New determinism golden
+  `tests/determinism/golden/camera-rigs.json` (§33 tier `same-runtime`; three rigged
+  cameras, 300 fixed steps, two in-process runs and one fresh process agreeing
+  byte-for-byte). Measured: **0 B** in five of six size-limited bundles, **+2.8 kB
+  gzip** in `motor-digital-twin`, the one bundle that calls `registerSceneNodeTypes()`.
+  §44's _path animation_ and _physics attachment_ need no rig class and are documented
+  compositions; fly, first-person, trackball, shake/impulse and the stereo/XR point stay
+  staged with named owners.
+
 ### 2026-08-09 — Dependabot high closed: nanoid override
 
 #### Fixed

@@ -9,9 +9,10 @@
  * a 2D, RGBA8, non-mipmapped texture built from a plain byte array, which is
  * what §55's sprite tier and §56's glyph atlas need in order to draw anything at
  * all — plus, since R-15 (2026-08-08), the **colour-space tag** §60a needs, which
- * the WebGL 2 backend turns into an sRGB internal format. The rest are named as
+ * the WebGL 2 backend turns into an sRGB internal format, and, since R-30
+ * (2026-08-13), **wrap and filter modes**. The rest are named as
  * deferred on {@link Texture} rather than sketched, because each of them (a
- * sampler-state object, a compressed-format enum) is a public shape the §79
+ * mip chain, a compressed-format enum) is a public shape the §79
  * scene format and every backend have to agree on.
  *
  * ## Two departures worth stating up front
@@ -70,11 +71,61 @@
  */
 
 import type { Disposable } from "@four/core";
-import type { SpriteTexture } from "@four/materials";
+import type {
+  MaterialTextureFilter,
+  MaterialTextureWrap,
+  SpriteTexture,
+} from "@four/materials";
 import type { ColorSpace } from "@four/math";
 
 import { validateColorSpace } from "./render-target.js";
 import { noteTexture } from "./resource-memory.js";
+
+/**
+ * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
+ * 2026-08-13).
+ *
+ * ```ts
+ * new Texture({ ...atlas, filter: "nearest" });   // a crisp bitmap font
+ * ```
+ *
+ * ## Why two values, and why one field rather than `minFilter`/`magFilter`
+ *
+ * §77 asks for filter modes, and GL offers six — but four of them
+ * (`*_MIPMAP_NEAREST`, `*_MIPMAP_LINEAR`) name a choice *between mip levels*,
+ * and a texture with one level has none to choose between. This tier generates
+ * no mipmaps ({@link Texture}), so the honest set is the two that mean something
+ * here, and naming the other four would be accepting a value the backend must
+ * then reinterpret.
+ *
+ * For the same reason there is one field and not two. `minFilter` and
+ * `magFilter` are a *pair* precisely because minification is the direction with
+ * mip levels in it; with one level the two accept the same two values and
+ * differing between them buys nothing an author can describe. When mipmaps
+ * land, `minFilter` gains four values and the split becomes a real choice —
+ * and it widens beside this field, which keeps its meaning ("both, unless
+ * overridden").
+ */
+export type TextureFilter = MaterialTextureFilter;
+
+/**
+ * How a texture is addressed outside `[0, 1]` (§77's "wrap modes"; R-30,
+ * 2026-08-13).
+ *
+ * One field for both axes — see {@link MaterialTextureWrap} for why, and for how
+ * it widens.
+ */
+export type TextureWrap = MaterialTextureWrap;
+
+/** The legal {@link TextureFilter} values, in the §85 message's order. */
+const FILTERS: readonly TextureFilter[] = ["nearest", "linear"];
+
+/** The legal {@link TextureWrap} values, in the §85 message's order. */
+const WRAPS: readonly TextureWrap[] = [
+  "clamp-to-edge",
+  "repeat",
+  "mirrored-repeat",
+];
 
 /**
  * The texel data a {@link Texture} is built from (§61's `TextureSource`, §77).
@@ -151,6 +202,39 @@ export interface TextureSource {
    * it becomes cheap to make.
    */
   readonly colorSpace?: ColorSpace;
+
+  /**
+   * How this texture is sampled between texel centres (§77; R-30,
+   * 2026-08-13). Defaults to `"linear"`.
+   *
+   * ```ts
+   * // A 6 × 12 bitmap font: every glyph texel stays a square.
+   * const atlas = new Texture({ ...buildGlyphAtlas(), filter: "nearest" });
+   * ```
+   *
+   * The default is `"linear"` because that is what this tier sampled with
+   * before the field existed: a texture that names no filter issues the
+   * identical `texParameteri` pair it always did, so no already-authored scene
+   * moves a pixel (the rule R-15's `colorSpace` default follows, for the same
+   * reason).
+   */
+  readonly filter?: TextureFilter;
+
+  /**
+   * How this texture is addressed outside `[0, 1]` (§77; R-30, 2026-08-13).
+   * Defaults to `"clamp-to-edge"`, this tier's previous fixed choice.
+   *
+   * ```ts
+   * // A tiling ground texture, with uv running 0…8 across the plane.
+   * new Texture({ width, height, data, wrap: "repeat" });
+   * ```
+   *
+   * Note that `"repeat"` and `"mirrored-repeat"` are legal on a
+   * non-power-of-two texture in WebGL 2 (they were not in WebGL 1), so a
+   * backend at §62's WebGL 1 tier would have to refuse the combination rather
+   * than silently sample black.
+   */
+  readonly wrap?: TextureWrap;
 }
 
 /**
@@ -170,10 +254,37 @@ function assignTextureId(): string {
 /** The source a disposed texture is left holding. */
 const EMPTY_SOURCE: TextureSource = Object.freeze({ width: 1, height: 1 });
 
+/**
+ * Refuses a sampler-state value the backend has no meaning for (§85).
+ *
+ * **Refuses; never substitutes.** A misspelled `"nearset"` that quietly became
+ * `"linear"` would be a texture sampled the wrong way with nothing anywhere
+ * saying so — and the §85 rule this repository applies to every configuration
+ * value is that a wrong one is louder than a plausible-looking rewrite.
+ */
+function validateEnum<T extends string>(
+  value: T,
+  legal: readonly T[],
+  field: string,
+): void {
+  if (!legal.includes(value)) {
+    throw new RangeError(
+      `Texture ${field} must be one of ${legal.map((one) => JSON.stringify(one)).join(", ")}; ` +
+        `got ${JSON.stringify(value)} (§77, §85).`,
+    );
+  }
+}
+
 /** Runs the §85 checks for one source. Throws on the first violation. */
 function validate(source: TextureSource): void {
   if (source.colorSpace !== undefined) {
     validateColorSpace(source.colorSpace, "Texture");
+  }
+  if (source.filter !== undefined) {
+    validateEnum(source.filter, FILTERS, "filter");
+  }
+  if (source.wrap !== undefined) {
+    validateEnum(source.wrap, WRAPS, "wrap");
   }
   for (const axis of ["width", "height"] as const) {
     const value = source[axis];
@@ -222,15 +333,20 @@ function validate(source: TextureSource): void {
  *
  * ## Deferred from §77 (named, not dropped)
  *
- * Cube/array/3D targets, mipmaps and their generation, wrap and filter modes
- * (the MVP samples `LINEAR` with `CLAMP_TO_EDGE` — see
- * `@four/render-webgl`'s `TextureCache`), anisotropy, the §77 *map roles* that
+ * Cube/array/3D targets, mipmaps and their generation, anisotropy, the §77 *map roles* that
  * would let colour-space metadata carry §60a's own defaults (colour maps sRGB,
  * data maps linear — the tag itself ships, see
  * {@link TextureSource.colorSpace}), compressed containers, render-target textures (§63), video textures,
  * and asynchronous upload with residency diagnostics (§84). Every one of them
  * adds public state that a backend, the §79 scene format, and §76's asset
  * manager all have to agree on.
+ *
+ * **Wrap and filter modes left that list on 2026-08-13 (R-30)** — see
+ * {@link TextureSource.filter} and {@link TextureSource.wrap}. They were the
+ * cheapest member of it by a wide margin, because sampler state is set on the
+ * texture object at upload time and read by nothing on the draw path: a
+ * `texParameteri` argument became a variable, and no frame does one thing more
+ * than it did.
  */
 export class Texture implements Disposable, SpriteTexture {
   /**
@@ -295,6 +411,34 @@ export class Texture implements Disposable, SpriteTexture {
    */
   get colorSpace(): ColorSpace {
     return this.#source.colorSpace ?? "linear";
+  }
+
+  /**
+   * How this texture is sampled between texel centres (§77; R-30), `"linear"`
+   * when the source names none — see {@link TextureSource.filter}.
+   *
+   * Resolved here rather than left optional for `colorSpace`'s reason: the
+   * backend reads one value and never repeats the `??`, while
+   * `MaterialTexture.filter` stays optional so every pre-R-30 texture and every
+   * test double satisfies the contract unchanged.
+   *
+   * **Sampler state is read at upload time.** Changing it on a texture the
+   * backend has already uploaded therefore needs {@link Texture.markDirty} (or
+   * a new {@link Texture.source}, which bumps the version for you) — the same
+   * announcement an in-place texel edit needs, and for the same reason.
+   */
+  get filter(): TextureFilter {
+    return this.#source.filter ?? "linear";
+  }
+
+  /**
+   * How this texture is addressed outside `[0, 1]` (§77; R-30),
+   * `"clamp-to-edge"` when the source names none — see
+   * {@link TextureSource.wrap} and {@link Texture.filter}'s note on when a
+   * change takes effect.
+   */
+  get wrap(): TextureWrap {
+    return this.#source.wrap ?? "clamp-to-edge";
   }
 
   /**

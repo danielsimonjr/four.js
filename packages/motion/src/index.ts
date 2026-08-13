@@ -1,6 +1,16 @@
 export const PACKAGE_NAME = "@four/motion";
 
 export type {
+  FollowFrame,
+  FollowRigOptions,
+  OrbitRigOptions,
+} from "./camera-rigs.js";
+export {
+  DEFAULT_ORBIT_PITCH_LIMIT,
+  FollowRig,
+  OrbitRig,
+} from "./camera-rigs.js";
+export type {
   ReadonlyTimeState,
   TimeState,
   TimeStateOptions,
@@ -13,6 +23,11 @@ export {
   copyTimeState,
   createTimeState,
 } from "./clock.js";
+export type {
+  ConstraintSystemOptions,
+  LookAtConstraintOptions,
+} from "./constraints.js";
+export { ConstraintSystem, LookAtConstraint } from "./constraints.js";
 export type { TwoBoneIKSolution } from "./ik.js";
 export { createTwoBoneIKSolution, solveTwoBoneIK } from "./ik.js";
 export type {
@@ -46,10 +61,14 @@ export type {
   MotionSystemOptions,
 } from "./motion-component.js";
 export { MotionComponent, MotionSystem } from "./motion-component.js";
+export type { RigTarget } from "./rig-target.js";
 export type { ComponentSerializerShape } from "./serializers.js";
 export {
+  FOLLOW_RIG_SERIALIZER,
   KINEMATIC_CONTROLLER_SERIALIZER,
+  LOOK_AT_CONSTRAINT_SERIALIZER,
   MOTION_COMPONENT_SERIALIZER,
+  ORBIT_RIG_SERIALIZER,
 } from "./serializers.js";
 export type { PIDControllerOptions, PIDDerivativeSource } from "./pid.js";
 export { DEFAULT_PID_OUTPUT_LIMITS, PIDController } from "./pid.js";

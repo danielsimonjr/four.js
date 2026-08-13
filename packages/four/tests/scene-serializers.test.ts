@@ -19,7 +19,14 @@ import {
   UnlitMaterial,
   type Material,
 } from "@four/materials";
-import { KinematicController, MotionComponent } from "@four/motion";
+import {
+  FollowRig,
+  KinematicController,
+  LookAtConstraint,
+  MotionComponent,
+  OrbitRig,
+  SpringDamper,
+} from "@four/motion";
 import { Vector3 } from "@four/math";
 import { Collider, RigidBody } from "@four/physics";
 import { Renderable, Sprite, Texture } from "@four/render";
@@ -703,6 +710,129 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(restored?.translationActive).toBe(false);
   });
 
+  it("round-trips the §44 camera rigs and §12's look-at constraint (2026-08-13)", () => {
+    // The three components that arrived with `ConstraintSystem`. What a
+    // document carries is the authored configuration: a `Vector3` target is
+    // written, a live `Node` target is dropped for the application to re-bind,
+    // and a spring round-trips as coefficients.
+    const io = registerSceneNodeTypes();
+    const root = new Group();
+    const subject = new Group();
+    root.add(subject);
+
+    const orbit = root.addComponent(
+      new OrbitRig({
+        target: new Vector3(0, 1, 0),
+        yaw: 0.5,
+        pitch: 0.2,
+        distance: 6,
+        minPitch: -1,
+        maxPitch: 1,
+        minDistance: 2,
+        maxDistance: 20,
+      }),
+    );
+    orbit.pitchLimitHits = 7;
+    const boom = new Group();
+    boom.addComponent(
+      new FollowRig({
+        target: subject,
+        offset: new Vector3(0, 2, 5),
+        frame: "target",
+        spring: new SpringDamper({ frequencyHz: 2, dampingRatio: 1 }),
+      }),
+    );
+    boom.addComponent(
+      new LookAtConstraint({ target: subject, maxAngularSpeed: 1.25 }),
+    );
+    root.add(boom);
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const restoredOrbit = reloaded.getComponent(OrbitRig);
+    expect(restoredOrbit).toBeInstanceOf(OrbitRig);
+    expect(restoredOrbit?.host).toBe(reloaded);
+    expect(restoredOrbit?.yaw).toBe(0.5);
+    expect(restoredOrbit?.pitch).toBe(0.2);
+    expect(restoredOrbit?.distance).toBe(6);
+    expect(restoredOrbit?.minDistance).toBe(2);
+    expect(restoredOrbit?.maxDistance).toBe(20);
+    expect(restoredOrbit?.target).toBeInstanceOf(Vector3);
+    // Counters describe a run, not a scene.
+    expect(restoredOrbit?.pitchLimitHits).toBe(0);
+
+    const restoredBoom = reloaded.children[1];
+    const restoredFollow = restoredBoom.getComponent(FollowRig);
+    expect(restoredFollow).toBeInstanceOf(FollowRig);
+    expect(restoredFollow?.frame).toBe("target");
+    expect(restoredFollow?.offset.equalsApprox(new Vector3(0, 2, 5), 0)).toBe(
+      true,
+    );
+    expect(restoredFollow?.spring?.stiffness).toBe(
+      boom.getComponent(FollowRig)?.spring?.stiffness,
+    );
+    // A live node target has nowhere to live in a §79 document: it is dropped,
+    // and the application re-binds it after the load.
+    expect(restoredFollow?.target).toBe(null);
+
+    const restoredAim = restoredBoom.getComponent(LookAtConstraint);
+    expect(restoredAim).toBeInstanceOf(LookAtConstraint);
+    expect(restoredAim?.maxAngularSpeed).toBe(1.25);
+    expect(restoredAim?.up.equalsApprox(new Vector3(0, 1, 0), 0)).toBe(true);
+    expect(restoredAim?.target).toBe(null);
+
+    // Re-binding is the one line the application owes, and it is enough to
+    // make the reloaded rig live again.
+    restoredAim!.target = restoredBoom;
+    expect(restoredAim?.target).toBe(restoredBoom);
+  });
+
+  it("keeps a rig document readable when a field is corrupt, and refuses an impossible one", () => {
+    // The §79-vs-§85 line the rig serializers draw: a field of the wrong shape
+    // restores to its default, a well-formed number describing a rig that
+    // cannot exist is refused rather than silently substituted.
+    const io = registerSceneNodeTypes();
+    const root = new Group();
+    root.addComponent(new OrbitRig({ yaw: 0.5, distance: 4 }));
+    const text = encodeSceneDocument(
+      serializeScene(root, io.components, io.write),
+    );
+
+    /** The same document with the rig's payload replaced by `data`. */
+    const tampered = (data: Record<string, unknown>): string => {
+      const document = JSON.parse(text) as {
+        nodes: { components?: { type: string; data: unknown }[] }[];
+      };
+      const components = document.nodes[0].components ?? [];
+      for (const entry of components) {
+        if (entry.type === OrbitRig.typeName) entry.data = data;
+      }
+      return JSON.stringify(document);
+    };
+
+    const shapeDamaged = instantiateScene(
+      decodeSceneDocument(tampered({ yaw: "east", distance: null })),
+      io.components,
+      io.read,
+    ).getComponent(OrbitRig);
+    expect(shapeDamaged?.yaw).toBe(0);
+    expect(shapeDamaged?.distance).toBe(1);
+
+    expect(() =>
+      instantiateScene(
+        decodeSceneDocument(tampered({ distance: -2 })),
+        io.components,
+        io.read,
+      ),
+    ).toThrow(RangeError);
+  });
+
   it("registers a serializer for every component class the engine ships", () => {
     // The enumerating test the KinematicController gap asked for (2026-08-07).
     // A component with no serializer makes `serializeScene` throw (A-15), and
@@ -730,8 +860,11 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     // exported would otherwise make this test pass by finding less.
     expect([...shipped.keys()].sort()).toEqual([
       "collider",
+      "follow-rig",
       "kinematic-controller",
+      "look-at-constraint",
       "motion",
+      "orbit-rig",
       "pose-target",
       "rigid-body",
     ]);

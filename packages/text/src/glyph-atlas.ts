@@ -34,6 +34,11 @@
  * depend on `scene` and `materials`; it is a thin wrapper over
  * {@link GlyphAtlas} and `layoutText`, and it is not this package's to write.
  *
+ * **It was written on 2026-08-13 (R-28), and it landed in the umbrella package
+ * `four`** — the only one the frozen §3.1 matrix lets see both this package and
+ * `@four/render`. It takes an atlas and a material and turns a string into one
+ * geometry of glyph quads: `packages/four/src/text-node.ts`.
+ *
  * ## Y-up, once (§7a)
  *
  * A font's rows are authored top-down; §7a's world and GL's default texture

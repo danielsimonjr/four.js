@@ -100,12 +100,58 @@ changes in `CHANGELOG.md`.
       §85 refusals, `same-runtime` determinism. `getWorldDirection` hoisted off the two
       light classes; `Matrix4.decompose` now shares one Shepperd implementation (goldens
       bit-identical, `matrix4.ts` to 100%). 36 tests. **Rig half still open.**
-- [ ] **§44/§47 camera rigs (R-36 rig half + PH-11)** — orbit, fly, first-person,
-      trackball, follow target, spring arm, shake/impulse, path animation, physics
-      attachment; plus §12's orbit motion and character controllers. Build on
-      `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
-      which has no producing system: seam is a `LookAtConstraint` component + a system
-      at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
+- [x] **R-28 DONE 2026-08-13 (bitmap-label tier)** — the `Text` node in `four`
+      (dependency matrix forbids `render`↔`text`), one geometry over one atlas material,
+      one draw per label; §65 glyph batching closed by construction; §56 alignment on
+      `layoutText` (cross-platform §33 tier, stated mechanically); §79 pair with loud
+      atlas refusal; `castShadow` false-by-data on this class alone. §86's
+      animated-glyph row now `half`-measured.
+- [x] **R-30 advanced 2026-08-13 (sampler-state tier)** — `TextureSource.filter`/`wrap`
+      through `Texture`/`MaterialTexture` to `TextureCache`; structural byte-identity;
+      +0.11 kB per Texture-carrying bundle.
+- [ ] **R-30b — the rest of §77:** mipmaps and generation, cube/array/3D targets,
+      anisotropy, map roles, compressed containers, video and `ImageBitmap` sources,
+      async upload + residency diagnostics. The wrap/filter bullet closed 2026-08-13; the
+      row's remaining scope is a different, larger item.
+- [ ] **Text follow-ups (2026-08-13):** (a) `examples/first-2d-scene` and
+      `examples/ui-demo` still cut one `Texture` per glyph cell — both should be
+      rewritten onto `Text` (ui-demo through a `WidgetSkin` turning `Label.textLayout`
+      into one `Text`); expected: a large draw-call drop and a smaller bundle; one
+      follow-up packet with the browser gate. (b) `.size-limit.json`: bump ui-demo
+      38 → 38.5 kB — measured 37.86 with R-28/R-30 (0.14 kB headroom); the next packet to
+      add a class method breaks it. (c) §56 wrapping — deliberately not bundled with
+      alignment: a wrap decides where lines end (UAX #14 and a language), alignment
+      merely places a finished line. (d) §86's animated-glyph row is now bounded by the
+      geometry rebuild (~700 ns/glyph); the named lever is a flat coordinate buffer
+      instead of one frozen `TextQuad` per glyph. (e) before §56 full shaping: RFC the
+      shaping engine (HarfBuzz-wasm vs native).
+- [x] **§44/§47 camera rigs DONE 2026-08-09 (R-36 rig half + PH-11)** — `OrbitRig`,
+      `FollowRig` (follow target **and** spring arm, one class switched by `frame`,
+      smoothed by `SpringDamper`), `LookAtConstraint` and `ConstraintSystem` at §39
+      step 7 under §42's `"constraint"` authority — the first producing system that
+      authority has ever had. A rig places, a constraint aims, both in one system
+      because §42 gives a node one owner. Path animation and physics attachment close
+      by composition (no class). §85 refusals at authoring, counted skips
+      mid-simulation, §79 serializers registered in the same batch, new determinism
+      golden. 0 B in five of six bundles, +2.8 kB in `motor-digital-twin`.
+- [ ] **§12 character controllers, and first-person camera control with them (PH-11
+      residue, 2026-08-09)** — the last open §12 feature. First-person is filed here
+      rather than with the rigs because it _writes a rotation_, so it collides with
+      `LookAtConstraint` for the node's one §42 authority; the packet has to decide the
+      aim-vs-free-look arbitration, and a character controller wants the same yaw
+      source. Effort M.
+- [ ] **Staged rigs (R-36/R-37 residue, 2026-08-09):** trackball belongs to the
+      `ScreenCamera` packet (defined over a viewport in screen space; `motion` has no
+      `input`/`render` edge); fly is a two-line application snippet once deltas are fed
+      in and needs no class; shake/impulse is a `CameraShake` additive offset over
+      `SeededRandom`, blocked only on choosing an interpolated value-noise function —
+      per-step white noise is a jitter whose character changes with the fixed rate
+      (§33).
+- [ ] **Nothing exercises a rig against a live solver (2026-08-09)** — §44's _physics
+      attachment_ is argued from the priority numbers (`PRIORITY_CONSTRAINTS` 700 >
+      `PRIORITY_PHYSICS_SOLVE` 600) and from a rig reading rather than writing its
+      target. Cheap to make evidence: add a `@four/physics-rapier` arm to
+      `tests/integration/camera-rigs.test.ts` chasing a dynamic body.
 - [ ] **Examples still hand-roll their orientations (R-36 follow-up)** —
       `examples/first-3d-scene/main.ts:151` (camera pitch) and `:219-220` (sun yaw∘pitch)
       are the code `lookAt` exists to replace. Left in place deliberately: `lookAt`
