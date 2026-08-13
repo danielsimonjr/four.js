@@ -152,6 +152,12 @@ changes in `CHANGELOG.md`.
       `PRIORITY_PHYSICS_SOLVE` 600) and from a rig reading rather than writing its
       target. Cheap to make evidence: add a `@four/physics-rapier` arm to
       `tests/integration/camera-rigs.test.ts` chasing a dynamic body.
+- [ ] **§44/§47 camera rigs (R-36 rig half + PH-11)** — orbit, fly, first-person,
+      trackball, follow target, spring arm, shake/impulse, path animation, physics
+      attachment; plus §12's orbit motion and character controllers. Build on
+      `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
+      which has no producing system: seam is a `LookAtConstraint` component + a system
+      at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
 - [ ] **Examples still hand-roll their orientations (R-36 follow-up)** —
       `examples/first-3d-scene/main.ts:151` (camera pitch) and `:219-220` (sun yaw∘pitch)
       are the code `lookAt` exists to replace. Left in place deliberately: `lookAt`
