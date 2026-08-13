@@ -8,6 +8,15 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-09 — Dependabot high closed: nanoid override
+
+#### Fixed
+
+- **GHSA-2v37-7h3g-55p8 (high): `nanoid` < 3.3.17** — reached only through the dev
+  toolchain (`vite → postcss → nanoid`), never shipped in any package. A pnpm override
+  (`"nanoid@<3.3.17": ">=3.3.17"`) forces the patched line; `pnpm audit` reports no known
+  vulnerabilities.
+
 ### 2026-08-09 — R-8 closed: §64 per-view render lists, §87 frustum culling, §66 key 4
 
 #### Added
