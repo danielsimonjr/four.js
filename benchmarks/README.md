@@ -33,6 +33,7 @@ the module loads. The whole suite takes about **77 s** on the recorded host, dom
 | [`animation-sampling.mjs`](#animation-samplingmjs--17-mixer-sampling)                         | `AnimationMixer.advance` over N instances of a 4-track clip                  | none — _animated glyphs_ is a text row, not a mixer row                                   |
 | [`particles-100k.mjs`](#particles-100kmjs--112s-particle-budget-wp-94-phase-9)                | 100 000 CPU particles under a 3-field §27 stack                              | **CPU particles** (at 4× §86's 25 000 baseline, per §112)                                 |
 | [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half)                        | `Panel.layout()` over 500–5 000 retained widgets, cold/incremental/warm      | **retained UI nodes: 5 000** — the layout-and-state half                                  |
+| [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)                     | `layoutText` and §49 `Text` geometry at 1 000–50 000 drawn glyphs per frame  | **animated glyphs: 20 000** — both CPU halves (R-28, 2026-08-13)                          |
 | [`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half)                     | `layoutText` at 1 000–50 000 drawn glyphs per frame                          | **animated glyphs: 20 000** — the layout half                                             |
 | [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half) | render-list build plus §65 batch assembly at 5 000–100 000 nodes             | **batched sprites: 100 000** and **simple batched shapes: 50 000** — the preparation half |
 | [`view-culling.mjs`](#view-cullingmjs--64s-per-view-lists-and-87s-frustum-cull)               | per-view list derivation and §87 culling at 10 000–100 000 nodes × 1–4 views | none — §86 has no culling row; this measures a design decision                            |
@@ -59,10 +60,23 @@ _"`@four/ui` ships and lays out; the row is a rendering-throughput number, so it
 real GPU rather than SwiftShader"_ and was filed under **hardware**; that was right about
 the drawing and wrong about the layout, which is pure CPU work and is now measured by
 [`ui-layout.mjs`](#ui-layoutmjs--86s-5-000-retained-ui-nodes-cpu-half). _Animated glyphs_
-keeps its **feature** block for the drawing half and gains a measured layout half in
-[`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half). Both rows are
+kept a **feature** block for its drawing half until 2026-08-13, when R-28's `Text` node
+removed the per-glyph texture cut the block was about; both of its CPU halves — layout and
+geometry build — are now measured in
+[`text-layout.mjs`](#text-layoutmjs--86s-20-000-animated-glyphs-cpu-half), and what is left
+of the row is GPU submission. Both rows are
 **partly** measured — a half-row is stated as a half-row here and in each script's record.
 
+| §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 100 000 batched sprites | **half**    | **Amended 2026-08-09 (R-9).** Read _"There is no sprite batching"_ until then, which stopped being true when `RenderBatcher` and `createGlBatching` landed: consecutive sprites over one atlas material now merge into one `drawElements`. The **preparation** half is measured by [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half); the **submission** half needs a GPU. §55's `frame` landed with R-29                                                                                                                                                              |
+| 50 000 batched shapes   | **half**    | **Amended 2026-08-09 (R-9).** Read _"There is no shape system to batch"_ until then; §50's catalogue landed with R-23/R-24/R-25 and §58's paints with R-16, and consecutive shapes over one material merge exactly as sprites do. Same split: preparation measured, submission GPU-blocked                                                                                                                                                                                                                                                                                                                         |
+| mesh instances          | **feature** | Instancing exists **only** in the particle path (`drawArraysInstanced`, one call per system). No instanced draw path exists for `Renderable`s, so there is no instance count to sweep                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| animated glyphs         | **half**    | **Amended 2026-08-13 (R-28).** Read _"the draw half stays **feature**-blocked — §56 ships a bitmap tier whose atlas cannot be addressed per glyph"_ until then; §55's `frame` (R-29) and §49's `Text` node closed that, and 20 000 glyphs are now **one** `drawElements` over one atlas material instead of 20 000 texture binds. Both CPU halves are measured by `text-layout.mjs` — `layoutText` producing the quads, and the `Text` geometry rebuild that turns them into vertex buffers; the **submission** half needs a GPU, exactly as the two batching rows say of theirs. Shaping and SDF are staged (S-6) |
+| 100 000+ GPU particles  | hardware    | The CPU path is measured by `particles-100k.mjs`. A GPU/compute path is not implemented **and** would need a GPU to measure; count it as blocked twice                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| retained UI nodes       | **half**    | The **layout-and-state** half is measured (`ui-layout.mjs`): `@four/ui` has no renderer dependency by design, so §74's two passes over the tree are the whole of what the package does per frame. The **draw** half needs a real GPU rather than SwiftShader. It no longer pays the per-glyph texture cut the row above used to (R-28, 2026-08-13), though a `WidgetSkin` has to be rewritten onto `Text` to stop paying it                                                                                                                                                                                        |
+| bundle payload          | —           | Not unmeasured: gated by `pnpm size` (size-limit) in CI, the one §86 row that _is_ enforced                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| idle scene / near-zero  | —           | Not unmeasured: `scene-propagation.mjs` covers the scene-graph half                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | §86 row                 | blocked by  | detail                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ----------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 100 000 batched sprites | **half**    | **Amended 2026-08-09 (R-9).** Read _"There is no sprite batching"_ until then, which stopped being true when `RenderBatcher` and `createGlBatching` landed: consecutive sprites over one atlas material now merge into one `drawElements`. The **preparation** half is measured by [`render-batching.mjs`](#render-batchingmjs--86s-batched-sprites-and-shapes-preparation-half); the **submission** half needs a GPU. §55's `frame` landed with R-29 |
@@ -426,11 +440,17 @@ run under record, and its host block before quoting it):
 node benchmarks/text-layout.mjs
 ```
 
-§86 asks for **20 000 animated glyphs**. Producing the quads is CPU work `@four/text` does
-today; drawing them is not, and stays blocked on a **feature** rather than on hardware — the
-§56 bitmap atlas cannot be addressed per glyph, so the shipped path cuts one `Texture` per
-glyph cell and issues a draw call each. This script closes the first half and leaves the
-second exactly where it was.
+§86 asks for **20 000 animated glyphs**. Producing the quads is CPU work `@four/text` does;
+turning them into vertex buffers is CPU work §49's `Text` node does; submitting the draw is
+the GPU's. This script measures the first two.
+
+**Amended 2026-08-13 (R-28).** It read _"drawing them is not [CPU work the engine does], and
+stays blocked on a **feature** rather than on hardware — the §56 bitmap atlas cannot be
+addressed per glyph, so the shipped path cuts one `Texture` per glyph cell and issues a draw
+call each"_. That stopped being true when R-29's §55 `frame` and R-28's `Text` node landed:
+a label is now **one** indexed vertex buffer over **one** atlas material, so 20 000 glyphs
+are one `drawElements` rather than 20 000 texture binds, and the `geometry half` rows below
+measure what a frame pays to build them.
 
 **What "animated" costs, honestly.** A glyph that only _moves_ is laid out **once**: the
 quads are geometry, and animating a node's transform never re-enters `layoutText`. Only text
@@ -464,6 +484,17 @@ perGlyph` fits with **perCall on the order of 120–140 ns** and perGlyph as abo
   look: a flat `Float32Array` of quad coordinates, not faster arithmetic. Unlike §7b's math
   types this path is not allocation-free and is not required to be — the quads _are_ the
   return value.
+- **The geometry half is the expensive half, and that is the finding.** Assigning a new
+  string to every `Text` node and reading its `geometry` back — one `layoutText` plus one
+  positions/uv/index rebuild per node — costs **roughly 14 ms at 20 000 glyphs** on this
+  host, about 700 ns per glyph, against ~2 ms for the layout alone. So closing the draw-call
+  gap moved the bottleneck rather than removing it, exactly as `render-batching.mjs` found
+  for sprites: what a content-changing text frame pays is three typed-array allocations and
+  a scan per label, not a draw call. Text that only _moves_ pays none of it.
+- **The draw-call number is the closed blocker, and it is not a millisecond.** 20 000 glyphs
+  over one atlas material are **one** `drawElements` under §65 batching (`drawCallsBatched`),
+  one per label without it (`drawCallsUnbatched`), and were **20 000** before R-28
+  (`drawCallsBeforeR28`). Submitting them is GPU work this host cannot measure.
 - **Building the atlas is setup, and is timed as such**: `buildGlyphAtlas()` on the built-in
   6 × 12 face costs a couple of milliseconds once, and is deliberately excluded from every
   throughput number above.

@@ -125,8 +125,12 @@ export const GL = {
   DEPTH_COMPONENT: 0x1902,
   /** `GL_RGBA` — the texel upload format. */
   RGBA: 0x1908,
-  /** `GL_CLAMP_TO_EDGE` — the wrap mode of every MVP-tier texture (§77). */
+  /** `GL_CLAMP_TO_EDGE` — the default wrap mode of a §77 texture (R-30). */
   CLAMP_TO_EDGE: 0x812f,
+  /** `GL_REPEAT` — §77's tiling wrap mode (R-30, 2026-08-13). */
+  REPEAT: 0x2901,
+  /** `GL_MIRRORED_REPEAT` — §77's mirrored tiling wrap mode (R-30). */
+  MIRRORED_REPEAT: 0x8370,
   /**
    * `GL_DEPTH_COMPONENT16` — storage format of a render target's depth
    * renderbuffer (R-4). The narrowest depth format WebGL 2 guarantees is

@@ -824,6 +824,18 @@ class TestTexture {
    */
   colorSpace?: "srgb" | "linear";
 
+  /**
+   * §77's sampler state (R-30, 2026-08-13). Both left `undefined` by default,
+   * exactly as every texture written before the fields existed leaves them —
+   * which is what keeps the four `texParameteri` calls of every other test in
+   * this file byte-identical, and what makes the `?? default` path the one they
+   * exercise.
+   */
+  filter?: "nearest" | "linear";
+
+  /** See {@link TestTexture.filter}. */
+  wrap?: "clamp-to-edge" | "repeat" | "mirrored-repeat";
+
   constructor(width = 2, height = 2, data: Uint8Array | null = null) {
     nextTestTextureId += 1;
     this.id = `test-texture-${String(nextTestTextureId)}`;
@@ -2734,6 +2746,84 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
       GL.RGBA8,
       GL.SRGB8_ALPHA8,
     ]);
+  });
+
+  it("writes the texture's own filter and wrap (§77, R-30)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(2, 2);
+    texture.filter = "nearest";
+    texture.wrap = "repeat";
+
+    cache.acquire(texture.asTexture);
+
+    expect(
+      gl.callsOf("texParameteri").map((call) => [call.args[1], call.args[2]]),
+    ).toEqual([
+      [GL.TEXTURE_MIN_FILTER, GL.NEAREST],
+      [GL.TEXTURE_MAG_FILTER, GL.NEAREST],
+      [GL.TEXTURE_WRAP_S, GL.REPEAT],
+      [GL.TEXTURE_WRAP_T, GL.REPEAT],
+    ]);
+  });
+
+  it("maps mirrored-repeat, and every unset field to its default (§77, R-30)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const mirrored = new TestTexture(1, 1);
+    mirrored.wrap = "mirrored-repeat";
+    const linear = new TestTexture(1, 1);
+    linear.filter = "linear";
+    linear.wrap = "clamp-to-edge";
+
+    cache.acquire(mirrored.asTexture);
+    cache.acquire(linear.asTexture);
+
+    const written = gl
+      .callsOf("texParameteri")
+      .map((call) => [call.args[1], call.args[2]]);
+    expect(written.slice(0, 4)).toEqual([
+      // The filter is unset on this one: the default arm of `glFilter`.
+      [GL.TEXTURE_MIN_FILTER, GL.LINEAR],
+      [GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_WRAP_S, GL.MIRRORED_REPEAT],
+      [GL.TEXTURE_WRAP_T, GL.MIRRORED_REPEAT],
+    ]);
+    // Naming the defaults explicitly must produce the identical four calls a
+    // texture that names neither produces — the byte-identity claim, from the
+    // other direction.
+    expect(written.slice(4)).toEqual([
+      [GL.TEXTURE_MIN_FILTER, GL.LINEAR],
+      [GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
+      [GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
+    ]);
+  });
+
+  it("re-uploads with the new sampler state after a version bump (§77, R-30)", () => {
+    // Sampler state is upload-time state, so changing it on a resident texture
+    // needs the same announcement an in-place texel edit needs.
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(1, 1);
+
+    cache.acquire(texture.asTexture);
+    texture.filter = "nearest";
+    cache.acquire(texture.asTexture);
+    // Still one upload: the version did not move, so the cache answered from
+    // its record and the GPU still samples linearly.
+    expect(gl.countOf("texImage2D")).toBe(1);
+
+    texture.markDirty();
+    cache.acquire(texture.asTexture);
+
+    expect(gl.countOf("texImage2D")).toBe(2);
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .slice(4)
+        .map((call) => call.args[2]),
+    ).toEqual([GL.NEAREST, GL.NEAREST, GL.CLAMP_TO_EDGE, GL.CLAMP_TO_EDGE]);
   });
 
   it("allocates zero-filled storage for a texture with no CPU-side data", () => {

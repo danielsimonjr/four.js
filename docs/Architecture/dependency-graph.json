@@ -2,10 +2,10 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-09",
-    "totalFiles": 211,
+    "lastUpdated": "2026-08-13",
+    "totalFiles": 215,
     "totalModules": 24,
-    "totalExports": 1952
+    "totalExports": 1990
   },
   "entryPoints": [
     {
@@ -2919,15 +2919,24 @@
               "SPOT_LIGHT_NODE_TYPE",
               "SPRITE_NODE_TYPE",
               "STAR_NODE_TYPE",
+              "TEXT_NODE_TYPE",
               "TOGGLE_NODE_TYPE",
               "composeSceneNodeTypes",
               "registerPhysicsSerializers",
               "registerRenderSerializers",
               "registerSceneNodeTypes",
               "registerShapeSerializers",
+              "registerTextSerializers",
               "registerUISerializers",
               "resourceCatalog",
               "restoreNodeId"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./text-node.js",
+            "imports": [
+              "Text"
             ],
             "reExport": true
           },
@@ -2952,6 +2961,14 @@
               "SceneResourceCatalog",
               "SceneSerializationSupport",
               "UnknownResourcePolicy"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./text-node.js",
+            "imports": [
+              "TextOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -2984,15 +3001,18 @@
           "SPOT_LIGHT_NODE_TYPE",
           "SPRITE_NODE_TYPE",
           "STAR_NODE_TYPE",
+          "TEXT_NODE_TYPE",
           "TOGGLE_NODE_TYPE",
           "composeSceneNodeTypes",
           "registerPhysicsSerializers",
           "registerRenderSerializers",
           "registerSceneNodeTypes",
           "registerShapeSerializers",
+          "registerTextSerializers",
           "registerUISerializers",
           "resourceCatalog",
           "restoreNodeId",
+          "Text",
           "ApplicationEventMap",
           "ApplicationOptions",
           "PhysicsWorldContext",
@@ -3003,7 +3023,8 @@
           "SceneNodeTypeSupport",
           "SceneResourceCatalog",
           "SceneSerializationSupport",
-          "UnknownResourcePolicy"
+          "UnknownResourcePolicy",
+          "TextOptions"
         ],
         "reExported": [
           "Application",
@@ -3031,15 +3052,18 @@
           "SPOT_LIGHT_NODE_TYPE",
           "SPRITE_NODE_TYPE",
           "STAR_NODE_TYPE",
+          "TEXT_NODE_TYPE",
           "TOGGLE_NODE_TYPE",
           "composeSceneNodeTypes",
           "registerPhysicsSerializers",
           "registerRenderSerializers",
           "registerSceneNodeTypes",
           "registerShapeSerializers",
+          "registerTextSerializers",
           "registerUISerializers",
           "resourceCatalog",
           "restoreNodeId",
+          "Text",
           "ApplicationEventMap",
           "ApplicationOptions",
           "PhysicsWorldContext",
@@ -3050,7 +3074,8 @@
           "SceneNodeTypeSupport",
           "SceneResourceCatalog",
           "SceneSerializationSupport",
-          "UnknownResourcePolicy"
+          "UnknownResourcePolicy",
+          "TextOptions"
         ]
       },
       "packages/four/src/input.ts": {
@@ -3323,7 +3348,14 @@
         "description": "§79 node types and component serializers for the classes the engine itself",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./text-node.js",
+            "imports": [
+              "Text"
+            ]
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -3347,17 +3379,24 @@
             "directory": "packages/materials",
             "imports": [
               "Material",
-              "SpriteMaterial"
+              "SpriteMaterial",
+              "UnlitMaterial"
             ]
           },
           {
             "package": "@four/motion",
             "directory": "packages/motion",
             "imports": [
+              "FOLLOW_RIG_SERIALIZER",
+              "FollowRig",
               "KINEMATIC_CONTROLLER_SERIALIZER",
               "KinematicController",
+              "LOOK_AT_CONSTRAINT_SERIALIZER",
+              "LookAtConstraint",
               "MOTION_COMPONENT_SERIALIZER",
-              "MotionComponent"
+              "MotionComponent",
+              "ORBIT_RIG_SERIALIZER",
+              "OrbitRig"
             ]
           },
           {
@@ -3428,7 +3467,8 @@
             "package": "@four/text",
             "directory": "packages/text",
             "imports": [
-              "GlyphAtlas"
+              "GlyphAtlas",
+              "TextAlign"
             ]
           },
           {
@@ -3464,6 +3504,7 @@
           "IMAGE_NODE_TYPE",
           "RENDERABLE_NODE_TYPE",
           "SPRITE_NODE_TYPE",
+          "TEXT_NODE_TYPE",
           "PERSPECTIVE_CAMERA_NODE_TYPE",
           "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
           "DIRECTIONAL_LIGHT_NODE_TYPE",
@@ -3485,6 +3526,7 @@
           "registerUISerializers",
           "registerRenderSerializers",
           "registerShapeSerializers",
+          "registerTextSerializers",
           "composeSceneNodeTypes",
           "registerPhysicsSerializers",
           "registerSceneNodeTypes"
@@ -3500,6 +3542,7 @@
           "registerUISerializers",
           "registerRenderSerializers",
           "registerShapeSerializers",
+          "registerTextSerializers",
           "composeSceneNodeTypes",
           "registerPhysicsSerializers",
           "registerSceneNodeTypes"
@@ -3516,6 +3559,7 @@
           "IMAGE_NODE_TYPE",
           "RENDERABLE_NODE_TYPE",
           "SPRITE_NODE_TYPE",
+          "TEXT_NODE_TYPE",
           "PERSPECTIVE_CAMERA_NODE_TYPE",
           "ORTHOGRAPHIC_CAMERA_NODE_TYPE",
           "DIRECTIONAL_LIGHT_NODE_TYPE",
@@ -3571,6 +3615,62 @@
         "exports": [],
         "reExported": [
           "* from @four/serialization"
+        ]
+      },
+      "packages/four/src/text-node.ts": {
+        "description": "`Text` (§49, §56) — a string, a font atlas and a material become **one** draw",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/geometry",
+            "directory": "packages/geometry",
+            "imports": [
+              "BufferGeometry"
+            ]
+          },
+          {
+            "package": "@four/materials",
+            "directory": "packages/materials",
+            "imports": [
+              "UnlitMaterial"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "Renderable",
+              "RenderableOptions"
+            ]
+          },
+          {
+            "package": "@four/text",
+            "directory": "packages/text",
+            "imports": [
+              "layoutText",
+              "GlyphAtlas",
+              "TextAlign",
+              "TextLayout"
+            ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Disposable"
+            ]
+          }
+        ],
+        "exports": [
+          "Text"
+        ],
+        "classes": [
+          "Text"
+        ],
+        "interfaces": [
+          "TextOptions"
         ]
       },
       "packages/four/src/text.ts": {
@@ -4775,7 +4875,7 @@
     },
     "packages/materials": {
       "packages/materials/src/index.ts": {
-        "description": "Package entry point for @four/materials (re-exports 15 symbols)",
+        "description": "Package entry point for @four/materials (re-exports 17 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -4852,7 +4952,9 @@
           {
             "file": "./texture.js",
             "imports": [
-              "MaterialTexture"
+              "MaterialTexture",
+              "MaterialTextureFilter",
+              "MaterialTextureWrap"
             ],
             "reExport": true,
             "typeOnly": true
@@ -4883,6 +4985,8 @@
           "ColorRGB",
           "StandardMaterialOptions",
           "MaterialTexture",
+          "MaterialTextureFilter",
+          "MaterialTextureWrap",
           "ColorRGBA",
           "UnlitMaterialOptions"
         ],
@@ -4900,6 +5004,8 @@
           "ColorRGB",
           "StandardMaterialOptions",
           "MaterialTexture",
+          "MaterialTextureFilter",
+          "MaterialTextureWrap",
           "ColorRGBA",
           "UnlitMaterialOptions"
         ],
@@ -5491,6 +5597,73 @@
       }
     },
     "packages/motion": {
+      "packages/motion/src/camera-rigs.ts": {
+        "description": "§44 camera rigs: {@link OrbitRig} (orbit) and {@link FollowRig} (follow target",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./rig-target.js",
+            "imports": [
+              "placeAtWorldPosition",
+              "resolveTargetPosition",
+              "worldPositionOf",
+              "RigTarget"
+            ]
+          },
+          {
+            "file": "./spring-damper.js",
+            "imports": [
+              "SpringDamper",
+              "SpringDamperVector3Result"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Component",
+              "ComponentHost"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "resolveWorldTransform",
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "DEFAULT_ORBIT_PITCH_LIMIT",
+          "DEFAULT_ORBIT_MIN_DISTANCE",
+          "OrbitRig",
+          "FollowRig"
+        ],
+        "classes": [
+          "OrbitRig",
+          "FollowRig"
+        ],
+        "interfaces": [
+          "OrbitRigOptions",
+          "FollowRigOptions"
+        ],
+        "constants": [
+          "DEFAULT_ORBIT_PITCH_LIMIT",
+          "DEFAULT_ORBIT_MIN_DISTANCE"
+        ]
+      },
       "packages/motion/src/clock.ts": {
         "description": "Clock and time domains (§9).",
         "externalDependencies": [],
@@ -5520,6 +5693,74 @@
           "DEFAULT_MAXIMUM_SUB_STEPS"
         ]
       },
+      "packages/motion/src/constraints.ts": {
+        "description": "§12's look-at constraint and the §39 step-7 system that runs it, together",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./camera-rigs.js",
+            "imports": [
+              "FollowRig",
+              "OrbitRig"
+            ]
+          },
+          {
+            "file": "./rig-target.js",
+            "imports": [
+              "resolveTargetPosition",
+              "RigTarget"
+            ]
+          },
+          {
+            "file": "./systems.js",
+            "imports": [
+              "PRIORITY_CONSTRAINTS",
+              "FixedUpdateContext",
+              "SimulationSystem"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Component",
+              "ComponentHost"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Quaternion",
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "resolveWorldTransform",
+              "warnAuthorityConflict",
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "LookAtConstraint",
+          "ConstraintSystem"
+        ],
+        "classes": [
+          "LookAtConstraint",
+          "ConstraintSystem"
+        ],
+        "interfaces": [
+          "LookAtConstraintOptions",
+          "ConstraintSystemOptions"
+        ]
+      },
       "packages/motion/src/ik.ts": {
         "description": "Analytic two-bone inverse kinematics (§111 \"inverse kinematics\"; plan P8-1).",
         "externalDependencies": [],
@@ -5547,10 +5788,19 @@
         ]
       },
       "packages/motion/src/index.ts": {
-        "description": "Package entry point for @four/motion (re-exports 112 symbols)",
+        "description": "Package entry point for @four/motion (re-exports 126 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./camera-rigs.js",
+            "imports": [
+              "DEFAULT_ORBIT_PITCH_LIMIT",
+              "FollowRig",
+              "OrbitRig"
+            ],
+            "reExport": true
+          },
           {
             "file": "./clock.js",
             "imports": [
@@ -5560,6 +5810,14 @@
               "assertTimeScale",
               "copyTimeState",
               "createTimeState"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./constraints.js",
+            "imports": [
+              "ConstraintSystem",
+              "LookAtConstraint"
             ],
             "reExport": true
           },
@@ -5604,8 +5862,11 @@
           {
             "file": "./serializers.js",
             "imports": [
+              "FOLLOW_RIG_SERIALIZER",
               "KINEMATIC_CONTROLLER_SERIALIZER",
-              "MOTION_COMPONENT_SERIALIZER"
+              "LOOK_AT_CONSTRAINT_SERIALIZER",
+              "MOTION_COMPONENT_SERIALIZER",
+              "ORBIT_RIG_SERIALIZER"
             ],
             "reExport": true
           },
@@ -5705,11 +5966,30 @@
             "reExport": true
           },
           {
+            "file": "./camera-rigs.js",
+            "imports": [
+              "FollowFrame",
+              "FollowRigOptions",
+              "OrbitRigOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./clock.js",
             "imports": [
               "ReadonlyTimeState",
               "TimeState",
               "TimeStateOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./constraints.js",
+            "imports": [
+              "ConstraintSystemOptions",
+              "LookAtConstraintOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -5749,6 +6029,14 @@
             "imports": [
               "MotionComponentOptions",
               "MotionSystemOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./rig-target.js",
+            "imports": [
+              "RigTarget"
             ],
             "reExport": true,
             "typeOnly": true
@@ -5834,12 +6122,17 @@
         ],
         "workspaceDependencies": [],
         "exports": [
+          "DEFAULT_ORBIT_PITCH_LIMIT",
+          "FollowRig",
+          "OrbitRig",
           "DEFAULT_FIXED_DELTA_TIME",
           "DEFAULT_MAXIMUM_SUB_STEPS",
           "assertFixedDeltaTime",
           "assertTimeScale",
           "copyTimeState",
           "createTimeState",
+          "ConstraintSystem",
+          "LookAtConstraint",
           "createTwoBoneIKSolution",
           "solveTwoBoneIK",
           "DEFAULT_INTEGRATOR",
@@ -5854,8 +6147,11 @@
           "KinematicSystem",
           "MotionComponent",
           "MotionSystem",
+          "FOLLOW_RIG_SERIALIZER",
           "KINEMATIC_CONTROLLER_SERIALIZER",
+          "LOOK_AT_CONSTRAINT_SERIALIZER",
           "MOTION_COMPONENT_SERIALIZER",
+          "ORBIT_RIG_SERIALIZER",
           "DEFAULT_PID_OUTPUT_LIMITS",
           "PIDController",
           "ballisticApexHeight",
@@ -5904,9 +6200,14 @@
           "ParabolicTrajectory",
           "ParametricTrajectory",
           "PACKAGE_NAME",
+          "FollowFrame",
+          "FollowRigOptions",
+          "OrbitRigOptions",
           "ReadonlyTimeState",
           "TimeState",
           "TimeStateOptions",
+          "ConstraintSystemOptions",
+          "LookAtConstraintOptions",
           "TwoBoneIKSolution",
           "AccelerationFn",
           "Integrator",
@@ -5918,6 +6219,7 @@
           "RotateOptions",
           "MotionComponentOptions",
           "MotionSystemOptions",
+          "RigTarget",
           "ComponentSerializerShape",
           "PIDControllerOptions",
           "PIDDerivativeSource",
@@ -5949,12 +6251,17 @@
           "Trajectory"
         ],
         "reExported": [
+          "DEFAULT_ORBIT_PITCH_LIMIT",
+          "FollowRig",
+          "OrbitRig",
           "DEFAULT_FIXED_DELTA_TIME",
           "DEFAULT_MAXIMUM_SUB_STEPS",
           "assertFixedDeltaTime",
           "assertTimeScale",
           "copyTimeState",
           "createTimeState",
+          "ConstraintSystem",
+          "LookAtConstraint",
           "createTwoBoneIKSolution",
           "solveTwoBoneIK",
           "DEFAULT_INTEGRATOR",
@@ -5969,8 +6276,11 @@
           "KinematicSystem",
           "MotionComponent",
           "MotionSystem",
+          "FOLLOW_RIG_SERIALIZER",
           "KINEMATIC_CONTROLLER_SERIALIZER",
+          "LOOK_AT_CONSTRAINT_SERIALIZER",
           "MOTION_COMPONENT_SERIALIZER",
+          "ORBIT_RIG_SERIALIZER",
           "DEFAULT_PID_OUTPUT_LIMITS",
           "PIDController",
           "ballisticApexHeight",
@@ -6018,9 +6328,14 @@
           "LinearTrajectory",
           "ParabolicTrajectory",
           "ParametricTrajectory",
+          "FollowFrame",
+          "FollowRigOptions",
+          "OrbitRigOptions",
           "ReadonlyTimeState",
           "TimeState",
           "TimeStateOptions",
+          "ConstraintSystemOptions",
+          "LookAtConstraintOptions",
           "TwoBoneIKSolution",
           "AccelerationFn",
           "Integrator",
@@ -6032,6 +6347,7 @@
           "RotateOptions",
           "MotionComponentOptions",
           "MotionSystemOptions",
+          "RigTarget",
           "ComponentSerializerShape",
           "PIDControllerOptions",
           "PIDDerivativeSource",
@@ -6293,6 +6609,40 @@
           "SeededRandom"
         ]
       },
+      "packages/motion/src/rig-target.ts": {
+        "description": "What a rig aims at, and how a rig writes a world-space placement back onto a",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Matrix4",
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "resolveWorldTransform",
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "resolveTargetPosition",
+          "worldPositionOf",
+          "placeAtWorldPosition"
+        ],
+        "functions": [
+          "resolveTargetPosition",
+          "worldPositionOf",
+          "placeAtWorldPosition"
+        ]
+      },
       "packages/motion/src/scheduler.ts": {
         "description": "Fixed-step scheduler (§10).",
         "externalDependencies": [],
@@ -6323,10 +6673,25 @@
         ]
       },
       "packages/motion/src/serializers.ts": {
-        "description": "The §79 serializers for this package's two components (PH-17, 2026-08-06;",
+        "description": "The §79 serializers for this package's components (PH-17, 2026-08-06;",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./camera-rigs.js",
+            "imports": [
+              "DEFAULT_ORBIT_MIN_DISTANCE",
+              "DEFAULT_ORBIT_PITCH_LIMIT",
+              "FollowRig",
+              "OrbitRig"
+            ]
+          },
+          {
+            "file": "./constraints.js",
+            "imports": [
+              "LookAtConstraint"
+            ]
+          },
           {
             "file": "./kinematic-controller.js",
             "imports": [
@@ -6337,6 +6702,19 @@
             "file": "./motion-component.js",
             "imports": [
               "MotionComponent"
+            ]
+          },
+          {
+            "file": "./rig-target.js",
+            "imports": [
+              "RigTarget"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./spring-damper.js",
+            "imports": [
+              "SpringDamper"
             ]
           }
         ],
@@ -6358,14 +6736,20 @@
         ],
         "exports": [
           "MOTION_COMPONENT_SERIALIZER",
-          "KINEMATIC_CONTROLLER_SERIALIZER"
+          "KINEMATIC_CONTROLLER_SERIALIZER",
+          "ORBIT_RIG_SERIALIZER",
+          "FOLLOW_RIG_SERIALIZER",
+          "LOOK_AT_CONSTRAINT_SERIALIZER"
         ],
         "interfaces": [
           "ComponentSerializerShape"
         ],
         "constants": [
           "MOTION_COMPONENT_SERIALIZER",
-          "KINEMATIC_CONTROLLER_SERIALIZER"
+          "KINEMATIC_CONTROLLER_SERIALIZER",
+          "ORBIT_RIG_SERIALIZER",
+          "FOLLOW_RIG_SERIALIZER",
+          "LOOK_AT_CONSTRAINT_SERIALIZER"
         ]
       },
       "packages/motion/src/spring-damper.ts": {
@@ -10481,7 +10865,7 @@
         ]
       },
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 142 symbols)",
+        "description": "Package entry point for @four/render (re-exports 144 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -10828,7 +11212,9 @@
           {
             "file": "./texture.js",
             "imports": [
-              "TextureSource"
+              "TextureFilter",
+              "TextureSource",
+              "TextureWrap"
             ],
             "reExport": true,
             "typeOnly": true
@@ -10985,7 +11371,9 @@
           "StrokeStyle",
           "SpriteFrame",
           "SpriteOptions",
+          "TextureFilter",
           "TextureSource",
+          "TextureWrap",
           "ViewRenderListOptions"
         ],
         "reExported": [
@@ -11129,7 +11517,9 @@
           "StrokeStyle",
           "SpriteFrame",
           "SpriteOptions",
+          "TextureFilter",
           "TextureSource",
+          "TextureWrap",
           "ViewRenderListOptions"
         ],
         "constants": [
@@ -11833,6 +12223,8 @@
             "package": "@four/materials",
             "directory": "packages/materials",
             "imports": [
+              "MaterialTextureFilter",
+              "MaterialTextureWrap",
               "SpriteTexture"
             ]
           },
@@ -14175,6 +14567,7 @@
           {
             "file": "./text-layout.js",
             "imports": [
+              "TextAlign",
               "TextLayout",
               "TextLayoutOptions",
               "TextQuad"
@@ -14199,6 +14592,7 @@
           "GlyphAtlas",
           "GlyphAtlasEntry",
           "GlyphAtlasOptions",
+          "TextAlign",
           "TextLayout",
           "TextLayoutOptions",
           "TextQuad"
@@ -14217,6 +14611,7 @@
           "GlyphAtlas",
           "GlyphAtlasEntry",
           "GlyphAtlasOptions",
+          "TextAlign",
           "TextLayout",
           "TextLayoutOptions",
           "TextQuad"
@@ -15104,6 +15499,7 @@
           "packages/four/src/scene-serializers.ts",
           "packages/four/src/scene.ts",
           "packages/four/src/serialization.ts",
+          "packages/four/src/text-node.ts",
           "packages/four/src/text.ts",
           "packages/four/src/ui.ts"
         ]
@@ -15165,7 +15561,9 @@
       {
         "name": "Packages/motion",
         "files": [
+          "packages/motion/src/camera-rigs.ts",
           "packages/motion/src/clock.ts",
+          "packages/motion/src/constraints.ts",
           "packages/motion/src/ik.ts",
           "packages/motion/src/index.ts",
           "packages/motion/src/integrators.ts",
@@ -15174,6 +15572,7 @@
           "packages/motion/src/pid.ts",
           "packages/motion/src/prediction.ts",
           "packages/motion/src/random.ts",
+          "packages/motion/src/rig-target.ts",
           "packages/motion/src/scheduler.ts",
           "packages/motion/src/serializers.ts",
           "packages/motion/src/spring-damper.ts",
@@ -15357,18 +15756,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 211,
+    "totalTypeScriptFiles": 215,
     "totalModules": 24,
-    "totalLinesOfCode": 97104,
-    "totalExports": 1952,
-    "totalClasses": 131,
-    "totalInterfaces": 419,
-    "totalFunctions": 331,
+    "totalLinesOfCode": 99676,
+    "totalExports": 1990,
+    "totalClasses": 136,
+    "totalInterfaces": 424,
+    "totalFunctions": 335,
     "totalTypeGuards": 19,
     "totalEnums": 0,
-    "totalConstants": 251,
-    "totalReExports": 1261,
-    "totalTypeOnlyImports": 243,
+    "totalConstants": 257,
+    "totalReExports": 1284,
+    "totalTypeOnlyImports": 249,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,

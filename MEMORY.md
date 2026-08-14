@@ -28,6 +28,212 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-13 — R-30 §77 sampler state + R-28 §49/§56 `Text`.** Decisions worth keeping:
+  - **A blocker that names another row's residue must be re-checked against source —
+    second confirmation.** GAP v0 gave R-28 `Depends on: R-30 (frame regions)`; frame
+    regions are §55's and shipped as **R-29** on 2026-08-08, so R-28's last blocker had
+    fallen five days before the row still said otherwise. R-30 was shipped anyway, at the
+    one tier text actually wants (filter), and the row is now honest about which bullet
+    closed.
+  - **The dependency matrix decides where a §49 family member lives, and it is not
+    negotiable.** `render` may not import `text`; `text` may not import `render`. The
+    umbrella is the only package that sees both, so `Text` lives in `four` beside the §45
+    composition root and the §79 serializers. §49's family was _already_ split this way
+    (`ParticleSystem` in `@four/particles`, recognised structurally because it cannot
+    even extend `Renderable`) — `Text` does better, because `four` is _above_ `render`
+    rather than beside it, so it really extends `Renderable` and no consumer has a
+    special case. Rule: when the matrix and a spec's class diagram disagree, the class
+    moves up, never the edge sideways.
+  - **One geometry beats N sprites, and the argument is expressiveness before speed.**
+    §55 derives uv affinely from position (`uv = (p.xy − quad.xy)/quad.zw`), which is
+    exact for one rectangle sampling one sub-rectangle and **cannot** map twelve glyphs
+    onto twelve atlas cells in one buffer. §53's `uvs` (R-19) and §57's `map` can. So a
+    label is one unlit textured draw — one draw call _unconditionally_, where N sprites
+    is one only if the application opted into `createGlBatching()`. Third application of
+    R-23's "close a gap by adding nothing to the frame path": no `RenderItemKind` arm, no
+    pipeline, no shader edit, `render-webgl` untouched by R-28.
+  - **§65's glyph batching was a `Text` packet, and it closed by construction.**
+    Consecutive `Text` nodes over one material are a run of same-material unlit items,
+    which `RenderBatcher` already merges. Nothing was added to `batch.ts`. What is left
+    of §65 is instancing and atlas grouping.
+  - **Sampler state is upload-time state, which is why R-30 is nearly free.** Four
+    `texParameteri` arguments became variables; no draw path reads them, so no frame does
+    one thing more. Byte-identity is _structural_: both fields resolve to the value the
+    backend hard-coded, so a pre-R-30 texture issues the same four calls with the same
+    enums in the same order. Corollary worth remembering: **changing `filter`/`wrap` on a
+    resident texture needs `markDirty()`**, the same announcement an in-place texel edit
+    needs.
+  - **Two filter values, one field, and the reason generalises.** §77's other four filter
+    modes name a choice _between mip levels_; a one-level texture has none to choose
+    between, so naming them would accept a value the backend must reinterpret. Same rule
+    as `minFilter`/`magFilter`: they are a pair _because_ minification is the direction
+    with mips in it. A union widens when the feature that gives its members meaning
+    arrives.
+  - **`castShadow` defaults `false` on `Text` alone, and the asymmetry is data because it
+    has to be.** A depth-only pass writes geometry, not alpha, so a label would cast its
+    rectangles — a black bar under every word. `Sprite` is excluded _structurally_ (the
+    list builder sees `kind === "sprite"`); `Text` draws through the same pipeline as an
+    opaque wall, so nothing structural distinguishes it. It becomes the right default the
+    day §69's transparent masks land.
+  - **A refusal is better than a substituted font.** A `Label` restored without an atlas
+    measures 0×0, which is what it _is_; a `Text` has no such state, so a document naming
+    one with no `atlas` option **throws**. Inventing a built-in face would reload
+    someone's scene in a font they never chose and never asked about.
+  - **`"left"` is a code path, not an offset of zero.** `layoutText`'s alignment shift
+    loop does not run for the default, so no `x + 0` is evaluated and no `-0` becomes
+    `+0`; an unaligned layout is bit-identical to the pre-R-28 one rather than merely
+    equal. Same technique as the permissive default mask and the `bool` uniform at GL's
+    initial `false`.
+  - **`layoutText` is cross-platform tier, and the proof is a closed list of
+    operations**: `+ − × ÷` and `Math.max` over doubles, no `sqrt`, no transcendental, no
+    `Math.fround`, no iteration over hash order (the atlas is `Map.get`, never walked).
+    An edit adding a rotation, an italic shear, or a round-to-whole-texels breaks the
+    _stated tier_.
+  - **Measured: +0.11 kB gzip in every bundle carrying `Texture`** (R-30's two validation
+    calls and two enum tables), +0.26 kB more in bundles carrying `@four/text`
+    (alignment), and **+1.6 kB on `motor-digital-twin` alone** — the only example that
+    calls `registerSceneNodeTypes`, confirming R-23's finding that the §79 pairs cost 0 B
+    in bundles that do not. ui-demo is at **37.86 / 38 kB**: 0.14 kB of headroom, and a
+    bump to 38.5 is proposed with the measurement.
+  - **§86's animated-glyph row: closing the draw-call gap moved the bottleneck.** 20 000
+    glyphs are one `drawElements` (800 unbatched) against 20 000 before; but the geometry
+    rebuild costs ~14 ms against ~2 ms for the layout alone, i.e. ~700 ns/glyph of
+    typed-array allocation and scanning. Exactly R-9's finding for sprites, one tier up.
+    Text that only _moves_ pays none of it — only content changes re-enter the rebuild.
+  - **A golden earns its place where thresholds structurally cannot reach.**
+    `tests/browser/text.spec.ts` counts ink and checks a two-line structure; a v-flip, an
+    off-by-one atlas cell, or a reversed string keeps ink count, row structure _and_ draw
+    count intact. `tests/visual/text.spec.ts` is the one text assertion that is a pixel
+    match. Its fixture is shared with the chromium gate deliberately — a golden of a
+    different page would guard a different thing.
+  - Gotcha (browser fixtures): a WebGL drawing buffer is **cleared on present** unless
+    `preserveDrawingBuffer`, so a canvas drawn once and then screenshotted photographs
+    black. A visual golden of a one-shot render needs a rAF loop redrawing the same
+    static frame; the readback probe beside it works because it reads inside the same
+    task.
+  - Gotcha (index widths): `vertexCount - 1 > 65 535` is the correct `Uint16Array` test,
+    not `vertexCount > 65 535` — 16 384 glyphs are exactly 65 536 vertices whose highest
+    index is still addressable. Cost one test iteration.
+  - Multi-agent: the A/B was done by reverting only files this packet exclusively owns
+    plus **one** exact-string toggle in the shared `scene-serializers.ts`, restored by
+    the _inverse_ string replacement applied to the file's then-current content — never a
+    wholesale copy-back. md5 verified identical before and after; arm A rebuilt to
+    hash-identical bundle names.
+- **2026-08-09 — R-36 rig half + PH-11: §44/§47 camera rigs and §42's first
+  `"constraint"` producer.** Decisions worth keeping:
+  - **A rig _places_; a constraint _aims_; and the split is forced by §42, not
+    chosen.** §42 allows a node **exactly one** transform authority, so a rig that both
+    placed and aimed would either duplicate `lookAt`'s world→local derivation or claim
+    an authority the aiming system also needs. Under one system and one authority the
+    two compose in the only correct order — placement first, then the aim, which
+    therefore reads the pose written _this_ step. §44's own closing sentence ("camera
+    motion should use the same timeline, constraint, and motion systems as ordinary
+    nodes") is the licence for making rigs components rather than camera classes.
+    Generalizes: when two writers want one node, the question is not how to arbitrate
+    them but which single system owns both.
+  - **§44's _path animation_ and _physics attachment_ close with no class at all, and
+    path animation needs two nodes.** A path-driven camera is a parent under
+    `"kinematic"` (`KinematicController.followPath`) carrying a constraint-aimed child
+    under `"constraint"`; one node can never be both, because §42 says so. Measured, not
+    argued — 120 steps round a `CircularTrajectory` with the subject at NDC (0,0) every
+    step and zero warnings. Physics attachment is free because a rig _reads_ its target
+    and writes only its own node, and `PRIORITY_CONSTRAINTS` (700) is after
+    `PRIORITY_PHYSICS_SOLVE` (600). Sixth application of
+    absent-beats-accepted-and-ignored, and the first where the absence is discharged by
+    _composition_ rather than by deferral.
+  - **`Node.lookAt` predicted its own caller, and the guard is the refusal test
+    hoisted.** `lookAt` throws on a degenerate aim and its doc says a rig "must guard
+    the call". `LookAtConstraint` makes exactly `lookAt`'s two tests _before_ calling
+    it, so the call that follows **cannot** throw — and a failed guard leaves the
+    rotation untouched and increments a public `skippedSteps`. §85's
+    refuse-don't-substitute rule governs **authoring** (the constructors refuse a zero
+    `up`, a non-positive distance, inconsistent limits); a value that only goes bad
+    mid-step is a transient the simulation must survive. The counter exists because a
+    camera that has silently stopped aiming is otherwise indistinguishable from one
+    whose target stopped moving, and a `console.warn` per step is the 60-lines-a-second
+    noise §42's own dedup was built to avoid.
+  - **The orbit rig's default pitch limit is a §85 argument, not a taste.**
+    `DEFAULT_ORBIT_PITCH_LIMIT = π/2 − 1e-3` exists because the pole is _exactly_ the
+    aim `lookAt` refuses with the default +Y `up`. A rig that could reach it would hand
+    its constraint an impossible aim at the moment a user drags one pixel too far.
+    1e-3 rad keeps the horizontal component at ~1e-3 · distance — thirteen orders above
+    the double noise floor — and is invisible. The escape (±π/2 plus a non-vertical
+    `up`) is explicit rather than accidental.
+  - **Rigs never read `@four/input`, and the reason is the frozen matrix.** §3.1 gives
+    `motion` only `core/math/scene`; an `input` edge would drag a device layer into
+    `physics` and `animation` too. So the surface is parameter-driven
+    (`orbit(dYaw, dPitch)`, `dolly(delta)`) — which is also the only reason the
+    determinism golden exists, since a rig's inputs are then _data_ a `SeededRandom` can
+    supply and a replay can reproduce (§33/§34). **Trackball is staged for the same
+    edge, from the other side:** it is defined over a viewport in screen space, so its
+    honest home is the `ScreenCamera` packet, not the motion tier.
+  - **`maxAngularSpeed`, not a new word.** The slew limit reuses `MotionComponent`'s
+    exact spelling and its absent-means-unlimited convention, rather than inventing a
+    `RotateOptions`-style `duration`: a rate limit and a duration are different
+    quantities, and the package already had a name for the rate. Applied as a
+    shortest-arc rate limit on the _angle_ — never overshoots, arrives in
+    `angle / rate` seconds exactly.
+  - **A slew step writes the rotation twice, deliberately.** The goal is obtained by
+    letting `Node.lookAt` write it and blending back from the captured previous
+    rotation. The alternative is a second copy of `lookAt`'s world→local rotation
+    division living in `@four/motion`, and a duplicated coordinate-space conversion is a
+    far worse thing to own than an extra `Transform.version` increment — `markDirty`
+    sets no flags and walks no children, so the cost really is the increment. Rule:
+    prefer an extra version bump to a second implementation of a frame conversion.
+  - **No `@four/math` method was added, and that was the bundle decision.** The slew
+    angle is four multiplies plus `Math.min`/`acos` inline over the existing `slerp`;
+    the parent-inverse point transform and the target-frame basis are read straight off
+    `Matrix4.elements`. R-36's gotcha stands and now has a second data point: a method
+    on `Vector3`/`Quaternion`/`Node` is paid by **every** bundle, a class in
+    `@four/motion` by only the bundles that name it. Measured: **0 B** in five of six
+    budgets, +2.8 kB in `motor-digital-twin` (the `registerSceneNodeTypes()` bundle).
+  - **`Math.sqrt`, never `Math.hypot`, on a path whose result multiplies into a
+    transform** — ECMA-262 specifies `sqrt` as exactly rounded and leaves `hypot`'s
+    accuracy implementation-defined. Small, but it is the difference between a
+    same-runtime claim that is true for a stated reason and one that is true by luck.
+  - **A node reference is not serializable, and the precedent already existed.** §79's
+    component serializers are handed `(data, node)` — the node being restored, with no
+    pass in which a sibling id could be resolved — so a rig's `Node` target is dropped
+    and only a `Vector3` target is written. That is `KINEMATIC_CONTROLLER_SERIALIZER`'s
+    `followPath`-holds-a-`Trajectory`-by-reference rule applied to a second kind of live
+    reference. **A spring round-trips in its coefficient form**
+    (`stiffness`/`damping`), not as `frequencyHz`/`dampingRatio`: the coefficients are
+    what `SpringDamper` stores, so they reconstruct bit-for-bit, where the frequency
+    form goes out through a `sqrt` and a division by 2π and comes back a few ulps away.
+  - **`OrbitRig`'s limits are `readonly`** (`SpringDamper`'s rule): a retuned limit is a
+    new rig, because a limit changed underneath a value already inside it needs a policy
+    for that value. The angles clamp **on assignment**, so a rig can never hold a value
+    outside its own limits and a caller reads back the clamp immediately rather than
+    discovering it a step later. Corollary for §79: the readonly limits must be written
+    to the document, because the reader has to _construct_ with them.
+  - **A branch that cannot be reached on demand should be a branchless clamp.** The
+    `acos` domain guard started as `if (cosHalf > 1)` — unreachable except by a rounding
+    accident, and therefore permanently uncovered. `Math.min(1, …)` is the same
+    arithmetic with no branch to cover. Reusable: prefer `min`/`max` to an `if` when the
+    `if` exists only for a rounding overshoot.
+  - **Gotcha (multi-agent, new instance class): `dist/` can be built from a _sibling's_
+    momentarily swapped-out source.** A suite that had passed twice began failing with
+    "component has no registered serializer" while the source on disk was correct — a
+    concurrent agent was running its own HEAD-swap A/B and rebuilt in between.
+    Diagnosis is `grep` the symbol in `packages/*/dist/*.js` and compare mtimes; the fix
+    is a rebuild, never a source edit. Joins the stash/revert/ports incident classes.
+  - **Gotcha (multi-agent): never `git show HEAD:<file> > <file>` on a file a sibling is
+    also editing.** Doing it to `packages/four/src/scene-serializers.ts` for a size A/B
+    silently discarded the sibling's in-flight work (caught immediately by the build,
+    restored from a scratchpad copy taken beforehand). The safe form of a same-tree A/B
+    is a **surgical** removal of only your own lines; back the file up first, and
+    md5-verify the restore.
+  - **Gotcha, fourth confirmation: `pnpm run docs` is the type gate, vitest is not.**
+    Two of this packet's own errors were invisible to 448 passing tests —
+    `new Group({ name })` (`NodeOptions` carries only `id`) and a `{@link Node}` to a
+    symbol `@four/motion` does not re-export. Both are TypeDoc-only failures.
+  - **Container-restore note (2026-08-09, second occurrence class):** this packet was
+    fully built and verified once, destroyed uncommitted by a container restore, and
+    rebuilt from its own report. The rebuild's regenerated numbers (coverage branch
+    99.44 vs 99.47, `pitchLimitHits` 16 vs 36 under different scenario constants,
+    +2.8 vs +2.9 kB) agreed with the original within noise — evidence that a
+    report-with-arguments is a sufficient rebuild spec. Push-per-batch remains the only
+    real protection.
 - **2026-08-09 — R-8 §64 per-view lists + §87 culling (+ R-10 key 4).** Decisions worth
   keeping:
   - **The frame's list is the model; a view's list is a query over it.** The rejected

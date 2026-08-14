@@ -37,13 +37,21 @@
  * ## The family member that is *not* a subclass
  *
  * `Sprite` (§55) joined the family on 2026-08-06, when §57's `Material` base
- * made its material nameable in this class's slot. One of §49's family is still
- * outside it, for a reason that is recorded where it bites:
+ * made its material nameable in this class's slot. Two of §49's family live
+ * outside this package, for reasons that are recorded where they bite — and in
+ * both cases the reason is the frozen §3.1 dependency matrix, not a design
+ * preference:
  *
  * - **`ParticleSystem`** (§36) is not in this package at all. It lives in
- *   `@four/particles`, which the frozen §3.1 dependency matrix forbids from
+ *   `@four/particles`, which the matrix forbids from
  *   importing `@four/render`, so it is recognised by `buildRenderList` through
  *   a **structural contract** instead of by inheritance — see `particles.ts`.
+ * - **`Text`** (§56) lives in the umbrella package `four` (R-28, 2026-08-13),
+ *   because it needs `@four/text`'s layout and this package may not import it.
+ *   It really does `extend Renderable`, though — `four` sits *above* this
+ *   package rather than beside it — so it needs no structural contract and no
+ *   special case anywhere: it is an unlit, textured drawable whose geometry is
+ *   one buffer of glyph quads.
  *
  * It is treated as a first-class drawable by the render list, which tags every
  * item with a `RenderItemKind` discriminant; it costs the backend no

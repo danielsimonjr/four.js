@@ -30,11 +30,31 @@
  * A texture object and the version it was uploaded from. Sampler state — filter
  * and wrap — is set on the texture object at upload time and never changed, so
  * the per-draw cost in `webgl-renderer.ts` is one `bindTexture` and nothing
- * else. §77's mipmaps, anisotropy, and configurable wrap/filter modes are
- * deferred with the state that would carry them; the fixed choice is
- * **`LINEAR` filtering with `CLAMP_TO_EDGE` wrapping**, which is the only
- * combination that is correct for a sprite or a glyph atlas without mip levels
- * and without bleeding neighbouring texels across a frame boundary.
+ * else. §77's mipmaps and anisotropy are deferred with the state that would
+ * carry them.
+ *
+ * ## Filter and wrap became the texture's own (R-30, 2026-08-13)
+ *
+ * This module fixed the pair at **`LINEAR` + `CLAMP_TO_EDGE`** until
+ * 2026-08-13, and the note that stood here called that "the only combination
+ * that is correct for a sprite or a glyph atlas". It is the right *default* and
+ * it is not the only correct choice: a bitmap glyph atlas drawn at or above 1:1
+ * wants `NEAREST`, because a 5 × 7 letterform blurred across its neighbours is
+ * exactly the soft, dirty look bitmap text is accused of, and a tiling ground
+ * texture wants `REPEAT`. So the four `texParameteri` arguments are now read off
+ * `texture.filter` / `texture.wrap` (§77, `@four/render`'s `Texture`).
+ *
+ * **Byte-identity is structural, not numerical**: both fields resolve to the
+ * previously hard-coded value when a source names neither, so a texture written
+ * against any earlier build issues the same four calls with the same four
+ * arguments in the same order. Nothing was added to the draw path — sampler
+ * state is upload-time state, and the upload path is the one that grew two
+ * table lookups.
+ *
+ * Because the state is written **at upload**, changing `filter` or `wrap` on a
+ * texture already resident needs a version bump (`markDirty()`, or a new
+ * `source`); the eviction rule below then re-uploads it with the new sampler
+ * state, which is the same path an in-place texel edit takes.
  *
  * ## Eviction policy
  *
@@ -74,6 +94,26 @@ import { GL, type GlTexture, type WebglContext } from "./gl-program.js";
  * carry.
  */
 export type CacheableTexture = SpriteRenderItem["material"]["texture"];
+
+/**
+ * `texture.filter` (§77, R-30) as a GL enum.
+ *
+ * A function of one comparison rather than a `Record` lookup, for the reason
+ * §33 gives everywhere in this backend: no object-key iteration, no `Map`, and
+ * an unknown value cannot reach here — `Texture` refuses one (§85) — so the
+ * fallback arm is the *default*, which is the value this tier hard-coded before
+ * the field existed.
+ */
+function glFilter(filter: string | undefined): number {
+  return filter === "nearest" ? GL.NEAREST : GL.LINEAR;
+}
+
+/** `texture.wrap` (§77, R-30) as a GL enum; see {@link glFilter}. */
+function glWrap(wrap: string | undefined): number {
+  if (wrap === "repeat") return GL.REPEAT;
+  if (wrap === "mirrored-repeat") return GL.MIRRORED_REPEAT;
+  return GL.CLAMP_TO_EDGE;
+}
 
 /** Everything one cached texture needs at draw time. */
 export interface TextureRecord {
@@ -224,10 +264,15 @@ export class TextureCache {
       GL.UNSIGNED_BYTE,
       texture.data,
     );
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+    // R-30: the arguments are the texture's own, defaulting to the pair this
+    // module hard-coded before 2026-08-13 — the same four calls in the same
+    // order with the same enums for every texture that names neither.
+    const filter = glFilter(texture.filter);
+    const wrap = glWrap(texture.wrap);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, filter);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, filter);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, wrap);
+    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, wrap);
     gl.bindTexture(GL.TEXTURE_2D, null);
 
     return { texture: handle, version: texture.version };

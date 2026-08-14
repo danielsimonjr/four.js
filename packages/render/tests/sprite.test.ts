@@ -156,6 +156,92 @@ describe("Texture — construction and validation (§77, §85)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Texture sampler state (§77, R-30, 2026-08-13).
+// ---------------------------------------------------------------------------
+
+describe("Texture — sampler state (§77, R-30)", () => {
+  it("defaults to the pair this tier hard-coded before the fields existed", () => {
+    // The byte-identity claim in one assertion: a texture that names neither
+    // resolves to exactly what `gl-texture.ts` used to write literally, so an
+    // already-authored scene issues the same four `texParameteri` calls.
+    const map = new Texture({ width: 1, height: 1 });
+
+    expect(map.filter).toBe("linear");
+    expect(map.wrap).toBe("clamp-to-edge");
+  });
+
+  it("honours an explicit filter and wrap", () => {
+    const map = new Texture({
+      width: 2,
+      height: 2,
+      filter: "nearest",
+      wrap: "repeat",
+    });
+
+    expect(map.filter).toBe("nearest");
+    expect(map.wrap).toBe("repeat");
+  });
+
+  it("accepts every value of both unions", () => {
+    for (const filter of ["nearest", "linear"] as const) {
+      expect(new Texture({ width: 1, height: 1, filter }).filter).toBe(filter);
+    }
+    for (const wrap of [
+      "clamp-to-edge",
+      "repeat",
+      "mirrored-repeat",
+    ] as const) {
+      expect(new Texture({ width: 1, height: 1, wrap }).wrap).toBe(wrap);
+    }
+  });
+
+  it("refuses a filter outside the union rather than substituting one (§85)", () => {
+    expect(
+      () =>
+        new Texture({
+          width: 1,
+          height: 1,
+          filter: "nearset",
+        } as unknown as { width: number; height: number }),
+    ).toThrow(
+      /Texture filter must be one of "nearest", "linear"; got "nearset"/,
+    );
+  });
+
+  it("refuses a wrap outside the union (§85)", () => {
+    expect(
+      () =>
+        new Texture({
+          width: 1,
+          height: 1,
+          wrap: "clamp",
+        } as unknown as { width: number; height: number }),
+    ).toThrow(/Texture wrap must be one of/);
+  });
+
+  it("re-validates and re-resolves when a whole source is replaced", () => {
+    const map = new Texture({ width: 1, height: 1, filter: "nearest" });
+
+    map.source = { width: 1, height: 1, wrap: "mirrored-repeat" };
+
+    // Sampler state belongs to the source, so replacing the source replaces it
+    // — the filter falls back to the default rather than being remembered.
+    expect(map.filter).toBe("linear");
+    expect(map.wrap).toBe("mirrored-repeat");
+    expect(map.version).toBe(1);
+  });
+
+  it("keeps sampler state on a disposed texture's empty source at the defaults", () => {
+    const map = new Texture({ width: 4, height: 4, filter: "nearest" });
+
+    map.dispose();
+
+    expect(map.filter).toBe("linear");
+    expect(map.wrap).toBe("clamp-to-edge");
+  });
+});
+
 describe("Texture — versioning (§53's contract, reused by §77)", () => {
   it("bumps the version once when a new source is assigned", () => {
     const map = texture();

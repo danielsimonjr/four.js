@@ -1,6 +1,7 @@
 /**
- * The §79 serializers for this package's two components (PH-17, 2026-08-06;
- * `KinematicController` added 2026-08-07).
+ * The §79 serializers for this package's components (PH-17, 2026-08-06;
+ * `KinematicController` added 2026-08-07; the §44 rigs and §12's look-at
+ * constraint added 2026-08-13).
  *
  * §6a says components "serialize under registered type names (§79)", and §79's
  * registry is `@four/serialization`'s — which may depend on `core`, `math`, and
@@ -36,13 +37,54 @@
  * For {@link KinematicController}, nothing — see
  * {@link KINEMATIC_CONTROLLER_SERIALIZER} for why an empty payload is the
  * complete answer for that class rather than an omission.
+ *
+ * For {@link OrbitRig}, {@link FollowRig} and {@link LookAtConstraint}, the
+ * authored configuration and **not** the live target, for two reasons that
+ * apply to all three:
+ *
+ * - A `Node` target is a live object reference. A serializer is handed
+ *   `(data, node)` and there is no id-resolution pass in §79's component
+ *   protocol, so it has nowhere to write "the node with id `player`" that
+ *   anything would read back — the same wall `KINEMATIC_CONTROLLER_SERIALIZER`
+ *   meets with a §13 `Trajectory` held by reference. A `Vector3` target *is*
+ *   document content and is written; a node target is dropped, and the
+ *   application re-binds it after the load, which is one line at the same place
+ *   it bound it the first time.
+ * - A spring round-trips in **coefficient** form (`stiffness`, `damping`),
+ *   never as `frequencyHz`/`dampingRatio`. Both describe the same spring, but
+ *   the frequency form goes through `√stiffness` and a division by `2π` on the
+ *   way out and multiplies them back on the way in, so a round trip would move
+ *   the last bits of a smoother's tuning for no reason. The coefficients are
+ *   what the class stores, so writing them is bit-exact.
+ *
+ * ## The corrupt-field policy (decision, R-36 rig half)
+ *
+ * Reading is **total for shape** and **refusing for range**, which are different
+ * failures. A field that is missing or is not a number at all restores to its
+ * documented default, exactly as `MOTION_COMPONENT_SERIALIZER` does: an older
+ * build's payload or a hand-edited file is a shape disagreement, and §79's
+ * extensibility goal is better served by tolerating it. A field that carries a
+ * perfectly good number the class refuses — a negative `distance`, a `minPitch`
+ * above its `maxPitch` — is not a shape disagreement but a rig that cannot
+ * exist, and the constructor's §85 refusal is allowed to stand. Substituting a
+ * default there would put a camera somewhere the document never asked for and
+ * say nothing about it.
  */
 
 import type { JsonValue } from "@four/core";
 import { Vector3 } from "@four/math";
 
+import {
+  DEFAULT_ORBIT_MIN_DISTANCE,
+  DEFAULT_ORBIT_PITCH_LIMIT,
+  FollowRig,
+  OrbitRig,
+} from "./camera-rigs.js";
+import { LookAtConstraint } from "./constraints.js";
 import { KinematicController } from "./kinematic-controller.js";
 import { MotionComponent } from "./motion-component.js";
+import type { RigTarget } from "./rig-target.js";
+import { SpringDamper } from "./spring-damper.js";
 
 /**
  * The structural shape of `@four/serialization`'s `ComponentSerializer<T>`.
@@ -212,5 +254,188 @@ export const KINEMATIC_CONTROLLER_SERIALIZER: ComponentSerializerShape<Kinematic
 
     deserialize(): KinematicController {
       return new KinematicController();
+    },
+  };
+
+/** The payload record of a §79 component document, or `{}` for anything else. */
+function readRecord(data: JsonValue): { readonly [key: string]: JsonValue } {
+  return typeof data === "object" && data !== null && !Array.isArray(data)
+    ? (data as { readonly [key: string]: JsonValue })
+    : {};
+}
+
+/**
+ * Reads a rig target: a `Vector3` when the document carries a point, `null`
+ * otherwise — including for the node target a writer dropped (see the module
+ * note).
+ */
+function readTarget(value: JsonValue | undefined): Vector3 | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  return readVector(value, new Vector3());
+}
+
+/**
+ * Writes a rig target: the point, or nothing at all for a live node reference.
+ *
+ * `undefined` rather than `null` so the caller can omit the key entirely — an
+ * absent target and a target that was dropped are the same thing to a reader,
+ * and §79 prefers the smaller document.
+ */
+function targetJson(target: RigTarget | null): JsonValue | undefined {
+  return target instanceof Vector3 ? vectorJson(target) : undefined;
+}
+
+/**
+ * The §79 serializer for {@link OrbitRig} (§44, 2026-08-13).
+ *
+ * ```ts
+ * import { OrbitRig, ORBIT_RIG_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(OrbitRig, ORBIT_RIG_SERIALIZER);
+ * ```
+ *
+ * or, from an application, one call: `registerSceneNodeTypes()` in the umbrella
+ * `four` package registers it alongside every other component the engine ships.
+ *
+ * The **limits are written**, not only the live angles, because they are
+ * constructor arguments: a reader that restored `yaw`/`pitch`/`distance` into a
+ * rig built with the *default* limits would silently re-clamp a rig authored
+ * with wider ones, moving the camera on load. `maxDistance` is omitted when it
+ * is `Infinity` (JSON has no infinity, and absent already means unbounded), and
+ * the two counters — `pitchLimitHits`, `skippedSteps` — are diagnostics of a run
+ * rather than scene content, so they are not carried and restore to zero.
+ */
+export const ORBIT_RIG_SERIALIZER: ComponentSerializerShape<OrbitRig> = {
+  serialize(component: OrbitRig): JsonValue {
+    const payload: Record<string, JsonValue> = {
+      yaw: component.yaw,
+      pitch: component.pitch,
+      distance: component.distance,
+      minPitch: component.minPitch,
+      maxPitch: component.maxPitch,
+      minDistance: component.minDistance,
+    };
+    if (Number.isFinite(component.maxDistance)) {
+      payload.maxDistance = component.maxDistance;
+    }
+    const target = targetJson(component.target);
+    if (target !== undefined) {
+      payload.target = target;
+    }
+    return payload;
+  },
+
+  deserialize(data: JsonValue): OrbitRig {
+    const record = readRecord(data);
+    const rig = new OrbitRig({
+      yaw: readNumber(record.yaw, 0),
+      pitch: readNumber(record.pitch, 0),
+      distance: readNumber(record.distance, 1),
+      minPitch: readNumber(record.minPitch, -DEFAULT_ORBIT_PITCH_LIMIT),
+      maxPitch: readNumber(record.maxPitch, DEFAULT_ORBIT_PITCH_LIMIT),
+      minDistance: readNumber(record.minDistance, DEFAULT_ORBIT_MIN_DISTANCE),
+      maxDistance: readNumber(record.maxDistance, Number.POSITIVE_INFINITY),
+    });
+    rig.target = readTarget(record.target);
+    return rig;
+  },
+};
+
+/**
+ * The §79 serializer for {@link FollowRig} (§44, 2026-08-13).
+ *
+ * ```ts
+ * import { FollowRig, FOLLOW_RIG_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(FollowRig, FOLLOW_RIG_SERIALIZER);
+ * ```
+ *
+ * The spring is written as `{ stiffness, damping }` when there is one and
+ * omitted when there is not — absent means "snaps", which is a different rig,
+ * not a rig with a very stiff spring. The smoother's *state* (its captured
+ * position and velocity) is not carried: §79 keeps simulation state out of a
+ * scene document, and a reloaded rig captures its state again on its first step
+ * from wherever the node was saved, which is the same thing a fresh rig does.
+ */
+export const FOLLOW_RIG_SERIALIZER: ComponentSerializerShape<FollowRig> = {
+  serialize(component: FollowRig): JsonValue {
+    const payload: Record<string, JsonValue> = {
+      offset: vectorJson(component.offset),
+      frame: component.frame,
+    };
+    const spring = component.spring;
+    if (spring !== null) {
+      payload.spring = { stiffness: spring.stiffness, damping: spring.damping };
+    }
+    const target = targetJson(component.target);
+    if (target !== undefined) {
+      payload.target = target;
+    }
+    return payload;
+  },
+
+  deserialize(data: JsonValue): FollowRig {
+    const record = readRecord(data);
+    const spring = readRecord(record.spring ?? null);
+    const rig = new FollowRig({
+      offset: readVector(record.offset, new Vector3()),
+      frame: record.frame === "target" ? "target" : "world",
+      spring:
+        typeof spring.stiffness === "number"
+          ? new SpringDamper({
+              stiffness: spring.stiffness,
+              damping: readNumber(spring.damping, 0),
+            })
+          : undefined,
+    });
+    rig.target = readTarget(record.target);
+    return rig;
+  },
+};
+
+/**
+ * The §79 serializer for {@link LookAtConstraint} (§12, 2026-08-13).
+ *
+ * ```ts
+ * import { LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER);
+ * ```
+ *
+ * `up` is always written — it is a direction the aim depends on, and a document
+ * that omitted it would restore a differently-rolled camera under any non-default
+ * convention — while `maxAngularSpeed` is absent-means-unlimited on both sides,
+ * as `MotionComponent`'s limits are. `skippedSteps` is a diagnostic of a run and
+ * is not carried.
+ */
+export const LOOK_AT_CONSTRAINT_SERIALIZER: ComponentSerializerShape<LookAtConstraint> =
+  {
+    serialize(component: LookAtConstraint): JsonValue {
+      const payload: Record<string, JsonValue> = {
+        up: vectorJson(component.up),
+      };
+      if (component.maxAngularSpeed !== undefined) {
+        payload.maxAngularSpeed = component.maxAngularSpeed;
+      }
+      const target = targetJson(component.target);
+      if (target !== undefined) {
+        payload.target = target;
+      }
+      return payload;
+    },
+
+    deserialize(data: JsonValue): LookAtConstraint {
+      const record = readRecord(data);
+      const constraint = new LookAtConstraint({
+        up: readVector(record.up, new Vector3(0, 1, 0)),
+        maxAngularSpeed:
+          typeof record.maxAngularSpeed === "number"
+            ? record.maxAngularSpeed
+            : undefined,
+      });
+      constraint.target = readTarget(record.target);
+      return constraint;
     },
   };
