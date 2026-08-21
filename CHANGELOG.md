@@ -8,6 +8,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — PH-11's residue closed: §12 character controllers and §44's first-person camera
+
+#### Added
+
+- **§12 character controllers (`PH-11`'s residue) and §44's first-person camera
+  (`R-36`'s last substantive staged rig).** `@four/motion` ships `CharacterController` —
+  parameter-driven planar move intent clamped to the unit disc, the character's yaw as
+  the single source of its heading, gravity/vertical velocity/terminal velocity/jumping
+  against a ground plane — and `FirstPersonLook`, the pitch-only look channel. Both are
+  §6a components advanced by the existing `KinematicSystem` at §39 step 4 under §42's
+  `"kinematic"` authority (locomotion → free look → commands, per node), because all
+  three components write the same node's transform under the same authority and §42
+  compares the authority rather than the system. A first-person camera is the
+  character's yaw composed with a child eye's local pitch — two nodes, one writer each,
+  no authority conflict to arbitrate; proved over 240 fixed steps of a walking,
+  pitching, jumping character whose world forward matches
+  `(−cos p·sin yaw, sin p, −cos p·cos yaw)` on every step, with zero §42 warnings,
+  beside a `FollowRig` + `LookAtConstraint` chase camera in the same registry. §85
+  refusals at authoring; a non-finite pose mid-step is a counted `skippedSteps`, never a
+  throw — both writes commit or neither does. §79 pairs ship in the same batch and are
+  registered by `registerSceneNodeTypes()`. §33 tier `same-runtime` with a new
+  three-form golden (`tests/determinism/golden/character-controller.json` — pinning both
+  arms of `jump()`'s refusal, the pitch-pole guard being reached, and the
+  terminal-velocity clamp biting). Slide, step height, slope limits and capsule sweeps
+  are **staged** as a `@four/physics`-tier packet over `PhysicsWorld.shapeCast` (§30),
+  because §3.1 runs the dependency edge `physics → motion` and not the reverse. Bundle
+  cost: **0 B** in every bundle that does not call `registerSceneNodeTypes()`,
+  **+0.93 kB gzip** in `motor-digital-twin`.
+
 ### 2026-08-21 — RFC 0005 drafted; the tests/ typecheck hole closed
 
 #### Added

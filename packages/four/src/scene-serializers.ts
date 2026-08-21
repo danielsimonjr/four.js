@@ -140,7 +140,11 @@ import { FourError, type JsonValue } from "@four/core";
 import { Path, type BufferGeometry, type Point2D } from "@four/geometry";
 import type { Material, SpriteMaterial, UnlitMaterial } from "@four/materials";
 import {
+  CHARACTER_CONTROLLER_SERIALIZER,
+  CharacterController,
+  FIRST_PERSON_LOOK_SERIALIZER,
   FOLLOW_RIG_SERIALIZER,
+  FirstPersonLook,
   FollowRig,
   KINEMATIC_CONTROLLER_SERIALIZER,
   KinematicController,
@@ -2703,6 +2707,12 @@ export function registerSceneNodeTypes(
   components.register(OrbitRig, ORBIT_RIG_SERIALIZER);
   components.register(FollowRig, FOLLOW_RIG_SERIALIZER);
   components.register(LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER);
+  // §12's character controller and §44's first-person look, added 2026-08-21
+  // in the same batch as the components themselves (the one-packet rule). The
+  // character carries its vertical motion state and drops its per-frame move
+  // intent — see the serializers in `@four/motion`.
+  components.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
+  components.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,

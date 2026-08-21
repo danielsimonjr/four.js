@@ -19,10 +19,12 @@
  * position from velocity, and from a solver (§37), which derives it from
  * forces.
  *
- * WP-2.5 implements the three methods above; §12's remaining required features
- * (steering behaviours, look-at constraints, orbit motion, camera rigs,
- * character controllers, motion limits) arrive with the Phase 8 advanced-motion
- * packets (§111). `followPath` takes the §13 {@link Trajectory} — the codebase
+ * WP-2.5 implements the three methods above; §12's other required features
+ * arrived with the Phase 8 advanced-motion packets (§111) — steering in
+ * `steering.ts`, look-at constraints in `constraints.ts`, orbit motion and
+ * camera rigs in `camera-rigs.ts`, and **character controllers** in
+ * `character-controller.ts`, which {@link KinematicSystem} also advances (see
+ * below). `followPath` takes the §13 {@link Trajectory} — the codebase
  * has no `Curve` type, and §13's sampler *is* the path abstraction §12 names
  * (decision, WP-2.5).
  *
@@ -135,6 +137,10 @@ import type { Component, ComponentHost } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import { warnAuthorityConflict, type Node, type Transform } from "@four/scene";
 
+import {
+  CharacterController,
+  FirstPersonLook,
+} from "./character-controller.js";
 import {
   PRIORITY_KINEMATICS,
   type FixedUpdateContext,
@@ -567,6 +573,28 @@ export interface KinematicSystemOptions {
  * system.track(node);
  * ```
  *
+ * ## Three components, one system, one authority (§42; PH-11 residue, 2026-08-21)
+ *
+ * This system also advances §12's {@link CharacterController} and §44's
+ * {@link FirstPersonLook}, for `ConstraintSystem`'s reason: all three
+ * components write a transform under the **same** `"kinematic"` authority, and
+ * §42's check compares the authority, not the system instance — so a second
+ * system would be a second writer that nothing could catch. Within a node the
+ * order is fixed:
+ *
+ * 1. locomotion — {@link CharacterController} (position and yaw);
+ * 2. free look — {@link FirstPersonLook} (rotation only);
+ * 3. commands — {@link KinematicController} (`moveTo`, `rotateTo`,
+ *    `followPath`).
+ *
+ * The command channel runs **last** deliberately: a scripted move is what takes
+ * a character away from the player, so an active command wins over locomotion
+ * for the steps it runs. They are alternatives, not layers — as an `OrbitRig`
+ * and a `FollowRig` on one node are.
+ *
+ * A component is stepped only when it is `active`, and a node whose components
+ * are all idle is skipped **before** the §42 check, so it reports no conflict.
+ *
  * Tracking is explicit and mirrors `MotionSystem`'s mechanism exactly, for the
  * reasons documented there: the component is looked up every step (so
  * attaching, detaching, or replacing it needs no re-tracking), the tracked set
@@ -627,18 +655,25 @@ export class KinematicSystem implements SimulationSystem {
     // Intentionally empty: the system owns no resources until nodes are tracked.
   }
 
-  /** Advances every tracked node's active commands by `time.fixedDeltaTime`. */
+  /**
+   * Advances every tracked node's active locomotion and commands by
+   * `time.fixedDeltaTime`, in the order documented on the class.
+   */
   fixedUpdate(context: FixedUpdateContext): void {
     const dt = context.time.fixedDeltaTime;
     for (const node of this.#tracked) {
       if (!node.enabled) {
         continue;
       }
+      const character = node.getComponent(CharacterController);
+      const look = node.getComponent(FirstPersonLook);
       const controller = node.getComponent(KinematicController);
-      if (controller === undefined) {
-        continue;
-      }
-      if (!controller.translationActive && !controller.rotationActive) {
+      const characterActive = character !== undefined && character.active;
+      const lookActive = look !== undefined && look.active;
+      const commandActive =
+        controller !== undefined &&
+        (controller.translationActive || controller.rotationActive);
+      if (!characterActive && !lookActive && !commandActive) {
         // Idle: no write, so no §42 conflict to report. See the module note.
         continue;
       }
@@ -649,7 +684,16 @@ export class KinematicSystem implements SimulationSystem {
         warnAuthorityConflict(node, KINEMATIC_SYSTEM_AUTHORITY);
         continue;
       }
-      controller.step(node.transform, dt);
+      const transform = node.transform;
+      if (characterActive) {
+        character.step(transform, dt);
+      }
+      if (lookActive) {
+        look.step(transform);
+      }
+      if (commandActive) {
+        controller.step(transform, dt);
+      }
     }
   }
 

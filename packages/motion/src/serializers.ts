@@ -80,6 +80,12 @@ import {
   FollowRig,
   OrbitRig,
 } from "./camera-rigs.js";
+import {
+  CharacterController,
+  DEFAULT_CHARACTER_GRAVITY,
+  DEFAULT_FIRST_PERSON_PITCH_LIMIT,
+  FirstPersonLook,
+} from "./character-controller.js";
 import { LookAtConstraint } from "./constraints.js";
 import { KinematicController } from "./kinematic-controller.js";
 import { MotionComponent } from "./motion-component.js";
@@ -437,5 +443,105 @@ export const LOOK_AT_CONSTRAINT_SERIALIZER: ComponentSerializerShape<LookAtConst
       });
       constraint.target = readTarget(record.target);
       return constraint;
+    },
+  };
+
+/**
+ * The §79 serializer for {@link CharacterController} (§12, PH-11 residue,
+ * 2026-08-21).
+ *
+ * ```ts
+ * import { CharacterController, CHARACTER_CONTROLLER_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
+ * ```
+ *
+ * The whole configuration is written, plus the **vertical motion state** —
+ * `verticalVelocity` and `grounded` — and nothing else. The split is the
+ * `KINEMATIC_CONTROLLER_SERIALIZER` rule applied to a class that has both kinds
+ * of state:
+ *
+ * - Vertical motion is *scene* state. A character saved mid-jump is at a
+ *   height the document already carries, moving at a speed nothing else can
+ *   reconstruct, so a document that dropped it would restore the character
+ *   hanging in the air and then let it fall from rest.
+ * - The **move intent is not**. It is this frame's input — the same live,
+ *   per-step quantity as an in-flight `moveTo` command, and §79 documents do
+ *   not carry the player's thumb. It restores at `(0, 0)`, and the application
+ *   writes the next one on the next step exactly where it wrote the last.
+ *
+ * `maxFallSpeed` is written only when finite: `Infinity` is not JSON, and its
+ * absence is already the class's "no terminal velocity" default on both sides.
+ * `skippedSteps` is a diagnostic of a run and is not carried.
+ */
+export const CHARACTER_CONTROLLER_SERIALIZER: ComponentSerializerShape<CharacterController> =
+  {
+    serialize(component: CharacterController): JsonValue {
+      const payload: Record<string, JsonValue> = {
+        yaw: component.yaw,
+        moveSpeed: component.moveSpeed,
+        gravity: component.gravity,
+        groundHeight: component.groundHeight,
+        jumpSpeed: component.jumpSpeed,
+        verticalVelocity: component.verticalVelocity,
+        grounded: component.grounded,
+      };
+      if (Number.isFinite(component.maxFallSpeed)) {
+        payload.maxFallSpeed = component.maxFallSpeed;
+      }
+      return payload;
+    },
+
+    deserialize(data: JsonValue): CharacterController {
+      const record = readRecord(data);
+      return new CharacterController({
+        yaw: readNumber(record.yaw, 0),
+        moveSpeed: readNumber(record.moveSpeed, 1),
+        gravity: readNumber(record.gravity, DEFAULT_CHARACTER_GRAVITY),
+        groundHeight: readNumber(record.groundHeight, 0),
+        jumpSpeed: readNumber(record.jumpSpeed, 4),
+        maxFallSpeed: readNumber(record.maxFallSpeed, Number.POSITIVE_INFINITY),
+        verticalVelocity: readNumber(record.verticalVelocity, 0),
+        grounded: record.grounded === true,
+      });
+    },
+  };
+
+/**
+ * The §79 serializer for {@link FirstPersonLook} (§44, PH-11 residue,
+ * 2026-08-21).
+ *
+ * ```ts
+ * import { FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
+ * ```
+ *
+ * The pitch and both limits, for `ORBIT_RIG_SERIALIZER`'s reason: the limits
+ * are `readonly`, so the reader has to **construct** with them, and a document
+ * that dropped them would restore a differently-bounded eye that clamps a
+ * perfectly good saved pitch. `pitchLimitHits` is a diagnostic of a run and is
+ * not carried.
+ */
+export const FIRST_PERSON_LOOK_SERIALIZER: ComponentSerializerShape<FirstPersonLook> =
+  {
+    serialize(component: FirstPersonLook): JsonValue {
+      return {
+        pitch: component.pitch,
+        minPitch: component.minPitch,
+        maxPitch: component.maxPitch,
+      };
+    },
+
+    deserialize(data: JsonValue): FirstPersonLook {
+      const record = readRecord(data);
+      return new FirstPersonLook({
+        pitch: readNumber(record.pitch, 0),
+        minPitch: readNumber(
+          record.minPitch,
+          -DEFAULT_FIRST_PERSON_PITCH_LIMIT,
+        ),
+        maxPitch: readNumber(record.maxPitch, DEFAULT_FIRST_PERSON_PITCH_LIMIT),
+      });
     },
   };

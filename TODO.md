@@ -34,6 +34,21 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **PH-11 residue — §12 character controllers DONE 2026-08-21.**
+      `CharacterController` + `FirstPersonLook` in `@four/motion`, advanced by the
+      existing `KinematicSystem` under §42's `"kinematic"` authority; §79 pair
+      registered; new §33 golden; first-person closed by composition (character yaw +
+      child-node pitch), not by a new rig class. Playground sensor-zone test verified
+      green on the settled tree (the earlier failure was the in-flight build state).
+- [ ] **PH-11b — solver-backed character controller (`@four/physics`).** A
+      `SweptCharacterController` over `PhysicsWorld.shapeCast` (§30): capsule sweep,
+      slide-along-wall, step height, slope limit, moving-platform carry, reusing
+      `CharacterController`'s intent/heading/gravity state. It lives in `@four/physics`
+      because §3.1 runs the edge `physics → motion`. Effort M. Needs a decision on
+      whether the swept controller _extends_ the kinematic one or holds one.
+- [ ] **Character-controller example follow-up:** nothing in `examples/` exercises the
+      new components — the only first-person camera in the repo lives in a test. Worth
+      folding into the next examples packet.
 - [x] **Tests typecheck sweep DONE 2026-08-21** — `pnpm typecheck:tests` added and
       wired into CI after `Build`; 21 errors in five classes fixed as the misspelled
       intent; the text visual golden regenerated deliberately (the fixture now clears

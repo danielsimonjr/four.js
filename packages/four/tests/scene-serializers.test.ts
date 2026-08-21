@@ -861,7 +861,9 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     // The list is asserted as well as walked: a component that stops being
     // exported would otherwise make this test pass by finding less.
     expect([...shipped.keys()].sort()).toEqual([
+      "character-controller",
       "collider",
+      "first-person-look",
       "follow-rig",
       "kinematic-controller",
       "look-at-constraint",

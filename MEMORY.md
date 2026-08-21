@@ -28,6 +28,81 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — PH-11's residue: §12 character controllers + §44's first-person rig.**
+  Decisions worth keeping:
+  - **The first-person "arbitration" was a decomposition, and asking which writer wins
+    was the wrong question.** R-36 staged the rig on aim-vs-free-look arbitration under
+    §42's one authority. The answer is that yaw and pitch belong to _different
+    objects_: yaw **is** the character's heading (the direction it walks and the
+    direction it faces are one number, so a second writer of it is a second definition
+    of where the character is going), and pitch is not a property of a walking body at
+    all. So pitch moves to a child node and the composition `yaw ∘ pitch` falls out of
+    the scene graph — no roll, no gimbal arithmetic, and §42 satisfied
+    **structurally**, because an authority is per _node_. Generalizes: when two writers
+    want one node, ask whether they want the same node.
+  - **One authority means one system, even when the components are unrelated.**
+    `CharacterController`, `FirstPersonLook` and `KinematicController` all write under
+    `"kinematic"`, so they are advanced by the **existing** `KinematicSystem`; §42
+    compares the authority, not the system instance, so a second system would be a
+    second writer nothing could catch. Order within a node: locomotion → free look →
+    commands, with the command channel **last** and winning — alternatives, not layers.
+  - **§12's one bullet decides the tier, and the sentence above it decides it harder.**
+    "Kinematic controllers directly prescribe movement" is the whole scope argument: a
+    §12 character controller is not a solver object, so gravity against a _plane_ is
+    the honest tier and ships complete, while slide/step-height/slope/capsule sweeps
+    are staged.
+  - **The staged half's blocker is a direction, not a missing capability.**
+    `PhysicsWorld.shapeCast` (§30) already exists — the reason a swept controller is
+    not in `@four/motion` is that §3.1 gives motion only `core`/`math`/`scene` and the
+    edge runs `physics → motion`. So the solver-backed half is a `@four/physics` packet
+    (`SweptCharacterController` reusing this class's intent/heading/gravity state), and
+    an injected query interface with no implementor was declined: absent beats
+    accepted-and-ignored. **Re-check a blocker against source** — this one was one
+    `grep` away from being mis-filed as "the adapter has no queries".
+  - **`maxAngularSpeed` was deliberately NOT reused, and that is consistent with the
+    rule rather than an exception to it.** `LookAtConstraint` has a rate limit because
+    it computes its own goal from a moving target. `turn(delta)`/`look(delta)` take
+    deltas the application already chose, so a second limit would silently discard
+    input the caller believed was accepted. The spelling arrives when a controller
+    grows a _desired heading_ — i.e. when there is something to limit.
+  - **Diagonal movement is the oldest bug in the genre, and the fix is one `sqrt`.**
+    `setMoveIntent` clamps the intent's _magnitude_ to 1. `Math.sqrt` not
+    `Math.hypot`, because the scale multiplies straight into a transform and only
+    `sqrt` is specified exactly rounded (§33).
+  - **The write gate is what keeps the §42 idle rule true for a component that is never
+    really idle.** A character with gravity writes every airborne step, so `active` is
+    `!grounded || headingDirty || intent ≠ 0` — a grounded, still, unturned character
+    writes nothing and therefore warns about nothing. Corollary chosen on purpose:
+    with `gravity: 0` a character above the plane **hovers and stays ungrounded** — it
+    is falling at zero speed, and pretending otherwise would make `jump()` succeed in
+    mid-air.
+  - **Both writes commit or neither does.** The whole pose is computed into locals and
+    checked for finiteness before `position.set`, so a `NaN` arriving from elsewhere
+    leaves the transform _and the vertical state_ untouched and counts one
+    `skippedSteps`.
+  - **A golden can pin the two arms of a refusal.** `jumpsTaken: 3` against six
+    attempts is the evidence that `jump()` refuses in mid-air, and
+    `landings === jumpsTaken` that every jump came back down; `pitchLimitHits: 162`
+    says the pole guard was _reached_, and `fallerVerticalVelocity: −6` that the
+    terminal-velocity clamp bit. Four readable numbers that localise a change before
+    anyone opens a debugger.
+  - **§79 asymmetry worth remembering: vertical motion is scene state, move intent is
+    not.** A character saved mid-jump is at a height the document already carries,
+    moving at a speed nothing can reconstruct — so `verticalVelocity`/`grounded`
+    round-trip. The move intent is this frame's input, and §79 documents do not carry
+    the player's thumb. `maxFallSpeed` is written **by omission** when infinite,
+    because `Infinity` is not JSON and absence already means "unbounded" on both
+    sides.
+  - **Multi-agent note (orchestrator, 2026-08-21):** the playground sensor-zone browser
+    test failed consistently while this packet's `packages/motion`/`four` edits were in
+    flight (the example builds against the shared tree's source) and passed immediately
+    on the settled tree. A red browser test on a shared tree indicts the tree state
+    before it indicts the spec — settle, then re-run, before bisecting.
+  - **Measured:** **0 B** in five of six bundles — checked structurally
+    (`character-controller`/`first-person-look` appear zero times in each) —
+    **+0.93 kB gzip** in `motor-digital-twin`. No budget bumps.
+  - Gotcha, sixth confirmation: **`pnpm run docs` is the type gate, vitest is not.**
+
 - **2026-08-21 — RFC 0005 (pixel/GPU-id picking) + the `tests/` typecheck gate.**
   Decisions worth keeping:
   - **A node's id is a `string`, and that is a picking design constraint, not a
