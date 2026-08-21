@@ -611,4 +611,8 @@
       "reason": "four.js: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
     }
   ]
-}
+},
+  {
+    "name": "CacheableGeometry",
+    "reason": "Backend-local structural view of the geometry a cache consumes. render-webgl and render-webgpu each declare the narrowed shape they read (the PARTICLE_INSTANCE_FLOATS class: a deliberate duck-typed contract, kept per backend so neither names the other and the cache's requirements stay in the file that enforces them). Types only; no runtime body."
+  }
