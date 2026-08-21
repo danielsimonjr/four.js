@@ -34,6 +34,21 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [ ] **R-1 (WebGPU backend) — planned, not started.** `docs/plans/R1-WEBGPU_PLAN.md`
+      holds the nine-packet decomposition (WP-R1.1 … WP-R1.9), gates, evidence tiers and
+      efforts. Dispatch is serial; only WP-R1.9's capability-declaration half is
+      parallelisable. Blocked on nothing technical — four owner questions in the §5
+      register (rows 21–22). `playwright.config.ts` will need `--enable-unsafe-webgpu`
+      in `use.launchOptions.args` plus a third `webgpu` project whose specs skip when
+      `requestAdapter()` returns null (verified not to disturb the WebGL gate).
+- [ ] **R-31 stays blocked but is no longer evidence-blocked** — WP-R1.8 owns it;
+      compute-with-storage-buffers is probe-verified to run headless in CI. Closes on
+      WebGPU only; WebGL 2 declares the tier absent.
+- [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
+      transient-target pooling and barrier scheduling (must land on both backends or
+      neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
+      `collisions: "depth-buffer"`; RFC 0005's `Rectangle2` prerequisite for a regional
+      `readPixels`.
 - [x] **PH-11 residue — §12 character controllers DONE 2026-08-21.**
       `CharacterController` + `FirstPersonLook` in `@four/motion`, advanced by the
       existing `KinematicSystem` under §42's `"kinematic"` authority; §79 pair

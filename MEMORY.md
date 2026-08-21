@@ -28,6 +28,54 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — R-1 WebGPU scoping.** Decisions worth keeping:
+  - **CI can run WebGPU, and the flag is exactly one.** Measured against the sandbox's
+    pre-installed Chromium (`/opt/pw-browsers`): `--enable-unsafe-webgpu` alone yields a
+    SwiftShader adapter on both `chrome` and `headless_shell` — a WGSL render pipeline,
+    render-to-texture, `mapAsync` readback and a compute pipeline with storage buffers
+    all run. Extra Vulkan flags are redundant (Dawn resolves the `libvk_swiftshader.so`
+    shipped in both browser trees). Adding the flag alongside the existing
+    `--use-gl=angle --use-angle=swiftshader` does not disturb the WebGL 2 gate.
+  - **Gotcha (probing WebGPU): `about:blank` reports `navigator.gpu` absent.** The same
+    browser on `http://localhost` reports it present — an opaque origin is not the
+    secure context WebGPU wants. Any WebGPU probe or gate page must be _served_, never
+    `page.setContent`-ed.
+  - **Node has no WebGPU** (`globalThis.navigator.gpu` is `undefined`), so every
+    Vitest-tier WebGPU test is against a structural double — the same position
+    `WebglContext`/`recording-gl.ts` already occupy.
+  - **Cross-backend determinism has exactly one claimable invariant: render-list
+    consumption.** Pixel identity between rasterisers is not claimable, and transcripts
+    are lists in different languages. What _is_ assertable — and what makes §61's "the
+    logical scene shall remain independent of the selected backend" testable for the
+    first time — is that every backend receives the identical `RenderItem[]` and
+    `RenderBatch[]` for a given scene/view/alpha.
+  - **The batching seam is the render tier's best-factored one.** `RenderBatcher` is a
+    pure planner in `@four/render`; `gl-batch.ts` is only the uploader. A second
+    backend's batch module is a twin of `gl-batch.ts`, not of `batch.ts`.
+  - **`RendererCapabilities` is the one shared-interface change a second backend
+    forces** — two members today against §62's eleven; widen **once**, additively, in
+    the first packet, or churn three implementors nine times.
+  - **`RenderTarget`'s stencil ⊥ depthTexture exclusivity survives the WebGPU port for
+    an independent reason** (`depth24plus-stencil8`'s combined aspect). A constraint two
+    backends reach independently is a design, not an artefact of the first one.
+  - **On WebGPU, pipelines are lazy and descriptor-keyed — a deliberate departure from
+    compile-at-init.** `GPURenderPipeline` is immutable and combinatorial, and R-6's
+    pipeline-cost law says the cache must be lazy or it taxes every example that never
+    selects WebGPU. New hazard: pipeline-cache keys must be canonical strings, not
+    objects.
+  - **RFC 0001 and R-1 were in a circular wait, and hand-written WGSL is the break.**
+    Hand-porting the seven pipelines is the same duplication the project accepted for
+    GLSL, is bounded, and makes the emitter testable afterwards. One thing R-1 owes the
+    RFC: bind-group layouts declared as data, so the future emitter targets the same
+    layout.
+  - **`AUTO_RENDERER_ORDER` already prefers `"webgpu"`**, so the day the backend is
+    registrable, `registerWebgpuRenderer()` silently moves an application off WebGL 2.
+    Filed as an owner question rather than decided.
+  - **Gotcha (bundles): the umbrella re-exports the WebGPU stub**
+    (`export * as renderWebgpu` in `packages/four/src/index.ts`), and four examples
+    import from `four`. Free today; at sub-kB headroom it must be a `pnpm run size`
+    gate in the first packet, not an assumption about namespace tree-shaking.
+
 - **2026-08-21 — PH-11's residue: §12 character controllers + §44's first-person rig.**
   Decisions worth keeping:
   - **The first-person "arbitration" was a decomposition, and asking which writer wins

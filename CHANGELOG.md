@@ -8,6 +8,33 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — R-1 scoped: the WebGPU backend has an executable plan
+
+#### Documentation
+
+- **`R-1` (§62 WebGPU backend) has an executable tiered plan**:
+  `docs/plans/R1-WEBGPU_PLAN.md` re-reads §62's promises against the render interface as
+  it stands today (seven pipelines, three resource caches, a batching planner, a graph, a
+  registry) and decomposes the backend into nine serial work packets in the house
+  `IMPLEMENTATION_PLAN.md` §2 format. Three findings change what the gap row can claim:
+  - **CI can run WebGPU.** Measured in the sandbox against the pre-installed Chromium:
+    the single flag `--enable-unsafe-webgpu` yields a SwiftShader adapter on both the
+    full binary and `headless_shell`, running a WGSL render pipeline, render-to-texture,
+    a `mapAsync` readback and a compute pipeline with storage buffers. The flag does not
+    disturb the existing WebGL 2 gate. Node has no `navigator.gpu`, so the Vitest tier
+    stays doubles-only.
+  - **Pixel identity between backends is not claimable and must never be asserted.** The
+    shared invariant is the _render-list consumption contract_ — both backends receive
+    byte-identical render lists and batch plans, asserted by a shared harness. Transcript
+    identity stays a per-backend, code-path claim.
+  - **RFC 0001 is a soft blocker, not a hard one.** The RFC defers WGSL generation
+    because no backend exists; the gap row says the backend needs the shader model. The
+    plan breaks the deadlock by hand-porting the seven pipelines (what the GL backend
+    already did once), leaving the emitter as a follow-up that hand-written WGSL finally
+    makes testable.
+    No package, test, or specification file was touched. Four owner questions join the §5
+    register (rows 21–22).
+
 ### 2026-08-21 — PH-11's residue closed: §12 character controllers and §44's first-person camera
 
 #### Added
