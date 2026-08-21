@@ -28,6 +28,62 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — R-37 `ScreenCamera` + the trackball rig.** Decisions worth keeping:
+  - **A derived projection must not inherit an authored one.** `ScreenCamera extends
+Camera`, not `OrthographicCamera`: the six bounds come from
+    `(width, height, resolution, origin, units)`, and inheriting writable
+    `left/right/bottom/top` would give a caller fields whose writes the next resize
+    silently discards. The generalisation: _never inherit a settable field you intend to
+    overwrite._
+  - **§7a's screen space reconciles at the camera, and only for `"top-left"`.** The flip
+    is `bottom > top` inside `setOrthographic` — one sign, nowhere else in the engine.
+    `"bottom-left"` and `"centered"` stay Y-up on purpose: they are chosen _because_ the
+    caller wants the world convention. Consequence to remember: a negative-determinant
+    projection mirrors winding — free while the WebGL backend keeps `CULL_FACE` disabled,
+    and a note the packet that enables culling must read.
+  - **A screen camera's default near must be negative.** `-1000`/`1000`, so a camera
+    nobody moved sees the `z = 0` plane its content is authored on. `near = 0.1` is right
+    for a frustum and wrong for a slab; `R-8` lost time to the same trap in three
+    harnesses.
+  - **Refuse a _measured_ number, tolerate an _authored_ one.** The other cameras
+    deliberately do not validate (a degenerate authored box yields non-finite elements
+    and says so). A screen camera's rectangle arrives from a `ResizeObserver`, so it
+    throws `FourError("INVALID_APPLICATION_STATE")` — from the constructor,
+    `setSurfaceSize`, _and_ `updateProjectionMatrix`, because §47's plain-field idiom
+    means a direct write is only catchable at the projection. This asymmetry is the rule,
+    not an inconsistency.
+  - **Structural opt-in beats `instanceof` at a package boundary.** `Application.resize`
+    feeds any camera with a `setSurfaceSize` method (`SurfaceSizedCamera`), never
+    `camera instanceof ScreenCamera`. Two payoffs: §47's _custom projection camera_ opts
+    in without `four` knowing it exists, and `Application` — which is in every bundle —
+    names no class, so the feature costs **0 B** where it is unused. Reach for this
+    whenever an always-loaded module would otherwise name an optional one.
+  - **A rig's shape follows its input, not its family.** `OrbitRig`/`FollowRig` are
+    per-step components because their targets move; `TrackballRig` is event-driven and
+    writes on demand, so it is a plain class the application calls under §42's
+    `"manual"` authority. Forcing it into a component would have required
+    `@four/motion`'s `ConstraintSystem` — which names its three classes literally — to
+    import `@four/scene`'s rig, i.e. exactly the §3.1 edge the R-36 staging note existed
+    to avoid. §42 still applies to application writes: `applyTo` calls
+    `warnAuthorityConflict` and refuses a node owned elsewhere.
+  - **The trackball crossover is at `d = 1/√2`, not at the silhouette.** Sphere
+    `sqrt(1 - d²)` to the 45° parallel, then Bell's sheet `1/(2d)`; both give `1/√2`
+    there with matching slope. Switching at `d = 1` leaves a half-radius jump — the
+    continuity test caught exactly that bug in the first cut. Worth remembering as _the_
+    classic trackball mis-implementation.
+  - **Gotcha (testing): `helpers/recording-gl.ts` retains uniform arrays by reference.**
+    A transcript read _after_ a later frame reports that later frame's uniform values, so
+    two transcripts are comparable only when both frames wrote the same values last. An
+    A/B with _different view counts_ cannot be asserted on uniforms — assert on bindings
+    (`bindVertexArray`), which the double records by value.
+  - **`Vector3.applyQuaternion` still does not exist**, deliberately: `trackball.ts`
+    writes out the one special case it needs (rotating `(0, 0, z)`) rather than adding a
+    math primitive whose naming and `out` conventions (§7b) belong to a `@four/math`
+    packet.
+  - Bundle cost measured: **0 B** in every bundle that does not call
+    `registerSceneNodeTypes`; ≤ ~0.5 kB gzip in `motor-digital-twin`, the only example
+    that does. No budget bumps.
+
 - **2026-08-21 — R-21 §53 geometry model + R-34 §27 field batching.** Decisions worth
   keeping:
   - **A base class earns its place through identity, not through shape.** §53's

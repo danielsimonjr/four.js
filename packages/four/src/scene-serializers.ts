@@ -184,6 +184,9 @@ import {
   OrthographicCamera,
   PerspectiveCamera,
   PointLight,
+  SCREEN_ORIGINS,
+  SCREEN_UNITS,
+  ScreenCamera,
   SpotLight,
   restoreNodeId,
   type Node,
@@ -271,6 +274,9 @@ export const PERSPECTIVE_CAMERA_NODE_TYPE = "scene:perspective-camera";
 
 /** The document `type` an {@link OrthographicCamera} serializes as (§47). */
 export const ORTHOGRAPHIC_CAMERA_NODE_TYPE = "scene:orthographic-camera";
+
+/** The document `type` a {@link ScreenCamera} serializes as (§47; R-37). */
+export const SCREEN_CAMERA_NODE_TYPE = "scene:screen-camera";
 
 /** The document `type` a {@link DirectionalLight} serializes as (§68). */
 export const DIRECTIONAL_LIGHT_NODE_TYPE = "scene:directional-light";
@@ -463,6 +469,23 @@ function readBoolean(value: JsonValue | undefined): boolean | undefined {
 function readFinite(value: JsonValue | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
+    : undefined;
+}
+
+/**
+ * One of `members`, or `undefined` — the string-union read (R-37).
+ *
+ * A payload carrying a name no build of the engine knows restores the class
+ * default rather than failing the scene, which is `readFinite`'s tolerance
+ * applied to an enumeration instead of a number.
+ */
+function readMember<T extends string>(
+  value: JsonValue | undefined,
+  members: readonly T[],
+): T | undefined {
+  return typeof value === "string" &&
+    (members as readonly string[]).includes(value)
+    ? (value as T)
     : undefined;
 }
 
@@ -1275,6 +1298,9 @@ export function registerRenderSerializers(
         if (constructor === OrthographicCamera) {
           return ORTHOGRAPHIC_CAMERA_NODE_TYPE;
         }
+        if (constructor === ScreenCamera) {
+          return SCREEN_CAMERA_NODE_TYPE;
+        }
         if (constructor === DirectionalLight) {
           return DIRECTIONAL_LIGHT_NODE_TYPE;
         }
@@ -1340,6 +1366,26 @@ export function registerRenderSerializers(
             right: camera.right,
             bottom: camera.bottom,
             top: camera.top,
+            near: camera.near,
+            far: camera.far,
+          };
+        }
+        if (constructor === ScreenCamera) {
+          const camera = node as ScreenCamera;
+          return {
+            // The origin and the units are the two fields §47 names, and they
+            // are written **always**: a document that omitted `"top-left"`
+            // because it is the default would reload identically today and
+            // differently the day §7a's default were ever revisited.
+            origin: camera.origin,
+            units: camera.units,
+            // The surface size is state, not authoring — the application
+            // pushes it on the next resize — but it is written anyway, so a
+            // scene loaded and rendered before any resize projects the
+            // rectangle it was saved with rather than the 1 × 1 default.
+            width: camera.width,
+            height: camera.height,
+            resolution: camera.resolution,
             near: camera.near,
             far: camera.far,
           };
@@ -1448,6 +1494,29 @@ export function registerRenderSerializers(
               "far",
             ]),
           );
+        }
+        if (document.type === SCREEN_CAMERA_NODE_TYPE) {
+          const origin = readMember(data.origin, SCREEN_ORIGINS);
+          const units = readMember(data.units, SCREEN_UNITS);
+          const size = finiteOptions(data, [
+            "width",
+            "height",
+            "resolution",
+            "near",
+            "far",
+          ]);
+          // §85: the class refuses a non-positive pixel count, so a corrupted
+          // payload restores the 1 × 1 default rather than taking the whole
+          // scene down — the `Sprite` extent rule, for the same reason.
+          for (const key of ["width", "height", "resolution"]) {
+            const value = size[key];
+            if (value !== undefined && value <= 0) delete size[key];
+          }
+          return new ScreenCamera({
+            ...size,
+            ...(origin !== undefined ? { origin } : {}),
+            ...(units !== undefined ? { units } : {}),
+          });
         }
         if (document.type === DIRECTIONAL_LIGHT_NODE_TYPE) {
           const color = readColor(data.color);

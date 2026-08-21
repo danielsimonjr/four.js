@@ -8,6 +8,56 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — R-37 closed: §47's `ScreenCamera` and the trackball rig
+
+#### Added
+
+- **§47 `ScreenCamera` (`R-37`)** — the pixel-rectangle camera, in `@four/scene` beside the
+  others. All three origins §47 requires (`"top-left"`, `"bottom-left"`, `"centered"`) in
+  either unit system (`"logical"`, `"physical"`), so UI content is authored in the units a
+  designer hands over and does not move when the world camera does. It extends `Camera`
+  rather than `OrthographicCamera` on purpose: the box is _derived_ from the surface, and
+  subclassing would leave `left`/`right`/`bottom`/`top` writable and lying, since the next
+  resize overwrites them. §7a's default is honoured — `"top-left"` in logical pixels — and
+  that origin is the only one that flips Y, as one sign inside the projection matrix and
+  nowhere else in the engine; `"bottom-left"` and `"centered"` are Y-up because they are
+  the origins a caller picks _for_ the world convention. Near/far default to `-1000`/`1000`
+  so that a camera nobody moved can see the `z = 0` plane its content is authored on. A
+  zero, negative or non-finite size is refused with `FourError("INVALID_APPLICATION_STATE")`
+  rather than clamped (§85): unlike an authored orthographic box, this rectangle is a
+  _measurement_, and a `NaN` from a `ResizeObserver` must not silently place every UI node
+  off screen. §79 pair: `scene:screen-camera`, origin and units written always, a corrupted
+  rectangle restoring the default rather than failing the scene.
+- **`Application.resize` feeds it (§45)** — every full-surface viewport whose camera accepts
+  a surface size is handed `(width, height, resolution)` and rebuilt, beside the existing
+  `PerspectiveCamera` aspect update, under A-7's argument: only the application knows which
+  rectangle a camera was authored for. The test is **structural** — a new exported type
+  `SurfaceSizedCamera`, matched by `typeof camera.setSurfaceSize === "function"` — so §47's
+  fifth camera type (the custom projection camera) opts in the same way, and no bundle pays
+  for `ScreenCamera` unless it uses one. The view loop was considered and rejected: a
+  projection should change when a _size_ changes, not when a frame is drawn, and a headless
+  application never runs a view loop.
+- **§44/§47 `TrackballRig` (`R-37`)** — the last staged camera rig, landing where `R-36`
+  said it would: with `ScreenCamera`, because it is defined over a viewport. The classic
+  virtual sphere (Shoemake's arcball with Bell's sheet, the two meeting tangentially at
+  `d = 1/√2`), world-space composition so a second drag turns about screen axes, no pole and
+  no up vector. Deliberately **not** a component: it is event-driven rather than per-step,
+  and `ConstraintSystem` lives in `@four/motion`, which may not import this package — so
+  `applyTo(node)` is the application's write, under §42's `"manual"` authority, and a node
+  owned by another authority is refused and warned about once. Parameter-driven like every
+  other rig: four numbers in viewport pixels, no `@four/input` edge. §33 tier
+  `same-runtime`.
+
+#### Proved
+
+- `tests/browser/screen-camera.spec.ts` (new, 65th browser test): on ANGLE/SwiftShader, one
+  100 × 40 panel authored at pixel `(20, 30)` lights **exactly** 4000 pixels, and the same
+  authored numbers land in three different corners under the three origins — the pixel-exact
+  placement claim the feature exists to earn, at zero tolerance. Existing goldens unmoved.
+- `tests/integration/screen-camera.test.ts`: the standard recipe (one scene, two
+  full-surface views with disjoint §46 layers, a world camera and a `ScreenCamera`) draws
+  each item exactly once; a scene with no screen camera emits its frame unchanged.
+
 ### 2026-08-21 — R-21 and R-34 closed: §53's geometry model complete, §27 field sampling batched
 
 #### Added

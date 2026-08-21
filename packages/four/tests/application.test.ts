@@ -28,6 +28,7 @@ import {
   Group,
   OrthographicCamera,
   PerspectiveCamera,
+  ScreenCamera,
   createFullscreenViewport,
   resolveWorldTransforms,
   type Viewport,
@@ -903,6 +904,67 @@ describe("Application — resize (§45, §61, §47)", () => {
     app.resize(1600, 800);
 
     expect(camera.aspect).toBe(1);
+  });
+
+  it("feeds a full-surface ScreenCamera the surface size (R-37)", () => {
+    const camera = new ScreenCamera();
+    const app = new Application({ views: [createFullscreenViewport(camera)] });
+
+    app.resize(1600, 800, 2);
+
+    expect(camera.width).toBe(1600);
+    expect(camera.height).toBe(800);
+    expect(camera.resolution).toBe(2);
+    // The projection was rebuilt with it: the right edge is now 1600 px.
+    const e = camera.projectionMatrix.elements;
+    expect(e[0] * 1600 + e[12]).toBeCloseTo(1, 12);
+    // Logical units by default, so the 2× buffer did not double the rectangle.
+    expect(camera.pixelWidth).toBe(1600);
+  });
+
+  it("counts device pixels for a physical-unit ScreenCamera (R-37)", () => {
+    const camera = new ScreenCamera({ units: "physical" });
+    const app = new Application({ views: [createFullscreenViewport(camera)] });
+
+    app.resize(400, 300, 2);
+
+    expect(camera.pixelWidth).toBe(800);
+    const e = camera.projectionMatrix.elements;
+    expect(e[0] * 800 + e[12]).toBeCloseTo(1, 12);
+  });
+
+  it("leaves a ScreenCamera in a partial viewport to its owner (R-37)", () => {
+    const camera = new ScreenCamera({ width: 100, height: 100 });
+    const app = new Application({
+      views: [
+        {
+          id: "inset",
+          camera,
+          x: 0,
+          y: 0,
+          width: 0.5,
+          height: 1,
+          normalized: true,
+        },
+      ],
+    });
+
+    app.resize(1600, 800);
+
+    expect(camera.width).toBe(100);
+  });
+
+  it("never pushes a degenerate size into a ScreenCamera (§85, R-37)", () => {
+    const camera = new ScreenCamera({ width: 320, height: 240 });
+    const app = new Application({ views: [createFullscreenViewport(camera)] });
+
+    // `resize` returns before the camera loop for a `0 × 0` surface, so the
+    // camera keeps a projection it can use rather than being handed a size it
+    // would have to refuse.
+    expect(() => {
+      app.resize(0, 0);
+    }).not.toThrow();
+    expect(camera.width).toBe(320);
   });
 
   it("leaves an orthographic camera's extent alone", () => {

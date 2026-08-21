@@ -34,6 +34,25 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-37 CLOSED 2026-08-21** — §47's `ScreenCamera` (three origins × two unit
+      systems, §7a defaults, negative near, §85 refusals, §79 pair) plus
+      `Application.resize` feeding it through the structural `SurfaceSizedCamera`
+      opt-in, and `TrackballRig`, the last staged §44/§47 rig. 27 new package tests, 4
+      integration, 1 new browser test with pixel-exact placement on SwiftShader. 0 B in
+      bundles that do not register serializers.
+- [ ] **Flagship UI-panel follow-up (R-37, 2026-08-21):** both flagships still work
+      around the missing screen camera — `one-scene-everything-moves` parents its UI
+      panel to the camera, and `motor-digital-twin/main.ts` still carries a header
+      comment saying "§47/§48's `ScreenCamera` is absent". Rewrite both onto the
+      standard recipe (a `"ui"` layer, a second full-surface viewport with a
+      `ScreenCamera`, `layerMask` on each view) and delete the workaround notes. The
+      recipe is proved in `tests/integration/screen-camera.test.ts`. Expect those
+      examples' visual goldens to move — regenerate deliberately. Fold into the
+      examples packet (with the Text and lookAt rewrites).
+- [ ] **Stale staging note (R-37, 2026-08-21):** the rig table in
+      `packages/motion/src/camera-rigs.ts` still lists **trackball** as unshipped.
+      It shipped; the row should point at `@four/scene`'s `TrackballRig` and record
+      that it is not a component. One-line doc fix for the next motion-touching packet.
 - [x] **R-21 — §53 geometry model (2026-08-21).** `Geometry` base, `clone()`,
       `BoundingVolume` (box + circumscribing sphere). `GeometryBounds` aliased, R-8
       unmodified. Seven §53 subclasses and hierarchical volumes deliberately staged with

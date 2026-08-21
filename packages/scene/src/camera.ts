@@ -20,9 +20,11 @@
  *
  * All six are shipped: `layers` joined them with §46's layer registry (R-38,
  * 2026-08-08 — it was deliberately absent until then, see {@link Camera.layers}).
- * The other two required §47 camera types (`ScreenCamera`, `ObliqueCamera`, plus
- * the custom projection camera and the camera rigs) are later phases. The MVP
- * (§120) needs perspective and orthographic, which is what this module ships.
+ * §47's `ScreenCamera` ships beside this module in `screen-camera.ts` (R-37,
+ * 2026-08-21) — it extends `Camera` rather than `OrthographicCamera`, and that
+ * file says why. `ObliqueCamera` and the custom projection camera are later
+ * phases. The MVP (§120) needs perspective and orthographic, which is what this
+ * module ships.
  *
  * ## Where the matrices come from
  *
@@ -43,9 +45,12 @@
  * exactly the orientation {@link Camera.updateViewMatrix} inverts, so
  * `camera.lookAt(target); camera.updateViewMatrix();` yields the classic
  * look-at view matrix. {@link Node.getWorldDirection} reads the aim back.
- * §44's *rigs* — orbit, fly, first-person, trackball, follow, spring arm,
- * shake — are still unshipped; `lookAt` is the primitive they will be built on,
- * not a substitute for them.
+ * §44's *rigs* live where each one's inputs do: `OrbitRig` and `FollowRig`
+ * (follow target and spring arm) in `@four/motion` (R-36), and `TrackballRig`
+ * in this package (R-37), because a trackball is defined over a viewport in
+ * screen space. Fly, first-person and shake are still staged with recorded
+ * reasons (`camera-rigs.ts`); `lookAt` is the primitive they are built on, not
+ * a substitute for them.
  *
  * ## Explicit recomputation (decision, WP-3.1)
  *
