@@ -416,12 +416,24 @@ changes in `CHANGELOG.md`.
       solved by erasing the parameter at the constructor, and both properties are
       compile-time assertions in `tests/integration/asset-abort.test.ts`
 - [ ] **A-18 remainder:** streaming, dependency graphs, progress reporting, worker
-      decoding, hot reload, content hashing (the last still blocks `A-16`'s §79
-      manifest). Each needs a contract this packet does not have — progress needs a
-      byte-length channel `FetchLike` does not expose, dependency graphs need a loader
-      that can load, hot reload needs a dev-server protocol
-- [ ] **§96 residue:** decompression limits (needed the moment gzip/Draco/Basis lands —
-      a size bound alone does not stop a zip bomb); shader/plugin trust boundaries
+      decoding, hot reload. Each needs a contract this packet does not have — progress
+      needs a byte-length channel `FetchLike` does not expose, dependency graphs need a
+      loader that can load, hot reload needs a dev-server protocol. **Content hashing
+      DONE 2026-08-21** (SHA-256 behind an injected `digest`, `expectedHash`
+      verification that refuses rather than passes, §79 manifest in `src/manifest.ts`)
+      — `A-16`'s manifest is unblocked
+- [ ] **A-16 remainder (manifest half):** the §79 manifest substrate ships in
+      `@four/assets` (2026-08-21). What is left is `@four/four`:
+      `SceneResourceCatalog.get(key)` is synchronous, so wiring is preload-then-catalog
+      — walk a document's resource keys, `loadFromManifest` each, hand the resulting map
+      to `resourceCatalog(...)`. `tests/integration/texture-manifest.test.ts` runs the
+      seam by hand today
+- [ ] **A-19 remainder:** §78 glTF/GLB (three blockers unchanged: §55/§59 materials, the
+      renderer-side texture tier, skins/morph targets — RFC 0003 answers the third on
+      paper) and renderer-side §77 (`R-30b`). The assets-side texture loader tier
+      shipped 2026-08-21 (`createTextureLoader`, `TextureAsset`, §96 decompression
+      bounds)
+- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader/plugin trust boundaries
       (blocked on A-3)
 - [ ] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
       graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/

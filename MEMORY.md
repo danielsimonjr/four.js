@@ -28,6 +28,62 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — A-18 content hashing + §79 manifest, A-19 texture tier.** Decisions worth
+  keeping:
+  - **The hash is SHA-256 because of what §79 asks it to DO.** §79's manifest clause
+    carries two jobs: cache-busting (any hash) and verification on reload (integrity
+    against whoever answers the request — §96's untrusted party). A non-cryptographic
+    hash is collidable by construction, so verifying with one would _announce_ integrity
+    without providing it — worse than no check, because callers would trust it. Async is
+    free: `load` is already async, hashing is IO, and §33 is untouched for the same
+    reason the manager is allowed `globalThis.fetch`. `crypto.subtle` is reached through
+    a `globalThis` probe with a local structural interface — no `node:` import, so
+    `graph:check` is unaffected, and the package still names no platform type.
+  - **Presence is the capability — but hashing's missing-capability behaviour is the
+    OPPOSITE of abort's.** No `abortController` → cancellation degrades quietly (the
+    socket drains). No `digest` (an insecure browser context has `crypto` without
+    `subtle`) → the load is **refused**, loudly, at the call. A verification that
+    silently passes is worse than no verification; a cancellation that silently drains is
+    not.
+  - **The hash covers the response's BYTES, whatever the loader reads.** A hashed load
+    reads the body once as bytes and derives `text()`/`json()` from them through an
+    injected `decodeText` (`globalThis.TextDecoder` by default). Rejected alternatives:
+    hashing only byte-reading loaders (a §79 manifest verifying a JSON scene is a
+    first-class case), and hashing re-encoded text (the same URL would then hash
+    differently under `binaryLoader` and `jsonLoader` — a hash that depends on its
+    observer cannot go in a manifest).
+  - **Verification is per caller, not per load** — the coalescing-consistent answer,
+    matching abort rule 2. The shared load computes one hash; each waiter compares its
+    own `expectedHash` and a failure detaches only that waiter's reference. **The
+    verification wrapper goes OUTSIDE the abort wrapper**: reversed, a waiter that
+    aborted and then saw the shared load settle would hand its reference back twice.
+    (Measured, not assumed — the `#withAbort` `done` latch only makes abort-vs-settle
+    exclusive, not abort-vs-verify.)
+  - **Hashing wraps inside `boundedResponse`**, so §96's size limit refuses an
+    over-budget body before a digest is ever computed over it.
+  - **A-16 was never blocked on more than this.** §79's manifest is now executable; the
+    remaining half is that `SceneResourceCatalog.get(key)` is _synchronous_
+    (deserialization is), so manifest → catalog is necessarily preload-then-catalog. That
+    is a `@four/four` packet, not an assets one.
+    `tests/integration/texture-manifest.test.ts` runs the seam.
+  - **A-19 shipped at the "assets half" tier, and the row says which half.** The §77
+    loader tier lives in `@four/assets`; everything renderer-side (cube/array/3D,
+    mipmaps, anisotropy, compressed containers, render targets, video) is `R-30b`'s, and
+    §78 glTF's three blockers are unchanged. `TextureAsset` satisfies `TextureSource`
+    **structurally** (`PARTICLE_INSTANCE_FLOATS` precedent) — `@four/assets` sits below
+    the renderer in §3.1 and §62 allows several backends, so the dependency edge would be
+    the wrong direction.
+  - **The §7a row flip belongs in the loader.** `TextureSource.data` already said so
+    ("flipped by the adapter that produces them (§76), not by the backend"); `flipY`
+    defaults to `true` because every codec decodes top-row-first.
+  - **§96's decompression-limit residue is now half-discharged.** The first decoder in
+    the engine brought both bounds with it: absolute decoded size (64 MiB = 4096²·4)
+    _and_ expansion ratio (1000×) — the ratio is the one that catches a bomb, since the
+    absolute bound lets a 200-byte file legitimately claim 60 MiB. Pre-decode with an
+    optional `probe`, post-decode without one; the honest residue (a platform
+    `createImageBitmap` cannot be pre-bounded at all) is written in source, not implied
+    away.
+
 - **2026-08-21 — R-37 `ScreenCamera` + the trackball rig.** Decisions worth keeping:
   - **A derived projection must not inherit an authored one.** `ScreenCamera extends
 Camera`, not `OrthographicCamera`: the six bounds come from

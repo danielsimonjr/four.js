@@ -8,6 +8,49 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — §76 content hashing, §79 asset manifest, §77 texture loader tier (A-18, A-19)
+
+#### Added
+
+- **`@four/assets`: content hashing (§76) and verification (§79, §96).**
+  `load(url, loader, { hashContent: true })` records a hash readable through
+  `AssetManager.contentHash(url, loader)`; `{ expectedHash }` verifies the bytes and
+  **refuses** a mismatch (`ASSET_LOAD_FAILED`, `context.reason === "hash-mismatch"`,
+  carrying `expectedHash`/`observedHash`), handing the caller's reference back exactly as
+  an abort does. SHA-256 over `globalThis.crypto.subtle` by default — the algorithm
+  argument is in `src/content-hash.ts`: a non-cryptographic hash is collidable by
+  construction, so a manifest verified with one would announce integrity without providing
+  it. Overridable via `AssetManagerOptions.digest`; `canHashContent` reports whether the
+  runtime has one (an insecure browser context does not), and a hash that cannot be
+  computed **refuses** rather than passing. The hash covers the response's _bytes_
+  whatever the loader reads, so the same URL hashes identically under `binaryLoader` and
+  `jsonLoader`; hashing wraps inside the §96 size bound, so an over-budget body is refused
+  before any digest is taken. Verification is per caller, not per load: one waiter's wrong
+  expectation does not disturb the others.
+- **`@four/assets`: the §79 manifest.** `manifestLoader` / `parseAssetManifest` (a
+  manifest is untrusted content too — shape-validated, with the offending key in
+  `context`), `loadFromManifest(assets, manifest, key, loader)` resolving logical
+  key → URL → verified bytes, `ManifestLoadOptions.requireHash` for the production
+  posture, and `manifestUrl` for the matching `release`. This is the substrate `A-16`'s
+  §79 manifest was blocked on.
+- **`@four/assets`: the texture loader tier (§77's assets half, A-19).**
+  `createTextureLoader({ decode })` — the decoder injected, as `createImageLoader`'s is,
+  so the package still names no `Blob`, `ImageBitmap`, or canvas — producing a
+  `Disposable` `TextureAsset` shaped **structurally** as `@four/render`'s `TextureSource`
+  (no dependency edge; the `PARTICLE_INSTANCE_FLOATS` precedent), carrying §60a/§77
+  `colorSpace`/`filter`/`wrap` and flipping the codec's top-first rows so row 0 is
+  `v = 0` (§7a).
+- **§96 decompression limits, first instalment.** `createTextureLoader` bounds decoded
+  output (`maximumDecodedBytes`, default 64 MiB = 4096²·4) **and** expansion ratio
+  (`maximumExpansionRatio`, default 1000×) — the latter is the bound that catches a bomb
+  the absolute one misses. Checked pre-decode when an optional `probe` reads the header,
+  post-decode otherwise; the residue (a platform `createImageBitmap` cannot be pre-bounded
+  at all) is stated in source rather than implied away.
+- New suites: `packages/assets/tests/{content-hash,manifest,texture}.test.ts` (assets
+  stays at 100 % on all four counters) and `tests/integration/texture-manifest.test.ts`,
+  which proves the `TextureSource` contract against the real `Texture` and runs §79's
+  manifest → verified bytes → `SceneResourceCatalog` wiring end to end.
+
 ### 2026-08-21 — R-37 closed: §47's `ScreenCamera` and the trackball rig
 
 #### Added
