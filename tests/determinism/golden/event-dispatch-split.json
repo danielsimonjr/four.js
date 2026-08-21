@@ -1,0 +1,12 @@
+{
+  "_warning": "IMMUTABLE. These numbers were recorded on 2026-08-21 by the PH-21 packet from an actual run of tests/determinism/helpers/event-split-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine or solver behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics, or a Rapier version bump) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that moving §39's event dispatch from step 6 to step 9 leaves the simulation untouched.",
+  "_scenario": "One \"2d\" PhysicsWorld on Rapier2dAdapter with Appendix A gravity holding a static rectangle floor (top y = -3.5) and eight dynamic 0.5 m boxes of mass 1 … 2.75 kg dropped in a narrow two-column stack, plus a second, quieter world of two boxes tracked by the same PhysicsSystem. A marker SimulationSystem at PRIORITY_CONSTRAINTS (700) counts its own runs. Driven 180 clean fixed steps of 1/60 s with an injected TimeState whose simulationTime is exactly step / 60. Run twice: arm \"combined\" registers a default PhysicsSystem (dispatch inside step 6); arm \"split\" registers PhysicsSystem({ dispatchEvents: false }) plus a PhysicsEventSystem at PRIORITY_EVENT_DISPATCH (900). Every body listens to all seven §29 event kinds; eventDigest is the D6 FNV-1a hasher over (step, kind index, emitter id) in delivery order, and summaryDigest is that hasher over the busy world's 180 per-step checksums in step order.",
+  "_tier": "same-runtime (§33), the same tier and the same reasons as golden/phase5.json: Rapier is compiled WebAssembly, state crosses the JS/wasm boundary as f64 → f32, and the wasm image is pinned per platform by the package manager. PH-21 itself adds no arithmetic at all — it moves a dispatch loop between two §39 priorities — so the tier here is entirely the solver's.",
+  "_claim": "Both arms are recorded under one set of numbers deliberately: the packet's claim is that they are equal. The constraint-marker offsets are the one recorded difference — -1 with dispatch at step 6, 0 with dispatch at step 9.",
+  "summaryDigest": 3319003658,
+  "firstStepChecksum": 2398925441,
+  "lastStepChecksum": 3388429139,
+  "eventCount": 1937,
+  "eventDigest": 2838379565,
+  "stepsWithEvents": 149
+}

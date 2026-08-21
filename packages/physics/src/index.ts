@@ -147,6 +147,8 @@ export {
   worldAxisToLocal,
 } from "./joints.js";
 export type { PhysicsMaterialOptions } from "./material.js";
+export type { PhysicsEventSystemOptions } from "./physics-event-system.js";
+export { PhysicsEventSystem } from "./physics-event-system.js";
 export type { PhysicsSystemOptions } from "./physics-system.js";
 export { PhysicsSystem } from "./physics-system.js";
 export {

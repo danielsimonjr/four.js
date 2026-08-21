@@ -34,6 +34,21 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **PH-21 — §39 step 9 occupiable (2026-08-21).** `PhysicsEventSystem` at
+      `PRIORITY_EVENT_DISPATCH` + `PhysicsSystemOptions.dispatchEvents`; golden
+      `event-dispatch-split.json`. Steps 7–8 closed as not splittable, documented in
+      `physics-event-system.ts`.
+- [x] **PH-20 — §33 rollback (2026-08-21).** `RollbackBuffer` + `RollbackTarget` in
+      `@four/diagnostics`; `tests/determinism/rollback.test.ts`.
+- [ ] **PH-22 residue (re-read 2026-08-21):** `PH-22f` joint-anchor mutability still
+      blocked on the which-pose decision (physics-joints packet); `PH-22i` IK still
+      blocked on a skeleton/chain model (PH-10's skinning RFC) + an adapter RFC;
+      `PH-22l` `Clock` is naming-only (owner call); `PH-22n` remainder — §10's
+      dropped-time warning is app-tier in `packages/four`'s `Application`.
+- [ ] **Step-8 sensor bookkeeping example.** `PRIORITY_SENSOR_UPDATE` is now genuinely
+      reachable (a system there runs before listeners at 900). Worth one worked example
+      in `examples/physics-playground` showing a sensor tally read at 800 and consumed
+      at 900.
 - [x] **R-8 DONE 2026-08-09** — §64 per-view render lists (`buildViewRenderList`, derive
       not rebuild), §87 frustum culling (`Frustum` in `@four/math`,
       `computeWorldBoundingSphere`, default-on, fails towards drawing), §49

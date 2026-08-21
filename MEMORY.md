@@ -28,6 +28,80 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — PH-21 §39 step 9 + PH-20 §33 rollback.** Decisions worth keeping:
+  - **A default kept is worth more than a name made right.** GAP v0's plan for PH-21 was to
+    split `PhysicsSystem` into `PhysicsStepSystem` + `PhysicsEventDispatchSystem`. The
+    rename was declined: it breaks every application, example and golden helper that names
+    the class, and the filing's own requirement — "preserving the current two-pass
+    semantics as the default registration" — is satisfied by an _option_
+    (`dispatchEvents: false`) and not by a rename. Rule: when a closure plan bundles a
+    rename with a behaviour, ship the behaviour and re-decide the rename on its own merits.
+  - **PH-8's technique, third use, and now at a step that already had an occupant.**
+    `ForceFieldSystem` took empty step 5, `ConstraintSystem` took empty step 7; step 9 was
+    different because `PhysicsSystem` was _already doing the work_ there, inside step 6's
+    priority. The move that kept the goldens still is that the existing loop was not
+    touched — it was wrapped in `if (dispatch) { …; return; }`, so the default arm executes
+    the identical statements in the identical order and byte-identity is a **code-path**
+    argument rather than a numerical one. Generalizes: to relocate work that already runs,
+    gate it rather than move it, and let the new location be the empty one.
+  - **§39's four unused constants named two different absences, and only one was a gap.**
+    Steps 7 and 8 are inside one `adapter.step()` call — a solver's constraint solve and
+    its sensor/intersection update are one internal pipeline — so interposing an engine
+    system between them would require every adapter to expose a half-stepped world, which
+    neither Rapier nor Box2D does. The constants are still legitimate: they hold
+    _engine-side_ work at those points (700 is `ConstraintSystem`'s; 800 is application
+    sensor bookkeeping). Only step 9 was structurally unavailable. Rule: an empty priority
+    is not evidence of a missing feature until you have asked what could occupy it.
+  - **An unbounded queue must announce itself.** `dispatchEvents: false` with nothing
+    claiming step 9 leaves `PhysicsWorld.#queue` growing forever — `#collectEvents` appends
+    and only `dispatchEvents` drains. So the first such fixed step warns once (plain
+    `console.warn` behind a flag; a simulation package may not import `devWarn` —
+    confirmed again), and `claimEventDispatch()` exists so an application that dispatches
+    by hand can silence it. The _inverse_ misconfiguration — a `PhysicsEventSystem` over a
+    source that still dispatches — is a §85 **refusal at construction**, because it looks
+    wired and is not. Two failure modes, two different treatments, because the fixes
+    differ.
+  - **A golden can pin an equality rather than a value.**
+    `golden/event-dispatch-split.json` carries **one** digest set for **both** arms,
+    because the packet's whole claim is that they are equal; recording two sets would have
+    made a divergence look like data. The one recorded difference is deliberately a
+    _different_ number: a step-7 marker's run count as seen by the first listener of each
+    step, −1 at dispatch-600 and 0 at dispatch-900, on all 149 event-bearing steps.
+    Reusable shape for any packet whose claim is "this re-ordering changes nothing".
+  - **A rollback buffer that re-simulates for you is wrong, and the reason is §39.** The
+    only thing `RollbackBuffer` could step is its target — `world.step(dt)` — which would
+    skip forces at step 5, constraints at 7 and dispatch at 9, so the re-simulated steps
+    would not be the steps that were rolled back. It therefore restores state and returns
+    the number of fixed steps owed; the caller re-runs its own registry loop. Same family
+    as "a force is not a transform write": the class that owns a piece of state does not
+    thereby own the frame.
+  - **`rollbackTo` is exact, and "nearest ≤ step" was rejected on purpose.** GAP v0's
+    sketch said restore-nearest. A predictor that asked for step 41, silently got step 38,
+    and re-simulated the three steps it accounted for would drift with no error anywhere.
+    Refusing and naming the window still held ("held steps are 4…5") answers the question
+    the caller actually has at that moment. Third instance of refuse-don't-substitute at a
+    seam rather than at a value.
+  - **A snapshot is adapter state and nothing else, said out loud.** The header states that
+    the caller must also rewind its `SeededRandom` stream, its animation clock and its own
+    accumulators. A rollback API that implied otherwise would be the most expensive kind of
+    lie — one that only shows up as a desync in someone else's netcode.
+  - **Measured: +160 B gzip in bundles carrying `@four/physics`** (`motor-digital-twin`
+    947 090 → 947 250 B, reproduced exactly on a second build), and **0 B** in the four
+    tight budgets — verified structurally rather than by subtraction: `claimEventDispatch`,
+    `RollbackBuffer` and `PhysicsSystem`'s error string appear **zero** times in each of
+    those built bundles. `PhysicsEventSystem` and `RollbackBuffer` are unreferenced named
+    bindings under `"sideEffects": false` and link nothing; the 160 B is the branch and the
+    warning string alone.
+  - Gotcha, fifth confirmation: **`pnpm run docs` is the type gate, vitest is not.**
+    Dropping `PhysicsEventSystem.fixedUpdate`'s unused `context` parameter (an ESLint fix)
+    left two `events.fixedUpdate(ctx)` calls in a suite of 13 **passing** tests. TypeDoc
+    found both; vitest found neither.
+  - Gotcha (same-tree A/B, new instance): reverting `physics-system.ts` to HEAD is not
+    enough to build arm A — the _new_ file that references its new members must be moved
+    aside too, or `tsc -b` fails and the example silently rebuilds against **stale
+    `dist/`**, i.e. against arm B. The symptom is a suspiciously round zero-delta. Joins
+    the sibling-rebuild incident class from 2026-08-09.
+
 - **2026-08-13 — R-30 §77 sampler state + R-28 §49/§56 `Text`.** Decisions worth keeping:
   - **A blocker that names another row's residue must be re-checked against source —
     second confirmation.** GAP v0 gave R-28 `Depends on: R-30 (frame regions)`; frame

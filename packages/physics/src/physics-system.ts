@@ -32,6 +32,11 @@
  * for each world, in tracking order: world.dispatchEvents()
  * ```
  *
+ * PH-21 (2026-08-21) makes that second pass movable: `dispatchEvents: false`
+ * leaves step 9 to a `PhysicsEventSystem` registered at
+ * `PRIORITY_EVENT_DISPATCH`. The default is unchanged, and this method was not
+ * otherwise edited, so every §33 golden is unmoved.
+ *
  * §6b forbids dispatching physics events during the step, and §39 puts
  * "collision event dispatch" at step 9, after the solve and the sensor update.
  * Splitting the passes gives the stronger guarantee that matters once there is
@@ -80,6 +85,22 @@ export interface PhysicsSystemOptions {
    * {@link PhysicsSystem.track} for each, which is what the constructor does.
    */
   worlds?: Iterable<PhysicsWorld>;
+
+  /**
+   * Whether this system also dispatches its worlds' queued events (§39 step 9).
+   *
+   * Defaults to `true`, which is the behaviour every application and every §33
+   * golden has had since P5-2: solve, then dispatch, both at step 6's priority.
+   *
+   * Pass `false` to move dispatch to its own §39 priority with
+   * `PhysicsEventSystem` (PH-21) — see that class for what the split changes.
+   * A system constructed with `false` whose dispatch nobody claims never
+   * delivers anything, and each world's queue grows without bound — so the
+   * first such fixed step warns once (see
+   * {@link PhysicsSystem.claimEventDispatch}). That is why `true` remains the
+   * default.
+   */
+  dispatchEvents?: boolean;
 }
 
 /**
@@ -101,13 +122,48 @@ export class PhysicsSystem implements SimulationSystem {
    */
   readonly #worlds: PhysicsWorld[] = [];
 
+  /** Whether this system dispatches its own worlds' events (§39 step 9). */
+  readonly #dispatchEvents: boolean;
+
+  /** Whether some other system has claimed step 9 — see `claimEventDispatch`. */
+  #dispatchClaimed = false;
+
+  /** Whether the "nobody dispatches" warning has already been written. */
+  #warnedUnclaimed = false;
+
   constructor(options: PhysicsSystemOptions = {}) {
     this.priority = options.priority ?? PRIORITY_PHYSICS_SOLVE;
+    this.#dispatchEvents = options.dispatchEvents ?? true;
     if (options.worlds !== undefined) {
       for (const world of options.worlds) {
         this.track(world);
       }
     }
+  }
+
+  /**
+   * Whether this system dispatches its worlds' queued events itself (§39 step
+   * 9), as opposed to leaving step 9 to another system.
+   *
+   * Fixed at construction: moving dispatch between priorities mid-run would
+   * deliver one step's events at two different points in the order, which is
+   * exactly the ambiguity §39's *"explicit"* forbids.
+   */
+  get dispatchesEvents(): boolean {
+    return this.#dispatchEvents;
+  }
+
+  /**
+   * Records that some other system dispatches this system's worlds' events, so
+   * that the "nobody is draining the queue" warning stays silent.
+   *
+   * {@link PhysicsEventSystem} calls this on itself at construction; call it
+   * yourself if you drive `PhysicsWorld.dispatchEvents` from your own system or
+   * from application code. Idempotent, and a no-op on a system that dispatches
+   * its own events.
+   */
+  claimEventDispatch(): void {
+    this.#dispatchClaimed = true;
   }
 
   /** How many worlds are tracked. */
@@ -185,8 +241,20 @@ export class PhysicsSystem implements SimulationSystem {
     for (let i = 0; i < worlds.length; i += 1) {
       worlds[i].step(delta);
     }
-    for (let i = 0; i < worlds.length; i += 1) {
-      worlds[i].dispatchEvents();
+    if (this.#dispatchEvents) {
+      for (let i = 0; i < worlds.length; i += 1) {
+        worlds[i].dispatchEvents();
+      }
+      return;
+    }
+    if (!this.#dispatchClaimed && !this.#warnedUnclaimed) {
+      this.#warnedUnclaimed = true;
+      // Not `devWarn`: a simulation package may not import the dev-build gate
+      // (tests/integration/dev-build-mode.test.ts), so the idiom is a plain
+      // warning behind a once-flag — see `RigidBody`.
+      console.warn(
+        "PhysicsSystem was constructed with { dispatchEvents: false } and no system has claimed §39 step 9; queued physics events will never be delivered and each world's queue will grow without bound. Register a PhysicsEventSystem, or call claimEventDispatch() if you dispatch them yourself.",
+      );
     }
   }
 
