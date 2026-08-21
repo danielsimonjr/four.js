@@ -28,6 +28,13 @@
  * structural `ComponentSerializerShape` so registering them into
  * `@four/serialization`'s registry needs no new §3.1 edge.
  *
+ * `PH-11b` (2026-08-21) adds §12's **solver-backed** character controller:
+ * `SweptCharacterController` — a capsule swept through `PhysicsWorld.shapeCast`
+ * (§30) with slide-along-wall, step height and a slope limit — the
+ * `SweptCharacterSystem` that advances it at §39 step 4 under §42's
+ * `"kinematic"` authority, and its §79 serializer. It **holds** a
+ * `CharacterController` rather than extending one; the module states why.
+ *
  * Named exports only, alphabetical within each module group.
  */
 
@@ -193,6 +200,7 @@ export type {
 export {
   COLLIDER_SERIALIZER,
   RIGID_BODY_SERIALIZER,
+  SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
   deserializeCollisionShape,
   serializeCollisionShape,
 } from "./serializers.js";
@@ -289,6 +297,19 @@ export {
   validateRigidBodyDescriptor,
   validateSphericalJointLimits,
 } from "./validation.js";
+export type {
+  SweptCharacterControllerOptions,
+  SweptCharacterSystemOptions,
+} from "./swept-character-controller.js";
+export {
+  DEFAULT_GROUND_SNAP_DISTANCE,
+  DEFAULT_MAX_SLIDES,
+  DEFAULT_SKIN_WIDTH,
+  DEFAULT_SLOPE_LIMIT,
+  DEFAULT_STEP_HEIGHT,
+  SweptCharacterController,
+  SweptCharacterSystem,
+} from "./swept-character-controller.js";
 export type {
   ActiveBodyVisitor,
   BodyControlModeOptions,

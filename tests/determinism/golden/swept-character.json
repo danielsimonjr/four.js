@@ -1,0 +1,19 @@
+{
+  "_warning": "IMMUTABLE. These numbers were recorded on 2026-08-21 by the PH-11b packet from an actual run of tests/determinism/helpers/swept-character-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine or solver behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics, or a Rapier version bump) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that \u00a712's swept character controller is deterministic.",
+  "_scenario": "One \"3d\" PhysicsWorld on Rapier3dAdapter with Appendix A gravity, holding four static boxes \u2014 a 60 \u00d7 1 \u00d7 60 floor whose top is y = 0, a wall at z = -4 spanning x \u2208 [-6, 6], a 0.25 m riser at x \u2208 [7, 13] spanning z \u2208 [-18, -2], and a box rotated 60\u00b0 about +X at (20, 1, -5) \u2014 and five capsule characters (radius 0.3, halfHeight 0.5) registered as \"kinematic-position\" bodies under \u00a742's \"kinematic\" authority: walker (moveSpeed 3, intent (1, 0.6), into the wall), stepper (moveSpeed 3, over the riser), climber (moveSpeed 3, into the 60\u00b0 ramp with slopeLimit \u03c0/4), jumper (moveSpeed 1, jump() asked on every step) and faller (dropped from y = 20 with maxFallSpeed 6). A SweptCharacterSystem at PRIORITY_KINEMATICS (400) and a PhysicsSystem at PRIORITY_PHYSICS_SOLVE (600) share one SystemRegistry, driven 300 clean fixed steps of 1/60 s with an injected TimeState whose simulationTime is exactly step / 60. The per-step value is the D6 FNV-1a hasher over world.checksum() followed by every character's position, vertical velocity and grounded flag in registration order; summaryDigest is the same hasher over all 300 of them in step order.",
+  "_tier": "same-runtime (\u00a733), the same tier as golden/phase5.json and golden/force-fields.json, with one reason specific to this packet: a controller that consumes solver queries inherits the solver's tier. Rapier is compiled WebAssembly, state crosses the JS/wasm boundary as f64 \u2192 f32, and the wasm image is pinned per platform by the package manager \u2014 so every shape-cast distance and normal this controller resolves against is runtime-bound before its own Math.sin/Math.cos/Math.sqrt touch it. Cross-platform determinism is NOT claimed. The checksum algorithm itself is exact and cross-platform; only its inputs are runtime-bound.",
+  "summaryDigest": 650809587,
+  "firstStepChecksum": 1417538725,
+  "lastStepChecksum": 2356890299,
+  "walkerSlides": 209,
+  "walkerSlideDistance": 6.87615891827948,
+  "stepperStepUps": 1,
+  "stepperMaxHeight": 1.0600818198323252,
+  "climberMaxHeight": 0.8500000000000001,
+  "jumpAttempts": 300,
+  "jumpsTaken": 7,
+  "landings": 7,
+  "fallerMinVerticalVelocity": -6,
+  "budgetExhaustedSteps": 0,
+  "skippedSteps": 0
+}

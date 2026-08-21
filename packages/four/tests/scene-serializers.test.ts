@@ -28,7 +28,7 @@ import {
   SpringDamper,
 } from "@four/motion";
 import { Vector3 } from "@four/math";
-import { Collider, RigidBody } from "@four/physics";
+import { Collider, RigidBody, SweptCharacterController } from "@four/physics";
 import { Renderable, Sprite, Texture } from "@four/render";
 import {
   DirectionalLight,
@@ -871,6 +871,7 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
       "orbit-rig",
       "pose-target",
       "rigid-body",
+      "swept-character-controller",
     ]);
 
     const registry = registerSceneNodeTypes().components;
@@ -890,21 +891,25 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(first.has(KinematicController.typeName)).toBe(true);
     expect(first.has(RigidBody.typeName)).toBe(true);
     expect(first.has(Collider.typeName)).toBe(true);
+    expect(first.has(SweptCharacterController.typeName)).toBe(true);
   });
 });
 
 describe("registerPhysicsSerializers (PH-17)", () => {
-  it("registers both components without pulling in the UI node types", () => {
+  it("registers every @four/physics component without pulling in the UI node types", () => {
     const components = registerPhysicsSerializers(
       createDefaultComponentSerializers(),
     );
 
     expect(components.has(RigidBody.typeName)).toBe(true);
     expect(components.has(Collider.typeName)).toBe(true);
+    // §12's swept character controller registers with the physics family, not
+    // the motion one: the split is by package (`PH-11b`, 2026-08-21).
+    expect(components.has(SweptCharacterController.typeName)).toBe(true);
     // The registry it was handed, returned for chaining — not a copy.
     expect(
       registerPhysicsSerializers(new ComponentSerializerRegistry()).size,
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it("refuses to register twice on one registry, rather than overwriting", () => {

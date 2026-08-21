@@ -29,6 +29,8 @@ import {
   PhysicsMaterial,
   RIGID_BODY_SERIALIZER,
   RigidBody,
+  SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
+  SweptCharacterController,
   deserializeCollisionShape,
   serializeCollisionShape,
   type CollisionShape,
@@ -685,5 +687,119 @@ describe("COLLIDER_SERIALIZER (§24, §25, §79)", () => {
     );
 
     expect(collider.body).toBe(body);
+  });
+});
+
+describe("SWEPT_CHARACTER_CONTROLLER_SERIALIZER (§12, §30, §79 — PH-11b)", () => {
+  it("round-trips the capsule, the resolution parameters and the vertical state", () => {
+    const controller = new SweptCharacterController({
+      radius: 0.4,
+      halfHeight: 0.6,
+      yaw: 1.25,
+      moveSpeed: 5,
+      gravity: -12,
+      jumpSpeed: 6,
+      maxFallSpeed: 20,
+      stepHeight: 0.45,
+      slopeLimit: 0.7,
+      skinWidth: 0.02,
+      groundSnapDistance: 0.2,
+      maxSlides: 6,
+      collisionGroups: 0b1010,
+      collisionMask: 0b0110,
+      verticalVelocity: -3.5,
+      grounded: false,
+    });
+    controller.setMoveIntent(1, 0);
+
+    const document = payload(
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.serialize(controller),
+    );
+    expect(document.maxFallSpeed).toBe(20);
+    // The move intent is this frame's input; a §79 document does not carry it.
+    expect(document.intentForward).toBeUndefined();
+    expect(document.world).toBeUndefined();
+    expect(document.groundBody).toBeUndefined();
+    expect(document.skippedSteps).toBeUndefined();
+
+    const restored = SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize(
+      document,
+      new Group(),
+    );
+    expect(restored.radius).toBe(0.4);
+    expect(restored.halfHeight).toBe(0.6);
+    expect(restored.yaw).toBe(1.25);
+    expect(restored.moveSpeed).toBe(5);
+    expect(restored.gravity).toBe(-12);
+    expect(restored.jumpSpeed).toBe(6);
+    expect(restored.maxFallSpeed).toBe(20);
+    expect(restored.stepHeight).toBe(0.45);
+    expect(restored.slopeLimit).toBe(0.7);
+    expect(restored.skinWidth).toBe(0.02);
+    expect(restored.groundSnapDistance).toBe(0.2);
+    expect(restored.maxSlides).toBe(6);
+    expect(restored.collisionGroups).toBe(0b1010);
+    expect(restored.collisionMask).toBe(0b0110);
+    expect(restored.verticalVelocity).toBe(-3.5);
+    expect(restored.grounded).toBe(false);
+    // Re-bound by the application, exactly as a reloaded RigidBody is
+    // registered: the document carries no live world.
+    expect(restored.world).toBeUndefined();
+    expect(restored.intentForward).toBe(0);
+    expect(restored.intentRight).toBe(0);
+  });
+
+  it("writes an infinite maxFallSpeed by omission, and a grounded character's state", () => {
+    const controller = new SweptCharacterController({
+      radius: 0.4,
+      halfHeight: 0.6,
+      grounded: true,
+    });
+    const document = payload(
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.serialize(controller),
+    );
+    expect("maxFallSpeed" in document).toBe(false);
+
+    const restored = SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize(
+      document,
+      new Group(),
+    );
+    expect(restored.maxFallSpeed).toBe(Number.POSITIVE_INFINITY);
+    expect(restored.grounded).toBe(true);
+  });
+
+  it("restores every documented default from an otherwise empty document", () => {
+    const restored = SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize(
+      { radius: 0.5, halfHeight: 0.5 },
+      new Group(),
+    );
+    expect(restored.stepHeight).toBe(0.3);
+    expect(restored.slopeLimit).toBeCloseTo(Math.PI / 4, 12);
+    expect(restored.skinWidth).toBe(0.01);
+    expect(restored.groundSnapDistance).toBe(0.1);
+    expect(restored.maxSlides).toBe(4);
+    expect(restored.grounded).toBe(false);
+    expect(restored.moveSpeed).toBe(1);
+  });
+
+  it("refuses a document with no capsule: geometry has no defensible default", () => {
+    expect(() =>
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize({}, new Group()),
+    ).toThrow(/"radius"/);
+    expect(() =>
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize(
+        { radius: 0.5 },
+        new Group(),
+      ),
+    ).toThrow(/"halfHeight"/);
+    expect(() =>
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize(null, new Group()),
+    ).toThrow(/"radius"/);
+  });
+
+  it("still matches @four/serialization's structural ComponentSerializer", () => {
+    const mirror: ComponentSerializerMirror<SweptCharacterController> =
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER;
+    expect(typeof mirror.serialize).toBe("function");
   });
 });

@@ -47,7 +47,9 @@
  * `OrbitRig`, `FollowRig` and `LookAtConstraint` (added 2026-08-13), through the
  * serializers `@four/motion` itself exports; and `RigidBody` and `Collider` (§23–§25),
  * through the pair `@four/physics` exports (`RIGID_BODY_SERIALIZER` /
- * `COLLIDER_SERIALIZER`, 2026-08-06 — the `PH-17` remainder). All three
+ * `COLLIDER_SERIALIZER`, 2026-08-06 — the `PH-17` remainder) plus §12's
+ * `SweptCharacterController` (`SWEPT_CHARACTER_CONTROLLER_SERIALIZER`,
+ * 2026-08-21 — `PH-11b`). All three
  * packages declare their serializers against the same structural
  * `ComponentSerializer` shape, so registering them here adds no §3.1 edge
  * anywhere.
@@ -160,6 +162,8 @@ import {
   Collider,
   RIGID_BODY_SERIALIZER,
   RigidBody,
+  SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
+  SweptCharacterController,
 } from "@four/physics";
 import {
   Arc,
@@ -2617,8 +2621,9 @@ export function composeSceneNodeTypes(
 }
 
 /**
- * Registers the two §6a physics components on `components` and returns it
- * (§23–§25, §79, PH-17 — 2026-08-06).
+ * Registers the §6a physics components on `components` and returns it
+ * (§23–§25, §79, PH-17 — 2026-08-06; joined by §12's swept character
+ * controller, `PH-11b`, 2026-08-21).
  *
  * ```ts
  * import { registerPhysicsSerializers } from "four";
@@ -2656,9 +2661,19 @@ export function composeSceneNodeTypes(
 export function registerPhysicsSerializers(
   components: ComponentSerializerRegistry,
 ): ComponentSerializerRegistry {
-  return components
-    .register(RigidBody, RIGID_BODY_SERIALIZER)
-    .register(Collider, COLLIDER_SERIALIZER);
+  return (
+    components
+      .register(RigidBody, RIGID_BODY_SERIALIZER)
+      .register(Collider, COLLIDER_SERIALIZER)
+      // §12's solver-backed character controller (`PH-11b`, 2026-08-21). It
+      // registers **here** rather than beside `@four/motion`'s plain
+      // `CharacterController` in `registerSceneNodeTypes`, because the split
+      // this function exists to make is by *package*, not by section: the
+      // component lives in `@four/physics` and its serializer with it, so a
+      // headless simulation that saves a scene carries its characters and a
+      // widget-only application still pulls in neither.
+      .register(SweptCharacterController, SWEPT_CHARACTER_CONTROLLER_SERIALIZER)
+  );
 }
 
 /**

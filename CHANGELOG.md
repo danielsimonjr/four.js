@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — PH-11b: the solver-backed character controller
+
+#### Added
+
+- **§12 solver-backed character controller (`PH-11b`).** `@four/physics` ships
+  `SweptCharacterController` — a capsule swept through `PhysicsWorld.shapeCast` (§30)
+  with **slide along wall**, **step height** and a **slope limit** — and
+  `SweptCharacterSystem`, which advances it at §39 step 4 (`PRIORITY_KINEMATICS`, 400)
+  under §42's `"kinematic"` authority, before the solve at 600 so a character carrying a
+  `"kinematic-position"` body feeds the solver this step's pose. It **holds** a
+  `@four/motion` `CharacterController` rather than extending one: the held instance is
+  the heading/intent/parameter store (unit-disc clamp, unbounded yaw, every §85 refusal,
+  executed once), while the swept class owns the vertical integrator and the collision
+  resolution. Collide-and-slide is bounded by a stated `maxSlides` (default 4) and
+  leftover motion is dropped rather than tunnelled; step-up is one up/forward/down triple
+  per step whose forward reach has a floor of one capsule radius (a step that stops on
+  the lip contacts the step's _edge_, whose normal is not the tread's). §85 refuses
+  rather than clamps: capsule size, a skin thicker than the radius, a slope limit outside
+  `[0, π/2)`, a non-integer slide budget, a `"2d"` world. **Staged with the seams
+  named:** pushing dynamic bodies (§26 impulse policy) and moving-platform carry — for
+  which `groundBody` and `translate()` are published so an application can do it today.
+  §79 serializer registered by `registerPhysicsSerializers` (vertical state round-trips,
+  move intent does not; the world is re-bound after a reload). §33 tier `same-runtime`
+  with a new golden on real Rapier 3D. Bundle cost measured: **0 B** in five of six
+  budgets, **+2.14 kB gzip** in `motor-digital-twin`; no budget bumps.
+
 ### 2026-08-21 — R-30b: §77 mipmaps, the min-filter split, and anisotropy
 
 #### Added
