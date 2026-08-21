@@ -11,7 +11,7 @@
   },
   {
     "path": "examples/particles-demo/dist/assets/*.js",
-    "limit": "31 kB",
+    "limit": "31.5 kB",
     "gzip": true
   },
   {

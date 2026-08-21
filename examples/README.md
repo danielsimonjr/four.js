@@ -59,9 +59,10 @@ guide points at one of them without the marker.
   on §118's list in one scene, one fixed-step loop and one frame — a textured lit cube spun
   by a `MotionComponent`, a 2D vector orbit, a `SpringJoint` pendulum, a bouncing body whose
   §29 landings fire a particle burst and a re-launch impulse, a motorised `HingeJoint`, two
-  world-space labels (one rides the bouncing body), a `@four/ui` panel parented to the
-  camera, a §16 `Timeline`, and pause / slow-motion / single-step controls that are
-  keyboard-operable. It is also the first example to select its backend _and_ its solver
+  world-space labels (one rides the bouncing body), a `@four/ui` panel drawn by a second,
+  screen-space viewport under §47's `ScreenCamera` (it was parented to the camera until
+  2026-08-21, when R-37's camera landed and the workaround was retired), a §16 `Timeline`,
+  and pause / slow-motion / single-step controls that are keyboard-operable. It is also the first example to select its backend _and_ its solver
   through the §62/§37 registries (`renderer: "auto"`, `solver: "auto"`), and the first to
   assemble the §113 debug overlay from `@four/diagnostics` streams.
   Build it with `pnpm run flagship:build`; it carries **both** Rapier wasm images (the cost

@@ -28,6 +28,59 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — the examples modernization packet (Text, lookAt, ScreenCamera).**
+  Decisions worth keeping:
+  - **§7a's default screen origin is the wrong one for a `@four/ui` tree.** §74 lays
+    children out at `(left, −top)` — a Y-**up** frame with downward offsets expressed
+    as negative numbers — and `"top-left"` is the one origin that flips Y in the
+    projection, so every one of those offsets would climb the screen. Both flagships
+    use `origin: "bottom-left"`. Generalizes: the default origin is right for content
+    authored the way CSS is, and wrong for content authored the way the world is.
+  - **A plane at constant depth is a scale and a translation, and that made one
+    flagship's move pixel-exact.** `motor-digital-twin`'s instrument column kept its
+    own unit under `UI_UNIT_PIXELS = HEIGHT / (2·UI_DEPTH·tan(fov/2))` on a
+    screen-space root, so forty authored literals meant exactly what they meant when
+    the column hung 2.2 units in front of the camera. The §118 flagship was
+    re-authored in pixels instead, because _its_ numbers are §74 layout sizes. Rule:
+    keep the unit when the numbers are a picture, convert it when the numbers are a
+    layout.
+  - **Name only the layer you are adding.** Both flagships define `"ui"` and leave the
+    world on `DEFAULT_LAYER_MASK`, rather than `defineLayer("world")` plus a mask on
+    every mesh. §46 is self-not-subtree, so the second form has to be maintained by
+    every future packet that adds a renderable. The cost of the first form — every UI
+    drawable needs the mask — is paid in the two or three funnels that build UI nodes
+    and nowhere else.
+  - **`Text` was load-bearing for the layer work, not merely tidier.** A skin that
+    rebuilds glyph `Sprite`s whenever the status text changes creates nodes on the
+    default layer every frame; `applyLayers` at setup cannot reach them. One `Text`
+    node created at attach makes the mask a single write.
+  - **`Text.size`/`letterSpacing` have no equality check; `text` does.** Writing all
+    three on every `layout()` pass marks the node dirty every frame and rebuilds
+    vertex buffers that did not move. Every skin here guards the two that do not
+    self-dedup. Worth a look the next time a derived-geometry node grows a setter.
+  - **A rewritten aim is allowed to move, and the number belongs in the comment.**
+    `camera.lookAt((0, 0.25, 0))` derives −0.17021 rad where the file wrote −0.17 —
+    2 × 10⁻⁴ rad, ≈ 0.14 px, no golden at risk, every threshold held. The sun's move
+    is _exact_: `‖(−3.45, 7.51, 5.63)‖ = 10.000`.
+  - **`OrbitRig`/`LookAtConstraint` were declined for `first-3d-scene`, on merit.**
+    Neither the camera nor the sun moves; a per-step component plus an authority plus
+    a system registration is three concepts bought to replace two one-line writes.
+    §44's rigs exist for targets that _move_.
+  - **The measurement to reuse: `data-drawcalls`.** The twin publishes §84 statistics,
+    which made the draw-call claim a before/after read (159 → 59) rather than an
+    argument; triangles held at 2014, the cheapest check that the rewrite drew the
+    same picture.
+  - **Gotcha (`controlPixels`): a widget's `transform.position` is its parent's frame,
+    not the canvas.** The first cut published every control's position relative to its
+    row; the browser gate caught it as `hover === "none"`.
+    `resolveWorldTransform(widget).elements[12]/[13]` is the answer — plus
+    `[0]`/`[5]` when the screen-space root is scaled.
+  - **Measured:** the Text rewrite _shrinks_ bundles (a cut-cell cache and a sprite
+    loop cost more than a `Text` import): first-2d 45.32 → 45.17, ui-demo
+    38.98 → 38.82, twin 945.41 → 945.26 kB gzip. Two goldens moved, both ui-demo's,
+    both confined to glyph pixels. `particles-demo`'s +109 B overrun predates the
+    packet (same file hash both arms) — bumped 31 → 31.5 kB with the measurement.
+
 - **2026-08-21 — A-18 content hashing + §79 manifest, A-19 texture tier.** Decisions worth
   keeping:
   - **The hash is SHA-256 because of what §79 asks it to DO.** §79's manifest clause

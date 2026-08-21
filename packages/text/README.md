@@ -14,7 +14,7 @@ Implements the MVP text tier of §56 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 - SDF/MSDF rendering tiers (staged 2026-08-01, Phase 3a).
 - Shaping, bidi, rich spans, and text on paths — full shaping is staged behind a shaping-engine RFC (HarfBuzz-wasm the likely route).
-- §55 frame regions are unimplemented in the sprite tier, so a dynamic label currently costs one texture per glyph cell (recorded advisory).
+- The one-texture-per-glyph-cell workaround this section used to record was retired on 2026-08-21: every example now draws labels through the `Text` node in `four` (one geometry over one atlas material, one draw per label).
 
 Unit tests are colocated in `tests/` per §92.
 

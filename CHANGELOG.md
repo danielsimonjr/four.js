@@ -8,6 +8,49 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — examples modernized onto Text, lookAt, and the ScreenCamera recipe
+
+#### Changed
+
+- **Examples modernized onto the APIs that landed after they were written.** Four
+  follow-ups from `TODO.md` discharged in one packet:
+  - **Text (R-28).** `first-2d-scene`, `ui-demo` and both flagships drew labels by
+    cutting one `Texture` per distinct glyph cell out of the atlas and issuing one
+    `Sprite` per drawn glyph — the §55 workaround `first-2d-scene` documented and every
+    later example inherited. All four now use `Text`: one node, one geometry, one draw
+    per label, over one shared atlas texture sampled with §77's `"nearest"` filter.
+    Measured draw-call drops: first-2d 30 → 1, ui-demo 44 → 3,
+    `one-scene-everything-moves` 78 → 7 text draws, and `motor-digital-twin`
+    **159 → 59 total draw calls** (its own `data-drawcalls`, §84), with triangles
+    unchanged at 2014. The twin's §79 catalog carries one glyph material instead of
+    ninety-odd and still round-trips byte-identically.
+  - **`Node.lookAt` (R-36).** `first-3d-scene` no longer composes its camera pitch or
+    its sun's yaw∘pitch out of `setFromAxisAngle` quaternions. The camera aims at a
+    scene point (deriving −0.17021 rad against the hand-written −0.17); the sun is
+    placed 10 units up-and-left and aimed at the origin, so the travel direction the
+    header used to assert in prose is now read off the code.
+  - **The screen-camera recipe (R-37/R-38).** Both flagships drew their UI by parenting
+    it to the `PerspectiveCamera` node at a fixed local depth, because §47's
+    `ScreenCamera` and §46's layer registry did not exist. Both now use the standard
+    arrangement — a `"ui"` layer, a second full-surface viewport with a `ScreenCamera`,
+    `layerMask` per view — and the workaround notes are deleted.
+    `one-scene-everything-moves`'s panel is re-authored in pixels and its
+    control-position publisher collapsed from twenty lines to two; `motor-digital-twin`
+    keeps its instrument units under one scale on a screen-space root, which makes that
+    move pixel-exact.
+  - **Doc fixes.** `@four/motion`'s rig table now points at `@four/scene`'s
+    `TrackballRig`; `docs/AUDIT-120.md`'s "ScreenCamera is absent" bullet and
+    `packages/text/README.md`'s one-texture-per-glyph advisory are corrected, with a
+    new `check-docs` retired-claim pin so neither can return undated.
+  - **Goldens.** `tests/visual/ui-demo.spec.ts`'s two goldens were regenerated
+    deliberately: the diff is confined to glyph pixels and the text is crisper
+    (nearest-filtered atlas sampling replaces linear-magnified per-cell textures).
+    `text-label-nearest-visual-linux.png` is byte-unchanged. Bundles: first-2d
+    45.32 → 45.17, ui-demo 38.98 → 38.82, twin 945.41 → 945.26 kB gzip; first-3d
+    +10 B; flagship unchanged. The one budget change is pre-existing:
+    `particles-demo` was +109 B over at HEAD (same built-file hash before and after
+    this packet), bumped 31 → 31.5 kB with the measurement.
+
 ### 2026-08-21 — §76 content hashing, §79 asset manifest, §77 texture loader tier (A-18, A-19)
 
 #### Added

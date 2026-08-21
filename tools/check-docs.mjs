@@ -230,6 +230,18 @@ if (audit === null) {
 
 const RETIRED = [
   {
+    re: /`?ScreenCamera`? is absent/i,
+    where: [],
+    allow: [
+      "CHANGELOG.md",
+      "MEMORY.md",
+      "TODO.md",
+      "docs/GAP ANALYSIS v0.md",
+      "docs/GAP ANALYSIS v1.md",
+    ],
+    why: "R-37 closed 2026-08-21; both flagships draw UI through a second viewport under ScreenCamera",
+  },
+  {
     re: /nothing on this roadmap has shipped yet/i,
     where: ["ROADMAP.md"],
     allow: ["ROADMAP.md", "CHANGELOG.md"],
@@ -280,6 +292,16 @@ const RETIRED = [
     where: ["docs/guides/custom-shaders.md"],
     allow: ["docs/guides/custom-shaders.md", "CHANGELOG.md"],
     why: "LitProgram made it four on 2026-08-04",
+  },
+  {
+    re: /panel parented to the$|panel parented to the camera/i,
+    where: ["examples/README.md"],
+    allow: ["examples/README.md", "CHANGELOG.md"],
+    why:
+      "both flagships moved onto the standard §46/§47/§48 screen-space recipe " +
+      'on 2026-08-21 (a "ui" layer, a second full-surface viewport with a ' +
+      "ScreenCamera, layerMask per view); the camera-parenting workaround R-37 " +
+      "unblocked is gone from examples/flagship/*",
   },
 ];
 

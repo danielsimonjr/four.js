@@ -42,6 +42,14 @@
  *   degrees, millimetres and milliseconds, converted once at the edge.
  * - **§79 save and load.** `registerSceneNodeTypes` + `registerRenderSerializers`
  *   + a `SceneResourceCatalog`, round-tripped and byte-compared on demand.
+ * - **A screen-space pass (§46, §47, §48).** The instrument column and the
+ *   control panel are drawn by a *second* full-surface viewport whose camera is
+ *   §47's `ScreenCamera`, over a `"ui"` layer the world view masks out — one
+ *   scene, one frame, two passes over one render list. Until 2026-08-21 they
+ *   were children of the `PerspectiveCamera` node at a fixed local depth,
+ *   because neither the camera nor §46's layer registry existed; the note that
+ *   said so is deleted, and {@link UI_UNIT_PIXELS} records why the swap needed
+ *   no layout number re-tuned.
  *
  * ## What §119 asks for that the engine cannot do yet (staged, honestly)
  *
@@ -56,13 +64,6 @@
  *   one-pixel, un-antialiased polylines, with no axis, tick or grid primitive
  *   behind them (the frames below are quads). When `R-23`/`R-24` land this is
  *   the file that should stop hand-writing `Float32Array`s.
- * - **The instrument column is parented to the camera, not to a screen camera**
- *   (`R-37`). §47/§48's `ScreenCamera` is absent and §48's `layerMask` is
- *   deferred with §46's layer registry, so a second viewport would draw the
- *   whole scene twice. The §118 flagship's workaround applies unchanged and is
- *   reused verbatim: the instruments and the control panel are children of the
- *   `PerspectiveCamera` node at a fixed local depth, which makes them
- *   screen-space, keeps them in one pass, and keeps §71 picking working.
  * - **No glTF motor model** (`S-7`, `A-18`). §76's manager ships JSON, text,
  *   binary and image loaders; glTF needs the §55 texture tier plus non-unlit
  *   materials. So the machine is built from §53 primitives in this file, which
@@ -237,13 +238,8 @@ import {
   torusGeometry,
 } from "four/geometry";
 import { KeyboardInput, PointerInput, type Pickable } from "four/input";
-import {
-  LitMaterial,
-  SpriteMaterial,
-  UnlitMaterial,
-  type Material,
-} from "four/materials";
-import { Matrix4, Quaternion, Vector3 } from "four/math";
+import { LitMaterial, UnlitMaterial, type Material } from "four/materials";
+import { Quaternion, Vector3 } from "four/math";
 import {
   PIDController,
   PRIORITY_COMMANDS,
@@ -259,14 +255,18 @@ import {
   SpringJoint,
 } from "four/physics";
 import { Rapier3dAdapter } from "four/physics-rapier";
-import { Renderable, Sprite, Texture } from "four/render";
+import { Renderable, Texture } from "four/render";
 import { WebglRenderer } from "four/render-webgl";
 import {
+  DEFAULT_LAYER_MASK,
   DirectionalLight,
   Group,
   PerspectiveCamera,
+  ScreenCamera,
   Transform,
   createFullscreenViewport,
+  defineLayer,
+  layerMask,
   resolveWorldTransform,
 } from "four/scene";
 import {
@@ -275,12 +275,7 @@ import {
   instantiateScene,
   serializeScene,
 } from "four/serialization";
-import {
-  buildGlyphAtlas,
-  layoutText,
-  type GlyphAtlas,
-  type TextQuad,
-} from "four/text";
+import { buildGlyphAtlas } from "four/text";
 import {
   Button,
   Label,
@@ -293,7 +288,7 @@ import {
   type UIWidget,
   type WidgetSkin,
 } from "four/ui";
-import { registerSceneNodeTypes, resourceCatalog } from "four";
+import { Text, registerSceneNodeTypes, resourceCatalog } from "four";
 
 // --- surface -----------------------------------------------------------------
 
@@ -386,9 +381,52 @@ camera.name = "camera";
 camera.transform.position.copy(CAMERA_POSITION);
 camera.updateProjectionMatrix();
 
-const view = createFullscreenViewport(camera);
+/**
+ * §46's screen-space layer, and the masks that split the world pass from it
+ * (R-37/R-38, adopted here 2026-08-21 — see the module header).
+ *
+ * Only the UI is named. The machine keeps the **default** layer, and the world
+ * view excludes the instruments by asking for {@link DEFAULT_LAYER_MASK} — so a
+ * future packet that adds a bearing does not have to remember a layer, and the
+ * one mistake this arrangement can make (forgetting the mask on a *new UI* node)
+ * is confined to the three funnels that build UI nodes.
+ */
+defineLayer("ui");
+const UI_LAYER = layerMask("ui");
+
+const view = createFullscreenViewport(camera, "world");
 /** Near-black, and far from every classifier the browser gate uses. */
 view.clearColor = [0.032, 0.036, 0.055, 1];
+view.layerMask = DEFAULT_LAYER_MASK;
+
+/**
+ * §47's screen camera — the projection **is** the surface's pixel rectangle.
+ *
+ * `origin: "bottom-left"` rather than §7a's default `"top-left"`: §74's layout
+ * writes its children at `(left, −top)`, a Y-**up** frame with downward offsets
+ * as negative numbers, and the instrument column below is authored the same way.
+ * A top-left origin flips Y in the projection, and every one of those offsets
+ * would climb the screen instead of descending it.
+ *
+ * `Application.resize` maintains its size from here on: any camera in the views
+ * that declares `setSurfaceSize` is fed (§45's structural opt-in).
+ */
+const uiCamera = new ScreenCamera({
+  origin: "bottom-left",
+  width: WIDTH,
+  height: HEIGHT,
+  resolution: window.devicePixelRatio,
+});
+uiCamera.name = "ui-camera";
+uiCamera.updateProjectionMatrix();
+
+/**
+ * The second full-surface viewport: the "ui" layer only, and **no
+ * `clearColor`** — a view that cleared would erase the world pass drawn before
+ * it (§48).
+ */
+const uiView = createFullscreenViewport(uiCamera, "ui");
+uiView.layerMask = UI_LAYER;
 
 // --- the application (§45), with §84 statistics on ---------------------------
 
@@ -404,7 +442,7 @@ const renderer = new WebglRenderer();
 const app = new Application({
   renderer,
   canvas,
-  views: [view],
+  views: [view, uiView],
   width: WIDTH,
   height: HEIGHT,
   resolution: window.devicePixelRatio,
@@ -415,6 +453,7 @@ const app = new Application({
 });
 
 app.scene.add(camera);
+app.scene.add(uiCamera);
 
 // --- light (§68) --------------------------------------------------------------
 
@@ -1644,93 +1683,57 @@ app.systems.register(instrumentSystem);
  */
 const atlas = buildGlyphAtlas();
 
-/** Sprite materials already built for a glyph cell, keyed by its atlas rectangle. */
-const glyphMaterials = new Map<string, SpriteMaterial>();
+/**
+ * The whole sheet as one texture, sampled with §77's `"nearest"` filter (R-30):
+ * the face is a bitmap, and a linear filter blends each texel with its
+ * neighbours — at a cell's edge, with the neighbouring *glyph*.
+ */
+const font = new Texture({ ...atlas, filter: "nearest" });
 
 /**
- * Copies one glyph cell out of the atlas into a standalone RGBA8 texture.
+ * One material behind **every** label on this page — nameplate, readouts and
+ * widget captions alike — registered in the §79 catalog like every other shared
+ * resource here, so a saved document names it once.
  *
- * The workaround `examples/first-2d-scene` documents and every later example
- * inherits: a `Sprite` maps its whole texture across its whole quad, and §55's
- * frame sub-rectangle has not landed, so the only way to draw one *cell* is to
- * make the cell a whole texture. Cached per cell.
+ * Until 2026-08-21 this section held `examples/first-2d-scene`'s workaround: one
+ * cut-out `Texture` and one catalog `SpriteMaterial` per distinct glyph cell,
+ * and one `Sprite` per drawn glyph, because a sprite maps its whole texture
+ * across its whole quad and §55's frame sub-rectangle never landed. R-28's
+ * `Text` node addresses the cells with §53 per-vertex uvs, so a label is one
+ * node, one geometry and one draw — and the catalog carries one glyph material
+ * instead of ninety-odd.
  */
-function cutGlyphCell(source: GlyphAtlas, quad: TextQuad): Texture {
-  const x = Math.round(quad.u0 * source.width);
-  const y = Math.round(quad.v0 * source.height);
-  const width = Math.round((quad.u1 - quad.u0) * source.width);
-  const height = Math.round((quad.v1 - quad.v0) * source.height);
-
-  const data = new Uint8Array(width * height * 4);
-  for (let row = 0; row < height; row += 1) {
-    const from = ((y + row) * source.width + x) * 4;
-    data.set(source.data.subarray(from, from + width * 4), row * width * 4);
-  }
-  return new Texture({ width, height, data });
-}
-
-/** The material for one glyph cell, built on first use and cached. */
-function materialForCell(quad: TextQuad): SpriteMaterial {
-  const key = `${String(quad.u0)},${String(quad.v0)}`;
-  const cached = glyphMaterials.get(key);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const built = material(
-    `glyph-${key}`,
-    new SpriteMaterial({
-      texture: cutGlyphCell(atlas, quad),
-      tint: [LABEL_TINT[0], LABEL_TINT[1], LABEL_TINT[2], LABEL_TINT[3]],
-    }),
-  );
-  glyphMaterials.set(key, built);
-  return built;
-}
+const ink = material(
+  "label-ink",
+  new UnlitMaterial({
+    map: font,
+    transparent: true,
+    color: [LABEL_TINT[0], LABEL_TINT[1], LABEL_TINT[2], LABEL_TINT[3]],
+  }),
+);
 
 /**
- * Fills `into` with one `Sprite` per glyph of `text`, left-aligned on the
- * group's origin.
+ * A label node: one geometry, one draw, left-aligned on its own origin.
  *
- * `renderLayer: 1` draws the glyphs after the opaque scene — sprites blend, and
- * blending needs what is behind it already in the framebuffer (§66).
+ * `renderLayer: 1` draws it after the opaque scene — it blends, and blending
+ * needs what is behind it already in the framebuffer (§66).
  */
-function writeLabel(into: Group, text: string, size: number): void {
-  while (into.children.length > 0) {
-    const previous = into.children[into.children.length - 1];
-    into.remove(previous);
-    // §83: a `Sprite` **owns** its quad (it derives it from its anchor and size),
-    // so a rebuilt line that only removed its old glyphs would leak one geometry
-    // per character per rebuild. This page publishes `data-bufferbytes` from
-    // §83's own accounting, so the leak would be visible from the outside — and
-    // that is the point of publishing it. `dispose` frees the quad and
-    // deliberately not the material or the texture, which are shared and cached.
-    if (previous instanceof Sprite) previous.dispose();
-  }
-  const layout = layoutText(text, atlas, { size });
-  for (const quad of layout.quads) {
-    const glyph = new Sprite(materialForCell(quad), {
-      width: quad.x1 - quad.x0,
-      height: quad.y1 - quad.y0,
-      anchor: { x: 0, y: 0 },
-      renderLayer: 1,
-    });
-    glyph.transform.position.set(quad.x0, quad.y0, 0);
-    into.add(glyph);
-  }
+function makeLabel(name: string, text: string, size: number): Text {
+  const label = new Text(atlas, ink, { text, size, renderLayer: 1 });
+  label.name = name;
+  return label;
 }
 
 /** The machine's nameplate, in world space above the stator. */
-const nameplate = new Group();
-nameplate.name = "nameplate";
+const nameplate = makeLabel("nameplate", "MOTOR-01  3ph  4kW", 0.19);
 nameplate.transform.position.set(
   MOTOR_ORIGIN.x - 0.62,
   MOTOR_ORIGIN.y + 1.42,
   MOTOR_ORIGIN.z,
 );
 app.scene.add(nameplate);
-writeLabel(nameplate, "MOTOR-01  3ph  4kW", 0.19);
 
-// --- the instrument column (camera-parented; §48's deferred layerMask) --------
+// --- the instrument column (screen-space; §46/§47/§48) -----------------------
 
 /**
  * How far in front of the camera the instrument plane sits, in world units.
@@ -1769,12 +1772,42 @@ const TRACE_COMMAND_COLOR: Rgba = [1, 0.86, 0.31, 1];
 const TRACE_VIBRATION_COLOR: Rgba = [0.31, 0.9, 0.47, 1];
 const TRACE_TEMPERATURE_COLOR: Rgba = [1, 0.43, 0.2, 1];
 
-/** The instrument column's root: a child of the **camera**, hence screen-space. */
+/**
+ * How many canvas pixels one instrument unit is.
+ *
+ * The column's numbers are kept in their own unit rather than re-authored in
+ * pixels, and one scale on {@link screenSpace} converts them — which makes this
+ * rewrite **pixel-exact**: a plane at a constant depth under a perspective
+ * projection maps to the screen by exactly a scale and a translation, so the
+ * same numbers through a `ScreenCamera` land on the same pixels they landed on
+ * when the column hung 2.2 units in front of the camera. That is the property
+ * that let this file move to §47's camera without re-tuning forty literals.
+ */
+const UI_UNIT_PIXELS = HEIGHT / (2 * UI_DEPTH * Math.tan(FIELD_OF_VIEW / 2));
+
+/**
+ * The screen-space root: everything the {@link uiCamera} draws hangs under it —
+ * the instrument column and the §73 control panel.
+ *
+ * It sits at the middle of the canvas because the instrument plane's origin used
+ * to sit on the camera's axis, and it is scaled by {@link UI_UNIT_PIXELS} so its
+ * children keep their own unit. §46 is self-not-subtree, so the mask still has
+ * to be written on every drawable inside it; this node carries it too, for the
+ * day it grows a quad of its own.
+ */
+const screenSpace = new Group();
+screenSpace.name = "screen-space";
+screenSpace.transformAuthority = "manual";
+screenSpace.layers = UI_LAYER;
+screenSpace.transform.position.set(WIDTH / 2, HEIGHT / 2, 0);
+screenSpace.transform.scale.set(UI_UNIT_PIXELS, UI_UNIT_PIXELS, 1);
+app.scene.add(screenSpace);
+
+/** The instrument column's root — a child of {@link screenSpace}. */
 const instruments = new Group();
 instruments.name = "instruments";
 instruments.transformAuthority = "manual";
-instruments.transform.position.set(0, 0, -UI_DEPTH);
-camera.add(instruments);
+screenSpace.add(instruments);
 
 /** Adds an unlit quad to the instrument plane, in instrument units. */
 function addInstrumentQuad(
@@ -1797,6 +1830,7 @@ function addInstrumentQuad(
   quad.transform.position.set((x0 + x1) / 2, (y0 + y1) / 2, z);
   quad.transform.scale.set(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
   quad.renderLayer = 1;
+  quad.layers = UI_LAYER;
   instruments.add(quad);
   return quad;
 }
@@ -1923,6 +1957,7 @@ const chartNode = new Renderable(
 );
 chartNode.name = "waveform-charts";
 chartNode.renderLayer = 1;
+chartNode.layers = UI_LAYER;
 instruments.add(chartNode);
 
 /**
@@ -2078,13 +2113,13 @@ const READOUT_TOP = 0.19;
 const READOUT_SPACING = 0.077;
 const READOUT_LINES = 5;
 
-/** One `Group` of glyph sprites per line, rebuilt only when its text changes. */
-const readouts: Group[] = [];
+/** One `Text` node per line; its quads are rebuilt only when its text changes. */
+const readouts: Text[] = [];
 const readoutText: string[] = [];
 
 for (let i = 0; i < READOUT_LINES; i += 1) {
-  const line = new Group();
-  line.name = `readout-${String(i)}`;
+  const line = makeLabel(`readout-${String(i)}`, "", READOUT_SIZE);
+  line.layers = UI_LAYER;
   line.transform.position.set(
     COLUMN_LEFT,
     READOUT_TOP - i * READOUT_SPACING,
@@ -2099,17 +2134,19 @@ for (let i = 0; i < READOUT_LINES; i += 1) {
 function setReadout(index: number, text: string): void {
   if (readoutText[index] === text) return;
   readoutText[index] = text;
-  writeLabel(readouts[index], text, READOUT_SIZE);
+  readouts[index].text = text;
 }
 
 /**
  * How often the readouts are re-laid-out, in frames.
  *
- * Every glyph is a `Sprite` and therefore a draw call (§65's batching is
- * unshipped), so rebuilding five lines every frame would put ~70 draw calls of
- * *text* in front of a scene that otherwise needs about thirty. Ten hertz is
- * what a panel meter updates at anyway, and the number is published as
- * `data-drawcalls` rather than guessed at.
+ * A line is one `Text` node and one draw call whatever it says (R-28), so this
+ * is no longer the draw-call throttle it was written as — it is a *rebuild*
+ * throttle: changing the string re-lays-out the line and rewrites its vertex
+ * buffers. Ten hertz is what a panel meter updates at anyway. Until 2026-08-21
+ * every glyph was its own `Sprite` and its own draw call, and rebuilding five
+ * lines every frame put ~70 draw calls of text in front of a scene that
+ * otherwise needs about thirty.
  */
 const READOUT_INTERVAL_FRAMES = 6;
 
@@ -2145,7 +2182,7 @@ const PANEL_TEXT_SIZE = 0.046;
 const BUTTON_TEXT_SIZE = 0.042;
 
 /** Top-left corner of the panel, in the camera's local frame. */
-const PANEL_ORIGIN = new Vector3(COLUMN_LEFT - PANEL_PADDING, -0.3, -UI_DEPTH);
+const PANEL_ORIGIN = new Vector3(COLUMN_LEFT - PANEL_PADDING, -0.3, 0);
 
 /** Widget surfaces: warm-grey and near-neutral, so no hue classifier claims them. */
 const PANEL_COLOR: Rgba = [0.11, 0.12, 0.15, 1];
@@ -2184,6 +2221,7 @@ function skinQuad(name: string, color: Rgba): Renderable<UnlitMaterial> {
   );
   quad.name = name;
   quad.renderLayer = 1;
+  quad.layers = UI_LAYER;
   return quad;
 }
 
@@ -2338,19 +2376,27 @@ function sliderSkin(): WidgetSkin {
   };
 }
 
-/** A §73 `Label`'s glyphs, drawn with the same atlas the readouts use. */
+/**
+ * A §73 `Label`'s glyphs — one `Text` node, over the same atlas and the same
+ * material the readouts use.
+ *
+ * `size` is written only when it changes: the setter has no equality check of
+ * its own (`text` does), so an unconditional write on every `layout()` pass
+ * would rebuild vertex buffers that did not move.
+ */
 function labelSkin(): WidgetSkin {
-  let glyphs: Group | null = null;
+  let glyphs: Text | null = null;
   return {
     onAttach(widget) {
-      glyphs = new Group();
-      glyphs.name = `${widget.name}-glyphs`;
+      glyphs = makeLabel(`${widget.name}-glyphs`, "", (widget as Label).size);
+      glyphs.layers = UI_LAYER;
       widget.add(glyphs);
     },
     onLayout(widget) {
       if (glyphs === null) return;
       const label = widget as Label;
-      writeLabel(glyphs, label.text, label.size);
+      glyphs.text = label.text;
+      if (glyphs.size !== label.size) glyphs.size = label.size;
       glyphs.transform.position.set(
         (widget.measuredWidth - label.measuredWidth) / 2,
         -widget.measuredHeight / 2 - label.size * 0.36,
@@ -2358,7 +2404,12 @@ function labelSkin(): WidgetSkin {
       );
     },
     onDetach(widget) {
-      if (glyphs !== null) widget.remove(glyphs);
+      if (glyphs !== null) {
+        // The node owns its quad buffers; the atlas, texture and material are
+        // shared and outlive it (§83).
+        widget.remove(glyphs);
+        glyphs.dispose();
+      }
       glyphs = null;
     },
   };
@@ -2410,7 +2461,9 @@ const uiRoot = new Panel({
 });
 uiRoot.transformAuthority = "manual";
 uiRoot.transform.position.copy(PANEL_ORIGIN);
-camera.add(uiRoot);
+// An ordinary child of the screen-space root: what makes it screen-space is the
+// view it is drawn through, not who its parent is (§47, §48).
+screenSpace.add(uiRoot);
 
 const panelTitle = new Label({
   name: "panel-title",
@@ -2590,8 +2643,11 @@ const pickables: Pickable[] = [];
 // A real `HTMLCanvasElement` satisfies `PointerSurface` structurally, and
 // `window` satisfies `KeySurface` the same way. Both live exactly as long as the
 // page does, so neither is disposed here (§83).
+// The **UI** camera: a §71 ray must be cast through the projection the panel is
+// drawn with, or it would test a screen-space rectangle against a perspective
+// ray and miss everything (§48, §71).
 new PointerInput(canvas, {
-  camera,
+  camera: uiCamera,
   pickables: () => collectPickables(uiRoot, pickables),
 });
 new KeyboardInput(window, { focusTarget: keyboardFocusTarget(uiRoot) });
@@ -3012,21 +3068,6 @@ function statNumber(value: number | undefined, digits: number): string {
 /** Frames rendered since the loop started. */
 let frameCount = 0;
 
-/** Scratch for {@link controlPixels}: camera-space transform and the point in it. */
-const cameraInverse = new Matrix4();
-const cameraSpacePoint = new Vector3();
-
-/** Transforms `point` by the affine matrix `m`, in place. */
-function transformPoint(m: Matrix4, point: Vector3): void {
-  const e = m.elements;
-  const { x, y, z } = point;
-  point.set(
-    e[0] * x + e[4] * y + e[8] * z + e[12],
-    e[1] * x + e[5] * y + e[9] * z + e[13],
-    e[2] * x + e[6] * y + e[10] * z + e[14],
-  );
-}
-
 /**
  * Where the centre of `widget`'s box lands on the canvas, in CSS pixels.
  *
@@ -3035,19 +3076,22 @@ function transformPoint(m: Matrix4, point: Vector3): void {
  * recomputed them would be testing its own copy of the algorithm. What the gate
  * *does* check is that the page's claim is true — it moves the pointer to the
  * published point and reads `data-hover` back before clicking.
+ *
+ * **This function used to be twenty lines** (2026-08-21): with the panel
+ * parented to the perspective camera it inverted the camera's world matrix,
+ * divided by −z and scaled by the frustum's half-extents at that depth. Under
+ * {@link uiCamera} a widget's world position *is* its position on the canvas —
+ * the panel's ancestors carry the scale, so the world matrix has already done
+ * the arithmetic — and the only conversion left is between the camera's
+ * bottom-left origin and the DOM's top-left one.
  */
 function controlPixels(widget: UIWidget): { x: number; y: number } {
-  cameraSpacePoint.set(widget.measuredWidth / 2, -widget.measuredHeight / 2, 0);
-  transformPoint(resolveWorldTransform(widget), cameraSpacePoint);
-  cameraInverse.copy(resolveWorldTransform(camera)).invert();
-  transformPoint(cameraInverse, cameraSpacePoint);
-
-  const depth = Math.max(1e-6, -cameraSpacePoint.z);
-  const halfHeight = depth * Math.tan(FIELD_OF_VIEW / 2);
-  const halfWidth = halfHeight * camera.aspect;
+  // Column-major (§7b): elements 0 and 5 are the accumulated scale, 12 and 13
+  // the translation. No widget on this page is rotated.
+  const world = resolveWorldTransform(widget).elements;
   return {
-    x: (cameraSpacePoint.x / halfWidth / 2 + 0.5) * WIDTH,
-    y: (0.5 - cameraSpacePoint.y / halfHeight / 2) * HEIGHT,
+    x: world[12] + (widget.measuredWidth * world[0]) / 2,
+    y: HEIGHT - (world[13] - (widget.measuredHeight * world[5]) / 2),
   };
 }
 

@@ -931,10 +931,15 @@ test.describe("examples/flagship/motor-digital-twin (§119)", () => {
       "the §79 document did not round-trip byte-identically",
     ).toBe("true");
     expect(Number(audited["savebytes"])).toBeGreaterThan(5_000);
+    // A floor against a document that saved nothing, not a pinned count. It was
+    // `> 100` until 2026-08-21, when every label became **one** `Text` node
+    // instead of one `Sprite` per drawn glyph (R-28): the scene lost sprites and
+    // the audit now reports 96. Lowered with that measurement, and deliberately
+    // still far above the handful of nodes a broken writer would emit.
     expect(
       Number(audited["savenodes"]),
       "the saved document is suspiciously small",
-    ).toBeGreaterThan(100);
+    ).toBeGreaterThan(80);
 
     // And the twin keeps running afterwards.
     const before = Number((await readStatus(page))["steps"]);

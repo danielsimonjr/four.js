@@ -40,19 +40,11 @@ changes in `CHANGELOG.md`.
       opt-in, and `TrackballRig`, the last staged §44/§47 rig. 27 new package tests, 4
       integration, 1 new browser test with pixel-exact placement on SwiftShader. 0 B in
       bundles that do not register serializers.
-- [ ] **Flagship UI-panel follow-up (R-37, 2026-08-21):** both flagships still work
-      around the missing screen camera — `one-scene-everything-moves` parents its UI
-      panel to the camera, and `motor-digital-twin/main.ts` still carries a header
-      comment saying "§47/§48's `ScreenCamera` is absent". Rewrite both onto the
-      standard recipe (a `"ui"` layer, a second full-surface viewport with a
-      `ScreenCamera`, `layerMask` on each view) and delete the workaround notes. The
-      recipe is proved in `tests/integration/screen-camera.test.ts`. Expect those
-      examples' visual goldens to move — regenerate deliberately. Fold into the
-      examples packet (with the Text and lookAt rewrites).
-- [ ] **Stale staging note (R-37, 2026-08-21):** the rig table in
-      `packages/motion/src/camera-rigs.ts` still lists **trackball** as unshipped.
-      It shipped; the row should point at `@four/scene`'s `TrackballRig` and record
-      that it is not a component. One-line doc fix for the next motion-touching packet.
+- [x] **Flagship UI-panel follow-up — DONE 2026-08-21 (examples packet).** Both
+      flagships on the ScreenCamera recipe; workaround notes deleted; AUDIT-120 and
+      the text README corrected with a new check-docs pin.
+- [x] **Stale trackball staging note — DONE 2026-08-21** (rig table points at
+      `@four/scene`'s `TrackballRig`).
 - [x] **R-21 — §53 geometry model (2026-08-21).** `Geometry` base, `clone()`,
       `BoundingVolume` (box + circumscribing sphere). `GeometryBounds` aliased, R-8
       unmodified. Seven §53 subclasses and hierarchical volumes deliberately staged with
@@ -183,18 +175,10 @@ changes in `CHANGELOG.md`.
       anisotropy, map roles, compressed containers, video and `ImageBitmap` sources,
       async upload + residency diagnostics. The wrap/filter bullet closed 2026-08-13; the
       row's remaining scope is a different, larger item.
-- [ ] **Text follow-ups (2026-08-13):** (a) `examples/first-2d-scene` and
-      `examples/ui-demo` still cut one `Texture` per glyph cell — both should be
-      rewritten onto `Text` (ui-demo through a `WidgetSkin` turning `Label.textLayout`
-      into one `Text`); expected: a large draw-call drop and a smaller bundle; one
-      follow-up packet with the browser gate. (b) `.size-limit.json`: bump ui-demo
-      38 → 38.5 kB — measured 37.86 with R-28/R-30 (0.14 kB headroom); the next packet to
-      add a class method breaks it. (c) §56 wrapping — deliberately not bundled with
-      alignment: a wrap decides where lines end (UAX #14 and a language), alignment
-      merely places a finished line. (d) §86's animated-glyph row is now bounded by the
-      geometry rebuild (~700 ns/glyph); the named lever is a flat coordinate buffer
-      instead of one frozen `TextQuad` per glyph. (e) before §56 full shaping: RFC the
-      shaping engine (HarfBuzz-wasm vs native).
+- [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
+      (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
+      ui-demo 44 → 3, twin 159 → 59; bundles shrank; two ui-demo goldens
+      regenerated deliberately (glyph pixels only, crisper).
 - [x] **§44/§47 camera rigs DONE 2026-08-09 (R-36 rig half + PH-11)** — `OrbitRig`,
       `FollowRig` (follow target **and** spring arm, one class switched by `frame`,
       smoothed by `SpringDamper`), `LookAtConstraint` and `ConstraintSystem` at §39
@@ -228,11 +212,9 @@ changes in `CHANGELOG.md`.
       `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
       which has no producing system: seam is a `LookAtConstraint` component + a system
       at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
-- [ ] **Examples still hand-roll their orientations (R-36 follow-up)** —
-      `examples/first-3d-scene/main.ts:151` (camera pitch) and `:219-220` (sun yaw∘pitch)
-      are the code `lookAt` exists to replace. Left in place deliberately: `lookAt`
-      derives the quaternion through `sqrt` where these use `sin`/`cos`, so the swap
-      could move a pixel golden. Needs a packet that can run `pnpm test:browser`.
+- [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
+      `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
+      held. Rigs declined on merit (nothing moves).
 - [ ] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — first-3d
       31.30/31.5, ui-demo 36.73/37, particles-demo 28.70/29 (each +0.50 kB gzip;
       `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed

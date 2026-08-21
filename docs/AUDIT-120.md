@@ -304,8 +304,8 @@ Three of §119's twelve features ship with a stated boundary rather than in full
 against a row of `docs/GAP ANALYSIS v1.md`: the **waveform charts** are a `"lines"`
 `BufferGeometry` with per-vertex colours because there is no `Path` or 2D shape node
 (`R-24`/`R-23`), so they have no stroke, width, axis or grid primitive; the **instrument
-column** is parented to the camera because `ScreenCamera` is absent (`R-37`), the §118
-flagship's workaround unchanged; and the **torque and mount-reaction glyphs** are drawn
+column** draws through a second viewport under §47's `ScreenCamera` since 2026-08-21
+(`R-37` closed; the camera-parenting workaround is retired); and the **torque and mount-reaction glyphs** are drawn
 from the application's own model, because no `PhysicsSolverAdapter` here reports joint
 reactions (both Rapier adapters declare `reportsJointReactions: false`) — the example says
 so in its header rather than presenting an estimate as a measurement. The **motor model is
