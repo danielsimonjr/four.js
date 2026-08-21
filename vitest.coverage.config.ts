@@ -16,6 +16,21 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     passWithNoTests: true,
+    // Instrumented runs are far slower than plain ones, and the default 5 s
+    // timeout does not account for it. Measured 2026-08-21 on the >65 536-vertex
+    // index-widening test in packages/render:
+    //
+    //     plain           242 ms
+    //     with coverage  3222 ms   (13x)
+    //     on CI          5590 ms   -> exceeded the 5 s default, red build
+    //
+    // The test was not flaky and not slow: it was systematically near the limit
+    // once instrumented, and the CI runner is slower than a workstation, so it
+    // crossed there and passed here. Raising the timeout for THIS config only is
+    // the fix -- the plain `test` scripts keep the 5 s default, so a genuine
+    // performance regression on the normal path still fails fast. This is a
+    // timeout, not a budget: a hung test still fails, it just takes longer.
+    testTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
