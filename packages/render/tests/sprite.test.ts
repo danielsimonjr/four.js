@@ -242,6 +242,167 @@ describe("Texture — sampler state (§77, R-30)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Mipmaps, the min-filter split, and anisotropy (§77, R-30b, 2026-08-21).
+// ---------------------------------------------------------------------------
+
+describe("Texture — mipmaps and the min-filter split (§77, R-30b)", () => {
+  it("carries no mip chain and resolves minFilter to filter by default", () => {
+    // The byte-identity claim for this packet: a texture that names none of the
+    // three new fields resolves to exactly what the backend wrote before they
+    // existed — one level, min = mag = `filter`, anisotropy 1.
+    const plain = new Texture({ width: 4, height: 4 });
+    const crisp = new Texture({ width: 4, height: 4, filter: "nearest" });
+
+    expect(plain.mipmaps).toBe(false);
+    expect(plain.minFilter).toBe("linear");
+    expect(plain.anisotropy).toBe(1);
+    expect(crisp.minFilter).toBe("nearest");
+  });
+
+  it("derives the chain-aware min filter from `filter` when mipmaps are on", () => {
+    const smooth = new Texture({ width: 4, height: 4, mipmaps: true });
+    const crisp = new Texture({
+      width: 4,
+      height: 4,
+      mipmaps: true,
+      filter: "nearest",
+    });
+
+    expect(smooth.minFilter).toBe("linear-mipmap-linear");
+    expect(crisp.minFilter).toBe("nearest-mipmap-nearest");
+    expect(smooth.mipmaps).toBe(true);
+  });
+
+  it("honours an explicit minFilter, and accepts every value of the union", () => {
+    expect(
+      new Texture({
+        width: 4,
+        height: 4,
+        mipmaps: true,
+        minFilter: "nearest-mipmap-linear",
+      }).minFilter,
+    ).toBe("nearest-mipmap-linear");
+
+    for (const minFilter of [
+      "nearest",
+      "linear",
+      "nearest-mipmap-nearest",
+      "linear-mipmap-nearest",
+      "nearest-mipmap-linear",
+      "linear-mipmap-linear",
+    ] as const) {
+      const map = new Texture({
+        width: 4,
+        height: 4,
+        mipmaps: true,
+        minFilter,
+      });
+      expect(map.minFilter).toBe(minFilter);
+    }
+
+    // The two in-level values are legal without a chain as well.
+    expect(
+      new Texture({ width: 4, height: 4, minFilter: "nearest" }).minFilter,
+    ).toBe("nearest");
+  });
+
+  it("refuses a mip-choosing minFilter on a texture with no chain (§85)", () => {
+    // GL would call the texture incomplete and sample it as opaque black —
+    // a whole-surface failure with nothing saying why.
+    expect(
+      () =>
+        new Texture({ width: 4, height: 4, minFilter: "linear-mipmap-linear" }),
+    ).toThrow(
+      /samples between mip levels, so the texture needs `mipmaps: true`/,
+    );
+  });
+
+  it("refuses a minFilter outside the union rather than substituting (§85)", () => {
+    expect(
+      () =>
+        new Texture({
+          width: 1,
+          height: 1,
+          minFilter: "trilinear",
+        } as unknown as { width: number; height: number }),
+    ).toThrow(/Texture minFilter must be one of "nearest", "linear",/);
+  });
+
+  it("bills the whole mip chain to §84's texture memory, level by level", () => {
+    // 4×4: 64 + 16 + 4 = 84 — not `4/3 × 64`, which is 85.33.
+    expect(new Texture({ width: 4, height: 4, mipmaps: true }).byteLength).toBe(
+      84,
+    );
+    // Non-square: the chain runs until *both* axes reach 1, with each axis
+    // clamped there independently (8×2 → 4×1 → 2×1 → 1×1).
+    expect(new Texture({ width: 8, height: 2, mipmaps: true }).byteLength).toBe(
+      64 + 16 + 8 + 4,
+    );
+    // A texture with no chain is unchanged, so no landed §84 number moves.
+    expect(new Texture({ width: 4, height: 4 }).byteLength).toBe(64);
+  });
+
+  it("keeps a disposed texture at zero bytes and the resolved defaults", () => {
+    const map = new Texture({ width: 8, height: 8, mipmaps: true });
+
+    map.dispose();
+
+    expect(map.byteLength).toBe(0);
+    expect(map.mipmaps).toBe(false);
+    expect(map.minFilter).toBe("linear");
+    expect(map.anisotropy).toBe(1);
+  });
+});
+
+describe("Texture — anisotropy is a request, not a guarantee (§77, §62, R-30b)", () => {
+  it("defaults to 1 and carries an integer request unchanged", () => {
+    expect(new Texture({ width: 1, height: 1 }).anisotropy).toBe(1);
+    expect(
+      new Texture({ width: 4, height: 4, mipmaps: true, anisotropy: 8 })
+        .anisotropy,
+    ).toBe(8);
+  });
+
+  it("accepts a request no device can fill — that is §62's clamp, not §85's refusal", () => {
+    // The whole policy in one assertion: 64× is legal to *ask* for, and the
+    // backend gives what the device has. Refusing here would turn a quality
+    // knob into a scene that does not run on half the fleet.
+    expect(
+      new Texture({ width: 4, height: 4, anisotropy: 64 }).anisotropy,
+    ).toBe(64);
+  });
+
+  it("refuses a value no device could honour: below 1, or not an integer (§85)", () => {
+    expect(() => new Texture({ width: 1, height: 1, anisotropy: 0 })).toThrow(
+      /Texture anisotropy must be an integer of at least 1; got 0/,
+    );
+    expect(() => new Texture({ width: 1, height: 1, anisotropy: 1.5 })).toThrow(
+      /must be an integer of at least 1; got 1.5/,
+    );
+    expect(
+      () => new Texture({ width: 1, height: 1, anisotropy: Number.NaN }),
+    ).toThrow(/must be an integer of at least 1/);
+  });
+
+  it("re-validates and re-resolves all three when the source is replaced", () => {
+    const map = new Texture({
+      width: 4,
+      height: 4,
+      mipmaps: true,
+      anisotropy: 4,
+    });
+
+    map.source = { width: 4, height: 4 };
+
+    expect(map.mipmaps).toBe(false);
+    expect(map.minFilter).toBe("linear");
+    expect(map.anisotropy).toBe(1);
+    expect(map.byteLength).toBe(64);
+    expect(map.version).toBe(1);
+  });
+});
+
 describe("Texture — versioning (§53's contract, reused by §77)", () => {
   it("bumps the version once when a new source is assigned", () => {
     const map = texture();

@@ -171,7 +171,12 @@ export {
 } from "./shape.js";
 export type { SpriteFrame, SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
-export type { TextureFilter, TextureSource, TextureWrap } from "./texture.js";
+export type {
+  TextureFilter,
+  TextureMinFilter,
+  TextureSource,
+  TextureWrap,
+} from "./texture.js";
 export { Texture } from "./texture.js";
 export type { ViewRenderListOptions } from "./view-list.js";
 export { buildViewRenderList, sortRenderListByDepth } from "./view-list.js";

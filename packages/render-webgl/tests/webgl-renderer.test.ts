@@ -147,6 +147,25 @@ interface FakeGlOptions {
   allocateVertexArrays?: boolean;
   /** When false, `createTexture` returns null. Default true. */
   allocateTextures?: boolean;
+  /**
+   * When false, the double declares **no** `generateMipmap` at all — a context
+   * that cannot build a mip chain (R-30b). Default true.
+   *
+   * Absent rather than throwing, because `WebglContext.generateMipmap` is
+   * optional and "presence is the capability" is the contract under test.
+   */
+  canGenerateMipmaps?: boolean;
+  /**
+   * When false, `getExtension` returns `null` for every name — a device with no
+   * `EXT_texture_filter_anisotropic` (R-30b, §62). Default true. `null` (as
+   * opposed to `false`) removes `getExtension` from the double entirely.
+   */
+  anisotropyExtension?: boolean | null;
+  /**
+   * What `getParameter(MAX_TEXTURE_MAX_ANISOTROPY_EXT)` reports (R-30b).
+   * Default 16; `unknown` so a test can hand back what a hostile driver would.
+   */
+  maxAnisotropy?: unknown;
   /** When false, `createBuffer` returns null. Default true. */
   allocateBuffers?: boolean;
   /** When false, `createFramebuffer` returns null. Default true (R-4). */
@@ -221,6 +240,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     failProgramAt = 0,
     allocateVertexArrays = true,
     allocateTextures = true,
+    canGenerateMipmaps = true,
+    anisotropyExtension = true,
+    maxAnisotropy = 16,
     allocateBuffers = true,
     allocateFramebuffers = true,
     allocateRenderbuffers = true,
@@ -482,7 +504,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
     getParameter(pname) {
       record("getParameter", pname);
-      return maxTextureSize;
+      return pname === GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT
+        ? maxAnisotropy
+        : maxTextureSize;
     },
     enable(capability) {
       record("enable", capability);
@@ -543,6 +567,21 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
       return false;
     },
   };
+
+  // R-30b: both entry points are *optional* on `WebglContext` — presence is the
+  // capability — so a double that lacks them is a legal context, and building
+  // them conditionally is the only way to test that path.
+  if (canGenerateMipmaps) {
+    gl.generateMipmap = (target: number): void => {
+      record("generateMipmap", target);
+    };
+  }
+  if (anisotropyExtension !== null) {
+    gl.getExtension = (name: string): unknown => {
+      record("getExtension", name);
+      return anisotropyExtension ? { name } : null;
+    };
+  }
 
   return gl;
 }
@@ -852,6 +891,27 @@ class TestTexture {
 
   /** See {@link TestTexture.filter}. */
   wrap?: "clamp-to-edge" | "repeat" | "mirrored-repeat";
+
+  /**
+   * §77's mip chain, its min-filter split, and its anisotropy request (R-30b,
+   * 2026-08-21). All three left `undefined` by default for
+   * {@link TestTexture.filter}'s reason: every other test in this file is a
+   * texture written before they existed, and its upload must stay byte-for-byte
+   * what it was.
+   */
+  mipmaps?: boolean;
+
+  /** See {@link TestTexture.mipmaps}. */
+  minFilter?:
+    | "nearest"
+    | "linear"
+    | "nearest-mipmap-nearest"
+    | "linear-mipmap-nearest"
+    | "nearest-mipmap-linear"
+    | "linear-mipmap-linear";
+
+  /** See {@link TestTexture.mipmaps}. */
+  anisotropy?: number;
 
   constructor(width = 2, height = 2, data: Uint8Array | null = null) {
     nextTestTextureId += 1;
@@ -2815,6 +2875,181 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
       [GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
       [GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
     ]);
+  });
+
+  it("adds nothing at all for a texture naming no mipmaps or anisotropy (R-30b)", () => {
+    // The byte-identity claim, structurally: the whole recorded transcript of
+    // an ordinary upload, in order, with no `generateMipmap`, no
+    // `getExtension`, and no fifth `texParameteri` — even though this context
+    // offers all three.
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+
+    cache.acquire(new TestTexture(2, 2).asTexture);
+
+    expect(gl.names()).toEqual([
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "bindTexture",
+    ]);
+  });
+
+  it("generates the mip chain and writes the derived min filter (§77, R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(4, 4);
+    texture.mipmaps = true;
+    texture.minFilter = "linear-mipmap-linear";
+
+    cache.acquire(texture.asTexture);
+
+    // Ordering matters: the chain must exist before a mip-choosing min filter
+    // is written, and `generateMipmap` reads the level-0 image.
+    expect(gl.names().slice(0, 5)).toEqual([
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "generateMipmap",
+      "texParameteri",
+    ]);
+    expect(
+      gl.callsOf("texParameteri").map((call) => [call.args[1], call.args[2]]),
+    ).toEqual([
+      [GL.TEXTURE_MIN_FILTER, GL.LINEAR_MIPMAP_LINEAR],
+      // Magnification has no levels to choose between: it stays `filter`.
+      [GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
+      [GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
+    ]);
+  });
+
+  it("maps every mip-choosing min filter to its GL enum (§77, R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const expected = [
+      ["nearest", GL.NEAREST],
+      ["nearest-mipmap-nearest", GL.NEAREST_MIPMAP_NEAREST],
+      ["linear-mipmap-nearest", GL.LINEAR_MIPMAP_NEAREST],
+      ["nearest-mipmap-linear", GL.NEAREST_MIPMAP_LINEAR],
+      ["linear-mipmap-linear", GL.LINEAR_MIPMAP_LINEAR],
+      ["linear", GL.LINEAR],
+    ] as const;
+
+    for (const [minFilter] of expected) {
+      const texture = new TestTexture(2, 2);
+      texture.mipmaps = true;
+      texture.minFilter = minFilter;
+      cache.acquire(texture.asTexture);
+    }
+
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MIN_FILTER)
+        .map((call) => call.args[2]),
+    ).toEqual(expected.map(([, value]) => value));
+  });
+
+  it("derives the min filter from `filter` when the texture names none (R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const smooth = new TestTexture(2, 2);
+    smooth.mipmaps = true;
+    const crisp = new TestTexture(2, 2);
+    crisp.mipmaps = true;
+    crisp.filter = "nearest";
+
+    cache.acquire(smooth.asTexture);
+    cache.acquire(crisp.asTexture);
+
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MIN_FILTER)
+        .map((call) => call.args[2]),
+    ).toEqual([GL.LINEAR_MIPMAP_LINEAR, GL.NEAREST_MIPMAP_NEAREST]);
+  });
+
+  it("degrades to one level on a context that cannot generate mipmaps (R-30b)", () => {
+    // A mip-choosing min filter on a one-level texture is *incomplete* in GL
+    // and samples as opaque black. Degrading the quality beats a black surface.
+    const gl = createFakeGl({ canGenerateMipmaps: false });
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(4, 4);
+    texture.mipmaps = true;
+    texture.minFilter = "linear-mipmap-linear";
+    const crisp = new TestTexture(4, 4);
+    crisp.mipmaps = true;
+    crisp.minFilter = "nearest-mipmap-nearest";
+
+    cache.acquire(texture.asTexture);
+    cache.acquire(crisp.asTexture);
+
+    expect(gl.countOf("generateMipmap")).toBe(0);
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MIN_FILTER)
+        .map((call) => call.args[2]),
+    ).toEqual([GL.LINEAR, GL.NEAREST]);
+  });
+
+  it("clamps an anisotropy request to the device ceiling, querying once (§62, R-30b)", () => {
+    const gl = createFakeGl({ maxAnisotropy: 4 });
+    const cache = new TextureCache(gl);
+    const modest = new TestTexture(2, 2);
+    modest.anisotropy = 2;
+    const greedy = new TestTexture(2, 2);
+    greedy.anisotropy = 64;
+
+    cache.acquire(modest.asTexture);
+    cache.acquire(greedy.asTexture);
+
+    expect(gl.callsOf("getExtension").map((call) => call.args[0])).toEqual([
+      "EXT_texture_filter_anisotropic",
+    ]);
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MAX_ANISOTROPY_EXT)
+        .map((call) => call.args[2]),
+    ).toEqual([2, 4]);
+  });
+
+  it("writes no anisotropy, and asks nothing, for a request of 1 (R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(2, 2);
+    texture.anisotropy = 1;
+
+    cache.acquire(texture.asTexture);
+
+    expect(gl.countOf("getExtension")).toBe(0);
+    expect(gl.countOf("texParameteri")).toBe(4);
+  });
+
+  it("ignores anisotropy where the extension is absent (§62's clamp, not §85)", () => {
+    for (const options of [
+      { anisotropyExtension: false },
+      // A context that does not even declare `getExtension`.
+      { anisotropyExtension: null },
+      // A driver that answers the query with something that is not a number.
+      { maxAnisotropy: null },
+    ] as const) {
+      const gl = createFakeGl(options);
+      const cache = new TextureCache(gl);
+      const texture = new TestTexture(2, 2);
+      texture.anisotropy = 8;
+
+      cache.acquire(texture.asTexture);
+
+      expect(gl.countOf("texParameteri")).toBe(4);
+    }
   });
 
   it("re-uploads with the new sampler state after a version bump (§77, R-30)", () => {

@@ -20,6 +20,7 @@ export { StandardMaterial } from "./standard-material.js";
 export type {
   MaterialTexture,
   MaterialTextureFilter,
+  MaterialTextureMinFilter,
   MaterialTextureWrap,
 } from "./texture.js";
 export type { ColorRGBA, UnlitMaterialOptions } from "./unlit-material.js";

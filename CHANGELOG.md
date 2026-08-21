@@ -8,6 +8,44 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — R-30b: §77 mipmaps, the min-filter split, and anisotropy
+
+#### Added
+
+- **§77 mipmaps, the min-filter split, and anisotropy (R-30b).** `TextureSource.mipmaps`,
+  `.minFilter` and `.anisotropy` in `@four/render`, mirrored as optional `MaterialTexture`
+  fields and applied by `TextureCache` at upload. R-30 recorded that the `minFilter` split
+  would "land with mipmaps, beside this field", and it did: `filter` is unchanged and _is_
+  the magnification filter, `minFilter` is the min-side override carrying GL's four
+  `*-mipmap-*` modes, and there is deliberately no `magFilter` — magnification has no mip
+  levels to choose between, so the pair would split a direction that cannot carry the four
+  values motivating the split. `minFilter` defaults to a **derived** value, never a
+  constant: `filter` with no chain (which is what its absence always meant), that filter's
+  chain-aware form with one. A mip-choosing `minFilter` without `mipmaps: true` is refused
+  (§85) — GL calls such a texture incomplete and samples it opaque black. WebGL 2 needs no
+  power-of-two size for either mipmaps or `REPEAT`; a §62 WebGL 1 tier would have to
+  refuse both. **Anisotropy is §62, not §85**: `EXT_texture_filter_anisotropic` is an
+  extension, so a request is clamped to the device ceiling and dropped where the extension
+  is absent — presence is the capability — while §85 still refuses what no device could
+  honour (a non-integer, or below 1). The extension is queried **lazily**, on the first
+  texture asking for more than 1, so a context that never meets one issues no GL call and
+  every recorded transcript is unchanged. `WebglContext.generateMipmap` and `.getExtension`
+  are optional for the same reason; a context lacking the first degrades to one level with
+  an in-level min filter rather than a black surface. `Texture.byteLength` now bills the
+  whole chain, summed level by level, so §84's `textureMemory` stays true. Byte-identity is
+  structural: a texture naming none of the three issues the identical five-call upload in
+  the identical order, asserted as a whole transcript in the backend suite and through the
+  real renderer in `tests/integration/texture-mipmaps.test.ts` (a mipmapped upload is the
+  plain one plus exactly one `generateMipmap` and one changed argument). Proven on a real
+  driver in the new `tests/browser/mipmaps.spec.ts`: a minified checkerboard is 81% extreme
+  pixels bilinearly and 1% trilinearly, and a half-pixel nudge moves the un-mipmapped frame
+  by 120 mean luma against the mip chain's 39 — the shimmer, as a number. Still deferred
+  from §77, each with its reason: cube/array/3D targets (sampler-type work in every
+  shader), compressed containers (a new upload call plus §62's format report), video and
+  `ImageBitmap` sources (per-frame update semantics, an assets-side adapter), async upload
+  with residency diagnostics. Measured +0.33–0.69 kB gzip per bundle carrying `Texture`;
+  budgets bumped 34.5 / 32 / 40.5 kB with the A/B numbers.
+
 ### 2026-08-21 — R-1 scoped: the WebGPU backend has an executable plan
 
 #### Documentation

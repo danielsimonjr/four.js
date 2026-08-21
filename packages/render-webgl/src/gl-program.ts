@@ -135,8 +135,31 @@ export const GL = {
    * than hardware filtering — see `gl-shadow.ts`.
    */
   NEAREST: 0x2600,
-  /** `GL_LINEAR` — bilinear sampling; the MVP tier has no mipmaps (§77). */
+  /** `GL_LINEAR` — bilinear sampling, and the default §77 filter (R-30). */
   LINEAR: 0x2601,
+  /** `GL_NEAREST_MIPMAP_NEAREST` — point in level, one level (§77, R-30b). */
+  NEAREST_MIPMAP_NEAREST: 0x2700,
+  /** `GL_LINEAR_MIPMAP_NEAREST` — bilinear in level, one level (§77, R-30b). */
+  LINEAR_MIPMAP_NEAREST: 0x2701,
+  /** `GL_NEAREST_MIPMAP_LINEAR` — point in level, two levels (§77, R-30b). */
+  NEAREST_MIPMAP_LINEAR: 0x2702,
+  /** `GL_LINEAR_MIPMAP_LINEAR` — trilinear (§77, R-30b, 2026-08-21). */
+  LINEAR_MIPMAP_LINEAR: 0x2703,
+  /**
+   * `GL_TEXTURE_MAX_ANISOTROPY_EXT` — the per-texture anisotropy limit of
+   * `EXT_texture_filter_anisotropic` (§77, R-30b).
+   *
+   * Written with `texParameteri` rather than `texParameterf`: the extension
+   * accepts both, `Texture.anisotropy` is an integer by construction (§85), and
+   * an integer keeps this package's GL budget at the entry points it already
+   * declares (see {@link WebglContext}).
+   */
+  TEXTURE_MAX_ANISOTROPY_EXT: 0x84fe,
+  /**
+   * `GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT` — the device's ceiling, read once per
+   * cache the first time a texture asks for anisotropy (§62, §77, R-30b).
+   */
+  MAX_TEXTURE_MAX_ANISOTROPY_EXT: 0x84ff,
   /** `GL_CCW` — counter-clockwise front faces (§7a right-handed, Y-up). */
   CCW: 0x0901,
   /** `GL_CULL_FACE`, deliberately left disabled — see `webgl-renderer.ts`. */
@@ -342,6 +365,32 @@ export interface WebglContext {
     pixels: ArrayBufferView | null,
   ): void;
   texParameteri(target: number, pname: number, param: number): void;
+  /**
+   * Builds the full mip chain of the bound texture (§77's mipmaps; R-30b,
+   * 2026-08-21).
+   *
+   * **Optional, and its presence is the capability** — the stance this package
+   * takes for every entry point that is not needed to draw a frame. WebGL 2 has
+   * it unconditionally; a *double* written before this field existed does not,
+   * and a texture asking for `mipmaps: true` against such a context uploads
+   * with one level and an in-level min filter (`gl-texture.ts`) rather than
+   * leaving GL a texture it would treat as incomplete and sample as black.
+   * Every existing double therefore keeps compiling and keeps issuing the call
+   * sequence it always did.
+   */
+  generateMipmap?(target: number): void;
+  /**
+   * Requests an extension object, or `null` where the device has none (§62's
+   * capability tiers; R-30b).
+   *
+   * Optional for {@link WebglContext.generateMipmap}'s reason, and called
+   * **lazily**: the one caller today is the texture cache, on the first texture
+   * that asks for anisotropy above 1, so a context that never meets one issues
+   * no query at all and every already-recorded GL transcript is unchanged. The
+   * return is `unknown` because this package must not name a `lib.dom` type;
+   * the caller checks it for `null` and reads the enum it needs off {@link GL}.
+   */
+  getExtension?(name: string): unknown;
   deleteTexture(texture: GlTexture): void;
   activeTexture(unit: number): void;
 

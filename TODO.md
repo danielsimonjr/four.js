@@ -222,10 +222,25 @@ changes in `CHANGELOG.md`.
 - [x] **R-30 advanced 2026-08-13 (sampler-state tier)** — `TextureSource.filter`/`wrap`
       through `Texture`/`MaterialTexture` to `TextureCache`; structural byte-identity;
       +0.11 kB per Texture-carrying bundle.
-- [ ] **R-30b — the rest of §77:** mipmaps and generation, cube/array/3D targets,
-      anisotropy, map roles, compressed containers, video and `ImageBitmap` sources,
-      async upload + residency diagnostics. The wrap/filter bullet closed 2026-08-13; the
-      row's remaining scope is a different, larger item.
+- [x] **R-30b advanced 2026-08-21 (mipmap + anisotropy tier)** — `TextureSource.mipmaps`
+      / `.minFilter` / `.anisotropy`, applied by `TextureCache` at upload
+      (`generateMipmap`, the min/mag split, a lazily negotiated
+      `EXT_texture_filter_anisotropic`). `Texture.byteLength` bills the chain.
+      Byte-identity structural, asserted as whole transcripts; new integration + browser
+      gates. `@four/assets` deliberately untouched — mipmap generation is an upload
+      decision, and `new Texture({ ...asset, mipmaps: true })` already works. Budgets
+      bumped 34.5/32/40.5 kB with A/B numbers.
+- [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:** cube/array/3D
+      targets (sampler-type change in every shader — pipeline/RFC-entangled, pairs with
+      R-1); compressed containers (`compressedTexImage2D`, a format enum shared with §79,
+      §62's compressed-format capability report — pairs with R-31/R-32); video and
+      `ImageBitmap`/canvas sources (per-frame update semantics under §9; the DOM-free
+      `TextureSource` rule puts the adapter in `@four/assets` — A-19's successor); §77
+      map roles (which would let §60a's colour-space defaults land); async upload and
+      residency diagnostics (§84 counters plus a worker split). Also: a §62
+      `capabilities.maxAnisotropy` / texture-format report, deliberately not added by
+      R-30b because reading it at `initialize` would move landed GL transcripts.
+
 - [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
       (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
       ui-demo 44 → 3, twin 159 → 59; bundles shrank; two ui-demo goldens

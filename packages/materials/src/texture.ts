@@ -44,12 +44,46 @@ import type { ColorSpace } from "@four/math";
  * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
  * 2026-08-13) — the read side of `@four/render`'s `TextureFilter`.
  *
- * Two values because this tier has no mip levels: §77's remaining filter modes
- * (`*_MIPMAP_*`) name a choice between mip levels, and a texture with one level
- * has none to choose between. They arrive with mipmaps, and with them the
- * separate `minFilter`/`magFilter` split — see `@four/render`'s `TextureSource`.
+ * Two values because a texture with one mip level has no choice to make between
+ * levels: §77's remaining filter modes (`*_MIPMAP_*`) name exactly that choice.
+ * They arrived with mipmaps on 2026-08-21 (R-30b) — on
+ * {@link MaterialTextureMinFilter}, the *minification* side, which is the only
+ * side that has mip levels in it. This type is unchanged and still means "both
+ * directions, unless the min side is overridden".
  */
 export type MaterialTextureFilter = "nearest" | "linear";
+
+/**
+ * How a texture is sampled when **minified** — the direction that has mip
+ * levels in it (§77's remaining filter modes; R-30b, 2026-08-21).
+ *
+ * The union is {@link MaterialTextureFilter} plus GL's four mip-choosing modes,
+ * spelled `<in-level>-mipmap-<between-levels>`:
+ *
+ * | value | within a level | between levels |
+ * | --- | --- | --- |
+ * | `"nearest-mipmap-nearest"` | point | pick one |
+ * | `"linear-mipmap-nearest"` | bilinear | pick one |
+ * | `"nearest-mipmap-linear"` | point | blend two |
+ * | `"linear-mipmap-linear"` | bilinear | blend two (trilinear) |
+ *
+ * A mip-choosing value is only meaningful on a texture that *has* a mip chain:
+ * GL leaves a texture with one level and a `*_MIPMAP_*` min filter **incomplete**
+ * — it samples as opaque black — which is why `@four/render`'s `Texture` refuses
+ * the combination (§85) rather than letting a scene go silently black.
+ *
+ * There is deliberately **no** `magFilter`: magnification cannot use mip levels
+ * (GL accepts only `NEAREST`/`LINEAR` there), so the pair `minFilter` and
+ * `magFilter` would be a split in which one half could never carry the four
+ * values that motivated the split. {@link MaterialTexture.filter} *is* the
+ * magnification filter, and the default for minification too.
+ */
+export type MaterialTextureMinFilter =
+  | MaterialTextureFilter
+  | "nearest-mipmap-nearest"
+  | "linear-mipmap-nearest"
+  | "nearest-mipmap-linear"
+  | "linear-mipmap-linear";
 
 /**
  * How a texture is addressed outside `[0, 1]` (§77's "wrap modes"; R-30,
@@ -148,4 +182,52 @@ export interface MaterialTexture {
    * `texture.wrap ?? "clamp-to-edge"`.
    */
   readonly wrap?: MaterialTextureWrap;
+
+  /**
+   * Whether the texture carries a full mip chain (§77's "mipmaps"; R-30b,
+   * 2026-08-21).
+   *
+   * **Optional, and absent means `false`** — no chain, exactly the one level
+   * this contract described before the field existed, so every texture and test
+   * double written earlier uploads the identical call sequence.
+   *
+   * `true` asks the backend to build the chain at upload time (WebGL 2's
+   * `generateMipmap`, which needs no power-of-two size). What the chain is
+   * *for* is minification: a 512² texture drawn across twenty pixels samples
+   * twenty of its half-million texels without one, which is the shimmer that
+   * appears when the camera moves.
+   */
+  readonly mipmaps?: boolean;
+
+  /**
+   * How the backend samples when the texture is **minified** (§77; R-30b,
+   * 2026-08-21).
+   *
+   * **Optional, and absent means "derived"**: without
+   * {@link MaterialTexture.mipmaps} it is {@link MaterialTexture.filter}, which
+   * is what this contract always meant; with them it is that filter's
+   * mip-chain-aware form (`"linear"` → `"linear-mipmap-linear"`, i.e.
+   * trilinear). Read it as the concrete class resolves it, or as
+   * `texture.minFilter ?? texture.filter ?? "linear"` if the texture is known
+   * to carry no chain.
+   */
+  readonly minFilter?: MaterialTextureMinFilter;
+
+  /**
+   * How many anisotropic samples the backend may take (§77's "anisotropy";
+   * R-30b, 2026-08-21). An integer ≥ 1.
+   *
+   * **Optional, and absent means `1`** — isotropic filtering, GL's own default
+   * and this contract's previous fixed behaviour.
+   *
+   * Anisotropic filtering is an *extension* in WebGL 2
+   * (`EXT_texture_filter_anisotropic`), so this is a **request, not a
+   * guarantee**: a backend clamps it to what the device reports and ignores it
+   * entirely where the extension is absent. That is §62's capability tiering
+   * rather than §85's refusal — a value the driver merely cannot honour is not
+   * an authoring mistake, and refusing it would make the same scene unrunnable
+   * on a conformant device. A non-integer or a value below 1 *is* an authoring
+   * mistake, and the concrete class refuses it.
+   */
+  readonly anisotropy?: number;
 }

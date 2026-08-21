@@ -28,6 +28,53 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — R-30b: §77 mipmaps, the min-filter split, anisotropy.** Decisions worth
+  keeping:
+  - **A union widens when the feature giving its members meaning arrives — and it widens
+    beside the field it refines, not instead of it.** R-30 wrote that the `minFilter`
+    split would "land with mipmaps, beside this field". It did: `filter` is untouched and
+    _is_ the magnification filter; `TextureMinFilter` is `filter`'s two values plus GL's
+    four `*-mipmap-*` modes, on the min side only. **There is no `magFilter`, and that is
+    the non-obvious half**: GL accepts only `NEAREST`/`LINEAR` for magnification, so the
+    classic `minFilter`/`magFilter` pair would split a direction that can never carry the
+    four values that motivated splitting.
+  - **A derived default beats a constant default when the constant would be nonsense.**
+    `minFilter` resolves to `filter` with no chain (the byte-identity anchor) and to that
+    filter's chain-aware form with one. Defaulting to `LINEAR` on a mipmapped texture
+    would build a chain nothing samples.
+  - **§85 refuses what no device could honour; §62 negotiates what some device cannot.**
+    A mip-choosing `minFilter` without `mipmaps: true` is _refused_ (GL samples the
+    incomplete texture as opaque black — a silent whole-surface failure), while
+    `anisotropy: 16` is _clamped_ to the device ceiling and dropped where the extension is
+    absent. A quality knob that turned a legal scene into an error on half the fleet
+    would be worse than one that quietly costs less.
+  - **A capability query must be lazy if the alternative moves recorded transcripts.**
+    `getExtension` is fetched on the first texture asking for anisotropy above 1, never
+    at `initialize` — reading it at init would add two GL calls to every context and move
+    every landed integration transcript. The §62 _report_ for anisotropy is therefore
+    staged with the texture-format report, stated in source. Pipeline-cost law, applied
+    to a query.
+  - **Optional context members are how a GL surface grows without breaking its doubles.**
+    `WebglContext.generateMipmap` and `.getExtension` are optional — presence is the
+    capability — so every pre-existing double still satisfies the type, and a context
+    that cannot mipmap degrades to one level rather than a black surface.
+  - **Accounting follows the allocation.** `Texture.byteLength` sums the mip chain level
+    by level (4 × 4 mipmapped = 84 bytes, not 4/3 × 64), keeping §84's `textureMemory`
+    true; no chain, no change, so no landed §84 number moved.
+  - **What is left of §77 is what is _not_ upload-time state.** Wrap, filter, colour
+    space, mipmaps and anisotropy were all cheap for one reason: set on the texture
+    object at upload, read by nothing on the draw path. Cube/array/3D change the sampler
+    type in every shader; compressed containers change the upload call; video needs
+    per-frame update semantics. That is the boundary to quote when the next §77 packet is
+    scoped.
+  - **A browser gate can measure a shimmer.** A one-texel checkerboard proves nothing —
+    plain `LINEAR` averages it to grey by itself, which is how the first draft of
+    `mipmaps.spec.ts` failed. Eight-texel cells at 8× minification put a bilinear tap
+    _inside_ one cell, and then the claim is assertable: 81% extreme pixels → 1%, and a
+    half-pixel nudge moving the frame 120 mean luma → 39.
+  - **Measured: +0.33–0.69 kB gzip in every bundle carrying `Texture`** (A/B). Budgets
+    bumped 34.5 / 32 / 40.5 kB with the numbers.
+
 - **2026-08-21 — R-1 WebGPU scoping.** Decisions worth keeping:
   - **CI can run WebGPU, and the flag is exactly one.** Measured against the sandbox's
     pre-installed Chromium (`/opt/pw-browsers`): `--enable-unsafe-webgpu` alone yields a
