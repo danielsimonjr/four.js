@@ -366,3 +366,66 @@ describe("RenderTarget — samplable depth (§69, R-18)", () => {
     expect(target.depthTexture).toBe(true);
   });
 });
+
+describe("RenderTarget — the stencil attachment (§67, R-7)", () => {
+  it("defaults to no stencil, which is what every target had before R-7", () => {
+    const target = new RenderTarget({ width: 8, height: 8 });
+
+    expect(target.stencil).toBe(false);
+  });
+
+  it("asks for one when told to, packed into the depth attachment", () => {
+    const target = new RenderTarget({ width: 8, height: 8, stencil: true });
+
+    expect([target.depth, target.stencil, target.depthTexture]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it("refuses a stencil with no depth to pack it into (§85)", () => {
+    expect(
+      () =>
+        new RenderTarget({
+          width: 8,
+          height: 8,
+          depth: false,
+          stencil: true,
+        }),
+    ).toThrow(/stencil requires depth/);
+  });
+
+  it("refuses a stencil beside R-18's samplable depth texture (§85)", () => {
+    // A framebuffer has one depth attachment; the packed stencil form is a
+    // renderbuffer and the samplable form is a texture, so this is a
+    // contradiction rather than a preference — refused where the mistake is.
+    expect(
+      () =>
+        new RenderTarget({
+          width: 8,
+          height: 8,
+          stencil: true,
+          depthTexture: true,
+        }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  it("accounts DEPTH24_STENCIL8 at four bytes per texel (§83, §84)", () => {
+    const size = 64 * 64;
+    expect(
+      new RenderTarget({ width: 64, height: 64, stencil: true }).byteLength,
+    ).toBe(size * 8);
+  });
+
+  it("keeps the choice across a resize and reports 0 once disposed", () => {
+    const target = new RenderTarget({ width: 16, height: 16, stencil: true });
+    target.resize(32, 32);
+
+    expect(target.stencil).toBe(true);
+    expect(target.byteLength).toBe(32 * 32 * 8);
+    target.dispose();
+    expect(target.byteLength).toBe(0);
+    expect(target.stencil).toBe(true);
+  });
+});

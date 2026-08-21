@@ -8,6 +8,31 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — R-7 closed: §67 stencil substrate
+
+#### Added
+
+- **§67 stencil support (`R-7`)** — §57's seventh material member ships, with the buffer it
+  drives. `StencilState` (`@four/materials`) carries §67's eight comparisons, eight
+  operations, reference and read/write masks, every value refused rather than clamped
+  outside 0…255 (§85 — every stencil buffer WebGL 2 can allocate is 8 bits deep, and GL
+  would mask a larger value down silently) and validated on assignment as well as at
+  construction (F14). `Material.stencil` is a plain property holding one: the class is
+  nominal, so the validating constructor is the only way in, and `material.ts` can import
+  it type-only — a bundle whose scenes never mask does not carry the class.
+  `RendererOptions.stencil` and `RenderTargetOptions.stencil` allocate the buffer (packed
+  `DEPTH24_STENCIL8` on `DEPTH_STENCIL_ATTACHMENT` off screen);
+  `{ stencil: true, depthTexture: true }` is refused, because a framebuffer has one depth
+  attachment and R-18's samplable form is a texture. The WebGL 2 backend applies the state
+  per draw against a CPU mirror seeded at GL's initial values, so a scene naming no
+  stencil emits the GL sequence recorded before this existed, call for call
+  (`FRAME_BEFORE_R7`, recorded on the reverted build; every pixel golden unmoved). Proven
+  on a real driver in `tests/browser/stencil.spec.ts`: a mask pass clips the draw after it
+  to exactly one sixth of its area, in the right place, in the same two draw calls. §67's
+  _clipping API_ — nesting, bit-plane assignment, the backend-limit diagnostic — stays
+  staged; this is the substrate it will be expressed in. +0.85 kB gzip in every bundle
+  carrying `WebglRenderer`; budgets bumped 34 / 31 / 39.5 kB with the A/B measurements.
+
 ### 2026-08-21 — PH-21 and PH-20 closed: §39 step 9 becomes an occupiable priority, and §33 gets its rollback API
 
 #### Added

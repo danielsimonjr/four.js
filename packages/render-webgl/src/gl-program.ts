@@ -79,8 +79,46 @@ export const GL = {
   DEPTH_BUFFER_BIT: 0x00000100,
   /** `GL_COLOR_BUFFER_BIT`, for {@link WebglContext.clear}. */
   COLOR_BUFFER_BIT: 0x00004000,
-  /** `GL_LEQUAL` — the depth comparison this backend uses. */
+  /** `GL_STENCIL_BUFFER_BIT`, for {@link WebglContext.clear} (§67, R-7). */
+  STENCIL_BUFFER_BIT: 0x00000400,
+  // §67's eight comparisons (R-7). GL numbers them contiguously from `NEVER`,
+  // and the four shared with the depth function keep their depth-function
+  // names — `LEQUAL` below is `GL_LEQUAL` whichever test asks for it.
+  /** `GL_NEVER` — a stencil test that never passes. */
+  NEVER: 0x0200,
+  /** `GL_LESS`. */
+  LESS: 0x0201,
+  /** `GL_EQUAL` — the mask test: draw only where the mask was written. */
+  EQUAL: 0x0202,
+  /** `GL_LEQUAL` — the depth comparison this backend uses, and a stencil one. */
   LEQUAL: 0x0203,
+  /** `GL_GREATER`. */
+  GREATER: 0x0204,
+  /** `GL_NOTEQUAL` — the inverse mask test. */
+  NOTEQUAL: 0x0205,
+  /** `GL_GEQUAL`. */
+  GEQUAL: 0x0206,
+  /** `GL_ALWAYS` — the stencil test's initial state, and what a mask pass uses. */
+  ALWAYS: 0x0207,
+  // §67's eight stencil operations (R-7). `KEEP`, `ZERO` and `REPLACE` are the
+  // three a flat mask needs; the increment/decrement pair is what a *nested*
+  // clip counts with, in both its saturating and its wrapping form.
+  /** `GL_KEEP` — leave the stored value alone; the initial state of all three ops. */
+  KEEP: 0x1e00,
+  /** `GL_REPLACE` — store the reference value. */
+  REPLACE: 0x1e01,
+  /** `GL_INCR` — increment, saturating at 255. */
+  INCR: 0x1e02,
+  /** `GL_DECR` — decrement, saturating at 0. */
+  DECR: 0x1e03,
+  /** `GL_INVERT` — bitwise-invert the stored value. */
+  INVERT: 0x150a,
+  /** `GL_INCR_WRAP` — increment, wrapping 255 to 0. */
+  INCR_WRAP: 0x8507,
+  /** `GL_DECR_WRAP` — decrement, wrapping 0 to 255. */
+  DECR_WRAP: 0x8508,
+  /** `GL_STENCIL_TEST` — disabled until a material declares `stencil` (§57). */
+  STENCIL_TEST: 0x0b90,
   /** `GL_TEXTURE_MAG_FILTER`. */
   TEXTURE_MAG_FILTER: 0x2800,
   /** `GL_TEXTURE_MIN_FILTER`. */
@@ -146,6 +184,20 @@ export const GL = {
    * before any bias can help; WebGL 2 requires this format for textures.
    */
   DEPTH_COMPONENT24: 0x81a6,
+  /**
+   * `GL_DEPTH24_STENCIL8` — the packed depth-plus-stencil renderbuffer storage
+   * a render target asks for with `stencil: true` (R-7, §67).
+   *
+   * Packed rather than a separate `STENCIL_INDEX8` renderbuffer: WebGL 2
+   * guarantees this combination is framebuffer-complete, a separate stencil
+   * attachment beside a separate depth attachment is not guaranteed to be, and
+   * one renderbuffer is one allocation. The consequence is stated where it
+   * matters (`gl-render-target.ts`): the packed form is a *renderbuffer*, so a
+   * target cannot ask for a stencil and R-18's samplable `depthTexture` at once.
+   */
+  DEPTH24_STENCIL8: 0x88f0,
+  /** `GL_DEPTH_STENCIL_ATTACHMENT` — where {@link GL.DEPTH24_STENCIL8} attaches. */
+  DEPTH_STENCIL_ATTACHMENT: 0x821a,
   /** `GL_TEXTURE0` — the one texture unit the sprite pipeline samples from. */
   TEXTURE0: 0x84c0,
   /** `GL_RGBA8` — the sized internal format of an MVP-tier texture. */
@@ -386,6 +438,32 @@ export interface WebglContext {
    * carrying a channel set would drive.
    */
   colorMask(red: boolean, green: boolean, blue: boolean, alpha: boolean): void;
+  /**
+   * Sets the stencil comparison for both faces (§67's `func`, `ref`,
+   * `readMask`).
+   *
+   * Both faces, always: this backend leaves `CULL_FACE` disabled and draws
+   * every polygon with one state, so the two-sided `stencilFuncSeparate` — the
+   * entry point a shadow-volume or a non-zero-winding fill pass needs — would
+   * be a second way to say the same thing until such a pass exists.
+   */
+  stencilFunc(func: number, ref: number, mask: number): void;
+  /**
+   * Sets what a stencil-fail, depth-fail, and pass store, for both faces
+   * ({@link WebglContext.stencilFunc}'s reason).
+   */
+  stencilOp(fail: number, depthFail: number, pass: number): void;
+  /**
+   * Sets the bits a stencil write — including `clear(STENCIL_BUFFER_BIT)` —
+   * may change (§67's `writeMask`).
+   *
+   * The clear is the trap and is why this is a mirrored value rather than a
+   * per-draw call: GL masks the *clear* with this too, so a frame that ended
+   * with a read-only mask material would clear nothing at all the next time
+   * round. `webgl-renderer.ts` puts it back before every clear, and with no
+   * stencil in the frame that comparison issues no call.
+   */
+  stencilMask(mask: number): void;
   drawArrays(mode: number, first: number, count: number): void;
   drawElements(mode: number, count: number, type: number, offset: number): void;
   isContextLost(): boolean;

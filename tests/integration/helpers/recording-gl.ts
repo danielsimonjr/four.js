@@ -96,6 +96,12 @@ const CONTEXT_METHODS = [
   "blendFunc",
   "depthMask",
   "colorMask",
+  // §67's three (R-7, 2026-08-11). Appended rather than inserted beside the
+  // other state calls: this list is the double's method set, and its order is
+  // not the order a frame calls them in.
+  "stencilFunc",
+  "stencilOp",
+  "stencilMask",
   "drawArrays",
   "drawArraysInstanced",
   "drawElements",

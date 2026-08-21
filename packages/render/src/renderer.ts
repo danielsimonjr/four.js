@@ -172,6 +172,27 @@ export interface RendererOptions {
    * initialization over it.
    */
   antialias?: boolean;
+
+  /**
+   * Request a **stencil buffer** on the drawing surface (§67, R-7); `false` by
+   * default.
+   *
+   * §57's `Material.stencil` describes a stencil test; this is the buffer that
+   * test reads and writes. The two are separate because they are separately
+   * costly: a material's stencil state costs nothing until a draw uses it,
+   * while the buffer is memory the surface carries for its lifetime and a
+   * clear every view issues — so a renderer asks for it once, up front, and a
+   * scene that never masks never pays.
+   *
+   * A hint in §45's sense, like {@link RendererOptions.antialias}: a backend
+   * that cannot provide one still initializes and still draws, with masking
+   * materials drawing unmasked rather than not at all (§61 forbids failing a
+   * frame over render state).
+   *
+   * Masking into an **off-screen** surface asks the render target instead —
+   * `RenderTargetOptions.stencil` — and leaves this `false`.
+   */
+  stencil?: boolean;
 }
 
 /**

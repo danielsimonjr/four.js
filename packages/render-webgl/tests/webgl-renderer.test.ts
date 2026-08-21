@@ -520,6 +520,15 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     colorMask(red, green, blue, alpha) {
       record("colorMask", red, green, blue, alpha);
     },
+    stencilFunc(func, ref, mask) {
+      record("stencilFunc", func, ref, mask);
+    },
+    stencilOp(fail, depthFail, pass) {
+      record("stencilOp", fail, depthFail, pass);
+    },
+    stencilMask(mask) {
+      record("stencilMask", mask);
+    },
     drawArrays(mode, first, count) {
       record("drawArrays", mode, first, count);
     },
@@ -721,6 +730,14 @@ class TestMaterial {
   map?: ItemTexture | null;
 
   vertexColors?: boolean;
+
+  /**
+   * §57's optional stencil record (§67, R-7) — optional and unset by default
+   * for `map`'s reason, and typed as a *partial* record on purpose: the
+   * backend reads every field defensively, and this double is what proves the
+   * fallbacks are reachable rather than decorative.
+   */
+  stencil?: Partial<NonNullable<ItemMaterial["stencil"]>>;
 
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
@@ -9293,5 +9310,301 @@ describe("WebglRenderer.render — §87 per-view frustum culling (R-8)", () => {
     ]);
 
     expect(gl.countOf("drawElements")).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §67's stencil state (R-7, 2026-08-11).
+//
+// The two-sided claim every state switch in this backend makes, once more: a
+// material that declares `stencil` gets it, applied group by group and only
+// where a group moved, and a material that declares none costs the frame
+// **nothing at all** — no enable, no func, no mask, not even a restore. The
+// second half is what keeps every recorded transcript and every pixel golden
+// valid, and it is why the mirror is seeded at GL's own initial values rather
+// than at "unknown".
+// ---------------------------------------------------------------------------
+
+/** The frame's stencil calls, as `[name, ...args]`, in call order. */
+function stencilCalls(gl: FakeGl): unknown[][] {
+  return gl.calls
+    .filter(
+      (call) =>
+        call.name.startsWith("stencil") ||
+        ((call.name === "enable" || call.name === "disable") &&
+          call.args[0] === GL.STENCIL_TEST),
+    )
+    .map((call) => [call.name, ...call.args]);
+}
+
+describe("WebglRenderer.render — §57's stencil state (§67, R-7)", () => {
+  it("costs a frame nothing when no material declares one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ depthTest: false }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Depth state moved, so this frame is not trivially call-free — and it
+    // still contains not one stencil call.
+    expect(toggles(gl)).toEqual([
+      ["disable", GL.DEPTH_TEST],
+      ["enable", GL.DEPTH_TEST],
+    ]);
+    expect(stencilCalls(gl)).toEqual([]);
+    expect(gl.countOf("stencilFunc")).toBe(0);
+    expect(gl.countOf("stencilOp")).toBe(0);
+    expect(gl.countOf("stencilMask")).toBe(0);
+  });
+
+  it("enables the test and nothing more for a record that names GL's defaults", async () => {
+    // The `{}` record is the reachability proof for every `??` in
+    // `applyStencilState`: a structurally-typed material may carry a partial
+    // record, and a missing field has to mean the documented default rather
+    // than `undefined` reaching a GL entry point.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ stencil: {} }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["disable", GL.STENCIL_TEST],
+    ]);
+  });
+
+  it("maps every field onto its GL entry point", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      stateful({
+        stencil: {
+          func: "equal",
+          ref: 2,
+          readMask: 0b0011,
+          writeMask: 0b1100,
+          failOp: "zero",
+          depthFailOp: "invert",
+          passOp: "replace",
+        },
+      }),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.EQUAL, 2, 0b0011],
+      ["stencilOp", GL.ZERO, GL.INVERT, GL.REPLACE],
+      ["stencilMask", 0b1100],
+      // The frame's exit envelope: the test off, and the write mask reopened
+      // so the next frame's clear is not masked by it.
+      ["disable", GL.STENCIL_TEST],
+      ["stencilMask", 0xff],
+    ]);
+    const names = gl.names();
+    expect(names.indexOf("stencilFunc")).toBeLessThan(
+      names.indexOf("drawArrays"),
+    );
+    expect(names.lastIndexOf("stencilMask")).toBeGreaterThan(
+      names.indexOf("drawArrays"),
+    );
+  });
+
+  it("translates all eight comparisons and all eight operations", async () => {
+    const funcs = [
+      ["never", GL.NEVER],
+      ["less", GL.LESS],
+      ["equal", GL.EQUAL],
+      ["lequal", GL.LEQUAL],
+      ["greater", GL.GREATER],
+      ["notequal", GL.NOTEQUAL],
+      ["gequal", GL.GEQUAL],
+      ["always", GL.ALWAYS],
+    ] as const;
+    const ops = [
+      ["keep", GL.KEEP],
+      ["zero", GL.ZERO],
+      ["replace", GL.REPLACE],
+      ["increment", GL.INCR],
+      ["increment-wrap", GL.INCR_WRAP],
+      ["decrement", GL.DECR],
+      ["decrement-wrap", GL.DECR_WRAP],
+      ["invert", GL.INVERT],
+    ] as const;
+
+    for (const [name, expected] of funcs) {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      // `ref: 1` so even `always` differs from the mirror and issues its call.
+      root.add(stateful({ stencil: { func: name, ref: 1 } }));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      expect(gl.callsOf("stencilFunc")[0].args).toEqual([expected, 1, 0xff]);
+    }
+    for (const [name, expected] of ops) {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(stateful({ stencil: { failOp: name, passOp: name } }));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      if (name === "keep") {
+        // Already the mirror's value: no call, which is the point of mirroring.
+        expect(gl.countOf("stencilOp")).toBe(0);
+        continue;
+      }
+      expect(gl.callsOf("stencilOp")[0].args).toEqual([
+        expected,
+        GL.KEEP,
+        expected,
+      ]);
+    }
+  });
+
+  it("re-issues only the group that moved between two stencil materials", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // The §67 composition: write the mask, then test against it. The two agree
+    // on the operations only after the second pass restores them, so what this
+    // asserts is that the *func* group and the *mask* group move on their own.
+    root.add(
+      stateful({ stencil: { func: "always", ref: 1, passOp: "replace" } }),
+    );
+    root.add(stateful({ stencil: { func: "equal", ref: 1, writeMask: 0 } }));
+    root.add(stateful({ stencil: { func: "equal", ref: 1, writeMask: 0 } }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.ALWAYS, 1, 0xff],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.REPLACE],
+      ["stencilFunc", GL.EQUAL, 1, 0xff],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.KEEP],
+      ["stencilMask", 0],
+      // The third item is identical to the second: not one call.
+      ["disable", GL.STENCIL_TEST],
+      ["stencilMask", 0xff],
+    ]);
+  });
+
+  it("turns the test off with one call, leaving the rest where it was", async () => {
+    // With `STENCIL_TEST` disabled GL performs no stencil test and no stencil
+    // write, so returning to "no stencil" is one `disable` — the func and op
+    // state is deliberately not restored call by call.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ stencil: { func: "equal", ref: 4 } }));
+    root.add(stateful({}));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.EQUAL, 4, 0xff],
+      ["disable", GL.STENCIL_TEST],
+    ]);
+  });
+
+  it("reopens the write mask before the next view clears", async () => {
+    // `clear` is masked by the stencil write mask whether or not the test is
+    // enabled, so a view following a read-only mask material would clear
+    // nothing at all. Two views make the restore visible inside one frame.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ stencil: { func: "equal", ref: 1, writeMask: 0 } }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera), createView(camera)]);
+
+    const names = gl.names();
+    const firstClear = names.indexOf("clear");
+    const closed = names.indexOf("stencilMask");
+    const secondClear = names.indexOf("clear", firstClear + 1);
+    expect(closed).toBeGreaterThan(firstClear);
+    expect(closed).toBeLessThan(secondClear);
+    expect(gl.callsOf("stencilMask").map((call) => call.args[0])).toEqual([
+      0, 0xff, 0, 0xff,
+    ]);
+  });
+
+  it("clears the stencil buffer only when the surface has one (§33, §61)", async () => {
+    // A stencil buffer that is never cleared is a mask leaking from one frame
+    // into the next. A renderer that did not ask for one issues the identical
+    // `clear` it always did — which is the byte-identity half of the clause.
+    const plain = await initialized();
+    plain.gl.reset();
+    plain.renderer.render(createRoot(), [createView(plain.camera)]);
+    for (const call of plain.gl.callsOf("clear")) {
+      expect(Number(call.args[0]) & GL.STENCIL_BUFFER_BIT).toBe(0);
+    }
+
+    const gl = createFakeGl();
+    const renderer = new WebglRenderer();
+    await renderer.initialize({ canvas: new TestCanvas(gl), stencil: true });
+    gl.reset();
+    renderer.render(createRoot(), [createView(new TestCamera())]);
+    const clears = gl.callsOf("clear");
+    expect(clears.length).toBeGreaterThan(0);
+    for (const call of clears) {
+      expect(Number(call.args[0]) & GL.STENCIL_BUFFER_BIT).toBe(
+        GL.STENCIL_BUFFER_BIT,
+      );
+    }
+  });
+
+  it("asks the context for the buffer only when told to", async () => {
+    const off = createFakeGl();
+    const offCanvas = new TestCanvas(off);
+    await new WebglRenderer().initialize({ canvas: offCanvas });
+    expect(offCanvas.attributes[0]?.stencil).toBe(false);
+
+    const on = createFakeGl();
+    const onCanvas = new TestCanvas(on);
+    await new WebglRenderer().initialize({ canvas: onCanvas, stencil: true });
+    expect(onCanvas.attributes[0]?.stencil).toBe(true);
+  });
+});
+
+describe("RenderTargetCache — the packed stencil attachment (§67, R-7)", () => {
+  it("allocates DEPTH24_STENCIL8 on the combined attachment point", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4, stencil: true });
+
+    const record = cache.acquire(target);
+
+    expect(record?.stencil).toBe(true);
+    expect(record?.depthBuffer).not.toBeNull();
+    // One renderbuffer, not two: the packed format *is* both buffers, which is
+    // what makes the exclusion with R-18's depth texture structural.
+    expect(gl.countOf("createRenderbuffer")).toBe(1);
+    expect(gl.callsOf("renderbufferStorage")[0].args[1]).toBe(
+      GL.DEPTH24_STENCIL8,
+    );
+    expect(gl.callsOf("framebufferRenderbuffer")[0].args[1]).toBe(
+      GL.DEPTH_STENCIL_ATTACHMENT,
+    );
+  });
+
+  it("leaves a target that asked for no stencil exactly as it was", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+
+    const record = cache.acquire(new RenderTarget({ width: 4, height: 4 }));
+
+    expect(record?.stencil).toBe(false);
+    expect(gl.callsOf("renderbufferStorage")[0].args[1]).toBe(
+      GL.DEPTH_COMPONENT16,
+    );
+    expect(gl.callsOf("framebufferRenderbuffer")[0].args[1]).toBe(
+      GL.DEPTH_ATTACHMENT,
+    );
   });
 });

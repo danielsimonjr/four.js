@@ -28,6 +28,62 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — R-7 §67 stencil substrate.** Decisions worth keeping:
+  - **A state record is not an API — and saying which one you shipped is the packet.** §67
+    lists six clipping mechanisms; §57 lists one optional material member. R-7 shipped the
+    member completely rather than the mechanisms partly. A `clip()` is a _scene-graph_
+    design (subtree inheritance, nesting, bit-plane assignment, the backend-limit
+    diagnostic §67 requires) and belongs to a packet that may edit `@four/scene`.
+    `readMask` is already the bit-plane selector it will need.
+  - **A nominal class beats a validating accessor, and the reason is bytes.** The first
+    cut normalized `stencil: { func: "equal" }` literals into a validated `StencilState`
+    through a `Material` accessor. It cost **0.62 kB gzip in every bundle carrying a
+    material**, masked or not, because `material.ts` then imported the class at runtime.
+    Making `StencilState` nominal (private fields ⇒ a literal is not assignable) moves the
+    same guarantee into the type system and lets the import be **type-only**. New reusable
+    technique: _when a field's validation can be carried by the value's own type, the
+    holder needs no accessor — and the class tree-shakes away for everyone who never uses
+    it._ This is R-23's "add nothing to the frame path" applied to bytes.
+  - **Refusing at the 8-bit boundary is a §85 refusal, not pedantry.** WebGL 2 has exactly
+    two stencil formats and both are 8 bits; GL _silently_ masks a larger reference down.
+    `ref: 256` becoming `0` does not draw wrong pixels loudly — it draws a mask that never
+    matches. That refusal is also what makes mirroring the all-ones mask as `0xff` (rather
+    than GL's literal `0xFFFFFFFF`) exact rather than a narrowing.
+  - **`clear` is masked by the stencil _write_ mask, test enabled or not.** A frame ending
+    with a read-only mask material clears nothing the next time round, and the mask leaks
+    across frames (§33). The write mask must be reopened before **every view clear**, not
+    only at frame exit — F13/F15's envelope rule, third extension.
+  - **Turning a test off does not need the rest put back.** With `STENCIL_TEST` disabled
+    GL performs no stencil write either, so returning to "no stencil" is one `disable`
+    and the func/op mirrors are deliberately left dirty. Cheapest correct restore.
+  - **Sixth confirmation of mirror-at-GL-initial**, and the first where the mirrored
+    initial values were factored into one `INITIAL_STENCIL` object — those values _are_
+    the byte-identity claim, and a claim stated twice is a claim that can drift.
+  - **The packed depth-stencil makes an exclusion structural rather than a policy.**
+    `DEPTH24_STENCIL8` is a renderbuffer and R-18's samplable depth is a
+    `DEPTH_COMPONENT24` texture; a framebuffer has one depth attachment, so
+    `{ stencil, depthTexture }` is refused in `@four/render` and `gl-render-target.ts`
+    never has to choose. Corollary: **a target cannot be both a shadow map and a masked
+    surface.**
+  - **A defensive branch that no caller can reach is a coverage hole, not a safety net.**
+    `stencil: target.stencil && depthBuffer !== null` was unreachable (stencil ⇒ depth ⇒
+    a renderbuffer, and a failed allocation returns `null` before the record) and cost a
+    branch. Deleted with the argument written where it was.
+  - **A fixture page is the third way to get a browser gate.** `batching.spec.ts`'s
+    Vite-bundled-and-injected fixture is now the pattern for any gate whose subject is a
+    _renderer option_: §67 needed a canvas built with `stencil: true`, and no example
+    asks for one. No tenth server, no page nobody would visit.
+  - **§79 needed nothing, and that is worth knowing before the next material packet.**
+    Materials serialize by catalog _reference_ (A-16), so a new material field adds no
+    serializer — and adds no contention with a sibling editing `scene-serializers.ts`.
+  - **Measured:** +0.85 kB gzip in every bundle carrying `WebglRenderer` (R-6's 0.75 kB
+    law again); three budgets bumped with measurements (`first-3d` 32.5→34, `particles`
+    30→31, `ui-demo` 38→39.5, superseding the queued 38.5).
+  - **Gotcha (pre-existing, not R-7's):** `packages/render/tests/shape.test.ts`'s
+    65 536-vertex widening test times out at the default 5 s under `--coverage` on a
+    loaded box; it passes alone and at `--testTimeout=30000`. It is a tessellation-time
+    flake, not a regression — do not "fix" it by editing the assertion.
+
 - **2026-08-21 — PH-21 §39 step 9 + PH-20 §33 rollback.** Decisions worth keeping:
   - **A default kept is worth more than a name made right.** GAP v0's plan for PH-21 was to
     split `PhysicsSystem` into `PhysicsStepSystem` + `PhysicsEventDispatchSystem`. The

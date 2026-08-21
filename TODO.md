@@ -34,6 +34,23 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-7 — §67 stencil support (2026-08-21).** `StencilState` in `@four/materials`,
+      `RendererOptions.stencil` / `RenderTargetOptions.stencil`, backend application and
+      packed `DEPTH24_STENCIL8` allocation, `FRAME_BEFORE_R7` recorded on the reverted
+      build, real-driver masking proof (browser gate now 64 tests). Budgets bumped
+      34/31/39.5 kB with A/B measurements.
+- [ ] **§67 clipping API (new, from R-7's residue, L)** — a node-level clip in
+      `@four/scene`: subtree inheritance, nested-clip intersection, stencil **bit-plane**
+      assignment in a render-list pass, and §67's required diagnostic when the eight
+      planes of an 8-bit buffer are exhausted. Expressed in `StencilState` records;
+      unblocks §73's scroll view and §119's section views, and is what §50's
+      masks/clipping waits on. Needs `@four/scene` in scope.
+- [ ] **Scissor clipping (§67's first bullet, small)** — unrelated to the stencil and
+      unblocked: the backend already keeps `SCISSOR_TEST` enabled and sets the rect per
+      view. A per-item scissor is a render-list field, not a buffer.
+- [ ] **Flake to watch (pre-existing):** `packages/render/tests/shape.test.ts`'s "widens
+      to a 32-bit index buffer" times out under `--coverage` on a loaded box. Either
+      raise that one test's timeout or shrink the fixture; do not weaken the assertion.
 - [x] **PH-21 — §39 step 9 occupiable (2026-08-21).** `PhysicsEventSystem` at
       `PRIORITY_EVENT_DISPATCH` + `PhysicsSystemOptions.dispatchEvents`; golden
       `event-dispatch-split.json`. Steps 7–8 closed as not splittable, documented in
