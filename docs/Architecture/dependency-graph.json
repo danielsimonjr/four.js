@@ -2,10 +2,10 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-13",
-    "totalFiles": 215,
+    "lastUpdated": "2026-08-21",
+    "totalFiles": 218,
     "totalModules": 24,
-    "totalExports": 1990
+    "totalExports": 2004
   },
   "entryPoints": [
     {
@@ -26,7 +26,7 @@
     {
       "file": "packages/diagnostics/src/index.ts",
       "type": "main",
-      "description": "--- WP-10.2 (ReplayPlayer) begin -------------------------------------------"
+      "description": "--- PH-20 (§33 rollback) ---------------------------------------------------"
     },
     {
       "file": "packages/four/src/index.ts",
@@ -2064,7 +2064,7 @@
         ]
       },
       "packages/diagnostics/src/index.ts": {
-        "description": "--- WP-10.2 (ReplayPlayer) begin -------------------------------------------",
+        "description": "--- PH-20 (§33 rollback) ---------------------------------------------------",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -2080,6 +2080,13 @@
             "file": "./recorder.js",
             "imports": [
               "ReplayRecorder"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./rollback.js",
+            "imports": [
+              "RollbackBuffer"
             ],
             "reExport": true
           },
@@ -2173,6 +2180,15 @@
             "typeOnly": true
           },
           {
+            "file": "./rollback.js",
+            "imports": [
+              "RollbackBufferOptions",
+              "RollbackTarget"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./replay-format.js",
             "imports": [
               "JsonValue",
@@ -2248,6 +2264,7 @@
           "createChecksum",
           "hashFloats",
           "ReplayRecorder",
+          "RollbackBuffer",
           "LATEST_REPLAY_FORMAT_VERSION",
           "MINIMUM_REPLAY_FORMAT_VERSION",
           "REPLAY_FORMAT_VERSION",
@@ -2294,6 +2311,8 @@
           "ReplayRecorderOptions",
           "ReplaySnapshot",
           "ReplayTarget",
+          "RollbackBufferOptions",
+          "RollbackTarget",
           "JsonValue",
           "ReplayAdapterIdentity",
           "ReplayFrameRecord",
@@ -2334,6 +2353,7 @@
           "createChecksum",
           "hashFloats",
           "ReplayRecorder",
+          "RollbackBuffer",
           "LATEST_REPLAY_FORMAT_VERSION",
           "MINIMUM_REPLAY_FORMAT_VERSION",
           "REPLAY_FORMAT_VERSION",
@@ -2379,6 +2399,8 @@
           "ReplayRecorderOptions",
           "ReplaySnapshot",
           "ReplayTarget",
+          "RollbackBufferOptions",
+          "RollbackTarget",
           "JsonValue",
           "ReplayAdapterIdentity",
           "ReplayFrameRecord",
@@ -2619,6 +2641,39 @@
         ],
         "constants": [
           "NO_RESOURCE_LEAKS"
+        ]
+      },
+      "packages/diagnostics/src/rollback.ts": {
+        "description": "`RollbackBuffer` (§33 *\"rollback\"*, §34; PH-20, 2026-08-21) — a bounded ring",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./recorder.js",
+            "imports": [
+              "ReplaySnapshot"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "RollbackBuffer"
+        ],
+        "classes": [
+          "RollbackBuffer"
+        ],
+        "interfaces": [
+          "RollbackTarget",
+          "RollbackBufferOptions"
         ]
       },
       "packages/diagnostics/src/stats.ts": {
@@ -4875,7 +4930,7 @@
     },
     "packages/materials": {
       "packages/materials/src/index.ts": {
-        "description": "Package entry point for @four/materials (re-exports 17 symbols)",
+        "description": "Package entry point for @four/materials (re-exports 22 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -4897,6 +4952,14 @@
             "file": "./sprite-material.js",
             "imports": [
               "SpriteMaterial"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./stencil-state.js",
+            "imports": [
+              "MAX_STENCIL_VALUE",
+              "StencilState"
             ],
             "reExport": true
           },
@@ -4941,6 +5004,16 @@
             "typeOnly": true
           },
           {
+            "file": "./stencil-state.js",
+            "imports": [
+              "StencilFunc",
+              "StencilOp",
+              "StencilStateOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./standard-material.js",
             "imports": [
               "ColorRGB",
@@ -4974,6 +5047,8 @@
           "LitMaterial",
           "Material",
           "SpriteMaterial",
+          "MAX_STENCIL_VALUE",
+          "StencilState",
           "StandardMaterial",
           "UnlitMaterial",
           "PACKAGE_NAME",
@@ -4982,6 +5057,9 @@
           "MaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
+          "StencilFunc",
+          "StencilOp",
+          "StencilStateOptions",
           "ColorRGB",
           "StandardMaterialOptions",
           "MaterialTexture",
@@ -4994,6 +5072,8 @@
           "LitMaterial",
           "Material",
           "SpriteMaterial",
+          "MAX_STENCIL_VALUE",
+          "StencilState",
           "StandardMaterial",
           "UnlitMaterial",
           "LitMaterialOptions",
@@ -5001,6 +5081,9 @@
           "MaterialOptions",
           "SpriteMaterialOptions",
           "SpriteTexture",
+          "StencilFunc",
+          "StencilOp",
+          "StencilStateOptions",
           "ColorRGB",
           "StandardMaterialOptions",
           "MaterialTexture",
@@ -5055,7 +5138,15 @@
         "description": "`Material` (§57) — the abstract base every material family member extends,",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./stencil-state.js",
+            "imports": [
+              "StencilState"
+            ],
+            "typeOnly": true
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -5157,6 +5248,26 @@
         ],
         "interfaces": [
           "StandardMaterialOptions"
+        ]
+      },
+      "packages/materials/src/stencil-state.ts": {
+        "description": "`StencilState` (§57, §67) — the per-material stencil test, write mask, and",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "MAX_STENCIL_VALUE",
+          "StencilState"
+        ],
+        "classes": [
+          "StencilState"
+        ],
+        "interfaces": [
+          "StencilStateOptions"
+        ],
+        "constants": [
+          "MAX_STENCIL_VALUE"
         ]
       },
       "packages/materials/src/texture.ts": {
@@ -7962,6 +8073,13 @@
             "reExport": true
           },
           {
+            "file": "./physics-event-system.js",
+            "imports": [
+              "PhysicsEventSystem"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./physics-system.js",
             "imports": [
               "PhysicsSystem"
@@ -8190,6 +8308,14 @@
             "typeOnly": true
           },
           {
+            "file": "./physics-event-system.js",
+            "imports": [
+              "PhysicsEventSystemOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./physics-system.js",
             "imports": [
               "PhysicsSystemOptions"
@@ -8354,6 +8480,7 @@
           "SpringJoint",
           "worldAnchorToLocal",
           "worldAxisToLocal",
+          "PhysicsEventSystem",
           "PhysicsSystem",
           "DEFAULT_DENSITY",
           "DEFAULT_FRICTION",
@@ -8467,6 +8594,7 @@
           "SphericalJointOptions",
           "SpringJointOptions",
           "PhysicsMaterialOptions",
+          "PhysicsEventSystemOptions",
           "PhysicsSystemOptions",
           "OverlapHit",
           "OverlapQuery",
@@ -8575,6 +8703,7 @@
           "SpringJoint",
           "worldAnchorToLocal",
           "worldAxisToLocal",
+          "PhysicsEventSystem",
           "PhysicsSystem",
           "DEFAULT_DENSITY",
           "DEFAULT_FRICTION",
@@ -8687,6 +8816,7 @@
           "SphericalJointOptions",
           "SpringJointOptions",
           "PhysicsMaterialOptions",
+          "PhysicsEventSystemOptions",
           "PhysicsSystemOptions",
           "OverlapHit",
           "OverlapQuery",
@@ -8961,6 +9091,53 @@
           "DEFAULT_DENSITY",
           "DEFAULT_FRICTION_COMBINE_MODE",
           "DEFAULT_RESTITUTION_COMBINE_MODE"
+        ]
+      },
+      "packages/physics/src/physics-event-system.ts": {
+        "description": "`PhysicsEventSystem` (§39 step 9, PH-21) — the optional occupant of",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./physics-system.js",
+            "imports": [
+              "PhysicsSystem"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./world.js",
+            "imports": [
+              "PhysicsWorld"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          },
+          {
+            "package": "@four/motion",
+            "directory": "packages/motion",
+            "imports": [
+              "PRIORITY_EVENT_DISPATCH",
+              "SimulationSystem"
+            ]
+          }
+        ],
+        "exports": [
+          "PhysicsEventSystem"
+        ],
+        "classes": [
+          "PhysicsEventSystem"
+        ],
+        "interfaces": [
+          "PhysicsEventSystemOptions"
         ]
       },
       "packages/physics/src/physics-system.ts": {
@@ -15469,6 +15646,7 @@
           "packages/diagnostics/src/replay-format.ts",
           "packages/diagnostics/src/replay-player.ts",
           "packages/diagnostics/src/resource-audit.ts",
+          "packages/diagnostics/src/rollback.ts",
           "packages/diagnostics/src/stats.ts"
         ]
       },
@@ -15539,6 +15717,7 @@
           "packages/materials/src/material.ts",
           "packages/materials/src/sprite-material.ts",
           "packages/materials/src/standard-material.ts",
+          "packages/materials/src/stencil-state.ts",
           "packages/materials/src/texture.ts",
           "packages/materials/src/unlit-material.ts"
         ]
@@ -15606,6 +15785,7 @@
           "packages/physics/src/index.ts",
           "packages/physics/src/joints.ts",
           "packages/physics/src/material.ts",
+          "packages/physics/src/physics-event-system.ts",
           "packages/physics/src/physics-system.ts",
           "packages/physics/src/queries.ts",
           "packages/physics/src/rigid-body.ts",
@@ -15756,18 +15936,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 215,
+    "totalTypeScriptFiles": 218,
     "totalModules": 24,
-    "totalLinesOfCode": 99676,
-    "totalExports": 1990,
-    "totalClasses": 136,
-    "totalInterfaces": 424,
+    "totalLinesOfCode": 101084,
+    "totalExports": 2004,
+    "totalClasses": 139,
+    "totalInterfaces": 428,
     "totalFunctions": 335,
     "totalTypeGuards": 19,
     "totalEnums": 0,
-    "totalConstants": 257,
-    "totalReExports": 1284,
-    "totalTypeOnlyImports": 249,
+    "totalConstants": 258,
+    "totalReExports": 1294,
+    "totalTypeOnlyImports": 256,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,

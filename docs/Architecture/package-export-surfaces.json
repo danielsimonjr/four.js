@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-13",
+  "generated": "2026-08-21",
   "surfaces": {
     "packages/animation": [
       "Advanceable",
@@ -274,6 +274,9 @@
       "ReplayTarget",
       "resetFrameStats",
       "ResourceLeakReport",
+      "RollbackBuffer",
+      "RollbackBufferOptions",
+      "RollbackTarget",
       "solverJointStatistics",
       "SolverJointStatistics",
       "solverStatistics",
@@ -464,12 +467,17 @@
       "MaterialTexture",
       "MaterialTextureFilter",
       "MaterialTextureWrap",
+      "MAX_STENCIL_VALUE",
       "PACKAGE_NAME",
       "SpriteMaterial",
       "SpriteMaterialOptions",
       "SpriteTexture",
       "StandardMaterial",
       "StandardMaterialOptions",
+      "StencilFunc",
+      "StencilOp",
+      "StencilState",
+      "StencilStateOptions",
       "UnlitMaterial",
       "UnlitMaterialOptions"
     ],
@@ -775,6 +783,8 @@
       "PhysicsColliderHandle",
       "PhysicsDimension",
       "PhysicsEvent",
+      "PhysicsEventSystem",
+      "PhysicsEventSystemOptions",
       "PhysicsEventType",
       "PhysicsHandle",
       "PhysicsJointHandle",
