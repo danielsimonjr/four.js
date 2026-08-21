@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-21",
-    "totalFiles": 221,
+    "totalFiles": 225,
     "totalModules": 24,
-    "totalExports": 2031
+    "totalExports": 2077
   },
   "entryPoints": [
     {
@@ -1209,7 +1209,17 @@
         "description": "The asset manager (§76) — one cache, one refcount, one fetch per asset.",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./content-hash.js",
+            "imports": [
+              "resolveGlobalDigest",
+              "resolveGlobalTextDecoder",
+              "DigestLike",
+              "TextDecodeLike"
+            ]
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -1246,6 +1256,25 @@
           "DEFAULT_TIMEOUT_SECONDS"
         ]
       },
+      "packages/assets/src/content-hash.ts": {
+        "description": "Content hashing (§76's last-but-one capability, §79's manifest half).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [],
+        "exports": [
+          "CONTENT_HASH_ALGORITHM",
+          "resolveGlobalDigest",
+          "resolveGlobalTextDecoder"
+        ],
+        "functions": [
+          "resolveGlobalDigest",
+          "resolveGlobalTextDecoder"
+        ],
+        "constants": [
+          "CONTENT_HASH_ALGORITHM"
+        ]
+      },
       "packages/assets/src/index.ts": {
         "description": "`@four/assets` — the asset system (§76–78).",
         "externalDependencies": [],
@@ -1257,6 +1286,33 @@
               "AssetManager",
               "DEFAULT_MAXIMUM_BYTES",
               "DEFAULT_TIMEOUT_SECONDS"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./content-hash.js",
+            "imports": [
+              "CONTENT_HASH_ALGORITHM"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./manifest.js",
+            "imports": [
+              "loadFromManifest",
+              "manifestLoader",
+              "manifestUrl",
+              "parseAssetManifest"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "DEFAULT_MAXIMUM_DECODED_BYTES",
+              "DEFAULT_MAXIMUM_EXPANSION_RATIO",
+              "TextureAsset",
+              "createTextureLoader"
             ],
             "reExport": true
           },
@@ -1289,6 +1345,39 @@
             "typeOnly": true
           },
           {
+            "file": "./content-hash.js",
+            "imports": [
+              "DigestLike",
+              "TextDecodeLike"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./manifest.js",
+            "imports": [
+              "AssetManifest",
+              "AssetManifestEntry",
+              "ManifestLoadOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./texture.js",
+            "imports": [
+              "DecodedTexels",
+              "TexelDecodeLike",
+              "TexelProbeLike",
+              "TextureColorSpace",
+              "TextureFilterMode",
+              "TextureLoaderOptions",
+              "TextureWrapMode"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./loaders.js",
             "imports": [
               "ImageBitmapLike",
@@ -1303,6 +1392,15 @@
           "AssetManager",
           "DEFAULT_MAXIMUM_BYTES",
           "DEFAULT_TIMEOUT_SECONDS",
+          "CONTENT_HASH_ALGORITHM",
+          "loadFromManifest",
+          "manifestLoader",
+          "manifestUrl",
+          "parseAssetManifest",
+          "DEFAULT_MAXIMUM_DECODED_BYTES",
+          "DEFAULT_MAXIMUM_EXPANSION_RATIO",
+          "TextureAsset",
+          "createTextureLoader",
           "ImageAsset",
           "binaryLoader",
           "createImageLoader",
@@ -1319,6 +1417,18 @@
           "FetchResponse",
           "ResponseHeadersLike",
           "TimerLike",
+          "DigestLike",
+          "TextDecodeLike",
+          "AssetManifest",
+          "AssetManifestEntry",
+          "ManifestLoadOptions",
+          "DecodedTexels",
+          "TexelDecodeLike",
+          "TexelProbeLike",
+          "TextureColorSpace",
+          "TextureFilterMode",
+          "TextureLoaderOptions",
+          "TextureWrapMode",
           "ImageBitmapLike",
           "ImageDecodeLike"
         ],
@@ -1326,6 +1436,15 @@
           "AssetManager",
           "DEFAULT_MAXIMUM_BYTES",
           "DEFAULT_TIMEOUT_SECONDS",
+          "CONTENT_HASH_ALGORITHM",
+          "loadFromManifest",
+          "manifestLoader",
+          "manifestUrl",
+          "parseAssetManifest",
+          "DEFAULT_MAXIMUM_DECODED_BYTES",
+          "DEFAULT_MAXIMUM_EXPANSION_RATIO",
+          "TextureAsset",
+          "createTextureLoader",
           "ImageAsset",
           "binaryLoader",
           "createImageLoader",
@@ -1341,6 +1460,18 @@
           "FetchResponse",
           "ResponseHeadersLike",
           "TimerLike",
+          "DigestLike",
+          "TextDecodeLike",
+          "AssetManifest",
+          "AssetManifestEntry",
+          "ManifestLoadOptions",
+          "DecodedTexels",
+          "TexelDecodeLike",
+          "TexelProbeLike",
+          "TextureColorSpace",
+          "TextureFilterMode",
+          "TextureLoaderOptions",
+          "TextureWrapMode",
           "ImageBitmapLike",
           "ImageDecodeLike"
         ],
@@ -1383,6 +1514,99 @@
           "textLoader",
           "jsonLoader",
           "binaryLoader"
+        ]
+      },
+      "packages/assets/src/manifest.ts": {
+        "description": "The §79 asset manifest — logical key → URL + content hash.",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./asset-manager.js",
+            "imports": [
+              "AssetLoader",
+              "AssetLoadOptions"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./asset-manager.js",
+            "imports": [
+              "AssetManager"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "exports": [
+          "manifestLoader",
+          "parseAssetManifest",
+          "loadFromManifest",
+          "manifestUrl"
+        ],
+        "interfaces": [
+          "AssetManifestEntry",
+          "ManifestLoadOptions"
+        ],
+        "functions": [
+          "parseAssetManifest",
+          "loadFromManifest",
+          "manifestUrl"
+        ],
+        "constants": [
+          "manifestLoader"
+        ]
+      },
+      "packages/assets/src/texture.ts": {
+        "description": "The texture loader tier (§77's asset half, A-19 — 2026-08-21).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./asset-manager.js",
+            "imports": [
+              "AssetLoader",
+              "FetchResponse"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "FourError",
+              "Disposable"
+            ]
+          }
+        ],
+        "exports": [
+          "DEFAULT_MAXIMUM_DECODED_BYTES",
+          "DEFAULT_MAXIMUM_EXPANSION_RATIO",
+          "createTextureLoader",
+          "TextureAsset"
+        ],
+        "classes": [
+          "TextureAsset"
+        ],
+        "interfaces": [
+          "DecodedTexels",
+          "TextureLoaderOptions"
+        ],
+        "functions": [
+          "createTextureLoader"
+        ],
+        "constants": [
+          "DEFAULT_MAXIMUM_DECODED_BYTES",
+          "DEFAULT_MAXIMUM_EXPANSION_RATIO"
         ]
       }
     },
@@ -3444,7 +3668,11 @@
             "package": "@four/motion",
             "directory": "packages/motion",
             "imports": [
+              "CHARACTER_CONTROLLER_SERIALIZER",
+              "CharacterController",
+              "FIRST_PERSON_LOOK_SERIALIZER",
               "FOLLOW_RIG_SERIALIZER",
+              "FirstPersonLook",
               "FollowRig",
               "KINEMATIC_CONTROLLER_SERIALIZER",
               "KinematicController",
@@ -5833,6 +6061,47 @@
           "DEFAULT_ORBIT_MIN_DISTANCE"
         ]
       },
+      "packages/motion/src/character-controller.ts": {
+        "description": "§12's **character controllers** — {@link CharacterController}, the one yaw",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Component",
+              "ComponentHost"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Transform"
+            ]
+          }
+        ],
+        "exports": [
+          "DEFAULT_CHARACTER_GRAVITY",
+          "DEFAULT_FIRST_PERSON_PITCH_LIMIT",
+          "CharacterController",
+          "FirstPersonLook"
+        ],
+        "classes": [
+          "CharacterController",
+          "FirstPersonLook"
+        ],
+        "interfaces": [
+          "CharacterControllerOptions",
+          "FirstPersonLookOptions"
+        ],
+        "constants": [
+          "DEFAULT_CHARACTER_GRAVITY",
+          "DEFAULT_FIRST_PERSON_PITCH_LIMIT"
+        ]
+      },
       "packages/motion/src/clock.ts": {
         "description": "Clock and time domains (§9).",
         "externalDependencies": [],
@@ -5957,7 +6226,7 @@
         ]
       },
       "packages/motion/src/index.ts": {
-        "description": "Package entry point for @four/motion (re-exports 126 symbols)",
+        "description": "Package entry point for @four/motion (re-exports 134 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -5967,6 +6236,16 @@
               "DEFAULT_ORBIT_PITCH_LIMIT",
               "FollowRig",
               "OrbitRig"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./character-controller.js",
+            "imports": [
+              "CharacterController",
+              "DEFAULT_CHARACTER_GRAVITY",
+              "DEFAULT_FIRST_PERSON_PITCH_LIMIT",
+              "FirstPersonLook"
             ],
             "reExport": true
           },
@@ -6031,6 +6310,8 @@
           {
             "file": "./serializers.js",
             "imports": [
+              "CHARACTER_CONTROLLER_SERIALIZER",
+              "FIRST_PERSON_LOOK_SERIALIZER",
               "FOLLOW_RIG_SERIALIZER",
               "KINEMATIC_CONTROLLER_SERIALIZER",
               "LOOK_AT_CONSTRAINT_SERIALIZER",
@@ -6140,6 +6421,15 @@
               "FollowFrame",
               "FollowRigOptions",
               "OrbitRigOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./character-controller.js",
+            "imports": [
+              "CharacterControllerOptions",
+              "FirstPersonLookOptions"
             ],
             "reExport": true,
             "typeOnly": true
@@ -6294,6 +6584,10 @@
           "DEFAULT_ORBIT_PITCH_LIMIT",
           "FollowRig",
           "OrbitRig",
+          "CharacterController",
+          "DEFAULT_CHARACTER_GRAVITY",
+          "DEFAULT_FIRST_PERSON_PITCH_LIMIT",
+          "FirstPersonLook",
           "DEFAULT_FIXED_DELTA_TIME",
           "DEFAULT_MAXIMUM_SUB_STEPS",
           "assertFixedDeltaTime",
@@ -6316,6 +6610,8 @@
           "KinematicSystem",
           "MotionComponent",
           "MotionSystem",
+          "CHARACTER_CONTROLLER_SERIALIZER",
+          "FIRST_PERSON_LOOK_SERIALIZER",
           "FOLLOW_RIG_SERIALIZER",
           "KINEMATIC_CONTROLLER_SERIALIZER",
           "LOOK_AT_CONSTRAINT_SERIALIZER",
@@ -6372,6 +6668,8 @@
           "FollowFrame",
           "FollowRigOptions",
           "OrbitRigOptions",
+          "CharacterControllerOptions",
+          "FirstPersonLookOptions",
           "ReadonlyTimeState",
           "TimeState",
           "TimeStateOptions",
@@ -6423,6 +6721,10 @@
           "DEFAULT_ORBIT_PITCH_LIMIT",
           "FollowRig",
           "OrbitRig",
+          "CharacterController",
+          "DEFAULT_CHARACTER_GRAVITY",
+          "DEFAULT_FIRST_PERSON_PITCH_LIMIT",
+          "FirstPersonLook",
           "DEFAULT_FIXED_DELTA_TIME",
           "DEFAULT_MAXIMUM_SUB_STEPS",
           "assertFixedDeltaTime",
@@ -6445,6 +6747,8 @@
           "KinematicSystem",
           "MotionComponent",
           "MotionSystem",
+          "CHARACTER_CONTROLLER_SERIALIZER",
+          "FIRST_PERSON_LOOK_SERIALIZER",
           "FOLLOW_RIG_SERIALIZER",
           "KINEMATIC_CONTROLLER_SERIALIZER",
           "LOOK_AT_CONSTRAINT_SERIALIZER",
@@ -6500,6 +6804,8 @@
           "FollowFrame",
           "FollowRigOptions",
           "OrbitRigOptions",
+          "CharacterControllerOptions",
+          "FirstPersonLookOptions",
           "ReadonlyTimeState",
           "TimeState",
           "TimeStateOptions",
@@ -6589,6 +6895,13 @@
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
+          {
+            "file": "./character-controller.js",
+            "imports": [
+              "CharacterController",
+              "FirstPersonLook"
+            ]
+          },
           {
             "file": "./systems.js",
             "imports": [
@@ -6856,6 +7169,15 @@
             ]
           },
           {
+            "file": "./character-controller.js",
+            "imports": [
+              "CharacterController",
+              "DEFAULT_CHARACTER_GRAVITY",
+              "DEFAULT_FIRST_PERSON_PITCH_LIMIT",
+              "FirstPersonLook"
+            ]
+          },
+          {
             "file": "./constraints.js",
             "imports": [
               "LookAtConstraint"
@@ -6908,7 +7230,9 @@
           "KINEMATIC_CONTROLLER_SERIALIZER",
           "ORBIT_RIG_SERIALIZER",
           "FOLLOW_RIG_SERIALIZER",
-          "LOOK_AT_CONSTRAINT_SERIALIZER"
+          "LOOK_AT_CONSTRAINT_SERIALIZER",
+          "CHARACTER_CONTROLLER_SERIALIZER",
+          "FIRST_PERSON_LOOK_SERIALIZER"
         ],
         "interfaces": [
           "ComponentSerializerShape"
@@ -6918,7 +7242,9 @@
           "KINEMATIC_CONTROLLER_SERIALIZER",
           "ORBIT_RIG_SERIALIZER",
           "FOLLOW_RIG_SERIALIZER",
-          "LOOK_AT_CONSTRAINT_SERIALIZER"
+          "LOOK_AT_CONSTRAINT_SERIALIZER",
+          "CHARACTER_CONTROLLER_SERIALIZER",
+          "FIRST_PERSON_LOOK_SERIALIZER"
         ]
       },
       "packages/motion/src/spring-damper.ts": {
@@ -15844,8 +16170,11 @@
         "name": "Packages/assets",
         "files": [
           "packages/assets/src/asset-manager.ts",
+          "packages/assets/src/content-hash.ts",
           "packages/assets/src/index.ts",
-          "packages/assets/src/loaders.ts"
+          "packages/assets/src/loaders.ts",
+          "packages/assets/src/manifest.ts",
+          "packages/assets/src/texture.ts"
         ]
       },
       {
@@ -15971,6 +16300,7 @@
         "name": "Packages/motion",
         "files": [
           "packages/motion/src/camera-rigs.ts",
+          "packages/motion/src/character-controller.ts",
           "packages/motion/src/clock.ts",
           "packages/motion/src/constraints.ts",
           "packages/motion/src/ik.ts",
@@ -16168,18 +16498,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 221,
+    "totalTypeScriptFiles": 225,
     "totalModules": 24,
-    "totalLinesOfCode": 102602,
-    "totalExports": 2031,
-    "totalClasses": 141,
-    "totalInterfaces": 432,
-    "totalFunctions": 336,
+    "totalLinesOfCode": 104591,
+    "totalExports": 2077,
+    "totalClasses": 144,
+    "totalInterfaces": 438,
+    "totalFunctions": 342,
     "totalTypeGuards": 19,
     "totalEnums": 0,
-    "totalConstants": 266,
-    "totalReExports": 1310,
-    "totalTypeOnlyImports": 260,
+    "totalConstants": 274,
+    "totalReExports": 1339,
+    "totalTypeOnlyImports": 266,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,

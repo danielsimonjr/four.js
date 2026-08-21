@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-21",
-  "totalFiles": 532,
+  "totalFiles": 544,
   "byDisposition": {
-    "reachable": 173,
+    "reachable": 177,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 289,
+    "test": 297,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -14,14 +14,14 @@
   "byArea": {
     "examples": 9,
     "config": 12,
-    "src": 221,
-    "tests": 289,
+    "src": 225,
+    "tests": 297,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 128,
+    "(root)": 132,
     "@four/animation": 25,
-    "@four/assets": 8,
+    "@four/assets": 14,
     "@four/core": 22,
     "@four/diagnostics": 19,
     "four": 33,
@@ -29,7 +29,7 @@
     "@four/input": 13,
     "@four/materials": 11,
     "@four/math": 16,
-    "@four/motion": 33,
+    "@four/motion": 35,
     "@four/particles": 16,
     "@four/physics-box2d": 2,
     "@four/physics-rapier": 20,
@@ -65,7 +65,7 @@
       "package": "(root)",
       "area": "examples",
       "disposition": "example",
-      "loc": 732
+      "loc": 703
     },
     {
       "file": "examples/first-2d-scene/vite.config.ts",
@@ -79,7 +79,7 @@
       "package": "(root)",
       "area": "examples",
       "disposition": "example",
-      "loc": 434
+      "loc": 457
     },
     {
       "file": "examples/first-3d-scene/vite.config.ts",
@@ -93,7 +93,7 @@
       "package": "(root)",
       "area": "examples",
       "disposition": "example",
-      "loc": 3320
+      "loc": 3364
     },
     {
       "file": "examples/flagship/motor-digital-twin/vite.config.ts",
@@ -107,7 +107,7 @@
       "package": "(root)",
       "area": "examples",
       "disposition": "example",
-      "loc": 1853
+      "loc": 1892
     },
     {
       "file": "examples/flagship/one-scene-everything-moves/vite.config.ts",
@@ -163,7 +163,7 @@
       "package": "(root)",
       "area": "examples",
       "disposition": "example",
-      "loc": 680
+      "loc": 658
     },
     {
       "file": "examples/ui-demo/vite.config.ts",
@@ -352,14 +352,21 @@
       "package": "@four/assets",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1257
+      "loc": 1560
+    },
+    {
+      "file": "packages/assets/src/content-hash.ts",
+      "package": "@four/assets",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 120
     },
     {
       "file": "packages/assets/src/index.ts",
       "package": "@four/assets",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 49
+      "loc": 84
     },
     {
       "file": "packages/assets/src/loaders.ts",
@@ -367,6 +374,20 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 188
+    },
+    {
+      "file": "packages/assets/src/manifest.ts",
+      "package": "@four/assets",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 198
+    },
+    {
+      "file": "packages/assets/src/texture.ts",
+      "package": "@four/assets",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 435
     },
     {
       "file": "packages/assets/tests/asset-manager.test.ts",
@@ -383,11 +404,25 @@
       "loc": 749
     },
     {
+      "file": "packages/assets/tests/content-hash.test.ts",
+      "package": "@four/assets",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 280
+    },
+    {
       "file": "packages/assets/tests/loaders.test.ts",
       "package": "@four/assets",
       "area": "tests",
       "disposition": "test",
       "loc": 198
+    },
+    {
+      "file": "packages/assets/tests/manifest.test.ts",
+      "package": "@four/assets",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 165
     },
     {
       "file": "packages/assets/tests/security.test.ts",
@@ -402,6 +437,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 10
+    },
+    {
+      "file": "packages/assets/tests/texture.test.ts",
+      "package": "@four/assets",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 253
     },
     {
       "file": "packages/core/src/component.ts",
@@ -842,7 +884,7 @@
       "package": "four",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2731
+      "loc": 2741
     },
     {
       "file": "packages/four/src/scene.ts",
@@ -898,7 +940,7 @@
       "package": "four",
       "area": "tests",
       "disposition": "test",
-      "loc": 1750
+      "loc": 1752
     },
     {
       "file": "packages/four/tests/shape-serializers.test.ts",
@@ -1339,7 +1381,14 @@
       "package": "@four/motion",
       "area": "src",
       "disposition": "reachable",
-      "loc": 621
+      "loc": 627
+    },
+    {
+      "file": "packages/motion/src/character-controller.ts",
+      "package": "@four/motion",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 720
     },
     {
       "file": "packages/motion/src/clock.ts",
@@ -1367,7 +1416,7 @@
       "package": "@four/motion",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 161
+      "loc": 173
     },
     {
       "file": "packages/motion/src/integrators.ts",
@@ -1381,7 +1430,7 @@
       "package": "@four/motion",
       "area": "src",
       "disposition": "reachable",
-      "loc": 661
+      "loc": 705
     },
     {
       "file": "packages/motion/src/motion-component.ts",
@@ -1430,7 +1479,7 @@
       "package": "@four/motion",
       "area": "src",
       "disposition": "reachable",
-      "loc": 442
+      "loc": 548
     },
     {
       "file": "packages/motion/src/spring-damper.ts",
@@ -1466,6 +1515,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 519
+    },
+    {
+      "file": "packages/motion/tests/character-controller.test.ts",
+      "package": "@four/motion",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 573
     },
     {
       "file": "packages/motion/tests/constraints.test.ts",
@@ -3061,14 +3117,14 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 149
+      "loc": 158
     },
     {
       "file": "tests/browser/fixtures/culling-page.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 144
+      "loc": 153
     },
     {
       "file": "tests/browser/fixtures/screen-camera-page.ts",
@@ -3082,14 +3138,14 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 160
+      "loc": 169
     },
     {
       "file": "tests/browser/fixtures/text-page.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 172
+      "loc": 181
     },
     {
       "file": "tests/browser/interaction.spec.ts",
@@ -3110,14 +3166,14 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 1010
+      "loc": 1015
     },
     {
       "file": "tests/browser/one-scene-everything-moves.spec.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 1036
+      "loc": 1041
     },
     {
       "file": "tests/browser/particles.spec.ts",
@@ -3183,6 +3239,13 @@
       "loc": 229
     },
     {
+      "file": "tests/determinism/character-controller.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 219
+    },
+    {
       "file": "tests/determinism/event-dispatch-split.test.ts",
       "package": "(root)",
       "area": "tests",
@@ -3209,6 +3272,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 367
+    },
+    {
+      "file": "tests/determinism/helpers/character-controller-scenario.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 320
     },
     {
       "file": "tests/determinism/helpers/event-split-scenario.ts",
@@ -3243,7 +3313,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 704
+      "loc": 729
     },
     {
       "file": "tests/determinism/helpers/phase2-scenario.ts",
@@ -3432,7 +3502,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 313
+      "loc": 323
     },
     {
       "file": "tests/integration/debug-overlay-render.test.ts",
@@ -3454,6 +3524,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 73
+    },
+    {
+      "file": "tests/integration/first-person-camera.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 209
     },
     {
       "file": "tests/integration/frame-statistics.test.ts",
@@ -3509,7 +3586,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 800
+      "loc": 830
     },
     {
       "file": "tests/integration/helpers/roundtrip-scenarios.ts",
@@ -3537,7 +3614,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 507
+      "loc": 517
     },
     {
       "file": "tests/integration/path-tessellation.test.ts",
@@ -3565,7 +3642,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 863
+      "loc": 881
     },
     {
       "file": "tests/integration/physics-live-properties.test.ts",
@@ -3614,35 +3691,35 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 394
+      "loc": 404
     },
     {
       "file": "tests/integration/render-graph.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 305
+      "loc": 315
     },
     {
       "file": "tests/integration/render-to-texture.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 399
+      "loc": 413
     },
     {
       "file": "tests/integration/renderer-context-loss.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 452
+      "loc": 462
     },
     {
       "file": "tests/integration/scene-layers.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 464
+      "loc": 474
     },
     {
       "file": "tests/integration/scene-roundtrip.test.ts",
@@ -3670,42 +3747,42 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 589
+      "loc": 599
     },
     {
       "file": "tests/integration/shape-paints.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 313
+      "loc": 323
     },
     {
       "file": "tests/integration/shape-rendering.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 242
+      "loc": 252
     },
     {
       "file": "tests/integration/sprite-frames.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 462
+      "loc": 472
     },
     {
       "file": "tests/integration/standard-material.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 470
+      "loc": 480
     },
     {
       "file": "tests/integration/stencil-masking.test.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 481
+      "loc": 491
     },
     {
       "file": "tests/integration/svg-path-pipeline.test.ts",
@@ -3720,6 +3797,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 268
+    },
+    {
+      "file": "tests/integration/texture-manifest.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 161
     },
     {
       "file": "tests/integration/units-display.test.ts",

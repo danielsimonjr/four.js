@@ -47,7 +47,7 @@ This document provides a comprehensive dependency graph of all files, components
 The codebase is organized into the following modules:
 
 - **packages/animation**: 11 files
-- **packages/assets**: 3 files
+- **packages/assets**: 6 files
 - **packages/core**: 12 files
 - **packages/diagnostics**: 9 files
 - **packages/four**: 27 files
@@ -55,7 +55,7 @@ The codebase is organized into the following modules:
 - **packages/input**: 8 files
 - **packages/materials**: 8 files
 - **packages/math**: 10 files
-- **packages/motion**: 18 files
+- **packages/motion**: 19 files
 - **packages/particles**: 8 files
 - **packages/physics**: 19 files
 - **packages/physics-box2d**: 1 file
@@ -79,7 +79,7 @@ The codebase is organized into the following modules:
 | Package | Depends On | Files (Active) | Files (Dormant) |
 |---------|------------|----------------|-----------------|
 | `@four/animation` (`packages/animation/`) | `@four/motion`, `@four/core`, `@four/scene`, `@four/math` | 11 | 0 |
-| `@four/assets` (`packages/assets/`) | `@four/core` | 3 | 0 |
+| `@four/assets` (`packages/assets/`) | `@four/core` | 6 | 0 |
 | `@four/core` (`packages/core/`) | (none) | 12 | 0 |
 | `@four/diagnostics` (`packages/diagnostics/`) | `@four/math`, `@four/core` | 9 | 0 |
 | `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/diagnostics`, `@four/geometry`, `@four/motion`, `@four/math`, `@four/assets`, `@four/physics`, `@four/scene`, `@four/render`, `@four/input`, `@four/materials`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/serialization`, `@four/text`, `@four/ui` | 27 | 0 |
@@ -87,7 +87,7 @@ The codebase is organized into the following modules:
 | `@four/input` (`packages/input/`) | `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
 | `@four/materials` (`packages/materials/`) | `@four/core`, `@four/math` | 8 | 0 |
 | `@four/math` (`packages/math/`) | (none) | 10 | 0 |
-| `@four/motion` (`packages/motion/`) | `@four/core`, `@four/math`, `@four/scene` | 18 | 0 |
+| `@four/motion` (`packages/motion/`) | `@four/core`, `@four/math`, `@four/scene` | 19 | 0 |
 | `@four/particles` (`packages/particles/`) | `@four/math`, `@four/core`, `@four/scene` | 8 | 0 |
 | `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 19 | 0 |
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
@@ -448,11 +448,25 @@ graph LR
 |---------|--------|
 | `@four/core` | `FourError, isFourError, disposeAll, Disposable` |
 
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./content-hash.js` | `resolveGlobalDigest, resolveGlobalTextDecoder, DigestLike, TextDecodeLike` | Import |
+
 **Exports:**
 - Classes: `AssetManager`
 - Interfaces: `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `FetchInit`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`
 - Types: `FetchLike`
 - Constants: `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`
+
+---
+
+### `packages/assets/src/content-hash.ts` - Content hashing (§76's last-but-one capability, §79's manifest half).
+
+**Exports:**
+- Types: `DigestLike`, `TextDecodeLike`
+- Functions: `resolveGlobalDigest`, `resolveGlobalTextDecoder`
+- Constants: `CONTENT_HASH_ALGORITHM`
 
 ---
 
@@ -462,13 +476,19 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./asset-manager.js` | `AssetManager, DEFAULT_MAXIMUM_BYTES, DEFAULT_TIMEOUT_SECONDS` | Re-export |
+| `./content-hash.js` | `CONTENT_HASH_ALGORITHM` | Re-export |
+| `./manifest.js` | `loadFromManifest, manifestLoader, manifestUrl, parseAssetManifest` | Re-export |
+| `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO, TextureAsset, createTextureLoader` | Re-export |
 | `./loaders.js` | `ImageAsset, binaryLoader, createImageLoader, jsonLoader, textLoader` | Re-export |
 | `./asset-manager.js` | `AbortHandle, AbortSignalLike, AssetLoadOptions, AssetLoader, AssetManagerOptions, FetchInit, FetchLike, FetchResponse, ResponseHeadersLike, TimerLike` | Re-export (type-only) |
+| `./content-hash.js` | `DigestLike, TextDecodeLike` | Re-export (type-only) |
+| `./manifest.js` | `AssetManifest, AssetManifestEntry, ManifestLoadOptions` | Re-export (type-only) |
+| `./texture.js` | `DecodedTexels, TexelDecodeLike, TexelProbeLike, TextureColorSpace, TextureFilterMode, TextureLoaderOptions, TextureWrapMode` | Re-export (type-only) |
 | `./loaders.js` | `ImageBitmapLike, ImageDecodeLike` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `FetchInit`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `ImageBitmapLike`, `ImageDecodeLike`
+- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `FetchInit`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `ImageBitmapLike`, `ImageDecodeLike`
 
 ---
 
@@ -485,6 +505,48 @@ graph LR
 - Types: `ImageDecodeLike`
 - Functions: `createImageLoader`
 - Constants: `textLoader`, `jsonLoader`, `binaryLoader`
+
+---
+
+### `packages/assets/src/manifest.ts` - The §79 asset manifest — logical key → URL + content hash.
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `FourError` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./asset-manager.js` | `AssetLoader, AssetLoadOptions` | Import (type-only) |
+| `./asset-manager.js` | `AssetManager` | Import |
+
+**Exports:**
+- Interfaces: `AssetManifestEntry`, `ManifestLoadOptions`
+- Types: `AssetManifest`
+- Functions: `parseAssetManifest`, `loadFromManifest`, `manifestUrl`
+- Constants: `manifestLoader`
+
+---
+
+### `packages/assets/src/texture.ts` - The texture loader tier (§77's asset half, A-19 — 2026-08-21).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `FourError, Disposable` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./asset-manager.js` | `AssetLoader, FetchResponse` | Import (type-only) |
+
+**Exports:**
+- Classes: `TextureAsset`
+- Interfaces: `DecodedTexels`, `TextureLoaderOptions`
+- Types: `TextureColorSpace`, `TextureFilterMode`, `TextureWrapMode`, `TexelDecodeLike`, `TexelProbeLike`
+- Functions: `createTextureLoader`
+- Constants: `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`
 
 ---
 
@@ -1077,7 +1139,7 @@ graph LR
 | `@four/core` | `FourError, JsonValue` |
 | `@four/geometry` | `Path, BufferGeometry, Point2D` |
 | `@four/materials` | `Material, SpriteMaterial, UnlitMaterial` |
-| `@four/motion` | `FOLLOW_RIG_SERIALIZER, FollowRig, KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, LOOK_AT_CONSTRAINT_SERIALIZER, LookAtConstraint, MOTION_COMPONENT_SERIALIZER, MotionComponent, ORBIT_RIG_SERIALIZER, OrbitRig` |
+| `@four/motion` | `CHARACTER_CONTROLLER_SERIALIZER, CharacterController, FIRST_PERSON_LOOK_SERIALIZER, FOLLOW_RIG_SERIALIZER, FirstPersonLook, FollowRig, KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, LOOK_AT_CONSTRAINT_SERIALIZER, LookAtConstraint, MOTION_COMPONENT_SERIALIZER, MotionComponent, ORBIT_RIG_SERIALIZER, OrbitRig` |
 | `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody` |
 | `@four/render` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star` |
 | `@four/render` | `ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle` |
@@ -1797,6 +1859,21 @@ graph LR
 
 ---
 
+### `packages/motion/src/character-controller.ts` - §12's **character controllers** — {@link CharacterController}, the one yaw
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `Component, ComponentHost` |
+| `@four/scene` | `Transform` |
+
+**Exports:**
+- Classes: `CharacterController`, `FirstPersonLook`
+- Interfaces: `CharacterControllerOptions`, `FirstPersonLookOptions`
+- Constants: `DEFAULT_CHARACTER_GRAVITY`, `DEFAULT_FIRST_PERSON_PITCH_LIMIT`
+
+---
+
 ### `packages/motion/src/clock.ts` - Clock and time domains (§9).
 
 **Exports:**
@@ -1842,19 +1919,20 @@ graph LR
 
 ---
 
-### `packages/motion/src/index.ts` - Package entry point for @four/motion (re-exports 126 symbols)
+### `packages/motion/src/index.ts` - Package entry point for @four/motion (re-exports 134 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
 | `./camera-rigs.js` | `DEFAULT_ORBIT_PITCH_LIMIT, FollowRig, OrbitRig` | Re-export |
+| `./character-controller.js` | `CharacterController, DEFAULT_CHARACTER_GRAVITY, DEFAULT_FIRST_PERSON_PITCH_LIMIT, FirstPersonLook` | Re-export |
 | `./clock.js` | `DEFAULT_FIXED_DELTA_TIME, DEFAULT_MAXIMUM_SUB_STEPS, assertFixedDeltaTime, assertTimeScale, copyTimeState, createTimeState` | Re-export |
 | `./constraints.js` | `ConstraintSystem, LookAtConstraint` | Re-export |
 | `./ik.js` | `createTwoBoneIKSolution, solveTwoBoneIK` | Re-export |
 | `./integrators.js` | `DEFAULT_INTEGRATOR, INTEGRATORS, explicitEuler, rk2, rk4, semiImplicitEuler, velocityVerlet` | Re-export |
 | `./kinematic-controller.js` | `KINEMATIC_COMPLETION_TOLERANCE, KinematicController, KinematicSystem` | Re-export |
 | `./motion-component.js` | `MotionComponent, MotionSystem` | Re-export |
-| `./serializers.js` | `FOLLOW_RIG_SERIALIZER, KINEMATIC_CONTROLLER_SERIALIZER, LOOK_AT_CONSTRAINT_SERIALIZER, MOTION_COMPONENT_SERIALIZER, ORBIT_RIG_SERIALIZER` | Re-export |
+| `./serializers.js` | `CHARACTER_CONTROLLER_SERIALIZER, FIRST_PERSON_LOOK_SERIALIZER, FOLLOW_RIG_SERIALIZER, KINEMATIC_CONTROLLER_SERIALIZER, LOOK_AT_CONSTRAINT_SERIALIZER, MOTION_COMPONENT_SERIALIZER, ORBIT_RIG_SERIALIZER` | Re-export |
 | `./pid.js` | `DEFAULT_PID_OUTPUT_LIMITS, PIDController` | Re-export |
 | `./prediction.js` | `ballisticApexHeight, ballisticTimeOfFlightToPlane, ballisticTimeToApex, interceptPoint, interceptTime, predictBallistic, predictLinear` | Re-export |
 | `./random.js` | `SeededRandom` | Re-export |
@@ -1864,6 +1942,7 @@ graph LR
 | `./systems.js` | `PRIORITY_ANIMATION_TARGETS, PRIORITY_COMMANDS, PRIORITY_CONSTRAINTS, PRIORITY_EVENT_DISPATCH, PRIORITY_FORCES, PRIORITY_INPUT, PRIORITY_KINEMATICS, PRIORITY_PHYSICS_SOLVE, PRIORITY_RENDER_INTERPOLATION, PRIORITY_SENSOR_UPDATE, PRIORITY_SNAPSHOT, SystemRegistry` | Re-export |
 | `./trajectories.js` | `BallisticTrajectory, CENTRAL_DIFFERENCE_STEP, CatmullRomTrajectory, CircularTrajectory, CubicBezierTrajectory, DEFAULT_BALLISTIC_ACCELERATION_Y, DampedSpringTrajectory, EllipticalTrajectory, LinearTrajectory, ParabolicTrajectory, ParametricTrajectory` | Re-export |
 | `./camera-rigs.js` | `FollowFrame, FollowRigOptions, OrbitRigOptions` | Re-export (type-only) |
+| `./character-controller.js` | `CharacterControllerOptions, FirstPersonLookOptions` | Re-export (type-only) |
 | `./clock.js` | `ReadonlyTimeState, TimeState, TimeStateOptions` | Re-export (type-only) |
 | `./constraints.js` | `ConstraintSystemOptions, LookAtConstraintOptions` | Re-export (type-only) |
 | `./ik.js` | `TwoBoneIKSolution` | Re-export (type-only) |
@@ -1881,7 +1960,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DEFAULT_ORBIT_PITCH_LIMIT`, `FollowRig`, `OrbitRig`, `DEFAULT_FIXED_DELTA_TIME`, `DEFAULT_MAXIMUM_SUB_STEPS`, `assertFixedDeltaTime`, `assertTimeScale`, `copyTimeState`, `createTimeState`, `ConstraintSystem`, `LookAtConstraint`, `createTwoBoneIKSolution`, `solveTwoBoneIK`, `DEFAULT_INTEGRATOR`, `INTEGRATORS`, `explicitEuler`, `rk2`, `rk4`, `semiImplicitEuler`, `velocityVerlet`, `KINEMATIC_COMPLETION_TOLERANCE`, `KinematicController`, `KinematicSystem`, `MotionComponent`, `MotionSystem`, `FOLLOW_RIG_SERIALIZER`, `KINEMATIC_CONTROLLER_SERIALIZER`, `LOOK_AT_CONSTRAINT_SERIALIZER`, `MOTION_COMPONENT_SERIALIZER`, `ORBIT_RIG_SERIALIZER`, `DEFAULT_PID_OUTPUT_LIMITS`, `PIDController`, `ballisticApexHeight`, `ballisticTimeOfFlightToPlane`, `ballisticTimeToApex`, `interceptPoint`, `interceptTime`, `predictBallistic`, `predictLinear`, `SeededRandom`, `Scheduler`, `SpringDamper`, `SteeringAgent`, `WanderState`, `alignment`, `arrive`, `cohesion`, `evade`, `flee`, `pursue`, `seek`, `separation`, `truncate`, `wander`, `PRIORITY_ANIMATION_TARGETS`, `PRIORITY_COMMANDS`, `PRIORITY_CONSTRAINTS`, `PRIORITY_EVENT_DISPATCH`, `PRIORITY_FORCES`, `PRIORITY_INPUT`, `PRIORITY_KINEMATICS`, `PRIORITY_PHYSICS_SOLVE`, `PRIORITY_RENDER_INTERPOLATION`, `PRIORITY_SENSOR_UPDATE`, `PRIORITY_SNAPSHOT`, `SystemRegistry`, `BallisticTrajectory`, `CENTRAL_DIFFERENCE_STEP`, `CatmullRomTrajectory`, `CircularTrajectory`, `CubicBezierTrajectory`, `DEFAULT_BALLISTIC_ACCELERATION_Y`, `DampedSpringTrajectory`, `EllipticalTrajectory`, `LinearTrajectory`, `ParabolicTrajectory`, `ParametricTrajectory`, `FollowFrame`, `FollowRigOptions`, `OrbitRigOptions`, `ReadonlyTimeState`, `TimeState`, `TimeStateOptions`, `ConstraintSystemOptions`, `LookAtConstraintOptions`, `TwoBoneIKSolution`, `AccelerationFn`, `Integrator`, `IntegratorFn`, `IntegratorState`, `KinematicSystemOptions`, `MoveOptions`, `PathFollowOptions`, `RotateOptions`, `MotionComponentOptions`, `MotionSystemOptions`, `RigTarget`, `ComponentSerializerShape`, `PIDControllerOptions`, `PIDDerivativeSource`, `SchedulerCallback`, `SchedulerOptions`, `SpringDamperCoefficientOptions`, `SpringDamperFrequencyOptions`, `SpringDamperOptions`, `SpringDamperResult`, `SpringDamperVector3Result`, `SteeringAgentOptions`, `SteeringContext`, `SteeringNeighbor`, `WanderStateOptions`, `Detach`, `FixedUpdateContext`, `SimulationContext`, `SimulationSystem`, `Unregister`, `BallisticTrajectoryOptions`, `CatmullRomTrajectoryOptions`, `CircularTrajectoryOptions`, `CubicBezierTrajectoryOptions`, `DampedSpringTrajectoryOptions`, `EllipticalTrajectoryOptions`, `LinearTrajectoryOptions`, `ParabolicTrajectoryOptions`, `ParametricTrajectoryOptions`, `Trajectory`
+- Re-exports: `DEFAULT_ORBIT_PITCH_LIMIT`, `FollowRig`, `OrbitRig`, `CharacterController`, `DEFAULT_CHARACTER_GRAVITY`, `DEFAULT_FIRST_PERSON_PITCH_LIMIT`, `FirstPersonLook`, `DEFAULT_FIXED_DELTA_TIME`, `DEFAULT_MAXIMUM_SUB_STEPS`, `assertFixedDeltaTime`, `assertTimeScale`, `copyTimeState`, `createTimeState`, `ConstraintSystem`, `LookAtConstraint`, `createTwoBoneIKSolution`, `solveTwoBoneIK`, `DEFAULT_INTEGRATOR`, `INTEGRATORS`, `explicitEuler`, `rk2`, `rk4`, `semiImplicitEuler`, `velocityVerlet`, `KINEMATIC_COMPLETION_TOLERANCE`, `KinematicController`, `KinematicSystem`, `MotionComponent`, `MotionSystem`, `CHARACTER_CONTROLLER_SERIALIZER`, `FIRST_PERSON_LOOK_SERIALIZER`, `FOLLOW_RIG_SERIALIZER`, `KINEMATIC_CONTROLLER_SERIALIZER`, `LOOK_AT_CONSTRAINT_SERIALIZER`, `MOTION_COMPONENT_SERIALIZER`, `ORBIT_RIG_SERIALIZER`, `DEFAULT_PID_OUTPUT_LIMITS`, `PIDController`, `ballisticApexHeight`, `ballisticTimeOfFlightToPlane`, `ballisticTimeToApex`, `interceptPoint`, `interceptTime`, `predictBallistic`, `predictLinear`, `SeededRandom`, `Scheduler`, `SpringDamper`, `SteeringAgent`, `WanderState`, `alignment`, `arrive`, `cohesion`, `evade`, `flee`, `pursue`, `seek`, `separation`, `truncate`, `wander`, `PRIORITY_ANIMATION_TARGETS`, `PRIORITY_COMMANDS`, `PRIORITY_CONSTRAINTS`, `PRIORITY_EVENT_DISPATCH`, `PRIORITY_FORCES`, `PRIORITY_INPUT`, `PRIORITY_KINEMATICS`, `PRIORITY_PHYSICS_SOLVE`, `PRIORITY_RENDER_INTERPOLATION`, `PRIORITY_SENSOR_UPDATE`, `PRIORITY_SNAPSHOT`, `SystemRegistry`, `BallisticTrajectory`, `CENTRAL_DIFFERENCE_STEP`, `CatmullRomTrajectory`, `CircularTrajectory`, `CubicBezierTrajectory`, `DEFAULT_BALLISTIC_ACCELERATION_Y`, `DampedSpringTrajectory`, `EllipticalTrajectory`, `LinearTrajectory`, `ParabolicTrajectory`, `ParametricTrajectory`, `FollowFrame`, `FollowRigOptions`, `OrbitRigOptions`, `CharacterControllerOptions`, `FirstPersonLookOptions`, `ReadonlyTimeState`, `TimeState`, `TimeStateOptions`, `ConstraintSystemOptions`, `LookAtConstraintOptions`, `TwoBoneIKSolution`, `AccelerationFn`, `Integrator`, `IntegratorFn`, `IntegratorState`, `KinematicSystemOptions`, `MoveOptions`, `PathFollowOptions`, `RotateOptions`, `MotionComponentOptions`, `MotionSystemOptions`, `RigTarget`, `ComponentSerializerShape`, `PIDControllerOptions`, `PIDDerivativeSource`, `SchedulerCallback`, `SchedulerOptions`, `SpringDamperCoefficientOptions`, `SpringDamperFrequencyOptions`, `SpringDamperOptions`, `SpringDamperResult`, `SpringDamperVector3Result`, `SteeringAgentOptions`, `SteeringContext`, `SteeringNeighbor`, `WanderStateOptions`, `Detach`, `FixedUpdateContext`, `SimulationContext`, `SimulationSystem`, `Unregister`, `BallisticTrajectoryOptions`, `CatmullRomTrajectoryOptions`, `CircularTrajectoryOptions`, `CubicBezierTrajectoryOptions`, `DampedSpringTrajectoryOptions`, `EllipticalTrajectoryOptions`, `LinearTrajectoryOptions`, `ParabolicTrajectoryOptions`, `ParametricTrajectoryOptions`, `Trajectory`
 
 ---
 
@@ -1910,6 +1989,7 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./character-controller.js` | `CharacterController, FirstPersonLook` | Import |
 | `./systems.js` | `PRIORITY_KINEMATICS, FixedUpdateContext, SimulationSystem` | Import |
 | `./trajectories.js` | `Trajectory` | Import (type-only) |
 
@@ -2014,6 +2094,7 @@ graph LR
 | File | Imports | Type |
 |------|---------|------|
 | `./camera-rigs.js` | `DEFAULT_ORBIT_MIN_DISTANCE, DEFAULT_ORBIT_PITCH_LIMIT, FollowRig, OrbitRig` | Import |
+| `./character-controller.js` | `CharacterController, DEFAULT_CHARACTER_GRAVITY, DEFAULT_FIRST_PERSON_PITCH_LIMIT, FirstPersonLook` | Import |
 | `./constraints.js` | `LookAtConstraint` | Import |
 | `./kinematic-controller.js` | `KinematicController` | Import |
 | `./motion-component.js` | `MotionComponent` | Import |
@@ -2022,7 +2103,7 @@ graph LR
 
 **Exports:**
 - Interfaces: `ComponentSerializerShape`
-- Constants: `MOTION_COMPONENT_SERIALIZER`, `KINEMATIC_CONTROLLER_SERIALIZER`, `ORBIT_RIG_SERIALIZER`, `FOLLOW_RIG_SERIALIZER`, `LOOK_AT_CONSTRAINT_SERIALIZER`
+- Constants: `MOTION_COMPONENT_SERIALIZER`, `KINEMATIC_CONTROLLER_SERIALIZER`, `ORBIT_RIG_SERIALIZER`, `FOLLOW_RIG_SERIALIZER`, `LOOK_AT_CONSTRAINT_SERIALIZER`, `CHARACTER_CONTROLLER_SERIALIZER`, `FIRST_PERSON_LOOK_SERIALIZER`
 
 ---
 
@@ -4205,8 +4286,8 @@ graph LR
 
 | File | Imports From | Exports To |
 |------|--------------|------------|
+| `packages/motion/src/index` | 18 files | 0 files |
 | `packages/physics/src/index` | 18 files | 0 files |
-| `packages/motion/src/index` | 17 files | 0 files |
 | `packages/physics/src/world` | 12 files | 5 files |
 | `packages/render/src/index` | 17 files | 0 files |
 | `packages/physics/src/types` | 0 files | 15 files |
@@ -4224,6 +4305,7 @@ graph LR
 | `packages/math/src/index` | 9 files | 0 files |
 | `packages/diagnostics/src/index` | 8 files | 0 files |
 | `packages/geometry/src/index` | 8 files | 0 files |
+| `packages/motion/src/serializers` | 7 files | 1 file |
 | `packages/physics/src/joints` | 6 files | 2 files |
 | `packages/physics/src/serializers` | 7 files | 1 file |
 | `packages/physics/src/shapes` | 1 file | 7 files |
@@ -4233,7 +4315,6 @@ graph LR
 | `packages/input/src/index` | 7 files | 0 files |
 | `packages/materials/src/index` | 7 files | 0 files |
 | `packages/math/src/alloc-counter` | 0 files | 7 files |
-| `packages/motion/src/serializers` | 6 files | 1 file |
 | `packages/particles/src/index` | 7 files | 0 files |
 | `packages/physics/src/adapter` | 4 files | 3 files |
 | `packages/physics/src/events` | 1 file | 6 files |
@@ -4286,236 +4367,239 @@ graph TD
 
     subgraph Packages/assets
         N11[asset-manager]
-        N12[index]
-        N13[loaders]
+        N12[content-hash]
+        N13[index]
+        N14[loaders]
+        N15[manifest]
+        N16[texture]
     end
 
     subgraph Packages/core
-        N14[component]
-        N15[conventions]
-        N16[dev]
-        N17[disposable]
-        N18[errors]
-        N19[events]
-        N20[index]
-        N21[json]
-        N22[random]
-        N23[space]
-        N24[...2 more]
+        N17[component]
+        N18[conventions]
+        N19[dev]
+        N20[disposable]
+        N21[errors]
+        N22[events]
+        N23[index]
+        N24[json]
+        N25[random]
+        N26[space]
+        N27[...2 more]
     end
 
     subgraph Packages/diagnostics
-        N25[checksum]
-        N26[debug-draw]
-        N27[index]
-        N28[recorder]
-        N29[replay-format]
-        N30[replay-player]
-        N31[resource-audit]
-        N32[rollback]
-        N33[stats]
+        N28[checksum]
+        N29[debug-draw]
+        N30[index]
+        N31[recorder]
+        N32[replay-format]
+        N33[replay-player]
+        N34[resource-audit]
+        N35[rollback]
+        N36[stats]
     end
 
     subgraph Packages/four
-        N34[animation]
-        N35[application]
-        N36[assets]
-        N37[core]
-        N38[diagnostics]
-        N39[geometry]
-        N40[index]
-        N41[input]
-        N42[materials]
-        N43[math]
-        N44[...17 more]
+        N37[animation]
+        N38[application]
+        N39[assets]
+        N40[core]
+        N41[diagnostics]
+        N42[geometry]
+        N43[index]
+        N44[input]
+        N45[materials]
+        N46[math]
+        N47[...17 more]
     end
 
     subgraph Packages/geometry
-        N45[buffer-geometry]
-        N46[geometry]
-        N47[index]
-        N48[path]
-        N49[primitive-support]
-        N50[primitives-3d]
-        N51[primitives]
-        N52[resource-memory]
-        N53[svg-path]
-        N54[tessellation]
+        N48[buffer-geometry]
+        N49[geometry]
+        N50[index]
+        N51[path]
+        N52[primitive-support]
+        N53[primitives-3d]
+        N54[primitives]
+        N55[resource-memory]
+        N56[svg-path]
+        N57[tessellation]
     end
 
     subgraph Packages/input
-        N55[drag]
-        N56[index]
-        N57[key-events]
-        N58[keyboard-input]
-        N59[pick]
-        N60[pointer-events]
-        N61[pointer-input]
-        N62[propagation]
+        N58[drag]
+        N59[index]
+        N60[key-events]
+        N61[keyboard-input]
+        N62[pick]
+        N63[pointer-events]
+        N64[pointer-input]
+        N65[propagation]
     end
 
     subgraph Packages/materials
-        N63[index]
-        N64[lit-material]
-        N65[material]
-        N66[sprite-material]
-        N67[standard-material]
-        N68[stencil-state]
-        N69[texture]
-        N70[unlit-material]
+        N66[index]
+        N67[lit-material]
+        N68[material]
+        N69[sprite-material]
+        N70[standard-material]
+        N71[stencil-state]
+        N72[texture]
+        N73[unlit-material]
     end
 
     subgraph Packages/math
-        N71[alloc-counter]
-        N72[color]
-        N73[frustum]
-        N74[index]
-        N75[matrix3]
-        N76[matrix4]
-        N77[quaternion]
-        N78[vector2]
-        N79[vector3]
-        N80[vector4]
+        N74[alloc-counter]
+        N75[color]
+        N76[frustum]
+        N77[index]
+        N78[matrix3]
+        N79[matrix4]
+        N80[quaternion]
+        N81[vector2]
+        N82[vector3]
+        N83[vector4]
     end
 
     subgraph Packages/motion
-        N81[camera-rigs]
-        N82[clock]
-        N83[constraints]
-        N84[ik]
-        N85[index]
-        N86[integrators]
-        N87[kinematic-controller]
-        N88[motion-component]
-        N89[pid]
-        N90[prediction]
-        N91[...8 more]
+        N84[camera-rigs]
+        N85[character-controller]
+        N86[clock]
+        N87[constraints]
+        N88[ik]
+        N89[index]
+        N90[integrators]
+        N91[kinematic-controller]
+        N92[motion-component]
+        N93[pid]
+        N94[...9 more]
     end
 
     subgraph Packages/particles
-        N92[emitter]
-        N93[fields]
-        N94[index]
-        N95[particle-renderable]
-        N96[particle-system]
-        N97[pool]
-        N98[random]
-        N99[types]
+        N95[emitter]
+        N96[fields]
+        N97[index]
+        N98[particle-renderable]
+        N99[particle-system]
+        N100[pool]
+        N101[random]
+        N102[types]
     end
 
     subgraph Packages/physics
-        N100[adapter]
-        N101[body-access]
-        N102[collider]
-        N103[descriptors]
-        N104[events]
-        N105[force-field]
-        N106[index]
-        N107[joints]
-        N108[material]
-        N109[physics-event-system]
-        N110[...9 more]
+        N103[adapter]
+        N104[body-access]
+        N105[collider]
+        N106[descriptors]
+        N107[events]
+        N108[force-field]
+        N109[index]
+        N110[joints]
+        N111[material]
+        N112[physics-event-system]
+        N113[...9 more]
     end
 
     subgraph Packages/physics-box2d
-        N111[index]
+        N114[index]
     end
 
     subgraph Packages/physics-rapier
-        N112[ccd]
-        N113[conversions2d]
-        N114[conversions3d]
-        N115[index]
-        N116[init]
-        N117[rapier2d-adapter]
-        N118[rapier3d-adapter]
-        N119[register]
+        N115[ccd]
+        N116[conversions2d]
+        N117[conversions3d]
+        N118[index]
+        N119[init]
+        N120[rapier2d-adapter]
+        N121[rapier3d-adapter]
+        N122[register]
     end
 
     subgraph Packages/physics-soft
-        N120[index]
+        N123[index]
     end
 
     subgraph Packages/render
-        N121[batch]
-        N122[bounds]
-        N123[effect-pass]
-        N124[index]
-        N125[lights]
-        N126[particles]
-        N127[render-graph]
-        N128[render-list]
-        N129[render-target]
-        N130[renderable]
-        N131[...8 more]
+        N124[batch]
+        N125[bounds]
+        N126[effect-pass]
+        N127[index]
+        N128[lights]
+        N129[particles]
+        N130[render-graph]
+        N131[render-list]
+        N132[render-target]
+        N133[renderable]
+        N134[...8 more]
     end
 
     subgraph Packages/render-canvas
-        N132[index]
+        N135[index]
     end
 
     subgraph Packages/render-svg
-        N133[index]
+        N136[index]
     end
 
     subgraph Packages/render-webgl
-        N134[gl-batch]
-        N135[gl-effect]
-        N136[gl-geometry]
-        N137[gl-particles]
-        N138[gl-program]
-        N139[gl-render-target]
-        N140[gl-shadow]
-        N141[gl-standard]
-        N142[gl-texture]
-        N143[index]
-        N144[...2 more]
+        N137[gl-batch]
+        N138[gl-effect]
+        N139[gl-geometry]
+        N140[gl-particles]
+        N141[gl-program]
+        N142[gl-render-target]
+        N143[gl-shadow]
+        N144[gl-standard]
+        N145[gl-texture]
+        N146[index]
+        N147[...2 more]
     end
 
     subgraph Packages/render-webgpu
-        N145[index]
+        N148[index]
     end
 
     subgraph Packages/scene
-        N146[authority]
-        N147[camera]
-        N148[group]
-        N149[index]
-        N150[interpolation]
-        N151[layers]
-        N152[light]
-        N153[node]
-        N154[pose-target]
-        N155[scene]
-        N156[...5 more]
+        N149[authority]
+        N150[camera]
+        N151[group]
+        N152[index]
+        N153[interpolation]
+        N154[layers]
+        N155[light]
+        N156[node]
+        N157[pose-target]
+        N158[scene]
+        N159[...5 more]
     end
 
     subgraph Packages/serialization
-        N157[format]
-        N158[index]
-        N159[migration]
-        N160[serializer]
+        N160[format]
+        N161[index]
+        N162[migration]
+        N163[serializer]
     end
 
     subgraph Packages/text
-        N161[bitmap-font]
-        N162[glyph-atlas]
-        N163[index]
-        N164[text-layout]
+        N164[bitmap-font]
+        N165[glyph-atlas]
+        N166[index]
+        N167[text-layout]
     end
 
     subgraph Packages/ui
-        N165[button]
-        N166[checkable]
-        N167[image]
-        N168[index]
-        N169[keyboard]
-        N170[label]
-        N171[numbers]
-        N172[panel]
-        N173[progress]
-        N174[radio]
-        N175[...2 more]
+        N168[button]
+        N169[checkable]
+        N170[image]
+        N171[index]
+        N172[keyboard]
+        N173[label]
+        N174[numbers]
+        N175[panel]
+        N176[progress]
+        N177[radio]
+        N178[...2 more]
     end
 
     N2 --> N8
@@ -4540,59 +4624,59 @@ graph TD
     N7 --> N9
     N9 --> N1
     N9 --> N4
-    N12 --> N11
-    N12 --> N13
+    N11 --> N12
     N13 --> N11
-    N14 --> N16
-    N14 --> N18
-    N16 --> N18
-    N20 --> N15
-    N20 --> N21
-    N20 --> N22
-    N20 --> N14
-    N20 --> N17
-    N20 --> N16
-    N20 --> N18
-    N20 --> N19
-    N20 --> N23
-    N27 --> N25
-    N27 --> N28
-    N27 --> N32
-    N27 --> N29
-    N27 --> N30
-    N27 --> N26
-    N27 --> N31
-    N27 --> N33
-    N28 --> N29
+    N13 --> N12
+    N13 --> N15
+    N13 --> N16
+    N13 --> N14
+    N14 --> N11
+    N15 --> N11
+    N16 --> N11
+    N17 --> N19
+    N17 --> N21
+    N19 --> N21
+    N23 --> N18
+    N23 --> N24
+    N23 --> N25
+    N23 --> N17
+    N23 --> N20
+    N23 --> N19
+    N23 --> N21
+    N23 --> N22
+    N23 --> N26
     N30 --> N28
+    N30 --> N31
+    N30 --> N35
+    N30 --> N32
+    N30 --> N33
     N30 --> N29
-    N32 --> N28
-    N33 --> N26
-    N40 --> N35
-    N45 --> N46
-    N45 --> N52
-    N47 --> N45
-    N47 --> N46
-    N47 --> N50
-    N47 --> N48
-    N47 --> N53
-    N47 --> N51
-    N47 --> N52
-    N47 --> N54
+    N30 --> N34
+    N30 --> N36
+    N31 --> N32
+    N33 --> N31
+    N33 --> N32
+    N35 --> N31
+    N36 --> N29
+    N43 --> N38
     N48 --> N49
-    N48 --> N54
-    N50 --> N45
+    N48 --> N55
+    N50 --> N48
     N50 --> N49
+    N50 --> N53
+    N50 --> N51
+    N50 --> N56
     N50 --> N54
-    N51 --> N45
-    N51 --> N49
-    N51 --> N54
+    N50 --> N55
+    N50 --> N57
+    N51 --> N52
+    N51 --> N57
     N53 --> N48
-    N54 --> N45
-    N54 --> N49
-    N55 --> N59
-    N55 --> N60
-    N55 --> N61
+    N53 --> N52
+    N53 --> N57
+    N54 --> N48
+    N54 --> N52
+    N54 --> N57
 ```
 
 ---
@@ -4602,17 +4686,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 221 |
+| Total TypeScript Files | 225 |
 | Total Modules | 24 |
-| Total Lines of Code | 102602 |
-| Total Exports | 2031 |
-| Total Re-exports | 1310 |
-| Total Classes | 141 |
-| Total Interfaces | 432 |
-| Total Functions | 336 |
+| Total Lines of Code | 104591 |
+| Total Exports | 2077 |
+| Total Re-exports | 1339 |
+| Total Classes | 144 |
+| Total Interfaces | 438 |
+| Total Functions | 342 |
 | Total Type Guards | 19 |
 | Total Enums | 0 |
-| Type-only Imports | 260 |
+| Type-only Imports | 266 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 2 |
 
