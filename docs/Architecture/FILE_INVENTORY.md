@@ -6,7 +6,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 544
+**Total files**: 547
 
 ## Disposition counts
 
@@ -16,11 +16,11 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 297 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 300 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 12 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 9 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **544** | |
+| **Total** | **547** | |
 
 ## Per-area counts
 
@@ -29,14 +29,14 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `config` | 12 |
 | `examples` | 9 |
 | `src` | 225 |
-| `tests` | 297 |
+| `tests` | 300 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 132 |
+| `(root)` | 135 |
 | `@four/animation` | 25 |
 | `@four/assets` | 14 |
 | `@four/core` | 22 |
@@ -506,11 +506,13 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/first-3d-scene.spec.ts` | (root) | tests | test |
 | `tests/browser/fixtures/batching-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/culling-page.ts` | (root) | tests | test |
+| `tests/browser/fixtures/mipmaps-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/screen-camera-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/stencil-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/text-page.ts` | (root) | tests | test |
 | `tests/browser/interaction.spec.ts` | (root) | tests | test |
 | `tests/browser/mechanism.spec.ts` | (root) | tests | test |
+| `tests/browser/mipmaps.spec.ts` | (root) | tests | test |
 | `tests/browser/motor-digital-twin.spec.ts` | (root) | tests | test |
 | `tests/browser/one-scene-everything-moves.spec.ts` | (root) | tests | test |
 | `tests/browser/particles.spec.ts` | (root) | tests | test |
@@ -603,6 +605,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/svg-path-pipeline.test.ts` | (root) | tests | test |
 | `tests/integration/text-rendering.test.ts` | (root) | tests | test |
 | `tests/integration/texture-manifest.test.ts` | (root) | tests | test |
+| `tests/integration/texture-mipmaps.test.ts` | (root) | tests | test |
 | `tests/integration/units-display.test.ts` | (root) | tests | test |
 | `tests/integration/view-culling.test.ts` | (root) | tests | test |
 | `tests/visual/text.spec.ts` | (root) | tests | test |

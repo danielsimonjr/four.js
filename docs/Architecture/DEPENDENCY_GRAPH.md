@@ -1561,7 +1561,7 @@ graph LR
 
 ## Packages/materials Dependencies
 
-### `packages/materials/src/index.ts` - Package entry point for @four/materials (re-exports 22 symbols)
+### `packages/materials/src/index.ts` - Package entry point for @four/materials (re-exports 23 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -1577,12 +1577,12 @@ graph LR
 | `./sprite-material.js` | `SpriteMaterialOptions, SpriteTexture` | Re-export (type-only) |
 | `./stencil-state.js` | `StencilFunc, StencilOp, StencilStateOptions` | Re-export (type-only) |
 | `./standard-material.js` | `ColorRGB, StandardMaterialOptions` | Re-export (type-only) |
-| `./texture.js` | `MaterialTexture, MaterialTextureFilter, MaterialTextureWrap` | Re-export (type-only) |
+| `./texture.js` | `MaterialTexture, MaterialTextureFilter, MaterialTextureMinFilter, MaterialTextureWrap` | Re-export (type-only) |
 | `./unlit-material.js` | `ColorRGBA, UnlitMaterialOptions` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `LitMaterial`, `Material`, `SpriteMaterial`, `MAX_STENCIL_VALUE`, `StencilState`, `StandardMaterial`, `UnlitMaterial`, `LitMaterialOptions`, `BlendMode`, `MaterialOptions`, `SpriteMaterialOptions`, `SpriteTexture`, `StencilFunc`, `StencilOp`, `StencilStateOptions`, `ColorRGB`, `StandardMaterialOptions`, `MaterialTexture`, `MaterialTextureFilter`, `MaterialTextureWrap`, `ColorRGBA`, `UnlitMaterialOptions`
+- Re-exports: `LitMaterial`, `Material`, `SpriteMaterial`, `MAX_STENCIL_VALUE`, `StencilState`, `StandardMaterial`, `UnlitMaterial`, `LitMaterialOptions`, `BlendMode`, `MaterialOptions`, `SpriteMaterialOptions`, `SpriteTexture`, `StencilFunc`, `StencilOp`, `StencilStateOptions`, `ColorRGB`, `StandardMaterialOptions`, `MaterialTexture`, `MaterialTextureFilter`, `MaterialTextureMinFilter`, `MaterialTextureWrap`, `ColorRGBA`, `UnlitMaterialOptions`
 
 ---
 
@@ -1675,7 +1675,7 @@ graph LR
 
 **Exports:**
 - Interfaces: `MaterialTexture`
-- Types: `MaterialTextureFilter`, `MaterialTextureWrap`
+- Types: `MaterialTextureFilter`, `MaterialTextureMinFilter`, `MaterialTextureWrap`
 
 ---
 
@@ -3032,7 +3032,7 @@ graph LR
 
 ---
 
-### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 144 symbols)
+### `packages/render/src/index.ts` - Package entry point for @four/render (re-exports 145 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3068,12 +3068,12 @@ graph LR
 | `./statistics.js` | `RenderStatistics, RenderStatisticsReporter` | Re-export (type-only) |
 | `./shape.js` | `ArcOptions, CircleOptions, EllipseOptions, LineOptions, Paint, PathShapeOptions, PolygonOptions, PolylineOptions, RectangleOptions, RegularPolygonOptions, RingOptions, SectorOptions, ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle, Shape2DOptions, ShapeFill, SolidPaint, StarOptions, StrokeStyle` | Re-export (type-only) |
 | `./sprite.js` | `SpriteFrame, SpriteOptions` | Re-export (type-only) |
-| `./texture.js` | `TextureFilter, TextureSource, TextureWrap` | Re-export (type-only) |
+| `./texture.js` | `TextureFilter, TextureMinFilter, TextureSource, TextureWrap` | Re-export (type-only) |
 | `./view-list.js` | `ViewRenderListOptions` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DEFAULT_MAX_BATCH_VERTICES`, `RenderBatcher`, `computeWorldBoundingSphere`, `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `groupRenderListByPipeline`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `buildViewRenderList`, `sortRenderListByDepth`, `BatchableItem`, `BatchableMaterial`, `RenderBatch`, `RenderBatchOptions`, `BoundingSphere`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureFilter`, `TextureSource`, `TextureWrap`, `ViewRenderListOptions`
+- Re-exports: `DEFAULT_MAX_BATCH_VERTICES`, `RenderBatcher`, `computeWorldBoundingSphere`, `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `groupRenderListByPipeline`, `isLitItem`, `isParticlesItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `RenderGraph`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `AUTO_RENDERER_ORDER`, `RendererRegistry`, `clearRegisteredRenderers`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `buildViewRenderList`, `sortRenderListByDepth`, `BatchableItem`, `BatchableMaterial`, `RenderBatch`, `RenderBatchOptions`, `BoundingSphere`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureFilter`, `TextureMinFilter`, `TextureSource`, `TextureWrap`, `ViewRenderListOptions`
 
 ---
 
@@ -3301,7 +3301,7 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/core` | `Disposable` |
-| `@four/materials` | `MaterialTextureFilter, MaterialTextureWrap, SpriteTexture` |
+| `@four/materials` | `MaterialTextureFilter, MaterialTextureMinFilter, MaterialTextureWrap, SpriteTexture` |
 | `@four/math` | `ColorSpace` |
 
 **Internal Dependencies:**
@@ -3313,7 +3313,7 @@ graph LR
 **Exports:**
 - Classes: `Texture`
 - Interfaces: `TextureSource`
-- Types: `TextureFilter`, `TextureWrap`
+- Types: `TextureFilter`, `TextureMinFilter`, `TextureWrap`
 
 ---
 
@@ -4688,9 +4688,9 @@ graph TD
 |----------|-------|
 | Total TypeScript Files | 225 |
 | Total Modules | 24 |
-| Total Lines of Code | 104591 |
-| Total Exports | 2077 |
-| Total Re-exports | 1339 |
+| Total Lines of Code | 105119 |
+| Total Exports | 2079 |
+| Total Re-exports | 1341 |
 | Total Classes | 144 |
 | Total Interfaces | 438 |
 | Total Functions | 342 |

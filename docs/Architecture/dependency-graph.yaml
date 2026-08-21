@@ -4,7 +4,7 @@ metadata:
   lastUpdated: "2026-08-21"
   totalFiles: 225
   totalModules: 24
-  totalExports: 2077
+  totalExports: 2079
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -3992,7 +3992,7 @@ modules:
         - dispatchThreePhase
   packages/materials:
     packages/materials/src/index.ts:
-      description: Package entry point for @four/materials (re-exports 22 symbols)
+      description: Package entry point for @four/materials (re-exports 23 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -4055,6 +4055,7 @@ modules:
           imports:
             - MaterialTexture
             - MaterialTextureFilter
+            - MaterialTextureMinFilter
             - MaterialTextureWrap
           reExport: true
           typeOnly: true
@@ -4086,6 +4087,7 @@ modules:
         - StandardMaterialOptions
         - MaterialTexture
         - MaterialTextureFilter
+        - MaterialTextureMinFilter
         - MaterialTextureWrap
         - ColorRGBA
         - UnlitMaterialOptions
@@ -4109,6 +4111,7 @@ modules:
         - StandardMaterialOptions
         - MaterialTexture
         - MaterialTextureFilter
+        - MaterialTextureMinFilter
         - MaterialTextureWrap
         - ColorRGBA
         - UnlitMaterialOptions
@@ -8673,7 +8676,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 144 symbols)
+      description: Package entry point for @four/render (re-exports 145 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -8927,6 +8930,7 @@ modules:
         - file: ./texture.js
           imports:
             - TextureFilter
+            - TextureMinFilter
             - TextureSource
             - TextureWrap
           reExport: true
@@ -9080,6 +9084,7 @@ modules:
         - SpriteFrame
         - SpriteOptions
         - TextureFilter
+        - TextureMinFilter
         - TextureSource
         - TextureWrap
         - ViewRenderListOptions
@@ -9225,6 +9230,7 @@ modules:
         - SpriteFrame
         - SpriteOptions
         - TextureFilter
+        - TextureMinFilter
         - TextureSource
         - TextureWrap
         - ViewRenderListOptions
@@ -9722,6 +9728,7 @@ modules:
           directory: packages/materials
           imports:
             - MaterialTextureFilter
+            - MaterialTextureMinFilter
             - MaterialTextureWrap
             - SpriteTexture
         - package: "@four/math"
@@ -12448,15 +12455,15 @@ dependencyGraph:
 statistics:
   totalTypeScriptFiles: 225
   totalModules: 24
-  totalLinesOfCode: 104591
-  totalExports: 2077
+  totalLinesOfCode: 105119
+  totalExports: 2079
   totalClasses: 144
   totalInterfaces: 438
   totalFunctions: 342
   totalTypeGuards: 19
   totalEnums: 0
   totalConstants: 274
-  totalReExports: 1339
+  totalReExports: 1341
   totalTypeOnlyImports: 266
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 2

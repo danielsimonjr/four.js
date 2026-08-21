@@ -5,7 +5,7 @@
     "lastUpdated": "2026-08-21",
     "totalFiles": 225,
     "totalModules": 24,
-    "totalExports": 2077
+    "totalExports": 2079
   },
   "entryPoints": [
     {
@@ -5216,7 +5216,7 @@
     },
     "packages/materials": {
       "packages/materials/src/index.ts": {
-        "description": "Package entry point for @four/materials (re-exports 22 symbols)",
+        "description": "Package entry point for @four/materials (re-exports 23 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -5313,6 +5313,7 @@
             "imports": [
               "MaterialTexture",
               "MaterialTextureFilter",
+              "MaterialTextureMinFilter",
               "MaterialTextureWrap"
             ],
             "reExport": true,
@@ -5350,6 +5351,7 @@
           "StandardMaterialOptions",
           "MaterialTexture",
           "MaterialTextureFilter",
+          "MaterialTextureMinFilter",
           "MaterialTextureWrap",
           "ColorRGBA",
           "UnlitMaterialOptions"
@@ -5374,6 +5376,7 @@
           "StandardMaterialOptions",
           "MaterialTexture",
           "MaterialTextureFilter",
+          "MaterialTextureMinFilter",
           "MaterialTextureWrap",
           "ColorRGBA",
           "UnlitMaterialOptions"
@@ -11426,7 +11429,7 @@
         ]
       },
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 144 symbols)",
+        "description": "Package entry point for @four/render (re-exports 145 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -11774,6 +11777,7 @@
             "file": "./texture.js",
             "imports": [
               "TextureFilter",
+              "TextureMinFilter",
               "TextureSource",
               "TextureWrap"
             ],
@@ -11933,6 +11937,7 @@
           "SpriteFrame",
           "SpriteOptions",
           "TextureFilter",
+          "TextureMinFilter",
           "TextureSource",
           "TextureWrap",
           "ViewRenderListOptions"
@@ -12079,6 +12084,7 @@
           "SpriteFrame",
           "SpriteOptions",
           "TextureFilter",
+          "TextureMinFilter",
           "TextureSource",
           "TextureWrap",
           "ViewRenderListOptions"
@@ -12785,6 +12791,7 @@
             "directory": "packages/materials",
             "imports": [
               "MaterialTextureFilter",
+              "MaterialTextureMinFilter",
               "MaterialTextureWrap",
               "SpriteTexture"
             ]
@@ -16500,15 +16507,15 @@
   "statistics": {
     "totalTypeScriptFiles": 225,
     "totalModules": 24,
-    "totalLinesOfCode": 104591,
-    "totalExports": 2077,
+    "totalLinesOfCode": 105119,
+    "totalExports": 2079,
     "totalClasses": 144,
     "totalInterfaces": 438,
     "totalFunctions": 342,
     "totalTypeGuards": 19,
     "totalEnums": 0,
     "totalConstants": 274,
-    "totalReExports": 1339,
+    "totalReExports": 1341,
     "totalTypeOnlyImports": 266,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,

@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-21",
-  "totalFiles": 544,
+  "totalFiles": 547,
   "byDisposition": {
     "reachable": 177,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 297,
+    "test": 300,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -15,11 +15,11 @@
     "examples": 9,
     "config": 12,
     "src": 225,
-    "tests": 297,
+    "tests": 300,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 132,
+    "(root)": 135,
     "@four/animation": 25,
     "@four/assets": 14,
     "@four/core": 22,
@@ -1192,7 +1192,7 @@
       "package": "@four/materials",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 27
+      "loc": 28
     },
     {
       "file": "packages/materials/src/lit-material.ts",
@@ -1234,7 +1234,7 @@
       "package": "@four/materials",
       "area": "src",
       "disposition": "reachable",
-      "loc": 152
+      "loc": 234
     },
     {
       "file": "packages/materials/src/unlit-material.ts",
@@ -2263,7 +2263,7 @@
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2064
+      "loc": 2113
     },
     {
       "file": "packages/render-webgl/src/gl-render-target.ts",
@@ -2291,7 +2291,7 @@
       "package": "@four/render-webgl",
       "area": "src",
       "disposition": "reachable",
-      "loc": 281
+      "loc": 421
     },
     {
       "file": "packages/render-webgl/src/index.ts",
@@ -2333,7 +2333,7 @@
       "package": "@four/render-webgl",
       "area": "tests",
       "disposition": "test",
-      "loc": 9611
+      "loc": 9846
     },
     {
       "file": "packages/render-webgpu/src/index.ts",
@@ -2375,7 +2375,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 178
+      "loc": 183
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -2466,7 +2466,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 541
+      "loc": 792
     },
     {
       "file": "packages/render/src/view-list.ts",
@@ -2571,7 +2571,7 @@
       "package": "@four/render",
       "area": "tests",
       "disposition": "test",
-      "loc": 942
+      "loc": 1103
     },
     {
       "file": "packages/render/tests/statistics.test.ts",
@@ -3127,6 +3127,13 @@
       "loc": 153
     },
     {
+      "file": "tests/browser/fixtures/mipmaps-page.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 206
+    },
+    {
       "file": "tests/browser/fixtures/screen-camera-page.ts",
       "package": "(root)",
       "area": "tests",
@@ -3160,6 +3167,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 939
+    },
+    {
+      "file": "tests/browser/mipmaps.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 234
     },
     {
       "file": "tests/browser/motor-digital-twin.spec.ts",
@@ -3804,6 +3818,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 161
+    },
+    {
+      "file": "tests/integration/texture-mipmaps.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 273
     },
     {
       "file": "tests/integration/units-display.test.ts",
