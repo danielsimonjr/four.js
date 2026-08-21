@@ -10,6 +10,10 @@ export type {
 } from "./recorder.js";
 export { ReplayRecorder } from "./recorder.js";
 
+// --- PH-20 (§33 rollback) ---------------------------------------------------
+export type { RollbackBufferOptions, RollbackTarget } from "./rollback.js";
+export { RollbackBuffer } from "./rollback.js";
+
 export type {
   JsonValue,
   ReplayAdapterIdentity,

@@ -8,6 +8,56 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — PH-21 and PH-20 closed: §39 step 9 becomes an occupiable priority, and §33 gets its rollback API
+
+#### Added
+
+- **§39 step 9 as a registered system (PH-21).** `PhysicsEventSystem` in `@four/physics`,
+  registered at `PRIORITY_EVENT_DISPATCH` (900), dispatches the queued physics events of a
+  `PhysicsSystem`'s tracked worlds — the pass `PhysicsSystem` performed internally at step
+  6's priority. Opt in with the new `PhysicsSystemOptions.dispatchEvents: false`; the
+  default stays `true`, so no existing application and no committed golden changes. With
+  dispatch at 900, a system at `PRIORITY_CONSTRAINTS` (700) or `PRIORITY_SENSOR_UPDATE`
+  (800) runs _before_ application listeners, which is the ordering §39 asks for and the
+  reason the split exists. `PhysicsSystem.dispatchesEvents` reports the choice;
+  `PhysicsSystem.claimEventDispatch()` silences the "nobody is draining the queue" warning
+  for an application that dispatches by hand. Constructing a `PhysicsEventSystem` over a
+  source that still dispatches its own events is refused (§85) rather than silently
+  draining an empty queue. `PhysicsWorld.step` and `PhysicsWorld.dispatchEvents` were not
+  edited, so every §33 golden is unmoved by construction — PH-8's step-5 technique, reused
+  for step 9.
+- **§33 rollback (PH-20).** `RollbackBuffer` in `@four/diagnostics`: a bounded, ordered ring
+  of snapshots over the new `RollbackTarget` shape (`createSnapshot`/`restoreSnapshot`;
+  `PhysicsWorld` satisfies it). `capture(step)` snapshots the end of a fixed step and evicts
+  the oldest once full; `rollbackTo(step)` restores that exact step, forgets everything
+  after it, and returns **how many fixed steps the caller must re-simulate**. It
+  deliberately does not re-simulate: the only thing it could step is the target, which would
+  skip every other §39 occupant, so the caller re-runs its own registry loop. An unheld or
+  evicted step throws and names the window still held, rather than restoring the nearest
+  older snapshot and silently rewinding further than asked. Rollback was the last of §33's
+  six facilities without an API.
+- **Two determinism gates.** `tests/determinism/event-dispatch-split.test.ts` +
+  `golden/event-dispatch-split.json` (three-form; 180 fixed steps, eight stacked boxes plus
+  a second tracked world, all seven §29 event kinds listened to) records that the combined
+  and split arms are equal step for step and event for event — one digest set covers both
+  arms, because equality is the claim — and that the one recorded difference is _when_ the
+  listeners ran: a step-7 marker's count is `n − 1` at dispatch-600 and `n` at dispatch-900,
+  on all 149 event-bearing steps. `tests/determinism/rollback.test.ts` rewinds a live
+  Rapier2d run from step 120 to step 100 and re-simulates through the same registry,
+  reproducing the reference run's 200 per-step checksums with zero divergence.
+
+#### Documented
+
+- **§39 steps 7 and 8 are not splittable, and it is a solver fact, not an omission.** A
+  solver's constraint solve and its sensor/intersection update happen inside one
+  `adapter.step()` call, so no engine system can be interposed between them without asking
+  every adapter to expose a half-stepped world. `PRIORITY_CONSTRAINTS` and
+  `PRIORITY_SENSOR_UPDATE` legitimately hold _engine-side_ work at those points — 700 is
+  `ConstraintSystem`'s since 2026-08-09, and 800 is where an application's own sensor
+  bookkeeping belongs. Recorded in `physics-event-system.ts`'s module header, which is the
+  §90/§102 material PH-21's filing asked for. No adapter capability changed, so
+  `docs/COMPATIBILITY.md` was not regenerated.
+
 ### 2026-08-13 — R-28 closed, R-30 advanced: the §49/§56 `Text` node and §77 sampler state
 
 #### Added
