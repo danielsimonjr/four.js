@@ -34,6 +34,25 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-21 — §53 geometry model (2026-08-21).** `Geometry` base, `clone()`,
+      `BoundingVolume` (box + circumscribing sphere). `GeometryBounds` aliased, R-8
+      unmodified. Seven §53 subclasses and hierarchical volumes deliberately staged with
+      the 2026-08-02 argument intact.
+- [x] **R-34 — §27 field batching (2026-08-21).** `ParticleForceField.sampleAll`, all
+      seven built-ins, bit-identical, per-field cost 5.15 → 1.12 ms;
+      `benchmarks/results/particles-100k.json` re-recorded (3-field 100k stack
+      16.58 → 4.51 ms).
+- [ ] **R-32 — textured / rotated / soft particles.** Owner: the `render-webgl`
+      particle-pipeline packet (NOT `@four/particles` — the flat square, the shader pair
+      and the 8-float instance stream are all backend-side; the stream constant is
+      triplicated across three packages by §3.1). Design recorded in the GAP row.
+      Sequence after the ScreenCamera wave so the particle pixel goldens move once.
+- [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
+      packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
+      simulate-ms and present-ms separately.
+- [ ] **R-31 — GPU particle simulation.** Blocked by R-1 (WebGPU is one line) and §82.
+      Do NOT add an accepted-then-rejected `simulation: "gpu"` option — the type-level
+      absence is a recorded WP-9.1 decision.
 - [x] **R-7 — §67 stencil support (2026-08-21).** `StencilState` in `@four/materials`,
       `RendererOptions.stencil` / `RenderTargetOptions.stencil`, backend application and
       packed `DEPTH24_STENCIL8` allocation, `FRAME_BEFORE_R7` recorded on the reverted

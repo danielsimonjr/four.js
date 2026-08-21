@@ -89,9 +89,13 @@
  * never runs on a draw path. `resource-memory.ts` documents the design.
  */
 
-import type { Disposable } from "@four/core";
 import { Vector3 } from "@four/math";
 
+import {
+  Geometry,
+  type BoundingVolume,
+  type MutableBoundingVolume,
+} from "./geometry.js";
 import { noteGeometry } from "./resource-memory.js";
 
 /**
@@ -114,27 +118,16 @@ export type GeometryDrawMode = "triangles" | "lines";
 export type GeometryIndexArray = Uint16Array | Uint32Array;
 
 /**
- * An axis-aligned bounding box in the geometry's own local space, as returned
- * by {@link BufferGeometry.computeBounds}.
+ * The axis-aligned box half of §53's bounding volume, in the geometry's own
+ * local space.
  *
- * §53 spells this as a `bounds: BoundingVolume` field plus a
- * `computeBounds(): void` that fills it. The volume hierarchy (spheres, capsule
- * bounds, hierarchical volumes) belongs to the culling packet (§87), so this
- * packet returns the one volume it can compute exactly — the AABB — and returns
- * it from the method instead of publishing a field whose type would have to
- * change when §87 lands.
- *
- * The `Vector3`s are **live**: they belong to the geometry, are rewritten in
- * place by the next recompute, and must not be mutated by callers. Copy them if
- * you need to keep them (the same rule `resolveWorldTransform` states for a
- * returned world matrix).
+ * **This is now an alias of {@link BoundingVolume}** (R-21, 2026-08-21), which
+ * is that box plus the sphere circumscribing it. The name is kept because four
+ * packages import it, and the widening is additive: every existing reader of
+ * `.min`/`.max` sees exactly the values it saw before. New code should prefer
+ * `BoundingVolume` — the name §53 uses.
  */
-export interface GeometryBounds {
-  /** Lowest corner. `+Infinity` on every axis when the geometry has no vertices. */
-  readonly min: Vector3;
-  /** Highest corner. `-Infinity` on every axis when the geometry has no vertices. */
-  readonly max: Vector3;
-}
+export type GeometryBounds = BoundingVolume;
 
 /** Construction arguments of {@link BufferGeometry}. */
 export interface BufferGeometryOptions {
@@ -171,19 +164,6 @@ export interface BufferGeometryOptions {
   indices?: GeometryIndexArray;
   /** Primitive assembly; defaults to `"triangles"`. */
   mode?: GeometryDrawMode;
-}
-
-/**
- * Source of geometry ids. Monotonic and process-wide, exactly like `Node`'s:
- * §33 forbids random or clock-derived identity, and a counter makes two
- * identical construction sequences produce identical ids.
- */
-let nextGeometryId = 1;
-
-function assignGeometryId(): string {
-  const id = `geometry-${String(nextGeometryId)}`;
-  nextGeometryId += 1;
-  return id;
 }
 
 /** Shared empty backing store handed to a disposed geometry. */
@@ -307,14 +287,7 @@ function validate(
  * Geometries are **shared, not owned by nodes**: any number of `Renderable`s
  * may point at one, and disposing it is the job of whoever created it (§83).
  */
-export class BufferGeometry implements Disposable {
-  /**
-   * Stable identity (§53), assigned at construction from a monotonic counter
-   * and formatted `geometry-<n>`. Unique within a process, ascending in
-   * construction order, never reused.
-   */
-  readonly id: string = assignGeometryId();
-
+export class BufferGeometry extends Geometry {
   #positions: Float32Array;
 
   #normals: Float32Array | undefined;
@@ -336,9 +309,13 @@ export class BufferGeometry implements Disposable {
 
   readonly #boundsMax = new Vector3();
 
-  readonly #bounds: GeometryBounds = {
+  readonly #boundsCenter = new Vector3();
+
+  readonly #bounds: MutableBoundingVolume = {
     min: this.#boundsMin,
     max: this.#boundsMax,
+    center: this.#boundsCenter,
+    radius: Number.NaN,
   };
 
   /**
@@ -348,6 +325,7 @@ export class BufferGeometry implements Disposable {
   #boundsVersion = -1;
 
   constructor(options: BufferGeometryOptions) {
+    super();
     const mode = options.mode ?? "triangles";
     validate(
       options.positions,
@@ -553,8 +531,20 @@ export class BufferGeometry implements Disposable {
    * against it; treat it as opaque and compare for inequality, exactly like
    * `Transform.version`. Monotonic, never wraps in a realistic session.
    */
-  get version(): number {
+  override get version(): number {
     return this.#version;
+  }
+
+  /**
+   * This geometry's local {@link BoundingVolume} — §53's `bounds` field,
+   * spelled as a getter so that it cannot go stale.
+   *
+   * Identical to calling {@link BufferGeometry.computeBounds}, down to the
+   * identity of the returned object: reading the property recomputes exactly
+   * when the method would.
+   */
+  override get bounds(): BoundingVolume {
+    return this.computeBounds();
   }
 
   /** Number of vertices — `positions.length / 3`. */
@@ -573,7 +563,7 @@ export class BufferGeometry implements Disposable {
   }
 
   /** Whether {@link BufferGeometry.dispose} has run. */
-  get disposed(): boolean {
+  override get disposed(): boolean {
     return this.#disposed;
   }
 
@@ -625,21 +615,23 @@ export class BufferGeometry implements Disposable {
   }
 
   /**
-   * Returns this geometry's axis-aligned bounds in local space, recomputing
-   * them only when {@link BufferGeometry.version} has advanced since the last
-   * call (§53: bounds are computed, then cached against the version).
+   * Returns this geometry's local {@link BoundingVolume}, recomputing it only
+   * when {@link BufferGeometry.version} has advanced since the last call (§53:
+   * bounds are computed, then cached against the version).
    *
-   * Allocates nothing — the returned {@link GeometryBounds} and its two vectors
-   * are owned by the geometry and rewritten in place on the next recompute, so
-   * callers that keep the values must copy them.
+   * Allocates nothing — the returned volume and its three vectors are owned by
+   * the geometry and rewritten in place on the next recompute, so callers that
+   * keep the values must copy them.
    *
    * A geometry with no vertices returns the empty box `min = +Infinity`,
    * `max = -Infinity` (decision, WP-3.3): that is the identity element of
    * bounds union, so an empty geometry folded into a scene bound contributes
    * nothing, whereas a zero-sized box at the origin would drag the scene bound
-   * to include a point that has no geometry in it.
+   * to include a point that has no geometry in it. Its `center` and `radius`
+   * are `NaN` for the same reason stated positively — the volume of no points
+   * is not a point at the origin (R-21).
    */
-  computeBounds(): GeometryBounds {
+  override computeBounds(): BoundingVolume {
     if (this.#boundsVersion === this.#version) {
       return this.#bounds;
     }
@@ -678,8 +670,80 @@ export class BufferGeometry implements Disposable {
 
     this.#boundsMin.set(minX, minY, minZ);
     this.#boundsMax.set(maxX, maxY, maxZ);
+    if (minX > maxX) {
+      // The empty box. Written explicitly rather than left to IEEE arithmetic,
+      // which would disagree with itself here: `(+∞ + −∞) / 2` is `NaN` but
+      // `|−∞ − +∞| / 2` is `+∞`, and a bound of infinite radius reads as
+      // "everywhere" to a culler — the one wrong answer that is never
+      // conservative in the safe direction.
+      this.#boundsCenter.set(Number.NaN, Number.NaN, Number.NaN);
+      this.#bounds.radius = Number.NaN;
+    } else {
+      const halfX = (maxX - minX) * 0.5;
+      const halfY = (maxY - minY) * 0.5;
+      const halfZ = (maxZ - minZ) * 0.5;
+      this.#boundsCenter.set(minX + halfX, minY + halfY, minZ + halfZ);
+      this.#bounds.radius = Math.sqrt(
+        halfX * halfX + halfY * halfY + halfZ * halfZ,
+      );
+    }
     this.#boundsVersion = this.#version;
     return this.#bounds;
+  }
+
+  /**
+   * An independent copy of this geometry — same vertex data, same mode,
+   * **a new {@link BufferGeometry.id}**, version `0` (§53).
+   *
+   * ```ts
+   * const wobbly = geometry.clone();
+   * wobbly.positions[1] += 0.5;   // does not touch `geometry`
+   * wobbly.markDirty();
+   * ```
+   *
+   * ## The contract: deep in the attributes, and nothing else to be shallow in
+   *
+   * Every typed array is **copied**, not shared. That is the only choice that
+   * survives contact with this class's own fast path: attributes are held *by
+   * reference* and the documented way to edit them is an in-place write
+   * followed by {@link BufferGeometry.markDirty}. A shallow clone would
+   * therefore give two geometries one buffer and two independent version
+   * counters — an in-place edit through either handle would silently change
+   * what the other draws while leaving the other's version (and so every
+   * backend cache keyed on it) untouched. That is not a cheaper clone; it is a
+   * cache-coherence bug with a convenient name.
+   *
+   * There is nothing else in a geometry to copy: the bounds are derived (the
+   * clone recomputes them on first use, to the same values), the id is
+   * deliberately not copied, and the geometry holds no references to nodes,
+   * materials, or backends.
+   *
+   * The cost is honest and worth stating: `clone()` allocates and copies
+   * `byteLength` bytes, and reports them to the §83 totals as a second live
+   * geometry. Cloning is for *forking* data — a procedural mesh about to be
+   * deformed per instance. Sharing one geometry between many renderables needs
+   * no clone at all (§83: geometries are shared, not owned by nodes).
+   *
+   * @throws TypeError if this geometry has been disposed. A disposed geometry
+   * holds no data, so the copy would be a silently empty mesh — §83 names
+   * "disposed resources still in use" as a thing to *detect*, and a refusal at
+   * the call site is the earliest place to detect it.
+   */
+  override clone(): BufferGeometry {
+    if (this.#disposed) {
+      throw new TypeError(
+        `Cannot clone ${this.id}: it has been disposed and holds no vertex ` +
+          "data (§83: disposed resource still in use).",
+      );
+    }
+    return new BufferGeometry({
+      positions: this.#positions.slice(),
+      normals: this.#normals?.slice(),
+      uvs: this.#uvs?.slice(),
+      colors: this.#colors?.slice(),
+      indices: this.#indices?.slice(),
+      mode: this.#mode,
+    });
   }
 
   /**
@@ -702,7 +766,7 @@ export class BufferGeometry implements Disposable {
    * idempotence guard above is what makes a double `dispose()` subtract once
    * rather than twice.
    */
-  dispose(): void {
+  override dispose(): void {
     if (this.#disposed) {
       return;
     }

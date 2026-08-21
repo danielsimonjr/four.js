@@ -28,6 +28,64 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — R-21 §53 geometry model + R-34 §27 field batching.** Decisions worth
+  keeping:
+  - **A base class earns its place through identity, not through shape.** §53's
+    `Geometry` ships with exactly one concrete member and the other seven names still
+    absent; what justifies it today is that §33 forbids random ids, so the monotonic
+    counter must be shared, and `clone()` — the one operation that must _not_ copy an
+    id — needs one place to draw from. "The diagram has seven boxes" is not a reason to
+    write seven classes; each of them pins an attribute layout the WebGL backend and §79
+    both must agree with.
+  - **Widen a bounds type by aliasing, never by replacing.** `GeometryBounds` became a
+    type alias of `BoundingVolume` (box + circumscribing sphere), so four packages that
+    read `.min`/`.max` needed no edit and produce byte-identical values. **R-8 keeps
+    deriving its _world_ sphere from the box on purpose** — transforming a local sphere
+    under non-uniform scale is a looser bound than transforming the box.
+  - **The empty bound's centre and radius must be written, not computed.** Left to IEEE
+    the two disagree: `(+∞ + −∞)/2` is `NaN` but `|−∞ − +∞|/2` is `+∞`, and an infinite
+    radius reads to a culler as "everywhere" — the one error direction that is never
+    conservative. Both are pinned to `NaN`; consumers gate on
+    `Number.isFinite(radius)`, the same gate `computeWorldBoundingSphere` already
+    applied.
+  - **§53's `computeBounds(): void` is a spelling, not a constraint.** Narrowing the
+    existing return value to match the letter of the spec would have broken `render`,
+    `input` and `render-webgl` to gain nothing; the `bounds` _property_ §53 also
+    declares ships as a getter returning the identical object. Both spellings live.
+  - **A clone must be deep wherever the class documents an in-place fast path.**
+    `BufferGeometry` holds attributes by reference and documents
+    edit-then-`markDirty()`; a shallow clone would give two geometries one buffer and
+    two version counters, so a write through either handle changes what the other draws
+    while leaving the other's backend cache valid. Cloning a disposed geometry throws
+    rather than silently producing a valid empty mesh (§83).
+  - **Geometries serialize as catalog key references, not by value** — so `clone()` and
+    a new bounds type needed no §79 pairing at all. Checked, not assumed.
+  - **The cost of a `ForceField` was never its arithmetic.** ~5.15 ms per field per 100k
+    was one megamorphic `sample()`, two `Vector3.set`s and three property reads per
+    particle per field. Batching those away (`sampleAll`) cut the per-field marginal
+    cost ~5× with the same math — re-recorded on the canonical host: 16.58 → 4.51 ms
+    for the 3-field 100k stack, per-field 5.15 → 1.12 ms.
+  - **A batched fast path must be bit-identical or it is a different engine.** Three
+    things that would each have broken it silently: accumulating in `Float32Array`
+    (rounds after every field), starting the accumulator at zero instead of at gravity
+    (changes `(g+s₁)+s₂` into `g+(s₁+s₂)`), and `continue`-ing on a degenerate input
+    instead of `+= 0` (a positive zero added to a negative-zero accumulator is not
+    "nothing"). The batched accumulator also has to **mirror `pool.kill`'s
+    swap-remove**, or a swap-removed slot draws the dead particle's acceleration.
+  - **An optional fast path must not be all-or-nothing.** Fields without `sampleAll` are
+    sampled per particle **in their own place in the declaration order** into the same
+    accumulator, so one custom field neither reorders the sum nor disables batching for
+    its neighbours. Note for Changesets: `sampleAll` on `ParticleForceField` is a public
+    extension seam — a third-party field with a different-shaped `sampleAll` property
+    now fails to typecheck; name it a minor, not a patch.
+  - **`pnpm run docs` earned its keep again.** It caught `speed:` where `initialSpeed:`
+    was meant in a new emitter test; vitest ran it green because both sides of the
+    comparison ignored the same unknown property.
+  - **Bundle A/B by revert-and-rebuild, not by estimate.** All six budgets moved by 0.
+    Two are under 1 kB of headroom after this wave's `@four/scene` growth (first-3d
+    33.07/34, ui-demo 38.98/39.5) — the next bundle-touching packet in _any_ lane must
+    A/B before writing code.
+
 - **2026-08-21 — R-7 §67 stencil substrate.** Decisions worth keeping:
   - **A state record is not an API — and saying which one you shipped is the packet.** §67
     lists six clipping mechanisms; §57 lists one optional material member. R-7 shipped the

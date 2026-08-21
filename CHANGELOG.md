@@ -8,6 +8,42 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — R-21 and R-34 closed: §53's geometry model complete, §27 field sampling batched
+
+#### Added
+
+- **§53 geometry model completed (`R-21`).** `@four/geometry` now exports the abstract
+  `Geometry` base §53 declares — `id`, `version`, `bounds`, `computeBounds()`, `clone()`,
+  `dispose()` — with `BufferGeometry` re-parented onto it and the monotonic geometry-id
+  counter hoisted into the base, so every §53 family member and every clone draws from one
+  §33-safe sequence.
+- **`BoundingVolume` (§53).** A geometry's local extent as both the axis-aligned box and
+  the sphere circumscribing it (`min`, `max`, `center`, `radius`). `GeometryBounds`
+  becomes an alias of it, so the widening is additive: every existing reader of
+  `.min`/`.max` — `computeWorldBoundingSphere` (`R-8`), `batch.ts`, `input/pick.ts`, the
+  WebGL renderer — sees byte-identical values and is unmodified. An empty geometry keeps
+  the union-identity box and reports `NaN` centre and radius, written explicitly so a
+  culler can never read an empty bound as "everywhere".
+- **`BufferGeometry.clone()` (§53).** Deep in every typed array, new `id`, version `0`;
+  refuses a disposed source (§83). Deep and not shallow because attributes are held by
+  reference and edited in place under `markDirty()` — one buffer behind two version
+  counters is a cache-coherence bug, not a cheaper clone.
+- **§27 batched field sampling (`R-34`).** `ParticleForceField` gains an optional
+  `sampleAll(positions, velocities, count, time, out)` that adds a whole lane's
+  contribution into a binary64 accumulator; all seven built-in fields implement it, and
+  `ParticleEmitter` engages it only when a configured field offers it, falling back to
+  `sample` per field for those that do not. Bit-identical to the scalar path by
+  construction and by test — same summation association, explicit zero adds on degenerate
+  inputs, and the accumulator takes the same swap the pool's `kill()` takes. Re-recorded
+  on the canonical host: the 3-field 100 000-particle step falls from 16.58 ms to
+  **4.51 ms** median, per-field marginal from ~5.15 ms to **1.12 ms** — the headline §112
+  stack moves from ~99.5% of the fixed-step budget to ~27%.
+
+#### Changed
+
+- `benchmarks/results/particles-100k.json` re-recorded with the batched path engaged;
+  `R-33`'s §112 rendered-exit measurement now has headroom instead of a pre-failed budget.
+
 ### 2026-08-21 — R-7 closed: §67 stencil substrate
 
 #### Added
