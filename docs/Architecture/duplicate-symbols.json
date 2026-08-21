@@ -3,7 +3,7 @@
   "note": "This report groups names by OWN definition, not by call graph, then classifies each flagged name (see DupEntryTag): TRUE_DUPLICATE (the actionable merge targets), DISPATCH_VARIANT (>=2 mathTyped(...) registrations of the same public name — distinct dispatch surfaces, Bucket C delegation candidates, not copy-paste bodies), ALIAS_DELEGATION (a const-alias forward to an imported symbol, not an independent body — excluded once fewer than 2 real bodies remain), and ALLOWLISTED (matches duplicate-allowlist.json: hot-path is* guards, AssemblyScript mirrors, per-package VERSION strings). NOT detected: same-file typed-dispatch overload polymorphism for different argument shapes within one registration — a human still triages TRUE_DUPLICATE entries using the defining files + public flags before merging anything.",
   "summary": {
     "runtimeDuplicates": 0,
-    "typeDuplicates": 0,
+    "typeDuplicates": 1,
     "runtimeByTag": {
       "TRUE_DUPLICATE": 0,
       "DISPATCH_VARIANT": 0,
@@ -11,7 +11,7 @@
       "ALLOWLISTED": 3
     },
     "typeByTag": {
-      "TRUE_DUPLICATE": 0,
+      "TRUE_DUPLICATE": 1,
       "DISPATCH_VARIANT": 0,
       "ALIAS_DELEGATION": 0,
       "ALLOWLISTED": 0
@@ -232,5 +232,26 @@
       "tag": "ALLOWLISTED"
     }
   ],
-  "types": []
+  "types": [
+    {
+      "name": "CacheableGeometry",
+      "category": "type",
+      "definers": [
+        {
+          "file": "packages/render-webgl/src/gl-geometry.ts",
+          "package": "@four/render-webgl",
+          "public": true,
+          "tag": "PLAIN"
+        },
+        {
+          "file": "packages/render-webgpu/src/wgpu-geometry.ts",
+          "package": "@four/render-webgpu",
+          "public": true,
+          "tag": "PLAIN"
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
+      "tag": "TRUE_DUPLICATE"
+    }
+  ]
 }

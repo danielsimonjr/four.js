@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-21",
-    "totalFiles": 225,
+    "totalFiles": 233,
     "totalModules": 24,
-    "totalExports": 2079
+    "totalExports": 2184
   },
   "entryPoints": [
     {
@@ -106,7 +106,7 @@
     {
       "file": "packages/render-webgpu/src/index.ts",
       "type": "main",
-      "description": "Entry Point"
+      "description": "`@four/render-webgpu` — the WebGPU backend (§62 backend 1)."
     },
     {
       "file": "packages/scene/src/index.ts",
@@ -3691,7 +3691,9 @@
               "COLLIDER_SERIALIZER",
               "Collider",
               "RIGID_BODY_SERIALIZER",
-              "RigidBody"
+              "RigidBody",
+              "SWEPT_CHARACTER_CONTROLLER_SERIALIZER",
+              "SweptCharacterController"
             ]
           },
           {
@@ -8504,6 +8506,7 @@
             "imports": [
               "COLLIDER_SERIALIZER",
               "RIGID_BODY_SERIALIZER",
+              "SWEPT_CHARACTER_CONTROLLER_SERIALIZER",
               "deserializeCollisionShape",
               "serializeCollisionShape"
             ],
@@ -8570,6 +8573,19 @@
               "validatePhysicsWorldOptions",
               "validateRigidBodyDescriptor",
               "validateSphericalJointLimits"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./swept-character-controller.js",
+            "imports": [
+              "DEFAULT_GROUND_SNAP_DISTANCE",
+              "DEFAULT_MAX_SLIDES",
+              "DEFAULT_SKIN_WIDTH",
+              "DEFAULT_SLOPE_LIMIT",
+              "DEFAULT_STEP_HEIGHT",
+              "SweptCharacterController",
+              "SweptCharacterSystem"
             ],
             "reExport": true
           },
@@ -8813,6 +8829,15 @@
             "typeOnly": true
           },
           {
+            "file": "./swept-character-controller.js",
+            "imports": [
+              "SweptCharacterControllerOptions",
+              "SweptCharacterSystemOptions"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./world.js",
             "imports": [
               "ActiveBodyVisitor",
@@ -8885,6 +8910,7 @@
           "sortHitsByDistance",
           "COLLIDER_SERIALIZER",
           "RIGID_BODY_SERIALIZER",
+          "SWEPT_CHARACTER_CONTROLLER_SERIALIZER",
           "deserializeCollisionShape",
           "serializeCollisionShape",
           "RigidBody",
@@ -8921,6 +8947,13 @@
           "validatePhysicsWorldOptions",
           "validateRigidBodyDescriptor",
           "validateSphericalJointLimits",
+          "DEFAULT_GROUND_SNAP_DISTANCE",
+          "DEFAULT_MAX_SLIDES",
+          "DEFAULT_SKIN_WIDTH",
+          "DEFAULT_SLOPE_LIMIT",
+          "DEFAULT_STEP_HEIGHT",
+          "SweptCharacterController",
+          "SweptCharacterSystem",
           "POSE_TARGET_CAPTURE_PRIORITY",
           "PhysicsWorld",
           "createPoseTargetCaptureSystem",
@@ -9043,6 +9076,8 @@
           "RotationInput",
           "SleepingConfig",
           "Vector3Input",
+          "SweptCharacterControllerOptions",
+          "SweptCharacterSystemOptions",
           "ActiveBodyVisitor",
           "BodyControlModeOptions",
           "PhysicsSnapshot",
@@ -9108,6 +9143,7 @@
           "sortHitsByDistance",
           "COLLIDER_SERIALIZER",
           "RIGID_BODY_SERIALIZER",
+          "SWEPT_CHARACTER_CONTROLLER_SERIALIZER",
           "deserializeCollisionShape",
           "serializeCollisionShape",
           "RigidBody",
@@ -9144,6 +9180,13 @@
           "validatePhysicsWorldOptions",
           "validateRigidBodyDescriptor",
           "validateSphericalJointLimits",
+          "DEFAULT_GROUND_SNAP_DISTANCE",
+          "DEFAULT_MAX_SLIDES",
+          "DEFAULT_SKIN_WIDTH",
+          "DEFAULT_SLOPE_LIMIT",
+          "DEFAULT_STEP_HEIGHT",
+          "SweptCharacterController",
+          "SweptCharacterSystem",
           "POSE_TARGET_CAPTURE_PRIORITY",
           "PhysicsWorld",
           "createPoseTargetCaptureSystem",
@@ -9265,6 +9308,8 @@
           "RotationInput",
           "SleepingConfig",
           "Vector3Input",
+          "SweptCharacterControllerOptions",
+          "SweptCharacterSystemOptions",
           "ActiveBodyVisitor",
           "BodyControlModeOptions",
           "PhysicsSnapshot",
@@ -9783,6 +9828,17 @@
             ]
           },
           {
+            "file": "./swept-character-controller.js",
+            "imports": [
+              "DEFAULT_GROUND_SNAP_DISTANCE",
+              "DEFAULT_MAX_SLIDES",
+              "DEFAULT_SKIN_WIDTH",
+              "DEFAULT_SLOPE_LIMIT",
+              "DEFAULT_STEP_HEIGHT",
+              "SweptCharacterController"
+            ]
+          },
+          {
             "file": "./shapes.js",
             "imports": [
               "CollisionShape"
@@ -9831,6 +9887,7 @@
             "package": "@four/motion",
             "directory": "packages/motion",
             "imports": [
+              "DEFAULT_CHARACTER_GRAVITY",
               "ComponentSerializerShape"
             ]
           },
@@ -9845,6 +9902,7 @@
         "exports": [
           "RIGID_BODY_SERIALIZER",
           "COLLIDER_SERIALIZER",
+          "SWEPT_CHARACTER_CONTROLLER_SERIALIZER",
           "serializeCollisionShape",
           "deserializeCollisionShape"
         ],
@@ -9859,7 +9917,8 @@
         ],
         "constants": [
           "RIGID_BODY_SERIALIZER",
-          "COLLIDER_SERIALIZER"
+          "COLLIDER_SERIALIZER",
+          "SWEPT_CHARACTER_CONTROLLER_SERIALIZER"
         ]
       },
       "packages/physics/src/shapes.ts": {
@@ -10000,6 +10059,107 @@
           "registeredSolvers",
           "clearRegisteredSolvers",
           "resolveSolver"
+        ]
+      },
+      "packages/physics/src/swept-character-controller.ts": {
+        "description": "§12's **solver-backed** character controller — {@link SweptCharacterController}",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./queries.js",
+            "imports": [
+              "ALL_COLLISION_GROUPS"
+            ]
+          },
+          {
+            "file": "./rigid-body.js",
+            "imports": [
+              "RigidBody"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./shapes.js",
+            "imports": [
+              "CollisionShape"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./types.js",
+            "imports": [
+              "PhysicsBodyHandle"
+            ],
+            "typeOnly": true
+          },
+          {
+            "file": "./world.js",
+            "imports": [
+              "PhysicsWorld",
+              "WorldShapeCastHit"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "Component",
+              "ComponentHost"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Vector3"
+            ]
+          },
+          {
+            "package": "@four/motion",
+            "directory": "packages/motion",
+            "imports": [
+              "CharacterController",
+              "PRIORITY_KINEMATICS",
+              "FixedUpdateContext",
+              "SimulationSystem"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "warnAuthorityConflict",
+              "Node"
+            ]
+          }
+        ],
+        "exports": [
+          "DEFAULT_SLOPE_LIMIT",
+          "DEFAULT_STEP_HEIGHT",
+          "DEFAULT_SKIN_WIDTH",
+          "DEFAULT_GROUND_SNAP_DISTANCE",
+          "DEFAULT_MAX_SLIDES",
+          "SweptCharacterController",
+          "SweptCharacterSystem"
+        ],
+        "classes": [
+          "SweptCharacterController",
+          "SweptCharacterSystem"
+        ],
+        "interfaces": [
+          "SweptCharacterControllerOptions",
+          "SweptCharacterSystemOptions"
+        ],
+        "constants": [
+          "DEFAULT_SLOPE_LIMIT",
+          "DEFAULT_STEP_HEIGHT",
+          "DEFAULT_SKIN_WIDTH",
+          "DEFAULT_GROUND_SNAP_DISTANCE",
+          "DEFAULT_MAX_SLIDES"
         ]
       },
       "packages/physics/src/types.ts": {
@@ -13799,16 +13959,602 @@
     },
     "packages/render-webgpu": {
       "packages/render-webgpu/src/index.ts": {
-        "description": "Entry point exporting 1 symbols",
+        "description": "`@four/render-webgpu` — the WebGPU backend (§62 backend 1).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_BUFFER_USAGE",
+              "GPU_SHADER_STAGE",
+              "GPU_TEXTURE_USAGE",
+              "UNIFORM_STRIDE_BYTES"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./webgpu-renderer.js",
+            "imports": [
+              "hostGpu",
+              "WebgpuRenderer"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./register.js",
+            "imports": [
+              "isWebgpuSupported",
+              "registerWebgpuRenderer"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./wgpu-bindings.js",
+            "imports": [
+              "DRAW_COLOR_OFFSET",
+              "DRAW_MODEL_OFFSET",
+              "DRAW_UNIFORM_BYTES",
+              "DRAW_UNIFORM_FLOATS",
+              "DRAW_UNIFORM_WGSL",
+              "DRAW_VIEW_PROJECTION_OFFSET",
+              "createDrawBindGroupLayout"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./wgpu-geometry.js",
+            "imports": [
+              "WgpuGeometryCache"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./wgpu-pipeline-cache.js",
+            "imports": [
+              "pipelineKey",
+              "WgpuPipelineCache"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./wgpu-unlit.js",
+            "imports": [
+              "CLEAR_SHADER_SOURCE",
+              "CLEAR_VERTEX_COUNT",
+              "COLOR_BUFFER_LAYOUT",
+              "COLOR_SHADER_LOCATION",
+              "FRAGMENT_ENTRY_POINT",
+              "POSITION_BUFFER_LAYOUT",
+              "POSITION_SHADER_LOCATION",
+              "VERTEX_ENTRY_POINT",
+              "unlitShaderSource",
+              "unlitVertexBufferLayouts"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "Gpu",
+              "GpuAdapter",
+              "GpuBindGroup",
+              "GpuBindGroupEntry",
+              "GpuBindGroupLayout",
+              "GpuBindGroupLayoutEntry",
+              "GpuBlendComponent",
+              "GpuBlendState",
+              "GpuBuffer",
+              "GpuBufferDescriptor",
+              "GpuCanvasContext",
+              "GpuCommandBuffer",
+              "GpuCommandEncoder",
+              "GpuDevice",
+              "GpuDeviceLostInfo",
+              "GpuPipelineLayout",
+              "GpuQueue",
+              "GpuRenderPassDescriptor",
+              "GpuRenderPassEncoder",
+              "GpuRenderPipeline",
+              "GpuRenderPipelineDescriptor",
+              "GpuShaderModule",
+              "GpuTexture",
+              "GpuTextureDescriptor",
+              "GpuTextureView",
+              "GpuVertexBufferLayout",
+              "WebgpuCanvas"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-geometry.js",
+            "imports": [
+              "CacheableGeometry",
+              "WgpuGeometryRecord"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./wgpu-pipeline-cache.js",
+            "imports": [
+              "WgpuPipelineDescriptor",
+              "WgpuPipelineKind"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "GPU_BUFFER_USAGE",
+          "GPU_SHADER_STAGE",
+          "GPU_TEXTURE_USAGE",
+          "UNIFORM_STRIDE_BYTES",
+          "hostGpu",
+          "WebgpuRenderer",
+          "isWebgpuSupported",
+          "registerWebgpuRenderer",
+          "DRAW_COLOR_OFFSET",
+          "DRAW_MODEL_OFFSET",
+          "DRAW_UNIFORM_BYTES",
+          "DRAW_UNIFORM_FLOATS",
+          "DRAW_UNIFORM_WGSL",
+          "DRAW_VIEW_PROJECTION_OFFSET",
+          "createDrawBindGroupLayout",
+          "WgpuGeometryCache",
+          "pipelineKey",
+          "WgpuPipelineCache",
+          "CLEAR_SHADER_SOURCE",
+          "CLEAR_VERTEX_COUNT",
+          "COLOR_BUFFER_LAYOUT",
+          "COLOR_SHADER_LOCATION",
+          "FRAGMENT_ENTRY_POINT",
+          "POSITION_BUFFER_LAYOUT",
+          "POSITION_SHADER_LOCATION",
+          "VERTEX_ENTRY_POINT",
+          "unlitShaderSource",
+          "unlitVertexBufferLayouts",
+          "PACKAGE_NAME",
+          "Gpu",
+          "GpuAdapter",
+          "GpuBindGroup",
+          "GpuBindGroupEntry",
+          "GpuBindGroupLayout",
+          "GpuBindGroupLayoutEntry",
+          "GpuBlendComponent",
+          "GpuBlendState",
+          "GpuBuffer",
+          "GpuBufferDescriptor",
+          "GpuCanvasContext",
+          "GpuCommandBuffer",
+          "GpuCommandEncoder",
+          "GpuDevice",
+          "GpuDeviceLostInfo",
+          "GpuPipelineLayout",
+          "GpuQueue",
+          "GpuRenderPassDescriptor",
+          "GpuRenderPassEncoder",
+          "GpuRenderPipeline",
+          "GpuRenderPipelineDescriptor",
+          "GpuShaderModule",
+          "GpuTexture",
+          "GpuTextureDescriptor",
+          "GpuTextureView",
+          "GpuVertexBufferLayout",
+          "WebgpuCanvas",
+          "CacheableGeometry",
+          "WgpuGeometryRecord",
+          "WgpuPipelineDescriptor",
+          "WgpuPipelineKind"
+        ],
+        "reExported": [
+          "GPU_BUFFER_USAGE",
+          "GPU_SHADER_STAGE",
+          "GPU_TEXTURE_USAGE",
+          "UNIFORM_STRIDE_BYTES",
+          "hostGpu",
+          "WebgpuRenderer",
+          "isWebgpuSupported",
+          "registerWebgpuRenderer",
+          "DRAW_COLOR_OFFSET",
+          "DRAW_MODEL_OFFSET",
+          "DRAW_UNIFORM_BYTES",
+          "DRAW_UNIFORM_FLOATS",
+          "DRAW_UNIFORM_WGSL",
+          "DRAW_VIEW_PROJECTION_OFFSET",
+          "createDrawBindGroupLayout",
+          "WgpuGeometryCache",
+          "pipelineKey",
+          "WgpuPipelineCache",
+          "CLEAR_SHADER_SOURCE",
+          "CLEAR_VERTEX_COUNT",
+          "COLOR_BUFFER_LAYOUT",
+          "COLOR_SHADER_LOCATION",
+          "FRAGMENT_ENTRY_POINT",
+          "POSITION_BUFFER_LAYOUT",
+          "POSITION_SHADER_LOCATION",
+          "VERTEX_ENTRY_POINT",
+          "unlitShaderSource",
+          "unlitVertexBufferLayouts",
+          "Gpu",
+          "GpuAdapter",
+          "GpuBindGroup",
+          "GpuBindGroupEntry",
+          "GpuBindGroupLayout",
+          "GpuBindGroupLayoutEntry",
+          "GpuBlendComponent",
+          "GpuBlendState",
+          "GpuBuffer",
+          "GpuBufferDescriptor",
+          "GpuCanvasContext",
+          "GpuCommandBuffer",
+          "GpuCommandEncoder",
+          "GpuDevice",
+          "GpuDeviceLostInfo",
+          "GpuPipelineLayout",
+          "GpuQueue",
+          "GpuRenderPassDescriptor",
+          "GpuRenderPassEncoder",
+          "GpuRenderPipeline",
+          "GpuRenderPipelineDescriptor",
+          "GpuShaderModule",
+          "GpuTexture",
+          "GpuTextureDescriptor",
+          "GpuTextureView",
+          "GpuVertexBufferLayout",
+          "WebgpuCanvas",
+          "CacheableGeometry",
+          "WgpuGeometryRecord",
+          "WgpuPipelineDescriptor",
+          "WgpuPipelineKind"
+        ],
+        "constants": [
+          "PACKAGE_NAME"
+        ]
+      },
+      "packages/render-webgpu/src/register.ts": {
+        "description": "This backend's opt-in to §62's renderer registry (R-2, A-8, WP-R1.1).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-renderer.js",
+            "imports": [
+              "hostGpu"
+            ]
+          },
+          {
+            "file": "./webgpu-renderer.js",
+            "imports": [
+              "WebgpuRenderer"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "registerRenderer",
+              "RendererOptions",
+              "RendererRegistry"
+            ]
+          }
+        ],
+        "exports": [
+          "isWebgpuSupported",
+          "registerWebgpuRenderer"
+        ],
+        "functions": [
+          "isWebgpuSupported",
+          "registerWebgpuRenderer"
+        ]
+      },
+      "packages/render-webgpu/src/webgpu-device.ts": {
+        "description": "The WebGPU surface this backend touches, described structurally (§61, §62).",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [],
         "workspaceDependencies": [],
         "exports": [
-          "PACKAGE_NAME"
+          "GPU_BUFFER_USAGE",
+          "GPU_TEXTURE_USAGE",
+          "GPU_SHADER_STAGE",
+          "UNIFORM_STRIDE_BYTES"
+        ],
+        "interfaces": [
+          "GpuDeviceLostInfo",
+          "GpuBuffer",
+          "GpuTexture",
+          "GpuVertexBufferLayout",
+          "GpuBlendState",
+          "GpuBlendComponent",
+          "GpuRenderPipelineDescriptor",
+          "GpuRenderPassDescriptor",
+          "GpuRenderPassEncoder",
+          "GpuCommandEncoder",
+          "GpuQueue",
+          "GpuBufferDescriptor",
+          "GpuTextureDescriptor",
+          "GpuBindGroupLayoutEntry",
+          "GpuBindGroupEntry",
+          "GpuDevice",
+          "GpuAdapter",
+          "Gpu",
+          "GpuCanvasContext",
+          "WebgpuCanvas"
         ],
         "constants": [
-          "PACKAGE_NAME"
+          "GPU_BUFFER_USAGE",
+          "GPU_TEXTURE_USAGE",
+          "GPU_SHADER_STAGE",
+          "UNIFORM_STRIDE_BYTES"
+        ]
+      },
+      "packages/render-webgpu/src/webgpu-renderer.ts": {
+        "description": "Draws four.js scenes with WebGPU (§61, §62 backend 1).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_BUFFER_USAGE",
+              "GPU_TEXTURE_USAGE",
+              "UNIFORM_STRIDE_BYTES",
+              "Gpu",
+              "GpuBindGroup",
+              "GpuBindGroupLayout",
+              "GpuBuffer",
+              "GpuCanvasContext",
+              "GpuDevice",
+              "GpuRenderPassEncoder",
+              "GpuTexture",
+              "GpuTextureView",
+              "WebgpuCanvas"
+            ]
+          },
+          {
+            "file": "./wgpu-bindings.js",
+            "imports": [
+              "DRAW_COLOR_OFFSET",
+              "DRAW_MODEL_OFFSET",
+              "DRAW_UNIFORM_BYTES",
+              "DRAW_VIEW_PROJECTION_OFFSET",
+              "createDrawBindGroupLayout"
+            ]
+          },
+          {
+            "file": "./wgpu-geometry.js",
+            "imports": [
+              "WgpuGeometryCache"
+            ]
+          },
+          {
+            "file": "./wgpu-pipeline-cache.js",
+            "imports": [
+              "WgpuPipelineCache",
+              "WgpuPipelineDescriptor"
+            ]
+          },
+          {
+            "file": "./wgpu-unlit.js",
+            "imports": [
+              "CLEAR_VERTEX_COUNT"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "EventEmitter",
+              "FourError"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "Frustum",
+              "Matrix4"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "buildInterpolatedRenderList",
+              "buildRenderList",
+              "buildViewRenderList",
+              "RenderInterpolation",
+              "RenderItem",
+              "RenderStatistics",
+              "Renderer",
+              "RendererCapabilities",
+              "RendererEventMap",
+              "RendererOptions"
+            ]
+          },
+          {
+            "package": "@four/scene",
+            "directory": "packages/scene",
+            "imports": [
+              "Node",
+              "Viewport"
+            ]
+          }
+        ],
+        "exports": [
+          "hostGpu",
+          "WebgpuRenderer"
+        ],
+        "classes": [
+          "WebgpuRenderer"
+        ],
+        "functions": [
+          "hostGpu"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-bindings.ts": {
+        "description": "This backend's binding layout, **declared as data** (§7 of the R-1 plan).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_SHADER_STAGE",
+              "GpuBindGroupLayout",
+              "GpuDevice"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "DRAW_VIEW_PROJECTION_OFFSET",
+          "DRAW_MODEL_OFFSET",
+          "DRAW_COLOR_OFFSET",
+          "DRAW_UNIFORM_BYTES",
+          "DRAW_UNIFORM_FLOATS",
+          "DRAW_UNIFORM_WGSL",
+          "createDrawBindGroupLayout"
+        ],
+        "functions": [
+          "createDrawBindGroupLayout"
+        ],
+        "constants": [
+          "DRAW_VIEW_PROJECTION_OFFSET",
+          "DRAW_MODEL_OFFSET",
+          "DRAW_COLOR_OFFSET",
+          "DRAW_UNIFORM_BYTES",
+          "DRAW_UNIFORM_FLOATS",
+          "DRAW_UNIFORM_WGSL"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-geometry.ts": {
+        "description": "Per-device store of uploaded geometry (§61, §64 stage 7) — the WebGPU twin of",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_BUFFER_USAGE",
+              "GpuBuffer",
+              "GpuDevice"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "RenderItem"
+            ]
+          }
+        ],
+        "exports": [
+          "WgpuGeometryCache"
+        ],
+        "classes": [
+          "WgpuGeometryCache"
+        ],
+        "interfaces": [
+          "WgpuGeometryRecord"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-pipeline-cache.ts": {
+        "description": "The lazy, descriptor-keyed render-pipeline cache (§4.2 of the R-1 plan).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GpuBindGroupLayout",
+              "GpuBlendState",
+              "GpuDevice",
+              "GpuPipelineLayout",
+              "GpuRenderPipeline",
+              "GpuShaderModule"
+            ]
+          },
+          {
+            "file": "./wgpu-unlit.js",
+            "imports": [
+              "CLEAR_SHADER_SOURCE",
+              "FRAGMENT_ENTRY_POINT",
+              "VERTEX_ENTRY_POINT",
+              "unlitShaderSource",
+              "unlitVertexBufferLayouts"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "pipelineKey",
+          "WgpuPipelineCache"
+        ],
+        "classes": [
+          "WgpuPipelineCache"
+        ],
+        "interfaces": [
+          "WgpuPipelineDescriptor"
+        ],
+        "functions": [
+          "pipelineKey"
+        ]
+      },
+      "packages/render-webgpu/src/wgpu-unlit.ts": {
+        "description": "The unlit pipeline in hand-written WGSL (§64, §120's MVP tier), plus the",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./wgpu-bindings.js",
+            "imports": [
+              "DRAW_UNIFORM_WGSL"
+            ]
+          },
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GpuVertexBufferLayout"
+            ],
+            "typeOnly": true
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "POSITION_SHADER_LOCATION",
+          "COLOR_SHADER_LOCATION",
+          "POSITION_BUFFER_LAYOUT",
+          "COLOR_BUFFER_LAYOUT",
+          "VERTEX_ENTRY_POINT",
+          "FRAGMENT_ENTRY_POINT",
+          "CLEAR_VERTEX_COUNT",
+          "CLEAR_SHADER_SOURCE",
+          "unlitVertexBufferLayouts",
+          "unlitShaderSource"
+        ],
+        "functions": [
+          "unlitVertexBufferLayouts",
+          "unlitShaderSource"
+        ],
+        "constants": [
+          "POSITION_SHADER_LOCATION",
+          "COLOR_SHADER_LOCATION",
+          "POSITION_BUFFER_LAYOUT",
+          "COLOR_BUFFER_LAYOUT",
+          "VERTEX_ENTRY_POINT",
+          "FRAGMENT_ENTRY_POINT",
+          "CLEAR_VERTEX_COUNT",
+          "CLEAR_SHADER_SOURCE"
         ]
       }
     },
@@ -16359,6 +17105,7 @@
           "packages/physics/src/serializers.ts",
           "packages/physics/src/shapes.ts",
           "packages/physics/src/solver-registry.ts",
+          "packages/physics/src/swept-character-controller.ts",
           "packages/physics/src/types.ts",
           "packages/physics/src/validation.ts",
           "packages/physics/src/world.ts"
@@ -16444,7 +17191,14 @@
       {
         "name": "Packages/render-webgpu",
         "files": [
-          "packages/render-webgpu/src/index.ts"
+          "packages/render-webgpu/src/index.ts",
+          "packages/render-webgpu/src/register.ts",
+          "packages/render-webgpu/src/webgpu-device.ts",
+          "packages/render-webgpu/src/webgpu-renderer.ts",
+          "packages/render-webgpu/src/wgpu-bindings.ts",
+          "packages/render-webgpu/src/wgpu-geometry.ts",
+          "packages/render-webgpu/src/wgpu-pipeline-cache.ts",
+          "packages/render-webgpu/src/wgpu-unlit.ts"
         ]
       },
       {
@@ -16505,18 +17259,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 225,
+    "totalTypeScriptFiles": 233,
     "totalModules": 24,
-    "totalLinesOfCode": 105119,
-    "totalExports": 2079,
-    "totalClasses": 144,
-    "totalInterfaces": 438,
-    "totalFunctions": 342,
-    "totalTypeGuards": 19,
+    "totalLinesOfCode": 109195,
+    "totalExports": 2184,
+    "totalClasses": 149,
+    "totalInterfaces": 462,
+    "totalFunctions": 349,
+    "totalTypeGuards": 20,
     "totalEnums": 0,
-    "totalConstants": 274,
-    "totalReExports": 1341,
-    "totalTypeOnlyImports": 266,
+    "totalConstants": 298,
+    "totalReExports": 1410,
+    "totalTypeOnlyImports": 275,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,

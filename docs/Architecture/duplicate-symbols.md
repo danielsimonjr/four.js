@@ -20,11 +20,11 @@ Names that are OWN-DEFINED (not merely re-exported) by >= 2 distinct files acros
 
 | Category | Count |
 | --- | --: |
-| **TRUE_DUPLICATE** (actionable) | 0 |
+| **TRUE_DUPLICATE** (actionable) | 1 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
 | ALLOWLISTED | 0 |
-| _Total flagged names_ | 0 |
+| _Total flagged names_ | 1 |
 
 ## Runtime duplicates
 
@@ -52,7 +52,9 @@ _None._
 
 ### TRUE_DUPLICATE
 
-_None._
+| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
+| --- | --- | --- | --- |
+| `CacheableGeometry` | type | `packages/render-webgl/src/gl-geometry.ts` (@four/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-geometry.ts` (@four/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
 
 ### DISPATCH_VARIANT
 

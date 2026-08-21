@@ -57,7 +57,7 @@ The codebase is organized into the following modules:
 - **packages/math**: 10 files
 - **packages/motion**: 19 files
 - **packages/particles**: 8 files
-- **packages/physics**: 19 files
+- **packages/physics**: 20 files
 - **packages/physics-box2d**: 1 file
 - **packages/physics-rapier**: 8 files
 - **packages/physics-soft**: 1 file
@@ -65,7 +65,7 @@ The codebase is organized into the following modules:
 - **packages/render-canvas**: 1 file
 - **packages/render-svg**: 1 file
 - **packages/render-webgl**: 12 files
-- **packages/render-webgpu**: 1 file
+- **packages/render-webgpu**: 8 files
 - **packages/scene**: 15 files
 - **packages/serialization**: 4 files
 - **packages/text**: 4 files
@@ -89,7 +89,7 @@ The codebase is organized into the following modules:
 | `@four/math` (`packages/math/`) | (none) | 10 | 0 |
 | `@four/motion` (`packages/motion/`) | `@four/core`, `@four/math`, `@four/scene` | 19 | 0 |
 | `@four/particles` (`packages/particles/`) | `@four/math`, `@four/core`, `@four/scene` | 8 | 0 |
-| `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 19 | 0 |
+| `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 20 | 0 |
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
 | `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/physics`, `@four/core`, `@four/math` | 8 | 0 |
 | `@four/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
@@ -97,7 +97,7 @@ The codebase is organized into the following modules:
 | `@four/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
 | `@four/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
 | `@four/render-webgl` (`packages/render-webgl/`) | `@four/math`, `@four/render`, `@four/core` | 12 | 0 |
-| `@four/render-webgpu` (`packages/render-webgpu/`) | (none) | 1 | 0 |
+| `@four/render-webgpu` (`packages/render-webgpu/`) | `@four/render`, `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
 | `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 15 | 0 |
 | `@four/serialization` (`packages/serialization/`) | `@four/core`, `@four/scene`, `@four/math` | 4 | 0 |
 | `@four/text` (`packages/text/`) | (none) | 4 | 0 |
@@ -189,6 +189,10 @@ graph LR
     P18 --> P8
     P18 --> P15
     P18 --> P2
+    P19 --> P15
+    P19 --> P2
+    P19 --> P8
+    P19 --> P20
     P20 --> P8
     P20 --> P2
     P21 --> P2
@@ -1140,7 +1144,7 @@ graph LR
 | `@four/geometry` | `Path, BufferGeometry, Point2D` |
 | `@four/materials` | `Material, SpriteMaterial, UnlitMaterial` |
 | `@four/motion` | `CHARACTER_CONTROLLER_SERIALIZER, CharacterController, FIRST_PERSON_LOOK_SERIALIZER, FOLLOW_RIG_SERIALIZER, FirstPersonLook, FollowRig, KINEMATIC_CONTROLLER_SERIALIZER, KinematicController, LOOK_AT_CONSTRAINT_SERIALIZER, LookAtConstraint, MOTION_COMPONENT_SERIALIZER, MotionComponent, ORBIT_RIG_SERIALIZER, OrbitRig` |
-| `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody` |
+| `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody, SWEPT_CHARACTER_CONTROLLER_SERIALIZER, SweptCharacterController` |
 | `@four/render` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star` |
 | `@four/render` | `ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle` |
 | `@four/scene` | `DirectionalLight, OrthographicCamera, PerspectiveCamera, PointLight, SCREEN_ORIGINS, SCREEN_UNITS, ScreenCamera, SpotLight, restoreNodeId, Node` |
@@ -2462,12 +2466,13 @@ graph LR
 | `./physics-system.js` | `PhysicsSystem` | Re-export |
 | `./material.js` | `DEFAULT_DENSITY, DEFAULT_FRICTION, DEFAULT_FRICTION_COMBINE_MODE, DEFAULT_RESTITUTION, DEFAULT_RESTITUTION_COMBINE_MODE, PhysicsMaterial, combineFriction, combineRestitution, combineValues, resolveDensity` | Re-export |
 | `./queries.js` | `ALL_COLLISION_GROUPS, passesQueryFilter, resolveQueryOptions, sortHitsByDistance` | Re-export |
-| `./serializers.js` | `COLLIDER_SERIALIZER, RIGID_BODY_SERIALIZER, deserializeCollisionShape, serializeCollisionShape` | Re-export |
+| `./serializers.js` | `COLLIDER_SERIALIZER, RIGID_BODY_SERIALIZER, SWEPT_CHARACTER_CONTROLLER_SERIALIZER, deserializeCollisionShape, serializeCollisionShape` | Re-export |
 | `./rigid-body.js` | `RigidBody` | Re-export |
 | `./solver-registry.js` | `SolverRegistry, clearRegisteredSolvers, registerSolver, registeredSolvers, resolveSolver` | Re-export |
 | `./shapes.js` | `COLLISION_SHAPE_TYPES_2D, COLLISION_SHAPE_TYPES_3D, COMPOSITE_COLLISION_SHAPE_TYPES, shapeIsConvex, shapeMaximumExtent, shapeSupportsDimension, validateCollisionShape, validateQueryShape` | Re-export |
 | `./types.js` | `BODY_TYPES, CCD_MODES, COMBINE_MODES, DEFAULT_CCD_MODE, DEFAULT_DETERMINISM_LEVEL, DEFAULT_ENABLED_CCD_MODE, DEFAULT_SLEEPING_CONFIG, DETERMINISM_LEVELS, PHYSICS_DIMENSIONS` | Re-export |
 | `./validation.js` | `validateAngularJointMotor, validateColliderDescriptor, validateInertiaTensor, validateJointBreakThreshold, validateJointDescriptor, validateJointLimits, validateLinearJointMotor, validateMass, validatePhysicsWorldOptions, validateRigidBodyDescriptor, validateSphericalJointLimits` | Re-export |
+| `./swept-character-controller.js` | `DEFAULT_GROUND_SNAP_DISTANCE, DEFAULT_MAX_SLIDES, DEFAULT_SKIN_WIDTH, DEFAULT_SLOPE_LIMIT, DEFAULT_STEP_HEIGHT, SweptCharacterController, SweptCharacterSystem` | Re-export |
 | `./world.js` | `POSE_TARGET_CAPTURE_PRIORITY, PhysicsWorld, createPoseTargetCaptureSystem` | Re-export |
 | `./adapter.js` | `PhysicsCapabilities, PhysicsQueryCapabilities, PhysicsSolverAdapter, PhysicsTuningCapabilities` | Re-export (type-only) |
 | `./body-access.js` | `SolverBodyAccess, SolverBodyTuningAccess, SolverJointAccess, SolverJointMotor` | Re-export (type-only) |
@@ -2485,11 +2490,12 @@ graph LR
 | `./solver-registry.js` | `SolverName, SolverRegistration, SolverRejectionReason, SolverRejectionReport, SolverResolveOptions, SolverSelection` | Re-export (type-only) |
 | `./shapes.js` | `BoxShape, CapsuleShape, ChainShape, CircleShape, CollisionShape, CollisionShape2D, CollisionShape3D, CollisionShapeType, ConeShape, ConvexHullShape, CylinderShape, HeightFieldShape, PolygonShape, PolylineShape, RectangleShape, SphereShape, TriangleMeshShape` | Re-export (type-only) |
 | `./types.js` | `AngularVelocityInput, BodyType, CCDMode, CombineMode, DeterminismLevel, PhysicsBodyHandle, PhysicsColliderHandle, PhysicsDimension, PhysicsHandle, PhysicsJointHandle, RotationInput, SleepingConfig, Vector3Input` | Re-export (type-only) |
+| `./swept-character-controller.js` | `SweptCharacterControllerOptions, SweptCharacterSystemOptions` | Re-export (type-only) |
 | `./world.js` | `ActiveBodyVisitor, BodyControlModeOptions, PhysicsSnapshot, PhysicsSnapshotConfiguration, PhysicsWorldAdapter, PhysicsWorldInit, PoseTargetCaptureSystemOptions, WorldOverlapHit, WorldPhysicsEvent, WorldPointHit, WorldQueryHit, WorldRaycastHit, WorldShapeCastHit` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `NO_TUNING_CAPABILITIES`, `resolveTuningCapabilities`, `missingSolverBodyTuning`, `missingSolverJointAccess`, `supportsSolverBodyTuning`, `supportsSolverJointAccess`, `Collider`, `DEFAULT_GRAVITY_Y`, `JOINT_TYPES`, `SHIPPED_JOINT_TYPES`, `SHIPPED_JOINT_TYPES_2D`, `SHIPPED_JOINT_TYPES_3D`, `STAGED_JOINT_TYPES`, `jointTypeSupportsDimension`, `resolveAngularVelocity`, `resolveGravity`, `resolveRotation`, `resolveSleepingConfig`, `widenToVector3`, `ForceFieldSystem`, `BallJoint`, `FixedJoint`, `HingeJoint`, `Joint`, `PrismaticJoint`, `RevoluteJoint`, `RopeJoint`, `SliderJoint`, `SphericalJoint`, `SpringJoint`, `worldAnchorToLocal`, `worldAxisToLocal`, `PhysicsEventSystem`, `PhysicsSystem`, `DEFAULT_DENSITY`, `DEFAULT_FRICTION`, `DEFAULT_FRICTION_COMBINE_MODE`, `DEFAULT_RESTITUTION`, `DEFAULT_RESTITUTION_COMBINE_MODE`, `PhysicsMaterial`, `combineFriction`, `combineRestitution`, `combineValues`, `resolveDensity`, `ALL_COLLISION_GROUPS`, `passesQueryFilter`, `resolveQueryOptions`, `sortHitsByDistance`, `COLLIDER_SERIALIZER`, `RIGID_BODY_SERIALIZER`, `deserializeCollisionShape`, `serializeCollisionShape`, `RigidBody`, `SolverRegistry`, `clearRegisteredSolvers`, `registerSolver`, `registeredSolvers`, `resolveSolver`, `COLLISION_SHAPE_TYPES_2D`, `COLLISION_SHAPE_TYPES_3D`, `COMPOSITE_COLLISION_SHAPE_TYPES`, `shapeIsConvex`, `shapeMaximumExtent`, `shapeSupportsDimension`, `validateCollisionShape`, `validateQueryShape`, `BODY_TYPES`, `CCD_MODES`, `COMBINE_MODES`, `DEFAULT_CCD_MODE`, `DEFAULT_DETERMINISM_LEVEL`, `DEFAULT_ENABLED_CCD_MODE`, `DEFAULT_SLEEPING_CONFIG`, `DETERMINISM_LEVELS`, `PHYSICS_DIMENSIONS`, `validateAngularJointMotor`, `validateColliderDescriptor`, `validateInertiaTensor`, `validateJointBreakThreshold`, `validateJointDescriptor`, `validateJointLimits`, `validateLinearJointMotor`, `validateMass`, `validatePhysicsWorldOptions`, `validateRigidBodyDescriptor`, `validateSphericalJointLimits`, `POSE_TARGET_CAPTURE_PRIORITY`, `PhysicsWorld`, `createPoseTargetCaptureSystem`, `PhysicsCapabilities`, `PhysicsQueryCapabilities`, `PhysicsSolverAdapter`, `PhysicsTuningCapabilities`, `SolverBodyAccess`, `SolverBodyTuningAccess`, `SolverJointAccess`, `SolverJointMotor`, `ColliderEventMap`, `ColliderOptions`, `ColliderTriggerEvent`, `RigidBodyCollisionEvent`, `AngularJointMotor`, `ColliderDescriptor`, `FixedJointDescriptor`, `JointDescriptor`, `JointDescriptorBase`, `JointLimits`, `JointType`, `LinearJointMotor`, `PhysicsWorldOptions`, `PrismaticJointDescriptor`, `RevoluteJointDescriptor`, `RigidBodyDescriptor`, `RopeJointDescriptor`, `ShippedJointType`, `SphericalJointDescriptor`, `SphericalJointLimits`, `SpringJointDescriptor`, `StagedJointType`, `CollisionEvent`, `CollisionPhase`, `ContactPoint`, `JointBreakEvent`, `JointPhase`, `PhysicsEvent`, `PhysicsEventType`, `SleepEvent`, `SleepPhase`, `TriggerEvent`, `TriggerPhase`, `ForceField`, `ForceFieldEntry`, `ForceFieldSystemOptions`, `ForceFieldUnits`, `HingeJointOptions`, `JointBinding`, `JointBreakPayload`, `JointCommands`, `JointEventMap`, `JointOptions`, `RopeJointOptions`, `SliderJointOptions`, `SphericalJointOptions`, `SpringJointOptions`, `PhysicsMaterialOptions`, `PhysicsEventSystemOptions`, `PhysicsSystemOptions`, `OverlapHit`, `OverlapQuery`, `PointHit`, `PointQuery`, `QueryCandidate`, `QueryFilter`, `QueryHit`, `QueryHitMode`, `QueryOptions`, `RaycastHit`, `RaycastQuery`, `ResolvedQueryOptions`, `ShapeCastHit`, `ShapeCastQuery`, `ColliderDocument`, `PhysicsMaterialDocument`, `RigidBodyDocument`, `BlendWeights`, `PointLoad`, `RigidBodyCommands`, `RigidBodyEventMap`, `RigidBodySleepEvent`, `SleepCommand`, `TorqueInput`, `SolverName`, `SolverRegistration`, `SolverRejectionReason`, `SolverRejectionReport`, `SolverResolveOptions`, `SolverSelection`, `BoxShape`, `CapsuleShape`, `ChainShape`, `CircleShape`, `CollisionShape`, `CollisionShape2D`, `CollisionShape3D`, `CollisionShapeType`, `ConeShape`, `ConvexHullShape`, `CylinderShape`, `HeightFieldShape`, `PolygonShape`, `PolylineShape`, `RectangleShape`, `SphereShape`, `TriangleMeshShape`, `AngularVelocityInput`, `BodyType`, `CCDMode`, `CombineMode`, `DeterminismLevel`, `PhysicsBodyHandle`, `PhysicsColliderHandle`, `PhysicsDimension`, `PhysicsHandle`, `PhysicsJointHandle`, `RotationInput`, `SleepingConfig`, `Vector3Input`, `ActiveBodyVisitor`, `BodyControlModeOptions`, `PhysicsSnapshot`, `PhysicsSnapshotConfiguration`, `PhysicsWorldAdapter`, `PhysicsWorldInit`, `PoseTargetCaptureSystemOptions`, `WorldOverlapHit`, `WorldPhysicsEvent`, `WorldPointHit`, `WorldQueryHit`, `WorldRaycastHit`, `WorldShapeCastHit`
+- Re-exports: `NO_TUNING_CAPABILITIES`, `resolveTuningCapabilities`, `missingSolverBodyTuning`, `missingSolverJointAccess`, `supportsSolverBodyTuning`, `supportsSolverJointAccess`, `Collider`, `DEFAULT_GRAVITY_Y`, `JOINT_TYPES`, `SHIPPED_JOINT_TYPES`, `SHIPPED_JOINT_TYPES_2D`, `SHIPPED_JOINT_TYPES_3D`, `STAGED_JOINT_TYPES`, `jointTypeSupportsDimension`, `resolveAngularVelocity`, `resolveGravity`, `resolveRotation`, `resolveSleepingConfig`, `widenToVector3`, `ForceFieldSystem`, `BallJoint`, `FixedJoint`, `HingeJoint`, `Joint`, `PrismaticJoint`, `RevoluteJoint`, `RopeJoint`, `SliderJoint`, `SphericalJoint`, `SpringJoint`, `worldAnchorToLocal`, `worldAxisToLocal`, `PhysicsEventSystem`, `PhysicsSystem`, `DEFAULT_DENSITY`, `DEFAULT_FRICTION`, `DEFAULT_FRICTION_COMBINE_MODE`, `DEFAULT_RESTITUTION`, `DEFAULT_RESTITUTION_COMBINE_MODE`, `PhysicsMaterial`, `combineFriction`, `combineRestitution`, `combineValues`, `resolveDensity`, `ALL_COLLISION_GROUPS`, `passesQueryFilter`, `resolveQueryOptions`, `sortHitsByDistance`, `COLLIDER_SERIALIZER`, `RIGID_BODY_SERIALIZER`, `SWEPT_CHARACTER_CONTROLLER_SERIALIZER`, `deserializeCollisionShape`, `serializeCollisionShape`, `RigidBody`, `SolverRegistry`, `clearRegisteredSolvers`, `registerSolver`, `registeredSolvers`, `resolveSolver`, `COLLISION_SHAPE_TYPES_2D`, `COLLISION_SHAPE_TYPES_3D`, `COMPOSITE_COLLISION_SHAPE_TYPES`, `shapeIsConvex`, `shapeMaximumExtent`, `shapeSupportsDimension`, `validateCollisionShape`, `validateQueryShape`, `BODY_TYPES`, `CCD_MODES`, `COMBINE_MODES`, `DEFAULT_CCD_MODE`, `DEFAULT_DETERMINISM_LEVEL`, `DEFAULT_ENABLED_CCD_MODE`, `DEFAULT_SLEEPING_CONFIG`, `DETERMINISM_LEVELS`, `PHYSICS_DIMENSIONS`, `validateAngularJointMotor`, `validateColliderDescriptor`, `validateInertiaTensor`, `validateJointBreakThreshold`, `validateJointDescriptor`, `validateJointLimits`, `validateLinearJointMotor`, `validateMass`, `validatePhysicsWorldOptions`, `validateRigidBodyDescriptor`, `validateSphericalJointLimits`, `DEFAULT_GROUND_SNAP_DISTANCE`, `DEFAULT_MAX_SLIDES`, `DEFAULT_SKIN_WIDTH`, `DEFAULT_SLOPE_LIMIT`, `DEFAULT_STEP_HEIGHT`, `SweptCharacterController`, `SweptCharacterSystem`, `POSE_TARGET_CAPTURE_PRIORITY`, `PhysicsWorld`, `createPoseTargetCaptureSystem`, `PhysicsCapabilities`, `PhysicsQueryCapabilities`, `PhysicsSolverAdapter`, `PhysicsTuningCapabilities`, `SolverBodyAccess`, `SolverBodyTuningAccess`, `SolverJointAccess`, `SolverJointMotor`, `ColliderEventMap`, `ColliderOptions`, `ColliderTriggerEvent`, `RigidBodyCollisionEvent`, `AngularJointMotor`, `ColliderDescriptor`, `FixedJointDescriptor`, `JointDescriptor`, `JointDescriptorBase`, `JointLimits`, `JointType`, `LinearJointMotor`, `PhysicsWorldOptions`, `PrismaticJointDescriptor`, `RevoluteJointDescriptor`, `RigidBodyDescriptor`, `RopeJointDescriptor`, `ShippedJointType`, `SphericalJointDescriptor`, `SphericalJointLimits`, `SpringJointDescriptor`, `StagedJointType`, `CollisionEvent`, `CollisionPhase`, `ContactPoint`, `JointBreakEvent`, `JointPhase`, `PhysicsEvent`, `PhysicsEventType`, `SleepEvent`, `SleepPhase`, `TriggerEvent`, `TriggerPhase`, `ForceField`, `ForceFieldEntry`, `ForceFieldSystemOptions`, `ForceFieldUnits`, `HingeJointOptions`, `JointBinding`, `JointBreakPayload`, `JointCommands`, `JointEventMap`, `JointOptions`, `RopeJointOptions`, `SliderJointOptions`, `SphericalJointOptions`, `SpringJointOptions`, `PhysicsMaterialOptions`, `PhysicsEventSystemOptions`, `PhysicsSystemOptions`, `OverlapHit`, `OverlapQuery`, `PointHit`, `PointQuery`, `QueryCandidate`, `QueryFilter`, `QueryHit`, `QueryHitMode`, `QueryOptions`, `RaycastHit`, `RaycastQuery`, `ResolvedQueryOptions`, `ShapeCastHit`, `ShapeCastQuery`, `ColliderDocument`, `PhysicsMaterialDocument`, `RigidBodyDocument`, `BlendWeights`, `PointLoad`, `RigidBodyCommands`, `RigidBodyEventMap`, `RigidBodySleepEvent`, `SleepCommand`, `TorqueInput`, `SolverName`, `SolverRegistration`, `SolverRejectionReason`, `SolverRejectionReport`, `SolverResolveOptions`, `SolverSelection`, `BoxShape`, `CapsuleShape`, `ChainShape`, `CircleShape`, `CollisionShape`, `CollisionShape2D`, `CollisionShape3D`, `CollisionShapeType`, `ConeShape`, `ConvexHullShape`, `CylinderShape`, `HeightFieldShape`, `PolygonShape`, `PolylineShape`, `RectangleShape`, `SphereShape`, `TriangleMeshShape`, `AngularVelocityInput`, `BodyType`, `CCDMode`, `CombineMode`, `DeterminismLevel`, `PhysicsBodyHandle`, `PhysicsColliderHandle`, `PhysicsDimension`, `PhysicsHandle`, `PhysicsJointHandle`, `RotationInput`, `SleepingConfig`, `Vector3Input`, `SweptCharacterControllerOptions`, `SweptCharacterSystemOptions`, `ActiveBodyVisitor`, `BodyControlModeOptions`, `PhysicsSnapshot`, `PhysicsSnapshotConfiguration`, `PhysicsWorldAdapter`, `PhysicsWorldInit`, `PoseTargetCaptureSystemOptions`, `WorldOverlapHit`, `WorldPhysicsEvent`, `WorldPointHit`, `WorldQueryHit`, `WorldRaycastHit`, `WorldShapeCastHit`
 
 ---
 
@@ -2635,7 +2641,7 @@ graph LR
 |---------|--------|
 | `@four/core` | `SPACE_MODES, FourError, JsonValue, SpaceMode` |
 | `@four/math` | `Matrix3, Quaternion, Vector2, Vector3` |
-| `@four/motion` | `ComponentSerializerShape` |
+| `@four/motion` | `DEFAULT_CHARACTER_GRAVITY, ComponentSerializerShape` |
 | `@four/scene` | `Transform` |
 
 **Internal Dependencies:**
@@ -2646,6 +2652,7 @@ graph LR
 | `./material.js` | `DEFAULT_DENSITY, DEFAULT_FRICTION, DEFAULT_RESTITUTION, PhysicsMaterial, PhysicsMaterialOptions` | Import |
 | `./queries.js` | `ALL_COLLISION_GROUPS` | Import |
 | `./rigid-body.js` | `RigidBody` | Import |
+| `./swept-character-controller.js` | `DEFAULT_GROUND_SNAP_DISTANCE, DEFAULT_MAX_SLIDES, DEFAULT_SKIN_WIDTH, DEFAULT_SLOPE_LIMIT, DEFAULT_STEP_HEIGHT, SweptCharacterController` | Import |
 | `./shapes.js` | `CollisionShape` | Import (type-only) |
 | `./types.js` | `BODY_TYPES, CCD_MODES, DEFAULT_CCD_MODE` | Import |
 | `./types.js` | `BodyType, CCDMode` | Import (type-only) |
@@ -2653,7 +2660,7 @@ graph LR
 **Exports:**
 - Interfaces: `RigidBodyDocument`, `PhysicsMaterialDocument`, `ColliderDocument`
 - Functions: `serializeCollisionShape`, `deserializeCollisionShape`
-- Constants: `RIGID_BODY_SERIALIZER`, `COLLIDER_SERIALIZER`
+- Constants: `RIGID_BODY_SERIALIZER`, `COLLIDER_SERIALIZER`, `SWEPT_CHARACTER_CONTROLLER_SERIALIZER`
 
 ---
 
@@ -2699,6 +2706,32 @@ graph LR
 - Interfaces: `SolverRegistration`, `SolverRejectionReport`, `SolverResolveOptions`
 - Types: `SolverName`, `SolverSelection`, `SolverRejectionReason`
 - Functions: `registerSolver`, `registeredSolvers`, `clearRegisteredSolvers`, `resolveSolver`
+
+---
+
+### `packages/physics/src/swept-character-controller.ts` - §12's **solver-backed** character controller — {@link SweptCharacterController}
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `Component, ComponentHost` |
+| `@four/math` | `Vector3` |
+| `@four/motion` | `CharacterController, PRIORITY_KINEMATICS, FixedUpdateContext, SimulationSystem` |
+| `@four/scene` | `warnAuthorityConflict, Node` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./queries.js` | `ALL_COLLISION_GROUPS` | Import |
+| `./rigid-body.js` | `RigidBody` | Import (type-only) |
+| `./shapes.js` | `CollisionShape` | Import (type-only) |
+| `./types.js` | `PhysicsBodyHandle` | Import (type-only) |
+| `./world.js` | `PhysicsWorld, WorldShapeCastHit` | Import (type-only) |
+
+**Exports:**
+- Classes: `SweptCharacterController`, `SweptCharacterSystem`
+- Interfaces: `SweptCharacterControllerOptions`, `SweptCharacterSystemOptions`
+- Constants: `DEFAULT_SLOPE_LIMIT`, `DEFAULT_STEP_HEIGHT`, `DEFAULT_SKIN_WIDTH`, `DEFAULT_GROUND_SNAP_DISTANCE`, `DEFAULT_MAX_SLIDES`
 
 ---
 
@@ -3615,10 +3648,139 @@ graph LR
 
 ## Packages/render webgpu Dependencies
 
-### `packages/render-webgpu/src/index.ts` - Entry point exporting 1 symbols
+### `packages/render-webgpu/src/index.ts` - `@four/render-webgpu` — the WebGPU backend (§62 backend 1).
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GPU_BUFFER_USAGE, GPU_SHADER_STAGE, GPU_TEXTURE_USAGE, UNIFORM_STRIDE_BYTES` | Re-export |
+| `./webgpu-renderer.js` | `hostGpu, WebgpuRenderer` | Re-export |
+| `./register.js` | `isWebgpuSupported, registerWebgpuRenderer` | Re-export |
+| `./wgpu-bindings.js` | `DRAW_COLOR_OFFSET, DRAW_MODEL_OFFSET, DRAW_UNIFORM_BYTES, DRAW_UNIFORM_FLOATS, DRAW_UNIFORM_WGSL, DRAW_VIEW_PROJECTION_OFFSET, createDrawBindGroupLayout` | Re-export |
+| `./wgpu-geometry.js` | `WgpuGeometryCache` | Re-export |
+| `./wgpu-pipeline-cache.js` | `pipelineKey, WgpuPipelineCache` | Re-export |
+| `./wgpu-unlit.js` | `CLEAR_SHADER_SOURCE, CLEAR_VERTEX_COUNT, COLOR_BUFFER_LAYOUT, COLOR_SHADER_LOCATION, FRAGMENT_ENTRY_POINT, POSITION_BUFFER_LAYOUT, POSITION_SHADER_LOCATION, VERTEX_ENTRY_POINT, unlitShaderSource, unlitVertexBufferLayouts` | Re-export |
+| `./webgpu-device.js` | `Gpu, GpuAdapter, GpuBindGroup, GpuBindGroupEntry, GpuBindGroupLayout, GpuBindGroupLayoutEntry, GpuBlendComponent, GpuBlendState, GpuBuffer, GpuBufferDescriptor, GpuCanvasContext, GpuCommandBuffer, GpuCommandEncoder, GpuDevice, GpuDeviceLostInfo, GpuPipelineLayout, GpuQueue, GpuRenderPassDescriptor, GpuRenderPassEncoder, GpuRenderPipeline, GpuRenderPipelineDescriptor, GpuShaderModule, GpuTexture, GpuTextureDescriptor, GpuTextureView, GpuVertexBufferLayout, WebgpuCanvas` | Re-export (type-only) |
+| `./wgpu-geometry.js` | `CacheableGeometry, WgpuGeometryRecord` | Re-export (type-only) |
+| `./wgpu-pipeline-cache.js` | `WgpuPipelineDescriptor, WgpuPipelineKind` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
+- Re-exports: `GPU_BUFFER_USAGE`, `GPU_SHADER_STAGE`, `GPU_TEXTURE_USAGE`, `UNIFORM_STRIDE_BYTES`, `hostGpu`, `WebgpuRenderer`, `isWebgpuSupported`, `registerWebgpuRenderer`, `DRAW_COLOR_OFFSET`, `DRAW_MODEL_OFFSET`, `DRAW_UNIFORM_BYTES`, `DRAW_UNIFORM_FLOATS`, `DRAW_UNIFORM_WGSL`, `DRAW_VIEW_PROJECTION_OFFSET`, `createDrawBindGroupLayout`, `WgpuGeometryCache`, `pipelineKey`, `WgpuPipelineCache`, `CLEAR_SHADER_SOURCE`, `CLEAR_VERTEX_COUNT`, `COLOR_BUFFER_LAYOUT`, `COLOR_SHADER_LOCATION`, `FRAGMENT_ENTRY_POINT`, `POSITION_BUFFER_LAYOUT`, `POSITION_SHADER_LOCATION`, `VERTEX_ENTRY_POINT`, `unlitShaderSource`, `unlitVertexBufferLayouts`, `Gpu`, `GpuAdapter`, `GpuBindGroup`, `GpuBindGroupEntry`, `GpuBindGroupLayout`, `GpuBindGroupLayoutEntry`, `GpuBlendComponent`, `GpuBlendState`, `GpuBuffer`, `GpuBufferDescriptor`, `GpuCanvasContext`, `GpuCommandBuffer`, `GpuCommandEncoder`, `GpuDevice`, `GpuDeviceLostInfo`, `GpuPipelineLayout`, `GpuQueue`, `GpuRenderPassDescriptor`, `GpuRenderPassEncoder`, `GpuRenderPipeline`, `GpuRenderPipelineDescriptor`, `GpuShaderModule`, `GpuTexture`, `GpuTextureDescriptor`, `GpuTextureView`, `GpuVertexBufferLayout`, `WebgpuCanvas`, `CacheableGeometry`, `WgpuGeometryRecord`, `WgpuPipelineDescriptor`, `WgpuPipelineKind`
+
+---
+
+### `packages/render-webgpu/src/register.ts` - This backend's opt-in to §62's renderer registry (R-2, A-8, WP-R1.1).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/render` | `registerRenderer, RendererOptions, RendererRegistry` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-renderer.js` | `hostGpu` | Import |
+| `./webgpu-renderer.js` | `WebgpuRenderer` | Import |
+
+**Exports:**
+- Functions: `isWebgpuSupported`, `registerWebgpuRenderer`
+
+---
+
+### `packages/render-webgpu/src/webgpu-device.ts` - The WebGPU surface this backend touches, described structurally (§61, §62).
+
+**Exports:**
+- Interfaces: `GpuDeviceLostInfo`, `GpuBuffer`, `GpuTexture`, `GpuVertexBufferLayout`, `GpuBlendState`, `GpuBlendComponent`, `GpuRenderPipelineDescriptor`, `GpuRenderPassDescriptor`, `GpuRenderPassEncoder`, `GpuCommandEncoder`, `GpuQueue`, `GpuBufferDescriptor`, `GpuTextureDescriptor`, `GpuBindGroupLayoutEntry`, `GpuBindGroupEntry`, `GpuDevice`, `GpuAdapter`, `Gpu`, `GpuCanvasContext`, `WebgpuCanvas`
+- Types: `GpuTextureView`, `GpuShaderModule`, `GpuBindGroupLayout`, `GpuPipelineLayout`, `GpuBindGroup`, `GpuRenderPipeline`, `GpuCommandBuffer`
+- Constants: `GPU_BUFFER_USAGE`, `GPU_TEXTURE_USAGE`, `GPU_SHADER_STAGE`, `UNIFORM_STRIDE_BYTES`
+
+---
+
+### `packages/render-webgpu/src/webgpu-renderer.ts` - Draws four.js scenes with WebGPU (§61, §62 backend 1).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `EventEmitter, FourError` |
+| `@four/math` | `Frustum, Matrix4` |
+| `@four/render` | `buildInterpolatedRenderList, buildRenderList, buildViewRenderList, RenderInterpolation, RenderItem, RenderStatistics, Renderer, RendererCapabilities, RendererEventMap, RendererOptions` |
+| `@four/scene` | `Node, Viewport` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GPU_BUFFER_USAGE, GPU_TEXTURE_USAGE, UNIFORM_STRIDE_BYTES, Gpu, GpuBindGroup, GpuBindGroupLayout, GpuBuffer, GpuCanvasContext, GpuDevice, GpuRenderPassEncoder, GpuTexture, GpuTextureView, WebgpuCanvas` | Import |
+| `./wgpu-bindings.js` | `DRAW_COLOR_OFFSET, DRAW_MODEL_OFFSET, DRAW_UNIFORM_BYTES, DRAW_VIEW_PROJECTION_OFFSET, createDrawBindGroupLayout` | Import |
+| `./wgpu-geometry.js` | `WgpuGeometryCache` | Import |
+| `./wgpu-pipeline-cache.js` | `WgpuPipelineCache, WgpuPipelineDescriptor` | Import |
+| `./wgpu-unlit.js` | `CLEAR_VERTEX_COUNT` | Import |
+
+**Exports:**
+- Classes: `WebgpuRenderer`
+- Functions: `hostGpu`
+
+---
+
+### `packages/render-webgpu/src/wgpu-bindings.ts` - This backend's binding layout, **declared as data** (§7 of the R-1 plan).
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GPU_SHADER_STAGE, GpuBindGroupLayout, GpuDevice` | Import |
+
+**Exports:**
+- Functions: `createDrawBindGroupLayout`
+- Constants: `DRAW_VIEW_PROJECTION_OFFSET`, `DRAW_MODEL_OFFSET`, `DRAW_COLOR_OFFSET`, `DRAW_UNIFORM_BYTES`, `DRAW_UNIFORM_FLOATS`, `DRAW_UNIFORM_WGSL`
+
+---
+
+### `packages/render-webgpu/src/wgpu-geometry.ts` - Per-device store of uploaded geometry (§61, §64 stage 7) — the WebGPU twin of
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/render` | `RenderItem` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GPU_BUFFER_USAGE, GpuBuffer, GpuDevice` | Import |
+
+**Exports:**
+- Classes: `WgpuGeometryCache`
+- Interfaces: `WgpuGeometryRecord`
+- Types: `CacheableGeometry`
+
+---
+
+### `packages/render-webgpu/src/wgpu-pipeline-cache.ts` - The lazy, descriptor-keyed render-pipeline cache (§4.2 of the R-1 plan).
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GpuBindGroupLayout, GpuBlendState, GpuDevice, GpuPipelineLayout, GpuRenderPipeline, GpuShaderModule` | Import |
+| `./wgpu-unlit.js` | `CLEAR_SHADER_SOURCE, FRAGMENT_ENTRY_POINT, VERTEX_ENTRY_POINT, unlitShaderSource, unlitVertexBufferLayouts` | Import |
+
+**Exports:**
+- Classes: `WgpuPipelineCache`
+- Interfaces: `WgpuPipelineDescriptor`
+- Types: `WgpuPipelineKind`
+- Functions: `pipelineKey`
+
+---
+
+### `packages/render-webgpu/src/wgpu-unlit.ts` - The unlit pipeline in hand-written WGSL (§64, §120's MVP tier), plus the
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./wgpu-bindings.js` | `DRAW_UNIFORM_WGSL` | Import |
+| `./webgpu-device.js` | `GpuVertexBufferLayout` | Import (type-only) |
+
+**Exports:**
+- Functions: `unlitVertexBufferLayouts`, `unlitShaderSource`
+- Constants: `POSITION_SHADER_LOCATION`, `COLOR_SHADER_LOCATION`, `POSITION_BUFFER_LAYOUT`, `COLOR_BUFFER_LAYOUT`, `VERTEX_ENTRY_POINT`, `FRAGMENT_ENTRY_POINT`, `CLEAR_VERTEX_COUNT`, `CLEAR_SHADER_SOURCE`
 
 ---
 
@@ -4286,29 +4448,30 @@ graph LR
 
 | File | Imports From | Exports To |
 |------|--------------|------------|
+| `packages/physics/src/index` | 19 files | 0 files |
 | `packages/motion/src/index` | 18 files | 0 files |
-| `packages/physics/src/index` | 18 files | 0 files |
-| `packages/physics/src/world` | 12 files | 5 files |
+| `packages/physics/src/world` | 12 files | 6 files |
 | `packages/render/src/index` | 17 files | 0 files |
-| `packages/physics/src/types` | 0 files | 15 files |
+| `packages/physics/src/types` | 0 files | 16 files |
 | `packages/scene/src/index` | 14 files | 0 files |
 | `packages/physics/src/descriptors` | 3 files | 9 files |
 | `packages/scene/src/node` | 4 files | 8 files |
 | `packages/core/src/index` | 11 files | 0 files |
 | `packages/physics/src/collider` | 8 files | 3 files |
+| `packages/physics/src/rigid-body` | 4 files | 7 files |
 | `packages/render-webgl/src/index` | 11 files | 0 files |
 | `packages/render-webgl/src/webgl-renderer` | 9 files | 2 files |
 | `packages/animation/src/index` | 10 files | 0 files |
-| `packages/physics/src/rigid-body` | 4 files | 6 files |
 | `packages/render-webgl/src/gl-program` | 0 files | 10 files |
 | `packages/ui/src/index` | 10 files | 0 files |
 | `packages/math/src/index` | 9 files | 0 files |
+| `packages/physics/src/serializers` | 8 files | 1 file |
+| `packages/physics/src/shapes` | 1 file | 8 files |
 | `packages/diagnostics/src/index` | 8 files | 0 files |
 | `packages/geometry/src/index` | 8 files | 0 files |
 | `packages/motion/src/serializers` | 7 files | 1 file |
 | `packages/physics/src/joints` | 6 files | 2 files |
-| `packages/physics/src/serializers` | 7 files | 1 file |
-| `packages/physics/src/shapes` | 1 file | 7 files |
+| `packages/physics/src/queries` | 2 files | 6 files |
 | `packages/physics/src/validation` | 3 files | 5 files |
 | `packages/animation/src/controller` | 6 files | 1 file |
 | `packages/animation/src/tween` | 3 files | 4 files |
@@ -4318,14 +4481,13 @@ graph LR
 | `packages/particles/src/index` | 7 files | 0 files |
 | `packages/physics/src/adapter` | 4 files | 3 files |
 | `packages/physics/src/events` | 1 file | 6 files |
-| `packages/physics/src/queries` | 2 files | 5 files |
+| `packages/physics/src/swept-character-controller` | 5 files | 2 files |
 | `packages/render/src/render-list` | 3 files | 4 files |
+| `packages/render-webgpu/src/index` | 7 files | 0 files |
+| `packages/render-webgpu/src/webgpu-renderer` | 5 files | 2 files |
 | `packages/animation/src/mixer` | 5 files | 1 file |
 | `packages/animation/src/values` | 0 files | 6 files |
 | `packages/geometry/src/buffer-geometry` | 2 files | 4 files |
-| `packages/geometry/src/tessellation` | 2 files | 4 files |
-| `packages/materials/src/material` | 1 file | 5 files |
-| `packages/motion/src/systems` | 2 files | 4 files |
 
 ---
 
@@ -4498,7 +4660,7 @@ graph TD
         N110[joints]
         N111[material]
         N112[physics-event-system]
-        N113[...9 more]
+        N113[...10 more]
     end
 
     subgraph Packages/physics-box2d
@@ -4558,48 +4720,55 @@ graph TD
 
     subgraph Packages/render-webgpu
         N148[index]
+        N149[register]
+        N150[webgpu-device]
+        N151[webgpu-renderer]
+        N152[wgpu-bindings]
+        N153[wgpu-geometry]
+        N154[wgpu-pipeline-cache]
+        N155[wgpu-unlit]
     end
 
     subgraph Packages/scene
-        N149[authority]
-        N150[camera]
-        N151[group]
-        N152[index]
-        N153[interpolation]
-        N154[layers]
-        N155[light]
-        N156[node]
-        N157[pose-target]
-        N158[scene]
-        N159[...5 more]
+        N156[authority]
+        N157[camera]
+        N158[group]
+        N159[index]
+        N160[interpolation]
+        N161[layers]
+        N162[light]
+        N163[node]
+        N164[pose-target]
+        N165[scene]
+        N166[...5 more]
     end
 
     subgraph Packages/serialization
-        N160[format]
-        N161[index]
-        N162[migration]
-        N163[serializer]
+        N167[format]
+        N168[index]
+        N169[migration]
+        N170[serializer]
     end
 
     subgraph Packages/text
-        N164[bitmap-font]
-        N165[glyph-atlas]
-        N166[index]
-        N167[text-layout]
+        N171[bitmap-font]
+        N172[glyph-atlas]
+        N173[index]
+        N174[text-layout]
     end
 
     subgraph Packages/ui
-        N168[button]
-        N169[checkable]
-        N170[image]
-        N171[index]
-        N172[keyboard]
-        N173[label]
-        N174[numbers]
-        N175[panel]
-        N176[progress]
-        N177[radio]
-        N178[...2 more]
+        N175[button]
+        N176[checkable]
+        N177[image]
+        N178[index]
+        N179[keyboard]
+        N180[label]
+        N181[numbers]
+        N182[panel]
+        N183[progress]
+        N184[radio]
+        N185[...2 more]
     end
 
     N2 --> N8
@@ -4686,17 +4855,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 225 |
+| Total TypeScript Files | 233 |
 | Total Modules | 24 |
-| Total Lines of Code | 105119 |
-| Total Exports | 2079 |
-| Total Re-exports | 1341 |
-| Total Classes | 144 |
-| Total Interfaces | 438 |
-| Total Functions | 342 |
-| Total Type Guards | 19 |
+| Total Lines of Code | 109195 |
+| Total Exports | 2184 |
+| Total Re-exports | 1410 |
+| Total Classes | 149 |
+| Total Interfaces | 462 |
+| Total Functions | 349 |
+| Total Type Guards | 20 |
 | Total Enums | 0 |
-| Type-only Imports | 266 |
+| Type-only Imports | 275 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 2 |
 
