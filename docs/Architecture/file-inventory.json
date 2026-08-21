@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-21",
-  "totalFiles": 522,
+  "totalFiles": 532,
   "byDisposition": {
-    "reachable": 170,
+    "reachable": 173,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 282,
+    "test": 289,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -14,23 +14,23 @@
   "byArea": {
     "examples": 9,
     "config": 12,
-    "src": 218,
-    "tests": 282,
+    "src": 221,
+    "tests": 289,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 125,
+    "(root)": 128,
     "@four/animation": 25,
     "@four/assets": 8,
     "@four/core": 22,
     "@four/diagnostics": 19,
     "four": 33,
-    "@four/geometry": 17,
+    "@four/geometry": 19,
     "@four/input": 13,
     "@four/materials": 11,
     "@four/math": 16,
     "@four/motion": 33,
-    "@four/particles": 15,
+    "@four/particles": 16,
     "@four/physics-box2d": 2,
     "@four/physics-rapier": 20,
     "@four/physics-soft": 2,
@@ -40,7 +40,7 @@
     "@four/render-webgl": 15,
     "@four/render-webgpu": 2,
     "@four/render": 34,
-    "@four/scene": 25,
+    "@four/scene": 29,
     "@four/serialization": 9,
     "@four/text": 6,
     "@four/ui": 23
@@ -702,7 +702,7 @@
       "package": "four",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 1882
+      "loc": 1915
     },
     {
       "file": "packages/four/src/assets.ts",
@@ -842,7 +842,7 @@
       "package": "four",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2662
+      "loc": 2731
     },
     {
       "file": "packages/four/src/scene.ts",
@@ -884,7 +884,7 @@
       "package": "four",
       "area": "tests",
       "disposition": "test",
-      "loc": 2168
+      "loc": 2230
     },
     {
       "file": "packages/four/tests/barrels.test.ts",
@@ -898,7 +898,7 @@
       "package": "four",
       "area": "tests",
       "disposition": "test",
-      "loc": 1697
+      "loc": 1750
     },
     {
       "file": "packages/four/tests/shape-serializers.test.ts",
@@ -926,14 +926,21 @@
       "package": "@four/geometry",
       "area": "src",
       "disposition": "reachable",
-      "loc": 720
+      "loc": 784
+    },
+    {
+      "file": "packages/geometry/src/geometry.ts",
+      "package": "@four/geometry",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 232
     },
     {
       "file": "packages/geometry/src/index.ts",
       "package": "@four/geometry",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 86
+      "loc": 90
     },
     {
       "file": "packages/geometry/src/path.ts",
@@ -983,6 +990,13 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 1892
+    },
+    {
+      "file": "packages/geometry/tests/geometry-base.test.ts",
+      "package": "@four/geometry",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 213
     },
     {
       "file": "packages/geometry/tests/geometry.test.ts",
@@ -1556,14 +1570,14 @@
       "package": "@four/particles",
       "area": "src",
       "disposition": "reachable",
-      "loc": 857
+      "loc": 944
     },
     {
       "file": "packages/particles/src/fields.ts",
       "package": "@four/particles",
       "area": "src",
       "disposition": "reachable",
-      "loc": 941
+      "loc": 1103
     },
     {
       "file": "packages/particles/src/index.ts",
@@ -1605,7 +1619,7 @@
       "package": "@four/particles",
       "area": "src",
       "disposition": "reachable",
-      "loc": 152
+      "loc": 212
     },
     {
       "file": "packages/particles/tests/emitter.test.ts",
@@ -1613,6 +1627,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 1098
+    },
+    {
+      "file": "packages/particles/tests/field-batching.test.ts",
+      "package": "@four/particles",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 290
     },
     {
       "file": "packages/particles/tests/fields.test.ts",
@@ -2522,7 +2543,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "reachable",
-      "loc": 386
+      "loc": 391
     },
     {
       "file": "packages/scene/src/group.ts",
@@ -2536,7 +2557,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 75
+      "loc": 92
     },
     {
       "file": "packages/scene/src/interpolation.ts",
@@ -2579,6 +2600,20 @@
       "area": "src",
       "disposition": "reachable",
       "loc": 133
+    },
+    {
+      "file": "packages/scene/src/screen-camera.ts",
+      "package": "@four/scene",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 402
+    },
+    {
+      "file": "packages/scene/src/trackball.ts",
+      "package": "@four/scene",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 383
     },
     {
       "file": "packages/scene/src/transform.ts",
@@ -2665,11 +2700,25 @@
       "loc": 674
     },
     {
+      "file": "packages/scene/tests/screen-camera.test.ts",
+      "package": "@four/scene",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 203
+    },
+    {
       "file": "packages/scene/tests/smoke.test.ts",
       "package": "@four/scene",
       "area": "tests",
       "disposition": "test",
       "loc": 10
+    },
+    {
+      "file": "packages/scene/tests/trackball.test.ts",
+      "package": "@four/scene",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 218
     },
     {
       "file": "packages/scene/tests/transform.test.ts",
@@ -3022,6 +3071,13 @@
       "loc": 144
     },
     {
+      "file": "tests/browser/fixtures/screen-camera-page.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 107
+    },
+    {
       "file": "tests/browser/fixtures/stencil-page.ts",
       "package": "(root)",
       "area": "tests",
@@ -3076,6 +3132,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 967
+    },
+    {
+      "file": "tests/browser/screen-camera.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 195
     },
     {
       "file": "tests/browser/smoothness.spec.ts",
@@ -3587,6 +3650,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 823
+    },
+    {
+      "file": "tests/integration/screen-camera.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 257
     },
     {
       "file": "tests/integration/security-csp.test.ts",

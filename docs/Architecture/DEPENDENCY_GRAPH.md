@@ -51,7 +51,7 @@ The codebase is organized into the following modules:
 - **packages/core**: 12 files
 - **packages/diagnostics**: 9 files
 - **packages/four**: 27 files
-- **packages/geometry**: 9 files
+- **packages/geometry**: 10 files
 - **packages/input**: 8 files
 - **packages/materials**: 8 files
 - **packages/math**: 10 files
@@ -66,7 +66,7 @@ The codebase is organized into the following modules:
 - **packages/render-svg**: 1 file
 - **packages/render-webgl**: 12 files
 - **packages/render-webgpu**: 1 file
-- **packages/scene**: 13 files
+- **packages/scene**: 15 files
 - **packages/serialization**: 4 files
 - **packages/text**: 4 files
 - **packages/ui**: 12 files
@@ -83,7 +83,7 @@ The codebase is organized into the following modules:
 | `@four/core` (`packages/core/`) | (none) | 12 | 0 |
 | `@four/diagnostics` (`packages/diagnostics/`) | `@four/math`, `@four/core` | 9 | 0 |
 | `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/diagnostics`, `@four/geometry`, `@four/motion`, `@four/math`, `@four/assets`, `@four/physics`, `@four/scene`, `@four/render`, `@four/input`, `@four/materials`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/serialization`, `@four/text`, `@four/ui` | 27 | 0 |
-| `@four/geometry` (`packages/geometry/`) | `@four/core`, `@four/math` | 9 | 0 |
+| `@four/geometry` (`packages/geometry/`) | `@four/math`, `@four/core` | 10 | 0 |
 | `@four/input` (`packages/input/`) | `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
 | `@four/materials` (`packages/materials/`) | `@four/core`, `@four/math` | 8 | 0 |
 | `@four/math` (`packages/math/`) | (none) | 10 | 0 |
@@ -98,7 +98,7 @@ The codebase is organized into the following modules:
 | `@four/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
 | `@four/render-webgl` (`packages/render-webgl/`) | `@four/math`, `@four/render`, `@four/core` | 12 | 0 |
 | `@four/render-webgpu` (`packages/render-webgpu/`) | (none) | 1 | 0 |
-| `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 13 | 0 |
+| `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 15 | 0 |
 | `@four/serialization` (`packages/serialization/`) | `@four/core`, `@four/scene`, `@four/math` | 4 | 0 |
 | `@four/text` (`packages/text/`) | (none) | 4 | 0 |
 | `@four/ui` (`packages/ui/`) | `@four/input`, `@four/math`, `@four/core`, `@four/scene`, `@four/text` | 12 | 0 |
@@ -161,8 +161,8 @@ graph LR
     P4 --> P21
     P4 --> P22
     P4 --> P23
-    P5 --> P2
     P5 --> P8
+    P5 --> P2
     P6 --> P2
     P6 --> P8
     P6 --> P20
@@ -825,7 +825,7 @@ graph LR
 | `@four/math` | `DepthRange` |
 | `@four/assets` | `AssetManager` |
 | `@four/physics` | `PhysicsWorld` |
-| `@four/scene` | `PerspectiveCamera, PoseBuffer, Scene, createSnapshotSystem, resolveWorldTransforms, Viewport, WorldTransformStats` |
+| `@four/scene` | `PerspectiveCamera, PoseBuffer, Scene, createSnapshotSystem, resolveWorldTransforms, Camera, SurfaceSizedCamera, Viewport, WorldTransformStats` |
 | `@four/render` | `RenderStatistics, Renderer, RendererFallbackReport, RendererRegistry, RendererSelection` |
 | `@four/render` | `resolveRenderer, textureMemoryBytes` |
 
@@ -1081,7 +1081,7 @@ graph LR
 | `@four/physics` | `COLLIDER_SERIALIZER, Collider, RIGID_BODY_SERIALIZER, RigidBody` |
 | `@four/render` | `Arc, Circle, Ellipse, Line, PathShape, Polygon, Polyline, Rectangle, RegularPolygon, Renderable, Ring, Sector, Shape2D, Sprite, Star` |
 | `@four/render` | `ResolvedPaint, ResolvedShapeFill, ResolvedStrokeStyle` |
-| `@four/scene` | `DirectionalLight, OrthographicCamera, PerspectiveCamera, PointLight, SpotLight, restoreNodeId, Node` |
+| `@four/scene` | `DirectionalLight, OrthographicCamera, PerspectiveCamera, PointLight, SCREEN_ORIGINS, SCREEN_UNITS, ScreenCamera, SpotLight, restoreNodeId, Node` |
 | `@four/serialization` | `ComponentSerializerRegistry, createDefaultComponentSerializers, InstantiateSceneOptions, SceneNodeDocument, SerializeSceneOptions` |
 | `@four/text` | `GlyphAtlas, TextAlign` |
 | `@four/ui` | `Button, Checkbox, ImageWidget, Label, Panel, ProgressIndicator, RadioButton, Slider, Toggle, UIWidget, CheckableWidget, UIWidgetOptions, WidgetAccessibility` |
@@ -1095,7 +1095,7 @@ graph LR
 - Interfaces: `SceneResourceCatalog`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneSerializationSupport`
 - Types: `UnknownResourcePolicy`
 - Functions: `resourceCatalog`, `registerUISerializers`, `registerRenderSerializers`, `registerShapeSerializers`, `registerTextSerializers`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerSceneNodeTypes`
-- Constants: `PANEL_NODE_TYPE`, `LABEL_NODE_TYPE`, `BUTTON_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `SLIDER_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `IMAGE_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SPRITE_NODE_TYPE`, `TEXT_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `POLYGON_NODE_TYPE`, `STAR_NODE_TYPE`, `SECTOR_NODE_TYPE`, `RING_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `LINE_NODE_TYPE`, `POLYLINE_NODE_TYPE`, `ARC_NODE_TYPE`
+- Constants: `PANEL_NODE_TYPE`, `LABEL_NODE_TYPE`, `BUTTON_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `SLIDER_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `IMAGE_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `SPRITE_NODE_TYPE`, `TEXT_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `SCREEN_CAMERA_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `POLYGON_NODE_TYPE`, `STAR_NODE_TYPE`, `SECTOR_NODE_TYPE`, `RING_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `LINE_NODE_TYPE`, `POLYLINE_NODE_TYPE`, `ARC_NODE_TYPE`
 
 ---
 
@@ -1173,27 +1173,42 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `Disposable` |
 | `@four/math` | `Vector3` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./geometry.js` | `Geometry, BoundingVolume, MutableBoundingVolume` | Import |
 | `./resource-memory.js` | `noteGeometry` | Import |
 
 **Exports:**
 - Classes: `BufferGeometry`
-- Interfaces: `GeometryBounds`, `BufferGeometryOptions`
-- Types: `GeometryDrawMode`, `GeometryIndexArray`
+- Interfaces: `BufferGeometryOptions`
+- Types: `GeometryDrawMode`, `GeometryIndexArray`, `GeometryBounds`
 
 ---
 
-### `packages/geometry/src/index.ts` - Package entry point for @four/geometry (re-exports 64 symbols)
+### `packages/geometry/src/geometry.ts` - §53's `Geometry` base and its `BoundingVolume` — the two declarations the
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `Disposable` |
+| `@four/math` | `Vector3` |
+
+**Exports:**
+- Interfaces: `BoundingVolume`, `MutableBoundingVolume`
+- Functions: `nextGeometryIdentifier`
+
+---
+
+### `packages/geometry/src/index.ts` - --- R-21: §53 geometry base + bounding volume (begin) ---
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
 | `./buffer-geometry.js` | `BufferGeometry` | Re-export |
+| `./geometry.js` | `Geometry` | Re-export |
 | `./primitives-3d.js` | `capsuleGeometry, coneGeometry, cylinderGeometry, extrudeGeometry, heightFieldGeometry, latheGeometry, sphereGeometry, torusGeometry, tubeGeometry` | Re-export |
 | `./path.js` | `DEFAULT_FLATTEN_TOLERANCE, MAX_SUBDIVISION_DEPTH, Path` | Re-export |
 | `./svg-path.js` | `DEFAULT_MAXIMUM_PATH_DATA_LENGTH, formatSvgPathData, parseSvgPathData` | Re-export |
@@ -1201,6 +1216,7 @@ graph LR
 | `./resource-memory.js` | `geometryMemoryBytes, liveGeometryCount` | Re-export |
 | `./tessellation.js` | `DEFAULT_MITER_LIMIT, earClippingTessellator, expandStroke, triangulatePolygon` | Re-export |
 | `./buffer-geometry.js` | `BufferGeometryOptions, GeometryBounds, GeometryDrawMode, GeometryIndexArray` | Re-export (type-only) |
+| `./geometry.js` | `BoundingVolume` | Re-export (type-only) |
 | `./primitives-3d.js` | `CapsuleGeometryOptions, ExtrudeGeometryOptions, HeightFieldGeometryOptions, LatheGeometryOptions, Point3D, SphereGeometryOptions, TaperedGeometryOptions, TorusGeometryOptions, TubeGeometryOptions` | Re-export (type-only) |
 | `./path.js` | `FillRule, PathArcCommand, PathClosestPoint, PathCloseCommand, PathCommand, PathCubicCommand, PathFillRings, PathLineCommand, PathMoveCommand, PathOptions, PathQuadraticCommand, PathSegmentCommand` | Re-export (type-only) |
 | `./svg-path.js` | `SvgPathParseOptions` | Re-export (type-only) |
@@ -1209,7 +1225,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `BufferGeometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`, `Path`, `DEFAULT_MAXIMUM_PATH_DATA_LENGTH`, `formatSvgPathData`, `parseSvgPathData`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `DEFAULT_MITER_LIMIT`, `earClippingTessellator`, `expandStroke`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `FillRule`, `PathArcCommand`, `PathClosestPoint`, `PathCloseCommand`, `PathCommand`, `PathCubicCommand`, `PathFillRings`, `PathLineCommand`, `PathMoveCommand`, `PathOptions`, `PathQuadraticCommand`, `PathSegmentCommand`, `SvgPathParseOptions`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`, `Polyline2D`, `StrokeAlignment`, `StrokeGeometryOptions`, `StrokeLineCap`, `StrokeLineJoin`, `StrokeMesh`
+- Re-exports: `BufferGeometry`, `Geometry`, `capsuleGeometry`, `coneGeometry`, `cylinderGeometry`, `extrudeGeometry`, `heightFieldGeometry`, `latheGeometry`, `sphereGeometry`, `torusGeometry`, `tubeGeometry`, `DEFAULT_FLATTEN_TOLERANCE`, `MAX_SUBDIVISION_DEPTH`, `Path`, `DEFAULT_MAXIMUM_PATH_DATA_LENGTH`, `formatSvgPathData`, `parseSvgPathData`, `boxGeometry`, `circleGeometry2D`, `planeGeometry`, `polygonGeometry2D`, `geometryMemoryBytes`, `liveGeometryCount`, `DEFAULT_MITER_LIMIT`, `earClippingTessellator`, `expandStroke`, `triangulatePolygon`, `BufferGeometryOptions`, `GeometryBounds`, `GeometryDrawMode`, `GeometryIndexArray`, `BoundingVolume`, `CapsuleGeometryOptions`, `ExtrudeGeometryOptions`, `HeightFieldGeometryOptions`, `LatheGeometryOptions`, `Point3D`, `SphereGeometryOptions`, `TaperedGeometryOptions`, `TorusGeometryOptions`, `TubeGeometryOptions`, `FillRule`, `PathArcCommand`, `PathClosestPoint`, `PathCloseCommand`, `PathCommand`, `PathCubicCommand`, `PathFillRings`, `PathLineCommand`, `PathMoveCommand`, `PathOptions`, `PathQuadraticCommand`, `PathSegmentCommand`, `SvgPathParseOptions`, `BoxGeometryOptions`, `CircleGeometry2DOptions`, `PlaneGeometryOptions`, `PolygonGeometry2DOptions`, `Point2D`, `PolygonTessellator`, `Polyline2D`, `StrokeAlignment`, `StrokeGeometryOptions`, `StrokeLineCap`, `StrokeLineJoin`, `StrokeMesh`
 
 ---
 
@@ -3571,13 +3587,15 @@ graph LR
 
 ---
 
-### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 59 symbols)
+### `packages/scene/src/index.ts` - Package entry point for @four/scene (re-exports 73 symbols)
 
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
 | `./authority.js` | `DEFAULT_TRANSFORM_AUTHORITY, TRANSFORM_AUTHORITIES, warnAuthorityConflict` | Re-export |
 | `./camera.js` | `Camera, OrthographicCamera, PerspectiveCamera` | Re-export |
+| `./screen-camera.js` | `DEFAULT_SCREEN_FAR, DEFAULT_SCREEN_NEAR, DEFAULT_SCREEN_ORIGIN, DEFAULT_SCREEN_UNITS, SCREEN_ORIGINS, SCREEN_UNITS, ScreenCamera` | Re-export |
+| `./trackball.js` | `DEFAULT_TRACKBALL_RADIUS, TrackballRig` | Re-export |
 | `./group.js` | `Group` | Re-export |
 | `./layers.js` | `ALL_LAYERS, DEFAULT_LAYER, DEFAULT_LAYER_MASK, DEFAULT_LAYER_NAME, LAYER_COUNT, NO_LAYERS, applyLayers, assertLayerMask, defineLayer, isLayerMask, layerIndex, layerMask, layerMaskNames, layerName, layerNames, layersMatch, resetLayers` | Re-export |
 | `./light.js` | `DirectionalLight, DirectionalLightShadow, PointLight, PunctualLight, SpotLight` | Re-export |
@@ -3590,6 +3608,8 @@ graph LR
 | `./world-transforms.js` | `resolveWorldTransform, resolveWorldTransforms` | Re-export |
 | `./authority.js` | `AuthorityNode, TransformAuthority` | Re-export (type-only) |
 | `./camera.js` | `OrthographicCameraOptions, PerspectiveCameraOptions` | Re-export (type-only) |
+| `./screen-camera.js` | `ScreenCameraOptions, ScreenOrigin, ScreenUnits, SurfaceSizedCamera` | Re-export (type-only) |
+| `./trackball.js` | `TrackballRigOptions` | Re-export (type-only) |
 | `./layers.js` | `LayerMask, LayeredNode` | Re-export (type-only) |
 | `./light.js` | `ColorRGB, DirectionalLightOptions, DirectionalLightShadowOptions, PunctualLightOptions, SpotLightOptions` | Re-export (type-only) |
 | `./interpolation.js` | `PoseSnapshotSystem, SnapshotSystemOptions` | Re-export (type-only) |
@@ -3599,7 +3619,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DEFAULT_TRANSFORM_AUTHORITY`, `TRANSFORM_AUTHORITIES`, `warnAuthorityConflict`, `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `Group`, `ALL_LAYERS`, `DEFAULT_LAYER`, `DEFAULT_LAYER_MASK`, `DEFAULT_LAYER_NAME`, `LAYER_COUNT`, `NO_LAYERS`, `applyLayers`, `assertLayerMask`, `defineLayer`, `isLayerMask`, `layerIndex`, `layerMask`, `layerMaskNames`, `layerName`, `layerNames`, `layersMatch`, `resetLayers`, `DirectionalLight`, `DirectionalLightShadow`, `PointLight`, `PunctualLight`, `SpotLight`, `POSE_SNAPSHOT_PRIORITY`, `PoseBuffer`, `createSnapshotSystem`, `Node`, `restoreNodeId`, `PoseTarget`, `Scene`, `Transform`, `createFullscreenViewport`, `resolveWorldTransform`, `resolveWorldTransforms`, `AuthorityNode`, `TransformAuthority`, `OrthographicCameraOptions`, `PerspectiveCameraOptions`, `LayerMask`, `LayeredNode`, `ColorRGB`, `DirectionalLightOptions`, `DirectionalLightShadowOptions`, `PunctualLightOptions`, `SpotLightOptions`, `PoseSnapshotSystem`, `SnapshotSystemOptions`, `NodeEventMap`, `NodeHierarchyEvent`, `NodeOptions`, `NodeType`, `Viewport`, `WorldTransformStats`
+- Re-exports: `DEFAULT_TRANSFORM_AUTHORITY`, `TRANSFORM_AUTHORITIES`, `warnAuthorityConflict`, `Camera`, `OrthographicCamera`, `PerspectiveCamera`, `DEFAULT_SCREEN_FAR`, `DEFAULT_SCREEN_NEAR`, `DEFAULT_SCREEN_ORIGIN`, `DEFAULT_SCREEN_UNITS`, `SCREEN_ORIGINS`, `SCREEN_UNITS`, `ScreenCamera`, `DEFAULT_TRACKBALL_RADIUS`, `TrackballRig`, `Group`, `ALL_LAYERS`, `DEFAULT_LAYER`, `DEFAULT_LAYER_MASK`, `DEFAULT_LAYER_NAME`, `LAYER_COUNT`, `NO_LAYERS`, `applyLayers`, `assertLayerMask`, `defineLayer`, `isLayerMask`, `layerIndex`, `layerMask`, `layerMaskNames`, `layerName`, `layerNames`, `layersMatch`, `resetLayers`, `DirectionalLight`, `DirectionalLightShadow`, `PointLight`, `PunctualLight`, `SpotLight`, `POSE_SNAPSHOT_PRIORITY`, `PoseBuffer`, `createSnapshotSystem`, `Node`, `restoreNodeId`, `PoseTarget`, `Scene`, `Transform`, `createFullscreenViewport`, `resolveWorldTransform`, `resolveWorldTransforms`, `AuthorityNode`, `TransformAuthority`, `OrthographicCameraOptions`, `PerspectiveCameraOptions`, `ScreenCameraOptions`, `ScreenOrigin`, `ScreenUnits`, `SurfaceSizedCamera`, `TrackballRigOptions`, `LayerMask`, `LayeredNode`, `ColorRGB`, `DirectionalLightOptions`, `DirectionalLightShadowOptions`, `PunctualLightOptions`, `SpotLightOptions`, `PoseSnapshotSystem`, `SnapshotSystemOptions`, `NodeEventMap`, `NodeHierarchyEvent`, `NodeOptions`, `NodeType`, `Viewport`, `WorldTransformStats`
 
 ---
 
@@ -3716,6 +3736,48 @@ graph LR
 
 **Exports:**
 - Classes: `Scene`
+
+---
+
+### `packages/scene/src/screen-camera.ts` - §47's `ScreenCamera` — the pixel-rectangle camera (R-37, 2026-08-21).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `FourError` |
+| `@four/math` | `DepthRange` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./camera.js` | `Camera` | Import |
+
+**Exports:**
+- Classes: `ScreenCamera`
+- Interfaces: `SurfaceSizedCamera`, `ScreenCameraOptions`
+- Types: `ScreenOrigin`, `ScreenUnits`
+- Constants: `SCREEN_ORIGINS`, `SCREEN_UNITS`, `DEFAULT_SCREEN_ORIGIN`, `DEFAULT_SCREEN_UNITS`, `DEFAULT_SCREEN_NEAR`, `DEFAULT_SCREEN_FAR`
+
+---
+
+### `packages/scene/src/trackball.ts` - §44/§47's **trackball** rig (R-37, 2026-08-21) — the last of the seven camera
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/math` | `Quaternion, Vector3` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./authority.js` | `warnAuthorityConflict` | Import |
+| `./node.js` | `Node` | Import (type-only) |
+| `./screen-camera.js` | `DEFAULT_SCREEN_ORIGIN, ScreenOrigin` | Import |
+
+**Exports:**
+- Classes: `TrackballRig`
+- Interfaces: `TrackballRigOptions`
+- Constants: `DEFAULT_TRACKBALL_RADIUS`
 
 ---
 
@@ -4148,26 +4210,26 @@ graph LR
 | `packages/physics/src/world` | 12 files | 5 files |
 | `packages/render/src/index` | 17 files | 0 files |
 | `packages/physics/src/types` | 0 files | 15 files |
+| `packages/scene/src/index` | 14 files | 0 files |
 | `packages/physics/src/descriptors` | 3 files | 9 files |
-| `packages/scene/src/index` | 12 files | 0 files |
+| `packages/scene/src/node` | 4 files | 8 files |
 | `packages/core/src/index` | 11 files | 0 files |
 | `packages/physics/src/collider` | 8 files | 3 files |
 | `packages/render-webgl/src/index` | 11 files | 0 files |
 | `packages/render-webgl/src/webgl-renderer` | 9 files | 2 files |
-| `packages/scene/src/node` | 4 files | 7 files |
 | `packages/animation/src/index` | 10 files | 0 files |
 | `packages/physics/src/rigid-body` | 4 files | 6 files |
 | `packages/render-webgl/src/gl-program` | 0 files | 10 files |
 | `packages/ui/src/index` | 10 files | 0 files |
 | `packages/math/src/index` | 9 files | 0 files |
 | `packages/diagnostics/src/index` | 8 files | 0 files |
+| `packages/geometry/src/index` | 8 files | 0 files |
 | `packages/physics/src/joints` | 6 files | 2 files |
 | `packages/physics/src/serializers` | 7 files | 1 file |
 | `packages/physics/src/shapes` | 1 file | 7 files |
 | `packages/physics/src/validation` | 3 files | 5 files |
 | `packages/animation/src/controller` | 6 files | 1 file |
 | `packages/animation/src/tween` | 3 files | 4 files |
-| `packages/geometry/src/index` | 7 files | 0 files |
 | `packages/input/src/index` | 7 files | 0 files |
 | `packages/materials/src/index` | 7 files | 0 files |
 | `packages/math/src/alloc-counter` | 0 files | 7 files |
@@ -4179,10 +4241,10 @@ graph LR
 | `packages/render/src/render-list` | 3 files | 4 files |
 | `packages/animation/src/mixer` | 5 files | 1 file |
 | `packages/animation/src/values` | 0 files | 6 files |
+| `packages/geometry/src/buffer-geometry` | 2 files | 4 files |
 | `packages/geometry/src/tessellation` | 2 files | 4 files |
 | `packages/materials/src/material` | 1 file | 5 files |
 | `packages/motion/src/systems` | 2 files | 4 files |
-| `packages/physics/src/solver-registry` | 4 files | 2 files |
 
 ---
 
@@ -4270,189 +4332,190 @@ graph TD
 
     subgraph Packages/geometry
         N45[buffer-geometry]
-        N46[index]
-        N47[path]
-        N48[primitive-support]
-        N49[primitives-3d]
-        N50[primitives]
-        N51[resource-memory]
-        N52[svg-path]
-        N53[tessellation]
+        N46[geometry]
+        N47[index]
+        N48[path]
+        N49[primitive-support]
+        N50[primitives-3d]
+        N51[primitives]
+        N52[resource-memory]
+        N53[svg-path]
+        N54[tessellation]
     end
 
     subgraph Packages/input
-        N54[drag]
-        N55[index]
-        N56[key-events]
-        N57[keyboard-input]
-        N58[pick]
-        N59[pointer-events]
-        N60[pointer-input]
-        N61[propagation]
+        N55[drag]
+        N56[index]
+        N57[key-events]
+        N58[keyboard-input]
+        N59[pick]
+        N60[pointer-events]
+        N61[pointer-input]
+        N62[propagation]
     end
 
     subgraph Packages/materials
-        N62[index]
-        N63[lit-material]
-        N64[material]
-        N65[sprite-material]
-        N66[standard-material]
-        N67[stencil-state]
-        N68[texture]
-        N69[unlit-material]
+        N63[index]
+        N64[lit-material]
+        N65[material]
+        N66[sprite-material]
+        N67[standard-material]
+        N68[stencil-state]
+        N69[texture]
+        N70[unlit-material]
     end
 
     subgraph Packages/math
-        N70[alloc-counter]
-        N71[color]
-        N72[frustum]
-        N73[index]
-        N74[matrix3]
-        N75[matrix4]
-        N76[quaternion]
-        N77[vector2]
-        N78[vector3]
-        N79[vector4]
+        N71[alloc-counter]
+        N72[color]
+        N73[frustum]
+        N74[index]
+        N75[matrix3]
+        N76[matrix4]
+        N77[quaternion]
+        N78[vector2]
+        N79[vector3]
+        N80[vector4]
     end
 
     subgraph Packages/motion
-        N80[camera-rigs]
-        N81[clock]
-        N82[constraints]
-        N83[ik]
-        N84[index]
-        N85[integrators]
-        N86[kinematic-controller]
-        N87[motion-component]
-        N88[pid]
-        N89[prediction]
-        N90[...8 more]
+        N81[camera-rigs]
+        N82[clock]
+        N83[constraints]
+        N84[ik]
+        N85[index]
+        N86[integrators]
+        N87[kinematic-controller]
+        N88[motion-component]
+        N89[pid]
+        N90[prediction]
+        N91[...8 more]
     end
 
     subgraph Packages/particles
-        N91[emitter]
-        N92[fields]
-        N93[index]
-        N94[particle-renderable]
-        N95[particle-system]
-        N96[pool]
-        N97[random]
-        N98[types]
+        N92[emitter]
+        N93[fields]
+        N94[index]
+        N95[particle-renderable]
+        N96[particle-system]
+        N97[pool]
+        N98[random]
+        N99[types]
     end
 
     subgraph Packages/physics
-        N99[adapter]
-        N100[body-access]
-        N101[collider]
-        N102[descriptors]
-        N103[events]
-        N104[force-field]
-        N105[index]
-        N106[joints]
-        N107[material]
-        N108[physics-event-system]
-        N109[...9 more]
+        N100[adapter]
+        N101[body-access]
+        N102[collider]
+        N103[descriptors]
+        N104[events]
+        N105[force-field]
+        N106[index]
+        N107[joints]
+        N108[material]
+        N109[physics-event-system]
+        N110[...9 more]
     end
 
     subgraph Packages/physics-box2d
-        N110[index]
+        N111[index]
     end
 
     subgraph Packages/physics-rapier
-        N111[ccd]
-        N112[conversions2d]
-        N113[conversions3d]
-        N114[index]
-        N115[init]
-        N116[rapier2d-adapter]
-        N117[rapier3d-adapter]
-        N118[register]
+        N112[ccd]
+        N113[conversions2d]
+        N114[conversions3d]
+        N115[index]
+        N116[init]
+        N117[rapier2d-adapter]
+        N118[rapier3d-adapter]
+        N119[register]
     end
 
     subgraph Packages/physics-soft
-        N119[index]
+        N120[index]
     end
 
     subgraph Packages/render
-        N120[batch]
-        N121[bounds]
-        N122[effect-pass]
-        N123[index]
-        N124[lights]
-        N125[particles]
-        N126[render-graph]
-        N127[render-list]
-        N128[render-target]
-        N129[renderable]
-        N130[...8 more]
+        N121[batch]
+        N122[bounds]
+        N123[effect-pass]
+        N124[index]
+        N125[lights]
+        N126[particles]
+        N127[render-graph]
+        N128[render-list]
+        N129[render-target]
+        N130[renderable]
+        N131[...8 more]
     end
 
     subgraph Packages/render-canvas
-        N131[index]
-    end
-
-    subgraph Packages/render-svg
         N132[index]
     end
 
+    subgraph Packages/render-svg
+        N133[index]
+    end
+
     subgraph Packages/render-webgl
-        N133[gl-batch]
-        N134[gl-effect]
-        N135[gl-geometry]
-        N136[gl-particles]
-        N137[gl-program]
-        N138[gl-render-target]
-        N139[gl-shadow]
-        N140[gl-standard]
-        N141[gl-texture]
-        N142[index]
-        N143[...2 more]
+        N134[gl-batch]
+        N135[gl-effect]
+        N136[gl-geometry]
+        N137[gl-particles]
+        N138[gl-program]
+        N139[gl-render-target]
+        N140[gl-shadow]
+        N141[gl-standard]
+        N142[gl-texture]
+        N143[index]
+        N144[...2 more]
     end
 
     subgraph Packages/render-webgpu
-        N144[index]
+        N145[index]
     end
 
     subgraph Packages/scene
-        N145[authority]
-        N146[camera]
-        N147[group]
-        N148[index]
-        N149[interpolation]
-        N150[layers]
-        N151[light]
-        N152[node]
-        N153[pose-target]
-        N154[scene]
-        N155[...3 more]
+        N146[authority]
+        N147[camera]
+        N148[group]
+        N149[index]
+        N150[interpolation]
+        N151[layers]
+        N152[light]
+        N153[node]
+        N154[pose-target]
+        N155[scene]
+        N156[...5 more]
     end
 
     subgraph Packages/serialization
-        N156[format]
-        N157[index]
-        N158[migration]
-        N159[serializer]
+        N157[format]
+        N158[index]
+        N159[migration]
+        N160[serializer]
     end
 
     subgraph Packages/text
-        N160[bitmap-font]
-        N161[glyph-atlas]
-        N162[index]
-        N163[text-layout]
+        N161[bitmap-font]
+        N162[glyph-atlas]
+        N163[index]
+        N164[text-layout]
     end
 
     subgraph Packages/ui
-        N164[button]
-        N165[checkable]
-        N166[image]
-        N167[index]
-        N168[keyboard]
-        N169[label]
-        N170[numbers]
-        N171[panel]
-        N172[progress]
-        N173[radio]
-        N174[...2 more]
+        N165[button]
+        N166[checkable]
+        N167[image]
+        N168[index]
+        N169[keyboard]
+        N170[label]
+        N171[numbers]
+        N172[panel]
+        N173[progress]
+        N174[radio]
+        N175[...2 more]
     end
 
     N2 --> N8
@@ -4506,30 +4569,30 @@ graph TD
     N32 --> N28
     N33 --> N26
     N40 --> N35
-    N45 --> N51
-    N46 --> N45
-    N46 --> N49
-    N46 --> N47
-    N46 --> N52
-    N46 --> N50
-    N46 --> N51
-    N46 --> N53
+    N45 --> N46
+    N45 --> N52
+    N47 --> N45
+    N47 --> N46
+    N47 --> N50
     N47 --> N48
     N47 --> N53
-    N49 --> N45
-    N49 --> N48
-    N49 --> N53
+    N47 --> N51
+    N47 --> N52
+    N47 --> N54
+    N48 --> N49
+    N48 --> N54
     N50 --> N45
-    N50 --> N48
-    N50 --> N53
-    N52 --> N47
-    N53 --> N45
+    N50 --> N49
+    N50 --> N54
+    N51 --> N45
+    N51 --> N49
+    N51 --> N54
     N53 --> N48
-    N54 --> N58
-    N54 --> N59
-    N54 --> N60
-    N55 --> N54
-    N55 --> N56
+    N54 --> N45
+    N54 --> N49
+    N55 --> N59
+    N55 --> N60
+    N55 --> N61
 ```
 
 ---
@@ -4539,17 +4602,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 218 |
+| Total TypeScript Files | 221 |
 | Total Modules | 24 |
-| Total Lines of Code | 101084 |
-| Total Exports | 2004 |
-| Total Re-exports | 1294 |
-| Total Classes | 139 |
-| Total Interfaces | 428 |
-| Total Functions | 335 |
+| Total Lines of Code | 102602 |
+| Total Exports | 2031 |
+| Total Re-exports | 1310 |
+| Total Classes | 141 |
+| Total Interfaces | 432 |
+| Total Functions | 336 |
 | Total Type Guards | 19 |
 | Total Enums | 0 |
-| Type-only Imports | 256 |
+| Type-only Imports | 260 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 2 |
 

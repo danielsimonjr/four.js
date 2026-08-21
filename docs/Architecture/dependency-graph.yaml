@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-21"
-  totalFiles: 218
+  totalFiles: 221
   totalModules: 24
-  totalExports: 2004
+  totalExports: 2031
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -23,7 +23,7 @@ entryPoints:
     description: "The umbrella package (§98): one namespace per workspace package, plus the"
   - file: packages/geometry/src/index.ts
     type: main
-    description: Entry Point
+    description: "--- R-21: §53 geometry base + bounding volume (begin) ---"
   - file: packages/input/src/index.ts
     type: main
     description: Entry Point
@@ -2194,6 +2194,8 @@ modules:
             - Scene
             - createSnapshotSystem
             - resolveWorldTransforms
+            - Camera
+            - SurfaceSizedCamera
             - Viewport
             - WorldTransformStats
         - package: "@four/render"
@@ -2704,6 +2706,9 @@ modules:
             - OrthographicCamera
             - PerspectiveCamera
             - PointLight
+            - SCREEN_ORIGINS
+            - SCREEN_UNITS
+            - ScreenCamera
             - SpotLight
             - restoreNodeId
             - Node
@@ -2752,6 +2757,7 @@ modules:
         - TEXT_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
+        - SCREEN_CAMERA_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
@@ -2804,6 +2810,7 @@ modules:
         - TEXT_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
+        - SCREEN_CAMERA_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
@@ -2913,9 +2920,30 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./geometry.js
+          imports:
+            - Geometry
+            - BoundingVolume
+            - MutableBoundingVolume
         - file: ./resource-memory.js
           imports:
             - noteGeometry
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Vector3
+      exports:
+        - BufferGeometry
+      classes:
+        - BufferGeometry
+      interfaces:
+        - BufferGeometryOptions
+    packages/geometry/src/geometry.ts:
+      description: §53's `Geometry` base and its `BoundingVolume` — the two declarations the
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -2926,20 +2954,24 @@ modules:
           imports:
             - Vector3
       exports:
-        - BufferGeometry
-      classes:
-        - BufferGeometry
+        - nextGeometryIdentifier
       interfaces:
-        - GeometryBounds
-        - BufferGeometryOptions
+        - BoundingVolume
+        - MutableBoundingVolume
+      functions:
+        - nextGeometryIdentifier
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 64 symbols)
+      description: "--- R-21: §53 geometry base + bounding volume (begin) ---"
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
         - file: ./buffer-geometry.js
           imports:
             - BufferGeometry
+          reExport: true
+        - file: ./geometry.js
+          imports:
+            - Geometry
           reExport: true
         - file: ./primitives-3d.js
           imports:
@@ -2990,6 +3022,11 @@ modules:
             - GeometryBounds
             - GeometryDrawMode
             - GeometryIndexArray
+          reExport: true
+          typeOnly: true
+        - file: ./geometry.js
+          imports:
+            - BoundingVolume
           reExport: true
           typeOnly: true
         - file: ./primitives-3d.js
@@ -3049,6 +3086,7 @@ modules:
       workspaceDependencies: []
       exports:
         - BufferGeometry
+        - Geometry
         - capsuleGeometry
         - coneGeometry
         - cylinderGeometry
@@ -3079,6 +3117,7 @@ modules:
         - GeometryBounds
         - GeometryDrawMode
         - GeometryIndexArray
+        - BoundingVolume
         - CapsuleGeometryOptions
         - ExtrudeGeometryOptions
         - HeightFieldGeometryOptions
@@ -3115,6 +3154,7 @@ modules:
         - StrokeMesh
       reExported:
         - BufferGeometry
+        - Geometry
         - capsuleGeometry
         - coneGeometry
         - cylinderGeometry
@@ -3144,6 +3184,7 @@ modules:
         - GeometryBounds
         - GeometryDrawMode
         - GeometryIndexArray
+        - BoundingVolume
         - CapsuleGeometryOptions
         - ExtrudeGeometryOptions
         - HeightFieldGeometryOptions
@@ -10227,7 +10268,7 @@ modules:
       classes:
         - Group
     packages/scene/src/index.ts:
-      description: Package entry point for @four/scene (re-exports 59 symbols)
+      description: Package entry point for @four/scene (re-exports 73 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -10242,6 +10283,21 @@ modules:
             - Camera
             - OrthographicCamera
             - PerspectiveCamera
+          reExport: true
+        - file: ./screen-camera.js
+          imports:
+            - DEFAULT_SCREEN_FAR
+            - DEFAULT_SCREEN_NEAR
+            - DEFAULT_SCREEN_ORIGIN
+            - DEFAULT_SCREEN_UNITS
+            - SCREEN_ORIGINS
+            - SCREEN_UNITS
+            - ScreenCamera
+          reExport: true
+        - file: ./trackball.js
+          imports:
+            - DEFAULT_TRACKBALL_RADIUS
+            - TrackballRig
           reExport: true
         - file: ./group.js
           imports:
@@ -10319,6 +10375,19 @@ modules:
             - PerspectiveCameraOptions
           reExport: true
           typeOnly: true
+        - file: ./screen-camera.js
+          imports:
+            - ScreenCameraOptions
+            - ScreenOrigin
+            - ScreenUnits
+            - SurfaceSizedCamera
+          reExport: true
+          typeOnly: true
+        - file: ./trackball.js
+          imports:
+            - TrackballRigOptions
+          reExport: true
+          typeOnly: true
         - file: ./layers.js
           imports:
             - LayerMask
@@ -10366,6 +10435,15 @@ modules:
         - Camera
         - OrthographicCamera
         - PerspectiveCamera
+        - DEFAULT_SCREEN_FAR
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - ScreenCamera
+        - DEFAULT_TRACKBALL_RADIUS
+        - TrackballRig
         - Group
         - ALL_LAYERS
         - DEFAULT_LAYER
@@ -10405,6 +10483,11 @@ modules:
         - TransformAuthority
         - OrthographicCameraOptions
         - PerspectiveCameraOptions
+        - ScreenCameraOptions
+        - ScreenOrigin
+        - ScreenUnits
+        - SurfaceSizedCamera
+        - TrackballRigOptions
         - LayerMask
         - LayeredNode
         - ColorRGB
@@ -10427,6 +10510,15 @@ modules:
         - Camera
         - OrthographicCamera
         - PerspectiveCamera
+        - DEFAULT_SCREEN_FAR
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - ScreenCamera
+        - DEFAULT_TRACKBALL_RADIUS
+        - TrackballRig
         - Group
         - ALL_LAYERS
         - DEFAULT_LAYER
@@ -10465,6 +10557,11 @@ modules:
         - TransformAuthority
         - OrthographicCameraOptions
         - PerspectiveCameraOptions
+        - ScreenCameraOptions
+        - ScreenOrigin
+        - ScreenUnits
+        - SurfaceSizedCamera
+        - TrackballRigOptions
         - LayerMask
         - LayeredNode
         - ColorRGB
@@ -10691,6 +10788,74 @@ modules:
         - Scene
       classes:
         - Scene
+    packages/scene/src/screen-camera.ts:
+      description: §47's `ScreenCamera` — the pixel-rectangle camera (R-37, 2026-08-21).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./camera.js
+          imports:
+            - Camera
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - DepthRange
+      exports:
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_FAR
+        - ScreenCamera
+      classes:
+        - ScreenCamera
+      interfaces:
+        - SurfaceSizedCamera
+        - ScreenCameraOptions
+      constants:
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_FAR
+    packages/scene/src/trackball.ts:
+      description: §44/§47's **trackball** rig (R-37, 2026-08-21) — the last of the seven camera
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./authority.js
+          imports:
+            - warnAuthorityConflict
+        - file: ./node.js
+          imports:
+            - Node
+          typeOnly: true
+        - file: ./screen-camera.js
+          imports:
+            - DEFAULT_SCREEN_ORIGIN
+            - ScreenOrigin
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Quaternion
+            - Vector3
+      exports:
+        - DEFAULT_TRACKBALL_RADIUS
+        - TrackballRig
+      classes:
+        - TrackballRig
+      interfaces:
+        - TrackballRigOptions
+      constants:
+        - DEFAULT_TRACKBALL_RADIUS
     packages/scene/src/transform.ts:
       description: Local/world transform of a scene node (§7).
       externalDependencies: []
@@ -11836,6 +12001,7 @@ dependencyGraph:
     - name: Packages/geometry
       files:
         - packages/geometry/src/buffer-geometry.ts
+        - packages/geometry/src/geometry.ts
         - packages/geometry/src/index.ts
         - packages/geometry/src/path.ts
         - packages/geometry/src/primitive-support.ts
@@ -11998,6 +12164,8 @@ dependencyGraph:
         - packages/scene/src/node.ts
         - packages/scene/src/pose-target.ts
         - packages/scene/src/scene.ts
+        - packages/scene/src/screen-camera.ts
+        - packages/scene/src/trackball.ts
         - packages/scene/src/transform.ts
         - packages/scene/src/viewport.ts
         - packages/scene/src/world-transforms.ts
@@ -12028,19 +12196,19 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 218
+  totalTypeScriptFiles: 221
   totalModules: 24
-  totalLinesOfCode: 101084
-  totalExports: 2004
-  totalClasses: 139
-  totalInterfaces: 428
-  totalFunctions: 335
+  totalLinesOfCode: 102602
+  totalExports: 2031
+  totalClasses: 141
+  totalInterfaces: 432
+  totalFunctions: 336
   totalTypeGuards: 19
   totalEnums: 0
-  totalConstants: 258
-  totalReExports: 1294
-  totalTypeOnlyImports: 256
+  totalConstants: 266
+  totalReExports: 1310
+  totalTypeOnlyImports: 260
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 2
   unusedFilesCount: 0
-  unusedExportsCount: 0
+  unusedExportsCount: 1
