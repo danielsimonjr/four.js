@@ -20,10 +20,10 @@ Names that are OWN-DEFINED (not merely re-exported) by >= 2 distinct files acros
 
 | Category | Count |
 | --- | --: |
-| **TRUE_DUPLICATE** (actionable) | 1 |
+| **TRUE_DUPLICATE** (actionable) | 0 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
-| ALLOWLISTED | 0 |
+| ALLOWLISTED | 1 |
 | _Total flagged names_ | 1 |
 
 ## Runtime duplicates
@@ -52,9 +52,7 @@ _None._
 
 ### TRUE_DUPLICATE
 
-| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
-| --- | --- | --- | --- |
-| `CacheableGeometry` | type | `packages/render-webgl/src/gl-geometry.ts` (@four/render-webgl, public, PLAIN)<br>`packages/render-webgpu/src/wgpu-geometry.ts` (@four/render-webgpu, public, PLAIN) | **AMBIGUOUS** |
+_None._
 
 ### DISPATCH_VARIANT
 
@@ -66,5 +64,7 @@ _None._
 
 ### ALLOWLISTED
 
-_None._
+| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
+| --- | --- | --- | --- |
+| `CacheableGeometry` | type | `packages/render-webgl/src/gl-geometry.ts` (@four/render-webgl, public, ALLOWLISTED: four.js: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring.)<br>`packages/render-webgpu/src/wgpu-geometry.ts` (@four/render-webgpu, public, ALLOWLISTED: four.js: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring.) | **AMBIGUOUS** |
 
