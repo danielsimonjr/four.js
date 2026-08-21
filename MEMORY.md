@@ -28,6 +28,77 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — PH-11b: the solver-backed character controller.** Decisions worth
+  keeping:
+  - **The extends-vs-holds question was decided by ES privacy, not by taste, and the
+    rule generalizes: inherit only when you can keep every inherited promise.**
+    `CharacterController`'s `#verticalVelocity`/`#grounded` have no setters, so a
+    subclass overriding `step` cannot maintain the state its own inherited getters
+    report — and it should not want to, because `grounded` is a promise about a
+    _plane_ and a swept controller's is a promise about _geometry_. Holding lets the
+    swept class expose the half that stays true (intent, heading, parameters —
+    executed once by the held object) and **re-declare** the half whose meaning
+    changed. It also cost `@four/motion` no edit at all.
+  - **A subclass sharing a `typeName` would have bought a free system and sold §79 to
+    get it.** The registry refuses a duplicate serializer name, so a swept controller
+    would round-trip through the plain one's serializer. Correct §79 outranks a free
+    system.
+  - **§39 placement is decided by `PhysicsWorld.step`'s own step 1.** Kinematic bodies
+    are fed `setNextKinematicTransform` from the _node transform_ at the top of the
+    step, so a character written at 400 reaches the solver at 600 and one written
+    after the solve would leave its collider a step behind the pose it just computed.
+    Corollary: the geometry the casts see is start-of-step geometry —
+    `ForceFieldSystem`'s velocity convention, the only self-consistent pairing.
+  - **§42 asks who _writes_, not who _reads_.** Consulting the solver does not make a
+    controller `"physics"`; §12's "kinematic controllers directly prescribe movement"
+    settles the tier, and `"physics"` would additionally make the publish pass
+    overwrite the character with a pose that does not exist.
+  - **The "one authority, one system" rule has exactly one permitted exception, and
+    §3.1 is what creates it.** `@four/motion` may not name `PhysicsWorld`, so
+    `KinematicSystem` _cannot_ advance a solver-backed controller. The hazard the rule
+    protected against — an uncatchable second writer — is caught by dispatching on
+    disjoint component types and refusing (once, `console.warn`) a node carrying both
+    locomotion components.
+  - **A collide-and-slide loop needs a stated constant, not an epsilon.** Each
+    iteration consumes distance or removes a degree of freedom, so it converges — but
+    §30 reports an already-overlapping cast as `distance: 0`, and "converges" is not
+    "terminates". `maxSlides` caps solver calls per character per step; leftover
+    motion is **dropped**, because the alternative is moving the capsule into
+    geometry.
+  - **Gotcha, found by measurement: a step-up must reach forward by at least one
+    capsule radius.** Stopping with half the capsule over the lip contacts the step's
+    _edge_, and an edge normal is not the tread's — measured `normal.y = 0.564` on a
+    flat 0.25 m riser against a 0.707 limit, so the flat surface read as unwalkable
+    and the character jittered on the lip for ever. A step is taken only if the feet
+    land _on_ the tread; the price is a deliberate over-step of up to one radius, once
+    per step.
+  - **Snap distance ships and coyote time does not, and the line between them is "is
+    it a collision fact?".** The ground under a character walking down a ramp _is_
+    there, just lower. The frames a player is forgiven after leaving a ledge are a
+    feel policy, composable from `grounded` in three lines.
+  - **A staged feature is better shipped as a published handle than as a paragraph.**
+    Platform carry is staged — but `groundBody` costs nothing (the probe's hit already
+    carries it) and `translate()` applies un-swept displacement, so an application can
+    carry itself today. Pushing dynamics stays fully staged because it needs a
+    _policy_, and there is nothing to hand over.
+  - **Measured, and it is honest that it is not zero: the character does not push a
+    dynamic box.** It stops one skin short, so the solver sees no penetration. Pinned
+    as a test rather than hidden.
+  - **§33: a controller that consumes solver queries inherits the solver's tier** —
+    `same-runtime`, because every shape-cast distance and normal is f64→f32 across the
+    wasm boundary before this code touches it. The golden pins `jumpsTaken: 7` of 300
+    attempts, `landings === jumpsTaken`, the fall clamp at exactly −6, one accepted
+    step-up at floor + riser, and a 60° ramp never climbed against a 45° limit.
+  - **§79 splits by package, not by section.** The swept controller registers with
+    `registerPhysicsSerializers` beside `RigidBody`/`Collider`. The umbrella's
+    enumerating test caught the registration mechanically, exactly as built.
+  - **Multi-agent note, second confirmation:** `@four/particles`' `random.test.ts`
+    times out only under full-tree parallelism while a sibling is in flight; passes
+    standalone. A red test on a loaded shared tree indicts the tree state first.
+  - Gotcha, seventh confirmation: **`pnpm run docs` is the type _and_ link gate** — a
+    `{@link}` from `@four/physics` cannot resolve a symbol that lives in `four`; plain
+    code span.
+
 - **2026-08-21 — R-30b: §77 mipmaps, the min-filter split, anisotropy.** Decisions worth
   keeping:
   - **A union widens when the feature giving its members meaning arrives — and it widens

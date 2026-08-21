@@ -55,12 +55,27 @@ changes in `CHANGELOG.md`.
       registered; new §33 golden; first-person closed by composition (character yaw +
       child-node pitch), not by a new rig class. Playground sensor-zone test verified
       green on the settled tree (the earlier failure was the in-flight build state).
-- [ ] **PH-11b — solver-backed character controller (`@four/physics`).** A
-      `SweptCharacterController` over `PhysicsWorld.shapeCast` (§30): capsule sweep,
-      slide-along-wall, step height, slope limit, moving-platform carry, reusing
-      `CharacterController`'s intent/heading/gravity state. It lives in `@four/physics`
-      because §3.1 runs the edge `physics → motion`. Effort M. Needs a decision on
-      whether the swept controller _extends_ the kinematic one or holds one.
+- [x] **PH-11b — solver-backed character controller DONE 2026-08-21.**
+      `SweptCharacterController` + `SweptCharacterSystem` in `@four/physics` over
+      `PhysicsWorld.shapeCast` (§30): capsule sweep, slide-along-wall, step height,
+      slope limit, ground snap. The recorded question is answered — it **holds** a
+      `CharacterController` (its vertical state is ES-private with no setters, and
+      `grounded` is a promise about a plane), so `@four/motion` needed no edit. §39
+      step 4 before the solve, §42 `"kinematic"`, §79 with the physics family, new §33
+      golden on real Rapier 3D. Platform carry and pushing dynamics staged with seams
+      named (`groundBody` + `translate()` published for the first).
+- [ ] **PH-11c — character/dynamics push interaction (`@four/physics`).** The one
+      staged half of PH-11b that needs a _decision_ rather than code: how much impulse
+      a kinematic character imparts to a dynamic body it sweeps into, how it is split
+      against §23's mass, and whether it may wake a §32 sleeper. The seam is
+      `RigidBody.applyImpulseAtPoint` at `ShapeCastHit.point`. Effort S once the
+      policy is chosen; blocked on the choice, not on engineering.
+- [ ] **Character-controller example follow-up (extended):** nothing in `examples/`
+      exercises `CharacterController`, `FirstPersonLook` **or**
+      `SweptCharacterController` — the only first-person camera and the only swept
+      capsule in the repo live in tests. A single first-person example would exercise
+      all three and the §39 ordering at once.
+
 - [ ] **Character-controller example follow-up:** nothing in `examples/` exercises the
       new components — the only first-person camera in the repo lives in a test. Worth
       folding into the next examples packet.
