@@ -28,6 +28,61 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — WP-R1.1: the WebGPU backend's foundation.** Decisions worth keeping:
+  - **A clear is a draw on WebGPU, and that is forced rather than chosen.** §61 confines
+    a clear to the viewport rectangle; `loadOp` clears the whole attachment and has no
+    scissor, so a `loadOp: "clear"` implementation would erase view 1 when view 2 began.
+    `setScissorRect` plus a full-surface triangle _is_ the GL backend's scissored
+    `clear`, expressed in the primitives WebGPU has — colour-write-masked for a view
+    that carries no `clearColor`, `depthCompare: "always"` with `z = 1` for the depth
+    clear every view owes.
+  - **One render pass per frame, not per view** — WebGPU's scissor and viewport are pass
+    commands, not ambient state. The one place this backend is structurally _safer_
+    than the GL one: no state mirror, nothing to restore in a `finally`, and a draw
+    that throws cannot leak state because the pass is never submitted.
+  - **The depth remap goes in the shader, not on the camera.**
+    `Camera.updateProjectionMatrix` accepts `"zero-to-one"` and this backend
+    deliberately does not call it: a renderer that rewrote an application-owned
+    camera's projection would corrupt any other renderer sharing that camera (§61:
+    rendering mutates nothing in the scene). `(clip.z + clip.w) * 0.5` in the vertex
+    stage is exact and leaves frustum culling against the one convention both backends
+    share — which is what makes cross-backend render-list identity hold.
+  - **Uniforms: one buffer, one bind group, a dynamic offset per draw**, sized _before_
+    the pass is recorded from an upper bound. Growing mid-frame would orphan the bind
+    group the pass has already been handed. One `queue.writeBuffer` per frame.
+  - **The lazy cache inverts R-19's uniform-vs-variant argument.**
+    `useMap`/`useVertexColors` are uniforms on WebGL because variants meant more
+    programs compiled at init. With a lazy descriptor-keyed cache a variant nothing
+    draws is never created, so on WebGPU they are variants — no per-fragment branch,
+    and the vertex layout can omit the colour buffer entirely.
+  - **The widened `RendererCapabilities` is optional-with-a-tri-state, and that is what
+    makes it additive.** `undefined` means "this backend has not been taught to
+    answer", distinct from `false`. Zero test doubles and zero umbrella files changed.
+    The WebGL backend answers everything it can state _without a new GL call_ and
+    **omits** the two `getParameter`-needing members — R-30b's lazy-query law again.
+  - **Gotcha (browser gate): `--enable-unsafe-webgpu` is NOT free for the other
+    projects.** A `webgl2` context still initialises alongside it — true, and not the
+    whole gate: the §118 flagship's slow-motion assertion fails reproducibly with the
+    flag on (initialising Dawn changes the frame pacing that spec measures). The flag
+    belongs on the `webgpu` project's own `launchOptions`, with
+    `testIgnore: "webgpu/**"` on `chromium` so the new specs do not run twice.
+  - **Gotcha (doubles): `globalThis.navigator` is a getter-only own property under
+    Node 22.** A plain assignment throws; installing a fake host needs
+    `Object.defineProperty` and the captured descriptor to restore.
+  - **`recording-gl.ts` retains typed-array arguments, and the GL backend uploads
+    matrices out of a module-level scratch** — every matrix read off that tape after
+    the frame is the frame's _last_ matrix. `recording-gpu.ts` copies at record time;
+    the cross-backend harness snapshots GL's matrices through a thin wrapper rather
+    than changing the landed helper underneath the suites that depend on it.
+  - **Cross-backend identity, measured:** NullRenderer, WebGL 2 and WebGPU submit the
+    same draws, in the same order, with the same transforms, for a scene mixing opaque,
+    transparent, explicitly-ordered and frustum-culled nodes across two views.
+  - **Measured: the umbrella's `export * as renderWebgpu` still tree-shakes.** No
+    WebGPU symbol reaches any tight bundle (grep for
+    `vertexMain`/`requestAdapter`/`depth24plus` against a `createVertexArray` control).
+    The uniform +0.10–0.11 kB gzip is the two capability records, not the backend. No
+    budget bump.
+
 - **2026-08-21 — PH-11b: the solver-backed character controller.** Decisions worth
   keeping:
   - **The extends-vs-holds question was decided by ES privacy, not by taste, and the

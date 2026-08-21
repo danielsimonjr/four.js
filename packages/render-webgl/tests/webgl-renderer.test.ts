@@ -1332,6 +1332,35 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
     expect(renderer.capabilities.maxTextureSize).toBe(0);
   });
 
+  it("answers §62's whole capability list, without asking GL anything new", async () => {
+    const { renderer, gl } = await initialized();
+    const capabilities = renderer.capabilities;
+
+    // Every member is a statement about *this backend on WebGL 2*, and each is
+    // true by construction (see `WEBGL_STATIC_CAPABILITIES`): WebGL 2 has no
+    // compute stage, no storage buffers and no indirect draw at all, this tier
+    // requests no timer extension and no float target, and GLSL ES 3.00
+    // requires fragment-stage `highp`.
+    expect(capabilities.computeShaders).toBe(false);
+    expect(capabilities.storageBuffers).toBe(false);
+    expect(capabilities.indirectDraw).toBe(false);
+    expect(capabilities.timestampQueries).toBe(false);
+    expect(capabilities.floatRenderTargets).toBe(false);
+    expect(capabilities.multisampling).toBe(true);
+    expect(capabilities.shaderPrecision).toBe("highp");
+    expect(capabilities.textureFormats).toEqual(["rgba8"]);
+    expect(capabilities.compressedTextureFormats).toEqual([]);
+
+    // §62's "maximum uniforms and bindings" is deliberately **not** reported:
+    // two more `getParameter` calls at initialization would move every landed
+    // integration transcript for a number nothing reads yet (R-30b's recorded
+    // lazy-query law). `undefined` says "not reported", which is a third
+    // answer distinct from a confident wrong one.
+    expect(capabilities.maxUniformBufferBytes).toBeUndefined();
+    expect(capabilities.maxBindings).toBeUndefined();
+    expect(gl.countOf("getParameter")).toBe(1);
+  });
+
   it("requests a webgl2 context with depth, no stencil, and the antialias hint", async () => {
     const gl = createFakeGl();
     const canvas = new TestCanvas(gl);

@@ -884,12 +884,61 @@ function asContext(value: unknown): ParticleGlContext | null {
   return value as ParticleGlContext;
 }
 
+/**
+ * The §62 members this backend answers **without asking GL anything new**
+ * (WP-R1.1, 2026-08-21).
+ *
+ * Every value is a statement about *this backend on WebGL 2*, and every one of
+ * them is true by construction rather than by query:
+ *
+ * - `computeShaders`, `storageBuffers`, `indirectDraw`, `timestampQueries` —
+ *   WebGL 2 has no compute stage, no storage buffers and no indirect draw at
+ *   all, and this tier requests no timer extension. §62's tiers exist so that
+ *   an application can read a `false` here and take the CPU path, rather than
+ *   discover the absence at dispatch time.
+ * - `floatRenderTargets` — `render-target.ts`'s `RenderTargetFormat` is the
+ *   single-member union `"rgba8"`, and this backend requests no
+ *   `EXT_color_buffer_float`; it cannot allocate a float target, whatever the
+ *   device could.
+ * - `multisampling` — core WebGL 2 (`renderbufferStorageMultisample`), and
+ *   `RendererOptions.antialias` already reaches the context attributes.
+ * - `shaderPrecision` — GLSL ES 3.00 *requires* fragment-stage `highp`, which
+ *   is why `gl-program.ts`'s fragment stages declare it unconditionally.
+ * - `compressedTextureFormats` — this tier uploads none (§77's boundary, see
+ *   `gl-texture.ts`), so the honest report is "none available through me".
+ *
+ * ## What is deliberately **not** reported, and why
+ *
+ * §62's "maximum uniforms and bindings" is `MAX_UNIFORM_BLOCK_SIZE` and
+ * `MAX_TEXTURE_IMAGE_UNITS` — two more `getParameter` calls at initialization.
+ * The recorded law from R-30b applies verbatim: *a capability query must be
+ * lazy if the alternative moves recorded transcripts.* Two extra `getParameter`
+ * calls in `initialize` would move every landed integration transcript for a
+ * number nothing in the engine reads yet. So both members are **omitted**, and
+ * `undefined` says exactly that — "this backend has not been taught to answer"
+ * — which is the third state the widened record exists to keep available
+ * (`renderer.ts`). They join the §62 report the day something needs them, with
+ * the query where the need is.
+ */
+const WEBGL_STATIC_CAPABILITIES = Object.freeze({
+  textureFormats: Object.freeze(["rgba8"]),
+  multisampling: true,
+  floatRenderTargets: false,
+  timestampQueries: false,
+  storageBuffers: false,
+  computeShaders: false,
+  indirectDraw: false,
+  compressedTextureFormats: Object.freeze([]),
+  shaderPrecision: "highp",
+} satisfies Partial<RendererCapabilities>);
+
 /** Reads the §62 limits this tier can honestly report. */
 function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
   const maxTextureSize = gl.getParameter(GL.MAX_TEXTURE_SIZE);
   return Object.freeze({
     backend: "webgl2",
     maxTextureSize: typeof maxTextureSize === "number" ? maxTextureSize : 0,
+    ...WEBGL_STATIC_CAPABILITIES,
   } satisfies RendererCapabilities);
 }
 
@@ -1105,6 +1154,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #capabilities: RendererCapabilities = Object.freeze({
     backend: "webgl2",
     maxTextureSize: 0,
+    ...WEBGL_STATIC_CAPABILITIES,
   } satisfies RendererCapabilities);
 
   #canvas: WebglCanvas | null = null;

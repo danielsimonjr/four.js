@@ -34,13 +34,25 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
-- [ ] **R-1 (WebGPU backend) — planned, not started.** `docs/plans/R1-WEBGPU_PLAN.md`
-      holds the nine-packet decomposition (WP-R1.1 … WP-R1.9), gates, evidence tiers and
-      efforts. Dispatch is serial; only WP-R1.9's capability-declaration half is
-      parallelisable. Blocked on nothing technical — four owner questions in the §5
-      register (rows 21–22). `playwright.config.ts` will need `--enable-unsafe-webgpu`
-      in `use.launchOptions.args` plus a third `webgpu` project whose specs skip when
-      `requestAdapter()` returns null (verified not to disturb the WebGL gate).
+- [x] **R-1 / WP-R1.1 — WebGPU device, registry, clear, unlit triangle, fake-device
+      harness. Landed 2026-08-21.** `RendererCapabilities` widened once (additive,
+      optional members); `webgpu` Playwright project added with the flag confined to it
+      (globally it perturbs the flagship's frame-pacing spec); render-list consumption
+      harness added under `tests/determinism/`.
+- [ ] **R-1 / WP-R1.2 — WebGPU geometry, texture and sampler caches** (§77, §83).
+      Extends the `wgpu-geometry.ts` WP-R1.1 seeded; samplers are a separate cache
+      keyed by (wrap × filter), unlike GL's per-texture parameters.
+- [ ] **R-1 / WP-R1.3 — sprites, text and `wgpu-batch.ts`** (the `RenderBatching`
+      uploader; the planner is untouched). First pixel evidence for the sprite path.
+- [ ] **R-1 / WP-R1.4 → WP-R1.8** — shapes/vertex colours, lit + standard, render
+      targets and effects (`readPixels` via `copyTextureToBuffer` + `mapAsync`),
+      shadows and stencil parity, compute and GPU particles (unblocks R-31). Strictly
+      serial; all share `packages/render-webgpu/src/`. Plan:
+      `docs/plans/R1-WEBGPU_PLAN.md`.
+- [ ] **§62's "applications may declare required and optional capabilities"** — still
+      unimplemented; now that the capability record is complete it is cheap
+      (WP-R1.9's first half, dispatches with the `R-14` wave).
+
 - [ ] **R-31 stays blocked but is no longer evidence-blocked** — WP-R1.8 owns it;
       compute-with-storage-buffers is probe-verified to run headless in CI. Closes on
       WebGPU only; WebGL 2 declares the tier absent.

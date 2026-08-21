@@ -8,6 +8,53 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — WP-R1.1: the WebGPU backend's foundation
+
+#### Added
+
+- **`@four/render-webgpu`: the WebGPU backend's foundation (R-1, WP-R1.1).** The
+  reserved stub is now a real backend: `WebgpuRenderer` acquires an adapter, a device
+  and the canvas's `"webgpu"` context (the first `initialize` for which the `Promise` is
+  not a formality), clears per view, and draws unlit geometry through the same
+  `buildRenderList` → `buildViewRenderList` → draw path the WebGL 2 backend uses.
+  `registerWebgpuRenderer()` opts into §62's registry. **Calling it moves your
+  application off WebGL 2**, because `AUTO_RENDERER_ORDER` prefers WebGPU — the
+  registration is deliberately an explicit, per-application opt-in and there is no
+  "register everything" convenience. Sprites, text, lighting, particles, shadows,
+  effects and compute are packets R1.2–R1.8 and are absent rather than stubbed: an item
+  this tier cannot draw is skipped, never approximated.
+- **Hand-written WGSL, with its bind-group layout declared as data** — a table in
+  TypeScript rather than implicit in a shader string, so RFC 0001's future WGSL emitter
+  targets the same layout instead of inventing a second one. No `layout: "auto"`
+  anywhere in the backend.
+- **A WebGPU browser gate**, `tests/browser/webgpu/`, running against a real SwiftShader
+  adapter: a cleared surface read back through `mapAsync`, and the backend's own unlit
+  WGSL compiled and rasterised. The specs skip themselves where no adapter can be had.
+- **The render-list consumption contract as a test**
+  (`tests/determinism/render-list-consumption.test.ts`): `NullRenderer`,
+  `WebglRenderer` and `WebgpuRenderer` are shown to receive the identical
+  `RenderItem[]` — same items, same order, same transforms — for one scene and two
+  views. The first time §61's "the logical scene shall remain independent of the
+  selected backend" is testable rather than aspirational.
+
+#### Changed
+
+- **`RendererCapabilities` now covers all of §62's list** — texture formats,
+  multisampling, floating-point targets, timestamp queries, storage buffers, compute
+  shaders, indirect draw, compressed textures, shader precision, and maximum
+  uniform-buffer size and bindings. Every added member is **optional**, and `undefined`
+  means "this backend has not been taught to answer" — a third answer distinct from
+  `false`, which keeps the widening additive: existing implementations and test doubles
+  satisfy the type unchanged. `NullRenderer` answers the headless floor; the WebGL 2
+  backend answers every member it can state without a new GL query
+  (`computeShaders: false` on WebGL 2 is a true statement, not a shortfall) and omits
+  "maximum uniforms and bindings" rather than move landed transcripts for numbers
+  nothing reads yet.
+- `playwright.config.ts` gains a third project, `webgpu`, whose browser is launched with
+  `--enable-unsafe-webgpu`. The flag is **per project**: with it set globally the §118
+  flagship's slow-motion assertion fails reproducibly, because initialising Dawn changes
+  the frame pacing that spec measures.
+
 ### 2026-08-21 — PH-11b: the solver-backed character controller
 
 #### Added
