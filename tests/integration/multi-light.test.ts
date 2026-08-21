@@ -91,7 +91,17 @@ async function harness(): Promise<Harness> {
   scene.ambientLight[1] = 0.2;
   scene.ambientLight[2] = 0.25;
 
-  const camera = new OrthographicCamera({ height: 6, aspect: 1 });
+  // §87 (R-8, 2026-08-09; tests typecheck gate, 2026-08-21): this said
+  // `{ height: 6, aspect: 1 }` — two fields `OrthographicCameraOptions` does
+  // not have, so the object was accepted and every property ignored, leaving
+  // the default unit box `[-1, 1]²`. The box below is the 6 × 6 view the
+  // harness always meant.
+  const camera = new OrthographicCamera({
+    left: -3,
+    right: 3,
+    bottom: -3,
+    top: 3,
+  });
   camera.transform.position.set(0, 0, 8);
   scene.add(camera);
 

@@ -8,6 +8,42 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — RFC 0005 drafted; the tests/ typecheck hole closed
+
+#### Added
+
+- **RFC 0005 — pixel and GPU-identifier picking (§71)** (`docs/rfcs/0005-pixel-picking.md`,
+  draft, owner decision pending). Closes `A-11`'s outstanding half at the _design_ level:
+  the analytic half fell with R-23/R-24's `toPath()`, but the pixel/GPU-id half needs a
+  render target that plan §3.1 forbids `@four/input` from importing. The RFC proposes a
+  `PickingService` in `@four/render` plus a structural `PickProvider` seam
+  (`pick(ndcX, ndcY): Promise<string | undefined>`) that the application hands to input —
+  the FetchLike / SurfaceSizedCamera precedent, so `@four/input` gains no new dependency.
+  Records the design constraint an implementer would otherwise miss: `Node.id` is a
+  _string_, so an id buffer must encode a traversal-ordered per-pass table index (a §33
+  obligation), never the id itself. Six flagged owner questions (§5 register rows 18–20).
+- **`pnpm typecheck:tests`** — `tests/tsconfig.json` existed but no script ever ran it, so
+  `tests/{integration,determinism,browser,visual}` sat outside every tsc project and
+  excess-property checking never applied there. Wired into CI immediately after
+  `typecheck:examples` (and, for the same reason, after `Build`).
+
+#### Fixed
+
+- **21 type errors the new `tests/` gate found**, in five classes, each fixed as the
+  misspelled intent rather than by weakening an assertion: 13 ×
+  `new OrthographicCamera({ height, aspect })` (silently ignored, leaving the default unit
+  box — rewritten as explicit bounds per R-8's precedents; all 500 suite tests pass
+  unchanged, confirming latent traps rather than configuration); 4 ×
+  `createFullscreenViewport(camera, { clearColor })` in `tests/browser/fixtures` (the
+  second parameter is the view _id_, so four pages asked for an opaque clear and got a
+  view that never cleared — fixed as a spread plus the field, validated by re-running
+  those specs; `text.spec.ts`'s visual golden was regenerated deliberately, its whole
+  diff being the background that now actually clears); one `Sprite({ size })` → explicit
+  `width`/`height`; one joint-seam narrowing through `supportsSolverJointAccess` (which
+  _strengthens_ the test); two `ReplaySnapshot` → `PhysicsSnapshot` conversions through a
+  documented helper whose narrowing is not trusted (§34's own field-by-field refusal is),
+  correcting a header that falsely claimed both directions compiled.
+
 ### 2026-08-21 — examples modernized onto Text, lookAt, and the ScreenCamera recipe
 
 #### Changed

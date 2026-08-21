@@ -41,6 +41,7 @@
     "test:suites": "vitest run --config vitest.suites.config.ts --passWithNoTests",
     "twin:build": "vite build examples/flagship/motor-digital-twin",
     "typecheck:examples": "tsc --noEmit -p examples",
+    "typecheck:tests": "tsc --noEmit -p tests",
     "ui-demo:build": "vite build examples/ui-demo"
   },
   "devDependencies": {

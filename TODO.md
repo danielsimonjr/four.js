@@ -34,6 +34,27 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **Tests typecheck sweep DONE 2026-08-21** — `pnpm typecheck:tests` added and
+      wired into CI after `Build`; 21 errors in five classes fixed as the misspelled
+      intent; the text visual golden regenerated deliberately (the fixture now clears
+      as it always intended). Closes the hole R-8 identified.
+- [ ] **A-11 / RFC 0005 — owner decision** on pixel + GPU-id picking
+      (`docs/rfcs/0005-pixel-picking.md`). Six questions in the §5 register (rows
+      18–20). Blocked on the owner, not on engineering.
+- [ ] **A-11 analytic tier (`"geometry"`)** — unblocked since R-23/R-24's `toPath()`
+      and **not** covered by RFC 0005: a normal packet in a layer that may import
+      `@four/geometry`. RFC 0005 recommends it also add `node.hitTestMode` (§71's
+      field, currently a silent divergence; §79 field + §90 scene-format row).
+- [ ] **`Rectangle2` in `@four/math`** — still the shared prerequisite for §61's
+      `readPixels`, staged in `render/src/renderer.ts` _and_
+      `render-webgl/src/gl-render-target.ts`. RFC 0005 Q5 asks whether picking should
+      bypass it entirely (it reads one texel, not a region).
+- [ ] **Playground sensor-zone browser test failing on the shared tree (2026-08-21,
+      under investigation):** `playground.spec.ts` "each sensor zone repaints" fails
+      consistently while the character-controllers agent holds in-flight
+      `packages/motion`/`physics` edits; the spec is untouched by any landed batch.
+      Re-check on the settled tree at the controllers landing — it is that batch's
+      gate to pass.
 - [x] **R-37 CLOSED 2026-08-21** — §47's `ScreenCamera` (three origins × two unit
       systems, §7a defaults, negative near, §85 refusals, §79 pair) plus
       `Application.resize` feeding it through the structural `SurfaceSizedCamera`

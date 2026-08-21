@@ -49,6 +49,7 @@ import {
   OrthographicCamera,
   Scene,
   createFullscreenViewport,
+  type Viewport,
   resolveWorldTransforms,
 } from "@four/scene";
 import { buildGlyphAtlas } from "@four/text";
@@ -103,7 +104,15 @@ const camera = new OrthographicCamera({
 camera.transform.position.set(0, 0, 5);
 camera.updateProjectionMatrix();
 resolveWorldTransforms(camera);
-const views = [createFullscreenViewport(camera, { clearColor: [0, 0, 0, 1] })];
+// Tests typecheck gate (2026-08-21): this read
+// `createFullscreenViewport(camera, { clearColor: [0, 0, 0, 1] })`, whose
+// second parameter is the view **id** (a string), not an options object — so
+// the page asked for an opaque black clear and got a view with no
+// `clearColor` at all, i.e. one that never cleared. Spreading the fullscreen
+// viewport and setting the field is how `viewport.ts` documents it.
+const views: Viewport[] = [
+  { ...createFullscreenViewport(camera), clearColor: [0, 0, 0, 1] },
+];
 
 /** One scene holding one centred, centre-aligned label over one atlas material. */
 function build(mode: Mode): { scene: Scene; label: Text } {

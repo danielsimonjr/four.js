@@ -28,6 +28,55 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — RFC 0005 (pixel/GPU-id picking) + the `tests/` typecheck gate.**
+  Decisions worth keeping:
+  - **A node's id is a `string`, and that is a picking design constraint, not a
+    detail.** `Node.id` is `node-<n>` because §33 forbids random ids. An RGBA8 id buffer
+    holds 32 bits per texel, so an id pass can never encode `node.id` — it encodes a
+    **dense index into a per-pass table**, built in **scene traversal order** (never
+    `Set`/`Map` iteration order) and rebuilt every pass. The public result hands back
+    the string; the integer never leaves the service.
+  - **A picking result must never enter a §33 checksum.** A pick is a §34 _input_; a GPU
+    read-back is not reproducible across drivers. An application driving simulation from
+    a pick records the resulting **action**, not the pick.
+  - **Async is the honest contract on every backend, including one that could answer
+    synchronously.** WebGL 2's plain `readPixels` stalls; the non-stalling paths
+    (`PIXEL_PACK_BUFFER` + `clientWaitSync`, WebGPU `mapAsync`) are both async. A
+    capability tier may change _quality or availability_; it must never change an API's
+    **shape**. The result carries the `frame` it came from, so "correct for what was
+    clicked" is distinguishable from "stale for what is on screen".
+  - **The seam is `PickProvider { pick(ndcX, ndcY): Promise<string | undefined> }`**, in
+    `@four/input`, naming no render type — the fourth instance of the FetchLike /
+    SurfaceSizedCamera move. `@four/input` gains no dependency; the adapter is four
+    lines in the application; a test satisfies the provider with a `Map`.
+  - **`tests/tsconfig.json` existed for months and nothing ran it.** A config file is
+    not a gate until a script invokes it — check for the _script_, never for the _file_.
+    Its first run found 21 errors: 13 more `OrthographicCamera({ height, aspect })`,
+    4 browser fixtures that passed `clearColor` through the **id** parameter and
+    therefore never cleared, one `Sprite({ size })`, one joint-seam narrowing, and two
+    `ReplaySnapshot` conversions.
+  - **A behavioral fixture fix invalidates the golden recorded against the bug.** The
+    four never-clearing fixtures were fixed types-first by a packet that could not run
+    the browser gate; the orchestrator's verification run caught
+    `text-label-nearest-visual-linux.png` failing at 97% of pixels — the background that
+    now actually clears — and regenerated it deliberately. Rule: a fixture behavior fix
+    and its golden must be validated in the same landing, whoever owns the browser gate.
+  - **Gotcha: prose that names a compiler as its assertion must be checked against the
+    script list.** `replay-scenarios.ts`'s header claimed the
+    `ReplaySnapshot` ↔ `PhysicsSnapshot` compatibility was verified **in both
+    directions**; the consume direction never compiled (`configuration` is `unknown` by
+    package-boundary design). Two files cited `tsc --noEmit -p tests/tsconfig.json` as
+    their real assertion; neither had ever been run by anything.
+  - **A structural double narrows through the guard the owning package already exports,
+    never through `as any`.** `supportsSolverJointAccess` as both an `expect` and a
+    narrowing throw turns a compile hole into a _stronger_ runtime assertion. Where a
+    cast is genuinely unavoidable, it goes in a named helper whose doc states why it is
+    safe.
+  - **Gotcha (playwright): `pnpm test:browser -- <spec> --update-snapshots` does not
+    forward the flag** in this repo's script setup — the golden stays untouched while
+    the run appears to update. `pnpm exec playwright test <spec> --update-snapshots` is
+    the form that works.
+
 - **2026-08-21 — the examples modernization packet (Text, lookAt, ScreenCamera).**
   Decisions worth keeping:
   - **§7a's default screen origin is the wrong one for a `@four/ui` tree.** §74 lays

@@ -219,7 +219,17 @@ async function harness(): Promise<Harness> {
   renderer.resize(256, 256);
 
   const scene = new Scene();
-  const camera = new OrthographicCamera({ height: 4, aspect: 1 });
+  // §87 (R-8, 2026-08-09; tests typecheck gate, 2026-08-21): this said
+  // `{ height: 4, aspect: 1 }` — two fields `OrthographicCameraOptions` does
+  // not have, so the object was accepted and every property ignored, leaving
+  // the default unit box `[-1, 1]²`. The box below is the 4 × 4 view the
+  // harness always meant.
+  const camera = new OrthographicCamera({
+    left: -2,
+    right: 2,
+    bottom: -2,
+    top: 2,
+  });
   camera.transform.position.set(0, 0, 5);
   scene.add(camera);
 
@@ -302,7 +312,11 @@ describe("R-4 — render to texture across render / materials / render-webgl", (
     // `SpriteMaterial.texture` takes the same `MaterialTexture` contract, so
     // the off-screen result is a sprite's texture with nothing in between.
     const material = new SpriteMaterial({ texture: target.colorTexture });
-    test.scene.add(new Sprite(material, { size: [1, 1] }));
+    // Tests typecheck gate (2026-08-21): this said `{ size: [1, 1] }`, a field
+    // `SpriteOptions` does not have — silently ignored, so the sprite took the
+    // default `width`/`height` of 1. Spelled as the two fields that exist, the
+    // sprite is the same 1 × 1 quad it has always been.
+    test.scene.add(new Sprite(material, { width: 1, height: 1 }));
 
     frame(test, target);
     const attachment = colorAttachment(test.recorder);
