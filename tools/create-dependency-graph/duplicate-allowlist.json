@@ -609,6 +609,11 @@
       "names": ["requireNonNegative"],
       "filesGlob": ["packages/geometry/src/primitive-support.ts", "packages/ui/src/numbers.ts"],
       "reason": "four.js: same name, different §85 contracts (distinct-by-domain, NOT a copy to consolidate): geometry's requireNonNegative(name, value) validates a primitive extent where zero is degenerate-but-meaningful (a cone's tip radius — R-20, 2026-08-07) with geometry's error-message shape; ui's requireNonNegative(owner, name, value) is A-12's control-value guard (2026-08-07) carrying the widget owner in Label's §85 message style. Different signatures, different message formats pinned by each package's tests; both are module-internal helpers (not in either barrel). Hoisting to core would flatten two deliberate message conventions into one and buy nothing — each is three lines. 2026-08-07 wave-3 gate wiring."
+    },
+    {
+      "names": ["CacheableGeometry"],
+      "filesGlob": ["packages/render-webgl/src/gl-geometry.ts", "packages/render-webgpu/src/wgpu-geometry.ts"],
+      "reason": "four.js: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring."
     }
   ]
 }

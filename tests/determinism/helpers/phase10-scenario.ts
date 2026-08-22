@@ -85,11 +85,36 @@ import {
   PhysicsWorld,
   RigidBody,
   type CollisionShape,
+  type PhysicsSnapshot,
   type WorldPhysicsEvent,
 } from "@four/physics";
 import { Rapier2dAdapter } from "@four/physics-rapier";
 import { Group, type Node } from "@four/scene";
 import { Application } from "four/application";
+
+/**
+ * The one narrowing the §34 snapshot round trip needs, and why it is a named
+ * helper rather than an inline cast.
+ *
+ * `ReplaySnapshot.configuration` is `unknown` **by design**:
+ * `@four/diagnostics` may not import `@four/physics`, so it cannot name
+ * `PhysicsSnapshotConfiguration` (`packages/diagnostics/src/recorder.ts`
+ * says so at the field). `PhysicsSnapshot.configuration` *is* that type. The
+ * two declarations are therefore assignable in the **produce** direction
+ * (`createSnapshot`) and not in the **consume** direction — which the tests
+ * typecheck gate (2026-08-21) is what first made visible; before it, nothing
+ * compiled this directory at all.
+ *
+ * The cast is safe because nothing trusts it: `PhysicsWorld.restoreSnapshot`
+ * validates adapter name, adapter version and — when the field is present —
+ * the configuration field by field, and refuses a mismatch (§34). A snapshot
+ * carrying a foreign `configuration` is rejected at run time by the code under
+ * test, which is precisely what these scenarios assert. No assertion is
+ * weakened by spelling the conversion here.
+ */
+function asPhysicsSnapshot(snapshot: ReplaySnapshot): PhysicsSnapshot {
+  return snapshot as PhysicsSnapshot;
+}
 
 // ---------------------------------------------------------------------------
 // Scenario constants (§7a: seconds and world units, never milliseconds)
@@ -250,7 +275,7 @@ export class ImpulseReplayTarget implements ReplayTarget {
   }
 
   restoreSnapshot(snapshot: ReplaySnapshot): void {
-    this.#world.restoreSnapshot(snapshot);
+    this.#world.restoreSnapshot(asPhysicsSnapshot(snapshot));
   }
 
   applyInput(step: number, payload: JsonValue): void {

@@ -160,6 +160,14 @@ export function uniformGravityField(
     sample(_position, _velocity, _time, out = scratch): Vector3 {
       return out.set(x, y, z);
     },
+    sampleAll(_positions, _velocities, count, _time, out): void {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += x;
+        out[base + 1] += y;
+        out[base + 2] += z;
+      }
+    },
   };
   return field;
 }
@@ -213,6 +221,14 @@ export function dragField(coefficient: number): ParticleForceField {
       const vz = velocity.z;
       return out.set(-c * vx, -c * vy, -c * vz);
     },
+    sampleAll(_positions, velocities, count, _time, out): void {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += -c * velocities[base];
+        out[base + 1] += -c * velocities[base + 1];
+        out[base + 2] += -c * velocities[base + 2];
+      }
+    },
   };
   return field;
 }
@@ -260,6 +276,14 @@ export function windField(
       const vy = velocity.y;
       const vz = velocity.z;
       return out.set(c * (wx - vx), c * (wy - vy), c * (wz - vz));
+    },
+    sampleAll(_positions, velocities, count, _time, out): void {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += c * (wx - velocities[base]);
+        out[base + 1] += c * (wy - velocities[base + 1]);
+        out[base + 2] += c * (wz - velocities[base + 2]);
+      }
     },
   };
   return field;
@@ -351,6 +375,30 @@ export function radialField(
       // there is one divide rather than two.
       const scale = s / (clamped * clamped * distance);
       return out.set(rx * scale, ry * scale, rz * scale);
+    },
+    sampleAll(positions, _velocities, count, _time, out): void {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        const rx = positions[base] - cx;
+        const ry = positions[base + 1] - cy;
+        const rz = positions[base + 2] - cz;
+        const distance = Math.sqrt(rx * rx + ry * ry + rz * rz);
+        if (distance === 0) {
+          // `+= 0`, not an early `continue`: `sample` adds an explicit zero
+          // here, and adding a positive zero to a negative-zero accumulator is
+          // not the same float as adding nothing. This path exists to be
+          // bit-identical, so it adds what the scalar path adds.
+          out[base] += 0;
+          out[base + 1] += 0;
+          out[base + 2] += 0;
+          continue;
+        }
+        const clamped = distance < minDistance ? minDistance : distance;
+        const scale = s / (clamped * clamped * distance);
+        out[base] += rx * scale;
+        out[base + 1] += ry * scale;
+        out[base + 2] += rz * scale;
+      }
     },
   };
   return field;
@@ -456,6 +504,31 @@ export function vortexField(
       const clamped = distance < minDistance ? minDistance : distance;
       const scale = s / (clamped * distance);
       return out.set(tx * scale, ty * scale, tz * scale);
+    },
+    sampleAll(positions, _velocities, count, _time, out): void {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        const rx = positions[base] - cx;
+        const ry = positions[base + 1] - cy;
+        const rz = positions[base + 2] - cz;
+        const tx = ay * rz - az * ry;
+        const ty = az * rx - ax * rz;
+        const tz = ax * ry - ay * rx;
+        const distance = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        if (distance === 0) {
+          // See `radialField.sampleAll` on why this adds zero rather than
+          // skipping.
+          out[base] += 0;
+          out[base + 1] += 0;
+          out[base + 2] += 0;
+          continue;
+        }
+        const clamped = distance < minDistance ? minDistance : distance;
+        const scale = s / (clamped * distance);
+        out[base] += tx * scale;
+        out[base + 1] += ty * scale;
+        out[base + 2] += tz * scale;
+      }
     },
   };
   return field;
@@ -653,6 +726,37 @@ export function turbulenceField(
         scale * (dyx - dxy),
       );
     },
+    sampleAll(positions, _velocities, count, time, out): void {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        const sx = (positions[base] - scrollX * time) * frequency;
+        const sy = (positions[base + 1] - scrollY * time) * frequency;
+        const sz = (positions[base + 2] - scrollZ * time) * frequency;
+
+        const dzy =
+          valueNoise(sx, sy + step, sz, saltZ) -
+          valueNoise(sx, sy - step, sz, saltZ);
+        const dyz =
+          valueNoise(sx, sy, sz + step, saltY) -
+          valueNoise(sx, sy, sz - step, saltY);
+        const dxz =
+          valueNoise(sx, sy, sz + step, saltX) -
+          valueNoise(sx, sy, sz - step, saltX);
+        const dzx =
+          valueNoise(sx + step, sy, sz, saltZ) -
+          valueNoise(sx - step, sy, sz, saltZ);
+        const dyx =
+          valueNoise(sx + step, sy, sz, saltY) -
+          valueNoise(sx - step, sy, sz, saltY);
+        const dxy =
+          valueNoise(sx, sy + step, sz, saltX) -
+          valueNoise(sx, sy - step, sz, saltX);
+
+        out[base] += scale * (dzy - dyz);
+        out[base + 1] += scale * (dxz - dzx);
+        out[base + 2] += scale * (dyx - dxy);
+      }
+    },
   };
   return field;
 }
@@ -755,6 +859,11 @@ export function volumeField(
   const falloff = assertFiniteAtLeast(volume.falloff ?? 0, 0, label, "falloff");
   const hasFade = falloff > 0;
   const scratch = new Vector3();
+  // Scratch for the batched path only, so that a `sampleAll` running while a
+  // caller still holds the result of a `sample` cannot overwrite it.
+  const batchPosition = new Vector3();
+  const batchVelocity = new Vector3();
+  const batchForce = new Vector3();
 
   // Half-extents for the box; for the sphere, `radius` in all three so the
   // hard-inclusion test can share a shape (it is not used for the sphere's
@@ -808,6 +917,59 @@ export function volumeField(
       const sy = sampled.y;
       const sz = sampled.z;
       return out.set(sx * weight, sy * weight, sz * weight);
+    },
+    sampleAll(positions, velocities, count, time, out): void {
+      // The inner field is sampled **scalar**, deliberately: the weight is
+      // per-particle, and the batched entry point is defined to *add* into the
+      // accumulator, so there is nowhere for an inner batch to deposit a value
+      // this wrapper could still scale. What this batch does win is the one
+      // thing a volume is for — a particle outside the volume costs a distance
+      // test and nothing else, where the scalar path pays the wrapper call too.
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        const px = positions[base] - cx;
+        const py = positions[base + 1] - cy;
+        const pz = positions[base + 2] - cz;
+
+        let depth: number;
+        if (isSphere) {
+          depth = radius - Math.sqrt(px * px + py * py + pz * pz);
+        } else {
+          const dx = ex - Math.abs(px);
+          const dy = ey - Math.abs(py);
+          const dz = ez - Math.abs(pz);
+          depth = dx < dy ? dx : dy;
+          depth = depth < dz ? depth : dz;
+        }
+
+        if (depth <= 0) {
+          out[base] += 0;
+          out[base + 1] += 0;
+          out[base + 2] += 0;
+          continue;
+        }
+
+        let weight = 1;
+        if (hasFade && depth < falloff) {
+          const t = depth / falloff;
+          weight = t * t * (3 - 2 * t);
+        }
+
+        const position = batchPosition.set(
+          positions[base],
+          positions[base + 1],
+          positions[base + 2],
+        );
+        const velocity = batchVelocity.set(
+          velocities[base],
+          velocities[base + 1],
+          velocities[base + 2],
+        );
+        const sampled = inner.sample(position, velocity, time, batchForce);
+        out[base] += sampled.x * weight;
+        out[base + 1] += sampled.y * weight;
+        out[base + 2] += sampled.z * weight;
+      }
     },
   };
   return field;

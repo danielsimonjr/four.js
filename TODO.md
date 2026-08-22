@@ -34,6 +34,131 @@ changes in `CHANGELOG.md`.
 > never listed: PH-2, PH-3, PH-4, PH-7, PH-14, PH-15, PH-16, PH-1 stage 1, R-11, and
 > the R-12/R-10 base tiers — all closed, now in CHANGELOG.
 
+- [x] **R-1 / WP-R1.1 — WebGPU device, registry, clear, unlit triangle, fake-device
+      harness. Landed 2026-08-21.** `RendererCapabilities` widened once (additive,
+      optional members); `webgpu` Playwright project added with the flag confined to it
+      (globally it perturbs the flagship's frame-pacing spec); render-list consumption
+      harness added under `tests/determinism/`.
+- [ ] **R-1 / WP-R1.2 — WebGPU geometry, texture and sampler caches** (§77, §83).
+      Extends the `wgpu-geometry.ts` WP-R1.1 seeded; samplers are a separate cache
+      keyed by (wrap × filter), unlike GL's per-texture parameters.
+- [ ] **R-1 / WP-R1.3 — sprites, text and `wgpu-batch.ts`** (the `RenderBatching`
+      uploader; the planner is untouched). First pixel evidence for the sprite path.
+- [ ] **R-1 / WP-R1.4 → WP-R1.8** — shapes/vertex colours, lit + standard, render
+      targets and effects (`readPixels` via `copyTextureToBuffer` + `mapAsync`),
+      shadows and stencil parity, compute and GPU particles (unblocks R-31). Strictly
+      serial; all share `packages/render-webgpu/src/`. Plan:
+      `docs/plans/R1-WEBGPU_PLAN.md`.
+- [ ] **§62's "applications may declare required and optional capabilities"** — still
+      unimplemented; now that the capability record is complete it is cheap
+      (WP-R1.9's first half, dispatches with the `R-14` wave).
+
+- [ ] **R-31 stays blocked but is no longer evidence-blocked** — WP-R1.8 owns it;
+      compute-with-storage-buffers is probe-verified to run headless in CI. Closes on
+      WebGPU only; WebGL 2 declares the tier absent.
+- [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
+      transient-target pooling and barrier scheduling (must land on both backends or
+      neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36
+      `collisions: "depth-buffer"`; RFC 0005's `Rectangle2` prerequisite for a regional
+      `readPixels`.
+- [x] **PH-11 residue — §12 character controllers DONE 2026-08-21.**
+      `CharacterController` + `FirstPersonLook` in `@four/motion`, advanced by the
+      existing `KinematicSystem` under §42's `"kinematic"` authority; §79 pair
+      registered; new §33 golden; first-person closed by composition (character yaw +
+      child-node pitch), not by a new rig class. Playground sensor-zone test verified
+      green on the settled tree (the earlier failure was the in-flight build state).
+- [x] **PH-11b — solver-backed character controller DONE 2026-08-21.**
+      `SweptCharacterController` + `SweptCharacterSystem` in `@four/physics` over
+      `PhysicsWorld.shapeCast` (§30): capsule sweep, slide-along-wall, step height,
+      slope limit, ground snap. The recorded question is answered — it **holds** a
+      `CharacterController` (its vertical state is ES-private with no setters, and
+      `grounded` is a promise about a plane), so `@four/motion` needed no edit. §39
+      step 4 before the solve, §42 `"kinematic"`, §79 with the physics family, new §33
+      golden on real Rapier 3D. Platform carry and pushing dynamics staged with seams
+      named (`groundBody` + `translate()` published for the first).
+- [ ] **PH-11c — character/dynamics push interaction (`@four/physics`).** The one
+      staged half of PH-11b that needs a _decision_ rather than code: how much impulse
+      a kinematic character imparts to a dynamic body it sweeps into, how it is split
+      against §23's mass, and whether it may wake a §32 sleeper. The seam is
+      `RigidBody.applyImpulseAtPoint` at `ShapeCastHit.point`. Effort S once the
+      policy is chosen; blocked on the choice, not on engineering.
+- [ ] **Character-controller example follow-up (extended):** nothing in `examples/`
+      exercises `CharacterController`, `FirstPersonLook` **or**
+      `SweptCharacterController` — the only first-person camera and the only swept
+      capsule in the repo live in tests. A single first-person example would exercise
+      all three and the §39 ordering at once.
+
+- [ ] **Character-controller example follow-up:** nothing in `examples/` exercises the
+      new components — the only first-person camera in the repo lives in a test. Worth
+      folding into the next examples packet.
+- [x] **Tests typecheck sweep DONE 2026-08-21** — `pnpm typecheck:tests` added and
+      wired into CI after `Build`; 21 errors in five classes fixed as the misspelled
+      intent; the text visual golden regenerated deliberately (the fixture now clears
+      as it always intended). Closes the hole R-8 identified.
+- [ ] **A-11 / RFC 0005 — owner decision** on pixel + GPU-id picking
+      (`docs/rfcs/0005-pixel-picking.md`). Six questions in the §5 register (rows
+      18–20). Blocked on the owner, not on engineering.
+- [ ] **A-11 analytic tier (`"geometry"`)** — unblocked since R-23/R-24's `toPath()`
+      and **not** covered by RFC 0005: a normal packet in a layer that may import
+      `@four/geometry`. RFC 0005 recommends it also add `node.hitTestMode` (§71's
+      field, currently a silent divergence; §79 field + §90 scene-format row).
+- [ ] **`Rectangle2` in `@four/math`** — still the shared prerequisite for §61's
+      `readPixels`, staged in `render/src/renderer.ts` _and_
+      `render-webgl/src/gl-render-target.ts`. RFC 0005 Q5 asks whether picking should
+      bypass it entirely (it reads one texel, not a region).
+- [ ] **Playground sensor-zone browser test failing on the shared tree (2026-08-21,
+      under investigation):** `playground.spec.ts` "each sensor zone repaints" fails
+      consistently while the character-controllers agent holds in-flight
+      `packages/motion`/`physics` edits; the spec is untouched by any landed batch.
+      Re-check on the settled tree at the controllers landing — it is that batch's
+      gate to pass.
+- [x] **R-37 CLOSED 2026-08-21** — §47's `ScreenCamera` (three origins × two unit
+      systems, §7a defaults, negative near, §85 refusals, §79 pair) plus
+      `Application.resize` feeding it through the structural `SurfaceSizedCamera`
+      opt-in, and `TrackballRig`, the last staged §44/§47 rig. 27 new package tests, 4
+      integration, 1 new browser test with pixel-exact placement on SwiftShader. 0 B in
+      bundles that do not register serializers.
+- [x] **Flagship UI-panel follow-up — DONE 2026-08-21 (examples packet).** Both
+      flagships on the ScreenCamera recipe; workaround notes deleted; AUDIT-120 and
+      the text README corrected with a new check-docs pin.
+- [x] **Stale trackball staging note — DONE 2026-08-21** (rig table points at
+      `@four/scene`'s `TrackballRig`).
+- [x] **R-21 — §53 geometry model (2026-08-21).** `Geometry` base, `clone()`,
+      `BoundingVolume` (box + circumscribing sphere). `GeometryBounds` aliased, R-8
+      unmodified. Seven §53 subclasses and hierarchical volumes deliberately staged with
+      the 2026-08-02 argument intact.
+- [x] **R-34 — §27 field batching (2026-08-21).** `ParticleForceField.sampleAll`, all
+      seven built-ins, bit-identical, per-field cost 5.15 → 1.12 ms;
+      `benchmarks/results/particles-100k.json` re-recorded (3-field 100k stack
+      16.58 → 4.51 ms).
+- [ ] **R-32 — textured / rotated / soft particles.** Owner: the `render-webgl`
+      particle-pipeline packet (NOT `@four/particles` — the flat square, the shader pair
+      and the 8-float instance stream are all backend-side; the stream constant is
+      triplicated across three packages by §3.1). Design recorded in the GAP row.
+      Sequence after the ScreenCamera wave so the particle pixel goldens move once.
+- [ ] **R-33 — §112's exit, rendered as well as simulated.** Owner: the browser-gate
+      packet, on non-SwiftShader hardware. Now has headroom (see R-34). Report
+      simulate-ms and present-ms separately.
+- [ ] **R-31 — GPU particle simulation.** Blocked by R-1 (WebGPU is one line) and §82.
+      Do NOT add an accepted-then-rejected `simulation: "gpu"` option — the type-level
+      absence is a recorded WP-9.1 decision.
+- [x] **R-7 — §67 stencil support (2026-08-21).** `StencilState` in `@four/materials`,
+      `RendererOptions.stencil` / `RenderTargetOptions.stencil`, backend application and
+      packed `DEPTH24_STENCIL8` allocation, `FRAME_BEFORE_R7` recorded on the reverted
+      build, real-driver masking proof (browser gate now 64 tests). Budgets bumped
+      34/31/39.5 kB with A/B measurements.
+- [ ] **§67 clipping API (new, from R-7's residue, L)** — a node-level clip in
+      `@four/scene`: subtree inheritance, nested-clip intersection, stencil **bit-plane**
+      assignment in a render-list pass, and §67's required diagnostic when the eight
+      planes of an 8-bit buffer are exhausted. Expressed in `StencilState` records;
+      unblocks §73's scroll view and §119's section views, and is what §50's
+      masks/clipping waits on. Needs `@four/scene` in scope.
+- [ ] **Scissor clipping (§67's first bullet, small)** — unrelated to the stencil and
+      unblocked: the backend already keeps `SCISSOR_TEST` enabled and sets the rect per
+      view. A per-item scissor is a render-list field, not a buffer.
+- [ ] **Flake to watch (pre-existing):** `packages/render/tests/shape.test.ts`'s "widens
+      to a 32-bit index buffer" times out under `--coverage` on a loaded box. Either
+      raise that one test's timeout or shrink the fixture; do not weaken the assertion.
 - [x] **PH-21 — §39 step 9 occupiable (2026-08-21).** `PhysicsEventSystem` at
       `PRIORITY_EVENT_DISPATCH` + `PhysicsSystemOptions.dispatchEvents`; golden
       `event-dispatch-split.json`. Steps 7–8 closed as not splittable, documented in
@@ -124,22 +249,29 @@ changes in `CHANGELOG.md`.
 - [x] **R-30 advanced 2026-08-13 (sampler-state tier)** — `TextureSource.filter`/`wrap`
       through `Texture`/`MaterialTexture` to `TextureCache`; structural byte-identity;
       +0.11 kB per Texture-carrying bundle.
-- [ ] **R-30b — the rest of §77:** mipmaps and generation, cube/array/3D targets,
-      anisotropy, map roles, compressed containers, video and `ImageBitmap` sources,
-      async upload + residency diagnostics. The wrap/filter bullet closed 2026-08-13; the
-      row's remaining scope is a different, larger item.
-- [ ] **Text follow-ups (2026-08-13):** (a) `examples/first-2d-scene` and
-      `examples/ui-demo` still cut one `Texture` per glyph cell — both should be
-      rewritten onto `Text` (ui-demo through a `WidgetSkin` turning `Label.textLayout`
-      into one `Text`); expected: a large draw-call drop and a smaller bundle; one
-      follow-up packet with the browser gate. (b) `.size-limit.json`: bump ui-demo
-      38 → 38.5 kB — measured 37.86 with R-28/R-30 (0.14 kB headroom); the next packet to
-      add a class method breaks it. (c) §56 wrapping — deliberately not bundled with
-      alignment: a wrap decides where lines end (UAX #14 and a language), alignment
-      merely places a finished line. (d) §86's animated-glyph row is now bounded by the
-      geometry rebuild (~700 ns/glyph); the named lever is a flat coordinate buffer
-      instead of one frozen `TextQuad` per glyph. (e) before §56 full shaping: RFC the
-      shaping engine (HarfBuzz-wasm vs native).
+- [x] **R-30b advanced 2026-08-21 (mipmap + anisotropy tier)** — `TextureSource.mipmaps`
+      / `.minFilter` / `.anisotropy`, applied by `TextureCache` at upload
+      (`generateMipmap`, the min/mag split, a lazily negotiated
+      `EXT_texture_filter_anisotropic`). `Texture.byteLength` bills the chain.
+      Byte-identity structural, asserted as whole transcripts; new integration + browser
+      gates. `@four/assets` deliberately untouched — mipmap generation is an upload
+      decision, and `new Texture({ ...asset, mipmaps: true })` already works. Budgets
+      bumped 34.5/32/40.5 kB with A/B numbers.
+- [ ] **R-30c — the rest of §77, scoped by why each is not ordinary work:** cube/array/3D
+      targets (sampler-type change in every shader — pipeline/RFC-entangled, pairs with
+      R-1); compressed containers (`compressedTexImage2D`, a format enum shared with §79,
+      §62's compressed-format capability report — pairs with R-31/R-32); video and
+      `ImageBitmap`/canvas sources (per-frame update semantics under §9; the DOM-free
+      `TextureSource` rule puts the adapter in `@four/assets` — A-19's successor); §77
+      map roles (which would let §60a's colour-space defaults land); async upload and
+      residency diagnostics (§84 counters plus a worker split). Also: a §62
+      `capabilities.maxAnisotropy` / texture-format report, deliberately not added by
+      R-30b because reading it at `initialize` would move landed GL transcripts.
+
+- [x] **Examples onto `Text` — DONE 2026-08-21**, extended to both flagships
+      (layer assignment needs one node per label). Draw calls: first-2d 30 → 1,
+      ui-demo 44 → 3, twin 159 → 59; bundles shrank; two ui-demo goldens
+      regenerated deliberately (glyph pixels only, crisper).
 - [x] **§44/§47 camera rigs DONE 2026-08-09 (R-36 rig half + PH-11)** — `OrbitRig`,
       `FollowRig` (follow target **and** spring arm, one class switched by `frame`,
       smoothed by `SpringDamper`), `LookAtConstraint` and `ConstraintSystem` at §39
@@ -173,11 +305,9 @@ changes in `CHANGELOG.md`.
       `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
       which has no producing system: seam is a `LookAtConstraint` component + a system
       at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
-- [ ] **Examples still hand-roll their orientations (R-36 follow-up)** —
-      `examples/first-3d-scene/main.ts:151` (camera pitch) and `:219-220` (sun yaw∘pitch)
-      are the code `lookAt` exists to replace. Left in place deliberately: `lookAt`
-      derives the quaternion through `sqrt` where these use `sin`/`cos`, so the swap
-      could move a pixel golden. Needs a packet that can run `pnpm test:browser`.
+- [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
+      `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
+      held. Rigs declined on merit (nothing moves).
 - [ ] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — first-3d
       31.30/31.5, ui-demo 36.73/37, particles-demo 28.70/29 (each +0.50 kB gzip;
       `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed
@@ -361,12 +491,24 @@ changes in `CHANGELOG.md`.
       solved by erasing the parameter at the constructor, and both properties are
       compile-time assertions in `tests/integration/asset-abort.test.ts`
 - [ ] **A-18 remainder:** streaming, dependency graphs, progress reporting, worker
-      decoding, hot reload, content hashing (the last still blocks `A-16`'s §79
-      manifest). Each needs a contract this packet does not have — progress needs a
-      byte-length channel `FetchLike` does not expose, dependency graphs need a loader
-      that can load, hot reload needs a dev-server protocol
-- [ ] **§96 residue:** decompression limits (needed the moment gzip/Draco/Basis lands —
-      a size bound alone does not stop a zip bomb); shader/plugin trust boundaries
+      decoding, hot reload. Each needs a contract this packet does not have — progress
+      needs a byte-length channel `FetchLike` does not expose, dependency graphs need a
+      loader that can load, hot reload needs a dev-server protocol. **Content hashing
+      DONE 2026-08-21** (SHA-256 behind an injected `digest`, `expectedHash`
+      verification that refuses rather than passes, §79 manifest in `src/manifest.ts`)
+      — `A-16`'s manifest is unblocked
+- [ ] **A-16 remainder (manifest half):** the §79 manifest substrate ships in
+      `@four/assets` (2026-08-21). What is left is `@four/four`:
+      `SceneResourceCatalog.get(key)` is synchronous, so wiring is preload-then-catalog
+      — walk a document's resource keys, `loadFromManifest` each, hand the resulting map
+      to `resourceCatalog(...)`. `tests/integration/texture-manifest.test.ts` runs the
+      seam by hand today
+- [ ] **A-19 remainder:** §78 glTF/GLB (three blockers unchanged: §55/§59 materials, the
+      renderer-side texture tier, skins/morph targets — RFC 0003 answers the third on
+      paper) and renderer-side §77 (`R-30b`). The assets-side texture loader tier
+      shipped 2026-08-21 (`createTextureLoader`, `TextureAsset`, §96 decompression
+      bounds)
+- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader/plugin trust boundaries
       (blocked on A-3)
 - [ ] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
       graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/

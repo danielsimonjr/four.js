@@ -354,6 +354,22 @@ export class ParticleEmitter {
 
   readonly #fields: readonly ParticleForceField[];
 
+  // --- R-34: §27 batched field sampling (begin) ---
+  /**
+   * Per-particle acceleration accumulator, in binary64, allocated **only** when
+   * at least one configured field offers `sampleAll` — otherwise `undefined`
+   * and the per-particle path below is unchanged, down to the branch it takes.
+   *
+   * `24 · maxParticles` bytes (2.4 MB at 100 000), which is the price of the
+   * batched path and is charged once at construction rather than per step. It
+   * is binary64 and not binary32 because the scalar path accumulates in
+   * JavaScript numbers; rounding each partial sum to float32 would make a
+   * batched run differ from a scalar one in the last bits, and §33 does not
+   * permit that (see `ParticleForceField.sampleAll`).
+   */
+  readonly #fieldAccumulator: Float64Array | undefined;
+  // --- R-34: §27 batched field sampling (end) ---
+
   readonly #hasPlane: boolean;
   readonly #planeY: number;
   readonly #restitution: number;
@@ -495,6 +511,11 @@ export class ParticleEmitter {
     this.#gravityZ = assertFinite(options.gravity?.z ?? 0, "gravity.z");
 
     this.#fields = options.fields === undefined ? [] : [...options.fields];
+    this.#fieldAccumulator = this.#fields.some(
+      (field) => field.sampleAll !== undefined,
+    )
+      ? new Float64Array(this.pool.capacity * 3)
+      : undefined;
 
     const planeY = options.collisionPlaneY;
     this.#hasPlane = planeY !== undefined;
@@ -624,6 +645,60 @@ export class ParticleEmitter {
     const fields = this.#fields;
     const fieldCount = fields.length;
 
+    // --- R-34: §27 batched field sampling (begin) ---
+    // One pre-pass over the live range, engaged only when a field offered
+    // `sampleAll` at construction. It reads exactly the state the per-particle
+    // loop below would have read — nothing has been integrated yet, and a slot
+    // the loop later swap-removes into carries its own (still pre-step) values
+    // — and it sums in the same order, gravity first and then fields in
+    // declaration order, so the result is bit-identical to the scalar path.
+    const accumulator =
+      fieldCount > 0 && this.#fieldAccumulator !== undefined
+        ? this.#fieldAccumulator
+        : undefined;
+    if (accumulator !== undefined) {
+      const live = pool.aliveCount;
+      for (let i = 0; i < live; i += 1) {
+        const base = i * 3;
+        accumulator[base] = this.#gravityX;
+        accumulator[base + 1] = this.#gravityY;
+        accumulator[base + 2] = this.#gravityZ;
+      }
+      for (let f = 0; f < fieldCount; f += 1) {
+        const field = fields[f];
+        if (field.sampleAll !== undefined) {
+          field.sampleAll(positions, velocities, live, time, accumulator);
+          continue;
+        }
+        // A field without the fast path is not penalised and does not disable
+        // it for its neighbours: it is sampled per particle, in its own place
+        // in the declaration order, into the same accumulator.
+        for (let i = 0; i < live; i += 1) {
+          const base = i * 3;
+          const position = this.#samplePosition.set(
+            positions[base],
+            positions[base + 1],
+            positions[base + 2],
+          );
+          const velocity = this.#sampleVelocity.set(
+            velocities[base],
+            velocities[base + 1],
+            velocities[base + 2],
+          );
+          const sampled = field.sample(
+            position,
+            velocity,
+            time,
+            this.#sampleForce,
+          );
+          accumulator[base] += sampled.x;
+          accumulator[base + 1] += sampled.y;
+          accumulator[base + 2] += sampled.z;
+        }
+      }
+    }
+    // --- R-34: §27 batched field sampling (end) ---
+
     let index = 0;
     while (index < pool.aliveCount) {
       const base = index * 3;
@@ -632,7 +707,11 @@ export class ParticleEmitter {
       let ay = this.#gravityY;
       let az = this.#gravityZ;
 
-      if (fieldCount > 0) {
+      if (accumulator !== undefined) {
+        ax = accumulator[base];
+        ay = accumulator[base + 1];
+        az = accumulator[base + 2];
+      } else if (fieldCount > 0) {
         const position = this.#samplePosition.set(
           positions[base],
           positions[base + 1],
@@ -692,6 +771,14 @@ export class ParticleEmitter {
       if (ages[index] >= lifetimes[index]) {
         // Swap-remove moves an as-yet-unprocessed particle into this slot, so
         // the index is deliberately not advanced (see `pool.ts` on ordering).
+        // The accumulator is indexed by slot, so it takes the same swap — the
+        // particle that lands here brings the acceleration computed for it.
+        if (accumulator !== undefined) {
+          const last = (pool.aliveCount - 1) * 3;
+          accumulator[base] = accumulator[last];
+          accumulator[base + 1] = accumulator[last + 1];
+          accumulator[base + 2] = accumulator[last + 2];
+        }
         pool.kill(index);
       } else {
         index += 1;

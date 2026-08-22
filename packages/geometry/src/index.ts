@@ -7,6 +7,10 @@ export type {
   GeometryIndexArray,
 } from "./buffer-geometry.js";
 export { BufferGeometry } from "./buffer-geometry.js";
+// --- R-21: §53 geometry base + bounding volume (begin) ---
+export type { BoundingVolume } from "./geometry.js";
+export { Geometry } from "./geometry.js";
+// --- R-21: §53 geometry base + bounding volume (end) ---
 export type {
   CapsuleGeometryOptions,
   ExtrudeGeometryOptions,

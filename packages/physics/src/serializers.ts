@@ -129,7 +129,10 @@ import {
   type SpaceMode,
 } from "@four/core";
 import { Matrix3, Quaternion, Vector2, Vector3 } from "@four/math";
-import type { ComponentSerializerShape } from "@four/motion";
+import {
+  DEFAULT_CHARACTER_GRAVITY,
+  type ComponentSerializerShape,
+} from "@four/motion";
 import { Transform } from "@four/scene";
 
 import { Collider, type ColliderOptions } from "./collider.js";
@@ -143,6 +146,14 @@ import {
 } from "./material.js";
 import { ALL_COLLISION_GROUPS } from "./queries.js";
 import { RigidBody } from "./rigid-body.js";
+import {
+  DEFAULT_GROUND_SNAP_DISTANCE,
+  DEFAULT_MAX_SLIDES,
+  DEFAULT_SKIN_WIDTH,
+  DEFAULT_SLOPE_LIMIT,
+  DEFAULT_STEP_HEIGHT,
+  SweptCharacterController,
+} from "./swept-character-controller.js";
 import type { CollisionShape } from "./shapes.js";
 import { BODY_TYPES, CCD_MODES, DEFAULT_CCD_MODE } from "./types.js";
 import type { BodyType, CCDMode } from "./types.js";
@@ -184,6 +195,25 @@ function readNumber(value: JsonValue | undefined, fallback: number): number {
 }
 
 /** Reads a JSON array, or an empty one for anything else. */
+/**
+ * A number that has no defensible default — absent or malformed throws naming
+ * the field, this module's rule for a value that cannot be guessed (see the
+ * header). `radius` and `halfHeight` are the two: §24 refuses a capsule without
+ * them, and inventing one restores a character of a size no author chose.
+ */
+function readRequiredNumber(
+  value: JsonValue | undefined,
+  field: string,
+): number {
+  if (typeof value !== "number") {
+    return fail(
+      `A swept-character-controller document must carry a numeric "${field}" (§24, §79); it is the capsule's geometry and has no default.`,
+      { field },
+    );
+  }
+  return value;
+}
+
 function readArray(value: JsonValue | undefined): readonly JsonValue[] {
   return Array.isArray(value) ? (value as readonly JsonValue[]) : [];
 }
@@ -872,3 +902,102 @@ export const COLLIDER_SERIALIZER: ComponentSerializerShape<Collider> = {
     return new Collider(options);
   },
 };
+
+/**
+ * The §79 serializer for {@link SweptCharacterController} (§12, §30, `PH-11b`,
+ * 2026-08-21).
+ *
+ * ```ts
+ * import {
+ *   SweptCharacterController,
+ *   SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
+ * } from "@four/physics";
+ *
+ * registry.register(
+ *   SweptCharacterController,
+ *   SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
+ * );
+ * ```
+ *
+ * `CHARACTER_CONTROLLER_SERIALIZER`'s split, applied to a class whose ground is
+ * geometry rather than a plane — **the asymmetry is the same one and it is worth
+ * restating**: vertical motion is *scene* state and the move intent is not. A
+ * character saved mid-jump is at a height the document already carries, moving
+ * at a speed nothing else can reconstruct; its move intent is this frame's
+ * input, and §79 documents do not carry the player's thumb. So
+ * `verticalVelocity` and `grounded` round-trip and the intent restores at
+ * `(0, 0)`.
+ *
+ * What this class adds to that split, and why each lands where it does:
+ *
+ * | state | round-trips? |
+ * | --- | --- |
+ * | the capsule (`radius`, `halfHeight`) and every resolution parameter | yes — they are `readonly`, so the reader must **construct** with them (`ORBIT_RIG_SERIALIZER`'s rule) |
+ * | `yaw`, `moveSpeed`, `gravity`, `jumpSpeed` | yes |
+ * | `maxFallSpeed` | yes, **by omission when infinite** — `Infinity` is not JSON and absence already means "unbounded" on both sides |
+ * | `verticalVelocity`, `grounded` | yes — scene state |
+ * | the move intent | **no** — this frame's input |
+ * | `world` | **no** — a live object reference, re-bound by the application exactly as a reloaded `RigidBody` is registered (`registerPhysicsSerializers`'s "reloading a scene is not restoring a simulation") |
+ * | `groundBody` | **no** — it is *derived*: the next step's probe recomputes it, and a saved reference to another node's component is precisely what the rig serializers drop |
+ * | `skippedSteps`, `slideCount`, `stepUpCount`, `budgetExhaustedSteps` | **no** — diagnostics of a run |
+ *
+ * Reading follows this module's own rule rather than `@four/motion`'s total
+ * one for the two fields that have no defensible default: `radius` and
+ * `halfHeight` are *required* constructor parameters (§24 refuses a capsule
+ * without them), so a document missing them throws naming the field rather than
+ * restoring a character of invented size.
+ */
+export const SWEPT_CHARACTER_CONTROLLER_SERIALIZER: ComponentSerializerShape<SweptCharacterController> =
+  {
+    serialize(component: SweptCharacterController): JsonValue {
+      const payload: Record<string, JsonValue> = {
+        radius: component.radius,
+        halfHeight: component.halfHeight,
+        yaw: component.yaw,
+        moveSpeed: component.moveSpeed,
+        gravity: component.gravity,
+        jumpSpeed: component.jumpSpeed,
+        stepHeight: component.stepHeight,
+        slopeLimit: component.slopeLimit,
+        skinWidth: component.skinWidth,
+        groundSnapDistance: component.groundSnapDistance,
+        maxSlides: component.maxSlides,
+        collisionGroups: component.collisionGroups,
+        collisionMask: component.collisionMask,
+        verticalVelocity: component.verticalVelocity,
+        grounded: component.grounded,
+      };
+      if (Number.isFinite(component.maxFallSpeed)) {
+        payload.maxFallSpeed = component.maxFallSpeed;
+      }
+      return payload;
+    },
+
+    deserialize(data: JsonValue): SweptCharacterController {
+      const source = record(data);
+      return new SweptCharacterController({
+        radius: readRequiredNumber(source.radius, "radius"),
+        halfHeight: readRequiredNumber(source.halfHeight, "halfHeight"),
+        yaw: readNumber(source.yaw, 0),
+        moveSpeed: readNumber(source.moveSpeed, 1),
+        gravity: readNumber(source.gravity, DEFAULT_CHARACTER_GRAVITY),
+        jumpSpeed: readNumber(source.jumpSpeed, 4),
+        maxFallSpeed: readNumber(source.maxFallSpeed, Number.POSITIVE_INFINITY),
+        stepHeight: readNumber(source.stepHeight, DEFAULT_STEP_HEIGHT),
+        slopeLimit: readNumber(source.slopeLimit, DEFAULT_SLOPE_LIMIT),
+        skinWidth: readNumber(source.skinWidth, DEFAULT_SKIN_WIDTH),
+        groundSnapDistance: readNumber(
+          source.groundSnapDistance,
+          DEFAULT_GROUND_SNAP_DISTANCE,
+        ),
+        maxSlides: readNumber(source.maxSlides, DEFAULT_MAX_SLIDES),
+        collisionGroups: readNumber(
+          source.collisionGroups,
+          ALL_COLLISION_GROUPS,
+        ),
+        collisionMask: readNumber(source.collisionMask, ALL_COLLISION_GROUPS),
+        verticalVelocity: readNumber(source.verticalVelocity, 0),
+        grounded: readBoolean(source.grounded, false),
+      });
+    },
+  };

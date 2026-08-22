@@ -28,7 +28,7 @@ import {
   SpringDamper,
 } from "@four/motion";
 import { Vector3 } from "@four/math";
-import { Collider, RigidBody } from "@four/physics";
+import { Collider, RigidBody, SweptCharacterController } from "@four/physics";
 import { Renderable, Sprite, Texture } from "@four/render";
 import {
   DirectionalLight,
@@ -36,6 +36,7 @@ import {
   SpotLight,
   Group,
   OrthographicCamera,
+  ScreenCamera,
   PerspectiveCamera,
   Scene,
 } from "@four/scene";
@@ -71,6 +72,7 @@ import {
   IMAGE_NODE_TYPE,
   LABEL_NODE_TYPE,
   ORTHOGRAPHIC_CAMERA_NODE_TYPE,
+  SCREEN_CAMERA_NODE_TYPE,
   PANEL_NODE_TYPE,
   PERSPECTIVE_CAMERA_NODE_TYPE,
   PROGRESS_NODE_TYPE,
@@ -859,7 +861,9 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     // The list is asserted as well as walked: a component that stops being
     // exported would otherwise make this test pass by finding less.
     expect([...shipped.keys()].sort()).toEqual([
+      "character-controller",
       "collider",
+      "first-person-look",
       "follow-rig",
       "kinematic-controller",
       "look-at-constraint",
@@ -867,6 +871,7 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
       "orbit-rig",
       "pose-target",
       "rigid-body",
+      "swept-character-controller",
     ]);
 
     const registry = registerSceneNodeTypes().components;
@@ -886,21 +891,25 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(first.has(KinematicController.typeName)).toBe(true);
     expect(first.has(RigidBody.typeName)).toBe(true);
     expect(first.has(Collider.typeName)).toBe(true);
+    expect(first.has(SweptCharacterController.typeName)).toBe(true);
   });
 });
 
 describe("registerPhysicsSerializers (PH-17)", () => {
-  it("registers both components without pulling in the UI node types", () => {
+  it("registers every @four/physics component without pulling in the UI node types", () => {
     const components = registerPhysicsSerializers(
       createDefaultComponentSerializers(),
     );
 
     expect(components.has(RigidBody.typeName)).toBe(true);
     expect(components.has(Collider.typeName)).toBe(true);
+    // §12's swept character controller registers with the physics family, not
+    // the motion one: the split is by package (`PH-11b`, 2026-08-21).
+    expect(components.has(SweptCharacterController.typeName)).toBe(true);
     // The registry it was handed, returned for chaining — not a copy.
     expect(
       registerPhysicsSerializers(new ComponentSerializerRegistry()).size,
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it("refuses to register twice on one registry, rather than overwriting", () => {
@@ -1248,6 +1257,9 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
     expect(io.write.nodeTypeOf(new OrthographicCamera())).toBe(
       ORTHOGRAPHIC_CAMERA_NODE_TYPE,
     );
+    expect(io.write.nodeTypeOf(new ScreenCamera())).toBe(
+      SCREEN_CAMERA_NODE_TYPE,
+    );
     expect(io.write.nodeTypeOf(new DirectionalLight())).toBe(
       DIRECTIONAL_LIGHT_NODE_TYPE,
     );
@@ -1498,6 +1510,54 @@ describe("registerRenderSerializers — defensive reads", () => {
     expect([minimap.left, minimap.right, minimap.bottom, minimap.top]).toEqual([
       -3, 1, -1, 1,
     ]);
+  });
+
+  it("round-trips a ScreenCamera's origin, units and rectangle (§47, R-37)", () => {
+    const camera = new ScreenCamera({
+      origin: "centered",
+      units: "physical",
+      width: 1024,
+      height: 768,
+      resolution: 2,
+      near: -5,
+      far: 5,
+    });
+    const data = io.write.nodeDataOf(camera) as Record<string, unknown>;
+    expect(data.origin).toBe("centered");
+    expect(data.units).toBe("physical");
+
+    const restored = io.read.nodeFactory({
+      type: SCREEN_CAMERA_NODE_TYPE,
+      data: data as never,
+    }) as ScreenCamera;
+    expect(restored.origin).toBe("centered");
+    expect(restored.units).toBe("physical");
+    expect(restored.width).toBe(1024);
+    expect(restored.height).toBe(768);
+    expect(restored.resolution).toBe(2);
+    expect(restored.near).toBe(-5);
+    expect([...restored.projectionMatrix.elements]).toEqual([
+      ...camera.projectionMatrix.elements,
+    ]);
+  });
+
+  it("restores a ScreenCamera's defaults from a payload the class would refuse", () => {
+    const camera = io.read.nodeFactory({
+      type: SCREEN_CAMERA_NODE_TYPE,
+      data: {
+        origin: "north-west",
+        units: 7,
+        width: 0,
+        height: -3,
+        resolution: Number.NaN,
+      },
+    }) as ScreenCamera;
+
+    // §85: a corrupted rectangle restores the default rather than throwing on
+    // the way in and taking the whole scene with it.
+    expect(camera.origin).toBe("top-left");
+    expect(camera.units).toBe("logical");
+    expect([camera.width, camera.height, camera.resolution]).toEqual([1, 1, 1]);
   });
 
   it("restores a camera from a payload that says nothing at all", () => {

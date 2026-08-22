@@ -16,7 +16,7 @@
  * members are its own public methods with matching signatures, and the fourth is
  * optional. {@link PHYSICS_WORLD_AS_REPLAY_TARGET} states exactly that as a
  * compiling assignment, so a drift in either declaration fails
- * `tsc --noEmit -p tests/tsconfig.json` here.
+ * `pnpm typecheck:tests` here.
  *
  * What `PhysicsWorld` does *not* have — and should not have — is
  * `applyInput(step, payload)`. A solver world has no idea what an application's
@@ -43,9 +43,13 @@
  *    overwrite" instinct, applied to input).
  * 3. **The two snapshot declarations are checked against each other.**
  *    `createSnapshot` returns `PhysicsWorld`'s `PhysicsSnapshot` where a
- *    `ReplaySnapshot` is demanded, and `restoreSnapshot` passes a
- *    `ReplaySnapshot` where a `PhysicsSnapshot` is demanded — both directions,
- *    in one class. Nothing else in the repository does that.
+ *    `ReplaySnapshot` is demanded — that direction compiles as written, and
+ *    a drift in either declaration fails `pnpm typecheck:tests`. The consume
+ *    direction does **not**, and saying it did was this header's own bug until
+ *    2026-08-21: `ReplaySnapshot.configuration` is `unknown` where
+ *    `PhysicsSnapshot.configuration` is `PhysicsSnapshotConfiguration`, for the
+ *    package-boundary reason {@link asPhysicsSnapshot} records. That helper is
+ *    the narrowing, and it is not trusted — §34's own refusal is.
  *
  * ## The stepping seam (WP-10.2's stated cost, exercised here)
  *
@@ -88,12 +92,37 @@ import {
   PhysicsWorld,
   RigidBody,
   type CollisionShape,
+  type PhysicsSnapshot,
   type RigidBodyCollisionEvent,
   type WorldPhysicsEvent,
 } from "@four/physics";
 import { Rapier2dAdapter } from "@four/physics-rapier";
 import { Group, type Node } from "@four/scene";
 import { Application } from "four/application";
+
+/**
+ * The one narrowing the §34 snapshot round trip needs, and why it is a named
+ * helper rather than an inline cast.
+ *
+ * `ReplaySnapshot.configuration` is `unknown` **by design**:
+ * `@four/diagnostics` may not import `@four/physics`, so it cannot name
+ * `PhysicsSnapshotConfiguration` (`packages/diagnostics/src/recorder.ts`
+ * says so at the field). `PhysicsSnapshot.configuration` *is* that type. The
+ * two declarations are therefore assignable in the **produce** direction
+ * (`createSnapshot`) and not in the **consume** direction — which the tests
+ * typecheck gate (2026-08-21) is what first made visible; before it, nothing
+ * compiled this directory at all.
+ *
+ * The cast is safe because nothing trusts it: `PhysicsWorld.restoreSnapshot`
+ * validates adapter name, adapter version and — when the field is present —
+ * the configuration field by field, and refuses a mismatch (§34). A snapshot
+ * carrying a foreign `configuration` is rejected at run time by the code under
+ * test, which is precisely what these scenarios assert. No assertion is
+ * weakened by spelling the conversion here.
+ */
+function asPhysicsSnapshot(snapshot: ReplaySnapshot): PhysicsSnapshot {
+  return snapshot as PhysicsSnapshot;
+}
 
 // ---------------------------------------------------------------------------
 // Scenario constants (§7a: seconds and world units, never milliseconds)
@@ -352,11 +381,12 @@ export class PhysicsReplayTarget implements ReplayTarget {
   }
 
   /**
-   * §34's restore, refusal included. The `ReplaySnapshot` is passed where a
-   * `PhysicsSnapshot` is demanded — the other half of the structural check.
+   * §34's restore, refusal included. The `ReplaySnapshot` is narrowed to a
+   * `PhysicsSnapshot` by {@link asPhysicsSnapshot} — see that helper for why
+   * the consume direction needs one and why the narrowing is not trusted.
    */
   restoreSnapshot(snapshot: ReplaySnapshot): void {
-    this.#world.restoreSnapshot(snapshot);
+    this.#world.restoreSnapshot(asPhysicsSnapshot(snapshot));
   }
 
   /**

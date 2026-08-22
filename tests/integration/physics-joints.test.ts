@@ -63,7 +63,12 @@
 import { FourError } from "@four/core";
 import { solverJointStatistics } from "@four/diagnostics";
 import { Vector3 } from "@four/math";
-import { FixedJoint, HingeJoint, SphericalJoint } from "@four/physics";
+import {
+  FixedJoint,
+  HingeJoint,
+  SphericalJoint,
+  supportsSolverJointAccess,
+} from "@four/physics";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -138,7 +143,20 @@ for (const kit of DIMENSION_KITS) {
       // §113's joint statistics against the live jointed adapter (2026-08-04
       // — the last debug provider previously exercised via fakes only). Both
       // Rapier adapters honestly declare reportsJointReactions false.
-      const jointStats = solverJointStatistics(world.adapter);
+      // Tests typecheck gate (2026-08-21): `world.adapter` is a
+      // `PhysicsWorldAdapter` (`PhysicsSolverAdapter & SolverBodyAccess`), and
+      // the joint seam is deliberately *separate* — so the adapter has to be
+      // narrowed before `@four/diagnostics`' structurally-declared
+      // `DebugJointAccess` can be satisfied. `supportsSolverJointAccess` is the
+      // guard `@four/physics` exports for exactly this, and it strengthens the
+      // assertion: a Rapier adapter that stopped implementing the seam now
+      // fails here instead of type-erroring nowhere.
+      const jointAccess = world.adapter;
+      expect(supportsSolverJointAccess(jointAccess)).toBe(true);
+      if (!supportsSolverJointAccess(jointAccess)) {
+        throw new TypeError("the joint world's adapter has no joint seam");
+      }
+      const jointStats = solverJointStatistics(jointAccess);
       expect(jointStats.jointCount).toBe(1);
       expect(jointStats.reportsJointReactions).toBe(false);
 

@@ -11,8 +11,8 @@
  * §76 asks the asset manager for deduplication, caching, reference counting,
  * lazy loading, streaming, dependency graphs, progress reporting, cancellation,
  * retries, worker decoding, hot reload, and content hashing. This module ships
- * the first four plus retries and cancellation, and stages the rest with dated
- * notes (see "Staged", below). The MVP reading is the plan's (P11-2): an asset
+ * the first four plus retries, cancellation, and content hashing, and stages the
+ * rest with dated notes (see "Staged", below). The MVP reading is the plan's (P11-2): an asset
  * manager whose caching and lifetime rules are exactly specified and fully
  * tested beats a wider surface whose corners are guesses.
  *
@@ -191,14 +191,51 @@
  * fields hold a signal-agnostic closure. Every instantiation of the class is
  * therefore mutually assignable, as it was before.
  *
+ * ## Content hashing and verification (§76, §79 — 2026-08-21)
+ *
+ * ```ts
+ * // Record the hash of what was fetched…
+ * await assets.load("/models/robot.bin", binaryLoader, { hashContent: true });
+ * assets.contentHash("/models/robot.bin", binaryLoader); // "sha256-9f86d0…"
+ *
+ * // …or declare it up front, which is §79's manifest reloading its asset.
+ * await assets.load("/models/robot.bin", binaryLoader, {
+ *   expectedHash: manifest.robot.hash,
+ * });   // rejects if the bytes are not the bytes the manifest named
+ * ```
+ *
+ * Four rules:
+ *
+ * 1. **The hash covers the response's bytes**, whatever the loader reads. A
+ *    hashed load therefore reads the body once as bytes and derives `text()` and
+ *    `json()` from them (through {@link AssetManagerOptions.decodeText}), so the
+ *    same URL hashes identically under `binaryLoader` and `jsonLoader`. A hash
+ *    that depended on which loader observed it could not be written in a
+ *    manifest at all.
+ * 2. **Verification is per caller, not per load.** A coalesced load computes one
+ *    hash; each waiter compares it against *its own* `expectedHash`. One
+ *    caller's wrong expectation rejects that caller and hands back its
+ *    reference (`context.reason === "hash-mismatch"`) — exactly as an abort
+ *    does, and for the same reason: the other waiters asked for something else.
+ * 3. **A hash that could not be computed is a refusal, never a pass.** Asking
+ *    for a hash on a manager with no {@link AssetManagerOptions.digest} throws
+ *    `INVALID_APPLICATION_STATE` at the call, naming the injection point;
+ *    joining a load that was *not* hashing rejects with
+ *    `context.reason === "hash-unavailable"`. Silently skipping the check is the
+ *    one behaviour §96 rules out — the check exists to be trusted.
+ * 4. **Hashing is opt-in.** It forces the whole body through memory and costs a
+ *    digest, so a load that did not ask for it fetches exactly as before.
+ *
+ * See `content-hash.ts` for why the default algorithm is SHA-256 rather than
+ * something synchronous and cheap.
+ *
  * ## Staged (dated notes, 2026-08-02, WP-11.2)
  *
  * - **Streaming, dependency graphs, progress reporting, worker decoding, hot
- *   reload, content hashing** (§76). Each needs a contract this packet does not
- *   have: progress needs a byte-length channel `FetchLike` does not expose,
- *   dependency graphs need a loader that can load (glTF's buffers and images),
- *   hot reload needs a dev-server protocol, worker decoding needs a transfer
- *   policy.
+ *   reload** (§76). Each needs a contract this packet does not have: progress
+ *   needs a byte-length channel `FetchLike` does not expose, dependency graphs
+ *   need a loader that can load (glTF's buffers and images), hot reload needs a
+ *   dev-server protocol, worker decoding needs a transfer policy.
  * - **The §76 record form** `assets.load({ robot: "/models/robot.glb", … })`.
  *   It infers a loader per file extension, which presumes the glTF and texture
  *   loaders that §55/§77 gate (see `loaders.ts`). A version that could only
@@ -211,6 +248,13 @@ import {
   disposeAll,
   type Disposable,
 } from "@four/core";
+
+import {
+  resolveGlobalDigest,
+  resolveGlobalTextDecoder,
+  type DigestLike,
+  type TextDecodeLike,
+} from "./content-hash.js";
 
 /**
  * The subset of a `fetch` response this package reads.
@@ -371,6 +415,27 @@ export interface AssetLoadOptions {
    * the others', and `release` is not `abort`.
    */
   readonly signal?: AbortSignalLike;
+  /**
+   * Compute and record this asset's content hash (§76), readable afterwards
+   * through {@link AssetManager.contentHash}.
+   *
+   * Implied by {@link AssetLoadOptions.expectedHash}. See the module comment's
+   * four hashing rules — in particular that the hash covers the response's
+   * bytes, so it does not depend on which loader read them.
+   */
+  readonly hashContent?: boolean;
+  /**
+   * The content hash this asset is *declared* to have — §79's manifest half.
+   *
+   * The bytes are hashed and compared; a mismatch rejects **this** call with
+   * `ASSET_LOAD_FAILED` and `context.reason === "hash-mismatch"` (plus
+   * `context.expectedHash` and `context.observedHash`), and hands back the
+   * reference the call took, so an asset that failed verification must not be
+   * released. Refusing is the feature: §96 treats external content as
+   * untrusted, and bytes that are not the bytes the build named are exactly the
+   * case the manifest exists to catch.
+   */
+  readonly expectedHash?: string;
 }
 
 /**
@@ -457,6 +522,24 @@ export interface AssetManagerOptions<TSignal = never> {
    * Node.
    */
   readonly timer?: TimerLike;
+  /**
+   * The content hash implementation (§76). Defaults to SHA-256 over
+   * `globalThis.crypto.subtle`, where the runtime has one.
+   *
+   * **Presence is the capability**, reported by
+   * {@link AssetManager.canHashContent}: a manager without one loads exactly as
+   * before, and refuses — loudly, at the call — any load that asked for a hash.
+   * See `content-hash.ts` for the algorithm argument.
+   */
+  readonly digest?: DigestLike;
+  /**
+   * The UTF-8 decoder a hashed `text()`/`json()` load needs, because hashing is
+   * defined over bytes. Defaults to `globalThis.TextDecoder`.
+   *
+   * Only ever consulted by a load that asked to be hashed *and* whose loader
+   * reads the body as text; a byte-reading loader needs none.
+   */
+  readonly decodeText?: TextDecodeLike;
 }
 
 /** One cache slot: a pending or settled load, plus its reference count. */
@@ -477,6 +560,13 @@ interface CacheEntry {
   value: unknown;
   /** Set when the entry was dropped from the cache before it settled. */
   evicted: boolean;
+  /**
+   * The content hash of the bytes this entry was built from, once computed
+   * (§76). `undefined` when no caller asked for one — which is what makes a
+   * later `expectedHash` on the same key a loud refusal rather than a silent
+   * pass; see the module comment's rule 3.
+   */
+  hash: string | undefined;
   /**
    * Cancels this load's request, or `undefined` when the manager was given no
    * {@link AssetManagerOptions.abortController}. Called at most once — by the
@@ -658,6 +748,61 @@ function boundedResponse(
   return bounded;
 }
 
+/** Where a hashed load's digest is deposited on its way to the cache entry. */
+interface HashSink {
+  /** Assigned once, by the first (and only) read of the body. */
+  hash: string | undefined;
+}
+
+/**
+ * Wraps a response so the bytes a loader reads are hashed on the way through
+ * (§76, §79).
+ *
+ * The body is read **once**, as bytes, and every accessor is derived from that
+ * one read: that is what makes the hash a property of the URL rather than of
+ * the loader that happened to observe it, which is the only form a manifest can
+ * record. `json()` goes through the decoded text for the same reason the
+ * bounded view does — a parsed value has no bytes left to hash.
+ *
+ * @param response the response to hash (already bounded by §96's limit)
+ * @param digest the caller's hash implementation
+ * @param decodeText the UTF-8 decoder, absent on a runtime that has none
+ * @param sink receives the hash; the manager reads it after the loader returns
+ * @param refuseText builds the failure for a text read with no decoder
+ * @returns a {@link FetchResponse} view over the same response
+ */
+function hashingResponse(
+  response: FetchResponse,
+  digest: DigestLike,
+  decodeText: TextDecodeLike | undefined,
+  sink: HashSink,
+  refuseText: () => FourError,
+): FetchResponse {
+  let bytes: Promise<ArrayBuffer> | undefined;
+  const read = async (): Promise<ArrayBuffer> => {
+    const data = await response.arrayBuffer();
+    sink.hash = await digest(data);
+    return data;
+  };
+  const once = (): Promise<ArrayBuffer> => (bytes ??= read());
+  const hashed: FetchResponse = {
+    ok: response.ok,
+    status: response.status,
+    headers: response.headers,
+    arrayBuffer: once,
+    async text(): Promise<string> {
+      if (decodeText === undefined) {
+        throw refuseText();
+      }
+      return decodeText(await once());
+    },
+    async json(): Promise<unknown> {
+      return JSON.parse(await hashed.text()) as unknown;
+    },
+  };
+  return hashed;
+}
+
 /**
  * Deduplicating, reference-counted asset cache (§76).
  *
@@ -690,6 +835,12 @@ export class AssetManager<TSignal = never> implements Disposable {
   /** Resolved once, so a host without `setTimeout` is diagnosed at load time. */
   readonly #timer: TimerLike | undefined;
 
+  /** §76 content hashing; `undefined` on a runtime with no `crypto.subtle`. */
+  readonly #digest: DigestLike | undefined;
+
+  /** UTF-8 decoding for hashed text loads; resolved for the same reason. */
+  readonly #decodeText: TextDecodeLike | undefined;
+
   #disposed = false;
 
   constructor(options?: AssetManagerOptions<TSignal>) {
@@ -709,6 +860,8 @@ export class AssetManager<TSignal = never> implements Disposable {
       "timeoutSeconds",
     );
     this.#timer = options?.timer ?? resolveGlobalTimer();
+    this.#digest = options?.digest ?? resolveGlobalDigest();
+    this.#decodeText = options?.decodeText ?? resolveGlobalTextDecoder();
   }
 
   /** The effective §96 input-size limit in bytes (diagnostics and tests). */
@@ -731,6 +884,20 @@ export class AssetManager<TSignal = never> implements Disposable {
    */
   get canAbortTransport(): boolean {
     return this.#abortController !== undefined;
+  }
+
+  /**
+   * Whether this manager can compute content hashes (§76) — that is, whether an
+   * {@link AssetManagerOptions.digest} was injected or the runtime supplied one
+   * (`crypto.subtle`, absent in an insecure browser context).
+   *
+   * Presence is the capability, exactly as {@link canAbortTransport} is. The
+   * difference is what a missing one does: cancellation degrades quietly to
+   * promise-level semantics, while a hash that cannot be computed **refuses**,
+   * because a verification that silently passes is worse than none.
+   */
+  get canHashContent(): boolean {
+    return this.#digest !== undefined;
   }
 
   /** Number of cache slots, pending loads included. */
@@ -789,14 +956,38 @@ export class AssetManager<TSignal = never> implements Disposable {
       return Promise.reject(abortFailure(url, loader.name));
     }
 
+    // Hashing is a capability, and asking for one this manager cannot compute is
+    // a programming error about *wiring*, so it is diagnosed exactly as a
+    // missing `fetch` is: synchronously, at the call, naming the way out.
+    const expectedHash = options?.expectedHash;
+    const wantHash =
+      options?.hashContent === true || expectedHash !== undefined;
+    const digest = this.#digest;
+    if (wantHash && digest === undefined) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot hash "${url}": this AssetManager has no digest. Pass ` +
+          `{ digest } to the constructor — this runtime has no crypto.subtle ` +
+          `(an insecure browser context, or Node older than 19).`,
+        { context: { url, loader: loader.name } },
+      );
+    }
+
     const byUrl = this.#groupFor(loader);
     const existing = byUrl.get(url);
     if (existing !== undefined) {
       existing.refCount += 1;
       const joined = existing.promise as Promise<T>;
-      return signal === undefined
-        ? joined
-        : this.#withAbort(joined, existing, url, loader, signal);
+      const guarded =
+        signal === undefined
+          ? joined
+          : this.#withAbort(joined, existing, url, loader, signal);
+      // Verification wraps *outside* the abort guard on purpose: an aborted
+      // waiter has already handed its reference back, and a verification that
+      // ran afterwards would hand back a second one.
+      return wantHash
+        ? this.#verified(guarded, existing, url, loader, expectedHash)
+        : guarded;
     }
 
     const fetchImpl = this.#fetch;
@@ -829,6 +1020,7 @@ export class AssetManager<TSignal = never> implements Disposable {
     // object has to be built first. It is never observable unset — nothing can
     // read the cache between these two statements, because `byUrl.set` is last.
     const handle = this.#abortController?.();
+    const sink: HashSink = { hash: undefined };
     const entry: CacheEntry = {
       url,
       promise: Promise.resolve(),
@@ -836,6 +1028,7 @@ export class AssetManager<TSignal = never> implements Disposable {
       settled: false,
       value: undefined,
       evicted: false,
+      hash: undefined,
       abort:
         handle === undefined
           ? undefined
@@ -844,7 +1037,14 @@ export class AssetManager<TSignal = never> implements Disposable {
             },
     };
     const promise = this.#withDeadline(
-      this.#run(fetchImpl, url, loader, handle?.signal),
+      this.#run(
+        fetchImpl,
+        url,
+        loader,
+        handle?.signal,
+        wantHash ? digest : undefined,
+        sink,
+      ),
       timer,
       url,
       loader.name,
@@ -853,6 +1053,7 @@ export class AssetManager<TSignal = never> implements Disposable {
       (value): T => {
         entry.settled = true;
         entry.value = value;
+        entry.hash = sink.hash;
         // Released (or cleared) while the fetch was in flight: honour the
         // release now that there is something to dispose.
         if (entry.refCount <= 0 || entry.evicted) {
@@ -869,9 +1070,13 @@ export class AssetManager<TSignal = never> implements Disposable {
     );
     entry.promise = promise;
     byUrl.set(url, entry);
-    return signal === undefined
-      ? promise
-      : this.#withAbort(promise, entry, url, loader, signal);
+    const guarded =
+      signal === undefined
+        ? promise
+        : this.#withAbort(promise, entry, url, loader, signal);
+    return wantHash
+      ? this.#verified(guarded, entry, url, loader, expectedHash)
+      : guarded;
   }
 
   /**
@@ -898,6 +1103,19 @@ export class AssetManager<TSignal = never> implements Disposable {
    */
   refCount(url: string, loader: AssetLoader<unknown>): number {
     return this.#entries.get(loader)?.get(url)?.refCount ?? 0;
+  }
+
+  /**
+   * The content hash recorded for (`url`, `loader`) (§76), or `undefined` when
+   * the entry is absent, still loading, or was loaded without
+   * {@link AssetLoadOptions.hashContent}.
+   *
+   * This is the value §79's manifest records beside the URL. Like {@link get} it
+   * is a peek: it never changes the reference count and never triggers a load.
+   */
+  contentHash(url: string, loader: AssetLoader<unknown>): string | undefined {
+    const entry = this.#entries.get(loader)?.get(url);
+    return entry?.settled === true ? entry.hash : undefined;
   }
 
   /**
@@ -1060,6 +1278,67 @@ export class AssetManager<TSignal = never> implements Disposable {
   }
 
   /**
+   * One waiter's content-hash check over a shared load (§76, §79).
+   *
+   * Per waiter, not per load — see the module comment's rule 2: the load
+   * computes one hash, and each caller compares it with the expectation it
+   * brought. A failed check rejects only this caller and hands its reference
+   * back through {@link #detach}, exactly as an abort does, because a caller
+   * that refused the bytes is not holding the asset.
+   *
+   * Two failures, and both are refusals rather than passes (rule 3): the hash
+   * differs from `expectedHash`, or there is no hash at all — which happens when
+   * this call joined a load that nobody asked to hash, and is reported as such
+   * rather than being silently accepted.
+   */
+  #verified<T>(
+    shared: Promise<T>,
+    entry: CacheEntry,
+    url: string,
+    loader: AssetLoader<unknown>,
+    expectedHash: string | undefined,
+  ): Promise<T> {
+    return shared.then((value: T): T => {
+      const observedHash = entry.hash;
+      if (observedHash === undefined) {
+        this.#detach(entry, url, loader);
+        throw new FourError(
+          "ASSET_LOAD_FAILED",
+          `Cannot verify "${url}": no content hash was computed — the load this ` +
+            `call joined was not hashing, or loader "${loader.name}" never read ` +
+            `the body. Load a key with { hashContent: true } consistently, or ` +
+            `release it before verifying it.`,
+          {
+            context: {
+              url,
+              loader: loader.name,
+              reason: "hash-unavailable",
+              expectedHash,
+            },
+          },
+        );
+      }
+      if (expectedHash !== undefined && observedHash !== expectedHash) {
+        this.#detach(entry, url, loader);
+        throw new FourError(
+          "ASSET_LOAD_FAILED",
+          `"${url}" hashes to ${observedHash}, not the declared ${expectedHash} (§79, §96).`,
+          {
+            context: {
+              url,
+              loader: loader.name,
+              reason: "hash-mismatch",
+              expectedHash,
+              observedHash,
+            },
+          },
+        );
+      }
+      return value;
+    });
+  }
+
+  /**
    * Hands back the one reference an aborted `load` took (§76 rule 1).
    *
    * Deliberately not {@link AssetManager.release}: that resolves the key through
@@ -1159,6 +1438,8 @@ export class AssetManager<TSignal = never> implements Disposable {
     url: string,
     loader: AssetLoader<T>,
     signal: unknown,
+    digest: DigestLike | undefined,
+    sink: HashSink,
   ): Promise<T> {
     let response: FetchResponse;
     try {
@@ -1204,6 +1485,28 @@ export class AssetManager<TSignal = never> implements Disposable {
         throw refuse(declared);
       }
       response = boundedResponse(response, maximumBytes, refuse);
+    }
+
+    // Hashing wraps *inside* the §96 bound: the bytes hashed are the bytes the
+    // loader is allowed to see, so an over-budget body is refused before a
+    // digest is ever computed over it.
+    if (digest !== undefined) {
+      response = hashingResponse(
+        response,
+        digest,
+        this.#decodeText,
+        sink,
+        () =>
+          new FourError(
+            "ASSET_LOAD_FAILED",
+            `Cannot hash "${url}": loader "${loader.name}" reads the body as ` +
+              `text and this runtime has no TextDecoder. Pass { decodeText } to ` +
+              `the AssetManager constructor.`,
+            {
+              context: { url, loader: loader.name, reason: "hash-unavailable" },
+            },
+          ),
+      );
     }
 
     try {

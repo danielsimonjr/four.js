@@ -21,8 +21,8 @@
  * WP-3.3 deliberately deferred this class — every field of it is render state
  * whose meaning is fixed by the backend that translates it into draw-time
  * calls, and the backend packet had not been written. It has been since
- * (`@four/render-webgl`), so the base lands here (2026-08-06) with **six of
- * §57's seven** members; `stencil` is staged below rather than sketched.
+ * (`@four/render-webgl`), so the base landed here (2026-08-06) with six of
+ * §57's seven members; the seventh, `stencil`, joined them on 2026-08-11 (R-7).
  *
  * ## What lives here, and what does not
  *
@@ -78,18 +78,32 @@
  * bumping would invalidate the geometry and texture bindings that *are* cached
  * against this counter for no reason.
  *
- * ## Staged, with the date (§67, R-7)
+ * ## `stencil` landed 2026-08-11 (§67, R-7)
  *
- * `stencil?: StencilState` is **not** here. The WebGL 2 backend acquires its
- * context with `stencil: false` (`webgl-renderer.ts`), so there is no stencil
- * buffer to configure, and §67's masks — rectangular scissor, path masks, alpha
- * masks, stencil masks, nested clipping — are a packet of their own that has to
- * design `StencilState` alongside the buffer it drives. Declaring the field now
- * would put a type in the public API that no backend can honour. Staged
- * 2026-08-06; it arrives with §67.
+ * This section used to say `stencil?: StencilState` was *staged*, because the
+ * WebGL 2 backend acquired its context with `stencil: false` and there was no
+ * buffer to configure. Both halves moved together in R-7: `StencilState` is
+ * `stencil-state.ts`, the backend applies it per draw against a CPU mirror at
+ * GL's initial values, and a stencil buffer is allocated where — and only
+ * where — a renderer or a render target asks for one.
+ *
+ * The base is therefore **§57 complete**: seven members, of which six are
+ * unconditional and the seventh is the optional one §57 declares optional.
+ * `undefined` is its default and means what it meant before the field existed —
+ * the stencil test stays disabled and the frame issues no stencil call at all.
+ *
+ * What is *still* staged is §67's clipping API, and `stencil-state.ts` says why
+ * at length: a `clip()` is a scene-graph design (inheritance down a subtree,
+ * nesting, bit-plane assignment, the limits diagnostic), not a state record.
+ * This is the substrate it will be expressed in.
  */
 
 import type { Disposable } from "@four/core";
+
+// **Type-only**, deliberately (R-7): `Material` never *constructs* a
+// `StencilState`, so a bundle whose scenes never mask does not carry the class
+// at all. See {@link Material.stencil} for what makes that safe.
+import type { StencilState } from "./stencil-state.js";
 
 /**
  * How a transparent material's fragments combine with what is already in the
@@ -134,6 +148,11 @@ export interface MaterialOptions {
   depthWrite?: boolean;
   /** Initial {@link Material.colorWrite}; defaults to `true`. */
   colorWrite?: boolean;
+  /**
+   * Initial {@link Material.stencil}; defaults to `undefined` (no stencil
+   * test). A `StencilState`, which validates itself at construction.
+   */
+  stencil?: StencilState;
 }
 
 /**
@@ -327,6 +346,42 @@ export abstract class Material implements Disposable {
   colorWrite: boolean;
 
   /**
+   * §57's optional stencil state (§67); `undefined` by default, which leaves
+   * the stencil test disabled — GL's initial state, and the state every frame
+   * this engine drew before R-7 ran in.
+   *
+   * ```ts
+   * material.stencil = new StencilState({ func: "equal", ref: 1, writeMask: 0 });
+   * ```
+   *
+   * A **plain property**, like the four booleans above and unlike
+   * {@link Material.opacity}, and the F14 rule is satisfied a different way:
+   * every field of a `StencilState` is validated by the class itself, on
+   * construction and on every later write, and the class is *nominal* — its
+   * fields are private, so an object literal is not assignable to it. A caller
+   * therefore cannot reach the backend with an unchecked comparison name
+   * without going through a validating constructor, and this property has
+   * nothing left to check.
+   *
+   * That is also what keeps it free. The import above is type-only, so a
+   * bundle whose scenes never mask does not carry `StencilState` — masking
+   * costs bytes only where it is used, which a validating accessor here would
+   * have made impossible (measured 2026-08-11 over four example bundles:
+   * 0.62 kB gzip each, which is 42% of what the whole packet costs them).
+   *
+   * Like the rest of §57's render state, assigning does **not** bump
+   * {@link Material.version}: a backend re-reads it per draw and caches none of
+   * it. Mutating the `StencilState` in place is therefore live too, with no
+   * announcement needed — and two materials may share one record, which is how
+   * the two passes of one mask stay in step.
+   *
+   * A backend that cannot allocate a stencil buffer honours this by drawing
+   * without the mask, never by failing the frame (§61) — see
+   * `@four/render-webgl`'s `RendererOptions.stencil`.
+   */
+  stencil: StencilState | undefined;
+
+  /**
    * Backing fields for the two validated accessors. Seeded with the documented
    * defaults so the constructor can assign *through* the setters — one copy of
    * each rule, checked wherever the value arrives from.
@@ -357,6 +412,9 @@ export abstract class Material implements Disposable {
     this.depthTest = options.depthTest ?? true;
     this.depthWrite = options.depthWrite ?? true;
     this.colorWrite = options.colorWrite ?? true;
+    // `undefined` in the overwhelmingly common case, which is what leaves the
+    // stencil test disabled and the frame's GL sequence unchanged.
+    this.stencil = options.stencil;
   }
 
   /**

@@ -38,7 +38,7 @@
  * | loads | §45, §62, §37 | `#status` reaches `running`; the page reports the backend and solver the registries *chose* (`webgl2`, `rapier3d`) with no fallbacks; six bodies and two joints; no console error or unhandled rejection |
  * | one scene | §118 | six objects and two text layers are counted in **one** screenshot, each by its own hue, over a lit ground with a dark sky above it |
  * | everything moves | §10, §16, §29 | two frames 400 ms apart differ over a large area, simulated time advances, the §16 timeline reports laps, and §29 has reported landings |
- * | the panel is screen-space | §48, §71, §72 | the panel's own glyphs land in the lower-right quadrant, and pointing at each control the page publishes flips `data-hover` to that control's name |
+ * | the panel is screen-space | §46, §47, §48, §71, §72 | the panel's own glyphs land in the lower-right quadrant of the second, `ScreenCamera` viewport, and pointing at each control the page publishes flips `data-hover` to that control's name |
  * | pause, single-step, overlay | §10, §113 | pause freezes the framebuffer (measured: **0** changed pixels) and simulated time; one step advances `sim` by exactly `1/60` s and redraws; the overlay's own colours appear where there were none |
  * | slow motion and the keyboard | §75, §9 | Tab reaches the slider, `Home` sets `timeScale` to its minimum, and simulated time then accumulates ~20× slower over the same wall-clock second; `Enter` activates the focused button and the activation reports `source: "keyboard"` |
  *
@@ -218,10 +218,13 @@ const FIXED_DELTA_TIME = 1 / 60;
 /**
  * The x below which a pixel is definitely *not* the control panel.
  *
- * The panel is parented to the camera at a local offset that puts it in the
- * lower-right quarter; the probe measured its glyphs spanning x 606…892 and
- * y 395…502, and its background starting at x ≈ 592. 590 is just left of that,
- * so "outside the panel" is a statement about the scene.
+ * The panel is drawn by a second, screen-space viewport whose §47 `ScreenCamera`
+ * makes its layout numbers pixels, and it is placed in the lower-right quarter;
+ * the probe measured its background starting at x = 592 exactly — which is what
+ * "the layout says 592" now means. 590 is just left of that, so "outside the
+ * panel" is a statement about the scene. (Before 2026-08-21 the panel was
+ * parented to the perspective camera and the same edge landed at x ≈ 592 by
+ * arithmetic through a perspective divide.)
  */
 const PANEL_LEFT_EDGE = 590;
 
@@ -842,8 +845,9 @@ test.describe("examples/flagship/one-scene-everything-moves (§118)", () => {
     const counts = measure(await grab(canvas));
 
     // The panel is drawn, and it is where a screen-space HUD is supposed to be:
-    // the lower-right quadrant. The probe measured its chrome starting at
-    // x = 606, y = 395 of a 960 × 600 frame.
+    // the lower-right quadrant of a 960 × 600 frame. Since 2026-08-21 that
+    // placement is exact rather than approximate: the panel's top-left corner is
+    // authored as the pixel pair (592, 221) under a §47 `ScreenCamera`.
     expect(
       counts.panelGlyphs,
       "the UI panel drew no text",
@@ -858,9 +862,10 @@ test.describe("examples/flagship/one-scene-everything-moves (§118)", () => {
     ).toBeGreaterThanOrEqual(CANVAS_HEIGHT / 2);
 
     // Pointing at each control the page publishes must reach *that* control:
-    // this is the §71 ray hitting a widget whose world transform runs through
-    // the camera node it is parented to, and the check that makes the published
-    // positions trustworthy for the tests below.
+    // this is the §71 ray, cast through the **screen** camera the panel is drawn
+    // with, hitting a widget whose world position is its position on the canvas
+    // — and the check that makes the published positions trustworthy for the
+    // tests below.
     const points = await controlPoints(page, canvas);
     for (const name of ["pause", "step", "debug"]) {
       const point = points.get(name);

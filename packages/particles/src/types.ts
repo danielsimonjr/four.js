@@ -97,6 +97,66 @@ export interface ParticleForceField {
     time: number,
     out?: Vector3,
   ): Vector3;
+
+  // --- R-34: §27 batched field sampling (begin) ---
+  /**
+   * **Optional fast path**: the same contribution as {@link
+   * ParticleForceField.sample}, for `count` particles at once, **added into**
+   * `out` (R-34, §27/§112).
+   *
+   * ```ts
+   * sampleAll(positions, velocities, count, time, out) {
+   *   for (let i = 0; i < count; i += 1) {
+   *     const base = i * 3;
+   *     out[base] += -c * velocities[base];
+   *     out[base + 1] += -c * velocities[base + 1];
+   *     out[base + 2] += -c * velocities[base + 2];
+   *   }
+   * }
+   * ```
+   *
+   * ## Why it exists
+   *
+   * Measured attribution in `benchmarks/results/particles-100k.json`: the
+   * integrator alone costs 1.31 ms per 100 000 particles, and **each** field
+   * adds ~5.15 ms — three fields consume the whole 16.67 ms fixed-step budget.
+   * Almost none of that is the field's arithmetic. It is one megamorphic
+   * `sample()` call, two `Vector3.set`s, and three property reads, per particle
+   * per field. A field that loops internally pays the call once per step
+   * instead of once per particle, and JIT-inlines its own monomorphic body.
+   *
+   * ## Contract
+   *
+   * - **Add, do not assign.** `out` arrives carrying the emitter's gravity and
+   *   every earlier field's contribution; overwriting it deletes them. (This is
+   *   the one place this entry point departs from §27's `sample`, which
+   *   produces a value. Producing here would force the emitter to allocate a
+   *   second buffer and make a third pass over 3 × `count` floats per field,
+   *   which is most of the win.)
+   * - **`out` is a `Float64Array`, not `Float32Array`.** The scalar path
+   *   accumulates in JavaScript numbers, i.e. binary64; a binary32 accumulator
+   *   would round after every field and make a batched run differ from a scalar
+   *   one in the last bits. §33 does not permit "fast, and also slightly
+   *   different".
+   * - **Be bit-identical to `sample`.** Same arithmetic, same order of
+   *   operations, same special cases. A field that ships both owes a test that
+   *   pins them against each other — every built-in field has one.
+   * - `positions` and `velocities` are the pool's live arrays, `xyz` at stride
+   *   3, valid for indices `[0, 3 · count)`. **Read, never write.**
+   * - Same purity rules as `sample`: no clock, no `Math.random`.
+   *
+   * A field that does not implement this is not penalised: the emitter falls
+   * back to `sample` for that field alone, in the same declaration order, with
+   * the same result.
+   */
+  sampleAll?(
+    positions: Float32Array,
+    velocities: Float32Array,
+    count: number,
+    time: number,
+    out: Float64Array,
+  ): void;
+  // --- R-34: §27 batched field sampling (end) ---
 }
 
 /**

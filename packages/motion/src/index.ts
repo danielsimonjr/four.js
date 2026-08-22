@@ -11,6 +11,16 @@ export {
   OrbitRig,
 } from "./camera-rigs.js";
 export type {
+  CharacterControllerOptions,
+  FirstPersonLookOptions,
+} from "./character-controller.js";
+export {
+  CharacterController,
+  DEFAULT_CHARACTER_GRAVITY,
+  DEFAULT_FIRST_PERSON_PITCH_LIMIT,
+  FirstPersonLook,
+} from "./character-controller.js";
+export type {
   ReadonlyTimeState,
   TimeState,
   TimeStateOptions,
@@ -64,6 +74,8 @@ export { MotionComponent, MotionSystem } from "./motion-component.js";
 export type { RigTarget } from "./rig-target.js";
 export type { ComponentSerializerShape } from "./serializers.js";
 export {
+  CHARACTER_CONTROLLER_SERIALIZER,
+  FIRST_PERSON_LOOK_SERIALIZER,
   FOLLOW_RIG_SERIALIZER,
   KINEMATIC_CONTROLLER_SERIALIZER,
   LOOK_AT_CONSTRAINT_SERIALIZER,

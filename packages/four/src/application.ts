@@ -164,6 +164,8 @@ import {
   Scene,
   createSnapshotSystem,
   resolveWorldTransforms,
+  type Camera,
+  type SurfaceSizedCamera,
   type Viewport,
   type WorldTransformStats,
 } from "@four/scene";
@@ -747,6 +749,25 @@ function isFullSurface(view: Viewport): boolean {
     view.y === 0 &&
     view.width === 1 &&
     view.height === 1
+  );
+}
+
+/**
+ * Whether `camera` asks to be told the surface's size on resize — §47's
+ * `ScreenCamera` and anything else that implements `SurfaceSizedCamera`
+ * (R-37, 2026-08-21).
+ *
+ * Structural, not `instanceof`, and `SurfaceSizedCamera`'s documentation argues
+ * why: §47's fifth camera type is a *custom projection camera*, which has the
+ * same need and cannot be enumerated here, and naming the class would pull
+ * `ScreenCamera` into every bundle that constructs an `Application` whether or
+ * not one is used. The method is the opt-in.
+ */
+function acceptsSurfaceSize(
+  camera: Camera,
+): camera is Camera & SurfaceSizedCamera {
+  return (
+    typeof (camera as Partial<SurfaceSizedCamera>).setSurfaceSize === "function"
   );
 }
 
@@ -1660,7 +1681,14 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    *    rectangle (§61);
    * 3. every **full-surface** viewport whose camera is a
    *    {@link PerspectiveCamera} has its `aspect` set to `width / height` and
-   *    its projection rebuilt.
+   *    its projection rebuilt; every full-surface viewport whose camera
+   *    instead accepts a surface size — §47's `ScreenCamera`, or any camera
+   *    implementing `SurfaceSizedCamera` — is handed `(width, height,
+   *    resolution)` and rebuilt too (R-37, 2026-08-21). That is how a
+   *    screen-space UI pass learns its pixel rectangle; the push happens here
+   *    rather than in the view loop because a projection should change when a
+   *    *size* changes, not when a frame is drawn, and because a headless
+   *    application (§45) never runs a view loop at all.
    *
    * **Why this class updates cameras and the renderer does not** (decision,
    * A-7; the sentence here quoted §61 until 2026-08-07 — "a camera's `aspect`
@@ -1679,9 +1707,11 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * **Full-surface** means `normalized` with the rectangle `(0, 0, 1, 1)` —
    * what `createFullscreenViewport` builds. A partial viewport is left alone
    * because its aspect is its rectangle's, not the surface's, and the rectangle
-   * may be in pixels the application maintains itself; an orthographic camera
-   * is left alone because its extent is an authoring decision (how much world
-   * to show), not a consequence of the window size.
+   * may be in pixels the application maintains itself — a screen camera in a
+   * partial viewport is sized with `setSurfaceSize` by whoever owns that
+   * rectangle; an orthographic camera is left alone because its extent is an
+   * authoring decision (how much world to show), not a consequence of the
+   * window size.
    * Two viewports sharing one camera update it twice with the same value, which
    * is idempotent.
    *
@@ -1739,6 +1769,9 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       const camera = view.camera;
       if (camera instanceof PerspectiveCamera) {
         camera.aspect = aspect;
+        camera.updateProjectionMatrix(this.#depthRange);
+      } else if (acceptsSurfaceSize(camera)) {
+        camera.setSurfaceSize(width, height, this.#resolution);
         camera.updateProjectionMatrix(this.#depthRange);
       }
     }

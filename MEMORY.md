@@ -28,6 +28,630 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-21 — WP-R1.1: the WebGPU backend's foundation.** Decisions worth keeping:
+  - **A clear is a draw on WebGPU, and that is forced rather than chosen.** §61 confines
+    a clear to the viewport rectangle; `loadOp` clears the whole attachment and has no
+    scissor, so a `loadOp: "clear"` implementation would erase view 1 when view 2 began.
+    `setScissorRect` plus a full-surface triangle _is_ the GL backend's scissored
+    `clear`, expressed in the primitives WebGPU has — colour-write-masked for a view
+    that carries no `clearColor`, `depthCompare: "always"` with `z = 1` for the depth
+    clear every view owes.
+  - **One render pass per frame, not per view** — WebGPU's scissor and viewport are pass
+    commands, not ambient state. The one place this backend is structurally _safer_
+    than the GL one: no state mirror, nothing to restore in a `finally`, and a draw
+    that throws cannot leak state because the pass is never submitted.
+  - **The depth remap goes in the shader, not on the camera.**
+    `Camera.updateProjectionMatrix` accepts `"zero-to-one"` and this backend
+    deliberately does not call it: a renderer that rewrote an application-owned
+    camera's projection would corrupt any other renderer sharing that camera (§61:
+    rendering mutates nothing in the scene). `(clip.z + clip.w) * 0.5` in the vertex
+    stage is exact and leaves frustum culling against the one convention both backends
+    share — which is what makes cross-backend render-list identity hold.
+  - **Uniforms: one buffer, one bind group, a dynamic offset per draw**, sized _before_
+    the pass is recorded from an upper bound. Growing mid-frame would orphan the bind
+    group the pass has already been handed. One `queue.writeBuffer` per frame.
+  - **The lazy cache inverts R-19's uniform-vs-variant argument.**
+    `useMap`/`useVertexColors` are uniforms on WebGL because variants meant more
+    programs compiled at init. With a lazy descriptor-keyed cache a variant nothing
+    draws is never created, so on WebGPU they are variants — no per-fragment branch,
+    and the vertex layout can omit the colour buffer entirely.
+  - **The widened `RendererCapabilities` is optional-with-a-tri-state, and that is what
+    makes it additive.** `undefined` means "this backend has not been taught to
+    answer", distinct from `false`. Zero test doubles and zero umbrella files changed.
+    The WebGL backend answers everything it can state _without a new GL call_ and
+    **omits** the two `getParameter`-needing members — R-30b's lazy-query law again.
+  - **Gotcha (browser gate): `--enable-unsafe-webgpu` is NOT free for the other
+    projects.** A `webgl2` context still initialises alongside it — true, and not the
+    whole gate: the §118 flagship's slow-motion assertion fails reproducibly with the
+    flag on (initialising Dawn changes the frame pacing that spec measures). The flag
+    belongs on the `webgpu` project's own `launchOptions`, with
+    `testIgnore: "webgpu/**"` on `chromium` so the new specs do not run twice.
+  - **Gotcha (doubles): `globalThis.navigator` is a getter-only own property under
+    Node 22.** A plain assignment throws; installing a fake host needs
+    `Object.defineProperty` and the captured descriptor to restore.
+  - **`recording-gl.ts` retains typed-array arguments, and the GL backend uploads
+    matrices out of a module-level scratch** — every matrix read off that tape after
+    the frame is the frame's _last_ matrix. `recording-gpu.ts` copies at record time;
+    the cross-backend harness snapshots GL's matrices through a thin wrapper rather
+    than changing the landed helper underneath the suites that depend on it.
+  - **Cross-backend identity, measured:** NullRenderer, WebGL 2 and WebGPU submit the
+    same draws, in the same order, with the same transforms, for a scene mixing opaque,
+    transparent, explicitly-ordered and frustum-culled nodes across two views.
+  - **Measured: the umbrella's `export * as renderWebgpu` still tree-shakes.** No
+    WebGPU symbol reaches any tight bundle (grep for
+    `vertexMain`/`requestAdapter`/`depth24plus` against a `createVertexArray` control).
+    The uniform +0.10–0.11 kB gzip is the two capability records, not the backend. No
+    budget bump.
+
+- **2026-08-21 — PH-11b: the solver-backed character controller.** Decisions worth
+  keeping:
+  - **The extends-vs-holds question was decided by ES privacy, not by taste, and the
+    rule generalizes: inherit only when you can keep every inherited promise.**
+    `CharacterController`'s `#verticalVelocity`/`#grounded` have no setters, so a
+    subclass overriding `step` cannot maintain the state its own inherited getters
+    report — and it should not want to, because `grounded` is a promise about a
+    _plane_ and a swept controller's is a promise about _geometry_. Holding lets the
+    swept class expose the half that stays true (intent, heading, parameters —
+    executed once by the held object) and **re-declare** the half whose meaning
+    changed. It also cost `@four/motion` no edit at all.
+  - **A subclass sharing a `typeName` would have bought a free system and sold §79 to
+    get it.** The registry refuses a duplicate serializer name, so a swept controller
+    would round-trip through the plain one's serializer. Correct §79 outranks a free
+    system.
+  - **§39 placement is decided by `PhysicsWorld.step`'s own step 1.** Kinematic bodies
+    are fed `setNextKinematicTransform` from the _node transform_ at the top of the
+    step, so a character written at 400 reaches the solver at 600 and one written
+    after the solve would leave its collider a step behind the pose it just computed.
+    Corollary: the geometry the casts see is start-of-step geometry —
+    `ForceFieldSystem`'s velocity convention, the only self-consistent pairing.
+  - **§42 asks who _writes_, not who _reads_.** Consulting the solver does not make a
+    controller `"physics"`; §12's "kinematic controllers directly prescribe movement"
+    settles the tier, and `"physics"` would additionally make the publish pass
+    overwrite the character with a pose that does not exist.
+  - **The "one authority, one system" rule has exactly one permitted exception, and
+    §3.1 is what creates it.** `@four/motion` may not name `PhysicsWorld`, so
+    `KinematicSystem` _cannot_ advance a solver-backed controller. The hazard the rule
+    protected against — an uncatchable second writer — is caught by dispatching on
+    disjoint component types and refusing (once, `console.warn`) a node carrying both
+    locomotion components.
+  - **A collide-and-slide loop needs a stated constant, not an epsilon.** Each
+    iteration consumes distance or removes a degree of freedom, so it converges — but
+    §30 reports an already-overlapping cast as `distance: 0`, and "converges" is not
+    "terminates". `maxSlides` caps solver calls per character per step; leftover
+    motion is **dropped**, because the alternative is moving the capsule into
+    geometry.
+  - **Gotcha, found by measurement: a step-up must reach forward by at least one
+    capsule radius.** Stopping with half the capsule over the lip contacts the step's
+    _edge_, and an edge normal is not the tread's — measured `normal.y = 0.564` on a
+    flat 0.25 m riser against a 0.707 limit, so the flat surface read as unwalkable
+    and the character jittered on the lip for ever. A step is taken only if the feet
+    land _on_ the tread; the price is a deliberate over-step of up to one radius, once
+    per step.
+  - **Snap distance ships and coyote time does not, and the line between them is "is
+    it a collision fact?".** The ground under a character walking down a ramp _is_
+    there, just lower. The frames a player is forgiven after leaving a ledge are a
+    feel policy, composable from `grounded` in three lines.
+  - **A staged feature is better shipped as a published handle than as a paragraph.**
+    Platform carry is staged — but `groundBody` costs nothing (the probe's hit already
+    carries it) and `translate()` applies un-swept displacement, so an application can
+    carry itself today. Pushing dynamics stays fully staged because it needs a
+    _policy_, and there is nothing to hand over.
+  - **Measured, and it is honest that it is not zero: the character does not push a
+    dynamic box.** It stops one skin short, so the solver sees no penetration. Pinned
+    as a test rather than hidden.
+  - **§33: a controller that consumes solver queries inherits the solver's tier** —
+    `same-runtime`, because every shape-cast distance and normal is f64→f32 across the
+    wasm boundary before this code touches it. The golden pins `jumpsTaken: 7` of 300
+    attempts, `landings === jumpsTaken`, the fall clamp at exactly −6, one accepted
+    step-up at floor + riser, and a 60° ramp never climbed against a 45° limit.
+  - **§79 splits by package, not by section.** The swept controller registers with
+    `registerPhysicsSerializers` beside `RigidBody`/`Collider`. The umbrella's
+    enumerating test caught the registration mechanically, exactly as built.
+  - **Multi-agent note, second confirmation:** `@four/particles`' `random.test.ts`
+    times out only under full-tree parallelism while a sibling is in flight; passes
+    standalone. A red test on a loaded shared tree indicts the tree state first.
+  - Gotcha, seventh confirmation: **`pnpm run docs` is the type _and_ link gate** — a
+    `{@link}` from `@four/physics` cannot resolve a symbol that lives in `four`; plain
+    code span.
+
+- **2026-08-21 — R-30b: §77 mipmaps, the min-filter split, anisotropy.** Decisions worth
+  keeping:
+  - **A union widens when the feature giving its members meaning arrives — and it widens
+    beside the field it refines, not instead of it.** R-30 wrote that the `minFilter`
+    split would "land with mipmaps, beside this field". It did: `filter` is untouched and
+    _is_ the magnification filter; `TextureMinFilter` is `filter`'s two values plus GL's
+    four `*-mipmap-*` modes, on the min side only. **There is no `magFilter`, and that is
+    the non-obvious half**: GL accepts only `NEAREST`/`LINEAR` for magnification, so the
+    classic `minFilter`/`magFilter` pair would split a direction that can never carry the
+    four values that motivated splitting.
+  - **A derived default beats a constant default when the constant would be nonsense.**
+    `minFilter` resolves to `filter` with no chain (the byte-identity anchor) and to that
+    filter's chain-aware form with one. Defaulting to `LINEAR` on a mipmapped texture
+    would build a chain nothing samples.
+  - **§85 refuses what no device could honour; §62 negotiates what some device cannot.**
+    A mip-choosing `minFilter` without `mipmaps: true` is _refused_ (GL samples the
+    incomplete texture as opaque black — a silent whole-surface failure), while
+    `anisotropy: 16` is _clamped_ to the device ceiling and dropped where the extension is
+    absent. A quality knob that turned a legal scene into an error on half the fleet
+    would be worse than one that quietly costs less.
+  - **A capability query must be lazy if the alternative moves recorded transcripts.**
+    `getExtension` is fetched on the first texture asking for anisotropy above 1, never
+    at `initialize` — reading it at init would add two GL calls to every context and move
+    every landed integration transcript. The §62 _report_ for anisotropy is therefore
+    staged with the texture-format report, stated in source. Pipeline-cost law, applied
+    to a query.
+  - **Optional context members are how a GL surface grows without breaking its doubles.**
+    `WebglContext.generateMipmap` and `.getExtension` are optional — presence is the
+    capability — so every pre-existing double still satisfies the type, and a context
+    that cannot mipmap degrades to one level rather than a black surface.
+  - **Accounting follows the allocation.** `Texture.byteLength` sums the mip chain level
+    by level (4 × 4 mipmapped = 84 bytes, not 4/3 × 64), keeping §84's `textureMemory`
+    true; no chain, no change, so no landed §84 number moved.
+  - **What is left of §77 is what is _not_ upload-time state.** Wrap, filter, colour
+    space, mipmaps and anisotropy were all cheap for one reason: set on the texture
+    object at upload, read by nothing on the draw path. Cube/array/3D change the sampler
+    type in every shader; compressed containers change the upload call; video needs
+    per-frame update semantics. That is the boundary to quote when the next §77 packet is
+    scoped.
+  - **A browser gate can measure a shimmer.** A one-texel checkerboard proves nothing —
+    plain `LINEAR` averages it to grey by itself, which is how the first draft of
+    `mipmaps.spec.ts` failed. Eight-texel cells at 8× minification put a bilinear tap
+    _inside_ one cell, and then the claim is assertable: 81% extreme pixels → 1%, and a
+    half-pixel nudge moving the frame 120 mean luma → 39.
+  - **Measured: +0.33–0.69 kB gzip in every bundle carrying `Texture`** (A/B). Budgets
+    bumped 34.5 / 32 / 40.5 kB with the numbers.
+
+- **2026-08-21 — R-1 WebGPU scoping.** Decisions worth keeping:
+  - **CI can run WebGPU, and the flag is exactly one.** Measured against the sandbox's
+    pre-installed Chromium (`/opt/pw-browsers`): `--enable-unsafe-webgpu` alone yields a
+    SwiftShader adapter on both `chrome` and `headless_shell` — a WGSL render pipeline,
+    render-to-texture, `mapAsync` readback and a compute pipeline with storage buffers
+    all run. Extra Vulkan flags are redundant (Dawn resolves the `libvk_swiftshader.so`
+    shipped in both browser trees). Adding the flag alongside the existing
+    `--use-gl=angle --use-angle=swiftshader` does not disturb the WebGL 2 gate.
+  - **Gotcha (probing WebGPU): `about:blank` reports `navigator.gpu` absent.** The same
+    browser on `http://localhost` reports it present — an opaque origin is not the
+    secure context WebGPU wants. Any WebGPU probe or gate page must be _served_, never
+    `page.setContent`-ed.
+  - **Node has no WebGPU** (`globalThis.navigator.gpu` is `undefined`), so every
+    Vitest-tier WebGPU test is against a structural double — the same position
+    `WebglContext`/`recording-gl.ts` already occupy.
+  - **Cross-backend determinism has exactly one claimable invariant: render-list
+    consumption.** Pixel identity between rasterisers is not claimable, and transcripts
+    are lists in different languages. What _is_ assertable — and what makes §61's "the
+    logical scene shall remain independent of the selected backend" testable for the
+    first time — is that every backend receives the identical `RenderItem[]` and
+    `RenderBatch[]` for a given scene/view/alpha.
+  - **The batching seam is the render tier's best-factored one.** `RenderBatcher` is a
+    pure planner in `@four/render`; `gl-batch.ts` is only the uploader. A second
+    backend's batch module is a twin of `gl-batch.ts`, not of `batch.ts`.
+  - **`RendererCapabilities` is the one shared-interface change a second backend
+    forces** — two members today against §62's eleven; widen **once**, additively, in
+    the first packet, or churn three implementors nine times.
+  - **`RenderTarget`'s stencil ⊥ depthTexture exclusivity survives the WebGPU port for
+    an independent reason** (`depth24plus-stencil8`'s combined aspect). A constraint two
+    backends reach independently is a design, not an artefact of the first one.
+  - **On WebGPU, pipelines are lazy and descriptor-keyed — a deliberate departure from
+    compile-at-init.** `GPURenderPipeline` is immutable and combinatorial, and R-6's
+    pipeline-cost law says the cache must be lazy or it taxes every example that never
+    selects WebGPU. New hazard: pipeline-cache keys must be canonical strings, not
+    objects.
+  - **RFC 0001 and R-1 were in a circular wait, and hand-written WGSL is the break.**
+    Hand-porting the seven pipelines is the same duplication the project accepted for
+    GLSL, is bounded, and makes the emitter testable afterwards. One thing R-1 owes the
+    RFC: bind-group layouts declared as data, so the future emitter targets the same
+    layout.
+  - **`AUTO_RENDERER_ORDER` already prefers `"webgpu"`**, so the day the backend is
+    registrable, `registerWebgpuRenderer()` silently moves an application off WebGL 2.
+    Filed as an owner question rather than decided.
+  - **Gotcha (bundles): the umbrella re-exports the WebGPU stub**
+    (`export * as renderWebgpu` in `packages/four/src/index.ts`), and four examples
+    import from `four`. Free today; at sub-kB headroom it must be a `pnpm run size`
+    gate in the first packet, not an assumption about namespace tree-shaking.
+
+- **2026-08-21 — PH-11's residue: §12 character controllers + §44's first-person rig.**
+  Decisions worth keeping:
+  - **The first-person "arbitration" was a decomposition, and asking which writer wins
+    was the wrong question.** R-36 staged the rig on aim-vs-free-look arbitration under
+    §42's one authority. The answer is that yaw and pitch belong to _different
+    objects_: yaw **is** the character's heading (the direction it walks and the
+    direction it faces are one number, so a second writer of it is a second definition
+    of where the character is going), and pitch is not a property of a walking body at
+    all. So pitch moves to a child node and the composition `yaw ∘ pitch` falls out of
+    the scene graph — no roll, no gimbal arithmetic, and §42 satisfied
+    **structurally**, because an authority is per _node_. Generalizes: when two writers
+    want one node, ask whether they want the same node.
+  - **One authority means one system, even when the components are unrelated.**
+    `CharacterController`, `FirstPersonLook` and `KinematicController` all write under
+    `"kinematic"`, so they are advanced by the **existing** `KinematicSystem`; §42
+    compares the authority, not the system instance, so a second system would be a
+    second writer nothing could catch. Order within a node: locomotion → free look →
+    commands, with the command channel **last** and winning — alternatives, not layers.
+  - **§12's one bullet decides the tier, and the sentence above it decides it harder.**
+    "Kinematic controllers directly prescribe movement" is the whole scope argument: a
+    §12 character controller is not a solver object, so gravity against a _plane_ is
+    the honest tier and ships complete, while slide/step-height/slope/capsule sweeps
+    are staged.
+  - **The staged half's blocker is a direction, not a missing capability.**
+    `PhysicsWorld.shapeCast` (§30) already exists — the reason a swept controller is
+    not in `@four/motion` is that §3.1 gives motion only `core`/`math`/`scene` and the
+    edge runs `physics → motion`. So the solver-backed half is a `@four/physics` packet
+    (`SweptCharacterController` reusing this class's intent/heading/gravity state), and
+    an injected query interface with no implementor was declined: absent beats
+    accepted-and-ignored. **Re-check a blocker against source** — this one was one
+    `grep` away from being mis-filed as "the adapter has no queries".
+  - **`maxAngularSpeed` was deliberately NOT reused, and that is consistent with the
+    rule rather than an exception to it.** `LookAtConstraint` has a rate limit because
+    it computes its own goal from a moving target. `turn(delta)`/`look(delta)` take
+    deltas the application already chose, so a second limit would silently discard
+    input the caller believed was accepted. The spelling arrives when a controller
+    grows a _desired heading_ — i.e. when there is something to limit.
+  - **Diagonal movement is the oldest bug in the genre, and the fix is one `sqrt`.**
+    `setMoveIntent` clamps the intent's _magnitude_ to 1. `Math.sqrt` not
+    `Math.hypot`, because the scale multiplies straight into a transform and only
+    `sqrt` is specified exactly rounded (§33).
+  - **The write gate is what keeps the §42 idle rule true for a component that is never
+    really idle.** A character with gravity writes every airborne step, so `active` is
+    `!grounded || headingDirty || intent ≠ 0` — a grounded, still, unturned character
+    writes nothing and therefore warns about nothing. Corollary chosen on purpose:
+    with `gravity: 0` a character above the plane **hovers and stays ungrounded** — it
+    is falling at zero speed, and pretending otherwise would make `jump()` succeed in
+    mid-air.
+  - **Both writes commit or neither does.** The whole pose is computed into locals and
+    checked for finiteness before `position.set`, so a `NaN` arriving from elsewhere
+    leaves the transform _and the vertical state_ untouched and counts one
+    `skippedSteps`.
+  - **A golden can pin the two arms of a refusal.** `jumpsTaken: 3` against six
+    attempts is the evidence that `jump()` refuses in mid-air, and
+    `landings === jumpsTaken` that every jump came back down; `pitchLimitHits: 162`
+    says the pole guard was _reached_, and `fallerVerticalVelocity: −6` that the
+    terminal-velocity clamp bit. Four readable numbers that localise a change before
+    anyone opens a debugger.
+  - **§79 asymmetry worth remembering: vertical motion is scene state, move intent is
+    not.** A character saved mid-jump is at a height the document already carries,
+    moving at a speed nothing can reconstruct — so `verticalVelocity`/`grounded`
+    round-trip. The move intent is this frame's input, and §79 documents do not carry
+    the player's thumb. `maxFallSpeed` is written **by omission** when infinite,
+    because `Infinity` is not JSON and absence already means "unbounded" on both
+    sides.
+  - **Multi-agent note (orchestrator, 2026-08-21):** the playground sensor-zone browser
+    test failed consistently while this packet's `packages/motion`/`four` edits were in
+    flight (the example builds against the shared tree's source) and passed immediately
+    on the settled tree. A red browser test on a shared tree indicts the tree state
+    before it indicts the spec — settle, then re-run, before bisecting.
+  - **Measured:** **0 B** in five of six bundles — checked structurally
+    (`character-controller`/`first-person-look` appear zero times in each) —
+    **+0.93 kB gzip** in `motor-digital-twin`. No budget bumps.
+  - Gotcha, sixth confirmation: **`pnpm run docs` is the type gate, vitest is not.**
+
+- **2026-08-21 — RFC 0005 (pixel/GPU-id picking) + the `tests/` typecheck gate.**
+  Decisions worth keeping:
+  - **A node's id is a `string`, and that is a picking design constraint, not a
+    detail.** `Node.id` is `node-<n>` because §33 forbids random ids. An RGBA8 id buffer
+    holds 32 bits per texel, so an id pass can never encode `node.id` — it encodes a
+    **dense index into a per-pass table**, built in **scene traversal order** (never
+    `Set`/`Map` iteration order) and rebuilt every pass. The public result hands back
+    the string; the integer never leaves the service.
+  - **A picking result must never enter a §33 checksum.** A pick is a §34 _input_; a GPU
+    read-back is not reproducible across drivers. An application driving simulation from
+    a pick records the resulting **action**, not the pick.
+  - **Async is the honest contract on every backend, including one that could answer
+    synchronously.** WebGL 2's plain `readPixels` stalls; the non-stalling paths
+    (`PIXEL_PACK_BUFFER` + `clientWaitSync`, WebGPU `mapAsync`) are both async. A
+    capability tier may change _quality or availability_; it must never change an API's
+    **shape**. The result carries the `frame` it came from, so "correct for what was
+    clicked" is distinguishable from "stale for what is on screen".
+  - **The seam is `PickProvider { pick(ndcX, ndcY): Promise<string | undefined> }`**, in
+    `@four/input`, naming no render type — the fourth instance of the FetchLike /
+    SurfaceSizedCamera move. `@four/input` gains no dependency; the adapter is four
+    lines in the application; a test satisfies the provider with a `Map`.
+  - **`tests/tsconfig.json` existed for months and nothing ran it.** A config file is
+    not a gate until a script invokes it — check for the _script_, never for the _file_.
+    Its first run found 21 errors: 13 more `OrthographicCamera({ height, aspect })`,
+    4 browser fixtures that passed `clearColor` through the **id** parameter and
+    therefore never cleared, one `Sprite({ size })`, one joint-seam narrowing, and two
+    `ReplaySnapshot` conversions.
+  - **A behavioral fixture fix invalidates the golden recorded against the bug.** The
+    four never-clearing fixtures were fixed types-first by a packet that could not run
+    the browser gate; the orchestrator's verification run caught
+    `text-label-nearest-visual-linux.png` failing at 97% of pixels — the background that
+    now actually clears — and regenerated it deliberately. Rule: a fixture behavior fix
+    and its golden must be validated in the same landing, whoever owns the browser gate.
+  - **Gotcha: prose that names a compiler as its assertion must be checked against the
+    script list.** `replay-scenarios.ts`'s header claimed the
+    `ReplaySnapshot` ↔ `PhysicsSnapshot` compatibility was verified **in both
+    directions**; the consume direction never compiled (`configuration` is `unknown` by
+    package-boundary design). Two files cited `tsc --noEmit -p tests/tsconfig.json` as
+    their real assertion; neither had ever been run by anything.
+  - **A structural double narrows through the guard the owning package already exports,
+    never through `as any`.** `supportsSolverJointAccess` as both an `expect` and a
+    narrowing throw turns a compile hole into a _stronger_ runtime assertion. Where a
+    cast is genuinely unavoidable, it goes in a named helper whose doc states why it is
+    safe.
+  - **Gotcha (playwright): `pnpm test:browser -- <spec> --update-snapshots` does not
+    forward the flag** in this repo's script setup — the golden stays untouched while
+    the run appears to update. `pnpm exec playwright test <spec> --update-snapshots` is
+    the form that works.
+
+- **2026-08-21 — the examples modernization packet (Text, lookAt, ScreenCamera).**
+  Decisions worth keeping:
+  - **§7a's default screen origin is the wrong one for a `@four/ui` tree.** §74 lays
+    children out at `(left, −top)` — a Y-**up** frame with downward offsets expressed
+    as negative numbers — and `"top-left"` is the one origin that flips Y in the
+    projection, so every one of those offsets would climb the screen. Both flagships
+    use `origin: "bottom-left"`. Generalizes: the default origin is right for content
+    authored the way CSS is, and wrong for content authored the way the world is.
+  - **A plane at constant depth is a scale and a translation, and that made one
+    flagship's move pixel-exact.** `motor-digital-twin`'s instrument column kept its
+    own unit under `UI_UNIT_PIXELS = HEIGHT / (2·UI_DEPTH·tan(fov/2))` on a
+    screen-space root, so forty authored literals meant exactly what they meant when
+    the column hung 2.2 units in front of the camera. The §118 flagship was
+    re-authored in pixels instead, because _its_ numbers are §74 layout sizes. Rule:
+    keep the unit when the numbers are a picture, convert it when the numbers are a
+    layout.
+  - **Name only the layer you are adding.** Both flagships define `"ui"` and leave the
+    world on `DEFAULT_LAYER_MASK`, rather than `defineLayer("world")` plus a mask on
+    every mesh. §46 is self-not-subtree, so the second form has to be maintained by
+    every future packet that adds a renderable. The cost of the first form — every UI
+    drawable needs the mask — is paid in the two or three funnels that build UI nodes
+    and nowhere else.
+  - **`Text` was load-bearing for the layer work, not merely tidier.** A skin that
+    rebuilds glyph `Sprite`s whenever the status text changes creates nodes on the
+    default layer every frame; `applyLayers` at setup cannot reach them. One `Text`
+    node created at attach makes the mask a single write.
+  - **`Text.size`/`letterSpacing` have no equality check; `text` does.** Writing all
+    three on every `layout()` pass marks the node dirty every frame and rebuilds
+    vertex buffers that did not move. Every skin here guards the two that do not
+    self-dedup. Worth a look the next time a derived-geometry node grows a setter.
+  - **A rewritten aim is allowed to move, and the number belongs in the comment.**
+    `camera.lookAt((0, 0.25, 0))` derives −0.17021 rad where the file wrote −0.17 —
+    2 × 10⁻⁴ rad, ≈ 0.14 px, no golden at risk, every threshold held. The sun's move
+    is _exact_: `‖(−3.45, 7.51, 5.63)‖ = 10.000`.
+  - **`OrbitRig`/`LookAtConstraint` were declined for `first-3d-scene`, on merit.**
+    Neither the camera nor the sun moves; a per-step component plus an authority plus
+    a system registration is three concepts bought to replace two one-line writes.
+    §44's rigs exist for targets that _move_.
+  - **The measurement to reuse: `data-drawcalls`.** The twin publishes §84 statistics,
+    which made the draw-call claim a before/after read (159 → 59) rather than an
+    argument; triangles held at 2014, the cheapest check that the rewrite drew the
+    same picture.
+  - **Gotcha (`controlPixels`): a widget's `transform.position` is its parent's frame,
+    not the canvas.** The first cut published every control's position relative to its
+    row; the browser gate caught it as `hover === "none"`.
+    `resolveWorldTransform(widget).elements[12]/[13]` is the answer — plus
+    `[0]`/`[5]` when the screen-space root is scaled.
+  - **Measured:** the Text rewrite _shrinks_ bundles (a cut-cell cache and a sprite
+    loop cost more than a `Text` import): first-2d 45.32 → 45.17, ui-demo
+    38.98 → 38.82, twin 945.41 → 945.26 kB gzip. Two goldens moved, both ui-demo's,
+    both confined to glyph pixels. `particles-demo`'s +109 B overrun predates the
+    packet (same file hash both arms) — bumped 31 → 31.5 kB with the measurement.
+
+- **2026-08-21 — A-18 content hashing + §79 manifest, A-19 texture tier.** Decisions worth
+  keeping:
+  - **The hash is SHA-256 because of what §79 asks it to DO.** §79's manifest clause
+    carries two jobs: cache-busting (any hash) and verification on reload (integrity
+    against whoever answers the request — §96's untrusted party). A non-cryptographic
+    hash is collidable by construction, so verifying with one would _announce_ integrity
+    without providing it — worse than no check, because callers would trust it. Async is
+    free: `load` is already async, hashing is IO, and §33 is untouched for the same
+    reason the manager is allowed `globalThis.fetch`. `crypto.subtle` is reached through
+    a `globalThis` probe with a local structural interface — no `node:` import, so
+    `graph:check` is unaffected, and the package still names no platform type.
+  - **Presence is the capability — but hashing's missing-capability behaviour is the
+    OPPOSITE of abort's.** No `abortController` → cancellation degrades quietly (the
+    socket drains). No `digest` (an insecure browser context has `crypto` without
+    `subtle`) → the load is **refused**, loudly, at the call. A verification that
+    silently passes is worse than no verification; a cancellation that silently drains is
+    not.
+  - **The hash covers the response's BYTES, whatever the loader reads.** A hashed load
+    reads the body once as bytes and derives `text()`/`json()` from them through an
+    injected `decodeText` (`globalThis.TextDecoder` by default). Rejected alternatives:
+    hashing only byte-reading loaders (a §79 manifest verifying a JSON scene is a
+    first-class case), and hashing re-encoded text (the same URL would then hash
+    differently under `binaryLoader` and `jsonLoader` — a hash that depends on its
+    observer cannot go in a manifest).
+  - **Verification is per caller, not per load** — the coalescing-consistent answer,
+    matching abort rule 2. The shared load computes one hash; each waiter compares its
+    own `expectedHash` and a failure detaches only that waiter's reference. **The
+    verification wrapper goes OUTSIDE the abort wrapper**: reversed, a waiter that
+    aborted and then saw the shared load settle would hand its reference back twice.
+    (Measured, not assumed — the `#withAbort` `done` latch only makes abort-vs-settle
+    exclusive, not abort-vs-verify.)
+  - **Hashing wraps inside `boundedResponse`**, so §96's size limit refuses an
+    over-budget body before a digest is ever computed over it.
+  - **A-16 was never blocked on more than this.** §79's manifest is now executable; the
+    remaining half is that `SceneResourceCatalog.get(key)` is _synchronous_
+    (deserialization is), so manifest → catalog is necessarily preload-then-catalog. That
+    is a `@four/four` packet, not an assets one.
+    `tests/integration/texture-manifest.test.ts` runs the seam.
+  - **A-19 shipped at the "assets half" tier, and the row says which half.** The §77
+    loader tier lives in `@four/assets`; everything renderer-side (cube/array/3D,
+    mipmaps, anisotropy, compressed containers, render targets, video) is `R-30b`'s, and
+    §78 glTF's three blockers are unchanged. `TextureAsset` satisfies `TextureSource`
+    **structurally** (`PARTICLE_INSTANCE_FLOATS` precedent) — `@four/assets` sits below
+    the renderer in §3.1 and §62 allows several backends, so the dependency edge would be
+    the wrong direction.
+  - **The §7a row flip belongs in the loader.** `TextureSource.data` already said so
+    ("flipped by the adapter that produces them (§76), not by the backend"); `flipY`
+    defaults to `true` because every codec decodes top-row-first.
+  - **§96's decompression-limit residue is now half-discharged.** The first decoder in
+    the engine brought both bounds with it: absolute decoded size (64 MiB = 4096²·4)
+    _and_ expansion ratio (1000×) — the ratio is the one that catches a bomb, since the
+    absolute bound lets a 200-byte file legitimately claim 60 MiB. Pre-decode with an
+    optional `probe`, post-decode without one; the honest residue (a platform
+    `createImageBitmap` cannot be pre-bounded at all) is written in source, not implied
+    away.
+
+- **2026-08-21 — R-37 `ScreenCamera` + the trackball rig.** Decisions worth keeping:
+  - **A derived projection must not inherit an authored one.** `ScreenCamera extends
+Camera`, not `OrthographicCamera`: the six bounds come from
+    `(width, height, resolution, origin, units)`, and inheriting writable
+    `left/right/bottom/top` would give a caller fields whose writes the next resize
+    silently discards. The generalisation: _never inherit a settable field you intend to
+    overwrite._
+  - **§7a's screen space reconciles at the camera, and only for `"top-left"`.** The flip
+    is `bottom > top` inside `setOrthographic` — one sign, nowhere else in the engine.
+    `"bottom-left"` and `"centered"` stay Y-up on purpose: they are chosen _because_ the
+    caller wants the world convention. Consequence to remember: a negative-determinant
+    projection mirrors winding — free while the WebGL backend keeps `CULL_FACE` disabled,
+    and a note the packet that enables culling must read.
+  - **A screen camera's default near must be negative.** `-1000`/`1000`, so a camera
+    nobody moved sees the `z = 0` plane its content is authored on. `near = 0.1` is right
+    for a frustum and wrong for a slab; `R-8` lost time to the same trap in three
+    harnesses.
+  - **Refuse a _measured_ number, tolerate an _authored_ one.** The other cameras
+    deliberately do not validate (a degenerate authored box yields non-finite elements
+    and says so). A screen camera's rectangle arrives from a `ResizeObserver`, so it
+    throws `FourError("INVALID_APPLICATION_STATE")` — from the constructor,
+    `setSurfaceSize`, _and_ `updateProjectionMatrix`, because §47's plain-field idiom
+    means a direct write is only catchable at the projection. This asymmetry is the rule,
+    not an inconsistency.
+  - **Structural opt-in beats `instanceof` at a package boundary.** `Application.resize`
+    feeds any camera with a `setSurfaceSize` method (`SurfaceSizedCamera`), never
+    `camera instanceof ScreenCamera`. Two payoffs: §47's _custom projection camera_ opts
+    in without `four` knowing it exists, and `Application` — which is in every bundle —
+    names no class, so the feature costs **0 B** where it is unused. Reach for this
+    whenever an always-loaded module would otherwise name an optional one.
+  - **A rig's shape follows its input, not its family.** `OrbitRig`/`FollowRig` are
+    per-step components because their targets move; `TrackballRig` is event-driven and
+    writes on demand, so it is a plain class the application calls under §42's
+    `"manual"` authority. Forcing it into a component would have required
+    `@four/motion`'s `ConstraintSystem` — which names its three classes literally — to
+    import `@four/scene`'s rig, i.e. exactly the §3.1 edge the R-36 staging note existed
+    to avoid. §42 still applies to application writes: `applyTo` calls
+    `warnAuthorityConflict` and refuses a node owned elsewhere.
+  - **The trackball crossover is at `d = 1/√2`, not at the silhouette.** Sphere
+    `sqrt(1 - d²)` to the 45° parallel, then Bell's sheet `1/(2d)`; both give `1/√2`
+    there with matching slope. Switching at `d = 1` leaves a half-radius jump — the
+    continuity test caught exactly that bug in the first cut. Worth remembering as _the_
+    classic trackball mis-implementation.
+  - **Gotcha (testing): `helpers/recording-gl.ts` retains uniform arrays by reference.**
+    A transcript read _after_ a later frame reports that later frame's uniform values, so
+    two transcripts are comparable only when both frames wrote the same values last. An
+    A/B with _different view counts_ cannot be asserted on uniforms — assert on bindings
+    (`bindVertexArray`), which the double records by value.
+  - **`Vector3.applyQuaternion` still does not exist**, deliberately: `trackball.ts`
+    writes out the one special case it needs (rotating `(0, 0, z)`) rather than adding a
+    math primitive whose naming and `out` conventions (§7b) belong to a `@four/math`
+    packet.
+  - Bundle cost measured: **0 B** in every bundle that does not call
+    `registerSceneNodeTypes`; ≤ ~0.5 kB gzip in `motor-digital-twin`, the only example
+    that does. No budget bumps.
+
+- **2026-08-21 — R-21 §53 geometry model + R-34 §27 field batching.** Decisions worth
+  keeping:
+  - **A base class earns its place through identity, not through shape.** §53's
+    `Geometry` ships with exactly one concrete member and the other seven names still
+    absent; what justifies it today is that §33 forbids random ids, so the monotonic
+    counter must be shared, and `clone()` — the one operation that must _not_ copy an
+    id — needs one place to draw from. "The diagram has seven boxes" is not a reason to
+    write seven classes; each of them pins an attribute layout the WebGL backend and §79
+    both must agree with.
+  - **Widen a bounds type by aliasing, never by replacing.** `GeometryBounds` became a
+    type alias of `BoundingVolume` (box + circumscribing sphere), so four packages that
+    read `.min`/`.max` needed no edit and produce byte-identical values. **R-8 keeps
+    deriving its _world_ sphere from the box on purpose** — transforming a local sphere
+    under non-uniform scale is a looser bound than transforming the box.
+  - **The empty bound's centre and radius must be written, not computed.** Left to IEEE
+    the two disagree: `(+∞ + −∞)/2` is `NaN` but `|−∞ − +∞|/2` is `+∞`, and an infinite
+    radius reads to a culler as "everywhere" — the one error direction that is never
+    conservative. Both are pinned to `NaN`; consumers gate on
+    `Number.isFinite(radius)`, the same gate `computeWorldBoundingSphere` already
+    applied.
+  - **§53's `computeBounds(): void` is a spelling, not a constraint.** Narrowing the
+    existing return value to match the letter of the spec would have broken `render`,
+    `input` and `render-webgl` to gain nothing; the `bounds` _property_ §53 also
+    declares ships as a getter returning the identical object. Both spellings live.
+  - **A clone must be deep wherever the class documents an in-place fast path.**
+    `BufferGeometry` holds attributes by reference and documents
+    edit-then-`markDirty()`; a shallow clone would give two geometries one buffer and
+    two version counters, so a write through either handle changes what the other draws
+    while leaving the other's backend cache valid. Cloning a disposed geometry throws
+    rather than silently producing a valid empty mesh (§83).
+  - **Geometries serialize as catalog key references, not by value** — so `clone()` and
+    a new bounds type needed no §79 pairing at all. Checked, not assumed.
+  - **The cost of a `ForceField` was never its arithmetic.** ~5.15 ms per field per 100k
+    was one megamorphic `sample()`, two `Vector3.set`s and three property reads per
+    particle per field. Batching those away (`sampleAll`) cut the per-field marginal
+    cost ~5× with the same math — re-recorded on the canonical host: 16.58 → 4.51 ms
+    for the 3-field 100k stack, per-field 5.15 → 1.12 ms.
+  - **A batched fast path must be bit-identical or it is a different engine.** Three
+    things that would each have broken it silently: accumulating in `Float32Array`
+    (rounds after every field), starting the accumulator at zero instead of at gravity
+    (changes `(g+s₁)+s₂` into `g+(s₁+s₂)`), and `continue`-ing on a degenerate input
+    instead of `+= 0` (a positive zero added to a negative-zero accumulator is not
+    "nothing"). The batched accumulator also has to **mirror `pool.kill`'s
+    swap-remove**, or a swap-removed slot draws the dead particle's acceleration.
+  - **An optional fast path must not be all-or-nothing.** Fields without `sampleAll` are
+    sampled per particle **in their own place in the declaration order** into the same
+    accumulator, so one custom field neither reorders the sum nor disables batching for
+    its neighbours. Note for Changesets: `sampleAll` on `ParticleForceField` is a public
+    extension seam — a third-party field with a different-shaped `sampleAll` property
+    now fails to typecheck; name it a minor, not a patch.
+  - **`pnpm run docs` earned its keep again.** It caught `speed:` where `initialSpeed:`
+    was meant in a new emitter test; vitest ran it green because both sides of the
+    comparison ignored the same unknown property.
+  - **Bundle A/B by revert-and-rebuild, not by estimate.** All six budgets moved by 0.
+    Two are under 1 kB of headroom after this wave's `@four/scene` growth (first-3d
+    33.07/34, ui-demo 38.98/39.5) — the next bundle-touching packet in _any_ lane must
+    A/B before writing code.
+
+- **2026-08-21 — R-7 §67 stencil substrate.** Decisions worth keeping:
+  - **A state record is not an API — and saying which one you shipped is the packet.** §67
+    lists six clipping mechanisms; §57 lists one optional material member. R-7 shipped the
+    member completely rather than the mechanisms partly. A `clip()` is a _scene-graph_
+    design (subtree inheritance, nesting, bit-plane assignment, the backend-limit
+    diagnostic §67 requires) and belongs to a packet that may edit `@four/scene`.
+    `readMask` is already the bit-plane selector it will need.
+  - **A nominal class beats a validating accessor, and the reason is bytes.** The first
+    cut normalized `stencil: { func: "equal" }` literals into a validated `StencilState`
+    through a `Material` accessor. It cost **0.62 kB gzip in every bundle carrying a
+    material**, masked or not, because `material.ts` then imported the class at runtime.
+    Making `StencilState` nominal (private fields ⇒ a literal is not assignable) moves the
+    same guarantee into the type system and lets the import be **type-only**. New reusable
+    technique: _when a field's validation can be carried by the value's own type, the
+    holder needs no accessor — and the class tree-shakes away for everyone who never uses
+    it._ This is R-23's "add nothing to the frame path" applied to bytes.
+  - **Refusing at the 8-bit boundary is a §85 refusal, not pedantry.** WebGL 2 has exactly
+    two stencil formats and both are 8 bits; GL _silently_ masks a larger reference down.
+    `ref: 256` becoming `0` does not draw wrong pixels loudly — it draws a mask that never
+    matches. That refusal is also what makes mirroring the all-ones mask as `0xff` (rather
+    than GL's literal `0xFFFFFFFF`) exact rather than a narrowing.
+  - **`clear` is masked by the stencil _write_ mask, test enabled or not.** A frame ending
+    with a read-only mask material clears nothing the next time round, and the mask leaks
+    across frames (§33). The write mask must be reopened before **every view clear**, not
+    only at frame exit — F13/F15's envelope rule, third extension.
+  - **Turning a test off does not need the rest put back.** With `STENCIL_TEST` disabled
+    GL performs no stencil write either, so returning to "no stencil" is one `disable`
+    and the func/op mirrors are deliberately left dirty. Cheapest correct restore.
+  - **Sixth confirmation of mirror-at-GL-initial**, and the first where the mirrored
+    initial values were factored into one `INITIAL_STENCIL` object — those values _are_
+    the byte-identity claim, and a claim stated twice is a claim that can drift.
+  - **The packed depth-stencil makes an exclusion structural rather than a policy.**
+    `DEPTH24_STENCIL8` is a renderbuffer and R-18's samplable depth is a
+    `DEPTH_COMPONENT24` texture; a framebuffer has one depth attachment, so
+    `{ stencil, depthTexture }` is refused in `@four/render` and `gl-render-target.ts`
+    never has to choose. Corollary: **a target cannot be both a shadow map and a masked
+    surface.**
+  - **A defensive branch that no caller can reach is a coverage hole, not a safety net.**
+    `stencil: target.stencil && depthBuffer !== null` was unreachable (stencil ⇒ depth ⇒
+    a renderbuffer, and a failed allocation returns `null` before the record) and cost a
+    branch. Deleted with the argument written where it was.
+  - **A fixture page is the third way to get a browser gate.** `batching.spec.ts`'s
+    Vite-bundled-and-injected fixture is now the pattern for any gate whose subject is a
+    _renderer option_: §67 needed a canvas built with `stencil: true`, and no example
+    asks for one. No tenth server, no page nobody would visit.
+  - **§79 needed nothing, and that is worth knowing before the next material packet.**
+    Materials serialize by catalog _reference_ (A-16), so a new material field adds no
+    serializer — and adds no contention with a sibling editing `scene-serializers.ts`.
+  - **Measured:** +0.85 kB gzip in every bundle carrying `WebglRenderer` (R-6's 0.75 kB
+    law again); three budgets bumped with measurements (`first-3d` 32.5→34, `particles`
+    30→31, `ui-demo` 38→39.5, superseding the queued 38.5).
+  - **Gotcha (pre-existing, not R-7's):** `packages/render/tests/shape.test.ts`'s
+    65 536-vertex widening test times out at the default 5 s under `--coverage` on a
+    loaded box; it passes alone and at `--testTimeout=30000`. It is a tessellation-time
+    flake, not a regression — do not "fix" it by editing the assertion.
+
 - **2026-08-21 — PH-21 §39 step 9 + PH-20 §33 rollback.** Decisions worth keeping:
   - **A default kept is worth more than a name made right.** GAP v0's plan for PH-21 was to
     split `PhysicsSystem` into `PhysicsStepSystem` + `PhysicsEventDispatchSystem`. The

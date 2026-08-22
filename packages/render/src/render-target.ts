@@ -195,6 +195,39 @@ export interface RenderTargetOptions {
   readonly depthTexture?: boolean;
 
   /**
+   * Whether the target carries a **stencil buffer** (§67; R-7, 2026-08-11).
+   * **Defaults to `false`.**
+   *
+   * ```ts
+   * const masked = new RenderTarget({ width: 512, height: 512, stencil: true });
+   * ```
+   *
+   * This is the off-screen counterpart of `RendererOptions.stencil`, and the
+   * two exist for the same reason: §57's `Material.stencil` describes a test,
+   * and a test needs a buffer to read. Off by default because a stencil buffer
+   * is memory the target carries for its lifetime and an extra clear every view
+   * issues.
+   *
+   * Two constraints, both refusals rather than quiet promotions (§85):
+   *
+   * - it **requires `depth`**, for `depthTexture`'s reason and one more of its
+   *   own: the backend allocates the packed `DEPTH24_STENCIL8` renderbuffer
+   *   WebGL 2 guarantees is framebuffer-complete, so the stencil arrives
+   *   *attached to* the depth buffer;
+   * - it is **mutually exclusive with `depthTexture`**. That packed
+   *   attachment is a renderbuffer, and R-18's samplable depth attachment is a
+   *   `DEPTH_COMPONENT24` texture; a surface has one depth attachment, so a
+   *   target cannot be both a shadow map and a masked surface. Asking for both
+   *   is refused where the mistake is, rather than resolved by a precedence
+   *   rule nobody would remember.
+   *
+   * The depth attachment's cost changes with it — 24-plus-8 bits occupy four
+   * bytes per texel where the plain renderbuffer occupies two — which
+   * {@link RenderTarget.byteLength} reports.
+   */
+  readonly stencil?: boolean;
+
+  /**
    * The colour space the attachment's texels are in — §60a's "render targets
    * carry color-space metadata" (R-15, 2026-08-08).
    *
@@ -313,12 +346,35 @@ function validateFormat(format: RenderTargetFormat): void {
  * Runs the §85 check for the depth pair (R-18). A samplable depth attachment
  * with no depth attachment at all is a contradiction, not a preference.
  */
-function validateDepthAttachment(depth: boolean, depthTexture: boolean): void {
+function validateDepthAttachment(
+  depth: boolean,
+  depthTexture: boolean,
+  stencil: boolean,
+): void {
   if (depthTexture && !depth) {
     throw new RangeError(
       "RenderTarget depthTexture requires depth; { depth: false, " +
         "depthTexture: true } asks for a samplable copy of a buffer the " +
         "target does not have (§69, §85).",
+    );
+  }
+  // R-7: the same shape of refusal for the same shape of contradiction. The
+  // stencil arrives packed into the depth attachment (`DEPTH24_STENCIL8`), so
+  // "a stencil and no depth" names an attachment that does not exist, and "a
+  // stencil and a samplable depth" names two attachments in one slot.
+  if (stencil && !depth) {
+    throw new RangeError(
+      "RenderTarget stencil requires depth; the stencil is packed into the " +
+        "depth attachment (DEPTH24_STENCIL8), so { depth: false, " +
+        "stencil: true } asks for a buffer the target does not have (§67, §85).",
+    );
+  }
+  if (stencil && depthTexture) {
+    throw new RangeError(
+      "RenderTarget stencil and depthTexture are mutually exclusive: the " +
+        "stencil is packed into a DEPTH24_STENCIL8 renderbuffer and a " +
+        "samplable depth attachment is a DEPTH_COMPONENT24 texture, and a " +
+        "framebuffer has one depth attachment (§67, §69, §85).",
     );
   }
 }
@@ -448,6 +504,8 @@ export class RenderTarget implements Disposable {
 
   readonly #depthTexture: boolean;
 
+  readonly #stencil: boolean;
+
   readonly #colorSpace: ColorSpace;
 
   #width: number;
@@ -467,7 +525,8 @@ export class RenderTarget implements Disposable {
     this.#format = format;
     this.#depth = options.depth ?? true;
     this.#depthTexture = options.depthTexture ?? false;
-    validateDepthAttachment(this.#depth, this.#depthTexture);
+    this.#stencil = options.stencil ?? false;
+    validateDepthAttachment(this.#depth, this.#depthTexture, this.#stencil);
     this.#colorSpace = validateColorSpace(
       options.colorSpace ?? "linear",
       "RenderTarget",
@@ -510,6 +569,16 @@ export class RenderTarget implements Disposable {
   }
 
   /**
+   * Whether the target carries a stencil buffer (§67) — see
+   * {@link RenderTargetOptions.stencil}. Fixed at construction, exactly as
+   * {@link RenderTarget.depth} and {@link RenderTarget.depthTexture} are: the
+   * three are one decision about what the framebuffer *is*.
+   */
+  get stencil(): boolean {
+    return this.#stencil;
+  }
+
+  /**
    * The colour space of the attachment's texels (§60a) — see
    * {@link RenderTargetOptions.colorSpace}. Fixed at construction, like
    * {@link RenderTarget.format}: a surface does not change what its bytes mean
@@ -540,10 +609,13 @@ export class RenderTarget implements Disposable {
    * Four bytes per texel for the `"rgba8"` colour attachment, plus the depth
    * attachment when {@link RenderTarget.depth} is on: **two** per texel for a
    * `DEPTH_COMPONENT16` renderbuffer, **four** for a `DEPTH_COMPONENT24`
-   * texture (R-18 — 24-bit depth occupies a 32-bit texel). Both formats are
-   * quoted from what `@four/render-webgl`'s `gl-render-target.ts` actually
-   * allocates, which is the difference between accounting and guessing. The
-   * constants move together when §67's `DEPTH24_STENCIL8` and §62's
+   * texture (R-18 — 24-bit depth occupies a 32-bit texel), and **four** for
+   * the packed `DEPTH24_STENCIL8` renderbuffer {@link RenderTarget.stencil}
+   * asks for (R-7 — 24 bits of depth and 8 of stencil in one 32-bit texel, so
+   * a stencil is two bytes per texel on top of the plain depth buffer, not
+   * one). All three formats are quoted from what `@four/render-webgl`'s
+   * `gl-render-target.ts` actually allocates, which is the difference between
+   * accounting and guessing. The constants move together when §62's
    * floating-point formats widen {@link RenderTargetFormat}.
    *
    * ```ts
@@ -551,6 +623,8 @@ export class RenderTarget implements Disposable {
    * new RenderTarget({ width: 512, height: 512, depth: false }).byteLength;
    * // 512*512*4
    * new RenderTarget({ width: 512, height: 512, depthTexture: true }).byteLength;
+   * // 512*512*8
+   * new RenderTarget({ width: 512, height: 512, stencil: true }).byteLength;
    * // 512*512*8
    * ```
    *
@@ -561,7 +635,11 @@ export class RenderTarget implements Disposable {
     if (this.#disposed) {
       return 0;
     }
-    const depthBytes = this.#depth ? (this.#depthTexture ? 4 : 2) : 0;
+    const depthBytes = this.#depth
+      ? this.#depthTexture || this.#stencil
+        ? 4
+        : 2
+      : 0;
     return this.#width * this.#height * (4 + depthBytes);
   }
 

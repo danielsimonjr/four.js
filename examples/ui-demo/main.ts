@@ -67,28 +67,29 @@
  * `"manual"`, exactly as `widget.ts` prescribes for a root. The skins position
  * only their own non-widget children, which no system claims.
  *
- * ## Text, and what it costs (§55 limitation, unchanged)
+ * ## Text, and what it costs (§49, §56)
  *
  * Labels *measure* their text through `@four/text` (a real `@four/ui`
- * dependency); drawing it is the skin's job, and this skin uses the same
- * cut-a-glyph-cell-per-texture workaround `examples/first-2d-scene` documents:
- * `Sprite` has no §55 frame sub-rectangle yet, so each distinct glyph cell
- * becomes its own tiny texture, cached per cell. Correct, visibly text, and
- * still the evidence for the §55 frame-region backlog item.
+ * dependency); drawing it is the skin's job, and {@link labelSkin} does it with
+ * **one `Text` node per label** over one shared atlas texture and one shared
+ * material — three nodes and three draw calls for the whole page.
+ *
+ * Until 2026-08-21 this skin used the cut-a-glyph-cell-per-texture workaround
+ * `examples/first-2d-scene` documented, because `Sprite` has no §55 frame
+ * sub-rectangle and a glyph is a *cell* of an atlas: every distinct cell became
+ * its own tiny texture and every drawn glyph its own sprite. R-28's `Text` node
+ * addresses the cells with §53 per-vertex uvs instead, so that workaround — and
+ * the backlog item it was the evidence for — is gone.
  */
 
 import { Application } from "four/application";
 import { planeGeometry } from "four/geometry";
 import { KeyboardInput, PointerInput, type Pickable } from "four/input";
-import { SpriteMaterial, UnlitMaterial } from "four/materials";
-import { Renderable, Sprite, Texture } from "four/render";
+import { UnlitMaterial } from "four/materials";
+import { Renderable, Texture } from "four/render";
 import { WebglRenderer } from "four/render-webgl";
-import {
-  Group,
-  OrthographicCamera,
-  createFullscreenViewport,
-} from "four/scene";
-import { buildGlyphAtlas, type GlyphAtlas, type TextQuad } from "four/text";
+import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+import { buildGlyphAtlas } from "four/text";
 import {
   Button,
   Label,
@@ -100,6 +101,7 @@ import {
   type WidgetActivationSource,
   type WidgetSkin,
 } from "four/ui";
+import { Text } from "four";
 
 // --- surface ---------------------------------------------------------------
 
@@ -204,52 +206,31 @@ const GLYPH_Z = 0.02;
 /** How far the focus ring extends past the button's box on every side. */
 const FOCUS_RING_MARGIN = 0.06;
 
-// --- glyph textures (the §55 workaround) -------------------------------------
+// --- the font (one atlas, one texture, one material) -------------------------
 
 // The font, packed once into one RGBA8 buffer with a uv rectangle per glyph.
 const atlas = buildGlyphAtlas();
 
 /**
- * Sprite materials already built for a glyph cell, keyed by that cell's atlas
- * rectangle — the two `o`s of "coral" share one texture and one material.
+ * The whole sheet as one texture, sampled with §77's `"nearest"` filter (R-30):
+ * the face is a bitmap, so a linear filter would blend each texel with its
+ * neighbours — including, at a cell's edge, the neighbouring *glyph*.
  */
-const glyphMaterials = new Map<string, SpriteMaterial>();
+const font = new Texture({ ...atlas, filter: "nearest" });
 
 /**
- * Copies one glyph cell out of `atlas` into a standalone RGBA8 texture source —
- * `examples/first-2d-scene`'s workaround, for its stated reason: a `Sprite`
- * maps its whole texture across its whole quad, and §55's frame sub-rectangle
- * has not landed, so the only way to draw one *cell* is to make the cell a
- * whole texture.
+ * One material for **every** label on the page. Shared deliberately: §57 puts a
+ * label's colour on the material, and consecutive `Text` nodes over one material
+ * are exactly the run §65's batcher merges — so the whole UI's text is one draw
+ * call under `createGlBatching()` and one per label without it.
+ *
+ * `transparent: true` because the atlas carries coverage in alpha.
  */
-function cutGlyphCell(source: GlyphAtlas, quad: TextQuad): Texture {
-  const x = Math.round(quad.u0 * source.width);
-  const y = Math.round(quad.v0 * source.height);
-  const width = Math.round((quad.u1 - quad.u0) * source.width);
-  const height = Math.round((quad.v1 - quad.v0) * source.height);
-
-  const data = new Uint8Array(width * height * 4);
-  for (let row = 0; row < height; row += 1) {
-    const from = ((y + row) * source.width + x) * 4;
-    data.set(source.data.subarray(from, from + width * 4), row * width * 4);
-  }
-  return new Texture({ width, height, data });
-}
-
-/** The material for one glyph cell, built on first use and cached. */
-function materialForCell(quad: TextQuad): SpriteMaterial {
-  const key = `${String(quad.u0)},${String(quad.v0)}`;
-  const cached = glyphMaterials.get(key);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const material = new SpriteMaterial({
-    texture: cutGlyphCell(atlas, quad),
-    tint: [LABEL_TINT[0], LABEL_TINT[1], LABEL_TINT[2], LABEL_TINT[3]],
-  });
-  glyphMaterials.set(key, material);
-  return material;
-}
+const ink = new UnlitMaterial({
+  map: font,
+  transparent: true,
+  color: [LABEL_TINT[0], LABEL_TINT[1], LABEL_TINT[2], LABEL_TINT[3]],
+});
 
 // --- the skins (the WidgetSkin seam) -----------------------------------------
 
@@ -363,52 +344,49 @@ function buttonSkin(): WidgetSkin {
 }
 
 /**
- * A label's glyphs, rebuilt only when its `TextLayout` actually changed.
+ * A label's glyphs — **one `Text` node per label** (§49, §56).
  *
  * `Label` measures its text (that is `@four/ui`'s half of the §56 split); this
- * skin draws it, by turning each laid-out quad into a tiny textured sprite.
- * The group sits at `(0, −textBaselineTop)` because `layoutText` emits quads
- * around a baseline-left origin while the widget's origin is its top-left
- * corner — the label documents exactly this translation. The cached layout
- * reference makes the common per-frame `layout()` pass free: `textLayout` is
- * cached inside the label until one of its inputs changes.
+ * skin draws it, by handing the same three numbers to a `Text` node and letting
+ * it own the quads. The node sits at `(0, −textBaselineTop)` because a `Text`'s
+ * origin is the first line's baseline at its left edge while the widget's origin
+ * is its top-left corner — the label documents exactly this translation.
+ *
+ * Until 2026-08-21 this function turned every laid-out quad into its own tiny
+ * textured `Sprite` over its own cut-out `Texture` — `examples/first-2d-scene`'s
+ * §55 workaround, which R-28's `Text` node retired. The status label alone went
+ * from 13 sprites to one node, and the page from 44 glyph draws to 3.
+ *
+ * The three assignments are guarded, not unconditional: `size` and
+ * `letterSpacing` have no equality check of their own (`text` does), so writing
+ * them on every `layout()` pass would mark the node dirty every frame and
+ * rebuild vertex buffers that did not change.
  */
 function labelSkin(): WidgetSkin {
-  let group: Group | null = null;
-  let builtFor: unknown = undefined;
+  let glyphs: Text | null = null;
   return {
     onAttach(widget) {
-      group = new Group();
-      group.name = `${widget.name}-glyphs`;
-      widget.add(group);
+      glyphs = new Text(atlas, ink, { renderLayer: 1 });
+      glyphs.name = `${widget.name}-glyphs`;
+      widget.add(glyphs);
     },
     onLayout(widget) {
-      if (group === null || !(widget instanceof Label)) return;
-      group.transform.position.set(0, -widget.textBaselineTop, GLYPH_Z);
-      const layout = widget.textLayout;
-      if (layout === builtFor) return;
-      builtFor = layout;
-      while (group.children.length > 0) {
-        group.remove(group.children[group.children.length - 1]);
-      }
-      if (layout === null) return;
-      for (const quad of layout.quads) {
-        // `renderLayer: 1` draws the glyphs after the opaque quads — sprites
-        // blend, and blending needs what is behind it already drawn (§66).
-        const glyph = new Sprite(materialForCell(quad), {
-          width: quad.x1 - quad.x0,
-          height: quad.y1 - quad.y0,
-          anchor: { x: 0, y: 0 },
-          renderLayer: 1,
-        });
-        glyph.transform.position.set(quad.x0, quad.y0, 0);
-        group.add(glyph);
+      if (glyphs === null || !(widget instanceof Label)) return;
+      glyphs.transform.position.set(0, -widget.textBaselineTop, GLYPH_Z);
+      glyphs.text = widget.text;
+      if (glyphs.size !== widget.size) glyphs.size = widget.size;
+      if (glyphs.letterSpacing !== widget.letterSpacing) {
+        glyphs.letterSpacing = widget.letterSpacing;
       }
     },
     onDetach(widget) {
-      if (group !== null) widget.remove(group);
-      group = null;
-      builtFor = undefined;
+      if (glyphs !== null) {
+        widget.remove(glyphs);
+        // The node owns its quad buffers; the atlas, texture and material are
+        // shared and outlive it (§83).
+        glyphs.dispose();
+      }
+      glyphs = null;
     },
   };
 }

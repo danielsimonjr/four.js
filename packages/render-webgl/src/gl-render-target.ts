@@ -67,10 +67,16 @@
  * The public shape of each of these is on `@four/render`'s `render-target.ts`;
  * what this module would additionally need is noted here:
  *
- * - **Stencil attachments** (§67) — `DEPTH_STENCIL_ATTACHMENT` plus
- *   `DEPTH24_STENCIL8` storage. Blocked with the rest of §67 by R-7: the
- *   backend requests its *context* without a stencil buffer, so a stencilled
- *   target would be the only stencilled surface in the engine.
+ * - ~~**Stencil attachments** (§67)~~ — **landed 2026-08-11 (R-7)**:
+ *   `RenderTargetOptions.stencil` allocates the depth renderbuffer as packed
+ *   `DEPTH24_STENCIL8` and attaches it to `DEPTH_STENCIL_ATTACHMENT`. The
+ *   interplay with R-18's samplable depth is an exclusion rather than a
+ *   precedence: a framebuffer has one depth attachment, the packed form is a
+ *   renderbuffer and the samplable form is a `DEPTH_COMPONENT24` texture, so
+ *   `@four/render`'s constructor refuses `{ stencil: true, depthTexture: true }`
+ *   (§85) and this cache never has to choose. `stencil: true` with
+ *   `depth: false` is refused there too, because the stencil arrives *inside*
+ *   the depth attachment.
  * - **Multiple render targets** (§63, §70) — a colour attachment per output
  *   plus `drawBuffers`, which is a new `WebglContext` entry point.
  * - **Multisampling** (§62) — `renderbufferStorageMultisample` into a
@@ -121,8 +127,25 @@ export interface RenderTargetRecord {
    * *or* one that asked for the samplable form, which allocates
    * {@link RenderTargetRecord.depthTexture} instead. At most one of the two is
    * ever non-`null`.
+   *
+   * When {@link RenderTargetRecord.stencil} is set this is the **packed**
+   * `DEPTH24_STENCIL8` renderbuffer, attached to `DEPTH_STENCIL_ATTACHMENT`
+   * rather than `DEPTH_ATTACHMENT` — one object serving both buffers, which is
+   * what makes the mutual exclusion with `depthTexture` a fact about the
+   * framebuffer rather than a policy (R-7, §67).
    */
   readonly depthBuffer: GlRenderbuffer | null;
+
+  /**
+   * Whether {@link RenderTargetRecord.depthBuffer} is the packed
+   * depth-plus-stencil form (§67, R-7) — i.e. whether a frame drawing into this
+   * target may run a stencil test, and must clear the stencil buffer.
+   *
+   * A boolean rather than a second handle: the packed renderbuffer *is* the
+   * depth buffer, so a `stencilBuffer` field would be an alias of
+   * `depthBuffer` that a reader could mistake for a second allocation.
+   */
+  readonly stencil: boolean;
 
   /**
    * The depth attachment as a **texture**, for a target built with
@@ -329,9 +352,13 @@ export class RenderTargetCache {
         return null;
       }
       gl.bindRenderbuffer(GL.RENDERBUFFER, depthBuffer);
+      // Packed depth-plus-stencil when the target asked for a stencil (R-7,
+      // §67), plain 16-bit depth otherwise — the storage a target with no
+      // stencil has always been given, unchanged, so its allocation is the
+      // identical call sequence it was before this branch existed.
       gl.renderbufferStorage(
         GL.RENDERBUFFER,
-        GL.DEPTH_COMPONENT16,
+        target.stencil ? GL.DEPTH24_STENCIL8 : GL.DEPTH_COMPONENT16,
         width,
         height,
       );
@@ -361,7 +388,9 @@ export class RenderTargetCache {
     if (depthBuffer !== null) {
       gl.framebufferRenderbuffer(
         GL.FRAMEBUFFER,
-        GL.DEPTH_ATTACHMENT,
+        // The packed renderbuffer attaches to the combined point, which is what
+        // gives the framebuffer both buffers from one object (R-7).
+        target.stencil ? GL.DEPTH_STENCIL_ATTACHMENT : GL.DEPTH_ATTACHMENT,
         GL.RENDERBUFFER,
         depthBuffer,
       );
@@ -394,6 +423,10 @@ export class RenderTargetCache {
       framebuffer,
       texture,
       depthBuffer,
+      // Read off the record rather than off the target at frame time: a target
+      // whose `stencil` could not be honoured (no renderbuffer at all) must not
+      // make the frame clear a buffer that is not there.
+      stencil: target.stencil && depthBuffer !== null,
       depthTexture,
       version: target.version,
       width,

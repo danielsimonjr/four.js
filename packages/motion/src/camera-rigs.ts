@@ -40,9 +40,15 @@
  * |---|---|
  * | fly | two lines of application code over `orbit`/`dolly` once input is fed; a class would add API surface and no behaviour |
  * | first-person | writes a rotation, so it collides with `LookAtConstraint` for §42's single authority — it waits on §12's character controllers to settle aim-vs-free-look arbitration |
- * | trackball | defined in **screen space**, and `@four/motion` may not import `render` or `input` (§3.1); it belongs with the §47 `ScreenCamera` packet |
  * | shake | wants interpolated value noise, not per-step white noise, whose character would change with the fixed rate (§33); a packet of its own |
  * | stereo / XR | an extension point on the camera, not a rig that writes a transform |
+ *
+ * **Trackball shipped elsewhere (R-37, 2026-08-21):** it is `TrackballRig` in
+ * `@four/scene`, not here and not a component — it is defined over a viewport in
+ * **screen space**, which `@four/motion` may not see (§3.1 gives it `core`,
+ * `math` and `scene` only), and it writes on demand from a drag rather than once
+ * per fixed step, so the application calls it under §42's `"manual"` authority.
+ * This table listed it as unshipped until that date.
  *
  * Two §44 rows are closed here **by composition** rather than by a class, which
  * §42 forces rather than merely permits:

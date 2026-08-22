@@ -47,7 +47,9 @@
  * `OrbitRig`, `FollowRig` and `LookAtConstraint` (added 2026-08-13), through the
  * serializers `@four/motion` itself exports; and `RigidBody` and `Collider` (§23–§25),
  * through the pair `@four/physics` exports (`RIGID_BODY_SERIALIZER` /
- * `COLLIDER_SERIALIZER`, 2026-08-06 — the `PH-17` remainder). All three
+ * `COLLIDER_SERIALIZER`, 2026-08-06 — the `PH-17` remainder) plus §12's
+ * `SweptCharacterController` (`SWEPT_CHARACTER_CONTROLLER_SERIALIZER`,
+ * 2026-08-21 — `PH-11b`). All three
  * packages declare their serializers against the same structural
  * `ComponentSerializer` shape, so registering them here adds no §3.1 edge
  * anywhere.
@@ -140,7 +142,11 @@ import { FourError, type JsonValue } from "@four/core";
 import { Path, type BufferGeometry, type Point2D } from "@four/geometry";
 import type { Material, SpriteMaterial, UnlitMaterial } from "@four/materials";
 import {
+  CHARACTER_CONTROLLER_SERIALIZER,
+  CharacterController,
+  FIRST_PERSON_LOOK_SERIALIZER,
   FOLLOW_RIG_SERIALIZER,
+  FirstPersonLook,
   FollowRig,
   KINEMATIC_CONTROLLER_SERIALIZER,
   KinematicController,
@@ -156,6 +162,8 @@ import {
   Collider,
   RIGID_BODY_SERIALIZER,
   RigidBody,
+  SWEPT_CHARACTER_CONTROLLER_SERIALIZER,
+  SweptCharacterController,
 } from "@four/physics";
 import {
   Arc,
@@ -184,6 +192,9 @@ import {
   OrthographicCamera,
   PerspectiveCamera,
   PointLight,
+  SCREEN_ORIGINS,
+  SCREEN_UNITS,
+  ScreenCamera,
   SpotLight,
   restoreNodeId,
   type Node,
@@ -271,6 +282,9 @@ export const PERSPECTIVE_CAMERA_NODE_TYPE = "scene:perspective-camera";
 
 /** The document `type` an {@link OrthographicCamera} serializes as (§47). */
 export const ORTHOGRAPHIC_CAMERA_NODE_TYPE = "scene:orthographic-camera";
+
+/** The document `type` a {@link ScreenCamera} serializes as (§47; R-37). */
+export const SCREEN_CAMERA_NODE_TYPE = "scene:screen-camera";
 
 /** The document `type` a {@link DirectionalLight} serializes as (§68). */
 export const DIRECTIONAL_LIGHT_NODE_TYPE = "scene:directional-light";
@@ -463,6 +477,23 @@ function readBoolean(value: JsonValue | undefined): boolean | undefined {
 function readFinite(value: JsonValue | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? value
+    : undefined;
+}
+
+/**
+ * One of `members`, or `undefined` — the string-union read (R-37).
+ *
+ * A payload carrying a name no build of the engine knows restores the class
+ * default rather than failing the scene, which is `readFinite`'s tolerance
+ * applied to an enumeration instead of a number.
+ */
+function readMember<T extends string>(
+  value: JsonValue | undefined,
+  members: readonly T[],
+): T | undefined {
+  return typeof value === "string" &&
+    (members as readonly string[]).includes(value)
+    ? (value as T)
     : undefined;
 }
 
@@ -1275,6 +1306,9 @@ export function registerRenderSerializers(
         if (constructor === OrthographicCamera) {
           return ORTHOGRAPHIC_CAMERA_NODE_TYPE;
         }
+        if (constructor === ScreenCamera) {
+          return SCREEN_CAMERA_NODE_TYPE;
+        }
         if (constructor === DirectionalLight) {
           return DIRECTIONAL_LIGHT_NODE_TYPE;
         }
@@ -1340,6 +1374,26 @@ export function registerRenderSerializers(
             right: camera.right,
             bottom: camera.bottom,
             top: camera.top,
+            near: camera.near,
+            far: camera.far,
+          };
+        }
+        if (constructor === ScreenCamera) {
+          const camera = node as ScreenCamera;
+          return {
+            // The origin and the units are the two fields §47 names, and they
+            // are written **always**: a document that omitted `"top-left"`
+            // because it is the default would reload identically today and
+            // differently the day §7a's default were ever revisited.
+            origin: camera.origin,
+            units: camera.units,
+            // The surface size is state, not authoring — the application
+            // pushes it on the next resize — but it is written anyway, so a
+            // scene loaded and rendered before any resize projects the
+            // rectangle it was saved with rather than the 1 × 1 default.
+            width: camera.width,
+            height: camera.height,
+            resolution: camera.resolution,
             near: camera.near,
             far: camera.far,
           };
@@ -1448,6 +1502,29 @@ export function registerRenderSerializers(
               "far",
             ]),
           );
+        }
+        if (document.type === SCREEN_CAMERA_NODE_TYPE) {
+          const origin = readMember(data.origin, SCREEN_ORIGINS);
+          const units = readMember(data.units, SCREEN_UNITS);
+          const size = finiteOptions(data, [
+            "width",
+            "height",
+            "resolution",
+            "near",
+            "far",
+          ]);
+          // §85: the class refuses a non-positive pixel count, so a corrupted
+          // payload restores the 1 × 1 default rather than taking the whole
+          // scene down — the `Sprite` extent rule, for the same reason.
+          for (const key of ["width", "height", "resolution"]) {
+            const value = size[key];
+            if (value !== undefined && value <= 0) delete size[key];
+          }
+          return new ScreenCamera({
+            ...size,
+            ...(origin !== undefined ? { origin } : {}),
+            ...(units !== undefined ? { units } : {}),
+          });
         }
         if (document.type === DIRECTIONAL_LIGHT_NODE_TYPE) {
           const color = readColor(data.color);
@@ -2544,8 +2621,9 @@ export function composeSceneNodeTypes(
 }
 
 /**
- * Registers the two §6a physics components on `components` and returns it
- * (§23–§25, §79, PH-17 — 2026-08-06).
+ * Registers the §6a physics components on `components` and returns it
+ * (§23–§25, §79, PH-17 — 2026-08-06; joined by §12's swept character
+ * controller, `PH-11b`, 2026-08-21).
  *
  * ```ts
  * import { registerPhysicsSerializers } from "four";
@@ -2583,9 +2661,19 @@ export function composeSceneNodeTypes(
 export function registerPhysicsSerializers(
   components: ComponentSerializerRegistry,
 ): ComponentSerializerRegistry {
-  return components
-    .register(RigidBody, RIGID_BODY_SERIALIZER)
-    .register(Collider, COLLIDER_SERIALIZER);
+  return (
+    components
+      .register(RigidBody, RIGID_BODY_SERIALIZER)
+      .register(Collider, COLLIDER_SERIALIZER)
+      // §12's solver-backed character controller (`PH-11b`, 2026-08-21). It
+      // registers **here** rather than beside `@four/motion`'s plain
+      // `CharacterController` in `registerSceneNodeTypes`, because the split
+      // this function exists to make is by *package*, not by section: the
+      // component lives in `@four/physics` and its serializer with it, so a
+      // headless simulation that saves a scene carries its characters and a
+      // widget-only application still pulls in neither.
+      .register(SweptCharacterController, SWEPT_CHARACTER_CONTROLLER_SERIALIZER)
+  );
 }
 
 /**
@@ -2634,6 +2722,12 @@ export function registerSceneNodeTypes(
   components.register(OrbitRig, ORBIT_RIG_SERIALIZER);
   components.register(FollowRig, FOLLOW_RIG_SERIALIZER);
   components.register(LookAtConstraint, LOOK_AT_CONSTRAINT_SERIALIZER);
+  // §12's character controller and §44's first-person look, added 2026-08-21
+  // in the same batch as the components themselves (the one-packet rule). The
+  // character carries its vertical motion state and drops its per-frame move
+  // intent — see the serializers in `@four/motion`.
+  components.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
+  components.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,

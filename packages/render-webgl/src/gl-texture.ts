@@ -30,8 +30,8 @@
  * A texture object and the version it was uploaded from. Sampler state — filter
  * and wrap — is set on the texture object at upload time and never changed, so
  * the per-draw cost in `webgl-renderer.ts` is one `bindTexture` and nothing
- * else. §77's mipmaps and anisotropy are deferred with the state that would
- * carry them.
+ * else. Mipmaps and anisotropy (R-30b, below) are more of the same state, set
+ * in the same place, read by nothing on the draw path.
  *
  * ## Filter and wrap became the texture's own (R-30, 2026-08-13)
  *
@@ -55,6 +55,26 @@
  * texture already resident needs a version bump (`markDirty()`, or a new
  * `source`); the eviction rule below then re-uploads it with the new sampler
  * state, which is the same path an in-place texel edit takes.
+ *
+ * ## Mipmaps and anisotropy (R-30b, 2026-08-21)
+ *
+ * Three more upload-time decisions, and the same byte-identity claim, made
+ * structurally rather than numerically:
+ *
+ * - `texture.mipmaps` adds **one** `generateMipmap` between the `texImage2D`
+ *   and the sampler state — nothing for a texture that does not ask;
+ * - the min filter is now `texture.minFilter` (which resolves to `filter` with
+ *   no chain, so the two `texParameteri` calls stay the pair they were) while
+ *   the mag filter is `texture.filter`, because magnification has no mip levels
+ *   to choose between;
+ * - `texture.anisotropy` above 1 adds **one** `texParameteri` after the wrap
+ *   pair, and only after the device's ceiling has been resolved once
+ *   ({@link TextureCache}'s private `#resolveAnisotropy`).
+ *
+ * So a texture naming none of the three issues the identical five calls in the
+ * identical order it did on 2026-08-13, and a context that cannot generate
+ * mipmaps at all degrades to a one-level upload with an in-level min filter
+ * instead of leaving GL a texture it would sample as black.
  *
  * ## Eviction policy
  *
@@ -115,6 +135,51 @@ function glWrap(wrap: string | undefined): number {
   return GL.CLAMP_TO_EDGE;
 }
 
+/**
+ * `texture.minFilter` (§77, R-30b) as a GL enum, given whether this upload
+ * actually built a mip chain.
+ *
+ * `hasMipmaps` is not a formality: `Texture` refuses a mip-choosing minFilter
+ * without `mipmaps: true` (§85), but a *context* can still be one that cannot
+ * generate a chain (`generateMipmap` is optional on `WebglContext`), and
+ * writing `LINEAR_MIPMAP_LINEAR` on a one-level texture leaves it **incomplete
+ * — sampled as opaque black**. So the mip-choosing values collapse to their
+ * in-level halves exactly when no chain exists, which degrades the *quality* of
+ * a frame that would otherwise have failed outright.
+ *
+ * The fallback arm is `LINEAR`, this tier's pre-R-30 default, so a texture that
+ * names no minFilter and no mipmaps reaches the identical enum it always did.
+ */
+function glMinFilter(
+  minFilter: string | undefined,
+  filter: string | undefined,
+  hasMipmaps: boolean,
+): number {
+  if (minFilter === undefined) {
+    // A texture — or a test double — that names no minFilter samples both
+    // directions with `filter`, which is what R-30's single field meant and
+    // what this module wrote before this function existed.
+    return hasMipmaps
+      ? glMinFilter(
+          filter === "nearest"
+            ? "nearest-mipmap-nearest"
+            : "linear-mipmap-linear",
+          filter,
+          true,
+        )
+      : glFilter(filter);
+  }
+  if (!hasMipmaps) {
+    return minFilter.startsWith("nearest") ? GL.NEAREST : GL.LINEAR;
+  }
+  if (minFilter === "nearest") return GL.NEAREST;
+  if (minFilter === "nearest-mipmap-nearest") return GL.NEAREST_MIPMAP_NEAREST;
+  if (minFilter === "linear-mipmap-nearest") return GL.LINEAR_MIPMAP_NEAREST;
+  if (minFilter === "nearest-mipmap-linear") return GL.NEAREST_MIPMAP_LINEAR;
+  if (minFilter === "linear-mipmap-linear") return GL.LINEAR_MIPMAP_LINEAR;
+  return GL.LINEAR;
+}
+
 /** Everything one cached texture needs at draw time. */
 export interface TextureRecord {
   /** The GL texture object to bind. */
@@ -147,6 +212,18 @@ export class TextureCache {
   readonly #records = new Map<string, TextureRecord>();
 
   #disposed = false;
+
+  /**
+   * The device's anisotropy ceiling (§62, §77; R-30b), or `0` while it has
+   * never been asked for.
+   *
+   * `0` is the "not yet queried" state rather than a separate boolean: every
+   * legal ceiling is ≥ 1, so one number carries both facts and the query runs
+   * at most once per cache. A device without
+   * `EXT_texture_filter_anisotropic` resolves to `1`, which is GL's isotropic
+   * default and therefore writes nothing at all.
+   */
+  #maxAnisotropy = 0;
 
   constructor(gl: WebglContext) {
     this.#gl = gl;
@@ -223,6 +300,46 @@ export class TextureCache {
   }
 
   /**
+   * Clamps a texture's anisotropy request to what this device offers (§62,
+   * §77; R-30b, 2026-08-21).
+   *
+   * ## Why the query is lazy, and why the answer is a clamp
+   *
+   * **Lazy** because a texture that asks for nothing must cost nothing: the
+   * extension is fetched on the first request above 1, so a context that never
+   * meets one issues no `getExtension` and no `getParameter`, and every GL
+   * transcript recorded before this packet is byte-for-byte what it was. That
+   * is this repository's pipeline-cost rule applied to a capability query.
+   *
+   * **A clamp, not a refusal**, because `EXT_texture_filter_anisotropic` is an
+   * *extension*: `anisotropy: 16` is a correct request that a conformant device
+   * may be unable to fill, which is §62's capability tiering and not §85's
+   * invalid value. The frame draws with the sharpness the device has. §85 still
+   * refuses a request that no device could fill — a non-integer, or one below 1
+   * — and it does so in `@four/render`'s `Texture`, at authoring time.
+   *
+   * `getExtension` itself is optional on `WebglContext`, so a double that does
+   * not declare it reports a ceiling of 1 and every anisotropy request is
+   * silently dropped, exactly as on a device without the extension.
+   */
+  #resolveAnisotropy(requested: number): number {
+    if (requested <= 1) {
+      return 1;
+    }
+    if (this.#maxAnisotropy === 0) {
+      const gl = this.#gl;
+      const extension = gl.getExtension?.("EXT_texture_filter_anisotropic");
+      const limit =
+        extension === undefined || extension === null
+          ? 1
+          : gl.getParameter(GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+      this.#maxAnisotropy =
+        typeof limit === "number" && limit >= 1 ? Math.floor(limit) : 1;
+    }
+    return Math.min(requested, this.#maxAnisotropy);
+  }
+
+  /**
    * Uploads `texture` into a fresh GL texture object, or returns `null` if GL
    * would not allocate one.
    *
@@ -252,6 +369,8 @@ export class TextureCache {
       return null;
     }
 
+    const mipmaps = texture.mipmaps === true && gl.generateMipmap !== undefined;
+
     gl.bindTexture(GL.TEXTURE_2D, handle);
     gl.texImage2D(
       GL.TEXTURE_2D,
@@ -267,12 +386,33 @@ export class TextureCache {
     // R-30: the arguments are the texture's own, defaulting to the pair this
     // module hard-coded before 2026-08-13 — the same four calls in the same
     // order with the same enums for every texture that names neither.
-    const filter = glFilter(texture.filter);
+    if (mipmaps) {
+      // R-30b: before the sampler state, because the chain has to exist by the
+      // time a mip-choosing min filter is written — and because `generateMipmap`
+      // reads the level-0 image this call just uploaded.
+      gl.generateMipmap?.(GL.TEXTURE_2D);
+    }
     const wrap = glWrap(texture.wrap);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, filter);
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, filter);
+    gl.texParameteri(
+      GL.TEXTURE_2D,
+      GL.TEXTURE_MIN_FILTER,
+      glMinFilter(texture.minFilter, texture.filter, mipmaps),
+    );
+    gl.texParameteri(
+      GL.TEXTURE_2D,
+      GL.TEXTURE_MAG_FILTER,
+      glFilter(texture.filter),
+    );
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, wrap);
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, wrap);
+    const anisotropy = this.#resolveAnisotropy(texture.anisotropy ?? 1);
+    if (anisotropy > 1) {
+      gl.texParameteri(
+        GL.TEXTURE_2D,
+        GL.TEXTURE_MAX_ANISOTROPY_EXT,
+        anisotropy,
+      );
+    }
     gl.bindTexture(GL.TEXTURE_2D, null);
 
     return { texture: handle, version: texture.version };

@@ -110,14 +110,43 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * precision, and maximum uniforms and bindings — and requires applications to
  * be able to declare required and optional capabilities against that set.
  *
- * This is the **minimal subset** the MVP can honestly fill in (decision,
- * WP-3.4): a backend tag and the one limit that unlit colored geometry can
- * actually run into. Reporting a field the backend has not queried would be
- * worse than not reporting it, because capability negotiation is precisely the
- * place where a confident wrong answer costs a crash. The remaining §62 fields
- * are added by the packets that can query them (WP-3.5 for the WebGL 2 limits,
- * the WebGPU backend for compute/storage/timestamps), and applications get
- * their required/optional capability declaration then.
+ * Two members carried this record until WP-R1.1 (2026-08-21), when the WebGPU
+ * backend arrived and made the rest of §62's list answerable: a backend that
+ * *can* run compute has to be able to say so, and an application that needs
+ * compute has to be able to ask. The widening is deliberately done **once**,
+ * with all of §62's list, rather than a field per packet — a capability record
+ * that grows a member per pipeline churns every implementor once per pipeline.
+ *
+ * ## Every added member is optional, and absent means "not reported"
+ *
+ * The original wording of this doc is the reason, and it is kept because it is
+ * still the rule: *reporting a field the backend has not queried would be worse
+ * than not reporting it, because capability negotiation is precisely the place
+ * where a confident wrong answer costs a crash.* So the members below are
+ * optional rather than required, and `undefined` is a third answer distinct
+ * from `false` — "this backend has not been taught to answer" rather than "this
+ * backend cannot". That also makes the widening *additive* in the strict sense
+ * (decision, WP-R1.1): every existing implementation, test double, and
+ * third-party backend still satisfies the type unchanged, which is the hazard
+ * §61 records about adding interface members.
+ *
+ * The three backends this monorepo ships answer **all** of them:
+ * {@link NullRenderer} with the floor, `WebglRenderer` with WebGL 2's honest
+ * conservative values (`computeShaders: false` is a true statement about
+ * WebGL 2, not a shortfall), and `WebgpuRenderer` from the device's own limits.
+ *
+ * A consumer therefore reads a member as a tri-state:
+ *
+ * ```ts
+ * if (renderer.capabilities.computeShaders === true) {
+ *   // …dispatch
+ * }
+ * ```
+ *
+ * §62's *"applications may declare required and optional capabilities"* is the
+ * half that still does not exist: a declaration mechanism belongs with the
+ * `"auto"` selector (`renderer-registry.ts`), and it is filed as WP-R1.9 rather
+ * than guessed at here.
  *
  * Treat instances as immutable: a renderer publishes its capabilities once, at
  * {@link Renderer.initialize} time, and callers only read them.
@@ -132,6 +161,82 @@ export interface RendererCapabilities {
    * at all, which is the honest answer for {@link NullRenderer}.
    */
   readonly maxTextureSize: number;
+
+  /**
+   * §62 "texture formats": the {@link @four/render!RenderTarget | render-target}
+   * and texture formats this backend accepts, by their engine-side names.
+   *
+   * Engine names, not backend names — `"rgba8"` means "eight-bit unsigned
+   * normalised colour", and whether the backend spells that `RGBA8`,
+   * `rgba8unorm` or `bgra8unorm` is its own business (§60a, `render-target.ts`).
+   * A backend with no textures reports an empty list.
+   */
+  readonly textureFormats?: readonly string[];
+
+  /** §62 "multisampling": whether the backend can allocate a multisampled surface. */
+  readonly multisampling?: boolean;
+
+  /**
+   * §62 "floating-point targets": whether a render target may hold
+   * floating-point components rather than eight-bit normalised ones.
+   */
+  readonly floatRenderTargets?: boolean;
+
+  /**
+   * §62 "timestamp queries": whether the backend can time GPU work
+   * (§84's GPU-side half). `false` on WebGL 2 without
+   * `EXT_disjoint_timer_query_webgl2`, and `false` under SwiftShader.
+   */
+  readonly timestampQueries?: boolean;
+
+  /** §62 "storage buffers": whether a shader may read and write a storage buffer. */
+  readonly storageBuffers?: boolean;
+
+  /**
+   * §62 "compute shaders": whether the backend can dispatch compute (§82).
+   *
+   * **`false` on WebGL 2 is a true statement, not a shortfall** — WebGL 2 has
+   * no compute stage at all, and §62's tiers exist so that an application can
+   * read that and pick the CPU path rather than discover it at dispatch time.
+   */
+  readonly computeShaders?: boolean;
+
+  /** §62 "indirect draw": whether draw arguments may be read from a buffer. */
+  readonly indirectDraw?: boolean;
+
+  /**
+   * §62 "compressed textures": the compressed texture formats available, by
+   * their canonical names (`"bc7-rgba-unorm"`, `"etc2-rgba8unorm"`, …), or an
+   * empty list where none are.
+   */
+  readonly compressedTextureFormats?: readonly string[];
+
+  /**
+   * §62 "shader precision": the highest floating-point precision the fragment
+   * stage supports, or `"none"` for a backend with no shaders at all.
+   *
+   * `"highp"` on both WebGL 2 (GLSL ES 3.00 requires fragment-stage `highp`)
+   * and WebGPU (WGSL's `f32` is single precision by definition).
+   */
+  readonly shaderPrecision?: "none" | "lowp" | "mediump" | "highp";
+
+  /**
+   * §62 "maximum uniforms": the largest uniform buffer binding, in bytes, a
+   * single shader may see. `0` for a backend with no shaders.
+   *
+   * Bytes rather than WebGL 2's "uniform vectors", because a byte size is the
+   * quantity both backends can state and the one a caller sizing a buffer
+   * actually needs; the WebGL 2 backend converts (`MAX_VERTEX_UNIFORM_VECTORS`
+   * counts `vec4`s, i.e. 16 bytes each).
+   */
+  readonly maxUniformBufferBytes?: number;
+
+  /**
+   * §62 "maximum bindings": how many resources one shader stage may bind at
+   * once — texture units on WebGL 2, bindings per bind group on WebGPU. `0`
+   * for a backend that binds nothing.
+   */
+  readonly maxBindings?: number;
 }
 
 /**
@@ -172,6 +277,27 @@ export interface RendererOptions {
    * initialization over it.
    */
   antialias?: boolean;
+
+  /**
+   * Request a **stencil buffer** on the drawing surface (§67, R-7); `false` by
+   * default.
+   *
+   * §57's `Material.stencil` describes a stencil test; this is the buffer that
+   * test reads and writes. The two are separate because they are separately
+   * costly: a material's stencil state costs nothing until a draw uses it,
+   * while the buffer is memory the surface carries for its lifetime and a
+   * clear every view issues — so a renderer asks for it once, up front, and a
+   * scene that never masks never pays.
+   *
+   * A hint in §45's sense, like {@link RendererOptions.antialias}: a backend
+   * that cannot provide one still initializes and still draws, with masking
+   * materials drawing unmasked rather than not at all (§61 forbids failing a
+   * frame over render state).
+   *
+   * Masking into an **off-screen** surface asks the render target instead —
+   * `RenderTargetOptions.stencil` — and leaves this `false`.
+   */
+  stencil?: boolean;
 }
 
 /**
@@ -608,10 +734,27 @@ export class NullRenderer implements Renderer {
    * §62's headless tier: no textures at all, hence `maxTextureSize: 0`.
    * Frozen — a fixture that could be reconfigured mid-test would make the
    * capability negotiation it is meant to exercise meaningless.
+   *
+   * Every §62 member is answered rather than omitted (WP-R1.1), and every
+   * answer is the floor: this renderer has no device, no shader stage and no
+   * surface, so "no" and "zero" are not conservative guesses here but the
+   * literal truth. That is what makes it the conformance fixture — a backend
+   * author reading it sees the complete record with nothing left to infer.
    */
   readonly capabilities: RendererCapabilities = Object.freeze({
     backend: "null",
     maxTextureSize: 0,
+    textureFormats: Object.freeze([]),
+    multisampling: false,
+    floatRenderTargets: false,
+    timestampQueries: false,
+    storageBuffers: false,
+    computeShaders: false,
+    indirectDraw: false,
+    compressedTextureFormats: Object.freeze([]),
+    shaderPrecision: "none",
+    maxUniformBufferBytes: 0,
+    maxBindings: 0,
   } satisfies RendererCapabilities);
 
   /** The §6b channel required by {@link Renderer}. Never emitted to by this class. */

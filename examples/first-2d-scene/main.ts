@@ -33,8 +33,8 @@
  *   displacement and applied to the node's position — under an authority
  *   handover the drag performs explicitly (see "Dragging and §42" below).
  * - The **label** above the scene is real geometry, not DOM: a bitmap glyph
- *   atlas, laid out into quads, drawn as textured sprites in the same graph as
- *   everything else.
+ *   atlas, laid out into quads, drawn as **one** textured `Text` node in the
+ *   same graph as everything else.
  * - The **diamond** on the right and the **vane** on the left are not
  *   interactive at all: they are running authored animation, and the section
  *   below says exactly which kind.
@@ -96,19 +96,21 @@
  * the same thing without the warning, which is what a handover actually is
  * (decision, WP-3a.5).
  *
- * ## What the label costs today (§55 limitation, feeds the §55 frame backlog)
+ * ## What the label costs (§49, §56 — and what it used to cost)
  *
- * `Sprite` derives its texture coordinates from the quad's own bounds — the
- * whole texture is mapped across the whole sprite — and neither `Sprite` nor
- * `SpriteMaterial` carries §55's `frame` sub-rectangle yet. A glyph is a *cell*
- * of an atlas, so there is currently **no way to point a sprite at one cell of
- * one texture**. This example therefore cuts each distinct glyph cell out of the
- * atlas into its own small `Texture` (6 × 12 texels, 288 bytes) and caches it per
- * cell, so a 37-character label costs ~20 tiny textures and one sprite per drawn
- * glyph instead of one texture and one batched draw. It is correct and it is
- * visibly text; it is not how text should be drawn. The fix is §55's frame
- * region (a uv sub-rect on the item or the material) plus §65 batching, and this
- * paragraph is the evidence for why that backlog item exists.
+ * One `Text` node: **one geometry, one texture, one draw call**, whatever the
+ * string says. §53's per-vertex `uvs` address a different atlas cell for every
+ * glyph out of a single buffer, which is the thing that makes a label a
+ * rectangle-list rather than a pile of nodes.
+ *
+ * It is worth recording what stood here until 2026-08-21, because the paragraph
+ * was the evidence for a backlog item and the item is now closed. `Sprite`
+ * derives its texture coordinates affinely from its own quad — the whole texture
+ * across the whole sprite — so there was no way to point one at a *cell* of an
+ * atlas, and this file cut every distinct cell out into its own 6 × 12 texel
+ * `Texture` and drew one `Sprite` per glyph: ~20 textures and 36 draw calls for
+ * a 37-character label. R-28's `Text` node (2026-08-13) replaced all of it with
+ * three lines, and the count this page now reports is **1**.
  */
 
 import {
@@ -124,7 +126,7 @@ import {
 import { Application } from "four/application";
 import { boxGeometry, circleGeometry2D, planeGeometry } from "four/geometry";
 import { DragManager, PointerInput, type Pickable } from "four/input";
-import { SpriteMaterial, UnlitMaterial } from "four/materials";
+import { UnlitMaterial } from "four/materials";
 import { Quaternion, Vector3 } from "four/math";
 import {
   CircularTrajectory,
@@ -133,19 +135,11 @@ import {
   MotionComponent,
   MotionSystem,
 } from "four/motion";
-import { Renderable, Sprite, Texture } from "four/render";
+import { Renderable, Texture } from "four/render";
 import { WebglRenderer } from "four/render-webgl";
-import {
-  Group,
-  OrthographicCamera,
-  createFullscreenViewport,
-} from "four/scene";
-import {
-  buildGlyphAtlas,
-  layoutText,
-  type GlyphAtlas,
-  type TextQuad,
-} from "four/text";
+import { OrthographicCamera, createFullscreenViewport } from "four/scene";
+import { buildGlyphAtlas } from "four/text";
+import { Text } from "four";
 
 // --- surface ---------------------------------------------------------------
 
@@ -620,77 +614,54 @@ const LABEL_TEXT = "four.js - click a shape, drag the box";
 // instead of to soot.
 const atlas = buildGlyphAtlas();
 
-// Pure arithmetic: where each glyph's rectangle goes (origin = the first line's
-// baseline at its left edge, +Y up) and which part of the atlas it samples.
-const layout = layoutText(LABEL_TEXT, atlas, { size: LABEL_SIZE });
+/**
+ * The whole sheet, sampled with §77's `"nearest"` filter (R-30).
+ *
+ * `"nearest"` and not the default `"linear"` because the face is a **bitmap**:
+ * one texel is one pixel of the glyph, and a linear filter blends each texel
+ * with its neighbours — including, at a cell's edge, the neighbouring *glyph*.
+ * Nearest keeps a 6 × 12 face crisp at the size it was drawn for, which is what
+ * the pixel golden in `tests/visual/text.spec.ts` photographs.
+ */
+const font = new Texture({ ...atlas, filter: "nearest" });
 
 /**
- * Sprite materials already built for a glyph cell, keyed by that cell's atlas
- * rectangle — so the two `o`s of "box" share one texture and one material.
+ * One material for the whole label. `transparent: true` because the atlas
+ * carries coverage in alpha, and §57's `color` is where a label's colour lives —
+ * it multiplies into every texel, which is exactly what the per-glyph sprite
+ * tint used to do.
  */
-const glyphMaterials = new Map<string, SpriteMaterial>();
+const ink = new UnlitMaterial({
+  map: font,
+  transparent: true,
+  color: [LABEL_TINT[0], LABEL_TINT[1], LABEL_TINT[2], LABEL_TINT[3]],
+});
 
 /**
- * Copies one glyph cell out of `atlas` into a standalone RGBA8 texture source.
+ * The label: **one node, one geometry, one draw call** (§49, §56).
  *
- * This is the workaround the file header describes: a `Sprite` maps its whole
- * texture across its whole quad, so pointing one at a *cell* of the atlas is
- * impossible until §55's frame region lands. Cutting the cell out gives the
- * sprite a texture whose 0…1 range **is** the glyph.
+ * `renderLayer: 1` draws it after the opaque shapes — it blends, and blending
+ * needs what is behind it already in the framebuffer (§66).
  *
- * The rectangle is recovered from the quad's uv, which the atlas produced as
- * exact texel ratios, so the rounding below is exact rather than approximate.
- * Row order is preserved: both the atlas and `TextureSource` put row 0 at
- * `v = 0`, the bottom (§7a).
+ * The node's origin is the first line's baseline at its left edge, so centring
+ * the block over the scene is one subtraction of a number the node itself
+ * reports (`layout.width`) — the same arithmetic `layoutText` did here before,
+ * now cached inside the node and recomputed only when the string changes.
+ *
+ * Until 2026-08-21 this was ~20 tiny `Texture`s — one per *distinct glyph cell*,
+ * cut out of the atlas by hand — and one `Sprite` per drawn glyph, because
+ * `Sprite` maps its whole texture across its whole quad and §55's frame
+ * sub-rectangle had not landed. R-28's `Text` node made that workaround
+ * unnecessary: §53's per-vertex `uvs` address twelve different atlas cells from
+ * one buffer, which is the thing a sprite's affine uv could never express.
  */
-function cutGlyphCell(source: GlyphAtlas, quad: TextQuad): Texture {
-  const x = Math.round(quad.u0 * source.width);
-  const y = Math.round(quad.v0 * source.height);
-  const width = Math.round((quad.u1 - quad.u0) * source.width);
-  const height = Math.round((quad.v1 - quad.v0) * source.height);
-
-  const data = new Uint8Array(width * height * 4);
-  for (let row = 0; row < height; row += 1) {
-    const from = ((y + row) * source.width + x) * 4;
-    data.set(source.data.subarray(from, from + width * 4), row * width * 4);
-  }
-  return new Texture({ width, height, data });
-}
-
-/** The material for one glyph cell, built on first use and cached. */
-function materialForCell(quad: TextQuad): SpriteMaterial {
-  const key = `${String(quad.u0)},${String(quad.v0)}`;
-  const cached = glyphMaterials.get(key);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const material = new SpriteMaterial({
-    texture: cutGlyphCell(atlas, quad),
-    tint: [LABEL_TINT[0], LABEL_TINT[1], LABEL_TINT[2], LABEL_TINT[3]],
-  });
-  glyphMaterials.set(key, material);
-  return material;
-}
-
-// One node holding the whole label, placed so the text is centred over the
-// scene: children keep the layout's own coordinates and inherit the group's
-// transform, so moving the label is one write (§7).
-const label = new Group();
+const label = new Text(atlas, ink, {
+  text: LABEL_TEXT,
+  size: LABEL_SIZE,
+  renderLayer: 1,
+});
 label.name = "label";
-label.transform.position.set(0 - layout.width / 2, LABEL_BASELINE_Y, 0);
-
-for (const quad of layout.quads) {
-  // `renderLayer: 1` draws the glyphs after the opaque shapes — sprites blend,
-  // and blending needs what is behind it already in the framebuffer (§66).
-  const glyph = new Sprite(materialForCell(quad), {
-    width: quad.x1 - quad.x0,
-    height: quad.y1 - quad.y0,
-    anchor: { x: 0, y: 0 },
-    renderLayer: 1,
-  });
-  glyph.transform.position.set(quad.x0, quad.y0, 0);
-  label.add(glyph);
-}
+label.transform.position.set(0 - label.layout.width / 2, LABEL_BASELINE_Y, 0);
 app.scene.add(label);
 
 // --- the frame loop ---------------------------------------------------------

@@ -343,6 +343,47 @@ const BLEND_FUNCTIONS: Record<ItemBlendMode, readonly [number, number]> = {
   screen: [GL.ONE, GL.ONE_MINUS_SRC_COLOR],
 };
 
+/** §57's optional `stencil` record, derived from the material for the same reason. */
+type ItemStencil = NonNullable<ItemMaterial["stencil"]>;
+
+/**
+ * Every bit of the stencil buffer — see `GlState.stencilReadMask` for why the
+ * all-ones mask this backend mirrors is one byte wide rather than four.
+ */
+const STENCIL_ALL_BITS = 0xff;
+
+/**
+ * §67's eight comparisons as GL enums (R-7).
+ *
+ * A record rather than a `switch`, matching `BLEND_FUNCTIONS`: the lookup is
+ * one property load, and `StencilState` validates every assignment against
+ * these same eight names (`@four/materials`), so the table is total over its
+ * key type and a missing arm is a compile error rather than an `undefined`
+ * reaching `stencilFunc` inside a frame.
+ */
+const STENCIL_FUNCS: Record<ItemStencil["func"], number> = {
+  never: GL.NEVER,
+  less: GL.LESS,
+  equal: GL.EQUAL,
+  lequal: GL.LEQUAL,
+  greater: GL.GREATER,
+  notequal: GL.NOTEQUAL,
+  gequal: GL.GEQUAL,
+  always: GL.ALWAYS,
+};
+
+/** §67's eight operations as GL enums, for {@link STENCIL_FUNCS}' reason. */
+const STENCIL_OPS: Record<ItemStencil["passOp"], number> = {
+  keep: GL.KEEP,
+  zero: GL.ZERO,
+  replace: GL.REPLACE,
+  increment: GL.INCR,
+  "increment-wrap": GL.INCR_WRAP,
+  decrement: GL.DECR,
+  "decrement-wrap": GL.DECR_WRAP,
+  invert: GL.INVERT,
+};
+
 /**
  * The GL state this backend toggles per draw (§57), mirrored on the CPU so a
  * frame issues a call only where a draw actually *changes* something.
@@ -374,7 +415,47 @@ interface GlState {
   depthTest: boolean;
   depthWrite: boolean;
   colorWrite: boolean;
+  /**
+   * §67's stencil test (R-7, 2026-08-11), mirrored at **GL's initial values**
+   * for the reason the four above are mirrored at theirs: a frame whose
+   * materials declare no `stencil` finds every comparison equal and issues not
+   * one stencil call, so it is byte-identical to the frame drawn before this
+   * field existed. Sixth confirmation of the mirror-at-GL-initial technique.
+   *
+   * The masks mirror `0xff`, not GL's literal all-ones: WebGL 2 has exactly two
+   * stencil formats and both are 8 bits deep, so the low byte is the whole
+   * buffer and `0xff` selects every bit of it. `StencilState` refuses a value
+   * above 255 (§85), which is what makes that narrowing safe rather than a
+   * silent truncation.
+   */
+  stencilTest: boolean;
+  stencilFunc: number;
+  stencilRef: number;
+  stencilReadMask: number;
+  stencilWriteMask: number;
+  stencilFailOp: number;
+  stencilDepthFailOp: number;
+  stencilPassOp: number;
 }
+
+/**
+ * GL's initial stencil state, written once (§67, R-7).
+ *
+ * One object rather than two copies of eight literals, because these values
+ * *are* the byte-identity claim — "the mirror starts where GL starts, so a
+ * frame that names no stencil finds every comparison equal" — and a claim
+ * stated twice is a claim that can drift.
+ */
+const INITIAL_STENCIL = {
+  stencilTest: false,
+  stencilFunc: GL.ALWAYS,
+  stencilRef: 0,
+  stencilReadMask: STENCIL_ALL_BITS,
+  stencilWriteMask: STENCIL_ALL_BITS,
+  stencilFailOp: GL.KEEP,
+  stencilDepthFailOp: GL.KEEP,
+  stencilPassOp: GL.KEEP,
+} as const;
 
 /** A mirror of the state a frame starts and ends in; see `GlState`. */
 function createGlState(): GlState {
@@ -384,6 +465,7 @@ function createGlState(): GlState {
     depthTest: true,
     depthWrite: true,
     colorWrite: true,
+    ...INITIAL_STENCIL,
   };
 }
 
@@ -402,6 +484,7 @@ function resetGlState(state: GlState): void {
   state.depthTest = true;
   state.depthWrite = true;
   state.colorWrite = true;
+  Object.assign(state, INITIAL_STENCIL);
 }
 
 /**
@@ -475,6 +558,101 @@ function applyDepthColorState(
 }
 
 /**
+ * Applies §57's optional stencil state for the draw about to be issued (§67,
+ * R-7).
+ *
+ * `stencil` is the material's record, or `undefined` for the overwhelmingly
+ * common material that declares none — which means *disable the test*, GL's
+ * initial state and the only stencil state this engine had before R-7.
+ *
+ * ## The three calls, and why they are three
+ *
+ * GL splits the state across `stencilFunc` (comparison, reference, read mask),
+ * `stencilOp` (the three outcomes), and `stencilMask` (the write mask), and
+ * each is re-issued only when *its* group moved. A mask pass and the draw it
+ * masks typically differ in the comparison and the write mask but agree on the
+ * operations, so the common composition costs two calls at the switch, not
+ * three.
+ *
+ * ## Turning the test off does not need the rest put back
+ *
+ * With `STENCIL_TEST` disabled GL performs no stencil test **and no stencil
+ * write** — the operations are unreachable — so returning to "no stencil" is
+ * one `disable`, and the func/op mirrors are deliberately left where the last
+ * stencil material put them. The next stencil material re-issues only what it
+ * actually disagrees with. The one place that reasoning does not hold is
+ * `clear`, which is masked by the write mask whether or not the test is
+ * enabled; {@link WebglRenderer.render} restores the mask before clearing for
+ * exactly that reason.
+ */
+function applyStencilState(
+  gl: ParticleGlContext,
+  state: GlState,
+  stencil: ItemStencil | undefined,
+): void {
+  if (stencil === undefined) {
+    if (state.stencilTest) {
+      gl.disable(GL.STENCIL_TEST);
+      state.stencilTest = false;
+    }
+    return;
+  }
+  if (!state.stencilTest) {
+    gl.enable(GL.STENCIL_TEST);
+    state.stencilTest = true;
+  }
+  // Read defensively, exactly as `applyMaterialState` reads the rest of §57:
+  // a structurally-typed double or a consumer's own material type may carry a
+  // partial record, and a missing field has to mean the documented default
+  // rather than `undefined` reaching a GL entry point. A real `StencilState`
+  // always declares all seven and validates each on assignment (F14).
+  const func = STENCIL_FUNCS[stencil.func ?? "always"];
+  const ref = stencil.ref ?? 0;
+  const readMask = stencil.readMask ?? STENCIL_ALL_BITS;
+  if (
+    func !== state.stencilFunc ||
+    ref !== state.stencilRef ||
+    readMask !== state.stencilReadMask
+  ) {
+    gl.stencilFunc(func, ref, readMask);
+    state.stencilFunc = func;
+    state.stencilRef = ref;
+    state.stencilReadMask = readMask;
+  }
+  const failOp = STENCIL_OPS[stencil.failOp ?? "keep"];
+  const depthFailOp = STENCIL_OPS[stencil.depthFailOp ?? "keep"];
+  const passOp = STENCIL_OPS[stencil.passOp ?? "keep"];
+  if (
+    failOp !== state.stencilFailOp ||
+    depthFailOp !== state.stencilDepthFailOp ||
+    passOp !== state.stencilPassOp
+  ) {
+    gl.stencilOp(failOp, depthFailOp, passOp);
+    state.stencilFailOp = failOp;
+    state.stencilDepthFailOp = depthFailOp;
+    state.stencilPassOp = passOp;
+  }
+  const writeMask = stencil.writeMask ?? STENCIL_ALL_BITS;
+  if (writeMask !== state.stencilWriteMask) {
+    gl.stencilMask(writeMask);
+    state.stencilWriteMask = writeMask;
+  }
+}
+
+/**
+ * Restores the stencil write mask to all bits, so a `clear` is not masked by
+ * whatever the last stencil material left behind (§67, R-7).
+ *
+ * One comparison, and it is `false` in every frame that names no stencil.
+ */
+function restoreStencilWriteMask(gl: ParticleGlContext, state: GlState): void {
+  if (state.stencilWriteMask !== STENCIL_ALL_BITS) {
+    gl.stencilMask(STENCIL_ALL_BITS);
+    state.stencilWriteMask = STENCIL_ALL_BITS;
+  }
+}
+
+/**
  * Applies every §57 field a material declares, defaulting each one the way a
  * material that predates the field would behave.
  *
@@ -511,6 +689,16 @@ function applyMaterialState(
     material?.depthWrite !== false,
     material?.colorWrite !== false,
   );
+  // §67's seam, and its whole per-item cost (R-7): one property load and one
+  // comparison. The second disjunct is what makes the *first* draw after a
+  // stencil material put the test back — without it a frame would need
+  // `applyStencilState` unconditionally, which is a call per draw for a feature
+  // almost no scene uses. Measured: no change in bundle size or frame time for
+  // a scene that names no stencil (see the packet's A/B).
+  const stencil = material?.stencil;
+  if (stencil !== undefined || state.stencilTest) {
+    applyStencilState(gl, state, stencil);
+  }
 }
 
 /**
@@ -623,6 +811,11 @@ function resolveTexture(
 function restoreGlState(gl: ParticleGlContext, state: GlState): void {
   applyBlendState(gl, state, false, "normal", true);
   applyDepthColorState(gl, state, true, true, true);
+  // §67, R-7: the test off and the write mask back to all bits — the two halves
+  // of the stencil state that outlive a frame. Both comparisons are equal in a
+  // frame that named no stencil, so this adds no call to one.
+  applyStencilState(gl, state, undefined);
+  restoreStencilWriteMask(gl, state);
 }
 
 /**
@@ -691,12 +884,61 @@ function asContext(value: unknown): ParticleGlContext | null {
   return value as ParticleGlContext;
 }
 
+/**
+ * The §62 members this backend answers **without asking GL anything new**
+ * (WP-R1.1, 2026-08-21).
+ *
+ * Every value is a statement about *this backend on WebGL 2*, and every one of
+ * them is true by construction rather than by query:
+ *
+ * - `computeShaders`, `storageBuffers`, `indirectDraw`, `timestampQueries` —
+ *   WebGL 2 has no compute stage, no storage buffers and no indirect draw at
+ *   all, and this tier requests no timer extension. §62's tiers exist so that
+ *   an application can read a `false` here and take the CPU path, rather than
+ *   discover the absence at dispatch time.
+ * - `floatRenderTargets` — `render-target.ts`'s `RenderTargetFormat` is the
+ *   single-member union `"rgba8"`, and this backend requests no
+ *   `EXT_color_buffer_float`; it cannot allocate a float target, whatever the
+ *   device could.
+ * - `multisampling` — core WebGL 2 (`renderbufferStorageMultisample`), and
+ *   `RendererOptions.antialias` already reaches the context attributes.
+ * - `shaderPrecision` — GLSL ES 3.00 *requires* fragment-stage `highp`, which
+ *   is why `gl-program.ts`'s fragment stages declare it unconditionally.
+ * - `compressedTextureFormats` — this tier uploads none (§77's boundary, see
+ *   `gl-texture.ts`), so the honest report is "none available through me".
+ *
+ * ## What is deliberately **not** reported, and why
+ *
+ * §62's "maximum uniforms and bindings" is `MAX_UNIFORM_BLOCK_SIZE` and
+ * `MAX_TEXTURE_IMAGE_UNITS` — two more `getParameter` calls at initialization.
+ * The recorded law from R-30b applies verbatim: *a capability query must be
+ * lazy if the alternative moves recorded transcripts.* Two extra `getParameter`
+ * calls in `initialize` would move every landed integration transcript for a
+ * number nothing in the engine reads yet. So both members are **omitted**, and
+ * `undefined` says exactly that — "this backend has not been taught to answer"
+ * — which is the third state the widened record exists to keep available
+ * (`renderer.ts`). They join the §62 report the day something needs them, with
+ * the query where the need is.
+ */
+const WEBGL_STATIC_CAPABILITIES = Object.freeze({
+  textureFormats: Object.freeze(["rgba8"]),
+  multisampling: true,
+  floatRenderTargets: false,
+  timestampQueries: false,
+  storageBuffers: false,
+  computeShaders: false,
+  indirectDraw: false,
+  compressedTextureFormats: Object.freeze([]),
+  shaderPrecision: "highp",
+} satisfies Partial<RendererCapabilities>);
+
 /** Reads the §62 limits this tier can honestly report. */
 function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
   const maxTextureSize = gl.getParameter(GL.MAX_TEXTURE_SIZE);
   return Object.freeze({
     backend: "webgl2",
     maxTextureSize: typeof maxTextureSize === "number" ? maxTextureSize : 0,
+    ...WEBGL_STATIC_CAPABILITIES,
   } satisfies RendererCapabilities);
 }
 
@@ -912,6 +1154,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #capabilities: RendererCapabilities = Object.freeze({
     backend: "webgl2",
     maxTextureSize: 0,
+    ...WEBGL_STATIC_CAPABILITIES,
   } satisfies RendererCapabilities);
 
   #canvas: WebglCanvas | null = null;
@@ -1060,6 +1303,16 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   #bufferWidth = 0;
 
   #bufferHeight = 0;
+
+  /**
+   * Whether the drawing buffer carries a stencil buffer (§67, R-7) — the
+   * `stencil` context attribute, remembered because the frame needs it to
+   * decide whether its clear may carry `STENCIL_BUFFER_BIT`.
+   *
+   * `false` unless {@link RendererOptions.stencil} asked, and `false` is what
+   * every renderer built before R-7 got: the attribute was hard-coded off.
+   */
+  #stencil = false;
 
   /** Whether `resize` has been called, so `initialize` knows whose size wins. */
   #sizeRequested = false;
@@ -1331,6 +1584,12 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // agree even if the application resized the target after this call began.
     const surfaceWidth = targetRecord?.width ?? this.#bufferWidth;
     const surfaceHeight = targetRecord?.height ?? this.#bufferHeight;
+    // Whether the surface this frame draws into *has* a stencil buffer (§67,
+    // R-7): on screen that is the context attribute this renderer was
+    // initialized with, off screen the target's own attachment. Read once for
+    // the frame beside the surface size, for the same reason.
+    const stencilAttached =
+      targetRecord === null ? this.#stencil : targetRecord.stencil;
 
     // This renderer's own state mirror, and the two frame-scoped bindings the
     // `finally` below has to see (F13, 2026-08-07).
@@ -1477,6 +1736,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         // clear nothing at all. Put both back first; with §57's defaults this
         // issues no call.
         applyDepthColorState(gl, state, true, true, true);
+        // §67's third clear-masking rule (R-7): a stencil write mask masks the
+        // *clear* too, whether or not the test is enabled. Restored here for
+        // the same reason, and equally free when no material named a stencil.
+        restoreStencilWriteMask(gl, state);
         resolveRect(view, surfaceWidth, surfaceHeight);
         gl.scissor(rect.x, rect.y, rect.width, rect.height);
         gl.viewport(rect.x, rect.y, rect.width, rect.height);
@@ -1491,6 +1754,16 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             clearColor[3],
           );
           mask |= GL.COLOR_BUFFER_BIT;
+        }
+        // A stencil buffer that is never cleared is a mask that leaks from one
+        // frame into the next — the §33 defect, not a feature — so a surface
+        // that *has* one clears it to 0 with the depth clear it already issues.
+        // The bit is added only where the buffer exists: a renderer that did
+        // not ask for `stencil` and a target that did not ask for one issue the
+        // identical `clear` they always did, which is the byte-identity half of
+        // this clause.
+        if (stencilAttached) {
+          mask |= GL.STENCIL_BUFFER_BIT;
         }
         gl.clearDepth(1);
         gl.clear(mask);
@@ -2220,11 +2493,20 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     }
 
     const canvas = requireCanvas(options?.canvas);
+    // §67's masks need somewhere to write, and the drawing buffer is where a
+    // *screen-space* mask (§73's overflow clipping, above all) has to write —
+    // so `stencil` is an opt-in attribute rather than an always-on one. Off by
+    // default, deliberately: a stencil buffer is memory every frame carries and
+    // an extra clear every view issues, and a scene that never masks should pay
+    // for neither. R-7, 2026-08-11; the attribute was hard-coded `false` until
+    // then. An application that masks into a render target instead asks that
+    // *target* for a stencil and leaves this alone.
+    this.#stencil = options?.stencil ?? false;
     const raw = canvas.getContext("webgl2", {
       alpha: true,
       antialias: options?.antialias ?? false,
       depth: true,
-      stencil: false,
+      stencil: this.#stencil,
     });
     const gl = asContext(raw);
     if (gl === null) {

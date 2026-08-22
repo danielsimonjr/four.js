@@ -254,6 +254,9 @@ export default defineConfig({
     {
       name: "chromium",
       testDir: "tests/browser",
+      // `tests/browser/webgpu` is the third project's, below. Ignored here so
+      // one spec is not run twice under two project names.
+      testIgnore: "webgpu/**",
       use: { browserName: "chromium" },
     },
     // §92's visual category (seeded 2026-08-04): golden-image comparison of
@@ -267,6 +270,47 @@ export default defineConfig({
       name: "visual",
       testDir: "tests/visual",
       use: { browserName: "chromium" },
+    },
+    // §62's second backend (WP-R1.1, 2026-08-21). A separate project rather
+    // than more specs in `chromium`, for one reason: these specs **skip
+    // themselves** when `requestAdapter()` resolves `null`, and a project
+    // boundary is what makes "the WebGPU gate skipped entirely" legible in a
+    // report instead of scattered through the WebGL results. They borrow the
+    // first site's origin — WebGPU is absent on `about:blank`, so a gate page
+    // must be served (recorded gotcha) — and, per §5 of the R-1 plan, they
+    // compare no pixels against WebGL and carry no goldens: a WebGPU golden,
+    // if one is ever justified, belongs in the `visual` project's
+    // WebGPU-to-WebGPU snapshot directory.
+    {
+      name: "webgpu",
+      testDir: "tests/browser/webgpu",
+      use: {
+        browserName: "chromium",
+        // `--enable-unsafe-webgpu` is what turns `requestAdapter()` from
+        // `null` into a SwiftShader adapter: Dawn resolves the
+        // `libvk_swiftshader.so` that ships inside both browser trees, so no
+        // Vulkan flag soup is needed — measured, one flag is enough.
+        //
+        // **Per project, not global**, and the reason is measured rather than
+        // cautious. The R-1 plan recommended setting it globally on the
+        // evidence that a `webgl2` context still initialises alongside it,
+        // which is true — but context creation is not the whole gate:
+        // `one-scene-everything-moves.spec.ts`'s slow-motion assertion
+        // (§75, §9) fails with the flag on and passes without it, reproducibly
+        // and on an idle machine. Initialising Dawn changes the frame pacing
+        // the flagship measures. A flag that only the WebGPU specs need has no
+        // business being in the other two projects' browsers, and confining it
+        // keeps every landed WebGL and visual gate launching exactly the
+        // browser it launched before (WP-R1.1, 2026-08-21).
+        launchOptions: {
+          executablePath: findPreinstalledChromium(),
+          args: [
+            "--use-gl=angle",
+            "--use-angle=swiftshader",
+            "--enable-unsafe-webgpu",
+          ],
+        },
+      },
     },
   ],
   // All nine sites are started before the first test and torn down after the

@@ -1,10 +1,10 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-13"
-  totalFiles: 215
+  lastUpdated: "2026-08-21"
+  totalFiles: 233
   totalModules: 24
-  totalExports: 1990
+  totalExports: 2184
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -17,13 +17,13 @@ entryPoints:
     description: §85 build mode (A-4, 2026-08-07). `DEV` is the flag every other package
   - file: packages/diagnostics/src/index.ts
     type: main
-    description: "--- WP-10.2 (ReplayPlayer) begin -------------------------------------------"
+    description: "--- PH-20 (§33 rollback) ---------------------------------------------------"
   - file: packages/four/src/index.ts
     type: main
     description: "The umbrella package (§98): one namespace per workspace package, plus the"
   - file: packages/geometry/src/index.ts
     type: main
-    description: Entry Point
+    description: "--- R-21: §53 geometry base + bounding volume (begin) ---"
   - file: packages/input/src/index.ts
     type: main
     description: Entry Point
@@ -65,7 +65,7 @@ entryPoints:
     description: "`@four/render-webgl` — the WebGL 2 backend (§62 backend 2, §120's MVP tier)."
   - file: packages/render-webgpu/src/index.ts
     type: main
-    description: Entry Point
+    description: "`@four/render-webgpu` — the WebGPU backend (§62 backend 1)."
   - file: packages/scene/src/index.ts
     type: main
     description: Entry Point
@@ -918,7 +918,13 @@ modules:
       description: The asset manager (§76) — one cache, one refcount, one fetch per asset.
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./content-hash.js
+          imports:
+            - resolveGlobalDigest
+            - resolveGlobalTextDecoder
+            - DigestLike
+            - TextDecodeLike
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -946,6 +952,21 @@ modules:
       constants:
         - DEFAULT_MAXIMUM_BYTES
         - DEFAULT_TIMEOUT_SECONDS
+    packages/assets/src/content-hash.ts:
+      description: Content hashing (§76's last-but-one capability, §79's manifest half).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - CONTENT_HASH_ALGORITHM
+        - resolveGlobalDigest
+        - resolveGlobalTextDecoder
+      functions:
+        - resolveGlobalDigest
+        - resolveGlobalTextDecoder
+      constants:
+        - CONTENT_HASH_ALGORITHM
     packages/assets/src/index.ts:
       description: "`@four/assets` — the asset system (§76–78)."
       externalDependencies: []
@@ -956,6 +977,24 @@ modules:
             - AssetManager
             - DEFAULT_MAXIMUM_BYTES
             - DEFAULT_TIMEOUT_SECONDS
+          reExport: true
+        - file: ./content-hash.js
+          imports:
+            - CONTENT_HASH_ALGORITHM
+          reExport: true
+        - file: ./manifest.js
+          imports:
+            - loadFromManifest
+            - manifestLoader
+            - manifestUrl
+            - parseAssetManifest
+          reExport: true
+        - file: ./texture.js
+          imports:
+            - DEFAULT_MAXIMUM_DECODED_BYTES
+            - DEFAULT_MAXIMUM_EXPANSION_RATIO
+            - TextureAsset
+            - createTextureLoader
           reExport: true
         - file: ./loaders.js
           imports:
@@ -979,6 +1018,30 @@ modules:
             - TimerLike
           reExport: true
           typeOnly: true
+        - file: ./content-hash.js
+          imports:
+            - DigestLike
+            - TextDecodeLike
+          reExport: true
+          typeOnly: true
+        - file: ./manifest.js
+          imports:
+            - AssetManifest
+            - AssetManifestEntry
+            - ManifestLoadOptions
+          reExport: true
+          typeOnly: true
+        - file: ./texture.js
+          imports:
+            - DecodedTexels
+            - TexelDecodeLike
+            - TexelProbeLike
+            - TextureColorSpace
+            - TextureFilterMode
+            - TextureLoaderOptions
+            - TextureWrapMode
+          reExport: true
+          typeOnly: true
         - file: ./loaders.js
           imports:
             - ImageBitmapLike
@@ -990,6 +1053,15 @@ modules:
         - AssetManager
         - DEFAULT_MAXIMUM_BYTES
         - DEFAULT_TIMEOUT_SECONDS
+        - CONTENT_HASH_ALGORITHM
+        - loadFromManifest
+        - manifestLoader
+        - manifestUrl
+        - parseAssetManifest
+        - DEFAULT_MAXIMUM_DECODED_BYTES
+        - DEFAULT_MAXIMUM_EXPANSION_RATIO
+        - TextureAsset
+        - createTextureLoader
         - ImageAsset
         - binaryLoader
         - createImageLoader
@@ -1006,12 +1078,33 @@ modules:
         - FetchResponse
         - ResponseHeadersLike
         - TimerLike
+        - DigestLike
+        - TextDecodeLike
+        - AssetManifest
+        - AssetManifestEntry
+        - ManifestLoadOptions
+        - DecodedTexels
+        - TexelDecodeLike
+        - TexelProbeLike
+        - TextureColorSpace
+        - TextureFilterMode
+        - TextureLoaderOptions
+        - TextureWrapMode
         - ImageBitmapLike
         - ImageDecodeLike
       reExported:
         - AssetManager
         - DEFAULT_MAXIMUM_BYTES
         - DEFAULT_TIMEOUT_SECONDS
+        - CONTENT_HASH_ALGORITHM
+        - loadFromManifest
+        - manifestLoader
+        - manifestUrl
+        - parseAssetManifest
+        - DEFAULT_MAXIMUM_DECODED_BYTES
+        - DEFAULT_MAXIMUM_EXPANSION_RATIO
+        - TextureAsset
+        - createTextureLoader
         - ImageAsset
         - binaryLoader
         - createImageLoader
@@ -1027,6 +1120,18 @@ modules:
         - FetchResponse
         - ResponseHeadersLike
         - TimerLike
+        - DigestLike
+        - TextDecodeLike
+        - AssetManifest
+        - AssetManifestEntry
+        - ManifestLoadOptions
+        - DecodedTexels
+        - TexelDecodeLike
+        - TexelProbeLike
+        - TextureColorSpace
+        - TextureFilterMode
+        - TextureLoaderOptions
+        - TextureWrapMode
         - ImageBitmapLike
         - ImageDecodeLike
       constants:
@@ -1058,6 +1163,69 @@ modules:
         - textLoader
         - jsonLoader
         - binaryLoader
+    packages/assets/src/manifest.ts:
+      description: The §79 asset manifest — logical key → URL + content hash.
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./asset-manager.js
+          imports:
+            - AssetLoader
+            - AssetLoadOptions
+          typeOnly: true
+        - file: ./asset-manager.js
+          imports:
+            - AssetManager
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+      exports:
+        - manifestLoader
+        - parseAssetManifest
+        - loadFromManifest
+        - manifestUrl
+      interfaces:
+        - AssetManifestEntry
+        - ManifestLoadOptions
+      functions:
+        - parseAssetManifest
+        - loadFromManifest
+        - manifestUrl
+      constants:
+        - manifestLoader
+    packages/assets/src/texture.ts:
+      description: The texture loader tier (§77's asset half, A-19 — 2026-08-21).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./asset-manager.js
+          imports:
+            - AssetLoader
+            - FetchResponse
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - Disposable
+      exports:
+        - DEFAULT_MAXIMUM_DECODED_BYTES
+        - DEFAULT_MAXIMUM_EXPANSION_RATIO
+        - createTextureLoader
+        - TextureAsset
+      classes:
+        - TextureAsset
+      interfaces:
+        - DecodedTexels
+        - TextureLoaderOptions
+      functions:
+        - createTextureLoader
+      constants:
+        - DEFAULT_MAXIMUM_DECODED_BYTES
+        - DEFAULT_MAXIMUM_EXPANSION_RATIO
   packages/core:
     packages/core/src/component.ts:
       description: Component model (§6a, plan D2).
@@ -1594,7 +1762,7 @@ modules:
         - DEBUG_DRAW_DEFAULT_COLORS
         - DEBUG_DRAW_STAGED
     packages/diagnostics/src/index.ts:
-      description: "--- WP-10.2 (ReplayPlayer) begin -------------------------------------------"
+      description: "--- PH-20 (§33 rollback) ---------------------------------------------------"
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -1606,6 +1774,10 @@ modules:
         - file: ./recorder.js
           imports:
             - ReplayRecorder
+          reExport: true
+        - file: ./rollback.js
+          imports:
+            - RollbackBuffer
           reExport: true
         - file: ./replay-format.js
           imports:
@@ -1675,6 +1847,12 @@ modules:
             - ReplayTarget
           reExport: true
           typeOnly: true
+        - file: ./rollback.js
+          imports:
+            - RollbackBufferOptions
+            - RollbackTarget
+          reExport: true
+          typeOnly: true
         - file: ./replay-format.js
           imports:
             - JsonValue
@@ -1735,6 +1913,7 @@ modules:
         - createChecksum
         - hashFloats
         - ReplayRecorder
+        - RollbackBuffer
         - LATEST_REPLAY_FORMAT_VERSION
         - MINIMUM_REPLAY_FORMAT_VERSION
         - REPLAY_FORMAT_VERSION
@@ -1781,6 +1960,8 @@ modules:
         - ReplayRecorderOptions
         - ReplaySnapshot
         - ReplayTarget
+        - RollbackBufferOptions
+        - RollbackTarget
         - JsonValue
         - ReplayAdapterIdentity
         - ReplayFrameRecord
@@ -1820,6 +2001,7 @@ modules:
         - createChecksum
         - hashFloats
         - ReplayRecorder
+        - RollbackBuffer
         - LATEST_REPLAY_FORMAT_VERSION
         - MINIMUM_REPLAY_FORMAT_VERSION
         - REPLAY_FORMAT_VERSION
@@ -1865,6 +2047,8 @@ modules:
         - ReplayRecorderOptions
         - ReplaySnapshot
         - ReplayTarget
+        - RollbackBufferOptions
+        - RollbackTarget
         - JsonValue
         - ReplayAdapterIdentity
         - ReplayFrameRecord
@@ -2048,6 +2232,27 @@ modules:
         - auditResourceLeaks
       constants:
         - NO_RESOURCE_LEAKS
+    packages/diagnostics/src/rollback.ts:
+      description: "`RollbackBuffer` (§33 *\"rollback\"*, §34; PH-20, 2026-08-21) — a bounded ring"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./recorder.js
+          imports:
+            - ReplaySnapshot
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+      exports:
+        - RollbackBuffer
+      classes:
+        - RollbackBuffer
+      interfaces:
+        - RollbackTarget
+        - RollbackBufferOptions
     packages/diagnostics/src/stats.ts:
       description: §84 runtime statistics — the record behind `app.stats` (A-1, 2026-08-07).
       externalDependencies: []
@@ -2157,6 +2362,8 @@ modules:
             - Scene
             - createSnapshotSystem
             - resolveWorldTransforms
+            - Camera
+            - SurfaceSizedCamera
             - Viewport
             - WorldTransformStats
         - package: "@four/render"
@@ -2619,7 +2826,11 @@ modules:
         - package: "@four/motion"
           directory: packages/motion
           imports:
+            - CHARACTER_CONTROLLER_SERIALIZER
+            - CharacterController
+            - FIRST_PERSON_LOOK_SERIALIZER
             - FOLLOW_RIG_SERIALIZER
+            - FirstPersonLook
             - FollowRig
             - KINEMATIC_CONTROLLER_SERIALIZER
             - KinematicController
@@ -2636,6 +2847,8 @@ modules:
             - Collider
             - RIGID_BODY_SERIALIZER
             - RigidBody
+            - SWEPT_CHARACTER_CONTROLLER_SERIALIZER
+            - SweptCharacterController
         - package: "@four/render"
           directory: packages/render
           imports:
@@ -2667,6 +2880,9 @@ modules:
             - OrthographicCamera
             - PerspectiveCamera
             - PointLight
+            - SCREEN_ORIGINS
+            - SCREEN_UNITS
+            - ScreenCamera
             - SpotLight
             - restoreNodeId
             - Node
@@ -2715,6 +2931,7 @@ modules:
         - TEXT_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
+        - SCREEN_CAMERA_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
@@ -2767,6 +2984,7 @@ modules:
         - TEXT_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
+        - SCREEN_CAMERA_NODE_TYPE
         - DIRECTIONAL_LIGHT_NODE_TYPE
         - POINT_LIGHT_NODE_TYPE
         - SPOT_LIGHT_NODE_TYPE
@@ -2876,9 +3094,30 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./geometry.js
+          imports:
+            - Geometry
+            - BoundingVolume
+            - MutableBoundingVolume
         - file: ./resource-memory.js
           imports:
             - noteGeometry
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Vector3
+      exports:
+        - BufferGeometry
+      classes:
+        - BufferGeometry
+      interfaces:
+        - BufferGeometryOptions
+    packages/geometry/src/geometry.ts:
+      description: §53's `Geometry` base and its `BoundingVolume` — the two declarations the
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -2889,20 +3128,24 @@ modules:
           imports:
             - Vector3
       exports:
-        - BufferGeometry
-      classes:
-        - BufferGeometry
+        - nextGeometryIdentifier
       interfaces:
-        - GeometryBounds
-        - BufferGeometryOptions
+        - BoundingVolume
+        - MutableBoundingVolume
+      functions:
+        - nextGeometryIdentifier
     packages/geometry/src/index.ts:
-      description: Package entry point for @four/geometry (re-exports 64 symbols)
+      description: "--- R-21: §53 geometry base + bounding volume (begin) ---"
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
         - file: ./buffer-geometry.js
           imports:
             - BufferGeometry
+          reExport: true
+        - file: ./geometry.js
+          imports:
+            - Geometry
           reExport: true
         - file: ./primitives-3d.js
           imports:
@@ -2953,6 +3196,11 @@ modules:
             - GeometryBounds
             - GeometryDrawMode
             - GeometryIndexArray
+          reExport: true
+          typeOnly: true
+        - file: ./geometry.js
+          imports:
+            - BoundingVolume
           reExport: true
           typeOnly: true
         - file: ./primitives-3d.js
@@ -3012,6 +3260,7 @@ modules:
       workspaceDependencies: []
       exports:
         - BufferGeometry
+        - Geometry
         - capsuleGeometry
         - coneGeometry
         - cylinderGeometry
@@ -3042,6 +3291,7 @@ modules:
         - GeometryBounds
         - GeometryDrawMode
         - GeometryIndexArray
+        - BoundingVolume
         - CapsuleGeometryOptions
         - ExtrudeGeometryOptions
         - HeightFieldGeometryOptions
@@ -3078,6 +3328,7 @@ modules:
         - StrokeMesh
       reExported:
         - BufferGeometry
+        - Geometry
         - capsuleGeometry
         - coneGeometry
         - cylinderGeometry
@@ -3107,6 +3358,7 @@ modules:
         - GeometryBounds
         - GeometryDrawMode
         - GeometryIndexArray
+        - BoundingVolume
         - CapsuleGeometryOptions
         - ExtrudeGeometryOptions
         - HeightFieldGeometryOptions
@@ -3742,7 +3994,7 @@ modules:
         - dispatchThreePhase
   packages/materials:
     packages/materials/src/index.ts:
-      description: Package entry point for @four/materials (re-exports 17 symbols)
+      description: Package entry point for @four/materials (re-exports 23 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3757,6 +4009,11 @@ modules:
         - file: ./sprite-material.js
           imports:
             - SpriteMaterial
+          reExport: true
+        - file: ./stencil-state.js
+          imports:
+            - MAX_STENCIL_VALUE
+            - StencilState
           reExport: true
         - file: ./standard-material.js
           imports:
@@ -3783,6 +4040,13 @@ modules:
             - SpriteTexture
           reExport: true
           typeOnly: true
+        - file: ./stencil-state.js
+          imports:
+            - StencilFunc
+            - StencilOp
+            - StencilStateOptions
+          reExport: true
+          typeOnly: true
         - file: ./standard-material.js
           imports:
             - ColorRGB
@@ -3793,6 +4057,7 @@ modules:
           imports:
             - MaterialTexture
             - MaterialTextureFilter
+            - MaterialTextureMinFilter
             - MaterialTextureWrap
           reExport: true
           typeOnly: true
@@ -3807,6 +4072,8 @@ modules:
         - LitMaterial
         - Material
         - SpriteMaterial
+        - MAX_STENCIL_VALUE
+        - StencilState
         - StandardMaterial
         - UnlitMaterial
         - PACKAGE_NAME
@@ -3815,10 +4082,14 @@ modules:
         - MaterialOptions
         - SpriteMaterialOptions
         - SpriteTexture
+        - StencilFunc
+        - StencilOp
+        - StencilStateOptions
         - ColorRGB
         - StandardMaterialOptions
         - MaterialTexture
         - MaterialTextureFilter
+        - MaterialTextureMinFilter
         - MaterialTextureWrap
         - ColorRGBA
         - UnlitMaterialOptions
@@ -3826,6 +4097,8 @@ modules:
         - LitMaterial
         - Material
         - SpriteMaterial
+        - MAX_STENCIL_VALUE
+        - StencilState
         - StandardMaterial
         - UnlitMaterial
         - LitMaterialOptions
@@ -3833,10 +4106,14 @@ modules:
         - MaterialOptions
         - SpriteMaterialOptions
         - SpriteTexture
+        - StencilFunc
+        - StencilOp
+        - StencilStateOptions
         - ColorRGB
         - StandardMaterialOptions
         - MaterialTexture
         - MaterialTextureFilter
+        - MaterialTextureMinFilter
         - MaterialTextureWrap
         - ColorRGBA
         - UnlitMaterialOptions
@@ -3870,7 +4147,11 @@ modules:
       description: "`Material` (§57) — the abstract base every material family member extends,"
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./stencil-state.js
+          imports:
+            - StencilState
+          typeOnly: true
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -3935,6 +4216,21 @@ modules:
         - StandardMaterial
       interfaces:
         - StandardMaterialOptions
+    packages/materials/src/stencil-state.ts:
+      description: "`StencilState` (§57, §67) — the per-material stencil test, write mask, and"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - MAX_STENCIL_VALUE
+        - StencilState
+      classes:
+        - StencilState
+      interfaces:
+        - StencilStateOptions
+      constants:
+        - MAX_STENCIL_VALUE
     packages/materials/src/texture.ts:
       description: The read surface of a texture as a **material** and a rendering backend see
       externalDependencies: []
@@ -4285,6 +4581,35 @@ modules:
       constants:
         - DEFAULT_ORBIT_PITCH_LIMIT
         - DEFAULT_ORBIT_MIN_DISTANCE
+    packages/motion/src/character-controller.ts:
+      description: §12's **character controllers** — {@link CharacterController}, the one yaw
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - Component
+            - ComponentHost
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Transform
+      exports:
+        - DEFAULT_CHARACTER_GRAVITY
+        - DEFAULT_FIRST_PERSON_PITCH_LIMIT
+        - CharacterController
+        - FirstPersonLook
+      classes:
+        - CharacterController
+        - FirstPersonLook
+      interfaces:
+        - CharacterControllerOptions
+        - FirstPersonLookOptions
+      constants:
+        - DEFAULT_CHARACTER_GRAVITY
+        - DEFAULT_FIRST_PERSON_PITCH_LIMIT
     packages/motion/src/clock.ts:
       description: Clock and time domains (§9).
       externalDependencies: []
@@ -4372,7 +4697,7 @@ modules:
         - createTwoBoneIKSolution
         - solveTwoBoneIK
     packages/motion/src/index.ts:
-      description: Package entry point for @four/motion (re-exports 126 symbols)
+      description: Package entry point for @four/motion (re-exports 134 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -4381,6 +4706,13 @@ modules:
             - DEFAULT_ORBIT_PITCH_LIMIT
             - FollowRig
             - OrbitRig
+          reExport: true
+        - file: ./character-controller.js
+          imports:
+            - CharacterController
+            - DEFAULT_CHARACTER_GRAVITY
+            - DEFAULT_FIRST_PERSON_PITCH_LIMIT
+            - FirstPersonLook
           reExport: true
         - file: ./clock.js
           imports:
@@ -4424,6 +4756,8 @@ modules:
           reExport: true
         - file: ./serializers.js
           imports:
+            - CHARACTER_CONTROLLER_SERIALIZER
+            - FIRST_PERSON_LOOK_SERIALIZER
             - FOLLOW_RIG_SERIALIZER
             - KINEMATIC_CONTROLLER_SERIALIZER
             - LOOK_AT_CONSTRAINT_SERIALIZER
@@ -4506,6 +4840,12 @@ modules:
             - FollowFrame
             - FollowRigOptions
             - OrbitRigOptions
+          reExport: true
+          typeOnly: true
+        - file: ./character-controller.js
+          imports:
+            - CharacterControllerOptions
+            - FirstPersonLookOptions
           reExport: true
           typeOnly: true
         - file: ./clock.js
@@ -4615,6 +4955,10 @@ modules:
         - DEFAULT_ORBIT_PITCH_LIMIT
         - FollowRig
         - OrbitRig
+        - CharacterController
+        - DEFAULT_CHARACTER_GRAVITY
+        - DEFAULT_FIRST_PERSON_PITCH_LIMIT
+        - FirstPersonLook
         - DEFAULT_FIXED_DELTA_TIME
         - DEFAULT_MAXIMUM_SUB_STEPS
         - assertFixedDeltaTime
@@ -4637,6 +4981,8 @@ modules:
         - KinematicSystem
         - MotionComponent
         - MotionSystem
+        - CHARACTER_CONTROLLER_SERIALIZER
+        - FIRST_PERSON_LOOK_SERIALIZER
         - FOLLOW_RIG_SERIALIZER
         - KINEMATIC_CONTROLLER_SERIALIZER
         - LOOK_AT_CONSTRAINT_SERIALIZER
@@ -4693,6 +5039,8 @@ modules:
         - FollowFrame
         - FollowRigOptions
         - OrbitRigOptions
+        - CharacterControllerOptions
+        - FirstPersonLookOptions
         - ReadonlyTimeState
         - TimeState
         - TimeStateOptions
@@ -4743,6 +5091,10 @@ modules:
         - DEFAULT_ORBIT_PITCH_LIMIT
         - FollowRig
         - OrbitRig
+        - CharacterController
+        - DEFAULT_CHARACTER_GRAVITY
+        - DEFAULT_FIRST_PERSON_PITCH_LIMIT
+        - FirstPersonLook
         - DEFAULT_FIXED_DELTA_TIME
         - DEFAULT_MAXIMUM_SUB_STEPS
         - assertFixedDeltaTime
@@ -4765,6 +5117,8 @@ modules:
         - KinematicSystem
         - MotionComponent
         - MotionSystem
+        - CHARACTER_CONTROLLER_SERIALIZER
+        - FIRST_PERSON_LOOK_SERIALIZER
         - FOLLOW_RIG_SERIALIZER
         - KINEMATIC_CONTROLLER_SERIALIZER
         - LOOK_AT_CONSTRAINT_SERIALIZER
@@ -4820,6 +5174,8 @@ modules:
         - FollowFrame
         - FollowRigOptions
         - OrbitRigOptions
+        - CharacterControllerOptions
+        - FirstPersonLookOptions
         - ReadonlyTimeState
         - TimeState
         - TimeStateOptions
@@ -4899,6 +5255,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./character-controller.js
+          imports:
+            - CharacterController
+            - FirstPersonLook
         - file: ./systems.js
           imports:
             - PRIORITY_KINEMATICS
@@ -5085,6 +5445,12 @@ modules:
             - DEFAULT_ORBIT_PITCH_LIMIT
             - FollowRig
             - OrbitRig
+        - file: ./character-controller.js
+          imports:
+            - CharacterController
+            - DEFAULT_CHARACTER_GRAVITY
+            - DEFAULT_FIRST_PERSON_PITCH_LIMIT
+            - FirstPersonLook
         - file: ./constraints.js
           imports:
             - LookAtConstraint
@@ -5116,6 +5482,8 @@ modules:
         - ORBIT_RIG_SERIALIZER
         - FOLLOW_RIG_SERIALIZER
         - LOOK_AT_CONSTRAINT_SERIALIZER
+        - CHARACTER_CONTROLLER_SERIALIZER
+        - FIRST_PERSON_LOOK_SERIALIZER
       interfaces:
         - ComponentSerializerShape
       constants:
@@ -5124,6 +5492,8 @@ modules:
         - ORBIT_RIG_SERIALIZER
         - FOLLOW_RIG_SERIALIZER
         - LOOK_AT_CONSTRAINT_SERIALIZER
+        - CHARACTER_CONTROLLER_SERIALIZER
+        - FIRST_PERSON_LOOK_SERIALIZER
     packages/motion/src/spring-damper.ts:
       description: Spring-damper controller (§111), the game-smoothing primitive.
       externalDependencies: []
@@ -6011,6 +6381,10 @@ modules:
             - worldAnchorToLocal
             - worldAxisToLocal
           reExport: true
+        - file: ./physics-event-system.js
+          imports:
+            - PhysicsEventSystem
+          reExport: true
         - file: ./physics-system.js
           imports:
             - PhysicsSystem
@@ -6039,6 +6413,7 @@ modules:
           imports:
             - COLLIDER_SERIALIZER
             - RIGID_BODY_SERIALIZER
+            - SWEPT_CHARACTER_CONTROLLER_SERIALIZER
             - deserializeCollisionShape
             - serializeCollisionShape
           reExport: true
@@ -6090,6 +6465,16 @@ modules:
             - validatePhysicsWorldOptions
             - validateRigidBodyDescriptor
             - validateSphericalJointLimits
+          reExport: true
+        - file: ./swept-character-controller.js
+          imports:
+            - DEFAULT_GROUND_SNAP_DISTANCE
+            - DEFAULT_MAX_SLIDES
+            - DEFAULT_SKIN_WIDTH
+            - DEFAULT_SLOPE_LIMIT
+            - DEFAULT_STEP_HEIGHT
+            - SweptCharacterController
+            - SweptCharacterSystem
           reExport: true
         - file: ./world.js
           imports:
@@ -6185,6 +6570,11 @@ modules:
             - PhysicsMaterialOptions
           reExport: true
           typeOnly: true
+        - file: ./physics-event-system.js
+          imports:
+            - PhysicsEventSystemOptions
+          reExport: true
+          typeOnly: true
         - file: ./physics-system.js
           imports:
             - PhysicsSystemOptions
@@ -6274,6 +6664,12 @@ modules:
             - Vector3Input
           reExport: true
           typeOnly: true
+        - file: ./swept-character-controller.js
+          imports:
+            - SweptCharacterControllerOptions
+            - SweptCharacterSystemOptions
+          reExport: true
+          typeOnly: true
         - file: ./world.js
           imports:
             - ActiveBodyVisitor
@@ -6325,6 +6721,7 @@ modules:
         - SpringJoint
         - worldAnchorToLocal
         - worldAxisToLocal
+        - PhysicsEventSystem
         - PhysicsSystem
         - DEFAULT_DENSITY
         - DEFAULT_FRICTION
@@ -6342,6 +6739,7 @@ modules:
         - sortHitsByDistance
         - COLLIDER_SERIALIZER
         - RIGID_BODY_SERIALIZER
+        - SWEPT_CHARACTER_CONTROLLER_SERIALIZER
         - deserializeCollisionShape
         - serializeCollisionShape
         - RigidBody
@@ -6378,6 +6776,13 @@ modules:
         - validatePhysicsWorldOptions
         - validateRigidBodyDescriptor
         - validateSphericalJointLimits
+        - DEFAULT_GROUND_SNAP_DISTANCE
+        - DEFAULT_MAX_SLIDES
+        - DEFAULT_SKIN_WIDTH
+        - DEFAULT_SLOPE_LIMIT
+        - DEFAULT_STEP_HEIGHT
+        - SweptCharacterController
+        - SweptCharacterSystem
         - POSE_TARGET_CAPTURE_PRIORITY
         - PhysicsWorld
         - createPoseTargetCaptureSystem
@@ -6438,6 +6843,7 @@ modules:
         - SphericalJointOptions
         - SpringJointOptions
         - PhysicsMaterialOptions
+        - PhysicsEventSystemOptions
         - PhysicsSystemOptions
         - OverlapHit
         - OverlapQuery
@@ -6499,6 +6905,8 @@ modules:
         - RotationInput
         - SleepingConfig
         - Vector3Input
+        - SweptCharacterControllerOptions
+        - SweptCharacterSystemOptions
         - ActiveBodyVisitor
         - BodyControlModeOptions
         - PhysicsSnapshot
@@ -6545,6 +6953,7 @@ modules:
         - SpringJoint
         - worldAnchorToLocal
         - worldAxisToLocal
+        - PhysicsEventSystem
         - PhysicsSystem
         - DEFAULT_DENSITY
         - DEFAULT_FRICTION
@@ -6562,6 +6971,7 @@ modules:
         - sortHitsByDistance
         - COLLIDER_SERIALIZER
         - RIGID_BODY_SERIALIZER
+        - SWEPT_CHARACTER_CONTROLLER_SERIALIZER
         - deserializeCollisionShape
         - serializeCollisionShape
         - RigidBody
@@ -6598,6 +7008,13 @@ modules:
         - validatePhysicsWorldOptions
         - validateRigidBodyDescriptor
         - validateSphericalJointLimits
+        - DEFAULT_GROUND_SNAP_DISTANCE
+        - DEFAULT_MAX_SLIDES
+        - DEFAULT_SKIN_WIDTH
+        - DEFAULT_SLOPE_LIMIT
+        - DEFAULT_STEP_HEIGHT
+        - SweptCharacterController
+        - SweptCharacterSystem
         - POSE_TARGET_CAPTURE_PRIORITY
         - PhysicsWorld
         - createPoseTargetCaptureSystem
@@ -6657,6 +7074,7 @@ modules:
         - SphericalJointOptions
         - SpringJointOptions
         - PhysicsMaterialOptions
+        - PhysicsEventSystemOptions
         - PhysicsSystemOptions
         - OverlapHit
         - OverlapQuery
@@ -6718,6 +7136,8 @@ modules:
         - RotationInput
         - SleepingConfig
         - Vector3Input
+        - SweptCharacterControllerOptions
+        - SweptCharacterSystemOptions
         - ActiveBodyVisitor
         - BodyControlModeOptions
         - PhysicsSnapshot
@@ -6881,6 +7301,35 @@ modules:
         - DEFAULT_DENSITY
         - DEFAULT_FRICTION_COMBINE_MODE
         - DEFAULT_RESTITUTION_COMBINE_MODE
+    packages/physics/src/physics-event-system.ts:
+      description: "`PhysicsEventSystem` (§39 step 9, PH-21) — the optional occupant of"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./physics-system.js
+          imports:
+            - PhysicsSystem
+          typeOnly: true
+        - file: ./world.js
+          imports:
+            - PhysicsWorld
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+        - package: "@four/motion"
+          directory: packages/motion
+          imports:
+            - PRIORITY_EVENT_DISPATCH
+            - SimulationSystem
+      exports:
+        - PhysicsEventSystem
+      classes:
+        - PhysicsEventSystem
+      interfaces:
+        - PhysicsEventSystemOptions
     packages/physics/src/physics-system.ts:
       description: "`PhysicsSystem` (§39 step 6, plan P5-2) — the `SimulationSystem` that steps"
       externalDependencies: []
@@ -7058,6 +7507,14 @@ modules:
         - file: ./rigid-body.js
           imports:
             - RigidBody
+        - file: ./swept-character-controller.js
+          imports:
+            - DEFAULT_GROUND_SNAP_DISTANCE
+            - DEFAULT_MAX_SLIDES
+            - DEFAULT_SKIN_WIDTH
+            - DEFAULT_SLOPE_LIMIT
+            - DEFAULT_STEP_HEIGHT
+            - SweptCharacterController
         - file: ./shapes.js
           imports:
             - CollisionShape
@@ -7090,6 +7547,7 @@ modules:
         - package: "@four/motion"
           directory: packages/motion
           imports:
+            - DEFAULT_CHARACTER_GRAVITY
             - ComponentSerializerShape
         - package: "@four/scene"
           directory: packages/scene
@@ -7098,6 +7556,7 @@ modules:
       exports:
         - RIGID_BODY_SERIALIZER
         - COLLIDER_SERIALIZER
+        - SWEPT_CHARACTER_CONTROLLER_SERIALIZER
         - serializeCollisionShape
         - deserializeCollisionShape
       interfaces:
@@ -7110,6 +7569,7 @@ modules:
       constants:
         - RIGID_BODY_SERIALIZER
         - COLLIDER_SERIALIZER
+        - SWEPT_CHARACTER_CONTROLLER_SERIALIZER
     packages/physics/src/shapes.ts:
       description: Collision shapes (§24) and their §85 parameter validation.
       externalDependencies: []
@@ -7209,6 +7669,73 @@ modules:
         - registeredSolvers
         - clearRegisteredSolvers
         - resolveSolver
+    packages/physics/src/swept-character-controller.ts:
+      description: §12's **solver-backed** character controller — {@link SweptCharacterController}
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./queries.js
+          imports:
+            - ALL_COLLISION_GROUPS
+        - file: ./rigid-body.js
+          imports:
+            - RigidBody
+          typeOnly: true
+        - file: ./shapes.js
+          imports:
+            - CollisionShape
+          typeOnly: true
+        - file: ./types.js
+          imports:
+            - PhysicsBodyHandle
+          typeOnly: true
+        - file: ./world.js
+          imports:
+            - PhysicsWorld
+            - WorldShapeCastHit
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - Component
+            - ComponentHost
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Vector3
+        - package: "@four/motion"
+          directory: packages/motion
+          imports:
+            - CharacterController
+            - PRIORITY_KINEMATICS
+            - FixedUpdateContext
+            - SimulationSystem
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - warnAuthorityConflict
+            - Node
+      exports:
+        - DEFAULT_SLOPE_LIMIT
+        - DEFAULT_STEP_HEIGHT
+        - DEFAULT_SKIN_WIDTH
+        - DEFAULT_GROUND_SNAP_DISTANCE
+        - DEFAULT_MAX_SLIDES
+        - SweptCharacterController
+        - SweptCharacterSystem
+      classes:
+        - SweptCharacterController
+        - SweptCharacterSystem
+      interfaces:
+        - SweptCharacterControllerOptions
+        - SweptCharacterSystemOptions
+      constants:
+        - DEFAULT_SLOPE_LIMIT
+        - DEFAULT_STEP_HEIGHT
+        - DEFAULT_SKIN_WIDTH
+        - DEFAULT_GROUND_SNAP_DISTANCE
+        - DEFAULT_MAX_SLIDES
     packages/physics/src/types.ts:
       description: The physics vocabulary (§21, §22, §25, §31, §32, §33) and the opaque solver
       externalDependencies: []
@@ -8266,7 +8793,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 144 symbols)
+      description: Package entry point for @four/render (re-exports 145 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -8520,6 +9047,7 @@ modules:
         - file: ./texture.js
           imports:
             - TextureFilter
+            - TextureMinFilter
             - TextureSource
             - TextureWrap
           reExport: true
@@ -8673,6 +9201,7 @@ modules:
         - SpriteFrame
         - SpriteOptions
         - TextureFilter
+        - TextureMinFilter
         - TextureSource
         - TextureWrap
         - ViewRenderListOptions
@@ -8818,6 +9347,7 @@ modules:
         - SpriteFrame
         - SpriteOptions
         - TextureFilter
+        - TextureMinFilter
         - TextureSource
         - TextureWrap
         - ViewRenderListOptions
@@ -9315,6 +9845,7 @@ modules:
           directory: packages/materials
           imports:
             - MaterialTextureFilter
+            - MaterialTextureMinFilter
             - MaterialTextureWrap
             - SpriteTexture
         - package: "@four/math"
@@ -10036,15 +10567,475 @@ modules:
         - WebglContextAttributes
   packages/render-webgpu:
     packages/render-webgpu/src/index.ts:
-      description: Entry point exporting 1 symbols
+      description: "`@four/render-webgpu` — the WebGPU backend (§62 backend 1)."
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_SHADER_STAGE
+            - GPU_TEXTURE_USAGE
+            - UNIFORM_STRIDE_BYTES
+          reExport: true
+        - file: ./webgpu-renderer.js
+          imports:
+            - hostGpu
+            - WebgpuRenderer
+          reExport: true
+        - file: ./register.js
+          imports:
+            - isWebgpuSupported
+            - registerWebgpuRenderer
+          reExport: true
+        - file: ./wgpu-bindings.js
+          imports:
+            - DRAW_COLOR_OFFSET
+            - DRAW_MODEL_OFFSET
+            - DRAW_UNIFORM_BYTES
+            - DRAW_UNIFORM_FLOATS
+            - DRAW_UNIFORM_WGSL
+            - DRAW_VIEW_PROJECTION_OFFSET
+            - createDrawBindGroupLayout
+          reExport: true
+        - file: ./wgpu-geometry.js
+          imports:
+            - WgpuGeometryCache
+          reExport: true
+        - file: ./wgpu-pipeline-cache.js
+          imports:
+            - pipelineKey
+            - WgpuPipelineCache
+          reExport: true
+        - file: ./wgpu-unlit.js
+          imports:
+            - CLEAR_SHADER_SOURCE
+            - CLEAR_VERTEX_COUNT
+            - COLOR_BUFFER_LAYOUT
+            - COLOR_SHADER_LOCATION
+            - FRAGMENT_ENTRY_POINT
+            - POSITION_BUFFER_LAYOUT
+            - POSITION_SHADER_LOCATION
+            - VERTEX_ENTRY_POINT
+            - unlitShaderSource
+            - unlitVertexBufferLayouts
+          reExport: true
+        - file: ./webgpu-device.js
+          imports:
+            - Gpu
+            - GpuAdapter
+            - GpuBindGroup
+            - GpuBindGroupEntry
+            - GpuBindGroupLayout
+            - GpuBindGroupLayoutEntry
+            - GpuBlendComponent
+            - GpuBlendState
+            - GpuBuffer
+            - GpuBufferDescriptor
+            - GpuCanvasContext
+            - GpuCommandBuffer
+            - GpuCommandEncoder
+            - GpuDevice
+            - GpuDeviceLostInfo
+            - GpuPipelineLayout
+            - GpuQueue
+            - GpuRenderPassDescriptor
+            - GpuRenderPassEncoder
+            - GpuRenderPipeline
+            - GpuRenderPipelineDescriptor
+            - GpuShaderModule
+            - GpuTexture
+            - GpuTextureDescriptor
+            - GpuTextureView
+            - GpuVertexBufferLayout
+            - WebgpuCanvas
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-geometry.js
+          imports:
+            - CacheableGeometry
+            - WgpuGeometryRecord
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-pipeline-cache.js
+          imports:
+            - WgpuPipelineDescriptor
+            - WgpuPipelineKind
+          reExport: true
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - GPU_BUFFER_USAGE
+        - GPU_SHADER_STAGE
+        - GPU_TEXTURE_USAGE
+        - UNIFORM_STRIDE_BYTES
+        - hostGpu
+        - WebgpuRenderer
+        - isWebgpuSupported
+        - registerWebgpuRenderer
+        - DRAW_COLOR_OFFSET
+        - DRAW_MODEL_OFFSET
+        - DRAW_UNIFORM_BYTES
+        - DRAW_UNIFORM_FLOATS
+        - DRAW_UNIFORM_WGSL
+        - DRAW_VIEW_PROJECTION_OFFSET
+        - createDrawBindGroupLayout
+        - WgpuGeometryCache
+        - pipelineKey
+        - WgpuPipelineCache
+        - CLEAR_SHADER_SOURCE
+        - CLEAR_VERTEX_COUNT
+        - COLOR_BUFFER_LAYOUT
+        - COLOR_SHADER_LOCATION
+        - FRAGMENT_ENTRY_POINT
+        - POSITION_BUFFER_LAYOUT
+        - POSITION_SHADER_LOCATION
+        - VERTEX_ENTRY_POINT
+        - unlitShaderSource
+        - unlitVertexBufferLayouts
+        - PACKAGE_NAME
+        - Gpu
+        - GpuAdapter
+        - GpuBindGroup
+        - GpuBindGroupEntry
+        - GpuBindGroupLayout
+        - GpuBindGroupLayoutEntry
+        - GpuBlendComponent
+        - GpuBlendState
+        - GpuBuffer
+        - GpuBufferDescriptor
+        - GpuCanvasContext
+        - GpuCommandBuffer
+        - GpuCommandEncoder
+        - GpuDevice
+        - GpuDeviceLostInfo
+        - GpuPipelineLayout
+        - GpuQueue
+        - GpuRenderPassDescriptor
+        - GpuRenderPassEncoder
+        - GpuRenderPipeline
+        - GpuRenderPipelineDescriptor
+        - GpuShaderModule
+        - GpuTexture
+        - GpuTextureDescriptor
+        - GpuTextureView
+        - GpuVertexBufferLayout
+        - WebgpuCanvas
+        - CacheableGeometry
+        - WgpuGeometryRecord
+        - WgpuPipelineDescriptor
+        - WgpuPipelineKind
+      reExported:
+        - GPU_BUFFER_USAGE
+        - GPU_SHADER_STAGE
+        - GPU_TEXTURE_USAGE
+        - UNIFORM_STRIDE_BYTES
+        - hostGpu
+        - WebgpuRenderer
+        - isWebgpuSupported
+        - registerWebgpuRenderer
+        - DRAW_COLOR_OFFSET
+        - DRAW_MODEL_OFFSET
+        - DRAW_UNIFORM_BYTES
+        - DRAW_UNIFORM_FLOATS
+        - DRAW_UNIFORM_WGSL
+        - DRAW_VIEW_PROJECTION_OFFSET
+        - createDrawBindGroupLayout
+        - WgpuGeometryCache
+        - pipelineKey
+        - WgpuPipelineCache
+        - CLEAR_SHADER_SOURCE
+        - CLEAR_VERTEX_COUNT
+        - COLOR_BUFFER_LAYOUT
+        - COLOR_SHADER_LOCATION
+        - FRAGMENT_ENTRY_POINT
+        - POSITION_BUFFER_LAYOUT
+        - POSITION_SHADER_LOCATION
+        - VERTEX_ENTRY_POINT
+        - unlitShaderSource
+        - unlitVertexBufferLayouts
+        - Gpu
+        - GpuAdapter
+        - GpuBindGroup
+        - GpuBindGroupEntry
+        - GpuBindGroupLayout
+        - GpuBindGroupLayoutEntry
+        - GpuBlendComponent
+        - GpuBlendState
+        - GpuBuffer
+        - GpuBufferDescriptor
+        - GpuCanvasContext
+        - GpuCommandBuffer
+        - GpuCommandEncoder
+        - GpuDevice
+        - GpuDeviceLostInfo
+        - GpuPipelineLayout
+        - GpuQueue
+        - GpuRenderPassDescriptor
+        - GpuRenderPassEncoder
+        - GpuRenderPipeline
+        - GpuRenderPipelineDescriptor
+        - GpuShaderModule
+        - GpuTexture
+        - GpuTextureDescriptor
+        - GpuTextureView
+        - GpuVertexBufferLayout
+        - WebgpuCanvas
+        - CacheableGeometry
+        - WgpuGeometryRecord
+        - WgpuPipelineDescriptor
+        - WgpuPipelineKind
+      constants:
+        - PACKAGE_NAME
+    packages/render-webgpu/src/register.ts:
+      description: This backend's opt-in to §62's renderer registry (R-2, A-8, WP-R1.1).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-renderer.js
+          imports:
+            - hostGpu
+        - file: ./webgpu-renderer.js
+          imports:
+            - WebgpuRenderer
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - registerRenderer
+            - RendererOptions
+            - RendererRegistry
+      exports:
+        - isWebgpuSupported
+        - registerWebgpuRenderer
+      functions:
+        - isWebgpuSupported
+        - registerWebgpuRenderer
+    packages/render-webgpu/src/webgpu-device.ts:
+      description: The WebGPU surface this backend touches, described structurally (§61, §62).
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
       workspaceDependencies: []
       exports:
-        - PACKAGE_NAME
+        - GPU_BUFFER_USAGE
+        - GPU_TEXTURE_USAGE
+        - GPU_SHADER_STAGE
+        - UNIFORM_STRIDE_BYTES
+      interfaces:
+        - GpuDeviceLostInfo
+        - GpuBuffer
+        - GpuTexture
+        - GpuVertexBufferLayout
+        - GpuBlendState
+        - GpuBlendComponent
+        - GpuRenderPipelineDescriptor
+        - GpuRenderPassDescriptor
+        - GpuRenderPassEncoder
+        - GpuCommandEncoder
+        - GpuQueue
+        - GpuBufferDescriptor
+        - GpuTextureDescriptor
+        - GpuBindGroupLayoutEntry
+        - GpuBindGroupEntry
+        - GpuDevice
+        - GpuAdapter
+        - Gpu
+        - GpuCanvasContext
+        - WebgpuCanvas
       constants:
-        - PACKAGE_NAME
+        - GPU_BUFFER_USAGE
+        - GPU_TEXTURE_USAGE
+        - GPU_SHADER_STAGE
+        - UNIFORM_STRIDE_BYTES
+    packages/render-webgpu/src/webgpu-renderer.ts:
+      description: Draws four.js scenes with WebGPU (§61, §62 backend 1).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_TEXTURE_USAGE
+            - UNIFORM_STRIDE_BYTES
+            - Gpu
+            - GpuBindGroup
+            - GpuBindGroupLayout
+            - GpuBuffer
+            - GpuCanvasContext
+            - GpuDevice
+            - GpuRenderPassEncoder
+            - GpuTexture
+            - GpuTextureView
+            - WebgpuCanvas
+        - file: ./wgpu-bindings.js
+          imports:
+            - DRAW_COLOR_OFFSET
+            - DRAW_MODEL_OFFSET
+            - DRAW_UNIFORM_BYTES
+            - DRAW_VIEW_PROJECTION_OFFSET
+            - createDrawBindGroupLayout
+        - file: ./wgpu-geometry.js
+          imports:
+            - WgpuGeometryCache
+        - file: ./wgpu-pipeline-cache.js
+          imports:
+            - WgpuPipelineCache
+            - WgpuPipelineDescriptor
+        - file: ./wgpu-unlit.js
+          imports:
+            - CLEAR_VERTEX_COUNT
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - EventEmitter
+            - FourError
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Frustum
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - buildInterpolatedRenderList
+            - buildRenderList
+            - buildViewRenderList
+            - RenderInterpolation
+            - RenderItem
+            - RenderStatistics
+            - Renderer
+            - RendererCapabilities
+            - RendererEventMap
+            - RendererOptions
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Node
+            - Viewport
+      exports:
+        - hostGpu
+        - WebgpuRenderer
+      classes:
+        - WebgpuRenderer
+      functions:
+        - hostGpu
+    packages/render-webgpu/src/wgpu-bindings.ts:
+      description: This backend's binding layout, **declared as data** (§7 of the R-1 plan).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuDevice
+      workspaceDependencies: []
+      exports:
+        - DRAW_VIEW_PROJECTION_OFFSET
+        - DRAW_MODEL_OFFSET
+        - DRAW_COLOR_OFFSET
+        - DRAW_UNIFORM_BYTES
+        - DRAW_UNIFORM_FLOATS
+        - DRAW_UNIFORM_WGSL
+        - createDrawBindGroupLayout
+      functions:
+        - createDrawBindGroupLayout
+      constants:
+        - DRAW_VIEW_PROJECTION_OFFSET
+        - DRAW_MODEL_OFFSET
+        - DRAW_COLOR_OFFSET
+        - DRAW_UNIFORM_BYTES
+        - DRAW_UNIFORM_FLOATS
+        - DRAW_UNIFORM_WGSL
+    packages/render-webgpu/src/wgpu-geometry.ts:
+      description: Per-device store of uploaded geometry (§61, §64 stage 7) — the WebGPU twin of
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GpuBuffer
+            - GpuDevice
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderItem
+      exports:
+        - WgpuGeometryCache
+      classes:
+        - WgpuGeometryCache
+      interfaces:
+        - WgpuGeometryRecord
+    packages/render-webgpu/src/wgpu-pipeline-cache.ts:
+      description: The lazy, descriptor-keyed render-pipeline cache (§4.2 of the R-1 plan).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GpuBindGroupLayout
+            - GpuBlendState
+            - GpuDevice
+            - GpuPipelineLayout
+            - GpuRenderPipeline
+            - GpuShaderModule
+        - file: ./wgpu-unlit.js
+          imports:
+            - CLEAR_SHADER_SOURCE
+            - FRAGMENT_ENTRY_POINT
+            - VERTEX_ENTRY_POINT
+            - unlitShaderSource
+            - unlitVertexBufferLayouts
+      workspaceDependencies: []
+      exports:
+        - pipelineKey
+        - WgpuPipelineCache
+      classes:
+        - WgpuPipelineCache
+      interfaces:
+        - WgpuPipelineDescriptor
+      functions:
+        - pipelineKey
+    packages/render-webgpu/src/wgpu-unlit.ts:
+      description: The unlit pipeline in hand-written WGSL (§64, §120's MVP tier), plus the
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./wgpu-bindings.js
+          imports:
+            - DRAW_UNIFORM_WGSL
+        - file: ./webgpu-device.js
+          imports:
+            - GpuVertexBufferLayout
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - POSITION_SHADER_LOCATION
+        - COLOR_SHADER_LOCATION
+        - POSITION_BUFFER_LAYOUT
+        - COLOR_BUFFER_LAYOUT
+        - VERTEX_ENTRY_POINT
+        - FRAGMENT_ENTRY_POINT
+        - CLEAR_VERTEX_COUNT
+        - CLEAR_SHADER_SOURCE
+        - unlitVertexBufferLayouts
+        - unlitShaderSource
+      functions:
+        - unlitVertexBufferLayouts
+        - unlitShaderSource
+      constants:
+        - POSITION_SHADER_LOCATION
+        - COLOR_SHADER_LOCATION
+        - POSITION_BUFFER_LAYOUT
+        - COLOR_BUFFER_LAYOUT
+        - VERTEX_ENTRY_POINT
+        - FRAGMENT_ENTRY_POINT
+        - CLEAR_VERTEX_COUNT
+        - CLEAR_SHADER_SOURCE
   packages/scene:
     packages/scene/src/authority.ts:
       description: Transform authority (§42).
@@ -10107,7 +11098,7 @@ modules:
       classes:
         - Group
     packages/scene/src/index.ts:
-      description: Package entry point for @four/scene (re-exports 59 symbols)
+      description: Package entry point for @four/scene (re-exports 73 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -10122,6 +11113,21 @@ modules:
             - Camera
             - OrthographicCamera
             - PerspectiveCamera
+          reExport: true
+        - file: ./screen-camera.js
+          imports:
+            - DEFAULT_SCREEN_FAR
+            - DEFAULT_SCREEN_NEAR
+            - DEFAULT_SCREEN_ORIGIN
+            - DEFAULT_SCREEN_UNITS
+            - SCREEN_ORIGINS
+            - SCREEN_UNITS
+            - ScreenCamera
+          reExport: true
+        - file: ./trackball.js
+          imports:
+            - DEFAULT_TRACKBALL_RADIUS
+            - TrackballRig
           reExport: true
         - file: ./group.js
           imports:
@@ -10199,6 +11205,19 @@ modules:
             - PerspectiveCameraOptions
           reExport: true
           typeOnly: true
+        - file: ./screen-camera.js
+          imports:
+            - ScreenCameraOptions
+            - ScreenOrigin
+            - ScreenUnits
+            - SurfaceSizedCamera
+          reExport: true
+          typeOnly: true
+        - file: ./trackball.js
+          imports:
+            - TrackballRigOptions
+          reExport: true
+          typeOnly: true
         - file: ./layers.js
           imports:
             - LayerMask
@@ -10246,6 +11265,15 @@ modules:
         - Camera
         - OrthographicCamera
         - PerspectiveCamera
+        - DEFAULT_SCREEN_FAR
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - ScreenCamera
+        - DEFAULT_TRACKBALL_RADIUS
+        - TrackballRig
         - Group
         - ALL_LAYERS
         - DEFAULT_LAYER
@@ -10285,6 +11313,11 @@ modules:
         - TransformAuthority
         - OrthographicCameraOptions
         - PerspectiveCameraOptions
+        - ScreenCameraOptions
+        - ScreenOrigin
+        - ScreenUnits
+        - SurfaceSizedCamera
+        - TrackballRigOptions
         - LayerMask
         - LayeredNode
         - ColorRGB
@@ -10307,6 +11340,15 @@ modules:
         - Camera
         - OrthographicCamera
         - PerspectiveCamera
+        - DEFAULT_SCREEN_FAR
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - ScreenCamera
+        - DEFAULT_TRACKBALL_RADIUS
+        - TrackballRig
         - Group
         - ALL_LAYERS
         - DEFAULT_LAYER
@@ -10345,6 +11387,11 @@ modules:
         - TransformAuthority
         - OrthographicCameraOptions
         - PerspectiveCameraOptions
+        - ScreenCameraOptions
+        - ScreenOrigin
+        - ScreenUnits
+        - SurfaceSizedCamera
+        - TrackballRigOptions
         - LayerMask
         - LayeredNode
         - ColorRGB
@@ -10571,6 +11618,74 @@ modules:
         - Scene
       classes:
         - Scene
+    packages/scene/src/screen-camera.ts:
+      description: §47's `ScreenCamera` — the pixel-rectangle camera (R-37, 2026-08-21).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./camera.js
+          imports:
+            - Camera
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - DepthRange
+      exports:
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_FAR
+        - ScreenCamera
+      classes:
+        - ScreenCamera
+      interfaces:
+        - SurfaceSizedCamera
+        - ScreenCameraOptions
+      constants:
+        - SCREEN_ORIGINS
+        - SCREEN_UNITS
+        - DEFAULT_SCREEN_ORIGIN
+        - DEFAULT_SCREEN_UNITS
+        - DEFAULT_SCREEN_NEAR
+        - DEFAULT_SCREEN_FAR
+    packages/scene/src/trackball.ts:
+      description: §44/§47's **trackball** rig (R-37, 2026-08-21) — the last of the seven camera
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./authority.js
+          imports:
+            - warnAuthorityConflict
+        - file: ./node.js
+          imports:
+            - Node
+          typeOnly: true
+        - file: ./screen-camera.js
+          imports:
+            - DEFAULT_SCREEN_ORIGIN
+            - ScreenOrigin
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Quaternion
+            - Vector3
+      exports:
+        - DEFAULT_TRACKBALL_RADIUS
+        - TrackballRig
+      classes:
+        - TrackballRig
+      interfaces:
+        - TrackballRigOptions
+      constants:
+        - DEFAULT_TRACKBALL_RADIUS
     packages/scene/src/transform.ts:
       description: Local/world transform of a scene node (§7).
       externalDependencies: []
@@ -11657,8 +12772,11 @@ dependencyGraph:
     - name: Packages/assets
       files:
         - packages/assets/src/asset-manager.ts
+        - packages/assets/src/content-hash.ts
         - packages/assets/src/index.ts
         - packages/assets/src/loaders.ts
+        - packages/assets/src/manifest.ts
+        - packages/assets/src/texture.ts
     - name: Packages/core
       files:
         - packages/core/src/component.ts
@@ -11682,6 +12800,7 @@ dependencyGraph:
         - packages/diagnostics/src/replay-format.ts
         - packages/diagnostics/src/replay-player.ts
         - packages/diagnostics/src/resource-audit.ts
+        - packages/diagnostics/src/rollback.ts
         - packages/diagnostics/src/stats.ts
     - name: Packages/four
       files:
@@ -11715,6 +12834,7 @@ dependencyGraph:
     - name: Packages/geometry
       files:
         - packages/geometry/src/buffer-geometry.ts
+        - packages/geometry/src/geometry.ts
         - packages/geometry/src/index.ts
         - packages/geometry/src/path.ts
         - packages/geometry/src/primitive-support.ts
@@ -11740,6 +12860,7 @@ dependencyGraph:
         - packages/materials/src/material.ts
         - packages/materials/src/sprite-material.ts
         - packages/materials/src/standard-material.ts
+        - packages/materials/src/stencil-state.ts
         - packages/materials/src/texture.ts
         - packages/materials/src/unlit-material.ts
     - name: Packages/math
@@ -11757,6 +12878,7 @@ dependencyGraph:
     - name: Packages/motion
       files:
         - packages/motion/src/camera-rigs.ts
+        - packages/motion/src/character-controller.ts
         - packages/motion/src/clock.ts
         - packages/motion/src/constraints.ts
         - packages/motion/src/ik.ts
@@ -11795,12 +12917,14 @@ dependencyGraph:
         - packages/physics/src/index.ts
         - packages/physics/src/joints.ts
         - packages/physics/src/material.ts
+        - packages/physics/src/physics-event-system.ts
         - packages/physics/src/physics-system.ts
         - packages/physics/src/queries.ts
         - packages/physics/src/rigid-body.ts
         - packages/physics/src/serializers.ts
         - packages/physics/src/shapes.ts
         - packages/physics/src/solver-registry.ts
+        - packages/physics/src/swept-character-controller.ts
         - packages/physics/src/types.ts
         - packages/physics/src/validation.ts
         - packages/physics/src/world.ts
@@ -11863,6 +12987,13 @@ dependencyGraph:
     - name: Packages/render-webgpu
       files:
         - packages/render-webgpu/src/index.ts
+        - packages/render-webgpu/src/register.ts
+        - packages/render-webgpu/src/webgpu-device.ts
+        - packages/render-webgpu/src/webgpu-renderer.ts
+        - packages/render-webgpu/src/wgpu-bindings.ts
+        - packages/render-webgpu/src/wgpu-geometry.ts
+        - packages/render-webgpu/src/wgpu-pipeline-cache.ts
+        - packages/render-webgpu/src/wgpu-unlit.ts
     - name: Packages/scene
       files:
         - packages/scene/src/authority.ts
@@ -11875,6 +13006,8 @@ dependencyGraph:
         - packages/scene/src/node.ts
         - packages/scene/src/pose-target.ts
         - packages/scene/src/scene.ts
+        - packages/scene/src/screen-camera.ts
+        - packages/scene/src/trackball.ts
         - packages/scene/src/transform.ts
         - packages/scene/src/viewport.ts
         - packages/scene/src/world-transforms.ts
@@ -11905,19 +13038,19 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 215
+  totalTypeScriptFiles: 233
   totalModules: 24
-  totalLinesOfCode: 99676
-  totalExports: 1990
-  totalClasses: 136
-  totalInterfaces: 424
-  totalFunctions: 335
-  totalTypeGuards: 19
+  totalLinesOfCode: 109195
+  totalExports: 2184
+  totalClasses: 149
+  totalInterfaces: 462
+  totalFunctions: 349
+  totalTypeGuards: 20
   totalEnums: 0
-  totalConstants: 257
-  totalReExports: 1284
-  totalTypeOnlyImports: 249
+  totalConstants: 298
+  totalReExports: 1410
+  totalTypeOnlyImports: 275
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 2
   unusedFilesCount: 0
-  unusedExportsCount: 0
+  unusedExportsCount: 1

@@ -42,6 +42,17 @@ jobs:
       - name: Typecheck examples
         run: pnpm run typecheck:examples
 
+      # `tests/` is outside every package's tsc project and outside the examples
+      # project, so until 2026-08-21 nothing type-checked the cross-package
+      # suites: option-object typos (`new OrthographicCamera({ height, aspect })`
+      # — fields that type does not declare) were accepted and silently ignored,
+      # and three integration harnesses asserted on invisible draws for it
+      # (R-8). `tests/tsconfig.json` already existed; this is the step that runs
+      # it. Placed after Build for the same reason as the examples: the suites
+      # import `four/*` through the workspace symlink into `packages/four/dist`.
+      - name: Typecheck tests
+        run: pnpm run typecheck:tests
+
       - name: Test
         run: pnpm -r --workspace-concurrency=4 run test
 

@@ -13,6 +13,13 @@
  * ({@link DEFAULT_TIMEOUT_SECONDS}), both finite by default, both overridable
  * per manager. See `docs/guides/security-and-untrusted-content.md`.
  *
+ * Content hashing (§76) and the §79 manifest landed on 2026-08-21, together
+ * with the texture loader tier (§77's assets half): `load(url, loader, {
+ * expectedHash })` refuses bytes that are not the bytes a manifest named, and
+ * {@link createTextureLoader} turns encoded images into `TextureSource`-shaped
+ * {@link TextureAsset}s under §96 decompression bounds. See `content-hash.ts`,
+ * `manifest.ts`, and `texture.ts`.
+ *
  * §76's cancellation landed on 2026-08-09: `load(url, loader, { signal })`
  * rejects and gives back its reference, and — when the manager was built with an
  * {@link AssetManagerOptions.abortController} — the last waiter's abort cancels
@@ -38,6 +45,34 @@ export {
   DEFAULT_MAXIMUM_BYTES,
   DEFAULT_TIMEOUT_SECONDS,
 } from "./asset-manager.js";
+export type { DigestLike, TextDecodeLike } from "./content-hash.js";
+export { CONTENT_HASH_ALGORITHM } from "./content-hash.js";
+export type {
+  AssetManifest,
+  AssetManifestEntry,
+  ManifestLoadOptions,
+} from "./manifest.js";
+export {
+  loadFromManifest,
+  manifestLoader,
+  manifestUrl,
+  parseAssetManifest,
+} from "./manifest.js";
+export type {
+  DecodedTexels,
+  TexelDecodeLike,
+  TexelProbeLike,
+  TextureColorSpace,
+  TextureFilterMode,
+  TextureLoaderOptions,
+  TextureWrapMode,
+} from "./texture.js";
+export {
+  DEFAULT_MAXIMUM_DECODED_BYTES,
+  DEFAULT_MAXIMUM_EXPANSION_RATIO,
+  TextureAsset,
+  createTextureLoader,
+} from "./texture.js";
 export type { ImageBitmapLike, ImageDecodeLike } from "./loaders.js";
 export {
   ImageAsset,

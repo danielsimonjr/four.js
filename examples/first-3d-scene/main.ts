@@ -52,10 +52,12 @@
  * ## Y-up in 3D exactly as in 2D (§7a)
  *
  * The world is right-handed with +Y up and −Z into the screen, angles are
- * radians, times are seconds. The camera is placed at +Z looking back toward
- * the origin and pitched *down* by a negative rotation about X; the light shines
- * along its node's −Z world axis (§68), which is why aiming it is a rotation and
- * not a direction vector — a light is a node like everything else.
+ * radians, times are seconds. The camera stands at +Z and is *aimed* at the
+ * middle of the scene; the light shines along its node's −Z world axis (§68),
+ * so it is placed up and to the left and aimed at the origin. Both are one
+ * `Node.lookAt(target)` call — a light is a node like everything else, and it is
+ * turned exactly the way a camera is. This file composed both orientations out
+ * of `setFromAxisAngle` quaternions until 2026-08-21.
  *
  * ## Colour discipline (what the browser gate depends on)
  *
@@ -85,7 +87,7 @@ import {
   torusGeometry,
 } from "four/geometry";
 import { LitMaterial } from "four/materials";
-import { Quaternion, Vector3 } from "four/math";
+import { Vector3 } from "four/math";
 import { MotionComponent, MotionSystem } from "four/motion";
 import { Renderable } from "four/render";
 import { WebglRenderer } from "four/render-webgl";
@@ -128,11 +130,19 @@ const FIELD_OF_VIEW = Math.PI / 4;
 const CAMERA_POSITION = new Vector3(0, 1.35, 6.4);
 
 /**
- * Downward pitch, in radians: a negative rotation about +X tips the camera's
- * −Z look axis toward −Y (§7a). Small — just enough to see the ground plane as
- * a receding surface rather than as an edge-on line.
+ * What the camera aims at, in **world** space — the middle of the arrangement,
+ * a little above the ground plane at `y = −1.3`.
+ *
+ * A target rather than an angle (R-36's `Node.lookAt`, adopted here 2026-08-21).
+ * This file used to write the aim as a rotation — `setFromAxisAngle((1, 0, 0),
+ * −0.17)` — which says *how far to tip the camera* and never says *what it is
+ * looking at*; a reader had to work the second out from the first, and moving
+ * anything in the scene meant re-deriving the angle by hand. One `lookAt` call
+ * states the intent, and derives the pitch that satisfies it:
+ * `atan2(−1.1, 6.4) = −0.17021` rad, which is the hand-written −0.17 to two
+ * ten-thousandths of a radian (about a seventh of a pixel at this projection).
  */
-const CAMERA_PITCH = -0.17;
+const CAMERA_TARGET = new Vector3(0, 0.25, 0);
 
 // The first perspective camera in any four.js example. `aspect` is the
 // viewport's width ÷ height and the application does not guess it: §61 makes it
@@ -148,7 +158,10 @@ const camera = new PerspectiveCamera({
   far: 100,
 });
 camera.transform.position.copy(CAMERA_POSITION);
-camera.transform.rotation.setFromAxisAngle(new Vector3(1, 0, 0), CAMERA_PITCH);
+// Aim the camera's −Z axis at the scene (§44/§47's orientation helper). The
+// target is world-space whatever the camera is parented to, and world +Y is the
+// default `up`, which is right for everything but a straight-down shot.
+camera.lookAt(CAMERA_TARGET);
 // Nothing recomputes implicitly: after setting projection parameters, say so.
 camera.updateProjectionMatrix();
 
@@ -184,26 +197,34 @@ app.scene.ambientLight[1] = AMBIENT_LIGHT[1];
 app.scene.ambientLight[2] = AMBIENT_LIGHT[2];
 
 /**
- * The sun's aim, as the two rotations that produce it.
+ * Where the sun stands, in world units — 10 units from the origin, up, to the
+ * left, and behind the viewer's shoulder.
  *
  * A `DirectionalLight` shines along its node's **−Z world axis** (§68) — the
  * direction a camera looks — so it is aimed by rotating the node, not by
- * writing a direction vector. Pitching by {@link SUN_PITCH} about +X sends −Z
- * to `(0, sin p, −cos p)`; yawing that by {@link SUN_YAW} about +Y swings it
- * sideways. Composed in that order (`yaw.multiply(pitch)` applies `pitch`
- * first, §7b), the light travels
+ * writing a direction vector. Until 2026-08-21 that rotation was composed here
+ * by hand out of a pitch and a yaw (`yaw.multiply(pitch)`, §7b), and the
+ * resulting travel direction was quoted in this comment because nothing in the
+ * code said it. Placing the light and calling {@link Node.lookAt} says the same
+ * thing in the terms anyone lighting a scene actually thinks in — *the sun is
+ * over there* — and the direction is then read off the code rather than
+ * asserted by a comment:
  *
  * ```text
+ * ‖SUN_POSITION‖ = 10 exactly, so the light travels
  * (0.345, −0.751, −0.563)   — down, to the right, and away from the camera
  * ```
  *
- * so it *comes from* up, to the left, and behind the viewer's shoulder. That is
- * the classic key-light placement, and it is what puts a bright upper-left and
- * a dim lower-right on every sphere here — the gradient the browser gate
- * measures to prove the shading is real Lambert diffuse and not a flat fill.
+ * which is the pre-`lookAt` pitch/yaw pair (−0.85, −0.55) to three decimal
+ * places. That is the classic key-light placement, and it is what puts a bright
+ * upper-left and a dim lower-right on every sphere here — the gradient the
+ * browser gate measures to prove the shading is real Lambert diffuse and not a
+ * flat fill.
  */
-const SUN_PITCH = -0.85;
-const SUN_YAW = -0.55;
+const SUN_POSITION = new Vector3(-3.45, 7.51, 5.63);
+
+/** What the sun is aimed at — the world origin, the middle of the meshes. */
+const ORIGIN = new Vector3(0, 0, 0);
 
 const sun = new DirectionalLight({
   // Slightly warm white against the cool ambient, so the lit and unlit sides of
@@ -215,9 +236,11 @@ const sun = new DirectionalLight({
   intensity: 1.25,
 });
 sun.name = "sun";
-sun.transform.rotation
-  .setFromAxisAngle(new Vector3(0, 1, 0), SUN_YAW)
-  .multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), SUN_PITCH));
+sun.transform.position.copy(SUN_POSITION);
+// A light is aimed exactly as a camera is: one call, a world-space target. The
+// position itself does not reach the shader — a directional light contributes a
+// direction only (§68) — it is what makes the aim expressible.
+sun.lookAt(ORIGIN);
 app.scene.add(sun);
 
 // --- the meshes -------------------------------------------------------------

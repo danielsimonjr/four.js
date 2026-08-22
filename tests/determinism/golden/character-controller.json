@@ -1,0 +1,14 @@
+{
+  "_warning": "IMMUTABLE. These numbers were recorded on 2026-08-21 by the PH-11 character-controller packet from an actual run of tests/determinism/helpers/character-controller-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself, or to intended engine semantics, justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that §12's character controllers are deterministic.",
+  "_scenario": "One headless Scene, no solver and no renderer. Character A (moveSpeed 4 m/s, jumpSpeed 5 m/s, gravity -9.81, groundHeight 0, starting grounded) is turned and steered every step by a SeededRandom(20260821) stream: a yaw delta in [-0.08, 0.08] rad and a move intent whose two components are each in [-1, 1], so the unit-disc scale-back is on the path. It attempts a jump every 45th step. Its child PerspectiveCamera at (0, 1.7, 0) carries a FirstPersonLook pitched by the same stream with a deliberately upward-biased delta in [-0.05, 0.12] rad, which walks the pitch into the default pole guard. Character B (moveSpeed 1, yaw 0.25, intent (0.5, -0.5), maxFallSpeed 6 m/s) falls from y = 50 under a parent at (-3, 0.5, 2) rotated 0.6 rad about +Y and scaled 2x, so the terminal-velocity clamp bites on every step and the world composition is hashed rather than only the local write. All three moving nodes are under \"kinematic\" authority and one KinematicSystem at PRIORITY_KINEMATICS (400) in one SystemRegistry, driven 300 clean fixed steps of 1/60 s with an injected TimeState whose simulationTime is exactly step / 60. The per-step value is an FNV-1a checksum (D6) over each node's world position and local rotation in registration order, then both vertical velocities and the eye's pitch; summaryDigest is the same hasher over all 300 of them in step order.",
+  "_tier": "same-runtime (§33), §33's stated initial target. The controllers call Math.sin, Math.cos and Math.sqrt — of these only sqrt is specified exactly rounded by IEEE 754, so cross-platform determinism is NOT claimed. Everything else on the path is exact: the seeded input stream is integer arithmetic, the step count and dt are fixed, iteration is insertion order, and no wall clock is read. The checksum algorithm itself is exact and cross-platform; only its inputs are runtime-bound.",
+  "summaryDigest": 2754445909,
+  "firstStepChecksum": 1071610087,
+  "lastStepChecksum": 3272421042,
+  "jumpsTaken": 3,
+  "groundedSteps": 120,
+  "landings": 3,
+  "pitchLimitHits": 162,
+  "skippedSteps": 0,
+  "fallerVerticalVelocity": -6
+}

@@ -98,10 +98,45 @@ describe("RendererCapabilities (§62)", () => {
 
     expect(capabilities.backend).toBe("null");
     expect(capabilities.maxTextureSize).toBe(0);
+    // §62's whole list, answered rather than omitted (WP-R1.1, 2026-08-21).
+    // The key set is asserted — not just the values — because the point of the
+    // conformance fixture is that a backend author reads a *complete* record
+    // off it: a member added to the interface and forgotten here would leave
+    // the reference implementation quietly incomplete.
     expect(Object.keys(capabilities).sort()).toEqual([
       "backend",
+      "compressedTextureFormats",
+      "computeShaders",
+      "floatRenderTargets",
+      "indirectDraw",
+      "maxBindings",
       "maxTextureSize",
+      "maxUniformBufferBytes",
+      "multisampling",
+      "shaderPrecision",
+      "storageBuffers",
+      "textureFormats",
+      "timestampQueries",
     ]);
+  });
+
+  it("answers every §62 member with the headless floor", () => {
+    const { renderer } = fixture();
+    const capabilities = renderer.capabilities;
+
+    // No device, no shader stage, no surface: "no" and "zero" are the literal
+    // truth here rather than conservative guesses.
+    expect(capabilities.textureFormats).toEqual([]);
+    expect(capabilities.compressedTextureFormats).toEqual([]);
+    expect(capabilities.multisampling).toBe(false);
+    expect(capabilities.floatRenderTargets).toBe(false);
+    expect(capabilities.timestampQueries).toBe(false);
+    expect(capabilities.storageBuffers).toBe(false);
+    expect(capabilities.computeShaders).toBe(false);
+    expect(capabilities.indirectDraw).toBe(false);
+    expect(capabilities.shaderPrecision).toBe("none");
+    expect(capabilities.maxUniformBufferBytes).toBe(0);
+    expect(capabilities.maxBindings).toBe(0);
   });
 
   it("is frozen, and survives disposal", () => {

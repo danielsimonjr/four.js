@@ -11,6 +11,23 @@ export type {
   PerspectiveCameraOptions,
 } from "./camera.js";
 export { Camera, OrthographicCamera, PerspectiveCamera } from "./camera.js";
+export type {
+  ScreenCameraOptions,
+  ScreenOrigin,
+  ScreenUnits,
+  SurfaceSizedCamera,
+} from "./screen-camera.js";
+export {
+  DEFAULT_SCREEN_FAR,
+  DEFAULT_SCREEN_NEAR,
+  DEFAULT_SCREEN_ORIGIN,
+  DEFAULT_SCREEN_UNITS,
+  SCREEN_ORIGINS,
+  SCREEN_UNITS,
+  ScreenCamera,
+} from "./screen-camera.js";
+export type { TrackballRigOptions } from "./trackball.js";
+export { DEFAULT_TRACKBALL_RADIUS, TrackballRig } from "./trackball.js";
 export { Group } from "./group.js";
 export type { LayerMask, LayeredNode } from "./layers.js";
 export {

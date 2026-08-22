@@ -5,15 +5,18 @@
  * §77 asks for 2D, cube, array, and 3D textures; mipmaps; wrap, filter, and
  * anisotropy state; colour-space metadata; compressed containers; render-target
  * textures; video textures; canvas and image-bitmap sources; and asynchronous
- * upload with residency diagnostics. This packet implements **one** of those:
- * a 2D, RGBA8, non-mipmapped texture built from a plain byte array, which is
- * what §55's sprite tier and §56's glyph atlas need in order to draw anything at
- * all — plus, since R-15 (2026-08-08), the **colour-space tag** §60a needs, which
- * the WebGL 2 backend turns into an sRGB internal format, and, since R-30
- * (2026-08-13), **wrap and filter modes**. The rest are named as
- * deferred on {@link Texture} rather than sketched, because each of them (a
- * mip chain, a compressed-format enum) is a public shape the §79
- * scene format and every backend have to agree on.
+ * upload with residency diagnostics. What is here is the **2D, RGBA8** texture
+ * built from a plain byte array — what §55's sprite tier and §56's glyph atlas
+ * need in order to draw anything at all — grown three times since: the
+ * **colour-space tag** §60a needs (R-15, 2026-08-08), which the WebGL 2 backend
+ * turns into an sRGB internal format; **wrap and filter modes** (R-30,
+ * 2026-08-13); and **mipmaps, the min-filter split, and anisotropy** (R-30b,
+ * 2026-08-21). What those three have in common is that they are *upload-time
+ * state*: a texture is still one image of one size, and the backend still reads
+ * every one of them in the same place. The rest are named as deferred on
+ * {@link Texture} rather than sketched, because each of them (a cube target, a
+ * compressed-format enum) is a public shape the §79 scene format and every
+ * backend have to agree on.
  *
  * ## Two departures worth stating up front
  *
@@ -73,6 +76,7 @@
 import type { Disposable } from "@four/core";
 import type {
   MaterialTextureFilter,
+  MaterialTextureMinFilter,
   MaterialTextureWrap,
   SpriteTexture,
 } from "@four/materials";
@@ -98,15 +102,35 @@ import { noteTexture } from "./resource-memory.js";
  * here, and naming the other four would be accepting a value the backend must
  * then reinterpret.
  *
- * For the same reason there is one field and not two. `minFilter` and
+ * For the same reason there was one field and not two. `minFilter` and
  * `magFilter` are a *pair* precisely because minification is the direction with
  * mip levels in it; with one level the two accept the same two values and
- * differing between them buys nothing an author can describe. When mipmaps
- * land, `minFilter` gains four values and the split becomes a real choice —
- * and it widens beside this field, which keeps its meaning ("both, unless
- * overridden").
+ * differing between them buys nothing an author can describe.
+ *
+ * **Mipmaps landed on 2026-08-21 (R-30b), and the split landed with them** —
+ * exactly where R-30 said it would: beside this field, not instead of it. This
+ * field still means "both directions, unless the min side is overridden", and
+ * {@link TextureSource.minFilter} is that override, carrying the four
+ * mip-choosing values ({@link TextureMinFilter}). There is no `magFilter`,
+ * because magnification has no mip levels to choose between and GL accepts only
+ * these two values there — so this field *is* the magnification filter.
  */
 export type TextureFilter = MaterialTextureFilter;
+
+/**
+ * How a texture is sampled when **minified** (§77's mip-choosing filter modes;
+ * R-30b, 2026-08-21) — {@link TextureFilter} plus GL's four `*_MIPMAP_*` modes.
+ *
+ * ```ts
+ * // Trilinear: bilinear within each level, blended between two levels.
+ * new Texture({ ...ground, mipmaps: true, minFilter: "linear-mipmap-linear" });
+ * ```
+ *
+ * See {@link MaterialTextureMinFilter} for the table of what each value does,
+ * and {@link TextureSource.minFilter} for the derived default and the §85
+ * refusal that keeps a mip-choosing value off a texture with no mip chain.
+ */
+export type TextureMinFilter = MaterialTextureMinFilter;
 
 /**
  * How a texture is addressed outside `[0, 1]` (§77's "wrap modes"; R-30,
@@ -119,6 +143,27 @@ export type TextureWrap = MaterialTextureWrap;
 
 /** The legal {@link TextureFilter} values, in the §85 message's order. */
 const FILTERS: readonly TextureFilter[] = ["nearest", "linear"];
+
+/** The legal {@link TextureMinFilter} values, in the §85 message's order. */
+const MIN_FILTERS: readonly TextureMinFilter[] = [
+  "nearest",
+  "linear",
+  "nearest-mipmap-nearest",
+  "linear-mipmap-nearest",
+  "nearest-mipmap-linear",
+  "linear-mipmap-linear",
+];
+
+/**
+ * Whether a {@link TextureMinFilter} chooses *between* mip levels — i.e.
+ * whether it needs the texture to carry a mip chain (R-30b).
+ *
+ * A substring test rather than a set, because the four values are exactly the
+ * ones spelled `*-mipmap-*` and the naming is the union's own convention.
+ */
+function usesMipLevels(minFilter: TextureMinFilter): boolean {
+  return minFilter.includes("-mipmap-");
+}
 
 /** The legal {@link TextureWrap} values, in the §85 message's order. */
 const WRAPS: readonly TextureWrap[] = [
@@ -235,6 +280,109 @@ export interface TextureSource {
    * than silently sample black.
    */
   readonly wrap?: TextureWrap;
+
+  /**
+   * Whether the backend builds a full mip chain for this texture at upload
+   * (§77's "mipmaps"; R-30b, 2026-08-21). Defaults to `false` — one level,
+   * which is what every texture in the engine had before this field existed.
+   *
+   * ```ts
+   * // A ground texture the camera flies away from.
+   * new Texture({ width: 512, height: 512, data, mipmaps: true });
+   * ```
+   *
+   * ## What it costs and what it buys
+   *
+   * It buys **minification**: a 512² texture covering twenty screen pixels
+   * takes twenty samples out of a quarter-million texels without a chain, and
+   * which twenty depends on the sub-pixel position of the camera — which is the
+   * crawling shimmer that appears the moment anything moves. With a chain the
+   * hardware samples a level whose texels are about the size of a pixel, and the
+   * image holds still.
+   *
+   * It costs a third more texture memory ({@link Texture.byteLength} counts the
+   * chain) and one `generateMipmap` at upload — both paid once per upload, and
+   * nothing at all on the draw path.
+   *
+   * ## No power-of-two constraint (WebGL 2)
+   *
+   * WebGL 1 could neither mipmap nor `REPEAT` a non-power-of-two texture. WebGL
+   * 2 is GLES 3.0 and lifts both restrictions for ordinary uncompressed
+   * formats, so a 300 × 173 texture takes a chain here with no padding and no
+   * resize. (Compressed containers keep restrictions of their own — they are
+   * still deferred, see {@link Texture}.) A backend at §62's WebGL 1 tier is the
+   * one that would have to refuse the combination, exactly as it would have to
+   * refuse {@link TextureSource.wrap}'s `"repeat"`.
+   *
+   * A backend whose context cannot generate mipmaps at all uploads the texture
+   * with one level and an in-level min filter — degrading rather than leaving
+   * a texture GL would treat as incomplete (see `@four/render-webgl`).
+   */
+  readonly mipmaps?: boolean;
+
+  /**
+   * How this texture is sampled when **minified** (§77; R-30b, 2026-08-21) —
+   * the mip-level-aware half of {@link TextureSource.filter}, which R-30 staged
+   * and this packet lands.
+   *
+   * ```ts
+   * // Crisp within a level, snapped between levels — pixel art at a distance.
+   * new Texture({ ...art, filter: "nearest", mipmaps: true,
+   *               minFilter: "nearest-mipmap-nearest" });
+   * ```
+   *
+   * **Defaults to the derived value**, never to a constant:
+   *
+   * - with no mip chain, to {@link TextureSource.filter} — which is what this
+   *   field's absence has always meant, and why a texture that names neither
+   *   still issues the identical pair of `texParameteri` calls;
+   * - with `mipmaps: true`, to that filter's chain-aware form — `"linear"` →
+   *   `"linear-mipmap-linear"` (trilinear), `"nearest"` →
+   *   `"nearest-mipmap-nearest"`. Building a chain and then not sampling it
+   *   would be the one combination nobody asks for on purpose.
+   *
+   * **A mip-choosing value without `mipmaps: true` is refused** (§85): GL calls
+   * such a texture *incomplete* and samples it as opaque black, which is a
+   * whole-surface visual failure with nothing anywhere saying why. Refusing is
+   * this repository's rule for exactly that class of value.
+   */
+  readonly minFilter?: TextureMinFilter;
+
+  /**
+   * How many anisotropic samples the backend may take when this texture is
+   * minified at a steep angle (§77's "anisotropy"; R-30b, 2026-08-21). An
+   * integer ≥ 1; defaults to `1`, which is isotropic filtering and GL's own
+   * default.
+   *
+   * ```ts
+   * // A ground plane seen edge-on: mip levels alone blur it to mush.
+   * new Texture({ ...ground, mipmaps: true, anisotropy: 8 });
+   * ```
+   *
+   * ## A request, not a guarantee (the §62 decision, R-30b)
+   *
+   * Anisotropic filtering is an **extension** in WebGL 2 —
+   * `EXT_texture_filter_anisotropic` — so a conformant device may not have it,
+   * and every device that does has its own maximum. The policy here is §62's,
+   * not §85's: the backend clamps the request to the device's maximum, and
+   * where the extension is absent it uploads the texture with no anisotropy at
+   * all rather than failing. **Presence is the capability**, the stance this
+   * package takes for every optional renderer feature.
+   *
+   * The asymmetry with {@link TextureSource.filter}, which *is* refused when
+   * unknown, is deliberate and worth stating: `"nearset"` is a mistake in the
+   * scene, and no device will ever honour it; `anisotropy: 16` is a correct
+   * request that some devices cannot fill, and a quality knob that turns a scene
+   * into an error on half the fleet is worse than one that quietly costs less.
+   * What §85 *does* refuse here is a value that is not an integer ≥ 1 — no
+   * device could honour that either.
+   *
+   * Anisotropy above 1 is only worth asking for together with `mipmaps: true`
+   * (it selects among mip levels per axis); the combination is not required and
+   * not refused, because a driver is free to do something useful with it and
+   * the texture is complete either way.
+   */
+  readonly anisotropy?: number;
 }
 
 /**
@@ -286,6 +434,29 @@ function validate(source: TextureSource): void {
   if (source.wrap !== undefined) {
     validateEnum(source.wrap, WRAPS, "wrap");
   }
+  if (source.minFilter !== undefined) {
+    validateEnum(source.minFilter, MIN_FILTERS, "minFilter");
+    if (usesMipLevels(source.minFilter) && source.mipmaps !== true) {
+      // GL leaves such a texture incomplete and samples it as opaque black —
+      // a silent, whole-surface failure, which is precisely the class §85 says
+      // to refuse rather than to substitute around (R-30b).
+      throw new RangeError(
+        `Texture minFilter ${JSON.stringify(source.minFilter)} samples between ` +
+          "mip levels, so the texture needs `mipmaps: true`; without a mip " +
+          "chain GL treats it as incomplete and samples it as black (§77, §85).",
+      );
+    }
+  }
+  if (
+    source.anisotropy !== undefined &&
+    (!Number.isInteger(source.anisotropy) || source.anisotropy < 1)
+  ) {
+    throw new RangeError(
+      "Texture anisotropy must be an integer of at least 1; got " +
+        `${String(source.anisotropy)} (§77, §85). A device that cannot honour a ` +
+        "legal request is a §62 capability, and is clamped rather than refused.",
+    );
+  }
   for (const axis of ["width", "height"] as const) {
     const value = source[axis];
     if (!Number.isInteger(value) || value < 1) {
@@ -333,7 +504,7 @@ function validate(source: TextureSource): void {
  *
  * ## Deferred from §77 (named, not dropped)
  *
- * Cube/array/3D targets, mipmaps and their generation, anisotropy, the §77 *map roles* that
+ * Cube/array/3D targets, the §77 *map roles* that
  * would let colour-space metadata carry §60a's own defaults (colour maps sRGB,
  * data maps linear — the tag itself ships, see
  * {@link TextureSource.colorSpace}), compressed containers, render-target textures (§63), video textures,
@@ -347,6 +518,16 @@ function validate(source: TextureSource): void {
  * texture object at upload time and read by nothing on the draw path: a
  * `texParameteri` argument became a variable, and no frame does one thing more
  * than it did.
+ *
+ * **Mipmaps and anisotropy left it on 2026-08-21 (R-30b)** — see
+ * {@link TextureSource.mipmaps}, {@link TextureSource.minFilter} and
+ * {@link TextureSource.anisotropy} — for the same reason and at the same cost:
+ * one more upload-time GL call for the textures that ask, nothing at all for
+ * the ones that do not, and no change anywhere on the draw path. What is left
+ * on the list are the members that are *not* upload-time state: a cube or array
+ * target changes the sampler type in every shader that reads it, a compressed
+ * container changes the upload call and needs a §62 format report, and a video
+ * source needs per-frame update semantics (§9) rather than a version bump.
  */
 export class Texture implements Disposable, SpriteTexture {
   /**
@@ -442,6 +623,54 @@ export class Texture implements Disposable, SpriteTexture {
   }
 
   /**
+   * Whether this texture carries a mip chain (§77; R-30b), `false` when the
+   * source says nothing — see {@link TextureSource.mipmaps}.
+   *
+   * Like every other piece of sampler state, it is read at **upload** time:
+   * turning it on for a texture a backend already holds needs
+   * {@link Texture.markDirty} (or a new {@link Texture.source}).
+   */
+  get mipmaps(): boolean {
+    return this.#source.mipmaps === true;
+  }
+
+  /**
+   * How this texture is sampled when minified (§77; R-30b), **derived** when
+   * the source names none: {@link Texture.filter} without a mip chain, and its
+   * chain-aware form with one — see {@link TextureSource.minFilter}.
+   *
+   * Resolved here for {@link Texture.filter}'s reason: the backend reads one
+   * value and repeats no `??`, and a texture that predates the field resolves
+   * to exactly the value the backend wrote before it existed.
+   */
+  get minFilter(): TextureMinFilter {
+    const named = this.#source.minFilter;
+    if (named !== undefined) {
+      return named;
+    }
+    const filter = this.filter;
+    if (!this.mipmaps) {
+      return filter;
+    }
+    return filter === "nearest"
+      ? "nearest-mipmap-nearest"
+      : "linear-mipmap-linear";
+  }
+
+  /**
+   * How many anisotropic samples this texture asks for (§77; R-30b), `1` when
+   * the source names none.
+   *
+   * A **request**: the backend clamps it to the device maximum and ignores it
+   * where `EXT_texture_filter_anisotropic` is absent — see
+   * {@link TextureSource.anisotropy} for why that is §62's answer rather than
+   * §85's.
+   */
+  get anisotropy(): number {
+    return this.#source.anisotropy ?? 1;
+  }
+
+  /**
    * The RGBA8 bytes, or `null` when the source carries none.
    *
    * A flat accessor rather than `source.data` because it is the field a backend
@@ -480,8 +709,19 @@ export class Texture implements Disposable, SpriteTexture {
    * Counted from the **size**, not from `data`: a source with no CPU-side bytes
    * still makes the backend allocate zero-filled storage of exactly this size
    * (see {@link TextureSource.data}), so billing it zero would under-report the
-   * memory the engine holds. Mip levels are not counted because this tier
-   * generates none (§77, module header).
+   * memory the engine holds.
+   *
+   * **Mip levels count** since R-30b (2026-08-21): a texture with
+   * `mipmaps: true` bills the whole chain, summed level by level down to 1 × 1
+   * — about a third more, and exactly a third more only for a square
+   * power-of-two texture, which is why it is summed rather than multiplied by
+   * `4/3`. A texture with no chain is unchanged, so no existing §84 number
+   * moves.
+   *
+   * ```ts
+   * new Texture({ width: 4, height: 4, mipmaps: true }).byteLength;
+   * // 64 + 16 + 4 = 84
+   * ```
    *
    * **`0` once disposed**, because a disposed texture holds nothing — one rule,
    * so that a write into a disposed texture (already a §83 "disposed resource
@@ -492,7 +732,18 @@ export class Texture implements Disposable, SpriteTexture {
     if (this.#disposed) {
       return 0;
     }
-    return this.#source.width * this.#source.height * 4;
+    let width = this.#source.width;
+    let height = this.#source.height;
+    let bytes = width * height * 4;
+    if (!this.mipmaps) {
+      return bytes;
+    }
+    while (width > 1 || height > 1) {
+      width = Math.max(1, width >> 1);
+      height = Math.max(1, height >> 1);
+      bytes += width * height * 4;
+    }
+    return bytes;
   }
 
   /**

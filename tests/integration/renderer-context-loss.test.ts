@@ -246,7 +246,17 @@ describe("§61 context loss and restore — the application half (§92)", () => 
     // checked is the *wiring*, not the pixels.
     const renderer: Renderer = new NullRenderer();
     const app = new Application({ renderer, fixedTimeStep: FIXED });
-    const camera = new OrthographicCamera({ height: 4, aspect: 1 });
+    // §87 (R-8, 2026-08-09; tests typecheck gate, 2026-08-21): this said
+    // `{ height: 4, aspect: 1 }` — two fields `OrthographicCameraOptions` does
+    // not have, so the object was accepted and every property ignored, leaving
+    // the default unit box `[-1, 1]²`. The box below is the 4 × 4 view the
+    // harness always meant.
+    const camera = new OrthographicCamera({
+      left: -2,
+      right: 2,
+      bottom: -2,
+      top: 2,
+    });
     app.scene.add(camera);
     const view = createFullscreenViewport(camera);
     app.views.push(view);

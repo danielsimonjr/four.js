@@ -1,6 +1,6 @@
 # Duplicate Symbols
 
-**Generated**: 2026-08-13 (by tools/create-dependency-graph)
+**Generated**: 2026-08-21 (by tools/create-dependency-graph)
 
 Names that are OWN-DEFINED (not merely re-exported) by >= 2 distinct files across the monorepo, then CLASSIFIED (see `DupEntryTag`) so the actionable subset is clear: `TRUE_DUPLICATE` (real merge targets) vs `DISPATCH_VARIANT` (>=2 `mathTyped(...)` registrations of the same public name — distinct dispatch surfaces, Bucket C delegation candidates, not copy-paste bodies), `ALIAS_DELEGATION` (a `const X = importedY` forward, excluded once <2 real bodies remain), and `ALLOWLISTED` (matches `duplicate-allowlist.json`: hot-path `is*` guards, AssemblyScript mirrors, per-package `VERSION` strings).
 
@@ -23,8 +23,8 @@ Names that are OWN-DEFINED (not merely re-exported) by >= 2 distinct files acros
 | **TRUE_DUPLICATE** (actionable) | 0 |
 | DISPATCH_VARIANT | 0 |
 | ALIAS_DELEGATION | 0 |
-| ALLOWLISTED | 0 |
-| _Total flagged names_ | 0 |
+| ALLOWLISTED | 1 |
+| _Total flagged names_ | 1 |
 
 ## Runtime duplicates
 
@@ -64,5 +64,7 @@ _None._
 
 ### ALLOWLISTED
 
-_None._
+| Name | Category | Defining files (package, public?, sub-tag) | Canonical hint |
+| --- | --- | --- | --- |
+| `CacheableGeometry` | type | `packages/render-webgl/src/gl-geometry.ts` (@four/render-webgl, public, ALLOWLISTED: four.js: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring.)<br>`packages/render-webgpu/src/wgpu-geometry.ts` (@four/render-webgpu, public, ALLOWLISTED: four.js: backend-local structural view of the geometry a resource cache consumes (types only, no runtime body) — the PARTICLE_INSTANCE_FLOATS class of deliberate per-backend duck typing. Each backend declares the narrowed shape it reads so the cache's requirements live in the file that enforces them and neither backend names the other; the shared render-list consumption harness catches drift. 2026-08-21, WP-R1.1 gate wiring.) | **AMBIGUOUS** |
 

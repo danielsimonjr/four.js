@@ -147,6 +147,25 @@ interface FakeGlOptions {
   allocateVertexArrays?: boolean;
   /** When false, `createTexture` returns null. Default true. */
   allocateTextures?: boolean;
+  /**
+   * When false, the double declares **no** `generateMipmap` at all — a context
+   * that cannot build a mip chain (R-30b). Default true.
+   *
+   * Absent rather than throwing, because `WebglContext.generateMipmap` is
+   * optional and "presence is the capability" is the contract under test.
+   */
+  canGenerateMipmaps?: boolean;
+  /**
+   * When false, `getExtension` returns `null` for every name — a device with no
+   * `EXT_texture_filter_anisotropic` (R-30b, §62). Default true. `null` (as
+   * opposed to `false`) removes `getExtension` from the double entirely.
+   */
+  anisotropyExtension?: boolean | null;
+  /**
+   * What `getParameter(MAX_TEXTURE_MAX_ANISOTROPY_EXT)` reports (R-30b).
+   * Default 16; `unknown` so a test can hand back what a hostile driver would.
+   */
+  maxAnisotropy?: unknown;
   /** When false, `createBuffer` returns null. Default true. */
   allocateBuffers?: boolean;
   /** When false, `createFramebuffer` returns null. Default true (R-4). */
@@ -221,6 +240,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     failProgramAt = 0,
     allocateVertexArrays = true,
     allocateTextures = true,
+    canGenerateMipmaps = true,
+    anisotropyExtension = true,
+    maxAnisotropy = 16,
     allocateBuffers = true,
     allocateFramebuffers = true,
     allocateRenderbuffers = true,
@@ -482,7 +504,9 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
 
     getParameter(pname) {
       record("getParameter", pname);
-      return maxTextureSize;
+      return pname === GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT
+        ? maxAnisotropy
+        : maxTextureSize;
     },
     enable(capability) {
       record("enable", capability);
@@ -520,6 +544,15 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     colorMask(red, green, blue, alpha) {
       record("colorMask", red, green, blue, alpha);
     },
+    stencilFunc(func, ref, mask) {
+      record("stencilFunc", func, ref, mask);
+    },
+    stencilOp(fail, depthFail, pass) {
+      record("stencilOp", fail, depthFail, pass);
+    },
+    stencilMask(mask) {
+      record("stencilMask", mask);
+    },
     drawArrays(mode, first, count) {
       record("drawArrays", mode, first, count);
     },
@@ -534,6 +567,21 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
       return false;
     },
   };
+
+  // R-30b: both entry points are *optional* on `WebglContext` — presence is the
+  // capability — so a double that lacks them is a legal context, and building
+  // them conditionally is the only way to test that path.
+  if (canGenerateMipmaps) {
+    gl.generateMipmap = (target: number): void => {
+      record("generateMipmap", target);
+    };
+  }
+  if (anisotropyExtension !== null) {
+    gl.getExtension = (name: string): unknown => {
+      record("getExtension", name);
+      return anisotropyExtension ? { name } : null;
+    };
+  }
 
   return gl;
 }
@@ -722,6 +770,14 @@ class TestMaterial {
 
   vertexColors?: boolean;
 
+  /**
+   * §57's optional stencil record (§67, R-7) — optional and unset by default
+   * for `map`'s reason, and typed as a *partial* record on purpose: the
+   * backend reads every field defensively, and this double is what proves the
+   * fallbacks are reachable rather than decorative.
+   */
+  stencil?: Partial<NonNullable<ItemMaterial["stencil"]>>;
+
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
   }
@@ -835,6 +891,27 @@ class TestTexture {
 
   /** See {@link TestTexture.filter}. */
   wrap?: "clamp-to-edge" | "repeat" | "mirrored-repeat";
+
+  /**
+   * §77's mip chain, its min-filter split, and its anisotropy request (R-30b,
+   * 2026-08-21). All three left `undefined` by default for
+   * {@link TestTexture.filter}'s reason: every other test in this file is a
+   * texture written before they existed, and its upload must stay byte-for-byte
+   * what it was.
+   */
+  mipmaps?: boolean;
+
+  /** See {@link TestTexture.mipmaps}. */
+  minFilter?:
+    | "nearest"
+    | "linear"
+    | "nearest-mipmap-nearest"
+    | "linear-mipmap-nearest"
+    | "nearest-mipmap-linear"
+    | "linear-mipmap-linear";
+
+  /** See {@link TestTexture.mipmaps}. */
+  anisotropy?: number;
 
   constructor(width = 2, height = 2, data: Uint8Array | null = null) {
     nextTestTextureId += 1;
@@ -1253,6 +1330,35 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
     const { renderer } = await initialized({ maxTextureSize: null });
 
     expect(renderer.capabilities.maxTextureSize).toBe(0);
+  });
+
+  it("answers §62's whole capability list, without asking GL anything new", async () => {
+    const { renderer, gl } = await initialized();
+    const capabilities = renderer.capabilities;
+
+    // Every member is a statement about *this backend on WebGL 2*, and each is
+    // true by construction (see `WEBGL_STATIC_CAPABILITIES`): WebGL 2 has no
+    // compute stage, no storage buffers and no indirect draw at all, this tier
+    // requests no timer extension and no float target, and GLSL ES 3.00
+    // requires fragment-stage `highp`.
+    expect(capabilities.computeShaders).toBe(false);
+    expect(capabilities.storageBuffers).toBe(false);
+    expect(capabilities.indirectDraw).toBe(false);
+    expect(capabilities.timestampQueries).toBe(false);
+    expect(capabilities.floatRenderTargets).toBe(false);
+    expect(capabilities.multisampling).toBe(true);
+    expect(capabilities.shaderPrecision).toBe("highp");
+    expect(capabilities.textureFormats).toEqual(["rgba8"]);
+    expect(capabilities.compressedTextureFormats).toEqual([]);
+
+    // §62's "maximum uniforms and bindings" is deliberately **not** reported:
+    // two more `getParameter` calls at initialization would move every landed
+    // integration transcript for a number nothing reads yet (R-30b's recorded
+    // lazy-query law). `undefined` says "not reported", which is a third
+    // answer distinct from a confident wrong one.
+    expect(capabilities.maxUniformBufferBytes).toBeUndefined();
+    expect(capabilities.maxBindings).toBeUndefined();
+    expect(gl.countOf("getParameter")).toBe(1);
   });
 
   it("requests a webgl2 context with depth, no stencil, and the antialias hint", async () => {
@@ -2798,6 +2904,181 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
       [GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
       [GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
     ]);
+  });
+
+  it("adds nothing at all for a texture naming no mipmaps or anisotropy (R-30b)", () => {
+    // The byte-identity claim, structurally: the whole recorded transcript of
+    // an ordinary upload, in order, with no `generateMipmap`, no
+    // `getExtension`, and no fifth `texParameteri` — even though this context
+    // offers all three.
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+
+    cache.acquire(new TestTexture(2, 2).asTexture);
+
+    expect(gl.names()).toEqual([
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "texParameteri",
+      "bindTexture",
+    ]);
+  });
+
+  it("generates the mip chain and writes the derived min filter (§77, R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(4, 4);
+    texture.mipmaps = true;
+    texture.minFilter = "linear-mipmap-linear";
+
+    cache.acquire(texture.asTexture);
+
+    // Ordering matters: the chain must exist before a mip-choosing min filter
+    // is written, and `generateMipmap` reads the level-0 image.
+    expect(gl.names().slice(0, 5)).toEqual([
+      "createTexture",
+      "bindTexture",
+      "texImage2D",
+      "generateMipmap",
+      "texParameteri",
+    ]);
+    expect(
+      gl.callsOf("texParameteri").map((call) => [call.args[1], call.args[2]]),
+    ).toEqual([
+      [GL.TEXTURE_MIN_FILTER, GL.LINEAR_MIPMAP_LINEAR],
+      // Magnification has no levels to choose between: it stays `filter`.
+      [GL.TEXTURE_MAG_FILTER, GL.LINEAR],
+      [GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE],
+      [GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE],
+    ]);
+  });
+
+  it("maps every mip-choosing min filter to its GL enum (§77, R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const expected = [
+      ["nearest", GL.NEAREST],
+      ["nearest-mipmap-nearest", GL.NEAREST_MIPMAP_NEAREST],
+      ["linear-mipmap-nearest", GL.LINEAR_MIPMAP_NEAREST],
+      ["nearest-mipmap-linear", GL.NEAREST_MIPMAP_LINEAR],
+      ["linear-mipmap-linear", GL.LINEAR_MIPMAP_LINEAR],
+      ["linear", GL.LINEAR],
+    ] as const;
+
+    for (const [minFilter] of expected) {
+      const texture = new TestTexture(2, 2);
+      texture.mipmaps = true;
+      texture.minFilter = minFilter;
+      cache.acquire(texture.asTexture);
+    }
+
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MIN_FILTER)
+        .map((call) => call.args[2]),
+    ).toEqual(expected.map(([, value]) => value));
+  });
+
+  it("derives the min filter from `filter` when the texture names none (R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const smooth = new TestTexture(2, 2);
+    smooth.mipmaps = true;
+    const crisp = new TestTexture(2, 2);
+    crisp.mipmaps = true;
+    crisp.filter = "nearest";
+
+    cache.acquire(smooth.asTexture);
+    cache.acquire(crisp.asTexture);
+
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MIN_FILTER)
+        .map((call) => call.args[2]),
+    ).toEqual([GL.LINEAR_MIPMAP_LINEAR, GL.NEAREST_MIPMAP_NEAREST]);
+  });
+
+  it("degrades to one level on a context that cannot generate mipmaps (R-30b)", () => {
+    // A mip-choosing min filter on a one-level texture is *incomplete* in GL
+    // and samples as opaque black. Degrading the quality beats a black surface.
+    const gl = createFakeGl({ canGenerateMipmaps: false });
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(4, 4);
+    texture.mipmaps = true;
+    texture.minFilter = "linear-mipmap-linear";
+    const crisp = new TestTexture(4, 4);
+    crisp.mipmaps = true;
+    crisp.minFilter = "nearest-mipmap-nearest";
+
+    cache.acquire(texture.asTexture);
+    cache.acquire(crisp.asTexture);
+
+    expect(gl.countOf("generateMipmap")).toBe(0);
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MIN_FILTER)
+        .map((call) => call.args[2]),
+    ).toEqual([GL.LINEAR, GL.NEAREST]);
+  });
+
+  it("clamps an anisotropy request to the device ceiling, querying once (§62, R-30b)", () => {
+    const gl = createFakeGl({ maxAnisotropy: 4 });
+    const cache = new TextureCache(gl);
+    const modest = new TestTexture(2, 2);
+    modest.anisotropy = 2;
+    const greedy = new TestTexture(2, 2);
+    greedy.anisotropy = 64;
+
+    cache.acquire(modest.asTexture);
+    cache.acquire(greedy.asTexture);
+
+    expect(gl.callsOf("getExtension").map((call) => call.args[0])).toEqual([
+      "EXT_texture_filter_anisotropic",
+    ]);
+    expect(
+      gl
+        .callsOf("texParameteri")
+        .filter((call) => call.args[1] === GL.TEXTURE_MAX_ANISOTROPY_EXT)
+        .map((call) => call.args[2]),
+    ).toEqual([2, 4]);
+  });
+
+  it("writes no anisotropy, and asks nothing, for a request of 1 (R-30b)", () => {
+    const gl = createFakeGl();
+    const cache = new TextureCache(gl);
+    const texture = new TestTexture(2, 2);
+    texture.anisotropy = 1;
+
+    cache.acquire(texture.asTexture);
+
+    expect(gl.countOf("getExtension")).toBe(0);
+    expect(gl.countOf("texParameteri")).toBe(4);
+  });
+
+  it("ignores anisotropy where the extension is absent (§62's clamp, not §85)", () => {
+    for (const options of [
+      { anisotropyExtension: false },
+      // A context that does not even declare `getExtension`.
+      { anisotropyExtension: null },
+      // A driver that answers the query with something that is not a number.
+      { maxAnisotropy: null },
+    ] as const) {
+      const gl = createFakeGl(options);
+      const cache = new TextureCache(gl);
+      const texture = new TestTexture(2, 2);
+      texture.anisotropy = 8;
+
+      cache.acquire(texture.asTexture);
+
+      expect(gl.countOf("texParameteri")).toBe(4);
+    }
   });
 
   it("re-uploads with the new sampler state after a version bump (§77, R-30)", () => {
@@ -9293,5 +9574,301 @@ describe("WebglRenderer.render — §87 per-view frustum culling (R-8)", () => {
     ]);
 
     expect(gl.countOf("drawElements")).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §67's stencil state (R-7, 2026-08-11).
+//
+// The two-sided claim every state switch in this backend makes, once more: a
+// material that declares `stencil` gets it, applied group by group and only
+// where a group moved, and a material that declares none costs the frame
+// **nothing at all** — no enable, no func, no mask, not even a restore. The
+// second half is what keeps every recorded transcript and every pixel golden
+// valid, and it is why the mirror is seeded at GL's own initial values rather
+// than at "unknown".
+// ---------------------------------------------------------------------------
+
+/** The frame's stencil calls, as `[name, ...args]`, in call order. */
+function stencilCalls(gl: FakeGl): unknown[][] {
+  return gl.calls
+    .filter(
+      (call) =>
+        call.name.startsWith("stencil") ||
+        ((call.name === "enable" || call.name === "disable") &&
+          call.args[0] === GL.STENCIL_TEST),
+    )
+    .map((call) => [call.name, ...call.args]);
+}
+
+describe("WebglRenderer.render — §57's stencil state (§67, R-7)", () => {
+  it("costs a frame nothing when no material declares one", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ depthTest: false }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Depth state moved, so this frame is not trivially call-free — and it
+    // still contains not one stencil call.
+    expect(toggles(gl)).toEqual([
+      ["disable", GL.DEPTH_TEST],
+      ["enable", GL.DEPTH_TEST],
+    ]);
+    expect(stencilCalls(gl)).toEqual([]);
+    expect(gl.countOf("stencilFunc")).toBe(0);
+    expect(gl.countOf("stencilOp")).toBe(0);
+    expect(gl.countOf("stencilMask")).toBe(0);
+  });
+
+  it("enables the test and nothing more for a record that names GL's defaults", async () => {
+    // The `{}` record is the reachability proof for every `??` in
+    // `applyStencilState`: a structurally-typed material may carry a partial
+    // record, and a missing field has to mean the documented default rather
+    // than `undefined` reaching a GL entry point.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ stencil: {} }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["disable", GL.STENCIL_TEST],
+    ]);
+  });
+
+  it("maps every field onto its GL entry point", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      stateful({
+        stencil: {
+          func: "equal",
+          ref: 2,
+          readMask: 0b0011,
+          writeMask: 0b1100,
+          failOp: "zero",
+          depthFailOp: "invert",
+          passOp: "replace",
+        },
+      }),
+    );
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.EQUAL, 2, 0b0011],
+      ["stencilOp", GL.ZERO, GL.INVERT, GL.REPLACE],
+      ["stencilMask", 0b1100],
+      // The frame's exit envelope: the test off, and the write mask reopened
+      // so the next frame's clear is not masked by it.
+      ["disable", GL.STENCIL_TEST],
+      ["stencilMask", 0xff],
+    ]);
+    const names = gl.names();
+    expect(names.indexOf("stencilFunc")).toBeLessThan(
+      names.indexOf("drawArrays"),
+    );
+    expect(names.lastIndexOf("stencilMask")).toBeGreaterThan(
+      names.indexOf("drawArrays"),
+    );
+  });
+
+  it("translates all eight comparisons and all eight operations", async () => {
+    const funcs = [
+      ["never", GL.NEVER],
+      ["less", GL.LESS],
+      ["equal", GL.EQUAL],
+      ["lequal", GL.LEQUAL],
+      ["greater", GL.GREATER],
+      ["notequal", GL.NOTEQUAL],
+      ["gequal", GL.GEQUAL],
+      ["always", GL.ALWAYS],
+    ] as const;
+    const ops = [
+      ["keep", GL.KEEP],
+      ["zero", GL.ZERO],
+      ["replace", GL.REPLACE],
+      ["increment", GL.INCR],
+      ["increment-wrap", GL.INCR_WRAP],
+      ["decrement", GL.DECR],
+      ["decrement-wrap", GL.DECR_WRAP],
+      ["invert", GL.INVERT],
+    ] as const;
+
+    for (const [name, expected] of funcs) {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      // `ref: 1` so even `always` differs from the mirror and issues its call.
+      root.add(stateful({ stencil: { func: name, ref: 1 } }));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      expect(gl.callsOf("stencilFunc")[0].args).toEqual([expected, 1, 0xff]);
+    }
+    for (const [name, expected] of ops) {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(stateful({ stencil: { failOp: name, passOp: name } }));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      if (name === "keep") {
+        // Already the mirror's value: no call, which is the point of mirroring.
+        expect(gl.countOf("stencilOp")).toBe(0);
+        continue;
+      }
+      expect(gl.callsOf("stencilOp")[0].args).toEqual([
+        expected,
+        GL.KEEP,
+        expected,
+      ]);
+    }
+  });
+
+  it("re-issues only the group that moved between two stencil materials", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // The §67 composition: write the mask, then test against it. The two agree
+    // on the operations only after the second pass restores them, so what this
+    // asserts is that the *func* group and the *mask* group move on their own.
+    root.add(
+      stateful({ stencil: { func: "always", ref: 1, passOp: "replace" } }),
+    );
+    root.add(stateful({ stencil: { func: "equal", ref: 1, writeMask: 0 } }));
+    root.add(stateful({ stencil: { func: "equal", ref: 1, writeMask: 0 } }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.ALWAYS, 1, 0xff],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.REPLACE],
+      ["stencilFunc", GL.EQUAL, 1, 0xff],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.KEEP],
+      ["stencilMask", 0],
+      // The third item is identical to the second: not one call.
+      ["disable", GL.STENCIL_TEST],
+      ["stencilMask", 0xff],
+    ]);
+  });
+
+  it("turns the test off with one call, leaving the rest where it was", async () => {
+    // With `STENCIL_TEST` disabled GL performs no stencil test and no stencil
+    // write, so returning to "no stencil" is one `disable` — the func and op
+    // state is deliberately not restored call by call.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ stencil: { func: "equal", ref: 4 } }));
+    root.add(stateful({}));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.EQUAL, 4, 0xff],
+      ["disable", GL.STENCIL_TEST],
+    ]);
+  });
+
+  it("reopens the write mask before the next view clears", async () => {
+    // `clear` is masked by the stencil write mask whether or not the test is
+    // enabled, so a view following a read-only mask material would clear
+    // nothing at all. Two views make the restore visible inside one frame.
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ stencil: { func: "equal", ref: 1, writeMask: 0 } }));
+    gl.reset();
+
+    renderer.render(root, [createView(camera), createView(camera)]);
+
+    const names = gl.names();
+    const firstClear = names.indexOf("clear");
+    const closed = names.indexOf("stencilMask");
+    const secondClear = names.indexOf("clear", firstClear + 1);
+    expect(closed).toBeGreaterThan(firstClear);
+    expect(closed).toBeLessThan(secondClear);
+    expect(gl.callsOf("stencilMask").map((call) => call.args[0])).toEqual([
+      0, 0xff, 0, 0xff,
+    ]);
+  });
+
+  it("clears the stencil buffer only when the surface has one (§33, §61)", async () => {
+    // A stencil buffer that is never cleared is a mask leaking from one frame
+    // into the next. A renderer that did not ask for one issues the identical
+    // `clear` it always did — which is the byte-identity half of the clause.
+    const plain = await initialized();
+    plain.gl.reset();
+    plain.renderer.render(createRoot(), [createView(plain.camera)]);
+    for (const call of plain.gl.callsOf("clear")) {
+      expect(Number(call.args[0]) & GL.STENCIL_BUFFER_BIT).toBe(0);
+    }
+
+    const gl = createFakeGl();
+    const renderer = new WebglRenderer();
+    await renderer.initialize({ canvas: new TestCanvas(gl), stencil: true });
+    gl.reset();
+    renderer.render(createRoot(), [createView(new TestCamera())]);
+    const clears = gl.callsOf("clear");
+    expect(clears.length).toBeGreaterThan(0);
+    for (const call of clears) {
+      expect(Number(call.args[0]) & GL.STENCIL_BUFFER_BIT).toBe(
+        GL.STENCIL_BUFFER_BIT,
+      );
+    }
+  });
+
+  it("asks the context for the buffer only when told to", async () => {
+    const off = createFakeGl();
+    const offCanvas = new TestCanvas(off);
+    await new WebglRenderer().initialize({ canvas: offCanvas });
+    expect(offCanvas.attributes[0]?.stencil).toBe(false);
+
+    const on = createFakeGl();
+    const onCanvas = new TestCanvas(on);
+    await new WebglRenderer().initialize({ canvas: onCanvas, stencil: true });
+    expect(onCanvas.attributes[0]?.stencil).toBe(true);
+  });
+});
+
+describe("RenderTargetCache — the packed stencil attachment (§67, R-7)", () => {
+  it("allocates DEPTH24_STENCIL8 on the combined attachment point", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+    const target = new RenderTarget({ width: 4, height: 4, stencil: true });
+
+    const record = cache.acquire(target);
+
+    expect(record?.stencil).toBe(true);
+    expect(record?.depthBuffer).not.toBeNull();
+    // One renderbuffer, not two: the packed format *is* both buffers, which is
+    // what makes the exclusion with R-18's depth texture structural.
+    expect(gl.countOf("createRenderbuffer")).toBe(1);
+    expect(gl.callsOf("renderbufferStorage")[0].args[1]).toBe(
+      GL.DEPTH24_STENCIL8,
+    );
+    expect(gl.callsOf("framebufferRenderbuffer")[0].args[1]).toBe(
+      GL.DEPTH_STENCIL_ATTACHMENT,
+    );
+  });
+
+  it("leaves a target that asked for no stencil exactly as it was", () => {
+    const gl = createFakeGl();
+    const cache = new RenderTargetCache(gl);
+
+    const record = cache.acquire(new RenderTarget({ width: 4, height: 4 }));
+
+    expect(record?.stencil).toBe(false);
+    expect(gl.callsOf("renderbufferStorage")[0].args[1]).toBe(
+      GL.DEPTH_COMPONENT16,
+    );
+    expect(gl.callsOf("framebufferRenderbuffer")[0].args[1]).toBe(
+      GL.DEPTH_ATTACHMENT,
+    );
   });
 });
