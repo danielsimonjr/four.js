@@ -8,6 +8,27 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — WP-R1.5: WebGPU lit and standard pipelines, lights
+
+#### Added
+
+- **render-webgpu: WP-R1.5 — lit and standard pipelines, lights (§68, §59,
+  §60a).** The WebGPU backend shades: `wgpu-lit.ts` and `wgpu-standard.ts`
+  hand-port the GL backend's Lambert and Cook-Torrance (GGX/Smith/Schlick) stages
+  to WGSL — same operation order, 1/π folded out of both lobes per R-13, same
+  guards; shadows arrive with WP-R1.7, and until then the stages match GL with
+  `useShadow` at its initial `false`, exactly. `wgpu-lights.ts` replaces GL's five
+  per-program uniform uploads with **one uniform buffer**: a 592-byte all-`vec4`
+  block per rendered view (768-byte stride), bound at group 1 with a dynamic
+  offset, packed from the same `collectSceneLights` record both backends consume —
+  same eight-light limit, same first-in-scene-order selection. `useMap` and the
+  normal stream are lazy pipeline _variants_ (eight WGSL modules across the two
+  families, each compiled only when drawn, each with its own browser
+  compile-and-rasterise line); §59's extra uniforms ride a third group-0 layout
+  over the same strided buffer (the sprite precedent). Normals upload per shaded
+  acquisition, so a scene with no lit materials — normal-carrying geometry
+  included — records the byte-identical transcript it always did.
+
 ### 2026-08-28 — WP-R1.4: WebGPU shapes and vertex colours
 
 #### Added

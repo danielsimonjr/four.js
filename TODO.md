@@ -85,12 +85,22 @@ changes in `CHANGELOG.md`.
 - [x] **R-1 / WP-R1.4 — WebGPU shapes and vertex colours** — landed 2026-08-28,
       tests-only as predicted (skinned-kind absence pinned; vc browser spec added,
       self-skipping — runs with the wave's browser gate at the RFC 0001 landing).
-- [ ] **R-1 / WP-R1.5 — lit and standard pipelines, lights** (`wgpu-lit.ts`,
-      `wgpu-standard.ts`, `wgpu-lights.ts`; punctual lights as one uniform buffer —
-      mind WGSL vec3 16-byte alignment; 1/π folded out per R-13; depth remap already
-      lands with the existing vertex stage).
-- [ ] **R-1 / WP-R1.6 → WP-R1.8** — render targets and effects (`readPixels` via
-      `copyTextureToBuffer` + `mapAsync`), shadows and stencil parity, compute and
+- [x] **R-1 / WP-R1.5 — lit and standard pipelines, lights** — landed 2026-08-28.
+      One per-view light uniform block at group 1 (all-vec4, 592 B, count as f32),
+      shaded `map` at group 2, §59's block as a third group-0 layout, normals per
+      shaded acquisition (litless byte-identity incl. normal-carrying geometry),
+      eight lazy WGSL variants each with its own browser compile line
+      (`tests/browser/webgpu/webgpu-lit.spec.ts`, written, awaiting the wave's
+      browser run). Shadows on the shaded families ride WP-R1.7.
+- [ ] **R-1 / WP-R1.6 — render targets, effects, graph participation**
+      (`wgpu-render-target.ts`, `wgpu-effect.ts`, `wgpu-readback.ts`;
+      `depthTexture` → `depth32float`/`depth24plus`; `renderEffect` per
+      (kind × format) pipeline cache; `readPixels` via `copyTextureToBuffer` +
+      `mapAsync`, whole-target form if `Rectangle2` has not landed; the R-4
+      feedback refusal restated). Note: the three tight-budget overruns at
+      WP-R1.5's gate run (+576/+372/+61 B) carry the RFC 0001 sibling's staged
+      edits and are that packet's to account.
+- [ ] **R-1 / WP-R1.7 → WP-R1.8** — shadows and stencil parity, compute and
       GPU particles (unblocks R-31). Strictly serial; all share
       `packages/render-webgpu/src/`. Plan: `docs/plans/R1-WEBGPU_PLAN.md`.
 - [ ] **§62's "applications may declare required and optional capabilities"** — still

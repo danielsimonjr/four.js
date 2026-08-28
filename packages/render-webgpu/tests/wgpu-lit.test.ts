@@ -1,0 +1,508 @@
+/**
+ * WP-R1.5's units, tested directly: the light uniform block and its packer,
+ * the lit and standard WGSL builders, the shared shaded vertex plumbing, and
+ * the pipeline cache's two shaded families.
+ *
+ * The renderer-level halves — the draw arms, the per-view blocks, the
+ * lazy-allocation byte-identity — live in `webgpu-renderer.test.ts`; what is
+ * here is everything a failure should localise to a module smaller than the
+ * frame (`wgpu-caches.test.ts`'s argument).
+ */
+
+import { MAX_PUNCTUAL_LIGHTS, createSceneLights } from "@four/render";
+import { describe, expect, it } from "vitest";
+
+import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";
+import {
+  COLOR_BUFFER_LAYOUT,
+  LIGHTS_BIND_GROUP_INDEX,
+  LIGHT_AMBIENT_OFFSET,
+  LIGHT_CAMERA_OFFSET,
+  LIGHT_COLOR_OFFSET,
+  LIGHT_COUNTS_OFFSET,
+  LIGHT_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_COLOR_OFFSET,
+  LIGHT_PUNCTUAL_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_PARAMS_OFFSET,
+  LIGHT_PUNCTUAL_POSITION_OFFSET,
+  LIGHT_UNIFORM_BYTES,
+  LIGHT_UNIFORM_FLOATS,
+  LIGHT_UNIFORM_STRIDE_BYTES,
+  LIGHT_UNIFORM_STRIDE_FLOATS,
+  LIGHT_UNIFORM_WGSL,
+  NORMAL_BUFFER_LAYOUT,
+  NORMAL_MATRIX_WGSL,
+  NORMAL_SHADER_LOCATION,
+  POSITION_BUFFER_LAYOUT,
+  PUNCTUAL_LIGHT_WGSL,
+  SHADED_MAP_BINDING_WGSL,
+  SHADED_MAP_BIND_GROUP_INDEX,
+  STANDARD_UNIFORM_BYTES,
+  STANDARD_UNIFORM_WGSL,
+  UV_BUFFER_LAYOUT,
+  WgpuGeometryCache,
+  WgpuPipelineCache,
+  createDrawBindGroupLayout,
+  createLightsBindGroupLayout,
+  createStandardBindGroupLayout,
+  createTextureBindGroupLayout,
+  litShaderSource,
+  pipelineKey,
+  shadedVertexBufferLayouts,
+  standardShaderSource,
+  writeLightUniforms,
+  type CacheableGeometry,
+  type GpuDevice,
+  type WgpuPipelineDescriptor,
+} from "../src/index.js";
+
+/** A device to build over; `device` is non-null for the default options. */
+function device(): {
+  device: GpuDevice;
+  gpu: ReturnType<typeof createRecordingGpu>;
+} {
+  const gpu = createRecordingGpu();
+  return { device: gpu.device as GpuDevice, gpu };
+}
+
+/** The lit family's flat, normal-shaded descriptor. */
+const LIT: WgpuPipelineDescriptor = {
+  kind: "lit",
+  vertexColors: false,
+  map: false,
+  blend: "none",
+  depthTest: true,
+  depthWrite: true,
+  colorWrite: true,
+  topology: "triangle-list",
+  colorFormat: "bgra8unorm",
+  depthFormat: "depth24plus",
+  normals: true,
+};
+
+/** A cache wired the way the renderer wires it — every provider present. */
+function fullCache(gpuDevice: GpuDevice): WgpuPipelineCache {
+  const texture = createTextureBindGroupLayout(gpuDevice);
+  const lights = createLightsBindGroupLayout(gpuDevice);
+  const standard = createStandardBindGroupLayout(gpuDevice);
+  return new WgpuPipelineCache(
+    gpuDevice,
+    createDrawBindGroupLayout(gpuDevice),
+    () => texture,
+    undefined,
+    () => lights,
+    () => standard,
+  );
+}
+
+describe("the light uniform layout (wgpu-lights.ts)", () => {
+  it("states a fully-vec4 layout whose numbers add up", () => {
+    // Every slot is 16 bytes and every offset is the previous plus its size —
+    // the "all-vec4, no implied padding" claim, checked as arithmetic.
+    expect(LIGHT_DIRECTION_OFFSET - LIGHT_AMBIENT_OFFSET).toBe(16);
+    expect(LIGHT_COLOR_OFFSET - LIGHT_DIRECTION_OFFSET).toBe(16);
+    expect(LIGHT_CAMERA_OFFSET - LIGHT_COLOR_OFFSET).toBe(16);
+    expect(LIGHT_COUNTS_OFFSET - LIGHT_CAMERA_OFFSET).toBe(16);
+    expect(LIGHT_PUNCTUAL_POSITION_OFFSET - LIGHT_COUNTS_OFFSET).toBe(16);
+    const arrayBytes = MAX_PUNCTUAL_LIGHTS * 16;
+    expect(LIGHT_PUNCTUAL_COLOR_OFFSET - LIGHT_PUNCTUAL_POSITION_OFFSET).toBe(
+      arrayBytes,
+    );
+    expect(LIGHT_PUNCTUAL_DIRECTION_OFFSET - LIGHT_PUNCTUAL_COLOR_OFFSET).toBe(
+      arrayBytes,
+    );
+    expect(LIGHT_PUNCTUAL_PARAMS_OFFSET - LIGHT_PUNCTUAL_DIRECTION_OFFSET).toBe(
+      arrayBytes,
+    );
+    expect(LIGHT_UNIFORM_BYTES).toBe(LIGHT_PUNCTUAL_PARAMS_OFFSET + arrayBytes);
+    expect(LIGHT_UNIFORM_FLOATS).toBe(LIGHT_UNIFORM_BYTES / 4);
+    // The stride is the block rounded up to the 256-byte dynamic-offset
+    // alignment, and it really is a round-up, not a guess.
+    expect(LIGHT_UNIFORM_STRIDE_BYTES % 256).toBe(0);
+    expect(LIGHT_UNIFORM_STRIDE_BYTES - LIGHT_UNIFORM_BYTES).toBeLessThan(256);
+    expect(LIGHT_UNIFORM_STRIDE_FLOATS).toBe(LIGHT_UNIFORM_STRIDE_BYTES / 4);
+  });
+
+  it("declares the group-1 layout the WGSL reads", () => {
+    const { device: gpuDevice, gpu } = device();
+    createLightsBindGroupLayout(gpuDevice);
+    expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
+      label: "four:lights",
+      entries: [
+        {
+          binding: 0,
+          visibility: 0x2,
+          buffer: {
+            type: "uniform",
+            hasDynamicOffset: true,
+            minBindingSize: LIGHT_UNIFORM_BYTES,
+          },
+        },
+      ],
+    });
+    expect(LIGHT_UNIFORM_WGSL).toContain(
+      `@group(${String(LIGHTS_BIND_GROUP_INDEX)}) @binding(0)`,
+    );
+    expect(LIGHT_UNIFORM_WGSL).toContain(
+      `array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>`,
+    );
+  });
+
+  it("packs a SceneLights record, camera included, at the given base", () => {
+    const lights = createSceneLights();
+    lights.ambientColor[0] = 0.1;
+    lights.ambientColor[1] = 0.2;
+    lights.ambientColor[2] = 0.3;
+    lights.hasDirectionalLight = true;
+    lights.direction.set(0, -1, 0);
+    lights.directionalColor[0] = 2;
+    lights.directionalColor[1] = 3;
+    lights.directionalColor[2] = 4;
+    lights.punctualCount = 2;
+    lights.punctualPositions.set([1, 2, 3, 4, 5, 6]);
+    lights.punctualColors.set([7, 8, 9, 10, 11, 12]);
+    lights.punctualDirections.set([0, 0, 0, 0, 0, -1]);
+    lights.punctualParams.set([5, 0, 0, 0, 10, 0.5, 4, 1]);
+
+    // A dirty, strided staging array: every float of the block must be
+    // rewritten, so no sentinel survives inside it.
+    const base = LIGHT_UNIFORM_STRIDE_FLOATS;
+    const staging = new Float32Array(base * 2).fill(-123);
+    writeLightUniforms(staging, base, lights, 7, 8, 9);
+
+    const at = (byteOffset: number): number[] =>
+      Array.from(
+        staging.slice(base + byteOffset / 4, base + byteOffset / 4 + 4),
+      );
+    expect(at(LIGHT_AMBIENT_OFFSET)).toEqual([
+      Math.fround(0.1),
+      Math.fround(0.2),
+      Math.fround(0.3),
+      0,
+    ]);
+    expect(at(LIGHT_DIRECTION_OFFSET)).toEqual([0, -1, 0, 0]);
+    expect(at(LIGHT_COLOR_OFFSET)).toEqual([2, 3, 4, 0]);
+    expect(at(LIGHT_CAMERA_OFFSET)).toEqual([7, 8, 9, 0]);
+    expect(at(LIGHT_COUNTS_OFFSET)).toEqual([2, 0, 0, 0]);
+    // The packed 3-float arrays are re-strided into vec4 slots, w written 0.
+    expect(at(LIGHT_PUNCTUAL_POSITION_OFFSET)).toEqual([1, 2, 3, 0]);
+    expect(at(LIGHT_PUNCTUAL_POSITION_OFFSET + 16)).toEqual([4, 5, 6, 0]);
+    expect(at(LIGHT_PUNCTUAL_COLOR_OFFSET)).toEqual([7, 8, 9, 0]);
+    expect(at(LIGHT_PUNCTUAL_COLOR_OFFSET + 16)).toEqual([10, 11, 12, 0]);
+    expect(at(LIGHT_PUNCTUAL_DIRECTION_OFFSET + 16)).toEqual([0, 0, -1, 0]);
+    // Params are vec4 on both sides and copy straight through.
+    expect(at(LIGHT_PUNCTUAL_PARAMS_OFFSET)).toEqual([5, 0, 0, 0]);
+    expect(at(LIGHT_PUNCTUAL_PARAMS_OFFSET + 16)).toEqual([10, 0.5, 4, 1]);
+    // The dead tail is written too — a transcript must not depend on history.
+    expect(at(LIGHT_PUNCTUAL_PARAMS_OFFSET + 32)).toEqual([0, 0, 0, 0]);
+    const blockFloats = LIGHT_UNIFORM_FLOATS;
+    for (let index = 0; index < blockFloats; index += 1) {
+      expect(staging[base + index]).not.toBe(-123);
+    }
+    // Nothing outside the block moved.
+    expect(staging[0]).toBe(-123);
+    expect(staging[base + blockFloats]).toBe(-123);
+  });
+});
+
+describe("the shaded WGSL builders", () => {
+  it("generates the four lit variants as pure functions of the flags", () => {
+    const flat = litShaderSource(true, false);
+    expect(litShaderSource(true, false)).toBe(flat);
+    expect(flat).toContain(LIGHT_UNIFORM_WGSL);
+    expect(flat).toContain(PUNCTUAL_LIGHT_WGSL);
+    expect(flat).toContain(NORMAL_MATRIX_WGSL);
+    expect(flat).toContain("(clip.z + clip.w) * 0.5");
+    expect(flat).not.toContain("textureSample");
+    expect(flat).toContain(
+      `@location(${String(NORMAL_SHADER_LOCATION)}) normal`,
+    );
+
+    const normalless = litShaderSource(false, false);
+    expect(normalless).not.toContain("normalMatrix");
+    // GL's default-attribute normal, written where GL reads it.
+    expect(normalless).toContain("vec3<f32>(0.0, 0.0, 0.0)");
+
+    const mapped = litShaderSource(true, true);
+    expect(mapped).toContain(SHADED_MAP_BINDING_WGSL);
+    expect(mapped).toContain("textureSample(mapTexture, mapSampler, input.uv)");
+    expect(litShaderSource(false, true)).toContain("textureSample");
+  });
+
+  it("generates the four standard variants over the widened block", () => {
+    const flat = standardShaderSource(true, false);
+    expect(flat).toContain(STANDARD_UNIFORM_WGSL);
+    expect(flat).toContain(LIGHT_UNIFORM_WGSL);
+    expect(flat).toContain(PUNCTUAL_LIGHT_WGSL);
+    expect(flat).toContain("directLobe");
+    // R-13's conventions, spelled where the GL module spells them.
+    expect(flat).toContain("DIELECTRIC_F0 : f32 = 0.04");
+    expect(flat).toContain("MIN_ROUGHNESS : f32 = 0.045");
+    expect(flat).toContain("lights.cameraPosition.xyz");
+    expect(flat).not.toContain("textureSample");
+
+    expect(standardShaderSource(false, false)).not.toContain("normalMatrix");
+    expect(standardShaderSource(true, true)).toContain(
+      "textureSample(mapTexture, mapSampler, input.uv)",
+    );
+    expect(standardShaderSource(false, true)).toContain(
+      SHADED_MAP_BINDING_WGSL,
+    );
+  });
+
+  it("binds the shaded map at group 2, leaving the unlit group 1 alone", () => {
+    expect(SHADED_MAP_BINDING_WGSL).toContain(
+      `@group(${String(SHADED_MAP_BIND_GROUP_INDEX)})`,
+    );
+    expect(SHADED_MAP_BIND_GROUP_INDEX).toBe(2);
+    expect(LIGHTS_BIND_GROUP_INDEX).toBe(1);
+  });
+
+  it("lists the shaded vertex buffers in slot order", () => {
+    expect(shadedVertexBufferLayouts(false, false)).toEqual([
+      POSITION_BUFFER_LAYOUT,
+    ]);
+    expect(shadedVertexBufferLayouts(true, false)).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      NORMAL_BUFFER_LAYOUT,
+    ]);
+    expect(shadedVertexBufferLayouts(false, true)).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      UV_BUFFER_LAYOUT,
+    ]);
+    expect(shadedVertexBufferLayouts(true, true)).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      NORMAL_BUFFER_LAYOUT,
+      UV_BUFFER_LAYOUT,
+    ]);
+    // The normal stream's location is a name, never a reused number.
+    expect(NORMAL_BUFFER_LAYOUT.attributes[0]?.shaderLocation).toBe(3);
+    expect(NORMAL_BUFFER_LAYOUT.attributes[0]?.shaderLocation).not.toBe(
+      COLOR_BUFFER_LAYOUT.attributes[0]?.shaderLocation,
+    );
+  });
+});
+
+describe("pipelineKey — the shaded families", () => {
+  it("appends the normals segment only when the field is carried", () => {
+    expect(pipelineKey(LIT)).toBe(
+      "lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+    expect(pipelineKey({ ...LIT, normals: false })).toMatch(/\|n:-$/u);
+    // A descriptor that does not carry the field — every pre-WP-R1.5 one —
+    // keys exactly as it always did.
+    const { normals, ...unshaded } = LIT;
+    expect(normals).toBe(true);
+    expect(pipelineKey({ ...unshaded, kind: "unlit" })).toBe(
+      "unlit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
+    );
+    expect(pipelineKey({ ...LIT, kind: "standard" })).toContain("standard|");
+  });
+});
+
+describe("WgpuPipelineCache — the shaded families", () => {
+  it("creates the standard group-0 layout the WGSL reads", () => {
+    const { device: gpuDevice, gpu } = device();
+    createStandardBindGroupLayout(gpuDevice);
+    expect(gpu.callsOf("device.createBindGroupLayout")[0]?.args[0]).toEqual({
+      label: "four:standard-uniforms",
+      entries: [
+        {
+          binding: 0,
+          visibility: 0x3,
+          buffer: {
+            type: "uniform",
+            hasDynamicOffset: true,
+            minBindingSize: STANDARD_UNIFORM_BYTES,
+          },
+        },
+      ],
+    });
+  });
+
+  it("compiles one module per shaded variant, shared across pipelines", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = fullCache(gpuDevice);
+    gpu.reset();
+
+    cache.acquire(LIT);
+    cache.acquire({ ...LIT, blend: "normal" });
+    expect(cache.moduleCount).toBe(1);
+    cache.acquire({ ...LIT, normals: false });
+    cache.acquire({ ...LIT, map: true });
+    cache.acquire({ ...LIT, kind: "standard" });
+    expect(cache.moduleCount).toBe(4);
+    expect(
+      gpu
+        .callsOf("device.createShaderModule")
+        .map((call) => (call.args[0] as { label?: string }).label),
+    ).toEqual(["four:lit|n", "four:lit", "four:lit|n|map", "four:standard|n"]);
+  });
+
+  it("composes each family's pipeline layout once and caches it", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = fullCache(gpuDevice);
+    gpu.reset();
+
+    cache.acquire(LIT);
+    cache.acquire({ ...LIT, normals: false });
+    cache.acquire({ ...LIT, map: true });
+    cache.acquire({ ...LIT, map: true, blend: "normal" });
+    cache.acquire({ ...LIT, kind: "standard" });
+    cache.acquire({ ...LIT, kind: "standard", map: true });
+    expect(
+      gpu
+        .callsOf("device.createPipelineLayout")
+        .map((call) => (call.args[0] as { label?: string }).label),
+    ).toEqual([
+      "four:pipeline-layout:lit",
+      "four:pipeline-layout:lit:map",
+      "four:pipeline-layout:standard",
+      "four:pipeline-layout:standard:map",
+    ]);
+  });
+
+  it("bakes the shaded vertex layouts into the pipeline", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = fullCache(gpuDevice);
+    gpu.reset();
+    cache.acquire({ ...LIT, map: true });
+    cache.acquire({ ...LIT, normals: false });
+    const buffers = gpu
+      .callsOf("device.createRenderPipeline")
+      .map(
+        (call) =>
+          (call.args[0] as { vertex: { buffers: unknown[] } }).vertex.buffers,
+      );
+    expect(buffers[0]).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      NORMAL_BUFFER_LAYOUT,
+      UV_BUFFER_LAYOUT,
+    ]);
+    expect(buffers[1]).toEqual([POSITION_BUFFER_LAYOUT]);
+  });
+
+  it("answers null for a shaded descriptor with no lights provider", () => {
+    const { device: gpuDevice } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+    );
+    expect(cache.acquire(LIT)).toBeNull();
+    expect(cache.size).toBe(0);
+  });
+
+  it("answers null for a standard descriptor with no standard provider", () => {
+    const { device: gpuDevice } = device();
+    const lights = createLightsBindGroupLayout(gpuDevice);
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      undefined,
+      undefined,
+      () => lights,
+    );
+    expect(cache.acquire({ ...LIT, kind: "standard" })).toBeNull();
+    // The lit family only needs the shared draw layout plus the lights.
+    expect(cache.acquire(LIT)).not.toBeNull();
+  });
+
+  it("answers null for a sampling shaded descriptor with no texture provider", () => {
+    const { device: gpuDevice } = device();
+    const lights = createLightsBindGroupLayout(gpuDevice);
+    const standard = createStandardBindGroupLayout(gpuDevice);
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      undefined,
+      undefined,
+      () => lights,
+      () => standard,
+    );
+    expect(cache.acquire({ ...LIT, map: true })).toBeNull();
+    expect(cache.acquire({ ...LIT, kind: "standard", map: true })).toBeNull();
+    expect(cache.acquire({ ...LIT, kind: "standard" })).not.toBeNull();
+  });
+});
+
+let nextId = 0;
+
+/** A §53 geometry double carrying normals, the shaded families' input. */
+function normalGeometry(withNormals: boolean): CacheableGeometry {
+  nextId += 1;
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  return {
+    id: `lit-geometry-${String(nextId)}`,
+    version: 0,
+    positions,
+    normals: withNormals
+      ? new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1])
+      : undefined,
+    mode: "triangles",
+    drawCount: 3,
+  } as unknown as CacheableGeometry;
+}
+
+describe("WgpuGeometryCache — the normal stream (WP-R1.5)", () => {
+  it("uploads normals only when the acquiring draw shades", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    const unshaded = cache.acquire(normalGeometry(true));
+    expect(unshaded?.normalBuffer).toBeNull();
+    const labels = (): string[] =>
+      gpu
+        .callsOf("device.createBuffer")
+        .map((call) => String((call.args[0] as { label?: string }).label));
+    expect(labels().some((label) => label.startsWith("four:normals:"))).toBe(
+      false,
+    );
+
+    const shaded = cache.acquire(normalGeometry(true), true);
+    expect(shaded?.normalBuffer).not.toBeNull();
+    // GL's allocation order: positions → normals → (uvs → colours → indices).
+    expect(labels().slice(-2)[0]).toContain("four:positions:");
+    expect(labels().slice(-1)[0]).toContain("four:normals:");
+  });
+
+  it("upgrades a record in place when its first shaded draw arrives", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    const geometry = normalGeometry(true);
+    const record = cache.acquire(geometry);
+    expect(record?.normalBuffer).toBeNull();
+    gpu.reset();
+
+    const upgraded = cache.acquire(geometry, true);
+    expect(upgraded).toBe(record);
+    expect(upgraded?.normalBuffer).not.toBeNull();
+    // One buffer uploads; the other streams are current and untouched.
+    expect(gpu.countOf("device.createBuffer")).toBe(1);
+    expect(gpu.countOf("queue.writeBuffer")).toBe(1);
+
+    // A second shaded acquisition is a plain cache hit.
+    gpu.reset();
+    expect(cache.acquire(geometry, true)).toBe(record);
+    expect(gpu.countOf("device.createBuffer")).toBe(0);
+  });
+
+  it("shades a normal-less geometry without inventing a stream", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    const geometry = normalGeometry(false);
+    expect(cache.acquire(geometry, true)?.normalBuffer).toBeNull();
+    // The hit path answers the same and uploads nothing.
+    gpu.reset();
+    expect(cache.acquire(geometry, true)?.normalBuffer).toBeNull();
+    expect(gpu.countOf("device.createBuffer")).toBe(0);
+  });
+
+  it("destroys the normal buffer with its record", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuGeometryCache(gpuDevice);
+    cache.acquire(normalGeometry(true), true);
+    gpu.reset();
+    cache.dispose();
+    // positions + normals.
+    expect(gpu.countOf("buffer.destroy")).toBe(2);
+  });
+});

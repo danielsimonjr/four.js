@@ -55,7 +55,9 @@ import {
   type GpuVertexBufferLayout,
 } from "./webgpu-device.js";
 import { batchVertexBufferLayout } from "./wgpu-batch.js";
+import { litShaderSource, shadedVertexBufferLayouts } from "./wgpu-lit.js";
 import { SPRITE_SHADER_SOURCE } from "./wgpu-sprite.js";
+import { standardShaderSource } from "./wgpu-standard.js";
 import {
   CLEAR_SHADER_SOURCE,
   FRAGMENT_ENTRY_POINT,
@@ -134,9 +136,12 @@ const STENCIL_OPERATIONS: Readonly<
  * merged draw, which compiles from the **unlit** WGSL modules over the
  * planner's interleaved vertex layout — a key family of its own because the
  * vertex layout is baked into the pipeline here, not a shader family of its
- * own (`wgpu-batch.ts`).
+ * own (`wgpu-batch.ts`); `"lit"` and `"standard"` are WP-R1.5's two shaded
+ * families (`wgpu-lit.ts`, `wgpu-standard.ts`), which read the light block at
+ * group 1 and — the standard family — a widened group-0 uniform block.
  */
-export type WgpuPipelineKind = "unlit" | "clear" | "sprite" | "batch";
+export type WgpuPipelineKind =
+  "unlit" | "clear" | "sprite" | "batch" | "lit" | "standard";
 
 /**
  * §67's stencil state as a pipeline bakes it (WP-R1.3) — §57's record minus
@@ -223,6 +228,20 @@ export interface WgpuPipelineDescriptor {
    * every other kind.
    */
   readonly batch?: WgpuBatchStream | null;
+
+  /**
+   * Whether a shaded variant reads the §53 normal stream (§68, WP-R1.5), or
+   * absent for every unshaded kind.
+   *
+   * **Optional, and carried — `true` or `false` — by exactly the shaded
+   * kinds**: on WebGPU the normal stream is a vertex-layout fact a pipeline
+   * bakes in (`wgpu-lit.ts`'s departure 2), so both values are pipeline
+   * identity and both append a key segment; absence appends nothing, which is
+   * what keeps every pre-WP-R1.5 key — and every `four:<key>` label in landed
+   * transcripts — byte-identical (the `stencil`/`batch` rule, third
+   * application).
+   */
+  readonly normals?: boolean;
 }
 
 /**
@@ -266,6 +285,10 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   const batch = descriptor.batch ?? null;
   if (batch !== null) {
     key += `|b:${batch.uvs ? "uv" : "-"},${batch.colors ? "col" : "-"}`;
+  }
+  const normals = descriptor.normals;
+  if (normals !== undefined) {
+    key += `|n:${normals ? "y" : "-"}`;
   }
   return key;
 }
@@ -316,6 +339,33 @@ export class WgpuPipelineCache {
   /** The sprite pipeline layout, built with the first sprite pipeline. */
   #spritePipelineLayout: GpuPipelineLayout | null = null;
 
+  /**
+   * The light block's group-1 layout (WP-R1.5), reached only when a shaded
+   * pipeline is first created — a provider for `#textureLayout`'s two reasons:
+   * it must be **the same object** the renderer binds its per-view light
+   * blocks against, and an eager layout would put a `createBindGroupLayout`
+   * into every unshaded application's initialization transcript. `undefined`
+   * for a cache built without one: such a cache answers `null` for a shaded
+   * descriptor, which skips the draw.
+   */
+  readonly #lightsLayout: (() => GpuBindGroupLayout) | undefined;
+
+  /**
+   * The standard draw's widened group-0 layout (`wgpu-standard.ts`), reached
+   * only when a standard pipeline is first created — the sprite provider's
+   * reasoning, verbatim.
+   */
+  readonly #standardLayout: (() => GpuBindGroupLayout) | undefined;
+
+  /** The lit families' pipeline layouts, built with each family's first pipeline. */
+  #litPipelineLayout: GpuPipelineLayout | null = null;
+
+  #litMapPipelineLayout: GpuPipelineLayout | null = null;
+
+  #standardPipelineLayout: GpuPipelineLayout | null = null;
+
+  #standardMapPipelineLayout: GpuPipelineLayout | null = null;
+
   /** Pipelines by {@link pipelineKey}. Insertion-ordered, string-keyed (§33). */
   readonly #pipelines = new Map<string, GpuRenderPipeline>();
 
@@ -336,10 +386,14 @@ export class WgpuPipelineCache {
     bindGroupLayout: GpuBindGroupLayout,
     textureLayout?: () => GpuBindGroupLayout,
     spriteLayout?: () => GpuBindGroupLayout,
+    lightsLayout?: () => GpuBindGroupLayout,
+    standardLayout?: () => GpuBindGroupLayout,
   ) {
     this.#device = device;
     this.#textureLayout = textureLayout;
     this.#spriteLayout = spriteLayout;
+    this.#lightsLayout = lightsLayout;
+    this.#standardLayout = standardLayout;
     this.#drawLayout = bindGroupLayout;
     this.#layout = device.createPipelineLayout({
       label: "four:pipeline-layout",
@@ -400,12 +454,18 @@ export class WgpuPipelineCache {
     this.#modules.clear();
     this.#texturedPipelineLayout = null;
     this.#spritePipelineLayout = null;
+    this.#litPipelineLayout = null;
+    this.#litMapPipelineLayout = null;
+    this.#standardPipelineLayout = null;
+    this.#standardMapPipelineLayout = null;
   }
 
   /**
    * The pipeline layout `descriptor` needs: group 0 alone; group 0 and
-   * group 1 for a variant that samples; or the sprite block's own group 0
-   * plus group 1 for the sprite family (`wgpu-sprite.ts`).
+   * group 1 for a variant that samples; the sprite block's own group 0
+   * plus group 1 for the sprite family (`wgpu-sprite.ts`); or, for the two
+   * shaded families, their group 0 plus the light block at group 1 — plus the
+   * texture layout at group 2 when the variant samples (`wgpu-lights.ts`).
    *
    * `null` when a pipeline is asked of a cache that was given no provider for
    * a layout it needs — see {@link WgpuPipelineCache}'s fields.
@@ -423,6 +483,9 @@ export class WgpuPipelineCache {
       });
       return this.#spritePipelineLayout;
     }
+    if (descriptor.kind === "lit" || descriptor.kind === "standard") {
+      return this.#shadedLayoutFor(descriptor);
+    }
     if (!descriptor.map) {
       return this.#layout;
     }
@@ -438,22 +501,92 @@ export class WgpuPipelineCache {
   }
 
   /**
+   * The shaded families' pipeline layouts (WP-R1.5): the family's group 0 —
+   * the shared `DrawUniforms` layout for `"lit"`, the widened standard layout
+   * for `"standard"` — then the light block at group 1, then, for a sampling
+   * variant, the texture layout at group 2. Four cached compositions, each
+   * built with its family's first pipeline; `null` for a missing provider,
+   * which skips the draw ({@link WgpuPipelineCache}'s fields).
+   */
+  #shadedLayoutFor(
+    descriptor: WgpuPipelineDescriptor,
+  ): GpuPipelineLayout | null {
+    const lights = this.#lightsLayout;
+    if (lights === undefined) {
+      return null;
+    }
+    const standard = descriptor.kind === "standard";
+    const drawProvider = standard ? this.#standardLayout : undefined;
+    if (standard && drawProvider === undefined) {
+      return null;
+    }
+    const texture = this.#textureLayout;
+    if (descriptor.map && texture === undefined) {
+      return null;
+    }
+    const drawLayout =
+      drawProvider === undefined ? this.#drawLayout : drawProvider();
+    const family = standard ? "standard" : "lit";
+    if (descriptor.map && texture !== undefined) {
+      const existing = standard
+        ? this.#standardMapPipelineLayout
+        : this.#litMapPipelineLayout;
+      if (existing !== null) {
+        return existing;
+      }
+      const created = this.#device.createPipelineLayout({
+        label: `four:pipeline-layout:${family}:map`,
+        bindGroupLayouts: [drawLayout, lights(), texture()],
+      });
+      if (standard) {
+        this.#standardMapPipelineLayout = created;
+      } else {
+        this.#litMapPipelineLayout = created;
+      }
+      return created;
+    }
+    const existing = standard
+      ? this.#standardPipelineLayout
+      : this.#litPipelineLayout;
+    if (existing !== null) {
+      return existing;
+    }
+    const created = this.#device.createPipelineLayout({
+      label: `four:pipeline-layout:${family}`,
+      bindGroupLayouts: [drawLayout, lights()],
+    });
+    if (standard) {
+      this.#standardPipelineLayout = created;
+    } else {
+      this.#litPipelineLayout = created;
+    }
+    return created;
+  }
+
+  /**
    * The WGSL module `kind` compiles from. `"batch"` deliberately maps onto the
    * **unlit** module keys: a batch draws through the unlit shader family
    * (`wgpu-batch.ts`), so a frame mixing batched and unbatched unlit draws of
-   * one variant compiles that variant's module exactly once.
+   * one variant compiles that variant's module exactly once. The two shaded
+   * families key on their own variant pair (`normals` × `map`, WP-R1.5) —
+   * `"lit"`, `"lit|n"`, `"lit|map"`, `"lit|n|map"` and the `standard`
+   * counterparts — so a frame mixing normal-carrying and normal-less lit
+   * geometry compiles two modules, not one per pipeline.
    */
   #module(
     kind: WgpuPipelineKind,
     vertexColors: boolean,
     map: boolean,
+    normals: boolean,
   ): GpuShaderModule {
     const key =
       kind === "clear"
         ? "clear"
         : kind === "sprite"
           ? "sprite"
-          : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
+          : kind === "lit" || kind === "standard"
+            ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}`
+            : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
     const existing = this.#modules.get(key);
     if (existing !== undefined) {
       return existing;
@@ -465,7 +598,11 @@ export class WgpuPipelineCache {
           ? CLEAR_SHADER_SOURCE
           : kind === "sprite"
             ? SPRITE_SHADER_SOURCE
-            : unlitShaderSource(vertexColors, map),
+            : kind === "lit"
+              ? litShaderSource(normals, map)
+              : kind === "standard"
+                ? standardShaderSource(normals, map)
+                : unlitShaderSource(vertexColors, map),
     });
     this.#modules.set(key, module);
     return module;
@@ -474,9 +611,10 @@ export class WgpuPipelineCache {
   /**
    * The vertex-buffer layouts `descriptor`'s pipeline reads: none for the
    * clear (its triangle is generated from the vertex index), position alone
-   * for a sprite (uv is derived from the quad uniform), the planner's one
-   * interleaved buffer for a batch, and the positional stream list for the
-   * unlit family.
+   * for a sprite (uv is derived from the quad uniform), the shaded stream
+   * list — position, then normals, then uvs — for the lit and standard
+   * families (WP-R1.5), the planner's one interleaved buffer for a batch, and
+   * the positional stream list for the unlit family.
    */
   #vertexBuffers(
     descriptor: WgpuPipelineDescriptor,
@@ -486,6 +624,12 @@ export class WgpuPipelineCache {
     }
     if (descriptor.kind === "sprite") {
       return [POSITION_BUFFER_LAYOUT];
+    }
+    if (descriptor.kind === "lit" || descriptor.kind === "standard") {
+      return shadedVertexBufferLayouts(
+        descriptor.normals === true,
+        descriptor.map,
+      );
     }
     const batch = descriptor.batch ?? null;
     if (batch !== null) {
@@ -510,6 +654,7 @@ export class WgpuPipelineCache {
       descriptor.kind,
       descriptor.vertexColors,
       descriptor.map,
+      descriptor.normals === true,
     );
     const blend =
       descriptor.blend === "none" ? undefined : BLEND_STATES[descriptor.blend];

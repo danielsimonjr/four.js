@@ -27,7 +27,7 @@
  */
 
 import { isFourError, type FourError } from "@four/core";
-import { Matrix4 } from "@four/math";
+import { Matrix4, type Vector3 } from "@four/math";
 import {
   Renderable,
   createRenderStatistics,
@@ -35,7 +35,7 @@ import {
   type Renderer,
   type UnlitRenderItem,
 } from "@four/render";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createRecordingGpu,
@@ -45,8 +45,21 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  LIGHT_AMBIENT_OFFSET,
+  LIGHT_CAMERA_OFFSET,
+  LIGHT_COLOR_OFFSET,
+  LIGHT_COUNTS_OFFSET,
+  LIGHT_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_COLOR_OFFSET,
+  LIGHT_PUNCTUAL_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_PARAMS_OFFSET,
+  LIGHT_PUNCTUAL_POSITION_OFFSET,
+  LIGHT_UNIFORM_STRIDE_BYTES,
+  LIGHT_UNIFORM_STRIDE_FLOATS,
   SPRITE_QUAD_OFFSET,
   SPRITE_TINT_OFFSET,
+  STANDARD_EMISSIVE_OFFSET,
+  STANDARD_SURFACE_OFFSET,
   UNIFORM_STRIDE_BYTES,
   WebgpuRenderer,
   createWgpuBatching,
@@ -69,6 +82,10 @@ class TestGeometry {
   positions: Float32Array;
 
   normals: Float32Array | undefined;
+
+  joints: Uint16Array | undefined;
+
+  weights: Float32Array | undefined;
 
   uvs: Float32Array | undefined;
 
@@ -1021,11 +1038,21 @@ describe("WebgpuRenderer.render", () => {
 
   it("skips an item this tier has no pipeline for", () => {
     const root = createRoot();
-    const item = renderable(triangle());
-    // A lit-material item: `pipelineOf` gives it kind `"lit"`, which WP-R1.5
-    // owns. It must be skipped, never approximated — and skipped before the
-    // geometry cache uploads buffers nothing will bind.
-    (item.material as unknown as { kind: string }).kind = "lit";
+    // A skinned item (RFC 0003): a renderable with a structural skeleton over
+    // a geometry carrying joints and weights builds as `"skinned-unlit"`,
+    // which needs the joint-palette pipeline this backend does not stage. It
+    // must be skipped, never approximated — and skipped before the geometry
+    // cache uploads buffers nothing will bind (WP-R1.4's pinned rule; before
+    // WP-R1.5 this test pinned the `"lit"` kind, which now draws).
+    const geometry = triangle();
+    geometry.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    geometry.weights = new Float32Array(12).fill(0.25);
+    const item = renderable(geometry);
+    (item as unknown as { skeleton: unknown }).skeleton = {
+      update: (): void => {},
+      jointMatrices: new Float32Array(16),
+      bones: [null],
+    };
     root.add(item);
     harness.renderer.render(root, [createView()]);
     expect(harness.gpu.countOf("pass.draw")).toBe(1);
@@ -1965,5 +1992,726 @@ describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
     harness.gpu.reset();
     harness.renderer.dispose();
     expect(harness.gpu.countOf("buffer.destroy")).toBe(0);
+  });
+});
+
+/** §68's ambient carrier: a root that offers `Scene.ambientLight`'s shape. */
+class AmbientRoot extends Renderable {
+  ambientLight: [number, number, number];
+
+  constructor(ambient: [number, number, number] = [0, 0, 0]) {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    this.ambientLight = ambient;
+  }
+}
+
+/** §68's directional light, as the structural contract the collector reads. */
+class DirectionalLightNode extends Renderable {
+  readonly isDirectionalLight = true;
+
+  color: [number, number, number] = [1, 1, 1];
+
+  intensity = 1;
+
+  direction: [number, number, number] = [0, 0, -1];
+
+  constructor() {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+  }
+
+  getWorldDirection(out: Vector3): Vector3 {
+    return out.set(this.direction[0], this.direction[1], this.direction[2]);
+  }
+}
+
+/** §68's point light, structurally. */
+class PointLightNode extends Renderable {
+  readonly isPunctualLight = true;
+
+  readonly lightType: "point" | "spot" = "point";
+
+  color: [number, number, number] = [1, 1, 1];
+
+  intensity = 1;
+
+  range = 0;
+
+  worldPosition: [number, number, number] = [0, 0, 0];
+
+  constructor(position: [number, number, number] = [0, 0, 0]) {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    this.worldPosition = position;
+  }
+
+  getWorldPosition(out: Vector3): Vector3 {
+    return out.set(
+      this.worldPosition[0],
+      this.worldPosition[1],
+      this.worldPosition[2],
+    );
+  }
+}
+
+/** §68's spot light, structurally. */
+class SpotLightNode extends PointLightNode {
+  override readonly lightType: "point" | "spot" = "spot";
+
+  innerConeAngle = Math.PI / 8;
+
+  outerConeAngle = Math.PI / 4;
+
+  axis: [number, number, number] = [0, 0, -1];
+
+  getWorldDirection(out: Vector3): Vector3 {
+    return out.set(this.axis[0], this.axis[1], this.axis[2]);
+  }
+}
+
+/** §57's `LitMaterial`, reduced to the state the shaded arm reads (WP-R1.5). */
+class TestLitMaterial {
+  readonly kind: string = "lit";
+
+  readonly color: [number, number, number, number];
+
+  transparent?: boolean;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  depthTest?: boolean;
+
+  depthWrite?: boolean;
+
+  colorWrite?: boolean;
+
+  opacity?: number;
+
+  map?: TestTexture | null;
+
+  stencil?: TestStencil;
+
+  constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
+    this.color = color;
+  }
+
+  get asMaterial(): ItemMaterial {
+    return this as unknown as ItemMaterial;
+  }
+}
+
+/** §59's `StandardMaterial`, reduced the same way. */
+class TestStandardMaterial {
+  readonly kind: string = "standard";
+
+  readonly baseColor: [number, number, number, number];
+
+  metalness = 0;
+
+  roughness = 1;
+
+  emissive: [number, number, number] = [0, 0, 0];
+
+  transparent?: boolean;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  opacity?: number;
+
+  map?: TestTexture | null;
+
+  constructor(baseColor: [number, number, number, number] = [1, 1, 1, 1]) {
+    this.baseColor = baseColor;
+  }
+
+  get asMaterial(): ItemMaterial {
+    return this as unknown as ItemMaterial;
+  }
+}
+
+/** A triangle carrying the normal stream the shaded variants transform. */
+function litTriangle(): TestGeometry {
+  const geometry = triangle();
+  geometry.normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  return geometry;
+}
+
+/** The frame's lights upload — the last `writeBuffer` of a shaded frame. */
+function lightsUpload(gpu: RecordingGpu): { floats: number[]; size: number } {
+  const uploads = gpu.callsOf("queue.writeBuffer");
+  const last = uploads[uploads.length - 1];
+  if (last === undefined) {
+    throw new Error("the frame uploaded nothing");
+  }
+  return { floats: last.args[2] as number[], size: last.args[4] as number };
+}
+
+/** One vec4 slot of a light block, by block index and byte offset. */
+function lightSlot(
+  floats: number[],
+  block: number,
+  byteOffset: number,
+): number[] {
+  const base = block * LIGHT_UNIFORM_STRIDE_FLOATS + byteOffset / 4;
+  return floats.slice(base, base + 4);
+}
+
+/** The frame's draw-uniform upload on a shaded frame — second to last. */
+function drawUniformUpload(gpu: RecordingGpu): number[] {
+  const uploads = gpu.callsOf("queue.writeBuffer");
+  const call = uploads[uploads.length - 2];
+  if (call === undefined) {
+    throw new Error("the frame uploaded no draw uniforms");
+  }
+  return call.args[2] as number[];
+}
+
+/** The labels of every buffer the tape allocated, in order. */
+function bufferLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createBuffer")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/** The labels of every bind-group layout the tape declared, in order. */
+function layoutLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createBindGroupLayout")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/** The labels of every WGSL module the tape compiled, in order. */
+function moduleLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createShaderModule")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/** Every `setBindGroup` at `index`, as its dynamic-offset arrays. */
+function bindGroupOffsets(gpu: RecordingGpu, index: number): unknown[] {
+  return gpu
+    .callsOf("pass.setBindGroup")
+    .filter((call) => call.args[0] === index)
+    .map((call) => call.args[2]);
+}
+
+describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("records the byte-identical frame for an unshaded scene, normals or not", async () => {
+    // The packet's byte-identity claim, made mechanically: the same unlit
+    // scene over the same-id geometry — one copy carrying a normal stream,
+    // one not — records the identical transcript, because nothing unshaded
+    // ever touches normals, lights, or the standard block.
+    const render = async (withNormals: boolean): Promise<string[]> => {
+      const rig = await initialized();
+      const geometry = withNormals ? litTriangle() : triangle();
+      (geometry as unknown as { id: string }).id = "shared-identity";
+      const root = createRoot();
+      root.add(renderable(geometry));
+      rig.renderer.render(root, [createView()]);
+      return rig.gpu.transcript();
+    };
+    expect(await render(true)).toEqual(await render(false));
+  });
+
+  it("draws a lit item through the lit pipeline with the light block at group 1", () => {
+    const root = new AmbientRoot([0.1, 0.2, 0.3]);
+    const sun = new DirectionalLightNode();
+    sun.color = [1, 0.5, 0.25];
+    sun.intensity = 2;
+    sun.direction = [0, -1, 0];
+    root.add(sun);
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+    expect(moduleLabels(harness.gpu)).toContain("four:lit|n");
+    // The lazy lights subsystem: one layout, one buffer, one bind group.
+    expect(
+      layoutLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+    // The normal stream uploaded for the shaded draw, in GL's order.
+    expect(
+      bufferLabels(harness.gpu).some((label) =>
+        label.startsWith("four:normals:"),
+      ),
+    ).toBe(true);
+    // The draw binds the view's block at group 1, offset 0.
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0]]);
+
+    // The block's contents: ambient, direction, premultiplied colour, count.
+    const { floats, size } = lightsUpload(harness.gpu);
+    expect(size).toBe(LIGHT_UNIFORM_STRIDE_FLOATS);
+    expect(lightSlot(floats, 0, LIGHT_AMBIENT_OFFSET)).toEqual([
+      Math.fround(0.1),
+      Math.fround(0.2),
+      Math.fround(0.3),
+      0,
+    ]);
+    expect(lightSlot(floats, 0, LIGHT_DIRECTION_OFFSET)).toEqual([0, -1, 0, 0]);
+    expect(lightSlot(floats, 0, LIGHT_COLOR_OFFSET)).toEqual([2, 1, 0.5, 0]);
+    expect(lightSlot(floats, 0, LIGHT_COUNTS_OFFSET)).toEqual([0, 0, 0, 0]);
+  });
+
+  it("shades a normal-less geometry through the normal-less variant", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(triangle().asGeometry, new TestLitMaterial().asMaterial),
+    );
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("four:lit");
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.endsWith("|n:-")),
+    ).toBe(true);
+    expect(
+      bufferLabels(harness.gpu).some((label) =>
+        label.startsWith("four:normals:"),
+      ),
+    ).toBe(false);
+    // One vertex buffer bound: position alone, slot 0.
+    expect(harness.gpu.countOf("pass.setVertexBuffer")).toBe(1);
+  });
+
+  it("samples §57's map at group 2 over the uv stream", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestLitMaterial();
+    material.map = new TestTexture();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("four:lit|n|map");
+    // position, normal, uv — three slots, one counter.
+    expect(
+      harness.gpu.callsOf("pass.setVertexBuffer").map((call) => call.args[0]),
+    ).toEqual([0, 1, 2]);
+    // The texture rides group 2 on the shaded families; group 1 is lights.
+    expect(bindGroupOffsets(harness.gpu, 2)).toHaveLength(1);
+    expect(mapAllocations(harness.gpu)).toBe(1);
+  });
+
+  it("skips a lit draw whose named texture will not resolve (§83)", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestLitMaterial();
+    material.map = new TestTexture();
+    material.map.dispose();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    // The clear alone drew.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+  });
+
+  it("degrades a mapped lit draw without uvs to the untextured variant", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    material.map = new TestTexture();
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(moduleLabels(harness.gpu)).toContain("four:lit|n");
+    expect(mapAllocations(harness.gpu)).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+  });
+
+  it("carries §57's state and opacity into the lit pipeline and block", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial([0.5, 0.25, 0.125, 0.8]);
+    material.transparent = true;
+    material.blendMode = "additive";
+    material.depthWrite = false;
+    material.opacity = 0.5;
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:lit|-|-|additive|dt|-|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+    const floats = drawUniformUpload(harness.gpu);
+    const colorBase = UNIFORM_STRIDE_BYTES / 4 + DRAW_COLOR_OFFSET / 4;
+    expect(floats.slice(colorBase, colorBase + 4)).toEqual([
+      0.5,
+      0.25,
+      0.125,
+      Math.fround(0.8 * 0.5),
+    ]);
+  });
+
+  it("draws a standard item through the widened block and its own group 0", () => {
+    const root = createRoot();
+    const material = new TestStandardMaterial([0.5, 0.25, 0.125, 1]);
+    material.metalness = 0.75;
+    material.roughness = 0.3;
+    material.emissive = [0.01, 0.02, 0.03];
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    const view = createView();
+    const camera = view.camera as unknown as TestCamera;
+    camera.transform.worldMatrix.elements[12] = 1;
+    camera.transform.worldMatrix.elements[13] = 2;
+    camera.transform.worldMatrix.elements[14] = 3;
+
+    harness.renderer.render(root, [view]);
+
+    expect(moduleLabels(harness.gpu)).toContain("four:standard|n");
+    expect(
+      layoutLabels(harness.gpu).filter(
+        (label) => label === "four:standard-uniforms",
+      ),
+    ).toHaveLength(1);
+    // §59's two extra vec4s, in the block's spare stride bytes.
+    const floats = drawUniformUpload(harness.gpu);
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(floats.slice(base + 32, base + 36)).toEqual([0.5, 0.25, 0.125, 1]);
+    expect(
+      floats.slice(
+        base + STANDARD_EMISSIVE_OFFSET / 4,
+        base + STANDARD_EMISSIVE_OFFSET / 4 + 4,
+      ),
+    ).toEqual([Math.fround(0.01), Math.fround(0.02), Math.fround(0.03), 0]);
+    expect(
+      floats.slice(
+        base + STANDARD_SURFACE_OFFSET / 4,
+        base + STANDARD_SURFACE_OFFSET / 4 + 4,
+      ),
+    ).toEqual([0.75, Math.fround(0.3), 0, 0]);
+    // The eye rides the light block, for the specular lobe.
+    const { floats: lightFloats } = lightsUpload(harness.gpu);
+    expect(lightSlot(lightFloats, 0, LIGHT_CAMERA_OFFSET)).toEqual([
+      1, 2, 3, 0,
+    ]);
+  });
+
+  it("packs the punctual set exactly as the GL backend selects it (§68, §84)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const root = createRoot();
+      for (let index = 0; index < 9; index += 1) {
+        const light = new PointLightNode([index + 1, 0, 0]);
+        light.color = [1, 0, 0];
+        light.intensity = 2;
+        light.range = 20;
+        root.add(light);
+      }
+      const spot = new SpotLightNode([0, 5, 0]);
+      spot.range = 10;
+      root.add(spot);
+      root.add(
+        new Renderable(
+          litTriangle().asGeometry,
+          new TestLitMaterial().asMaterial,
+        ),
+      );
+
+      harness.renderer.render(root, [createView()]);
+
+      const { floats } = lightsUpload(harness.gpu);
+      // Nine points and a spot arrived; the first eight in scene order win —
+      // the spot, tenth, is dropped with the ninth point (the GL rule).
+      expect(lightSlot(floats, 0, LIGHT_COUNTS_OFFSET)).toEqual([8, 0, 0, 0]);
+      expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_POSITION_OFFSET)).toEqual([
+        1, 0, 0, 0,
+      ]);
+      expect(
+        lightSlot(floats, 0, LIGHT_PUNCTUAL_POSITION_OFFSET + 7 * 16),
+      ).toEqual([8, 0, 0, 0]);
+      expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_COLOR_OFFSET)).toEqual([
+        2, 0, 0, 0,
+      ]);
+      expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_PARAMS_OFFSET)).toEqual([
+        20, 0, 0, 0,
+      ]);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("packs a spot light's cone the way `SceneLights` precomputes it", () => {
+    const root = createRoot();
+    const spot = new SpotLightNode([0, 5, 0]);
+    spot.color = [0, 1, 0];
+    spot.intensity = 3;
+    spot.range = 10;
+    spot.axis = [0, -1, 0];
+    root.add(spot);
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+
+    harness.renderer.render(root, [createView()]);
+    const { floats } = lightsUpload(harness.gpu);
+    expect(lightSlot(floats, 0, LIGHT_COUNTS_OFFSET)).toEqual([1, 0, 0, 0]);
+    expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_DIRECTION_OFFSET)).toEqual([
+      0, -1, 0, 0,
+    ]);
+    const params = lightSlot(floats, 0, LIGHT_PUNCTUAL_PARAMS_OFFSET);
+    expect(params[0]).toBe(10);
+    expect(params[1]).toBeCloseTo(Math.cos(Math.PI / 4), 5);
+    expect(params[2]).toBeCloseTo(
+      1 / (Math.cos(Math.PI / 8) - Math.cos(Math.PI / 4)),
+      4,
+    );
+    expect(params[3]).toBe(1);
+  });
+
+  it("writes one light block per rendered view, at strided offsets", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    const first = createView();
+    const second = createView();
+    const camera = second.camera as unknown as TestCamera;
+    camera.transform.worldMatrix.elements[12] = 5;
+    camera.transform.worldMatrix.elements[13] = 6;
+    camera.transform.worldMatrix.elements[14] = 7;
+
+    harness.renderer.render(root, [first, second]);
+
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([
+      [0],
+      [LIGHT_UNIFORM_STRIDE_BYTES],
+    ]);
+    const { floats, size } = lightsUpload(harness.gpu);
+    expect(size).toBe(2 * LIGHT_UNIFORM_STRIDE_FLOATS);
+    expect(lightSlot(floats, 0, LIGHT_CAMERA_OFFSET)).toEqual([0, 0, 0, 0]);
+    expect(lightSlot(floats, 1, LIGHT_CAMERA_OFFSET)).toEqual([5, 6, 7, 0]);
+  });
+
+  it("leaves no gap for a zero-area view's light block", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    harness.renderer.render(root, [createView({ width: 0 }), createView()]);
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0]]);
+    expect(lightsUpload(harness.gpu).size).toBe(LIGHT_UNIFORM_STRIDE_FLOATS);
+  });
+
+  it("reuses the lights buffer across frames and grows it for more views", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    harness.renderer.render(root, [createView()]);
+    harness.renderer.render(root, [createView()]);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+
+    // A fifth view exceeds the four-block floor: the buffer regrows once and
+    // the old allocation is destroyed.
+    const views = [
+      createView(),
+      createView(),
+      createView(),
+      createView(),
+      createView(),
+    ];
+    harness.renderer.render(root, views);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(2);
+    expect(lightsUpload(harness.gpu).size).toBe(
+      5 * LIGHT_UNIFORM_STRIDE_FLOATS,
+    );
+  });
+
+  it("recreates the standard bind group after a uniform regrowth", () => {
+    const standardScene = (count: number): Renderable => {
+      const root = createRoot();
+      for (let index = 0; index < count; index += 1) {
+        root.add(
+          new Renderable(
+            litTriangle().asGeometry,
+            new TestStandardMaterial().asMaterial,
+          ),
+        );
+      }
+      return root;
+    };
+    harness.renderer.render(standardScene(1), [createView()]);
+    // 21 blocks exceed the 16-block floor: the buffer regrows, the standard
+    // bind group pointed at the destroyed buffer, and the next standard draw
+    // recreates it.
+    harness.renderer.render(standardScene(20), [createView()]);
+    const standardGroups = harness.gpu
+      .callsOf("device.createBindGroup")
+      .filter(
+        (call) =>
+          (call.args[0] as { label?: string }).label ===
+          "four:standard-uniforms",
+      );
+    expect(standardGroups).toHaveLength(2);
+  });
+
+  it("survives a reentrant dispose inside a material accessor (§61)", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    let dispose: () => void = () => undefined;
+    Object.defineProperty(material, "map", {
+      get: (): null => {
+        dispose();
+        return null;
+      },
+    });
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The clear drew; the lit draw — and the lights upload — were skipped.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("survives a reentrant dispose inside a stencil accessor on a clipping frame", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    const material = new TestLitMaterial();
+    let dispose: () => void = () => undefined;
+    Object.defineProperty(material, "stencil", {
+      get: (): undefined => {
+        dispose();
+        return undefined;
+      },
+    });
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The lit pipeline was never created: the cache was disposed by the time
+    // the arm asked it.
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.includes("four:lit")),
+    ).toBe(false);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("bakes §67's clip into a shaded pipeline and sets its reference", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    root.add(panel);
+
+    harness.renderer.render(root, [createView()]);
+    const clippedLit = pipelineLabels(harness.gpu).find(
+      (label) => label.includes("four:lit") && label.includes("|s:equal"),
+    );
+    expect(clippedLit).toBeDefined();
+    expect(clippedLit).toContain("|n:y");
+    expect(stencilReferences(harness.gpu).length).toBeGreaterThan(0);
+  });
+
+  it("blends a transparent lit draw with the normal mode by default", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    material.transparent = true;
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    harness.renderer.render(root, [createView()]);
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:lit|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+  });
+
+  it("draws an indexed lit geometry through drawIndexed and counts §84", () => {
+    const root = createRoot();
+    const geometry = new TestGeometry(
+      new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]),
+      new Uint16Array([0, 1, 2]),
+    );
+    geometry.normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    root.add(
+      new Renderable(geometry.asGeometry, new TestLitMaterial().asMaterial),
+    );
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+  });
+
+  it("mixes the two shaded families over one light block and one collect", () => {
+    const root = new AmbientRoot([0.2, 0.2, 0.2]);
+    root.add(new DirectionalLightNode());
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestStandardMaterial().asMaterial,
+      ),
+    );
+
+    harness.renderer.render(root, [createView()]);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0], [0]]);
+    expect(moduleLabels(harness.gpu)).toEqual(
+      expect.arrayContaining(["four:lit|n", "four:standard|n"]),
+    );
   });
 });

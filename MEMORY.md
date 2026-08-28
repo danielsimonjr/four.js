@@ -28,6 +28,58 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — WP-R1.5: WebGPU lit/standard pipelines and the light block.**
+  Decisions worth keeping:
+  - **The light block is all-`vec4`, and that is the alignment answer, not a
+    style.** WGSL's `vec3<f32>` is 16-byte aligned, so any `vec3` member means
+    implicit padding the CPU packer must know about; a layout with no `vec3` slot
+    makes every byte named. The count travels as **f32** (`counts.x`, read back
+    with `i32()`) because the block is packed through one `Float32Array` and a
+    `u32` word would need a second view over the same bytes — exact over 0…8.
+  - **The per-view group arrived at group 1 as promised, which pushed the shaded
+    families' `map` to group 2** — the _same_ texture layout object and bind
+    groups, because a bind group carries no index (the pipeline layout assigns
+    it). Corollary: the map group index is now per-family data
+    (`MAP_BIND_GROUP_INDEX` for unlit/sprite, `SHADED_MAP_BIND_GROUP_INDEX` for
+    lit/standard).
+  - **Light blocks index by _rendered_ view ordinal, not view array index** — a
+    zero-area view writes no block and leaves no gap, so every uploaded byte was
+    written this frame (the `clearSceneLights` transcript-determinism argument,
+    one buffer later). The eye rides the light block (per-view state like the
+    lights); the lit WGSL simply never reads it.
+  - **Normals upload per shaded acquisition, not per geometry** —
+    `acquire(geometry, normals)` with an in-place one-buffer upgrade. Forced by
+    byte-identity: `planeGeometry` carries normals, so the GL cache's
+    upload-whatever-exists rule would have moved every landed sprite/shape
+    transcript. The honest unit of need on a loose-buffer backend is the draw,
+    not the package.
+  - **The hasLit scan excludes `skinned-lit`, deliberately** — a skinned item is
+    transcript-invisible here (WP-R1.4), and a light block allocated for skipped
+    draws would break that byte-identity from the side. Pinned as a transcript
+    A/B.
+  - **WGSL has no `inverse()`** — the inverse-transpose is a hand-written
+    cofactor function (`transpose(inverse(A)) = [a₁×a₂ a₂×a₀ a₀×a₁]/det`), per
+    vertex like GL's, hoistable to a per-draw uniform for both backends at once
+    when `Matrix3` grows the utility. And WGSL has no `out` params — the punctual
+    chunk returns a two-member struct.
+  - **GL's default-attribute zero normal becomes a variant** (a WebGPU pipeline
+    cannot leave a declared vertex buffer unbound): the normal-less variant's
+    vertex stage writes the same zero vector, the shared fragment guard shades it
+    ambient-only — two variants, one arithmetic. The descriptor's `normals?`
+    field appends `|n:y`/`|n:-` only when carried (conditional-suffix rule, third
+    application).
+  - **A reentrant mid-frame dispose is reachable through a material accessor**,
+    not just `camera.updateViewMatrix` — pinned twice (a `map` getter and a
+    `stencil` getter), which is what made the shaded arm's two "unreachable"
+    narrowings coverable: the lights group is read off the field _after_ the
+    material getters run.
+  - **Multi-agent note, fourth confirmation:** one `pnpm run docs` run failed on
+    the RFC 0001 sibling's mid-flight `render-webgl` test edits and passed
+    unchanged on re-run; the three tight-bundle size overruns (+61…576 B) at this
+    packet's gate run carry the sibling's staged `render`/`materials` changes —
+    zero WebGPU symbols reach any bundle (control grep unchanged).
+  - Measured: coverage 99.61/99.24 → **99.70/99.41**; 0 B in every tight bundle.
+
 - **2026-08-28 — WP-R1.4: WebGPU shapes and vertex colours.** Decisions worth keeping:
   - **The packet proved a negative, which was its point**: no unlit-variant plumbing
     was deferred from R1.1 — colour-only-no-uv was already a lazy variant with a

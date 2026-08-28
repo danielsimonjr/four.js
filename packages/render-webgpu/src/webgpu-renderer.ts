@@ -10,19 +10,21 @@
  * renderer.dispose();
  * ```
  *
- * This is WP-R1.1 through WP-R1.3 of the R-1 plan: device and context
+ * This is WP-R1.1 through WP-R1.5 of the R-1 plan: device and context
  * acquisition, the registry opt-in, per-view clears, the **unlit** tier —
  * flat, vertex-coloured and §57-`map`-textured — plus WP-R1.3's **sprite**
  * pipeline (§55; §56's `Text` needs nothing more — a label is one textured
  * unlit draw, R-28), the opt-in §65 **batching** uploader (`wgpu-batch.ts`),
- * and §67's **clip** application (masks write stencil bit planes, clipped
+ * §67's **clip** application (masks write stencil bit planes, clipped
  * draws test them — see `DEPTH_STENCIL_FORMAT` below for the per-frame
- * stencil-format decision). All of it drawn through the real
- * `buildRenderList` → `buildViewRenderList` → draw path; WP-R1.4 added no
- * pipeline — §50 shapes and §58 paints were already ordinary unlit draws, and
- * that packet's deliverable is the transcript-identity tests saying so. The
- * remaining pipelines (lit, standard, particles, shadows, effects, compute —
- * packets R1.5–R1.8 — and RFC 0003's `skinned-unlit`/`skinned-lit`, which
+ * stencil-format decision), and WP-R1.5's two **shaded** tiers — §68's
+ * Lambert `lit` family and §59's metallic-roughness `standard` family, both
+ * under one per-view light uniform block (`wgpu-lights.ts`). All of it drawn
+ * through the real `buildRenderList` → `buildViewRenderList` → draw path;
+ * WP-R1.4 added no pipeline — §50 shapes and §58 paints were already ordinary
+ * unlit draws, and that packet's deliverable is the transcript-identity tests
+ * saying so. The remaining pipelines (particles, shadows, effects, compute —
+ * packets R1.6–R1.8 — and RFC 0003's `skinned-unlit`/`skinned-lit`, which
  * need a joint-palette pipeline this backend does not stage yet) are
  * *absent*, not stubbed: an item this tier cannot draw is
  * skipped, exactly as a draw with no geometry record is, because a pipeline
@@ -86,6 +88,8 @@ import {
   buildInterpolatedRenderList,
   buildRenderList,
   buildViewRenderList,
+  collectSceneLights,
+  createSceneLights,
   type RenderBatch,
   type RenderInterpolation,
   type RenderItem,
@@ -128,10 +132,25 @@ import {
 import type { WgpuRenderBatching } from "./wgpu-batch.js";
 import { WgpuGeometryCache, type WgpuGeometryRecord } from "./wgpu-geometry.js";
 import {
+  LIGHTS_BIND_GROUP_INDEX,
+  LIGHT_UNIFORM_BYTES,
+  LIGHT_UNIFORM_STRIDE_BYTES,
+  LIGHT_UNIFORM_STRIDE_FLOATS,
+  SHADED_MAP_BIND_GROUP_INDEX,
+  createLightsBindGroupLayout,
+  writeLightUniforms,
+} from "./wgpu-lights.js";
+import {
   WgpuPipelineCache,
   type WgpuPipelineDescriptor,
   type WgpuStencilDescriptor,
 } from "./wgpu-pipeline-cache.js";
+import {
+  STANDARD_EMISSIVE_OFFSET,
+  STANDARD_SURFACE_OFFSET,
+  STANDARD_UNIFORM_BYTES,
+  createStandardBindGroupLayout,
+} from "./wgpu-standard.js";
 import {
   SPRITE_QUAD_OFFSET,
   SPRITE_UNIFORM_BYTES,
@@ -214,6 +233,24 @@ type SpriteItem = Extract<RenderItem, { kind: "sprite" }>;
 
 /** §55's material as this backend reads it — texture, tint, §57 state. */
 type SpriteMaterialLike = SpriteItem["material"];
+
+/** A shaded render item (§68 lit or §59 standard, WP-R1.5). */
+type ShadedItem = Extract<RenderItem, { kind: "lit" | "standard" }>;
+
+/** §59's material as this backend reads it — base colour, surface, §57 state. */
+type StandardMaterialLike = Extract<
+  ShadedItem,
+  { kind: "standard" }
+>["material"];
+
+/**
+ * The frame's flattened lighting (§68), pooled across frames exactly as the
+ * GL backend's module-level record is: `collectSceneLights` rewrites every
+ * field in place, and the frame consumes it synchronously. Only refreshed for
+ * frames that contain a lit or standard item, so a scene that never shades
+ * never pays the collection walk.
+ */
+const sceneLights = createSceneLights();
 
 /** §67's per-item clip record, non-null — `webgl-renderer.ts`'s `ItemClip`. */
 type ItemClip = NonNullable<RenderItem["clip"]>;
@@ -511,6 +548,35 @@ export class WebgpuRenderer implements Renderer {
   #spriteBindGroup: GpuBindGroup | null = null;
 
   /**
+   * The standard draws' group-0 layout and bind group over the same strided
+   * buffer, bound at {@link STANDARD_UNIFORM_BYTES} (WP-R1.5) — the sprite
+   * pair's lifecycle verbatim: layout created by the first standard draw,
+   * bind group dropped on regrowth and recreated by the next one.
+   */
+  #standardLayout: GpuBindGroupLayout | null = null;
+
+  #standardBindGroup: GpuBindGroup | null = null;
+
+  /**
+   * §68's per-view light block (WP-R1.5, `wgpu-lights.ts`): the group-1
+   * layout, one buffer holding a 768-byte-strided block per rendered view,
+   * the single bind group the shaded draws offset into, and the CPU staging
+   * the view loop packs. All `null`/empty until the first frame that contains
+   * a lit or standard item — the WP-R1.2 lazy-subsystem precedent — so an
+   * unshaded application records not one of these allocations.
+   */
+  #lightsLayout: GpuBindGroupLayout | null = null;
+
+  #lightsBuffer: GpuBuffer | null = null;
+
+  #lightsBindGroup: GpuBindGroup | null = null;
+
+  #lightsStaging = new Float32Array(0);
+
+  /** Light blocks the buffer and staging can hold. Only grows. */
+  #lightsCapacity = 0;
+
+  /**
    * §65 batching, or `null` (the default) to batch nothing — the opt-in seam
    * R-9 recorded for the GL backend, restated here byte for byte: the field is
    * read once per frame, the whole no-batching cost is one comparison per
@@ -667,6 +733,8 @@ export class WebgpuRenderer implements Renderer {
       bindGroupLayout,
       () => textures.bindGroupLayout,
       () => this.#acquireSpriteLayout(device),
+      () => this.#acquireLightsLayout(device),
+      () => this.#acquireStandardLayout(device),
     );
     this.#geometries = new WgpuGeometryCache(device);
     this.#growUniforms(device, bindGroupLayout, 1);
@@ -755,6 +823,28 @@ export class WebgpuRenderer implements Renderer {
     const frameClips = items.length > 0 && items[0].clip?.maskPass === true;
     const depthFormat = frameClips ? DEPTH_STENCIL_FORMAT : DEPTH_FORMAT;
 
+    // §68 (WP-R1.5): does this frame shade at all? One `kind` comparison per
+    // item, the GL backend's scan — minus the skinned-lit kind it includes
+    // there, deliberately: a skinned item is transcript-invisible on this
+    // backend (WP-R1.4's pinned claim), and collecting lights for draws that
+    // will be skipped would allocate the light block into that byte-identical
+    // tape. Collected once per call, not per view — lights are frame state,
+    // like the render list; the eye is the per-view half, packed per view
+    // below.
+    let hasLitItems = false;
+    for (const item of items) {
+      if (item.kind === "lit" || item.kind === "standard") {
+        hasLitItems = true;
+        break;
+      }
+    }
+    if (hasLitItems) {
+      collectSceneLights(root, sceneLights);
+      // Sized before recording, like the draw uniforms below: one block per
+      // view at most, and growth mid-pass would orphan the bound group.
+      this.#growLights(device, views.length);
+    }
+
     // Sized before recording: one clear block per view plus, at worst, one
     // block per item per view. Growing mid-pass would orphan the bind group
     // the pass has already been handed.
@@ -821,6 +911,10 @@ export class WebgpuRenderer implements Renderer {
       batching.beginFrame();
     }
     let block = 0;
+    // §68: how many light blocks the view loop has packed — one per *rendered*
+    // view, so skipped (zero-area) views leave no gap and every uploaded byte
+    // was written this frame (`writeLightUniforms`' determinism contract).
+    let lightBlock = 0;
     // §67: the pass's stencil reference, a pass command mirrored here so it is
     // issued only when a stencil-carrying draw needs a different value.
     // WebGPU's initial value is 0, so a clipless frame issues none at all.
@@ -845,6 +939,26 @@ export class WebgpuRenderer implements Renderer {
       this.#viewProjection
         .copy(camera.projectionMatrix)
         .multiply(camera.viewMatrix);
+
+      // §68 (WP-R1.5): this view's light block — the frame's lights plus the
+      // per-view eye, read straight out of the camera's world matrix
+      // translation column (`updateViewMatrix()` above resolved it; the GL
+      // standard branch's read, verbatim). CPU packing only; the one upload
+      // happens after the pass, beside the draw uniforms'.
+      let lightBase = 0;
+      if (hasLitItems) {
+        lightBase = lightBlock * LIGHT_UNIFORM_STRIDE_BYTES;
+        const eye = camera.transform.worldMatrix.elements;
+        writeLightUniforms(
+          this.#lightsStaging,
+          lightBlock * LIGHT_UNIFORM_STRIDE_FLOATS,
+          sceneLights,
+          eye[12],
+          eye[13],
+          eye[14],
+        );
+        lightBlock += 1;
+      }
 
       // The clear draw: colour where the view asks for it, depth always.
       const clearColor = view.clearColor;
@@ -923,14 +1037,26 @@ export class WebgpuRenderer implements Renderer {
 
         const clip = item.clip ?? null;
         const maskPass = clip !== null && clip.maskPass;
-        if (!maskPass && item.kind !== "unlit" && item.kind !== "sprite") {
-          // WP-R1.5 onwards, and RFC 0003's skinned kinds until a
+        if (
+          !maskPass &&
+          item.kind !== "unlit" &&
+          item.kind !== "sprite" &&
+          item.kind !== "lit" &&
+          item.kind !== "standard"
+        ) {
+          // WP-R1.6 onwards (particles), and RFC 0003's skinned kinds until a
           // joint-palette pipeline exists here. Skipped, never approximated —
           // and skipped *before* the geometry cache uploads buffers nothing
           // will bind.
           continue;
         }
-        const record = geometries.acquire(item.geometry);
+        // A shaded draw asks the cache for the normal stream too (WP-R1.5);
+        // a mask does not — coverage, not shading — and every other kind
+        // passes the default `false`, i.e. exactly the call it always made.
+        const record = geometries.acquire(
+          item.geometry,
+          !maskPass && (item.kind === "lit" || item.kind === "standard"),
+        );
         if (record === null) {
           continue;
         }
@@ -1030,10 +1156,164 @@ export class WebgpuRenderer implements Renderer {
           }
           continue;
         }
-        // By elimination this is the unlit arm: masks and sprites continued
-        // above, and the early guard skipped every other kind. The cast is the
-        // loop's one, for `render-list.ts`'s `itemAt` reason — TypeScript
-        // cannot carry the invariant across two `continue`s.
+
+        if (item.kind === "lit" || item.kind === "standard") {
+          // WP-R1.5's two shaded arms — the unlit arm's shape with three
+          // additions: the normal stream picks a variant, the light block
+          // binds at group 1 with this view's offset, and the standard kind
+          // writes its widened uniform block through its own group-0 layout.
+          const material = item.material;
+          // The variant is the record's answer, not the geometry's: a
+          // normal-less geometry selects the normal-less variant, whose
+          // vertex stage writes the zero vector GL's default attribute
+          // yields — "ambient only", the documented shading (`wgpu-lit.ts`).
+          const normals = record.normalBuffer !== null;
+          // §57's `map`, resolved exactly as the unlit arm resolves it: draws
+          // only with uvs to sample by and a texture that uploads; a named
+          // texture that fails skips the draw (§83), a missing uv stream
+          // degrades to the untextured variant's absence.
+          const map = material.map ?? null;
+          const textureRecord =
+            map === null || record.uvBuffer === null
+              ? null
+              : textures.acquire(map);
+          if (
+            map !== null &&
+            record.uvBuffer !== null &&
+            textureRecord === null
+          ) {
+            continue;
+          }
+          const useMap = textureRecord !== null;
+          // The lights group is read off the *field*, not a frame local, and
+          // read here — after the material's getters have run — so a
+          // reentrant mid-frame `dispose()` inside application code (the
+          // pinned WP-R1.3 scenario, reachable through a material accessor
+          // too) skips this and every remaining shaded draw instead of
+          // binding a dropped group (§61: the frame must not throw).
+          const lightsBindGroup = this.#lightsBindGroup;
+          if (lightsBindGroup === null) {
+            continue;
+          }
+          // §67's resolution, the unlit arm's verbatim.
+          const stencilRecord = frameClips
+            ? clip !== null
+              ? clip.stencil
+              : material.stencil
+            : undefined;
+          const pipeline = pipelines.acquire({
+            kind: item.kind,
+            vertexColors: false,
+            map: useMap,
+            blend:
+              material.transparent === true
+                ? (material.blendMode ?? "normal")
+                : "none",
+            depthTest: material.depthTest !== false,
+            depthWrite: material.depthWrite !== false,
+            colorWrite: material.colorWrite !== false,
+            topology: record.topology,
+            colorFormat: this.#format,
+            depthFormat,
+            stencil:
+              stencilRecord === undefined
+                ? null
+                : stencilDescriptor(stencilRecord),
+            batch: null,
+            normals,
+          });
+          if (pipeline === null) {
+            // Unreachable given the class invariant — the unlit arm's
+            // narrowing, same reason: §61 forbids throwing here.
+            continue;
+          }
+
+          const opacity = material.opacity ?? 1;
+          if (item.kind === "standard") {
+            // §59's block: base colour in `DrawUniforms.color`'s slot, then
+            // the two vec4s only this family reads — bound through the
+            // widened group-0 layout over the same strided buffer.
+            const baseColor = item.material.baseColor;
+            this.#writeBlock(
+              block,
+              this.#viewProjection,
+              item.worldMatrix,
+              baseColor[0],
+              baseColor[1],
+              baseColor[2],
+              baseColor[3] * opacity,
+            );
+            this.#writeSurface(block, item.material);
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(
+              0,
+              this.#acquireStandardBindGroup(device, uniformBuffer),
+              [block * UNIFORM_STRIDE_BYTES],
+            );
+          } else {
+            const color = item.material.color;
+            this.#writeBlock(
+              block,
+              this.#viewProjection,
+              item.worldMatrix,
+              color[0],
+              color[1],
+              color[2],
+              color[3] * opacity,
+            );
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+          }
+          // The view's light block, at this view's dynamic offset — bound per
+          // draw rather than mirrored, because slot 1 is also where the unlit
+          // family binds its textures, so "what group 1 holds" is not a
+          // per-view constant (and eliding rebinds here would have to model
+          // that, for a saving the GL backend's per-draw uniform calls never
+          // had either).
+          pass.setBindGroup(LIGHTS_BIND_GROUP_INDEX, lightsBindGroup, [
+            lightBase,
+          ]);
+          if (stencilRecord !== undefined) {
+            stencilReference = applyStencilReference(
+              pass,
+              stencilReference,
+              stencilRecord.ref,
+            );
+          }
+          // Slots are positional, in `shadedVertexBufferLayouts`' order:
+          // position, then normals if the variant shades with them, then uvs
+          // if it samples. One counter, both sides.
+          let slot = 0;
+          pass.setVertexBuffer(slot, record.positionBuffer);
+          if (normals) {
+            slot += 1;
+            pass.setVertexBuffer(slot, record.normalBuffer);
+          }
+          if (textureRecord !== null) {
+            slot += 1;
+            pass.setVertexBuffer(slot, record.uvBuffer);
+            pass.setBindGroup(
+              SHADED_MAP_BIND_GROUP_INDEX,
+              textureRecord.bindGroup,
+            );
+          }
+          if (record.indexBuffer !== null && record.indexFormat !== null) {
+            pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
+            pass.drawIndexed(record.count);
+          } else {
+            pass.draw(record.count);
+          }
+          if (statistics !== null) {
+            countDraw(statistics, record.topology, record.count, 1);
+          }
+          block += 1;
+          continue;
+        }
+        // By elimination this is the unlit arm: masks, sprites and the shaded
+        // kinds continued above, and the early guard skipped every other
+        // kind. The cast is the loop's one, for `render-list.ts`'s `itemAt`
+        // reason — TypeScript cannot carry the invariant across two
+        // `continue`s.
         const material = (item as UnlitItem).material;
         const vertexColors =
           material.vertexColors === true && record.colorBuffer !== null;
@@ -1142,6 +1422,20 @@ export class WebgpuRenderer implements Renderer {
       0,
       block * UNIFORM_STRIDE_FLOATS,
     );
+    // §68: the frame's light blocks, one strided block per rendered view —
+    // the same one-upload-per-frame shape, absent to the byte on a frame with
+    // no shaded item. The buffer is re-read off the field so a reentrant
+    // mid-frame dispose skips the upload along with the draws.
+    const lightsBuffer = this.#lightsBuffer;
+    if (lightBlock > 0 && lightsBuffer !== null) {
+      device.queue.writeBuffer(
+        lightsBuffer,
+        0,
+        this.#lightsStaging,
+        0,
+        lightBlock * LIGHT_UNIFORM_STRIDE_FLOATS,
+      );
+    }
     device.queue.submit([encoder.finish()]);
   }
 
@@ -1169,6 +1463,7 @@ export class WebgpuRenderer implements Renderer {
       this.#textures?.dispose();
       this.batching?.dispose();
       this.#uniformBuffer?.destroy();
+      this.#lightsBuffer?.destroy();
       this.#depthTexture?.destroy?.();
       this.#context?.unconfigure?.();
       this.#device?.destroy();
@@ -1182,6 +1477,11 @@ export class WebgpuRenderer implements Renderer {
     this.#bindGroupLayout = null;
     this.#spriteLayout = null;
     this.#spriteBindGroup = null;
+    this.#standardLayout = null;
+    this.#standardBindGroup = null;
+    this.#lightsLayout = null;
+    this.#lightsBuffer = null;
+    this.#lightsBindGroup = null;
     this.#depthTexture = null;
     this.#context = null;
     this.#device = null;
@@ -1472,6 +1772,99 @@ export class WebgpuRenderer implements Renderer {
     return this.#spriteBindGroup;
   }
 
+  /** §68's group-1 layout, one per renderer, created on first use (WP-R1.5). */
+  #acquireLightsLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#lightsLayout ??= createLightsBindGroupLayout(device);
+    return this.#lightsLayout;
+  }
+
+  /** §59's group-0 layout, one per renderer, created on first use (WP-R1.5). */
+  #acquireStandardLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#standardLayout ??= createStandardBindGroupLayout(device);
+    return this.#standardLayout;
+  }
+
+  /**
+   * The standard draws' bind group over the current uniform buffer, created
+   * by the first standard draw after initialization or after a regrowth —
+   * `#acquireSpriteBindGroup`'s lifecycle, third block size over one buffer.
+   */
+  #acquireStandardBindGroup(
+    device: GpuDevice,
+    buffer: GpuBuffer,
+  ): GpuBindGroup {
+    this.#standardBindGroup ??= device.createBindGroup({
+      label: "four:standard-uniforms",
+      layout: this.#acquireStandardLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: STANDARD_UNIFORM_BYTES },
+        },
+      ],
+    });
+    return this.#standardBindGroup;
+  }
+
+  /**
+   * Packs §59's two extra vec4s — the emissive term, then metalness and
+   * roughness — into the spare bytes of `block`'s stride, after the
+   * `DrawUniforms`-shaped 144 `#writeBlock` wrote (`wgpu-standard.ts`'s
+   * layout). The unused slots are written, not assumed: the staging array is
+   * reused across frames, and an uploaded byte nobody wrote this frame is a
+   * transcript that depends on history.
+   */
+  #writeSurface(block: number, material: StandardMaterialLike): void {
+    const staging = this.#uniformStaging;
+    const base = block * UNIFORM_STRIDE_FLOATS;
+    const emissiveBase = base + STANDARD_EMISSIVE_OFFSET / 4;
+    const emissive = material.emissive;
+    staging[emissiveBase] = emissive[0];
+    staging[emissiveBase + 1] = emissive[1];
+    staging[emissiveBase + 2] = emissive[2];
+    staging[emissiveBase + 3] = 0;
+    const surfaceBase = base + STANDARD_SURFACE_OFFSET / 4;
+    staging[surfaceBase] = material.metalness;
+    staging[surfaceBase + 1] = material.roughness;
+    staging[surfaceBase + 2] = 0;
+    staging[surfaceBase + 3] = 0;
+  }
+
+  /**
+   * Grows the lights buffer, its staging array and its bind group to hold at
+   * least `blocks` per-view blocks (WP-R1.5). `#growUniforms`' contract one
+   * buffer over: never shrinks, doubles, and everything it creates is created
+   * lazily — an application that never shades never reaches this method, so
+   * never allocates a lights layout, buffer or group at all.
+   */
+  #growLights(device: GpuDevice, blocks: number): void {
+    if (blocks <= this.#lightsCapacity) {
+      return;
+    }
+    const capacity = Math.max(blocks, this.#lightsCapacity * 2, 4);
+    this.#lightsBuffer?.destroy();
+    const buffer = device.createBuffer({
+      label: "four:lights",
+      size: capacity * LIGHT_UNIFORM_STRIDE_BYTES,
+      usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
+    });
+    this.#lightsBuffer = buffer;
+    this.#lightsStaging = new Float32Array(
+      capacity * LIGHT_UNIFORM_STRIDE_FLOATS,
+    );
+    this.#lightsCapacity = capacity;
+    this.#lightsBindGroup = device.createBindGroup({
+      label: "four:lights",
+      layout: this.#acquireLightsLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: LIGHT_UNIFORM_BYTES },
+        },
+      ],
+    });
+  }
+
   /**
    * Packs §55's `quad` — the local rectangle the whole texture maps onto —
    * into the sprite block's last sixteen bytes: the geometry's own bounds for
@@ -1576,11 +1969,13 @@ export class WebgpuRenderer implements Renderer {
         },
       ],
     });
-    // The sprite bind group pointed at the destroyed buffer; dropped here and
-    // recreated lazily by the next sprite draw, so a scene whose sprites are
-    // gone stops paying for one. Growth happens before the pass is recorded,
-    // so no recorded draw can be holding the dropped group.
+    // The sprite and standard bind groups pointed at the destroyed buffer;
+    // dropped here and recreated lazily by the next draw of each kind, so a
+    // scene whose sprites (or standard surfaces) are gone stops paying for
+    // one. Growth happens before the pass is recorded, so no recorded draw
+    // can be holding a dropped group.
     this.#spriteBindGroup = null;
+    this.#standardBindGroup = null;
   }
 
   /**
@@ -1642,6 +2037,14 @@ export class WebgpuRenderer implements Renderer {
       this.#pipelines?.dispose();
       this.#spriteLayout = null;
       this.#spriteBindGroup = null;
+      // §68's block, like every allocation above: the handles died with the
+      // device — dropped, never destroyed.
+      this.#standardLayout = null;
+      this.#standardBindGroup = null;
+      this.#lightsLayout = null;
+      this.#lightsBuffer = null;
+      this.#lightsBindGroup = null;
+      this.#lightsCapacity = 0;
       this.events.emit("contextlost", { renderer: this });
     });
   }

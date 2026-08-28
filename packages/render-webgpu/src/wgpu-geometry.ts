@@ -25,12 +25,20 @@
  * typed array — so a geometry mutated after the call is not read back, and the
  * `version` bump is what re-uploads it.
  *
- * This packet uploads **positions, optional uvs, optional colours and optional
- * indices**: exactly the streams the unlit tier draws. Uvs joined in WP-R1.2,
- * with the textured variant that reads them; normals join with the lit and
- * standard pipelines (WP-R1.5), by the same rule — a stream is uploaded when a
- * pipeline in this package can read it, never before, because a buffer nothing
- * binds is bytes nothing draws.
+ * This cache uploads **positions, optional normals, optional uvs, optional
+ * colours and optional indices**: exactly the streams this package's pipelines
+ * draw. Uvs joined in WP-R1.2, with the textured variant that reads them.
+ * Normals joined in WP-R1.5 with the lit and standard pipelines — and joined
+ * **per acquisition, not per geometry**: the caller states whether the draw at
+ * hand shades (`acquire`'s second parameter), and the stream uploads on the
+ * first acquisition that says so. The rule stands — a stream is uploaded when
+ * a pipeline can read it, never before — and it is applied per *draw kind*
+ * rather than per package on purpose: a normal-carrying geometry drawn only
+ * unlit (`planeGeometry` under an `UnlitMaterial`, every §55 sprite quad)
+ * would otherwise upload a buffer nothing ever binds, and every landed
+ * pre-WP-R1.5 transcript would move. (The GL cache uploads normals
+ * unconditionally because its VAO records all streams at once; here a record
+ * is loose buffers, so the honest unit of need is the draw.)
  */
 
 import type { RenderItem } from "@four/render";
@@ -48,6 +56,18 @@ export type CacheableGeometry = RenderItem["geometry"];
 export interface WgpuGeometryRecord {
   /** Buffer backing the position attribute (slot 0). */
   readonly positionBuffer: GpuBuffer;
+  /**
+   * Buffer backing the optional per-vertex normal attribute (§53, §68), or
+   * `null` — for a geometry that carries none, **and** for one whose normals
+   * have not been asked for yet (see `acquire`'s `normals` parameter): the
+   * shaded draw paths read this member to pick the variant, so `null` means
+   * "shade without normals" in both cases, which is exactly GL's default-
+   * attribute behaviour for the first and the pre-upload state for the second.
+   *
+   * The one **mutable** member: an upgrade writes the buffer into the live
+   * record rather than re-uploading four streams that have not changed.
+   */
+  normalBuffer: GpuBuffer | null;
   /** Buffer backing the optional per-vertex colour attribute, or `null`. */
   readonly colorBuffer: GpuBuffer | null;
   /**
@@ -120,18 +140,42 @@ export class WgpuGeometryCache {
    * Returns the buffers for `geometry`, uploading them on first use and
    * re-uploading whenever `geometry.version` has advanced.
    *
+   * `normals` says whether the draw at hand shades (WP-R1.5): `true` uploads
+   * the geometry's normal stream — with the initial upload, or as a one-buffer
+   * upgrade of a record first acquired by an unshaded draw — and `false` (the
+   * default, and every pre-WP-R1.5 call site verbatim) never touches it, so a
+   * scene with no lit materials records the byte-identical upload sequence it
+   * always did. See the module header for why the flag is per acquisition.
+   *
    * Returns `null` — and creates no entry — when there is nothing to draw
    * (`drawCount === 0`, which includes every disposed geometry) or once the
    * cache is disposed. **Never throws**: this runs inside `Renderer.render`,
    * and §61 forbids throwing there.
    */
-  acquire(geometry: CacheableGeometry): WgpuGeometryRecord | null {
+  acquire(
+    geometry: CacheableGeometry,
+    normals = false,
+  ): WgpuGeometryRecord | null {
     if (this.#disposed) {
       return null;
     }
     const existing = this.#records.get(geometry.id);
     if (existing !== undefined) {
       if (existing.version === geometry.version) {
+        if (
+          normals &&
+          existing.normalBuffer === null &&
+          geometry.normals !== undefined
+        ) {
+          // The upgrade path: a record first acquired by an unshaded draw
+          // meets its first lit one. One buffer uploads; the other four are
+          // current and stay where they are.
+          existing.normalBuffer = this.#uploadBuffer(
+            geometry.normals,
+            GPU_BUFFER_USAGE.VERTEX,
+            `four:normals:${geometry.id}`,
+          );
+        }
         return existing;
       }
       this.#destroyRecord(existing);
@@ -142,7 +186,7 @@ export class WgpuGeometryCache {
       return null;
     }
 
-    const record = this.#upload(geometry);
+    const record = this.#upload(geometry, normals);
     this.#records.set(geometry.id, record);
     return record;
   }
@@ -168,16 +212,27 @@ export class WgpuGeometryCache {
     this.#records.clear();
   }
 
-  #upload(geometry: CacheableGeometry): WgpuGeometryRecord {
+  #upload(geometry: CacheableGeometry, normals: boolean): WgpuGeometryRecord {
     const positionBuffer = this.#uploadBuffer(
       geometry.positions,
       GPU_BUFFER_USAGE.VERTEX,
       `four:positions:${geometry.id}`,
     );
 
-    // Allocation order is positions → uvs → colours → indices, the order
-    // `gl-geometry.ts` allocates in, so the two backends' upload transcripts
-    // stay readable side by side.
+    // Allocation order is positions → normals → uvs → colours → indices, the
+    // order `gl-geometry.ts` allocates in, so the two backends' upload
+    // transcripts stay readable side by side. Normals only when the acquiring
+    // draw shades (see the module header).
+    const normalData = normals ? geometry.normals : undefined;
+    const normalBuffer =
+      normalData === undefined
+        ? null
+        : this.#uploadBuffer(
+            normalData,
+            GPU_BUFFER_USAGE.VERTEX,
+            `four:normals:${geometry.id}`,
+          );
+
     const uvs = geometry.uvs;
     const uvBuffer =
       uvs === undefined
@@ -210,6 +265,7 @@ export class WgpuGeometryCache {
 
     return {
       positionBuffer,
+      normalBuffer,
       colorBuffer,
       uvBuffer,
       indexBuffer,
@@ -241,6 +297,7 @@ export class WgpuGeometryCache {
 
   #destroyRecord(record: WgpuGeometryRecord): void {
     record.positionBuffer.destroy();
+    record.normalBuffer?.destroy();
     record.colorBuffer?.destroy();
     record.uvBuffer?.destroy();
     record.indexBuffer?.destroy();
