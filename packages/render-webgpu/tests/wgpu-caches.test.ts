@@ -16,6 +16,14 @@ import { createRecordingGpu } from "../../../tests/integration/helpers/recording
 import {
   CLEAR_SHADER_SOURCE,
   COLOR_SHADER_LOCATION,
+  SPRITE_QUAD_OFFSET,
+  SPRITE_SHADER_SOURCE,
+  SPRITE_TINT_OFFSET,
+  SPRITE_UNIFORM_BYTES,
+  SPRITE_UNIFORM_WGSL,
+  batchVertexBufferLayout,
+  createSpriteBindGroupLayout,
+  createTextureBindGroupLayout,
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
   DRAW_UNIFORM_BYTES,
@@ -45,6 +53,7 @@ import {
   type GpuDevice,
   type WgpuCacheableTexture,
   type WgpuPipelineDescriptor,
+  type WgpuStencilDescriptor,
 } from "../src/index.js";
 
 /** A device to build caches over; `device` is non-null for the default options. */
@@ -984,5 +993,317 @@ describe("WgpuTextureCache", () => {
     cache.dispose();
     expect(gpu.calls).toHaveLength(0);
     expect(cache.acquire(source)).toBeNull();
+  });
+});
+
+/** A canonical §67 stencil record — the engine-composed mask-test shape. */
+const TEST_STENCIL: WgpuStencilDescriptor = {
+  func: "equal",
+  readMask: 3,
+  writeMask: 0,
+  failOp: "keep",
+  depthFailOp: "keep",
+  passOp: "keep",
+};
+
+describe("pipelineKey — the §67 stencil and §65 batch segments (WP-R1.3)", () => {
+  it("appends nothing for an absent or null field — pre-R1.3 keys are byte-identical", () => {
+    // The labels recorded in landed transcripts are `four:<key>`, so this is
+    // the byte-identity claim for every clipless, batchless descriptor.
+    expect(pipelineKey({ ...BASE, stencil: null, batch: null })).toBe(
+      pipelineKey(BASE),
+    );
+    expect(pipelineKey(BASE)).toBe(
+      "unlit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
+    );
+  });
+
+  it("separates every stencil field a pipeline bakes in — and not ref", () => {
+    const keys = new Set<string>();
+    const stencils: WgpuStencilDescriptor[] = [
+      TEST_STENCIL,
+      { ...TEST_STENCIL, func: "always" },
+      { ...TEST_STENCIL, readMask: 1 },
+      { ...TEST_STENCIL, writeMask: 1 },
+      { ...TEST_STENCIL, failOp: "zero" },
+      { ...TEST_STENCIL, depthFailOp: "invert" },
+      { ...TEST_STENCIL, passOp: "replace" },
+    ];
+    for (const stencil of stencils) {
+      keys.add(pipelineKey({ ...BASE, stencil }));
+    }
+    expect(keys.size).toBe(stencils.length);
+    // `ref` is deliberately absent from the record and so from the key: it is
+    // a pass command (`setStencilReference`), so a mask writing bit 4 shares
+    // the pipeline of one writing bit 1.
+    expect(pipelineKey({ ...BASE, stencil: TEST_STENCIL })).toContain("|s:");
+  });
+
+  it("separates the batch stream's two flags", () => {
+    const keys = new Set<string>([
+      pipelineKey({
+        ...BASE,
+        kind: "batch",
+        batch: { uvs: false, colors: false },
+      }),
+      pipelineKey({
+        ...BASE,
+        kind: "batch",
+        batch: { uvs: true, colors: false },
+      }),
+      pipelineKey({
+        ...BASE,
+        kind: "batch",
+        batch: { uvs: false, colors: true },
+      }),
+      pipelineKey({
+        ...BASE,
+        kind: "batch",
+        batch: { uvs: true, colors: true },
+      }),
+    ]);
+    expect(keys.size).toBe(4);
+  });
+});
+
+describe("the sprite pipeline family (§55, WP-R1.3)", () => {
+  /** A cache with both lazy providers wired, as the renderer wires them. */
+  function spriteCache(): {
+    cache: WgpuPipelineCache;
+    gpu: ReturnType<typeof createRecordingGpu>;
+  } {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      () => createTextureBindGroupLayout(gpuDevice),
+      () => createSpriteBindGroupLayout(gpuDevice),
+    );
+    gpu.reset();
+    return { cache, gpu };
+  }
+
+  const SPRITE: WgpuPipelineDescriptor = {
+    ...BASE,
+    kind: "sprite",
+    map: true,
+    blend: "normal",
+  };
+
+  it("compiles the sprite module once, and it is the exported source", () => {
+    const { cache, gpu } = spriteCache();
+    cache.acquire(SPRITE);
+    cache.acquire({ ...SPRITE, blend: "additive" });
+    expect(cache.moduleCount).toBe(1);
+    const sources = gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(sources).toEqual([SPRITE_SHADER_SOURCE]);
+  });
+
+  it("builds the sprite pipeline layout lazily, once, over both providers", () => {
+    const { cache, gpu } = spriteCache();
+    expect(gpu.countOf("createPipelineLayout")).toBe(0);
+    cache.acquire(SPRITE);
+    cache.acquire({ ...SPRITE, depthWrite: false });
+    // One sprite group-0 layout, one group-1 layout, one pipeline layout —
+    // shared by both variants.
+    expect(gpu.countOf("device.createPipelineLayout")).toBe(1);
+    expect(gpu.countOf("device.createBindGroupLayout")).toBe(2);
+  });
+
+  it("reads position alone — uv is derived from the quad uniform", () => {
+    const { cache, gpu } = spriteCache();
+    cache.acquire(SPRITE);
+    const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
+      ?.args[0] as {
+      vertex: { buffers: { arrayStride: number; attributes: unknown[] }[] };
+    };
+    expect(descriptor.vertex.buffers).toHaveLength(1);
+    expect(descriptor.vertex.buffers[0]?.arrayStride).toBe(12);
+    expect(descriptor.vertex.buffers[0]?.attributes).toHaveLength(1);
+  });
+
+  it("answers null when a provider is missing, and skips rather than throws", () => {
+    const { device: gpuDevice } = device();
+    const drawLayout = createDrawBindGroupLayout(gpuDevice);
+    // No sprite provider (a hand-built cache predating WP-R1.3).
+    const withoutSprite = new WgpuPipelineCache(gpuDevice, drawLayout, () =>
+      createTextureBindGroupLayout(gpuDevice),
+    );
+    expect(withoutSprite.acquire(SPRITE)).toBeNull();
+    // A sprite provider without a texture provider cannot bind group 1.
+    const withoutTexture = new WgpuPipelineCache(
+      gpuDevice,
+      drawLayout,
+      undefined,
+      () => createSpriteBindGroupLayout(gpuDevice),
+    );
+    expect(withoutTexture.acquire(SPRITE)).toBeNull();
+  });
+});
+
+describe("the batch pipeline family (§65, WP-R1.3)", () => {
+  const BATCH: WgpuPipelineDescriptor = {
+    ...BASE,
+    kind: "batch",
+    map: true,
+    batch: { uvs: true, colors: false },
+  };
+
+  function texturedCache(): {
+    cache: WgpuPipelineCache;
+    gpu: ReturnType<typeof createRecordingGpu>;
+  } {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      () => createTextureBindGroupLayout(gpuDevice),
+    );
+    gpu.reset();
+    return { cache, gpu };
+  }
+
+  it("compiles from the unlit module — one module for both families", () => {
+    const { cache } = texturedCache();
+    cache.acquire({ ...BASE, map: true });
+    cache.acquire(BATCH);
+    // "unlit|map", shared; two pipelines.
+    expect(cache.moduleCount).toBe(1);
+    expect(cache.size).toBe(2);
+  });
+
+  it("reads one interleaved buffer with the planner's stride and offsets", () => {
+    const { cache, gpu } = texturedCache();
+    cache.acquire(BATCH);
+    const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
+      ?.args[0] as {
+      vertex: {
+        buffers: {
+          arrayStride: number;
+          attributes: { offset: number; shaderLocation: number }[];
+        }[];
+      };
+    };
+    expect(descriptor.vertex.buffers).toHaveLength(1);
+    expect(descriptor.vertex.buffers[0]?.arrayStride).toBe(20);
+    expect(descriptor.vertex.buffers[0]?.attributes).toEqual([
+      { format: "float32x3", offset: 0, shaderLocation: 0 },
+      { format: "float32x2", offset: 12, shaderLocation: UV_SHADER_LOCATION },
+    ]);
+  });
+});
+
+describe("batchVertexBufferLayout", () => {
+  it("strides over a stream the variant does not read (the untextured unlit batch)", () => {
+    const layout = batchVertexBufferLayout(true, false, false, false);
+    expect(layout.arrayStride).toBe(20);
+    expect(layout.attributes).toHaveLength(1);
+  });
+
+  it("offsets the colour stream past the uv floats it follows", () => {
+    const layout = batchVertexBufferLayout(true, true, true, true);
+    expect(layout.arrayStride).toBe(36);
+    expect(layout.attributes).toEqual([
+      { format: "float32x3", offset: 0, shaderLocation: 0 },
+      { format: "float32x2", offset: 12, shaderLocation: UV_SHADER_LOCATION },
+      {
+        format: "float32x4",
+        offset: 20,
+        shaderLocation: COLOR_SHADER_LOCATION,
+      },
+    ]);
+  });
+
+  it("packs colours directly after position when the stream has no uv", () => {
+    const layout = batchVertexBufferLayout(false, true, false, true);
+    expect(layout.arrayStride).toBe(28);
+    expect(layout.attributes[1]).toEqual({
+      format: "float32x4",
+      offset: 12,
+      shaderLocation: COLOR_SHADER_LOCATION,
+    });
+  });
+});
+
+describe("§67's stencil state on a pipeline (WP-R1.3)", () => {
+  it("maps the engine's §57 spellings onto WebGPU's, both faces alike", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+    );
+    gpu.reset();
+    cache.acquire({
+      ...BASE,
+      depthFormat: "depth24plus-stencil8",
+      stencil: {
+        func: "lequal",
+        readMask: 7,
+        writeMask: 1,
+        failOp: "increment",
+        depthFailOp: "decrement",
+        passOp: "replace",
+      },
+    });
+    const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
+      ?.args[0] as {
+      depthStencil: Record<string, unknown>;
+    };
+    const face = {
+      compare: "less-equal",
+      failOp: "increment-clamp",
+      depthFailOp: "decrement-clamp",
+      passOp: "replace",
+    };
+    expect(descriptor.depthStencil["stencilFront"]).toEqual(face);
+    expect(descriptor.depthStencil["stencilBack"]).toEqual(face);
+    expect(descriptor.depthStencil["stencilReadMask"]).toBe(7);
+    expect(descriptor.depthStencil["stencilWriteMask"]).toBe(1);
+  });
+
+  it("omits all four members for a stencil-free descriptor — WP-R1.1's object", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+    );
+    gpu.reset();
+    cache.acquire(BASE);
+    const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
+      ?.args[0] as { depthStencil: Record<string, unknown> };
+    expect(descriptor.depthStencil).toEqual({
+      format: "depth24plus",
+      depthWriteEnabled: true,
+      depthCompare: "less",
+    });
+  });
+});
+
+describe("the sprite uniform block, declared as data (§7's discipline)", () => {
+  it("declares the widened binding the WGSL reads, side by side", () => {
+    expect(SPRITE_UNIFORM_BYTES).toBe(160);
+    expect(SPRITE_TINT_OFFSET).toBe(128);
+    expect(SPRITE_QUAD_OFFSET).toBe(144);
+    expect(SPRITE_SHADER_SOURCE).toContain(SPRITE_UNIFORM_WGSL);
+    expect(SPRITE_UNIFORM_WGSL).toContain("quad : vec4<f32>");
+  });
+
+  it("asks for a dynamically-offset uniform of the widened size", () => {
+    const { device: gpuDevice, gpu } = device();
+    createSpriteBindGroupLayout(gpuDevice);
+    const descriptor = gpu.callsOf("device.createBindGroupLayout")[0]
+      ?.args[0] as {
+      entries: {
+        binding: number;
+        buffer: { hasDynamicOffset: boolean; minBindingSize: number };
+      }[];
+    };
+    expect(descriptor.entries[0]?.binding).toBe(0);
+    expect(descriptor.entries[0]?.buffer.hasDynamicOffset).toBe(true);
+    expect(descriptor.entries[0]?.buffer.minBindingSize).toBe(
+      SPRITE_UNIFORM_BYTES,
+    );
   });
 });

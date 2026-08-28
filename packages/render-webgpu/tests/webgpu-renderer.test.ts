@@ -45,8 +45,11 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  SPRITE_QUAD_OFFSET,
+  SPRITE_TINT_OFFSET,
   UNIFORM_STRIDE_BYTES,
   WebgpuRenderer,
+  createWgpuBatching,
   hostGpu,
 } from "../src/index.js";
 
@@ -103,6 +106,24 @@ class TestGeometry {
     this.version += 1;
   }
 
+  /** §53's cached local bounds, reduced to what the sprite path reads. */
+  computeBounds(): {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  } {
+    const min = { x: Infinity, y: Infinity, z: Infinity };
+    const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+    for (let i = 0; i < this.positions.length; i += 3) {
+      min.x = Math.min(min.x, this.positions[i]);
+      min.y = Math.min(min.y, this.positions[i + 1]);
+      min.z = Math.min(min.z, this.positions[i + 2]);
+      max.x = Math.max(max.x, this.positions[i]);
+      max.y = Math.max(max.y, this.positions[i + 1]);
+      max.z = Math.max(max.z, this.positions[i + 2]);
+    }
+    return { min, max };
+  }
+
   get asGeometry(): ItemGeometry {
     return this as unknown as ItemGeometry;
   }
@@ -144,6 +165,17 @@ class TestTexture {
   }
 }
 
+/** A partial §57 stencil record, as a structurally-typed double carries one. */
+interface TestStencil {
+  func?: string;
+  ref?: number;
+  readMask?: number;
+  writeMask?: number;
+  failOp?: string;
+  depthFailOp?: string;
+  passOp?: string;
+}
+
 /** §57's `UnlitMaterial`, reduced to the state the pipeline descriptor reads. */
 class TestMaterial {
   readonly color: [number, number, number, number];
@@ -164,12 +196,57 @@ class TestMaterial {
 
   map?: TestTexture | null;
 
+  stencil?: TestStencil;
+
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
   }
 
   get asMaterial(): ItemMaterial {
     return this as unknown as ItemMaterial;
+  }
+}
+
+/** §55's `SpriteMaterial`, reduced to what the sprite path reads (WP-R1.3). */
+class TestSpriteMaterial {
+  /** The discriminant `pipelineOf` routes on. */
+  readonly kind = "sprite";
+
+  readonly tint: [number, number, number, number];
+
+  texture: TestTexture | null;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  depthTest?: boolean;
+
+  depthWrite?: boolean;
+
+  colorWrite?: boolean;
+
+  opacity?: number;
+
+  stencil?: TestStencil;
+
+  constructor(
+    texture: TestTexture | null = new TestTexture(),
+    tint: [number, number, number, number] = [1, 1, 1, 1],
+  ) {
+    this.texture = texture;
+    this.tint = tint;
+  }
+
+  get asMaterial(): ItemMaterial {
+    return this as unknown as ItemMaterial;
+  }
+}
+
+/** A §55 sprite node: a renderable that may carry the frame sub-rectangle. */
+class SpriteNode extends Renderable {
+  frame: { x: number; y: number; width: number; height: number } | null = null;
+
+  constructor(geometry: TestGeometry, material: TestSpriteMaterial) {
+    super(geometry.asGeometry, material.asMaterial);
   }
 }
 
@@ -945,12 +1022,14 @@ describe("WebgpuRenderer.render", () => {
   it("skips an item this tier has no pipeline for", () => {
     const root = createRoot();
     const item = renderable(triangle());
-    // A sprite-material item: `pipelineOf` gives it kind `"sprite"`, which
-    // WP-R1.3 owns. It must be skipped, never approximated.
-    (item.material as unknown as { kind: string }).kind = "sprite";
+    // A lit-material item: `pipelineOf` gives it kind `"lit"`, which WP-R1.5
+    // owns. It must be skipped, never approximated — and skipped before the
+    // geometry cache uploads buffers nothing will bind.
+    (item.material as unknown as { kind: string }).kind = "lit";
     root.add(item);
     harness.renderer.render(root, [createView()]);
     expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
   });
 
   it("skips a draw whose geometry has nothing to draw", () => {
@@ -1229,5 +1308,662 @@ describe("WebgpuRenderer.dispose", () => {
     const renderer = new WebgpuRenderer();
     renderer.render(createRoot(), [createView()]);
     expect(renderer.capabilities.backend).toBe("webgpu");
+  });
+});
+
+/** The labels of every pipeline the frame compiled, in creation order. */
+function pipelineLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createRenderPipeline")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/**
+ * The recorded `createRenderPipeline` descriptor whose label contains `part` —
+ * `unknown`, for the caller to narrow to the members its assertion reads.
+ */
+function pipelineDescriptor(gpu: RecordingGpu, part: string): unknown {
+  const call = gpu
+    .callsOf("device.createRenderPipeline")
+    .find((candidate) =>
+      String((candidate.args[0] as { label?: string }).label).includes(part),
+    );
+  if (call === undefined) {
+    throw new Error(`no pipeline whose label contains ${part}`);
+  }
+  return call.args[0];
+}
+
+/** Every recorded stencil reference, in order — `[]` for a clipless frame. */
+function stencilReferences(gpu: RecordingGpu): number[] {
+  return gpu
+    .callsOf("pass.setStencilReference")
+    .map((call) => call.args[0] as number);
+}
+
+describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("draws a sprite through the sprite pipeline, texture at group 1", () => {
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+
+    // Clear plus the sprite.
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("four:sprite|"),
+      ),
+    ).toBe(true);
+    // The sprite's own group-0 layout and the texture's group 1, both created
+    // by this first sprite frame (the lazy WP-R1.2 pattern), plus their two
+    // bind groups.
+    expect(harness.gpu.countOf("device.createBindGroupLayout")).toBe(2);
+    expect(harness.gpu.countOf("device.createBindGroup")).toBe(2);
+    const groups = harness.gpu
+      .callsOf("pass.setBindGroup")
+      .map((call) => call.args[0]);
+    expect(groups).toContain(1);
+  });
+
+  it("uploads tint × opacity and the quad rectangle in the sprite block", () => {
+    const root = createRoot();
+    const material = new TestSpriteMaterial(
+      new TestTexture(),
+      [1, 0.5, 0.25, 0.8],
+    );
+    material.opacity = 0.5;
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    const data = uniformUpload(harness.gpu);
+    const stride = UNIFORM_STRIDE_BYTES / 4;
+    const tint = stride + SPRITE_TINT_OFFSET / 4;
+    expect(data.slice(tint, tint + 3)).toEqual([1, 0.5, 0.25]);
+    expect(data[tint + 3]).toBeCloseTo(0.4);
+    // The triangle's local bounds: x, y ∈ [-0.5, 0.5].
+    const quad = stride + SPRITE_QUAD_OFFSET / 4;
+    expect(data.slice(quad, quad + 4)).toEqual([-0.5, -0.5, 1, 1]);
+  });
+
+  it("reparametrizes the quad for §55's frame, exactly as the GL path does", () => {
+    const root = createRoot();
+    const material = new TestSpriteMaterial(new TestTexture(4, 4));
+    const sprite = new SpriteNode(triangle(), material);
+    sprite.frame = { x: 2, y: 2, width: 2, height: 2 };
+    root.add(sprite);
+    harness.renderer.render(root, [createView()]);
+
+    const data = uniformUpload(harness.gpu);
+    const quad = UNIFORM_STRIDE_BYTES / 4 + SPRITE_QUAD_OFFSET / 4;
+    // The rectangle the whole 4×4 texture would occupy so that the quad shows
+    // the (2, 2, 2, 2) frame of it — R-29's affine reparametrization.
+    expect(data.slice(quad, quad + 4)).toEqual([-1.5, -1.5, 2, 2]);
+  });
+
+  it("blends by construction, whatever `transparent` says (§55)", () => {
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+
+    const descriptor = pipelineDescriptor(harness.gpu, "four:sprite|") as {
+      fragment: { targets: { blend?: { color: { srcFactor: string } } }[] };
+    };
+    expect(descriptor.fragment.targets[0]?.blend?.color.srcFactor).toBe(
+      "src-alpha",
+    );
+  });
+
+  it("skips a sprite whose texture is disposed (§83)", () => {
+    const root = createRoot();
+    const material = new TestSpriteMaterial();
+    material.texture?.dispose();
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+  });
+
+  it("skips a sprite material double that carries no texture at all", () => {
+    const root = createRoot();
+    // The F16 defensive read: a structurally-typed §55 double predating the
+    // contract reports nothing, which must mean "no texture", not a crash.
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial(null)));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("draws an indexed sprite quad through drawIndexed", () => {
+    const root = createRoot();
+    const quad = new TestGeometry(
+      new Float32Array([
+        -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
+      ]),
+      new Uint16Array([0, 1, 2, 0, 2, 3]),
+    );
+    root.add(new SpriteNode(quad, new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(6);
+  });
+
+  it("reuses the sprite bind group until the uniform buffer regrows", () => {
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    // Frame 2: no new layout, no new bind group — everything is cached.
+    expect(harness.gpu.countOf("device.createBindGroup")).toBe(0);
+
+    // Growing the uniform buffer orphans both bind groups; the next sprite
+    // draw recreates its own against the new buffer.
+    for (let index = 0; index < 40; index += 1) {
+      root.add(renderable(triangle()));
+    }
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    // The draw bind group (in growUniforms) and the sprite's (lazily).
+    expect(harness.gpu.countOf("device.createBindGroup")).toBe(2);
+  });
+
+  it("counts §84's statistics for a sprite draw", () => {
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+  });
+});
+
+describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  /** A clip node over a triangle, with one clipped child. */
+  function clippedScene(): Renderable {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle(), new TestMaterial([1, 0, 0, 1])));
+    root.add(panel);
+    return root;
+  }
+
+  it("records no stencil content at all for a clipless frame — byte identity", () => {
+    const root = createRoot();
+    root.add(renderable(triangle()));
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).not.toContain("depth24plus-stencil8");
+    expect(transcript).not.toContain("stencilLoadOp");
+    expect(transcript).not.toContain("stencilFront");
+    expect(transcript).not.toContain("setStencilReference");
+  });
+
+  it("upgrades the depth format and the pass for a frame that clips", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+
+    const depth = harness.gpu.callsOf("device.createTexture")[0]?.args[0] as {
+      label: string;
+      format: string;
+    };
+    expect(depth.label).toBe("four:depth");
+    expect(depth.format).toBe("depth24plus-stencil8");
+    const pass = harness.gpu.callsOf("encoder.beginRenderPass")[0]?.args[0] as {
+      depthStencilAttachment: {
+        stencilLoadOp?: string;
+        stencilStoreOp?: string;
+      };
+    };
+    expect(pass.depthStencilAttachment.stencilLoadOp).toBe("load");
+    expect(pass.depthStencilAttachment.stencilStoreOp).toBe("store");
+  });
+
+  it("clears the stencil rectangle with the clear draw (passOp zero)", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+    const clear = pipelineDescriptor(harness.gpu, "four:clear") as {
+      depthStencil: {
+        stencilFront: { compare: string; passOp: string };
+        stencilWriteMask: number;
+      };
+    };
+    expect(clear.depthStencil.stencilFront.compare).toBe("always");
+    expect(clear.depthStencil.stencilFront.passOp).toBe("zero");
+    expect(clear.depthStencil.stencilWriteMask).toBe(0xff);
+  });
+
+  it("writes the mask's plane with colour and depth off, and tests content equal", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+
+    // Clear, mask, panel (unclipped), child (clipped) — four draws.
+    expect(harness.gpu.countOf("pass.draw")).toBe(4);
+
+    const mask = pipelineDescriptor(harness.gpu, "|s:always,255,1,") as {
+      fragment: { targets: { writeMask: number }[] };
+      depthStencil: {
+        depthWriteEnabled: boolean;
+        depthCompare: string;
+        stencilFront: { compare: string; passOp: string };
+        stencilWriteMask: number;
+      };
+    };
+    expect(mask.fragment.targets[0]?.writeMask).toBe(0);
+    expect(mask.depthStencil.depthWriteEnabled).toBe(false);
+    expect(mask.depthStencil.depthCompare).toBe("always");
+    expect(mask.depthStencil.stencilFront.compare).toBe("always");
+    expect(mask.depthStencil.stencilFront.passOp).toBe("replace");
+    expect(mask.depthStencil.stencilWriteMask).toBe(1);
+
+    const content = pipelineDescriptor(harness.gpu, "|s:equal,1,0,") as {
+      depthStencil: {
+        stencilFront: { compare: string; passOp: string };
+        stencilReadMask: number;
+        stencilWriteMask: number;
+      };
+    };
+    expect(content.depthStencil.stencilFront.compare).toBe("equal");
+    expect(content.depthStencil.stencilFront.passOp).toBe("keep");
+    expect(content.depthStencil.stencilReadMask).toBe(1);
+    expect(content.depthStencil.stencilWriteMask).toBe(0);
+
+    // The mask's reference is bit 1, the content's test is the same value —
+    // one recorded pass command serves both.
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("intersects nested clips through the accumulated planes", () => {
+    const root = createRoot();
+    const outer = renderable(triangle());
+    outer.clip = true;
+    const inner = renderable(triangle());
+    inner.clip = true;
+    inner.add(renderable(triangle(), new TestMaterial([0, 1, 0, 1])));
+    outer.add(inner);
+    root.add(outer);
+    harness.renderer.render(root, [createView()]);
+
+    // Masks 1 and 2 first; the outer's own item resets nothing (unclipped);
+    // the inner's own item tests the outer's plane (1); the leaf tests the
+    // conjunction (3).
+    expect(stencilReferences(harness.gpu)).toEqual([1, 2, 1, 3]);
+  });
+
+  it("lets the engine's clip record outrank the material's own §57 stencil", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    const child = renderable(triangle());
+    (child.material as unknown as TestMaterial).stencil = { func: "never" };
+    panel.add(child);
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).toContain('"compare":"equal"');
+    expect(transcript).not.toContain('"compare":"never"');
+  });
+
+  it("applies a material's own stencil beside a clip, defaults filled in", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    // Two unclipped siblings composing R-7's mask by hand, with *partial*
+    // structural records: every missing field takes §57's documented default
+    // — `always`, masks `0xff`, ops `keep`, and a missing `ref` reads 0.
+    const byHand = new TestMaterial();
+    byHand.stencil = { ref: 5 };
+    root.add(renderable(triangle(), byHand));
+    const refless = new TestMaterial();
+    refless.stencil = {};
+    root.add(renderable(triangle(), refless));
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).toContain('"stencilWriteMask":255');
+    // Mask (1), the by-hand ref (5), then back to 0 for the record naming
+    // none.
+    expect(stencilReferences(harness.gpu)).toEqual([1, 5, 0]);
+  });
+
+  it("leaves a material stencil inert on a clipless frame — the GL-parity tier", () => {
+    const root = createRoot();
+    const byHand = new TestMaterial();
+    byHand.stencil = { func: "never" };
+    root.add(renderable(triangle(), byHand));
+    harness.renderer.render(root, [createView()]);
+
+    // No clip, no stencil bits to test against: the record is inert, exactly
+    // as it is on a WebGL surface created without `{ stencil: true }`.
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).not.toContain("stencilFront");
+    expect(transcript).not.toContain("depth24plus-stencil8");
+  });
+
+  it("tests a clipped sprite against its clip's planes", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:sprite|"),
+    );
+    expect(label).toContain("|s:equal,1,0,");
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("clips a sprite subtree — the mask is coverage, not shading", () => {
+    const root = createRoot();
+    const panel = new SpriteNode(triangle(), new TestSpriteMaterial());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    // The sprite's mask draws through the flat unlit pipeline (one vertex
+    // buffer, no texture bind), then the sprite's own item draws textured.
+    const mask = pipelineDescriptor(harness.gpu, "|s:always,255,1,") as {
+      vertex: { buffers: unknown[] };
+    };
+    expect(mask.vertex.buffers).toHaveLength(1);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("four:sprite|"),
+      ),
+    ).toBe(true);
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("draws the masks again in every view — a stencil buffer is per surface", () => {
+    harness.renderer.render(clippedScene(), [
+      createView({ id: "a", width: 0.5 }),
+      createView({ id: "b", x: 0.5, width: 0.5 }),
+    ]);
+    // Each view: clear, mask, panel, child.
+    expect(harness.gpu.countOf("pass.draw")).toBe(8);
+    // The reference returns to the mask bit at the second view's mask: the
+    // pass command survives across views, so the mirror re-issues only on
+    // change — [mask 1, content 1] twice collapses to one call.
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("reallocates the depth attachment when a scene stops clipping", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+    const clipless = createRoot();
+    clipless.add(renderable(triangle()));
+    harness.renderer.render(clipless, [createView()]);
+
+    const formats = harness.gpu
+      .callsOf("device.createTexture")
+      .map((call) => (call.args[0] as { format: string }).format);
+    expect(formats).toEqual(["depth24plus-stencil8", "depth24plus"]);
+    expect(harness.gpu.countOf("texture.destroy")).toBe(1);
+  });
+
+  it("counts mask draws in §84's statistics, like the GL backend", () => {
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    harness.renderer.render(clippedScene(), [createView()]);
+    // Mask, panel, child — the clear stays the backend's own.
+    expect(statistics.drawCalls).toBe(3);
+  });
+
+  it("draws an indexed clip node's mask through drawIndexed", () => {
+    const root = createRoot();
+    const panel = renderable(
+      new TestGeometry(
+        new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]),
+        new Uint16Array([0, 1, 2]),
+      ),
+    );
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+    // The mask and the panel's own item share the indexed geometry.
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(2);
+  });
+});
+
+describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  /** Two triangles over one shared material — the smallest §65 run. */
+  function batchableScene(
+    material = new TestMaterial([0, 0, 1, 1]),
+  ): Renderable {
+    const root = createRoot();
+    root.add(renderable(triangle(), material));
+    root.add(renderable(triangle(), material));
+    return root;
+  }
+
+  it("merges a run into one drawIndexed through the batch pipeline", () => {
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(batchableScene(), [createView()]);
+
+    // The clear, then one merged draw for both triangles.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    expect(harness.gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(6);
+    expect(harness.gpu.callsOf("pass.setIndexBuffer")[0]?.args[1]).toBe(
+      "uint32",
+    );
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("four:batch|"),
+      ),
+    ).toBe(true);
+    // The per-item geometry is never uploaded: the run draws from the
+    // uploader's own two buffers.
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(2);
+  });
+
+  it("uploads the identity model and the shared colour for the run", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestMaterial([0, 0.5, 1, 1]);
+    material.opacity = 0.5;
+    harness.renderer.render(batchableScene(material), [createView()]);
+
+    const data = uniformUpload(harness.gpu);
+    const stride = UNIFORM_STRIDE_BYTES / 4;
+    const model = stride + DRAW_MODEL_OFFSET / 4;
+    expect(data[model]).toBe(1);
+    expect(data[model + 5]).toBe(1);
+    expect(data[model + 12]).toBe(0);
+    const color = stride + DRAW_COLOR_OFFSET / 4;
+    expect(data.slice(color, color + 3)).toEqual([0, 0.5, 1]);
+    expect(data[color + 3]).toBeCloseTo(0.5);
+  });
+
+  it("records the identical frame when the batcher finds nothing to merge", async () => {
+    // One scene object, rendered by both renderers, so the geometry ids in
+    // the recorded upload labels are the same on both tapes.
+    const root = createRoot();
+    root.add(renderable(triangle(), new TestMaterial([1, 0, 0, 1])));
+    root.add(renderable(triangle(), new TestMaterial([0, 1, 0, 1])));
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(root, [createView()]);
+    const withBatcher = harness.gpu.transcript();
+
+    const plain = await initialized();
+    plain.renderer.render(root, [createView()]);
+    expect(withBatcher).toEqual(plain.gpu.transcript());
+  });
+
+  it("reuses each slot's buffers across frames", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const root = batchableScene();
+    harness.renderer.render(root, [createView()]);
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    // One uniform upload plus the slot's vertex and index streams.
+    expect(harness.gpu.countOf("queue.writeBuffer")).toBe(3);
+  });
+
+  it("merges a sprite run, tinted and textured at group 1", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestSpriteMaterial(new TestTexture(), [1, 0, 1, 1]);
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), material));
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    expect(label).toContain("|map|");
+    const groups = harness.gpu
+      .callsOf("pass.setBindGroup")
+      .map((call) => call.args[0]);
+    expect(groups).toContain(1);
+    const data = uniformUpload(harness.gpu);
+    const color = UNIFORM_STRIDE_BYTES / 4 + DRAW_COLOR_OFFSET / 4;
+    expect(data.slice(color, color + 4)).toEqual([1, 0, 1, 1]);
+  });
+
+  it("skips a sprite run whose texture will not resolve, whole", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestSpriteMaterial();
+    material.texture?.dispose();
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), material));
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+  });
+
+  it("merges a lines run under the line-list topology", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    const material = new TestMaterial();
+    const segment = (): TestGeometry =>
+      new TestGeometry(
+        new Float32Array([-0.5, 0, 0, 0.5, 0, 0]),
+        undefined,
+        "lines",
+      );
+    const root = createRoot();
+    root.add(renderable(segment(), material));
+    root.add(renderable(segment(), material));
+    harness.renderer.render(root, [createView()]);
+
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    expect(label).toContain("line-list");
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(0);
+  });
+
+  it("carries the run's clip record onto the merged draw (§67)", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestMaterial([1, 1, 0, 1]);
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle(), material));
+    panel.add(renderable(triangle(), material));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    expect(label).toContain("|s:equal,1,0,");
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("leaves an unclipped run stencil-free on a frame that clips elsewhere", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestMaterial([0, 1, 1, 1]);
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    root.add(renderable(triangle(), material));
+    root.add(renderable(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    // Stencil-capable format, no stencil segment: the run tests nothing.
+    expect(label).toContain("depth24plus-stencil8");
+    expect(label).not.toContain("|s:");
+  });
+
+  it("counts one §84 draw call for the whole run", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    harness.renderer.render(batchableScene(), [createView()]);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("survives a reentrant dispose mid-frame, skipping every remaining draw", () => {
+    // `updateViewMatrix` is application code running inside the frame; §61
+    // forbids the frame to throw whatever it does — including tearing the
+    // renderer down. Every cache then answers null and every draw is skipped,
+    // which is the invariant the "unreachable" narrowings in the draw paths
+    // actually encode.
+    harness.renderer.batching = createWgpuBatching();
+    const root = batchableScene();
+    const camera = new TestCamera();
+    camera.updateViewMatrix = (): void => {
+      harness.renderer.dispose();
+    };
+    expect(() => {
+      harness.renderer.render(root, [createView({ camera: camera.asCamera })]);
+    }).not.toThrow();
+    expect(harness.gpu.countOf("pass.draw")).toBe(0);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+  });
+
+  it("destroys the uploader's buffers at dispose, on a live device", () => {
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(batchableScene(), [createView()]);
+    harness.gpu.reset();
+    harness.renderer.dispose();
+    // The uniform buffer plus the slot's vertex and index buffers.
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(3);
+  });
+
+  it("forgets the uploader's buffers on device loss, destroying nothing", async () => {
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(batchableScene(), [createView()]);
+    harness.gpu.loseDevice();
+    await Promise.resolve();
+    await Promise.resolve();
+    harness.gpu.reset();
+    harness.renderer.dispose();
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(0);
   });
 });

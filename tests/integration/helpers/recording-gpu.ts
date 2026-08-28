@@ -211,6 +211,11 @@ export function createRecordingGpu(
     setScissorRect: (x, y, width, height): void => {
       record("pass.setScissorRect", x, y, width, height);
     },
+    // §67's stencil reference (WP-R1.3) — the one §57 stencil field WebGPU
+    // leaves as a pass command rather than pipeline state.
+    setStencilReference: (reference): void => {
+      record("pass.setStencilReference", reference);
+    },
     draw: (vertexCount, instanceCount, firstVertex, firstInstance): void => {
       record(
         "pass.draw",

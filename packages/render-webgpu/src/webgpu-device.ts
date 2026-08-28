@@ -237,7 +237,35 @@ export interface GpuRenderPipelineDescriptor {
     readonly format: string;
     readonly depthWriteEnabled: boolean;
     readonly depthCompare: string;
+    /**
+     * §67's stencil test and operations (WP-R1.3), present only on a pipeline
+     * that actually tests or writes stencil bits — a clipless pipeline's
+     * descriptor omits all four members, which is what keeps its recorded
+     * `createRenderPipeline` line byte-identical to WP-R1.1's.
+     *
+     * Front and back are always the same state in this backend: GL's
+     * `stencilFunc`/`stencilOp` are two-sided, and culling is disabled on both
+     * backends, so a per-face split would be a distinction nothing draws.
+     */
+    readonly stencilFront?: GpuStencilFaceState;
+    readonly stencilBack?: GpuStencilFaceState;
+    /** The bits the test looks at (§57's `readMask`). */
+    readonly stencilReadMask?: number;
+    /** The bits a write may change (§57's `writeMask`). */
+    readonly stencilWriteMask?: number;
   };
+}
+
+/** One face's stencil comparison and operations (`GPUStencilFaceState`). */
+export interface GpuStencilFaceState {
+  /** The comparison, against the pass's stencil reference. */
+  readonly compare: string;
+  /** Stored on stencil-test failure. */
+  readonly failOp: string;
+  /** Stored when the stencil test passes and the depth test fails. */
+  readonly depthFailOp: string;
+  /** Stored when both tests pass. */
+  readonly passOp: string;
 }
 
 /** A render pass descriptor, reduced to what this packet attaches. */
@@ -257,6 +285,16 @@ export interface GpuRenderPassDescriptor {
     readonly depthLoadOp: "load" | "clear";
     readonly depthStoreOp: "store" | "discard";
     readonly depthClearValue?: number;
+    /**
+     * Stencil-aspect ops (§67, WP-R1.3) — **required by validation when the
+     * attachment's format carries a stencil aspect, and forbidden when it does
+     * not**, which is why they are optional here and written only on a frame
+     * whose depth attachment is `depth24plus-stencil8`. Always `"load"`: §61
+     * confines clears to the viewport rectangle, so the stencil clear is a
+     * scissored draw per view, exactly as the colour and depth clears are.
+     */
+    readonly stencilLoadOp?: "load" | "clear";
+    readonly stencilStoreOp?: "store" | "discard";
   };
 }
 
@@ -296,6 +334,13 @@ export interface GpuRenderPassEncoder {
   ): void;
   /** Confines writes — including this backend's clear draws — to a rectangle. */
   setScissorRect(x: number, y: number, width: number, height: number): void;
+  /**
+   * Sets the stencil reference the pipeline's `compare` and `"replace"` op
+   * read (§67, WP-R1.3). Pass state, initially `0` — the renderer mirrors it
+   * per frame and issues this only when a stencil-carrying draw needs a
+   * different value, so a clipless frame records none at all.
+   */
+  setStencilReference(reference: number): void;
   /** Non-indexed draw. */
   draw(
     vertexCount: number,

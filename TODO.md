@@ -57,10 +57,13 @@ changes in `CHANGELOG.md`.
 - [x] **R-1 / WP-R1.2 — WebGPU geometry, texture and sampler caches** (§77, §83) —
       **done 2026-08-28, all gates green.** Sampler cache keyed on the five resolved
       values; blit-based lazy mip generation; unlit `map` variant at bind group 1.
-- [ ] **R-1 / WP-R1.3 — sprites, text and `wgpu-batch.ts`** (the `RenderBatching`
-      uploader; the planner is untouched). First pixel evidence for the sprite path:
-      first browser spec in `tests/browser/webgpu/` with the adapter-skip guard —
-      the deferred WP-R1.2 browser evidence rides along.
+- [x] **R-1 / WP-R1.3 — sprites, text and `wgpu-batch.ts`** — landed 2026-08-28.
+      Sprite pipeline over a second lazy group-0 layout; text proved as the textured
+      unlit tier (R-28); `createWgpuBatching` uploader (buffer pair per batch slot —
+      queue-order rationale in the module header; staging ring noted, not built).
+      Browser specs written (sprites/batch + WP-R1.2's deferred texture evidence,
+      stencil intersection), self-skipping; validated with the wave's browser gate
+      at the RFC 0003 landing.
 - [ ] **R-1 / WP-R1.4 → WP-R1.8** — shapes/vertex colours, lit + standard, render
       targets and effects (`readPixels` via `copyTextureToBuffer` + `mapAsync`),
       shadows and stencil parity, compute and GPU particles (unblocks R-31). Strictly
@@ -173,11 +176,13 @@ changes in `CHANGELOG.md`.
       (a section view = a clip whose source is a §50 shape). Staged with named
       owners in `clip.ts`: alpha masks, 3D clip planes; the scissor fast-path
       bullet below is unchanged and still open.
-- [ ] **render-webgpu ignores `item.clip` (new, small, owner: next WebGPU packet).**
-      The backend predates §67 clips: on a clipped scene it draws mask items as
-      visible content and tests nothing. Unclipped scenes unaffected (the field is
-      `null`). Needs the WGSL-era twin of `applyMaterialState`'s clip parameter plus
-      a stencil-capable depth format decision (`depth24plus-stencil8`).
+- [x] **render-webgpu ignores `item.clip`** — closed by WP-R1.3 (2026-08-28): masks
+      write bit planes / content tests them, `item.clip` outranks `material.stencil`,
+      batch runs break on record identity; `depth24plus-stencil8` chosen per frame
+      from R-23's O(1) first-item read; clipless transcripts byte-identical. Residue
+      (rides WP-R1.7's stencil-parity packet): §57 `material.stencil` on a frame that
+      never clips is inert on WebGPU — GL-without-`{stencil:true}` parity, stated in
+      source.
 - [ ] **Sprite §79 flag drop (pre-existing, found 2026-08-28):** the writer writes
       `castShadow`/`receiveShadow`/`frustumCulled` for sprites; `Sprite`'s
       constructor filters its options and drops all three, so they do not survive a

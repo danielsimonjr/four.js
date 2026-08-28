@@ -22,6 +22,7 @@ export const PACKAGE_NAME = "@four/render-webgpu";
 export type {
   Gpu,
   GpuAdapter,
+  GpuStencilFaceState,
   GpuBindGroup,
   GpuBindGroupEntry,
   GpuBindGroupLayout,
@@ -77,10 +78,28 @@ export {
 export type { CacheableGeometry, WgpuGeometryRecord } from "./wgpu-geometry.js";
 export { WgpuGeometryCache } from "./wgpu-geometry.js";
 export type {
+  WgpuBatchStream,
   WgpuPipelineDescriptor,
   WgpuPipelineKind,
+  WgpuStencilDescriptor,
 } from "./wgpu-pipeline-cache.js";
 export { pipelineKey, WgpuPipelineCache } from "./wgpu-pipeline-cache.js";
+export type { WgpuRenderBatching } from "./wgpu-batch.js";
+export {
+  WgpuBatching,
+  batchVertexBufferLayout,
+  createWgpuBatching,
+} from "./wgpu-batch.js";
+export {
+  SPRITE_MODEL_OFFSET,
+  SPRITE_QUAD_OFFSET,
+  SPRITE_SHADER_SOURCE,
+  SPRITE_TINT_OFFSET,
+  SPRITE_UNIFORM_BYTES,
+  SPRITE_UNIFORM_WGSL,
+  SPRITE_VIEW_PROJECTION_OFFSET,
+  createSpriteBindGroupLayout,
+} from "./wgpu-sprite.js";
 export type {
   ResolvedSamplerState,
   WgpuCacheableTexture,

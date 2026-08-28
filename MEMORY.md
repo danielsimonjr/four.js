@@ -28,6 +28,66 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — WP-R1.3: WebGPU sprites, text, batching, §67 clips.** Decisions worth
+  keeping:
+  - **The stencil format is a per-frame decision, and R-23's sort key is what makes it
+    O(1).** `items[0].clip?.maskPass` picks `depth24plus-stencil8` over `depth24plus`;
+    only clipping frames pay for stencil-carrying pipelines and the attachment byte —
+    the pipeline-cost law applied to a _format_ (it is baked into every pipeline key).
+    A scene that starts/stops clipping reallocates once, like a resize. Corollary: no
+    `stencil` renderer option and no no-stencil diagnostic on WebGPU — the backend
+    owns its depth attachment and can always widen it; GL needs both only because its
+    stencil buffer is a context-creation attribute. Honest residue, stated in source:
+    §57 `material.stencil` is inert on clipless frames (= GL without
+    `{stencil:true}`).
+  - **§57's stencil record splits across WebGPU's seam: test/ops/masks are pipeline
+    identity, `ref` is a pass command.** `ref` stays out of the descriptor and the
+    key, so a mask writing bit 4 shares the pipeline of one writing bit 1; the
+    renderer mirrors the pass's reference and issues `setStencilReference` only on
+    change — a clipless frame records none.
+  - **A §67 mask is coverage, not shading.** With colour writes forced off, every
+    material family rasterises the identical fragment set, so one flat unlit variant
+    draws every mask — and a lit/standard clip node masks correctly on WebGPU before
+    WP-R1.5 gives its content a pipeline. (GL reuses the item's own program because a
+    program costs nothing to switch; a pipeline is a compiled object.)
+  - **`queue.writeBuffer` executes in queue order, not issue order — so the GL batch
+    uploader's single buffer pair cannot be ported.** A second batch's upload into a
+    shared buffer would land before the first batch's recorded draw executes.
+    `wgpu-batch.ts` keeps a buffer pair per batch _slot_ (slot k of every frame
+    reuses pair k; `beginFrame()` resets the counter — the one contract member GL
+    lacks); growth destroys immediately because a slot's previous use was an
+    already-submitted frame. §65's staging ring is the noted follow-up, not built.
+  - **A second group-0 layout is how a per-draw uniform block widens without moving
+    anything.** §55's `quad` needs 16 bytes `DrawUniforms` doesn't have; widening the
+    shared block would move `minBindingSize` in every recorded init transcript. The
+    sprite layout (160 B) binds the _same_ strided buffer and is created by the first
+    sprite draw — the WP-R1.2 "group 1 is created by the first textured upload"
+    precedent, second application. The stride's spare bytes were already allocated.
+  - **`pipelineKey` grows by conditional suffix, and that is what byte-identity
+    demands.** `|s:…`/`|b:…` append only when carried; absence appends nothing, no
+    required field can spell the prefixes, so the key stays total and injective while
+    every pre-R1.3 key — and every `four:<key>` label in landed transcripts — is
+    byte-identical. Batches key as their own _kind_ but share the unlit _modules_
+    (one compile per variant across both families).
+  - **Text was already done, and knowing why saved a pipeline.** R-28 made a label
+    one textured unlit item with per-glyph uvs, so WP-R1.2's `map` variant draws text
+    with zero new code; WP-R1.3's text deliverable is the WebGPU restatement of the
+    R-28 claims as tests. The plan's "text rides the sprite path" was stale by one
+    packet.
+  - **A reentrant mid-frame `dispose()` (application code inside
+    `camera.updateViewMatrix`) is the one reachable path to a disposed cache inside a
+    frame** — pinned as a test: the frame skips every remaining draw and does not
+    throw (§61), which is what the draw paths' "unreachable" null-narrowings actually
+    encode.
+  - **Multi-agent note, third confirmation:** two suite tests failed once while the
+    RFC 0003 sibling's edits were mid-flight on the shared tree and passed unchanged
+    on re-run. A red suite on a loaded shared tree indicts the tree state first.
+  - **Measured: 0 B in every bundle** — no WebGPU symbol (`vertexMain`,
+    `requestAdapter`, `depth24plus`, `SpriteUniforms`, `batch-vertices`,
+    `setStencilReference`) reaches any tight bundle; `createVertexArray` control 3×
+    each. The three tight-budget overruns observed at this packet's gate run
+    (+134…385 B) carry the sibling's `jointMatrices` and are RFC 0003's to account.
+
 - **2026-08-28 — R-23: §67's clipping API.** Decisions worth keeping:
   - **A clip is one extra draw and one shared record, and the record's _identity_ is
     the API.** Every item under one clip carries the identical pooled

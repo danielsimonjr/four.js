@@ -8,6 +8,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — WP-R1.3: WebGPU sprites, text, batching and §67 clips
+
+#### Added
+
+- **WP-R1.3 — WebGPU sprites, text, §65 batching and §67 clip application.**
+  `@four/render-webgpu` gains the §55 sprite pipeline (`wgpu-sprite.ts`: quad-uniform
+  uv derivation, `texture × tint`, always-blend, R-29 frame reparametrization) over a
+  second, lazily-created group-0 layout — the shared `DrawUniforms` layout does not
+  move, so spriteless transcripts are byte-identical; §56 text needs nothing new
+  (a label is one textured unlit draw since R-28, proved on WebGPU in
+  `tests/integration/webgpu-sprites-text.test.ts`); and the §65 uploader
+  (`wgpu-batch.ts`, `createWgpuBatching`) behind the shared planner — opt-in,
+  type-only-imported, drawing merged runs through the unlit WGSL modules over one
+  interleaved vertex buffer. Structural note recorded in source: `queue.writeBuffer`
+  executes in queue order, not issue order, so the uploader keeps a buffer pair per
+  batch slot rather than GL's single pair; §65's staging ring is noted, not built.
+  §67 clips now apply: mask draws write stencil bit planes (colour/depth forced off,
+  through the flat unlit pipeline — a mask is coverage, not shading), clipped draws
+  test `equal` over the accumulated planes, `item.clip` outranks `material.stencil`,
+  batch runs break on record identity, and the stencil reference is the one §57
+  field left as a pass command (issued only on change). The depth format is decided
+  per frame from R-23's O(1) sort-key question: `depth24plus-stencil8` only when the
+  frame clips — no `stencil` option and no no-stencil diagnostic, because this
+  backend owns its depth attachment and can always widen it. Clipless scenes record
+  the WP-R1.1/R1.2 transcript byte for byte (every landed expectation unmodified).
+  New browser specs (self-skipping): sprite/batch rasterisation with real texture
+  sampling (the deferred WP-R1.2 evidence), and two-plane stencil intersection.
+  Coverage 99.61/99.24, new files 100×4; no bundle carries a WebGPU symbol (grep).
+
 ### 2026-08-28 — R-23: §67's clipping API
 
 #### Added
