@@ -145,8 +145,8 @@ export type WgpuPipelineKind = "unlit" | "clear" | "sprite" | "batch";
  * share a pipeline and differ by one recorded pass command.
  *
  * Field values are the engine's §57 spellings, mapped to WebGPU's at creation
- * ({@link STENCIL_COMPARES}, {@link STENCIL_OPERATIONS}); the renderer builds
- * the record with §57's documented defaults already applied, so two draws
+ * (the module-private `STENCIL_COMPARES` and `STENCIL_OPERATIONS` tables); the
+ * renderer builds the record with §57's documented defaults applied, so two draws
  * under one clip record always produce one key.
  */
 export interface WgpuStencilDescriptor {

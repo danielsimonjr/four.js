@@ -67,6 +67,7 @@ import {
   EffectProgram,
   GL,
   GeometryCache,
+  JOINTS_ATTRIBUTE_LOCATION,
   LitProgram,
   MAP_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
@@ -83,10 +84,16 @@ import {
   SpriteProgram,
   StandardProgram,
   TextureCache,
+  SkinnedLitProgram,
+  SkinnedUnlitProgram,
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
+  WEIGHTS_ATTRIBUTE_LOCATION,
   WebglRenderer,
+  clearRegisteredSkinningPipeline,
   createGlBatching,
+  registerSkinningPipeline,
+  resolveSkinningPipelineFactory,
   type BatchGlContext,
   type ParticleGlContext,
   type WebglCanvas,
@@ -685,6 +692,12 @@ class TestGeometry {
   /** Optional per-vertex colour stream (§53, §60a; R-19) — undefined too. */
   colors: Float32Array | undefined;
 
+  /** Optional joint-index stream (§53, §54; RFC 0003) — undefined too. */
+  joints: Uint16Array | undefined;
+
+  /** Optional joint-weight stream (§53, §54; RFC 0003) — undefined too. */
+  weights: Float32Array | undefined;
+
   indices: Uint16Array | Uint32Array | undefined;
 
   mode: "triangles" | "lines" = "triangles";
@@ -729,6 +742,8 @@ class TestGeometry {
     this.normals = undefined;
     this.uvs = undefined;
     this.colors = undefined;
+    this.joints = undefined;
+    this.weights = undefined;
     this.indices = undefined;
     this.markDirty();
   }
@@ -10023,5 +10038,641 @@ describe("WebglRenderer.render — §67 clips (R-23)", () => {
       warn.mockRestore();
       resetDevWarnings();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §54's skinned pipelines (RFC 0003 — gaps PH-10 + R-22).
+// ---------------------------------------------------------------------------
+
+/**
+ * A `Skeleton` reduced to what the backend's render list and draw path read
+ * (§54): the bone count, the palette, and `update` — a double for the reason
+ * every scene-side object here is one (`@four/scene` is outside the frozen
+ * dependency matrix). The palette starts at per-joint identities and a test
+ * writes recognisable values into it directly.
+ */
+class TestSkeleton {
+  readonly bones: readonly null[];
+
+  readonly jointMatrices: Float32Array;
+
+  updates = 0;
+
+  constructor(count = 1) {
+    this.bones = new Array<null>(count).fill(null);
+    this.jointMatrices = new Float32Array(count * 16);
+    for (let i = 0; i < count; i += 1) {
+      const base = i * 16;
+      this.jointMatrices[base] = 1;
+      this.jointMatrices[base + 5] = 1;
+      this.jointMatrices[base + 10] = 1;
+      this.jointMatrices[base + 15] = 1;
+    }
+  }
+
+  update(): void {
+    this.updates += 1;
+  }
+}
+
+/** A drawable carrying §54's skin surface — `Mesh`, structurally. */
+class SkinnedTestNode extends Renderable {
+  skeleton: TestSkeleton | null = null;
+}
+
+/** A triangle carrying §53's full skin layout. */
+function skinnedGeometry(): TestGeometry {
+  const geometry = triangleGeometry();
+  geometry.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  geometry.weights = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
+  return geometry;
+}
+
+/** A root holding one skinned drawable over `material`. */
+function skinnedScene(
+  material: TestMaterial | TestLitMaterial = new TestMaterial(),
+  skeleton = new TestSkeleton(),
+): { root: Renderable; node: SkinnedTestNode; skeleton: TestSkeleton } {
+  const root = createRoot();
+  const node = new SkinnedTestNode(
+    skinnedGeometry().asGeometry,
+    material.asMaterial,
+  );
+  node.skeleton = skeleton;
+  root.add(node);
+  return { root, node, skeleton };
+}
+
+/** The per-program uniform maps that resolved `jointMatrices[0]`. */
+function skinnedUniformMaps(gl: FakeGl): Map<string, object>[] {
+  const maps: Map<string, object>[] = [];
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("jointMatrices[0]")) {
+      maps.push(perProgram);
+    }
+  }
+  return maps;
+}
+
+/** The skinned-unlit program's uniforms (declares `useVertexColors`). */
+function skinnedUnlitUniforms(gl: FakeGl): Map<string, object> {
+  for (const map of skinnedUniformMaps(gl)) {
+    if (map.has("useVertexColors")) {
+      return map;
+    }
+  }
+  throw new Error("the skinned-unlit program never resolved its uniforms");
+}
+
+/** The skinned-lit program's uniforms (declares `ambientLight`). */
+function skinnedLitUniforms(gl: FakeGl): Map<string, object> {
+  for (const map of skinnedUniformMaps(gl)) {
+    if (map.has("ambientLight")) {
+      return map;
+    }
+  }
+  throw new Error("the skinned-lit program never resolved its uniforms");
+}
+
+describe("registerSkinningPipeline — the registry slot (RFC 0003)", () => {
+  beforeEach(() => {
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("starts empty, fills on registration, and clears for tests", () => {
+    expect(resolveSkinningPipelineFactory()).toBeNull();
+    registerSkinningPipeline();
+    const factory = resolveSkinningPipelineFactory();
+    expect(factory).not.toBeNull();
+    // Idempotent: registering again installs an equivalent factory.
+    registerSkinningPipeline();
+    expect(resolveSkinningPipelineFactory()).not.toBeNull();
+    clearRegisteredSkinningPipeline();
+    expect(resolveSkinningPipelineFactory()).toBeNull();
+  });
+
+  it("compiles both programs through the factory, paired for disposal", () => {
+    registerSkinningPipeline();
+    const gl = createFakeGl();
+    const programs = resolveSkinningPipelineFactory()?.create(gl);
+    expect(programs).toBeDefined();
+    // Both linked; the registry interface is satisfied by the real classes.
+    expect(gl.countOf("linkProgram")).toBe(2);
+    programs?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+    // Idempotent per program.
+    programs?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+  });
+
+  it("disposes the unlit half when the lit half fails to compile", () => {
+    registerSkinningPipeline();
+    const gl = createFakeGl({ failProgramAt: 2 });
+    expect(() => resolveSkinningPipelineFactory()?.create(gl)).toThrow();
+    // The first program was built and must not leak (§83).
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("SkinnedUnlitProgram / SkinnedLitProgram (RFC 0003)", () => {
+  it("uploads the palette verbatim and mirrors its feature switches", () => {
+    const gl = createFakeGl();
+    const program = SkinnedUnlitProgram.create(gl);
+    program.use();
+    const palette = new Float32Array(32);
+    palette[0] = 7;
+    palette[17] = 9;
+    program.setJointMatrices(palette);
+    const location = skinnedUnlitUniforms(gl).get("jointMatrices[0]");
+    const uploads = uploadsAt(gl, location);
+    expect(uploads).toHaveLength(1);
+    expect((uploads[0] as number[])[0]).toBe(7);
+    expect((uploads[0] as number[])[17]).toBe(9);
+
+    // The mirror-at-GL-initial rule, inherited from the unlit program: both
+    // features off uploads nothing; a change uploads once.
+    const before = gl.countOf("uniform1i");
+    program.setFeatures(false, false);
+    expect(gl.countOf("uniform1i")).toBe(before);
+    program.setFeatures(true, true);
+    program.setFeatures(true, true);
+    // map sampler + useMap + useVertexColors, each exactly once.
+    expect(gl.countOf("uniform1i")).toBe(before + 3);
+    expect(program.disposed).toBe(false);
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    program.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("carries the lit contract: lights, shadow state, colour, palette", () => {
+    const gl = createFakeGl();
+    const program = SkinnedLitProgram.create(gl);
+    program.use();
+    program.setViewProjection(new Matrix4());
+    program.setModel(new Matrix4());
+    program.setColor([1, 0.5, 0.25, 1], 0.5);
+    program.setAmbientLight([0.1, 0.2, 0.3]);
+    program.setDirectionalLight(new Vector3(0, -1, 0), [1, 1, 1]);
+    const lights = createSceneLights();
+    program.setPunctualLights(lights);
+    program.setShadow(lights);
+    program.setReceivesShadow(false); // mirrored at GL's initial false
+    const uniformCalls = gl.countOf("uniform1i");
+    program.setReceivesShadow(true);
+    expect(gl.countOf("uniform1i")).toBe(uniformCalls + 1);
+    const colorUpload = uploadsAt(
+      gl,
+      skinnedLitUniforms(gl).get("color"),
+    )[0] as number[];
+    expect(colorUpload).toEqual([1, 0.5, 0.25, 0.5]);
+    program.setFeatures(true);
+    program.setFeatures(true);
+    program.setJointMatrices(new Float32Array(16));
+    program.dispose();
+    program.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("cleans up when its own uniforms are missing from the link (§89)", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+    expect(() => SkinnedUnlitProgram.create(gl)).toThrow();
+    expect(() => SkinnedLitProgram.create(gl)).toThrow();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+  });
+});
+
+describe("GeometryCache — the joint and weight streams (§53, §54)", () => {
+  it("uploads joints and weights at locations 4 and 5, and deletes them", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    const geometry = skinnedGeometry();
+    const record = cache.acquire(geometry.asGeometry);
+    expect(record?.jointBuffer).not.toBeNull();
+    expect(record?.weightBuffer).not.toBeNull();
+
+    const pointers = gl.callsOf("vertexAttribPointer");
+    const joints = pointers.find(
+      (call) => call.args[0] === JOINTS_ATTRIBUTE_LOCATION,
+    );
+    const weights = pointers.find(
+      (call) => call.args[0] === WEIGHTS_ATTRIBUTE_LOCATION,
+    );
+    // Non-normalized UNSIGNED_SHORT floats — see JOINTS_ATTRIBUTE_LOCATION.
+    expect(joints?.args.slice(1)).toEqual([4, GL.UNSIGNED_SHORT, false, 0, 0]);
+    expect(weights?.args.slice(1)).toEqual([4, GL.FLOAT, false, 0, 0]);
+
+    geometry.dispose();
+    cache.acquire(geometry.asGeometry);
+    // position + joints + weights buffers all deleted with the stale record.
+    expect(gl.countOf("deleteBuffer")).toBe(3);
+  });
+
+  it("uploads neither stream for a geometry that carries none", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    cache.acquire(triangleGeometry().asGeometry);
+    const locations = gl
+      .callsOf("enableVertexAttribArray")
+      .map((call) => call.args[0]);
+    expect(locations).not.toContain(JOINTS_ATTRIBUTE_LOCATION);
+    expect(locations).not.toContain(WEIGHTS_ATTRIBUTE_LOCATION);
+  });
+
+  it("abandons a half-allocated skinned upload without leaking (§83)", () => {
+    // Buffers: 1 position, 2 joints, 3 weights — fail the third.
+    const gl = createFakeGl();
+    let created = 0;
+    const original = gl.createBuffer.bind(gl);
+    gl.createBuffer = () => {
+      created += 1;
+      return created === 3 ? null : original();
+    };
+    const cache = new GeometryCache(gl);
+    expect(cache.acquire(skinnedGeometry().asGeometry)).toBeNull();
+    // The two live buffers and the vertex array are unwound.
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("reports the declared joint limit as a §62 capability", async () => {
+    const { renderer } = await initialized();
+    expect(renderer.capabilities.maximumSkinningJoints).toBe(48);
+  });
+
+  it("skips skinned draws with one warning when nothing is registered", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const { root } = skinnedScene();
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+
+      // No draw, no compile — and the warning names the fix, once.
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(gl.countOf("createProgram")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerSkinningPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("keeps a skinless frame's transcript byte-identical under registration", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(triangleGeometry()));
+    const views = [createView(camera)];
+    renderer.render(root, views);
+    gl.reset();
+    renderer.render(root, views);
+    const before = JSON.stringify(gl.calls);
+
+    registerSkinningPipeline();
+    try {
+      gl.reset();
+      renderer.render(root, views);
+      expect(JSON.stringify(gl.calls)).toBe(before);
+    } finally {
+      clearRegisteredSkinningPipeline();
+    }
+  });
+
+  it("compiles lazily on the first skinned draw, once, and draws through it", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const { root, skeleton } = skinnedScene();
+    skeleton.jointMatrices[13] = 5;
+    const views = [createView(camera)];
+    // Seven programs at initialize, none of them skinned.
+    expect(gl.countOf("createProgram")).toBe(7);
+    gl.reset();
+
+    renderer.render(root, views);
+
+    // Two more programs, compiled inside the frame — the first skinned draw.
+    expect(gl.countOf("createProgram")).toBe(2);
+    // The render list ran the palette update in the same build (the
+    // particle-repack precedent), and the draw uploaded the palette verbatim.
+    expect(skeleton.updates).toBe(1);
+    const palette = uploadsAt(
+      gl,
+      skinnedUnlitUniforms(gl).get("jointMatrices[0]"),
+    );
+    expect(palette).toHaveLength(1);
+    expect((palette[0] as number[])[13]).toBe(5);
+    expect(gl.countOf("drawArrays")).toBe(1);
+
+    // The second frame reuses the compiled pair.
+    gl.reset();
+    renderer.render(root, views);
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("shades a skinned-lit draw with the frame's lights", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.2, 0.3, 0.4]);
+    const node = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial([1, 0, 0, 1]).asMaterial,
+    );
+    node.skeleton = new TestSkeleton(2);
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = skinnedLitUniforms(gl);
+    const ambient = uploadsAt(gl, uniforms.get("ambientLight"))[0] as number[];
+    // Uploaded through a Float32Array scratch, so compare at f32 precision.
+    expect(ambient.map((v) => Math.fround(v))).toEqual(
+      [0.2, 0.3, 0.4].map((v) => Math.fround(v)),
+    );
+    expect(uploadsAt(gl, uniforms.get("jointMatrices[0]"))).toHaveLength(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("latches a compile failure: one warning, no draw, no retry", async () => {
+    registerSkinningPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // Program 8 is the first skinned compile (7 at initialize).
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 8 });
+      const { root } = skinnedScene();
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(root, views);
+      renderer.render(root, views);
+
+      // Asked once, refused once, never asked again (§61: no throw escaped).
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("failed to compile");
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("drops the pair on context loss and recompiles lazily after restore", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = skinnedScene();
+    const views = [createView(camera)];
+    renderer.render(root, views);
+
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+    canvas.dispatch("webglcontextrestored");
+    // The restore rebuilds the seven eager programs only — the skinned pair
+    // waits for the next skinned draw.
+    expect(gl.countOf("createProgram")).toBe(7);
+
+    gl.reset();
+    renderer.render(root, views);
+    expect(gl.countOf("createProgram")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("disposes the compiled pair with the renderer (§83)", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const { root } = skinnedScene();
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Seven eager programs plus the skinned pair.
+    expect(gl.countOf("deleteProgram")).toBe(9);
+  });
+
+  it("excludes skinned casters from the §69 shadow pass (bind pose)", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const caster = litRenderable();
+    const skinned = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    root.add(light, caster, skinned);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // One caster in the map — the unskinned one. A skinned caster would cast
+    // its bind pose, which is a different picture.
+    const shadowModel = shadowUniforms(gl).get("model");
+    expect(uploadsAt(gl, shadowModel)).toHaveLength(1);
+    // The skinned draw itself still happened, in the colour pass.
+    expect(
+      uploadsAt(gl, skinnedLitUniforms(gl).get("jointMatrices[0]")),
+    ).toHaveLength(1);
+  });
+});
+
+describe("skinned draws — textures and feature mirrors (RFC 0003, R-19)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("binds a skinned-unlit material's map and mirrors the switches", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture().asTexture;
+    material.vertexColors = true;
+    const node = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      material.asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    // A second, untextured skinned draw after it: the unit stays active and
+    // the switches mirror back off.
+    const plainMaterial = new TestMaterial();
+    const plain = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      plainMaterial.asMaterial,
+    );
+    plain.skeleton = new TestSkeleton();
+    root.add(node, plain);
+    const views = [createView(camera)];
+    gl.reset();
+
+    renderer.render(root, views);
+
+    // One activeTexture for the map unit, one bind for the one texture.
+    expect(gl.countOf("activeTexture")).toBe(1);
+    const uniforms = skinnedUnlitUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
+    expect(uploadsAt(gl, uniforms.get("useVertexColors"))).toEqual([1, 0]);
+    expect(gl.countOf("drawArrays")).toBe(2);
+
+    // A second frame re-binds the map on the already-active unit — the
+    // sampler is uploaded once for the program's life.
+    gl.reset();
+    renderer.render(root, views);
+    const sampler = uploadsAt(gl, uniforms.get("map"));
+    expect(sampler).toEqual([]);
+  });
+
+  it("binds a skinned-lit material's map, and drops a disposed one's draw", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    const texture = new TestTexture();
+    material.map = texture.asTexture;
+    const node = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      material.asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    root.add(node);
+    const views = [createView(camera)];
+    gl.reset();
+
+    renderer.render(root, views);
+    const uniforms = skinnedLitUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+
+    // A disposed map degrades the draw to untextured — §83's rule, exactly as
+    // the lit pipeline treats it (a texture the cache cannot resolve).
+    texture.dispose();
+    gl.reset();
+    renderer.render(root, views);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([0]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+});
+
+describe("skinned program mirrors — the sampler uploads once", () => {
+  it("re-raising useMap after a drop does not re-upload the unit (unlit)", () => {
+    const gl = createFakeGl();
+    const program = SkinnedUnlitProgram.create(gl);
+    program.use();
+    program.setFeatures(true, false);
+    program.setFeatures(false, false);
+    program.setFeatures(true, false);
+    const sampler = uploadsAt(gl, skinnedUnlitUniforms(gl).get("map"));
+    expect(sampler).toEqual([0]);
+    // The vertex-colour switch moves independently of the map switch.
+    program.setFeatures(true, true);
+    expect(
+      uploadsAt(gl, skinnedUnlitUniforms(gl).get("useVertexColors")),
+    ).toEqual([1]);
+  });
+
+  it("re-raising useMap after a drop does not re-upload the unit (lit)", () => {
+    const gl = createFakeGl();
+    const program = SkinnedLitProgram.create(gl);
+    program.use();
+    expect(program.disposed).toBe(false);
+    program.setFeatures(true);
+    program.setFeatures(false);
+    program.setFeatures(true);
+    const sampler = uploadsAt(gl, skinnedLitUniforms(gl).get("map"));
+    expect(sampler).toEqual([0]);
+    program.dispose();
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("GeometryCache — the joint buffer's own failure path (§83)", () => {
+  it("abandons the upload when the joint buffer will not allocate", () => {
+    const gl = createFakeGl();
+    let created = 0;
+    const original = gl.createBuffer.bind(gl);
+    gl.createBuffer = () => {
+      created += 1;
+      // 1 position, 2 joints — fail the joints allocation itself.
+      return created === 2 ? null : original();
+    };
+    const cache = new GeometryCache(gl);
+    expect(cache.acquire(skinnedGeometry().asGeometry)).toBeNull();
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("skinned draws — indexed geometry, statistics, disposed skips", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("draws an indexed skinned geometry through drawElements and counts it", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const geometry = quadGeometry();
+    geometry.joints = new Uint16Array(16);
+    geometry.weights = new Float32Array(16);
+    for (let i = 0; i < 4; i += 1) {
+      geometry.weights[i * 4] = 1;
+    }
+    const node = new SkinnedTestNode(
+      geometry.asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    root.add(node);
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+    // §84: one submitted draw, two triangles, one instance.
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("skips a skinned draw with nothing to draw (§83's empty geometry)", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Zero vertices carrying (empty) influence streams: the render list still
+    // classifies the draw skinned, and the geometry cache answers "nothing to
+    // draw" — the same skip a disposed geometry takes, after the pipeline
+    // resolution rather than before it.
+    const geometry = new TestGeometry(new Float32Array(0));
+    geometry.joints = new Uint16Array(0);
+    geometry.weights = new Float32Array(0);
+    const node = new SkinnedTestNode(
+      geometry.asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
   });
 });

@@ -237,6 +237,24 @@ export interface RendererCapabilities {
    * for a backend that binds nothing.
    */
   readonly maxBindings?: number;
+
+  /**
+   * The most bones one skinned draw may use (§54, §62; RFC 0003), or `0`
+   * where skinning is unsupported.
+   *
+   * Optional with the tri-state every WP-R1.1 member carries — `undefined`
+   * means "this backend has not been taught to answer", distinct from `0` —
+   * which is a recorded deviation from RFC 0003's required-member sketch: the
+   * RFC predates the widening law WP-R1.1 landed (*every added member is
+   * optional, absent means not reported*), and a required member here would
+   * break every third-party `Renderer` for a number most backends answer with
+   * a constant. The WebGL 2 backend reports `@four/render`'s declared
+   * `MAX_SKINNING_JOINTS` (see `mesh.ts` for the portability arithmetic); a
+   * skinned draw against it additionally requires its
+   * `registerSkinningPipeline()` — the capability says what the backend *can*
+   * do, registration is the application opting in to paying for it.
+   */
+  readonly maximumSkinningJoints?: number;
 }
 
 /**
@@ -755,6 +773,7 @@ export class NullRenderer implements Renderer {
     shaderPrecision: "none",
     maxUniformBufferBytes: 0,
     maxBindings: 0,
+    maximumSkinningJoints: 0,
   } satisfies RendererCapabilities);
 
   /** The §6b channel required by {@link Renderer}. Never emitted to by this class. */

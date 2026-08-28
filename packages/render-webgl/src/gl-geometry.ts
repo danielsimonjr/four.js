@@ -11,9 +11,10 @@
  *
  * ## What one entry holds
  *
- * A vertex array object plus the one to five buffers it references —
+ * A vertex array object plus the one to seven buffers it references —
  * positions, the optional normal stream (§68, 2026-08-04), the optional uv and
- * per-vertex colour streams (§53, R-19, 2026-08-07), the optional index
+ * per-vertex colour streams (§53, R-19, 2026-08-07), the optional joint and
+ * weight streams (§54, RFC 0003, 2026-08-28), the optional index
  * buffer — and the
  * three numbers the draw call needs (mode, element count, index type). Binding
  * a VAO restores the whole attribute *and* element-array binding state in one
@@ -62,9 +63,11 @@ import type { RenderItem } from "@four/render";
 import {
   COLOR_ATTRIBUTE_LOCATION,
   GL,
+  JOINTS_ATTRIBUTE_LOCATION,
   NORMAL_ATTRIBUTE_LOCATION,
   POSITION_ATTRIBUTE_LOCATION,
   UV_ATTRIBUTE_LOCATION,
+  WEIGHTS_ATTRIBUTE_LOCATION,
   type WebglContext,
 } from "./gl-program.js";
 import type { GlBuffer, GlVertexArray } from "./gl-program.js";
@@ -115,6 +118,21 @@ export interface GeometryRecord {
    * overlay reaches the screen (R-35).
    */
   readonly colorBuffer: GlBuffer | null;
+
+  /**
+   * Buffer backing the optional joint-index attribute (§53, §54; RFC 0003),
+   * or `null`. Bound at `JOINTS_ATTRIBUTE_LOCATION` as non-normalized
+   * `UNSIGNED_SHORT` — the skinned pipelines declare `in vec4 joints` and
+   * index with `int(...)`; every other program ignores the slot.
+   */
+  readonly jointBuffer: GlBuffer | null;
+
+  /**
+   * Buffer backing the optional joint-weight attribute (§53, §54; RFC 0003),
+   * or `null`. Bound at `WEIGHTS_ATTRIBUTE_LOCATION`; consumed only by the
+   * skinned pipelines.
+   */
+  readonly weightBuffer: GlBuffer | null;
 
   /** Index buffer, or `null` for a non-indexed geometry. */
   readonly indexBuffer: GlBuffer | null;
@@ -267,7 +285,8 @@ export class GeometryCache {
     }
 
     // Buffers are allocated before anything is bound, in the fixed order
-    // positions → normals → uvs → colors → indices, so that a refusal part way
+    // positions → normals → uvs → colors → joints → weights → indices, so
+    // that a refusal part way
     // through unwinds exactly what it created and the geometry is skipped
     // rather than half-uploaded. `allocated` records them for that unwind; the
     // list is the reason adding two optional streams did not multiply the
@@ -316,6 +335,24 @@ export class GeometryCache {
     if (colors !== undefined) {
       colorBuffer = allocate();
       if (colorBuffer === null) {
+        return abandon();
+      }
+    }
+
+    const joints = geometry.joints;
+    let jointBuffer: GlBuffer | null = null;
+    if (joints !== undefined) {
+      jointBuffer = allocate();
+      if (jointBuffer === null) {
+        return abandon();
+      }
+    }
+
+    const weights = geometry.weights;
+    let weightBuffer: GlBuffer | null = null;
+    if (weights !== undefined) {
+      weightBuffer = allocate();
+      if (weightBuffer === null) {
         return abandon();
       }
     }
@@ -382,6 +419,37 @@ export class GeometryCache {
       );
     }
 
+    if (joints !== undefined && jointBuffer !== null) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, jointBuffer);
+      gl.bufferData(GL.ARRAY_BUFFER, joints, GL.STATIC_DRAW);
+      gl.enableVertexAttribArray(JOINTS_ATTRIBUTE_LOCATION);
+      // Non-normalized UNSIGNED_SHORT: the indices arrive in the vertex stage
+      // as exact floats (see `JOINTS_ATTRIBUTE_LOCATION` for why not an
+      // integer attribute).
+      gl.vertexAttribPointer(
+        JOINTS_ATTRIBUTE_LOCATION,
+        4,
+        GL.UNSIGNED_SHORT,
+        false,
+        0,
+        0,
+      );
+    }
+
+    if (weights !== undefined && weightBuffer !== null) {
+      gl.bindBuffer(GL.ARRAY_BUFFER, weightBuffer);
+      gl.bufferData(GL.ARRAY_BUFFER, weights, GL.STATIC_DRAW);
+      gl.enableVertexAttribArray(WEIGHTS_ATTRIBUTE_LOCATION);
+      gl.vertexAttribPointer(
+        WEIGHTS_ATTRIBUTE_LOCATION,
+        4,
+        GL.FLOAT,
+        false,
+        0,
+        0,
+      );
+    }
+
     if (indices !== undefined && indexBuffer !== null) {
       gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
       gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW);
@@ -396,6 +464,8 @@ export class GeometryCache {
       normalBuffer,
       uvBuffer,
       colorBuffer,
+      jointBuffer,
+      weightBuffer,
       indexBuffer,
       version: geometry.version,
       mode: glMode(geometry.mode),
@@ -413,6 +483,8 @@ export class GeometryCache {
       record.normalBuffer,
       record.uvBuffer,
       record.colorBuffer,
+      record.jointBuffer,
+      record.weightBuffer,
       record.indexBuffer,
     ]) {
       if (buffer !== null) {

@@ -6,11 +6,12 @@
  * `ProceduralGeometry`, …) over an abstract base with `id`, `version`,
  * `bounds`, `computeBounds()`, `clone()`, and `dispose()`. This packet
  * implements exactly one concrete member of it — positions, the optional
- * per-vertex `normals`, `uvs`, and `colors` attributes, optional indices, a
+ * per-vertex `normals`, `uvs`, `colors`, and (since RFC 0003) `joints`/`weights`
+ * attributes, optional indices, a
  * draw mode — because that is what the §120 MVP renders (unlit, textured, and
- * Lambert-lit primitives, WebGL 2). The rest of the family, the rest of §53's
- * standard attribute set (tangents, a secondary uv set, joints/weights,
- * instance transforms), and `clone()` are deliberately absent rather than
+ * Lambert-lit primitives, WebGL 2). The rest of the family and the rest of
+ * §53's standard attribute set (tangents, a secondary uv set,
+ * instance transforms) are deliberately absent rather than
  * sketched: each of them pins a public layout that the WebGL backend and the
  * §79 scene format both have to agree with, and none of them is needed to draw
  * a textured box.
@@ -44,6 +45,31 @@
  * Neither is *consumed* unless a material asks for it: a geometry may carry uvs
  * and still draw flat-coloured, which is what keeps the attributes free to add
  * to the primitive builders without changing a single existing pixel.
+ *
+ * `joints` and `weights` joined on 2026-08-28 (§54; RFC 0003 — this is "the
+ * act of pinning that layout" the paragraph above deferred), following the
+ * same precedent — optional, index-aligned, §85-validated on assignment,
+ * dropped by `dispose()`:
+ *
+ * - **`joints`** are **4 joint indices per vertex** (`joints[4 * i]` is vertex
+ *   `i`'s first influence), as a `Uint16Array`. This package cannot name a
+ *   bone — its §3.1 row is `core, math` — so a joint is an *index*, and what
+ *   it indexes is somebody else's problem: `@four/scene`'s `Skeleton.bones`,
+ *   whose insertion order is the ABI (§33). Indices are **not** range-checked
+ *   here, because the geometry cannot see the skeleton; the backend's joint
+ *   limit and the skeleton's own length are checked where each is known.
+ * - **`weights`** are 4 floats per vertex, index-parallel with `joints`.
+ *   Their sum per vertex should be 1, and — the `normals` precedent applied
+ *   verbatim — that is the author's contract, not validated here: §85 checks
+ *   finiteness only, and a renormalization would silently rewrite authored
+ *   data.
+ *
+ * Four influences per vertex matches glTF's `JOINTS_0`/`WEIGHTS_0` and fixes
+ * the attribute budget; a second set (`JOINTS_1`/`WEIGHTS_1`) is the named
+ * extension point, at the next two locations, so the layout is not
+ * re-litigated (RFC 0003 open question 2, adopted). The WebGL backend binds
+ * these at the fixed attribute locations **4 (joints)** and **5 (weights)**,
+ * continuing R-19's numbering — 0 position, 1 normal, 2 uv, 3 colour.
  *
  * ## Version, not events
  *
@@ -158,6 +184,21 @@ export interface BufferGeometryOptions {
    */
   colors?: Float32Array;
   /**
+   * Optional per-vertex joint indices as quadruplets, index-aligned with
+   * `positions` (§53, §54; RFC 0003). Length must be `4 / 3` of
+   * `positions.length` — four influences per vertex — and each entry indexes a
+   * `Skeleton.bones` array this package cannot see (§85 checks the length; the
+   * range is the consumers'). Meaningful only together with `weights`.
+   */
+  joints?: Uint16Array;
+  /**
+   * Optional per-vertex joint weights as quadruplets, index-parallel with
+   * `joints` (§53, §54; RFC 0003). Length must be `4 / 3` of
+   * `positions.length` and every value finite (§85); summing to 1 per vertex
+   * is the author's contract — see the module header.
+   */
+  weights?: Float32Array;
+  /**
    * Optional index buffer. Every entry must be a valid vertex index and the
    * length must be a multiple of the mode's primitive size (§85).
    */
@@ -185,7 +226,7 @@ function primitiveSize(mode: GeometryDrawMode): number {
  */
 function validateAttribute(
   name: string,
-  values: Float32Array | undefined,
+  values: Float32Array | Uint16Array | undefined,
   components: number,
   vertexCount: number,
   reference: string,
@@ -200,6 +241,12 @@ function validateAttribute(
         `${String(components)} floats per vertex — so their length must be ` +
         `${String(expected)}; got ${String(values.length)} (${reference}).`,
     );
+  }
+  if (values instanceof Uint16Array) {
+    // §54's `joints`: every element of a Uint16Array is a finite integer by
+    // construction, so the finiteness pass below has nothing to find and is
+    // skipped rather than run for show.
+    return;
   }
   for (let i = 0; i < values.length; i += 1) {
     if (!Number.isFinite(values[i])) {
@@ -220,6 +267,8 @@ function validate(
   normals: Float32Array | undefined,
   uvs: Float32Array | undefined,
   colors: Float32Array | undefined,
+  joints: Uint16Array | undefined,
+  weights: Float32Array | undefined,
   indices: GeometryIndexArray | undefined,
   mode: GeometryDrawMode,
 ): void {
@@ -242,6 +291,8 @@ function validate(
   validateAttribute("normals", normals, 3, vertexCount, "§53, §68");
   validateAttribute("uvs", uvs, 2, vertexCount, "§53, §55");
   validateAttribute("colors", colors, 4, vertexCount, "§53, §60a");
+  validateAttribute("joints", joints, 4, vertexCount, "§53, §54");
+  validateAttribute("weights", weights, 4, vertexCount, "§53, §54");
 
   const size = primitiveSize(mode);
 
@@ -296,6 +347,10 @@ export class BufferGeometry extends Geometry {
 
   #colors: Float32Array | undefined;
 
+  #joints: Uint16Array | undefined;
+
+  #weights: Float32Array | undefined;
+
   #indices: GeometryIndexArray | undefined;
 
   #mode: GeometryDrawMode;
@@ -332,6 +387,8 @@ export class BufferGeometry extends Geometry {
       options.normals,
       options.uvs,
       options.colors,
+      options.joints,
+      options.weights,
       options.indices,
       mode,
     );
@@ -339,6 +396,8 @@ export class BufferGeometry extends Geometry {
     this.#normals = options.normals;
     this.#uvs = options.uvs;
     this.#colors = options.colors;
+    this.#joints = options.joints;
+    this.#weights = options.weights;
     this.#indices = options.indices;
     this.#mode = mode;
     noteGeometry(1, this.byteLength);
@@ -375,6 +434,8 @@ export class BufferGeometry extends Geometry {
       this.#normals,
       this.#uvs,
       this.#colors,
+      this.#joints,
+      this.#weights,
       this.#indices,
       this.#mode,
     );
@@ -406,6 +467,8 @@ export class BufferGeometry extends Geometry {
       value,
       this.#uvs,
       this.#colors,
+      this.#joints,
+      this.#weights,
       this.#indices,
       this.#mode,
     );
@@ -439,6 +502,8 @@ export class BufferGeometry extends Geometry {
       this.#normals,
       value,
       this.#colors,
+      this.#joints,
+      this.#weights,
       this.#indices,
       this.#mode,
     );
@@ -472,11 +537,75 @@ export class BufferGeometry extends Geometry {
       this.#normals,
       this.#uvs,
       value,
+      this.#joints,
+      this.#weights,
       this.#indices,
       this.#mode,
     );
     const before = this.byteLength;
     this.#colors = value;
+    this.#mutated(before);
+  }
+
+  /**
+   * Optional per-vertex joint indices as quadruplets, or `undefined` for a
+   * geometry no skin influences (§53, §54; RFC 0003). Held by reference, like
+   * {@link BufferGeometry.positions}, and subject to the same rules: assigning
+   * validates (four entries per vertex, index-aligned, §85) and bumps the
+   * version; **in-place edits are invisible and need
+   * {@link BufferGeometry.markDirty}**. Assigning `undefined` drops the
+   * attribute — the geometry then never draws skinned, whatever skeleton its
+   * mesh carries (the render list warns about the mismatch in a development
+   * build).
+   *
+   * Each entry indexes `Skeleton.bones` (§33: insertion order is the ABI) and
+   * is deliberately not range-checked here — see the module header.
+   */
+  get joints(): Uint16Array | undefined {
+    return this.#joints;
+  }
+
+  set joints(value: Uint16Array | undefined) {
+    validate(
+      this.#positions,
+      this.#normals,
+      this.#uvs,
+      this.#colors,
+      value,
+      this.#weights,
+      this.#indices,
+      this.#mode,
+    );
+    const before = this.byteLength;
+    this.#joints = value;
+    this.#mutated(before);
+  }
+
+  /**
+   * Optional per-vertex joint weights as quadruplets, index-parallel with
+   * {@link BufferGeometry.joints}, or `undefined` (§53, §54; RFC 0003). Held
+   * by reference and subject to the same rules as every attribute: assigning
+   * validates (four finite floats per vertex, §85) and bumps the version;
+   * in-place edits need {@link BufferGeometry.markDirty}. A per-vertex sum of
+   * 1 is the author's contract, not validated — see the module header.
+   */
+  get weights(): Float32Array | undefined {
+    return this.#weights;
+  }
+
+  set weights(value: Float32Array | undefined) {
+    validate(
+      this.#positions,
+      this.#normals,
+      this.#uvs,
+      this.#colors,
+      this.#joints,
+      value,
+      this.#indices,
+      this.#mode,
+    );
+    const before = this.byteLength;
+    this.#weights = value;
     this.#mutated(before);
   }
 
@@ -496,6 +625,8 @@ export class BufferGeometry extends Geometry {
       this.#normals,
       this.#uvs,
       this.#colors,
+      this.#joints,
+      this.#weights,
       value,
       this.#mode,
     );
@@ -519,6 +650,8 @@ export class BufferGeometry extends Geometry {
       this.#normals,
       this.#uvs,
       this.#colors,
+      this.#joints,
+      this.#weights,
       this.#indices,
       value,
     );
@@ -570,8 +703,8 @@ export class BufferGeometry extends Geometry {
   /**
    * Bytes this geometry holds (§83, §84's `bufferMemory`) — the sum of the
    * `byteLength`s of `positions` and whichever of `normals`, `uvs`, `colors`,
-   * and `indices` are present, and therefore exactly what a backend uploads
-   * for it.
+   * `joints`, `weights`, and `indices` are present, and therefore exactly what
+   * a backend uploads for it.
    *
    * ```ts
    * // 3 vertices × 3 floats × 4 bytes
@@ -597,6 +730,8 @@ export class BufferGeometry extends Geometry {
       (this.#normals?.byteLength ?? 0) +
       (this.#uvs?.byteLength ?? 0) +
       (this.#colors?.byteLength ?? 0) +
+      (this.#joints?.byteLength ?? 0) +
+      (this.#weights?.byteLength ?? 0) +
       (this.#indices?.byteLength ?? 0)
     );
   }
@@ -741,6 +876,8 @@ export class BufferGeometry extends Geometry {
       normals: this.#normals?.slice(),
       uvs: this.#uvs?.slice(),
       colors: this.#colors?.slice(),
+      joints: this.#joints?.slice(),
+      weights: this.#weights?.slice(),
       indices: this.#indices?.slice(),
       mode: this.#mode,
     });
@@ -750,7 +887,7 @@ export class BufferGeometry extends Geometry {
    * Releases this geometry's CPU-side data (§83). Idempotent.
    *
    * The typed arrays are dropped — `positions` becomes empty, `normals`,
-   * `uvs`, `colors`, and
+   * `uvs`, `colors`, `joints`, `weights`, and
    * `indices` become `undefined` — so a large mesh's memory is reclaimable the moment
    * its owner is done with it, and the version is bumped so any backend cache
    * keyed on it re-reads (and finds nothing to draw). Nothing throws
@@ -776,6 +913,8 @@ export class BufferGeometry extends Geometry {
     this.#normals = undefined;
     this.#uvs = undefined;
     this.#colors = undefined;
+    this.#joints = undefined;
+    this.#weights = undefined;
     this.#indices = undefined;
     noteGeometry(-1, -before);
     this.markDirty();

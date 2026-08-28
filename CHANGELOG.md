@@ -8,6 +8,40 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — RFC 0003: §54 skinning and skeletal animation (PH-10 + R-22)
+
+#### Added
+
+- **RFC 0003 implemented — §54 skinning and skeletal animation (gaps `PH-10` +
+  `R-22`; spec revision 1.10).** `@four/scene` gains `Bone` (an ordinary `Node` —
+  §42 authority, §19 blending, §79 and animation apply with no new mechanism),
+  `Skeleton` (joint index = position in `bones`, insertion order the §33 ABI;
+  `update` derives the palette `inverse(skinRootWorld)·boneWorld·inverseBind[i]`
+  in a fixed association order), and the `MorphWeights` component (+ serializer,
+  registered the same packet). `BufferGeometry` gains the §53 `joints`/`weights`
+  attributes (4 influences/vertex, §85-validated; weight sums are the author's
+  contract), bound by the WebGL backend at fixed locations **4/5**. `@four/render`
+  gains §54's `Mesh` (skeleton refused over `MAX_SKINNING_JOINTS = 48` at setup
+  with `UNSUPPORTED_GPU_FEATURE`; `morphTargetWeights` is an accessor over the
+  component; §79 skeleton reference restored by id on first read via
+  `restoreMeshSkeleton`), the `"skinned-unlit"`/`"skinned-lit"` render-item kinds
+  with the palette refreshed in the same list build, and the optional
+  `RendererCapabilities.maximumSkinningJoints`. `@four/render-webgl` gains the
+  lazily-registered skinning pipeline (`registerSkinningPipeline()`; programs
+  compile on a renderer's first skinned draw — skinless scenes transcribe
+  byte-identically, transcript-asserted; unregistered/uncompilable/unskinnable
+  draws are skipped with one warning, never shown in bind pose). §17 is **9 of 9**
+  with zero new `ValueKind`s — the two "missing" track types are the indexed-array
+  binding form (`bones.<i>.…`, `weights.<i>`), documented and tested in
+  `@four/animation` (+ `createArrayElementBinding`). New determinism golden
+  `skinned-pose.json` (§33 `same-runtime`; the palette is the envelope's last CPU
+  value — no engine API returns skinned vertex positions), new browser proof
+  (two-bone column bends 90° on a real driver: arm region 0→480 px, top 560→0,
+  one draw). Bone-axis disposition adopted: the engine imposes **none**; +Y is a
+  helper convention only (`ik.ts` reconciled). Bundle cost: +0.75–0.80 kB gzip per
+  WebglRenderer bundle (frame-path); the pipeline itself is 0 B unless registered.
+  Budgets: first-3d-scene 36→36.5, particles-demo 34→34.5, ui-demo 42→43 kB.
+
 ### 2026-08-28 — WP-R1.3: WebGPU sprites, text, batching and §67 clips
 
 #### Added

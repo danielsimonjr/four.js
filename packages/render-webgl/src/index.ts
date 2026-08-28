@@ -61,6 +61,30 @@ export type {
   RenderTargetRecord,
 } from "./gl-render-target.js";
 export { RenderTargetCache } from "./gl-render-target.js";
+export {
+  JOINTS_ATTRIBUTE_LOCATION,
+  WEIGHTS_ATTRIBUTE_LOCATION,
+} from "./gl-program.js";
+export type {
+  SkinnedLitPipeline,
+  SkinnedPrograms,
+  SkinnedUnlitPipeline,
+  SkinningPipelineFactory,
+} from "./gl-skinning-registry.js";
+export {
+  clearRegisteredSkinningPipeline,
+  resolveSkinningPipelineFactory,
+} from "./gl-skinning-registry.js";
+// The skinned pipeline itself (§54; RFC 0003). Deliberately the **only**
+// module here that `WebglRenderer` does not reach statically: importing
+// `registerSkinningPipeline` is what links the two skinned programs into a
+// bundle, and a barrel re-export does not (it tree-shakes like every other
+// unused export) — see `gl-skinning-registry.ts` for the whole seam.
+export {
+  SkinnedLitProgram,
+  SkinnedUnlitProgram,
+  registerSkinningPipeline,
+} from "./gl-skinning.js";
 export { ShadowProgram } from "./gl-shadow.js";
 export { StandardProgram } from "./gl-standard.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";

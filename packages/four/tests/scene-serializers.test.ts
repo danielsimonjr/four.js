@@ -29,10 +29,13 @@ import {
 } from "@four/motion";
 import { Vector3 } from "@four/math";
 import { Collider, RigidBody, SweptCharacterController } from "@four/physics";
-import { Renderable, Sprite, Texture } from "@four/render";
+import { Mesh, Renderable, Sprite, Texture } from "@four/render";
 import {
+  Bone,
   DirectionalLight,
+  MorphWeights,
   PointLight,
+  Skeleton,
   SpotLight,
   Group,
   OrthographicCamera,
@@ -64,6 +67,7 @@ import { describe, expect, it } from "vitest";
 
 import * as four from "../src/index.js";
 import {
+  BONE_NODE_TYPE,
   BUTTON_NODE_TYPE,
   CHECKBOX_NODE_TYPE,
   DIRECTIONAL_LIGHT_NODE_TYPE,
@@ -77,6 +81,7 @@ import {
   PERSPECTIVE_CAMERA_NODE_TYPE,
   PROGRESS_NODE_TYPE,
   RADIO_BUTTON_NODE_TYPE,
+  MESH_NODE_TYPE,
   RENDERABLE_NODE_TYPE,
   SLIDER_NODE_TYPE,
   SPRITE_NODE_TYPE,
@@ -867,6 +872,7 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
       "follow-rig",
       "kinematic-controller",
       "look-at-constraint",
+      "morph-weights",
       "motion",
       "orbit-rig",
       "pose-target",
@@ -1755,5 +1761,169 @@ describe("composeSceneNodeTypes", () => {
     expect(composed.write.nodeTypeOf(new Group())).toBeUndefined();
     expect(composed.write.nodeDataOf(new Group())).toBeUndefined();
     expect(composed.read.nodeFactory({ type: "group" })).toBeUndefined();
+  });
+});
+
+/**
+ * §54's skinned tier survives §79 (RFC 0003 — gaps PH-10 + R-22): a `Mesh`
+ * keeps its class, its shared resources, and its skeleton — written as bone
+ * ids plus inverse bind matrices, resolved against the reloaded `scene:bone`
+ * nodes on the first read — and `MorphWeights` rounds through the component
+ * registry like every other component.
+ */
+describe("registerSceneNodeTypes — Mesh, Bone, and MorphWeights (RFC 0003)", () => {
+  const skinnedPlane = planeGeometry();
+  {
+    const vertexCount = skinnedPlane.vertexCount;
+    skinnedPlane.joints = new Uint16Array(vertexCount * 4);
+    const weights = new Float32Array(vertexCount * 4);
+    for (let i = 0; i < vertexCount; i += 1) {
+      weights[i * 4] = 1;
+    }
+    skinnedPlane.weights = weights;
+  }
+  const skin = new UnlitMaterial();
+  const geometries = resourceCatalog<BufferGeometry>([
+    ["geometry/skinned-plane", skinnedPlane],
+  ]);
+  const materials = resourceCatalog<Material>([["material/skin", skin]]);
+
+  function buildSkinnedScene(): Scene {
+    const scene = new Scene();
+    const mesh = new Mesh(skinnedPlane, skin, { renderLayer: 1 });
+    const hip = new Bone();
+    hip.name = "hip";
+    hip.transform.position.set(0, 1, 0);
+    const knee = new Bone();
+    knee.transform.position.set(0, -0.5, 0);
+    hip.add(knee);
+    const binds = new Float32Array(32);
+    for (const base of [0, 16]) {
+      binds[base] = 1;
+      binds[base + 5] = 1;
+      binds[base + 10] = 1;
+      binds[base + 15] = 1;
+    }
+    binds[13] = -1; // hip's bind at y = 1
+    mesh.skeleton = new Skeleton([hip, knee], binds);
+    mesh.addComponent(new MorphWeights([0.25, 0.75]));
+    scene.add(mesh, hip);
+    return scene;
+  }
+
+  it("round-trips the mesh, its skeleton, and its morph weights through text", () => {
+    const io = registerSceneNodeTypes({ geometries, materials });
+    const scene = buildSkinnedScene();
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(scene, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const [mesh, hip] = reloaded.children as [Mesh, Bone];
+    expect(mesh).toBeInstanceOf(Mesh);
+    expect(mesh.geometry).toBe(skinnedPlane);
+    expect(mesh.material).toBe(skin);
+    expect(mesh.renderLayer).toBe(1);
+
+    expect(hip).toBeInstanceOf(Bone);
+    expect(hip.name).toBe("hip");
+    const knee = hip.children[0];
+    expect(knee).toBeInstanceOf(Bone);
+
+    // The reference resolved against the *reloaded* bones, in joint order.
+    const skeleton = mesh.skeleton;
+    expect(skeleton).not.toBeNull();
+    expect(skeleton?.bones[0]).toBe(hip);
+    expect(skeleton?.bones[1]).toBe(knee);
+    expect(skeleton?.inverseBindMatrices[13]).toBe(-1);
+
+    const weights = mesh.getComponent(MorphWeights);
+    expect(Array.from(weights?.weights ?? [])).toEqual([0.25, 0.75]);
+    expect(mesh.morphTargetWeights).toBe(weights?.weights);
+  });
+
+  it("is textually idempotent, skeleton included — the P11-1 gate", () => {
+    const io = registerSceneNodeTypes({ geometries, materials });
+    const scene = buildSkinnedScene();
+    const first = encodeSceneDocument(
+      serializeScene(scene, io.components, io.write),
+    );
+    const second = encodeSceneDocument(
+      serializeScene(
+        instantiateScene(decodeSceneDocument(first), io.components, io.read),
+        io.components,
+        io.write,
+      ),
+    );
+    expect(second).toBe(first);
+  });
+
+  it("names both classes by exact identity, and writes null for no skeleton", () => {
+    const io = registerRenderSerializers({ geometries, materials });
+    const mesh = new Mesh(skinnedPlane, skin);
+    expect(io.write.nodeTypeOf(mesh)).toBe(MESH_NODE_TYPE);
+    expect(io.write.nodeTypeOf(new Bone())).toBe(BONE_NODE_TYPE);
+    expect(
+      io.write.nodeTypeOf(new (class extends Mesh {})(skinnedPlane, skin)),
+    ).toBeUndefined();
+    expect(io.write.nodeDataOf(mesh)).toMatchObject({ skeleton: null });
+    expect(io.write.nodeDataOf(new Bone())).toBeUndefined();
+  });
+
+  it("restores a mesh with no skeleton from a shape-corrupt record", () => {
+    const io = registerRenderSerializers({ geometries, materials });
+    for (const skeleton of [
+      undefined,
+      null,
+      42,
+      { bones: [] },
+      { bones: ["a"], inverseBindMatrices: "nope" },
+      { bones: [7], inverseBindMatrices: [] },
+      { bones: ["a"], inverseBindMatrices: [Number.NaN] },
+    ]) {
+      const mesh = io.read.nodeFactory({
+        type: MESH_NODE_TYPE,
+        data: {
+          geometry: "geometry/skinned-plane",
+          material: "material/skin",
+          skeleton: skeleton as never,
+        },
+      }) as Mesh;
+      expect(mesh).toBeInstanceOf(Mesh);
+      expect(mesh.skeleton).toBeNull();
+    }
+  });
+
+  it("lets the classes refuse a well-formed record that cannot exist (§85)", () => {
+    const io = registerRenderSerializers({ geometries, materials });
+    // 16 floats for two bones: the restore seam refuses the mismatch loudly.
+    expect(() =>
+      io.read.nodeFactory({
+        type: MESH_NODE_TYPE,
+        data: {
+          geometry: "geometry/skinned-plane",
+          material: "material/skin",
+          skeleton: {
+            bones: ["a", "b"],
+            inverseBindMatrices: Array.from(new Float32Array(16)),
+          },
+        },
+      }),
+    ).toThrowError(/16 per bone/);
+  });
+
+  it("restores a bone under its saved id (§79, A-17)", () => {
+    const io = registerRenderSerializers({});
+    const bone = io.read.nodeFactory({
+      type: BONE_NODE_TYPE,
+      id: "node-saved-bone",
+    }) as Bone;
+    expect(bone).toBeInstanceOf(Bone);
+    expect(bone.id).toBe("node-saved-bone");
+    expect(io.read.nodeFactory({ type: BONE_NODE_TYPE })).toBeInstanceOf(Bone);
   });
 });

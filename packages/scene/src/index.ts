@@ -80,6 +80,13 @@ export type {
 } from "./node.js";
 export { Node, restoreNodeId } from "./node.js";
 export { PoseTarget } from "./pose-target.js";
+export type { MorphWeightsSerializerShape } from "./skeleton.js";
+export {
+  Bone,
+  MORPH_WEIGHTS_SERIALIZER,
+  MorphWeights,
+  Skeleton,
+} from "./skeleton.js";
 export { Scene } from "./scene.js";
 export { Transform } from "./transform.js";
 export type { Viewport } from "./viewport.js";

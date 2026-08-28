@@ -28,6 +28,54 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — RFC 0003 / PH-10 + R-22: §54 skinning.** Decisions worth keeping:
+  - **A skinned draw's failure direction is absence, and the check sits above the
+    geometry upload.** Unregistered pipeline, failed compile (latched per context,
+    cleared on restore), and a material family with no skinned variant all skip with
+    one §85 warning — a T-pose is a different picture. The skinned arm is a
+    self-contained `continue` block like the particle arm, resolved _before_
+    `geometries.acquire`, so a skipped draw contributes not even a buffer; that is
+    what made the with/without-mesh transcript A/B exact.
+  - **The joint limit is a declared constant, not a query — R-30b's law decided
+    it.** `MAX_SKINNING_JOINTS = 48` (192 of WebGL 2's guaranteed 256 vertex uniform
+    vec4s), reported through the optional-tri-state
+    `RendererCapabilities.maximumSkinningJoints` (WP-R1.1's widening law overrode
+    the RFC's required-member sketch), enforced at `Mesh.skeleton` assignment with
+    `UNSUPPORTED_GPU_FEATURE` — setup-time, per §61. The unbounded path is a bone
+    texture, deferred.
+  - **A node class must not carry `static typeName`** — that key is §6a's component
+    key and the umbrella completeness test enumerates it; `Bone`'s §79 identity is
+    the node type `"scene:bone"`. Deviation from RFC 0003's sketch, recorded at the
+    class.
+  - **A §79 intra-file object reference resolves on first read.** A mesh's skeleton
+    is written as bone ids + inverse binds and resolved by walking to the mesh's
+    root when `skeleton` is first read — the earliest moment mesh and bones share a
+    tree (a factory runs mid-assembly; `restoreNodeId`'s reasoning one level up).
+    Missing ids stay pending and retry; a non-Bone id throws. The serializer's
+    writer triggers resolution, which is what keeps the P11-1 textual idempotency
+    exact.
+  - **§17's "missing track types" cost zero code** — an element _is_ a property of
+    its array (`"2" in float32Array`), so the existing dotted path grammar already
+    addresses `weights.2` and `bones.0.transform.rotation`; the packet's whole §2
+    was documentation, tests, and `createArrayElementBinding`. Check whether a
+    "missing" feature is a missing _spelling_ before building machinery.
+  - **The palette follows the particle-repack precedent**: `Skeleton.update` runs
+    inside `collect`, so the uploaded matrices can never be a step older than the
+    item pointing at them; under the §43 interpolated builder the palette uses the
+    last _resolved_ pose (palette interpolation deferred with CPU skinning, stated
+    in source). Skinned casters are excluded from the §69 pass — a bind-pose shadow
+    is a different picture too.
+  - **Measured: +0.75–0.80 kB gzip in every WebglRenderer bundle** (frame-path:
+    draw arm, collect decision, geometry streams; A/B against a HEAD worktree —
+    worktrees are the sanctioned baseline mechanism, never stash). The pipeline
+    itself is 0 B unless `registerSkinningPipeline()` is called (grep: `skinMatrix`
+    in 0 of 9 bundles). Budgets moved: 36→36.5, 34→34.5, 42→43 (ui-demo's 0.40 kB
+    headroom was consumed exactly as R-23 warned).
+  - **Purity, observed**: the skinned-pose golden's 600 steps contain only 121
+    distinct digests — a looping clip reproduces every pose bit-exactly across
+    loops, the strongest cheap purity evidence a determinism scenario has produced
+    yet.
+
 - **2026-08-28 — WP-R1.3: WebGPU sprites, text, batching, §67 clips.** Decisions worth
   keeping:
   - **The stencil format is a per-frame decision, and R-23's sort key is what makes it

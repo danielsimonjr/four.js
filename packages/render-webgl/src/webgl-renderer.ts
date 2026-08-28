@@ -38,6 +38,7 @@
 import { DEV, devWarnOnce, EventEmitter, FourError } from "@four/core";
 import { Frustum, Matrix4 } from "@four/math";
 import {
+  MAX_SKINNING_JOINTS,
   RenderTarget,
   buildInterpolatedRenderList,
   buildRenderList,
@@ -47,6 +48,8 @@ import {
   isLitItem,
   isParticlesItem,
   isRenderTargetTexture,
+  isSkinnedLitItem,
+  isSkinnedUnlitItem,
   isSpriteItem,
   isStandardItem,
   COLOR_GRADE_DEFAULTS,
@@ -92,6 +95,10 @@ import {
   RenderTargetCache,
   type RenderTargetRecord,
 } from "./gl-render-target.js";
+import {
+  resolveSkinningPipelineFactory,
+  type SkinnedPrograms,
+} from "./gl-skinning-registry.js";
 import { ShadowProgram } from "./gl-shadow.js";
 import { StandardProgram } from "./gl-standard.js";
 import { TextureCache, type CacheableTexture } from "./gl-texture.js";
@@ -971,6 +978,12 @@ const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   indirectDraw: false,
   compressedTextureFormats: Object.freeze([]),
   shaderPrecision: "highp",
+  // §54's joint limit (RFC 0003): a declared constant, not a `getParameter`
+  // read — `@four/render`'s `MAX_SKINNING_JOINTS` documents the portability
+  // arithmetic, and R-30b's law is why no query happens here. The capability
+  // says what this backend *can* do; drawing skinned additionally requires
+  // `registerSkinningPipeline()` (see `gl-skinning-registry.ts`).
+  maximumSkinningJoints: MAX_SKINNING_JOINTS,
 } satisfies Partial<RendererCapabilities>);
 
 /** Reads the §62 limits this tier can honestly report. */
@@ -1276,6 +1289,27 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    */
   #shadowTarget: RenderTarget | null = null;
 
+  /**
+   * The registered skinning pipeline's two programs (§54; RFC 0003), or
+   * `null` — before the first skinned draw, while the context is lost, when
+   * nothing registered, and forever in a scene that never skins. **Compiled
+   * lazily by {@link WebglRenderer.render}**, never at initialize: the other
+   * seven programs compile up front because §61 forbids a frame from
+   * throwing, and the skinned pair cannot (this module does not link them) —
+   * so the frame compiles inside a `try` and a driver refusal costs skinning,
+   * not the frame. A skinless scene therefore issues the byte-identical GL
+   * sequence it always did — the RFC's acceptance gate.
+   */
+  #skinnedPrograms: SkinnedPrograms | null = null;
+
+  /**
+   * Whether a skinned-program compile failed on the current context — the
+   * once-per-context latch that keeps a refusing driver from being asked
+   * again every frame. Cleared on context restore: a fresh context may
+   * compile.
+   */
+  #skinnedProgramsFailed = false;
+
   #geometries: GeometryCache | null = null;
 
   #textures: TextureCache | null = null;
@@ -1379,6 +1413,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#standardProgram = null;
     this.#effectProgram = null;
     this.#shadowProgram = null;
+    // §54's lazily compiled pair (RFC 0003) died with the context like every
+    // other handle; the next skinned draw recompiles.
+    this.#skinnedPrograms = null;
+    this.#skinnedProgramsFailed = false;
     this.#geometries?.forget();
     this.#textures?.forget();
     this.#renderTargets?.forget();
@@ -1724,7 +1762,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // this comparison.
       let hasLitItems = false;
       for (const item of items) {
-        if (item.kind === "lit" || item.kind === "standard") {
+        if (
+          item.kind === "lit" ||
+          item.kind === "standard" ||
+          item.kind === "skinned-lit"
+        ) {
           hasLitItems = true;
           break;
         }
@@ -1853,6 +1895,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         let particleViewUploaded = false;
         let litViewUploaded = false;
         let standardViewUploaded = false;
+        let skinnedUnlitViewUploaded = false;
+        let skinnedLitViewUploaded = false;
 
         // §64 stages 2–3, per view (R-8, 2026-08-09). The frame's list is built
         // once, above; this derives *this view's* draws from it — §46's layer
@@ -1959,6 +2003,131 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               index += batch.items - 1;
               continue;
             }
+          }
+
+          // §54's skinned draws (RFC 0003) — a self-contained arm ending in
+          // `continue`, like the particle arm below, because the skinned
+          // pipeline must be resolved *before* the geometry upload: a draw
+          // skipped for an unregistered pipeline (or a failed compile)
+          // contributes nothing at all — not even a buffer upload. The two
+          // programs compile lazily on this renderer's first skinned draw —
+          // see `#acquireSkinnedPrograms` for the whole policy; the failure
+          // direction is absence with a one-time warning, never a bind pose
+          // (a character standing in T-pose is a different picture).
+          if (isSkinnedUnlitItem(item) || isSkinnedLitItem(item)) {
+            const skinnedPrograms = this.#acquireSkinnedPrograms(gl);
+            if (skinnedPrograms === null) {
+              continue;
+            }
+            const skinnedRecord = geometries.acquire(item.geometry);
+            if (skinnedRecord === null) {
+              continue;
+            }
+            if (isSkinnedUnlitItem(item)) {
+              const skinnedProgram = skinnedPrograms.unlit;
+              if (activeKind !== "skinned-unlit") {
+                skinnedProgram.use();
+                activeKind = "skinned-unlit";
+              }
+              applyMaterialState(
+                gl,
+                state,
+                item.material,
+                false,
+                item.clip ?? null,
+              );
+              if (!skinnedUnlitViewUploaded) {
+                skinnedProgram.setViewProjection(viewProjection);
+                skinnedUnlitViewUploaded = true;
+              }
+              const map = mapOf(item.material);
+              const texture =
+                map === null
+                  ? null
+                  : resolveTexture(textures, renderTargets, activeTarget, map);
+              if (texture !== null) {
+                if (!mapUnitActive) {
+                  gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                  mapUnitActive = true;
+                }
+                gl.bindTexture(GL.TEXTURE_2D, texture);
+                textureBound = true;
+              }
+              skinnedProgram.setFeatures(
+                texture !== null,
+                item.material.vertexColors === true,
+              );
+              skinnedProgram.setModel(item.worldMatrix);
+              skinnedProgram.setColor(
+                item.material.color,
+                opacityOf(item.material),
+              );
+              skinnedProgram.setJointMatrices(item.jointMatrices);
+            } else {
+              const skinnedProgram = skinnedPrograms.lit;
+              if (activeKind !== "skinned-lit") {
+                skinnedProgram.use();
+                activeKind = "skinned-lit";
+              }
+              applyMaterialState(
+                gl,
+                state,
+                item.material,
+                false,
+                item.clip ?? null,
+              );
+              if (!skinnedLitViewUploaded) {
+                // The same per-view state the lit branch uploads, through the
+                // same shared uniform classes, so the skip rules agree.
+                skinnedProgram.setViewProjection(viewProjection);
+                skinnedProgram.setAmbientLight(sceneLights.ambientColor);
+                skinnedProgram.setDirectionalLight(
+                  sceneLights.direction,
+                  sceneLights.directionalColor,
+                );
+                skinnedProgram.setPunctualLights(sceneLights);
+                skinnedProgram.setShadow(sceneLights);
+                skinnedLitViewUploaded = true;
+              }
+              const map = mapOf(item.material);
+              const texture =
+                map === null
+                  ? null
+                  : resolveTexture(textures, renderTargets, activeTarget, map);
+              if (texture !== null) {
+                if (!mapUnitActive) {
+                  gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                  mapUnitActive = true;
+                }
+                gl.bindTexture(GL.TEXTURE_2D, texture);
+                textureBound = true;
+              }
+              skinnedProgram.setFeatures(texture !== null);
+              skinnedProgram.setReceivesShadow(
+                shadowActive && item.receiveShadow,
+              );
+              skinnedProgram.setModel(item.worldMatrix);
+              skinnedProgram.setColor(
+                item.material.color,
+                opacityOf(item.material),
+              );
+              skinnedProgram.setJointMatrices(item.jointMatrices);
+            }
+            gl.bindVertexArray(skinnedRecord.vertexArray);
+            if (skinnedRecord.indexType === null) {
+              gl.drawArrays(skinnedRecord.mode, 0, skinnedRecord.count);
+            } else {
+              gl.drawElements(
+                skinnedRecord.mode,
+                skinnedRecord.count,
+                skinnedRecord.indexType,
+                0,
+              );
+            }
+            if (statistics !== null) {
+              countDraw(statistics, skinnedRecord.mode, skinnedRecord.count, 1);
+            }
+            continue;
           }
 
           const record = geometries.acquire(item.geometry);
@@ -2542,6 +2711,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#standardProgram?.dispose();
       this.#effectProgram?.dispose();
       this.#shadowProgram?.dispose();
+      this.#skinnedPrograms?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
@@ -2556,6 +2726,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#standardProgram = null;
     this.#effectProgram = null;
     this.#shadowProgram = null;
+    this.#skinnedPrograms = null;
     // The one `RenderTarget` this renderer created for itself (R-18), so the
     // one it owes a `dispose()` to (§83) — its bytes leave the process-wide
     // totals here. The framebuffer behind it is the cache's and was released
@@ -2715,6 +2886,61 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   }
 
   /**
+   * The registered skinning pipeline's programs for this context, compiled on
+   * first use, or `null` when there is nothing to draw skinned with (§54;
+   * RFC 0003).
+   *
+   * Three answers, all §61-safe (never a throw from inside the frame):
+   *
+   * - **compiled already** — the pair, one field read;
+   * - **nothing registered** — `null`, with a one-time §85 development
+   *   warning naming `registerSkinningPipeline()`; the skinned draw is
+   *   skipped rather than shown in bind pose (RFC 0003 §5);
+   * - **the compile failed** — `null` forever on this context (the latch),
+   *   with a one-time warning carrying the driver's §89 failure; a context
+   *   restore clears the latch, because a fresh context may compile.
+   */
+  #acquireSkinnedPrograms(gl: ParticleGlContext): SkinnedPrograms | null {
+    const existing = this.#skinnedPrograms;
+    if (existing !== null) {
+      return existing;
+    }
+    if (this.#skinnedProgramsFailed) {
+      return null;
+    }
+    const factory = resolveSkinningPipelineFactory();
+    if (factory === null) {
+      if (DEV) {
+        devWarnOnce(
+          "webgl-skinning-unregistered",
+          "§54: this scene contains a skinned mesh but no skinning pipeline " +
+            "is registered, so its draws are skipped (a bind pose would be " +
+            "a different picture). Call registerSkinningPipeline() from " +
+            "@four/render-webgl at application setup (RFC 0003).",
+        );
+      }
+      return null;
+    }
+    try {
+      const compiled = factory.create(gl);
+      this.#skinnedPrograms = compiled;
+      return compiled;
+    } catch (error: unknown) {
+      // §61: a driver's compile refusal costs skinning, never the frame. The
+      // latch keeps a refusing driver from being asked once per skinned item.
+      this.#skinnedProgramsFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-skinning-compile-failed",
+          "§54: the skinning pipeline failed to compile on this context; " +
+            `skinned draws are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
    * Renders §69's directional shadow map and returns the framebuffer record it
    * drew into, or `null` if the map could not be produced (R-18, 2026-08-09).
    *
@@ -2817,7 +3043,17 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // depth-only pass writes geometry, not visibility. Mask draws never
       // reach this loop at all; the list builder writes `castShadow: false`
       // on every one, because a mask is not content.
-      if (!item.castShadow || item.kind === "sprite") {
+      // §54 (RFC 0003): skinned draws are excluded beside sprites, and for
+      // the analogous reason — this depth-only program does not skin, so a
+      // skinned caster would cast its **bind pose**, which is a different
+      // picture. A skinned caster program is deferred with CPU skinning;
+      // until it lands, a skinned mesh casts no shadow, documented on `Mesh`.
+      if (
+        !item.castShadow ||
+        item.kind === "sprite" ||
+        item.kind === "skinned-unlit" ||
+        item.kind === "skinned-lit"
+      ) {
         continue;
       }
       const geometry = geometries.acquire(item.geometry);

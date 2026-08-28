@@ -61,6 +61,8 @@ export type {
   ParticleRenderItem,
   RenderItem,
   RenderItemKind,
+  SkinnedLitRenderItem,
+  SkinnedUnlitRenderItem,
   SpriteRenderItem,
   StandardRenderItem,
   UnlitRenderItem,
@@ -71,6 +73,8 @@ export {
   groupRenderListByPipeline,
   isLitItem,
   isParticlesItem,
+  isSkinnedLitItem,
+  isSkinnedUnlitItem,
   isSpriteItem,
   isStandardItem,
   isUnlitItem,
@@ -96,6 +100,7 @@ export type {
 export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
 export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
+export { MAX_SKINNING_JOINTS, Mesh, restoreMeshSkeleton } from "./mesh.js";
 export type {
   RendererFallbackReason,
   RendererFallbackReport,

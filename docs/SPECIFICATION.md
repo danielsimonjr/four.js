@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.9 — 2026-08-28**
+**Specification revision 1.10 — 2026-08-28**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -24,6 +24,7 @@
 | 1.7 | 2026-08-06 | Public-API reconciliation (gap analysis A-22/PH-18, owner decision — amend the specification rather than alias the shipped surface). New §97a "Namespace and Naming Conventions" records the per-package umbrella barrel (decision WP-0.7-fix1: collision avoidance plus §91 tree-shaking, so every `Four.X` of Parts VII and X reads `Four.<package>.X`), the shipped-name mapping (`Mesh`→`Renderable`; `*Geometry` classes→geometry factory functions; `*Collider` classes→one `Collider` component over a `CollisionShape` descriptor union; `Motion`→`MotionComponent`; `SceneMigrator.upgrade`→`migrateSceneDocument` + `SceneMigrationRegistry`; `scene.activeCamera`→§48 viewports on `app.views`; `physicsWeight`/`animationWeight` on the `RigidBody` component, not the node), the names with no shipped equivalent yet (a `Text` node, `AnimationController`, `Circle`, `StandardMaterial`, §8 space modes, `Node.animation`), and the deferred string-selection affordances (`renderer: "auto"`, `solver: "auto"`). §97 and §114–§117 and the inline snippets of §11, §15, §16, §18, §20, §111 are rewritten against the shipped API; where a feature is unshipped the example shows the available-today form and cites §97a. Frozen §1–120 numbering respected: the new section takes a letter suffix. |
 | 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@four/render` node that the frozen package dependency matrix forbids `@four/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
 | 1.9 | 2026-08-28 | RFC 0002 (plugin system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `A-3` implemented. **§45** gains `plugins?: readonly FourPlugin[]` and the paragraph stating that installation happens in `initialize` — open question 1's disposition (a), *amend §45*: the §40 precedent against inventing an option turned on `units` being absent from §45's own list, whereas §81 requires an install lifecycle and §45 owns the lifecycle, so §81 had nowhere else to live. **§81** gains the two fields its own closing sentence already required and its code block omitted (`dependencies`, `engineRange`), the statement that `PluginContext` is a set of capability tokens rather than a fixed interface (forced by §3.1: every registry §81 hands over sits downstream of `core`), the specified install order (topological over `dependencies`, ties broken by supply order — a §33 requirement, since a plugin may register a §39 system and equal-priority systems run in registration order), the revocability rule (a capability declares it; a plugin that acquired a non-revocable one cannot be uninstalled and the attempt is refused naming what pins it), and the §96 boundary (a plugin is a value; no URL, no module specifier, no name from a document; no sandbox is described or provided). §96's requirements list is unchanged — it states requirements, not status. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
+| 1.10 | 2026-08-28 | RFC 0003 (skinning and skeletal animation) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gaps `PH-10` + `R-22` implemented. Revision 1.8 already carried the two corrections the RFC forced (§54's `morphTargetWeights` storage moved to a scene component; §17's *morph weight* and *skeletal joint* entries identified as binding forms); this revision records the remaining adopted dispositions and ends §54's silent staging. **§54** gains the shipped/staged split of its eleven rows, the layout commitments (four influences per vertex at fixed attribute locations 4 joints / 5 weights, `JOINTS_1`/`WEIGHTS_1` named as the extension point at the next two locations; joint index = position in `Skeleton.bones`, insertion order being the §33 ABI), the bone-axis disposition (the engine imposes **no** bone-axis convention on the data model — the inverse bind matrix absorbs the authoring tool's; **+Y as the bone's length axis is a helper convention only**), the joint-limit rule (a rig over the declared `maximumSkinningJoints` is refused at setup with `UNSUPPORTED_GPU_FEATURE`, §89 — never clamped, never a frame-time throw, §61), the §79 document form (a skeleton is written inline on its mesh as bone ids plus inverse bind matrices — intra-file references are by id), and the §33 boundary rule (**no engine API returns skinned vertex positions**: the palette is the last CPU value in the envelope; picking and culling therefore use bind-pose bounds, stated as known inaccuracies). **§62**'s capability list gains "maximum skinning joints"; the WebGL 2 tier reports a declared portability constant rather than a device query. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 
 ---
 
@@ -1762,6 +1763,49 @@ The engine shall support:
 - level-of-detail selection;
 - impostors and billboards;
 - geometry merging and batching tools.
+
+**Shipped/staged status of this list (RFC 0003, 2026-08-28 — this note ends
+the section's silent staging).** Shipped: `Mesh` itself; **skeletal
+deformation** (bones are ordinary scene nodes — `Bone extends Node`, so §42
+authority, §19 blending, §79 serialization, and animation all apply with no
+new mechanism; `Skeleton` derives the joint-matrix palette on the CPU); the
+**morph-target plumbing** (the `MorphWeights` component, §17's binding form,
+and the weights snapshotted onto the render item — the GPU morph path is
+additional vertex streams and is staged as its own layout decision).
+Staged, deliberately: multiple material groups; hardware instancing; indirect
+rendering (WebGPU); dynamic GPU buffer usage; level of detail; impostors and
+billboards; merging and batching tools; CPU skinning; bone textures;
+dual-quaternion skinning.
+
+Layout commitments (RFC 0003): **four influences per vertex** — `joints` (4
+joint indices, `Uint16Array`) and `weights` (4 floats) on `BufferGeometry`,
+index-aligned with positions, at fixed attribute locations **4 (joints)** and
+**5 (weights)**; a second influence set (`JOINTS_1`/`WEIGHTS_1`) is the named
+extension point at the next two locations. The joint index is the position in
+`Skeleton.bones`, and insertion order is the ABI (§33). In a §79 document a
+skeleton is written inline on its mesh as bone **ids** plus the inverse bind
+matrices (intra-file references are by id); weights are the author's contract
+(a per-vertex sum of 1 is not validated or renormalized, the `normals`
+precedent).
+
+**The engine imposes no bone-axis convention on the data model.** A bone is a
+node with an arbitrary local frame; the inverse bind matrix absorbs whatever
+convention the authoring tool used. **+Y as the bone's length axis is a
+convention for helpers only** (procedural rigs, look-down-a-bone,
+angle-producing IK), matching §7a's Y-up world — never a format requirement,
+and never a constraint on authored rigs.
+
+**Limits and determinism.** A skeleton whose bone count exceeds the backend's
+reported `maximumSkinningJoints` (§62) is refused **at setup** with
+`UNSUPPORTED_GPU_FEATURE` (§89) — never clamped, and never a throw from
+inside a frame (§61). Skeletal animation is deterministic (§33): bone
+transforms and the palette are CPU values inside the envelope. Vertex
+deformation happens in the GPU vertex stage, outside the envelope by
+construction, and **no engine API returns skinned vertex positions** — the
+palette is uploaded and nothing is read back; §33's checksum is over bodies,
+never vertices. Consequently §71 picking and §87 culling evaluate a skinned
+mesh at its bind-pose bounds, a known inaccuracy stated here and at the type
+rather than discovered by a user.
 ### 55. Sprite and Raster System
 Sprites shall support:
 - screen-space and world-space sizing;
@@ -2022,7 +2066,12 @@ Capability reporting shall include:
 - indirect draw;
 - compressed textures;
 - shader precision;
-- maximum uniforms and bindings.
+- maximum uniforms and bindings;
+- maximum skinning joints (§54; RFC 0003) — the most bones one skinned draw
+  may use, `0` where skinning is unsupported. The WebGL 2 tier reports a
+  declared portability constant sized to the guaranteed-minimum vertex
+  uniform budget rather than a per-device query; a per-device (or unbounded,
+  bone-texture) palette is the staged successor.
 Applications may declare required and optional capabilities.
 ### 63. Render Graph
 Rendering shall be organized as a directed acyclic graph of passes and resources.

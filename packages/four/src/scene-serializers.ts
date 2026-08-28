@@ -170,6 +170,7 @@ import {
   Circle,
   Ellipse,
   Line,
+  Mesh,
   PathShape,
   Polygon,
   Polyline,
@@ -181,6 +182,7 @@ import {
   Shape2D,
   Sprite,
   Star,
+  restoreMeshSkeleton,
 } from "@four/render";
 import type {
   ResolvedPaint,
@@ -188,7 +190,10 @@ import type {
   ResolvedStrokeStyle,
 } from "@four/render";
 import {
+  Bone,
   DirectionalLight,
+  MORPH_WEIGHTS_SERIALIZER,
+  MorphWeights,
   OrthographicCamera,
   PerspectiveCamera,
   PointLight,
@@ -263,6 +268,29 @@ export const RENDERABLE_NODE_TYPE = "render:renderable";
 
 /** The document `type` a {@link Sprite} serializes as (§55). */
 export const SPRITE_NODE_TYPE = "render:sprite";
+
+/**
+ * The document `type` a {@link Mesh} serializes as (§54; RFC 0003,
+ * 2026-08-28). Its payload is a `Renderable`'s — geometry and material keys,
+ * the ordering pair, the four drawable flags — plus `skeleton`: `null`, or
+ * bone **ids** in joint-index order with the inverse bind matrices inline
+ * (§79: intra-file references are by id; the ids resolve against the reloaded
+ * `scene:bone` nodes on the first `skeleton` read — see `restoreMeshSkeleton`).
+ * Morph weights are not here: they are a §6a component (`MorphWeights`) and
+ * round-trip through the component registry like every other component.
+ */
+export const MESH_NODE_TYPE = "render:mesh";
+
+/**
+ * The document `type` a {@link Bone} serializes as (§54; RFC 0003).
+ *
+ * A bone's whole state is its base-node state — transform, id, name — which
+ * §79 already carries for every node, so the payload is empty; what the type
+ * name preserves is the **class**, which `Mesh.skeleton`'s id resolution
+ * requires (a skeleton's joints index bones and only bones) and which a bare
+ * `Node` fallback would silently lose (A-15's failure mode).
+ */
+export const BONE_NODE_TYPE = "scene:bone";
 
 /**
  * The document `type` a {@link Text} serializes as (§49, §56; R-28,
@@ -1308,6 +1336,8 @@ export function registerRenderSerializers(
       nodeTypeOf: (node: Node): string | undefined => {
         const constructor = node.constructor;
         if (constructor === Renderable) return RENDERABLE_NODE_TYPE;
+        if (constructor === Mesh) return MESH_NODE_TYPE;
+        if (constructor === Bone) return BONE_NODE_TYPE;
         if (constructor === Sprite) return SPRITE_NODE_TYPE;
         if (constructor === PerspectiveCamera) {
           return PERSPECTIVE_CAMERA_NODE_TYPE;
@@ -1347,6 +1377,41 @@ export function registerRenderSerializers(
             renderLayer: renderable.renderLayer,
             renderOrder: renderable.renderOrder,
             ...renderableFlagsJson(renderable),
+          };
+        }
+        if (constructor === Mesh) {
+          const mesh = node as Mesh<Material>;
+          // Reading `skeleton` resolves any pending §79 reference first, so a
+          // reloaded scene re-serializes the identical record — the textual
+          // idempotency the P11-1 gate demands.
+          const skeleton = mesh.skeleton;
+          return {
+            geometry: resourceKeyJson<BufferGeometry>(
+              node,
+              "geometry",
+              mesh.geometry,
+              geometries,
+              policy,
+            ),
+            material: resourceKeyJson<Material>(
+              node,
+              "material",
+              mesh.material,
+              materials,
+              policy,
+            ),
+            renderLayer: mesh.renderLayer,
+            renderOrder: mesh.renderOrder,
+            ...renderableFlagsJson(mesh),
+            skeleton:
+              skeleton === null
+                ? null
+                : {
+                    bones: skeleton.bones.map((bone) => bone.id),
+                    inverseBindMatrices: Array.from(
+                      skeleton.inverseBindMatrices,
+                    ),
+                  },
           };
         }
         if (constructor === Sprite) {
@@ -1472,6 +1537,52 @@ export function registerRenderSerializers(
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
           });
+        }
+        if (document.type === MESH_NODE_TYPE) {
+          const geometry = resolveResource<BufferGeometry>(
+            document,
+            "geometry",
+            geometries,
+          );
+          const material = resolveResource<Material>(
+            document,
+            "material",
+            materials,
+          );
+          const mesh = new Mesh<Material>(geometry, material, {
+            ...finiteOptions(data, ["renderLayer", "renderOrder"]),
+            ...readRenderableFlags(data),
+          });
+          // The skeleton record: shape-corrupt restores no skeleton (the
+          // motion serializers' corrupt-field policy — a mesh without its rig
+          // is a usable mesh), while a well-formed record the classes refuse
+          // (a duplicate id, a mis-sized matrix array, a rig over the joint
+          // limit) is refused loudly at resolution (§85).
+          const skeletonRecord = record(data.skeleton);
+          const boneIds = skeletonRecord.bones;
+          const binds = skeletonRecord.inverseBindMatrices;
+          if (
+            Array.isArray(boneIds) &&
+            boneIds.length > 0 &&
+            boneIds.every((id) => typeof id === "string") &&
+            Array.isArray(binds) &&
+            binds.every(
+              (value) => typeof value === "number" && Number.isFinite(value),
+            )
+          ) {
+            restoreMeshSkeleton(
+              mesh,
+              boneIds,
+              new Float32Array(binds as number[]),
+            );
+          }
+          return mesh;
+        }
+        if (document.type === BONE_NODE_TYPE) {
+          // A bone's state is its node state, which the instantiator applies
+          // after this factory returns; the id goes through the constructor so
+          // it is reserved against the counter (A-17).
+          return new Bone(document.id === undefined ? {} : { id: document.id });
         }
         if (document.type === SPRITE_NODE_TYPE) {
           const material = resolveResource<Material>(
@@ -2737,6 +2848,12 @@ export function registerSceneNodeTypes(
   // intent — see the serializers in `@four/motion`.
   components.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
   components.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
+  // §54's morph weights (RFC 0003, 2026-08-28), registered in the same packet
+  // that shipped the component — the one-packet rule the enumerating test
+  // below this module enforces. The serializer lives in `@four/scene` beside
+  // the class, declared against the same structural shape the motion
+  // serializers use.
+  components.register(MorphWeights, MORPH_WEIGHTS_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,

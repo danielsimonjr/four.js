@@ -112,6 +112,7 @@ describe("RendererCapabilities (§62)", () => {
       "maxBindings",
       "maxTextureSize",
       "maxUniformBufferBytes",
+      "maximumSkinningJoints",
       "multisampling",
       "shaderPrecision",
       "storageBuffers",
@@ -137,6 +138,10 @@ describe("RendererCapabilities (§62)", () => {
     expect(capabilities.shaderPrecision).toBe("none");
     expect(capabilities.maxUniformBufferBytes).toBe(0);
     expect(capabilities.maxBindings).toBe(0);
+    // §54's joint limit (RFC 0003): `0` — skinning unsupported — is the
+    // headless floor, distinct from the `undefined` a backend that has not
+    // been taught to answer reports.
+    expect(capabilities.maximumSkinningJoints).toBe(0);
   });
 
   it("is frozen, and survives disposal", () => {

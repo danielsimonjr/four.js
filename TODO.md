@@ -11,9 +11,27 @@ changes in `CHANGELOG.md`.
       verifier's priority order:
 
 - [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
-      2026-08-28)~~ → 0003 skinning → 0001 shader/node materials → 0005 pixel
-      picking → 0004 raster painting, interleaved with WP-R1.3…R1.8. First-to-land
-      of 0001/0003 owns the `RenderItemKind`/`pipelineId` widening.
+      2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → 0001 shader/node
+      materials → 0005 pixel picking → 0004 raster painting, interleaved with
+      WP-R1.4…R1.8. 0003 landed first, so it owns the `RenderItemKind` widening:
+      one string member per compiled pipeline, discriminating a closed item union
+      (documented for 0001 in `render-list.ts`).
+- [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
+      extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
+      skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
+      shadow is a different picture); CPU skinning (Canvas/SVG tiers + the skinned
+      bounds/picking home, with its own `same-runtime` golden); bone-texture palette
+      (unbounds `MAX_SKINNING_JOINTS = 48`; needs a render-target format union +
+      vertex texture fetch); §43-interpolated palettes (today the palette is the
+      last resolved pose).
+- [ ] **RFC 0003 prototype measurements still owed:** bones-as-nodes resolve cost at
+      60 bones ×1/×10 (the number that decides whether alternative A ever returns)
+      and controller channel cost at 180 channels. §86 has no skinned-mesh
+      performance target yet — propose one from those measurements.
+- [ ] **glTF loader (§78) unblocked 2026-08-28** — all three blockers cleared
+      (`A-19` textures, `R-12`/`R-13` materials, RFC 0003 skinning). Needs a packet
+      of its own.
+
 - [ ] **Move the six capability tokens to their owning packages** when
       `packages/render`/`motion`/`physics`/`serialization` are free (RFC 0002 §2's
       spelling). They ship in `four/plugins.ts` because the A-3 packet could not
@@ -201,8 +219,10 @@ changes in `CHANGELOG.md`.
 - [x] **PH-20 — §33 rollback (2026-08-21).** `RollbackBuffer` + `RollbackTarget` in
       `@four/diagnostics`; `tests/determinism/rollback.test.ts`.
 - [ ] **PH-22 residue (re-read 2026-08-21):** `PH-22f` joint-anchor mutability still
-      blocked on the which-pose decision (physics-joints packet); `PH-22i` IK still
-      blocked on a skeleton/chain model (PH-10's skinning RFC) + an adapter RFC;
+      blocked on the which-pose decision (physics-joints packet); `PH-22i` IK's chain
+      model shipped 2026-08-28 (RFC 0003 `Bone`/`Skeleton`); CCD/FABRIK/limits now
+      wait on a limits/ownership/convergence contract (`ik.ts` staging note) + an
+      adapter RFC for path planning;
       `PH-22l` `Clock` is naming-only (owner call); `PH-22n` remainder — §10's
       dropped-time warning is app-tier in `packages/four`'s `Application`.
 - [ ] **Step-8 sensor bookkeeping example.** `PRIORITY_SENSOR_UPDATE` is now genuinely
