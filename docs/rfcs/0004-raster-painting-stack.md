@@ -1,6 +1,6 @@
 # RFC 0004: 2D raster painting stack (§77a proposed, §73, §77)
 
-- **Status:** draft
+- **Status:** accepted (owner, 2026-08-21 — "Continue with the remaining WPs and the RFCs"; the recommended dispositions of the flagged questions are adopted)
 - **Date:** 2026-08-09
 - **Owner decision:** pending
 - **Spec sections affected:** §77 (primary), a proposed new **§77a**, §73, §33, §34, §40, §55, §58, §62, §63, §79, §83, §85, §89, §90, §96, §98

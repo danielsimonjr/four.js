@@ -1,6 +1,6 @@
 # RFC 0005: Pixel and GPU-identifier picking (§71)
 
-- **Status:** draft
+- **Status:** accepted (owner, 2026-08-21 — "Continue with the remaining WPs and the RFCs"; the recommended dispositions of the flagged questions are adopted)
 - **Date:** 2026-08-21
 - **Owner decision:** pending
 - **Spec sections affected:** §71 (primary), §6b, §33, §34, §45, §47, §48, §55, §61, §62, §63, §72, §73, §85, §89, §90, §92, §96, §98

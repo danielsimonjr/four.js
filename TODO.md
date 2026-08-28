@@ -10,6 +10,11 @@ changes in `CHANGELOG.md`.
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
 
+- [ ] **RFC implementation queue (accepted 2026-08-21):** 0002 plugins → 0003
+      skinning → 0001 shader/node materials → 0005 pixel picking → 0004 raster
+      painting, interleaved with WP-R1.3…R1.8. First-to-land of 0001/0003 owns the
+      `RenderItemKind`/`pipelineId` widening.
+
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
 - [ ] Lighting follow-ups (MVP tier shipped 2026-08-04 — see Done): multi-light +

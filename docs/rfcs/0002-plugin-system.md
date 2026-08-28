@@ -1,6 +1,6 @@
 # RFC 0002: Plugin system (§81)
 
-- **Status:** draft
+- **Status:** accepted (owner, 2026-08-21 — "Continue with the remaining WPs and the RFCs"; the recommended dispositions of the flagged questions are adopted)
 - **Date:** 2026-08-07
 - **Owner decision:** pending
 - **Spec sections affected:** §81 (primary), §6a, §37, §39, §45, §62, §76, §79, §80, §85, §89, §90, §96, §98

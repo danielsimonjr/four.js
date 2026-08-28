@@ -8,6 +8,22 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-21 — RFCs 0001–0005 accepted
+
+#### Decided
+
+- **RFC 0001 (shader + node materials), 0002 (plugin system), 0003 (skinning), 0004
+  (raster painting), 0005 (pixel picking) are accepted** by owner instruction
+  ("Continue with the remaining WPs and the RFCs"), with each RFC's recommended
+  dispositions of its flagged questions adopted. Implementation joins the queue in
+  dependency order — 0002 (independent), 0003 (unblocks §54's silent rows, `R-22`,
+  glTF's third blocker, the `PH-22g/h/i` cross-tier letters), 0001 (unblocks `R-14`,
+  the shape paint pipeline, `ShaderMaterial`, and WP-R1.9's WGSL emitter), 0005
+  (`A-11`'s pixel half), 0004 (the raster painting stack) — interleaved with the
+  remaining WebGPU work packets. Coordination rule re-affirmed: RFC 0001 and 0003 both
+  widen `RenderItemKind`, and whichever implementation lands first owns the
+  `pipelineId` shape.
+
 ### 2026-08-21 — WP-R1.1: the WebGPU backend's foundation
 
 #### Added
