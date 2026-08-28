@@ -8,6 +8,97 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — A-3: the §81 plugin system (RFC 0002)
+
+#### Added
+
+- **`@four/core` gains the §81 plugin host (RFC 0002, gap `A-3`).** `FourPlugin`,
+  `PluginContext`, `PluginHost`, `installPlugins`, `defineCapability`,
+  `bindCapability`, `satisfiesPluginRange`, and `PLUGIN_API_VERSION`. A plugin
+  declares `name`, `version`, optional `dependencies`, and an optional
+  `engineRange`; `install` may be asynchronous. Install order is **topological
+  over `dependencies`, ties broken by the order plugins were supplied** — a §33
+  requirement, not a convenience, because a plugin may register a `SimulationSystem`
+  and equal-priority systems run in registration order, so an unspecified install
+  order would be an unspecified fixed-step order.
+- **Six capability tokens, exported from `four`** (the umbrella is the one package
+  that sees all four registry owners at once, and `@four/core` may name none of
+  them under the frozen §3.1 matrix): `SIMULATION_SYSTEMS` (§39),
+  `RENDERER_REGISTRY` (§62), `SOLVER_REGISTRY` (§37), `COMPONENT_SERIALIZERS` (§79),
+  `SCENE_MIGRATIONS` (§80), `RENDER_GRAPH` (§63). §79's shipped promise —
+  "components serialize under registered type names; plugins register theirs
+  (§81)" — is executable for the first time.
+  **Five of §81's eleven extension points have no token at all** (asset formats,
+  materials and shader nodes, UI controls, editor tools, compute workloads): there
+  is no registry to hand over, so a plugin asking is refused by name rather than
+  registering into nothing. Adding a token later is additive.
+- **`ApplicationOptions.plugins`** (§45, as amended — see below). Installed in
+  `initialize()`, last, so a plugin sees a resolved renderer and an initialized
+  world; a refusal rejects `initialize` and leaves the application uninitialized.
+  `Application` provides `SIMULATION_SYSTEMS` always and `RENDERER_REGISTRY` when
+  §45's `rendererRegistry` option supplied one; a plugin needing a solver registry,
+  a serializer registry, or a render graph installs through a standalone
+  `PluginHost`, because an `Application` holds none of those and naming them would
+  put `@four/physics` and `@four/serialization` in every bundle. `app.pluginContext`
+  publishes the sealed context.
+- **`PLUGIN_API_VERSION` starts at `0.1.0`** and is versioned independently of
+  package semver (§90), like the §79 scene format. The range grammar is
+  deliberately restricted to `*`, `X.Y.Z`, `^X.Y.Z`, `~X.Y.Z`, `>=X.Y.Z`; anything
+  else is refused with a message saying so, rather than taking a semver dependency
+  into the package every other package depends on. Consequence worth knowing:
+  a caret range below 1.0.0 is minor-locked, so `^0.1.0` refuses `0.2.0`.
+
+#### Changed
+
+- **Specification revision 1.9.** §45's `ApplicationOptions` gains
+  `plugins?: readonly FourPlugin[]` and the paragraph stating that installation
+  happens in `initialize` (RFC 0002 open question 1, owner disposition (a) —
+  the §40 "don't invent §45 options" precedent turned on `units` being absent from
+  §45's own list, whereas §81 requires an install lifecycle and §45 owns the
+  lifecycle). §81 gains `dependencies`/`engineRange` (the declaration its own
+  closing sentence already required and its code block omitted), the
+  capability-token statement, the specified install order, the revocability rule,
+  and the §96 boundary. Frozen §1–120 numbering untouched.
+- **`docs/guides/security-and-untrusted-content.md`:** §96's _"safe shader/plugin
+  boundaries"_ row moves **absent → partial**. See below.
+
+#### Security
+
+- **§96's plugin half is answered, and the answer is a boundary rather than a
+  sandbox.** A plugin is JavaScript the application imported and runs with the
+  application's authority; nothing here isolates it and nothing claims to. What is
+  enforced is that **untrusted content can never become a plugin**: `PluginHost.add`
+  and `ApplicationOptions.plugins` take a `FourPlugin` _value_ — no URL, no module
+  specifier, no name resolved out of a document — so no deserialization path can
+  reach the host, and a scene document naming an unregistered component type gets
+  §79's existing error rather than a load. Plugins named in a scene file were
+  rejected outright rather than staged, because that is arbitrary code execution
+  from a scene file in the plainest possible form. Both halves are checked, not
+  asserted: `tests/integration/plugin-boundary.test.ts` fails if any package but
+  `core` and `four` so much as mentions the host, and pins that `add`'s parameter
+  admits no string.
+
+#### Fixed
+
+- Nothing. `A-3` was an absence, not a defect.
+
+#### Notes
+
+- **Uninstall is not symmetric, and the design says so instead of pretending.**
+  A capability declares its revocability (default `false`, owner decision), and a
+  plugin that acquired a non-revocable one **cannot be uninstalled**: the attempt
+  raises `INVALID_APPLICATION_STATE` naming the capability that pins it, rather than
+  running `uninstall` and leaving a half-removed registration behind. Only
+  `SIMULATION_SYSTEMS` is revocable, because only `SystemRegistry` has real removal;
+  `ComponentSerializerRegistry` has none, deliberately, so a document's shape cannot
+  depend on evaluation order. For most plugins the honest lifecycle is install-once.
+- **Measured: `PluginHost` tree-shakes out of every bundle** (grep-verified in all
+  four tight examples), but the **installer does not**, and cannot: a plugin is a
+  value passed at runtime, and side-effect registration is forbidden, so
+  `Application.initialize` must statically reach it. **+1.28–1.31 kB gzip in every
+  bundle carrying an `Application`** (A/B by revert-and-rebuild). Three budgets
+  bumped with the measurements: first-3d 34.5→36, particles 32→34, ui-demo 40.5→42.
+
 ### 2026-08-21 — RFCs 0001–0005 accepted
 
 #### Decided

@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.8 — 2026-08-08**
+**Specification revision 1.9 — 2026-08-28**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -23,6 +23,7 @@
 | 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@four/*`. |
 | 1.7 | 2026-08-06 | Public-API reconciliation (gap analysis A-22/PH-18, owner decision — amend the specification rather than alias the shipped surface). New §97a "Namespace and Naming Conventions" records the per-package umbrella barrel (decision WP-0.7-fix1: collision avoidance plus §91 tree-shaking, so every `Four.X` of Parts VII and X reads `Four.<package>.X`), the shipped-name mapping (`Mesh`→`Renderable`; `*Geometry` classes→geometry factory functions; `*Collider` classes→one `Collider` component over a `CollisionShape` descriptor union; `Motion`→`MotionComponent`; `SceneMigrator.upgrade`→`migrateSceneDocument` + `SceneMigrationRegistry`; `scene.activeCamera`→§48 viewports on `app.views`; `physicsWeight`/`animationWeight` on the `RigidBody` component, not the node), the names with no shipped equivalent yet (a `Text` node, `AnimationController`, `Circle`, `StandardMaterial`, §8 space modes, `Node.animation`), and the deferred string-selection affordances (`renderer: "auto"`, `solver: "auto"`). §97 and §114–§117 and the inline snippets of §11, §15, §16, §18, §20, §111 are rewritten against the shipped API; where a feature is unshipped the example shows the available-today form and cites §97a. Frozen §1–120 numbering respected: the new section takes a letter suffix. |
 | 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@four/render` node that the frozen package dependency matrix forbids `@four/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
+| 1.9 | 2026-08-28 | RFC 0002 (plugin system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `A-3` implemented. **§45** gains `plugins?: readonly FourPlugin[]` and the paragraph stating that installation happens in `initialize` — open question 1's disposition (a), *amend §45*: the §40 precedent against inventing an option turned on `units` being absent from §45's own list, whereas §81 requires an install lifecycle and §45 owns the lifecycle, so §81 had nowhere else to live. **§81** gains the two fields its own closing sentence already required and its code block omitted (`dependencies`, `engineRange`), the statement that `PluginContext` is a set of capability tokens rather than a fixed interface (forced by §3.1: every registry §81 hands over sits downstream of `core`), the specified install order (topological over `dependencies`, ties broken by supply order — a §33 requirement, since a plugin may register a §39 system and equal-priority systems run in registration order), the revocability rule (a capability declares it; a plugin that acquired a non-revocable one cannot be uninstalled and the attempt is refused naming what pins it), and the §96 boundary (a plugin is a value; no URL, no module specifier, no name from a document; no sandbox is described or provided). §96's requirements list is unchanged — it states requirements, not status. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 
 ---
 
@@ -1448,8 +1449,19 @@ interface ApplicationOptions {
   fixedTimeStep?: number;
   maximumSubSteps?: number;
   physics?: PhysicsWorldOptions | false;
+  plugins?: readonly FourPlugin[];
 }
 ```
+
+`plugins` (revision 1.9) lists the §81 plugins the application installs. §81
+requires an install lifecycle and types `install` as `void | Promise<void>`, so
+installation cannot happen in a constructor; §45 owns the lifecycle, and the
+`initialize` step is where installation happens. Plugins are **values** the
+application supplies, never names resolved from a document (§96); a plugin is
+handed the capabilities the application itself owns, and asking for one the
+application does not provide is refused by name (§85). An application whose
+plugins need a capability the Application does not hold installs them through a
+standalone plugin host instead (§81).
 
 The application lifecycle shall expose:
 - initialize;
@@ -2387,10 +2399,44 @@ Migrations must be:
 interface FourPlugin {
   name: string;
   version: string;
+  dependencies?: readonly PluginDependency[];
+  engineRange?: string;
   install(context: PluginContext): void | Promise<void>;
   uninstall?(context: PluginContext): void;
 }
 ```
+
+`dependencies` and `engineRange` (revision 1.9) are the declaration this
+section's closing sentence already required and the original code block omitted:
+`dependencies` names other plugins and the range of each one's `version` this
+plugin accepts, and `engineRange` names the range of the plugin API version this
+plugin accepts. The plugin API version is versioned independently of package
+versions, as the scene format version is (§79, §90).
+
+`PluginContext` is a set of **capability tokens** rather than a fixed interface.
+A token is declared by the package that owns the value it hands over and carries
+that value's type; the context resolves a token to the value or refuses by name
+(§85). This is what lets §98's `core` own the plugin host without naming the
+registries the extension points below live in, all of which sit downstream of it
+in the package dependency matrix (§3.1).
+
+Install order is **topological over `dependencies`, with ties broken by the
+order the plugins were supplied in**, and uninstall order is its reverse. This
+is a determinism requirement, not a convenience: a plugin may register a
+simulation system, and equal-priority systems run in registration order (§39),
+so an unspecified install order would be an unspecified fixed-step order (§33).
+
+Capabilities declare whether they are revocable. A plugin that acquired a
+capability that is not revocable cannot be uninstalled, and the attempt is
+refused naming the capability that pins it rather than running `uninstall` and
+leaving a registration behind that nothing can remove (§85).
+
+A plugin is a **value** the application installs. The host accepts no URL, no
+module specifier, and no name resolved out of a document, and no deserialization
+path reaches it: a scene document names a registered type name, never a module
+(§79). This is what §96's *safe plugin boundaries* requires and all it provides
+— a plugin runs with the authority of the application that imported it, and
+this specification does not describe a sandbox.
 
 Plugin extension points:
 - render passes;

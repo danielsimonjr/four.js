@@ -247,20 +247,36 @@ Notes per row:
 
 ## 5. Plugin API versions (§81)
 
-**n/a — the §81 plugin system is not implemented (gap A-3).** There is no
-`FourPlugin`, no `PluginContext`, no install/uninstall lifecycle, and none of
-§81's eleven extension points; §98's `@four/core` charter line ("plugin host
-(§81)") is unimplemented and no phase §103–§113a scheduled it. There is
-therefore no plugin API version to publish and no compatibility range to
-honour, and this section will stay a sentence rather than become a table until
-that changes.
+**Implemented 2026-08-28 (RFC 0002, gap A-3 closed).** The §81 plugin host lives
+in `@four/core` (`FourPlugin`, `PluginContext`, `PluginHost`, `installPlugins`),
+and the umbrella package `four` declares the six capability tokens
+(`SIMULATION_SYSTEMS`, `RENDERER_REGISTRY`, `SOLVER_REGISTRY`,
+`COMPONENT_SERIALIZERS`, `SCENE_MIGRATIONS`, `RENDER_GRAPH`).
 
-Worth stating so the absence is not mistaken for a smaller one: the _shape_
-§81 needs already exists in several places, independently invented —
-`ComponentSerializerRegistry` (§79), `SceneMigrationRegistry` (§80), the
-injectable `AssetLoader` value, `WidgetSkin` (§74). Those are ordinary package
-APIs governed by section 6's semantic versioning, not a plugin API, and code
-built on them is not a plugin in §81's sense.
+| Surface              | Version | Governed by                                                                           |
+| -------------------- | ------- | ------------------------------------------------------------------------------------- |
+| `PLUGIN_API_VERSION` | `0.1.0` | this section — independent of package semver (§90), like the §79 scene format version |
+
+A plugin's optional `engineRange` is matched against `PLUGIN_API_VERSION` with a
+**deliberately restricted range grammar**: `*`, `X.Y.Z`, `^X.Y.Z`, `~X.Y.Z`, and
+`>=X.Y.Z` only. Anything else is refused with a message saying so, rather than
+taking a semver dependency into the package every other package depends on. One
+consequence worth knowing before publishing a plugin: a caret range below
+`1.0.0` is minor-locked, so `^0.1.0` accepts `0.1.z` and **refuses** `0.2.0` —
+which is exactly the honesty starting at `0.1.0` buys.
+
+Five of §81's eleven extension points (asset formats, materials/shader nodes,
+UI controls, editor tools, compute workloads) have **no capability token, by
+design**: there is no registry to hand over yet, so a plugin asking for one is
+refused by name at install rather than registering into nothing. Adding a token
+later is additive and does not move `PLUGIN_API_VERSION`'s major.
+
+The registries the tokens hand over — `ComponentSerializerRegistry` (§79),
+`SceneMigrationRegistry` (§80), `SystemRegistry` (§39), `RendererRegistry`
+(§62), `SolverRegistry` (§37) — remain ordinary package APIs governed by
+section 6's semantic versioning; the plugin API version covers the host's
+contract (install lifecycle, capability acquisition, revocability), not the
+shapes behind the tokens.
 
 ## 6. Package versioning (§90)
 

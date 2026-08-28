@@ -28,6 +28,76 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — A-3 / RFC 0002: the §81 plugin system.** Decisions worth keeping:
+  - **§3.1 chose the design, not taste: a capability _token_ beats a fixed
+    `PluginContext`.** Five of the six registries §81 hands over live downstream of
+    `core`, so an interface naming them would invert five edges of a frozen matrix,
+    and `unknown` members would type nothing. A token is `{ name, revocable }` plus a
+    phantom `T`, declared by whoever owns the value — so `core` names a string and a
+    type parameter, a plugin gets `context.require(RENDERER_REGISTRY): RendererRegistry`
+    checked by the compiler, and a sixth capability is additive. Use this move whenever
+    a lower package must hand over a higher package's type.
+  - **The phantom is a plain optional property, not a `unique symbol` brand.** A
+    module-private `declare const brand: unique symbol` breaks declaration emit
+    (`tsc -b` writes `.d.ts` for every package), and exporting it would ship a runtime
+    name with no runtime value. `readonly capabilityType?: T` costs nothing and emits.
+  - **Absence is the honest signal, and it is worth saying eleven times.** Six of §81's
+    extension points have a token; five (asset formats, shader nodes, UI controls,
+    editor tools, compute) have **none**, because there is no registry to hand over. A
+    plugin asking is refused _by name_ at install. The alternative — a fixed interface
+    with five `undefined`-valued members — would make "not implemented" and "not
+    provided by this host" indistinguishable.
+  - **Acquisition is the enforceable proxy for "wrote into".** The host cannot observe
+    a write into a registry it does not own; it can observe that a plugin _asked_. So
+    asking for a non-revocable capability is what pins a plugin, and `uninstall` refuses
+    naming it — `removeCollider`-returns-false vs `addCollider`-throws, again.
+    `SIMULATION_SYSTEMS` is the one revocable token because `SystemRegistry` is the one
+    registry with real removal.
+  - **Sealing the context beat wrapping a registry.** RFC 0002 proposed an
+    `isSealed`-aware wrapper for `SIMULATION_SYSTEMS`. Sealing the _context_ after
+    `install()` — `get`/`require` refuse, `plugins`/`capabilities` still read — is
+    general over all six capabilities, needs no edit in any registry's package, and is
+    sealed in a `finally` so a plugin whose `install` threw cannot keep fetching. What
+    a plugin does with a registry it already fetched remains beyond the seam's reach,
+    and the source says so rather than implying otherwise.
+  - **A defensive branch no caller can reach is a coverage hole (fifth confirmation).**
+    Three of them appeared in the first cut — an `isInstalled` check for a runtime that
+    can only install once, a `?? []` for a map every install path populates, a
+    `#current === undefined` guard on a method only a running plugin can reach.
+    Restructuring so the state cannot be missing (`#currentName: string`, `#pins` keyed
+    by plugin name, first-non-revocable recorded off the token at acquisition) took
+    `plugin.ts` from 99.13% branches to **100×4** and deleted code.
+  - **The zero-cost-when-unused target is unreachable once §45 owns the option, and
+    the reason generalizes.** `resolveRenderer`'s lazy module-`let` works because a
+    _backend package_ calls `registerRenderer` and thereby brings the registry in. A
+    plugin is a **value passed at runtime**, and the same RFC forbids side-effect
+    registration (`"sideEffects": false`), so nothing a plugin-using application imports
+    can populate a slot. `Application.initialize` must statically reach the installer.
+    What _was_ achievable and is achieved: `installPlugins` is the front door and
+    `PluginHost` references _it_, so the host class and all its messages tree-shake out
+    (grep-verified 0 occurrences in four bundles). **Measured +1.28–1.31 kB gzip in
+    every Application-bearing bundle**; trimming the refusal messages once bought
+    0.36 kB of the original 1.64. Rule: _a lazily-created module `let` only helps when
+    the thing that needs the feature is a module, not a value._
+  - **§96's plugin boundary is a rule about arrival, not about containment, and saying
+    so is the deliverable.** No sandbox is proposed or provided. The enforceable claim
+    — untrusted content can never _become_ a plugin — is pinned by an A-2-style
+    allowlist test (no package but `core`/`four` may mention the host) plus
+    `@ts-expect-error` that `add` admits no string. Plugins named in a scene document
+    were rejected without a staging note, because staging would imply it is coming.
+  - **Install order is a §33 property because it becomes fixed-step order.** Two
+    plugins registering equal-priority systems produce different transcripts by install
+    order. Kahn driven by a scan of the supplied list gives topological order with
+    supply-order tie-breaks; `tests/integration/plugin-order.test.ts` asserts two
+    listings differ **only** where the declared dependencies permit.
+  - **Gotcha (tracking): GAP v1 register row 4's recommendation text still said
+    "defer explicitly (Alternative E)" while the same row was marked DECIDED/accepted
+    and the RFC header says accepted.** Implemented per the RFC header and rows 5–6;
+    row 4's wording reconciled at landing. A row whose _recommendation_ and
+    _decision_ disagree is worth reading twice before implementing either.
+  - **Landed with the batch:** `docs/COMPATIBILITY.md` §5 rewritten (was "n/a — the
+    §81 plugin system is not implemented", which became false at this landing).
+
 - **2026-08-21 — WP-R1.1: the WebGPU backend's foundation.** Decisions worth keeping:
   - **A clear is a draw on WebGPU, and that is forced rather than chosen.** §61 confines
     a clear to the viewport rectangle; `loadOp` clears the whole attachment and has no

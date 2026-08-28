@@ -109,7 +109,19 @@
  * that one option.
  */
 
-import { DEV, EventEmitter, FourError } from "@four/core";
+import {
+  DEV,
+  EventEmitter,
+  FourError,
+  bindCapability,
+  installPlugins,
+  type FourPlugin,
+  type PluginCapabilityBinding,
+  type PluginContext,
+} from "@four/core";
+// §81's capability tokens (RFC 0002, A-3). Two objects of `{ name, revocable }`
+// — see `plugins.ts` for why naming them here costs no bundle a registry class.
+import { RENDERER_REGISTRY, SIMULATION_SYSTEMS } from "./plugins.js";
 // Every runtime value in this block, plus `geometryMemoryBytes` and
 // `textureMemoryBytes` below, is named **only** from code that `DEV` makes
 // unreachable (A-4, 2026-08-07) — either directly inside an `if (DEV)`, or
@@ -720,6 +732,62 @@ export interface ApplicationOptions {
    * the setting should get.
    */
   reducedMotionSource?: () => boolean;
+
+  /**
+   * The §81 plugins this application installs, in order (RFC 0002, gap `A-3`).
+   *
+   * ```ts
+   * const app = new Application({ plugins: [windPlugin, telemetryPlugin] });
+   * await app.initialize();          // installs, in dependency order
+   * app.pluginContext?.plugins;      // what installed, in install order
+   * ```
+   *
+   * ## Why this option exists at all
+   *
+   * §45's own option block did not list it, and the §40 packet's rule is that
+   * adding an option §45 does not list is inventing API. RFC 0002's first open
+   * question is exactly that collision, and the owner decided it (2026-08-21,
+   * register row 5): **amend §45**. The precedent turned on `units` being
+   * absent from the spec's own list *for §45*, whereas §81 is a spec section
+   * that requires an install lifecycle and §45 owns the lifecycle — §81 has
+   * nowhere else to live. Specification revision 1.9 records the amendment;
+   * this option is the shipped form of it.
+   *
+   * ## Installation happens in `initialize`, and it must
+   *
+   * §81 types `install` as `void | Promise<void>`, so installation is
+   * potentially asynchronous and cannot happen in a constructor.
+   * {@link Application.initialize} installs the plugins **after** the renderer
+   * and the physics world are ready, so a plugin's `install` sees a fully
+   * constructed application. A refusal — a duplicate name, a missing
+   * dependency, a dependency cycle, an engine-version mismatch, a capability
+   * this host does not provide — rejects `initialize` and leaves the
+   * application uninitialized, exactly as a failed renderer does.
+   *
+   * ## Which capabilities this host provides
+   *
+   * Two, and only two, because they are the only registries the application
+   * itself holds:
+   *
+   * | Capability                                             | Provided |
+   * | ------------------------------------------------------ | -------- |
+   * | `SIMULATION_SYSTEMS` (§39) — {@link Application.systems} | always |
+   * | `RENDERER_REGISTRY` (§62) — {@link ApplicationOptions.rendererRegistry} | when that option was passed |
+   *
+   * A plugin needing a solver registry, a serializer registry, or a render
+   * graph asks for something an `Application` never holds — naming those here
+   * would put `@four/physics`, `@four/serialization`, and a `RendererRegistry`
+   * in every bundle that composes an application, which is the cost this whole
+   * file is written to avoid. Install such a plugin through a standalone
+   * {@link @four/core!PluginHost | PluginHost}, providing the registries you
+   * own; it takes three lines and is the form RFC 0002's §7 ships. Asking here
+   * is refused loudly and by name, never ignored.
+   *
+   * Plugins are **values**, never names resolved from a document (§96). See
+   * `@four/core`'s `plugin.ts` for the trust posture in full: a plugin runs
+   * with the application's authority and nothing here sandboxes it.
+   */
+  plugins?: readonly FourPlugin[];
 }
 
 /**
@@ -1070,6 +1138,19 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    */
   readonly #now: (() => number) | undefined;
 
+  /**
+   * {@link ApplicationOptions.plugins} as given, copied, or `null` when none
+   * were configured (§81, A-3).
+   *
+   * `null` rather than an empty array so the install path is one `!== null`
+   * comparison on a field that is `null` for every application that has no
+   * plugins — the same shape `#renderStatistics` uses.
+   */
+  readonly #plugins: readonly FourPlugin[] | null;
+
+  /** The sealed §81 context, once {@link Application.initialize} has installed. */
+  #pluginContext: PluginContext | null = null;
+
   /** Resolved once {@link Application.initialize} has completed. */
   #initialized = false;
 
@@ -1166,6 +1247,13 @@ export class Application extends EventEmitter<ApplicationEventMap> {
           : physicsOption;
     const world = this.physics;
     this.assets = options.assets ?? null;
+    // §81 (A-3). Copied, not aliased, for `views`' reason: the list an
+    // application hands in is not the list this class installs from if the
+    // caller keeps mutating it. Empty is `null`, so "no plugins" and "no
+    // plugins option" are the same state.
+    const plugins = options.plugins;
+    this.#plugins =
+      plugins === undefined || plugins.length === 0 ? null : [...plugins];
     this.#reducedMotion = options.reducedMotion ?? "auto";
     this.#reducedMotionSource = options.reducedMotionSource;
     if (this.#poseInterpolation) {
@@ -1439,9 +1527,58 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       if (world !== null && !world.initialized) {
         await world.initialize();
       }
+      // §81 last (A-3): a plugin's `install` sees a fully constructed
+      // application — a resolved renderer, an initialized world — and its
+      // refusals therefore cannot be confused with a half-built host. A
+      // rejection here leaves `initialized` false, exactly as the renderer's
+      // does.
+      await this.#installPlugins();
       this.#initialized = true;
     });
     return this.#initialization;
+  }
+
+  /**
+   * Installs {@link ApplicationOptions.plugins} (§81, A-3), or does nothing.
+   *
+   * The capability list is built here rather than held as a field because it is
+   * read exactly once, and because building it is where the two rules live:
+   * `SIMULATION_SYSTEMS` is always available (the registry is this
+   * application's own), and `RENDERER_REGISTRY` is available only when §45's
+   * `rendererRegistry` option supplied one — an application that did not scope
+   * its backends holds no registry object to hand over, and reaching for the
+   * process-wide one would make this file name `RendererRegistry` at runtime in
+   * every bundle.
+   */
+  async #installPlugins(): Promise<void> {
+    const plugins = this.#plugins;
+    if (plugins === null) {
+      return;
+    }
+    const capabilities: PluginCapabilityBinding[] = [
+      bindCapability(SIMULATION_SYSTEMS, this.systems),
+    ];
+    const rendererRegistry = this.#rendererRegistry;
+    if (rendererRegistry !== undefined) {
+      capabilities.push(bindCapability(RENDERER_REGISTRY, rendererRegistry));
+    }
+    this.#pluginContext = await installPlugins(plugins, capabilities);
+  }
+
+  /**
+   * The §81 plugin context once {@link Application.initialize} has installed
+   * {@link ApplicationOptions.plugins}, and `null` before that (or forever, for
+   * an application that configured none).
+   *
+   * It is **sealed**: `plugins` and `capabilities` read back for diagnostics,
+   * and `get`/`require` refuse, because registration is legal only during a
+   * plugin's own `install`. `context.plugins` is in install order — topological
+   * over declared dependencies, ties broken by the order they were listed in
+   * (§33: install order decides equal-priority system order, so it is a
+   * specified property rather than an emergent one).
+   */
+  get pluginContext(): PluginContext | null {
+    return this.#pluginContext;
   }
 
   /**

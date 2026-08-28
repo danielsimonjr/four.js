@@ -10,10 +10,20 @@ changes in `CHANGELOG.md`.
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
 
-- [ ] **RFC implementation queue (accepted 2026-08-21):** 0002 plugins → 0003
-      skinning → 0001 shader/node materials → 0005 pixel picking → 0004 raster
-      painting, interleaved with WP-R1.3…R1.8. First-to-land of 0001/0003 owns the
-      `RenderItemKind`/`pipelineId` widening.
+- [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
+      2026-08-28)~~ → 0003 skinning → 0001 shader/node materials → 0005 pixel
+      picking → 0004 raster painting, interleaved with WP-R1.3…R1.8. First-to-land
+      of 0001/0003 owns the `RenderItemKind`/`pipelineId` widening.
+- [ ] **Move the six capability tokens to their owning packages** when
+      `packages/render`/`motion`/`physics`/`serialization` are free (RFC 0002 §2's
+      spelling). They ship in `four/plugins.ts` because the A-3 packet could not
+      touch `packages/render*`; `four` already depends on all four so no §3.1 edge
+      moves either way, and the migration is a re-export — a token's identity is its
+      `name` string.
+- [ ] **Tokens for the five absent §81 extension points** arrive with the registries
+      they need: asset formats (`asset-manager.ts` states there is no registry by
+      design), materials/shader nodes (RFC 0001's deferred alternative E), UI
+      controls, editor tools, compute workloads (§82, WebGPU).
 
 ### Post-plan backlog (final exit verifier, 2026-08-02)
 
@@ -354,9 +364,7 @@ changes in `CHANGELOG.md`.
       surfaces (geometry's was two days stale).
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
-      R-13} - A-3 blocking sub-question: `ApplicationOptions.plugins` vs the same-day §40
-      "don't invent §45 options" precedent — owner consistency call; alternative E
-      (keep registries as ordinary package APIs) genuinely defensible - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing
+      R-13} - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing
       none; +Y for helpers only). Packet gates: `MorphWeights` is the sixth
       `static typeName` and fails the registry-completeness test until registered - Cross-RFC coordination: 0001 and 0003 both widen `RenderItemKind` — whichever
       packet lands first owns the `pipelineId` shape - New spec-revisit items: §57 `ShaderMaterial` row may become permanently
@@ -513,8 +521,11 @@ changes in `CHANGELOG.md`.
       paper) and renderer-side §77 (`R-30b`). The assets-side texture loader tier
       shipped 2026-08-21 (`createTextureLoader`, `TextureAsset`, §96 decompression
       bounds)
-- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader/plugin trust boundaries
-      (blocked on A-3)
+- [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
+      closed operators and a new operator is out of scope in both RFCs). **Plugin trust
+      boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
+      document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a
+      sandbox. Guide row moved absent → partial
 - [ ] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
       graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/
       materials/assets/core/serialization/diagnostics surface)

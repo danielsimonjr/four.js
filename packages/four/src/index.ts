@@ -34,6 +34,19 @@ export type {
 } from "./application.js";
 export { Application } from "./application.js";
 
+// §81's capability tokens (RFC 0002, A-3). The third API this package owns
+// rather than re-exports, and `plugins.ts` records why the umbrella is their
+// home: `@four/core` owns the plugin machinery and may name no registry, and
+// `four` is the one package that sees all four registry owners at once.
+export {
+  COMPONENT_SERIALIZERS,
+  RENDERER_REGISTRY,
+  RENDER_GRAPH,
+  SCENE_MIGRATIONS,
+  SIMULATION_SYSTEMS,
+  SOLVER_REGISTRY,
+} from "./plugins.js";
+
 // §79 support for the engine's own node classes and components (A-14, PH-17,
 // and the drawing tier — A-16, 2026-08-07). It lives here rather than in
 // `@four/serialization` for the reason that package's own header gives: the
