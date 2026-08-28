@@ -100,6 +100,15 @@ export interface WgpuPipelineDescriptor {
   readonly kind: WgpuPipelineKind;
   /** Whether the variant reads the per-vertex colour stream (§53, §60a). */
   readonly vertexColors: boolean;
+  /**
+   * Whether the variant samples §57's `map` — and therefore reads the uv
+   * stream and binds group 1 (§77, WP-R1.2).
+   *
+   * A pipeline field rather than a uniform, for the reason `wgpu-unlit.ts`
+   * gives at length: the cache is lazy, so a variant nothing draws is never
+   * created, which inverts R-19's measured argument for the WebGL backend.
+   */
+  readonly map: boolean;
   /** §57's blend mode, or `"none"` for an opaque draw. */
   readonly blend: "none" | "normal" | "additive" | "multiply" | "screen";
   /** §57's `depthTest` — `"always"` when off, `"less"` when on (GL's default). */
@@ -131,6 +140,7 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   return [
     descriptor.kind,
     descriptor.vertexColors ? "vc" : "-",
+    descriptor.map ? "map" : "-",
     descriptor.blend,
     descriptor.depthTest ? "dt" : "-",
     descriptor.depthWrite ? "dw" : "-",
@@ -154,11 +164,31 @@ export class WgpuPipelineCache {
 
   readonly #layout: GpuPipelineLayout;
 
+  /** Group 0's layout, retained so a textured pipeline layout can name it too. */
+  readonly #drawLayout: GpuBindGroupLayout;
+
+  /**
+   * Group 1's layout, reached only when a textured pipeline is first created.
+   *
+   * A provider rather than a layout, because the object has to be **the same
+   * one** the texture cache creates its bind groups against and because
+   * creating it eagerly would put a `createBindGroupLayout` into the
+   * initialization transcript of every application, textured or not (R-30b's
+   * lazy-query law). `undefined` for a cache built without one: such a cache
+   * answers `null` for a textured descriptor, which skips the draw the way
+   * every other unsatisfiable request in this backend is skipped.
+   */
+  readonly #textureLayout: (() => GpuBindGroupLayout) | undefined;
+
+  /** The two-group pipeline layout, built with the first textured pipeline. */
+  #texturedPipelineLayout: GpuPipelineLayout | null = null;
+
   /** Pipelines by {@link pipelineKey}. Insertion-ordered, string-keyed (§33). */
   readonly #pipelines = new Map<string, GpuRenderPipeline>();
 
   /**
-   * WGSL modules by variant key (`"unlit"`, `"unlit|vc"`, `"clear"`).
+   * WGSL modules by variant key (`"unlit"`, `"unlit|vc"`, `"unlit|map"`,
+   * `"unlit|vc|map"`, `"clear"`).
    *
    * A second cache, one level below the pipelines, because a module is shared
    * by every pipeline of its variant: the flat unlit shader is compiled once
@@ -168,8 +198,14 @@ export class WgpuPipelineCache {
 
   #disposed = false;
 
-  constructor(device: GpuDevice, bindGroupLayout: GpuBindGroupLayout) {
+  constructor(
+    device: GpuDevice,
+    bindGroupLayout: GpuBindGroupLayout,
+    textureLayout?: () => GpuBindGroupLayout,
+  ) {
     this.#device = device;
+    this.#textureLayout = textureLayout;
+    this.#drawLayout = bindGroupLayout;
     this.#layout = device.createPipelineLayout({
       label: "four:pipeline-layout",
       bindGroupLayouts: [bindGroupLayout],
@@ -207,7 +243,11 @@ export class WgpuPipelineCache {
     if (existing !== undefined) {
       return existing;
     }
-    const pipeline = this.#create(descriptor, key);
+    const layout = this.#layoutFor(descriptor);
+    if (layout === null) {
+      return null;
+    }
+    const pipeline = this.#create(descriptor, key, layout);
     this.#pipelines.set(key, pipeline);
     return pipeline;
   }
@@ -223,11 +263,40 @@ export class WgpuPipelineCache {
     this.#disposed = true;
     this.#pipelines.clear();
     this.#modules.clear();
+    this.#texturedPipelineLayout = null;
   }
 
-  #module(kind: WgpuPipelineKind, vertexColors: boolean): GpuShaderModule {
+  /**
+   * The pipeline layout `descriptor` needs: group 0 alone, or group 0 and
+   * group 1 for a variant that samples.
+   *
+   * `null` when a textured pipeline is asked of a cache that was given no
+   * texture-layout provider — see {@link WgpuPipelineCache}'s field.
+   */
+  #layoutFor(descriptor: WgpuPipelineDescriptor): GpuPipelineLayout | null {
+    if (!descriptor.map) {
+      return this.#layout;
+    }
+    const provider = this.#textureLayout;
+    if (provider === undefined) {
+      return null;
+    }
+    this.#texturedPipelineLayout ??= this.#device.createPipelineLayout({
+      label: "four:pipeline-layout:map",
+      bindGroupLayouts: [this.#drawLayout, provider()],
+    });
+    return this.#texturedPipelineLayout;
+  }
+
+  #module(
+    kind: WgpuPipelineKind,
+    vertexColors: boolean,
+    map: boolean,
+  ): GpuShaderModule {
     const key =
-      kind === "clear" ? "clear" : vertexColors ? "unlit|vc" : "unlit";
+      kind === "clear"
+        ? "clear"
+        : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
     const existing = this.#modules.get(key);
     if (existing !== undefined) {
       return existing;
@@ -237,19 +306,27 @@ export class WgpuPipelineCache {
       code:
         kind === "clear"
           ? CLEAR_SHADER_SOURCE
-          : unlitShaderSource(vertexColors),
+          : unlitShaderSource(vertexColors, map),
     });
     this.#modules.set(key, module);
     return module;
   }
 
-  #create(descriptor: WgpuPipelineDescriptor, key: string): GpuRenderPipeline {
-    const module = this.#module(descriptor.kind, descriptor.vertexColors);
+  #create(
+    descriptor: WgpuPipelineDescriptor,
+    key: string,
+    layout: GpuPipelineLayout,
+  ): GpuRenderPipeline {
+    const module = this.#module(
+      descriptor.kind,
+      descriptor.vertexColors,
+      descriptor.map,
+    );
     const blend =
       descriptor.blend === "none" ? undefined : BLEND_STATES[descriptor.blend];
     return this.#device.createRenderPipeline({
       label: `four:${key}`,
-      layout: this.#layout,
+      layout,
       vertex: {
         module,
         entryPoint: VERTEX_ENTRY_POINT,
@@ -259,7 +336,7 @@ export class WgpuPipelineCache {
         buffers:
           descriptor.kind === "clear"
             ? []
-            : unlitVertexBufferLayouts(descriptor.vertexColors),
+            : unlitVertexBufferLayouts(descriptor.vertexColors, descriptor.map),
       },
       fragment: {
         module,

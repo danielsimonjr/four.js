@@ -8,6 +8,25 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — WP-R1.2: WebGPU texture and sampler caches (§77, §83)
+
+#### Added
+
+- **WP-R1.2 — WebGPU texture and sampler caches (§77, §83).** `@four/render-webgpu`
+  gains `WgpuTextureCache`: id/version-keyed `queue.writeTexture` uploads
+  (`rgba8unorm`, `rgba8unorm-srgb` for §60a-tagged textures), a separate sampler
+  cache deduplicating `GPUSampler`s on the canonical resolved key
+  (wrap | magFilter | minFilter | mipmapFilter | anisotropy), and blit-based mip
+  generation — WebGPU has no `generateMipmap`, so the chain is drawn, one half-size
+  pass per level, through a lazily compiled generator that costs nothing when
+  unused. The unlit tier gains its `map` variant: uv stream at `@location(2)`,
+  texture+sampler bound at group 1 with the layout declared as data; the geometry
+  cache uploads uvs. §84 accounting matches the GL backend byte for byte
+  (4 × 4 mipmapped = 84 bytes, asserted against `Texture.byteLength`). New
+  cross-package suite `tests/integration/webgpu-textures.test.ts`;
+  `recording-gpu.ts` gained `writeTexture`, `createSampler`, and mip-level view
+  recording. Coverage 99.57/99.18 (from 99.33/98.75); all six bundles unchanged.
+
 ### 2026-08-28 — A-3: the §81 plugin system (RFC 0002)
 
 #### Added

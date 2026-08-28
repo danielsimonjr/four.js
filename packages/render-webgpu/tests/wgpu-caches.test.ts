@@ -9,6 +9,7 @@
  * to.
  */
 
+import { Texture } from "@four/render";
 import { describe, expect, it } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";
@@ -22,16 +23,27 @@ import {
   DRAW_UNIFORM_WGSL,
   DRAW_VIEW_PROJECTION_OFFSET,
   GPU_BUFFER_USAGE,
+  GPU_TEXTURE_USAGE,
+  MAP_BINDING_WGSL,
+  MAP_SAMPLER_BINDING,
+  MAP_TEXTURE_BINDING,
+  MIPMAP_SHADER_SOURCE,
   POSITION_SHADER_LOCATION,
   UNIFORM_STRIDE_BYTES,
+  UV_SHADER_LOCATION,
   WgpuGeometryCache,
   WgpuPipelineCache,
+  WgpuTextureCache,
   createDrawBindGroupLayout,
+  mipLevelCount,
   pipelineKey,
+  samplerKey,
+  textureByteLength,
   unlitShaderSource,
   unlitVertexBufferLayouts,
   type CacheableGeometry,
   type GpuDevice,
+  type WgpuCacheableTexture,
   type WgpuPipelineDescriptor,
 } from "../src/index.js";
 
@@ -47,6 +59,7 @@ function device(): {
 const BASE: WgpuPipelineDescriptor = {
   kind: "unlit",
   vertexColors: false,
+  map: false,
   blend: "none",
   depthTest: true,
   depthWrite: true,
@@ -83,12 +96,49 @@ function geometry(
   } as unknown as CacheableGeometry;
 }
 
+/** A §77 texture double, exactly the `MaterialTexture` read contract. */
+function texture(
+  overrides: Partial<{
+    width: number;
+    height: number;
+    data: Uint8Array | null;
+    version: number;
+    disposed: boolean;
+    colorSpace: "linear" | "srgb";
+    filter: "nearest" | "linear";
+    wrap: "clamp-to-edge" | "repeat" | "mirrored-repeat";
+    mipmaps: boolean;
+    minFilter: string;
+    anisotropy: number;
+  }> = {},
+): WgpuCacheableTexture {
+  nextId += 1;
+  const width = overrides.width ?? 2;
+  const height = overrides.height ?? 2;
+  return {
+    id: `texture-${String(nextId)}`,
+    version: overrides.version ?? 0,
+    width,
+    height,
+    data:
+      "data" in overrides ? overrides.data : new Uint8Array(width * height * 4),
+    disposed: overrides.disposed ?? false,
+    colorSpace: overrides.colorSpace,
+    filter: overrides.filter,
+    wrap: overrides.wrap,
+    mipmaps: overrides.mipmaps,
+    minFilter: overrides.minFilter,
+    anisotropy: overrides.anisotropy,
+  } as unknown as WgpuCacheableTexture;
+}
+
 describe("pipelineKey", () => {
   it("is a total, canonical function of the descriptor", () => {
     expect(pipelineKey(BASE)).toBe(
-      "unlit|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
+      "unlit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
     );
     expect(pipelineKey({ ...BASE, vertexColors: true })).toContain("|vc|");
+    expect(pipelineKey({ ...BASE, map: true })).toContain("|map|");
     expect(pipelineKey({ ...BASE, depthFormat: null })).toMatch(/\|-$/u);
   });
 
@@ -98,6 +148,7 @@ describe("pipelineKey", () => {
       BASE,
       { ...BASE, kind: "clear" as const },
       { ...BASE, vertexColors: true },
+      { ...BASE, map: true },
       { ...BASE, blend: "normal" as const },
       { ...BASE, blend: "additive" as const },
       { ...BASE, blend: "multiply" as const },
@@ -111,7 +162,7 @@ describe("pipelineKey", () => {
     ]) {
       keys.add(pipelineKey(descriptor));
     }
-    expect(keys.size).toBe(13);
+    expect(keys.size).toBe(14);
   });
 
   it("is stable across two structurally identical descriptors", () => {
@@ -268,6 +319,72 @@ describe("WgpuPipelineCache", () => {
     expect(cache.size).toBe(0);
     expect(cache.moduleCount).toBe(0);
     expect(cache.acquire(BASE)).toBeNull();
+  });
+
+  it("answers null for a textured descriptor when built without a texture layout", () => {
+    // The provider is optional so WP-R1.1's construction still typechecks; a
+    // cache without one skips the draw the way every unsatisfiable request in
+    // this backend is skipped, rather than throwing inside `render` (§61).
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+    );
+    gpu.reset();
+    expect(cache.acquire({ ...BASE, map: true })).toBeNull();
+    expect(cache.size).toBe(0);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(0);
+  });
+
+  it("builds the two-group pipeline layout lazily, and exactly once", () => {
+    const { device: gpuDevice, gpu } = device();
+    const textures = new WgpuTextureCache(gpuDevice);
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      () => textures.bindGroupLayout,
+    );
+    gpu.reset();
+
+    // Untextured pipelines never reach for group 1's layout (R-30b's law).
+    cache.acquire(BASE);
+    expect(gpu.countOf("device.createBindGroupLayout")).toBe(0);
+    expect(gpu.countOf("device.createPipelineLayout")).toBe(0);
+
+    const first = cache.acquire({ ...BASE, map: true });
+    expect(first).not.toBeNull();
+    expect(gpu.countOf("device.createBindGroupLayout")).toBe(1);
+    expect(gpu.countOf("device.createPipelineLayout")).toBe(1);
+    const layoutArgs = gpu.callsOf("device.createPipelineLayout")[0]
+      ?.args[0] as { bindGroupLayouts: unknown[] };
+    expect(layoutArgs.bindGroupLayouts).toHaveLength(2);
+    expect(layoutArgs.bindGroupLayouts[1]).toBe(textures.bindGroupLayout);
+
+    // A second textured variant reuses the two-group layout.
+    cache.acquire({ ...BASE, map: true, blend: "additive" });
+    expect(gpu.countOf("device.createPipelineLayout")).toBe(1);
+  });
+
+  it("gives a textured variant its uv vertex buffer and its own module", () => {
+    const { device: gpuDevice, gpu } = device();
+    const textures = new WgpuTextureCache(gpuDevice);
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      () => textures.bindGroupLayout,
+    );
+    gpu.reset();
+    cache.acquire({ ...BASE, map: true });
+    cache.acquire({ ...BASE, vertexColors: true, map: true });
+    expect(cache.moduleCount).toBe(2);
+    const buffers = gpu
+      .callsOf("device.createRenderPipeline")
+      .map(
+        (call) =>
+          (call.args[0] as { vertex: { buffers: unknown[] } }).vertex.buffers
+            .length,
+      );
+    expect(buffers).toEqual([2, 3]);
   });
 });
 
@@ -455,8 +572,417 @@ describe("the unlit WGSL", () => {
     expect(unlitVertexBufferLayouts(false)[0]?.arrayStride).toBe(12);
   });
 
+  it("samples §57's map only in the textured variants (WP-R1.2)", () => {
+    expect(unlitShaderSource(false)).not.toContain("textureSample");
+    expect(unlitShaderSource(false, true)).toContain(
+      "input.color * textureSample(mapTexture, mapSampler, input.uv)",
+    );
+    expect(unlitShaderSource(false, true)).toContain(MAP_BINDING_WGSL);
+    expect(unlitShaderSource(false, true)).toContain(
+      `@location(${String(UV_SHADER_LOCATION)}) uv`,
+    );
+    // Both flags together: the tint, the vertex colour and the sample multiply.
+    expect(unlitShaderSource(true, true)).toContain("draw.color * vertexColor");
+    expect(unlitShaderSource(true, true)).toContain("textureSample");
+  });
+
+  it("appends the uv stream after the colour stream, positionally", () => {
+    expect(unlitVertexBufferLayouts(false, true)).toHaveLength(2);
+    expect(unlitVertexBufferLayouts(true, true)).toHaveLength(3);
+    // The uv layout keeps `@location(2)` whichever slot it lands in — a
+    // shader location is a name, a slot is a position (`wgpu-unlit.ts`).
+    expect(
+      unlitVertexBufferLayouts(false, true)[1]?.attributes[0]?.shaderLocation,
+    ).toBe(UV_SHADER_LOCATION);
+    expect(
+      unlitVertexBufferLayouts(true, true)[2]?.attributes[0]?.shaderLocation,
+    ).toBe(UV_SHADER_LOCATION);
+    expect(unlitVertexBufferLayouts(false, true)[1]?.arrayStride).toBe(8);
+  });
+
   it("generates the clear triangle from the vertex index alone", () => {
     expect(CLEAR_SHADER_SOURCE).toContain("@builtin(vertex_index)");
     expect(CLEAR_SHADER_SOURCE).not.toContain("@location(0) position");
+  });
+});
+
+describe("mipLevelCount and textureByteLength", () => {
+  it("counts the full chain, one halving at a time", () => {
+    expect(mipLevelCount(1, 1)).toBe(1);
+    expect(mipLevelCount(2, 2)).toBe(2);
+    expect(mipLevelCount(4, 4)).toBe(3);
+    expect(mipLevelCount(256, 256)).toBe(9);
+    // Non-square: the longer axis decides, the shorter clamps at 1.
+    expect(mipLevelCount(8, 2)).toBe(4);
+    expect(mipLevelCount(1, 16)).toBe(5);
+  });
+
+  it("bills the chain level by level, as `Texture.byteLength` does", () => {
+    expect(textureByteLength(4, 4, false)).toBe(64);
+    // R-30b's recorded number: 4 × 4 mipmapped is 84 bytes, not 4/3 × 64.
+    expect(textureByteLength(4, 4, true)).toBe(84);
+    expect(textureByteLength(8, 2, true)).toBe(64 + 16 + 8 + 4);
+  });
+
+  it("agrees with `@four/render`'s own accounting (§84 backend parity)", () => {
+    // Independent computations, asserted equal — the parity §84 needs for
+    // `textureMemory` to mean one thing across backends where formats match.
+    for (const [width, height, mipmaps] of [
+      [4, 4, true],
+      [4, 4, false],
+      [256, 256, true],
+      [8, 2, true],
+    ] as const) {
+      const cpu = new Texture({ width, height, mipmaps });
+      expect(textureByteLength(width, height, mipmaps)).toBe(cpu.byteLength);
+      cpu.dispose();
+    }
+  });
+});
+
+describe("the mip blit's WGSL", () => {
+  it("binds only the texture/sampler group, at the shared bindings", () => {
+    // Group 0 here, group 1 in the unlit shader — one layout object, two
+    // pipeline layouts (`wgpu-bindings.ts`); and no vertex buffers at all:
+    // the triangle and its uvs come from the vertex index.
+    expect(MIPMAP_SHADER_SOURCE).toContain(
+      `@group(0) @binding(${String(MAP_TEXTURE_BINDING)})`,
+    );
+    expect(MIPMAP_SHADER_SOURCE).toContain(
+      `@group(0) @binding(${String(MAP_SAMPLER_BINDING)})`,
+    );
+    expect(MIPMAP_SHADER_SOURCE).toContain("@builtin(vertex_index)");
+    expect(MIPMAP_SHADER_SOURCE).not.toContain("@location(0) position");
+  });
+});
+
+describe("samplerKey", () => {
+  it("is total over the five resolved fields, in a fixed order", () => {
+    expect(
+      samplerKey({
+        addressMode: "clamp-to-edge",
+        magFilter: "linear",
+        minFilter: "linear",
+        mipmapFilter: "nearest",
+        anisotropy: 1,
+      }),
+    ).toBe("clamp-to-edge|linear|linear|nearest|1");
+  });
+});
+
+describe("WgpuTextureCache", () => {
+  it("creates nothing at construction — the layout is first-use lazy", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    expect(gpu.calls).toHaveLength(0);
+    const layout = cache.bindGroupLayout;
+    expect(gpu.countOf("device.createBindGroupLayout")).toBe(1);
+    expect(cache.bindGroupLayout).toBe(layout);
+    expect(gpu.countOf("device.createBindGroupLayout")).toBe(1);
+  });
+
+  it("uploads once with writeTexture and reuses until the version advances", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    const source = texture({ width: 2, height: 2 });
+
+    const first = cache.acquire(source);
+    expect(first).not.toBeNull();
+    expect(cache.acquire(source)).toBe(first);
+    expect(gpu.countOf("device.createTexture")).toBe(1);
+    expect(gpu.countOf("queue.writeTexture")).toBe(1);
+    expect(cache.size).toBe(1);
+    expect(cache.byteLength).toBe(16);
+
+    const upload = gpu.callsOf("queue.writeTexture")[0];
+    expect(upload?.args[2]).toEqual({
+      offset: 0,
+      bytesPerRow: 8,
+      rowsPerImage: 2,
+    });
+    expect(upload?.args[3]).toEqual([2, 2]);
+
+    (source as unknown as { version: number }).version = 1;
+    const second = cache.acquire(source);
+    expect(second).not.toBe(first);
+    expect(gpu.countOf("texture.destroy")).toBe(1);
+    expect(cache.size).toBe(1);
+    expect(cache.byteLength).toBe(16);
+  });
+
+  it("allocates rgba8unorm, and rgba8unorm-srgb for a tagged texture (§60a)", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({}));
+    cache.acquire(texture({ colorSpace: "srgb" }));
+    const formats = gpu
+      .callsOf("device.createTexture")
+      .map((call) => (call.args[0] as { format: string }).format);
+    expect(formats).toEqual(["rgba8unorm", "rgba8unorm-srgb"]);
+  });
+
+  it("binds the texture's view and its sampler at the declared bindings", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    const record = cache.acquire(texture({}));
+    const descriptor = gpu.callsOf("device.createBindGroup")[0]?.args[0] as {
+      layout: unknown;
+      entries: { binding: number; resource: unknown }[];
+    };
+    expect(descriptor.layout).toBe(cache.bindGroupLayout);
+    expect(descriptor.entries.map((entry) => entry.binding)).toEqual([
+      MAP_TEXTURE_BINDING,
+      MAP_SAMPLER_BINDING,
+    ]);
+    expect(descriptor.entries[0]?.resource).toBe(record?.view);
+    expect(descriptor.entries[1]?.resource).toBe(record?.sampler);
+  });
+
+  it("returns null for a disposed texture, and destroys its stale record", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    const source = texture({});
+    cache.acquire(source);
+    (source as unknown as { version: number; disposed: boolean }).version = 1;
+    (source as unknown as { disposed: boolean }).disposed = true;
+    expect(cache.acquire(source)).toBeNull();
+    expect(gpu.countOf("texture.destroy")).toBe(1);
+    expect(cache.size).toBe(0);
+    expect(cache.byteLength).toBe(0);
+  });
+
+  it("shares one sampler across textures naming the same §77 state", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    // Naming the default state and naming nothing resolve to one sampler —
+    // the key is built from resolved values, not raw fields.
+    cache.acquire(texture({}));
+    cache.acquire(texture({ filter: "linear", wrap: "clamp-to-edge" }));
+    expect(cache.samplerCount).toBe(1);
+    expect(gpu.countOf("device.createSampler")).toBe(1);
+
+    cache.acquire(texture({ wrap: "repeat" }));
+    cache.acquire(texture({ filter: "nearest" }));
+    expect(cache.samplerCount).toBe(3);
+
+    const descriptor = gpu.callsOf("device.createSampler")[0]?.args[0];
+    expect(descriptor).toEqual({
+      label: "four:sampler:clamp-to-edge|linear|linear|nearest|1",
+      addressModeU: "clamp-to-edge",
+      addressModeV: "clamp-to-edge",
+      magFilter: "linear",
+      minFilter: "linear",
+      mipmapFilter: "nearest",
+    });
+  });
+
+  it("maps §77's wrap modes onto WebGPU's address modes", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({ wrap: "repeat" }));
+    cache.acquire(texture({ wrap: "mirrored-repeat" }));
+    const modes = gpu
+      .callsOf("device.createSampler")
+      .map((call) => (call.args[0] as { addressModeU: string }).addressModeU);
+    expect(modes).toEqual(["repeat", "mirror-repeat"]);
+  });
+
+  it("splits §77's minFilter into WebGPU's two fields", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    // `data: null` allocates the chain without generating it, keeping the
+    // blit's own sampler off this tape — only the resolved §77 samplers land.
+    cache.acquire(
+      texture({
+        mipmaps: true,
+        minFilter: "linear-mipmap-nearest",
+        data: null,
+      }),
+    );
+    cache.acquire(
+      texture({
+        mipmaps: true,
+        minFilter: "nearest-mipmap-linear",
+        data: null,
+      }),
+    );
+    // An in-level minFilter on a mipmapped texture: between levels, pick one.
+    cache.acquire(texture({ mipmaps: true, minFilter: "nearest", data: null }));
+    const pairs = gpu
+      .callsOf("device.createSampler")
+      .map(
+        (call) => call.args[0] as { minFilter: string; mipmapFilter: string },
+      )
+      .map((descriptor) => [descriptor.minFilter, descriptor.mipmapFilter]);
+    expect(pairs).toEqual([
+      ["linear", "nearest"],
+      ["nearest", "linear"],
+      ["nearest", "nearest"],
+    ]);
+  });
+
+  it("derives the min filter from `filter`, chain-aware, when unnamed (R-30b)", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({ mipmaps: true, data: null }));
+    cache.acquire(texture({ mipmaps: true, filter: "nearest", data: null }));
+    const pairs = gpu
+      .callsOf("device.createSampler")
+      .map(
+        (call) => call.args[0] as { minFilter: string; mipmapFilter: string },
+      )
+      .map((descriptor) => [descriptor.minFilter, descriptor.mipmapFilter]);
+    expect(pairs).toEqual([
+      ["linear", "linear"],
+      ["nearest", "nearest"],
+    ]);
+  });
+
+  it("collapses a mip-choosing minFilter on a texture with no chain", () => {
+    // Reachable through a double even though `Texture` refuses the pairing
+    // (§85) — the same defensive collapse `gl-texture.ts` makes.
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({ minFilter: "linear-mipmap-linear" }));
+    expect(gpu.callsOf("device.createSampler")[0]?.args[0]).toMatchObject({
+      minFilter: "linear",
+      mipmapFilter: "nearest",
+    });
+  });
+
+  it("clamps anisotropy to the assumed ceiling, and only when trilinear", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({ mipmaps: true, anisotropy: 8, data: null }));
+    cache.acquire(texture({ mipmaps: true, anisotropy: 64, data: null }));
+    // Nearest-filtered: anisotropy is a request WebGPU cannot express (§62's
+    // degrade, not §85's refusal) — the descriptor omits the field entirely.
+    cache.acquire(
+      texture({ mipmaps: true, filter: "nearest", anisotropy: 8, data: null }),
+    );
+    // No chain: minification is not trilinear, so the same degrade applies.
+    cache.acquire(texture({ anisotropy: 8 }));
+    const values = gpu
+      .callsOf("device.createSampler")
+      .map(
+        (call) =>
+          (call.args[0] as { maxAnisotropy?: number }).maxAnisotropy ?? null,
+      );
+    expect(values).toEqual([8, 16, null, null]);
+  });
+
+  it("honours a device that reports an anisotropy limit, resolved once", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    (gpuDevice as { limits?: unknown }).limits = { maxAnisotropy: 4 };
+    cache.acquire(texture({ mipmaps: true, anisotropy: 8, data: null }));
+    expect(gpu.callsOf("device.createSampler")[0]?.args[0]).toMatchObject({
+      maxAnisotropy: 4,
+    });
+  });
+
+  it("generates a mip chain by drawing each level from the one above", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    const record = cache.acquire(
+      texture({ width: 4, height: 4, mipmaps: true }),
+    );
+    expect(record?.levels).toBe(3);
+    expect(record?.byteLength).toBe(84);
+    expect(cache.byteLength).toBe(84);
+
+    // The allocation asks for the chain and for attachability — the chain is
+    // drawn, so its levels are render targets.
+    const allocation = gpu.callsOf("device.createTexture")[0]?.args[0] as {
+      mipLevelCount?: number;
+      usage: number;
+    };
+    expect(allocation.mipLevelCount).toBe(3);
+    expect(allocation.usage & GPU_TEXTURE_USAGE.RENDER_ATTACHMENT).not.toBe(0);
+
+    // Level 0 uploads; levels 1 and 2 are passes: two one-level target views,
+    // two draws, one encoder, one submit — before any frame exists.
+    expect(gpu.countOf("queue.writeTexture")).toBe(1);
+    expect(gpu.countOf("encoder.beginRenderPass")).toBe(2);
+    expect(gpu.countOf("pass.draw")).toBe(2);
+    expect(gpu.countOf("queue.submit")).toBe(1);
+    const levelViews = gpu
+      .callsOf("texture.createView")
+      .map((call) => call.args[1] as { baseMipLevel?: number } | undefined)
+      .filter((descriptor) => descriptor !== undefined)
+      .map((descriptor) => descriptor.baseMipLevel);
+    expect(levelViews).toEqual([0, 1, 1, 2]);
+  });
+
+  it("compiles the blit lazily — an unmipped scene compiles nothing", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({}));
+    expect(gpu.countOf("device.createShaderModule")).toBe(0);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(0);
+
+    // The first chain compiles once; a second chain in the same format reuses
+    // the pipeline; an sRGB chain adds a pipeline but never a second module.
+    cache.acquire(texture({ width: 4, height: 4, mipmaps: true }));
+    expect(gpu.countOf("device.createShaderModule")).toBe(1);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+    cache.acquire(texture({ width: 8, height: 8, mipmaps: true }));
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(1);
+    cache.acquire(
+      texture({ width: 4, height: 4, mipmaps: true, colorSpace: "srgb" }),
+    );
+    expect(gpu.countOf("device.createShaderModule")).toBe(1);
+    expect(gpu.countOf("device.createRenderPipeline")).toBe(2);
+  });
+
+  it("skips generation for a mipmapped texture with no CPU data", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    const record = cache.acquire(
+      texture({ width: 4, height: 4, mipmaps: true, data: null }),
+    );
+    // The chain is still allocated — and still billed (§84): `byteLength`
+    // follows the allocation, exactly as `Texture.byteLength` does.
+    expect(record?.levels).toBe(3);
+    expect(record?.byteLength).toBe(84);
+    expect(gpu.countOf("queue.writeTexture")).toBe(0);
+    expect(gpu.countOf("encoder.beginRenderPass")).toBe(0);
+    // Filtering zeroes into zeroes is work to compute what is already there,
+    // so the allocation does not ask to be a render target either.
+    const allocation = gpu.callsOf("device.createTexture")[0]?.args[0] as {
+      usage: number;
+    };
+    expect(allocation.usage & GPU_TEXTURE_USAGE.RENDER_ATTACHMENT).toBe(0);
+  });
+
+  it("forgets everything without touching a lost device", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    cache.acquire(texture({ width: 4, height: 4, mipmaps: true }));
+    cache.acquire(texture({}));
+    gpu.reset();
+    cache.forget();
+    expect(gpu.calls).toHaveLength(0);
+    expect(cache.size).toBe(0);
+    expect(cache.samplerCount).toBe(0);
+    expect(cache.byteLength).toBe(0);
+  });
+
+  it("destroys every texture on dispose — and only the textures", () => {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuTextureCache(gpuDevice);
+    const source = texture({});
+    cache.acquire(source);
+    cache.acquire(texture({ width: 4, height: 4, mipmaps: true }));
+    gpu.reset();
+    cache.dispose();
+    expect(gpu.countOf("texture.destroy")).toBe(2);
+    expect(gpu.calls).toHaveLength(2);
+    expect(cache.disposed).toBe(true);
+    expect(cache.byteLength).toBe(0);
+    gpu.reset();
+    cache.dispose();
+    expect(gpu.calls).toHaveLength(0);
+    expect(cache.acquire(source)).toBeNull();
   });
 });

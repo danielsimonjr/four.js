@@ -37,11 +37,16 @@
  * variant nothing draws is never created at all — so the cost model inverts,
  * and the variant is strictly better: no per-fragment branch, and the vertex
  * layout can *omit* the colour buffer entirely rather than binding a dummy.
- * (Texturing itself is WP-R1.2's; this module ships the flat and
- * vertex-coloured variants.)
+ *
+ * `useMap` joined it in WP-R1.2, and joined it as a *variant* for the same
+ * reason: the textured shader is compiled only for a frame that actually draws
+ * a textured object, the untextured variants keep the one-bind-group pipeline
+ * layout they had, and the uv stream is absent from the vertex layout rather
+ * than bound as a dummy. The two flags multiply out to four variants, of which
+ * a given application typically compiles one or two.
  */
 
-import { DRAW_UNIFORM_WGSL } from "./wgpu-bindings.js";
+import { DRAW_UNIFORM_WGSL, MAP_BINDING_WGSL } from "./wgpu-bindings.js";
 import type { GpuVertexBufferLayout } from "./webgpu-device.js";
 
 /** `@location(0)` — object-space position, the one required stream (§53). */
@@ -76,20 +81,58 @@ export const COLOR_BUFFER_LAYOUT: GpuVertexBufferLayout = Object.freeze({
   ]),
 });
 
+/** `@location(2)` — the optional per-vertex uv stream (§53, §55, §77). */
+export const UV_SHADER_LOCATION = 2;
+
 /**
- * Vertex layouts for an unlit pipeline, in slot order — one buffer, or two when
- * the variant reads per-vertex colours.
+ * Vertex layout for the optional uv stream: one tightly packed `vec2<f32>`.
+ *
+ * `@location(2)` rather than `1`, even though uvs are read by a variant that
+ * often carries no colours: a shader location is a name, and giving uv and
+ * colour the same number would mean two different meanings for one location
+ * across variants of one shader family — which is exactly the confusion the
+ * eventual WGSL emitter (RFC 0001) must not have to disambiguate.
+ */
+export const UV_BUFFER_LAYOUT: GpuVertexBufferLayout = Object.freeze({
+  arrayStride: 8,
+  stepMode: "vertex",
+  attributes: Object.freeze([
+    Object.freeze({
+      format: "float32x2",
+      offset: 0,
+      shaderLocation: UV_SHADER_LOCATION,
+    }),
+  ]),
+});
+
+/**
+ * Vertex layouts for an unlit pipeline, **in slot order**: position always,
+ * then colours if the variant reads them, then uvs if it samples a texture.
  *
  * Separate buffers rather than one interleaved one, matching `gl-geometry.ts`:
  * `BufferGeometry` holds each stream as its own typed array, so one buffer per
  * stream is a straight upload with no CPU-side interleave pass.
+ *
+ * Slot index is *positional*, not fixed per stream — a textured, uncoloured
+ * variant binds its uvs to slot 1, a textured and coloured one to slot 2 — so
+ * the renderer's `setVertexBuffer` order has to be built in the same order this
+ * function is. It is, and both are a single counter, which is why the ordering
+ * is stated here rather than left to be inferred: the failure mode of getting
+ * it wrong is a pipeline reading colours as uvs, which validates cleanly and
+ * draws garbage.
  */
 export function unlitVertexBufferLayouts(
   vertexColors: boolean,
+  map = false,
 ): readonly GpuVertexBufferLayout[] {
-  return vertexColors
-    ? [POSITION_BUFFER_LAYOUT, COLOR_BUFFER_LAYOUT]
-    : [POSITION_BUFFER_LAYOUT];
+  const layouts: GpuVertexBufferLayout[] = [POSITION_BUFFER_LAYOUT];
+  if (vertexColors) {
+    layouts.push(COLOR_BUFFER_LAYOUT);
+  }
+  if (map) {
+    layouts.push(UV_BUFFER_LAYOUT);
+  }
+  return layouts;
 }
 
 /** Entry point name of every vertex stage in this package. */
@@ -108,17 +151,30 @@ export const FRAGMENT_ENTRY_POINT = "fragmentMain";
  * descriptor instead of on the string (§33's determinism rule, applied to a
  * cache).
  */
-export function unlitShaderSource(vertexColors: boolean): string {
-  const input = vertexColors
-    ? `  @location(${String(POSITION_SHADER_LOCATION)}) position : vec3<f32>,
-  @location(${String(COLOR_SHADER_LOCATION)}) vertexColor : vec4<f32>,`
-    : `  @location(${String(POSITION_SHADER_LOCATION)}) position : vec3<f32>,`;
+export function unlitShaderSource(vertexColors: boolean, map = false): string {
+  let input = `  @location(${String(POSITION_SHADER_LOCATION)}) position : vec3<f32>,`;
+  if (vertexColors) {
+    input += `
+  @location(${String(COLOR_SHADER_LOCATION)}) vertexColor : vec4<f32>,`;
+  }
+  if (map) {
+    input += `
+  @location(${String(UV_SHADER_LOCATION)}) uv : vec2<f32>,`;
+  }
   const color = vertexColors ? "draw.color * vertexColor" : "draw.color";
-  return `${DRAW_UNIFORM_WGSL}
+  // `map` multiplies the interpolated colour, so the tint and the per-vertex
+  // colour both survive — the same expression `gl-program.ts`'s unlit fragment
+  // stage writes (`result *= texture(map, vUv)`), and the same order.
+  return `${DRAW_UNIFORM_WGSL}${map ? `\n\n${MAP_BINDING_WGSL}` : ""}
 
 struct VertexOutput {
   @builtin(position) position : vec4<f32>,
-  @location(0) color : vec4<f32>,
+  @location(0) color : vec4<f32>,${
+    map
+      ? `
+  @location(1) uv : vec2<f32>,`
+      : ""
+  }
 };
 
 @vertex
@@ -129,13 +185,18 @@ ${input}
   let clip = draw.viewProjection * draw.model * vec4<f32>(position, 1.0);
   // WebGL clip depth [-w, w] onto WebGPU's [0, w]; see the module header.
   output.position = vec4<f32>(clip.x, clip.y, (clip.z + clip.w) * 0.5, clip.w);
-  output.color = ${color};
+  output.color = ${color};${
+    map
+      ? `
+  output.uv = uv;`
+      : ""
+  }
   return output;
 }
 
 @fragment
 fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
-  return input.color;
+  return ${map ? "input.color * textureSample(mapTexture, mapSampler, input.uv)" : "input.color"};
 }
 `;
 }

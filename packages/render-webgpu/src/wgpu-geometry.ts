@@ -25,9 +25,12 @@
  * typed array — so a geometry mutated after the call is not read back, and the
  * `version` bump is what re-uploads it.
  *
- * This packet uploads **positions, optional colours and optional indices**:
- * exactly the streams the unlit tier draws. Normals and uvs join with the
- * pipelines that read them (WP-R1.2, WP-R1.5).
+ * This packet uploads **positions, optional uvs, optional colours and optional
+ * indices**: exactly the streams the unlit tier draws. Uvs joined in WP-R1.2,
+ * with the textured variant that reads them; normals join with the lit and
+ * standard pipelines (WP-R1.5), by the same rule — a stream is uploaded when a
+ * pipeline in this package can read it, never before, because a buffer nothing
+ * binds is bytes nothing draws.
  */
 
 import type { RenderItem } from "@four/render";
@@ -45,8 +48,17 @@ export type CacheableGeometry = RenderItem["geometry"];
 export interface WgpuGeometryRecord {
   /** Buffer backing the position attribute (slot 0). */
   readonly positionBuffer: GpuBuffer;
-  /** Buffer backing the optional per-vertex colour attribute (slot 1), or `null`. */
+  /** Buffer backing the optional per-vertex colour attribute, or `null`. */
   readonly colorBuffer: GpuBuffer | null;
+  /**
+   * Buffer backing the optional per-vertex uv attribute (§53, §77), or `null`.
+   *
+   * No slot number here, and none on `colorBuffer` any more: a slot index is
+   * *positional* in the variant's vertex layout (`wgpu-unlit.ts`), so a record
+   * cannot name one — a coloured, textured draw binds uvs to slot 2 and an
+   * uncoloured, textured one binds them to slot 1.
+   */
+  readonly uvBuffer: GpuBuffer | null;
   /** Index buffer, or `null` for a non-indexed geometry. */
   readonly indexBuffer: GpuBuffer | null;
   /** `"uint16"` or `"uint32"`, or `null` when there are no indices. */
@@ -163,6 +175,19 @@ export class WgpuGeometryCache {
       `four:positions:${geometry.id}`,
     );
 
+    // Allocation order is positions → uvs → colours → indices, the order
+    // `gl-geometry.ts` allocates in, so the two backends' upload transcripts
+    // stay readable side by side.
+    const uvs = geometry.uvs;
+    const uvBuffer =
+      uvs === undefined
+        ? null
+        : this.#uploadBuffer(
+            uvs,
+            GPU_BUFFER_USAGE.VERTEX,
+            `four:uvs:${geometry.id}`,
+          );
+
     const colors = geometry.colors;
     const colorBuffer =
       colors === undefined
@@ -186,6 +211,7 @@ export class WgpuGeometryCache {
     return {
       positionBuffer,
       colorBuffer,
+      uvBuffer,
       indexBuffer,
       indexFormat:
         indices === undefined
@@ -216,6 +242,7 @@ export class WgpuGeometryCache {
   #destroyRecord(record: WgpuGeometryRecord): void {
     record.positionBuffer.destroy();
     record.colorBuffer?.destroy();
+    record.uvBuffer?.destroy();
     record.indexBuffer?.destroy();
   }
 }

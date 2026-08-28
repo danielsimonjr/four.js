@@ -119,3 +119,85 @@ export const DRAW_UNIFORM_WGSL = `struct DrawUniforms {
 };
 
 @group(0) @binding(0) var<uniform> draw : DrawUniforms;`;
+
+/**
+ * The bind-group index §77's texture and sampler occupy: **group 1**, exactly
+ * where the header above said a second group would arrive.
+ *
+ * Group 0 does not move, and that is the point of having declared it as data:
+ * a pipeline that samples nothing keeps the one-group layout it had, and the
+ * WGSL of the untextured variants is byte-identical to what WP-R1.1 emitted.
+ */
+export const MAP_BIND_GROUP_INDEX = 1;
+
+/** `@binding(0)` of {@link MAP_BIND_GROUP_INDEX} — the sampled texture. */
+export const MAP_TEXTURE_BINDING = 0;
+
+/** `@binding(1)` of {@link MAP_BIND_GROUP_INDEX} — the sampler that reads it. */
+export const MAP_SAMPLER_BINDING = 1;
+
+/**
+ * The texture/sampler bind-group layout (§77, WP-R1.2).
+ *
+ * ## Why the two bindings are one group, and why the group is a *second* one
+ *
+ * They are one group because they are one decision — "sample this image this
+ * way" — and because a bind group is the unit of binding: splitting them would
+ * double the per-draw `setBindGroup` traffic for a pair that never varies
+ * independently.
+ *
+ * They are a second group rather than two more bindings on group 0 because
+ * group 0 is **per draw** and rebound at a dynamic offset for every object in
+ * the frame, while this one is **per texture** and shared by every draw that
+ * samples the same image. Merging them would mean one bind group per (draw ×
+ * texture) instead of one per texture, allocated inside the frame — the cost
+ * the dynamic-offset design exists to avoid.
+ *
+ * ## Fragment-only visibility
+ *
+ * Both entries are `FRAGMENT` alone. The vertex stage carries the uv through
+ * as a varying and never samples, so declaring vertex visibility would ask the
+ * implementation to reserve a vertex-stage texture slot for a resource no
+ * vertex shader in this package reads (§62's per-stage binding limits are
+ * where that shows up).
+ *
+ * `sampleType: "float"` and `type: "filtering"` are the pair that makes
+ * `textureSample` legal: an `unfilterable-float` texture may only be sampled
+ * with a `non-filtering` sampler, which is the trap a depth or float target
+ * walks into (R-18's shadow map, WP-R1.6's targets) — those tiers declare
+ * their own layout rather than widen this one.
+ *
+ * The same layout object is reused as the mip-generation blit's group 0
+ * (`wgpu-texture.ts`): a blit binds exactly a texture and a sampler, so
+ * declaring a second identical layout would be two objects for one shape.
+ */
+export function createTextureBindGroupLayout(
+  device: GpuDevice,
+): GpuBindGroupLayout {
+  return device.createBindGroupLayout({
+    label: "four:map",
+    entries: [
+      {
+        binding: MAP_TEXTURE_BINDING,
+        visibility: GPU_SHADER_STAGE.FRAGMENT,
+        texture: { sampleType: "float", viewDimension: "2d" },
+      },
+      {
+        binding: MAP_SAMPLER_BINDING,
+        visibility: GPU_SHADER_STAGE.FRAGMENT,
+        sampler: { type: "filtering" },
+      },
+    ],
+  });
+}
+
+/**
+ * The WGSL declaration of {@link createTextureBindGroupLayout}'s group, spliced
+ * into every shader in this package that samples a texture.
+ *
+ * Here for {@link DRAW_UNIFORM_WGSL}'s reason: the layout the pipeline declares
+ * and the layout the shader reads are two definitions in one module, so they
+ * cannot drift.
+ */
+export const MAP_BINDING_WGSL = `@group(${String(MAP_BIND_GROUP_INDEX)}) @binding(${String(MAP_TEXTURE_BINDING)}) var mapTexture : texture_2d<f32>;
+@group(${String(MAP_BIND_GROUP_INDEX)}) @binding(${String(MAP_SAMPLER_BINDING)}) var mapSampler : sampler;`;

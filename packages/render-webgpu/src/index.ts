@@ -40,11 +40,15 @@ export type {
   GpuRenderPassDescriptor,
   GpuRenderPassEncoder,
   GpuRenderPipeline,
+  GpuBufferBinding,
   GpuRenderPipelineDescriptor,
+  GpuSampler,
+  GpuSamplerDescriptor,
   GpuShaderModule,
   GpuTexture,
   GpuTextureDescriptor,
   GpuTextureView,
+  GpuTextureViewDescriptor,
   GpuVertexBufferLayout,
   WebgpuCanvas,
 } from "./webgpu-device.js";
@@ -63,7 +67,12 @@ export {
   DRAW_UNIFORM_FLOATS,
   DRAW_UNIFORM_WGSL,
   DRAW_VIEW_PROJECTION_OFFSET,
+  MAP_BINDING_WGSL,
+  MAP_BIND_GROUP_INDEX,
+  MAP_SAMPLER_BINDING,
+  MAP_TEXTURE_BINDING,
   createDrawBindGroupLayout,
+  createTextureBindGroupLayout,
 } from "./wgpu-bindings.js";
 export type { CacheableGeometry, WgpuGeometryRecord } from "./wgpu-geometry.js";
 export { WgpuGeometryCache } from "./wgpu-geometry.js";
@@ -72,6 +81,18 @@ export type {
   WgpuPipelineKind,
 } from "./wgpu-pipeline-cache.js";
 export { pipelineKey, WgpuPipelineCache } from "./wgpu-pipeline-cache.js";
+export type {
+  ResolvedSamplerState,
+  WgpuCacheableTexture,
+  WgpuTextureRecord,
+} from "./wgpu-texture.js";
+export {
+  MIPMAP_SHADER_SOURCE,
+  WgpuTextureCache,
+  mipLevelCount,
+  samplerKey,
+  textureByteLength,
+} from "./wgpu-texture.js";
 export {
   CLEAR_SHADER_SOURCE,
   CLEAR_VERTEX_COUNT,
@@ -80,6 +101,8 @@ export {
   FRAGMENT_ENTRY_POINT,
   POSITION_BUFFER_LAYOUT,
   POSITION_SHADER_LOCATION,
+  UV_BUFFER_LAYOUT,
+  UV_SHADER_LOCATION,
   VERTEX_ENTRY_POINT,
   unlitShaderSource,
   unlitVertexBufferLayouts,

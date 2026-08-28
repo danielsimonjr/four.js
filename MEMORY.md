@@ -28,6 +28,43 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — WP-R1.2: the WebGPU texture tier.** Decisions worth keeping:
+  - **Mipmaps are generated, not degraded — and the generator is lazy.** WebGPU has no
+    `generateMipmap`; degrading (R-30b's no-`generateMipmap`-context path) would make
+    the §62-first backend strictly worse than GL at a feature WebGPU supports, and
+    would falsify §84's chain-billed `byteLength`. The blit's module/layout/sampler/
+    pipeline are first-chain-lazy and format-keyed, so an application that mipmaps
+    nothing records the identical WP-R1.1 transcript — the pipeline-cost law applied
+    to a subsystem. `data: null` chains allocate but skip generation (zero-filled
+    levels) and skip `RENDER_ATTACHMENT`.
+  - **The blit passes are the one legitimate `loadOp: "clear"` in this backend** —
+    they are not §61 viewport clears; the whole level is the triangle's.
+  - **Sampler-state-as-upload-state becomes sampler-state-as-object**: a second cache
+    keyed on the canonical string of the five _resolved_ values, so "names the
+    default" and "names nothing" share one sampler. Total key coverage is what makes
+    a hit mean something.
+  - **WebGPU has no queryable anisotropy limit** — `limits.maxAnisotropy` is honored
+    if a device ever reports one, else 16 is assumed (GL's de-facto ceiling, so both
+    backends clamp 64→16); and `maxAnisotropy > 1` is API-invalid without full
+    trilinear filtering, so non-trilinear textures degrade to isotropic — §62's
+    degrade reached for an API-validity reason.
+  - **Group 1 is per-texture; group 0 stays per-draw.** Merging them would allocate
+    one bind group per (draw × texture) inside the frame. The pipeline cache takes a
+    layout _provider_ so the compiled-against and bound-against layout are one
+    object, created lazily.
+  - **Vertex slots are positional, shader locations are names**: uv keeps
+    `@location(2)` whether it lands in slot 1 or 2; both sides are one counter.
+    Getting it wrong validates cleanly and draws garbage — stated in source.
+  - **Two opaque `object` aliases cannot share a union**
+    (`no-duplicate-type-constituents`): `GpuBindGroupEntry.resource` is typed
+    `GpuBufferBinding | GpuTextureView` with the prose naming three kinds — the
+    layout entry, not the handle's type, disambiguates.
+  - **`recording-gpu.ts` records `createView`'s descriptor only when passed**, so
+    WP-R1.1 transcript lines stayed byte-identical while mip-level views became
+    assertable.
+  - Map without uvs degrades to the flat draw; map disposed skips the draw (§83) —
+    degradation to a variant's _absence_, never to undefined content.
+
 - **2026-08-28 — A-3 / RFC 0002: the §81 plugin system.** Decisions worth keeping:
   - **§3.1 chose the design, not taste: a capability _token_ beats a fixed
     `PluginContext`.** Five of the six registries §81 hands over live downstream of

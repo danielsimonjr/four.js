@@ -108,6 +108,42 @@ class TestGeometry {
   }
 }
 
+let nextTextureId = 0;
+
+/** §77's `MaterialTexture` read contract, reduced to what the cache reads. */
+class TestTexture {
+  readonly id: string;
+
+  version = 0;
+
+  readonly width: number;
+
+  readonly height: number;
+
+  data: Uint8Array | null;
+
+  disposed = false;
+
+  mipmaps?: boolean;
+
+  constructor(width = 2, height = 2) {
+    nextTextureId += 1;
+    this.id = `test-texture-${String(nextTextureId)}`;
+    this.width = width;
+    this.height = height;
+    this.data = new Uint8Array(width * height * 4);
+  }
+
+  markDirty(): void {
+    this.version += 1;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.version += 1;
+  }
+}
+
 /** §57's `UnlitMaterial`, reduced to the state the pipeline descriptor reads. */
 class TestMaterial {
   readonly color: [number, number, number, number];
@@ -125,6 +161,8 @@ class TestMaterial {
   opacity?: number;
 
   vertexColors?: boolean;
+
+  map?: TestTexture | null;
 
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
@@ -164,6 +202,13 @@ function triangle(colors?: Float32Array): TestGeometry {
     "triangles",
     colors,
   );
+}
+
+/** A triangle carrying the uv stream §77's textured variant samples with. */
+function texturedTriangle(colors?: Float32Array): TestGeometry {
+  const geometry = triangle(colors);
+  geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+  return geometry;
 }
 
 function renderable(
@@ -224,6 +269,20 @@ function uniformUpload(gpu: RecordingGpu): number[] {
     throw new Error("the frame uploaded no uniforms");
   }
   return last.args[2] as number[];
+}
+
+/**
+ * How many §77 map textures the tape allocates — `createTexture` calls minus
+ * the frame's own depth attachment, told apart by the cache's label.
+ */
+function mapAllocations(gpu: RecordingGpu): number {
+  return gpu
+    .callsOf("device.createTexture")
+    .filter((call) =>
+      String((call.args[0] as { label?: string }).label).startsWith(
+        "four:texture:",
+      ),
+    ).length;
 }
 
 /** Awaits a rejection and returns the `FourError` it carried. */
@@ -706,6 +765,136 @@ describe("WebgpuRenderer.render", () => {
     expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(3);
   });
 
+  it("samples §57's map through group 1 when the geometry carries uvs", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    // The texture uploads once and binds beside its sampler at group 1. (The
+    // frame's other `createTexture` is the depth attachment.)
+    expect(mapAllocations(harness.gpu)).toBe(1);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(1);
+    const groupBinds = harness.gpu
+      .callsOf("pass.setBindGroup")
+      .map((call) => call.args[0]);
+    expect(groupBinds).toContain(1);
+
+    // Positions at slot 0, uvs at slot 1 — the positional order.
+    const slots = harness.gpu
+      .callsOf("pass.setVertexBuffer")
+      .map((call) => call.args[0]);
+    expect(slots).toEqual([0, 1]);
+
+    // The textured module is its own variant, and it samples.
+    const sources = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(sources.some((code) => code.includes("textureSample"))).toBe(true);
+  });
+
+  it("reuses the uploaded texture across frames, until markDirty", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    const map = new TestTexture();
+    material.map = map;
+    root.add(renderable(texturedTriangle(), material));
+    harness.renderer.render(root, [createView()]);
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(1);
+
+    map.markDirty();
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(2);
+    expect(harness.gpu.countOf("texture.destroy")).toBe(1);
+  });
+
+  it("shares one sampler and one pipeline across textures sharing state", () => {
+    const root = createRoot();
+    const first = new TestMaterial();
+    first.map = new TestTexture();
+    const second = new TestMaterial();
+    second.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), first));
+    root.add(renderable(texturedTriangle(), second));
+    harness.renderer.render(root, [createView()]);
+
+    // Two textures, two bind groups — one sampler between them (§77), and
+    // one textured pipeline plus the clear.
+    expect(mapAllocations(harness.gpu)).toBe(2);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(1);
+    expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(2);
+  });
+
+  it("draws untextured when the geometry carries no uvs to sample with", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    // Clear + triangle: the draw happens, flat, with nothing uploaded.
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+    expect(mapAllocations(harness.gpu)).toBe(0);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(0);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("skips the draw when its map has been disposed (§83)", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    const map = new TestTexture();
+    material.map = map;
+    root.add(renderable(texturedTriangle(), material));
+    map.dispose();
+    harness.renderer.render(root, [createView()]);
+
+    // The clear draws; the textured item is skipped, never painted undefined.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("binds colours and uvs in slot order for a variant reading all three", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.vertexColors = true;
+    material.map = new TestTexture();
+    root.add(
+      renderable(texturedTriangle(new Float32Array(12).fill(1)), material),
+    );
+    harness.renderer.render(root, [createView()]);
+
+    const slots = harness.gpu
+      .callsOf("pass.setVertexBuffer")
+      .map((call) => call.args[0]);
+    expect(slots).toEqual([0, 1, 2]);
+    // Position, colour and uv buffers, in the geometry cache's upload order:
+    // positions → uvs → colours (matching `gl-geometry.ts`), bound as
+    // position → colours → uvs (the variant's slot order).
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(3);
+  });
+
+  it("generates a mip chain for a mipmapped map, inside the frame", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    const map = new TestTexture(4, 4);
+    map.mipmaps = true;
+    material.map = map;
+    root.add(renderable(texturedTriangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    // The chain's own encoder submits before the frame's: two blit passes for
+    // levels 1 and 2, then the frame pass — three passes, two submits.
+    expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(3);
+    expect(harness.gpu.countOf("queue.submit")).toBe(2);
+    const submits = harness.gpu.calls
+      .map((call) => call.name)
+      .filter((name) => name === "queue.submit" || name === "pass.end");
+    expect(submits[submits.length - 1]).toBe("queue.submit");
+  });
+
   it("takes §57's blend mode from the material, defaulting to normal", () => {
     const root = createRoot();
     const plain = new TestMaterial();
@@ -906,6 +1095,23 @@ describe("WebgpuRenderer device loss (§61)", () => {
     expect(gpu.calls).toHaveLength(0);
   });
 
+  it("forgets uploaded textures on loss without touching the dead device", async () => {
+    const { gpu, renderer } = await initialized();
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), material));
+    renderer.render(root, [createView()]);
+
+    gpu.loseDevice();
+    await Promise.resolve();
+    await Promise.resolve();
+    gpu.reset();
+    renderer.dispose();
+    // No `texture.destroy` for the map: its allocation died with the device.
+    expect(gpu.countOf("texture.destroy")).toBe(0);
+  });
+
   it("does not report teardown as a loss", async () => {
     const { gpu, renderer } = await initialized();
     let lost = 0;
@@ -970,6 +1176,20 @@ describe("WebgpuRenderer.dispose", () => {
     // The geometry's vertex buffer, the depth texture and the uniform buffer.
     expect(gpu.countOf("buffer.destroy")).toBeGreaterThanOrEqual(2);
     expect(gpu.countOf("texture.destroy")).toBe(1);
+  });
+
+  it("destroys uploaded textures alongside the depth texture", async () => {
+    const { gpu, renderer } = await initialized();
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), material));
+    renderer.render(root, [createView()]);
+    gpu.reset();
+
+    renderer.dispose();
+    // The map's allocation and the depth attachment.
+    expect(gpu.countOf("texture.destroy")).toBe(2);
   });
 
   it("is idempotent", async () => {

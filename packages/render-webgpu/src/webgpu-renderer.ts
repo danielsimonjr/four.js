@@ -10,11 +10,12 @@
  * renderer.dispose();
  * ```
  *
- * This is WP-R1.1 of the R-1 plan: device and context acquisition, the registry
- * opt-in, per-view clears, and the **unlit** tier drawn through the real
+ * This is WP-R1.1 and WP-R1.2 of the R-1 plan: device and context acquisition,
+ * the registry opt-in, per-view clears, and the **unlit** tier — flat,
+ * vertex-coloured and now §57-`map`-textured — drawn through the real
  * `buildRenderList` → `buildViewRenderList` → draw path. The remaining
  * pipelines (sprites and text, lit, standard, particles, shadows, effects,
- * compute) are packets R1.2–R1.8 and are *absent*, not stubbed: an item this
+ * compute) are packets R1.3–R1.8 and are *absent*, not stubbed: an item this
  * tier cannot draw is skipped, exactly as a draw with no geometry record is,
  * because a pipeline that silently draws the wrong thing is worse than one that
  * does not exist yet (the recorded WP-9.1 rule, applied to a backend).
@@ -103,6 +104,7 @@ import {
   DRAW_MODEL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_VIEW_PROJECTION_OFFSET,
+  MAP_BIND_GROUP_INDEX,
   createDrawBindGroupLayout,
 } from "./wgpu-bindings.js";
 import { WgpuGeometryCache } from "./wgpu-geometry.js";
@@ -110,6 +112,7 @@ import {
   WgpuPipelineCache,
   type WgpuPipelineDescriptor,
 } from "./wgpu-pipeline-cache.js";
+import { WgpuTextureCache } from "./wgpu-texture.js";
 import { CLEAR_VERTEX_COUNT } from "./wgpu-unlit.js";
 
 /** Error code for use-after-dispose, mirroring the other two backends (§83, §89). */
@@ -351,6 +354,8 @@ export class WebgpuRenderer implements Renderer {
 
   #geometries: WgpuGeometryCache | null = null;
 
+  #textures: WgpuTextureCache | null = null;
+
   #bindGroupLayout: GpuBindGroupLayout | null = null;
 
   #uniformBuffer: GpuBuffer | null = null;
@@ -485,7 +490,17 @@ export class WebgpuRenderer implements Renderer {
 
     const bindGroupLayout = createDrawBindGroupLayout(device);
     this.#bindGroupLayout = bindGroupLayout;
-    this.#pipelines = new WgpuPipelineCache(device, bindGroupLayout);
+    const textures = new WgpuTextureCache(device);
+    this.#textures = textures;
+    // The provider, not the layout: group 1 is created by the first textured
+    // upload and by nothing else (`wgpu-texture.ts`), so a textured pipeline
+    // and its bind groups are built against one object without either cache
+    // allocating anything at initialization.
+    this.#pipelines = new WgpuPipelineCache(
+      device,
+      bindGroupLayout,
+      () => textures.bindGroupLayout,
+    );
     this.#geometries = new WgpuGeometryCache(device);
     this.#growUniforms(device, bindGroupLayout, 1);
     this.#watchDeviceLoss(device);
@@ -540,12 +555,14 @@ export class WebgpuRenderer implements Renderer {
     const context = this.#context;
     const pipelines = this.#pipelines;
     const geometries = this.#geometries;
+    const textures = this.#textures;
     const layout = this.#bindGroupLayout;
     if (
       device === null ||
       context === null ||
       pipelines === null ||
       geometries === null ||
+      textures === null ||
       layout === null ||
       this.#deviceLost ||
       views.length === 0 ||
@@ -666,8 +683,31 @@ export class WebgpuRenderer implements Renderer {
         const material = item.material;
         const vertexColors =
           material.vertexColors === true && record.colorBuffer !== null;
+        // §57's `map` draws only when the geometry carries the uvs to sample it
+        // with and the texture will upload — a texture disposed while still
+        // referenced skips the draw rather than painting undefined content
+        // (§83), which is the rule `gl-texture.ts` states and this honours by
+        // falling through to the untextured variant's *absence*, not to it.
+        const map = material.map ?? null;
+        const textureRecord =
+          map === null || record.uvBuffer === null
+            ? null
+            : textures.acquire(map);
+        if (
+          map !== null &&
+          record.uvBuffer !== null &&
+          textureRecord === null
+        ) {
+          continue;
+        }
+        const useMap = textureRecord !== null;
         const pipeline = pipelines.acquire(
-          this.#unlitDescriptor(material, vertexColors, record.topology),
+          this.#unlitDescriptor(
+            material,
+            vertexColors,
+            useMap,
+            record.topology,
+          ),
         );
         if (pipeline === null) {
           // Unreachable given the class invariant — the cache answers `null`
@@ -691,9 +731,19 @@ export class WebgpuRenderer implements Renderer {
 
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
-        pass.setVertexBuffer(0, record.positionBuffer);
+        // Slots are positional, in `unlitVertexBufferLayouts`' order: position,
+        // then colours if the variant reads them, then uvs if it samples. One
+        // counter, on both sides, so the two orders cannot drift.
+        let slot = 0;
+        pass.setVertexBuffer(slot, record.positionBuffer);
         if (vertexColors && record.colorBuffer !== null) {
-          pass.setVertexBuffer(1, record.colorBuffer);
+          slot += 1;
+          pass.setVertexBuffer(slot, record.colorBuffer);
+        }
+        if (textureRecord !== null && record.uvBuffer !== null) {
+          slot += 1;
+          pass.setVertexBuffer(slot, record.uvBuffer);
+          pass.setBindGroup(MAP_BIND_GROUP_INDEX, textureRecord.bindGroup);
         }
         if (record.indexBuffer !== null && record.indexFormat !== null) {
           pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
@@ -735,8 +785,10 @@ export class WebgpuRenderer implements Renderer {
     this.#disposed = true;
     if (this.#deviceLost) {
       this.#geometries?.forget();
+      this.#textures?.forget();
     } else {
       this.#geometries?.dispose();
+      this.#textures?.dispose();
       this.#uniformBuffer?.destroy();
       this.#depthTexture?.destroy?.();
       this.#context?.unconfigure?.();
@@ -744,6 +796,7 @@ export class WebgpuRenderer implements Renderer {
     }
     this.#pipelines?.dispose();
     this.#geometries = null;
+    this.#textures = null;
     this.#pipelines = null;
     this.#uniformBuffer = null;
     this.#bindGroup = null;
@@ -759,11 +812,13 @@ export class WebgpuRenderer implements Renderer {
   #unlitDescriptor(
     material: UnlitMaterialLike,
     vertexColors: boolean,
+    map: boolean,
     topology: "triangle-list" | "line-list",
   ): WgpuPipelineDescriptor {
     return {
       kind: "unlit",
       vertexColors,
+      map,
       blend:
         material.transparent === true
           ? (material.blendMode ?? "normal")
@@ -788,6 +843,7 @@ export class WebgpuRenderer implements Renderer {
     const pipeline = pipelines.acquire({
       kind: "clear",
       vertexColors: false,
+      map: false,
       blend: "none",
       // `depthTest: false` compiles to `depthCompare: "always"`, which is what
       // makes this draw *set* depth to the far plane rather than test against
@@ -918,6 +974,7 @@ export class WebgpuRenderer implements Renderer {
       }
       this.#deviceLost = true;
       this.#geometries?.forget();
+      this.#textures?.forget();
       this.#pipelines?.dispose();
       this.events.emit("contextlost", { renderer: this });
     });

@@ -110,16 +110,49 @@ export interface GpuBuffer {
   destroy(): void;
 }
 
-/** An opaque texture view — what a render pass attaches. */
+/** An opaque texture view — what a render pass attaches, and what a shader samples. */
 export type GpuTextureView = object;
+
+/**
+ * Which levels of a texture a view exposes (`GPUTextureViewDescriptor`).
+ *
+ * Every member is optional and the whole descriptor is optional, so
+ * `createView()` still means "the whole texture" — which is the only form
+ * WP-R1.1 needed and the form the swap chain and the depth attachment still
+ * use. The two members are here because mip generation cannot be expressed
+ * without them: a blit reads level *n* and writes level *n + 1*, and a WebGPU
+ * pass attaches a **view**, not a texture, so "write level 3" is spelled as a
+ * one-level view based at 3 (§77, WP-R1.2).
+ */
+export interface GpuTextureViewDescriptor {
+  /** Diagnostic name. */
+  readonly label?: string;
+  /** First mip level the view exposes; `0` — the whole texture — by default. */
+  readonly baseMipLevel?: number;
+  /** How many levels from `baseMipLevel`; all of them by default. */
+  readonly mipLevelCount?: number;
+}
 
 /** An opaque GPU texture handle. */
 export interface GpuTexture {
-  /** A view of the whole texture; the only form this packet needs. */
-  createView(): GpuTextureView;
+  /** A view of the whole texture, or of the mip range `descriptor` names. */
+  createView(descriptor?: GpuTextureViewDescriptor): GpuTextureView;
   /** Releases the allocation (§83). Absent on a swap-chain texture. */
   destroy?(): void;
 }
+
+/**
+ * An opaque sampler — filter and wrap state as an **object** (§77).
+ *
+ * The one structural difference between this backend's texture tier and the
+ * WebGL one, and the reason `wgpu-texture.ts` has a second cache in it: GL
+ * writes filter and wrap onto the texture with `texParameteri`, so R-30's
+ * sampler state is per-texture and costs nothing to vary. WebGPU makes it a
+ * separate, immutable object bound alongside the texture, so a thousand
+ * textures sharing one filter/wrap pair should share **one** sampler rather
+ * than allocate a thousand identical ones.
+ */
+export type GpuSampler = object;
 
 /** A compiled WGSL module. */
 export type GpuShaderModule = object;
@@ -300,8 +333,45 @@ export interface GpuQueue {
     dataOffset?: number,
     size?: number,
   ): void;
+  /**
+   * Uploads CPU bytes into a texture's mip level.
+   *
+   * The WebGPU counterpart of `texImage2D`, and note what it is *not*: there is
+   * no bound texture and no unit, so an upload triggered mid-frame cannot
+   * disturb anything the frame has already bound — the `gl.bindTexture(…, null)`
+   * the WebGL cache issues after every upload has no counterpart here because
+   * it has nothing to undo.
+   */
+  writeTexture(
+    destination: { readonly texture: GpuTexture; readonly mipLevel?: number },
+    data: ArrayBufferView,
+    dataLayout: {
+      readonly offset?: number;
+      readonly bytesPerRow: number;
+      readonly rowsPerImage?: number;
+    },
+    size: readonly [number, number],
+  ): void;
   /** Submits recorded command buffers, in order. */
   submit(commandBuffers: readonly GpuCommandBuffer[]): void;
+}
+
+/** A sampler allocation request (`GPUSamplerDescriptor`) — see {@link GpuSampler}. */
+export interface GpuSamplerDescriptor {
+  /** Diagnostic name. */
+  readonly label?: string;
+  /** §77's wrap mode on the U axis. */
+  readonly addressModeU: string;
+  /** §77's wrap mode on the V axis; one field feeds both (§77's single `wrap`). */
+  readonly addressModeV: string;
+  /** §77's magnification filter. */
+  readonly magFilter: string;
+  /** The in-level half of §77's `minFilter`. */
+  readonly minFilter: string;
+  /** The between-levels half of §77's `minFilter`. */
+  readonly mipmapFilter: string;
+  /** §77's anisotropy, present only above 1 — see `wgpu-texture.ts`. */
+  readonly maxAnisotropy?: number;
 }
 
 /** A buffer allocation request. */
@@ -314,7 +384,7 @@ export interface GpuBufferDescriptor {
   readonly usage: number;
 }
 
-/** A texture allocation request — the depth attachment, in this packet. */
+/** A texture allocation request — the depth attachment and §77's uploads. */
 export interface GpuTextureDescriptor {
   /** Diagnostic name. */
   readonly label?: string;
@@ -324,6 +394,13 @@ export interface GpuTextureDescriptor {
   readonly format: string;
   /** Bit set from {@link GPU_TEXTURE_USAGE}. */
   readonly usage: number;
+  /**
+   * How many mip levels to allocate; `1` — a single level — when omitted.
+   *
+   * Omitted rather than passed as `1` for the whole tier that does not mipmap,
+   * so the depth attachment's descriptor is the object it always was.
+   */
+  readonly mipLevelCount?: number;
 }
 
 /** One entry of a bind-group layout — see `wgpu-bindings.ts`. */
@@ -332,24 +409,47 @@ export interface GpuBindGroupLayoutEntry {
   readonly binding: number;
   /** Bit set from {@link GPU_SHADER_STAGE}. */
   readonly visibility: number;
-  /** Buffer binding shape; the only kind this packet declares. */
+  /** Buffer binding shape — group 0's uniform block. */
   readonly buffer?: {
     readonly type: "uniform" | "storage" | "read-only-storage";
     readonly hasDynamicOffset?: boolean;
     readonly minBindingSize?: number;
   };
+  /** Sampled-texture binding shape — group 1's `map` (§77). */
+  readonly texture?: {
+    readonly sampleType: string;
+    readonly viewDimension: string;
+  };
+  /** Sampler binding shape — group 1's `mapSampler` (§77). */
+  readonly sampler?: {
+    readonly type: string;
+  };
 }
 
-/** A bound resource, in this packet always a buffer range. */
+/** A bound buffer range — group 0's dynamically-offset uniform block. */
+export interface GpuBufferBinding {
+  /** The buffer the range lives in. */
+  readonly buffer: GpuBuffer;
+  /** Byte offset of the range; `0` when omitted. */
+  readonly offset?: number;
+  /** Byte length of the range; the rest of the buffer when omitted. */
+  readonly size?: number;
+}
+
+/** A bound resource: a buffer range, a texture view, or a sampler. */
 export interface GpuBindGroupEntry {
   /** Binding number, matching the layout's. */
   readonly binding: number;
-  /** The bound resource. */
-  readonly resource: {
-    readonly buffer: GpuBuffer;
-    readonly offset?: number;
-    readonly size?: number;
-  };
+  /**
+   * The bound resource: a buffer range, a texture view, or a sampler.
+   *
+   * Typed as two constituents though the prose names three, because
+   * {@link GpuTextureView} and {@link GpuSampler} are both opaque `object`
+   * aliases on this surface — naming both would duplicate one union
+   * constituent — and it is the matching *layout entry*, never the handle's
+   * shape, that tells WebGPU which kind it received.
+   */
+  readonly resource: GpuBufferBinding | GpuTextureView;
 }
 
 /** The device: everything the backend allocates and submits through. */
@@ -373,6 +473,8 @@ export interface GpuDevice {
   createBuffer(descriptor: GpuBufferDescriptor): GpuBuffer;
   /** Allocates a texture. */
   createTexture(descriptor: GpuTextureDescriptor): GpuTexture;
+  /** Creates a sampler — §77's filter and wrap state as an object. */
+  createSampler(descriptor: GpuSamplerDescriptor): GpuSampler;
   /** Compiles a WGSL module. */
   createShaderModule(descriptor: {
     readonly label?: string;

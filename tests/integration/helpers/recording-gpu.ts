@@ -175,8 +175,15 @@ export function createRecordingGpu(
     const handle = mint(kind);
     return {
       ...handle,
-      createView: (): object => {
-        record("texture.createView", handle);
+      // The descriptor joined in WP-R1.2 (mip generation views a single
+      // level); it is recorded only when passed, so every WP-R1.1 transcript
+      // line — always the whole-texture form — stays byte-identical.
+      createView: (descriptor?: unknown): object => {
+        if (descriptor === undefined) {
+          record("texture.createView", handle);
+        } else {
+          record("texture.createView", handle, descriptor);
+        }
         return mint(`${kind}-view`);
       },
       destroy: (): void => {
@@ -253,6 +260,14 @@ export function createRecordingGpu(
           size,
         );
       },
+      // WP-R1.2's texture upload. The destination names a texture handle, so
+      // the object survives on the tape; the texel data itself is an
+      // `ArrayBufferView` and is copied at record time like every other one
+      // (see the module header) — a texture edited in place after `markDirty`
+      // must not rewrite what the first upload's transcript line says.
+      writeTexture: (destination, data, dataLayout, size): void => {
+        record("queue.writeTexture", destination, data, dataLayout, size);
+      },
       submit: (buffers): void => {
         record("queue.submit", buffers);
       },
@@ -271,6 +286,10 @@ export function createRecordingGpu(
     createTexture: (descriptor): GpuTexture => {
       record("device.createTexture", descriptor);
       return texture("texture");
+    },
+    createSampler: (descriptor): object => {
+      record("device.createSampler", descriptor);
+      return mint("sampler");
     },
     createShaderModule: (descriptor): object => {
       record("device.createShaderModule", descriptor);

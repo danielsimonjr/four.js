@@ -54,11 +54,13 @@ changes in `CHANGELOG.md`.
       optional members); `webgpu` Playwright project added with the flag confined to it
       (globally it perturbs the flagship's frame-pacing spec); render-list consumption
       harness added under `tests/determinism/`.
-- [ ] **R-1 / WP-R1.2 — WebGPU geometry, texture and sampler caches** (§77, §83).
-      Extends the `wgpu-geometry.ts` WP-R1.1 seeded; samplers are a separate cache
-      keyed by (wrap × filter), unlike GL's per-texture parameters.
+- [x] **R-1 / WP-R1.2 — WebGPU geometry, texture and sampler caches** (§77, §83) —
+      **done 2026-08-28, all gates green.** Sampler cache keyed on the five resolved
+      values; blit-based lazy mip generation; unlit `map` variant at bind group 1.
 - [ ] **R-1 / WP-R1.3 — sprites, text and `wgpu-batch.ts`** (the `RenderBatching`
-      uploader; the planner is untouched). First pixel evidence for the sprite path.
+      uploader; the planner is untouched). First pixel evidence for the sprite path:
+      first browser spec in `tests/browser/webgpu/` with the adapter-skip guard —
+      the deferred WP-R1.2 browser evidence rides along.
 - [ ] **R-1 / WP-R1.4 → WP-R1.8** — shapes/vertex colours, lit + standard, render
       targets and effects (`readPixels` via `copyTextureToBuffer` + `mapAsync`),
       shadows and stencil parity, compute and GPU particles (unblocks R-31). Strictly
