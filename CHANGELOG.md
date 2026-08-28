@@ -8,6 +8,48 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — RFC 0001: the §60 shader and node-material system (R-14)
+
+#### Added
+
+- **RFC 0001 — §60 shader and node-material system (gap R-14; §57, §58, §60, §63,
+  §70, §96).** The unit of extension is a serializable graph, never a source
+  string. `@four/materials` gains the §60 IR — `ShaderGraph`, a closed-operator,
+  JSON-ready graph validated and reflected by `analyzeShaderGraph` (§85 caps on
+  nodes and samplers) — the fluent `NodeMaterialBuilder`/`ShaderGraphBuilder`
+  authoring surface (§60's own example compiles), and §57's `NodeMaterial` (frozen
+  graph; per-material uniforms and textures, RFC Q3's decided tier; unlit at this
+  tier, sequenced R-14 → R-17 → R-13). `RenderItemKind` gains `"node"` — one
+  member for the family, decided at item-generation time; the per-graph
+  compiled-pipeline identity is the graph's structure, resolved by the backend's
+  program cache, and `pipelineOf`'s flat-colour fallback deliberately excludes it
+  (an unregistered node draw is skipped with one §85 warning, never substituted).
+  `ScreenEffect` gains `GraphEffect` — §70's custom full-screen passes as data,
+  moved staged → shipped — whose full sample set stays visible to
+  `RenderGraph.validate()` (declared inputs; no `"opaque"` issue; feedback and
+  ordering checks run over them, and over a scene pass's node-material bindings).
+  The WebGL 2 backend emits GLSL ES 3.00 behind `registerNodeMaterialPipeline()` —
+  the fifth explicit-registration seam — compiling lazily, per distinct graph, on
+  first draw; one program serves any number of materials (structural source-pair
+  key), per-graph compile failures are latched and warned once, and vec2/mat3
+  uniforms travel padded as vec4/mat4 so the backend's GL budget is unchanged.
+  Emission is §33-deterministic (array-order walk; dead-node elimination is the
+  only transform), pinned byte-for-byte by
+  `tests/determinism/shader-graph-glsl.test.ts` + `golden/node-material-glsl.json`.
+  Byte-identity for node-material-free scenes proven by whole-transcript A/B
+  (with/without registration; with/without the node renderable) in
+  `tests/integration/node-materials.test.ts`; real-driver proof
+  `tests/browser/node-material.spec.ts` — a radial-gradient graph (the picture
+  per-vertex colour cannot produce) matches its analytic model within 3/255 over
+  24 probes, one draw. Spec revision 1.11 records §57's `ShaderMaterial` as
+  permanently unshipped and §60's no-raw-source narrowing + shipped/deferred
+  tier; the security guide's shader row moved partial → met. §58's linear/radial
+  gradients, image pattern, procedural and render-target paints are now
+  expressible exactly per fragment (conic waits on an angle operator). Measured
+  +0.60–0.79 kB gzip frame-path cost per WebglRenderer bundle (A/B against a HEAD
+  worktree); the emitter is 0 B unless registered (grep: emitted-GLSL strings in
+  0 of 9 bundles). Budgets bumped 36.5→37.5, 34.5→35.5, 43→43.5 with the numbers.
+
 ### 2026-08-28 — WP-R1.5: WebGPU lit and standard pipelines, lights
 
 #### Added

@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.10 — 2026-08-28**
+**Specification revision 1.11 — 2026-08-28**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -25,6 +25,7 @@
 | 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@four/render` node that the frozen package dependency matrix forbids `@four/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
 | 1.9 | 2026-08-28 | RFC 0002 (plugin system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `A-3` implemented. **§45** gains `plugins?: readonly FourPlugin[]` and the paragraph stating that installation happens in `initialize` — open question 1's disposition (a), *amend §45*: the §40 precedent against inventing an option turned on `units` being absent from §45's own list, whereas §81 requires an install lifecycle and §45 owns the lifecycle, so §81 had nowhere else to live. **§81** gains the two fields its own closing sentence already required and its code block omitted (`dependencies`, `engineRange`), the statement that `PluginContext` is a set of capability tokens rather than a fixed interface (forced by §3.1: every registry §81 hands over sits downstream of `core`), the specified install order (topological over `dependencies`, ties broken by supply order — a §33 requirement, since a plugin may register a §39 system and equal-priority systems run in registration order), the revocability rule (a capability declares it; a plugin that acquired a non-revocable one cannot be uninstalled and the attempt is refused naming what pins it), and the §96 boundary (a plugin is a value; no URL, no module specifier, no name from a document; no sandbox is described or provided). §96's requirements list is unchanged — it states requirements, not status. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 | 1.10 | 2026-08-28 | RFC 0003 (skinning and skeletal animation) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gaps `PH-10` + `R-22` implemented. Revision 1.8 already carried the two corrections the RFC forced (§54's `morphTargetWeights` storage moved to a scene component; §17's *morph weight* and *skeletal joint* entries identified as binding forms); this revision records the remaining adopted dispositions and ends §54's silent staging. **§54** gains the shipped/staged split of its eleven rows, the layout commitments (four influences per vertex at fixed attribute locations 4 joints / 5 weights, `JOINTS_1`/`WEIGHTS_1` named as the extension point at the next two locations; joint index = position in `Skeleton.bones`, insertion order being the §33 ABI), the bone-axis disposition (the engine imposes **no** bone-axis convention on the data model — the inverse bind matrix absorbs the authoring tool's; **+Y as the bone's length axis is a helper convention only**), the joint-limit rule (a rig over the declared `maximumSkinningJoints` is refused at setup with `UNSUPPORTED_GPU_FEATURE`, §89 — never clamped, never a frame-time throw, §61), the §79 document form (a skeleton is written inline on its mesh as bone ids plus inverse bind matrices — intra-file references are by id), and the §33 boundary rule (**no engine API returns skinned vertex positions**: the palette is the last CPU value in the envelope; picking and culling therefore use bind-pose bounds, stated as known inaccuracies). **§62**'s capability list gains "maximum skinning joints"; the WebGL 2 tier reports a declared portability constant rather than a device query. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
+| 1.11 | 2026-08-28 | RFC 0001 (shader and node-material system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `R-14` implemented. **§57**: `ShaderMaterial`'s provisional withdrawal (revision 1.8) becomes **permanent** — the row is retained so the name stays reserved and cannot be implemented by inference, and a source-string material is never implemented (Q1's disposition: a raw GLSL/WGSL payload re-opens §96's "no arbitrary code execution from scene files" and makes §63's resource checks unable to see what a pass samples). **§60** gains the normative narrowing the owner-decision register's row 3 asked for: the backend-independent shader model is a **serializable graph of closed operators** — no user shader source at any tier — with the shipped/deferred split of §60's feature list recorded (the node graph, uniforms, textures and samplers, the four fixed vertex attributes, reflection metadata and GLSL ES 3.00 generation ship; WGSL generation follows the WebGPU backend; uniform blocks, reusable functions, conditional variants, storage buffers and source maps are deferred with RFC 0001 §6's recorded reasons; node materials are unlit at this tier, sequenced R-14 → R-17 → R-13), and §60's example is rewritten against the shipped authoring surface (`NodeMaterialBuilder`, §97a's namespace spelling) per revision 1.7's example-compilation discipline. Uniform ownership is per material (Q3); a displacing graph on a collider-carrying node raises no §85 warning (Q4 — a vertex displacement is not a transform, §42). Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 
 ---
 
@@ -1908,17 +1909,17 @@ Two notes on that family, both amendments rather than restatements:
   `StandardMaterial`, because a scene that wants flat diffuse shading should not
   be made to carry roughness, metalness, and their maps. `UnlitMaterial`,
   `LitMaterial`, and `StandardMaterial` all ship.
-- **`ShaderMaterial` is provisionally withdrawn.** RFC 0001 (§60) proposes that
-  it never be implemented, because `ShaderMaterial` has no meaning other than
-  "material carrying raw GLSL or WGSL source", and §96 forbids exactly that: a
-  shader expressed as a string is an opaque pass that §63's graph validation
-  cannot check, it is not backend-independent, and it pins internal shader
-  sources as public contract. §60's node/graph material is the sanctioned
-  extension surface, and `NodeMaterial` is the family member that carries it.
-  **Status: RFC 0001 is a draft with the owner's decision pending**; the row is
-  retained here so it cannot be implemented by inference from this list alone.
-  Accepting the RFC makes the withdrawal permanent and gets its own amendments
-  row; rejecting it restores the row unchanged.
+- **`ShaderMaterial` is permanently unshipped (revision 1.11; RFC 0001
+  accepted by the owner 2026-08-21, Q1's recommended disposition adopted).**
+  `ShaderMaterial` has no meaning other than "material carrying raw GLSL or
+  WGSL source", and §96 forbids exactly that: a shader expressed as a string
+  is an opaque pass that §63's graph validation cannot check, it is not
+  backend-independent, and it pins internal shader sources as public contract.
+  The row is **retained in the list above so the name stays reserved** and the
+  material cannot be re-introduced by inference from this list alone;
+  implementing it would need a new owner decision and a new amendments row.
+  §60's node/graph material is the sanctioned extension surface, and
+  `NodeMaterial` — shipped 2026-08-28 — is the family member that carries it.
 ### 58. Paints, Fills, and Strokes
 A shape paint may be:
 - solid color;
@@ -1969,10 +1970,11 @@ Later physical extensions may include:
 Advanced users require a backend-independent shader model.
 
 ```ts
-const material = new Four.NodeMaterial();
+const material = new Four.materials.NodeMaterialBuilder();
 const albedo = material.texture(albedoTexture);
 const pulse = material.sin(material.time().multiply(2));
 material.output.color = albedo.multiply(pulse.add(1));
+const built = material.build(); // NodeMaterial
 ```
 
 The compiler should generate:
@@ -1988,6 +1990,37 @@ Shader features:
 - conditional variants;
 - reflection metadata;
 - source maps and readable compiler diagnostics.
+
+Two notes on that model, both amendments rather than restatements (revision
+1.11; RFC 0001 accepted 2026-08-21, implemented 2026-08-28):
+
+- **The shader model is a serializable graph of closed operators, and no user
+  shader source exists at any tier.** This is a normative narrowing of
+  "backend-independent shader model", recorded here because a reader would
+  otherwise find it only in the RFC: nothing in the public surface accepts
+  GLSL or WGSL text, because §96 requires "no arbitrary code execution from
+  scene files; safe shader boundaries", and because a shader expressed as a
+  graph is one §63's validation can see inside — every texture a graph
+  samples is enumerable from the graph, so a §70 graph effect keeps the
+  render graph's feedback and ordering checks instead of switching them off.
+  The IR is `ShaderGraph` in `@four/materials` (JSON by construction); the
+  authoring surface is the builder above; the operator set grows only by a
+  versioned amendment, and a data-declared custom operator is RFC 0001's
+  deferred alternative E. Backends compile lazily behind explicit
+  registration (`registerNodeMaterialPipeline()` on WebGL 2), and a backend
+  with no registered pipeline skips a node draw rather than approximating it.
+- **The shipped tier (2026-08-28), against the lists above:** the node graph,
+  individual uniforms, textures and samplers, vertex attributes (the four
+  fixed streams of §53's baseline: position, normal, uv, color), reflection
+  metadata, and GLSL ES 3.00 generation for WebGL 2 ship; readable
+  diagnostics ship as §89's `SHADER_COMPILATION_FAILED` carrying the emitted
+  source and the driver log. WGSL generation follows the WebGPU backend's
+  emitter packet; Canvas/SVG fallbacks follow those backends. Uniform
+  blocks, reusable functions, conditional variants, storage buffers (§82)
+  and source maps are deferred with the reasons recorded in RFC 0001 §6.
+  Uniform values are owned **per material**. A node material at this tier is
+  **unlit** — it does not see §68's lights; lighting-aware graphs are
+  sequenced behind the light-uniform contract (R-14 → R-17 → R-13).
 ### 60a. Color Management
 The rendering pipeline is linear-light on the GPU backends:
 - color textures default to sRGB-encoded and are decoded to linear on sample; data

@@ -101,6 +101,7 @@ import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type {
   LitMaterial,
   Material,
+  NodeMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
@@ -206,6 +207,22 @@ interface SkinnedDrawable {
  * item-generation time, never per draw). Until then, widening remains an edit
  * to this file, and an exhaustive consumer `switch` over `RenderItemKind` is
  * broken by every widening — the §90 note both RFCs record.
+ *
+ * `"node"` joined with §60's node materials (RFC 0001, 2026-08-28), and it is
+ * the shape that note anticipated, implemented at the item tier: **one**
+ * member discriminates the whole node-material family — decided at
+ * item-generation time from the material's `kind`, like every other member —
+ * while the *compiled-pipeline* identity inside that family is the graph's
+ * structure, resolved by the backend's program cache off
+ * `item.material.graph` (one program per distinct graph, however many
+ * materials share it). The registry-issued `pipelineId` that would replace
+ * this union's closed-ness therefore remains a follow-up; what §60 needed was
+ * a member whose pipeline *count* is open while the member set stays closed.
+ * An unregistered backend **skips** a `"node"` item with a one-time §85
+ * warning — `pipelineOf`'s flat-colour fallback is deliberately excluded for
+ * it, because a graph the author wrote is a specific picture and drawing an
+ * unrelated one is R-6's "a JSON value must not become a different picture"
+ * in the material domain.
  */
 export type RenderItemKind =
   | "unlit"
@@ -214,7 +231,8 @@ export type RenderItemKind =
   | "sprite"
   | "particles"
   | "skinned-unlit"
-  | "skinned-lit";
+  | "skinned-lit"
+  | "node";
 
 /**
  * The fields every render item carries, whatever pipeline draws it — one draw in
@@ -489,6 +507,27 @@ export interface StandardRenderItem extends RenderItemBase {
   material: StandardMaterial;
 }
 
+/**
+ * A draw generated from a `Renderable` carrying a `NodeMaterial` (§49, §57,
+ * §60; RFC 0001) — shaded by the material's own compiled graph.
+ *
+ * Structurally a base item: the graph, the material's uniform values, and its
+ * texture bindings all travel on the **material** (`material.graph`,
+ * `material.getUniform`, `material.getTexture`), one property load away, and
+ * the backend's program cache keys on the graph's structure — a thousand
+ * materials sharing one graph share one compiled program and differ only in
+ * the per-draw uniform uploads (RFC 0001 §3; Q3's per-material tier).
+ *
+ * Unlit at this tier: the frame's `SceneLights` record is deliberately not
+ * consumed by this pipeline (RFC 0001 §6 — lighting-aware graphs wait on
+ * R-17's light-uniform contract).
+ */
+export interface NodeRenderItem extends RenderItemBase {
+  kind: "node";
+  /** Surface appearance (§57, §60): the frozen graph plus its bindings. */
+  material: NodeMaterial;
+}
+
 /** A draw generated from a {@link Sprite} (§55) — one textured, tinted quad. */
 export interface SpriteRenderItem extends RenderItemBase {
   kind: "sprite";
@@ -589,7 +628,8 @@ export type RenderItem =
   | SpriteRenderItem
   | ParticleRenderItem
   | SkinnedUnlitRenderItem
-  | SkinnedLitRenderItem;
+  | SkinnedLitRenderItem
+  | NodeRenderItem;
 
 /**
  * The pooled item as the builders write it: one mutable shape covering every
@@ -608,7 +648,12 @@ export type RenderItem =
  */
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
-  material?: UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+  material?:
+    | UnlitMaterial
+    | LitMaterial
+    | StandardMaterial
+    | SpriteMaterial
+    | NodeMaterial;
   frame: SpriteFrame | null;
   id: string;
   count: number;
@@ -657,6 +702,13 @@ function pipelineOf(material: Material): RenderItemKind {
   if (material.kind === "sprite") {
     return "sprite";
   }
+  // §60's node material (RFC 0001) — deliberately **not** part of the
+  // flat-colour fallback below: a backend with no registered node pipeline
+  // skips the draw with a one-time §85 warning, because a graph the author
+  // wrote is a specific picture and flat colour would be a different one.
+  if (material.kind === "node") {
+    return "node";
+  }
   return "unlit";
 }
 
@@ -699,6 +751,11 @@ export function isStandardItem(item: RenderItem): item is StandardRenderItem {
 /** Narrows `item` to the batched particle pipeline (§36; see `particles.ts`). */
 export function isParticlesItem(item: RenderItem): item is ParticleRenderItem {
   return item.kind === "particles";
+}
+
+/** Narrows `item` to the node-material pipeline (§60; RFC 0001). */
+export function isNodeItem(item: RenderItem): item is NodeRenderItem {
+  return item.kind === "node";
 }
 
 /** Narrows `item` to the skinned flat-colour pipeline (§54; RFC 0003). */
@@ -1084,7 +1141,11 @@ function collect(
       // this slot as the four known surface materials, and `pipelineOf` has just
       // decided which of them the backend will read it as.
       item.material = material as
-        UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+        | UnlitMaterial
+        | LitMaterial
+        | StandardMaterial
+        | SpriteMaterial
+        | NodeMaterial;
       // §55's frame (R-29), read structurally and only where it can mean
       // something. Written on **every** renderable, not only framed sprites: the
       // item is pooled, so a slot that carried a framed sprite last frame would
@@ -1253,7 +1314,11 @@ function collect(
         item.kind = pipelineOf(material);
         item.geometry = geometry;
         item.material = material as
-          UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+          | UnlitMaterial
+          | LitMaterial
+          | StandardMaterial
+          | SpriteMaterial
+          | NodeMaterial;
         item.frame =
           item.kind === "sprite"
             ? ((node as FramedDrawable).frame ?? null)

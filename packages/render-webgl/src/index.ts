@@ -85,6 +85,30 @@ export {
   SkinnedUnlitProgram,
   registerSkinningPipeline,
 } from "./gl-skinning.js";
+export type {
+  NodeItemMaterial,
+  NodeMaterialPipelineFactory,
+  NodeMaterialProgram,
+  NodeMaterialPrograms,
+} from "./node-pipeline-registry.js";
+export {
+  NODE_SURFACE_TEXTURE_UNIT_BASE,
+  clearRegisteredNodeMaterialPipeline,
+  resolveNodeMaterialPipelineFactory,
+} from "./node-pipeline-registry.js";
+// §60's node pipeline (RFC 0001). Deliberately — like the skinned pipeline
+// above — a module `WebglRenderer` never reaches statically: importing
+// `registerNodeMaterialPipeline` is what links the GLSL emitter and the
+// program cache into a bundle, and a barrel re-export does not (it
+// tree-shakes like every other unused export) — see
+// `node-pipeline-registry.ts` for the whole seam.
+export type { EmittedNodeShader } from "./gl-node-program.js";
+export {
+  GlNodeProgram,
+  GlNodeProgramCache,
+  emitShaderGraphGlsl,
+  registerNodeMaterialPipeline,
+} from "./gl-node-program.js";
 export { ShadowProgram } from "./gl-shadow.js";
 export { StandardProgram } from "./gl-standard.js";
 export type { CacheableTexture, TextureRecord } from "./gl-texture.js";

@@ -28,6 +28,55 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — RFC 0001 / R-14: §60 node materials.** Decisions worth keeping:
+  - **The IR lives in `@four/materials`; backends read it through `@four/render`'s
+    re-export** — the RFC's §3.1 legality argument executed: `analyzeShaderGraph`
+    and the graph types are re-exported from `render`, so `render-webgl`'s frozen
+    `core, math, render` row gained no edge.
+  - **The program cache keys on the emitted source pair, not a hash of the
+    graph.** Two graphs that emit the same GLSL are one program (a `Map` on the
+    source; a `WeakMap` identity fast path in front); a per-graph compile failure
+    is latched `null` in the same `WeakMap` — the skinning latch, per graph
+    instead of per context.
+  - **vec2/mat3 uniforms are declared vec4/mat4 and read back narrow** (`u_x.xy`,
+    `mat3(u_x)`), uploads padded: the `WebglContext` GL budget has no
+    `uniform2fv`/`uniformMatrix3fv`, and growing it would have touched every
+    recorded double. IR, reflection and `setUniform` validation stay narrow; only
+    declaration and upload widen. Reuse this transport move before growing the GL
+    budget.
+  - **The screen domain gets exactly one attribute: `"uv"` means the pass's own
+    normalized coordinate** — a recorded deviation from RFC §5's blanket attribute
+    rejection, because without a coordinate the domain cannot express even a copy.
+    The other three stay rejected there.
+  - **`texture` nodes are refused reachable-from-`positionOffset`** (the
+    displacement runs in the vertex stage, where implicit-derivative sampling does
+    not exist) — a §85 validation rule, not a driver's discretion.
+  - **Node texture units start at 2** (0 is the map's, 1 the §69 shadow's — both
+    can be live in a node frame); screen programs start at 0; the constant lives
+    in the registry module so the renderer's `finally` can unbind without linking
+    the emitter.
+  - **Per-view uploads with many programs need no map: a module-level monotonic
+    view stamp** (`nodeViewStamp`), each program recording the last stamp it saw —
+    one view-projection (+ time) upload per program per view, allocation-free.
+  - **§9 render time reaches the backend as `WebglRenderer.renderTime`**, a plain
+    public field on the statistics/batching precedent, defaulting to GL's initial
+    0 so time-less scenes pay nothing. Never simulation time (§42/§43).
+  - **A displaced node caster is excluded from the §69 pass; an undisplaced one
+    casts exactly** — depth ignores colour, so the caster program is right for it
+    (the skinned bind-pose rule, applied only where the picture would actually
+    differ).
+  - **Conic is the one §58 paint the closed operator set cannot spell** (no
+    `atan`); the other five non-solid paints are now exact per fragment. An angle
+    operator is a one-row closed-union amendment when a consumer wants it.
+  - **Lazy, observed:** initialize compiles 7 programs registered or not; the
+    first node frame adds exactly 1; three materials sharing a graph structure
+    still add exactly 1.
+  - **Measured: +0.60–0.79 kB gzip frame path in every WebglRenderer bundle**
+    (A/B against a HEAD worktree); the emitter is 0 B unless
+    `registerNodeMaterialPipeline()` is called (grep: `uniform sampler2D s_` in 0
+    of 9 bundles; the twin's one text hit is the DEV warning string — it builds
+    with DEV on). Budgets moved 36.5→37.5, 34.5→35.5, 43→43.5.
+
 - **2026-08-28 — WP-R1.5: WebGPU lit/standard pipelines and the light block.**
   Decisions worth keeping:
   - **The light block is all-`vec4`, and that is the alignment answer, not a

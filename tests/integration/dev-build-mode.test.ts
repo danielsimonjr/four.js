@@ -219,7 +219,11 @@ const GATED: ReadonlyMap<string, string> = new Map([
   ],
   [
     join("packages", "render-webgl", "src", "webgl-renderer.ts"),
-    "§67's clip-without-a-stencil-buffer warning (R-23, 2026-08-28). Diagnostic only, and O(1): mask draws sort to the head of the frame list, so the check is one read of the first item, issues no GL call, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, which is the same fail-toward-drawing behaviour the warning describes",
+    "§67's clip-without-a-stencil-buffer warning (R-23, 2026-08-28). Diagnostic only, and O(1): mask draws sort to the head of the frame list, so the check is one read of the first item, issues no GL call, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, which is the same fail-toward-drawing behaviour the warning describes. RFC 0001 (2026-08-28) added two §60 warnings under the same rule: the unregistered-node-pipeline notice and the unresolvable-node-texture notice — in both builds the draw is skipped identically (absence, never a flat-coloured stand-in), and only the message naming the fix moves with the flag",
+  ],
+  [
+    join("packages", "render-webgl", "src", "gl-node-program.ts"),
+    "§60's per-graph compile-failure notice (RFC 0001, 2026-08-28). Message only: the cache latches the failed graph `null` in both builds — its draws are skipped identically, the latch is the behaviour and it is unconditional — and only the console.warn carrying §89's log moves with the flag. Rendering is outside the §33 envelope regardless; nothing a shader draws re-enters simulation state (§42/§43)",
   ],
 ]);
 

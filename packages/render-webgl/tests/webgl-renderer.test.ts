@@ -49,7 +49,10 @@ import {
   createSceneLights,
   particleQuadGeometry,
   resetRenderStatistics,
+  type EffectRenderPass,
+  type GraphEffect,
   type RenderBatch,
+  type ShaderGraph,
   type RenderStatistics,
   type LitRenderItem,
   type ParticleRenderItem,
@@ -89,12 +92,16 @@ import {
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
   WEIGHTS_ATTRIBUTE_LOCATION,
+  NODE_SURFACE_TEXTURE_UNIT_BASE,
   WebglRenderer,
+  clearRegisteredNodeMaterialPipeline,
   clearRegisteredSkinningPipeline,
   createGlBatching,
+  registerNodeMaterialPipeline,
   registerSkinningPipeline,
   resolveSkinningPipelineFactory,
   type BatchGlContext,
+  type NodeItemMaterial,
   type ParticleGlContext,
   type WebglCanvas,
   type WebglContextAttributes,
@@ -10674,5 +10681,569 @@ describe("skinned draws — indexed geometry, statistics, disposed skips", () =>
     renderer.render(root, [createView(camera)]);
     expect(gl.countOf("drawArrays")).toBe(0);
     expect(gl.countOf("drawElements")).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §60 — node materials (RFC 0001, 2026-08-28).
+// ---------------------------------------------------------------------------
+
+let nextTestNodeMaterialId = 0;
+
+/**
+ * A `NodeMaterial` reduced to what the backend reads (§57, §60): the `kind`
+ * discriminant the render list branches on, the frozen graph the program
+ * cache keys on, and the per-name uniform/texture reads the draw uploads.
+ * Same technique, same reason, as every double above — and what proves the
+ * backend reads nothing outside the structural surface.
+ */
+class TestNodeMaterial {
+  readonly kind = "node" as const;
+
+  readonly id: string;
+
+  readonly graph: ShaderGraph;
+
+  opacity?: number;
+
+  transparent?: boolean;
+
+  /** Bound textures by sampler name; unset names read as `null`. */
+  readonly textures = new Map<string, TestTexture | null>();
+
+  /** Uniform values by name; unset names read as zeroed vec4s. */
+  readonly uniforms = new Map<string, Float32Array>();
+
+  constructor(graph: ShaderGraph) {
+    nextTestNodeMaterialId += 1;
+    this.id = `test-node-material-${String(nextTestNodeMaterialId)}`;
+    this.graph = graph;
+  }
+
+  getUniform(name: string): Float32Array {
+    return this.uniforms.get(name) ?? new Float32Array(4);
+  }
+
+  getTexture(name: string): TestTexture | null {
+    return this.textures.get(name) ?? null;
+  }
+
+  get asMaterial(): NodeItemMaterial {
+    return this as unknown as NodeItemMaterial;
+  }
+}
+
+/** A constant-colour surface graph — no samplers, no uniforms, no time. */
+function flatNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [{ kind: "constant", type: "vec4", value: [1, 0, 0, 1] }],
+    color: 0,
+  };
+}
+
+/** A surface graph sampling one texture named `map` over the uv stream. */
+function texturedNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [
+      { kind: "attribute", name: "uv" },
+      { kind: "texture", name: "map", uv: 0 },
+    ],
+    color: 1,
+  };
+}
+
+/** A surface graph whose colour pulses with §9 render time. */
+function timedNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [
+      { kind: "time" },
+      { kind: "compose", type: "vec4", parts: [0, 0, 0, 0] },
+    ],
+    color: 1,
+  };
+}
+
+/** A displaced surface graph — the §69 caster exclusion's subject. */
+function displacedNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [
+      { kind: "constant", type: "vec3", value: [0, 1, 0] },
+      { kind: "constant", type: "vec4", value: [0, 1, 0, 1] },
+    ],
+    color: 1,
+    positionOffset: 0,
+  };
+}
+
+/** A screen graph copying `source`, optionally scaled by a uniform. */
+function screenNodeGraph(withUniform = false): ShaderGraph {
+  const nodes: ShaderGraph["nodes"] = withUniform
+    ? [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+        { kind: "uniform", type: "float", name: "gain" },
+        { kind: "binary", op: "multiply", left: 1, right: 2 },
+      ]
+    : [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+      ];
+  return { domain: "screen", nodes, color: nodes.length - 1 };
+}
+
+/** A node-material renderable over `geometry`. */
+function nodeRenderable(
+  material: TestNodeMaterial,
+  geometry: TestGeometry = triangleGeometry(),
+): Renderable<NodeItemMaterial> {
+  return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+/** The node program's uniform handles — `spriteUniforms`' pattern. */
+function nodeUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("opacity")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the node program never resolved its uniforms");
+}
+
+describe("WebglRenderer — §60 node materials (RFC 0001)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredNodeMaterialPipeline();
+  });
+
+  it("skips an unregistered node draw — absent, never flat-coloured", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      const withoutNode = gl.calls.map((call) => call.name).join("|");
+
+      const rig = await initialized();
+      const rigRoot = createRoot();
+      rigRoot.add(renderable(triangleGeometry()));
+      rigRoot.add(nodeRenderable(new TestNodeMaterial(flatNodeGraph())));
+      rig.gl.reset();
+      rig.renderer.render(rigRoot, [createView(rig.camera)]);
+
+      expect(rig.gl.calls.map((call) => call.name).join("|")).toBe(withoutNode);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerNodeMaterialPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("compiles one program per graph structure on the first draw, shared by materials", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+    );
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Two materials, structurally one graph: exactly one new program, one
+    // `useProgram` switch onto it, two draws.
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(statistics.drawCalls).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(2);
+
+    // The next frame compiles nothing further.
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("createProgram")).toBe(0);
+  });
+
+  it("uploads view state once per view per program, and per-draw state per draw", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+    );
+    gl.reset();
+    renderer.render(root, [
+      createView(camera),
+      createView(camera, { id: "second" }),
+    ]);
+
+    const uniforms = nodeUniforms(gl);
+    const viewUploads = uploadsAt(gl, uniforms.get("viewProjection"));
+    const modelUploadsList = uploadsAt(gl, uniforms.get("model"));
+    // Two views: two view-projection uploads; two draws per view: four models.
+    expect(viewUploads).toHaveLength(2);
+    expect(modelUploadsList).toHaveLength(4);
+    // Opacity: mirror starts at GL's 0, both materials report 1 — one upload.
+    expect(uploadsAt(gl, uniforms.get("opacity"))).toEqual([1]);
+  });
+
+  it("feeds §9 render time to a graph that reads it", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(nodeRenderable(new TestNodeMaterial(timedNodeGraph())));
+    renderer.renderTime = 1.25;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    const uniforms = nodeUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("time"))).toEqual([1.25]);
+  });
+
+  it("binds node textures above the fixed units and unbinds them in the finally", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestNodeMaterial(texturedNodeGraph());
+    material.textures.set("map", new TestTexture(2, 2));
+    root.add(nodeRenderable(material));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    const nodeUnit = GL.TEXTURE0 + NODE_SURFACE_TEXTURE_UNIT_BASE;
+    const unitSelections = gl
+      .callsOf("activeTexture")
+      .map((call) => call.args[0]);
+    // Selected to bind, re-selected to unbind, ending back at unit 0.
+    expect(unitSelections).toEqual([
+      nodeUnit,
+      GL.TEXTURE0,
+      nodeUnit,
+      GL.TEXTURE0,
+    ]);
+    const binds = gl.callsOf("bindTexture");
+    expect(binds[binds.length - 1].args[1]).toBeNull();
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("skips a node draw whose sampler is unbound or disposed — nothing at all", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      registerNodeMaterialPipeline();
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      const unbound = new TestNodeMaterial(texturedNodeGraph());
+      const disposed = new TestNodeMaterial(texturedNodeGraph());
+      const gone = new TestTexture(2, 2);
+      gone.disposed = true;
+      disposed.textures.set("map", gone);
+      root.add(nodeRenderable(unbound), nodeRenderable(disposed));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(gl.countOf("bufferData")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("skips a node draw whose graph the cache refused, with one warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      registerNodeMaterialPipeline();
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      const broken: ShaderGraph = { domain: "surface", nodes: [], color: 0 };
+      root.add(nodeRenderable(new TestNodeMaterial(broken)));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("draws an indexed node geometry through drawElements", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph()), quadGeometry()),
+    );
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("skips a node draw with nothing to draw (§83's empty geometry)", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(
+        new TestNodeMaterial(flatNodeGraph()),
+        new TestGeometry(new Float32Array(0)),
+      ),
+    );
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
+  });
+
+  it("drops the cache on context loss and dispose", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera, canvas } = await initialized();
+    const root = createRoot();
+    root.add(nodeRenderable(new TestNodeMaterial(flatNodeGraph())));
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("deleteProgram")).toBe(0);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    // The next node frame recreates the cache and recompiles the graph.
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("createProgram")).toBe(1);
+
+    gl.reset();
+    renderer.dispose();
+    // Eight eager programs (7 pipelines + restore already counted) — assert
+    // only that the node program's delete is among them.
+    expect(gl.countOf("deleteProgram")).toBeGreaterThanOrEqual(8);
+  });
+
+  it("a displaced node material casts nothing; an undisplaced one casts exactly (§69)", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(new TestShadowLight());
+    const lit = new Renderable(
+      triangleGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    root.add(lit);
+    root.add(nodeRenderable(new TestNodeMaterial(flatNodeGraph())));
+    root.add(nodeRenderable(new TestNodeMaterial(displacedNodeGraph())));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    // The caster pass drew the lit triangle and the undisplaced node mesh:
+    // two model uploads through the shadow program, never a third.
+    const casters = uploadsAt(gl, shadowUniforms(gl).get("model"));
+    expect(casters).toHaveLength(2);
+    // Both node materials still drew in the colour pass (3 surface draws +
+    // 2 caster draws).
+    expect(gl.countOf("drawArrays")).toBe(5);
+  });
+});
+
+describe("WebglRenderer.renderEffect — §70 graph effects (§60; RFC 0001)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredNodeMaterialPipeline();
+  });
+
+  /** A pass over a fresh 8×8 source, with `effect` and an optional target. */
+  function graphPass(
+    effect: GraphEffect,
+    destination?: RenderTarget,
+  ): { pass: EffectRenderPass; source: RenderTarget } {
+    const source = new RenderTarget({ width: 8, height: 8 });
+    return {
+      pass: {
+        kind: "effect",
+        source: source.colorTexture,
+        effect,
+        ...(destination === undefined ? {} : { target: destination }),
+      },
+      source,
+    };
+  }
+
+  it("skips silently while nothing is registered, warning once", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl } = await initialized();
+      const { pass } = graphPass({ kind: "graph", graph: screenNodeGraph() });
+      gl.reset();
+      renderer.renderEffect(pass);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("draws the full-screen triangle over the source, on and off screen", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl } = await initialized();
+    const destination = new RenderTarget({ width: 4, height: 4 });
+    const { pass } = graphPass(
+      { kind: "graph", graph: screenNodeGraph() },
+      destination,
+    );
+    gl.reset();
+    renderer.renderEffect(pass);
+    // One compile, one framebuffer bind + unbind, the destination's whole
+    // rectangle, one triangle, and the source bound at unit 0 then released.
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    const scissor = gl.callsOf("scissor")[0];
+    expect(scissor.args).toEqual([0, 0, 4, 4]);
+    const frameBinds = gl.callsOf("bindFramebuffer");
+    expect(frameBinds[frameBinds.length - 1].args[1]).toBeNull();
+    const unitSelections = gl
+      .callsOf("activeTexture")
+      .map((call) => call.args[0]);
+    expect(unitSelections).toEqual([GL.TEXTURE0, GL.TEXTURE0]);
+
+    // On screen: once the source's framebuffer is cached, no framebuffer
+    // call at all — and the compiled program is reused for the structurally
+    // identical graph.
+    const onScreen = graphPass({ kind: "graph", graph: screenNodeGraph() });
+    renderer.renderEffect(onScreen.pass); // warms the source's record
+    gl.reset();
+    renderer.renderEffect(onScreen.pass);
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("bindFramebuffer")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("uploads pass uniforms — scalars and arrays — and §9 render time", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl } = await initialized();
+    const graph: ShaderGraph = {
+      domain: "screen",
+      nodes: [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+        { kind: "uniform", type: "float", name: "gain" },
+        { kind: "uniform", type: "vec4", name: "tint" },
+        { kind: "time" },
+        { kind: "binary", op: "multiply", left: 1, right: 2 },
+        { kind: "binary", op: "multiply", left: 5, right: 3 },
+        { kind: "binary", op: "multiply", left: 6, right: 4 },
+      ],
+      color: 7,
+    };
+    renderer.renderTime = 0.5;
+    const { pass } = graphPass({
+      kind: "graph",
+      graph,
+      uniforms: { tint: [1, 2, 3, 4], gain: 2 },
+    });
+    gl.reset();
+    renderer.renderEffect(pass);
+    // A screen program has no `opacity`; find it by its own uniform.
+    let uniforms: Map<string, object> | undefined;
+    for (const perProgram of gl.uniformsByProgram.values()) {
+      if (perProgram.has("u_gain")) {
+        uniforms = perProgram;
+      }
+    }
+    if (uniforms === undefined) {
+      throw new Error("the graph-effect program never resolved its uniforms");
+    }
+    expect(uploadsAt(gl, uniforms.get("u_gain"))).toEqual([2]);
+    expect(uploadsAt(gl, uniforms.get("u_tint"))).toEqual([[1, 2, 3, 4]]);
+    expect(uploadsAt(gl, uniforms.get("time"))).toEqual([0.5]);
+    // §84: the triangle counted as one submitted draw.
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    renderer.renderEffect(pass);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+  });
+
+  it("resolves declared extra inputs and refuses a feedback loop through one", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl } = await initialized();
+    const noise = new RenderTarget({ width: 8, height: 8 });
+    const graph: ShaderGraph = {
+      domain: "screen",
+      nodes: [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+        { kind: "texture", name: "noise", uv: 0 },
+        { kind: "binary", op: "add", left: 1, right: 2 },
+      ],
+      color: 3,
+    };
+    const good = graphPass({
+      kind: "graph",
+      graph,
+      textures: { noise: noise.colorTexture },
+    });
+    gl.reset();
+    renderer.renderEffect(good.pass);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // Two samplers: units 0 and 1, bound then unbound in reverse.
+    const unitSelections = gl
+      .callsOf("activeTexture")
+      .map((call) => call.args[0]);
+    expect(unitSelections).toEqual([
+      GL.TEXTURE0,
+      GL.TEXTURE0 + 1,
+      GL.TEXTURE0 + 1,
+      GL.TEXTURE0,
+    ]);
+
+    // The same pass aimed *at* its own extra input: skipped before any state.
+    const feedback = graphPass(
+      { kind: "graph", graph, textures: { noise: noise.colorTexture } },
+      noise,
+    );
+    gl.reset();
+    renderer.renderEffect(feedback.pass);
+    expect(gl.countOf("drawArrays")).toBe(0);
+
+    // A sampler the pass never declared: skipped too.
+    const undeclared = graphPass({ kind: "graph", graph });
+    gl.reset();
+    renderer.renderEffect(undeclared.pass);
+    expect(gl.countOf("drawArrays")).toBe(0);
+
+    // A declared input that is not a render-target texture (a caller that
+    // bypassed validation): skipped structurally, like the fixed path's
+    // source check.
+    const wrongKind = graphPass({
+      kind: "graph",
+      graph,
+      textures: { noise: {} as never },
+    });
+    gl.reset();
+    renderer.renderEffect(wrongKind.pass);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("skips a graph the cache latched as failed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      registerNodeMaterialPipeline();
+      const { renderer, gl } = await initialized();
+      const broken: ShaderGraph = { domain: "screen", nodes: [], color: 0 };
+      const { pass } = graphPass({ kind: "graph", graph: broken });
+      gl.reset();
+      renderer.renderEffect(pass);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

@@ -360,23 +360,6 @@ function isEffectPass(pass: RenderPass): pass is EffectRenderPass {
 }
 
 /**
- * The texture a render item samples, or `null` — the material-shaped half of
- * what the WebGL backend's `resolveTexture` reads, minus the caches.
- *
- * A particle item has no material at all (§36 puts colour on the particle), and
- * an untextured surface has a `null` `map`; both mean "samples nothing".
- */
-function sampledTextureOf(item: RenderItem): unknown {
-  if (item.kind === "particles") {
-    return null;
-  }
-  if (item.kind === "sprite") {
-    return item.material.texture;
-  }
-  return item.material.map ?? null;
-}
-
-/**
  * Adds every render target `root`'s subtree samples to `out`.
  *
  * Uses the real {@link buildRenderList}, not a bespoke walk, so the traversal
@@ -388,7 +371,31 @@ function collectSampledTargets(root: Node, out: Set<RenderTarget>): void {
   const items: RenderItem[] = [];
   buildRenderList(root, items);
   for (const item of items) {
-    const texture = sampledTextureOf(item);
+    // A particle item has no material at all (§36 puts colour on the
+    // particle) and samples nothing.
+    if (item.kind === "particles") {
+      continue;
+    }
+    // §60's node materials sample by name, several at a time, and their whole
+    // sample set is enumerable from the material's reflection (RFC 0001 —
+    // exactly the checkability the graph form exists to preserve, and what a
+    // shader source string would have hidden from this scan).
+    if (item.kind === "node") {
+      for (const sampler of item.material.reflection.textures) {
+        const bound = item.material.getTexture(sampler.name);
+        if (isRenderTargetTexture(bound)) {
+          out.add(bound.renderTarget);
+        }
+      }
+      continue;
+    }
+    // Everything else: the material-shaped half of what the WebGL backend's
+    // `resolveTexture` reads, minus the caches — §55's `texture`, or §57's
+    // `map` (an untextured surface has a `null` map and samples nothing).
+    const texture: unknown =
+      item.kind === "sprite"
+        ? item.material.texture
+        : (item.material.map ?? null);
     if (isRenderTargetTexture(texture)) {
       out.add(texture.renderTarget);
     }
@@ -691,6 +698,19 @@ export class RenderGraph {
         sampled.clear();
         if (isEffectPass(pass)) {
           sampled.add(pass.source.renderTarget);
+          // §60's graph effect (RFC 0001): the graph's additional inputs are
+          // declared on the pass — that declaration is the whole reason a
+          // graph effect stays checkable, so the feedback and ordering scans
+          // below see the pass's **full** sample set, exactly as they see a
+          // built-in effect's one field. Keys are sorted so the issue order
+          // is a function of the graph, not of a record's key order (§33).
+          const effect = pass.effect;
+          if (effect.kind === "graph" && effect.textures !== undefined) {
+            const inputs = effect.textures;
+            for (const name of Object.keys(inputs).sort()) {
+              sampled.add(inputs[name].renderTarget);
+            }
+          }
         } else {
           collectSampledTargets(pass.root, sampled);
         }

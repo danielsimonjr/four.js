@@ -11,11 +11,27 @@ changes in `CHANGELOG.md`.
       verifier's priority order:
 
 - [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
-      2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → 0001 shader/node
-      materials → 0005 pixel picking → 0004 raster painting, interleaved with
-      WP-R1.4…R1.8. 0003 landed first, so it owns the `RenderItemKind` widening:
-      one string member per compiled pipeline, discriminating a closed item union
-      (documented for 0001 in `render-list.ts`).
+      2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → ~~0001 shader/node
+      materials (done 2026-08-28)~~ → **0005 pixel picking next** → 0004 raster
+      painting, interleaved with WP-R1.6…R1.8. 0001's landing decides WP-R1.9's
+      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+      reachability are backend-independent and re-exported through `@four/render`;
+      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+      (screen domain included, for §70 graph effects).
+- [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
+      with a measurement), reusable functions (named subgraphs need an emission
+      scope + call-site key), conditional variants (a second cache dimension),
+      storage buffers (§82, WebGPU), source maps (per-node provenance; the error
+      path ships source + driver log); lighting-aware graphs (R-17's light-uniform
+      contract first); alternative E (data-declared custom operators — a follow-up
+      RFC, also the `materials/shader nodes` §81 token's gate); an angle operator
+      (unlocks §58's conic gradient); the §58 Paint-object tier on `Shape2D`
+      (R-16's shape-paint packet, now unblocked).
+- [ ] **docs/guides/custom-shaders.md is stale (2026-08-28):** it promises "expect
+      a declarative surface when §60 lands" — §60 landed. Needs a rewrite around
+      `NodeMaterialBuilder`/`GraphEffect`/`registerNodeMaterialPipeline`; the
+      security guide's shader row already moved.
+
 - [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
       skinned shadow caster program (the §69 pass skips skinned draws — a bind-pose
@@ -390,14 +406,15 @@ changes in `CHANGELOG.md`.
       module; `Line`/`Polyline`/`Arc` complete all fourteen §50 rows (twelve classes);
       fill+stroke travel as per-vertex colour — no `RenderItemKind`, no pipeline, no
       frame-path edit. **Group 5 (the 2D vector stack) is closed.**
-- [ ] **The shape paint pipeline** _(R-16 residue, blocked on RFC 0001/0003 deciding
-      `pipelineId` — first to land owns it)_: §58's six non-solid paints (linear /
-      radial / conic gradients, patterns, procedural, render-target) — per-vertex colour
-      is exact only for solids and two-stop linear gradients, so the exact tier is a
-      compiled pipeline at the measured ~1.9 kB-per-`WebglRenderer`-bundle price; §52's
-      anti-alias fringe (needs a per-vertex coverage attribute no §57 pipeline reads).
-      This is also what would finally give `ShapeMaterial` content (re-examined and
-      deliberately unshipped twice — R-23, R-16).
+- [ ] **The shape paint pipeline** _(R-16 residue — unblocked 2026-08-28: RFC 0001
+      decided the shape as `"node"` item kind + structural program cache, and
+      linear/radial gradients, patterns, procedural and render-target paints are
+      already exact via `NodeMaterial`)_: what remains is the §58 `Paint`-object
+      integration on `Shape2D` fill/stroke, the conic gradient (needs an angle
+      operator — closed-union amendment), and §52's anti-alias fringe (needs a
+      per-vertex coverage attribute no §57 pipeline reads). This is also what would
+      finally give `ShapeMaterial` content (re-examined and deliberately unshipped
+      twice — R-23, R-16).
 - [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
       R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
       geometry operations (§51's four, the shared planar-subdivision packet), world

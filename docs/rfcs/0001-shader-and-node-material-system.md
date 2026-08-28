@@ -2,7 +2,7 @@
 
 - **Status:** accepted (owner, 2026-08-21 — "Continue with the remaining WPs and the RFCs"; the recommended dispositions of the flagged questions are adopted)
 - **Date:** 2026-08-07
-- **Owner decision:** pending
+- **Owner decision:** accepted 2026-08-21; implemented 2026-08-28 (R-14 closed)
 - **Spec sections affected:** §60 (primary), §57, §53, §61–§64, §66, §70, §79, §85, §89, §90, §92, §96, §98, §120
 
 ## Context
