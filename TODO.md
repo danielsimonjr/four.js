@@ -82,11 +82,17 @@ changes in `CHANGELOG.md`.
       Browser specs written (sprites/batch + WP-R1.2's deferred texture evidence,
       stencil intersection), self-skipping; validated with the wave's browser gate
       at the RFC 0003 landing.
-- [ ] **R-1 / WP-R1.4 → WP-R1.8** — shapes/vertex colours, lit + standard, render
-      targets and effects (`readPixels` via `copyTextureToBuffer` + `mapAsync`),
-      shadows and stencil parity, compute and GPU particles (unblocks R-31). Strictly
-      serial; all share `packages/render-webgpu/src/`. Plan:
-      `docs/plans/R1-WEBGPU_PLAN.md`.
+- [x] **R-1 / WP-R1.4 — WebGPU shapes and vertex colours** — landed 2026-08-28,
+      tests-only as predicted (skinned-kind absence pinned; vc browser spec added,
+      self-skipping — runs with the wave's browser gate at the RFC 0001 landing).
+- [ ] **R-1 / WP-R1.5 — lit and standard pipelines, lights** (`wgpu-lit.ts`,
+      `wgpu-standard.ts`, `wgpu-lights.ts`; punctual lights as one uniform buffer —
+      mind WGSL vec3 16-byte alignment; 1/π folded out per R-13; depth remap already
+      lands with the existing vertex stage).
+- [ ] **R-1 / WP-R1.6 → WP-R1.8** — render targets and effects (`readPixels` via
+      `copyTextureToBuffer` + `mapAsync`), shadows and stencil parity, compute and
+      GPU particles (unblocks R-31). Strictly serial; all share
+      `packages/render-webgpu/src/`. Plan: `docs/plans/R1-WEBGPU_PLAN.md`.
 - [ ] **§62's "applications may declare required and optional capabilities"** — still
       unimplemented; now that the capability record is complete it is cheap
       (WP-R1.9's first half, dispatches with the `R-14` wave).

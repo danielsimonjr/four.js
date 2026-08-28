@@ -8,6 +8,24 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — WP-R1.4: WebGPU shapes and vertex colours
+
+#### Added
+
+- **WP-R1.4 (R-1): §50 shapes and §53/§58 vertex colours proven on the WebGPU
+  backend** — a tests-only packet, as planned: a scene of `Shape2D`s records the
+  byte-identical WebGPU command transcript (tape, serials and uniform bytes
+  included) as plain `Renderable`s over the same geometries; a painted, stroked
+  shape is one draw through the lazy `unlit|vc` variant with its colour stream at
+  slot 1; the render-list consumption contract holds kind for kind between WebGL 2
+  and WebGPU for tessellated shape scenes; and RFC 0003's skinned kinds are pinned
+  as transcript-invisibly skipped (no upload, no draw, never bind pose) until a
+  joint-palette pipeline exists. New self-skipping browser spec compiles the vc
+  variant's WGSL on a real adapter — the one unlit variant no adapter had run. No
+  backend behavior changed; comment-only staging notes in `webgpu-renderer.ts`.
+  (`tests/integration/webgpu-shapes.test.ts`,
+  `tests/browser/webgpu/webgpu-vertex-colors.spec.ts`)
+
 ### 2026-08-28 — RFC 0003: §54 skinning and skeletal animation (PH-10 + R-22)
 
 #### Added

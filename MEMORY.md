@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — WP-R1.4: WebGPU shapes and vertex colours.** Decisions worth keeping:
+  - **The packet proved a negative, which was its point**: no unlit-variant plumbing
+    was deferred from R1.1 — colour-only-no-uv was already a lazy variant with a
+    positional vertex layout — so WP-R1.4 shipped zero behavior lines. The WebGPU
+    identity test is _stronger_ than the GL original it restates: full-tape equality
+    (handle serials and uniform bytes included), not names+draw-args, because
+    `recording-gpu.ts` copies typed arrays at record time and the uniform path is one
+    strided upload.
+  - **A skinned item is transcript-invisible on this backend, and that is now pinned
+    from both sides**: {scene + skinned mesh} records the byte-identical tape of
+    {scene}, and the same scene through GL-with-registerSkinningPipeline draws one
+    more item than WebGPU — the honest "closed on WebGL 2, absent on WebGPU"
+    wording, in a test rather than a sentence.
+  - **The vc variant's WGSL had never met a real adapter** — the browser gate
+    compiled only `unlitShaderSource(false)`. Rule worth keeping: a _variant_
+    family's browser evidence covers only the variants it compiles; each generated
+    module needs its own compile-and-rasterise line once, or "the WGSL compiles"
+    quietly means "one of the four compiles".
+
 - **2026-08-28 — RFC 0003 / PH-10 + R-22: §54 skinning.** Decisions worth keeping:
   - **A skinned draw's failure direction is absence, and the check sits above the
     geometry upload.** Unregistered pipeline, failed compile (latched per context,

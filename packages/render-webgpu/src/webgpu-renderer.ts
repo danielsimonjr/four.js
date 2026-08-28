@@ -18,9 +18,13 @@
  * and §67's **clip** application (masks write stencil bit planes, clipped
  * draws test them — see `DEPTH_STENCIL_FORMAT` below for the per-frame
  * stencil-format decision). All of it drawn through the real
- * `buildRenderList` → `buildViewRenderList` → draw path. The remaining
- * pipelines (lit, standard, particles, shadows, effects, compute) are packets
- * R1.4–R1.8 and are *absent*, not stubbed: an item this tier cannot draw is
+ * `buildRenderList` → `buildViewRenderList` → draw path; WP-R1.4 added no
+ * pipeline — §50 shapes and §58 paints were already ordinary unlit draws, and
+ * that packet's deliverable is the transcript-identity tests saying so. The
+ * remaining pipelines (lit, standard, particles, shadows, effects, compute —
+ * packets R1.5–R1.8 — and RFC 0003's `skinned-unlit`/`skinned-lit`, which
+ * need a joint-palette pipeline this backend does not stage yet) are
+ * *absent*, not stubbed: an item this tier cannot draw is
  * skipped, exactly as a draw with no geometry record is, because a pipeline
  * that silently draws the wrong thing is worse than one that does not exist
  * yet (the recorded WP-9.1 rule, applied to a backend). The one exception is
@@ -920,8 +924,10 @@ export class WebgpuRenderer implements Renderer {
         const clip = item.clip ?? null;
         const maskPass = clip !== null && clip.maskPass;
         if (!maskPass && item.kind !== "unlit" && item.kind !== "sprite") {
-          // WP-R1.5 onwards. Skipped, never approximated — and skipped
-          // *before* the geometry cache uploads buffers nothing will bind.
+          // WP-R1.5 onwards, and RFC 0003's skinned kinds until a
+          // joint-palette pipeline exists here. Skipped, never approximated —
+          // and skipped *before* the geometry cache uploads buffers nothing
+          // will bind.
           continue;
         }
         const record = geometries.acquire(item.geometry);
