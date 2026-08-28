@@ -164,12 +164,25 @@ changes in `CHANGELOG.md`.
       packed `DEPTH24_STENCIL8` allocation, `FRAME_BEFORE_R7` recorded on the reverted
       build, real-driver masking proof (browser gate now 64 tests). Budgets bumped
       34/31/39.5 kB with A/B measurements.
-- [ ] **§67 clipping API (new, from R-7's residue, L)** — a node-level clip in
-      `@four/scene`: subtree inheritance, nested-clip intersection, stencil **bit-plane**
-      assignment in a render-list pass, and §67's required diagnostic when the eight
-      planes of an 8-bit buffer are exhausted. Expressed in `StencilState` records;
-      unblocks §73's scroll view and §119's section views, and is what §50's
-      masks/clipping waits on. Needs `@four/scene` in scope.
+- [x] **§67 clipping API (from R-7's residue) — closed 2026-08-28.** `node.clip` in
+      `@four/scene`; allocator/mask emission in `@four/render/src/clip.ts`; backend
+      application, §79 pair, batching break, per-view masks; browser proof
+      `tests/browser/clipping.spec.ts` (nested intersection measured at exactly 1/6).
+      §73's scroll view now waits only on §74 overflow/scroll extent + a gesture
+      source (staging note updated in `widget.ts`); §119's section views unblocked
+      (a section view = a clip whose source is a §50 shape). Staged with named
+      owners in `clip.ts`: alpha masks, 3D clip planes; the scissor fast-path
+      bullet below is unchanged and still open.
+- [ ] **render-webgpu ignores `item.clip` (new, small, owner: next WebGPU packet).**
+      The backend predates §67 clips: on a clipped scene it draws mask items as
+      visible content and tests nothing. Unclipped scenes unaffected (the field is
+      `null`). Needs the WGSL-era twin of `applyMaterialState`'s clip parameter plus
+      a stencil-capable depth format decision (`depth24plus-stencil8`).
+- [ ] **Sprite §79 flag drop (pre-existing, found 2026-08-28):** the writer writes
+      `castShadow`/`receiveShadow`/`frustumCulled` for sprites; `Sprite`'s
+      constructor filters its options and drops all three, so they do not survive a
+      round trip. `clip` was plumbed through explicitly; the other three need the
+      same one-line pass-through plus a round-trip test.
 - [ ] **Scissor clipping (§67's first bullet, small)** — unrelated to the stencil and
       unblocked: the backend already keeps `SCISSOR_TEST` enabled and sets the rect per
       view. A per-item scissor is a render-list field, not a buffer.

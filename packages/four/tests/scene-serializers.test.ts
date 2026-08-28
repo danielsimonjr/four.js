@@ -1357,6 +1357,8 @@ describe("registerRenderSerializers — resource references are refused loudly",
       castShadow: true,
       receiveShadow: true,
       frustumCulled: true,
+      // §67's clip joined the always-written flags with R-23 (2026-08-28).
+      clip: false,
     });
     // The inspector case: the hierarchy saves. Loading it is still a refusal,
     // because a renderable without a geometry is not a renderable.
@@ -1461,6 +1463,7 @@ describe("registerRenderSerializers — resource references are refused loudly",
       castShadow: true,
       receiveShadow: true,
       frustumCulled: true,
+      clip: false,
     });
     expect(
       codeOf(() =>

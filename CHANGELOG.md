@@ -8,6 +8,25 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — R-23: §67's clipping API
+
+#### Added
+
+- **R-23 — §67's clipping API (2026-08-28).** `node.clip = true` on any drawable
+  masks its subtree to the node's own drawn shape, expressed entirely in §57
+  stencil records over R-7's substrate: the render list emits a colour/depth-less
+  mask draw per clip ahead of all content, assigns stencil bit planes 0–7 in
+  traversal order (§33), and hands every clipped item one shared read-only `equal`
+  test over the accumulated planes — so nested clips intersect by construction and
+  a clip boundary ends a §65 batch run by record identity. The ninth concurrent
+  clip is dropped with §67's required diagnostic and its subtree spills rather
+  than vanishing; a clip on a non-drawing node and a clip without a stencil buffer
+  warn in development and fail toward drawing. §79 writes `clip` beside the three
+  §49 flags on every drawable (`RenderableOptions.clip`, `SpriteOptions.clip`).
+  New browser gate: nested clips visibly intersect on a real driver (69 browser
+  tests). Scenes with no clips are byte-identical at the GL boundary
+  (`FRAME_BEFORE_R7` unmoved); +0.50 kB gzip in every bundle, no budget bumps.
+
 ### 2026-08-28 — WP-R1.2: WebGPU texture and sampler caches (§77, §83)
 
 #### Added

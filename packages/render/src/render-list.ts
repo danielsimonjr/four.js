@@ -95,7 +95,7 @@
  * the next build into the same array.
  */
 
-import { DEV } from "@four/core";
+import { DEV, devWarnOnce } from "@four/core";
 import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type {
@@ -117,6 +117,7 @@ import {
   type Viewport,
 } from "@four/scene";
 
+import { ClipPlaneAllocator, type RenderItemClip } from "./clip.js";
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
 import type { SpriteFrame } from "./sprite.js";
@@ -310,6 +311,36 @@ interface RenderItemBase {
    * it without having sorted reads that `0`.
    */
   viewDepth: number;
+
+  /**
+   * §67's clip, or `null` for a draw no clip touches (R-23, 2026-08-21) — the
+   * overwhelmingly common case, and the one every scene had before clipping
+   * existed.
+   *
+   * Three things read it. A backend applies `clip.stencil` **in place of** the
+   * material's own §57 `stencil` and, when `clip.maskPass` is set, forces
+   * colour writes, depth writes and the depth test off; §65's batcher breaks a
+   * run where two consecutive items carry different records, because the same
+   * material under two different clips is two different draws; and the
+   * comparators below sort mask draws to the front of the list.
+   *
+   * The record is a **shared, pooled object** — every item under one clip
+   * carries the identical reference — which is what makes the batcher's check
+   * one `!==` rather than a seven-field comparison. Like every other field on a
+   * pooled item it is rewritten by the next build; see `clip.ts` for what it
+   * means and why it is not a `StencilState`.
+   *
+   * **Optional, and `undefined` means exactly what `null` means.** The
+   * builders always write it (`null` for the unclipped case), so an item this
+   * module produced answers with one property load; the field is optional so
+   * that a **hand-built item literal or structural double predating §67** —
+   * R-38's recorded gotcha, answered structurally this time — still
+   * typechecks, and reports `undefined`, which every reader treats as "no
+   * clip". Same move as `RendererCapabilities`' optional members (R-1): widen
+   * a shipped shape additively, and let absence mean the pre-feature
+   * behaviour.
+   */
+  clip?: RenderItemClip | null;
 }
 
 /** A draw generated from a `Renderable` (§49) — flat colour, no texture. */
@@ -471,6 +502,13 @@ interface MutableRenderItem extends RenderItemBase {
   id: string;
   count: number;
   instances: Float32Array;
+  /**
+   * Required here though optional on the base: the builders must write it on
+   * every item (a pooled slot must not hand a stale clip to whatever lands in
+   * it next), and re-declaring it non-optional makes forgetting that a type
+   * error rather than a leak.
+   */
+  clip: RenderItemClip | null;
 }
 
 /**
@@ -578,6 +616,14 @@ interface ListPool {
   /** Item objects, indexed by generation order (not by final sorted order). */
   readonly items: MutableRenderItem[];
   /**
+   * §67's bit-plane allocator for this list (R-23). Reset by both builders
+   * before traversal, so a clip's plane depends on the scene and not on how
+   * many frames have been drawn. Pooled with the items for the same reason they
+   * are: two simultaneously live lists must not share one buffer's eight
+   * planes.
+   */
+  readonly clips: ClipPlaneAllocator;
+  /**
    * World matrices for the interpolated builder, index-aligned with `items` and
    * grown only when that builder runs — {@link buildRenderList} never
    * constructs one.
@@ -598,7 +644,7 @@ const pools = new WeakMap<readonly RenderItem[], ListPool>();
 function poolFor(out: RenderItem[]): ListPool {
   let pool = pools.get(out);
   if (pool === undefined) {
-    pool = { items: [], matrices: [] };
+    pool = { items: [], matrices: [], clips: new ClipPlaneAllocator() };
     pools.set(out, pool);
   }
   return pool;
@@ -634,6 +680,7 @@ function itemAt(
       receiveShadow: false,
       frustumCulled: true,
       viewDepth: 0,
+      clip: null,
       id: "",
       count: 0,
       instances: EMPTY_INSTANCES,
@@ -812,6 +859,8 @@ function collect(
   poses: PoseBuffer | null,
   alpha: number,
   mask: LayerMask,
+  clipBits: number,
+  clip: RenderItemClip | null,
 ): number {
   if (!node.visible || !node.enabled) {
     return count;
@@ -890,6 +939,11 @@ function collect(
     // rather than left, so a pooled slot cannot hand a stale depth to a caller
     // that reads the field without sorting.
     item.viewDepth = 0;
+    // §67 (R-23): the accumulated test of every enclosing clip, or `null` where
+    // there is none. Written rather than left, for the reason the `material`,
+    // `frame` and shadow resets in the particle arm below are — a pooled slot
+    // must not hand a stale clip to whatever lands in it next.
+    item.clip = clip;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     // The one cast in the module, and the only place the `kind`/`material`
     // correlation is established: both were just written from the same node, so
@@ -952,14 +1006,87 @@ function collect(
     // the reason the `material`, `frame` and shadow resets above are.
     item.frustumCulled = false;
     item.viewDepth = 0;
+    // §67 (R-23): a particle system inside a clipped subtree is clipped like
+    // everything else — the test is per draw, and §36's batched item is one
+    // draw. Written rather than left, for the reason the resets above are.
+    item.clip = clip;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;
   }
 
+  // §67's clip (R-23), resolved *after* this node's own item and *before* the
+  // children: the mirror of §46's layers, which gate the node and not the
+  // subtree. A panel paints its own background unclipped by itself and then
+  // contains what is inside it.
+  let childBits = clipBits;
+  let childClip = clip;
+  if (node.clip === true) {
+    if (isRenderable(node)) {
+      const scope = pool.clips.allocate(clipBits, node.id);
+      // `null` is §67's exhaustion case: the frame's eight bit planes are gone,
+      // `clip.ts` has warned, and this subtree keeps the clips it inherited —
+      // it spills past this boundary rather than vanishing behind it.
+      if (scope !== null) {
+        // The mask draw: this node's own geometry again, writing the plane and
+        // nothing else. It carries §46's every-layer mask and `frustumCulled:
+        // false` deliberately — a mask is not content, and a view that dropped
+        // it would draw *none* of this subtree rather than less of it.
+        const geometry = node.geometry;
+        const material = node.material;
+        const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
+        item.kind = pipelineOf(material);
+        item.geometry = geometry;
+        item.material = material as
+          UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+        item.frame =
+          item.kind === "sprite"
+            ? ((node as FramedDrawable).frame ?? null)
+            : null;
+        item.renderLayer = node.renderLayer;
+        item.renderOrder = node.renderOrder;
+        item.layers = ALL_LAYERS;
+        item.transparent = false;
+        item.materialId = material.id ?? "";
+        item.castShadow = false;
+        item.receiveShadow = false;
+        item.frustumCulled = false;
+        item.viewDepth = 0;
+        item.clip = scope.write;
+        writeWorldMatrix(item, node, pool, next, poses, alpha);
+        out[next] = item as RenderItem;
+        next += 1;
+        childBits = scope.bits;
+        childClip = scope.test;
+      }
+    } else if (DEV) {
+      // §85, and a development build only: a `Group` has no shape to mask
+      // with, so the clip is inert. Warned rather than refused — §61 forbids
+      // throwing inside a frame — and inert *toward drawing*: the subtree is
+      // not narrowed, rather than being masked to nothing.
+      devWarnOnce(
+        `clip-not-drawable:${node.id}`,
+        `§67: node "${node.id}" sets clip = true but draws no geometry, so ` +
+          "there is no shape to mask its subtree with and the clip does " +
+          "nothing. Put the clip on the node that draws the region (a Shape, " +
+          "a Renderable, a Sprite), not on a Group above it.",
+      );
+    }
+  }
+
   const children = node.children;
   for (let i = 0; i < children.length; i += 1) {
-    next = collect(children[i], out, pool, next, poses, alpha, mask);
+    next = collect(
+      children[i],
+      out,
+      pool,
+      next,
+      poses,
+      alpha,
+      mask,
+      childBits,
+      childClip,
+    );
   }
   return next;
 }
@@ -983,6 +1110,16 @@ function collect(
  * key 1 and outranks this.
  */
 function compareRenderItems(a: RenderItem, b: RenderItem): number {
+  // §67's mask draws first, ahead of every other key (R-23): the stencil
+  // buffer must be complete before the first clipped fragment is tested, and
+  // nothing else in §66's order can be allowed to interleave content between a
+  // mask and the draws it masks. `false !== false` in every scene that names no
+  // clip, so this key is a single comparison and never a reordering.
+  const aMask = a.clip?.maskPass === true;
+  const bMask = b.clip?.maskPass === true;
+  if (aMask !== bMask) {
+    return aMask ? -1 : 1;
+  }
   if (a.renderLayer !== b.renderLayer) {
     return a.renderLayer - b.renderLayer;
   }
@@ -1010,6 +1147,16 @@ function compareRenderItems(a: RenderItem, b: RenderItem): number {
  * or a camera, so the result is a pure function of the list (§33).
  */
 function comparePipelineGroupedItems(a: RenderItem, b: RenderItem): number {
+  // §67's mask draws first, ahead of every other key (R-23): the stencil
+  // buffer must be complete before the first clipped fragment is tested, and
+  // nothing else in §66's order can be allowed to interleave content between a
+  // mask and the draws it masks. `false !== false` in every scene that names no
+  // clip, so this key is a single comparison and never a reordering.
+  const aMask = a.clip?.maskPass === true;
+  const bMask = b.clip?.maskPass === true;
+  if (aMask !== bMask) {
+    return aMask ? -1 : 1;
+  }
   if (a.renderLayer !== b.renderLayer) {
     return a.renderLayer - b.renderLayer;
   }
@@ -1150,7 +1297,8 @@ export function buildRenderList(
 ): RenderItem[] {
   if (DEV) assertLayerMask(layerMask, "buildRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, null, 0, layerMask);
+  pool.clips.begin();
+  const count = collect(root, out, pool, 0, null, 0, layerMask, 0, null);
   out.length = count;
   out.sort(compareRenderItems);
   return out;
@@ -1198,7 +1346,8 @@ export function buildInterpolatedRenderList(
 ): RenderItem[] {
   if (DEV) assertLayerMask(layerMask, "buildInterpolatedRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, poses, alpha, layerMask);
+  pool.clips.begin();
+  const count = collect(root, out, pool, 0, poses, alpha, layerMask, 0, null);
   out.length = count;
   out.sort(compareRenderItems);
   return out;

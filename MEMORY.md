@@ -28,6 +28,62 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — R-23: §67's clipping API.** Decisions worth keeping:
+  - **A clip is one extra draw and one shared record, and the record's _identity_ is
+    the API.** Every item under one clip carries the identical pooled
+    `RenderItemClip`, which is what makes the batcher's boundary check one `!==`,
+    the backend's read one property load, and nesting free: the subtree test is
+    `equal` over the accumulated bits, so no mask ever needs masking — an inner mask
+    writing outside the outer region is harmless because the conjunction requires
+    the outer bit.
+  - **Self-not-subtree has a mirror: subtree-not-self.** §46's layers gate the node
+    and not its children; §67's clip gates the children and not the node (a panel
+    paints its own background, then contains). The two fields sit adjacent in
+    `node.ts` with opposite scopes stated — when adding a per-node render field,
+    decide and _say_ which scope it has.
+  - **The ninth clip fails toward drawing, and toward a superset.** It is dropped;
+    its subtree keeps the eight clips that fit — content spills at a visible
+    boundary that points at the offending clip, instead of vanishing
+    indistinguishably from a culling bug (R-8's precedent, second application).
+    Same direction for the other two failure modes: a clip on a `Group` and a clip
+    with no stencil buffer are warned-inert, never masked-to-nothing.
+  - **The exhaustion warning is once per allocator, not once per frame** — `begin()`
+    resets the plane counter, not the warned flag. An over-budget scene is over
+    budget every frame, and a frame-rate warning hides its own first line (§42/§39
+    precedent). The _count_ (`refused`) is still per build — it is §84-shaped
+    state, unwired until a diagnostics packet wants it.
+  - **"Masks first" is a sort key, not a list phase — and it makes a diagnostic
+    O(1).** The comparators' key 0 puts mask draws ahead of every §66 key; a single
+    `items[0].clip?.maskPass` read then answers "does this frame clip at all",
+    which is how the backend's no-stencil-buffer warning costs one comparison
+    instead of a scan.
+  - **Optional-with-required-override is how a pooled interface widens.**
+    `RenderItemBase.clip?` keeps every hand-built item literal and pre-§67
+    structural double compiling (`undefined` ≡ `null` ≡ unclipped — R-38's gotcha
+    answered structurally); `MutableRenderItem` re-declares it required so the
+    builders cannot leave a pooled slot stale. Batcher and backend normalize with
+    `?? null`.
+  - **The engine's record outranks `material.stencil` on clipped draws** — a
+    documented collision, resolved for the containment guarantee an author cannot
+    restore by hand. R-7's mask-by-hand tier is untouched everywhere else.
+  - **Clips are screen-space, per view; shadows are not clipped, structurally.**
+    Plane assignment is frame state (one traversal), mask draws happen per view
+    after that view's stencil clear; the §69 pass ignores clips because its
+    framebuffer _cannot_ carry stencil bits (R-7's packed-format exclusion) —
+    stated in source as the analogue of a sprite casting its rectangle.
+  - **A browser gate can prove _intersection_, not just masking, without a golden**:
+    full-view content under two offset 4×4 clips leaves 1/6 — a footprint one mask
+    (1/3) or the union (5/9) cannot produce. Measured exactly: 76 800 → 12 800
+    orange pixels, ratio 0.1667, box x 120…199 y 40…199.
+  - **Gotcha (found, not fixed): `Sprite`'s constructor drops the three §49 flags
+    its §79 writer writes.** `clip` was passed through by hand;
+    `castShadow`/`receiveShadow`/`frustumCulled` still are not — a sprite
+    round-trips those as defaults. Filed in TODO.
+  - **Measured: +0.50 kB gzip in every bundle** (the allocator and mask emission
+    ride in `buildRenderList` — R-6/R-7's law), +0.68/+1.26 kB where §79 and the ui
+    staging note ride along. No bumps; **ui-demo is at 41.60/42 kB — 0.40 kB of
+    headroom**, the next ui-touching packet must A/B first.
+
 - **2026-08-28 — WP-R1.2: the WebGPU texture tier.** Decisions worth keeping:
   - **Mipmaps are generated, not degraded — and the generator is lazy.** WebGPU has no
     `generateMipmap`; degrading (R-30b's no-`generateMipmap`-context path) would make

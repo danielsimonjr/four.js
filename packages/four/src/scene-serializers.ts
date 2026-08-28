@@ -575,36 +575,42 @@ function finiteOptions(
 }
 
 /**
- * §49's boolean flags as document fields — the two shadow flags (§69; R-18,
- * 2026-08-09) and `frustumCulled` (§87; R-8, 2026-08-09).
+ * A drawable's boolean flags as document fields — §49's two shadow flags (§69;
+ * R-18, 2026-08-09) and `frustumCulled` (§87; R-8, 2026-08-09), plus §67's
+ * `clip` (R-23, 2026-08-28), which is a `Node` field but is written *here*
+ * because it only means something on a node that draws: the mask is the
+ * node's own geometry, and a document putting it on a `Group` would restore a
+ * warned-inert flag.
  *
  * Written **always**, not only when they differ from the default, for the
  * reason every other field here is: §79 documents state what a node *is*, and a
  * reader that has to know this build's defaults to interpret a document is a
- * reader that breaks the day a default changes. All three default to `true`, so
- * a document written before this build carries none of the keys, `readBoolean`
- * answers `undefined`, and the node restores casting, receiving, and being
- * culled — which is exactly how a `Renderable` authored today behaves.
+ * reader that breaks the day a default changes. A document written before this
+ * build carries none of the keys, `readBoolean` answers `undefined`, and the
+ * node restores casting, receiving, being culled, and not clipping — which is
+ * exactly how a `Renderable` authored today behaves.
  *
- * One helper for all three because they land in the same place on the same
+ * One helper for all four because they land in the same place on the same
  * classes and are read back into the same options record; splitting them per
- * feature would put three spreads on every writer for no reader's benefit.
+ * feature would put four spreads on every writer for no reader's benefit.
  */
 function renderableFlagsJson(node: {
   readonly castShadow: boolean;
   readonly receiveShadow: boolean;
   readonly frustumCulled: boolean;
+  readonly clip: boolean;
 }): Record<string, JsonValue> {
   return {
     castShadow: node.castShadow,
     receiveShadow: node.receiveShadow,
     frustumCulled: node.frustumCulled,
+    clip: node.clip,
   };
 }
 
 /**
- * §49's boolean flags as `RenderableOptions` (§69, §87), dropping whatever the
- * payload does not carry as a boolean.
+ * The drawable boolean flags as `RenderableOptions` (§69, §87, §67), dropping
+ * whatever the payload does not carry as a boolean.
  */
 function readRenderableFlags(data: {
   readonly [key: string]: JsonValue;
@@ -616,6 +622,8 @@ function readRenderableFlags(data: {
   if (receiveShadow !== undefined) options.receiveShadow = receiveShadow;
   const frustumCulled = readBoolean(data.frustumCulled);
   if (frustumCulled !== undefined) options.frustumCulled = frustumCulled;
+  const clip = readBoolean(data.clip);
+  if (clip !== undefined) options.clip = clip;
   return options;
 }
 
@@ -1233,13 +1241,14 @@ export function registerUISerializers(
  *
  * - **`Renderable`** — a `geometry` key, a `material` key (see the module
  *   header), `renderLayer`, `renderOrder`, `castShadow`/`receiveShadow` (§69,
- *   R-18) and `frustumCulled` (§87, R-8). §49's `depthMode` is still not
+ *   R-18), `frustumCulled` (§87, R-8) and `clip` (§67, R-23, 2026-08-28).
+ *   §49's `depthMode` is still not
  *   written because the class does not have it yet; it joins the payload with
  *   the feature. (This bullet claimed all four were unwritten until
  *   2026-08-09 — it predated R-18.)
  * - **`Sprite`** — a `material` key, `width`, `height`, `anchor`,
- *   `renderLayer`, `renderOrder`, the same three §49 flags, and **no geometry
- *   key at all**: a sprite
+ *   `renderLayer`, `renderOrder`, the same four drawable flags, and **no
+ *   geometry key at all**: a sprite
  *   derives its quad from the anchor and the size and owns it (§55), so the
  *   payload above rebuilds it exactly. Its `dispose()` state is not written —
  *   a disposed sprite is a released resource, not authored scene state.
@@ -2462,7 +2471,7 @@ function requireUnlitMaterial(
  * ## What a text document carries
  *
  * A `material` key, `text`, `size`, `letterSpacing`, `align`, `renderLayer`,
- * `renderOrder`, and §49's three boolean flags — and **no geometry key**, for
+ * `renderOrder`, and the four drawable boolean flags — and **no geometry key**, for
  * `Sprite`'s reason: a `Text` derives its glyph quads from the four fields above
  * and owns them, so that payload rebuilds the geometry exactly.
  *

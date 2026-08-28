@@ -35,7 +35,7 @@
  * calls checkable.
  */
 
-import { EventEmitter, FourError } from "@four/core";
+import { DEV, devWarnOnce, EventEmitter, FourError } from "@four/core";
 import { Frustum, Matrix4 } from "@four/math";
 import {
   RenderTarget,
@@ -193,7 +193,11 @@ export interface WebglContextAttributes {
   antialias?: boolean;
   /** A depth buffer — required, since every view clears and tests depth (§61). */
   depth?: boolean;
-  /** No stencil until §67's masks land. */
+  /**
+   * Stencil bits for §67's masks and clips, driven by
+   * `RendererOptions.stencil` (R-7; consumed by R-23's node-level clips).
+   * `false` unless asked — the attribute every renderer built before R-7 got.
+   */
   stencil?: boolean;
 }
 
@@ -345,6 +349,17 @@ const BLEND_FUNCTIONS: Record<ItemBlendMode, readonly [number, number]> = {
 
 /** §57's optional `stencil` record, derived from the material for the same reason. */
 type ItemStencil = NonNullable<ItemMaterial["stencil"]>;
+
+/**
+ * §67's per-item clip record, derived from the render item exactly as
+ * {@link ItemMaterial} is and for the same frozen-matrix reason (R-23,
+ * 2026-08-21). `RenderItem.clip` is optional-or-null — `undefined` and `null`
+ * both mean "no clip touches this draw" — so the non-nullable half is the
+ * record a clipped draw actually carries: the §57-shaped stencil state the
+ * engine composed for it, and whether this draw *writes* the mask
+ * (`maskPass`) rather than being tested by it.
+ */
+type ItemClip = NonNullable<RenderItem["clip"]>;
 
 /**
  * Every bit of the stencil buffer — see `GlState.stencilReadMask` for why the
@@ -561,8 +576,10 @@ function applyDepthColorState(
  * Applies §57's optional stencil state for the draw about to be issued (§67,
  * R-7).
  *
- * `stencil` is the material's record, or `undefined` for the overwhelmingly
- * common material that declares none — which means *disable the test*, GL's
+ * `stencil` is the material's record, §67's engine-composed clip record (R-23
+ * — structurally §57's shape with every field present, so the defensive `??`
+ * reads below never fire on one), or `undefined` for the overwhelmingly
+ * common draw that carries neither — which means *disable the test*, GL's
  * initial state and the only stencil state this engine had before R-7.
  *
  * ## The three calls, and why they are three
@@ -588,7 +605,7 @@ function applyDepthColorState(
 function applyStencilState(
   gl: ParticleGlContext,
   state: GlState,
-  stencil: ItemStencil | undefined,
+  stencil: ItemStencil | ItemClip["stencil"] | undefined,
 ): void {
   if (stencil === undefined) {
     if (state.stencilTest) {
@@ -669,12 +686,28 @@ function restoreStencilWriteMask(gl: ParticleGlContext, state: GlState): void {
  * a bad value on assignment as well as at construction (F14) — so a fallback
  * that no structural double could reach has been removed rather than left to
  * read as a live defence.
+ *
+ * ## §67's clip (R-23, 2026-08-21)
+ *
+ * `clip` is the item's engine-composed clip record, or `null` for the
+ * overwhelmingly common draw no clip touches — every draw of every scene that
+ * predates §67, whose path through this function is unchanged to the byte.
+ * A clipped draw's record **replaces** the material's own §57 `stencil` (the
+ * documented collision: a node that declares a clip is asking the engine to
+ * compose the mask, and the engine's record is what keeps the containment
+ * guarantee true). A **mask pass** (`clip.maskPass`) additionally forces the
+ * depth test, depth writes, and colour writes off, whatever the material says:
+ * a mask contributes no pixels and must neither occlude, be occluded by, nor
+ * be depth-rejected against the content it masks. Blending is left to the
+ * material — with colour writes off it cannot reach the framebuffer either
+ * way, and skipping the call would leave the mirror wrong for the next draw.
  */
 function applyMaterialState(
   gl: ParticleGlContext,
   state: GlState,
   material: ItemMaterial | undefined,
   alwaysBlend: boolean,
+  clip: ItemClip | null = null,
 ): void {
   applyBlendState(
     gl,
@@ -682,20 +715,28 @@ function applyMaterialState(
     alwaysBlend || material?.transparent === true,
     material?.blendMode ?? "normal",
   );
-  applyDepthColorState(
-    gl,
-    state,
-    material?.depthTest !== false,
-    material?.depthWrite !== false,
-    material?.colorWrite !== false,
-  );
+  if (clip !== null && clip.maskPass) {
+    // §67's mask draw — see the function documentation.
+    applyDepthColorState(gl, state, false, false, false);
+  } else {
+    applyDepthColorState(
+      gl,
+      state,
+      material?.depthTest !== false,
+      material?.depthWrite !== false,
+      material?.colorWrite !== false,
+    );
+  }
   // §67's seam, and its whole per-item cost (R-7): one property load and one
   // comparison. The second disjunct is what makes the *first* draw after a
   // stencil material put the test back — without it a frame would need
   // `applyStencilState` unconditionally, which is a call per draw for a feature
   // almost no scene uses. Measured: no change in bundle size or frame time for
-  // a scene that names no stencil (see the packet's A/B).
-  const stencil = material?.stencil;
+  // a scene that names no stencil (see the packet's A/B). R-23 widened the
+  // resolution by one comparison: the engine's clip record outranks the
+  // material's own stencil, and `null` — every pre-§67 draw — resolves to
+  // exactly what this line resolved to before the parameter existed.
+  const stencil = clip !== null ? clip.stencil : material?.stencil;
   if (stencil !== undefined || state.stencilTest) {
     applyStencilState(gl, state, stencil);
   }
@@ -1649,6 +1690,30 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               renderList,
             );
 
+      // §67's other exhaustion case, and a development build only (R-23): a
+      // clip on a surface with no stencil buffer has nothing to write its mask
+      // into, so GL treats every stencil test as passing and the subtree draws
+      // **unclipped** — failing toward drawing, like the ninth clip, but
+      // silently. The check is O(1), not a scan: mask draws sort ahead of
+      // every other item in the frame list, so "does this frame clip at all"
+      // is one read of the first item. Diagnostic only — no GL call, no value
+      // any later code reads (§33's A-4 rule).
+      if (
+        DEV &&
+        !stencilAttached &&
+        items.length > 0 &&
+        items[0].clip?.maskPass === true
+      ) {
+        devWarnOnce(
+          "webgl-clip-without-stencil",
+          "§67: this scene sets `clip = true` but the surface being drawn " +
+            "into has no stencil buffer, so there is nothing to write the " +
+            "mask into and the clipped subtrees draw unclipped. Construct " +
+            "the renderer with `{ stencil: true }` (or give the render " +
+            "target `{ stencil: true }`) to allocate one (R-7).",
+        );
+      }
+
       // The frame's lights (§68), collected only when something will be shaded
       // by them: one `kind` comparison per item decides, so a scene with no lit
       // materials adds nothing to its frame but this loop. Collected once per
@@ -1862,6 +1927,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                   state,
                   batch.material,
                   batch.kind === "sprite",
+                  // §67 (R-23): the run's shared clip — the batcher broke the
+                  // run wherever the record changed, so one apply covers every
+                  // merged draw. `?? null` for a hand-built batch predating
+                  // the field.
+                  batch.clip ?? null,
                 );
                 if (batchTexture !== null) {
                   if (!mapUnitActive) {
@@ -1916,7 +1986,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             // carry no material to say otherwise, so they blend with the straight
             // alpha function and draw with §57's default depth and colour state —
             // see `gl-particles.ts` for the whole policy.
-            applyMaterialState(gl, state, undefined, true);
+            // §67 (R-23): a particle system inside a clipped subtree is
+            // tested like everything else — the clip is per draw, and §36's
+            // batched item is one draw. `?? null` for a structurally-typed
+            // item predating the field.
+            applyMaterialState(gl, state, undefined, true, item.clip ?? null);
             if (!particleViewUploaded) {
               // The billboard offset happens between the view and the projection,
               // so this pipeline takes the two matrices separately rather than
@@ -1960,7 +2034,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             // channel has to composite whatever the flag says — so `alwaysBlend`
             // is `true` here. Everything else the material declares (blend mode,
             // depth test, depth write, colour write) applies as usual.
-            applyMaterialState(gl, state, material, true);
+            applyMaterialState(gl, state, material, true, item.clip ?? null);
             if (!spriteViewUploaded) {
               spriteProgram.setViewProjection(viewProjection);
               spriteViewUploaded = true;
@@ -2017,7 +2091,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               litProgram.use();
               activeKind = "lit";
             }
-            applyMaterialState(gl, state, item.material, false);
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              false,
+              item.clip ?? null,
+            );
             if (!litViewUploaded) {
               // The view-projection and the frame's lights, once per view —
               // uniforms live in the program object, so they hold for every lit
@@ -2076,7 +2156,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               standardProgram.use();
               activeKind = "standard";
             }
-            applyMaterialState(gl, state, item.material, false);
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              false,
+              item.clip ?? null,
+            );
             if (!standardViewUploaded) {
               // Per-view state: uniforms live in the program object, so one
               // upload holds for every standard draw into this view even when
@@ -2139,7 +2225,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               program.use();
               activeKind = "unlit";
             }
-            applyMaterialState(gl, state, item.material, false);
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              false,
+              item.clip ?? null,
+            );
             const map = mapOf(item.material);
             const texture =
               map === null
@@ -2716,6 +2808,15 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     shadowProgram.use();
     shadowProgram.setViewProjection(sceneLights.shadowMatrix);
     for (const item of items) {
+      // §67's clip is deliberately not consulted here (R-23). A stencil clip
+      // is a per-view, screen-space construct and this framebuffer carries no
+      // stencil attachment (R-7: samplable depth is a DEPTH_COMPONENT24
+      // texture, which structurally excludes the packed stencil format), so a
+      // clipped surface casts its **whole** shadow — the §69 analogue of a
+      // sprite casting its rectangle, and honest for the same reason: a
+      // depth-only pass writes geometry, not visibility. Mask draws never
+      // reach this loop at all; the list builder writes `castShadow: false`
+      // on every one, because a mask is not content.
       if (!item.castShadow || item.kind === "sprite") {
         continue;
       }

@@ -11,6 +11,9 @@ export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
 export type { BoundingSphere } from "./bounds.js";
 export { computeWorldBoundingSphere } from "./bounds.js";
 
+export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
+export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
+
 export type {
   ColorGradeEffect,
   CopyEffect,

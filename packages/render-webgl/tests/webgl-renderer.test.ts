@@ -37,7 +37,7 @@
  * `buildRenderList` are used for real: `@four/render` *is* a dependency.
  */
 
-import { FourError, isFourError } from "@four/core";
+import { FourError, isFourError, resetDevWarnings } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
@@ -59,7 +59,7 @@ import {
   type StandardRenderItem,
   type UnlitRenderItem,
 } from "@four/render";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
@@ -9870,5 +9870,158 @@ describe("RenderTargetCache — the packed stencil attachment (§67, R-7)", () =
     expect(gl.callsOf("framebufferRenderbuffer")[0].args[1]).toBe(
       GL.DEPTH_ATTACHMENT,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §67's engine-composed clips (R-23, 2026-08-28).
+//
+// The render list composes the records (`@four/render`'s `clip.ts` — mask
+// draws first, one shared test per subtree); what this backend owes them is
+// three things, and this block pins each: a mask pass draws colourlessly,
+// depthlessly, writing exactly its bit plane; a clipped draw's record replaces
+// the material's own §57 stencil; and a scene that names no clip reaches
+// `applyMaterialState` with `null` and issues the GL sequence it always did —
+// which the whole rest of this file is the recorded proof of.
+// ---------------------------------------------------------------------------
+
+describe("WebglRenderer.render — §67 clips (R-23)", () => {
+  /** A harness whose drawing buffer actually has the stencil bits (R-7). */
+  async function initializedWithStencil(): Promise<Harness> {
+    const gl = createFakeGl();
+    const canvas = new TestCanvas(gl);
+    const renderer = new WebglRenderer();
+    await renderer.initialize({ canvas, stencil: true });
+    return { gl, canvas, renderer, camera: new TestCamera() };
+  }
+
+  /** A clipping panel with one child, over plain unlit materials. */
+  function clippedScene(): Renderable {
+    const root = createRoot();
+    const panel = renderable(triangleGeometry());
+    panel.clip = true;
+    panel.add(renderable(triangleGeometry()));
+    root.add(panel);
+    return root;
+  }
+
+  it("draws the mask first: stencil write on its plane, colour and depth off", async () => {
+    const { renderer, gl, camera } = await initializedWithStencil();
+    const root = clippedScene();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      // The mask draw: always/replace onto plane 0, write mask = its bit.
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.ALWAYS, 0b1, 0xff],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.REPLACE],
+      ["stencilMask", 0b1],
+      // The panel's own draw is not clipped by its own clip: test off.
+      ["disable", GL.STENCIL_TEST],
+      // The child: read-only equality test over the accumulated bits.
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.EQUAL, 0b1, 0b1],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.KEEP],
+      ["stencilMask", 0],
+      // The frame's exit envelope (R-7): the test off, the write mask open so
+      // the next clear is not masked by the child's read-only state.
+      ["disable", GL.STENCIL_TEST],
+      ["stencilMask", 0xff],
+    ]);
+    // The mask contributes no pixels and no depth: colour and depth writes and
+    // the depth test go off for it and come back for the panel's own draw.
+    expect(gl.callsOf("colorMask").map((call) => call.args)).toEqual([
+      [false, false, false, false],
+      [true, true, true, true],
+    ]);
+    expect(gl.callsOf("depthMask").map((call) => call.args[0])).toEqual([
+      false,
+      true,
+    ]);
+    // Three draws: the mask, the panel, the child — the mask is a real draw.
+    expect(gl.countOf("drawArrays")).toBe(3);
+  });
+
+  it("clears the stencil buffer with every view, so no mask leaks a frame", async () => {
+    const { renderer, gl, camera } = await initializedWithStencil();
+    const root = clippedScene();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    const clears = gl.callsOf("clear");
+    expect(clears).toHaveLength(1);
+    expect(Number(clears[0].args[0]) & GL.STENCIL_BUFFER_BIT).toBe(
+      GL.STENCIL_BUFFER_BIT,
+    );
+  });
+
+  it("lets the engine's record outrank the material's own §57 stencil", async () => {
+    const { renderer, gl, camera } = await initializedWithStencil();
+    const root = createRoot();
+    const panel = renderable(triangleGeometry());
+    panel.clip = true;
+    // The child's material composes a mask by hand (R-7's tier) — and it is
+    // *inside* an engine-composed clip, so the engine's containment wins.
+    const child = stateful({
+      stencil: { func: "notequal", ref: 7, writeMask: 0xf0 },
+    });
+    panel.add(child);
+    root.add(panel);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const funcs = gl.callsOf("stencilFunc").map((call) => call.args);
+    // Mask write, then the engine's equality test — never NOTEQUAL/7.
+    expect(funcs).toEqual([
+      [GL.ALWAYS, 0b1, 0xff],
+      [GL.EQUAL, 0b1, 0b1],
+    ]);
+  });
+
+  it("warns once, in a development build, for a clip with no stencil buffer", async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // The default surface: no stencil bits (R-7's context attribute).
+      const { renderer, gl, camera } = await initialized();
+      const root = clippedScene();
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain("§67");
+      expect(warn.mock.calls[0]?.[0]).toContain("stencil: true");
+      // The defined behaviour is fail-toward-drawing: the draws still happen —
+      // mask included, though the buffer it writes does not exist — and GL
+      // treats every test as passing.
+      expect(gl.countOf("drawArrays")).toBe(6);
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("does not warn for a clipless frame on a stencil-less surface", async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
   });
 });

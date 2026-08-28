@@ -153,7 +153,13 @@ export const UI_STAGED: readonly string[] = Object.freeze([
     "slider, progress indicator, and image shipped beside panel, label, and " +
     "button). Each name still here needs engine surface this layer does not " +
     "have: text input needs §56 selection and caret; scroll view and virtual " +
-    "list need §74 overflow and scroll extent plus §67 clipping; the embedded " +
+    "list need §74 overflow and scroll extent — their §67 clipping half is " +
+    "met since 2026-08-28 (R-23: a scroll view's viewport panel sets " +
+    "`clip = true` on the node that draws its background, masking the " +
+    "content subtree to it, with nested scroll views intersecting by " +
+    "construction; what remains is §74's layout policy, i.e. measuring the " +
+    "content extent and offsetting it) — plus, for the scroll view, a wheel/" +
+    "drag gesture source; the embedded " +
     "3D viewport needs a §48 nested render surface; canvas view needs the " +
     "immediate-mode drawing surface the dependency matrix keeps out of this " +
     "package; menu and tooltip need a per-frame update hook no widget has — " +
