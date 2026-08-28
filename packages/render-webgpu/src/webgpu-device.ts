@@ -21,11 +21,13 @@
  *
  * ## What is deliberately *not* modelled
  *
- * Everything this packet does not call: `mapAsync`, `copyTextureToBuffer`,
- * compute pipelines, query sets, external textures. Each joins the interface
- * with the packet that calls it (WP-R1.6's readback, WP-R1.8's compute), so the
- * double never has to fake a member no code path reaches — the property that
- * keeps it a double rather than a reimplementation.
+ * Everything this backend does not call: compute pipelines, query sets,
+ * external textures. Each joins the interface with the packet that calls it
+ * (WP-R1.8's compute), so the double never has to fake a member no code path
+ * reaches — the property that keeps it a double rather than a reimplementation.
+ * `mapAsync` and `copyTextureToBuffer` joined with WP-R1.6's readback, as
+ * **optional** members: presence is the capability (R-30b's rule), so every
+ * double written before them still satisfies the surface.
  *
  * ## Names
  *
@@ -59,6 +61,16 @@ export const GPU_BUFFER_USAGE = Object.freeze({
   UNIFORM: 0x0040,
   /** Buffer may be bound as a storage buffer (§82, WP-R1.8). */
   STORAGE: 0x0080,
+});
+
+/**
+ * Bit flags for `GpuBuffer.mapAsync`'s mode (`GPUMapMode`) — WP-R1.6's
+ * readback. Written out for {@link GPU_BUFFER_USAGE}'s reason: `GPUMapMode`
+ * does not exist in Node, and the value is a normative constant.
+ */
+export const GPU_MAP_MODE = Object.freeze({
+  /** Map for reading — the only mode `readPixels` needs. */
+  READ: 0x0001,
 });
 
 /** Bit flags for `GpuTextureDescriptor.usage` (`GPUTextureUsage`). */
@@ -104,10 +116,28 @@ export interface GpuDeviceLostInfo {
   readonly message?: string;
 }
 
-/** An opaque GPU buffer handle. */
+/**
+ * An opaque GPU buffer handle.
+ *
+ * The three mapping members are **optional, and presence is the capability** —
+ * R-30b's optional-context-member rule, applied here so every double built
+ * before WP-R1.6's readback still satisfies the type. Only a buffer created
+ * with `MAP_READ` usage may be mapped, and only `readPixels` creates one;
+ * `WebgpuRenderer.readPixels` rejects with `UNSUPPORTED_GPU_FEATURE` on a
+ * device whose buffers cannot map, rather than crashing into an absent member.
+ */
 export interface GpuBuffer {
   /** Releases the allocation (§83). */
   destroy(): void;
+  /**
+   * Resolves when the buffer's contents are mapped into CPU memory —
+   * WP-R1.6's readback path. `mode` is a {@link GPU_MAP_MODE} bit.
+   */
+  mapAsync?(mode: number): Promise<void>;
+  /** The mapped bytes. Valid only between `mapAsync` resolving and `unmap`. */
+  getMappedRange?(): ArrayBuffer;
+  /** Returns the mapped range to the GPU; the `ArrayBuffer` is detached. */
+  unmap?(): void;
 }
 
 /** An opaque texture view — what a render pass attaches, and what a shader samples. */
@@ -364,6 +394,22 @@ export interface GpuRenderPassEncoder {
 export interface GpuCommandEncoder {
   /** Opens a render pass. */
   beginRenderPass(descriptor: GpuRenderPassDescriptor): GpuRenderPassEncoder;
+  /**
+   * Copies a texture's texels into a buffer — `readPixels`' mechanism
+   * (WP-R1.6, RFC 0005). Optional for {@link GpuBuffer.mapAsync}'s reason:
+   * presence is the capability, and only the readback path calls it.
+   * `bytesPerRow` must be a multiple of 256 (the WebGPU constant
+   * `COPY_BYTES_PER_ROW_ALIGNMENT`); `wgpu-readback.ts` owns that arithmetic.
+   */
+  copyTextureToBuffer?(
+    source: { readonly texture: GpuTexture; readonly mipLevel?: number },
+    destination: {
+      readonly buffer: GpuBuffer;
+      readonly bytesPerRow: number;
+      readonly rowsPerImage?: number;
+    },
+    size: readonly [number, number],
+  ): void;
   /** Closes the encoder and yields the buffer to submit. */
   finish(): GpuCommandBuffer;
 }

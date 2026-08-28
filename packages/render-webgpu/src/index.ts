@@ -55,6 +55,7 @@ export type {
 } from "./webgpu-device.js";
 export {
   GPU_BUFFER_USAGE,
+  GPU_MAP_MODE,
   GPU_SHADER_STAGE,
   GPU_TEXTURE_USAGE,
   UNIFORM_STRIDE_BYTES,
@@ -156,6 +157,33 @@ export {
   shadedVertexBufferLayouts,
   shadedVertexStageWgsl,
 } from "./wgpu-lit.js";
+export type {
+  WgpuCacheableRenderTarget,
+  WgpuRenderTargetRecord,
+} from "./wgpu-render-target.js";
+export {
+  RENDER_TARGET_COLOR_FORMAT,
+  RENDER_TARGET_DEPTH_FORMAT,
+  RENDER_TARGET_DEPTH_STENCIL_FORMAT,
+  RENDER_TARGET_DEPTH_TEXTURE_FORMAT,
+  WgpuRenderTargetCache,
+  renderTargetDepthFormat,
+} from "./wgpu-render-target.js";
+export type { WgpuEffectKind } from "./wgpu-effect.js";
+export {
+  EFFECT_BIND_GROUP_INDEX,
+  EFFECT_GRADE_OFFSET,
+  EFFECT_PASS_VERTEX_COUNT,
+  EFFECT_UNIFORM_BYTES,
+  EFFECT_UNIFORM_WGSL,
+  createEffectBindGroupLayout,
+  effectShaderSource,
+} from "./wgpu-effect.js";
+export {
+  READBACK_ROW_ALIGNMENT,
+  readTexturePixels,
+  readbackBytesPerRow,
+} from "./wgpu-readback.js";
 export {
   STANDARD_BASE_COLOR_OFFSET,
   STANDARD_EMISSIVE_OFFSET,

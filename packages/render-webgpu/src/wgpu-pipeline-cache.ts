@@ -55,6 +55,7 @@ import {
   type GpuVertexBufferLayout,
 } from "./webgpu-device.js";
 import { batchVertexBufferLayout } from "./wgpu-batch.js";
+import { effectShaderSource, type WgpuEffectKind } from "./wgpu-effect.js";
 import { litShaderSource, shadedVertexBufferLayouts } from "./wgpu-lit.js";
 import { SPRITE_SHADER_SOURCE } from "./wgpu-sprite.js";
 import { standardShaderSource } from "./wgpu-standard.js";
@@ -138,10 +139,12 @@ const STENCIL_OPERATIONS: Readonly<
  * vertex layout is baked into the pipeline here, not a shader family of its
  * own (`wgpu-batch.ts`); `"lit"` and `"standard"` are WP-R1.5's two shaded
  * families (`wgpu-lit.ts`, `wgpu-standard.ts`), which read the light block at
- * group 1 and — the standard family — a widened group-0 uniform block.
+ * group 1 and — the standard family — a widened group-0 uniform block;
+ * `"effect"` is §70's full-screen pass (WP-R1.6, `wgpu-effect.ts`), whose
+ * WGSL module is picked by the descriptor's `effect` member.
  */
 export type WgpuPipelineKind =
-  "unlit" | "clear" | "sprite" | "batch" | "lit" | "standard";
+  "unlit" | "clear" | "sprite" | "batch" | "lit" | "standard" | "effect";
 
 /**
  * §67's stencil state as a pipeline bakes it (WP-R1.3) — §57's record minus
@@ -230,6 +233,16 @@ export interface WgpuPipelineDescriptor {
   readonly batch?: WgpuBatchStream | null;
 
   /**
+   * Which §70 effect a `kind: "effect"` pipeline draws (WP-R1.6), or
+   * absent/`null` for every other kind — module identity, exactly as
+   * `vertexColors`/`map` are for the unlit family, carried as its own member
+   * because the effect kinds are not a boolean pair. Appends a key segment
+   * only when carried (the `stencil`/`batch`/`normals` rule, fourth
+   * application), so every landed key is byte-identical.
+   */
+  readonly effect?: WgpuEffectKind | null;
+
+  /**
    * Whether a shaded variant reads the §53 normal stream (§68, WP-R1.5), or
    * absent for every unshaded kind.
    *
@@ -289,6 +302,10 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   const normals = descriptor.normals;
   if (normals !== undefined) {
     key += `|n:${normals ? "y" : "-"}`;
+  }
+  const effect = descriptor.effect ?? null;
+  if (effect !== null) {
+    key += `|e:${effect}`;
   }
   return key;
 }
@@ -366,6 +383,23 @@ export class WgpuPipelineCache {
 
   #standardMapPipelineLayout: GpuPipelineLayout | null = null;
 
+  /**
+   * The grade effect's group-1 layout (WP-R1.6, `wgpu-effect.ts`), reached
+   * only when a grade pipeline is first created — a provider for
+   * `#textureLayout`'s two reasons: it must be **the same object** the
+   * renderer binds its effect uniform block against, and an eager layout
+   * would put a `createBindGroupLayout` into every effectless application's
+   * initialization transcript. `undefined` for a cache built without one:
+   * such a cache answers `null` for an effect descriptor, which skips the
+   * effect the way every other unsatisfiable request is skipped.
+   */
+  readonly #effectLayout: (() => GpuBindGroupLayout) | undefined;
+
+  /** The effect pipeline layouts: source-only, and source-plus-grade-block. */
+  #effectPipelineLayout: GpuPipelineLayout | null = null;
+
+  #effectGradePipelineLayout: GpuPipelineLayout | null = null;
+
   /** Pipelines by {@link pipelineKey}. Insertion-ordered, string-keyed (§33). */
   readonly #pipelines = new Map<string, GpuRenderPipeline>();
 
@@ -388,12 +422,14 @@ export class WgpuPipelineCache {
     spriteLayout?: () => GpuBindGroupLayout,
     lightsLayout?: () => GpuBindGroupLayout,
     standardLayout?: () => GpuBindGroupLayout,
+    effectLayout?: () => GpuBindGroupLayout,
   ) {
     this.#device = device;
     this.#textureLayout = textureLayout;
     this.#spriteLayout = spriteLayout;
     this.#lightsLayout = lightsLayout;
     this.#standardLayout = standardLayout;
+    this.#effectLayout = effectLayout;
     this.#drawLayout = bindGroupLayout;
     this.#layout = device.createPipelineLayout({
       label: "four:pipeline-layout",
@@ -458,6 +494,8 @@ export class WgpuPipelineCache {
     this.#litMapPipelineLayout = null;
     this.#standardPipelineLayout = null;
     this.#standardMapPipelineLayout = null;
+    this.#effectPipelineLayout = null;
+    this.#effectGradePipelineLayout = null;
   }
 
   /**
@@ -483,6 +521,9 @@ export class WgpuPipelineCache {
       });
       return this.#spritePipelineLayout;
     }
+    if (descriptor.kind === "effect") {
+      return this.#effectLayoutFor(descriptor);
+    }
     if (descriptor.kind === "lit" || descriptor.kind === "standard") {
       return this.#shadedLayoutFor(descriptor);
     }
@@ -498,6 +539,39 @@ export class WgpuPipelineCache {
       bindGroupLayouts: [this.#drawLayout, provider()],
     });
     return this.#texturedPipelineLayout;
+  }
+
+  /**
+   * The effect family's pipeline layouts (WP-R1.6): the texture layout alone
+   * at group 0 for a copy or an output transform — an effect binds exactly a
+   * source and its sampler, through the same layout object the mip blit and
+   * every `map` pipeline share — plus the grade uniform block at group 1 for
+   * the grade. Two cached compositions, each built with its first pipeline;
+   * `null` for a missing provider, which skips the effect.
+   */
+  #effectLayoutFor(
+    descriptor: WgpuPipelineDescriptor,
+  ): GpuPipelineLayout | null {
+    const texture = this.#textureLayout;
+    if (texture === undefined) {
+      return null;
+    }
+    if ((descriptor.effect ?? null) === "grade") {
+      const effect = this.#effectLayout;
+      if (effect === undefined) {
+        return null;
+      }
+      this.#effectGradePipelineLayout ??= this.#device.createPipelineLayout({
+        label: "four:pipeline-layout:effect:grade",
+        bindGroupLayouts: [texture(), effect()],
+      });
+      return this.#effectGradePipelineLayout;
+    }
+    this.#effectPipelineLayout ??= this.#device.createPipelineLayout({
+      label: "four:pipeline-layout:effect",
+      bindGroupLayouts: [texture()],
+    });
+    return this.#effectPipelineLayout;
   }
 
   /**
@@ -571,22 +645,28 @@ export class WgpuPipelineCache {
    * families key on their own variant pair (`normals` × `map`, WP-R1.5) —
    * `"lit"`, `"lit|n"`, `"lit|map"`, `"lit|n|map"` and the `standard`
    * counterparts — so a frame mixing normal-carrying and normal-less lit
-   * geometry compiles two modules, not one per pipeline.
+   * geometry compiles two modules, not one per pipeline. The effect family
+   * keys per kind (WP-R1.6) — `"effect|copy"`, `"effect|grade"`,
+   * `"effect|output-transform"` — so a chain grading into two formats compiles
+   * one grade module and two pipelines.
    */
   #module(
     kind: WgpuPipelineKind,
     vertexColors: boolean,
     map: boolean,
     normals: boolean,
+    effect: WgpuEffectKind | null,
   ): GpuShaderModule {
     const key =
       kind === "clear"
         ? "clear"
         : kind === "sprite"
           ? "sprite"
-          : kind === "lit" || kind === "standard"
-            ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}`
-            : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
+          : kind === "effect"
+            ? `effect|${effect ?? "copy"}`
+            : kind === "lit" || kind === "standard"
+              ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}`
+              : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
     const existing = this.#modules.get(key);
     if (existing !== undefined) {
       return existing;
@@ -598,11 +678,13 @@ export class WgpuPipelineCache {
           ? CLEAR_SHADER_SOURCE
           : kind === "sprite"
             ? SPRITE_SHADER_SOURCE
-            : kind === "lit"
-              ? litShaderSource(normals, map)
-              : kind === "standard"
-                ? standardShaderSource(normals, map)
-                : unlitShaderSource(vertexColors, map),
+            : kind === "effect"
+              ? effectShaderSource(effect ?? "copy")
+              : kind === "lit"
+                ? litShaderSource(normals, map)
+                : kind === "standard"
+                  ? standardShaderSource(normals, map)
+                  : unlitShaderSource(vertexColors, map),
     });
     this.#modules.set(key, module);
     return module;
@@ -610,7 +692,8 @@ export class WgpuPipelineCache {
 
   /**
    * The vertex-buffer layouts `descriptor`'s pipeline reads: none for the
-   * clear (its triangle is generated from the vertex index), position alone
+   * clear and the effect (their triangles are generated from the vertex
+   * index), position alone
    * for a sprite (uv is derived from the quad uniform), the shaded stream
    * list — position, then normals, then uvs — for the lit and standard
    * families (WP-R1.5), the planner's one interleaved buffer for a batch, and
@@ -619,7 +702,7 @@ export class WgpuPipelineCache {
   #vertexBuffers(
     descriptor: WgpuPipelineDescriptor,
   ): readonly GpuVertexBufferLayout[] {
-    if (descriptor.kind === "clear") {
+    if (descriptor.kind === "clear" || descriptor.kind === "effect") {
       return [];
     }
     if (descriptor.kind === "sprite") {
@@ -655,6 +738,7 @@ export class WgpuPipelineCache {
       descriptor.vertexColors,
       descriptor.map,
       descriptor.normals === true,
+      descriptor.effect ?? null,
     );
     const blend =
       descriptor.blend === "none" ? undefined : BLEND_STATES[descriptor.blend];

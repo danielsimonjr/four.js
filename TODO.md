@@ -108,17 +108,28 @@ changes in `CHANGELOG.md`.
       eight lazy WGSL variants each with its own browser compile line
       (`tests/browser/webgpu/webgpu-lit.spec.ts`, written, awaiting the wave's
       browser run). Shadows on the shaded families ride WP-R1.7.
-- [ ] **R-1 / WP-R1.6 — render targets, effects, graph participation**
-      (`wgpu-render-target.ts`, `wgpu-effect.ts`, `wgpu-readback.ts`;
-      `depthTexture` → `depth32float`/`depth24plus`; `renderEffect` per
-      (kind × format) pipeline cache; `readPixels` via `copyTextureToBuffer` +
-      `mapAsync`, whole-target form if `Rectangle2` has not landed; the R-4
-      feedback refusal restated). Note: the three tight-budget overruns at
-      WP-R1.5's gate run (+576/+372/+61 B) carry the RFC 0001 sibling's staged
-      edits and are that packet's to account.
-- [ ] **R-1 / WP-R1.7 → WP-R1.8** — shadows and stencil parity, compute and
-      GPU particles (unblocks R-31). Strictly serial; all share
-      `packages/render-webgpu/src/`. Plan: `docs/plans/R1-WEBGPU_PLAN.md`.
+- [x] **R-1 / WP-R1.6 — render targets, effects, graph participation** — landed
+      2026-08-28. Format table as data (`depthTexture` → **`depth32float`**, the
+      sampleable-and-copyable choice; stencil → `depth24plus-stencil8`, the
+      exclusivity's independent reason); `renderEffect` per (kind × format)
+      through the shared lazy cache (`|e:` conditional suffix, landed keys
+      byte-identical); `readPixels` whole-target via `copyTextureToBuffer` +
+      `mapAsync` (`Rectangle2` still not landed — `region` stays with it), rows
+      bottom-to-top by decision; R-4 feedback refusal restated at both seams and
+      cross-checked against `RenderGraph.validate()`; `RenderGraph` unchanged,
+      graph-vs-hand tape identity pinned. Browser specs written
+      (`webgpu-effects.spec.ts`, one compile line per module, self-skipping —
+      runs with the wave's browser gate). RFC 0001's `"graph"` effect kind absent
+      on WebGPU until the WGSL emitter. (The WP-R1.5-era size overruns were RFC
+      0001's and were bumped at its landing.)
+- [ ] **R-1 / WP-R1.7 — shadows and stencil parity** (`wgpu-shadow.ts`,
+      `wgpu-stencil.ts`; `sampler_comparison` is a distinct binding type, so the
+      shadow layout differs structurally from GL's texture unit; the samplable
+      `depth32float` target and its cache row are already allocated by R1.6; §67
+      scissor is a pass command — record where the mirror-state discipline
+      evaporates; browser parity spec mirroring `tests/browser/stencil.spec.ts`
+      by threshold). Then **WP-R1.8** compute + GPU particles (unblocks R-31).
+      Plan: `docs/plans/R1-WEBGPU_PLAN.md`.
 - [ ] **§62's "applications may declare required and optional capabilities"** — still
       unimplemented; now that the capability record is complete it is cheap
       (WP-R1.9's first half, dispatches with the `R-14` wave).

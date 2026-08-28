@@ -30,6 +30,7 @@ import { isFourError, type FourError } from "@four/core";
 import { Matrix4, type Vector3 } from "@four/math";
 import {
   Renderable,
+  RenderTarget,
   createRenderStatistics,
   type RenderItem,
   type Renderer,
@@ -648,8 +649,10 @@ describe("WebgpuRenderer.render", () => {
     expect(harness.gpu.calls).toHaveLength(0);
   });
 
-  it("skips the frame when a render target is passed (WP-R1.6)", () => {
-    harness.renderer.render(createRoot(), [createView()], undefined, {});
+  it("skips the frame for a disposed render target (§83, WP-R1.6)", () => {
+    const target = new RenderTarget({ width: 8, height: 8 });
+    target.dispose();
+    harness.renderer.render(createRoot(), [createView()], undefined, target);
     expect(harness.gpu.calls).toHaveLength(0);
   });
 

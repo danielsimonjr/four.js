@@ -28,6 +28,67 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-28 — WP-R1.6: WebGPU render targets, effects, `readPixels`.**
+  Decisions worth keeping:
+  - **The samplable depth form is `depth32float`, and the table is exported
+    data.** The plan's wording allowed `depth24plus`; `depth32float` is the
+    format WebGPU guarantees can be both sampled and copied out
+    (`copyTextureToBuffer` forbids `depth24plus`'s depth aspect), and its
+    4 B/texel is what R-18's accounting already bills. `renderTargetDepthFormat()`
+    is the whole decision — R1.7's shadow sampling and the R-4 float-format
+    widening target the table, not string literals.
+  - **Off-screen colour is `rgba8unorm`, deliberately not the preferred canvas
+    format**: `"rgba8"` means precision, channel order is backend detail — and
+    RGBA order is what makes `readPixels` swizzle-free. The consequence —
+    off-screen pipelines carry a different `colorFormat` — is exactly what the
+    per-format pipeline cache absorbs; an application's first off-screen frame
+    compiles its variants a second time, by design.
+  - **`readPixels` rows are bottom-to-top by decision** (§61's sketch is silent;
+    first implementation fixes it): §7a's Y-up, and the order GL's `readPixels`
+    produces natively, so cross-backend byte agreement was decided once instead
+    of discovered as a flip. The flip rides the 256-byte padding strip the map
+    forces anyway.
+  - **The frame's stencil question split in two**: `frameStencil` (does the
+    surface carry the aspect — the pass descriptor's ops, `material.stencil`'s
+    reach, the clear's stencil zeroing) vs `frameClips` (do masks draw). On
+    screen they coincide with the landed behaviour byte-for-byte; off screen
+    `frameStencil` is the target's `stencil` option (GL's `stencilAttached`), so
+    R-7's mask-by-hand tier works into stencilled targets clipless, and a clip
+    into a plain target warns-inert (`webgpu-clip-without-stencil`,
+    GATED-registered) — the condition GL always had is reachable on WebGPU only
+    off screen.
+  - **`renderEffect` has no state envelope, and the kinds are modules.** GL's
+    try/finally borrows four states; here each effect is its own pass in its own
+    encoder and there is nothing ambient to restore. The R-19 inversion's third
+    application: GL's `useGrade`/`useEncode` uniform switches became three lazy
+    modules; only the grade binds uniforms, so a copy chain has zero uniform
+    traffic _structurally_ rather than by mirror discipline.
+  - **A grade coefficient accessor is application code — the reentrant-dispose
+    family's fourth member.** The scratch write (app getters) runs before
+    `pipelines.acquire`, so a mid-call teardown surfaces as the cache's `null`
+    and skips the effect without resurrecting an allocation; pinned as a test,
+    which is what made the "unreachable" narrowing coverable.
+  - **The device surface grew only optional members** (`copyTextureToBuffer`,
+    `mapAsync`/`getMappedRange`/`unmap`; `GPU_MAP_MODE`) —
+    presence-is-the-capability, so every pre-R1.6 double still compiles, and
+    `readPixels` rejects `UNSUPPORTED_GPU_FEATURE` on one that lacks them.
+    `recording-gpu.ts`'s `getMappedRange` returns an `i % 251` byte pattern — a
+    prime period can never align with 256-byte rows, so the padding strip and
+    row flip are assertable exactly.
+  - **Graph participation cost zero graph edits**, as the plan said:
+    `supportsScreenEffects` detects the new member, and graph-vs-hand
+    **full-tape** transcript identity is pinned
+    (`webgpu-render-to-texture.test.ts`) — R-5's "the graph is a driver" now
+    holds on two backends.
+  - **Multi-agent note, fifth confirmation:** the RFC 0001 sibling committed
+    mid-session and an RFC 0005 picking wave started on the shared tree; one
+    shared-tree `pnpm run docs` run failed on its unexported symbols and 56
+    prettier warnings are its files'. A clean-room worktree (HEAD + this packet
+    only) ran every gate green — a red gate on a loaded shared tree indicts the
+    tree state first.
+  - Measured: coverage 99.70/99.41 → **99.75/99.53** (new files 100×4); rebuilt
+    example bundles byte-identical, 0/9 carry any WebGPU symbol.
+
 - **2026-08-28 — RFC 0001 / R-14: §60 node materials.** Decisions worth keeping:
   - **The IR lives in `@four/materials`; backends read it through `@four/render`'s
     re-export** — the RFC's §3.1 legality argument executed: `analyzeShaderGraph`

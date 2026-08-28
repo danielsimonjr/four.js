@@ -8,6 +8,46 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-28 — WP-R1.6: WebGPU render targets, effects, readPixels
+
+#### Added
+
+- **render-webgpu: WP-R1.6 — render targets, §70 effects, §63 graph
+  participation, §61 `readPixels` (§48, §61, §62, §63, §67, §69, §70, §92;
+  RFC 0005).** The WebGPU backend renders off screen: `wgpu-render-target.ts` is
+  the fourth id/version cache (colour `rgba8unorm` with attachment+sampling+copy
+  usage; depth per an exported format table — `depth24plus` plain,
+  **`depth32float`** for the samplable `depthTexture` form (guaranteed sampleable
+  _and_ copyable, unlike `depth24plus`'s depth aspect), `depth24plus-stencil8`
+  for `stencil: true`, so §67's `stencil` ⊥ `depthTexture` exclusivity survives
+  the port for WebGPU's own reason). A rendered target is sampled back through
+  R-4's `resolveTexture` seam — one lazy bind group over the texture cache's own
+  layout object, one shared linear-clamp sampler, and the same feedback refusal:
+  a draw sampling the active target is dropped, an effect writing its own source
+  is skipped, and `RenderGraph.validate()` names both statically. `renderEffect`
+  draws §70's copy, grade and output transform as lazy per-(kind × format)
+  pipelines through the shared cache (conditional `|e:` key suffix — landed keys
+  byte-identical); each kind is its own WGSL module with no per-fragment branch,
+  only the grade touches a 16-byte uniform block, and there is no state envelope
+  to restore because a WebGPU pass has no ambient state. RFC 0001's `"graph"`
+  kind is absent-not-approximated until the WGSL emitter lands. `RenderGraph`
+  needed no change — `graph.execute` over this backend emits the byte-identical
+  transcript of the hand-written `render`+`renderEffect` sequence (pinned in
+  `tests/integration/webgpu-render-to-texture.test.ts`).
+  `WebgpuRenderer.readPixels(target)` ships §61's member in the whole-target
+  form (`region` waits on `Rectangle2`, RFC 0005's named prerequisite):
+  `copyTextureToBuffer` + `mapAsync` — WebGPU has no synchronous readback, the
+  standing evidence for RFC 0005's Promise-forever contract — with 256-byte row
+  alignment stripped on repack and rows returned bottom-to-top (§7a's order, and
+  the order GL's `readPixels` will naturally produce). §67 into targets: a
+  stencilled target masks and serves `material.stencil` without clips; a clip
+  into a stencil-less target warns once (DEV) and fails toward drawing. Browser
+  specs written (`tests/browser/webgpu/webgpu-effects.spec.ts`, self-skipping):
+  a compile-and-rasterise line per effect module — copy bit-exact, grade and
+  encode threshold-matched against CPU models. Coverage 99.70/99.41 → 99.75/99.53
+  (new files 100×4); 0 B in every bundle (rebuilt bundles byte-identical; no
+  WebGPU symbol in any of 9, `createVertexArray` control 9/9); no budget bump.
+
 ### 2026-08-28 — RFC 0001: the §60 shader and node-material system (R-14)
 
 #### Added

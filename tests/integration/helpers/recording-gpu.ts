@@ -161,12 +161,34 @@ export function createRecordingGpu(
     return { kind, serial };
   };
 
-  const buffer = (label: string): GpuBuffer => {
+  const buffer = (label: string, size: number): GpuBuffer => {
     const handle = mint(label);
     return {
       ...handle,
       destroy: (): void => {
         record("buffer.destroy", handle);
+      },
+      // WP-R1.6's readback trio. Optional on the interface (presence is the
+      // capability), always present on this double so `readPixels` is
+      // testable against the tape. `getMappedRange` hands back a
+      // deterministic byte pattern — byte i is `i % 251`, a prime chosen so
+      // the pattern never aligns with the 256-byte padded rows — which is
+      // what lets a unit test assert the padding strip and the row flip
+      // *exactly* rather than over zeroes that hide both.
+      mapAsync: (mode: number): Promise<void> => {
+        record("buffer.mapAsync", handle, mode);
+        return Promise.resolve();
+      },
+      getMappedRange: (): ArrayBuffer => {
+        record("buffer.getMappedRange", handle);
+        const bytes = new Uint8Array(size);
+        for (let index = 0; index < size; index += 1) {
+          bytes[index] = index % 251;
+        }
+        return bytes.buffer;
+      },
+      unmap: (): void => {
+        record("buffer.unmap", handle);
       },
     };
   };
@@ -238,6 +260,11 @@ export function createRecordingGpu(
       record("encoder.beginRenderPass", descriptor);
       return pass;
     },
+    // WP-R1.6's readback copy — optional on the interface, present here so
+    // the copy's alignment arithmetic is assertable off the tape.
+    copyTextureToBuffer: (source, destination, size): void => {
+      record("encoder.copyTextureToBuffer", source, destination, size);
+    },
     finish: (): GpuCommandBuffer => {
       record("encoder.finish");
       return mint("command-buffer");
@@ -286,7 +313,7 @@ export function createRecordingGpu(
     lost,
     createBuffer: (descriptor): GpuBuffer => {
       record("device.createBuffer", descriptor);
-      return buffer("buffer");
+      return buffer("buffer", descriptor.size);
     },
     createTexture: (descriptor): GpuTexture => {
       record("device.createTexture", descriptor);
