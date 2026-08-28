@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-28"
-  totalFiles: 237
+  totalFiles: 243
   totalModules: 24
-  totalExports: 2252
+  totalExports: 2324
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -107,6 +107,7 @@ modules:
         - file: ./values.js
           imports:
             - detectAdapter
+            - numberAdapter
             - ValueAdapter
       workspaceDependencies:
         - package: "@four/core"
@@ -115,10 +116,12 @@ modules:
             - FourError
       exports:
         - createBinding
+        - createArrayElementBinding
       interfaces:
         - PropertyBinding
       functions:
         - createBinding
+        - createArrayElementBinding
     packages/animation/src/clip.ts:
       description: Animation clips (§17).
       externalDependencies: []
@@ -315,6 +318,7 @@ modules:
           reExport: true
         - file: ./binding.js
           imports:
+            - createArrayElementBinding
             - createBinding
           reExport: true
         - file: ./clip.js
@@ -488,6 +492,7 @@ modules:
       workspaceDependencies: []
       exports:
         - AnimationSystem
+        - createArrayElementBinding
         - createBinding
         - AnimationClip
         - AnimationController
@@ -596,6 +601,7 @@ modules:
         - ValueKind
       reExported:
         - AnimationSystem
+        - createArrayElementBinding
         - createBinding
         - AnimationClip
         - AnimationController
@@ -3003,6 +3009,7 @@ modules:
             - Circle
             - Ellipse
             - Line
+            - Mesh
             - PathShape
             - Polygon
             - Polyline
@@ -3014,6 +3021,7 @@ modules:
             - Shape2D
             - Sprite
             - Star
+            - restoreMeshSkeleton
         - package: "@four/render"
           directory: packages/render
           imports:
@@ -3023,7 +3031,10 @@ modules:
         - package: "@four/scene"
           directory: packages/scene
           imports:
+            - Bone
             - DirectionalLight
+            - MORPH_WEIGHTS_SERIALIZER
+            - MorphWeights
             - OrthographicCamera
             - PerspectiveCamera
             - PointLight
@@ -3075,6 +3086,8 @@ modules:
         - IMAGE_NODE_TYPE
         - RENDERABLE_NODE_TYPE
         - SPRITE_NODE_TYPE
+        - MESH_NODE_TYPE
+        - BONE_NODE_TYPE
         - TEXT_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
@@ -3128,6 +3141,8 @@ modules:
         - IMAGE_NODE_TYPE
         - RENDERABLE_NODE_TYPE
         - SPRITE_NODE_TYPE
+        - MESH_NODE_TYPE
+        - BONE_NODE_TYPE
         - TEXT_NODE_TYPE
         - PERSPECTIVE_CAMERA_NODE_TYPE
         - ORTHOGRAPHIC_CAMERA_NODE_TYPE
@@ -8971,7 +8986,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 150 symbols)
+      description: Package entry point for @four/render (re-exports 157 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -9021,6 +9036,8 @@ modules:
             - groupRenderListByPipeline
             - isLitItem
             - isParticlesItem
+            - isSkinnedLitItem
+            - isSkinnedUnlitItem
             - isSpriteItem
             - isStandardItem
             - isUnlitItem
@@ -9038,6 +9055,12 @@ modules:
         - file: ./renderable.js
           imports:
             - Renderable
+          reExport: true
+        - file: ./mesh.js
+          imports:
+            - MAX_SKINNING_JOINTS
+            - Mesh
+            - restoreMeshSkeleton
           reExport: true
         - file: ./renderer-registry.js
           imports:
@@ -9147,6 +9170,8 @@ modules:
             - ParticleRenderItem
             - RenderItem
             - RenderItemKind
+            - SkinnedLitRenderItem
+            - SkinnedUnlitRenderItem
             - SpriteRenderItem
             - StandardRenderItem
             - UnlitRenderItem
@@ -9275,6 +9300,8 @@ modules:
         - groupRenderListByPipeline
         - isLitItem
         - isParticlesItem
+        - isSkinnedLitItem
+        - isSkinnedUnlitItem
         - isSpriteItem
         - isStandardItem
         - isUnlitItem
@@ -9283,6 +9310,9 @@ modules:
         - RenderTarget
         - isRenderTargetTexture
         - Renderable
+        - MAX_SKINNING_JOINTS
+        - Mesh
+        - restoreMeshSkeleton
         - AUTO_RENDERER_ORDER
         - RendererRegistry
         - clearRegisteredRenderers
@@ -9342,6 +9372,8 @@ modules:
         - ParticleRenderItem
         - RenderItem
         - RenderItemKind
+        - SkinnedLitRenderItem
+        - SkinnedUnlitRenderItem
         - SpriteRenderItem
         - StandardRenderItem
         - UnlitRenderItem
@@ -9427,6 +9459,8 @@ modules:
         - groupRenderListByPipeline
         - isLitItem
         - isParticlesItem
+        - isSkinnedLitItem
+        - isSkinnedUnlitItem
         - isSpriteItem
         - isStandardItem
         - isUnlitItem
@@ -9435,6 +9469,9 @@ modules:
         - RenderTarget
         - isRenderTargetTexture
         - Renderable
+        - MAX_SKINNING_JOINTS
+        - Mesh
+        - restoreMeshSkeleton
         - AUTO_RENDERER_ORDER
         - RendererRegistry
         - clearRegisteredRenderers
@@ -9493,6 +9530,8 @@ modules:
         - ParticleRenderItem
         - RenderItem
         - RenderItemKind
+        - SkinnedLitRenderItem
+        - SkinnedUnlitRenderItem
         - SpriteRenderItem
         - StandardRenderItem
         - UnlitRenderItem
@@ -9589,6 +9628,42 @@ modules:
         - collectSceneLights
       constants:
         - MAX_PUNCTUAL_LIGHTS
+    packages/render/src/mesh.ts:
+      description: "`Mesh` (§54) — the renderable that can be skinned (RFC 0003 — gaps PH-10 +"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./renderable.js
+          imports:
+            - Renderable
+            - RenderableOptions
+            - SurfaceMaterial
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - Material
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Bone
+            - MorphWeights
+            - Skeleton
+            - Node
+      exports:
+        - MAX_SKINNING_JOINTS
+        - restoreMeshSkeleton
+        - Mesh
+      classes:
+        - Mesh
+      functions:
+        - restoreMeshSkeleton
+      constants:
+        - MAX_SKINNING_JOINTS
     packages/render/src/particles.ts:
       description: The particle drawing contract (§36, §49, plan P9-3) — one batched render item
       externalDependencies: []
@@ -9715,6 +9790,7 @@ modules:
             - LayerMask
             - Node
             - PoseBuffer
+            - Skeleton
             - Viewport
       exports:
         - isSpriteItem
@@ -9722,12 +9798,16 @@ modules:
         - isLitItem
         - isStandardItem
         - isParticlesItem
+        - isSkinnedUnlitItem
+        - isSkinnedLitItem
         - viewLayerMask
         - groupRenderListByPipeline
         - buildRenderList
         - buildInterpolatedRenderList
       interfaces:
         - UnlitRenderItem
+        - SkinnedUnlitRenderItem
+        - SkinnedLitRenderItem
         - LitRenderItem
         - StandardRenderItem
         - SpriteRenderItem
@@ -9738,6 +9818,8 @@ modules:
         - isLitItem
         - isStandardItem
         - isParticlesItem
+        - isSkinnedUnlitItem
+        - isSkinnedLitItem
         - viewLayerMask
         - groupRenderListByPipeline
         - buildRenderList
@@ -10191,9 +10273,11 @@ modules:
           imports:
             - COLOR_ATTRIBUTE_LOCATION
             - GL
+            - JOINTS_ATTRIBUTE_LOCATION
             - NORMAL_ATTRIBUTE_LOCATION
             - POSITION_ATTRIBUTE_LOCATION
             - UV_ATTRIBUTE_LOCATION
+            - WEIGHTS_ATTRIBUTE_LOCATION
             - WebglContext
         - file: ./gl-program.js
           imports:
@@ -10286,10 +10370,14 @@ modules:
         - NORMAL_ATTRIBUTE_LOCATION
         - UV_ATTRIBUTE_LOCATION
         - COLOR_ATTRIBUTE_LOCATION
+        - JOINTS_ATTRIBUTE_LOCATION
+        - WEIGHTS_ATTRIBUTE_LOCATION
         - MAP_TEXTURE_UNIT
         - SHADOW_TEXTURE_UNIT
+        - FRAGMENT_SHADER_SOURCE
         - PUNCTUAL_LIGHT_GLSL
         - SHADOW_GLSL
+        - LIT_FRAGMENT_SHADER_SOURCE
         - matrixScratch
         - createLinkedProgram
         - requireUniform
@@ -10315,10 +10403,14 @@ modules:
         - NORMAL_ATTRIBUTE_LOCATION
         - UV_ATTRIBUTE_LOCATION
         - COLOR_ATTRIBUTE_LOCATION
+        - JOINTS_ATTRIBUTE_LOCATION
+        - WEIGHTS_ATTRIBUTE_LOCATION
         - MAP_TEXTURE_UNIT
         - SHADOW_TEXTURE_UNIT
+        - FRAGMENT_SHADER_SOURCE
         - PUNCTUAL_LIGHT_GLSL
         - SHADOW_GLSL
+        - LIT_FRAGMENT_SHADER_SOURCE
         - matrixScratch
     packages/render-webgl/src/gl-render-target.ts:
       description: "GPU-side render targets for the WebGL 2 backend: one framebuffer object per"
@@ -10369,6 +10461,84 @@ modules:
         - ShadowProgram
       classes:
         - ShadowProgram
+    packages/render-webgl/src/gl-skinning-registry.ts:
+      description: The skinning pipeline's registration slot (§54, §62; RFC 0003, 2026-08-28)
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - WebglContext
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - SceneLights
+      exports:
+        - setSkinningPipelineFactory
+        - resolveSkinningPipelineFactory
+        - clearRegisteredSkinningPipeline
+      interfaces:
+        - SkinnedUnlitPipeline
+        - SkinnedLitPipeline
+        - SkinnedPrograms
+        - SkinningPipelineFactory
+      functions:
+        - setSkinningPipelineFactory
+        - resolveSkinningPipelineFactory
+        - clearRegisteredSkinningPipeline
+    packages/render-webgl/src/gl-skinning.ts:
+      description: "The skinned pipelines (§54, §62; RFC 0003 — gaps PH-10 + R-22, 2026-08-28):"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - FRAGMENT_SHADER_SOURCE
+            - LIT_FRAGMENT_SHADER_SOURCE
+            - MAP_TEXTURE_UNIT
+            - PunctualLightUniforms
+            - ShadowUniforms
+            - createLinkedProgram
+            - matrixScratch
+            - requireUniform
+            - GlProgramHandle
+            - GlUniformLocation
+            - WebglContext
+        - file: ./gl-skinning-registry.js
+          imports:
+            - setSkinningPipelineFactory
+            - SkinnedLitPipeline
+            - SkinnedPrograms
+            - SkinnedUnlitPipeline
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - Disposable
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - MAX_SKINNING_JOINTS
+            - SceneLights
+      exports:
+        - registerSkinningPipeline
+        - SkinnedUnlitProgram
+        - SkinnedLitProgram
+      classes:
+        - SkinnedUnlitProgram
+        - SkinnedLitProgram
+      functions:
+        - registerSkinningPipeline
     packages/render-webgl/src/gl-standard.ts:
       description: The metallic-roughness pipeline (§59, §68) — this backend's sixth program,
       externalDependencies: []
@@ -10474,6 +10644,22 @@ modules:
           imports:
             - RenderTargetCache
           reExport: true
+        - file: ./gl-program.js
+          imports:
+            - JOINTS_ATTRIBUTE_LOCATION
+            - WEIGHTS_ATTRIBUTE_LOCATION
+          reExport: true
+        - file: ./gl-skinning-registry.js
+          imports:
+            - clearRegisteredSkinningPipeline
+            - resolveSkinningPipelineFactory
+          reExport: true
+        - file: ./gl-skinning.js
+          imports:
+            - SkinnedLitProgram
+            - SkinnedUnlitProgram
+            - registerSkinningPipeline
+          reExport: true
         - file: ./gl-shadow.js
           imports:
             - ShadowProgram
@@ -10536,6 +10722,14 @@ modules:
             - RenderTargetRecord
           reExport: true
           typeOnly: true
+        - file: ./gl-skinning-registry.js
+          imports:
+            - SkinnedLitPipeline
+            - SkinnedPrograms
+            - SkinnedUnlitPipeline
+            - SkinningPipelineFactory
+          reExport: true
+          typeOnly: true
         - file: ./gl-texture.js
           imports:
             - CacheableTexture
@@ -10576,6 +10770,13 @@ modules:
         - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
         - RenderTargetCache
+        - JOINTS_ATTRIBUTE_LOCATION
+        - WEIGHTS_ATTRIBUTE_LOCATION
+        - clearRegisteredSkinningPipeline
+        - resolveSkinningPipelineFactory
+        - SkinnedLitProgram
+        - SkinnedUnlitProgram
+        - registerSkinningPipeline
         - ShadowProgram
         - StandardProgram
         - TextureCache
@@ -10600,6 +10801,10 @@ modules:
         - GlRenderbuffer
         - CacheableRenderTarget
         - RenderTargetRecord
+        - SkinnedLitPipeline
+        - SkinnedPrograms
+        - SkinnedUnlitPipeline
+        - SkinningPipelineFactory
         - CacheableTexture
         - TextureRecord
         - WebglCanvas
@@ -10631,6 +10836,13 @@ modules:
         - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
         - RenderTargetCache
+        - JOINTS_ATTRIBUTE_LOCATION
+        - WEIGHTS_ATTRIBUTE_LOCATION
+        - clearRegisteredSkinningPipeline
+        - resolveSkinningPipelineFactory
+        - SkinnedLitProgram
+        - SkinnedUnlitProgram
+        - registerSkinningPipeline
         - ShadowProgram
         - StandardProgram
         - TextureCache
@@ -10654,6 +10866,10 @@ modules:
         - GlRenderbuffer
         - CacheableRenderTarget
         - RenderTargetRecord
+        - SkinnedLitPipeline
+        - SkinnedPrograms
+        - SkinnedUnlitPipeline
+        - SkinningPipelineFactory
         - CacheableTexture
         - TextureRecord
         - WebglCanvas
@@ -10717,6 +10933,10 @@ modules:
           imports:
             - RenderTargetCache
             - RenderTargetRecord
+        - file: ./gl-skinning-registry.js
+          imports:
+            - resolveSkinningPipelineFactory
+            - SkinnedPrograms
         - file: ./gl-shadow.js
           imports:
             - ShadowProgram
@@ -10743,6 +10963,7 @@ modules:
         - package: "@four/render"
           directory: packages/render
           imports:
+            - MAX_SKINNING_JOINTS
             - RenderTarget
             - buildInterpolatedRenderList
             - buildRenderList
@@ -10752,6 +10973,8 @@ modules:
             - isLitItem
             - isParticlesItem
             - isRenderTargetTexture
+            - isSkinnedLitItem
+            - isSkinnedUnlitItem
             - isSpriteItem
             - isStandardItem
             - COLOR_GRADE_DEFAULTS
@@ -10819,6 +11042,23 @@ modules:
             - pipelineKey
             - WgpuPipelineCache
           reExport: true
+        - file: ./wgpu-batch.js
+          imports:
+            - WgpuBatching
+            - batchVertexBufferLayout
+            - createWgpuBatching
+          reExport: true
+        - file: ./wgpu-sprite.js
+          imports:
+            - SPRITE_MODEL_OFFSET
+            - SPRITE_QUAD_OFFSET
+            - SPRITE_SHADER_SOURCE
+            - SPRITE_TINT_OFFSET
+            - SPRITE_UNIFORM_BYTES
+            - SPRITE_UNIFORM_WGSL
+            - SPRITE_VIEW_PROJECTION_OFFSET
+            - createSpriteBindGroupLayout
+          reExport: true
         - file: ./wgpu-texture.js
           imports:
             - MIPMAP_SHADER_SOURCE
@@ -10846,6 +11086,7 @@ modules:
           imports:
             - Gpu
             - GpuAdapter
+            - GpuStencilFaceState
             - GpuBindGroup
             - GpuBindGroupEntry
             - GpuBindGroupLayout
@@ -10885,8 +11126,15 @@ modules:
           typeOnly: true
         - file: ./wgpu-pipeline-cache.js
           imports:
+            - WgpuBatchStream
             - WgpuPipelineDescriptor
             - WgpuPipelineKind
+            - WgpuStencilDescriptor
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-batch.js
+          imports:
+            - WgpuRenderBatching
           reExport: true
           typeOnly: true
         - file: ./wgpu-texture.js
@@ -10921,6 +11169,17 @@ modules:
         - WgpuGeometryCache
         - pipelineKey
         - WgpuPipelineCache
+        - WgpuBatching
+        - batchVertexBufferLayout
+        - createWgpuBatching
+        - SPRITE_MODEL_OFFSET
+        - SPRITE_QUAD_OFFSET
+        - SPRITE_SHADER_SOURCE
+        - SPRITE_TINT_OFFSET
+        - SPRITE_UNIFORM_BYTES
+        - SPRITE_UNIFORM_WGSL
+        - SPRITE_VIEW_PROJECTION_OFFSET
+        - createSpriteBindGroupLayout
         - MIPMAP_SHADER_SOURCE
         - WgpuTextureCache
         - mipLevelCount
@@ -10941,6 +11200,7 @@ modules:
         - PACKAGE_NAME
         - Gpu
         - GpuAdapter
+        - GpuStencilFaceState
         - GpuBindGroup
         - GpuBindGroupEntry
         - GpuBindGroupLayout
@@ -10972,8 +11232,11 @@ modules:
         - WebgpuCanvas
         - CacheableGeometry
         - WgpuGeometryRecord
+        - WgpuBatchStream
         - WgpuPipelineDescriptor
         - WgpuPipelineKind
+        - WgpuStencilDescriptor
+        - WgpuRenderBatching
         - ResolvedSamplerState
         - WgpuCacheableTexture
         - WgpuTextureRecord
@@ -11001,6 +11264,17 @@ modules:
         - WgpuGeometryCache
         - pipelineKey
         - WgpuPipelineCache
+        - WgpuBatching
+        - batchVertexBufferLayout
+        - createWgpuBatching
+        - SPRITE_MODEL_OFFSET
+        - SPRITE_QUAD_OFFSET
+        - SPRITE_SHADER_SOURCE
+        - SPRITE_TINT_OFFSET
+        - SPRITE_UNIFORM_BYTES
+        - SPRITE_UNIFORM_WGSL
+        - SPRITE_VIEW_PROJECTION_OFFSET
+        - createSpriteBindGroupLayout
         - MIPMAP_SHADER_SOURCE
         - WgpuTextureCache
         - mipLevelCount
@@ -11020,6 +11294,7 @@ modules:
         - unlitVertexBufferLayouts
         - Gpu
         - GpuAdapter
+        - GpuStencilFaceState
         - GpuBindGroup
         - GpuBindGroupEntry
         - GpuBindGroupLayout
@@ -11051,8 +11326,11 @@ modules:
         - WebgpuCanvas
         - CacheableGeometry
         - WgpuGeometryRecord
+        - WgpuBatchStream
         - WgpuPipelineDescriptor
         - WgpuPipelineKind
+        - WgpuStencilDescriptor
+        - WgpuRenderBatching
         - ResolvedSamplerState
         - WgpuCacheableTexture
         - WgpuTextureRecord
@@ -11102,6 +11380,7 @@ modules:
         - GpuBlendState
         - GpuBlendComponent
         - GpuRenderPipelineDescriptor
+        - GpuStencilFaceState
         - GpuRenderPassDescriptor
         - GpuRenderPassEncoder
         - GpuCommandEncoder
@@ -11150,16 +11429,28 @@ modules:
             - DRAW_VIEW_PROJECTION_OFFSET
             - MAP_BIND_GROUP_INDEX
             - createDrawBindGroupLayout
+        - file: ./wgpu-batch.js
+          imports:
+            - WgpuRenderBatching
+          typeOnly: true
         - file: ./wgpu-geometry.js
           imports:
             - WgpuGeometryCache
+            - WgpuGeometryRecord
         - file: ./wgpu-pipeline-cache.js
           imports:
             - WgpuPipelineCache
             - WgpuPipelineDescriptor
+            - WgpuStencilDescriptor
+        - file: ./wgpu-sprite.js
+          imports:
+            - SPRITE_QUAD_OFFSET
+            - SPRITE_UNIFORM_BYTES
+            - createSpriteBindGroupLayout
         - file: ./wgpu-texture.js
           imports:
             - WgpuTextureCache
+            - WgpuTextureRecord
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_VERTEX_COUNT
@@ -11180,6 +11471,7 @@ modules:
             - buildInterpolatedRenderList
             - buildRenderList
             - buildViewRenderList
+            - RenderBatch
             - RenderInterpolation
             - RenderItem
             - RenderStatistics
@@ -11199,6 +11491,42 @@ modules:
         - WebgpuRenderer
       functions:
         - hostGpu
+    packages/render-webgpu/src/wgpu-batch.ts:
+      description: §65 batching for the WebGPU backend — the GPU half of `@four/render`'s
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GpuBuffer
+            - GpuDevice
+            - GpuRenderPassEncoder
+            - GpuVertexBufferLayout
+        - file: ./wgpu-unlit.js
+          imports:
+            - COLOR_SHADER_LOCATION
+            - POSITION_SHADER_LOCATION
+            - UV_SHADER_LOCATION
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderBatcher
+            - RenderBatch
+            - RenderBatchOptions
+            - RenderItem
+      exports:
+        - batchVertexBufferLayout
+        - createWgpuBatching
+        - WgpuBatching
+      classes:
+        - WgpuBatching
+      interfaces:
+        - WgpuRenderBatching
+      functions:
+        - batchVertexBufferLayout
+        - createWgpuBatching
     packages/render-webgpu/src/wgpu-bindings.ts:
       description: This backend's binding layout, **declared as data** (§7 of the R-1 plan).
       externalDependencies: []
@@ -11271,23 +11599,75 @@ modules:
             - GpuPipelineLayout
             - GpuRenderPipeline
             - GpuShaderModule
+            - GpuStencilFaceState
+            - GpuVertexBufferLayout
+        - file: ./wgpu-batch.js
+          imports:
+            - batchVertexBufferLayout
+        - file: ./wgpu-sprite.js
+          imports:
+            - SPRITE_SHADER_SOURCE
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_SHADER_SOURCE
             - FRAGMENT_ENTRY_POINT
+            - POSITION_BUFFER_LAYOUT
             - VERTEX_ENTRY_POINT
             - unlitShaderSource
             - unlitVertexBufferLayouts
-      workspaceDependencies: []
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderItemStencil
       exports:
         - pipelineKey
         - WgpuPipelineCache
       classes:
         - WgpuPipelineCache
       interfaces:
+        - WgpuStencilDescriptor
+        - WgpuBatchStream
         - WgpuPipelineDescriptor
       functions:
         - pipelineKey
+    packages/render-webgpu/src/wgpu-sprite.ts:
+      description: The sprite pipeline in hand-written WGSL (§55, WP-R1.3), plus the widened
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuDevice
+        - file: ./wgpu-bindings.js
+          imports:
+            - MAP_BINDING_WGSL
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies: []
+      exports:
+        - SPRITE_VIEW_PROJECTION_OFFSET
+        - SPRITE_MODEL_OFFSET
+        - SPRITE_TINT_OFFSET
+        - SPRITE_QUAD_OFFSET
+        - SPRITE_UNIFORM_BYTES
+        - SPRITE_UNIFORM_WGSL
+        - SPRITE_SHADER_SOURCE
+        - createSpriteBindGroupLayout
+      functions:
+        - createSpriteBindGroupLayout
+      constants:
+        - SPRITE_VIEW_PROJECTION_OFFSET
+        - SPRITE_MODEL_OFFSET
+        - SPRITE_TINT_OFFSET
+        - SPRITE_QUAD_OFFSET
+        - SPRITE_UNIFORM_BYTES
+        - SPRITE_UNIFORM_WGSL
+        - SPRITE_SHADER_SOURCE
     packages/render-webgpu/src/wgpu-texture.ts:
       description: "GPU-side textures and samplers for the WebGPU backend: one `GPUTexture` per"
       externalDependencies: []
@@ -11439,7 +11819,7 @@ modules:
       classes:
         - Group
     packages/scene/src/index.ts:
-      description: Package entry point for @four/scene (re-exports 73 symbols)
+      description: Package entry point for @four/scene (re-exports 78 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -11517,6 +11897,13 @@ modules:
           imports:
             - PoseTarget
           reExport: true
+        - file: ./skeleton.js
+          imports:
+            - Bone
+            - MORPH_WEIGHTS_SERIALIZER
+            - MorphWeights
+            - Skeleton
+          reExport: true
         - file: ./scene.js
           imports:
             - Scene
@@ -11588,6 +11975,11 @@ modules:
             - NodeType
           reExport: true
           typeOnly: true
+        - file: ./skeleton.js
+          imports:
+            - MorphWeightsSerializerShape
+          reExport: true
+          typeOnly: true
         - file: ./viewport.js
           imports:
             - Viewport
@@ -11644,6 +12036,10 @@ modules:
         - Node
         - restoreNodeId
         - PoseTarget
+        - Bone
+        - MORPH_WEIGHTS_SERIALIZER
+        - MorphWeights
+        - Skeleton
         - Scene
         - Transform
         - createFullscreenViewport
@@ -11672,6 +12068,7 @@ modules:
         - NodeHierarchyEvent
         - NodeOptions
         - NodeType
+        - MorphWeightsSerializerShape
         - Viewport
         - WorldTransformStats
       reExported:
@@ -11719,6 +12116,10 @@ modules:
         - Node
         - restoreNodeId
         - PoseTarget
+        - Bone
+        - MORPH_WEIGHTS_SERIALIZER
+        - MorphWeights
+        - Skeleton
         - Scene
         - Transform
         - createFullscreenViewport
@@ -11746,6 +12147,7 @@ modules:
         - NodeHierarchyEvent
         - NodeOptions
         - NodeType
+        - MorphWeightsSerializerShape
         - Viewport
         - WorldTransformStats
       constants:
@@ -11996,6 +12398,42 @@ modules:
         - DEFAULT_SCREEN_UNITS
         - DEFAULT_SCREEN_NEAR
         - DEFAULT_SCREEN_FAR
+    packages/scene/src/skeleton.ts:
+      description: Bones, skeletons, and morph weights (§54, §14, §17; RFC 0003 — gaps PH-10 +
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./node.js
+          imports:
+            - Node
+        - file: ./world-transforms.js
+          imports:
+            - resolveWorldTransform
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - Component
+            - ComponentHost
+            - JsonValue
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+      exports:
+        - MORPH_WEIGHTS_SERIALIZER
+        - Bone
+        - Skeleton
+        - MorphWeights
+      classes:
+        - Bone
+        - Skeleton
+        - MorphWeights
+      interfaces:
+        - MorphWeightsSerializerShape
+      constants:
+        - MORPH_WEIGHTS_SERIALIZER
     packages/scene/src/trackball.ts:
       description: §44/§47's **trackball** rig (R-37, 2026-08-21) — the last of the seven camera
       externalDependencies: []
@@ -13295,6 +13733,7 @@ dependencyGraph:
         - packages/render/src/effect-pass.ts
         - packages/render/src/index.ts
         - packages/render/src/lights.ts
+        - packages/render/src/mesh.ts
         - packages/render/src/particles.ts
         - packages/render/src/render-graph.ts
         - packages/render/src/render-list.ts
@@ -13323,6 +13762,8 @@ dependencyGraph:
         - packages/render-webgl/src/gl-program.ts
         - packages/render-webgl/src/gl-render-target.ts
         - packages/render-webgl/src/gl-shadow.ts
+        - packages/render-webgl/src/gl-skinning-registry.ts
+        - packages/render-webgl/src/gl-skinning.ts
         - packages/render-webgl/src/gl-standard.ts
         - packages/render-webgl/src/gl-texture.ts
         - packages/render-webgl/src/index.ts
@@ -13334,9 +13775,11 @@ dependencyGraph:
         - packages/render-webgpu/src/register.ts
         - packages/render-webgpu/src/webgpu-device.ts
         - packages/render-webgpu/src/webgpu-renderer.ts
+        - packages/render-webgpu/src/wgpu-batch.ts
         - packages/render-webgpu/src/wgpu-bindings.ts
         - packages/render-webgpu/src/wgpu-geometry.ts
         - packages/render-webgpu/src/wgpu-pipeline-cache.ts
+        - packages/render-webgpu/src/wgpu-sprite.ts
         - packages/render-webgpu/src/wgpu-texture.ts
         - packages/render-webgpu/src/wgpu-unlit.ts
     - name: Packages/scene
@@ -13352,6 +13795,7 @@ dependencyGraph:
         - packages/scene/src/pose-target.ts
         - packages/scene/src/scene.ts
         - packages/scene/src/screen-camera.ts
+        - packages/scene/src/skeleton.ts
         - packages/scene/src/trackball.ts
         - packages/scene/src/transform.ts
         - packages/scene/src/viewport.ts
@@ -13383,18 +13827,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 237
+  totalTypeScriptFiles: 243
   totalModules: 24
-  totalLinesOfCode: 112259
-  totalExports: 2252
-  totalClasses: 152
-  totalInterfaces: 476
-  totalFunctions: 357
-  totalTypeGuards: 20
+  totalLinesOfCode: 116157
+  totalExports: 2324
+  totalClasses: 159
+  totalInterfaces: 487
+  totalFunctions: 368
+  totalTypeGuards: 22
   totalEnums: 0
-  totalConstants: 313
-  totalReExports: 1452
-  totalTypeOnlyImports: 279
+  totalConstants: 328
+  totalReExports: 1491
+  totalTypeOnlyImports: 284
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 2
   unusedFilesCount: 0
