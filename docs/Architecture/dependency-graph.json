@@ -2,10 +2,10 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-21",
-    "totalFiles": 233,
+    "lastUpdated": "2026-08-28",
+    "totalFiles": 237,
     "totalModules": 24,
-    "totalExports": 2184
+    "totalExports": 2252
   },
   "entryPoints": [
     {
@@ -1809,6 +1809,18 @@
             "reExport": true
           },
           {
+            "file": "./plugin.js",
+            "imports": [
+              "PLUGIN_API_VERSION",
+              "PluginHost",
+              "bindCapability",
+              "defineCapability",
+              "installPlugins",
+              "satisfiesPluginRange"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./space.js",
             "imports": [
               "DEFAULT_SPACE_MODE",
@@ -1897,6 +1909,19 @@
             "typeOnly": true
           },
           {
+            "file": "./plugin.js",
+            "imports": [
+              "DefineCapabilityOptions",
+              "FourPlugin",
+              "PluginCapability",
+              "PluginCapabilityBinding",
+              "PluginContext",
+              "PluginDependency"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
             "file": "./space.js",
             "imports": [
               "SpaceMode"
@@ -1943,6 +1968,12 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "PLUGIN_API_VERSION",
+          "PluginHost",
+          "bindCapability",
+          "defineCapability",
+          "installPlugins",
+          "satisfiesPluginRange",
           "DEFAULT_SPACE_MODE",
           "SPACE_MODES",
           "isSimulationSpaceMode",
@@ -1979,6 +2010,12 @@
           "FourErrorOptions",
           "EventListener",
           "Unsubscribe",
+          "DefineCapabilityOptions",
+          "FourPlugin",
+          "PluginCapability",
+          "PluginCapabilityBinding",
+          "PluginContext",
+          "PluginDependency",
           "SpaceMode",
           "AngleUnit",
           "LengthUnit",
@@ -2004,6 +2041,12 @@
           "FourError",
           "isFourError",
           "EventEmitter",
+          "PLUGIN_API_VERSION",
+          "PluginHost",
+          "bindCapability",
+          "defineCapability",
+          "installPlugins",
+          "satisfiesPluginRange",
           "DEFAULT_SPACE_MODE",
           "SPACE_MODES",
           "isSimulationSpaceMode",
@@ -2039,6 +2082,12 @@
           "FourErrorOptions",
           "EventListener",
           "Unsubscribe",
+          "DefineCapabilityOptions",
+          "FourPlugin",
+          "PluginCapability",
+          "PluginCapabilityBinding",
+          "PluginContext",
+          "PluginDependency",
           "SpaceMode",
           "AngleUnit",
           "LengthUnit",
@@ -2065,6 +2114,48 @@
         ],
         "functions": [
           "cloneJsonValue"
+        ]
+      },
+      "packages/core/src/plugin.ts": {
+        "description": "The §81 plugin system (RFC 0002, accepted 2026-08-21; gap `A-3`).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./errors.js",
+            "imports": [
+              "FourError"
+            ]
+          }
+        ],
+        "workspaceDependencies": [],
+        "exports": [
+          "PLUGIN_API_VERSION",
+          "defineCapability",
+          "bindCapability",
+          "satisfiesPluginRange",
+          "installPlugins",
+          "PluginHost"
+        ],
+        "classes": [
+          "PluginHost"
+        ],
+        "interfaces": [
+          "PluginDependency",
+          "FourPlugin",
+          "PluginCapability",
+          "DefineCapabilityOptions",
+          "PluginCapabilityBinding",
+          "PluginContext"
+        ],
+        "functions": [
+          "defineCapability",
+          "bindCapability",
+          "satisfiesPluginRange",
+          "installPlugins"
+        ],
+        "constants": [
+          "PLUGIN_API_VERSION"
         ]
       },
       "packages/core/src/random.ts": {
@@ -2970,7 +3061,15 @@
         "description": "The `Application` composition root (§45, plan D4).",
         "externalDependencies": [],
         "nodeDependencies": [],
-        "internalDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./plugins.js",
+            "imports": [
+              "RENDERER_REGISTRY",
+              "SIMULATION_SYSTEMS"
+            ]
+          }
+        ],
         "workspaceDependencies": [
           {
             "package": "@four/core",
@@ -2978,7 +3077,12 @@
             "imports": [
               "DEV",
               "EventEmitter",
-              "FourError"
+              "FourError",
+              "bindCapability",
+              "installPlugins",
+              "FourPlugin",
+              "PluginCapabilityBinding",
+              "PluginContext"
             ]
           },
           {
@@ -3174,6 +3278,18 @@
             "reExport": true
           },
           {
+            "file": "./plugins.js",
+            "imports": [
+              "COMPONENT_SERIALIZERS",
+              "RENDERER_REGISTRY",
+              "RENDER_GRAPH",
+              "SCENE_MIGRATIONS",
+              "SIMULATION_SYSTEMS",
+              "SOLVER_REGISTRY"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./scene-serializers.js",
             "imports": [
               "BUTTON_NODE_TYPE",
@@ -3258,6 +3374,12 @@
         "workspaceDependencies": [],
         "exports": [
           "Application",
+          "COMPONENT_SERIALIZERS",
+          "RENDERER_REGISTRY",
+          "RENDER_GRAPH",
+          "SCENE_MIGRATIONS",
+          "SIMULATION_SYSTEMS",
+          "SOLVER_REGISTRY",
           "BUTTON_NODE_TYPE",
           "CHECKBOX_NODE_TYPE",
           "CIRCLE_NODE_TYPE",
@@ -3309,6 +3431,12 @@
         ],
         "reExported": [
           "Application",
+          "COMPONENT_SERIALIZERS",
+          "RENDERER_REGISTRY",
+          "RENDER_GRAPH",
+          "SCENE_MIGRATIONS",
+          "SIMULATION_SYSTEMS",
+          "SOLVER_REGISTRY",
           "BUTTON_NODE_TYPE",
           "CHECKBOX_NODE_TYPE",
           "CIRCLE_NODE_TYPE",
@@ -3528,6 +3656,67 @@
         "exports": [],
         "reExported": [
           "* from @four/physics"
+        ]
+      },
+      "packages/four/src/plugins.ts": {
+        "description": "The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`).",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "defineCapability"
+            ]
+          },
+          {
+            "package": "@four/motion",
+            "directory": "packages/motion",
+            "imports": [
+              "SystemRegistry"
+            ]
+          },
+          {
+            "package": "@four/physics",
+            "directory": "packages/physics",
+            "imports": [
+              "SolverRegistry"
+            ]
+          },
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "RenderGraph",
+              "RendererRegistry"
+            ]
+          },
+          {
+            "package": "@four/serialization",
+            "directory": "packages/serialization",
+            "imports": [
+              "ComponentSerializerRegistry",
+              "SceneMigrationRegistry"
+            ]
+          }
+        ],
+        "exports": [
+          "SIMULATION_SYSTEMS",
+          "RENDERER_REGISTRY",
+          "SOLVER_REGISTRY",
+          "COMPONENT_SERIALIZERS",
+          "SCENE_MIGRATIONS",
+          "RENDER_GRAPH"
+        ],
+        "constants": [
+          "SIMULATION_SYSTEMS",
+          "RENDERER_REGISTRY",
+          "SOLVER_REGISTRY",
+          "COMPONENT_SERIALIZERS",
+          "SCENE_MIGRATIONS",
+          "RENDER_GRAPH"
         ]
       },
       "packages/four/src/render-canvas.ts": {
@@ -11447,6 +11636,13 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./clip.js",
+            "imports": [
+              "RenderItemClip"
+            ],
+            "typeOnly": true
+          },
+          {
             "file": "./render-list.js",
             "imports": [
               "RenderItem",
@@ -11543,6 +11739,45 @@
           "computeWorldBoundingSphere"
         ]
       },
+      "packages/render/src/clip.ts": {
+        "description": "§67 clipping — a node's drawn shape masks its subtree, expressed entirely in",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [],
+        "workspaceDependencies": [
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEV",
+              "devWarn"
+            ]
+          },
+          {
+            "package": "@four/materials",
+            "directory": "packages/materials",
+            "imports": [
+              "StencilFunc",
+              "StencilOp"
+            ]
+          }
+        ],
+        "exports": [
+          "MAX_CLIP_PLANES",
+          "ClipPlaneAllocator"
+        ],
+        "classes": [
+          "ClipPlaneAllocator"
+        ],
+        "interfaces": [
+          "RenderItemStencil",
+          "RenderItemClip",
+          "ClipScope"
+        ],
+        "constants": [
+          "MAX_CLIP_PLANES"
+        ]
+      },
       "packages/render/src/effect-pass.ts": {
         "description": "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):",
         "externalDependencies": [],
@@ -11589,7 +11824,7 @@
         ]
       },
       "packages/render/src/index.ts": {
-        "description": "Package entry point for @four/render (re-exports 145 symbols)",
+        "description": "Package entry point for @four/render (re-exports 150 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -11605,6 +11840,14 @@
             "file": "./bounds.js",
             "imports": [
               "computeWorldBoundingSphere"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./clip.js",
+            "imports": [
+              "ClipPlaneAllocator",
+              "MAX_CLIP_PLANES"
             ],
             "reExport": true
           },
@@ -11772,6 +12015,16 @@
             "file": "./bounds.js",
             "imports": [
               "BoundingSphere"
+            ],
+            "reExport": true,
+            "typeOnly": true
+          },
+          {
+            "file": "./clip.js",
+            "imports": [
+              "ClipScope",
+              "RenderItemClip",
+              "RenderItemStencil"
             ],
             "reExport": true,
             "typeOnly": true
@@ -11958,6 +12211,8 @@
           "DEFAULT_MAX_BATCH_VERTICES",
           "RenderBatcher",
           "computeWorldBoundingSphere",
+          "ClipPlaneAllocator",
+          "MAX_CLIP_PLANES",
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
           "OUTPUT_TRANSFORM_EFFECT",
@@ -12023,6 +12278,9 @@
           "RenderBatch",
           "RenderBatchOptions",
           "BoundingSphere",
+          "ClipScope",
+          "RenderItemClip",
+          "RenderItemStencil",
           "ColorGradeEffect",
           "CopyEffect",
           "EffectRenderPass",
@@ -12106,6 +12364,8 @@
           "DEFAULT_MAX_BATCH_VERTICES",
           "RenderBatcher",
           "computeWorldBoundingSphere",
+          "ClipPlaneAllocator",
+          "MAX_CLIP_PLANES",
           "COLOR_GRADE_DEFAULTS",
           "COPY_EFFECT",
           "OUTPUT_TRANSFORM_EFFECT",
@@ -12170,6 +12430,9 @@
           "RenderBatch",
           "RenderBatchOptions",
           "BoundingSphere",
+          "ClipScope",
+          "RenderItemClip",
+          "RenderItemStencil",
           "ColorGradeEffect",
           "CopyEffect",
           "EffectRenderPass",
@@ -12411,6 +12674,13 @@
         "nodeDependencies": [],
         "internalDependencies": [
           {
+            "file": "./clip.js",
+            "imports": [
+              "ClipPlaneAllocator",
+              "RenderItemClip"
+            ]
+          },
+          {
             "file": "./particles.js",
             "imports": [
               "isParticleDrawable",
@@ -12436,7 +12706,8 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
-              "DEV"
+              "DEV",
+              "devWarnOnce"
             ]
           },
           {
@@ -13904,6 +14175,8 @@
             "package": "@four/core",
             "directory": "packages/core",
             "imports": [
+              "DEV",
+              "devWarnOnce",
               "EventEmitter",
               "FourError"
             ]
@@ -13998,7 +14271,12 @@
               "DRAW_UNIFORM_FLOATS",
               "DRAW_UNIFORM_WGSL",
               "DRAW_VIEW_PROJECTION_OFFSET",
-              "createDrawBindGroupLayout"
+              "MAP_BINDING_WGSL",
+              "MAP_BIND_GROUP_INDEX",
+              "MAP_SAMPLER_BINDING",
+              "MAP_TEXTURE_BINDING",
+              "createDrawBindGroupLayout",
+              "createTextureBindGroupLayout"
             ],
             "reExport": true
           },
@@ -14018,6 +14296,17 @@
             "reExport": true
           },
           {
+            "file": "./wgpu-texture.js",
+            "imports": [
+              "MIPMAP_SHADER_SOURCE",
+              "WgpuTextureCache",
+              "mipLevelCount",
+              "samplerKey",
+              "textureByteLength"
+            ],
+            "reExport": true
+          },
+          {
             "file": "./wgpu-unlit.js",
             "imports": [
               "CLEAR_SHADER_SOURCE",
@@ -14027,6 +14316,8 @@
               "FRAGMENT_ENTRY_POINT",
               "POSITION_BUFFER_LAYOUT",
               "POSITION_SHADER_LOCATION",
+              "UV_BUFFER_LAYOUT",
+              "UV_SHADER_LOCATION",
               "VERTEX_ENTRY_POINT",
               "unlitShaderSource",
               "unlitVertexBufferLayouts"
@@ -14056,11 +14347,15 @@
               "GpuRenderPassDescriptor",
               "GpuRenderPassEncoder",
               "GpuRenderPipeline",
+              "GpuBufferBinding",
               "GpuRenderPipelineDescriptor",
+              "GpuSampler",
+              "GpuSamplerDescriptor",
               "GpuShaderModule",
               "GpuTexture",
               "GpuTextureDescriptor",
               "GpuTextureView",
+              "GpuTextureViewDescriptor",
               "GpuVertexBufferLayout",
               "WebgpuCanvas"
             ],
@@ -14084,6 +14379,16 @@
             ],
             "reExport": true,
             "typeOnly": true
+          },
+          {
+            "file": "./wgpu-texture.js",
+            "imports": [
+              "ResolvedSamplerState",
+              "WgpuCacheableTexture",
+              "WgpuTextureRecord"
+            ],
+            "reExport": true,
+            "typeOnly": true
           }
         ],
         "workspaceDependencies": [],
@@ -14102,10 +14407,20 @@
           "DRAW_UNIFORM_FLOATS",
           "DRAW_UNIFORM_WGSL",
           "DRAW_VIEW_PROJECTION_OFFSET",
+          "MAP_BINDING_WGSL",
+          "MAP_BIND_GROUP_INDEX",
+          "MAP_SAMPLER_BINDING",
+          "MAP_TEXTURE_BINDING",
           "createDrawBindGroupLayout",
+          "createTextureBindGroupLayout",
           "WgpuGeometryCache",
           "pipelineKey",
           "WgpuPipelineCache",
+          "MIPMAP_SHADER_SOURCE",
+          "WgpuTextureCache",
+          "mipLevelCount",
+          "samplerKey",
+          "textureByteLength",
           "CLEAR_SHADER_SOURCE",
           "CLEAR_VERTEX_COUNT",
           "COLOR_BUFFER_LAYOUT",
@@ -14113,6 +14428,8 @@
           "FRAGMENT_ENTRY_POINT",
           "POSITION_BUFFER_LAYOUT",
           "POSITION_SHADER_LOCATION",
+          "UV_BUFFER_LAYOUT",
+          "UV_SHADER_LOCATION",
           "VERTEX_ENTRY_POINT",
           "unlitShaderSource",
           "unlitVertexBufferLayouts",
@@ -14137,17 +14454,24 @@
           "GpuRenderPassDescriptor",
           "GpuRenderPassEncoder",
           "GpuRenderPipeline",
+          "GpuBufferBinding",
           "GpuRenderPipelineDescriptor",
+          "GpuSampler",
+          "GpuSamplerDescriptor",
           "GpuShaderModule",
           "GpuTexture",
           "GpuTextureDescriptor",
           "GpuTextureView",
+          "GpuTextureViewDescriptor",
           "GpuVertexBufferLayout",
           "WebgpuCanvas",
           "CacheableGeometry",
           "WgpuGeometryRecord",
           "WgpuPipelineDescriptor",
-          "WgpuPipelineKind"
+          "WgpuPipelineKind",
+          "ResolvedSamplerState",
+          "WgpuCacheableTexture",
+          "WgpuTextureRecord"
         ],
         "reExported": [
           "GPU_BUFFER_USAGE",
@@ -14164,10 +14488,20 @@
           "DRAW_UNIFORM_FLOATS",
           "DRAW_UNIFORM_WGSL",
           "DRAW_VIEW_PROJECTION_OFFSET",
+          "MAP_BINDING_WGSL",
+          "MAP_BIND_GROUP_INDEX",
+          "MAP_SAMPLER_BINDING",
+          "MAP_TEXTURE_BINDING",
           "createDrawBindGroupLayout",
+          "createTextureBindGroupLayout",
           "WgpuGeometryCache",
           "pipelineKey",
           "WgpuPipelineCache",
+          "MIPMAP_SHADER_SOURCE",
+          "WgpuTextureCache",
+          "mipLevelCount",
+          "samplerKey",
+          "textureByteLength",
           "CLEAR_SHADER_SOURCE",
           "CLEAR_VERTEX_COUNT",
           "COLOR_BUFFER_LAYOUT",
@@ -14175,6 +14509,8 @@
           "FRAGMENT_ENTRY_POINT",
           "POSITION_BUFFER_LAYOUT",
           "POSITION_SHADER_LOCATION",
+          "UV_BUFFER_LAYOUT",
+          "UV_SHADER_LOCATION",
           "VERTEX_ENTRY_POINT",
           "unlitShaderSource",
           "unlitVertexBufferLayouts",
@@ -14198,17 +14534,24 @@
           "GpuRenderPassDescriptor",
           "GpuRenderPassEncoder",
           "GpuRenderPipeline",
+          "GpuBufferBinding",
           "GpuRenderPipelineDescriptor",
+          "GpuSampler",
+          "GpuSamplerDescriptor",
           "GpuShaderModule",
           "GpuTexture",
           "GpuTextureDescriptor",
           "GpuTextureView",
+          "GpuTextureViewDescriptor",
           "GpuVertexBufferLayout",
           "WebgpuCanvas",
           "CacheableGeometry",
           "WgpuGeometryRecord",
           "WgpuPipelineDescriptor",
-          "WgpuPipelineKind"
+          "WgpuPipelineKind",
+          "ResolvedSamplerState",
+          "WgpuCacheableTexture",
+          "WgpuTextureRecord"
         ],
         "constants": [
           "PACKAGE_NAME"
@@ -14267,6 +14610,7 @@
         "interfaces": [
           "GpuDeviceLostInfo",
           "GpuBuffer",
+          "GpuTextureViewDescriptor",
           "GpuTexture",
           "GpuVertexBufferLayout",
           "GpuBlendState",
@@ -14276,9 +14620,11 @@
           "GpuRenderPassEncoder",
           "GpuCommandEncoder",
           "GpuQueue",
+          "GpuSamplerDescriptor",
           "GpuBufferDescriptor",
           "GpuTextureDescriptor",
           "GpuBindGroupLayoutEntry",
+          "GpuBufferBinding",
           "GpuBindGroupEntry",
           "GpuDevice",
           "GpuAdapter",
@@ -14323,6 +14669,7 @@
               "DRAW_MODEL_OFFSET",
               "DRAW_UNIFORM_BYTES",
               "DRAW_VIEW_PROJECTION_OFFSET",
+              "MAP_BIND_GROUP_INDEX",
               "createDrawBindGroupLayout"
             ]
           },
@@ -14337,6 +14684,12 @@
             "imports": [
               "WgpuPipelineCache",
               "WgpuPipelineDescriptor"
+            ]
+          },
+          {
+            "file": "./wgpu-texture.js",
+            "imports": [
+              "WgpuTextureCache"
             ]
           },
           {
@@ -14421,10 +14774,16 @@
           "DRAW_UNIFORM_BYTES",
           "DRAW_UNIFORM_FLOATS",
           "DRAW_UNIFORM_WGSL",
-          "createDrawBindGroupLayout"
+          "MAP_BIND_GROUP_INDEX",
+          "MAP_TEXTURE_BINDING",
+          "MAP_SAMPLER_BINDING",
+          "MAP_BINDING_WGSL",
+          "createDrawBindGroupLayout",
+          "createTextureBindGroupLayout"
         ],
         "functions": [
-          "createDrawBindGroupLayout"
+          "createDrawBindGroupLayout",
+          "createTextureBindGroupLayout"
         ],
         "constants": [
           "DRAW_VIEW_PROJECTION_OFFSET",
@@ -14432,7 +14791,11 @@
           "DRAW_COLOR_OFFSET",
           "DRAW_UNIFORM_BYTES",
           "DRAW_UNIFORM_FLOATS",
-          "DRAW_UNIFORM_WGSL"
+          "DRAW_UNIFORM_WGSL",
+          "MAP_BIND_GROUP_INDEX",
+          "MAP_TEXTURE_BINDING",
+          "MAP_SAMPLER_BINDING",
+          "MAP_BINDING_WGSL"
         ]
       },
       "packages/render-webgpu/src/wgpu-geometry.ts": {
@@ -14510,6 +14873,74 @@
           "pipelineKey"
         ]
       },
+      "packages/render-webgpu/src/wgpu-texture.ts": {
+        "description": "GPU-side textures and samplers for the WebGPU backend: one `GPUTexture` per",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./webgpu-device.js",
+            "imports": [
+              "GPU_TEXTURE_USAGE",
+              "GpuBindGroup",
+              "GpuBindGroupLayout",
+              "GpuDevice",
+              "GpuPipelineLayout",
+              "GpuRenderPipeline",
+              "GpuSampler",
+              "GpuShaderModule",
+              "GpuTexture",
+              "GpuTextureView"
+            ]
+          },
+          {
+            "file": "./wgpu-bindings.js",
+            "imports": [
+              "MAP_SAMPLER_BINDING",
+              "MAP_TEXTURE_BINDING",
+              "createTextureBindGroupLayout"
+            ]
+          },
+          {
+            "file": "./wgpu-unlit.js",
+            "imports": [
+              "FRAGMENT_ENTRY_POINT",
+              "VERTEX_ENTRY_POINT"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/render",
+            "directory": "packages/render",
+            "imports": [
+              "RenderItem"
+            ]
+          }
+        ],
+        "exports": [
+          "MIPMAP_SHADER_SOURCE",
+          "mipLevelCount",
+          "textureByteLength",
+          "samplerKey",
+          "WgpuTextureCache"
+        ],
+        "classes": [
+          "WgpuTextureCache"
+        ],
+        "interfaces": [
+          "ResolvedSamplerState",
+          "WgpuTextureRecord"
+        ],
+        "functions": [
+          "mipLevelCount",
+          "textureByteLength",
+          "samplerKey"
+        ],
+        "constants": [
+          "MIPMAP_SHADER_SOURCE"
+        ]
+      },
       "packages/render-webgpu/src/wgpu-unlit.ts": {
         "description": "The unlit pipeline in hand-written WGSL (§64, §120's MVP tier), plus the",
         "externalDependencies": [],
@@ -14518,7 +14949,8 @@
           {
             "file": "./wgpu-bindings.js",
             "imports": [
-              "DRAW_UNIFORM_WGSL"
+              "DRAW_UNIFORM_WGSL",
+              "MAP_BINDING_WGSL"
             ]
           },
           {
@@ -14535,6 +14967,8 @@
           "COLOR_SHADER_LOCATION",
           "POSITION_BUFFER_LAYOUT",
           "COLOR_BUFFER_LAYOUT",
+          "UV_SHADER_LOCATION",
+          "UV_BUFFER_LAYOUT",
           "VERTEX_ENTRY_POINT",
           "FRAGMENT_ENTRY_POINT",
           "CLEAR_VERTEX_COUNT",
@@ -14551,6 +14985,8 @@
           "COLOR_SHADER_LOCATION",
           "POSITION_BUFFER_LAYOUT",
           "COLOR_BUFFER_LAYOUT",
+          "UV_SHADER_LOCATION",
+          "UV_BUFFER_LAYOUT",
           "VERTEX_ENTRY_POINT",
           "FRAGMENT_ENTRY_POINT",
           "CLEAR_VERTEX_COUNT",
@@ -16941,6 +17377,7 @@
           "packages/core/src/events.ts",
           "packages/core/src/index.ts",
           "packages/core/src/json.ts",
+          "packages/core/src/plugin.ts",
           "packages/core/src/random.ts",
           "packages/core/src/space.ts",
           "packages/core/src/units.ts",
@@ -16980,6 +17417,7 @@
           "packages/four/src/physics-rapier.ts",
           "packages/four/src/physics-soft.ts",
           "packages/four/src/physics.ts",
+          "packages/four/src/plugins.ts",
           "packages/four/src/render-canvas.ts",
           "packages/four/src/render-svg.ts",
           "packages/four/src/render-webgl.ts",
@@ -17141,6 +17579,7 @@
         "files": [
           "packages/render/src/batch.ts",
           "packages/render/src/bounds.ts",
+          "packages/render/src/clip.ts",
           "packages/render/src/effect-pass.ts",
           "packages/render/src/index.ts",
           "packages/render/src/lights.ts",
@@ -17198,6 +17637,7 @@
           "packages/render-webgpu/src/wgpu-bindings.ts",
           "packages/render-webgpu/src/wgpu-geometry.ts",
           "packages/render-webgpu/src/wgpu-pipeline-cache.ts",
+          "packages/render-webgpu/src/wgpu-texture.ts",
           "packages/render-webgpu/src/wgpu-unlit.ts"
         ]
       },
@@ -17259,18 +17699,18 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 233,
+    "totalTypeScriptFiles": 237,
     "totalModules": 24,
-    "totalLinesOfCode": 109195,
-    "totalExports": 2184,
-    "totalClasses": 149,
-    "totalInterfaces": 462,
-    "totalFunctions": 349,
+    "totalLinesOfCode": 112259,
+    "totalExports": 2252,
+    "totalClasses": 152,
+    "totalInterfaces": 476,
+    "totalFunctions": 357,
     "totalTypeGuards": 20,
     "totalEnums": 0,
-    "totalConstants": 298,
-    "totalReExports": 1410,
-    "totalTypeOnlyImports": 275,
+    "totalConstants": 313,
+    "totalReExports": 1452,
+    "totalTypeOnlyImports": 279,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 2,
     "unusedFilesCount": 0,

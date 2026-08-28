@@ -1,10 +1,10 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-21"
-  totalFiles: 233
+  lastUpdated: "2026-08-28"
+  totalFiles: 237
   totalModules: 24
-  totalExports: 2184
+  totalExports: 2252
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -1363,6 +1363,15 @@ modules:
           imports:
             - EventEmitter
           reExport: true
+        - file: ./plugin.js
+          imports:
+            - PLUGIN_API_VERSION
+            - PluginHost
+            - bindCapability
+            - defineCapability
+            - installPlugins
+            - satisfiesPluginRange
+          reExport: true
         - file: ./space.js
           imports:
             - DEFAULT_SPACE_MODE
@@ -1427,6 +1436,16 @@ modules:
             - Unsubscribe
           reExport: true
           typeOnly: true
+        - file: ./plugin.js
+          imports:
+            - DefineCapabilityOptions
+            - FourPlugin
+            - PluginCapability
+            - PluginCapabilityBinding
+            - PluginContext
+            - PluginDependency
+          reExport: true
+          typeOnly: true
         - file: ./space.js
           imports:
             - SpaceMode
@@ -1464,6 +1483,12 @@ modules:
         - FourError
         - isFourError
         - EventEmitter
+        - PLUGIN_API_VERSION
+        - PluginHost
+        - bindCapability
+        - defineCapability
+        - installPlugins
+        - satisfiesPluginRange
         - DEFAULT_SPACE_MODE
         - SPACE_MODES
         - isSimulationSpaceMode
@@ -1500,6 +1525,12 @@ modules:
         - FourErrorOptions
         - EventListener
         - Unsubscribe
+        - DefineCapabilityOptions
+        - FourPlugin
+        - PluginCapability
+        - PluginCapabilityBinding
+        - PluginContext
+        - PluginDependency
         - SpaceMode
         - AngleUnit
         - LengthUnit
@@ -1524,6 +1555,12 @@ modules:
         - FourError
         - isFourError
         - EventEmitter
+        - PLUGIN_API_VERSION
+        - PluginHost
+        - bindCapability
+        - defineCapability
+        - installPlugins
+        - satisfiesPluginRange
         - DEFAULT_SPACE_MODE
         - SPACE_MODES
         - isSimulationSpaceMode
@@ -1559,6 +1596,12 @@ modules:
         - FourErrorOptions
         - EventListener
         - Unsubscribe
+        - DefineCapabilityOptions
+        - FourPlugin
+        - PluginCapability
+        - PluginCapabilityBinding
+        - PluginContext
+        - PluginDependency
         - SpaceMode
         - AngleUnit
         - LengthUnit
@@ -1581,6 +1624,38 @@ modules:
         - cloneJsonValue
       functions:
         - cloneJsonValue
+    packages/core/src/plugin.ts:
+      description: The §81 plugin system (RFC 0002, accepted 2026-08-21; gap `A-3`).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./errors.js
+          imports:
+            - FourError
+      workspaceDependencies: []
+      exports:
+        - PLUGIN_API_VERSION
+        - defineCapability
+        - bindCapability
+        - satisfiesPluginRange
+        - installPlugins
+        - PluginHost
+      classes:
+        - PluginHost
+      interfaces:
+        - PluginDependency
+        - FourPlugin
+        - PluginCapability
+        - DefineCapabilityOptions
+        - PluginCapabilityBinding
+        - PluginContext
+      functions:
+        - defineCapability
+        - bindCapability
+        - satisfiesPluginRange
+        - installPlugins
+      constants:
+        - PLUGIN_API_VERSION
     packages/core/src/random.ts:
       description: Seeded pseudo-random numbers for deterministic engine code (§33, plan P8-3).
       externalDependencies: []
@@ -2307,7 +2382,11 @@ modules:
       description: The `Application` composition root (§45, plan D4).
       externalDependencies: []
       nodeDependencies: []
-      internalDependencies: []
+      internalDependencies:
+        - file: ./plugins.js
+          imports:
+            - RENDERER_REGISTRY
+            - SIMULATION_SYSTEMS
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -2315,6 +2394,11 @@ modules:
             - DEV
             - EventEmitter
             - FourError
+            - bindCapability
+            - installPlugins
+            - FourPlugin
+            - PluginCapabilityBinding
+            - PluginContext
         - package: "@four/diagnostics"
           directory: packages/diagnostics
           imports:
@@ -2448,6 +2532,15 @@ modules:
           imports:
             - Application
           reExport: true
+        - file: ./plugins.js
+          imports:
+            - COMPONENT_SERIALIZERS
+            - RENDERER_REGISTRY
+            - RENDER_GRAPH
+            - SCENE_MIGRATIONS
+            - SIMULATION_SYSTEMS
+            - SOLVER_REGISTRY
+          reExport: true
         - file: ./scene-serializers.js
           imports:
             - BUTTON_NODE_TYPE
@@ -2517,6 +2610,12 @@ modules:
       workspaceDependencies: []
       exports:
         - Application
+        - COMPONENT_SERIALIZERS
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
+        - SCENE_MIGRATIONS
+        - SIMULATION_SYSTEMS
+        - SOLVER_REGISTRY
         - BUTTON_NODE_TYPE
         - CHECKBOX_NODE_TYPE
         - CIRCLE_NODE_TYPE
@@ -2567,6 +2666,12 @@ modules:
         - TextOptions
       reExported:
         - Application
+        - COMPONENT_SERIALIZERS
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
+        - SCENE_MIGRATIONS
+        - SIMULATION_SYSTEMS
+        - SOLVER_REGISTRY
         - BUTTON_NODE_TYPE
         - CHECKBOX_NODE_TYPE
         - CIRCLE_NODE_TYPE
@@ -2732,6 +2837,48 @@ modules:
       exports: []
       reExported:
         - "* from @four/physics"
+    packages/four/src/plugins.ts:
+      description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+        - package: "@four/motion"
+          directory: packages/motion
+          imports:
+            - SystemRegistry
+        - package: "@four/physics"
+          directory: packages/physics
+          imports:
+            - SolverRegistry
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderGraph
+            - RendererRegistry
+        - package: "@four/serialization"
+          directory: packages/serialization
+          imports:
+            - ComponentSerializerRegistry
+            - SceneMigrationRegistry
+      exports:
+        - SIMULATION_SYSTEMS
+        - RENDERER_REGISTRY
+        - SOLVER_REGISTRY
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
+        - RENDER_GRAPH
+      constants:
+        - SIMULATION_SYSTEMS
+        - RENDERER_REGISTRY
+        - SOLVER_REGISTRY
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
+        - RENDER_GRAPH
     packages/four/src/render-canvas.ts:
       description: render-canvas module
       externalDependencies: []
@@ -8698,6 +8845,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./clip.js
+          imports:
+            - RenderItemClip
+          typeOnly: true
         - file: ./render-list.js
           imports:
             - RenderItem
@@ -8759,6 +8910,33 @@ modules:
         - BoundingSphere
       functions:
         - computeWorldBoundingSphere
+    packages/render/src/clip.ts:
+      description: §67 clipping — a node's drawn shape masks its subtree, expressed entirely in
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - devWarn
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - StencilFunc
+            - StencilOp
+      exports:
+        - MAX_CLIP_PLANES
+        - ClipPlaneAllocator
+      classes:
+        - ClipPlaneAllocator
+      interfaces:
+        - RenderItemStencil
+        - RenderItemClip
+        - ClipScope
+      constants:
+        - MAX_CLIP_PLANES
     packages/render/src/effect-pass.ts:
       description: "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):"
       externalDependencies: []
@@ -8793,7 +8971,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 145 symbols)
+      description: Package entry point for @four/render (re-exports 150 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -8805,6 +8983,11 @@ modules:
         - file: ./bounds.js
           imports:
             - computeWorldBoundingSphere
+          reExport: true
+        - file: ./clip.js
+          imports:
+            - ClipPlaneAllocator
+            - MAX_CLIP_PLANES
           reExport: true
         - file: ./effect-pass.js
           imports:
@@ -8921,6 +9104,13 @@ modules:
         - file: ./bounds.js
           imports:
             - BoundingSphere
+          reExport: true
+          typeOnly: true
+        - file: ./clip.js
+          imports:
+            - ClipScope
+            - RenderItemClip
+            - RenderItemStencil
           reExport: true
           typeOnly: true
         - file: ./effect-pass.js
@@ -9062,6 +9252,8 @@ modules:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
         - computeWorldBoundingSphere
+        - ClipPlaneAllocator
+        - MAX_CLIP_PLANES
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -9127,6 +9319,9 @@ modules:
         - RenderBatch
         - RenderBatchOptions
         - BoundingSphere
+        - ClipScope
+        - RenderItemClip
+        - RenderItemStencil
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -9209,6 +9404,8 @@ modules:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
         - computeWorldBoundingSphere
+        - ClipPlaneAllocator
+        - MAX_CLIP_PLANES
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -9273,6 +9470,9 @@ modules:
         - RenderBatch
         - RenderBatchOptions
         - BoundingSphere
+        - ClipScope
+        - RenderItemClip
+        - RenderItemStencil
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -9465,6 +9665,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./clip.js
+          imports:
+            - ClipPlaneAllocator
+            - RenderItemClip
         - file: ./particles.js
           imports:
             - isParticleDrawable
@@ -9481,6 +9685,7 @@ modules:
           directory: packages/core
           imports:
             - DEV
+            - devWarnOnce
         - package: "@four/geometry"
           directory: packages/geometry
           imports:
@@ -10526,6 +10731,8 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - DEV
+            - devWarnOnce
             - EventEmitter
             - FourError
         - package: "@four/math"
@@ -10596,7 +10803,12 @@ modules:
             - DRAW_UNIFORM_FLOATS
             - DRAW_UNIFORM_WGSL
             - DRAW_VIEW_PROJECTION_OFFSET
+            - MAP_BINDING_WGSL
+            - MAP_BIND_GROUP_INDEX
+            - MAP_SAMPLER_BINDING
+            - MAP_TEXTURE_BINDING
             - createDrawBindGroupLayout
+            - createTextureBindGroupLayout
           reExport: true
         - file: ./wgpu-geometry.js
           imports:
@@ -10607,6 +10819,14 @@ modules:
             - pipelineKey
             - WgpuPipelineCache
           reExport: true
+        - file: ./wgpu-texture.js
+          imports:
+            - MIPMAP_SHADER_SOURCE
+            - WgpuTextureCache
+            - mipLevelCount
+            - samplerKey
+            - textureByteLength
+          reExport: true
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_SHADER_SOURCE
@@ -10616,6 +10836,8 @@ modules:
             - FRAGMENT_ENTRY_POINT
             - POSITION_BUFFER_LAYOUT
             - POSITION_SHADER_LOCATION
+            - UV_BUFFER_LAYOUT
+            - UV_SHADER_LOCATION
             - VERTEX_ENTRY_POINT
             - unlitShaderSource
             - unlitVertexBufferLayouts
@@ -10642,11 +10864,15 @@ modules:
             - GpuRenderPassDescriptor
             - GpuRenderPassEncoder
             - GpuRenderPipeline
+            - GpuBufferBinding
             - GpuRenderPipelineDescriptor
+            - GpuSampler
+            - GpuSamplerDescriptor
             - GpuShaderModule
             - GpuTexture
             - GpuTextureDescriptor
             - GpuTextureView
+            - GpuTextureViewDescriptor
             - GpuVertexBufferLayout
             - WebgpuCanvas
           reExport: true
@@ -10661,6 +10887,13 @@ modules:
           imports:
             - WgpuPipelineDescriptor
             - WgpuPipelineKind
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-texture.js
+          imports:
+            - ResolvedSamplerState
+            - WgpuCacheableTexture
+            - WgpuTextureRecord
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -10679,10 +10912,20 @@ modules:
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
         - DRAW_VIEW_PROJECTION_OFFSET
+        - MAP_BINDING_WGSL
+        - MAP_BIND_GROUP_INDEX
+        - MAP_SAMPLER_BINDING
+        - MAP_TEXTURE_BINDING
         - createDrawBindGroupLayout
+        - createTextureBindGroupLayout
         - WgpuGeometryCache
         - pipelineKey
         - WgpuPipelineCache
+        - MIPMAP_SHADER_SOURCE
+        - WgpuTextureCache
+        - mipLevelCount
+        - samplerKey
+        - textureByteLength
         - CLEAR_SHADER_SOURCE
         - CLEAR_VERTEX_COUNT
         - COLOR_BUFFER_LAYOUT
@@ -10690,6 +10933,8 @@ modules:
         - FRAGMENT_ENTRY_POINT
         - POSITION_BUFFER_LAYOUT
         - POSITION_SHADER_LOCATION
+        - UV_BUFFER_LAYOUT
+        - UV_SHADER_LOCATION
         - VERTEX_ENTRY_POINT
         - unlitShaderSource
         - unlitVertexBufferLayouts
@@ -10714,17 +10959,24 @@ modules:
         - GpuRenderPassDescriptor
         - GpuRenderPassEncoder
         - GpuRenderPipeline
+        - GpuBufferBinding
         - GpuRenderPipelineDescriptor
+        - GpuSampler
+        - GpuSamplerDescriptor
         - GpuShaderModule
         - GpuTexture
         - GpuTextureDescriptor
         - GpuTextureView
+        - GpuTextureViewDescriptor
         - GpuVertexBufferLayout
         - WebgpuCanvas
         - CacheableGeometry
         - WgpuGeometryRecord
         - WgpuPipelineDescriptor
         - WgpuPipelineKind
+        - ResolvedSamplerState
+        - WgpuCacheableTexture
+        - WgpuTextureRecord
       reExported:
         - GPU_BUFFER_USAGE
         - GPU_SHADER_STAGE
@@ -10740,10 +10992,20 @@ modules:
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
         - DRAW_VIEW_PROJECTION_OFFSET
+        - MAP_BINDING_WGSL
+        - MAP_BIND_GROUP_INDEX
+        - MAP_SAMPLER_BINDING
+        - MAP_TEXTURE_BINDING
         - createDrawBindGroupLayout
+        - createTextureBindGroupLayout
         - WgpuGeometryCache
         - pipelineKey
         - WgpuPipelineCache
+        - MIPMAP_SHADER_SOURCE
+        - WgpuTextureCache
+        - mipLevelCount
+        - samplerKey
+        - textureByteLength
         - CLEAR_SHADER_SOURCE
         - CLEAR_VERTEX_COUNT
         - COLOR_BUFFER_LAYOUT
@@ -10751,6 +11013,8 @@ modules:
         - FRAGMENT_ENTRY_POINT
         - POSITION_BUFFER_LAYOUT
         - POSITION_SHADER_LOCATION
+        - UV_BUFFER_LAYOUT
+        - UV_SHADER_LOCATION
         - VERTEX_ENTRY_POINT
         - unlitShaderSource
         - unlitVertexBufferLayouts
@@ -10774,17 +11038,24 @@ modules:
         - GpuRenderPassDescriptor
         - GpuRenderPassEncoder
         - GpuRenderPipeline
+        - GpuBufferBinding
         - GpuRenderPipelineDescriptor
+        - GpuSampler
+        - GpuSamplerDescriptor
         - GpuShaderModule
         - GpuTexture
         - GpuTextureDescriptor
         - GpuTextureView
+        - GpuTextureViewDescriptor
         - GpuVertexBufferLayout
         - WebgpuCanvas
         - CacheableGeometry
         - WgpuGeometryRecord
         - WgpuPipelineDescriptor
         - WgpuPipelineKind
+        - ResolvedSamplerState
+        - WgpuCacheableTexture
+        - WgpuTextureRecord
       constants:
         - PACKAGE_NAME
     packages/render-webgpu/src/register.ts:
@@ -10825,6 +11096,7 @@ modules:
       interfaces:
         - GpuDeviceLostInfo
         - GpuBuffer
+        - GpuTextureViewDescriptor
         - GpuTexture
         - GpuVertexBufferLayout
         - GpuBlendState
@@ -10834,9 +11106,11 @@ modules:
         - GpuRenderPassEncoder
         - GpuCommandEncoder
         - GpuQueue
+        - GpuSamplerDescriptor
         - GpuBufferDescriptor
         - GpuTextureDescriptor
         - GpuBindGroupLayoutEntry
+        - GpuBufferBinding
         - GpuBindGroupEntry
         - GpuDevice
         - GpuAdapter
@@ -10874,6 +11148,7 @@ modules:
             - DRAW_MODEL_OFFSET
             - DRAW_UNIFORM_BYTES
             - DRAW_VIEW_PROJECTION_OFFSET
+            - MAP_BIND_GROUP_INDEX
             - createDrawBindGroupLayout
         - file: ./wgpu-geometry.js
           imports:
@@ -10882,6 +11157,9 @@ modules:
           imports:
             - WgpuPipelineCache
             - WgpuPipelineDescriptor
+        - file: ./wgpu-texture.js
+          imports:
+            - WgpuTextureCache
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_VERTEX_COUNT
@@ -10939,9 +11217,15 @@ modules:
         - DRAW_UNIFORM_BYTES
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
+        - MAP_BIND_GROUP_INDEX
+        - MAP_TEXTURE_BINDING
+        - MAP_SAMPLER_BINDING
+        - MAP_BINDING_WGSL
         - createDrawBindGroupLayout
+        - createTextureBindGroupLayout
       functions:
         - createDrawBindGroupLayout
+        - createTextureBindGroupLayout
       constants:
         - DRAW_VIEW_PROJECTION_OFFSET
         - DRAW_MODEL_OFFSET
@@ -10949,6 +11233,10 @@ modules:
         - DRAW_UNIFORM_BYTES
         - DRAW_UNIFORM_FLOATS
         - DRAW_UNIFORM_WGSL
+        - MAP_BIND_GROUP_INDEX
+        - MAP_TEXTURE_BINDING
+        - MAP_SAMPLER_BINDING
+        - MAP_BINDING_WGSL
     packages/render-webgpu/src/wgpu-geometry.ts:
       description: Per-device store of uploaded geometry (§61, §64 stage 7) — the WebGPU twin of
       externalDependencies: []
@@ -11000,6 +11288,54 @@ modules:
         - WgpuPipelineDescriptor
       functions:
         - pipelineKey
+    packages/render-webgpu/src/wgpu-texture.ts:
+      description: "GPU-side textures and samplers for the WebGPU backend: one `GPUTexture` per"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_TEXTURE_USAGE
+            - GpuBindGroup
+            - GpuBindGroupLayout
+            - GpuDevice
+            - GpuPipelineLayout
+            - GpuRenderPipeline
+            - GpuSampler
+            - GpuShaderModule
+            - GpuTexture
+            - GpuTextureView
+        - file: ./wgpu-bindings.js
+          imports:
+            - MAP_SAMPLER_BINDING
+            - MAP_TEXTURE_BINDING
+            - createTextureBindGroupLayout
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderItem
+      exports:
+        - MIPMAP_SHADER_SOURCE
+        - mipLevelCount
+        - textureByteLength
+        - samplerKey
+        - WgpuTextureCache
+      classes:
+        - WgpuTextureCache
+      interfaces:
+        - ResolvedSamplerState
+        - WgpuTextureRecord
+      functions:
+        - mipLevelCount
+        - textureByteLength
+        - samplerKey
+      constants:
+        - MIPMAP_SHADER_SOURCE
     packages/render-webgpu/src/wgpu-unlit.ts:
       description: The unlit pipeline in hand-written WGSL (§64, §120's MVP tier), plus the
       externalDependencies: []
@@ -11008,6 +11344,7 @@ modules:
         - file: ./wgpu-bindings.js
           imports:
             - DRAW_UNIFORM_WGSL
+            - MAP_BINDING_WGSL
         - file: ./webgpu-device.js
           imports:
             - GpuVertexBufferLayout
@@ -11018,6 +11355,8 @@ modules:
         - COLOR_SHADER_LOCATION
         - POSITION_BUFFER_LAYOUT
         - COLOR_BUFFER_LAYOUT
+        - UV_SHADER_LOCATION
+        - UV_BUFFER_LAYOUT
         - VERTEX_ENTRY_POINT
         - FRAGMENT_ENTRY_POINT
         - CLEAR_VERTEX_COUNT
@@ -11032,6 +11371,8 @@ modules:
         - COLOR_SHADER_LOCATION
         - POSITION_BUFFER_LAYOUT
         - COLOR_BUFFER_LAYOUT
+        - UV_SHADER_LOCATION
+        - UV_BUFFER_LAYOUT
         - VERTEX_ENTRY_POINT
         - FRAGMENT_ENTRY_POINT
         - CLEAR_VERTEX_COUNT
@@ -12787,6 +13128,7 @@ dependencyGraph:
         - packages/core/src/events.ts
         - packages/core/src/index.ts
         - packages/core/src/json.ts
+        - packages/core/src/plugin.ts
         - packages/core/src/random.ts
         - packages/core/src/space.ts
         - packages/core/src/units.ts
@@ -12820,6 +13162,7 @@ dependencyGraph:
         - packages/four/src/physics-rapier.ts
         - packages/four/src/physics-soft.ts
         - packages/four/src/physics.ts
+        - packages/four/src/plugins.ts
         - packages/four/src/render-canvas.ts
         - packages/four/src/render-svg.ts
         - packages/four/src/render-webgl.ts
@@ -12948,6 +13291,7 @@ dependencyGraph:
       files:
         - packages/render/src/batch.ts
         - packages/render/src/bounds.ts
+        - packages/render/src/clip.ts
         - packages/render/src/effect-pass.ts
         - packages/render/src/index.ts
         - packages/render/src/lights.ts
@@ -12993,6 +13337,7 @@ dependencyGraph:
         - packages/render-webgpu/src/wgpu-bindings.ts
         - packages/render-webgpu/src/wgpu-geometry.ts
         - packages/render-webgpu/src/wgpu-pipeline-cache.ts
+        - packages/render-webgpu/src/wgpu-texture.ts
         - packages/render-webgpu/src/wgpu-unlit.ts
     - name: Packages/scene
       files:
@@ -13038,18 +13383,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 233
+  totalTypeScriptFiles: 237
   totalModules: 24
-  totalLinesOfCode: 109195
-  totalExports: 2184
-  totalClasses: 149
-  totalInterfaces: 462
-  totalFunctions: 349
+  totalLinesOfCode: 112259
+  totalExports: 2252
+  totalClasses: 152
+  totalInterfaces: 476
+  totalFunctions: 357
   totalTypeGuards: 20
   totalEnums: 0
-  totalConstants: 298
-  totalReExports: 1410
-  totalTypeOnlyImports: 275
+  totalConstants: 313
+  totalReExports: 1452
+  totalTypeOnlyImports: 279
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 2
   unusedFilesCount: 0
