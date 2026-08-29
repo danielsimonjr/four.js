@@ -60,10 +60,10 @@ changes in `CHANGELOG.md`.
       conditionally true.
 
       0001's landing decides WP-R1.9's
-                  input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                  reachability are backend-independent and re-exported through `@four/render`;
-                  the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                  (screen domain included, for §70 graph effects).
+                      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                      reachability are backend-independent and re-exported through `@four/render`;
+                      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                      (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -91,9 +91,20 @@ changes in `CHANGELOG.md`.
       60 bones ×1/×10 (the number that decides whether alternative A ever returns)
       and controller channel cost at 180 channels. §86 has no skinned-mesh
       performance target yet — propose one from those measurements.
-- [ ] **glTF loader (§78) unblocked 2026-08-28** — all three blockers cleared
-      (`A-19` textures, `R-12`/`R-13` materials, RFC 0003 skinning). Needs a packet
-      of its own.
+- [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
+      (`@four/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
+      containers, all six §53 attributes, §59 factors + base-colour texture,
+      skins (landed 48-joint refusal), LINEAR/STEP animations via the RFC 0003
+      binding form. Refusal list recorded in `gltf.ts`'s header; digests pinned
+      in `tests/determinism/gltf-load.test.ts`; browser gate
+      `tests/browser/gltf.spec.ts`.
+- [ ] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
+      `StandardMaterial` carries `map` only, so a loaded glTF's
+      metallicRoughness/normal/occlusion/emissive textures are warned-inert.
+      Needs the unit allocator `packages/render-webgl/src/gl-program.ts` has
+      named since WP-3a.3; when it lands, extend the glTF loader's decoded-slot
+      set (one list in `packages/assets/src/gltf.ts`) and drop the
+      `ignoredTextures` warning for the newly sampleable slots.
 
 - [ ] **Move the six capability tokens to their owning packages** when
       `packages/render`/`motion`/`physics`/`serialization` are free (RFC 0002 §2's
@@ -687,11 +698,14 @@ changes in `CHANGELOG.md`.
       — walk a document's resource keys, `loadFromManifest` each, hand the resulting map
       to `resourceCatalog(...)`. `tests/integration/texture-manifest.test.ts` runs the
       seam by hand today
-- [ ] **A-19 remainder:** §78 glTF/GLB (three blockers unchanged: §55/§59 materials, the
-      renderer-side texture tier, skins/morph targets — RFC 0003 answers the third on
-      paper) and renderer-side §77 (`R-30b`). The assets-side texture loader tier
-      shipped 2026-08-21 (`createTextureLoader`, `TextureAsset`, §96 decompression
-      bounds)
+- [ ] **A-19 remainder:** renderer-side §77 only (`R-30b`: cube/array/3D,
+      compressed containers, video). §78 glTF/GLB shipped 2026-08-29 at the
+      glTF 2.0-core tier; its staged residue lives with other rows: morph
+      targets wait on the GPU morph path (RFC 0003 staging), CUBICSPLINE waits
+      on a squad/tangent decision in `@four/animation`, and the four
+      unsampleable material texture slots (`ignoredTextures`) wait on the
+      multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
+      the loader parses them already and widens without a format change.
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
       closed operators and a new operator is out of scope in both RFCs). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a

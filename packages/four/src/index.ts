@@ -107,6 +107,27 @@ export {
 export type { TextOptions } from "./text-node.js";
 export { Text } from "./text-node.js";
 
+// §82's `Four.ComputePass` (the Q3 promotion, 2026-08-29) — the named-map
+// sugar over `@four/render`'s ordered `ComputePassDescriptor`, in the
+// umbrella because the spec's example spells it `Four.*` and the recorded
+// WP-R1.8 decision assigns the named-map spelling here. Tree-shakes when
+// unused; owns no device resource.
+export type {
+  ComputePassBindingEntry,
+  ComputePassBindings,
+  ComputePassOptions,
+} from "./compute-pass.js";
+export { ComputePass } from "./compute-pass.js";
+
+// §78's glTF assembly (A-19, 2026-08-29): `@four/assets` parses a glTF file
+// into plain data (its §3.1 row is `core` alone), and the umbrella — the one
+// package that sees geometry, materials, render, scene, and animation at
+// once — assembles it into live nodes. `gltf.ts` records the argument and
+// §78's sharing rule. Never referenced by `Application`; tree-shakes when
+// unused.
+export type { GltfInstance } from "./gltf.js";
+export { instantiateGltf } from "./gltf.js";
+
 // §71's picking adapter (RFC 0005): a render-side `PickingService` presented
 // as `@four/input`'s render-free `PickProvider` seam. It lives here because
 // the umbrella is the one layer that may name both sides — `pick-provider.ts`

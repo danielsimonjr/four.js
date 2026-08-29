@@ -234,6 +234,14 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§71's id-program compile-failure notice (RFC 0005, 2026-08-28). Message only: the failure is latched per context era in both builds — picking passes are skipped identically, and `pick` refuses identically for want of an id buffer — and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
   ],
   [
+    join("packages", "assets", "src", "gltf.ts"),
+    "§78's ignored-feature notices (A-19, 2026-08-29). Message only: every ignored feature is recorded unconditionally in GltfAsset.ignored — the §33 evidence is the determinism suite's pinned digest, which is computed over the parse output and holds in both builds — and only the console.warn naming each feature moves with the flag. Parsing is IO, runs before any fixed step, and its output is a pure function of the input bytes either way",
+  ],
+  [
+    join("packages", "four", "src", "gltf.ts"),
+    "§78's ignored-texture-slot warning at instantiation (A-19, 2026-08-29). Message only: the instantiated nodes, materials (factors applied, unsampleable slots absent), and clips are identical in both builds — the slot list itself is parse data on the material record — and only the console.warn saying the base map is the one sampled moves with the flag. Assembly runs outside the fixed step and writes nothing any simulation reads",
+  ],
+  [
     join("packages", "render-webgl", "src", "gl-node-program.ts"),
     "§60's per-graph compile-failure notice (RFC 0001, 2026-08-28). Message only: the cache latches the failed graph `null` in both builds — its draws are skipped identically, the latch is the behaviour and it is unconditional — and only the console.warn carrying §89's log moves with the flag. Rendering is outside the §33 envelope regardless; nothing a shader draws re-enters simulation state (§42/§43)",
   ],

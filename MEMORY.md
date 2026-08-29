@@ -28,6 +28,58 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — A-19 / §78: the glTF loader.** Decisions worth keeping:
+  - **The parse/assembly split is the TextureAsset seam one level up.**
+    `@four/assets` (§3.1 row: `core` alone) parses to plain validated data —
+    typed arrays and records, no engine class named — and `four` owns
+    `instantiateGltf`, because the umbrella is the one package that sees
+    geometry, materials, render, scene, and animation at once (the
+    `scene-serializers.ts` argument, third application). Zero new edges.
+  - **Refuse what would draw the wrong picture; ignore-with-record what
+    cannot.** Morph targets, CUBICSPLINE, MASK, sparse, texCoord ≥ 1,
+    unsupported modes → §85-precise refusals (a mesh authored to morph must not
+    draw un-morphed). Cameras, non-required extensions, TANGENT, mip
+    minFilters, wrapT≠wrapS → `GltfAsset.ignored` + one devWarnOnce each
+    (absence cannot corrupt the picture — the §67 warned-inert posture).
+    `extensionsRequired` is where every compression extension is refused.
+  - **The single-texture-unit material tier bounded the §59 half.** The packet
+    sketch assumed metallicRoughness textures were consumable; R-13's landed
+    StandardMaterial has `map` only. The four unsampleable slots are parsed,
+    validated, surfaced as `GltfMaterialRecord.ignoredTextures`, and warned at
+    instantiation — never dropped silently; factors always apply. The loader
+    needs no format change when the unit allocator lands.
+  - **glTF's uv convention converts at parse (`v → 1 − v`), textures keep the
+    landed flip.** One row flip in the engine (the texture tier's) plus one
+    coordinate conversion in the adapter — the §7a "flipped by the adapter that
+    produces them" rule extended to coordinates. Inverse binds absorb the
+    bone-axis convention; no axis conversion anywhere (RFC 0003 confirmed in
+    practice).
+  - **The 48-joint ceiling fires through the landed refusal, not a restated
+    constant** — `mesh.skeleton = skeleton` at instantiation throws
+    `UNSUPPORTED_GPU_FEATURE`; the number lives in one place.
+  - **All accessor reads are explicit little-endian `DataView` arithmetic** —
+    slower than typed-array views and chosen anyway: one code path for tight
+    and strided layouts, and parse output is byte-identical even on a
+    big-endian host, which is what let the determinism suite pin FNV-1a digests
+    of the committed fixtures (`quad.gltf` → 925a50c2, `skinned-column.glb` →
+    637ac47b).
+  - **A synthetic FetchResponse is a coverage dead-end — export the decode half
+    instead.** The first draft wrapped image bytes in a fake response to reuse
+    `createTextureLoader.load`; its never-called `text()`/`json()` were
+    uncoverable. `createTextureDecoder` (encoded bytes → TextureAsset) is now
+    the real seam, `createTextureLoader` wraps it, both suites cover it. When a
+    reuse needs a fake of an interface, extract the half you actually use.
+  - **Loaded clips target the instantiation object, not a node** — paths are
+    `nodes.<i>.transform.<channel>` (RFC 0003's indexed-array form), clips
+    build once per asset and play onto any instance; no §42 authority is
+    claimed (the mixer's non-Node-target posture), applications assign
+    authorities per node.
+  - **Measured: 0 B in every bundle** — worktree A/B: first-2d, first-3d,
+    ui-demo, and particles-demo bundles byte-identical at HEAD vs HEAD+packet;
+    grep: no glTF symbol in any tight bundle. Coverage: assets and four both
+    hold **100×4**. Browser gate 93/93; the glTF spec measured 784/784 orange
+    in-region, 0/784 out, 1 draw call.
+
 - **2026-08-29 — R-31 wiring + Q3 promotion (§36 `simulation: "gpu"`; §82
   `ComputePass` promoted).** Decisions worth keeping:
   - **CPU spawn + GPU integrate.** Every §33-bearing decision (RNG stream,

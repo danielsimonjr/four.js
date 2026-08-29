@@ -8,6 +8,67 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — §78 glTF 2.0 loader (A-19 closed: parse tier in `@four/assets`, assembly in `four`)
+
+#### Added
+
+- **`createGltfLoader` / `GltfAsset`** (`@four/assets`): the §78 parse tier at
+  the honest glTF 2.0-core slice — `.gltf` + separate `.bin` through the
+  injected `FetchLike`, base64 `data:` URIs, and the GLB container; every
+  geometry attribute the §53 layer has (positions/normals/uvs/colors/
+  joints/weights + u8/u16/u32 indices, `triangles`/`lines`, strided and
+  interleaved accessors); §59 metallic-roughness materials with the base-colour
+  texture decoded through the landed texture tier (`srgb`, sampler mapping, §96
+  decompression bounds, §7a row flip — uv `v` converts at parse to match);
+  skins as joints + inverse binds (no axis conversion — the binds absorb the
+  authoring convention, RFC 0003); `LINEAR`/`STEP` animations as per-channel
+  keyframe records; `extras` metadata. Refused loudly by name:
+  `extensionsRequired` (compression included), sparse accessors, morph targets
+  (GPU path staged — weights that deform nothing would draw the wrong picture),
+  `CUBICSPLINE`, `MASK` alpha, point/strip/fan modes, non-zero texCoord sets.
+  Ignored with a record (`GltfAsset.ignored`, §85-warned once): cameras,
+  non-required extensions, unrecognized attributes, mip minFilters,
+  `wrapT`≠`wrapS`. §96 throughout: every offset bounds-checked against its
+  container, every subresource size-bounded before allocation where a size is
+  declared, every float that can reach a transform validated finite, JSON
+  through `parseUntrustedJson`'s guards. §33: parsing is a pure function of the
+  input bytes — file-array traversal, explicit little-endian `DataView` reads —
+  pinned by digest in `tests/determinism/gltf-load.test.ts`.
+- **`instantiateGltf` / `GltfInstance`** (`four`): §78 assembly, in the
+  umbrella because `@four/assets`' frozen §3.1 row is `core` alone (the
+  `scene-serializers.ts` argument). §78's sharing sentence applied literally:
+  geometry, textures, and clips built once per asset and shared; nodes and
+  (mutable) materials fresh per call. Joints become `Bone`s, skins become one
+  `Skeleton` per instantiation (the landed 48-joint `UNSUPPORTED_GPU_FEATURE`
+  refusal fires at `Mesh.skeleton`), skinned meshes are created
+  `frustumCulled: false`, matrix-form nodes decompose here, and clips bind
+  through RFC 0003's indexed-array form (`nodes.<i>.transform.<channel>`) so
+  one clip plays onto any instantiation via `new AnimationMixer(instance)`.
+  Texture slots the single-unit §59 tier cannot sample
+  (`metallicRoughnessTexture`, normal/occlusion/emissive) are validated,
+  surfaced as `GltfMaterialRecord.ignoredTextures`, and warned at
+  instantiation — never silently dropped; factors still apply.
+- **`createTextureDecoder`** (`@four/assets`): the fetch-free half of the
+  landed texture decode path as a standalone export — `createTextureLoader`
+  now wraps it, and the glTF loader reuses it whole for embedded and
+  buffer-view images. No behaviour change.
+- **Committed fixtures** `tests/fixtures/gltf/` (hand-built, tiny):
+  `quad.gltf` + `quad.bin` and `skinned-column.glb`. New gates: unit
+  (malformed files are half the parse suite), integration (fixtures round-trip
+  into a drawn scene; the GLB skin animates through the mixer and moves the
+  palette), determinism (digest-pinned), and a browser spec
+  (`tests/browser/gltf.spec.ts`) rasterising the committed quad on
+  ANGLE/SwiftShader — 784/784 threshold pixels in-region, 0/784 out, one draw.
+
+#### Notes
+
+- `docs/SPECIFICATION.md` untouched: §78's list states requirements, not
+  status (the revision-1.9 precedent for §96), so the tier is recorded here and
+  in the gap register rather than as an amendment.
+- Bundle cost: **0 B** in every non-loading bundle (worktree A/B: first-2d,
+  first-3d, ui-demo, and particles-demo bundles byte-identical at HEAD vs
+  HEAD+packet).
+
 ### 2026-08-29 — §36 GPU particle simulation wired + the Q3 ComputePass promotion (R-31 closed)
 
 #### Added
