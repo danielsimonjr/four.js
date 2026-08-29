@@ -138,14 +138,23 @@ changes in `CHANGELOG.md`.
       runs with the wave's browser gate). RFC 0001's `"graph"` effect kind absent
       on WebGPU until the WGSL emitter. (The WP-R1.5-era size overruns were RFC
       0001's and were bumped at its landing.)
-- [ ] **R-1 / WP-R1.7 — shadows and stencil parity** (`wgpu-shadow.ts`,
-      `wgpu-stencil.ts`; `sampler_comparison` is a distinct binding type, so the
-      shadow layout differs structurally from GL's texture unit; the samplable
-      `depth32float` target and its cache row are already allocated by R1.6; §67
-      scissor is a pass command — record where the mirror-state discipline
-      evaporates; browser parity spec mirroring `tests/browser/stencil.spec.ts`
-      by threshold). Then **WP-R1.8** compute + GPU particles (unblocks R-31).
-      Plan: `docs/plans/R1-WEBGPU_PLAN.md`.
+- [x] **R-1 / WP-R1.7 — shadows and stencil parity** — landed 2026-08-29.
+      Caster pass into the R1.6 `depth32float` row; nine explicit
+      `textureSampleCompareLevel` taps through a nearest comparison sampler on a
+      widened lights layout (spare stride bytes; no landed transcript moved);
+      lazy `|sh` variants; R1.3's material-stencil residue retired by
+      `frameWantsStencil`. Browser specs written under `tests/browser/webgpu/`
+      (shadow threshold + the stencil 1/6 mirror), pending the next
+      `test:browser` run — record first-run measurements into the spec headers
+      then, per the gate convention.
+- [ ] **R-1 / WP-R1.8 — compute (§82) and GPU particles (R-31)**: instanced
+      particle draw first (port of `gl-particles.ts`), then §82's `ComputePass` —
+      placement is owner question Q3 (`@four/render` recommended); do not widen
+      `simulation: "gpu"` before it works; R-31 closes for WebGPU only. Notes:
+      `webgpu-device.ts` still models no compute members (joins with the packet
+      that calls it); the lights group now uses bindings 0–2, and group count
+      stays ≤ 3, leaving room per §62's four-group guarantee. Plan:
+      `docs/plans/R1-WEBGPU_PLAN.md`.
 - [ ] **§62's "applications may declare required and optional capabilities"** — still
       unimplemented; now that the capability record is complete it is cheap
       (WP-R1.9's first half, dispatches with the `R-14` wave).

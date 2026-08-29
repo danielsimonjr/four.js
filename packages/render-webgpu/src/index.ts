@@ -140,6 +140,7 @@ export {
   LIGHT_PUNCTUAL_POSITION_OFFSET,
   LIGHT_UNIFORM_BYTES,
   LIGHT_UNIFORM_FLOATS,
+  LIGHT_UNIFORM_MEMBERS_WGSL,
   LIGHT_UNIFORM_STRIDE_BYTES,
   LIGHT_UNIFORM_STRIDE_FLOATS,
   LIGHT_UNIFORM_WGSL,
@@ -184,6 +185,28 @@ export {
   readTexturePixels,
   readbackBytesPerRow,
 } from "./wgpu-readback.js";
+export {
+  SHADOW_FACTOR_WGSL,
+  SHADOW_LIGHT_UNIFORM_BYTES,
+  SHADOW_LIGHT_UNIFORM_WGSL,
+  SHADOW_MAP_BINDING,
+  SHADOW_MATRIX_OFFSET,
+  SHADOW_PARAMS_OFFSET,
+  SHADOW_SAMPLER_BINDING,
+  SHADOW_SHADER_SOURCE,
+  SHADOW_UNIFORM_SPARE_BYTES,
+  createShadowLightsBindGroupLayout,
+  createShadowSampler,
+  writeShadowUniforms,
+} from "./wgpu-shadow.js";
+export type { WgpuStencilSource } from "./wgpu-stencil.js";
+export {
+  CLEAR_STENCIL,
+  STENCIL_ALL_BITS,
+  applyStencilReference,
+  frameWantsStencil,
+  stencilDescriptor,
+} from "./wgpu-stencil.js";
 export {
   STANDARD_BASE_COLOR_OFFSET,
   STANDARD_EMISSIVE_OFFSET,

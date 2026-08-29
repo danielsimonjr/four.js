@@ -8,6 +8,25 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — WP-R1.7: WebGPU shadows and stencil parity
+
+#### Added
+
+- **WebGPU shadows and stencil parity (WP-R1.7).** §69's directional shadow tier
+  lands on the WebGPU backend: a depth-only caster pass into the renderer's own
+  samplable `depth32float` map (`wgpu-shadow.ts`), GL's 3×3 PCF as nine explicit
+  `textureSampleCompareLevel` taps through a nearest `less-equal`
+  `sampler_comparison` — a structurally distinct binding that joins a widened
+  lights group riding the light buffer's spare stride bytes — and a lazy `|sh`
+  variant of both shaded families, so shadowless scenes record byte-identical
+  transcripts and non-receivers share the shadowless pipeline. §57 stencil parity
+  completes (`wgpu-stencil.ts`): R1.3's recorded residue is retired — a
+  `material.stencil` alone now selects the stencil-carrying frame format on
+  screen via a frame scan (R-7's mask-by-hand tier, no renderer option needed;
+  off screen the target's `stencil` option still decides, GL's parity). New
+  browser parity specs (shadow threshold; the stencil 1/6 mirror) under
+  `tests/browser/webgpu/`.
+
 ### 2026-08-29 — RFC 0005: pixel/GPU-id picking (A-11's remaining half)
 
 #### Added

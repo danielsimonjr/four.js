@@ -28,6 +28,65 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — WP-R1.7: WebGPU shadows and stencil parity.** Decisions worth
+  keeping:
+  - **The shadow binding joins the lights group, widened — not a fourth group.**
+    `sampler_comparison`/`texture_depth_2d` cannot ride the `map` layout
+    (API-invalid pairing), so they join a second group-1 layout whose uniform
+    half is the landed light block plus 80 bytes in the stride's spare (592…672
+    of 768; `SHADOW_UNIFORM_SPARE_BYTES` pins what's left). No landed layout,
+    `minBindingSize` or transcript moves; the member list is one shared string so
+    the two structs cannot drift. Frame-level group like GL's frame-level unit
+    bind; dropped on lights-buffer regrowth and on map reallocation (view
+    identity is the cache key).
+  - **`useShadow` is a variant appended only-when-true** (`|sh:y` — the
+    conditional-suffix rule's fifth application, with a twist): `false` and
+    absent share one key _deliberately_, because they name identical pipeline
+    content — a non-receiver in a shadowed frame draws the shadowless frame's
+    very pipeline, which is the transcript-label half of GL's
+    mirror-at-initial-false byte-identity claim. The R1.5 statement "shaded
+    stages are GL-with-`useShadow`-false" now describes the unshadowed variant
+    only.
+  - **`textureSampleCompareLevel`, never `textureSampleCompare`** — the `Level`
+    form has no implicit derivatives, so the nine taps are legal inside the
+    non-uniform `len > 0` guard where GL also evaluates them; with a nearest
+    comparison sampler each tap is exactly one `receiver <= occluder`, keeping
+    §33's explicit-arithmetic filter. The receiver's `v` flips
+    (`0.5 − ndc.y·0.5`) for the top-left map origin; the caster's §3.3.8 remap
+    lands stored depth on GL's [0,1] convention, so the comparison needs no
+    depth-side correction.
+  - **Skinned and node casters are excluded by absence, not by rule**: the caster
+    whitelist is "what this backend draws" (unlit/lit/standard) — an invisible
+    surface must not cast. GL's finer undisplaced-node-casts-exactly rule becomes
+    reachable only with the WGSL emitter; recorded in source as a deviation, not
+    an omission.
+  - **The stencil residue retired by a frame scan, and the scan follows from a
+    landed decision**: with no `{stencil:true}` option (R1.3 — the backend owns
+    its attachment), the frame's list is the only place "does this frame need
+    stencil bits" can be answered. `frameWantsStencil` = the O(1) clip read plus
+    an early-exit material scan over drawable kinds; GL asks its surface, WebGPU
+    asks its frame, both ask the target off screen. The R1.3-pinned inertness
+    test was flipped in the same packet that retired the residue it pinned.
+  - **The scan moved application accessors ahead of every allocation, so the
+    frame now bails on `#disposed` right after it** — a reentrant dispose in a
+    stencil getter resurrects nothing (the R1.6 rule); a dispose in a _light_
+    accessor (collect-time, pre-existing exposure) still costs only the frame,
+    pinned including the map-not-produced path.
+  - **`depthLoadOp:"clear"` is the shadow pass's to use** — the mip blits'
+    exception gains its second member: a shadow pass has no sub-rectangle, so
+    §61's scissored-clear argument does not reach it. And the caster pass is
+    where the GL mirror-state discipline visibly evaporates: GL's
+    `#renderShadowMap` borrows framebuffer/rectangles/program and owes re-binds;
+    here it is a pass of its own borrowing nothing — recorded per the plan as the
+    place this backend is structurally safer.
+  - **Multi-agent note:** the RFC 0005 sibling committed mid-session, moving the
+    tip under this packet's working tree; the forecast gl-picking GATED failure
+    never fired (their commit carried the entry), suites ran green on the moved
+    tree, and the packet's staged diff separated cleanly.
+  - Measured: coverage 99.75/99.53 → **99.77/99.58** (new files 100×4); 0/9
+    bundles carry any WebGPU shadow/stencil symbol (`createVertexArray` control
+    9/9); all size budgets green.
+
 - **2026-08-29 — RFC 0005 / A-11 pixel half: GPU-id picking.** Decisions worth
   keeping:
   - **The item→node join is the worldMatrix object.** Render items carry no node

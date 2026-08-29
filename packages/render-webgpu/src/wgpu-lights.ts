@@ -62,15 +62,18 @@
  * group carries no index of its own (the pipeline layout assigns it), so the
  * texture cache's records serve both families unchanged.
  *
- * ## No shadow half yet
+ * ## The shadow half rides the spare stride bytes (WP-R1.7)
  *
- * §69's comparison sampler is a structurally different binding and is
- * WP-R1.7's packet. Until it lands the shaded WGSL is the GL stage with
- * `useShadow` at its initial `false` — which is the identical arithmetic,
- * operation for operation (the claim `gl-program.ts`'s `ShadowUniforms`
- * records) — and a casting light lights the frame unshadowed rather than
- * skipping it, the §61 direction the GL backend takes for a shadow target it
- * cannot allocate.
+ * §69's comparison sampler is a structurally different binding, and it lives
+ * in `wgpu-shadow.ts`: a **widened twin** of this block
+ * (`SHADOW_LIGHT_UNIFORM_WGSL`) appends the shadow matrix and parameters in
+ * the stride bytes this layout already leaves spare (592…672 of 768), and two
+ * more bindings — `texture_depth_2d` and `sampler_comparison` — join it in a
+ * second group-1 layout. This layout, this struct, and
+ * {@link LIGHT_UNIFORM_BYTES} are untouched, which is what keeps every landed
+ * shaded transcript byte-identical: a draw that receives no shadow still binds
+ * exactly this block. The member list is shared as
+ * {@link LIGHT_UNIFORM_MEMBERS_WGSL} so the two structs cannot drift.
  */
 
 import { MAX_PUNCTUAL_LIGHTS, type SceneLights } from "@four/render";
@@ -177,12 +180,13 @@ export function createLightsBindGroupLayout(
 }
 
 /**
- * The WGSL declaration of the block above — `DRAW_UNIFORM_WGSL`'s discipline:
- * the layout the pipeline declares and the layout the shader reads live side
- * by side in one module, so they cannot drift.
+ * The member list of the block above, without the struct wrapper — shared
+ * with `wgpu-shadow.ts`'s widened `ShadowLightUniforms` (WP-R1.7), whose
+ * first {@link LIGHT_UNIFORM_BYTES} bytes must be this layout exactly: one
+ * string, two structs, so the shadowed and unshadowed variants cannot
+ * disagree about where a light lives.
  */
-export const LIGHT_UNIFORM_WGSL = `struct LightUniforms {
-  ambientColor : vec4<f32>,
+export const LIGHT_UNIFORM_MEMBERS_WGSL = `  ambientColor : vec4<f32>,
   lightDirection : vec4<f32>,
   lightColor : vec4<f32>,
   cameraPosition : vec4<f32>,
@@ -190,7 +194,15 @@ export const LIGHT_UNIFORM_WGSL = `struct LightUniforms {
   punctualPosition : array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>,
   punctualColor : array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>,
   punctualDirection : array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>,
-  punctualParams : array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>,
+  punctualParams : array<vec4<f32>, ${String(MAX_PUNCTUAL_LIGHTS)}>,`;
+
+/**
+ * The WGSL declaration of the block above — `DRAW_UNIFORM_WGSL`'s discipline:
+ * the layout the pipeline declares and the layout the shader reads live side
+ * by side in one module, so they cannot drift.
+ */
+export const LIGHT_UNIFORM_WGSL = `struct LightUniforms {
+${LIGHT_UNIFORM_MEMBERS_WGSL}
 };
 
 @group(${String(LIGHTS_BIND_GROUP_INDEX)}) @binding(0) var<uniform> lights : LightUniforms;`;

@@ -57,6 +57,7 @@ import {
 import { batchVertexBufferLayout } from "./wgpu-batch.js";
 import { effectShaderSource, type WgpuEffectKind } from "./wgpu-effect.js";
 import { litShaderSource, shadedVertexBufferLayouts } from "./wgpu-lit.js";
+import { SHADOW_SHADER_SOURCE } from "./wgpu-shadow.js";
 import { SPRITE_SHADER_SOURCE } from "./wgpu-sprite.js";
 import { standardShaderSource } from "./wgpu-standard.js";
 import {
@@ -141,10 +142,20 @@ const STENCIL_OPERATIONS: Readonly<
  * families (`wgpu-lit.ts`, `wgpu-standard.ts`), which read the light block at
  * group 1 and — the standard family — a widened group-0 uniform block;
  * `"effect"` is §70's full-screen pass (WP-R1.6, `wgpu-effect.ts`), whose
- * WGSL module is picked by the descriptor's `effect` member.
+ * WGSL module is picked by the descriptor's `effect` member; `"shadow"` is
+ * §69's depth-only caster pass (WP-R1.7, `wgpu-shadow.ts`), one module over
+ * the shared `DrawUniforms` layout whatever family shades its caster on
+ * screen — `gl-shadow.ts`'s one-program argument, restated as one family.
  */
 export type WgpuPipelineKind =
-  "unlit" | "clear" | "sprite" | "batch" | "lit" | "standard" | "effect";
+  | "unlit"
+  | "clear"
+  | "sprite"
+  | "batch"
+  | "lit"
+  | "standard"
+  | "effect"
+  | "shadow";
 
 /**
  * §67's stencil state as a pipeline bakes it (WP-R1.3) — §57's record minus
@@ -255,6 +266,18 @@ export interface WgpuPipelineDescriptor {
    * application).
    */
   readonly normals?: boolean;
+
+  /**
+   * Whether a shaded variant multiplies §69's shadow term in (WP-R1.7,
+   * `wgpu-shadow.ts`) — GL's per-draw `useShadow` uniform as pipeline
+   * identity, appended to the key **only when `true`**: a non-receiver
+   * inside a shadowed frame then shares the very pipeline (and key, and
+   * transcript label) a shadowless frame compiles, exactly as GL's
+   * `useShadow: false` draw is the plain program path. `false` and absent
+   * are deliberately one key — they name identical pipeline content — so
+   * the renderer may pass the flag unconditionally on shaded draws.
+   */
+  readonly shadow?: boolean;
 }
 
 /**
@@ -268,11 +291,13 @@ export interface WgpuPipelineDescriptor {
  * make impossible — so a new field on {@link WgpuPipelineDescriptor} is a
  * compile error here until it is added below.
  *
- * The two **optional** fields (§67's `stencil`, §65's `batch`) append a
- * prefixed segment only when present. That is still a total, injective
- * function — absence appends nothing, and no required field's value can spell
- * `|s:` or `|b:` — and it is what keeps every pre-WP-R1.3 key, and therefore
- * every `four:<key>` pipeline label already recorded in landed transcripts,
+ * The **optional** fields (§67's `stencil`, §65's `batch`, §68's `normals`,
+ * §70's `effect`, §69's `shadow`) append a prefixed segment only when carried
+ * — `shadow` only when carried *true*, since `false` names the same pipeline
+ * content as absence. That is still a total, injective function — absence
+ * appends nothing, and no required field's value can spell the prefixes —
+ * and it is what keeps every earlier packet's key, and therefore every
+ * `four:<key>` pipeline label already recorded in landed transcripts,
  * byte-identical for a descriptor that does not carry them.
  */
 export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
@@ -306,6 +331,9 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   const effect = descriptor.effect ?? null;
   if (effect !== null) {
     key += `|e:${effect}`;
+  }
+  if (descriptor.shadow === true) {
+    key += "|sh:y";
   }
   return key;
 }
@@ -384,6 +412,26 @@ export class WgpuPipelineCache {
   #standardMapPipelineLayout: GpuPipelineLayout | null = null;
 
   /**
+   * The **shadowed** shaded families' group-1 layout (WP-R1.7,
+   * `wgpu-shadow.ts`) — the widened light block plus the comparison pair —
+   * reached only when a shadowed pipeline is first created: a provider for
+   * `#lightsLayout`'s two reasons, verbatim (same object the renderer binds
+   * its shadow group against; no eager `createBindGroupLayout` in a
+   * shadowless application's transcript). `undefined` for a cache built
+   * without one: such a cache answers `null` for a shadowed descriptor,
+   * which skips the draw.
+   */
+  readonly #shadowLightsLayout: (() => GpuBindGroupLayout) | undefined;
+
+  /**
+   * The shadowed shaded compositions, keyed `lit`/`lit|map`/`standard`/
+   * `standard|map` — a small map rather than four more fields, because the
+   * four landed fields stay exactly where the landed transcripts put them
+   * and these compositions are new objects a shadowless frame never creates.
+   */
+  readonly #shadowShadedLayouts = new Map<string, GpuPipelineLayout>();
+
+  /**
    * The grade effect's group-1 layout (WP-R1.6, `wgpu-effect.ts`), reached
    * only when a grade pipeline is first created — a provider for
    * `#textureLayout`'s two reasons: it must be **the same object** the
@@ -423,6 +471,7 @@ export class WgpuPipelineCache {
     lightsLayout?: () => GpuBindGroupLayout,
     standardLayout?: () => GpuBindGroupLayout,
     effectLayout?: () => GpuBindGroupLayout,
+    shadowLightsLayout?: () => GpuBindGroupLayout,
   ) {
     this.#device = device;
     this.#textureLayout = textureLayout;
@@ -430,6 +479,7 @@ export class WgpuPipelineCache {
     this.#lightsLayout = lightsLayout;
     this.#standardLayout = standardLayout;
     this.#effectLayout = effectLayout;
+    this.#shadowLightsLayout = shadowLightsLayout;
     this.#drawLayout = bindGroupLayout;
     this.#layout = device.createPipelineLayout({
       label: "four:pipeline-layout",
@@ -496,14 +546,18 @@ export class WgpuPipelineCache {
     this.#standardMapPipelineLayout = null;
     this.#effectPipelineLayout = null;
     this.#effectGradePipelineLayout = null;
+    this.#shadowShadedLayouts.clear();
   }
 
   /**
    * The pipeline layout `descriptor` needs: group 0 alone; group 0 and
    * group 1 for a variant that samples; the sprite block's own group 0
    * plus group 1 for the sprite family (`wgpu-sprite.ts`); or, for the two
-   * shaded families, their group 0 plus the light block at group 1 — plus the
+   * shaded families, their group 0 plus the light block at group 1 — the
+   * widened shadow-lights layout for a shadowed variant (WP-R1.7) — plus the
    * texture layout at group 2 when the variant samples (`wgpu-lights.ts`).
+   * §69's caster family (`"shadow"`) reads exactly the shared `DrawUniforms`
+   * group, so it resolves through the unsampling arm below.
    *
    * `null` when a pipeline is asked of a cache that was given no provider for
    * a layout it needs — see {@link WgpuPipelineCache}'s fields.
@@ -581,11 +635,17 @@ export class WgpuPipelineCache {
    * variant, the texture layout at group 2. Four cached compositions, each
    * built with its family's first pipeline; `null` for a missing provider,
    * which skips the draw ({@link WgpuPipelineCache}'s fields).
+   *
+   * A **shadowed** variant (WP-R1.7) is the same shape with group 1 swapped
+   * for the widened shadow-lights layout — four more compositions, cached in
+   * {@link WgpuPipelineCache.#shadowShadedLayouts}, none of which a
+   * shadowless frame creates.
    */
   #shadedLayoutFor(
     descriptor: WgpuPipelineDescriptor,
   ): GpuPipelineLayout | null {
-    const lights = this.#lightsLayout;
+    const shadow = descriptor.shadow === true;
+    const lights = shadow ? this.#shadowLightsLayout : this.#lightsLayout;
     if (lights === undefined) {
       return null;
     }
@@ -601,6 +661,24 @@ export class WgpuPipelineCache {
     const drawLayout =
       drawProvider === undefined ? this.#drawLayout : drawProvider();
     const family = standard ? "standard" : "lit";
+    if (shadow) {
+      const key = `${family}${descriptor.map ? "|map" : ""}`;
+      const existing = this.#shadowShadedLayouts.get(key);
+      if (existing !== undefined) {
+        return existing;
+      }
+      const created = this.#device.createPipelineLayout({
+        label: `four:pipeline-layout:${family}:shadow${
+          descriptor.map ? ":map" : ""
+        }`,
+        bindGroupLayouts:
+          descriptor.map && texture !== undefined
+            ? [drawLayout, lights(), texture()]
+            : [drawLayout, lights()],
+      });
+      this.#shadowShadedLayouts.set(key, created);
+      return created;
+    }
     if (descriptor.map && texture !== undefined) {
       const existing = standard
         ? this.#standardMapPipelineLayout
@@ -642,13 +720,15 @@ export class WgpuPipelineCache {
    * **unlit** module keys: a batch draws through the unlit shader family
    * (`wgpu-batch.ts`), so a frame mixing batched and unbatched unlit draws of
    * one variant compiles that variant's module exactly once. The two shaded
-   * families key on their own variant pair (`normals` × `map`, WP-R1.5) —
-   * `"lit"`, `"lit|n"`, `"lit|map"`, `"lit|n|map"` and the `standard`
-   * counterparts — so a frame mixing normal-carrying and normal-less lit
-   * geometry compiles two modules, not one per pipeline. The effect family
-   * keys per kind (WP-R1.6) — `"effect|copy"`, `"effect|grade"`,
-   * `"effect|output-transform"` — so a chain grading into two formats compiles
-   * one grade module and two pipelines.
+   * families key on their own variant triple (`normals` × `map` × WP-R1.7's
+   * `shadow`) — `"lit"`, `"lit|n"`, `"lit|map"`, `"lit|n|map"`, their `|sh`
+   * counterparts, and the `standard` set — so a frame mixing normal-carrying
+   * and normal-less lit geometry compiles two modules, not one per pipeline,
+   * and a shadowed frame's non-receivers share the shadowless module. The
+   * effect family keys per kind (WP-R1.6) — `"effect|copy"`,
+   * `"effect|grade"`, `"effect|output-transform"` — so a chain grading into
+   * two formats compiles one grade module and two pipelines. `"shadow"` is
+   * §69's one caster module (WP-R1.7), variant-free like the sprite's.
    */
   #module(
     kind: WgpuPipelineKind,
@@ -656,17 +736,20 @@ export class WgpuPipelineCache {
     map: boolean,
     normals: boolean,
     effect: WgpuEffectKind | null,
+    shadow: boolean,
   ): GpuShaderModule {
     const key =
       kind === "clear"
         ? "clear"
         : kind === "sprite"
           ? "sprite"
-          : kind === "effect"
-            ? `effect|${effect ?? "copy"}`
-            : kind === "lit" || kind === "standard"
-              ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}`
-              : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
+          : kind === "shadow"
+            ? "shadow"
+            : kind === "effect"
+              ? `effect|${effect ?? "copy"}`
+              : kind === "lit" || kind === "standard"
+                ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}${shadow ? "|sh" : ""}`
+                : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
     const existing = this.#modules.get(key);
     if (existing !== undefined) {
       return existing;
@@ -678,13 +761,15 @@ export class WgpuPipelineCache {
           ? CLEAR_SHADER_SOURCE
           : kind === "sprite"
             ? SPRITE_SHADER_SOURCE
-            : kind === "effect"
-              ? effectShaderSource(effect ?? "copy")
-              : kind === "lit"
-                ? litShaderSource(normals, map)
-                : kind === "standard"
-                  ? standardShaderSource(normals, map)
-                  : unlitShaderSource(vertexColors, map),
+            : kind === "shadow"
+              ? SHADOW_SHADER_SOURCE
+              : kind === "effect"
+                ? effectShaderSource(effect ?? "copy")
+                : kind === "lit"
+                  ? litShaderSource(normals, map, shadow)
+                  : kind === "standard"
+                    ? standardShaderSource(normals, map, shadow)
+                    : unlitShaderSource(vertexColors, map),
     });
     this.#modules.set(key, module);
     return module;
@@ -694,7 +779,10 @@ export class WgpuPipelineCache {
    * The vertex-buffer layouts `descriptor`'s pipeline reads: none for the
    * clear and the effect (their triangles are generated from the vertex
    * index), position alone
-   * for a sprite (uv is derived from the quad uniform), the shaded stream
+   * for a sprite (uv is derived from the quad uniform) and for §69's caster
+   * (a depth-only stage ignores every other stream, `gl-shadow.ts`'s
+   * argument — the vertex arrays' streams-not-declared-are-ignored rule,
+   * expressed as a one-buffer layout), the shaded stream
    * list — position, then normals, then uvs — for the lit and standard
    * families (WP-R1.5), the planner's one interleaved buffer for a batch, and
    * the positional stream list for the unlit family.
@@ -705,7 +793,7 @@ export class WgpuPipelineCache {
     if (descriptor.kind === "clear" || descriptor.kind === "effect") {
       return [];
     }
-    if (descriptor.kind === "sprite") {
+    if (descriptor.kind === "sprite" || descriptor.kind === "shadow") {
       return [POSITION_BUFFER_LAYOUT];
     }
     if (descriptor.kind === "lit" || descriptor.kind === "standard") {
@@ -739,6 +827,7 @@ export class WgpuPipelineCache {
       descriptor.map,
       descriptor.normals === true,
       descriptor.effect ?? null,
+      descriptor.shadow === true,
     );
     const blend =
       descriptor.blend === "none" ? undefined : BLEND_STATES[descriptor.blend];

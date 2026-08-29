@@ -463,6 +463,13 @@ export interface GpuSamplerDescriptor {
   readonly mipmapFilter: string;
   /** §77's anisotropy, present only above 1 — see `wgpu-texture.ts`. */
   readonly maxAnisotropy?: number;
+  /**
+   * The comparison a `sampler_comparison` evaluates per tap (§69, WP-R1.7) —
+   * present exactly on the shadow sampler (`wgpu-shadow.ts`), absent on every
+   * ordinary sampler, mirroring the WebGPU descriptor: presence is what makes
+   * the object a comparison sampler.
+   */
+  readonly compare?: string;
 }
 
 /** A buffer allocation request. */

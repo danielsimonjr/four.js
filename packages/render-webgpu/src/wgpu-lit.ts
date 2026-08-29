@@ -15,10 +15,12 @@
  *
  * — with `lightColor` premultiplied by intensity and no `1/π` anywhere (R-13:
  * the engine's light units already fold it out; `wgpu-lights.ts` restates the
- * convention). §69's shadow term is absent because its comparison sampler is
- * WP-R1.7's packet; the GL stage with `useShadow` at its initial `false`
- * evaluates exactly the expression above, operation for operation, so the two
- * backends shade the same frame until shadows land here too.
+ * convention). §69's shadow term is a **lazy variant** (WP-R1.7,
+ * `wgpu-shadow.ts`): with `shadow` false the module is the GL stage with
+ * `useShadow` at its initial `false`, operation for operation — byte-identical
+ * to what WP-R1.5 landed — and with it true the directional product is bound
+ * to a local and multiplied by `shadowFactor` under the same `len > 0` guard,
+ * exactly as the GL stage multiplies it under `useShadow`.
  *
  * ## Three departures from the GLSL original, each forced by WebGPU
  *
@@ -50,6 +52,10 @@ import {
   PUNCTUAL_LIGHT_WGSL,
   SHADED_MAP_BINDING_WGSL,
 } from "./wgpu-lights.js";
+import {
+  SHADOW_FACTOR_WGSL,
+  SHADOW_LIGHT_UNIFORM_WGSL,
+} from "./wgpu-shadow.js";
 import {
   FRAGMENT_ENTRY_POINT,
   POSITION_BUFFER_LAYOUT,
@@ -194,7 +200,7 @@ ${input}
 }
 
 /**
- * The lit WGSL module for one variant pair.
+ * The lit WGSL module for one variant triple.
  *
  * Generated rather than stored, `unlitShaderSource`'s rule: the shared half is
  * written once and the text is a pure function of the flags, so the pipeline
@@ -204,11 +210,21 @@ ${input}
  * *added to* the pre-existing expression — so a variant that samples nothing
  * under a scene with no punctual lights computes exactly what the GL program
  * computes with its switches at their initial values.
+ *
+ * `shadow` (WP-R1.7) swaps the light block for `wgpu-shadow.ts`'s widened
+ * twin, splices `shadowFactor`, and multiplies the directional product before
+ * it joins the lighting sum — GL's `useShadow` branch, as a variant; the
+ * module header carries the argument. With it false — the default, and every
+ * pre-R1.7 call — the emitted text is byte-identical to what WP-R1.5 landed.
  */
-export function litShaderSource(normals: boolean, map: boolean): string {
+export function litShaderSource(
+  normals: boolean,
+  map: boolean,
+  shadow = false,
+): string {
   return `${DRAW_UNIFORM_WGSL}
 
-${LIGHT_UNIFORM_WGSL}${
+${shadow ? SHADOW_LIGHT_UNIFORM_WGSL : LIGHT_UNIFORM_WGSL}${
     map
       ? `
 
@@ -218,7 +234,13 @@ ${SHADED_MAP_BINDING_WGSL}`
 
 ${shadedVertexStageWgsl(normals, map)}
 
-${PUNCTUAL_LIGHT_WGSL}
+${PUNCTUAL_LIGHT_WGSL}${
+    shadow
+      ? `
+
+${SHADOW_FACTOR_WGSL}`
+      : ""
+  }
 
 @fragment
 fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
@@ -233,7 +255,14 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
   if (len > 0.0) {
     diffuse = max(dot(input.normal / len, -lights.lightDirection.xyz), 0.0);
   }
-  let direct = lights.lightColor.xyz * diffuse;
+  ${
+    shadow
+      ? `var direct = lights.lightColor.xyz * diffuse;
+  if (len > 0.0) {
+    direct = direct * shadowFactor(input.worldPosition, input.normal / len);
+  }`
+      : `let direct = lights.lightColor.xyz * diffuse;`
+  }
   var lighting = lights.ambientColor.xyz + direct;
   if (len > 0.0) {
     let n = input.normal / len;

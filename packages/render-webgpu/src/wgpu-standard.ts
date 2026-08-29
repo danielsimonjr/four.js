@@ -22,9 +22,12 @@
  * The guards are the GL stage's too: a zero-length normal shades
  * ambient-plus-emissive, `nDotL ≤ 0` skips the whole direct term, `nDotV` is
  * floored at `1e-4`, the `D` and `V` denominators at `1e-8`/`1e-6`. §69's
- * shadow multiply is absent for `wgpu-lit.ts`'s reason — WP-R1.7 owns the
- * comparison sampler, and the GL stage with `useShadow` at its initial `false`
- * is this arithmetic exactly.
+ * shadow multiply is a lazy variant (WP-R1.7, `wgpu-shadow.ts`): with
+ * `shadow` false this arithmetic is exactly the GL stage with `useShadow` at
+ * its initial `false`, and with it true the **directional lobe's** product is
+ * bound to a local and multiplied by `shadowFactor` before joining `shaded` —
+ * the R-17 shape `gl-standard.ts` records, with the same normalized `n` the
+ * BRDF shades with fed to the normal bias.
  *
  * ## Why a second group-0 layout (the sprite precedent, second application)
  *
@@ -67,6 +70,10 @@ import {
   SHADED_MAP_BINDING_WGSL,
 } from "./wgpu-lights.js";
 import { shadedVertexStageWgsl } from "./wgpu-lit.js";
+import {
+  SHADOW_FACTOR_WGSL,
+  SHADOW_LIGHT_UNIFORM_WGSL,
+} from "./wgpu-shadow.js";
 import { FRAGMENT_ENTRY_POINT } from "./wgpu-unlit.js";
 
 /** Byte offset of `StandardUniforms.viewProjection` — shared with `DrawUniforms`. */
@@ -135,10 +142,11 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
 @group(0) @binding(0) var<uniform> draw : StandardUniforms;`;
 
 /**
- * The standard WGSL module for one variant pair — the same variant axes as the
- * lit family (`normals`, `map`), for the same reasons (`wgpu-lit.ts`'s
- * departures 2 and 3 apply verbatim; the vertex stage *is* the lit family's,
- * over this module's own uniform block).
+ * The standard WGSL module for one variant triple — the same variant axes as
+ * the lit family (`normals`, `map`, WP-R1.7's `shadow`), for the same reasons
+ * (`wgpu-lit.ts`'s departures 2 and 3 apply verbatim; the vertex stage *is*
+ * the lit family's, over this module's own uniform block; `shadow` defaults
+ * false and the default's text is byte-identical to what WP-R1.5 landed).
  *
  * The fragment stage is `STANDARD_FRAGMENT_SHADER_SOURCE`'s arithmetic in its
  * order: the base sample, the diffuse/F0 split, ambient into the diffuse lobe,
@@ -148,10 +156,14 @@ export const STANDARD_UNIFORM_WGSL = `struct StandardUniforms {
  * keeps the directional term the pre-R-17 expression. Emissive is added last,
  * outside every guard, so a normal-less or back-facing surface still glows.
  */
-export function standardShaderSource(normals: boolean, map: boolean): string {
+export function standardShaderSource(
+  normals: boolean,
+  map: boolean,
+  shadow = false,
+): string {
   return `${STANDARD_UNIFORM_WGSL}
 
-${LIGHT_UNIFORM_WGSL}${
+${shadow ? SHADOW_LIGHT_UNIFORM_WGSL : LIGHT_UNIFORM_WGSL}${
     map
       ? `
 
@@ -161,7 +173,13 @@ ${SHADED_MAP_BINDING_WGSL}`
 
 ${shadedVertexStageWgsl(normals, map)}
 
-${PUNCTUAL_LIGHT_WGSL}
+${PUNCTUAL_LIGHT_WGSL}${
+    shadow
+      ? `
+
+${SHADOW_FACTOR_WGSL}`
+      : ""
+  }
 
 const DIELECTRIC_F0 : f32 = 0.04;
 const MIN_ROUGHNESS : f32 = 0.045;
@@ -219,8 +237,15 @@ fn ${FRAGMENT_ENTRY_POINT}(input : VertexOutput) -> @location(0) vec4<f32> {
     let l = -lights.lightDirection.xyz;
     let nDotL = dot(n, l);
     if (nDotL > 0.0) {
-      shaded = shaded + directLobe(n, v, l, nDotL, diffuseColor, f0, alpha2)
+      ${
+        shadow
+          ? `var direct = directLobe(n, v, l, nDotL, diffuseColor, f0, alpha2)
         * lights.lightColor.xyz * nDotL;
+      direct = direct * shadowFactor(input.worldPosition, n);
+      shaded = shaded + direct;`
+          : `shaded = shaded + directLobe(n, v, l, nDotL, diffuseColor, f0, alpha2)
+        * lights.lightColor.xyz * nDotL;`
+      }
     }
 
     let punctualCount = i32(lights.counts.x);
