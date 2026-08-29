@@ -226,6 +226,10 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§67's clip-into-a-stencil-less-render-target warning (WP-R1.6, 2026-08-28) — the WebGPU restatement of the GL entry above, reachable only off screen (the on-screen attachment always widens to carry stencil). Diagnostic only, and O(1): the check is one read of the frame's first item beside the target record's `stencil` flag, records no command, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, the same fail-toward-drawing behaviour the warning describes. Rendering is outside the §33 envelope regardless; nothing a frame draws re-enters simulation state (§42/§43)",
   ],
   [
+    join("packages", "render-webgl", "src", "gl-picking.ts"),
+    "§71's id-program compile-failure notice (RFC 0005, 2026-08-28). Message only: the failure is latched per context era in both builds — picking passes are skipped identically, and `pick` refuses identically for want of an id buffer — and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
+  ],
+  [
     join("packages", "render-webgl", "src", "gl-node-program.ts"),
     "§60's per-graph compile-failure notice (RFC 0001, 2026-08-28). Message only: the cache latches the failed graph `null` in both builds — its draws are skipped identically, the latch is the behaviour and it is unconditional — and only the console.warn carrying §89's log moves with the flag. Rendering is outside the §33 envelope regardless; nothing a shader draws re-enters simulation state (§42/§43)",
   ],

@@ -34,6 +34,7 @@ export type {
   GlBuffer,
   GlProgramHandle,
   GlShader,
+  GlSync,
   GlTexture,
   GlUniformLocation,
   GlVertexArray,
@@ -56,6 +57,26 @@ export {
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
 } from "./gl-program.js";
+export type {
+  PickingRendererHost,
+  PickingServiceFactory,
+} from "./gl-picking-registry.js";
+export {
+  clearRegisteredPickingPipeline,
+  resolvePickingServiceFactory,
+} from "./gl-picking-registry.js";
+// §71's picking pipeline (RFC 0005). Deliberately — like the skinned and
+// node-material pipelines above and below — a module `WebglRenderer` never
+// reaches statically: importing `registerPickingPipeline` is what links the
+// id program, the service, and its fence read-back into a bundle, and a
+// barrel re-export does not (it tree-shakes like every other unused export)
+// — see `gl-picking-registry.ts` for the whole seam.
+export {
+  IdPassProgram,
+  PICKING_GL,
+  WebglPickingService,
+  registerPickingPipeline,
+} from "./gl-picking.js";
 export type {
   CacheableRenderTarget,
   RenderTargetRecord,

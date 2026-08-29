@@ -12,8 +12,24 @@ changes in `CHANGELOG.md`.
 
 - [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
       2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → ~~0001 shader/node
-      materials (done 2026-08-28)~~ → **0005 pixel picking next** → 0004 raster
-      painting, interleaved with WP-R1.6…R1.8. 0001's landing decides WP-R1.9's
+      materials (done 2026-08-28)~~ → ~~0005 pixel picking (done
+      2026-08-29)~~ → **0004 raster painting next**, interleaved with WP-R1.7…R1.9.
+- [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
+      id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
+      then particle systems pick by bounds only); §86 rows still owed: id-pass
+      cost vs the flagship list and measured fence-vs-stall pick latency;
+      WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material; §72
+      pointer-event dispatch on a `PickProvider` result is an input packet. The
+      analytic `"geometry"` tier (+ `node.hitTestMode` per the adopted Q3)
+      remains A-11's own follow-up packet, unblocked.
+- [ ] **docs/COMPATIBILITY.md §2 is stale beyond the two rows fixed 2026-08-29**
+      (WebGPU row updated to the R1.1–R1.6 truth; §71 picking row added): the
+      WebGL feature table still says four pipelines / batching absent / one
+      directional light, the capability paragraph still says two of eleven
+      fields, and the `renderer: "auto"` paragraph predates A-8's closure
+      (registries + "auto" landed 2026-08-07). Needs a §2 refresh packet or the
+      closing honesty pass.
+      0001's landing decides WP-R1.9's
       input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
       reachability are backend-independent and re-exported through `@four/render`;
       the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache

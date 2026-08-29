@@ -94,9 +94,12 @@ import {
   WEIGHTS_ATTRIBUTE_LOCATION,
   NODE_SURFACE_TEXTURE_UNIT_BASE,
   WebglRenderer,
+  WebglPickingService,
   clearRegisteredNodeMaterialPipeline,
+  clearRegisteredPickingPipeline,
   clearRegisteredSkinningPipeline,
   createGlBatching,
+  registerPickingPipeline,
   registerNodeMaterialPipeline,
   registerSkinningPipeline,
   resolveSkinningPipelineFactory,
@@ -11244,6 +11247,102 @@ describe("WebglRenderer.renderEffect — §70 graph effects (§60; RFC 0001)", (
       expect(warn).toHaveBeenCalledTimes(1);
     } finally {
       warn.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §71's picking service seam (RFC 0005) — the renderer's half: the gated
+// factory method and the live host window it opens. The service's own pass
+// and read-back live in `gl-picking.test.ts`.
+// ---------------------------------------------------------------------------
+
+describe("WebglRenderer.createPickingService (§71, RFC 0005)", () => {
+  it("refuses when no picking pipeline is registered (§85)", async () => {
+    clearRegisteredPickingPipeline();
+    const { renderer } = await initialized();
+    const error = thrown(() => renderer.createPickingService());
+    expect(error.code).toBe("INVALID_APPLICATION_STATE");
+    expect(String(error.message)).toContain("registerPickingPipeline");
+  });
+
+  it("refuses on a disposed renderer (§83)", async () => {
+    registerPickingPipeline();
+    try {
+      const { renderer } = await initialized();
+      renderer.dispose();
+      const error = thrown(() => renderer.createPickingService());
+      expect(error.code).toBe("INVALID_APPLICATION_STATE");
+    } finally {
+      clearRegisteredPickingPipeline();
+    }
+  });
+
+  it("builds a service whose host window tracks the live renderer state", async () => {
+    registerPickingPipeline();
+    try {
+      const { renderer, gl, camera } = await initialized();
+      renderer.resize(8, 8);
+      const service = renderer.createPickingService();
+      expect(service).toBeInstanceOf(WebglPickingService);
+      // Creation alone issues no GL call (the lazy-compile contract).
+      const before = gl.calls.length;
+      expect(gl.calls.length).toBe(before);
+
+      // The host's surface size and caches are live: an update over the
+      // renderer's own context compiles the id program and draws through
+      // the renderer's geometry cache.
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      const view = createView(camera);
+      camera.projectionMatrix.identity();
+      camera.viewMatrix.identity();
+      service.update(root, view);
+      expect(gl.countOf("drawArrays")).toBeGreaterThan(0);
+
+      // The fake context predates the optional read-back group, and
+      // presence is the capability (§62): the pick refuses by name.
+      const error = await rejection(
+        service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
+      );
+      expect(error.code).toBe("UNSUPPORTED_GPU_FEATURE");
+
+      // Disposal under a live renderer releases through the shared caches.
+      service.dispose();
+      expect(service.disposed).toBe(true);
+    } finally {
+      clearRegisteredPickingPipeline();
+    }
+  });
+
+  it("hands the service a lost-context view of the renderer (§61)", async () => {
+    registerPickingPipeline();
+    try {
+      const { renderer, gl, canvas, camera } = await initialized();
+      renderer.resize(8, 8);
+      const service = renderer.createPickingService();
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      const view = createView(camera);
+      service.update(root, view);
+      const drawsBefore = gl.countOf("drawArrays");
+
+      canvas.dispatch("webglcontextlost");
+      // The standing buffer did not survive the loss the host reports.
+      const lost = await rejection(
+        service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
+      );
+      expect(lost.code).toBe("CONTEXT_LOST");
+      // A pass attempted while lost is skipped and drops the stale buffer,
+      // so the refusal becomes "no id buffer" rather than a stale answer.
+      service.update(root, view);
+      expect(gl.countOf("drawArrays")).toBe(drawsBefore);
+      const noBuffer = await rejection(
+        service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
+      );
+      expect(noBuffer.code).toBe("INVALID_APPLICATION_STATE");
+    } finally {
+      clearRegisteredPickingPipeline();
     }
   });
 });

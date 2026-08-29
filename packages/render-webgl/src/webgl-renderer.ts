@@ -56,6 +56,7 @@ import {
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
   type GraphEffect,
+  type PickingService,
   type RenderItem,
   type RenderItemKind,
   type RenderStatistics,
@@ -93,6 +94,10 @@ import {
   UnlitProgram,
   type GlTexture,
 } from "./gl-program.js";
+import {
+  resolvePickingServiceFactory,
+  type PickingRendererHost,
+} from "./gl-picking-registry.js";
 import {
   RenderTargetCache,
   type RenderTargetRecord,
@@ -2877,6 +2882,54 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    *
    * Cameras are not touched — `aspect` is the application's to set (§47).
    */
+  /**
+   * Builds a `PickingService` over this renderer — §71's `"gpu"` tier
+   * (RFC 0005), gated on `registerPickingPipeline()` exactly as skinned
+   * draws are gated on `registerSkinningPipeline()`: this method resolves the
+   * registry slot and refuses (§85) when nothing registered, so the id
+   * program, the service, and its read-back live only in bundles that opted
+   * in (the pipeline-cost law; `gl-picking-registry.ts`).
+   *
+   * What the service receives is a **live window** onto exactly the renderer
+   * state an id pass needs — context, the two shared caches, the surface
+   * size, and the two lifecycle flags — as accessors, so a §61 restore's new
+   * caches are seen rather than captured stale (`PickingRendererHost`). Each
+   * call builds an independent service; the caller owns and disposes it
+   * (§83). No GL call is issued here — the id program compiles on the
+   * service's first pass.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
+   * when no picking pipeline is registered.
+   */
+  createPickingService(): PickingService {
+    this.#assertUsable("createPickingService");
+    const factory = resolvePickingServiceFactory();
+    if (factory === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "§71: call registerPickingPipeline() from @four/render-webgl " +
+          "before createPickingService() (§85).",
+        { context: { registered: false } },
+      );
+    }
+    // Seven `this`-capturing arrows are the whole window: the host outlives
+    // this call and must keep seeing the *live* renderer state (a §61 restore
+    // swaps the caches), which is why the seam is accessor methods rather
+    // than a snapshot — and arrows rather than getters is what keeps this
+    // method's ride-along in never-picking bundles small (the A-3
+    // trim-the-refusal precedent, applied to a factory).
+    const host: PickingRendererHost = {
+      context: () => this.#gl,
+      geometries: () => this.#geometries,
+      renderTargets: () => this.#renderTargets,
+      surfaceWidth: () => this.#bufferWidth,
+      surfaceHeight: () => this.#bufferHeight,
+      contextLost: () => this.#contextLost,
+      disposed: () => this.#disposed,
+    };
+    return factory.create(host);
+  }
+
   resize(width: number, height: number, resolution = 1): void {
     this.#assertUsable("resize");
     this.#sizeRequested = true;

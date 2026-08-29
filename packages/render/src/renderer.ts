@@ -88,6 +88,7 @@ import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
 import type { EffectRenderPass } from "./effect-pass.js";
+import type { PickingService } from "./picking.js";
 import type { RenderTarget } from "./render-target.js";
 import type { RenderStatistics } from "./statistics.js";
 
@@ -646,6 +647,30 @@ export interface Renderer extends Disposable {
    * each staged one is waiting on.
    */
   renderEffect?(pass: EffectRenderPass): void;
+
+  /**
+   * Builds a {@link PickingService} over this backend — §71's `"gpu"`/`"pixel"`
+   * picking tier (RFC 0005, 2026-08-28).
+   *
+   * **Optional, and its presence is the capability** — the
+   * {@link Renderer.statistics} / {@link Renderer.renderEffect} stance, for
+   * the same two reasons: a required member would break every implementor,
+   * and a backend with no readable pixels should say so by omission rather
+   * than by emulating. {@link supportsPicking} is the runtime test. Absent on
+   * {@link NullRenderer} (no pixels at all), and deliberately absent on the
+   * future Canvas 2D / SVG tiers even though both could answer `"pixel"`
+   * natively (`isPointInPath`, SVG hit testing): emulation would make §71's
+   * result *quality* vary by backend, and the owner's decision on RFC 0005 Q6
+   * is that the tier is declared absent there instead.
+   *
+   * The WebGL 2 backend declares it, gated on its `registerPickingPipeline()`
+   * (the skinning seam's shape): the member says what the backend *can* do,
+   * registration is the application opting in to paying for it, and calling
+   * this without registering is refused with `INVALID_APPLICATION_STATE`
+   * (§85) naming the fix. Each call builds an independent service with its
+   * own id buffer; the caller owns it and disposes it (§83).
+   */
+  createPickingService?(): PickingService;
 
   /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at

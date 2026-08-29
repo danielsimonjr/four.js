@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — RFC 0005: pixel/GPU-id picking (A-11's remaining half)
+
+#### Added
+
+- **§71 pixel/GPU-id picking (RFC 0005 — A-11's remaining half).** `@four/render`
+  gains the backend-neutral seam (`PickingService`,
+  `Renderer.createPickingService?()` — presence-is-the-capability; Canvas 2D/SVG
+  declare the tier absent by omission per the adopted Q6), the §33 candidate-table
+  rules (`collectPickCandidates`, traversal-ordered, rebuilt per pass) and the
+  exact id codec (`encodePickId`/`decodePickId`, index+1 in RGBA8, 0 = nothing,
+  overflow refused per §85). `@four/render-webgl` executes it behind
+  `registerPickingPipeline()` (fifth registration seam): a lazily compiled flat id
+  program draws the frame's own view list — §66 order, frustum cull, material
+  depth/colour state and §67 clip stencils included; skinned and particle items
+  resolve through absence, stated — into a service-owned target, read back
+  asynchronously on WebGL 2's fence path (`PIXEL_PACK_BUFFER` + `fenceSync`,
+  stalling `readPixels` as the degradation) with `CONTEXT_LOST`-honest staleness
+  by cache-era identity. `@four/input` gains the render-free `PickProvider` seam
+  and RFC 0005's adopted Alternative D: `Pickable.alphaMask` confirms a bounds hit
+  against CPU-resident texel alpha (§55 frames via `region`). `four` gains the
+  promised adapter `createPickProvider(service, viewport)`. Scenes that never pick
+  are byte-identical (transcript-proven, including the frame _after_ an id pass);
+  the GPU tier is grep-absent from all nine example bundles; browser-proven on a
+  real driver (`tests/browser/picking.spec.ts`: co-planar submission order
+  resolves the front-most id). ui-demo budget 43.5→44 kB with the measurement.
+
 ### 2026-08-28 — WP-R1.6: WebGPU render targets, effects, readPixels
 
 #### Added

@@ -16,7 +16,12 @@ export type {
   SurfaceKeyListener,
 } from "./keyboard-input.js";
 export { KeyboardInput } from "./keyboard-input.js";
-export type { PickHit, Pickable } from "./pick.js";
+export type {
+  PickHit,
+  Pickable,
+  PickableAlphaMask,
+  PickProvider,
+} from "./pick.js";
 export { createPickRay, pick } from "./pick.js";
 export type {
   PointerDeviceType,

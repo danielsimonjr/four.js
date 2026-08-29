@@ -106,3 +106,10 @@ export {
 // leaves the umbrella as its only legal home.
 export type { TextOptions } from "./text-node.js";
 export { Text } from "./text-node.js";
+
+// §71's picking adapter (RFC 0005): a render-side `PickingService` presented
+// as `@four/input`'s render-free `PickProvider` seam. It lives here because
+// the umbrella is the one layer that may name both sides — `pick-provider.ts`
+// records the argument. Never referenced by `Application`; tree-shakes when
+// unused.
+export { createPickProvider } from "./pick-provider.js";

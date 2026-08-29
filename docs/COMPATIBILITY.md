@@ -68,13 +68,13 @@ What an application needs at runtime:
 reserved package directories — `RendererBackend` names all five so that the
 interface does not change when a backend lands.
 
-| §62 backend | `RendererBackend` | Package               | Status                                                           |
-| ----------- | ----------------- | --------------------- | ---------------------------------------------------------------- |
-| WebGL 2     | `"webgl2"`        | `@four/render-webgl`  | **shipped** — `WebglRenderer`; the §120 MVP tier                 |
-| headless    | `"null"`          | `@four/render`        | **shipped** — `NullRenderer`, alongside the `Renderer` interface |
-| WebGPU      | `"webgpu"`        | `@four/render-webgpu` | reserved stub — the package builds and exports `PACKAGE_NAME`    |
-| Canvas 2D   | `"canvas2d"`      | `@four/render-canvas` | reserved stub — the package builds and exports `PACKAGE_NAME`    |
-| SVG         | `"svg"`           | `@four/render-svg`    | reserved stub — the package builds and exports `PACKAGE_NAME`    |
+| §62 backend | `RendererBackend` | Package               | Status                                                                                                                                                                                                                                                                                                 |
+| ----------- | ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| WebGL 2     | `"webgl2"`        | `@four/render-webgl`  | **shipped** — `WebglRenderer`; the §120 MVP tier                                                                                                                                                                                                                                                       |
+| headless    | `"null"`          | `@four/render`        | **shipped** — `NullRenderer`, alongside the `Renderer` interface                                                                                                                                                                                                                                       |
+| WebGPU      | `"webgpu"`        | `@four/render-webgpu` | **shipping in tiers (WP-R1.1–R1.6 landed 2026-08-21…28)** — `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard/batching, textures+samplers, §67 clips, render targets/effects/`readPixels`; shadows (R1.7), compute (R1.8) and the WGSL node-material emitter (R1.9) remain |
+| Canvas 2D   | `"canvas2d"`      | `@four/render-canvas` | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                          |
+| SVG         | `"svg"`           | `@four/render-svg`    | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                          |
 
 What the WebGL 2 tier actually carries:
 
@@ -87,6 +87,7 @@ What the WebGL 2 tier actually carries:
 | Lighting                       | one directional light plus scene ambient, first light in scene-graph DFS order (§33-deterministic) |
 | Sprite batching (§65)          | absent — one draw call per sprite                                                                  |
 | Anti-aliasing                  | `RendererOptions.antialias` is a hint; a backend that cannot honour it never fails initialization  |
+| Picking (§71)                  | id-buffer + fence read-back, behind `registerPickingPipeline()` (RFC 0005, 2026-08-29)             |
 
 §62's capability-reporting clause lists eleven fields. `RendererCapabilities`
 carries **two** of them — `backend` and `maxTextureSize` — and that is

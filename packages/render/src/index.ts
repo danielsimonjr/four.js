@@ -125,6 +125,15 @@ export type {
   SceneRenderPass,
 } from "./render-graph.js";
 export { RenderGraph } from "./render-graph.js";
+export type { PickRequest, PickResult, PickingService } from "./picking.js";
+export {
+  MAX_PICK_CANDIDATES,
+  assertEncodableCandidateCount,
+  collectPickCandidates,
+  decodePickId,
+  encodePickId,
+  supportsPicking,
+} from "./picking.js";
 export type {
   RenderTargetFormat,
   RenderTargetOptions,

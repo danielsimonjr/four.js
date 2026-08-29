@@ -28,6 +28,54 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — RFC 0005 / A-11 pixel half: GPU-id picking.** Decisions worth
+  keeping:
+  - **The item→node join is the worldMatrix object.** Render items carry no node
+    reference (§64), but the non-interpolated builder documents
+    `item.worldMatrix` as the node's own matrix — one object per node, so
+    `Map<Matrix4, index>` joins the sorted draw list to the traversal-ordered §33
+    table exactly, allocation-free. Breaks if the plain builder ever pools
+    matrices; the doc on `RenderItemBase.worldMatrix` is now load-bearing.
+  - **Staleness is detected by cache-era identity, not flags.** A WebGL restore
+    keeps the context _object_; what changes identity is the renderer's rebuilt
+    caches. The pass records `host.geometries()` as its era; `pick` compares and
+    rejects `CONTEXT_LOST` — and an update skipped under §61 drops the previous
+    pass, because a stale `undefined` is indistinguishable from "nothing there"
+    (the RFC's own argument, applied twice).
+  - **The host seam is seven `this`-capturing arrows, and that is a bundle
+    decision.** Getter-object and this-alias forms cost ~250 B more per
+    WebglRenderer bundle and the latter is lint-banned; accessor _methods_ keep
+    the window live across restores (new caches seen, never captured). The
+    `createPickingService` ride-along is the seam's whole never-picking cost
+    (~0.15 kB gzip), the `maximumSkinningJoints` precedent.
+  - **The id pass mirrors what decides "on top", and nothing else**: material
+    depthTest/depthWrite/colorWrite and §67 clip stencils (the target takes the
+    packed stencil form per pass via `items[0].clip?.maskPass` — WP-R1.3's O(1)
+    decision on a target option). Ignored on purpose, stated in source: blending
+    (D's CPU tier answers alpha), R-7's `material.stencil`, skinned items (§69's
+    caster-exclusion, third application), particles (staged: needs the instanced
+    billboard vertex stage).
+  - **Every skip resolves before the first state or uniform call** — otherwise a
+    never-drawn item (empty geometry, mid-build reentrancy miss) uploads an id or
+    moves the mirror; found by the unit tape, fixed by ordering, matching the
+    frame renderer's "a skipped draw contributes nothing at all".
+  - **An unreachable presence re-check is a coverage hole (sixth confirmation)** —
+    the fenced reader takes the four narrowed entry points as values instead of
+    re-probing gl; and the §85 count refusal lives in an exported pure function so
+    the 2³² branch is testable.
+  - **WebglContext read-back members are function-typed properties, not
+    methods** — method syntax + extraction trips
+    `@typescript-eslint/unbound-method`; property syntax keeps `.call(gl, …)`
+    (needed for real contexts) lint-clean.
+  - **Measured:** GPU-tier symbols in 0 of 9 bundles; +0.15–0.17 kB gzip (seam)
+    in WebglRenderer bundles, +~0.4 kB more where `pick()` rides (Alternative D);
+    ui-demo 43.60/43.5 — bumped 43.5→44. Transcripts: frame-after-id-pass
+    byte-identical.
+  - **Multi-agent note:** HEAD advanced mid-packet (sibling landed WP-R1.6,
+    2ff733c); one `pnpm run docs` run failed on the sibling's mid-flight
+    `wgpu-shadow.ts` and passed unchanged on re-run — another confirmation that a
+    red gate on a loaded shared tree indicts the tree state first.
+
 - **2026-08-28 — WP-R1.6: WebGPU render targets, effects, `readPixels`.**
   Decisions worth keeping:
   - **The samplable depth form is `depth32float`, and the table is exported
