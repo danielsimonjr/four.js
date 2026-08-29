@@ -3,9 +3,9 @@
     "name": "four.js-monorepo",
     "version": "0.0.0",
     "lastUpdated": "2026-08-29",
-    "totalFiles": 271,
+    "totalFiles": 272,
     "totalModules": 24,
-    "totalExports": 2734
+    "totalExports": 2757
   },
   "entryPoints": [
     {
@@ -4182,6 +4182,7 @@
             "directory": "packages/materials",
             "imports": [
               "Material",
+              "MaterialTexture",
               "SpriteMaterial",
               "UnlitMaterial"
             ]
@@ -4238,6 +4239,7 @@
               "Shape2D",
               "Sprite",
               "Star",
+              "resolveShapePaintSupport",
               "restoreMeshSkeleton"
             ]
           },
@@ -4245,6 +4247,8 @@
             "package": "@four/render",
             "directory": "packages/render",
             "imports": [
+              "GradientStop",
+              "Paint",
               "ResolvedPaint",
               "ResolvedShapeFill",
               "ResolvedStrokeStyle"
@@ -4266,6 +4270,7 @@
               "ScreenCamera",
               "SpotLight",
               "restoreNodeId",
+              "HitTestMode",
               "Node"
             ]
           },
@@ -5285,7 +5290,7 @@
         ]
       },
       "packages/input/src/index.ts": {
-        "description": "Package entry point for @four/input (re-exports 37 symbols)",
+        "description": "Package entry point for @four/input (re-exports 38 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -5382,6 +5387,7 @@
               "PickHit",
               "Pickable",
               "PickableAlphaMask",
+              "PickableTriangles",
               "PickProvider"
             ],
             "reExport": true,
@@ -5441,6 +5447,7 @@
           "PickHit",
           "Pickable",
           "PickableAlphaMask",
+          "PickableTriangles",
           "PickProvider",
           "PointerDeviceType",
           "PropagatingPointerEventType",
@@ -5480,6 +5487,7 @@
           "PickHit",
           "Pickable",
           "PickableAlphaMask",
+          "PickableTriangles",
           "PickProvider",
           "PointerDeviceType",
           "PropagatingPointerEventType",
@@ -5614,6 +5622,7 @@
         "interfaces": [
           "PickProvider",
           "PickableAlphaMask",
+          "PickableTriangles",
           "Pickable",
           "PickHit"
         ],
@@ -12657,6 +12666,7 @@
             "imports": [
               "Arc",
               "Circle",
+              "clearRegisteredShapePaints",
               "Ellipse",
               "Line",
               "PathShape",
@@ -12664,10 +12674,19 @@
               "Polyline",
               "Rectangle",
               "RegularPolygon",
+              "resolveShapePaintSupport",
               "Ring",
               "Sector",
+              "setShapePaintSupport",
               "Shape2D",
               "Star"
+            ],
+            "reExport": true
+          },
+          {
+            "file": "./shape-paint.js",
+            "imports": [
+              "registerShapePaints"
             ],
             "reExport": true
           },
@@ -12888,20 +12907,33 @@
               "ArcOptions",
               "CircleOptions",
               "EllipseOptions",
+              "GradientStop",
+              "LinearGradientPaint",
               "LineOptions",
+              "ObjectPaint",
               "Paint",
               "PathShapeOptions",
+              "PatternPaint",
               "PolygonOptions",
               "PolylineOptions",
+              "RadialGradientPaint",
               "RectangleOptions",
               "RegularPolygonOptions",
               "RingOptions",
               "SectorOptions",
+              "ResolvedGradientStop",
+              "ResolvedLinearGradientPaint",
+              "ResolvedObjectPaint",
               "ResolvedPaint",
+              "ResolvedPatternPaint",
+              "ResolvedRadialGradientPaint",
               "ResolvedShapeFill",
+              "ResolvedSolidPaint",
               "ResolvedStrokeStyle",
               "Shape2DOptions",
               "ShapeFill",
+              "ShapePaintPlan",
+              "ShapePaintSupport",
               "SolidPaint",
               "StarOptions",
               "StrokeStyle"
@@ -13044,6 +13076,7 @@
           "supportsRenderStatistics",
           "Arc",
           "Circle",
+          "clearRegisteredShapePaints",
           "Ellipse",
           "Line",
           "PathShape",
@@ -13051,10 +13084,13 @@
           "Polyline",
           "Rectangle",
           "RegularPolygon",
+          "resolveShapePaintSupport",
           "Ring",
           "Sector",
+          "setShapePaintSupport",
           "Shape2D",
           "Star",
+          "registerShapePaints",
           "Sprite",
           "Texture",
           "buildViewRenderList",
@@ -13152,20 +13188,33 @@
           "ArcOptions",
           "CircleOptions",
           "EllipseOptions",
+          "GradientStop",
+          "LinearGradientPaint",
           "LineOptions",
+          "ObjectPaint",
           "Paint",
           "PathShapeOptions",
+          "PatternPaint",
           "PolygonOptions",
           "PolylineOptions",
+          "RadialGradientPaint",
           "RectangleOptions",
           "RegularPolygonOptions",
           "RingOptions",
           "SectorOptions",
+          "ResolvedGradientStop",
+          "ResolvedLinearGradientPaint",
+          "ResolvedObjectPaint",
           "ResolvedPaint",
+          "ResolvedPatternPaint",
+          "ResolvedRadialGradientPaint",
           "ResolvedShapeFill",
+          "ResolvedSolidPaint",
           "ResolvedStrokeStyle",
           "Shape2DOptions",
           "ShapeFill",
+          "ShapePaintPlan",
+          "ShapePaintSupport",
           "SolidPaint",
           "StarOptions",
           "StrokeStyle",
@@ -13251,6 +13300,7 @@
           "supportsRenderStatistics",
           "Arc",
           "Circle",
+          "clearRegisteredShapePaints",
           "Ellipse",
           "Line",
           "PathShape",
@@ -13258,10 +13308,13 @@
           "Polyline",
           "Rectangle",
           "RegularPolygon",
+          "resolveShapePaintSupport",
           "Ring",
           "Sector",
+          "setShapePaintSupport",
           "Shape2D",
           "Star",
+          "registerShapePaints",
           "Sprite",
           "Texture",
           "buildViewRenderList",
@@ -13358,20 +13411,33 @@
           "ArcOptions",
           "CircleOptions",
           "EllipseOptions",
+          "GradientStop",
+          "LinearGradientPaint",
           "LineOptions",
+          "ObjectPaint",
           "Paint",
           "PathShapeOptions",
+          "PatternPaint",
           "PolygonOptions",
           "PolylineOptions",
+          "RadialGradientPaint",
           "RectangleOptions",
           "RegularPolygonOptions",
           "RingOptions",
           "SectorOptions",
+          "ResolvedGradientStop",
+          "ResolvedLinearGradientPaint",
+          "ResolvedObjectPaint",
           "ResolvedPaint",
+          "ResolvedPatternPaint",
+          "ResolvedRadialGradientPaint",
           "ResolvedShapeFill",
+          "ResolvedSolidPaint",
           "ResolvedStrokeStyle",
           "Shape2DOptions",
           "ShapeFill",
+          "ShapePaintPlan",
+          "ShapePaintSupport",
           "SolidPaint",
           "StarOptions",
           "StrokeStyle",
@@ -14094,6 +14160,65 @@
           "liveRenderTargetCount"
         ]
       },
+      "packages/render/src/shape-paint.ts": {
+        "description": "The §58 paint-object tier — validation and paint-to-graph lowering behind",
+        "externalDependencies": [],
+        "nodeDependencies": [],
+        "internalDependencies": [
+          {
+            "file": "./shape.js",
+            "imports": [
+              "setShapePaintSupport",
+              "GradientStop",
+              "LinearGradientPaint",
+              "Paint",
+              "PatternPaint",
+              "RadialGradientPaint",
+              "ResolvedGradientStop",
+              "ResolvedLinearGradientPaint",
+              "ResolvedObjectPaint",
+              "ResolvedPaint",
+              "ResolvedPatternPaint",
+              "ResolvedRadialGradientPaint",
+              "ResolvedShapeFill",
+              "ResolvedStrokeStyle",
+              "ShapePaintPlan"
+            ]
+          }
+        ],
+        "workspaceDependencies": [
+          {
+            "package": "@four/materials",
+            "directory": "packages/materials",
+            "imports": [
+              "NodeMaterialBuilder",
+              "Material",
+              "MaterialTexture",
+              "ShaderExpression"
+            ]
+          },
+          {
+            "package": "@four/math",
+            "directory": "packages/math",
+            "imports": [
+              "ColorRGBA"
+            ]
+          },
+          {
+            "package": "@four/geometry",
+            "directory": "packages/geometry",
+            "imports": [
+              "Point2D"
+            ]
+          }
+        ],
+        "exports": [
+          "registerShapePaints"
+        ],
+        "functions": [
+          "registerShapePaints"
+        ]
+      },
       "packages/render/src/shape.ts": {
         "description": "§50's native 2D shape system — the node tier (R-23, 2026-08-09).",
         "externalDependencies": [],
@@ -14138,7 +14263,8 @@
             "package": "@four/materials",
             "directory": "packages/materials",
             "imports": [
-              "Material"
+              "Material",
+              "MaterialTexture"
             ]
           },
           {
@@ -14150,6 +14276,9 @@
           }
         ],
         "exports": [
+          "setShapePaintSupport",
+          "resolveShapePaintSupport",
+          "clearRegisteredShapePaints",
           "Circle",
           "Ellipse",
           "Rectangle",
@@ -14179,9 +14308,19 @@
         ],
         "interfaces": [
           "SolidPaint",
-          "ResolvedPaint",
+          "GradientStop",
+          "LinearGradientPaint",
+          "RadialGradientPaint",
+          "PatternPaint",
+          "ResolvedSolidPaint",
+          "ResolvedGradientStop",
+          "ResolvedLinearGradientPaint",
+          "ResolvedRadialGradientPaint",
+          "ResolvedPatternPaint",
           "StrokeStyle",
           "ResolvedStrokeStyle",
+          "ShapePaintPlan",
+          "ShapePaintSupport",
           "Shape2DOptions",
           "CircleOptions",
           "EllipseOptions",
@@ -14195,6 +14334,11 @@
           "LineOptions",
           "PolylineOptions",
           "ArcOptions"
+        ],
+        "functions": [
+          "setShapePaintSupport",
+          "resolveShapePaintSupport",
+          "clearRegisteredShapePaints"
         ]
       },
       "packages/render/src/sprite.ts": {
@@ -18536,7 +18680,7 @@
         ]
       },
       "packages/scene/src/index.ts": {
-        "description": "Package entry point for @four/scene (re-exports 78 symbols)",
+        "description": "Package entry point for @four/scene (re-exports 79 symbols)",
         "externalDependencies": [],
         "nodeDependencies": [],
         "internalDependencies": [
@@ -18753,6 +18897,7 @@
           {
             "file": "./node.js",
             "imports": [
+              "HitTestMode",
               "NodeEventMap",
               "NodeHierarchyEvent",
               "NodeOptions",
@@ -18860,6 +19005,7 @@
           "SpotLightOptions",
           "PoseSnapshotSystem",
           "SnapshotSystemOptions",
+          "HitTestMode",
           "NodeEventMap",
           "NodeHierarchyEvent",
           "NodeOptions",
@@ -18940,6 +19086,7 @@
           "SpotLightOptions",
           "PoseSnapshotSystem",
           "SnapshotSystemOptions",
+          "HitTestMode",
           "NodeEventMap",
           "NodeHierarchyEvent",
           "NodeOptions",
@@ -21189,6 +21336,7 @@
           "packages/render/src/renderer-registry.ts",
           "packages/render/src/renderer.ts",
           "packages/render/src/resource-memory.ts",
+          "packages/render/src/shape-paint.ts",
           "packages/render/src/shape.ts",
           "packages/render/src/sprite.ts",
           "packages/render/src/statistics.ts",
@@ -21320,17 +21468,17 @@
     ]
   },
   "statistics": {
-    "totalTypeScriptFiles": 271,
+    "totalTypeScriptFiles": 272,
     "totalModules": 24,
-    "totalLinesOfCode": 134249,
-    "totalExports": 2734,
+    "totalLinesOfCode": 136059,
+    "totalExports": 2757,
     "totalClasses": 178,
-    "totalInterfaces": 538,
-    "totalFunctions": 424,
+    "totalInterfaces": 549,
+    "totalFunctions": 428,
     "totalTypeGuards": 23,
     "totalEnums": 0,
     "totalConstants": 411,
-    "totalReExports": 1742,
+    "totalReExports": 1761,
     "totalTypeOnlyImports": 324,
     "runtimeCircularDeps": 0,
     "typeOnlyCircularDeps": 3,

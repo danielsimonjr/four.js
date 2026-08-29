@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-29",
-  "totalFiles": 690,
+  "totalFiles": 701,
   "byDisposition": {
-    "reachable": 223,
+    "reachable": 224,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 397,
+    "test": 407,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -14,19 +14,19 @@
   "byArea": {
     "examples": 9,
     "config": 12,
-    "src": 271,
-    "tests": 397,
+    "src": 272,
+    "tests": 407,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 190,
+    "(root)": 195,
     "@four/animation": 25,
     "@four/assets": 16,
     "@four/core": 24,
     "@four/diagnostics": 19,
-    "four": 42,
+    "four": 44,
     "@four/geometry": 19,
-    "@four/input": 14,
+    "@four/input": 15,
     "@four/materials": 16,
     "@four/math": 16,
     "@four/motion": 35,
@@ -39,8 +39,8 @@
     "@four/render-svg": 2,
     "@four/render-webgl": 23,
     "@four/render-webgpu": 39,
-    "@four/render": 50,
-    "@four/scene": 32,
+    "@four/render": 52,
+    "@four/scene": 33,
     "@four/serialization": 9,
     "@four/text": 6,
     "@four/ui": 25
@@ -940,7 +940,7 @@
       "package": "four",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2919
+      "loc": 3329
     },
     {
       "file": "packages/four/src/scene.ts",
@@ -1013,6 +1013,13 @@
       "loc": 551
     },
     {
+      "file": "packages/four/tests/hit-test-mode-serialization.test.ts",
+      "package": "four",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 156
+    },
+    {
       "file": "packages/four/tests/pick-provider.test.ts",
       "package": "four",
       "area": "tests",
@@ -1032,6 +1039,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 1980
+    },
+    {
+      "file": "packages/four/tests/shape-paint-serialization.test.ts",
+      "package": "four",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 436
     },
     {
       "file": "packages/four/tests/shape-serializers.test.ts",
@@ -1199,7 +1213,7 @@
       "package": "@four/input",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 50
+      "loc": 51
     },
     {
       "file": "packages/input/src/key-events.ts",
@@ -1220,7 +1234,7 @@
       "package": "@four/input",
       "area": "src",
       "disposition": "reachable",
-      "loc": 655
+      "loc": 936
     },
     {
       "file": "packages/input/src/pointer-events.ts",
@@ -1256,6 +1270,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 210
+    },
+    {
+      "file": "packages/input/tests/pick-geometry.test.ts",
+      "package": "@four/input",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 402
     },
     {
       "file": "packages/input/tests/pick.test.ts",
@@ -2858,7 +2879,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 257
+      "loc": 274
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -2935,7 +2956,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 1006
+      "loc": 1018
     },
     {
       "file": "packages/render/src/resource-memory.ts",
@@ -2945,11 +2966,18 @@
       "loc": 111
     },
     {
+      "file": "packages/render/src/shape-paint.ts",
+      "package": "@four/render",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 570
+    },
+    {
       "file": "packages/render/src/shape.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 2202
+      "loc": 2664
     },
     {
       "file": "packages/render/src/sprite.ts",
@@ -3134,6 +3162,13 @@
       "loc": 161
     },
     {
+      "file": "packages/render/tests/shape-paint.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 662
+    },
+    {
       "file": "packages/render/tests/shape.test.ts",
       "package": "@four/render",
       "area": "tests",
@@ -3194,7 +3229,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 99
+      "loc": 100
     },
     {
       "file": "packages/scene/src/interpolation.ts",
@@ -3222,7 +3257,7 @@
       "package": "@four/scene",
       "area": "src",
       "disposition": "reachable",
-      "loc": 825
+      "loc": 881
     },
     {
       "file": "packages/scene/src/pose-target.ts",
@@ -3300,6 +3335,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 40
+    },
+    {
+      "file": "packages/scene/tests/hit-test-mode.test.ts",
+      "package": "@four/scene",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 49
     },
     {
       "file": "packages/scene/tests/interpolation.test.ts",
@@ -3799,6 +3841,13 @@
       "loc": 107
     },
     {
+      "file": "tests/browser/fixtures/shape-paint-page.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 148
+    },
+    {
       "file": "tests/browser/fixtures/skinning-page.ts",
       "package": "(root)",
       "area": "tests",
@@ -3909,6 +3958,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 195
+    },
+    {
+      "file": "tests/browser/shape-paint.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 194
     },
     {
       "file": "tests/browser/skinning.spec.ts",
@@ -4303,6 +4359,13 @@
       "loc": 86
     },
     {
+      "file": "tests/determinism/shape-paint.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 132
+    },
+    {
       "file": "tests/determinism/skinned-pose.test.ts",
       "package": "(root)",
       "area": "tests",
@@ -4336,6 +4399,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 243
+    },
+    {
+      "file": "tests/integration/analytic-picking.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 144
     },
     {
       "file": "tests/integration/application-physics.test.ts",
@@ -4679,6 +4749,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 599
+    },
+    {
+      "file": "tests/integration/shape-paint-objects.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 186
     },
     {
       "file": "tests/integration/shape-paints.test.ts",
