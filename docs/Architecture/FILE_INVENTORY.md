@@ -6,21 +6,21 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 673
+**Total files**: 690
 
 ## Disposition counts
 
 | Disposition | Count | Meaning |
 | --- | --: | --- |
-| `reachable` | 218 | A `src/` file in the module graph, reachable from a root. |
+| `reachable` | 223 | A `src/` file in the module graph, reachable from a root. |
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 385 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 397 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 12 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 9 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **673** | |
+| **Total** | **690** | |
 
 ## Per-area counts
 
@@ -28,17 +28,17 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | --- | --: |
 | `config` | 12 |
 | `examples` | 9 |
-| `src` | 266 |
-| `tests` | 385 |
+| `src` | 271 |
+| `tests` | 397 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 184 |
+| `(root)` | 190 |
 | `@four/animation` | 25 |
-| `@four/assets` | 14 |
+| `@four/assets` | 16 |
 | `@four/core` | 24 |
 | `@four/diagnostics` | 19 |
 | `@four/geometry` | 19 |
@@ -46,21 +46,21 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@four/materials` | 16 |
 | `@four/math` | 16 |
 | `@four/motion` | 35 |
-| `@four/particles` | 16 |
+| `@four/particles` | 17 |
 | `@four/physics` | 45 |
 | `@four/physics-box2d` | 2 |
 | `@four/physics-rapier` | 20 |
 | `@four/physics-soft` | 2 |
-| `@four/render` | 48 |
+| `@four/render` | 50 |
 | `@four/render-canvas` | 2 |
 | `@four/render-svg` | 2 |
 | `@four/render-webgl` | 23 |
-| `@four/render-webgpu` | 37 |
+| `@four/render-webgpu` | 39 |
 | `@four/scene` | 32 |
 | `@four/serialization` | 9 |
 | `@four/text` | 6 |
 | `@four/ui` | 25 |
-| `four` | 38 |
+| `four` | 42 |
 
 ## All files
 
@@ -111,6 +111,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/animation/tests/values.test.ts` | @four/animation | tests | test |
 | `packages/assets/src/asset-manager.ts` | @four/assets | src | reachable |
 | `packages/assets/src/content-hash.ts` | @four/assets | src | reachable |
+| `packages/assets/src/gltf.ts` | @four/assets | src | reachable |
 | `packages/assets/src/index.ts` | @four/assets | src | build-entry |
 | `packages/assets/src/loaders.ts` | @four/assets | src | reachable |
 | `packages/assets/src/manifest.ts` | @four/assets | src | reachable |
@@ -118,6 +119,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/assets/tests/asset-manager.test.ts` | @four/assets | tests | test |
 | `packages/assets/tests/cancellation.test.ts` | @four/assets | tests | test |
 | `packages/assets/tests/content-hash.test.ts` | @four/assets | tests | test |
+| `packages/assets/tests/gltf.test.ts` | @four/assets | tests | test |
 | `packages/assets/tests/loaders.test.ts` | @four/assets | tests | test |
 | `packages/assets/tests/manifest.test.ts` | @four/assets | tests | test |
 | `packages/assets/tests/security.test.ts` | @four/assets | tests | test |
@@ -169,9 +171,11 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/four/src/animation.ts` | four | src | build-entry |
 | `packages/four/src/application.ts` | four | src | build-entry |
 | `packages/four/src/assets.ts` | four | src | build-entry |
+| `packages/four/src/compute-pass.ts` | four | src | reachable |
 | `packages/four/src/core.ts` | four | src | build-entry |
 | `packages/four/src/diagnostics.ts` | four | src | build-entry |
 | `packages/four/src/geometry.ts` | four | src | build-entry |
+| `packages/four/src/gltf.ts` | four | src | reachable |
 | `packages/four/src/index.ts` | four | src | build-entry |
 | `packages/four/src/input.ts` | four | src | build-entry |
 | `packages/four/src/materials.ts` | four | src | build-entry |
@@ -198,6 +202,8 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/four/tests/application.test.ts` | four | tests | test |
 | `packages/four/tests/barrels.test.ts` | four | tests | test |
 | `packages/four/tests/clip-serialization.test.ts` | four | tests | test |
+| `packages/four/tests/compute-pass.test.ts` | four | tests | test |
+| `packages/four/tests/gltf.test.ts` | four | tests | test |
 | `packages/four/tests/pick-provider.test.ts` | four | tests | test |
 | `packages/four/tests/plugins.test.ts` | four | tests | test |
 | `packages/four/tests/scene-serializers.test.ts` | four | tests | test |
@@ -315,6 +321,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/particles/tests/emitter.test.ts` | @four/particles | tests | test |
 | `packages/particles/tests/field-batching.test.ts` | @four/particles | tests | test |
 | `packages/particles/tests/fields.test.ts` | @four/particles | tests | test |
+| `packages/particles/tests/gpu-simulation.test.ts` | @four/particles | tests | test |
 | `packages/particles/tests/particle-renderable.test.ts` | @four/particles | tests | test |
 | `packages/particles/tests/particle-system.test.ts` | @four/particles | tests | test |
 | `packages/particles/tests/pool.test.ts` | @four/particles | tests | test |
@@ -429,6 +436,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/src/wgpu-lit.ts` | @four/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-node-program.ts` | @four/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-node-registry.ts` | @four/render-webgpu | src | reachable |
+| `packages/render-webgpu/src/wgpu-particle-simulation.ts` | @four/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-particles.ts` | @four/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-pipeline-cache.ts` | @four/render-webgpu | src | reachable |
 | `packages/render-webgpu/src/wgpu-readback.ts` | @four/render-webgpu | src | reachable |
@@ -448,6 +456,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgpu/tests/wgpu-effect.test.ts` | @four/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-lit.test.ts` | @four/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-node-program.test.ts` | @four/render-webgpu | tests | test |
+| `packages/render-webgpu/tests/wgpu-particle-simulation.test.ts` | @four/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-particles.test.ts` | @four/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-readback.test.ts` | @four/render-webgpu | tests | test |
 | `packages/render-webgpu/tests/wgpu-render-target.test.ts` | @four/render-webgpu | tests | test |
@@ -456,6 +465,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render/src/batch.ts` | @four/render | src | reachable |
 | `packages/render/src/bounds.ts` | @four/render | src | reachable |
 | `packages/render/src/clip.ts` | @four/render | src | reachable |
+| `packages/render/src/compute.ts` | @four/render | src | reachable |
 | `packages/render/src/effect-pass.ts` | @four/render | src | reachable |
 | `packages/render/src/index.ts` | @four/render | src | build-entry |
 | `packages/render/src/lights.ts` | @four/render | src | reachable |
@@ -481,6 +491,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render/tests/clip-options.test.ts` | @four/render | tests | test |
 | `packages/render/tests/clip-render-list.test.ts` | @four/render | tests | test |
 | `packages/render/tests/clip.test.ts` | @four/render | tests | test |
+| `packages/render/tests/compute.test.ts` | @four/render | tests | test |
 | `packages/render/tests/effect-pass.test.ts` | @four/render | tests | test |
 | `packages/render/tests/graph-effect.test.ts` | @four/render | tests | test |
 | `packages/render/tests/lights.test.ts` | @four/render | tests | test |
@@ -585,6 +596,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/fixtures/batching-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/clipping-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/culling-page.ts` | (root) | tests | test |
+| `tests/browser/fixtures/gltf-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/mipmaps-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/node-material-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/picking-page.ts` | (root) | tests | test |
@@ -594,6 +606,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/fixtures/stencil-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/text-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/webgpu-node-material-page.ts` | (root) | tests | test |
+| `tests/browser/gltf.spec.ts` | (root) | tests | test |
 | `tests/browser/interaction.spec.ts` | (root) | tests | test |
 | `tests/browser/mechanism.spec.ts` | (root) | tests | test |
 | `tests/browser/mipmaps.spec.ts` | (root) | tests | test |
@@ -613,6 +626,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/webgpu/webgpu-clipping.spec.ts` | (root) | tests | test |
 | `tests/browser/webgpu/webgpu-compute.spec.ts` | (root) | tests | test |
 | `tests/browser/webgpu/webgpu-effects.spec.ts` | (root) | tests | test |
+| `tests/browser/webgpu/webgpu-gpu-particles.spec.ts` | (root) | tests | test |
 | `tests/browser/webgpu/webgpu-lit.spec.ts` | (root) | tests | test |
 | `tests/browser/webgpu/webgpu-node-materials.spec.ts` | (root) | tests | test |
 | `tests/browser/webgpu/webgpu-particles.spec.ts` | (root) | tests | test |
@@ -626,6 +640,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/determinism/character-controller.test.ts` | (root) | tests | test |
 | `tests/determinism/event-dispatch-split.test.ts` | (root) | tests | test |
 | `tests/determinism/force-fields.test.ts` | (root) | tests | test |
+| `tests/determinism/gltf-load.test.ts` | (root) | tests | test |
 | `tests/determinism/helpers/animation-controller-scenario.ts` | (root) | tests | test |
 | `tests/determinism/helpers/camera-rig-scenario.ts` | (root) | tests | test |
 | `tests/determinism/helpers/character-controller-scenario.ts` | (root) | tests | test |
@@ -675,6 +690,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/examples-build-coverage.test.ts` | (root) | tests | test |
 | `tests/integration/first-person-camera.test.ts` | (root) | tests | test |
 | `tests/integration/frame-statistics.test.ts` | (root) | tests | test |
+| `tests/integration/gltf-scene.test.ts` | (root) | tests | test |
 | `tests/integration/helpers/blending-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/joint-scenarios.ts` | (root) | tests | test |
 | `tests/integration/helpers/losable-canvas.ts` | (root) | tests | test |
@@ -726,6 +742,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/integration/units-display.test.ts` | (root) | tests | test |
 | `tests/integration/view-culling.test.ts` | (root) | tests | test |
 | `tests/integration/webgpu-clipping.test.ts` | (root) | tests | test |
+| `tests/integration/webgpu-gpu-particles.test.ts` | (root) | tests | test |
 | `tests/integration/webgpu-lighting.test.ts` | (root) | tests | test |
 | `tests/integration/webgpu-node-materials.test.ts` | (root) | tests | test |
 | `tests/integration/webgpu-particles.test.ts` | (root) | tests | test |

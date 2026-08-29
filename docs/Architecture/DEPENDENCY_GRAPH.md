@@ -47,10 +47,10 @@ This document provides a comprehensive dependency graph of all files, components
 The codebase is organized into the following modules:
 
 - **packages/animation**: 11 files
-- **packages/assets**: 6 files
+- **packages/assets**: 7 files
 - **packages/core**: 13 files
 - **packages/diagnostics**: 9 files
-- **packages/four**: 29 files
+- **packages/four**: 31 files
 - **packages/geometry**: 10 files
 - **packages/input**: 8 files
 - **packages/materials**: 11 files
@@ -61,11 +61,11 @@ The codebase is organized into the following modules:
 - **packages/physics-box2d**: 1 file
 - **packages/physics-rapier**: 8 files
 - **packages/physics-soft**: 1 file
-- **packages/render**: 22 files
+- **packages/render**: 23 files
 - **packages/render-canvas**: 1 file
 - **packages/render-svg**: 1 file
 - **packages/render-webgl**: 18 files
-- **packages/render-webgpu**: 23 files
+- **packages/render-webgpu**: 24 files
 - **packages/scene**: 16 files
 - **packages/serialization**: 4 files
 - **packages/text**: 4 files
@@ -79,25 +79,25 @@ The codebase is organized into the following modules:
 | Package | Depends On | Files (Active) | Files (Dormant) |
 |---------|------------|----------------|-----------------|
 | `@four/animation` (`packages/animation/`) | `@four/motion`, `@four/core`, `@four/scene`, `@four/math` | 11 | 0 |
-| `@four/assets` (`packages/assets/`) | `@four/core` | 6 | 0 |
+| `@four/assets` (`packages/assets/`) | `@four/core` | 7 | 0 |
 | `@four/core` (`packages/core/`) | (none) | 13 | 0 |
 | `@four/diagnostics` (`packages/diagnostics/`) | `@four/math`, `@four/core` | 9 | 0 |
-| `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/diagnostics`, `@four/geometry`, `@four/motion`, `@four/math`, `@four/assets`, `@four/physics`, `@four/scene`, `@four/render`, `@four/input`, `@four/materials`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/serialization`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/text`, `@four/ui` | 29 | 0 |
+| `four` (`packages/four/`) | `@four/animation`, `@four/core`, `@four/diagnostics`, `@four/geometry`, `@four/motion`, `@four/math`, `@four/assets`, `@four/physics`, `@four/scene`, `@four/render`, `@four/materials`, `@four/input`, `@four/particles`, `@four/physics-box2d`, `@four/physics-rapier`, `@four/physics-soft`, `@four/serialization`, `@four/render-canvas`, `@four/render-svg`, `@four/render-webgl`, `@four/render-webgpu`, `@four/text`, `@four/ui` | 31 | 0 |
 | `@four/geometry` (`packages/geometry/`) | `@four/math`, `@four/core` | 10 | 0 |
 | `@four/input` (`packages/input/`) | `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
 | `@four/materials` (`packages/materials/`) | `@four/core`, `@four/math` | 11 | 0 |
 | `@four/math` (`packages/math/`) | (none) | 10 | 0 |
 | `@four/motion` (`packages/motion/`) | `@four/core`, `@four/math`, `@four/scene` | 19 | 0 |
-| `@four/particles` (`packages/particles/`) | `@four/math`, `@four/core`, `@four/scene` | 8 | 0 |
+| `@four/particles` (`packages/particles/`) | `@four/core`, `@four/math`, `@four/scene` | 8 | 0 |
 | `@four/physics` (`packages/physics/`) | `@four/core`, `@four/math`, `@four/scene`, `@four/motion` | 20 | 0 |
 | `@four/physics-box2d` (`packages/physics-box2d/`) | (none) | 1 | 0 |
 | `@four/physics-rapier` (`packages/physics-rapier/`) | `@four/physics`, `@four/core`, `@four/math` | 8 | 0 |
 | `@four/physics-soft` (`packages/physics-soft/`) | (none) | 1 | 0 |
-| `@four/render` (`packages/render/`) | `@four/geometry`, `@four/materials`, `@four/math`, `@four/scene`, `@four/core` | 22 | 0 |
+| `@four/render` (`packages/render/`) | `@four/geometry`, `@four/materials`, `@four/math`, `@four/scene`, `@four/core` | 23 | 0 |
 | `@four/render-canvas` (`packages/render-canvas/`) | (none) | 1 | 0 |
 | `@four/render-svg` (`packages/render-svg/`) | (none) | 1 | 0 |
 | `@four/render-webgl` (`packages/render-webgl/`) | `@four/math`, `@four/render`, `@four/core` | 18 | 0 |
-| `@four/render-webgpu` (`packages/render-webgpu/`) | `@four/render`, `@four/core`, `@four/math`, `@four/scene` | 23 | 0 |
+| `@four/render-webgpu` (`packages/render-webgpu/`) | `@four/render`, `@four/core`, `@four/math`, `@four/scene` | 24 | 0 |
 | `@four/scene` (`packages/scene/`) | `@four/math`, `@four/core` | 16 | 0 |
 | `@four/serialization` (`packages/serialization/`) | `@four/core`, `@four/scene`, `@four/math` | 4 | 0 |
 | `@four/text` (`packages/text/`) | (none) | 4 | 0 |
@@ -148,8 +148,8 @@ graph LR
     P4 --> P11
     P4 --> P20
     P4 --> P15
-    P4 --> P6
     P4 --> P7
+    P4 --> P6
     P4 --> P10
     P4 --> P12
     P4 --> P13
@@ -171,8 +171,8 @@ graph LR
     P9 --> P2
     P9 --> P8
     P9 --> P20
-    P10 --> P8
     P10 --> P2
+    P10 --> P8
     P10 --> P20
     P11 --> P2
     P11 --> P8
@@ -474,6 +474,28 @@ graph LR
 
 ---
 
+### `packages/assets/src/gltf.ts` - The §78 glTF 2.0 loader — the **parse tier** (A-19's last half, 2026-08-29).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `FourError, cloneJsonValue, devWarnOnce, isFourError, parseUntrustedJson, Disposable, JsonValue` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./asset-manager.js` | `DEFAULT_MAXIMUM_BYTES, AssetLoader, FetchLike, FetchResponse` | Import |
+| `./content-hash.js` | `resolveGlobalTextDecoder, TextDecodeLike` | Import |
+| `./texture.js` | `createTextureDecoder, TexelDecodeLike, TexelProbeLike, TextureAsset, TextureFilterMode, TextureWrapMode` | Import |
+
+**Exports:**
+- Classes: `GltfAsset`
+- Interfaces: `GltfPrimitiveRecord`, `GltfMeshRecord`, `GltfMaterialRecord`, `GltfNodeRecord`, `GltfSceneRecord`, `GltfSkinRecord`, `GltfChannelRecord`, `GltfAnimationRecord`, `GltfLoaderOptions`
+- Types: `GltfPrimitiveMode`, `GltfChannelPath`
+- Functions: `createGltfLoader`
+
+---
+
 ### `packages/assets/src/index.ts` - `@four/assets` — the asset system (§76–78).
 
 **Internal Dependencies:**
@@ -482,17 +504,19 @@ graph LR
 | `./asset-manager.js` | `AssetManager, DEFAULT_MAXIMUM_BYTES, DEFAULT_TIMEOUT_SECONDS` | Re-export |
 | `./content-hash.js` | `CONTENT_HASH_ALGORITHM` | Re-export |
 | `./manifest.js` | `loadFromManifest, manifestLoader, manifestUrl, parseAssetManifest` | Re-export |
-| `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO, TextureAsset, createTextureLoader` | Re-export |
+| `./texture.js` | `DEFAULT_MAXIMUM_DECODED_BYTES, DEFAULT_MAXIMUM_EXPANSION_RATIO, TextureAsset, createTextureDecoder, createTextureLoader` | Re-export |
+| `./gltf.js` | `GltfAsset, createGltfLoader` | Re-export |
 | `./loaders.js` | `ImageAsset, binaryLoader, createImageLoader, jsonLoader, textLoader` | Re-export |
 | `./asset-manager.js` | `AbortHandle, AbortSignalLike, AssetLoadOptions, AssetLoader, AssetManagerOptions, FetchInit, FetchLike, FetchResponse, ResponseHeadersLike, TimerLike` | Re-export (type-only) |
 | `./content-hash.js` | `DigestLike, TextDecodeLike` | Re-export (type-only) |
 | `./manifest.js` | `AssetManifest, AssetManifestEntry, ManifestLoadOptions` | Re-export (type-only) |
 | `./texture.js` | `DecodedTexels, TexelDecodeLike, TexelProbeLike, TextureColorSpace, TextureFilterMode, TextureLoaderOptions, TextureWrapMode` | Re-export (type-only) |
+| `./gltf.js` | `GltfAnimationRecord, GltfChannelPath, GltfChannelRecord, GltfLoaderOptions, GltfMaterialRecord, GltfMeshRecord, GltfNodeRecord, GltfPrimitiveMode, GltfPrimitiveRecord, GltfSceneRecord, GltfSkinRecord` | Re-export (type-only) |
 | `./loaders.js` | `ImageBitmapLike, ImageDecodeLike` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `FetchInit`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `ImageBitmapLike`, `ImageDecodeLike`
+- Re-exports: `AssetManager`, `DEFAULT_MAXIMUM_BYTES`, `DEFAULT_TIMEOUT_SECONDS`, `CONTENT_HASH_ALGORITHM`, `loadFromManifest`, `manifestLoader`, `manifestUrl`, `parseAssetManifest`, `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`, `TextureAsset`, `createTextureDecoder`, `createTextureLoader`, `GltfAsset`, `createGltfLoader`, `ImageAsset`, `binaryLoader`, `createImageLoader`, `jsonLoader`, `textLoader`, `AbortHandle`, `AbortSignalLike`, `AssetLoadOptions`, `AssetLoader`, `AssetManagerOptions`, `FetchInit`, `FetchLike`, `FetchResponse`, `ResponseHeadersLike`, `TimerLike`, `DigestLike`, `TextDecodeLike`, `AssetManifest`, `AssetManifestEntry`, `ManifestLoadOptions`, `DecodedTexels`, `TexelDecodeLike`, `TexelProbeLike`, `TextureColorSpace`, `TextureFilterMode`, `TextureLoaderOptions`, `TextureWrapMode`, `GltfAnimationRecord`, `GltfChannelPath`, `GltfChannelRecord`, `GltfLoaderOptions`, `GltfMaterialRecord`, `GltfMeshRecord`, `GltfNodeRecord`, `GltfPrimitiveMode`, `GltfPrimitiveRecord`, `GltfSceneRecord`, `GltfSkinRecord`, `ImageBitmapLike`, `ImageDecodeLike`
 
 ---
 
@@ -549,7 +573,7 @@ graph LR
 - Classes: `TextureAsset`
 - Interfaces: `DecodedTexels`, `TextureLoaderOptions`
 - Types: `TextureColorSpace`, `TextureFilterMode`, `TextureWrapMode`, `TexelDecodeLike`, `TexelProbeLike`
-- Functions: `createTextureLoader`
+- Functions: `createTextureDecoder`, `createTextureLoader`
 - Constants: `DEFAULT_MAXIMUM_DECODED_BYTES`, `DEFAULT_MAXIMUM_EXPANSION_RATIO`
 
 ---
@@ -936,6 +960,20 @@ graph LR
 
 ---
 
+### `packages/four/src/compute-pass.ts` - §82's `Four.ComputePass` — the named-map sugar over `@four/render`'s
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/render` | `ComputeBinding, ComputeBuffer, ComputePassDescriptor` |
+
+**Exports:**
+- Classes: `ComputePass`
+- Interfaces: `ComputePassOptions`
+- Types: `ComputePassBindingEntry`, `ComputePassBindings`
+
+---
+
 ### `packages/four/src/core.ts` - core module
 
 **Workspace Dependencies:**
@@ -972,6 +1010,26 @@ graph LR
 
 ---
 
+### `packages/four/src/gltf.ts` - §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/assets` | `GltfAsset` |
+| `@four/animation` | `AnimationClip, AnimationTrack, quaternionAdapter, vector3Adapter, AnimationTrackLike` |
+| `@four/core` | `FourError, devWarnOnce` |
+| `@four/geometry` | `BufferGeometry` |
+| `@four/materials` | `StandardMaterial` |
+| `@four/math` | `Matrix4, Quaternion, Vector3` |
+| `@four/render` | `Mesh, Texture` |
+| `@four/scene` | `Bone, Group, Skeleton, Node` |
+
+**Exports:**
+- Interfaces: `GltfInstance`
+- Functions: `instantiateGltf`
+
+---
+
 ### `packages/four/src/index.ts` - The umbrella package (§98): one namespace per workspace package, plus the
 
 **Internal Dependencies:**
@@ -981,13 +1039,17 @@ graph LR
 | `./plugins.js` | `COMPONENT_SERIALIZERS, RENDERER_REGISTRY, RENDER_GRAPH, SCENE_MIGRATIONS, SIMULATION_SYSTEMS, SOLVER_REGISTRY` | Re-export |
 | `./scene-serializers.js` | `BUTTON_NODE_TYPE, CHECKBOX_NODE_TYPE, CIRCLE_NODE_TYPE, DIRECTIONAL_LIGHT_NODE_TYPE, ELLIPSE_NODE_TYPE, IMAGE_NODE_TYPE, LABEL_NODE_TYPE, ORTHOGRAPHIC_CAMERA_NODE_TYPE, PANEL_NODE_TYPE, PATH_SHAPE_NODE_TYPE, PERSPECTIVE_CAMERA_NODE_TYPE, POINT_LIGHT_NODE_TYPE, POLYGON_NODE_TYPE, PROGRESS_NODE_TYPE, RADIO_BUTTON_NODE_TYPE, RECTANGLE_NODE_TYPE, REGULAR_POLYGON_NODE_TYPE, RENDERABLE_NODE_TYPE, RING_NODE_TYPE, SECTOR_NODE_TYPE, SLIDER_NODE_TYPE, SPOT_LIGHT_NODE_TYPE, SPRITE_NODE_TYPE, STAR_NODE_TYPE, TEXT_NODE_TYPE, TOGGLE_NODE_TYPE, composeSceneNodeTypes, registerPhysicsSerializers, registerRenderSerializers, registerSceneNodeTypes, registerShapeSerializers, registerTextSerializers, registerUISerializers, resourceCatalog, restoreNodeId` | Re-export |
 | `./text-node.js` | `Text` | Re-export |
+| `./compute-pass.js` | `ComputePass` | Re-export |
+| `./gltf.js` | `instantiateGltf` | Re-export |
 | `./pick-provider.js` | `createPickProvider` | Re-export |
 | `./application.js` | `ApplicationEventMap, ApplicationOptions, PhysicsWorldContext, PhysicsWorldFactory, SurfaceObserver, SurfaceResize` | Re-export (type-only) |
 | `./scene-serializers.js` | `SceneNodeTypeOptions, SceneNodeTypeSupport, SceneResourceCatalog, SceneSerializationSupport, UnknownResourcePolicy` | Re-export (type-only) |
 | `./text-node.js` | `TextOptions` | Re-export (type-only) |
+| `./compute-pass.js` | `ComputePassBindingEntry, ComputePassBindings, ComputePassOptions` | Re-export (type-only) |
+| `./gltf.js` | `GltfInstance` | Re-export (type-only) |
 
 **Exports:**
-- Re-exports: `Application`, `COMPONENT_SERIALIZERS`, `RENDERER_REGISTRY`, `RENDER_GRAPH`, `SCENE_MIGRATIONS`, `SIMULATION_SYSTEMS`, `SOLVER_REGISTRY`, `BUTTON_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `IMAGE_NODE_TYPE`, `LABEL_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `PANEL_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `POLYGON_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `RING_NODE_TYPE`, `SECTOR_NODE_TYPE`, `SLIDER_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `SPRITE_NODE_TYPE`, `STAR_NODE_TYPE`, `TEXT_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerRenderSerializers`, `registerSceneNodeTypes`, `registerShapeSerializers`, `registerTextSerializers`, `registerUISerializers`, `resourceCatalog`, `restoreNodeId`, `Text`, `createPickProvider`, `ApplicationEventMap`, `ApplicationOptions`, `PhysicsWorldContext`, `PhysicsWorldFactory`, `SurfaceObserver`, `SurfaceResize`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneResourceCatalog`, `SceneSerializationSupport`, `UnknownResourcePolicy`, `TextOptions`
+- Re-exports: `Application`, `COMPONENT_SERIALIZERS`, `RENDERER_REGISTRY`, `RENDER_GRAPH`, `SCENE_MIGRATIONS`, `SIMULATION_SYSTEMS`, `SOLVER_REGISTRY`, `BUTTON_NODE_TYPE`, `CHECKBOX_NODE_TYPE`, `CIRCLE_NODE_TYPE`, `DIRECTIONAL_LIGHT_NODE_TYPE`, `ELLIPSE_NODE_TYPE`, `IMAGE_NODE_TYPE`, `LABEL_NODE_TYPE`, `ORTHOGRAPHIC_CAMERA_NODE_TYPE`, `PANEL_NODE_TYPE`, `PATH_SHAPE_NODE_TYPE`, `PERSPECTIVE_CAMERA_NODE_TYPE`, `POINT_LIGHT_NODE_TYPE`, `POLYGON_NODE_TYPE`, `PROGRESS_NODE_TYPE`, `RADIO_BUTTON_NODE_TYPE`, `RECTANGLE_NODE_TYPE`, `REGULAR_POLYGON_NODE_TYPE`, `RENDERABLE_NODE_TYPE`, `RING_NODE_TYPE`, `SECTOR_NODE_TYPE`, `SLIDER_NODE_TYPE`, `SPOT_LIGHT_NODE_TYPE`, `SPRITE_NODE_TYPE`, `STAR_NODE_TYPE`, `TEXT_NODE_TYPE`, `TOGGLE_NODE_TYPE`, `composeSceneNodeTypes`, `registerPhysicsSerializers`, `registerRenderSerializers`, `registerSceneNodeTypes`, `registerShapeSerializers`, `registerTextSerializers`, `registerUISerializers`, `resourceCatalog`, `restoreNodeId`, `Text`, `ComputePass`, `instantiateGltf`, `createPickProvider`, `ApplicationEventMap`, `ApplicationOptions`, `PhysicsWorldContext`, `PhysicsWorldFactory`, `SurfaceObserver`, `SurfaceResize`, `SceneNodeTypeOptions`, `SceneNodeTypeSupport`, `SceneResourceCatalog`, `SceneSerializationSupport`, `UnknownResourcePolicy`, `TextOptions`, `ComputePassBindingEntry`, `ComputePassBindings`, `ComputePassOptions`, `GltfInstance`
 
 ---
 
@@ -2284,6 +2346,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
+| `@four/core` | `FourError` |
 | `@four/math` | `Vector3` |
 
 **Internal Dependencies:**
@@ -2291,7 +2354,7 @@ graph LR
 |------|---------|------|
 | `./pool.js` | `ParticlePool` | Import |
 | `./random.js` | `SeededRandom` | Import |
-| `./types.js` | `ParticleBurst, ParticleColor, ParticleForceField, ParticleLifetimeRamp, ParticleRange` | Import (type-only) |
+| `./types.js` | `ParticleBurst, ParticleColor, ParticleForceField, ParticleGpuSimulation, ParticleLifetimeRamp, ParticleRange, ParticleSimulationMode` | Import (type-only) |
 
 **Exports:**
 - Classes: `ParticleEmitter`
@@ -2339,11 +2402,11 @@ graph LR
 | `./fields.js` | `BoxFieldVolume, FieldVolume, RadialFieldOptions, SphereFieldVolume, TurbulenceFieldOptions, VortexFieldOptions` | Re-export (type-only) |
 | `./particle-renderable.js` | `ParticleRenderableOptions` | Re-export (type-only) |
 | `./particle-system.js` | `ParticleFixedUpdateContext, ParticleStepTime, ParticleSystemOptions, SteppableEmitter` | Re-export (type-only) |
-| `./types.js` | `ParticleBurst, ParticleColor, ParticleForceField, ParticleLifetimeRamp, ParticleRange` | Re-export (type-only) |
+| `./types.js` | `ParticleBurst, ParticleColor, ParticleForceField, ParticleGpuSimulation, ParticleLifetimeRamp, ParticleRange, ParticleSimulationMode` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DEFAULT_PARTICLE_LIFETIME_SECONDS`, `DEFAULT_PARTICLE_RESTITUTION`, `DEFAULT_PARTICLE_SEED`, `DEFAULT_PARTICLE_SIZE`, `PARTICLE_DRAWS_PER_SPAWN`, `ParticleEmitter`, `ParticlePool`, `DEFAULT_GRAVITY_Y`, `DEFAULT_RADIAL_MIN_DISTANCE`, `DEFAULT_TURBULENCE_AMPLITUDE`, `DEFAULT_TURBULENCE_FREQUENCY`, `DEFAULT_VORTEX_MIN_DISTANCE`, `TURBULENCE_DIFFERENCE_CELLS`, `dragField`, `radialField`, `turbulenceField`, `uniformGravityField`, `volumeField`, `vortexField`, `windField`, `PARTICLE_INSTANCE_FLOATS`, `ParticleRenderable`, `PRIORITY_PARTICLES`, `ParticleSystem`, `SeededRandom`, `ParticleEmitterOptions`, `BoxFieldVolume`, `FieldVolume`, `RadialFieldOptions`, `SphereFieldVolume`, `TurbulenceFieldOptions`, `VortexFieldOptions`, `ParticleRenderableOptions`, `ParticleFixedUpdateContext`, `ParticleStepTime`, `ParticleSystemOptions`, `SteppableEmitter`, `ParticleBurst`, `ParticleColor`, `ParticleForceField`, `ParticleLifetimeRamp`, `ParticleRange`
+- Re-exports: `DEFAULT_PARTICLE_LIFETIME_SECONDS`, `DEFAULT_PARTICLE_RESTITUTION`, `DEFAULT_PARTICLE_SEED`, `DEFAULT_PARTICLE_SIZE`, `PARTICLE_DRAWS_PER_SPAWN`, `ParticleEmitter`, `ParticlePool`, `DEFAULT_GRAVITY_Y`, `DEFAULT_RADIAL_MIN_DISTANCE`, `DEFAULT_TURBULENCE_AMPLITUDE`, `DEFAULT_TURBULENCE_FREQUENCY`, `DEFAULT_VORTEX_MIN_DISTANCE`, `TURBULENCE_DIFFERENCE_CELLS`, `dragField`, `radialField`, `turbulenceField`, `uniformGravityField`, `volumeField`, `vortexField`, `windField`, `PARTICLE_INSTANCE_FLOATS`, `ParticleRenderable`, `PRIORITY_PARTICLES`, `ParticleSystem`, `SeededRandom`, `ParticleEmitterOptions`, `BoxFieldVolume`, `FieldVolume`, `RadialFieldOptions`, `SphereFieldVolume`, `TurbulenceFieldOptions`, `VortexFieldOptions`, `ParticleRenderableOptions`, `ParticleFixedUpdateContext`, `ParticleStepTime`, `ParticleSystemOptions`, `SteppableEmitter`, `ParticleBurst`, `ParticleColor`, `ParticleForceField`, `ParticleGpuSimulation`, `ParticleLifetimeRamp`, `ParticleRange`, `ParticleSimulationMode`
 
 ---
 
@@ -2408,7 +2471,8 @@ graph LR
 | `@four/math` | `Vector3` |
 
 **Exports:**
-- Interfaces: `ParticleForceField`, `ParticleRange`, `ParticleLifetimeRamp`, `ParticleColor`, `ParticleBurst`
+- Interfaces: `ParticleForceField`, `ParticleGpuSimulation`, `ParticleRange`, `ParticleLifetimeRamp`, `ParticleColor`, `ParticleBurst`
+- Types: `ParticleSimulationMode`
 
 ---
 
@@ -3166,6 +3230,16 @@ graph LR
 
 ---
 
+### `packages/render/src/compute.ts` - §82's `ComputePass`, as the backend-independent descriptor — the Q3
+
+**Exports:**
+- Interfaces: `ComputeBuffer`, `ComputeBinding`, `ComputePassDescriptor`, `ComputeDispatcher`
+- Types: `ComputeBindingAccess`
+- Functions: `supportsCompute`
+- Constants: `COMPUTE_ENTRY_POINT`
+
+---
+
 ### `packages/render/src/effect-pass.ts` - §70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):
 
 **Workspace Dependencies:**
@@ -3201,6 +3275,7 @@ graph LR
 | `./batch.js` | `DEFAULT_MAX_BATCH_VERTICES, RenderBatcher` | Re-export |
 | `./bounds.js` | `computeWorldBoundingSphere` | Re-export |
 | `./clip.js` | `ClipPlaneAllocator, MAX_CLIP_PLANES` | Re-export |
+| `./compute.js` | `COMPUTE_ENTRY_POINT, supportsCompute` | Re-export |
 | `./effect-pass.js` | `COLOR_GRADE_DEFAULTS, COPY_EFFECT, OUTPUT_TRANSFORM_EFFECT, supportsScreenEffects, validateEffectRenderPass` | Re-export |
 | `./lights.js` | `MAX_PUNCTUAL_LIGHTS, collectSceneLights, createSceneLights, isDirectionalLightSource, isPunctualLightSource` | Re-export |
 | `./particles.js` | `PARTICLE_COLOR_OFFSET, PARTICLE_INSTANCE_FLOATS, PARTICLE_POSITION_OFFSET, PARTICLE_SIZE_OFFSET, isParticleDrawable, particleQuadGeometry` | Re-export |
@@ -3222,6 +3297,7 @@ graph LR
 | `./batch.js` | `BatchableItem, BatchableMaterial, RenderBatch, RenderBatchOptions` | Re-export (type-only) |
 | `./bounds.js` | `BoundingSphere` | Re-export (type-only) |
 | `./clip.js` | `ClipScope, RenderItemClip, RenderItemStencil` | Re-export (type-only) |
+| `./compute.js` | `ComputeBinding, ComputeBindingAccess, ComputeBuffer, ComputeDispatcher, ComputePassDescriptor` | Re-export (type-only) |
 | `./effect-pass.js` | `ColorGradeEffect, CopyEffect, EffectRenderPass, GraphEffect, OutputTransformEffect, ScreenEffect, ScreenEffectKind, ScreenEffectRenderer` | Re-export (type-only) |
 | `./lights.js` | `AmbientLightSource, DirectionalLightSource, DirectionalShadowSource, PointLightSource, PunctualLightSource, PunctualLightSourceBase, SceneLights, SpotLightSource` | Re-export (type-only) |
 | `./particles.js` | `ParticleDrawable` | Re-export (type-only) |
@@ -3241,7 +3317,7 @@ graph LR
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `DEFAULT_MAX_BATCH_VERTICES`, `RenderBatcher`, `computeWorldBoundingSphere`, `ClipPlaneAllocator`, `MAX_CLIP_PLANES`, `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `groupRenderListByPipeline`, `isLitItem`, `isNodeItem`, `isParticlesItem`, `isSkinnedLitItem`, `isSkinnedUnlitItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `MAX_SHADER_GRAPH_NODES`, `MAX_SHADER_GRAPH_TEXTURES`, `SHADER_ATTRIBUTE_TYPES`, `SHADER_VALUE_COMPONENTS`, `analyzeShaderGraph`, `forEachShaderNodeReference`, `RenderGraph`, `CanvasTexture`, `MAX_PICK_CANDIDATES`, `assertEncodableCandidateCount`, `collectPickCandidates`, `decodePickId`, `encodePickId`, `supportsPicking`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `MAX_SKINNING_JOINTS`, `Mesh`, `restoreMeshSkeleton`, `AUTO_RENDERER_ORDER`, `RENDERER_CAPABILITY_NAMES`, `RendererRegistry`, `clearRegisteredRenderers`, `missingCapabilities`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `validateCapabilityDeclaration`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `buildViewRenderList`, `sortRenderListByDepth`, `BatchableItem`, `BatchableMaterial`, `RenderBatch`, `RenderBatchOptions`, `BoundingSphere`, `ClipScope`, `RenderItemClip`, `RenderItemStencil`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `GraphEffect`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `NodeRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SkinnedLitRenderItem`, `SkinnedUnlitRenderItem`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `ShaderAttributeName`, `ShaderBinaryOp`, `ShaderDomain`, `ShaderGraph`, `ShaderGraphAnalysis`, `ShaderNode`, `ShaderNodeId`, `ShaderReflection`, `ShaderTextureReflection`, `ShaderUnaryOp`, `ShaderUniformReflection`, `ShaderValueType`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `CanvasTextureOptions`, `RasterOrigin`, `RasterSource`, `PickRequest`, `PickResult`, `PickingService`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererCapabilityDeclaration`, `RendererCapabilityName`, `RendererCapabilityShortfall`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureFilter`, `TextureMinFilter`, `TextureSource`, `TextureWrap`, `ViewRenderListOptions`
+- Re-exports: `DEFAULT_MAX_BATCH_VERTICES`, `RenderBatcher`, `computeWorldBoundingSphere`, `ClipPlaneAllocator`, `MAX_CLIP_PLANES`, `COMPUTE_ENTRY_POINT`, `supportsCompute`, `COLOR_GRADE_DEFAULTS`, `COPY_EFFECT`, `OUTPUT_TRANSFORM_EFFECT`, `supportsScreenEffects`, `validateEffectRenderPass`, `MAX_PUNCTUAL_LIGHTS`, `collectSceneLights`, `createSceneLights`, `isDirectionalLightSource`, `isPunctualLightSource`, `PARTICLE_COLOR_OFFSET`, `PARTICLE_INSTANCE_FLOATS`, `PARTICLE_POSITION_OFFSET`, `PARTICLE_SIZE_OFFSET`, `isParticleDrawable`, `particleQuadGeometry`, `buildInterpolatedRenderList`, `buildRenderList`, `groupRenderListByPipeline`, `isLitItem`, `isNodeItem`, `isParticlesItem`, `isSkinnedLitItem`, `isSkinnedUnlitItem`, `isSpriteItem`, `isStandardItem`, `isUnlitItem`, `viewLayerMask`, `MAX_SHADER_GRAPH_NODES`, `MAX_SHADER_GRAPH_TEXTURES`, `SHADER_ATTRIBUTE_TYPES`, `SHADER_VALUE_COMPONENTS`, `analyzeShaderGraph`, `forEachShaderNodeReference`, `RenderGraph`, `CanvasTexture`, `MAX_PICK_CANDIDATES`, `assertEncodableCandidateCount`, `collectPickCandidates`, `decodePickId`, `encodePickId`, `supportsPicking`, `RenderTarget`, `isRenderTargetTexture`, `Renderable`, `MAX_SKINNING_JOINTS`, `Mesh`, `restoreMeshSkeleton`, `AUTO_RENDERER_ORDER`, `RENDERER_CAPABILITY_NAMES`, `RendererRegistry`, `clearRegisteredRenderers`, `missingCapabilities`, `registerRenderer`, `registeredRenderers`, `resolveRenderer`, `validateCapabilityDeclaration`, `NullRenderer`, `liveRenderTargetCount`, `liveTextureCount`, `textureMemoryBytes`, `createRenderStatistics`, `resetRenderStatistics`, `supportsRenderStatistics`, `Arc`, `Circle`, `Ellipse`, `Line`, `PathShape`, `Polygon`, `Polyline`, `Rectangle`, `RegularPolygon`, `Ring`, `Sector`, `Shape2D`, `Star`, `Sprite`, `Texture`, `buildViewRenderList`, `sortRenderListByDepth`, `BatchableItem`, `BatchableMaterial`, `RenderBatch`, `RenderBatchOptions`, `BoundingSphere`, `ClipScope`, `RenderItemClip`, `RenderItemStencil`, `ComputeBinding`, `ComputeBindingAccess`, `ComputeBuffer`, `ComputeDispatcher`, `ComputePassDescriptor`, `ColorGradeEffect`, `CopyEffect`, `EffectRenderPass`, `GraphEffect`, `OutputTransformEffect`, `ScreenEffect`, `ScreenEffectKind`, `ScreenEffectRenderer`, `AmbientLightSource`, `DirectionalLightSource`, `DirectionalShadowSource`, `PointLightSource`, `PunctualLightSource`, `PunctualLightSourceBase`, `SceneLights`, `SpotLightSource`, `ParticleDrawable`, `LitRenderItem`, `NodeRenderItem`, `ParticleRenderItem`, `RenderItem`, `RenderItemKind`, `SkinnedLitRenderItem`, `SkinnedUnlitRenderItem`, `SpriteRenderItem`, `StandardRenderItem`, `UnlitRenderItem`, `ShaderAttributeName`, `ShaderBinaryOp`, `ShaderDomain`, `ShaderGraph`, `ShaderGraphAnalysis`, `ShaderNode`, `ShaderNodeId`, `ShaderReflection`, `ShaderTextureReflection`, `ShaderUnaryOp`, `ShaderUniformReflection`, `ShaderValueType`, `AddPassOptions`, `CustomRenderPass`, `RenderGraphIssue`, `RenderGraphIssueCode`, `RenderGraphIssueSeverity`, `RenderGraphPass`, `RenderPass`, `RenderPassContext`, `SceneRenderPass`, `CanvasTextureOptions`, `RasterOrigin`, `RasterSource`, `PickRequest`, `PickResult`, `PickingService`, `RenderTargetFormat`, `RenderTargetOptions`, `RenderTargetTexture`, `RenderableOptions`, `SurfaceMaterial`, `RendererCapabilityDeclaration`, `RendererCapabilityName`, `RendererCapabilityShortfall`, `RendererFallbackReason`, `RendererFallbackReport`, `RendererRegistration`, `RendererResolveOptions`, `RendererSelection`, `RenderInterpolation`, `Renderer`, `RendererBackend`, `RendererCapabilities`, `RendererEventMap`, `RendererOptions`, `ResizeRecord`, `RenderStatistics`, `RenderStatisticsReporter`, `ArcOptions`, `CircleOptions`, `EllipseOptions`, `LineOptions`, `Paint`, `PathShapeOptions`, `PolygonOptions`, `PolylineOptions`, `RectangleOptions`, `RegularPolygonOptions`, `RingOptions`, `SectorOptions`, `ResolvedPaint`, `ResolvedShapeFill`, `ResolvedStrokeStyle`, `Shape2DOptions`, `ShapeFill`, `SolidPaint`, `StarOptions`, `StrokeStyle`, `SpriteFrame`, `SpriteOptions`, `TextureFilter`, `TextureMinFilter`, `TextureSource`, `TextureWrap`, `ViewRenderListOptions`
 
 ---
 
@@ -3460,6 +3536,7 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
+| `./compute.js` | `ComputePassDescriptor` | Import (type-only) |
 | `./effect-pass.js` | `EffectRenderPass` | Import (type-only) |
 | `./picking.js` | `PickingService` | Import (type-only) |
 | `./render-target.js` | `RenderTarget` | Import (type-only) |
@@ -4012,7 +4089,8 @@ graph LR
 | `./wgpu-effect.js` | `EFFECT_BIND_GROUP_INDEX, EFFECT_GRADE_OFFSET, EFFECT_PASS_VERTEX_COUNT, EFFECT_UNIFORM_BYTES, EFFECT_UNIFORM_WGSL, createEffectBindGroupLayout, effectShaderSource` | Re-export |
 | `./wgpu-readback.js` | `READBACK_ROW_ALIGNMENT, readTexturePixels, readbackBytesPerRow` | Re-export |
 | `./wgpu-compute.js` | `COMPUTE_ENTRY_POINT, PARTICLE_INTEGRATOR_SHADER_SOURCE, PARTICLE_INTEGRATOR_WORKGROUP_SIZE, PARTICLE_SIMULATION_PARAMS_FLOATS, WgpuComputeBuffer, WgpuComputeCache, createComputeBuffer, particleIntegratorWorkgroups, readComputeBufferBytes, writeComputeBuffer, writeParticleSimulationParams` | Re-export |
-| `./wgpu-particles.js` | `PARTICLE_INSTANCE_BUFFER_LAYOUT, PARTICLE_INSTANCE_STRIDE_BYTES, PARTICLE_MODEL_OFFSET, PARTICLE_PROJECTION_OFFSET, PARTICLE_SHADER_SOURCE, PARTICLE_UNIFORM_BYTES, PARTICLE_UNIFORM_WGSL, PARTICLE_VERTEX_BUFFER_LAYOUTS, PARTICLE_VIEW_OFFSET, WgpuParticleCache, createParticleBindGroupLayout` | Re-export |
+| `./wgpu-particles.js` | `PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT, PARTICLE_GPU_POSITION_BUFFER_LAYOUT, PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS, PARTICLE_INSTANCE_BUFFER_LAYOUT, PARTICLE_INSTANCE_STRIDE_BYTES, PARTICLE_MODEL_OFFSET, PARTICLE_PROJECTION_OFFSET, PARTICLE_SHADER_SOURCE, PARTICLE_UNIFORM_BYTES, PARTICLE_UNIFORM_WGSL, PARTICLE_VERTEX_BUFFER_LAYOUTS, PARTICLE_VIEW_OFFSET, WgpuParticleCache, createParticleBindGroupLayout` | Re-export |
+| `./wgpu-particle-simulation.js` | `PARTICLE_SIMULATION_SCRATCH_BYTES, PARTICLE_SIMULATION_VECTOR_BYTES, WgpuParticleSimulation` | Re-export |
 | `./wgpu-shadow.js` | `SHADOW_FACTOR_WGSL, SHADOW_LIGHT_UNIFORM_BYTES, SHADOW_LIGHT_UNIFORM_WGSL, SHADOW_MAP_BINDING, SHADOW_MATRIX_OFFSET, SHADOW_PARAMS_OFFSET, SHADOW_SAMPLER_BINDING, SHADOW_SHADER_SOURCE, SHADOW_UNIFORM_SPARE_BYTES, createShadowLightsBindGroupLayout, createShadowSampler, writeShadowUniforms` | Re-export |
 | `./wgpu-stencil.js` | `CLEAR_STENCIL, STENCIL_ALL_BITS, applyStencilReference, frameWantsStencil, stencilDescriptor` | Re-export |
 | `./wgpu-standard.js` | `STANDARD_BASE_COLOR_OFFSET, STANDARD_EMISSIVE_OFFSET, STANDARD_MODEL_OFFSET, STANDARD_SURFACE_OFFSET, STANDARD_UNIFORM_BYTES, STANDARD_UNIFORM_WGSL, STANDARD_VIEW_PROJECTION_OFFSET, createStandardBindGroupLayout, standardShaderSource` | Re-export |
@@ -4027,13 +4105,14 @@ graph LR
 | `./wgpu-effect.js` | `WgpuEffectKind` | Re-export (type-only) |
 | `./wgpu-compute.js` | `ComputeBinding, ComputeBindingAccess, ComputeBufferOptions, ComputePassDescriptor` | Re-export (type-only) |
 | `./wgpu-particles.js` | `WgpuParticleRecord` | Re-export (type-only) |
+| `./wgpu-particle-simulation.js` | `WgpuParticleSimulationOptions` | Re-export (type-only) |
 | `./wgpu-stencil.js` | `WgpuStencilSource` | Re-export (type-only) |
 | `./wgpu-node-registry.js` | `WgpuNodeFrameState, WgpuNodeItemMaterial, WgpuNodeMaterialPipelineFactory, WgpuNodeMaterialPipelines, WgpuNodePipelineHost` | Re-export (type-only) |
 | `./wgpu-node-program.js` | `EmittedWgslNodeShader` | Re-export (type-only) |
 
 **Exports:**
 - Constants: `PACKAGE_NAME`
-- Re-exports: `GPU_BUFFER_USAGE`, `GPU_MAP_MODE`, `GPU_SHADER_STAGE`, `GPU_TEXTURE_USAGE`, `UNIFORM_STRIDE_BYTES`, `hostGpu`, `WebgpuRenderer`, `isWebgpuSupported`, `registerWebgpuRenderer`, `DRAW_COLOR_OFFSET`, `DRAW_MODEL_OFFSET`, `DRAW_UNIFORM_BYTES`, `DRAW_UNIFORM_FLOATS`, `DRAW_UNIFORM_WGSL`, `DRAW_VIEW_PROJECTION_OFFSET`, `MAP_BINDING_WGSL`, `MAP_BIND_GROUP_INDEX`, `MAP_SAMPLER_BINDING`, `MAP_TEXTURE_BINDING`, `createDrawBindGroupLayout`, `createTextureBindGroupLayout`, `WgpuGeometryCache`, `blendStateFor`, `pipelineKey`, `stencilStateFor`, `WgpuPipelineCache`, `WgpuBatching`, `batchVertexBufferLayout`, `createWgpuBatching`, `SPRITE_MODEL_OFFSET`, `SPRITE_QUAD_OFFSET`, `SPRITE_SHADER_SOURCE`, `SPRITE_TINT_OFFSET`, `SPRITE_UNIFORM_BYTES`, `SPRITE_UNIFORM_WGSL`, `SPRITE_VIEW_PROJECTION_OFFSET`, `createSpriteBindGroupLayout`, `MIPMAP_SHADER_SOURCE`, `WgpuTextureCache`, `mipLevelCount`, `samplerKey`, `textureByteLength`, `CLEAR_SHADER_SOURCE`, `CLEAR_VERTEX_COUNT`, `COLOR_BUFFER_LAYOUT`, `COLOR_SHADER_LOCATION`, `FRAGMENT_ENTRY_POINT`, `POSITION_BUFFER_LAYOUT`, `POSITION_SHADER_LOCATION`, `UV_BUFFER_LAYOUT`, `UV_SHADER_LOCATION`, `VERTEX_ENTRY_POINT`, `unlitShaderSource`, `unlitVertexBufferLayouts`, `LIGHTS_BIND_GROUP_INDEX`, `LIGHT_AMBIENT_OFFSET`, `LIGHT_CAMERA_OFFSET`, `LIGHT_COLOR_OFFSET`, `LIGHT_COUNTS_OFFSET`, `LIGHT_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_COLOR_OFFSET`, `LIGHT_PUNCTUAL_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_PARAMS_OFFSET`, `LIGHT_PUNCTUAL_POSITION_OFFSET`, `LIGHT_UNIFORM_BYTES`, `LIGHT_UNIFORM_FLOATS`, `LIGHT_UNIFORM_MEMBERS_WGSL`, `LIGHT_UNIFORM_STRIDE_BYTES`, `LIGHT_UNIFORM_STRIDE_FLOATS`, `LIGHT_UNIFORM_WGSL`, `PUNCTUAL_LIGHT_WGSL`, `SHADED_MAP_BINDING_WGSL`, `SHADED_MAP_BIND_GROUP_INDEX`, `createLightsBindGroupLayout`, `writeLightUniforms`, `NORMAL_BUFFER_LAYOUT`, `NORMAL_MATRIX_WGSL`, `NORMAL_SHADER_LOCATION`, `litShaderSource`, `shadedVertexBufferLayouts`, `shadedVertexStageWgsl`, `RENDER_TARGET_COLOR_FORMAT`, `RENDER_TARGET_DEPTH_FORMAT`, `RENDER_TARGET_DEPTH_STENCIL_FORMAT`, `RENDER_TARGET_DEPTH_TEXTURE_FORMAT`, `WgpuRenderTargetCache`, `renderTargetDepthFormat`, `EFFECT_BIND_GROUP_INDEX`, `EFFECT_GRADE_OFFSET`, `EFFECT_PASS_VERTEX_COUNT`, `EFFECT_UNIFORM_BYTES`, `EFFECT_UNIFORM_WGSL`, `createEffectBindGroupLayout`, `effectShaderSource`, `READBACK_ROW_ALIGNMENT`, `readTexturePixels`, `readbackBytesPerRow`, `COMPUTE_ENTRY_POINT`, `PARTICLE_INTEGRATOR_SHADER_SOURCE`, `PARTICLE_INTEGRATOR_WORKGROUP_SIZE`, `PARTICLE_SIMULATION_PARAMS_FLOATS`, `WgpuComputeBuffer`, `WgpuComputeCache`, `createComputeBuffer`, `particleIntegratorWorkgroups`, `readComputeBufferBytes`, `writeComputeBuffer`, `writeParticleSimulationParams`, `PARTICLE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_INSTANCE_STRIDE_BYTES`, `PARTICLE_MODEL_OFFSET`, `PARTICLE_PROJECTION_OFFSET`, `PARTICLE_SHADER_SOURCE`, `PARTICLE_UNIFORM_BYTES`, `PARTICLE_UNIFORM_WGSL`, `PARTICLE_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_VIEW_OFFSET`, `WgpuParticleCache`, `createParticleBindGroupLayout`, `SHADOW_FACTOR_WGSL`, `SHADOW_LIGHT_UNIFORM_BYTES`, `SHADOW_LIGHT_UNIFORM_WGSL`, `SHADOW_MAP_BINDING`, `SHADOW_MATRIX_OFFSET`, `SHADOW_PARAMS_OFFSET`, `SHADOW_SAMPLER_BINDING`, `SHADOW_SHADER_SOURCE`, `SHADOW_UNIFORM_SPARE_BYTES`, `createShadowLightsBindGroupLayout`, `createShadowSampler`, `writeShadowUniforms`, `CLEAR_STENCIL`, `STENCIL_ALL_BITS`, `applyStencilReference`, `frameWantsStencil`, `stencilDescriptor`, `STANDARD_BASE_COLOR_OFFSET`, `STANDARD_EMISSIVE_OFFSET`, `STANDARD_MODEL_OFFSET`, `STANDARD_SURFACE_OFFSET`, `STANDARD_UNIFORM_BYTES`, `STANDARD_UNIFORM_WGSL`, `STANDARD_VIEW_PROJECTION_OFFSET`, `createStandardBindGroupLayout`, `standardShaderSource`, `clearRegisteredWebgpuNodeMaterialPipeline`, `resolveWebgpuNodeMaterialPipelineFactory`, `setWebgpuNodeMaterialPipelineFactory`, `NODE_SCREEN_BLOCK_BASE_BYTES`, `NODE_SCREEN_TEXTURE_GROUP`, `NODE_SURFACE_BLOCK_BASE_BYTES`, `NODE_SURFACE_BLOCK_GROUP`, `NODE_SURFACE_TEXTURE_GROUP`, `WgpuNodePipelineStore`, `emitShaderGraphWgsl`, `registerWebgpuNodeMaterialPipeline`, `Gpu`, `GpuAdapter`, `GpuStencilFaceState`, `GpuBindGroup`, `GpuBindGroupEntry`, `GpuBindGroupLayout`, `GpuBindGroupLayoutEntry`, `GpuBlendComponent`, `GpuBlendState`, `GpuBuffer`, `GpuBufferDescriptor`, `GpuCanvasContext`, `GpuCommandBuffer`, `GpuCommandEncoder`, `GpuComputePassEncoder`, `GpuComputePipeline`, `GpuComputePipelineDescriptor`, `GpuDevice`, `GpuDeviceLostInfo`, `GpuPipelineLayout`, `GpuQueue`, `GpuRenderPassDescriptor`, `GpuRenderPassEncoder`, `GpuRenderPipeline`, `GpuBufferBinding`, `GpuRenderPipelineDescriptor`, `GpuSampler`, `GpuSamplerDescriptor`, `GpuShaderModule`, `GpuTexture`, `GpuTextureDescriptor`, `GpuTextureView`, `GpuTextureViewDescriptor`, `GpuVertexBufferLayout`, `WebgpuCanvas`, `CacheableGeometry`, `WgpuGeometryRecord`, `WgpuBatchStream`, `WgpuPipelineDescriptor`, `WgpuPipelineKind`, `WgpuStencilDescriptor`, `WgpuRenderBatching`, `ResolvedSamplerState`, `WgpuCacheableTexture`, `WgpuTextureRecord`, `WgpuCacheableRenderTarget`, `WgpuRenderTargetRecord`, `WgpuEffectKind`, `ComputeBinding`, `ComputeBindingAccess`, `ComputeBufferOptions`, `ComputePassDescriptor`, `WgpuParticleRecord`, `WgpuStencilSource`, `WgpuNodeFrameState`, `WgpuNodeItemMaterial`, `WgpuNodeMaterialPipelineFactory`, `WgpuNodeMaterialPipelines`, `WgpuNodePipelineHost`, `EmittedWgslNodeShader`
+- Re-exports: `GPU_BUFFER_USAGE`, `GPU_MAP_MODE`, `GPU_SHADER_STAGE`, `GPU_TEXTURE_USAGE`, `UNIFORM_STRIDE_BYTES`, `hostGpu`, `WebgpuRenderer`, `isWebgpuSupported`, `registerWebgpuRenderer`, `DRAW_COLOR_OFFSET`, `DRAW_MODEL_OFFSET`, `DRAW_UNIFORM_BYTES`, `DRAW_UNIFORM_FLOATS`, `DRAW_UNIFORM_WGSL`, `DRAW_VIEW_PROJECTION_OFFSET`, `MAP_BINDING_WGSL`, `MAP_BIND_GROUP_INDEX`, `MAP_SAMPLER_BINDING`, `MAP_TEXTURE_BINDING`, `createDrawBindGroupLayout`, `createTextureBindGroupLayout`, `WgpuGeometryCache`, `blendStateFor`, `pipelineKey`, `stencilStateFor`, `WgpuPipelineCache`, `WgpuBatching`, `batchVertexBufferLayout`, `createWgpuBatching`, `SPRITE_MODEL_OFFSET`, `SPRITE_QUAD_OFFSET`, `SPRITE_SHADER_SOURCE`, `SPRITE_TINT_OFFSET`, `SPRITE_UNIFORM_BYTES`, `SPRITE_UNIFORM_WGSL`, `SPRITE_VIEW_PROJECTION_OFFSET`, `createSpriteBindGroupLayout`, `MIPMAP_SHADER_SOURCE`, `WgpuTextureCache`, `mipLevelCount`, `samplerKey`, `textureByteLength`, `CLEAR_SHADER_SOURCE`, `CLEAR_VERTEX_COUNT`, `COLOR_BUFFER_LAYOUT`, `COLOR_SHADER_LOCATION`, `FRAGMENT_ENTRY_POINT`, `POSITION_BUFFER_LAYOUT`, `POSITION_SHADER_LOCATION`, `UV_BUFFER_LAYOUT`, `UV_SHADER_LOCATION`, `VERTEX_ENTRY_POINT`, `unlitShaderSource`, `unlitVertexBufferLayouts`, `LIGHTS_BIND_GROUP_INDEX`, `LIGHT_AMBIENT_OFFSET`, `LIGHT_CAMERA_OFFSET`, `LIGHT_COLOR_OFFSET`, `LIGHT_COUNTS_OFFSET`, `LIGHT_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_COLOR_OFFSET`, `LIGHT_PUNCTUAL_DIRECTION_OFFSET`, `LIGHT_PUNCTUAL_PARAMS_OFFSET`, `LIGHT_PUNCTUAL_POSITION_OFFSET`, `LIGHT_UNIFORM_BYTES`, `LIGHT_UNIFORM_FLOATS`, `LIGHT_UNIFORM_MEMBERS_WGSL`, `LIGHT_UNIFORM_STRIDE_BYTES`, `LIGHT_UNIFORM_STRIDE_FLOATS`, `LIGHT_UNIFORM_WGSL`, `PUNCTUAL_LIGHT_WGSL`, `SHADED_MAP_BINDING_WGSL`, `SHADED_MAP_BIND_GROUP_INDEX`, `createLightsBindGroupLayout`, `writeLightUniforms`, `NORMAL_BUFFER_LAYOUT`, `NORMAL_MATRIX_WGSL`, `NORMAL_SHADER_LOCATION`, `litShaderSource`, `shadedVertexBufferLayouts`, `shadedVertexStageWgsl`, `RENDER_TARGET_COLOR_FORMAT`, `RENDER_TARGET_DEPTH_FORMAT`, `RENDER_TARGET_DEPTH_STENCIL_FORMAT`, `RENDER_TARGET_DEPTH_TEXTURE_FORMAT`, `WgpuRenderTargetCache`, `renderTargetDepthFormat`, `EFFECT_BIND_GROUP_INDEX`, `EFFECT_GRADE_OFFSET`, `EFFECT_PASS_VERTEX_COUNT`, `EFFECT_UNIFORM_BYTES`, `EFFECT_UNIFORM_WGSL`, `createEffectBindGroupLayout`, `effectShaderSource`, `READBACK_ROW_ALIGNMENT`, `readTexturePixels`, `readbackBytesPerRow`, `COMPUTE_ENTRY_POINT`, `PARTICLE_INTEGRATOR_SHADER_SOURCE`, `PARTICLE_INTEGRATOR_WORKGROUP_SIZE`, `PARTICLE_SIMULATION_PARAMS_FLOATS`, `WgpuComputeBuffer`, `WgpuComputeCache`, `createComputeBuffer`, `particleIntegratorWorkgroups`, `readComputeBufferBytes`, `writeComputeBuffer`, `writeParticleSimulationParams`, `PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_GPU_POSITION_BUFFER_LAYOUT`, `PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_INSTANCE_STRIDE_BYTES`, `PARTICLE_MODEL_OFFSET`, `PARTICLE_PROJECTION_OFFSET`, `PARTICLE_SHADER_SOURCE`, `PARTICLE_UNIFORM_BYTES`, `PARTICLE_UNIFORM_WGSL`, `PARTICLE_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_VIEW_OFFSET`, `WgpuParticleCache`, `createParticleBindGroupLayout`, `PARTICLE_SIMULATION_SCRATCH_BYTES`, `PARTICLE_SIMULATION_VECTOR_BYTES`, `WgpuParticleSimulation`, `SHADOW_FACTOR_WGSL`, `SHADOW_LIGHT_UNIFORM_BYTES`, `SHADOW_LIGHT_UNIFORM_WGSL`, `SHADOW_MAP_BINDING`, `SHADOW_MATRIX_OFFSET`, `SHADOW_PARAMS_OFFSET`, `SHADOW_SAMPLER_BINDING`, `SHADOW_SHADER_SOURCE`, `SHADOW_UNIFORM_SPARE_BYTES`, `createShadowLightsBindGroupLayout`, `createShadowSampler`, `writeShadowUniforms`, `CLEAR_STENCIL`, `STENCIL_ALL_BITS`, `applyStencilReference`, `frameWantsStencil`, `stencilDescriptor`, `STANDARD_BASE_COLOR_OFFSET`, `STANDARD_EMISSIVE_OFFSET`, `STANDARD_MODEL_OFFSET`, `STANDARD_SURFACE_OFFSET`, `STANDARD_UNIFORM_BYTES`, `STANDARD_UNIFORM_WGSL`, `STANDARD_VIEW_PROJECTION_OFFSET`, `createStandardBindGroupLayout`, `standardShaderSource`, `clearRegisteredWebgpuNodeMaterialPipeline`, `resolveWebgpuNodeMaterialPipelineFactory`, `setWebgpuNodeMaterialPipelineFactory`, `NODE_SCREEN_BLOCK_BASE_BYTES`, `NODE_SCREEN_TEXTURE_GROUP`, `NODE_SURFACE_BLOCK_BASE_BYTES`, `NODE_SURFACE_BLOCK_GROUP`, `NODE_SURFACE_TEXTURE_GROUP`, `WgpuNodePipelineStore`, `emitShaderGraphWgsl`, `registerWebgpuNodeMaterialPipeline`, `Gpu`, `GpuAdapter`, `GpuStencilFaceState`, `GpuBindGroup`, `GpuBindGroupEntry`, `GpuBindGroupLayout`, `GpuBindGroupLayoutEntry`, `GpuBlendComponent`, `GpuBlendState`, `GpuBuffer`, `GpuBufferDescriptor`, `GpuCanvasContext`, `GpuCommandBuffer`, `GpuCommandEncoder`, `GpuComputePassEncoder`, `GpuComputePipeline`, `GpuComputePipelineDescriptor`, `GpuDevice`, `GpuDeviceLostInfo`, `GpuPipelineLayout`, `GpuQueue`, `GpuRenderPassDescriptor`, `GpuRenderPassEncoder`, `GpuRenderPipeline`, `GpuBufferBinding`, `GpuRenderPipelineDescriptor`, `GpuSampler`, `GpuSamplerDescriptor`, `GpuShaderModule`, `GpuTexture`, `GpuTextureDescriptor`, `GpuTextureView`, `GpuTextureViewDescriptor`, `GpuVertexBufferLayout`, `WebgpuCanvas`, `CacheableGeometry`, `WgpuGeometryRecord`, `WgpuBatchStream`, `WgpuPipelineDescriptor`, `WgpuPipelineKind`, `WgpuStencilDescriptor`, `WgpuRenderBatching`, `ResolvedSamplerState`, `WgpuCacheableTexture`, `WgpuTextureRecord`, `WgpuCacheableRenderTarget`, `WgpuRenderTargetRecord`, `WgpuEffectKind`, `ComputeBinding`, `ComputeBindingAccess`, `ComputeBufferOptions`, `ComputePassDescriptor`, `WgpuParticleRecord`, `WgpuParticleSimulationOptions`, `WgpuStencilSource`, `WgpuNodeFrameState`, `WgpuNodeItemMaterial`, `WgpuNodeMaterialPipelineFactory`, `WgpuNodeMaterialPipelines`, `WgpuNodePipelineHost`, `EmittedWgslNodeShader`
 
 ---
 
@@ -4085,6 +4164,7 @@ graph LR
 | `./wgpu-lights.js` | `LIGHTS_BIND_GROUP_INDEX, LIGHT_UNIFORM_BYTES, LIGHT_UNIFORM_STRIDE_BYTES, LIGHT_UNIFORM_STRIDE_FLOATS, SHADED_MAP_BIND_GROUP_INDEX, createLightsBindGroupLayout, writeLightUniforms` | Import |
 | `./wgpu-compute.js` | `WgpuComputeCache, createComputeBuffer, readComputeBufferBytes, writeComputeBuffer, ComputeBufferOptions, ComputePassDescriptor, WgpuComputeBuffer` | Import |
 | `./wgpu-particles.js` | `PARTICLE_MODEL_OFFSET, PARTICLE_PROJECTION_OFFSET, PARTICLE_UNIFORM_BYTES, PARTICLE_VIEW_OFFSET, WgpuParticleCache, createParticleBindGroupLayout, WgpuParticleRecord` | Import |
+| `./wgpu-particle-simulation.js` | `WgpuParticleSimulation, WgpuParticleSimulationOptions` | Import |
 | `./wgpu-pipeline-cache.js` | `WgpuPipelineCache, WgpuPipelineDescriptor, WgpuStencilDescriptor` | Import |
 | `./wgpu-readback.js` | `readTexturePixels` | Import |
 | `./wgpu-render-target.js` | `RENDER_TARGET_COLOR_FORMAT, WgpuRenderTargetCache, WgpuRenderTargetRecord` | Import |
@@ -4141,6 +4221,7 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/core` | `FourError` |
+| `@four/render` | `COMPUTE_ENTRY_POINT, ComputeBinding, ComputeBindingAccess, ComputeBuffer, ComputePassDescriptor` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -4149,10 +4230,9 @@ graph LR
 
 **Exports:**
 - Classes: `WgpuComputeBuffer`, `WgpuComputeCache`
-- Interfaces: `ComputeBinding`, `ComputePassDescriptor`, `ComputeBufferOptions`
-- Types: `ComputeBindingAccess`
+- Interfaces: `ComputeBufferOptions`
 - Functions: `createComputeBuffer`, `writeComputeBuffer`, `readComputeBufferBytes`, `writeParticleSimulationParams`, `particleIntegratorWorkgroups`
-- Constants: `COMPUTE_ENTRY_POINT`, `PARTICLE_INTEGRATOR_WORKGROUP_SIZE`, `PARTICLE_SIMULATION_PARAMS_FLOATS`, `PARTICLE_INTEGRATOR_SHADER_SOURCE`
+- Constants: `PARTICLE_INTEGRATOR_WORKGROUP_SIZE`, `PARTICLE_SIMULATION_PARAMS_FLOATS`, `PARTICLE_INTEGRATOR_SHADER_SOURCE`
 
 ---
 
@@ -4278,6 +4358,26 @@ graph LR
 
 ---
 
+### `packages/render-webgpu/src/wgpu-particle-simulation.ts` - `WgpuParticleSimulation` — the device side of §36's `simulation: "gpu"`
+
+**Workspace Dependencies:**
+| Package | Import |
+|---------|--------|
+| `@four/core` | `FourError` |
+
+**Internal Dependencies:**
+| File | Imports | Type |
+|------|---------|------|
+| `./webgpu-device.js` | `GPU_BUFFER_USAGE, GpuBuffer, GpuDevice` | Import |
+| `./wgpu-compute.js` | `PARTICLE_INTEGRATOR_SHADER_SOURCE, PARTICLE_SIMULATION_PARAMS_FLOATS, WgpuComputeBuffer, WgpuComputeCache, createComputeBuffer, particleIntegratorWorkgroups, writeComputeBuffer, writeParticleSimulationParams` | Import |
+
+**Exports:**
+- Classes: `WgpuParticleSimulation`
+- Interfaces: `WgpuParticleSimulationOptions`
+- Constants: `PARTICLE_SIMULATION_VECTOR_BYTES`, `PARTICLE_SIMULATION_SCRATCH_BYTES`
+
+---
+
 ### `packages/render-webgpu/src/wgpu-particles.ts` - The batched particle pipeline for the WebGPU backend (§36, §64 stage 6,
 
 **Workspace Dependencies:**
@@ -4295,7 +4395,7 @@ graph LR
 - Classes: `WgpuParticleCache`
 - Interfaces: `WgpuParticleRecord`
 - Functions: `createParticleBindGroupLayout`
-- Constants: `PARTICLE_PROJECTION_OFFSET`, `PARTICLE_VIEW_OFFSET`, `PARTICLE_MODEL_OFFSET`, `PARTICLE_UNIFORM_BYTES`, `PARTICLE_INSTANCE_STRIDE_BYTES`, `PARTICLE_UNIFORM_WGSL`, `PARTICLE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_SHADER_SOURCE`
+- Constants: `PARTICLE_PROJECTION_OFFSET`, `PARTICLE_VIEW_OFFSET`, `PARTICLE_MODEL_OFFSET`, `PARTICLE_UNIFORM_BYTES`, `PARTICLE_INSTANCE_STRIDE_BYTES`, `PARTICLE_UNIFORM_WGSL`, `PARTICLE_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_GPU_POSITION_BUFFER_LAYOUT`, `PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT`, `PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS`, `PARTICLE_SHADER_SOURCE`
 
 ---
 
@@ -4313,7 +4413,7 @@ graph LR
 | `./wgpu-batch.js` | `batchVertexBufferLayout` | Import |
 | `./wgpu-effect.js` | `effectShaderSource, WgpuEffectKind` | Import |
 | `./wgpu-lit.js` | `litShaderSource, shadedVertexBufferLayouts` | Import |
-| `./wgpu-particles.js` | `PARTICLE_SHADER_SOURCE, PARTICLE_VERTEX_BUFFER_LAYOUTS` | Import |
+| `./wgpu-particles.js` | `PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS, PARTICLE_SHADER_SOURCE, PARTICLE_VERTEX_BUFFER_LAYOUTS` | Import |
 | `./wgpu-shadow.js` | `SHADOW_SHADER_SOURCE` | Import |
 | `./wgpu-sprite.js` | `SPRITE_SHADER_SOURCE` | Import |
 | `./wgpu-standard.js` | `standardShaderSource` | Import |
@@ -5175,10 +5275,10 @@ graph LR
 
 | File | Imports From | Exports To |
 |------|--------------|------------|
-| `packages/render-webgpu/src/index` | 22 files | 0 files |
-| `packages/render/src/index` | 21 files | 0 files |
-| `packages/render-webgpu/src/webgpu-device` | 0 files | 21 files |
-| `packages/render-webgpu/src/webgpu-renderer` | 18 files | 2 files |
+| `packages/render-webgpu/src/index` | 23 files | 0 files |
+| `packages/render/src/index` | 22 files | 0 files |
+| `packages/render-webgpu/src/webgpu-device` | 0 files | 22 files |
+| `packages/render-webgpu/src/webgpu-renderer` | 19 files | 2 files |
 | `packages/physics/src/index` | 19 files | 0 files |
 | `packages/motion/src/index` | 18 files | 0 files |
 | `packages/physics/src/world` | 12 files | 6 files |
@@ -5201,6 +5301,7 @@ graph LR
 | `packages/math/src/index` | 9 files | 0 files |
 | `packages/physics/src/serializers` | 8 files | 1 file |
 | `packages/physics/src/shapes` | 1 file | 8 files |
+| `packages/render/src/renderer` | 5 files | 4 files |
 | `packages/render-webgpu/src/wgpu-lit` | 5 files | 4 files |
 | `packages/render-webgpu/src/wgpu-node-program` | 8 files | 1 file |
 | `packages/render-webgpu/src/wgpu-shadow` | 4 files | 5 files |
@@ -5211,7 +5312,6 @@ graph LR
 | `packages/physics/src/queries` | 2 files | 6 files |
 | `packages/physics/src/validation` | 3 files | 5 files |
 | `packages/render/src/render-list` | 4 files | 4 files |
-| `packages/render/src/renderer` | 4 files | 4 files |
 | `packages/render-webgpu/src/wgpu-standard` | 5 files | 3 files |
 | `packages/animation/src/controller` | 6 files | 1 file |
 | `packages/animation/src/tween` | 3 files | 4 files |
@@ -5258,251 +5358,252 @@ graph TD
     subgraph Packages/assets
         N11[asset-manager]
         N12[content-hash]
-        N13[index]
-        N14[loaders]
-        N15[manifest]
-        N16[texture]
+        N13[gltf]
+        N14[index]
+        N15[loaders]
+        N16[manifest]
+        N17[texture]
     end
 
     subgraph Packages/core
-        N17[component]
-        N18[conventions]
-        N19[dev]
-        N20[disposable]
-        N21[errors]
-        N22[events]
-        N23[index]
-        N24[json]
-        N25[plugin]
-        N26[random]
-        N27[...3 more]
+        N18[component]
+        N19[conventions]
+        N20[dev]
+        N21[disposable]
+        N22[errors]
+        N23[events]
+        N24[index]
+        N25[json]
+        N26[plugin]
+        N27[random]
+        N28[...3 more]
     end
 
     subgraph Packages/diagnostics
-        N28[checksum]
-        N29[debug-draw]
-        N30[index]
-        N31[recorder]
-        N32[replay-format]
-        N33[replay-player]
-        N34[resource-audit]
-        N35[rollback]
-        N36[stats]
+        N29[checksum]
+        N30[debug-draw]
+        N31[index]
+        N32[recorder]
+        N33[replay-format]
+        N34[replay-player]
+        N35[resource-audit]
+        N36[rollback]
+        N37[stats]
     end
 
     subgraph Packages/four
-        N37[animation]
-        N38[application]
-        N39[assets]
-        N40[core]
-        N41[diagnostics]
-        N42[geometry]
-        N43[index]
-        N44[input]
-        N45[materials]
-        N46[math]
-        N47[...19 more]
+        N38[animation]
+        N39[application]
+        N40[assets]
+        N41[compute-pass]
+        N42[core]
+        N43[diagnostics]
+        N44[geometry]
+        N45[gltf]
+        N46[index]
+        N47[input]
+        N48[...21 more]
     end
 
     subgraph Packages/geometry
-        N48[buffer-geometry]
-        N49[geometry]
-        N50[index]
-        N51[path]
-        N52[primitive-support]
-        N53[primitives-3d]
-        N54[primitives]
-        N55[resource-memory]
-        N56[svg-path]
-        N57[tessellation]
+        N49[buffer-geometry]
+        N50[geometry]
+        N51[index]
+        N52[path]
+        N53[primitive-support]
+        N54[primitives-3d]
+        N55[primitives]
+        N56[resource-memory]
+        N57[svg-path]
+        N58[tessellation]
     end
 
     subgraph Packages/input
-        N58[drag]
-        N59[index]
-        N60[key-events]
-        N61[keyboard-input]
-        N62[pick]
-        N63[pointer-events]
-        N64[pointer-input]
-        N65[propagation]
+        N59[drag]
+        N60[index]
+        N61[key-events]
+        N62[keyboard-input]
+        N63[pick]
+        N64[pointer-events]
+        N65[pointer-input]
+        N66[propagation]
     end
 
     subgraph Packages/materials
-        N66[index]
-        N67[lit-material]
-        N68[material]
-        N69[node-material-builder]
-        N70[node-material]
-        N71[shader-graph]
-        N72[sprite-material]
-        N73[standard-material]
-        N74[stencil-state]
-        N75[texture]
-        N76[...1 more]
+        N67[index]
+        N68[lit-material]
+        N69[material]
+        N70[node-material-builder]
+        N71[node-material]
+        N72[shader-graph]
+        N73[sprite-material]
+        N74[standard-material]
+        N75[stencil-state]
+        N76[texture]
+        N77[...1 more]
     end
 
     subgraph Packages/math
-        N77[alloc-counter]
-        N78[color]
-        N79[frustum]
-        N80[index]
-        N81[matrix3]
-        N82[matrix4]
-        N83[quaternion]
-        N84[vector2]
-        N85[vector3]
-        N86[vector4]
+        N78[alloc-counter]
+        N79[color]
+        N80[frustum]
+        N81[index]
+        N82[matrix3]
+        N83[matrix4]
+        N84[quaternion]
+        N85[vector2]
+        N86[vector3]
+        N87[vector4]
     end
 
     subgraph Packages/motion
-        N87[camera-rigs]
-        N88[character-controller]
-        N89[clock]
-        N90[constraints]
-        N91[ik]
-        N92[index]
-        N93[integrators]
-        N94[kinematic-controller]
-        N95[motion-component]
-        N96[pid]
-        N97[...9 more]
+        N88[camera-rigs]
+        N89[character-controller]
+        N90[clock]
+        N91[constraints]
+        N92[ik]
+        N93[index]
+        N94[integrators]
+        N95[kinematic-controller]
+        N96[motion-component]
+        N97[pid]
+        N98[...9 more]
     end
 
     subgraph Packages/particles
-        N98[emitter]
-        N99[fields]
-        N100[index]
-        N101[particle-renderable]
-        N102[particle-system]
-        N103[pool]
-        N104[random]
-        N105[types]
+        N99[emitter]
+        N100[fields]
+        N101[index]
+        N102[particle-renderable]
+        N103[particle-system]
+        N104[pool]
+        N105[random]
+        N106[types]
     end
 
     subgraph Packages/physics
-        N106[adapter]
-        N107[body-access]
-        N108[collider]
-        N109[descriptors]
-        N110[events]
-        N111[force-field]
-        N112[index]
-        N113[joints]
-        N114[material]
-        N115[physics-event-system]
-        N116[...10 more]
+        N107[adapter]
+        N108[body-access]
+        N109[collider]
+        N110[descriptors]
+        N111[events]
+        N112[force-field]
+        N113[index]
+        N114[joints]
+        N115[material]
+        N116[physics-event-system]
+        N117[...10 more]
     end
 
     subgraph Packages/physics-box2d
-        N117[index]
+        N118[index]
     end
 
     subgraph Packages/physics-rapier
-        N118[ccd]
-        N119[conversions2d]
-        N120[conversions3d]
-        N121[index]
-        N122[init]
-        N123[rapier2d-adapter]
-        N124[rapier3d-adapter]
-        N125[register]
+        N119[ccd]
+        N120[conversions2d]
+        N121[conversions3d]
+        N122[index]
+        N123[init]
+        N124[rapier2d-adapter]
+        N125[rapier3d-adapter]
+        N126[register]
     end
 
     subgraph Packages/physics-soft
-        N126[index]
+        N127[index]
     end
 
     subgraph Packages/render
-        N127[batch]
-        N128[bounds]
-        N129[clip]
-        N130[effect-pass]
-        N131[index]
-        N132[lights]
-        N133[mesh]
-        N134[particles]
-        N135[picking]
-        N136[raster]
-        N137[...12 more]
+        N128[batch]
+        N129[bounds]
+        N130[clip]
+        N131[compute]
+        N132[effect-pass]
+        N133[index]
+        N134[lights]
+        N135[mesh]
+        N136[particles]
+        N137[picking]
+        N138[...13 more]
     end
 
     subgraph Packages/render-canvas
-        N138[index]
-    end
-
-    subgraph Packages/render-svg
         N139[index]
     end
 
+    subgraph Packages/render-svg
+        N140[index]
+    end
+
     subgraph Packages/render-webgl
-        N140[gl-batch]
-        N141[gl-effect]
-        N142[gl-geometry]
-        N143[gl-node-program]
-        N144[gl-particles]
-        N145[gl-picking-registry]
-        N146[gl-picking]
-        N147[gl-program]
-        N148[gl-render-target]
-        N149[gl-shadow]
-        N150[...8 more]
+        N141[gl-batch]
+        N142[gl-effect]
+        N143[gl-geometry]
+        N144[gl-node-program]
+        N145[gl-particles]
+        N146[gl-picking-registry]
+        N147[gl-picking]
+        N148[gl-program]
+        N149[gl-render-target]
+        N150[gl-shadow]
+        N151[...8 more]
     end
 
     subgraph Packages/render-webgpu
-        N151[index]
-        N152[register]
-        N153[webgpu-device]
-        N154[webgpu-renderer]
-        N155[wgpu-batch]
-        N156[wgpu-bindings]
-        N157[wgpu-compute]
-        N158[wgpu-effect]
-        N159[wgpu-geometry]
-        N160[wgpu-lights]
-        N161[...13 more]
+        N152[index]
+        N153[register]
+        N154[webgpu-device]
+        N155[webgpu-renderer]
+        N156[wgpu-batch]
+        N157[wgpu-bindings]
+        N158[wgpu-compute]
+        N159[wgpu-effect]
+        N160[wgpu-geometry]
+        N161[wgpu-lights]
+        N162[...14 more]
     end
 
     subgraph Packages/scene
-        N162[authority]
-        N163[camera]
-        N164[group]
-        N165[index]
-        N166[interpolation]
-        N167[layers]
-        N168[light]
-        N169[node]
-        N170[pose-target]
-        N171[scene]
-        N172[...6 more]
+        N163[authority]
+        N164[camera]
+        N165[group]
+        N166[index]
+        N167[interpolation]
+        N168[layers]
+        N169[light]
+        N170[node]
+        N171[pose-target]
+        N172[scene]
+        N173[...6 more]
     end
 
     subgraph Packages/serialization
-        N173[format]
-        N174[index]
-        N175[migration]
-        N176[serializer]
+        N174[format]
+        N175[index]
+        N176[migration]
+        N177[serializer]
     end
 
     subgraph Packages/text
-        N177[bitmap-font]
-        N178[glyph-atlas]
-        N179[index]
-        N180[text-layout]
+        N178[bitmap-font]
+        N179[glyph-atlas]
+        N180[index]
+        N181[text-layout]
     end
 
     subgraph Packages/ui
-        N181[button]
-        N182[canvas-view]
-        N183[checkable]
-        N184[image]
-        N185[index]
-        N186[keyboard]
-        N187[label]
-        N188[numbers]
-        N189[panel]
-        N190[progress]
-        N191[...3 more]
+        N182[button]
+        N183[canvas-view]
+        N184[checkable]
+        N185[image]
+        N186[index]
+        N187[keyboard]
+        N188[label]
+        N189[numbers]
+        N190[panel]
+        N191[progress]
+        N192[...3 more]
     end
 
     N2 --> N8
@@ -5530,56 +5631,56 @@ graph TD
     N11 --> N12
     N13 --> N11
     N13 --> N12
-    N13 --> N15
-    N13 --> N16
-    N13 --> N14
+    N13 --> N17
     N14 --> N11
+    N14 --> N12
+    N14 --> N16
+    N14 --> N17
+    N14 --> N13
+    N14 --> N15
     N15 --> N11
     N16 --> N11
-    N17 --> N19
-    N17 --> N21
-    N19 --> N21
-    N23 --> N18
-    N23 --> N24
-    N23 --> N26
-    N23 --> N17
-    N23 --> N20
-    N23 --> N19
-    N23 --> N21
-    N23 --> N22
-    N23 --> N25
-    N25 --> N21
-    N30 --> N28
-    N30 --> N31
-    N30 --> N35
-    N30 --> N32
-    N30 --> N33
-    N30 --> N29
-    N30 --> N34
-    N30 --> N36
+    N17 --> N11
+    N18 --> N20
+    N18 --> N22
+    N20 --> N22
+    N24 --> N19
+    N24 --> N25
+    N24 --> N27
+    N24 --> N18
+    N24 --> N21
+    N24 --> N20
+    N24 --> N22
+    N24 --> N23
+    N24 --> N26
+    N26 --> N22
+    N31 --> N29
     N31 --> N32
-    N33 --> N31
-    N33 --> N32
-    N35 --> N31
-    N36 --> N29
-    N43 --> N38
-    N48 --> N49
-    N48 --> N55
-    N50 --> N48
-    N50 --> N49
-    N50 --> N53
-    N50 --> N51
-    N50 --> N56
-    N50 --> N54
-    N50 --> N55
-    N50 --> N57
+    N31 --> N36
+    N31 --> N33
+    N31 --> N34
+    N31 --> N30
+    N31 --> N35
+    N31 --> N37
+    N32 --> N33
+    N34 --> N32
+    N34 --> N33
+    N36 --> N32
+    N37 --> N30
+    N46 --> N39
+    N46 --> N41
+    N46 --> N45
+    N49 --> N50
+    N49 --> N56
+    N51 --> N49
+    N51 --> N50
+    N51 --> N54
     N51 --> N52
     N51 --> N57
-    N53 --> N48
-    N53 --> N52
-    N53 --> N57
-    N54 --> N48
-    N54 --> N52
+    N51 --> N55
+    N51 --> N56
+    N51 --> N58
+    N52 --> N53
 ```
 
 ---
@@ -5589,17 +5690,17 @@ graph TD
 
 | Category | Count |
 |----------|-------|
-| Total TypeScript Files | 266 |
+| Total TypeScript Files | 271 |
 | Total Modules | 24 |
-| Total Lines of Code | 129888 |
-| Total Exports | 2685 |
-| Total Re-exports | 1706 |
-| Total Classes | 175 |
-| Total Interfaces | 523 |
-| Total Functions | 420 |
+| Total Lines of Code | 134249 |
+| Total Exports | 2734 |
+| Total Re-exports | 1742 |
+| Total Classes | 178 |
+| Total Interfaces | 538 |
+| Total Functions | 424 |
 | Total Type Guards | 23 |
 | Total Enums | 0 |
-| Type-only Imports | 318 |
+| Type-only Imports | 324 |
 | Runtime Circular Deps | 0 |
 | Type-only Circular Deps | 3 |
 
