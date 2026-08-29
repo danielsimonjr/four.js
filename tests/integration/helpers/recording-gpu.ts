@@ -38,6 +38,7 @@ import type {
   GpuCanvasContext,
   GpuCommandBuffer,
   GpuCommandEncoder,
+  GpuComputePassEncoder,
   GpuDevice,
   GpuRenderPassEncoder,
   GpuTexture,
@@ -255,15 +256,54 @@ export function createRecordingGpu(
     },
   };
 
+  // WP-R1.8's compute pass — optional members on the interface (presence is
+  // the capability); present on this double so §82's dispatch sequence is
+  // assertable off the tape.
+  const computePass: GpuComputePassEncoder = {
+    setPipeline: (pipeline): void => {
+      record("computePass.setPipeline", pipeline);
+    },
+    setBindGroup: (index, group): void => {
+      record("computePass.setBindGroup", index, group);
+    },
+    dispatchWorkgroups: (x, y, z): void => {
+      record("computePass.dispatchWorkgroups", x, y, z);
+    },
+    end: (): void => {
+      record("computePass.end");
+    },
+  };
+
   const encoder: GpuCommandEncoder = {
     beginRenderPass: (descriptor): GpuRenderPassEncoder => {
       record("encoder.beginRenderPass", descriptor);
       return pass;
     },
+    beginComputePass: (descriptor): GpuComputePassEncoder => {
+      record("encoder.beginComputePass", descriptor);
+      return computePass;
+    },
     // WP-R1.6's readback copy — optional on the interface, present here so
     // the copy's alignment arithmetic is assertable off the tape.
     copyTextureToBuffer: (source, destination, size): void => {
       record("encoder.copyTextureToBuffer", source, destination, size);
+    },
+    // WP-R1.8's compute readback copy — same terms as the texture one.
+    copyBufferToBuffer: (
+      source,
+      sourceOffset,
+      destination,
+      destinationOffset,
+      size,
+    ): void => {
+      record(
+        "encoder.copyBufferToBuffer",
+        source,
+        sourceOffset,
+        destination,
+        destinationOffset,
+        size,
+      );
     },
     finish: (): GpuCommandBuffer => {
       record("encoder.finish");
@@ -342,6 +382,12 @@ export function createRecordingGpu(
     createRenderPipeline: (descriptor): object => {
       record("device.createRenderPipeline", descriptor);
       return mint("render-pipeline");
+    },
+    // WP-R1.8's §82 pipeline — optional on the interface; present here so
+    // the compute tier is testable against the tape.
+    createComputePipeline: (descriptor): object => {
+      record("device.createComputePipeline", descriptor);
+      return mint("compute-pipeline");
     },
     createCommandEncoder: (descriptor): GpuCommandEncoder => {
       record("device.createCommandEncoder", descriptor);

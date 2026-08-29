@@ -28,6 +28,59 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — WP-R1.8: WebGPU particles (§36) and compute (§82).** Decisions
+  worth keeping:
+  - **The particle block is a third group-0 layout — 192 B, projection/view/model,
+    vertex-only.** The sprite second-layout precedent, again for a byte reason
+    (`minBindingSize` in landed init transcripts); the matrices travel separately
+    because the billboard offset happens _between_ view and projection; the block
+    fills its binding exactly, so no uploaded byte of it is history.
+  - **Instance streams upload once per frame, not per view — a stated deviation
+    from GL.** `updateParticleInstances` runs once per render call, so the bytes
+    cannot differ between views; and `queue.writeBuffer` executes in queue order,
+    so a per-view re-upload would overwrite the first before either recorded draw
+    executes (the `wgpu-batch.ts` hazard). Identical bytes make per-view
+    harmless; one upload makes it impossible. Gate = a renderer frame ordinal on
+    the record.
+  - **A zero-count (or count-outruns-capacity) system skips before the geometry
+    cache** — stricter than GL, which acquires its record first; {scene} ≡
+    {scene + zero-count system} is pinned as a full-tape A/B across two fresh
+    devices. No VAO to guard: the record is two fields where GL's is four,
+    because attribute layouts are pipeline state.
+  - **Q3 executed conservatively: `ComputePass` lives in `render-webgpu`,
+    promotion recorded as one re-export** + optional `Renderer.compute?()`
+    (token-identity precedent) — RFC 0004 held `packages/render` concurrently and
+    landed mid-session (ec6aab5); zero file overlap, clean diff separation.
+    Bindings are an **ordered array** (index _i_ = `@binding(i)`); the spec's
+    named map is the umbrella sugar's, at promotion.
+  - **Compute joined the device surface as optional members**
+    (`createComputePipeline`, `beginComputePass`, `copyBufferToBuffer`) —
+    presence-is-the-capability; every pre-R1.8 double compiles;
+    `UNSUPPORTED_GPU_FEATURE` on absence (`readPixels`' contract); WebGL 2's
+    no-compute stays an honest structural mirror.
+  - **Compute pipelines cache on (access pattern | entry point | source)** — the
+    RFC 0001 source-keyed program cache one stage over; one module per source; a
+    binding-less kernel's pipeline layout carries no bind-group layouts at all,
+    so nothing requires a group the dispatch never sets.
+  - **The integrator's `count` travels as f32** (the light-block one-packer
+    precedent; exact far past §112's budget); params bind read-only storage,
+    positions/velocities read-write flat f32 lanes in the pool's own x,y,z
+    layout; `v += g·dt` then `p += v·dt`, the emitter's documented closed form —
+    the browser spec reads one exact step back and observes the count guard on an
+    untouched lane.
+  - **`frameWantsStencil` keeps excluding `"particles"`, for a new reason:**
+    drawn now, but material-less (`material?: undefined`) — there is nothing to
+    scan, and §67's clip record (clause 1) is a particle item's only stencil.
+  - **Two more reentrant-family pins made two "unreachable" narrowings honest**
+    (a disposing unlit `map` getter; a disposing sprite `blendMode` getter — both
+    surface as the disposed pipeline cache's null); the mask/shadow/particle
+    pipeline-null narrowings remain genuinely unreachable — no application
+    accessor runs between cache and acquire — and say so in source.
+  - Measured: coverage 99.77/99.58 → **99.85/99.73** (new files 100×4); 0/9
+    bundles carry any WebGPU or compute symbol (`computeMain`/
+    `dispatchWorkgroups`/`ParticleUniforms` joined the grep; `createVertexArray`
+    control 9/9); all size budgets green, no bumps.
+
 - **2026-08-29 — RFC 0004 / §77a: the raster painting stack.** Decisions worth
   keeping:
   - **R-4's `MaterialTexture` seam paid off a third time**: `CanvasTexture`

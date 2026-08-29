@@ -32,8 +32,13 @@
  * samplable target, the comparison-sampler bindings, and a lazy `shadow`
  * variant of both shaded families) and completes §57 **stencil parity**
  * (`wgpu-stencil.ts`: R-7's mask-by-hand tier now selects the stencil format
- * on clipless frames too). The remaining pipelines (particles and
- * compute — packet R1.8 — RFC 0003's
+ * on clipless frames too). WP-R1.8 lands §36's **particle** pipeline
+ * (`wgpu-particles.ts`: the instanced billboard port of `gl-particles.ts`,
+ * one draw per system over the shared unit quad and a per-system instance
+ * buffer) and §82's **compute** tier (`wgpu-compute.ts`: `compute()`,
+ * `createComputeBuffer`/`writeComputeBuffer`/`readComputeBuffer`, and the
+ * §36 GPU particle integrator kernel — the first capability of this backend
+ * WebGL 2 structurally cannot mirror). The remaining pipelines (RFC 0003's
  * `skinned-unlit`/`skinned-lit`, which need a joint-palette pipeline this
  * backend does not stage yet, and RFC 0001's `"graph"` effect, which waits on
  * the WGSL emitter) are *absent*, not stubbed: an item this tier cannot draw
@@ -164,6 +169,24 @@ import {
   writeLightUniforms,
 } from "./wgpu-lights.js";
 import {
+  WgpuComputeCache,
+  createComputeBuffer,
+  readComputeBufferBytes,
+  writeComputeBuffer,
+  type ComputeBufferOptions,
+  type ComputePassDescriptor,
+  type WgpuComputeBuffer,
+} from "./wgpu-compute.js";
+import {
+  PARTICLE_MODEL_OFFSET,
+  PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_UNIFORM_BYTES,
+  PARTICLE_VIEW_OFFSET,
+  WgpuParticleCache,
+  createParticleBindGroupLayout,
+  type WgpuParticleRecord,
+} from "./wgpu-particles.js";
+import {
   WgpuPipelineCache,
   type WgpuPipelineDescriptor,
   type WgpuStencilDescriptor,
@@ -254,6 +277,9 @@ type UnlitMaterialLike = UnlitItem["material"];
 
 /** A sprite render item (§55, WP-R1.3). */
 type SpriteItem = Extract<RenderItem, { kind: "sprite" }>;
+
+/** A particle render item (§36, WP-R1.8) — one instanced draw per system. */
+type ParticleItem = Extract<RenderItem, { kind: "particles" }>;
 
 /** §55's material as this backend reads it — texture, tint, §57 state. */
 type SpriteMaterialLike = SpriteItem["material"];
@@ -591,6 +617,35 @@ export class WebgpuRenderer implements Renderer {
   #standardBindGroup: GpuBindGroup | null = null;
 
   /**
+   * §36's particle tier (WP-R1.8, `wgpu-particles.ts`), on the sprite pair's
+   * lifecycle: the three-matrix group-0 layout and its bind group over the
+   * same strided uniform buffer — layout created by the first particle draw,
+   * group dropped on buffer regrowth and on device loss — plus the
+   * per-system instance-buffer cache, constructed at initialization (which
+   * allocates nothing) and consulted only by a frame that draws particles.
+   */
+  #particleLayout: GpuBindGroupLayout | null = null;
+
+  #particleBindGroup: GpuBindGroup | null = null;
+
+  #particles: WgpuParticleCache | null = null;
+
+  /**
+   * Which `render` call is running, for the once-per-frame instance upload
+   * (`wgpu-particles.ts` on the cadence). Starts at 0 so a fresh record's
+   * `uploadedFrame: 0` never matches a frame that has actually run.
+   */
+  #frameOrdinal = 0;
+
+  /**
+   * §82's compute caches (WP-R1.8, `wgpu-compute.ts`), created by the first
+   * `compute()` call — the lazy-subsystem precedent, so an application that
+   * never dispatches allocates none of it — and dropped whole on device loss
+   * and disposal.
+   */
+  #compute: WgpuComputeCache | null = null;
+
+  /**
    * §68's per-view light block (WP-R1.5, `wgpu-lights.ts`): the group-1
    * layout, one buffer holding a 768-byte-strided block per rendered view,
    * the single bind group the shaded draws offset into, and the CPU staging
@@ -821,8 +876,12 @@ export class WebgpuRenderer implements Renderer {
       () => this.#acquireStandardLayout(device),
       () => this.#acquireEffectLayout(device),
       () => this.#acquireShadowLightsLayout(device),
+      () => this.#acquireParticleLayout(device),
     );
     this.#geometries = new WgpuGeometryCache(device);
+    // Constructed here because construction allocates nothing (the family
+    // rule); a particle-less application records not one call from it.
+    this.#particles = new WgpuParticleCache(device);
     // Constructed here because construction allocates nothing (the family
     // rule); its sampling layout provider is the texture cache's, so a
     // sampled target binds against the object every `map` pipeline names.
@@ -889,6 +948,7 @@ export class WebgpuRenderer implements Renderer {
     const geometries = this.#geometries;
     const textures = this.#textures;
     const renderTargets = this.#renderTargets;
+    const particles = this.#particles;
     const layout = this.#bindGroupLayout;
     if (
       device === null ||
@@ -897,12 +957,18 @@ export class WebgpuRenderer implements Renderer {
       geometries === null ||
       textures === null ||
       renderTargets === null ||
+      particles === null ||
       layout === null ||
       this.#deviceLost ||
       views.length === 0
     ) {
       return;
     }
+
+    // §36's once-per-frame instance-upload gate (WP-R1.8): pure CPU state,
+    // advanced per render call, compared by nothing else — a particle-less
+    // frame records not one call more or less for it.
+    this.#frameOrdinal += 1;
 
     // §61's fourth argument (R-4): resolved before anything else, because a
     // disposed target skips the whole frame and an allocation is what gives
@@ -1301,12 +1367,60 @@ export class WebgpuRenderer implements Renderer {
           item.kind !== "unlit" &&
           item.kind !== "sprite" &&
           item.kind !== "lit" &&
-          item.kind !== "standard"
+          item.kind !== "standard" &&
+          item.kind !== "particles"
         ) {
-          // WP-R1.6 onwards (particles), and RFC 0003's skinned kinds until a
-          // joint-palette pipeline exists here. Skipped, never approximated —
-          // and skipped *before* the geometry cache uploads buffers nothing
-          // will bind.
+          // RFC 0003's skinned kinds until a joint-palette pipeline exists
+          // here, and RFC 0001's node kind until the WGSL emitter. Skipped,
+          // never approximated — and skipped *before* the geometry cache
+          // uploads buffers nothing will bind. (`"particles"` left this list
+          // in WP-R1.8 — the deliberate flip of the R1.4-era absence.)
+          continue;
+        }
+        if (!maskPass && item.kind === "particles") {
+          // §36's whole system, one instanced draw (WP-R1.8) — the
+          // `gl-particles.ts` arm, restated: the geometry record is the
+          // *shared unit quad* every particle item points at, and this
+          // system's own instance buffer rides beside it as the pipeline's
+          // second, per-instance vertex stream. A zero-particle system is
+          // skipped **before** the quad uploads — the skinned-absence
+          // discipline, deliberately stricter than GL, which acquires its
+          // geometry record first: a draw that contributes nothing must
+          // contribute not even a buffer. A reentrant mid-frame dispose
+          // surfaces as the caches' `null` answers below (the pinned
+          // WP-R1.3 scenario), skipping this and every remaining draw.
+          if (item.count === 0) {
+            continue;
+          }
+          const quad = geometries.acquire(item.geometry);
+          if (quad === null) {
+            continue;
+          }
+          // `null` for a capacity-less instance array — a structural double
+          // whose `count` outruns its storage draws nothing, GL's answer —
+          // and for a cache racing teardown.
+          const batch = particles.acquire(item);
+          if (batch === null) {
+            continue;
+          }
+          stencilReference = this.#drawParticles(
+            device,
+            pass,
+            pipelines,
+            uniformBuffer,
+            particles,
+            item,
+            quad,
+            batch,
+            camera,
+            block,
+            depthFormat,
+            frameStencil,
+            clip,
+            stencilReference,
+            statistics,
+          );
+          block += 1;
           continue;
         }
         // A shaded draw asks the cache for the normal stream too (WP-R1.5);
@@ -1587,9 +1701,9 @@ export class WebgpuRenderer implements Renderer {
           block += 1;
           continue;
         }
-        // By elimination this is the unlit arm: masks, sprites and the shaded
-        // kinds continued above, and the early guard skipped every other
-        // kind. The cast is the loop's one, for `render-list.ts`'s `itemAt`
+        // By elimination this is the unlit arm: masks, particles, sprites and
+        // the shaded kinds continued above, and the early guard skipped every
+        // other kind. The cast is the loop's one, for `render-list.ts`'s `itemAt`
         // reason — TypeScript cannot carry the invariant across two
         // `continue`s.
         const material = (item as UnlitItem).material;
@@ -1932,6 +2046,124 @@ export class WebgpuRenderer implements Renderer {
     return pixels;
   }
 
+  /**
+   * Allocates one §82 storage buffer (WP-R1.8, `wgpu-compute.ts`) — the
+   * application owns it and owes its `dispose()` (§83).
+   *
+   * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a renderer that is
+   * disposed or was never initialized, or for an option record naming both
+   * `size` and `data`, neither, or a size that is not a positive multiple of
+   * 4; `DEVICE_LOST` while the device is lost (§89).
+   */
+  createComputeBuffer(options: ComputeBufferOptions): WgpuComputeBuffer {
+    return createComputeBuffer(
+      this.#computeDevice("createComputeBuffer"),
+      options,
+    );
+  }
+
+  /**
+   * Uploads `data` into a compute buffer at `byteOffset` (§82) — the per-step
+   * params refresh the integrator tier needs, without reallocating.
+   *
+   * The error contract is {@link WebgpuRenderer.createComputeBuffer}'s, plus
+   * `INVALID_APPLICATION_STATE` for a disposed buffer or an out-of-range or
+   * misaligned write.
+   */
+  writeComputeBuffer(
+    buffer: WgpuComputeBuffer,
+    data: ArrayBufferView,
+    byteOffset = 0,
+  ): void {
+    writeComputeBuffer(
+      this.#computeDevice("writeComputeBuffer"),
+      buffer,
+      data,
+      byteOffset,
+    );
+  }
+
+  /**
+   * Runs one §82 `ComputePass` (WP-R1.8): compiles the kernel on first use
+   * (cached on the source — `wgpu-compute.ts`), binds the storage buffers at
+   * `@group(0)` in array order, and submits the dispatch.
+   *
+   * **This is the seam the R-1 plan's Q3 promotes to `Renderer.compute?()`**
+   * — presence is the capability, the `statistics`/`renderEffect` pattern:
+   * WebGL 2 has no compute and never grows this member, and §62's
+   * `computeShaders` capability is how an application asks before reaching
+   * for it. The frame path never calls it — §82's "basic graphics … must not
+   * require compute support", held structurally.
+   *
+   * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a disposed or
+   * never-initialized renderer, for non-integer workgroup counts, or for a
+   * disposed buffer in `bindings`; `DEVICE_LOST` while lost;
+   * `UNSUPPORTED_GPU_FEATURE` on a device surface without the compute entry
+   * points. A kernel that fails to *compile* does not throw — WebGPU surfaces
+   * compilation failure through the device's error scopes and the dispatch
+   * does nothing, the pipeline cache's recorded reading of the error model.
+   */
+  compute(pass: ComputePassDescriptor): void {
+    const device = this.#computeDevice("compute");
+    this.#compute ??= new WgpuComputeCache(device);
+    if (!this.#compute.dispatch(pass)) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "This device surface does not implement the §82 compute entry " +
+          "points (createComputePipeline / beginComputePass); presence is " +
+          "the capability (WP-R1.8).",
+      );
+    }
+  }
+
+  /**
+   * Reads a compute buffer back as a tightly packed `ArrayBuffer` (§82) —
+   * `copyBufferToBuffer` + `mapAsync`, `readPixels`' honestly-asynchronous
+   * contract for a buffer: rejects rather than skips, with the same codes
+   * (`INVALID_APPLICATION_STATE` for a disposed renderer, one never
+   * initialized, or a disposed buffer; `DEVICE_LOST` while lost;
+   * `UNSUPPORTED_GPU_FEATURE` on a device surface without the entry points).
+   */
+  async readComputeBuffer(buffer: WgpuComputeBuffer): Promise<ArrayBuffer> {
+    const device = this.#computeDevice("readComputeBuffer");
+    const bytes = await readComputeBufferBytes(device, buffer);
+    if (bytes === null) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "This device surface does not implement the compute readback entry " +
+          "points (copyBufferToBuffer / mapAsync); presence is the " +
+          "capability (WP-R1.8).",
+      );
+    }
+    return bytes;
+  }
+
+  /**
+   * The compute methods' shared lifecycle gate: an initialized, un-lost
+   * device or a thrown `FourError` — `readPixels`' opening checks, factored
+   * because four §82 methods share them verbatim.
+   */
+  #computeDevice(method: string): GpuDevice {
+    this.#assertUsable(method);
+    const device = this.#device;
+    if (device === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        `WebgpuRenderer.${method}() needs an initialized renderer (§61).`,
+        { context: { method } },
+      );
+    }
+    if (this.#deviceLost) {
+      throw new FourError(
+        "DEVICE_LOST",
+        `WebgpuRenderer.${method}() was called while the device is lost ` +
+          "(§61, §89).",
+        { context: { method } },
+      );
+    }
+    return device;
+  }
+
   /** Builds the pipeline descriptor for one §70 effect draw (WP-R1.6). */
   #effectDescriptor(
     kind: WgpuEffectKind,
@@ -2014,6 +2246,7 @@ export class WebgpuRenderer implements Renderer {
       this.#geometries?.forget();
       this.#textures?.forget();
       this.#renderTargets?.forget();
+      this.#particles?.forget();
       // §65's uploader, when the application assigned one (R-9): its buffers
       // belong to the lost device — dropped, never destroyed.
       this.batching?.forget();
@@ -2021,6 +2254,7 @@ export class WebgpuRenderer implements Renderer {
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
+      this.#particles?.dispose();
       this.batching?.dispose();
       this.#uniformBuffer?.destroy();
       this.#lightsBuffer?.destroy();
@@ -2030,6 +2264,11 @@ export class WebgpuRenderer implements Renderer {
       this.#device?.destroy();
     }
     this.#pipelines?.dispose();
+    // §82's compute caches (WP-R1.8): nothing here has a destroy(); dropping
+    // is the release. Application-created compute *buffers* are §83's
+    // creator-owns — `WgpuComputeBuffer.dispose` is theirs to call.
+    this.#compute?.dispose();
+    this.#compute = null;
     // §69's target is engine-side state this renderer owns (R-18): disposed
     // on both branches — its GPU rows were released (or died) with the cache
     // above, and the §83 accounting closes with the object.
@@ -2042,12 +2281,15 @@ export class WebgpuRenderer implements Renderer {
     this.#geometries = null;
     this.#textures = null;
     this.#renderTargets = null;
+    this.#particles = null;
     this.#pipelines = null;
     this.#uniformBuffer = null;
     this.#bindGroup = null;
     this.#bindGroupLayout = null;
     this.#spriteLayout = null;
     this.#spriteBindGroup = null;
+    this.#particleLayout = null;
+    this.#particleBindGroup = null;
     this.#standardLayout = null;
     this.#standardBindGroup = null;
     this.#lightsLayout = null;
@@ -2230,6 +2472,157 @@ export class WebgpuRenderer implements Renderer {
       countDraw(statistics, record.topology, record.count, 1);
     }
     return reference;
+  }
+
+  /**
+   * Records one §36 particle draw (WP-R1.8): the instanced billboard pipeline
+   * over the shared quad's position stream and the system's per-instance
+   * buffer, with the three matrices — projection and view **separately**,
+   * because the billboard offset happens between them (`wgpu-particles.ts`) —
+   * in the particle-widened uniform block. Returns the stencil reference now
+   * in effect.
+   *
+   * The state is the GL arm's, held as pipeline identity instead of ambient
+   * calls: particles are transparent by construction (§36's colour ramp) and
+   * carry no material to say otherwise, so the blend is always `"normal"`
+   * straight alpha; depth test, depth writes and colour writes are §57's
+   * defaults; and §67's clip record is the only stencil a material-less item
+   * can carry (R-23: the clip is per draw, and §36's batched item is one
+   * draw).
+   */
+  #drawParticles(
+    device: GpuDevice,
+    pass: GpuRenderPassEncoder,
+    pipelines: WgpuPipelineCache,
+    uniformBuffer: GpuBuffer,
+    particles: WgpuParticleCache,
+    item: ParticleItem,
+    record: WgpuGeometryRecord,
+    batch: WgpuParticleRecord,
+    camera: Viewport["camera"],
+    block: number,
+    depthFormat: string | null,
+    frameStencil: boolean,
+    clip: ItemClip | null,
+    stencilReference: number,
+    statistics: RenderStatistics | null,
+  ): number {
+    const stencilRecord =
+      frameStencil && clip !== null ? clip.stencil : undefined;
+    const pipeline = pipelines.acquire({
+      kind: "particles",
+      vertexColors: false,
+      map: false,
+      blend: "normal",
+      // Normalized off on a depthless pass (WP-R1.6) — the shaded arm's note.
+      depthTest: depthFormat !== null,
+      depthWrite: depthFormat !== null,
+      colorWrite: true,
+      topology: record.topology,
+      colorFormat: this.#frameFormat,
+      depthFormat,
+      stencil:
+        stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
+      batch: null,
+    });
+    if (pipeline === null) {
+      // Unreachable for the unlit path's reason — this renderer always wires
+      // the particle layout provider; same narrowing.
+      return stencilReference;
+    }
+
+    this.#writeParticleBlock(
+      block,
+      camera.projectionMatrix,
+      camera.viewMatrix,
+      item.worldMatrix,
+    );
+    // The instance stream, uploaded once per frame however many views draw
+    // it (`wgpu-particles.ts` on the cadence); `queue.writeBuffer` copies at
+    // call time and executes before the submit that reads it.
+    particles.upload(batch, item, this.#frameOrdinal);
+
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(
+      0,
+      this.#acquireParticleBindGroup(device, uniformBuffer),
+      [block * UNIFORM_STRIDE_BYTES],
+    );
+    let reference = stencilReference;
+    if (stencilRecord !== undefined) {
+      reference = applyStencilReference(
+        pass,
+        stencilReference,
+        stencilRecord.ref,
+      );
+    }
+    pass.setVertexBuffer(0, record.positionBuffer);
+    pass.setVertexBuffer(1, batch.buffer);
+    // Non-indexed and instanced, GL's `drawArraysInstanced` verbatim: the
+    // instance mesh contract is the shared six-vertex quad (`particles.ts`),
+    // so the record's index stream — which the GL arm equally ignores — has
+    // no role here.
+    pass.draw(record.count, item.count);
+    if (statistics !== null) {
+      // One draw call, `item.count` instances of the shared quad — the §36
+      // system's whole per-frame GPU cost, and the one place in this backend
+      // where `instances` exceeds `drawCalls` (§84).
+      countDraw(statistics, record.topology, record.count, item.count);
+    }
+    return reference;
+  }
+
+  /** §36's group-0 layout, one per renderer, created on first use (WP-R1.8). */
+  #acquireParticleLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#particleLayout ??= createParticleBindGroupLayout(device);
+    return this.#particleLayout;
+  }
+
+  /**
+   * The particle draws' bind group over the current uniform buffer, created
+   * by the first particle draw after initialization or after a regrowth —
+   * `#acquireSpriteBindGroup`'s lifecycle, fourth block size over one buffer.
+   */
+  #acquireParticleBindGroup(
+    device: GpuDevice,
+    buffer: GpuBuffer,
+  ): GpuBindGroup {
+    this.#particleBindGroup ??= device.createBindGroup({
+      label: "four:particle-uniforms",
+      layout: this.#acquireParticleLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: PARTICLE_UNIFORM_BYTES },
+        },
+      ],
+    });
+    return this.#particleBindGroup;
+  }
+
+  /**
+   * Packs one `ParticleUniforms` block — projection, view, model, in
+   * `wgpu-particles.ts`'s layout — into the staging array at `block`'s
+   * stride. All 48 floats of the binding are written, so no uploaded byte of
+   * the block is history (§33); the narrowing from the matrices' f64
+   * elements happens here, element by element, as in `#writeBlock`.
+   */
+  #writeParticleBlock(
+    block: number,
+    projection: Matrix4,
+    view: Matrix4,
+    model: Matrix4,
+  ): void {
+    const staging = this.#uniformStaging;
+    const base = block * UNIFORM_STRIDE_FLOATS;
+    const projectionBase = base + PARTICLE_PROJECTION_OFFSET / 4;
+    const viewBase = base + PARTICLE_VIEW_OFFSET / 4;
+    const modelBase = base + PARTICLE_MODEL_OFFSET / 4;
+    for (let index = 0; index < 16; index += 1) {
+      staging[projectionBase + index] = projection.elements[index];
+      staging[viewBase + index] = view.elements[index];
+      staging[modelBase + index] = model.elements[index];
+    }
   }
 
   /**
@@ -2504,9 +2897,10 @@ export class WebgpuRenderer implements Renderer {
     for (const item of items) {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
       // opt-out, sprites (a quad would cast its rectangle), and every kind
-      // this backend has no pipeline for (skinned, node, particles — an
-      // invisible surface must not cast). Masks and particle items carry
-      // `castShadow: false` from the list builder.
+      // this backend has no pipeline for (skinned, node — an invisible
+      // surface must not cast). Masks and particle items carry
+      // `castShadow: false` from the list builder — a §36 billboard has no
+      // surface to project, drawn (WP-R1.8) or not.
       if (
         !item.castShadow ||
         (item.kind !== "unlit" &&
@@ -2733,13 +3127,14 @@ export class WebgpuRenderer implements Renderer {
         },
       ],
     });
-    // The sprite and standard bind groups pointed at the destroyed buffer;
-    // dropped here and recreated lazily by the next draw of each kind, so a
-    // scene whose sprites (or standard surfaces) are gone stops paying for
-    // one. Growth happens before the pass is recorded, so no recorded draw
-    // can be holding a dropped group.
+    // The sprite, standard and particle bind groups pointed at the destroyed
+    // buffer; dropped here and recreated lazily by the next draw of each
+    // kind, so a scene whose sprites (or standard surfaces, or particle
+    // systems) are gone stops paying for one. Growth happens before the pass
+    // is recorded, so no recorded draw can be holding a dropped group.
     this.#spriteBindGroup = null;
     this.#standardBindGroup = null;
+    this.#particleBindGroup = null;
   }
 
   /**
@@ -2796,12 +3191,21 @@ export class WebgpuRenderer implements Renderer {
       this.#geometries?.forget();
       this.#textures?.forget();
       this.#renderTargets?.forget();
+      // §36's instance buffers (WP-R1.8): same terms — the allocations died
+      // with the device.
+      this.#particles?.forget();
       // §65's uploader (R-9): its buffers died with the device, like every
       // other handle — dropped, never destroyed.
       this.batching?.forget();
       this.#pipelines?.dispose();
+      // §82's compute caches (WP-R1.8): pipelines and layouts of a dead
+      // device — dropped whole; the next compute() call reports the loss.
+      this.#compute?.dispose();
+      this.#compute = null;
       this.#spriteLayout = null;
       this.#spriteBindGroup = null;
+      this.#particleLayout = null;
+      this.#particleBindGroup = null;
       // §68's block, like every allocation above: the handles died with the
       // device — dropped, never destroyed.
       this.#standardLayout = null;

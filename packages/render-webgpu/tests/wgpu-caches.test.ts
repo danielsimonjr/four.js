@@ -36,6 +36,8 @@ import {
   MAP_SAMPLER_BINDING,
   MAP_TEXTURE_BINDING,
   MIPMAP_SHADER_SOURCE,
+  PARTICLE_SHADER_SOURCE,
+  PARTICLE_VERTEX_BUFFER_LAYOUTS,
   POSITION_SHADER_LOCATION,
   UNIFORM_STRIDE_BYTES,
   UV_SHADER_LOCATION,
@@ -43,6 +45,7 @@ import {
   WgpuPipelineCache,
   WgpuTextureCache,
   createDrawBindGroupLayout,
+  createParticleBindGroupLayout,
   mipLevelCount,
   pipelineKey,
   samplerKey,
@@ -1140,6 +1143,75 @@ describe("the sprite pipeline family (§55, WP-R1.3)", () => {
       () => createSpriteBindGroupLayout(gpuDevice),
     );
     expect(withoutTexture.acquire(SPRITE)).toBeNull();
+  });
+});
+
+describe("the particle pipeline family (§36, WP-R1.8)", () => {
+  const PARTICLES: WgpuPipelineDescriptor = {
+    ...BASE,
+    kind: "particles",
+    blend: "normal",
+  };
+
+  function particleCache(): {
+    cache: WgpuPipelineCache;
+    gpu: ReturnType<typeof createRecordingGpu>;
+  } {
+    const { device: gpuDevice, gpu } = device();
+    const cache = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      () => createParticleBindGroupLayout(gpuDevice),
+    );
+    gpu.reset();
+    return { cache, gpu };
+  }
+
+  it("compiles the particle module once, and it is the exported source", () => {
+    const { cache, gpu } = particleCache();
+    cache.acquire(PARTICLES);
+    cache.acquire({ ...PARTICLES, depthTest: false });
+    expect(cache.moduleCount).toBe(1);
+    expect(cache.size).toBe(2);
+    const sources = gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(sources).toEqual([PARTICLE_SHADER_SOURCE]);
+  });
+
+  it("builds the particle pipeline layout lazily, once, over its own group 0", () => {
+    const { cache, gpu } = particleCache();
+    expect(gpu.countOf("device.createPipelineLayout")).toBe(0);
+    cache.acquire(PARTICLES);
+    cache.acquire({ ...PARTICLES, depthWrite: false });
+    // One particle group-0 layout, one pipeline layout — shared by both
+    // variants, and nothing else in it: the family binds no texture.
+    expect(gpu.countOf("device.createPipelineLayout")).toBe(1);
+    expect(gpu.countOf("device.createBindGroupLayout")).toBe(1);
+  });
+
+  it("bakes the corner and per-instance streams into the pipeline", () => {
+    const { cache, gpu } = particleCache();
+    cache.acquire(PARTICLES);
+    const descriptor = gpu.callsOf("device.createRenderPipeline")[0]
+      ?.args[0] as { vertex: { buffers: unknown } };
+    expect(descriptor.vertex.buffers).toBe(PARTICLE_VERTEX_BUFFER_LAYOUTS);
+  });
+
+  it("answers null when built without a particle provider", () => {
+    const { device: gpuDevice } = device();
+    // A hand-built cache predating WP-R1.8 skips the draw, never throws.
+    const withoutParticles = new WgpuPipelineCache(
+      gpuDevice,
+      createDrawBindGroupLayout(gpuDevice),
+    );
+    expect(withoutParticles.acquire(PARTICLES)).toBeNull();
   });
 });
 

@@ -21,13 +21,15 @@
  *
  * ## What is deliberately *not* modelled
  *
- * Everything this backend does not call: compute pipelines, query sets,
- * external textures. Each joins the interface with the packet that calls it
- * (WP-R1.8's compute), so the double never has to fake a member no code path
- * reaches — the property that keeps it a double rather than a reimplementation.
- * `mapAsync` and `copyTextureToBuffer` joined with WP-R1.6's readback, as
- * **optional** members: presence is the capability (R-30b's rule), so every
- * double written before them still satisfies the surface.
+ * Everything this backend does not call: query sets, external textures. Each
+ * joins the interface with the packet that calls it, so the double never has
+ * to fake a member no code path reaches — the property that keeps it a double
+ * rather than a reimplementation. `mapAsync` and `copyTextureToBuffer` joined
+ * with WP-R1.6's readback, and §82's compute members (`createComputePipeline`,
+ * `beginComputePass`, `copyBufferToBuffer`) with WP-R1.8, all as **optional**
+ * members: presence is the capability (R-30b's rule), so every double written
+ * before them still satisfies the surface — and WebGL 2, which has no compute
+ * at all, keeps an honest structural mirror of that absence.
  *
  * ## Names
  *
@@ -199,6 +201,37 @@ export type GpuBindGroup = object;
 /** An immutable, fully specified render pipeline (§4.2 of the R-1 plan). */
 export type GpuRenderPipeline = object;
 
+/** An immutable compute pipeline (§82, WP-R1.8). */
+export type GpuComputePipeline = object;
+
+/** A compute pipeline descriptor, reduced to the members this backend sets. */
+export interface GpuComputePipelineDescriptor {
+  /** Diagnostic name. */
+  readonly label?: string;
+  /** Explicit layout — never `"auto"`, `wgpu-bindings.ts`'s standing rule. */
+  readonly layout: GpuPipelineLayout;
+  /** The kernel: module and entry point. */
+  readonly compute: {
+    readonly module: GpuShaderModule;
+    readonly entryPoint: string;
+  };
+}
+
+/**
+ * The commands a compute pass records (§82, WP-R1.8) — no viewport, no
+ * scissor, no vertex state: a dispatch is a grid, not a rasterisation.
+ */
+export interface GpuComputePassEncoder {
+  /** Selects the pipeline subsequent dispatches use. */
+  setPipeline(pipeline: GpuComputePipeline): void;
+  /** Binds a bind group of storage buffers. */
+  setBindGroup(index: number, bindGroup: GpuBindGroup): void;
+  /** Dispatches a workgroup grid. A zero count is a defined no-op. */
+  dispatchWorkgroups(x: number, y?: number, z?: number): void;
+  /** Closes the pass. Every `beginComputePass` owes exactly one of these. */
+  end(): void;
+}
+
 /** A recorded, submittable command buffer. */
 export type GpuCommandBuffer = object;
 
@@ -206,7 +239,7 @@ export type GpuCommandBuffer = object;
 export interface GpuVertexBufferLayout {
   /** Distance between consecutive elements, in bytes. */
   readonly arrayStride: number;
-  /** `"vertex"` (this packet) or `"instance"` (WP-R1.8's particles). */
+  /** `"vertex"`, or `"instance"` for §36's particle stream (WP-R1.8). */
   readonly stepMode?: "vertex" | "instance";
   /** The attributes read out of this buffer. */
   readonly attributes: readonly {
@@ -394,6 +427,28 @@ export interface GpuRenderPassEncoder {
 export interface GpuCommandEncoder {
   /** Opens a render pass. */
   beginRenderPass(descriptor: GpuRenderPassDescriptor): GpuRenderPassEncoder;
+  /**
+   * Opens a compute pass (§82, WP-R1.8). Optional for
+   * {@link GpuBuffer.mapAsync}'s reason: presence is the capability, and only
+   * the compute path calls it — the frame path never does (§82's "basic
+   * graphics … must not require compute support", held structurally).
+   */
+  beginComputePass?(descriptor?: {
+    readonly label?: string;
+  }): GpuComputePassEncoder;
+  /**
+   * Copies a buffer range into another buffer — compute readback's mechanism
+   * (`wgpu-compute.ts`), the buffer-to-buffer half of WP-R1.6's
+   * `copyTextureToBuffer`, optional on the same presence-is-the-capability
+   * terms.
+   */
+  copyBufferToBuffer?(
+    source: GpuBuffer,
+    sourceOffset: number,
+    destination: GpuBuffer,
+    destinationOffset: number,
+    size: number,
+  ): void;
   /**
    * Copies a texture's texels into a buffer — `readPixels`' mechanism
    * (WP-R1.6, RFC 0005). Optional for {@link GpuBuffer.mapAsync}'s reason:
@@ -598,6 +653,14 @@ export interface GpuDevice {
   createRenderPipeline(
     descriptor: GpuRenderPipelineDescriptor,
   ): GpuRenderPipeline;
+  /**
+   * Creates an immutable compute pipeline (§82, WP-R1.8). Optional —
+   * presence is the capability, and it is the one member `compute()` gates
+   * on before recording anything (`wgpu-compute.ts`).
+   */
+  createComputePipeline?(
+    descriptor: GpuComputePipelineDescriptor,
+  ): GpuComputePipeline;
   /** Opens a command encoder. */
   createCommandEncoder(descriptor?: {
     readonly label?: string;

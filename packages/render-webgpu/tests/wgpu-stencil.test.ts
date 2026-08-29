@@ -49,9 +49,12 @@ describe("frameWantsStencil", () => {
     }
   });
 
-  it("ignores stencils on kinds this backend does not draw", () => {
-    // A skipped draw must not re-key every pipeline of a frame it
-    // contributes nothing to.
+  it("ignores stencils on kinds the scan has no material to read", () => {
+    // A skipped draw (skinned, node) must not re-key every pipeline of a
+    // frame it contributes nothing to — and a particle item, drawn since
+    // WP-R1.8, carries no material at all (`material?: undefined`), so a
+    // structural double smuggling one in must still not re-key the frame:
+    // its only stencil is §67's clip record, which clause 1 answers.
     expect(
       frameWantsStencil([
         item("particles", { stencil: { func: "never" } }),

@@ -161,21 +161,37 @@ changes in `CHANGELOG.md`.
       (shadow threshold + the stencil 1/6 mirror), pending the next
       `test:browser` run — record first-run measurements into the spec headers
       then, per the gate convention.
-- [ ] **R-1 / WP-R1.8 — compute (§82) and GPU particles (R-31)**: instanced
-      particle draw first (port of `gl-particles.ts`), then §82's `ComputePass` —
-      placement is owner question Q3 (`@four/render` recommended); do not widen
-      `simulation: "gpu"` before it works; R-31 closes for WebGPU only. Notes:
-      `webgpu-device.ts` still models no compute members (joins with the packet
-      that calls it); the lights group now uses bindings 0–2, and group count
-      stays ≤ 3, leaving room per §62's four-group guarantee. Plan:
-      `docs/plans/R1-WEBGPU_PLAN.md`.
+- [x] **R-1 / WP-R1.8 — compute (§82) and GPU particles (R-31)** — landed
+      2026-08-29. Instanced billboard draw (the `gl-particles.ts` port: third
+      group-0 layout, once-per-frame instance uploads, §67 clips honoured,
+      zero-count skipped before the geometry cache); §82 `compute()`/buffer
+      create/write/read over optional device members; the §36 integrator kernel.
+      `ComputePass` descriptor in `render-webgpu` pending the Q3 one-re-export
+      promotion (RFC 0004 held `packages/render`). Browser specs written under
+      `tests/browser/webgpu/` (particle rasterisation + exact integrator
+      readback), pending the next `test:browser` run — record first-run
+      measurements into the spec headers then. `simulation: "gpu"` deliberately
+      unwidened (WP-9.1 rule).
+- [ ] **R-31 residue — wire the GPU integrator to `@four/particles`** (its own
+      packet; needs that package): widen `simulation: "gpu"` in the same change
+      that connects `PARTICLE_INTEGRATOR_SHADER_SOURCE` to the emitter (the
+      WP-9.1 rule, standing). §27 GPU fields and §36 `collisions: "depth-buffer"`
+      remain separate follow-ups. R-31's _mechanism_ is closed on WebGPU
+      (WP-R1.8); WebGL 2 declares the tier absent.
+- [ ] **Q3 promotion (one re-export, when `packages/render` is free):**
+      move/mirror `ComputePassDescriptor` into `@four/render` and add optional
+      `Renderer.compute?()`; `render-webgpu` re-exports (token-identity
+      precedent); the umbrella's named-map `Four.ComputePass` sugar decides the
+      spec's `{ positions, velocities, parameters }` spelling then. WP-R1.9
+      (capability declaration + the WGSL emitter twin) is now the sole remaining
+      R-1 packet.
 - [ ] **§62's "applications may declare required and optional capabilities"** — still
       unimplemented; now that the capability record is complete it is cheap
       (WP-R1.9's first half, dispatches with the `R-14` wave).
 
-- [ ] **R-31 stays blocked but is no longer evidence-blocked** — WP-R1.8 owns it;
-      compute-with-storage-buffers is probe-verified to run headless in CI. Closes on
-      WebGPU only; WebGL 2 declares the tier absent.
+- [x] **R-31 mechanism closed on WebGPU (WP-R1.8, 2026-08-29)** — see the R-31
+      residue item above for the remaining `@four/particles` wiring; WebGL 2
+      declares the tier absent.
 - [ ] **Follow-ups the R-1 plan explicitly defers** (each needs its own filing): §63
       transient-target pooling and barrier scheduling (must land on both backends or
       neither); §65's persistent-mapped/staging-ring buffers; §27 GPU fields and §36

@@ -34,6 +34,9 @@ export type {
   GpuCanvasContext,
   GpuCommandBuffer,
   GpuCommandEncoder,
+  GpuComputePassEncoder,
+  GpuComputePipeline,
+  GpuComputePipelineDescriptor,
   GpuDevice,
   GpuDeviceLostInfo,
   GpuPipelineLayout,
@@ -185,6 +188,39 @@ export {
   readTexturePixels,
   readbackBytesPerRow,
 } from "./wgpu-readback.js";
+export type {
+  ComputeBinding,
+  ComputeBindingAccess,
+  ComputeBufferOptions,
+  ComputePassDescriptor,
+} from "./wgpu-compute.js";
+export {
+  COMPUTE_ENTRY_POINT,
+  PARTICLE_INTEGRATOR_SHADER_SOURCE,
+  PARTICLE_INTEGRATOR_WORKGROUP_SIZE,
+  PARTICLE_SIMULATION_PARAMS_FLOATS,
+  WgpuComputeBuffer,
+  WgpuComputeCache,
+  createComputeBuffer,
+  particleIntegratorWorkgroups,
+  readComputeBufferBytes,
+  writeComputeBuffer,
+  writeParticleSimulationParams,
+} from "./wgpu-compute.js";
+export type { WgpuParticleRecord } from "./wgpu-particles.js";
+export {
+  PARTICLE_INSTANCE_BUFFER_LAYOUT,
+  PARTICLE_INSTANCE_STRIDE_BYTES,
+  PARTICLE_MODEL_OFFSET,
+  PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_SHADER_SOURCE,
+  PARTICLE_UNIFORM_BYTES,
+  PARTICLE_UNIFORM_WGSL,
+  PARTICLE_VERTEX_BUFFER_LAYOUTS,
+  PARTICLE_VIEW_OFFSET,
+  WgpuParticleCache,
+  createParticleBindGroupLayout,
+} from "./wgpu-particles.js";
 export {
   SHADOW_FACTOR_WGSL,
   SHADOW_LIGHT_UNIFORM_BYTES,

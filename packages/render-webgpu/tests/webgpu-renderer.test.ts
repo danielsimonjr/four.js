@@ -29,6 +29,7 @@
 import { isFourError, type FourError } from "@four/core";
 import { Matrix4, type Vector3 } from "@four/math";
 import {
+  PARTICLE_INSTANCE_FLOATS,
   Renderable,
   RenderTarget,
   createRenderStatistics,
@@ -57,6 +58,12 @@ import {
   LIGHT_PUNCTUAL_POSITION_OFFSET,
   LIGHT_UNIFORM_STRIDE_BYTES,
   LIGHT_UNIFORM_STRIDE_FLOATS,
+  PARTICLE_INSTANCE_BUFFER_LAYOUT,
+  PARTICLE_MODEL_OFFSET,
+  PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_UNIFORM_BYTES,
+  PARTICLE_VIEW_OFFSET,
+  POSITION_BUFFER_LAYOUT,
   SHADOW_LIGHT_UNIFORM_BYTES,
   SHADOW_MATRIX_OFFSET,
   SHADOW_PARAMS_OFFSET,
@@ -1040,6 +1047,52 @@ describe("WebgpuRenderer.render", () => {
       depthCompare: "always",
     });
     expect(descriptor.fragment.targets[0]?.writeMask).toBe(0);
+  });
+
+  it("skips the draw when a material accessor disposes the renderer mid-arm (§61)", () => {
+    // The reentrant family, one accessor later than the pinned map/stencil
+    // getters: `map` runs inside the unlit arm *before* the pipeline is
+    // acquired, so a teardown there surfaces as the disposed cache's null —
+    // the narrowing the draw path encodes — and the draw is skipped, not
+    // thrown.
+    const material = new TestMaterial();
+    Object.defineProperty(material, "map", {
+      get: (): null => {
+        harness.renderer.dispose();
+        return null;
+      },
+    });
+    const root = createRoot();
+    root.add(renderable(triangle(), material));
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The clear drew; the unlit draw found its pipeline cache disposed.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("skips a sprite whose material accessor disposes the renderer mid-draw (§61)", () => {
+    // The same family inside `#drawSprite`: the texture resolved while the
+    // renderer was live, and `blendMode` — read while building the pipeline
+    // descriptor — tears it down. The disposed cache answers null and the
+    // sprite is skipped without a throw.
+    const material = new TestSpriteMaterial();
+    Object.defineProperty(material, "blendMode", {
+      get: (): undefined => {
+        harness.renderer.dispose();
+        return undefined;
+      },
+    });
+    const root = createRoot();
+    root.add(new SpriteNode(texturedTriangle(), material));
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.renderer.disposed).toBe(true);
   });
 
   it("skips an item this tier has no pipeline for", () => {
@@ -3204,5 +3257,429 @@ describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
           (call.args[0] as { label?: string }).label === "four:shadow-lights",
       );
     expect(shadowGroups).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Particles (§36, §64 stage 6, WP-R1.8).
+//
+// The emitting node is a double for the GL suite's recorded reason:
+// `@four/particles`' `ParticleRenderable` is outside this package's dependency
+// matrix — and, by design, outside `@four/render`'s too. What `buildRenderList`
+// recognises is the *structural* `ParticleDrawable` contract, so a double
+// implementing that contract is not a shortcut here: it is the contract,
+// exercised exactly as the real class is (the real class runs in
+// `tests/integration/webgpu-particles.test.ts`).
+// ---------------------------------------------------------------------------
+
+type RenderNode = Parameters<Renderer["render"]>[0];
+
+let nextTestParticlesId = 0;
+
+/**
+ * A particle system node reduced to what the render list reads — the GL
+ * suite's double, minus the interpolated-path transform members these tests
+ * never touch. Particle `i` sits at `(i, i + 0.5, 0)` with size `i + 1` and
+ * colour `(i, 0, 0, 0.5)`, so an upload assertion can name its floats.
+ */
+class TestParticles {
+  readonly isParticleDrawable = true;
+
+  readonly id: string;
+
+  readonly parent = null;
+
+  readonly children: unknown[] = [];
+
+  visible = true;
+
+  enabled = true;
+
+  renderLayer = 0;
+
+  renderOrder = 0;
+
+  particleCount: number;
+
+  /** Mutable so a capacity-growth test can swap in a larger array. */
+  particleInstances: Float32Array;
+
+  /** Calls to `updateParticleInstances` — the list owes exactly one per build. */
+  updateCalls = 0;
+
+  readonly transform = { worldMatrix: new Matrix4() };
+
+  constructor(capacity: number, count = capacity) {
+    nextTestParticlesId += 1;
+    this.id = `test-particles-${String(nextTestParticlesId)}`;
+    this.particleInstances = new Float32Array(
+      capacity * PARTICLE_INSTANCE_FLOATS,
+    );
+    this.particleCount = count;
+    for (let i = 0; i < capacity; i += 1) {
+      const base = i * PARTICLE_INSTANCE_FLOATS;
+      this.particleInstances[base] = i;
+      this.particleInstances[base + 1] = i + 0.5;
+      this.particleInstances[base + 2] = 0;
+      this.particleInstances[base + 3] = i + 1;
+      this.particleInstances[base + 4] = i;
+      this.particleInstances[base + 7] = 0.5;
+    }
+  }
+
+  updateParticleInstances(): void {
+    this.updateCalls += 1;
+  }
+
+  get asNode(): RenderNode {
+    return this as unknown as RenderNode;
+  }
+}
+
+/**
+ * A container node reduced to §6's traversal surface, so a test can put a
+ * particle double and a real `Renderable` under one root — `Node.add` takes a
+ * real node, which a double is not (the GL suite's `TestGroup`, verbatim).
+ */
+class TestGroup {
+  visible = true;
+
+  enabled = true;
+
+  readonly parent = null;
+
+  readonly children: unknown[] = [];
+
+  add(...nodes: { asNode: RenderNode }[]): this {
+    for (const node of nodes) {
+      this.children.push(node.asNode);
+    }
+    return this;
+  }
+
+  addRenderables(...nodes: Renderable[]): this {
+    this.children.push(...nodes);
+    return this;
+  }
+
+  get asNode(): RenderNode {
+    return this as unknown as RenderNode;
+  }
+}
+
+/** The instance-stream uploads on the tape: `writeBuffer`s of `floats` elements. */
+function instanceUploads(
+  gpu: RecordingGpu,
+  floats: number,
+): { args: readonly unknown[] }[] {
+  return gpu
+    .callsOf("queue.writeBuffer")
+    .filter((call) => call.args[4] === floats);
+}
+
+describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("draws the whole system in ONE instanced draw of the shared quad", () => {
+    const particles = new TestParticles(1000, 250);
+
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    // The clear triangle, then the system: six quad vertices, 250 instances —
+    // and no per-particle draw anywhere.
+    const draws = harness.gpu.callsOf("pass.draw");
+    expect(draws).toHaveLength(2);
+    expect(draws[1]?.args[0]).toBe(6);
+    expect(draws[1]?.args[1]).toBe(250);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+    expect(particles.updateCalls).toBe(1);
+    // Slot 0 is the shared quad's positions, slot 1 the instance buffer —
+    // two distinct buffers, positionally bound (`wgpu-particles.ts`).
+    const vertexBuffers = harness.gpu.callsOf("pass.setVertexBuffer");
+    expect(vertexBuffers).toHaveLength(2);
+    expect(vertexBuffers[0]?.args[0]).toBe(0);
+    expect(vertexBuffers[1]?.args[0]).toBe(1);
+    expect(vertexBuffers[1]?.args[1]).not.toBe(vertexBuffers[0]?.args[1]);
+  });
+
+  it("compiles the particle pipeline lazily, instance layout baked in", () => {
+    harness.renderer.render(new TestParticles(4).asNode, [createView()]);
+
+    // The clear pipeline, then the particle pipeline — created by this first
+    // particle frame, not at initialization.
+    expect(pipelineLabels(harness.gpu)).toEqual([
+      "four:clear|-|-|none|-|dw|-|triangle-list|bgra8unorm|depth24plus",
+      "four:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
+    ]);
+    const descriptor = harness.gpu.callsOf("device.createRenderPipeline")[1]
+      ?.args[0] as {
+      vertex: { buffers: unknown[] };
+      fragment: { targets: { blend?: { color: { srcFactor: string } } }[] };
+      depthStencil: { depthWriteEnabled: boolean; depthCompare: string };
+    };
+    expect(descriptor.vertex.buffers).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      PARTICLE_INSTANCE_BUFFER_LAYOUT,
+    ]);
+    // §66's straight alpha, always — a material-less item cannot opt out.
+    expect(descriptor.fragment.targets[0]?.blend?.color.srcFactor).toBe(
+      "src-alpha",
+    );
+    // §57's default depth state: tested and written.
+    expect(descriptor.depthStencil).toMatchObject({
+      depthWriteEnabled: true,
+      depthCompare: "less",
+    });
+    // The widened group-0 layout arrived with the draw, once, and its bind
+    // group reads the particle block off the shared strided buffer.
+    expect(
+      layoutLabels(harness.gpu).filter(
+        (label) => label === "four:particle-uniforms",
+      ),
+    ).toHaveLength(1);
+    const groups = harness.gpu
+      .callsOf("device.createBindGroup")
+      .map((call) => call.args[0] as { label?: string; entries: unknown[] })
+      .filter((descriptor_) => descriptor_.label === "four:particle-uniforms");
+    expect(groups).toHaveLength(1);
+    expect(
+      (groups[0]?.entries[0] as { resource: { size?: number } }).resource.size,
+    ).toBe(PARTICLE_UNIFORM_BYTES);
+  });
+
+  it("packs projection, view and model separately into the particle block", () => {
+    const particles = new TestParticles(2);
+    particles.transform.worldMatrix.elements[13] = 7;
+    const camera = new TestCamera();
+    camera.projectionMatrix.elements[0] = 2;
+    camera.viewMatrix.elements[12] = 5;
+
+    harness.renderer.render(particles.asNode, [
+      createView({ camera: camera.asCamera }),
+    ]);
+
+    const data = uniformUpload(harness.gpu);
+    // Block 0 is the clear; block 1 the system, three matrices at the
+    // wgpu-particles.ts offsets — the billboard offset happens *between*
+    // view and projection, which is why they travel separately.
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(data[base + PARTICLE_PROJECTION_OFFSET / 4]).toBe(2);
+    expect(data[base + PARTICLE_VIEW_OFFSET / 4 + 12]).toBe(5);
+    expect(data[base + PARTICLE_MODEL_OFFSET / 4 + 13]).toBe(7);
+  });
+
+  it("uploads the instance stream once per frame, shared by every view", () => {
+    const particles = new TestParticles(8, 3);
+    const floats = 3 * PARTICLE_INSTANCE_FLOATS;
+    const views = [
+      createView({ id: "a", width: 0.5 }),
+      createView({ id: "b", x: 0.5, width: 0.5 }),
+    ];
+
+    harness.renderer.render(particles.asNode, views);
+
+    // Two views, two instanced draws — one upload (`wgpu-particles.ts` on
+    // the deviation from GL's per-view cadence, forced by queue ordering).
+    expect(
+      harness.gpu.callsOf("pass.draw").filter((call) => call.args[1] === 3),
+    ).toHaveLength(2);
+    const uploads = instanceUploads(harness.gpu, floats);
+    expect(uploads).toHaveLength(1);
+    // Particle 1 of the double: centre (1, 1.5, 0), size 2, colour (1,0,0,0.5).
+    expect((uploads[0]?.args[2] as number[]).slice(8, 16)).toEqual([
+      1, 1.5, 0, 2, 1, 0, 0, 0.5,
+    ]);
+
+    // The next frame uploads again, into the same warm buffer.
+    harness.gpu.reset();
+    harness.renderer.render(particles.asNode, views);
+    expect(instanceUploads(harness.gpu, floats)).toHaveLength(1);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(0);
+  });
+
+  it("skips a zero-count system before its buffer is allocated", () => {
+    const emptyish = new TestParticles(8, 0);
+    const empty = new TestParticles(0, 0);
+
+    harness.renderer.render(new TestGroup().add(emptyish, empty).asNode, [
+      createView(),
+    ]);
+
+    // The clear alone drew, and neither the shared quad nor an instance
+    // buffer was allocated — the skip sits *before* the geometry cache, the
+    // skinned-absence discipline (stricter than GL's arm, which acquires its
+    // record first; stated in source).
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    // …but the list still repacked each system once (§64's contract).
+    expect(emptyish.updateCalls).toBe(1);
+  });
+
+  it("is byte-identical with and without a zero-count system — full tape", async () => {
+    // Two fresh renderers over two fresh devices, the WP-R1.4 skinned A/B
+    // restated for §36: {scene} and {scene + zero-count system} must record
+    // the identical tape from initialization on, handle serials included.
+    // One shared geometry, so its id — which the upload labels carry — is
+    // the same byte sequence on both tapes.
+    const shared = triangle();
+    const tapeOf = async (withEmpty: boolean): Promise<string[]> => {
+      const gpu = createRecordingGpu();
+      const renderer = new WebgpuRenderer();
+      await withHostGpu(gpu.gpu, async () => {
+        await renderer.initialize({ canvas: gpu.canvas });
+      });
+      renderer.resize(256, 256, 1);
+      const group = new TestGroup();
+      group.addRenderables(renderable(shared));
+      if (withEmpty) {
+        group.add(new TestParticles(4, 0));
+      }
+      renderer.render(group.asNode, [createView()]);
+      return gpu.transcript();
+    };
+
+    expect(await tapeOf(true)).toEqual(await tapeOf(false));
+  });
+
+  it("rebuilds the instance buffer when the system's capacity grows", () => {
+    const particles = new TestParticles(2);
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    particles.particleInstances = new Float32Array(
+      8 * PARTICLE_INSTANCE_FLOATS,
+    );
+    particles.particleCount = 8;
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    const allocations = harness.gpu
+      .callsOf("device.createBuffer")
+      .map((call) => call.args[0] as { label?: string; size?: number })
+      .filter((descriptor) =>
+        String(descriptor.label).startsWith("four:particles:"),
+      );
+    expect(allocations.map((descriptor) => descriptor.size)).toEqual([
+      2 * PARTICLE_INSTANCE_FLOATS * 4,
+      8 * PARTICLE_INSTANCE_FLOATS * 4,
+    ]);
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(1);
+  });
+
+  it("tests a clipped particle system against its clip's planes (§67)", () => {
+    // A §67 panel over a real geometry, with the particle double reached
+    // through the live children array — `Node.add` takes a real node, and
+    // the clip record must come from a real, renderable clip node (R-23).
+    const panel = renderable(triangle());
+    panel.clip = true;
+    const particles = new TestParticles(4);
+    (panel.children as unknown as RenderNode[]).push(particles.asNode);
+
+    harness.renderer.render(panel, [createView()]);
+
+    // Clear, mask, panel content (unclipped), particles (clipped).
+    expect(harness.gpu.countOf("pass.draw")).toBe(4);
+    const label = pipelineLabels(harness.gpu).find((entry) =>
+      entry.startsWith("four:particles"),
+    );
+    // The engine's clip record is the particle pipeline's stencil — an
+    // `equal` test over the accumulated planes, on the stencil-carrying
+    // frame format.
+    expect(label).toBe(
+      "four:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|" +
+        "depth24plus-stencil8|s:equal,1,0,keep,keep,keep",
+    );
+    // …and the clipped draw put the pass's reference where the mask left it.
+    expect(harness.gpu.callsOf("pass.setStencilReference")).toHaveLength(1);
+  });
+
+  it("skips a double whose count outruns its instance storage — GL's answer", () => {
+    // A structurally typed node lying about its count: `buildRenderList`
+    // copies both fields verbatim, and a capacity-less instance array can
+    // draw nothing. The quad is acquired (count > 0 reads as a live system)
+    // but the instance cache refuses, and the draw is skipped whole.
+    const malformed = new TestParticles(0, 5);
+
+    harness.renderer.render(malformed.asNode, [createView()]);
+
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(
+      harness.gpu
+        .callsOf("device.createBuffer")
+        .filter((call) =>
+          String((call.args[0] as { label?: string }).label).startsWith(
+            "four:particles:",
+          ),
+        ),
+    ).toHaveLength(0);
+  });
+
+  it("survives a reentrant dispose mid-frame, skipping the particle draw (§61)", () => {
+    // The pinned WP-R1.3 scenario, reaching the particle arm: application
+    // code inside `camera.updateViewMatrix` tears the renderer down, the
+    // geometry cache answers null for the shared quad, and the frame skips
+    // every draw without throwing and without resurrecting an allocation.
+    const camera = new TestCamera();
+    camera.updateViewMatrix = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(new TestParticles(4).asNode, [
+        createView({ camera: camera.asCamera }),
+      ]);
+    }).not.toThrow();
+    // Not even the clear drew: the teardown ran before the view's clear.
+    expect(harness.gpu.countOf("pass.draw")).toBe(0);
+    expect(
+      harness.gpu
+        .callsOf("device.createBuffer")
+        .filter((call) =>
+          String((call.args[0] as { label?: string }).label).startsWith(
+            "four:",
+          ),
+        ),
+    ).toHaveLength(0);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("forgets the instance buffers on device loss — dropped, never destroyed", async () => {
+    const particles = new TestParticles(4);
+    harness.renderer.render(particles.asNode, [createView()]);
+    harness.gpu.reset();
+
+    harness.gpu.loseDevice();
+    await Promise.resolve();
+    harness.renderer.dispose();
+
+    // §61: the allocations died with the device; nothing calls destroy on a
+    // handle that no longer exists.
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(0);
+  });
+
+  it("destroys the instance buffers with the renderer (§83)", () => {
+    harness.renderer.render(new TestParticles(4).asNode, [createView()]);
+    harness.gpu.reset();
+
+    harness.renderer.dispose();
+
+    // The instance buffer and the frame's uniform buffer both die here.
+    expect(harness.gpu.countOf("buffer.destroy")).toBeGreaterThanOrEqual(2);
+  });
+
+  it("counts §84's statistics as one call, count instances, 2·count triangles", () => {
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+
+    harness.renderer.render(new TestParticles(250).asNode, [createView()]);
+
+    // The clear is the backend's own; the system is one submitted draw of
+    // 250 quad instances — the one place `instances` exceeds `drawCalls`.
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.instances).toBe(250);
+    expect(statistics.triangles).toBe(500);
   });
 });

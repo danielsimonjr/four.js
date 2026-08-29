@@ -8,6 +8,33 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — WP-R1.8: WebGPU instanced particles and §82 compute
+
+#### Added
+
+- **render-webgpu: WP-R1.8 — §36 instanced particles and §82 compute.** The
+  `"particles"` item kind draws on WebGPU: one instanced draw of the shared unit
+  quad per system (`wgpu-particles.ts`, the `gl-particles.ts` port — view-space
+  billboard over separate view/projection matrices in a third lazily-created
+  192-byte group-0 block, straight-alpha blend, §67 clip stencils honoured), fed
+  by a per-system instance buffer uploaded once per frame (queue-ordering forbids
+  GL's per-view cadence; stated in source). Zero-count systems are skipped before
+  the geometry cache uploads anything — stricter than GL, pinned as a full-tape
+  A/B — and particle-less scenes record byte-identical transcripts. §82 lands as
+  `WebgpuRenderer.compute()` plus
+  `createComputeBuffer`/`writeComputeBuffer`/`readComputeBuffer`
+  (`wgpu-compute.ts`): storage-buffer bind groups, lazy source-keyed compute
+  pipelines, dispatch, exact readback — over **optional** device members
+  (presence is the capability; WebGL 2's absence stays structural) — plus the
+  §36 GPU particle integrator kernel (semi-implicit Euler, the emitter's closed
+  form, count as f32). The `ComputePass` descriptor lives in
+  `@four/render-webgpu` pending Q3's `@four/render` promotion (one re-export +
+  optional `Renderer.compute?()`; RFC 0004 held `packages/render` concurrently).
+  `simulation: "gpu"` in `@four/particles` is deliberately **not** widened (the
+  WP-9.1 rule: it widens in the change that wires the kernel to the emitter).
+  R-31 closes on WebGPU only. Browser specs written (particle rasterisation; an
+  exact integrator readback), pending the next `test:browser` run.
+
 ### 2026-08-29 — RFC 0004: the 2D raster painting stack (§77a)
 
 #### Added

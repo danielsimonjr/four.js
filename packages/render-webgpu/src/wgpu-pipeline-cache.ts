@@ -57,6 +57,10 @@ import {
 import { batchVertexBufferLayout } from "./wgpu-batch.js";
 import { effectShaderSource, type WgpuEffectKind } from "./wgpu-effect.js";
 import { litShaderSource, shadedVertexBufferLayouts } from "./wgpu-lit.js";
+import {
+  PARTICLE_SHADER_SOURCE,
+  PARTICLE_VERTEX_BUFFER_LAYOUTS,
+} from "./wgpu-particles.js";
 import { SHADOW_SHADER_SOURCE } from "./wgpu-shadow.js";
 import { SPRITE_SHADER_SOURCE } from "./wgpu-sprite.js";
 import { standardShaderSource } from "./wgpu-standard.js";
@@ -145,7 +149,10 @@ const STENCIL_OPERATIONS: Readonly<
  * WGSL module is picked by the descriptor's `effect` member; `"shadow"` is
  * §69's depth-only caster pass (WP-R1.7, `wgpu-shadow.ts`), one module over
  * the shared `DrawUniforms` layout whatever family shades its caster on
- * screen — `gl-shadow.ts`'s one-program argument, restated as one family.
+ * screen — `gl-shadow.ts`'s one-program argument, restated as one family;
+ * `"particles"` is §36's instanced billboard draw (WP-R1.8,
+ * `wgpu-particles.ts`), one variant-free module — like the sprite's — over
+ * its own three-matrix group-0 layout and the per-instance vertex stream.
  */
 export type WgpuPipelineKind =
   | "unlit"
@@ -155,7 +162,8 @@ export type WgpuPipelineKind =
   | "lit"
   | "standard"
   | "effect"
-  | "shadow";
+  | "shadow"
+  | "particles";
 
 /**
  * §67's stencil state as a pipeline bakes it (WP-R1.3) — §57's record minus
@@ -385,6 +393,21 @@ export class WgpuPipelineCache {
   #spritePipelineLayout: GpuPipelineLayout | null = null;
 
   /**
+   * The particle draw's group-0 layout (WP-R1.8, `wgpu-particles.ts`),
+   * reached only when a particle pipeline is first created — the sprite
+   * provider's two reasons, verbatim: it must be **the same object** the
+   * renderer binds its particle uniform block against, and an eager layout
+   * would put a `createBindGroupLayout` into every particle-less
+   * application's initialization transcript. `undefined` for a cache built
+   * without one: such a cache answers `null` for a particle descriptor,
+   * which skips the draw.
+   */
+  readonly #particleLayout: (() => GpuBindGroupLayout) | undefined;
+
+  /** The particle pipeline layout, built with the first particle pipeline. */
+  #particlePipelineLayout: GpuPipelineLayout | null = null;
+
+  /**
    * The light block's group-1 layout (WP-R1.5), reached only when a shaded
    * pipeline is first created — a provider for `#textureLayout`'s two reasons:
    * it must be **the same object** the renderer binds its per-view light
@@ -472,6 +495,7 @@ export class WgpuPipelineCache {
     standardLayout?: () => GpuBindGroupLayout,
     effectLayout?: () => GpuBindGroupLayout,
     shadowLightsLayout?: () => GpuBindGroupLayout,
+    particleLayout?: () => GpuBindGroupLayout,
   ) {
     this.#device = device;
     this.#textureLayout = textureLayout;
@@ -480,6 +504,7 @@ export class WgpuPipelineCache {
     this.#standardLayout = standardLayout;
     this.#effectLayout = effectLayout;
     this.#shadowLightsLayout = shadowLightsLayout;
+    this.#particleLayout = particleLayout;
     this.#drawLayout = bindGroupLayout;
     this.#layout = device.createPipelineLayout({
       label: "four:pipeline-layout",
@@ -540,6 +565,7 @@ export class WgpuPipelineCache {
     this.#modules.clear();
     this.#texturedPipelineLayout = null;
     this.#spritePipelineLayout = null;
+    this.#particlePipelineLayout = null;
     this.#litPipelineLayout = null;
     this.#litMapPipelineLayout = null;
     this.#standardPipelineLayout = null;
@@ -557,7 +583,8 @@ export class WgpuPipelineCache {
    * widened shadow-lights layout for a shadowed variant (WP-R1.7) — plus the
    * texture layout at group 2 when the variant samples (`wgpu-lights.ts`).
    * §69's caster family (`"shadow"`) reads exactly the shared `DrawUniforms`
-   * group, so it resolves through the unsampling arm below.
+   * group, so it resolves through the unsampling arm below. §36's particle
+   * family (WP-R1.8) reads its own three-matrix group 0 and nothing else.
    *
    * `null` when a pipeline is asked of a cache that was given no provider for
    * a layout it needs — see {@link WgpuPipelineCache}'s fields.
@@ -574,6 +601,17 @@ export class WgpuPipelineCache {
         bindGroupLayouts: [sprite(), texture()],
       });
       return this.#spritePipelineLayout;
+    }
+    if (descriptor.kind === "particles") {
+      const particle = this.#particleLayout;
+      if (particle === undefined) {
+        return null;
+      }
+      this.#particlePipelineLayout ??= this.#device.createPipelineLayout({
+        label: "four:pipeline-layout:particles",
+        bindGroupLayouts: [particle()],
+      });
+      return this.#particlePipelineLayout;
     }
     if (descriptor.kind === "effect") {
       return this.#effectLayoutFor(descriptor);
@@ -728,7 +766,8 @@ export class WgpuPipelineCache {
    * effect family keys per kind (WP-R1.6) — `"effect|copy"`,
    * `"effect|grade"`, `"effect|output-transform"` — so a chain grading into
    * two formats compiles one grade module and two pipelines. `"shadow"` is
-   * §69's one caster module (WP-R1.7), variant-free like the sprite's.
+   * §69's one caster module (WP-R1.7), variant-free like the sprite's —
+   * as is `"particles"`, §36's one billboard module (WP-R1.8).
    */
   #module(
     kind: WgpuPipelineKind,
@@ -745,11 +784,13 @@ export class WgpuPipelineCache {
           ? "sprite"
           : kind === "shadow"
             ? "shadow"
-            : kind === "effect"
-              ? `effect|${effect ?? "copy"}`
-              : kind === "lit" || kind === "standard"
-                ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}${shadow ? "|sh" : ""}`
-                : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
+            : kind === "particles"
+              ? "particles"
+              : kind === "effect"
+                ? `effect|${effect ?? "copy"}`
+                : kind === "lit" || kind === "standard"
+                  ? `${kind}${normals ? "|n" : ""}${map ? "|map" : ""}${shadow ? "|sh" : ""}`
+                  : `unlit${vertexColors ? "|vc" : ""}${map ? "|map" : ""}`;
     const existing = this.#modules.get(key);
     if (existing !== undefined) {
       return existing;
@@ -763,13 +804,15 @@ export class WgpuPipelineCache {
             ? SPRITE_SHADER_SOURCE
             : kind === "shadow"
               ? SHADOW_SHADER_SOURCE
-              : kind === "effect"
-                ? effectShaderSource(effect ?? "copy")
-                : kind === "lit"
-                  ? litShaderSource(normals, map, shadow)
-                  : kind === "standard"
-                    ? standardShaderSource(normals, map, shadow)
-                    : unlitShaderSource(vertexColors, map),
+              : kind === "particles"
+                ? PARTICLE_SHADER_SOURCE
+                : kind === "effect"
+                  ? effectShaderSource(effect ?? "copy")
+                  : kind === "lit"
+                    ? litShaderSource(normals, map, shadow)
+                    : kind === "standard"
+                      ? standardShaderSource(normals, map, shadow)
+                      : unlitShaderSource(vertexColors, map),
     });
     this.#modules.set(key, module);
     return module;
@@ -784,8 +827,9 @@ export class WgpuPipelineCache {
    * argument — the vertex arrays' streams-not-declared-are-ignored rule,
    * expressed as a one-buffer layout), the shaded stream
    * list — position, then normals, then uvs — for the lit and standard
-   * families (WP-R1.5), the planner's one interleaved buffer for a batch, and
-   * the positional stream list for the unlit family.
+   * families (WP-R1.5), the planner's one interleaved buffer for a batch,
+   * the corner-plus-instance pair for §36's particles (WP-R1.8), and the
+   * positional stream list for the unlit family.
    */
   #vertexBuffers(
     descriptor: WgpuPipelineDescriptor,
@@ -795,6 +839,9 @@ export class WgpuPipelineCache {
     }
     if (descriptor.kind === "sprite" || descriptor.kind === "shadow") {
       return [POSITION_BUFFER_LAYOUT];
+    }
+    if (descriptor.kind === "particles") {
+      return PARTICLE_VERTEX_BUFFER_LAYOUTS;
     }
     if (descriptor.kind === "lit" || descriptor.kind === "standard") {
       return shadedVertexBufferLayouts(

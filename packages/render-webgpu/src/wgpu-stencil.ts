@@ -135,10 +135,14 @@ export function applyStencilReference(
  * ask this; their answer is the target's `stencil` option, read off the
  * cache record.
  *
- * Only the kinds this backend draws are scanned: an item with no pipeline
- * (skinned, node, particles — skipped draws) must not be able to re-key
- * every pipeline of a frame it contributes nothing to. Mask items short out
- * at clause 1, so the scan body only ever reads content materials.
+ * Only the material-carrying kinds this backend draws are scanned: an item
+ * with no pipeline (skinned, node — skipped draws) must not be able to
+ * re-key every pipeline of a frame it contributes nothing to, and a
+ * `"particles"` item — drawn since WP-R1.8 — carries **no material at all**
+ * (`material?: undefined` on the item), so it has nothing to scan and its
+ * only stencil is §67's clip record, which clause 1 already answers. Mask
+ * items short out at clause 1, so the scan body only ever reads content
+ * materials.
  */
 export function frameWantsStencil(items: readonly RenderItem[]): boolean {
   if (items.length === 0) {
