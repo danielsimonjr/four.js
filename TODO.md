@@ -13,7 +13,21 @@ changes in `CHANGELOG.md`.
 - [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
       2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → ~~0001 shader/node
       materials (done 2026-08-28)~~ → ~~0005 pixel picking (done
-      2026-08-29)~~ → **0004 raster painting next**, interleaved with WP-R1.7…R1.9.
+      2026-08-29)~~ → ~~0004 raster
+      painting (done 2026-08-29)~~. **The RFC queue (0001–0005) is COMPLETE.**
+      Remaining R-1 packets: WP-R1.8 (in flight), WP-R1.9 WGSL emitter.
+- [ ] **RFC 0004 residue (all deferred by the RFC's own §6 table, none
+      scheduled):** video textures (frame-arrival signal, DOM-free);
+      `ImageBitmap`/decoded-image raster sources (A-18's generic
+      `FetchLike<TSignal>` half + the §96 decode row); in-place resize +
+      partial/dirty-rect upload + mipmaps/filter modes for raster surfaces (all
+      R-30); GPU readback as a raster source (wants its own RFC — a different
+      determinism argument; explicitly must not ride on 0004 or 0005); the §62
+      Canvas 2D backend (stays a stub **by decision** — and if ever built,
+      refusing a feedback `CanvasTexture` sampling the surface being rendered is
+      that packet's named obligation); a docs/guides page carrying the browser
+      adapter (recipe currently lives in `raster.ts`'s header and §77a).
+
 - [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
       then particle systems pick by bounds only); §86 rows still owed: id-pass

@@ -1,12 +1,13 @@
 /**
  * `@four/ui` — retained-mode UI at §113a's MVP tier (§73–§75).
  *
- * Nine controls over one base class: {@link Panel} (container + §74 layout),
+ * Ten controls over one base class: {@link Panel} (container + §74 layout),
  * {@link Label} (text measured with `@four/text`), {@link Button} (§72 click →
  * activation), the three checkables — {@link Toggle}, {@link Checkbox}, and
  * {@link RadioButton} (exclusive by group name) — {@link Slider} (pointer drag
- * + §75 arrow keys), {@link ProgressIndicator}, and {@link ImageWidget}, plus
- * §75's keyboard navigation over all of them
+ * + §75 arrow keys), {@link ProgressIndicator}, {@link ImageWidget}, and
+ * {@link CanvasViewWidget} (§77a's skin-drawn canvas view; RFC 0004,
+ * 2026-08-29), plus §75's keyboard navigation over all of them
  * ({@link installKeyboardTraversal}, {@link keyboardFocusTarget}). Everything
  * else §73–§75 names is staged with a dated note in {@link UI_STAGED} — read
  * that array before assuming a control exists.
@@ -39,6 +40,8 @@ export const PACKAGE_NAME = "@four/ui";
 
 export type { ButtonOptions } from "./button.js";
 export { Button } from "./button.js";
+export type { CanvasViewWidgetOptions } from "./canvas-view.js";
+export { CanvasViewWidget } from "./canvas-view.js";
 export type {
   CheckableWidgetOptions,
   CheckboxOptions,

@@ -28,6 +28,49 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — RFC 0004 / §77a: the raster painting stack.** Decisions worth
+  keeping:
+  - **R-4's `MaterialTexture` seam paid off a third time**: `CanvasTexture`
+    uploads through the id/version path with zero backend edits and no new
+    duck-typed contract (count stays five). A new texture _producer_ needs no
+    consumer change anywhere — quote this before ever proposing an upload-path
+    edit.
+  - **The flip is folded into the read, and the scratch is one row.**
+    `"top-left"` sources are reversed in place via a `width*4` scratch allocated
+    at construction — no per-repaint allocation. Measured: the flip costs the
+    same order as the `readPixels` copy itself (2048²: 0.96 ms vs 1.32 ms; 256²:
+    24 µs), both far under a frame.
+  - **The constant-size check runs _after_ `paint()` and before the read** — the
+    obvious hazard is a panel-resize repaint that grows its own canvas mid-paint,
+    and the rule must catch the size the read would see, not the size at entry.
+  - **A node class must not carry `static typeName` — second application** (the
+    `Bone` rule): RFC 0004 §2b's sketch shows one on `CanvasViewWidget` and is
+    overridden by RFC 0003's recorded deviation; the §79 identity is
+    `"ui:canvas-view"` via `registerUISerializers`.
+  - **The display-only scan catches prose, and that is a feature.** The widget's
+    first draft mentioned `CanvasTexture` in a doc comment; the scan flagged it
+    and the docs were reworded — "the widget names no texture type" is now true
+    of comments too, which is what keeps the claim greppable.
+  - **`UI_STAGED` text is bundle mass** (R-29's finding, reconfirmed): correcting
+    the canvas-view blocker note cost +109 B gzip in every `@four/ui` bundle at
+    first draft, trimmed to +28 B — the full story lives in `canvas-view.ts`'s
+    header, the staged array carries one line.
+  - **§96's two error paths split on who built the value** (A-23, applied): the
+    over-budget refusal is a `RangeError` because the size came from the
+    application's own source object; `UNTRUSTED_INPUT_REJECTED` is specified for
+    decoded-external-content sources and deliberately unbuilt — decode is
+    deferred with `ImageBitmap` sources on A-18's remaining half, and a stub that
+    refuses nothing would have been dishonest.
+  - **Measured:** painting symbols in 0 of 9 bundles; six bundles byte-identical;
+    ui-demo 43.63/44 (no bump); twin +213 B carries the serializer pair (only
+    `registerSceneNodeTypes` caller). Browser: orientation 400/400 box counts
+    both ways; paint-only and invalidate-only frames byte-stable on screen.
+    Suites bit-exact; goldens untouched.
+  - **Multi-agent note (seventh confirmation):** shared-tree lint (17 errors) and
+    TypeDoc (2 warnings) failures were entirely the WP-R1.8 sibling's mid-flight
+    `render-webgpu` files; a HEAD+packet clean-room worktree ran every gate
+    green.
+
 - **2026-08-29 — WP-R1.7: WebGPU shadows and stencil parity.** Decisions worth
   keeping:
   - **The shadow binding joins the lights group, widened — not a fourth group.**

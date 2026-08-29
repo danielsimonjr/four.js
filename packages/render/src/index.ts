@@ -125,6 +125,15 @@ export type {
   SceneRenderPass,
 } from "./render-graph.js";
 export { RenderGraph } from "./render-graph.js";
+// §77a raster painting (RFC 0004). Nothing on the render path references this
+// module — a backend meets a `CanvasTexture` only through `MaterialTexture`,
+// which is what keeps the tier at 0 B in every bundle that never paints.
+export type {
+  CanvasTextureOptions,
+  RasterOrigin,
+  RasterSource,
+} from "./raster.js";
+export { CanvasTexture } from "./raster.js";
 export type { PickRequest, PickResult, PickingService } from "./picking.js";
 export {
   MAX_PICK_CANDIDATES,

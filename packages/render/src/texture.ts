@@ -245,6 +245,12 @@ export interface TextureSource {
    * keeps §60a's behaviour available and every existing frame byte-identical.
    * Flipping it is an owner call, and the day §77's map roles land is the day
    * it becomes cheap to make.
+   *
+   * §77a's `CanvasTexture` deliberately answers the same question differently
+   * — its default is `"srgb"` — because a class born after R-15 has no
+   * authored content and no goldens to protect, and a host 2D canvas produces
+   * sRGB-encoded bytes unambiguously (RFC 0004 Q3, adopted; the reason is
+   * recorded at both defaults).
    */
   readonly colorSpace?: ColorSpace;
 

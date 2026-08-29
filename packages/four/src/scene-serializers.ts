@@ -34,12 +34,14 @@
  *
  * ## What is covered, and what is deliberately not
  *
- * Covered: the nine §73 widgets — `Panel`, `Label`, `Button`, and, since
+ * Covered: the ten §73 widgets — `Panel`, `Label`, `Button`; since
  * 2026-08-07 (A-12), `Toggle`, `Checkbox`, `RadioButton`, `Slider`,
- * `ProgressIndicator`, and `ImageWidget` — with their §74 box model and layout,
+ * `ProgressIndicator`, and `ImageWidget`; and, since 2026-08-29 (RFC 0004),
+ * `CanvasViewWidget` — with their §74 box model and layout,
  * their interaction flags, their §75 accessibility record, and whatever state
  * each control adds (checkedness, a group name, a range and its value, an image
- * key); the five drawing-tier node classes A-16 named, added 2026-08-07 —
+ * key, a canvas view's device-pixel resolution — never its painted pixels,
+ * §77a); the five drawing-tier node classes A-16 named, added 2026-08-07 —
  * §49's `Renderable`, §55's `Sprite`, §47's `PerspectiveCamera` and
  * `OrthographicCamera`, and §68's `DirectionalLight`
  * ({@link registerRenderSerializers}); `MotionComponent` (§11),
@@ -214,6 +216,7 @@ import {
 import type { GlyphAtlas, TextAlign } from "@four/text";
 import {
   Button,
+  CanvasViewWidget,
   Checkbox,
   ImageWidget,
   Label,
@@ -262,6 +265,19 @@ export const PROGRESS_NODE_TYPE = "ui:progress";
  * such collision to avoid.
  */
 export const IMAGE_NODE_TYPE = "ui:image";
+
+/**
+ * The document `type` a {@link CanvasViewWidget} serializes as (§73, §77a;
+ * RFC 0004, 2026-08-29).
+ *
+ * The payload is the widget's box and its `resolution`, and **nothing else**:
+ * painted pixels are display content with no §79 representation (§77a's
+ * display-only rule — a painted surface has no logical key and its bytes are
+ * produced by code), and `contentVersion` is transient repaint state, not
+ * authored scene state. A reloaded canvas view is blank until the
+ * application's skin paints it, which is what it is.
+ */
+export const CANVAS_VIEW_NODE_TYPE = "ui:canvas-view";
 
 /** The document `type` a {@link Renderable} serializes as (2026-08-07, A-16). */
 export const RENDERABLE_NODE_TYPE = "render:renderable";
@@ -1063,8 +1079,9 @@ function requireSpriteMaterial(
 /**
  * The §73/§79 node-type pair for every widget class `@four/ui` ships — `Panel`,
  * `Label`, `Button`, `Toggle`, `Checkbox`, `RadioButton`, `Slider`,
- * `ProgressIndicator`, and `ImageWidget` (A-14; the six controls added
- * 2026-08-07, A-12).
+ * `ProgressIndicator`, `ImageWidget`, and `CanvasViewWidget` (A-14; the six
+ * controls added 2026-08-07, A-12; the canvas view added 2026-08-29,
+ * RFC 0004).
  *
  * Matched by **exact class identity**, exactly as `@four/serialization` matches
  * its own two: a subclass of `Button` is not a `Button` for this purpose, and
@@ -1093,6 +1110,7 @@ export function registerUISerializers(
         if (constructor === Slider) return SLIDER_NODE_TYPE;
         if (constructor === ProgressIndicator) return PROGRESS_NODE_TYPE;
         if (constructor === ImageWidget) return IMAGE_NODE_TYPE;
+        if (constructor === CanvasViewWidget) return CANVAS_VIEW_NODE_TYPE;
         return undefined;
       },
       nodeDataOf: (node: Node): JsonValue | undefined => {
@@ -1145,6 +1163,12 @@ export function registerUISerializers(
             naturalWidth: image.naturalWidth,
             naturalHeight: image.naturalHeight,
           };
+        }
+        if (constructor === CanvasViewWidget) {
+          const view = node as CanvasViewWidget;
+          // The box and the resolution only — no pixels, no contentVersion
+          // (§77a; see CANVAS_VIEW_NODE_TYPE).
+          return { ...widgetDataJson(view), resolution: view.resolution };
         }
         return undefined;
       },
@@ -1228,6 +1252,19 @@ export function registerUISerializers(
               : {}),
             ...(naturalHeight !== undefined && naturalHeight >= 0
               ? { naturalHeight }
+              : {}),
+          });
+        }
+        if (document.type === CANVAS_VIEW_NODE_TYPE) {
+          const data = record(document.data);
+          const resolution = readFinite(data.resolution);
+          // The class refuses a non-positive resolution (§85), so a corrupted
+          // payload restores the default rather than taking the scene down —
+          // the same tolerance every control here applies.
+          return new CanvasViewWidget({
+            ...widgetOptions,
+            ...(resolution !== undefined && resolution > 0
+              ? { resolution }
               : {}),
           });
         }

@@ -54,6 +54,7 @@ import {
 import { buildGlyphAtlas } from "@four/text";
 import {
   Button,
+  CanvasViewWidget,
   Checkbox,
   ImageWidget,
   Label,
@@ -374,6 +375,12 @@ describe("registerSceneNodeTypes — the A-12 controls survive §79", () => {
         naturalWidth: 64,
         naturalHeight: 48,
       }),
+      new CanvasViewWidget({
+        name: "minimap",
+        width: 120,
+        height: 80,
+        resolution: 2,
+      }),
     );
     return root;
   }
@@ -391,7 +398,7 @@ describe("registerSceneNodeTypes — the A-12 controls survive §79", () => {
       io.read,
     ) as Panel;
 
-    const [mute, loop, low, high, gravity, loading, avatar] =
+    const [mute, loop, low, high, gravity, loading, avatar, minimap] =
       reloaded.children as [
         Toggle,
         Checkbox,
@@ -400,6 +407,7 @@ describe("registerSceneNodeTypes — the A-12 controls survive §79", () => {
         Slider,
         ProgressIndicator,
         ImageWidget,
+        CanvasViewWidget,
       ];
 
     expect(mute).toBeInstanceOf(Toggle);
@@ -429,6 +437,35 @@ describe("registerSceneNodeTypes — the A-12 controls survive §79", () => {
     expect(avatar).toBeInstanceOf(ImageWidget);
     expect(avatar.source).toBe("textures/avatar.png");
     expect([avatar.naturalWidth, avatar.naturalHeight]).toEqual([64, 48]);
+
+    expect(minimap).toBeInstanceOf(CanvasViewWidget);
+    expect(minimap.resolution).toBe(2);
+    minimap.layout();
+    expect([minimap.pixelWidth, minimap.pixelHeight]).toEqual([240, 160]);
+  });
+
+  it("writes a canvas view's box and resolution — never pixels or repaint state (§77a)", () => {
+    const io = registerSceneNodeTypes();
+    const view = new CanvasViewWidget({ width: 32, height: 16, resolution: 2 });
+    view.invalidate();
+    view.invalidate(); // transient repaint state, about to be proven absent
+
+    const document = serializeScene(view, io.components, io.write);
+    expect(document.nodes[0].type).toBe("ui:canvas-view");
+    const data = document.nodes[0].data as Record<string, unknown>;
+    expect(data.resolution).toBe(2);
+    expect(data).not.toHaveProperty("contentVersion");
+    expect(data).not.toHaveProperty("pixels");
+    expect(data).not.toHaveProperty("data");
+
+    // A reloaded view starts blank at revision 0: painted pixels are display
+    // content with no §79 representation, so there is nothing to restore.
+    const reloaded = instantiateScene(
+      document,
+      io.components,
+      io.read,
+    ) as CanvasViewWidget;
+    expect(reloaded.contentVersion).toBe(0);
   });
 
   it("is textually idempotent, controls included", () => {
@@ -495,6 +532,19 @@ describe("registerUISerializers — the A-12 controls read defensively", () => {
       (io.read.nodeFactory({ type: RADIO_BUTTON_NODE_TYPE }) as RadioButton)
         .group,
     ).toBe("");
+  });
+
+  it("defaults a canvas view's corrupted resolution instead of throwing (§85)", () => {
+    // The class refuses a non-positive resolution, so the reader filters —
+    // each corruption restores the default 1 rather than failing the scene.
+    for (const resolution of [0, -2, "2", null]) {
+      const view = io.read.nodeFactory({
+        type: "ui:canvas-view",
+        data: { resolution },
+      }) as CanvasViewWidget;
+      expect(view).toBeInstanceOf(CanvasViewWidget);
+      expect(view.resolution).toBe(1);
+    }
   });
 
   it("drops a range whose bounds contradict each other, keeping both defaults", () => {

@@ -147,22 +147,24 @@ export const UI_LAYOUT_AUTHORITY = "constraint" as const;
  * still wait on the same DOM integration policy.
  */
 export const UI_STAGED: readonly string[] = Object.freeze([
-  "§73 controls — text input, scroll view, list, virtual list, menu, tooltip, " +
-    "canvas view, and embedded 3D viewport are not implemented (2026-08-02, " +
+  "§73 controls — text input, scroll view, list, virtual list, menu, " +
+    "tooltip, and embedded 3D viewport are not implemented (2026-08-02, " +
     "WP-11.3; narrowed 2026-08-07, A-12, when toggle, checkbox, radio button, " +
     "slider, progress indicator, and image shipped beside panel, label, and " +
-    "button). Each name still here needs engine surface this layer does not " +
-    "have: text input needs §56 selection and caret; scroll view and virtual " +
-    "list need §74 overflow and scroll extent — their §67 clipping half is " +
-    "met since 2026-08-28 (R-23: a scroll view's viewport panel sets " +
+    "button; narrowed again 2026-08-29, RFC 0004, when the canvas view " +
+    "shipped as CanvasViewWidget — its blocker note here was wrong: the " +
+    "widget never draws, the skin owns the §77a surface, see " +
+    "canvas-view.ts). Each name still here needs engine surface this layer " +
+    "does not have: text input needs §56 selection and caret; scroll view and " +
+    "virtual list need §74 overflow and scroll extent — their §67 clipping " +
+    "half is met since 2026-08-28 (R-23: a scroll view's viewport panel sets " +
     "`clip = true` on the node that draws its background, masking the " +
     "content subtree to it, with nested scroll views intersecting by " +
     "construction; what remains is §74's layout policy, i.e. measuring the " +
     "content extent and offsetting it) — plus, for the scroll view, a wheel/" +
     "drag gesture source; the embedded " +
-    "3D viewport needs a §48 nested render surface; canvas view needs the " +
-    "immediate-mode drawing surface the dependency matrix keeps out of this " +
-    "package; menu and tooltip need a per-frame update hook no widget has — " +
+    "3D viewport needs a §48 nested render surface; " +
+    "menu and tooltip need a per-frame update hook no widget has — " +
     "a hover delay is a §9 time-domain reading, and the loop that owns time " +
     "(§10) lives above this package, so a tooltip built here would either " +
     "invent a clock or measure nothing. List needs a selection model and item " +

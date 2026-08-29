@@ -14,6 +14,7 @@ Implements the MVP tier of §73–75 in [`docs/SPECIFICATION.md`](../../docs/SPE
 - **`Slider`** (A-12) — a range (`min`/`max`/`step`) and a `value` with `fraction` for the skin; §72 press-and-drag through the hit point (transformed by the widget's own world matrix) and §75 arrow/Home/End keys. Emits `uivaluechange`.
 - **`ProgressIndicator`** (A-12) — an output, not a control: clamped `value`, `fraction`, `indeterminate`; not interactive, not focusable.
 - **`ImageWidget`** (A-12) — a box, a §79 logical `source` key, and a supplied natural size that becomes §74's intrinsic image size. Named with the suffix because `Image` is a browser global; its document type is `ui:image`.
+- **`CanvasViewWidget`** (RFC 0004, 2026-08-29) — §73's canvas view, skin-drawn: the widget owns its box, a supplied device-pixel `resolution` (so `pixelWidth`/`pixelHeight` name the backing size in texels), and a monotonic `contentVersion` bumped by `invalidate()`; the `WidgetSkin` owns the §77a `CanvasTexture` and repaints through `onContentChange`. Document type `ui:canvas-view` — box and resolution only, painted pixels are never serialized (§77a).
 - **`collectPickables`** — bridges a widget tree into `@four/input`'s §71 picking.
 - **Keyboard navigation (§75)** — `installKeyboardTraversal` (Tab / Shift-Tab over the widget tree), `collectFocusOrder` (scene order, sorted by `accessibility.tabIndex`; negative opts out), and `keyboardFocusTarget` — the resolver `@four/input`'s `KeyboardInput` takes, which is how keys reach the focused widget without `input` ever depending on `ui`.
 - **`WidgetSkin`** — five optional hooks: `onAttach`, `onLayout`, `onStateChange` (any §75 flag, checkedness included), `onContentChange` (a value, an `indeterminate` flag, an image source — content with no layout or state transition), `onDetach`.
@@ -21,7 +22,7 @@ Implements the MVP tier of §73–75 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 ## Staged / not yet implemented (see `UI_STAGED` for reasons)
 
-- §73 controls that are genuinely blocked: text input (§56 selection/caret), scroll view and virtual list (§74 overflow + §67 clipping), embedded 3D viewport (§48 nested surface), canvas view (immediate-mode drawing this package may not import), menu and tooltip (a per-frame update hook no widget has — a hover delay needs §9 time, which the §10 loop owns), and list (a selection model plus the same overflow). Nine of the sixteen ship as of 2026-08-07 (A-12).
+- §73 controls that are genuinely blocked: text input (§56 selection/caret), scroll view and virtual list (§74 overflow + §67 clipping), embedded 3D viewport (§48 nested surface), menu and tooltip (a per-frame update hook no widget has — a hover delay needs §9 time, which the §10 loop owns), and list (a selection model plus the same overflow). Ten of the sixteen ship as of 2026-08-29 (RFC 0004, when the canvas view landed — its old blocker note, "immediate-mode drawing this package may not import", was wrong: the widget never draws, the skin does).
 - §74 grid and constraint layout; percentage sizing, overflow, RTL.
 - §75 hidden DOM accessibility mirror, screen-reader updates, high-contrast hooks, scalable text, and reduced motion. Keyboard navigation and activation **shipped** 2026-08-07 (gap A-13), once `@four/input` gained a key source (A-10).
 

@@ -8,6 +8,51 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — RFC 0004: the 2D raster painting stack (§77a)
+
+#### Added
+
+- **§77a raster painting (RFC 0004, accepted 2026-08-21; tier (b) — the seam
+  tier).** `@four/render` gains `RasterSource` — a structural, DOM-free read seam
+  in the `TextureSource`/`FetchLike` discipline: the application paints with
+  whatever it likes (its `paint()` hook takes no parameter and the engine never
+  learns what it closed over), `readPixels(out)` writes RGBA8 into an
+  engine-owned buffer — and `CanvasTexture`, a `MaterialTexture` that reaches
+  every backend through the existing id/version upload path with **zero backend
+  changes**. One buffer for the texture's life (§83-accounted via `noteTexture`);
+  explicit dirty tracking (`invalidate()`/`update()` — nothing polls, per the
+  adopted Q6); the §7a row flip written once in the engine
+  (`origin: "top-left"`); `colorSpace` defaulting `"srgb"`, deliberately unlike
+  `TextureSource`'s `"linear"`, with the reason at both (Q3); size constant for
+  the texture's life, in-place resize refused `INVALID_APPLICATION_STATE` and
+  gated on R-30 (Q5); §96's 64 MiB default byte ceiling with `Infinity` as the
+  explicit opt-out. Painted pixels are **display content, never simulation
+  input** (§33): no §79 representation, no §34 replay content, enforced by
+  `tests/integration/raster-display-only.test.ts` — §40's display-only scan with
+  "inexact" replaced by "unreproducible".
+- **§73's canvas view ships** (`@four/ui` `CanvasViewWidget`, document type
+  `ui:canvas-view`): a skin-drawn control — box, supplied device-pixel
+  `resolution` (`pixelWidth`/`pixelHeight`), and a monotonic `contentVersion`
+  bumped by `invalidate()` through the existing `onContentChange` hook; no new
+  skin hook, no dependency edge, and the widget names no texture type. Its
+  recorded blocker ("needs the immediate-mode drawing surface the dependency
+  matrix keeps out of this package") was **wrong** and is corrected in
+  `UI_STAGED` — the widget never draws; the skin owns the §77a surface. Ten of
+  §73's sixteen controls now ship. §79 payload is the box and `resolution` only —
+  painted pixels are never serialized.
+- Spec revision **1.12**: new §77a (letter suffix; `"77a"` added to
+  `ALLOWED_LETTERED`), the §73 skin-drawn note, and the amendments row recording
+  every adopted disposition. §62's Canvas 2D backend is explicitly untouched and
+  `render-canvas` stays a reserved stub.
+- Browser proof `tests/browser/raster.spec.ts`: a real 2D canvas painted by
+  application code renders the right way up through a real WebGL 2 driver
+  (upper-red/lower-blue 400/400 box counts), and only `update()` re-uploads — a
+  host repaint alone and `invalidate()` alone leave the frame unchanged. Measured
+  A/B: painting symbols in 0 of 9 example bundles; six bundles byte-identical,
+  ui-demo +28 B / flagship +30 B (the corrected `UI_STAGED` prose), twin +213 B
+  (the `ui:canvas-view` serializer pair — the one example calling
+  `registerSceneNodeTypes`). No budget bumps.
+
 ### 2026-08-29 — WP-R1.7: WebGPU shadows and stencil parity
 
 #### Added
