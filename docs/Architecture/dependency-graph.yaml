@@ -1,10 +1,10 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-28"
-  totalFiles: 243
+  lastUpdated: "2026-08-29"
+  totalFiles: 264
   totalModules: 24
-  totalExports: 2324
+  totalExports: 2644
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -53,7 +53,7 @@ entryPoints:
     description: Entry Point
   - file: packages/render/src/index.ts
     type: main
-    description: Entry Point
+    description: §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
   - file: packages/render-canvas/src/index.ts
     type: main
     description: Entry Point
@@ -2589,6 +2589,10 @@ modules:
           imports:
             - Text
           reExport: true
+        - file: ./pick-provider.js
+          imports:
+            - createPickProvider
+          reExport: true
         - file: ./application.js
           imports:
             - ApplicationEventMap
@@ -2658,6 +2662,7 @@ modules:
         - resourceCatalog
         - restoreNodeId
         - Text
+        - createPickProvider
         - ApplicationEventMap
         - ApplicationOptions
         - PhysicsWorldContext
@@ -2714,6 +2719,7 @@ modules:
         - resourceCatalog
         - restoreNodeId
         - Text
+        - createPickProvider
         - ApplicationEventMap
         - ApplicationOptions
         - PhysicsWorldContext
@@ -2843,6 +2849,28 @@ modules:
       exports: []
       reExported:
         - "* from @four/physics"
+    packages/four/src/pick-provider.ts:
+      description: "The four-line adapter RFC 0005 §2 promised (§71, §45; 2026-08-28): a"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/input"
+          directory: packages/input
+          imports:
+            - PickProvider
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - PickingService
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Viewport
+      exports:
+        - createPickProvider
+      functions:
+        - createPickProvider
     packages/four/src/plugins.ts:
       description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`).
       externalDependencies: []
@@ -3061,6 +3089,7 @@ modules:
           directory: packages/ui
           imports:
             - Button
+            - CanvasViewWidget
             - Checkbox
             - ImageWidget
             - Label
@@ -3084,6 +3113,7 @@ modules:
         - SLIDER_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - IMAGE_NODE_TYPE
+        - CANVAS_VIEW_NODE_TYPE
         - RENDERABLE_NODE_TYPE
         - SPRITE_NODE_TYPE
         - MESH_NODE_TYPE
@@ -3139,6 +3169,7 @@ modules:
         - SLIDER_NODE_TYPE
         - PROGRESS_NODE_TYPE
         - IMAGE_NODE_TYPE
+        - CANVAS_VIEW_NODE_TYPE
         - RENDERABLE_NODE_TYPE
         - SPRITE_NODE_TYPE
         - MESH_NODE_TYPE
@@ -3820,7 +3851,7 @@ modules:
       interfaces:
         - DragManagerOptions
     packages/input/src/index.ts:
-      description: Package entry point for @four/input (re-exports 35 symbols)
+      description: Package entry point for @four/input (re-exports 37 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3885,6 +3916,8 @@ modules:
           imports:
             - PickHit
             - Pickable
+            - PickableAlphaMask
+            - PickProvider
           reExport: true
           typeOnly: true
         - file: ./pointer-events.js
@@ -3933,6 +3966,8 @@ modules:
         - SurfaceKeyListener
         - PickHit
         - Pickable
+        - PickableAlphaMask
+        - PickProvider
         - PointerDeviceType
         - PropagatingPointerEventType
         - ScenePointerEventInit
@@ -3969,6 +4004,8 @@ modules:
         - SurfaceKeyListener
         - PickHit
         - Pickable
+        - PickableAlphaMask
+        - PickProvider
         - PointerDeviceType
         - PropagatingPointerEventType
         - ScenePointerEventInit
@@ -4038,6 +4075,10 @@ modules:
       nodeDependencies: []
       internalDependencies: []
       workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -4054,6 +4095,8 @@ modules:
         - createPickRay
         - pick
       interfaces:
+        - PickProvider
+        - PickableAlphaMask
         - Pickable
         - PickHit
       functions:
@@ -4156,7 +4199,7 @@ modules:
         - dispatchThreePhase
   packages/materials:
     packages/materials/src/index.ts:
-      description: Package entry point for @four/materials (re-exports 23 symbols)
+      description: Package entry point for @four/materials (re-exports 49 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -4167,6 +4210,27 @@ modules:
         - file: ./material.js
           imports:
             - Material
+          reExport: true
+        - file: ./node-material.js
+          imports:
+            - NodeMaterial
+          reExport: true
+        - file: ./node-material-builder.js
+          imports:
+            - NodeMaterialBuilder
+            - ShaderExpression
+            - ShaderGraphBuilder
+            - ShaderGraphOutput
+          reExport: true
+        - file: ./shader-graph.js
+          imports:
+            - MAX_SHADER_GRAPH_NODES
+            - MAX_SHADER_GRAPH_TEXTURES
+            - SHADER_ATTRIBUTE_TYPES
+            - SHADER_VALUE_COMPONENTS
+            - analyzeShaderGraph
+            - forEachShaderNodeReference
+            - freezeShaderGraph
           reExport: true
         - file: ./sprite-material.js
           imports:
@@ -4194,6 +4258,32 @@ modules:
           imports:
             - BlendMode
             - MaterialOptions
+          reExport: true
+          typeOnly: true
+        - file: ./node-material.js
+          imports:
+            - NodeMaterialOptions
+          reExport: true
+          typeOnly: true
+        - file: ./node-material-builder.js
+          imports:
+            - ShaderOperand
+          reExport: true
+          typeOnly: true
+        - file: ./shader-graph.js
+          imports:
+            - ShaderAttributeName
+            - ShaderBinaryOp
+            - ShaderDomain
+            - ShaderGraph
+            - ShaderGraphAnalysis
+            - ShaderNode
+            - ShaderNodeId
+            - ShaderReflection
+            - ShaderTextureReflection
+            - ShaderUnaryOp
+            - ShaderUniformReflection
+            - ShaderValueType
           reExport: true
           typeOnly: true
         - file: ./sprite-material.js
@@ -4233,6 +4323,18 @@ modules:
       exports:
         - LitMaterial
         - Material
+        - NodeMaterial
+        - NodeMaterialBuilder
+        - ShaderExpression
+        - ShaderGraphBuilder
+        - ShaderGraphOutput
+        - MAX_SHADER_GRAPH_NODES
+        - MAX_SHADER_GRAPH_TEXTURES
+        - SHADER_ATTRIBUTE_TYPES
+        - SHADER_VALUE_COMPONENTS
+        - analyzeShaderGraph
+        - forEachShaderNodeReference
+        - freezeShaderGraph
         - SpriteMaterial
         - MAX_STENCIL_VALUE
         - StencilState
@@ -4242,6 +4344,20 @@ modules:
         - LitMaterialOptions
         - BlendMode
         - MaterialOptions
+        - NodeMaterialOptions
+        - ShaderOperand
+        - ShaderAttributeName
+        - ShaderBinaryOp
+        - ShaderDomain
+        - ShaderGraph
+        - ShaderGraphAnalysis
+        - ShaderNode
+        - ShaderNodeId
+        - ShaderReflection
+        - ShaderTextureReflection
+        - ShaderUnaryOp
+        - ShaderUniformReflection
+        - ShaderValueType
         - SpriteMaterialOptions
         - SpriteTexture
         - StencilFunc
@@ -4258,6 +4374,18 @@ modules:
       reExported:
         - LitMaterial
         - Material
+        - NodeMaterial
+        - NodeMaterialBuilder
+        - ShaderExpression
+        - ShaderGraphBuilder
+        - ShaderGraphOutput
+        - MAX_SHADER_GRAPH_NODES
+        - MAX_SHADER_GRAPH_TEXTURES
+        - SHADER_ATTRIBUTE_TYPES
+        - SHADER_VALUE_COMPONENTS
+        - analyzeShaderGraph
+        - forEachShaderNodeReference
+        - freezeShaderGraph
         - SpriteMaterial
         - MAX_STENCIL_VALUE
         - StencilState
@@ -4266,6 +4394,20 @@ modules:
         - LitMaterialOptions
         - BlendMode
         - MaterialOptions
+        - NodeMaterialOptions
+        - ShaderOperand
+        - ShaderAttributeName
+        - ShaderBinaryOp
+        - ShaderDomain
+        - ShaderGraph
+        - ShaderGraphAnalysis
+        - ShaderNode
+        - ShaderNodeId
+        - ShaderReflection
+        - ShaderTextureReflection
+        - ShaderUnaryOp
+        - ShaderUniformReflection
+        - ShaderValueType
         - SpriteMaterialOptions
         - SpriteTexture
         - StencilFunc
@@ -4322,6 +4464,98 @@ modules:
       exports: []
       interfaces:
         - MaterialOptions
+    packages/materials/src/node-material-builder.ts:
+      description: The fluent authoring surface over `shader-graph.ts`'s IR (§60; RFC 0001).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./shader-graph.js
+          imports:
+            - analyzeShaderGraph
+            - ShaderAttributeName
+            - ShaderBinaryOp
+            - ShaderDomain
+            - ShaderGraph
+            - ShaderNode
+            - ShaderNodeId
+            - ShaderUnaryOp
+            - ShaderValueType
+        - file: ./node-material.js
+          imports:
+            - NodeMaterial
+            - NodeMaterialOptions
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - ShaderExpression
+        - ShaderGraphOutput
+        - ShaderGraphBuilder
+        - NodeMaterialBuilder
+      classes:
+        - ShaderExpression
+        - ShaderGraphOutput
+        - ShaderGraphBuilder
+        - NodeMaterialBuilder
+    packages/materials/src/node-material.ts:
+      description: "`NodeMaterial` (§57, §60) — the material family member that carries a"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./material.js
+          imports:
+            - Material
+            - MaterialOptions
+        - file: ./shader-graph.js
+          imports:
+            - SHADER_VALUE_COMPONENTS
+            - analyzeShaderGraph
+            - freezeShaderGraph
+            - ShaderGraph
+            - ShaderReflection
+            - ShaderValueType
+        - file: ./texture.js
+          imports:
+            - MaterialTexture
+          typeOnly: true
+      workspaceDependencies: []
+      exports:
+        - NodeMaterial
+      classes:
+        - NodeMaterial
+      interfaces:
+        - NodeMaterialOptions
+    packages/materials/src/shader-graph.ts:
+      description: The shader graph (§60) — a backend-independent, JSON-serializable shader IR
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - MAX_SHADER_GRAPH_NODES
+        - MAX_SHADER_GRAPH_TEXTURES
+        - SHADER_VALUE_COMPONENTS
+        - SHADER_ATTRIBUTE_TYPES
+        - forEachShaderNodeReference
+        - analyzeShaderGraph
+        - freezeShaderGraph
+      interfaces:
+        - ShaderGraph
+        - ShaderUniformReflection
+        - ShaderTextureReflection
+        - ShaderReflection
+        - ShaderGraphAnalysis
+      functions:
+        - forEachShaderNodeReference
+        - analyzeShaderGraph
+        - freezeShaderGraph
+      constants:
+        - MAX_SHADER_GRAPH_NODES
+        - MAX_SHADER_GRAPH_TEXTURES
+        - SHADER_VALUE_COMPONENTS
+        - SHADER_ATTRIBUTE_TYPES
     packages/materials/src/sprite-material.ts:
       description: "`SpriteMaterial` (§55, §57) — one texture, one tint."
       externalDependencies: []
@@ -8965,7 +9199,13 @@ modules:
         - file: ./render-target.js
           imports:
             - isRenderTargetTexture
-      workspaceDependencies: []
+      workspaceDependencies:
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - SHADER_VALUE_COMPONENTS
+            - analyzeShaderGraph
+            - ShaderGraph
       exports:
         - OUTPUT_TRANSFORM_EFFECT
         - COLOR_GRADE_DEFAULTS
@@ -8976,6 +9216,7 @@ modules:
         - CopyEffect
         - ColorGradeEffect
         - OutputTransformEffect
+        - GraphEffect
         - EffectRenderPass
         - ScreenEffectRenderer
       functions:
@@ -8986,7 +9227,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: Package entry point for @four/render (re-exports 157 symbols)
+      description: §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -9035,6 +9276,7 @@ modules:
             - buildRenderList
             - groupRenderListByPipeline
             - isLitItem
+            - isNodeItem
             - isParticlesItem
             - isSkinnedLitItem
             - isSkinnedUnlitItem
@@ -9046,6 +9288,19 @@ modules:
         - file: ./render-graph.js
           imports:
             - RenderGraph
+          reExport: true
+        - file: ./raster.js
+          imports:
+            - CanvasTexture
+          reExport: true
+        - file: ./picking.js
+          imports:
+            - MAX_PICK_CANDIDATES
+            - assertEncodableCandidateCount
+            - collectPickCandidates
+            - decodePickId
+            - encodePickId
+            - supportsPicking
           reExport: true
         - file: ./render-target.js
           imports:
@@ -9141,6 +9396,7 @@ modules:
             - ColorGradeEffect
             - CopyEffect
             - EffectRenderPass
+            - GraphEffect
             - OutputTransformEffect
             - ScreenEffect
             - ScreenEffectKind
@@ -9167,6 +9423,7 @@ modules:
         - file: ./render-list.js
           imports:
             - LitRenderItem
+            - NodeRenderItem
             - ParticleRenderItem
             - RenderItem
             - RenderItemKind
@@ -9188,6 +9445,20 @@ modules:
             - RenderPass
             - RenderPassContext
             - SceneRenderPass
+          reExport: true
+          typeOnly: true
+        - file: ./raster.js
+          imports:
+            - CanvasTextureOptions
+            - RasterOrigin
+            - RasterSource
+          reExport: true
+          typeOnly: true
+        - file: ./picking.js
+          imports:
+            - PickRequest
+            - PickResult
+            - PickingService
           reExport: true
           typeOnly: true
         - file: ./render-target.js
@@ -9272,7 +9543,31 @@ modules:
             - ViewRenderListOptions
           reExport: true
           typeOnly: true
-      workspaceDependencies: []
+      workspaceDependencies:
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - MAX_SHADER_GRAPH_NODES
+            - MAX_SHADER_GRAPH_TEXTURES
+            - SHADER_ATTRIBUTE_TYPES
+            - SHADER_VALUE_COMPONENTS
+            - analyzeShaderGraph
+            - forEachShaderNodeReference
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - ShaderAttributeName
+            - ShaderBinaryOp
+            - ShaderDomain
+            - ShaderGraph
+            - ShaderGraphAnalysis
+            - ShaderNode
+            - ShaderNodeId
+            - ShaderReflection
+            - ShaderTextureReflection
+            - ShaderUnaryOp
+            - ShaderUniformReflection
+            - ShaderValueType
       exports:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
@@ -9299,6 +9594,7 @@ modules:
         - buildRenderList
         - groupRenderListByPipeline
         - isLitItem
+        - isNodeItem
         - isParticlesItem
         - isSkinnedLitItem
         - isSkinnedUnlitItem
@@ -9306,7 +9602,20 @@ modules:
         - isStandardItem
         - isUnlitItem
         - viewLayerMask
+        - MAX_SHADER_GRAPH_NODES
+        - MAX_SHADER_GRAPH_TEXTURES
+        - SHADER_ATTRIBUTE_TYPES
+        - SHADER_VALUE_COMPONENTS
+        - analyzeShaderGraph
+        - forEachShaderNodeReference
         - RenderGraph
+        - CanvasTexture
+        - MAX_PICK_CANDIDATES
+        - assertEncodableCandidateCount
+        - collectPickCandidates
+        - decodePickId
+        - encodePickId
+        - supportsPicking
         - RenderTarget
         - isRenderTargetTexture
         - Renderable
@@ -9355,6 +9664,7 @@ modules:
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
+        - GraphEffect
         - OutputTransformEffect
         - ScreenEffect
         - ScreenEffectKind
@@ -9369,6 +9679,7 @@ modules:
         - SpotLightSource
         - ParticleDrawable
         - LitRenderItem
+        - NodeRenderItem
         - ParticleRenderItem
         - RenderItem
         - RenderItemKind
@@ -9377,6 +9688,18 @@ modules:
         - SpriteRenderItem
         - StandardRenderItem
         - UnlitRenderItem
+        - ShaderAttributeName
+        - ShaderBinaryOp
+        - ShaderDomain
+        - ShaderGraph
+        - ShaderGraphAnalysis
+        - ShaderNode
+        - ShaderNodeId
+        - ShaderReflection
+        - ShaderTextureReflection
+        - ShaderUnaryOp
+        - ShaderUniformReflection
+        - ShaderValueType
         - AddPassOptions
         - CustomRenderPass
         - RenderGraphIssue
@@ -9386,6 +9709,12 @@ modules:
         - RenderPass
         - RenderPassContext
         - SceneRenderPass
+        - CanvasTextureOptions
+        - RasterOrigin
+        - RasterSource
+        - PickRequest
+        - PickResult
+        - PickingService
         - RenderTargetFormat
         - RenderTargetOptions
         - RenderTargetTexture
@@ -9458,6 +9787,7 @@ modules:
         - buildRenderList
         - groupRenderListByPipeline
         - isLitItem
+        - isNodeItem
         - isParticlesItem
         - isSkinnedLitItem
         - isSkinnedUnlitItem
@@ -9465,7 +9795,20 @@ modules:
         - isStandardItem
         - isUnlitItem
         - viewLayerMask
+        - MAX_SHADER_GRAPH_NODES
+        - MAX_SHADER_GRAPH_TEXTURES
+        - SHADER_ATTRIBUTE_TYPES
+        - SHADER_VALUE_COMPONENTS
+        - analyzeShaderGraph
+        - forEachShaderNodeReference
         - RenderGraph
+        - CanvasTexture
+        - MAX_PICK_CANDIDATES
+        - assertEncodableCandidateCount
+        - collectPickCandidates
+        - decodePickId
+        - encodePickId
+        - supportsPicking
         - RenderTarget
         - isRenderTargetTexture
         - Renderable
@@ -9513,6 +9856,7 @@ modules:
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
+        - GraphEffect
         - OutputTransformEffect
         - ScreenEffect
         - ScreenEffectKind
@@ -9527,6 +9871,7 @@ modules:
         - SpotLightSource
         - ParticleDrawable
         - LitRenderItem
+        - NodeRenderItem
         - ParticleRenderItem
         - RenderItem
         - RenderItemKind
@@ -9535,6 +9880,18 @@ modules:
         - SpriteRenderItem
         - StandardRenderItem
         - UnlitRenderItem
+        - ShaderAttributeName
+        - ShaderBinaryOp
+        - ShaderDomain
+        - ShaderGraph
+        - ShaderGraphAnalysis
+        - ShaderNode
+        - ShaderNodeId
+        - ShaderReflection
+        - ShaderTextureReflection
+        - ShaderUnaryOp
+        - ShaderUniformReflection
+        - ShaderValueType
         - AddPassOptions
         - CustomRenderPass
         - RenderGraphIssue
@@ -9544,6 +9901,12 @@ modules:
         - RenderPass
         - RenderPassContext
         - SceneRenderPass
+        - CanvasTextureOptions
+        - RasterOrigin
+        - RasterSource
+        - PickRequest
+        - PickResult
+        - PickingService
         - RenderTargetFormat
         - RenderTargetOptions
         - RenderTargetTexture
@@ -9691,6 +10054,83 @@ modules:
         - PARTICLE_POSITION_OFFSET
         - PARTICLE_SIZE_OFFSET
         - PARTICLE_COLOR_OFFSET
+    packages/render/src/picking.ts:
+      description: Pixel/GPU-id picking — the backend-neutral half (§71; RFC 0005, accepted
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./renderable.js
+          imports:
+            - Renderable
+        - file: ./renderer.js
+          imports:
+            - Renderer
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Node
+            - Viewport
+      exports:
+        - MAX_PICK_CANDIDATES
+        - supportsPicking
+        - assertEncodableCandidateCount
+        - collectPickCandidates
+        - encodePickId
+        - decodePickId
+      interfaces:
+        - PickRequest
+        - PickResult
+        - PickingService
+      functions:
+        - supportsPicking
+        - assertEncodableCandidateCount
+        - collectPickCandidates
+        - encodePickId
+        - decodePickId
+      constants:
+        - MAX_PICK_CANDIDATES
+    packages/render/src/raster.ts:
+      description: Raster painting (§77a; RFC 0004, accepted 2026-08-21) — a surface an
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-target.js
+          imports:
+            - validateColorSpace
+        - file: ./resource-memory.js
+          imports:
+            - noteTexture
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - Disposable
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - MaterialTexture
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorSpace
+      exports:
+        - CanvasTexture
+      classes:
+        - CanvasTexture
+      interfaces:
+        - RasterSource
+        - CanvasTextureOptions
     packages/render/src/render-graph.ts:
       description: "`RenderGraph` (§63) — an ordered list of passes, executed by one call, with"
       externalDependencies: []
@@ -9776,6 +10216,7 @@ modules:
           imports:
             - LitMaterial
             - Material
+            - NodeMaterial
             - SpriteMaterial
             - StandardMaterial
             - UnlitMaterial
@@ -9798,6 +10239,7 @@ modules:
         - isLitItem
         - isStandardItem
         - isParticlesItem
+        - isNodeItem
         - isSkinnedUnlitItem
         - isSkinnedLitItem
         - viewLayerMask
@@ -9810,6 +10252,7 @@ modules:
         - SkinnedLitRenderItem
         - LitRenderItem
         - StandardRenderItem
+        - NodeRenderItem
         - SpriteRenderItem
         - ParticleRenderItem
       functions:
@@ -9818,6 +10261,7 @@ modules:
         - isLitItem
         - isStandardItem
         - isParticlesItem
+        - isNodeItem
         - isSkinnedUnlitItem
         - isSkinnedLitItem
         - viewLayerMask
@@ -9927,6 +10371,10 @@ modules:
         - file: ./effect-pass.js
           imports:
             - EffectRenderPass
+          typeOnly: true
+        - file: ./picking.js
+          imports:
+            - PickingService
           typeOnly: true
         - file: ./render-target.js
           imports:
@@ -10295,6 +10743,61 @@ modules:
         - GeometryCache
       interfaces:
         - GeometryRecord
+    packages/render-webgl/src/gl-node-program.ts:
+      description: "The node-material pipeline (§60, §62; RFC 0001 — gap R-14): a GLSL ES 3.00"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - createLinkedProgram
+            - matrixScratch
+            - requireUniform
+            - GlProgramHandle
+            - GlUniformLocation
+            - WebglContext
+        - file: ./node-pipeline-registry.js
+          imports:
+            - NODE_SURFACE_TEXTURE_UNIT_BASE
+            - setNodeMaterialPipelineFactory
+            - NodeItemMaterial
+            - NodeMaterialProgram
+            - NodeMaterialPrograms
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - devWarnOnce
+            - Disposable
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - analyzeShaderGraph
+            - ShaderAttributeName
+            - ShaderDomain
+            - ShaderGraph
+            - ShaderGraphAnalysis
+            - ShaderNode
+            - ShaderUniformReflection
+            - ShaderValueType
+      exports:
+        - emitShaderGraphGlsl
+        - registerNodeMaterialPipeline
+        - GlNodeProgram
+        - GlNodeProgramCache
+      classes:
+        - GlNodeProgram
+        - GlNodeProgramCache
+      interfaces:
+        - EmittedNodeShader
+      functions:
+        - emitShaderGraphGlsl
+        - registerNodeMaterialPipeline
     packages/render-webgl/src/gl-particles.ts:
       description: The batched particle pipeline for the WebGL 2 backend (§36, §64 stage 6,
       externalDependencies: []
@@ -10343,6 +10846,105 @@ modules:
       constants:
         - PARTICLE_GL
         - PARTICLE_ATTRIBUTE_LOCATIONS
+    packages/render-webgl/src/gl-picking-registry.ts:
+      description: The picking pipeline's registration slot (§71, §62; RFC 0005, 2026-08-28) —
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-geometry.js
+          imports:
+            - GeometryCache
+          typeOnly: true
+        - file: ./gl-program.js
+          imports:
+            - WebglContext
+          typeOnly: true
+        - file: ./gl-render-target.js
+          imports:
+            - RenderTargetCache
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - PickingService
+      exports:
+        - setPickingServiceFactory
+        - resolvePickingServiceFactory
+        - clearRegisteredPickingPipeline
+      interfaces:
+        - PickingRendererHost
+        - PickingServiceFactory
+      functions:
+        - setPickingServiceFactory
+        - resolvePickingServiceFactory
+        - clearRegisteredPickingPipeline
+    packages/render-webgl/src/gl-picking.ts:
+      description: The WebGL 2 picking service (§71, §62; RFC 0005, 2026-08-28) — the id-buffer
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-geometry.js
+          imports:
+            - GeometryCache
+          typeOnly: true
+        - file: ./gl-picking-registry.js
+          imports:
+            - setPickingServiceFactory
+            - PickingRendererHost
+        - file: ./gl-program.js
+          imports:
+            - GL
+            - createLinkedProgram
+            - matrixScratch
+            - requireUniform
+            - GlProgramHandle
+            - GlUniformLocation
+            - WebglContext
+        - file: ./gl-render-target.js
+          imports:
+            - RenderTargetRecord
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - FourError
+            - devWarnOnce
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Frustum
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderTarget
+            - assertEncodableCandidateCount
+            - buildRenderList
+            - buildViewRenderList
+            - collectPickCandidates
+            - decodePickId
+            - encodePickId
+            - PickRequest
+            - PickResult
+            - PickingService
+            - RenderItem
+            - RenderItemClip
+            - RenderItemStencil
+      exports:
+        - PICKING_GL
+        - registerPickingPipeline
+        - IdPassProgram
+        - WebglPickingService
+      classes:
+        - IdPassProgram
+        - WebglPickingService
+      functions:
+        - registerPickingPipeline
+      constants:
+        - PICKING_GL
     packages/render-webgl/src/gl-program.ts:
       description: The WebGL 2 surface this backend uses, and the pipelines it draws with
       externalDependencies: []
@@ -10640,6 +11242,18 @@ modules:
             - UV_ATTRIBUTE_LOCATION
             - UnlitProgram
           reExport: true
+        - file: ./gl-picking-registry.js
+          imports:
+            - clearRegisteredPickingPipeline
+            - resolvePickingServiceFactory
+          reExport: true
+        - file: ./gl-picking.js
+          imports:
+            - IdPassProgram
+            - PICKING_GL
+            - WebglPickingService
+            - registerPickingPipeline
+          reExport: true
         - file: ./gl-render-target.js
           imports:
             - RenderTargetCache
@@ -10659,6 +11273,19 @@ modules:
             - SkinnedLitProgram
             - SkinnedUnlitProgram
             - registerSkinningPipeline
+          reExport: true
+        - file: ./node-pipeline-registry.js
+          imports:
+            - NODE_SURFACE_TEXTURE_UNIT_BASE
+            - clearRegisteredNodeMaterialPipeline
+            - resolveNodeMaterialPipelineFactory
+          reExport: true
+        - file: ./gl-node-program.js
+          imports:
+            - GlNodeProgram
+            - GlNodeProgramCache
+            - emitShaderGraphGlsl
+            - registerNodeMaterialPipeline
           reExport: true
         - file: ./gl-shadow.js
           imports:
@@ -10704,6 +11331,7 @@ modules:
             - GlBuffer
             - GlProgramHandle
             - GlShader
+            - GlSync
             - GlTexture
             - GlUniformLocation
             - GlVertexArray
@@ -10714,6 +11342,12 @@ modules:
           imports:
             - GlFramebuffer
             - GlRenderbuffer
+          reExport: true
+          typeOnly: true
+        - file: ./gl-picking-registry.js
+          imports:
+            - PickingRendererHost
+            - PickingServiceFactory
           reExport: true
           typeOnly: true
         - file: ./gl-render-target.js
@@ -10728,6 +11362,19 @@ modules:
             - SkinnedPrograms
             - SkinnedUnlitPipeline
             - SkinningPipelineFactory
+          reExport: true
+          typeOnly: true
+        - file: ./node-pipeline-registry.js
+          imports:
+            - NodeItemMaterial
+            - NodeMaterialPipelineFactory
+            - NodeMaterialProgram
+            - NodeMaterialPrograms
+          reExport: true
+          typeOnly: true
+        - file: ./gl-node-program.js
+          imports:
+            - EmittedNodeShader
           reExport: true
           typeOnly: true
         - file: ./gl-texture.js
@@ -10769,6 +11416,12 @@ modules:
         - SpriteProgram
         - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
+        - clearRegisteredPickingPipeline
+        - resolvePickingServiceFactory
+        - IdPassProgram
+        - PICKING_GL
+        - WebglPickingService
+        - registerPickingPipeline
         - RenderTargetCache
         - JOINTS_ATTRIBUTE_LOCATION
         - WEIGHTS_ATTRIBUTE_LOCATION
@@ -10777,6 +11430,13 @@ modules:
         - SkinnedLitProgram
         - SkinnedUnlitProgram
         - registerSkinningPipeline
+        - NODE_SURFACE_TEXTURE_UNIT_BASE
+        - clearRegisteredNodeMaterialPipeline
+        - resolveNodeMaterialPipelineFactory
+        - GlNodeProgram
+        - GlNodeProgramCache
+        - emitShaderGraphGlsl
+        - registerNodeMaterialPipeline
         - ShadowProgram
         - StandardProgram
         - TextureCache
@@ -10793,18 +11453,26 @@ modules:
         - GlBuffer
         - GlProgramHandle
         - GlShader
+        - GlSync
         - GlTexture
         - GlUniformLocation
         - GlVertexArray
         - WebglContext
         - GlFramebuffer
         - GlRenderbuffer
+        - PickingRendererHost
+        - PickingServiceFactory
         - CacheableRenderTarget
         - RenderTargetRecord
         - SkinnedLitPipeline
         - SkinnedPrograms
         - SkinnedUnlitPipeline
         - SkinningPipelineFactory
+        - NodeItemMaterial
+        - NodeMaterialPipelineFactory
+        - NodeMaterialProgram
+        - NodeMaterialPrograms
+        - EmittedNodeShader
         - CacheableTexture
         - TextureRecord
         - WebglCanvas
@@ -10835,6 +11503,12 @@ modules:
         - SpriteProgram
         - UV_ATTRIBUTE_LOCATION
         - UnlitProgram
+        - clearRegisteredPickingPipeline
+        - resolvePickingServiceFactory
+        - IdPassProgram
+        - PICKING_GL
+        - WebglPickingService
+        - registerPickingPipeline
         - RenderTargetCache
         - JOINTS_ATTRIBUTE_LOCATION
         - WEIGHTS_ATTRIBUTE_LOCATION
@@ -10843,6 +11517,13 @@ modules:
         - SkinnedLitProgram
         - SkinnedUnlitProgram
         - registerSkinningPipeline
+        - NODE_SURFACE_TEXTURE_UNIT_BASE
+        - clearRegisteredNodeMaterialPipeline
+        - resolveNodeMaterialPipelineFactory
+        - GlNodeProgram
+        - GlNodeProgramCache
+        - emitShaderGraphGlsl
+        - registerNodeMaterialPipeline
         - ShadowProgram
         - StandardProgram
         - TextureCache
@@ -10858,18 +11539,26 @@ modules:
         - GlBuffer
         - GlProgramHandle
         - GlShader
+        - GlSync
         - GlTexture
         - GlUniformLocation
         - GlVertexArray
         - WebglContext
         - GlFramebuffer
         - GlRenderbuffer
+        - PickingRendererHost
+        - PickingServiceFactory
         - CacheableRenderTarget
         - RenderTargetRecord
         - SkinnedLitPipeline
         - SkinnedPrograms
         - SkinnedUnlitPipeline
         - SkinningPipelineFactory
+        - NodeItemMaterial
+        - NodeMaterialPipelineFactory
+        - NodeMaterialProgram
+        - NodeMaterialPrograms
+        - EmittedNodeShader
         - CacheableTexture
         - TextureRecord
         - WebglCanvas
@@ -10877,6 +11566,40 @@ modules:
         - WebglContextEventLike
       constants:
         - PACKAGE_NAME
+    packages/render-webgl/src/node-pipeline-registry.ts:
+      description: The node-material pipeline's registration slot (§60, §62; RFC 0001, gap
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./gl-program.js
+          imports:
+            - WebglContext
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - NodeRenderItem
+            - ShaderGraph
+      exports:
+        - NODE_SURFACE_TEXTURE_UNIT_BASE
+        - setNodeMaterialPipelineFactory
+        - resolveNodeMaterialPipelineFactory
+        - clearRegisteredNodeMaterialPipeline
+      interfaces:
+        - NodeMaterialProgram
+        - NodeMaterialPrograms
+        - NodeMaterialPipelineFactory
+      functions:
+        - setNodeMaterialPipelineFactory
+        - resolveNodeMaterialPipelineFactory
+        - clearRegisteredNodeMaterialPipeline
+      constants:
+        - NODE_SURFACE_TEXTURE_UNIT_BASE
     packages/render-webgl/src/register.ts:
       description: This backend's opt-in to §62's renderer registry (R-2, A-8).
       externalDependencies: []
@@ -10929,6 +11652,10 @@ modules:
             - SpriteProgram
             - UnlitProgram
             - GlTexture
+        - file: ./gl-picking-registry.js
+          imports:
+            - resolvePickingServiceFactory
+            - PickingRendererHost
         - file: ./gl-render-target.js
           imports:
             - RenderTargetCache
@@ -10937,6 +11664,12 @@ modules:
           imports:
             - resolveSkinningPipelineFactory
             - SkinnedPrograms
+        - file: ./node-pipeline-registry.js
+          imports:
+            - NODE_SURFACE_TEXTURE_UNIT_BASE
+            - resolveNodeMaterialPipelineFactory
+            - NodeMaterialProgram
+            - NodeMaterialPrograms
         - file: ./gl-shadow.js
           imports:
             - ShadowProgram
@@ -10971,6 +11704,7 @@ modules:
             - collectSceneLights
             - createSceneLights
             - isLitItem
+            - isNodeItem
             - isParticlesItem
             - isRenderTargetTexture
             - isSkinnedLitItem
@@ -10979,6 +11713,8 @@ modules:
             - isStandardItem
             - COLOR_GRADE_DEFAULTS
             - EffectRenderPass
+            - GraphEffect
+            - PickingService
             - RenderItem
             - RenderItemKind
             - RenderStatistics
@@ -11004,6 +11740,7 @@ modules:
         - file: ./webgpu-device.js
           imports:
             - GPU_BUFFER_USAGE
+            - GPU_MAP_MODE
             - GPU_SHADER_STAGE
             - GPU_TEXTURE_USAGE
             - UNIFORM_STRIDE_BYTES
@@ -11082,6 +11819,127 @@ modules:
             - unlitShaderSource
             - unlitVertexBufferLayouts
           reExport: true
+        - file: ./wgpu-lights.js
+          imports:
+            - LIGHTS_BIND_GROUP_INDEX
+            - LIGHT_AMBIENT_OFFSET
+            - LIGHT_CAMERA_OFFSET
+            - LIGHT_COLOR_OFFSET
+            - LIGHT_COUNTS_OFFSET
+            - LIGHT_DIRECTION_OFFSET
+            - LIGHT_PUNCTUAL_COLOR_OFFSET
+            - LIGHT_PUNCTUAL_DIRECTION_OFFSET
+            - LIGHT_PUNCTUAL_PARAMS_OFFSET
+            - LIGHT_PUNCTUAL_POSITION_OFFSET
+            - LIGHT_UNIFORM_BYTES
+            - LIGHT_UNIFORM_FLOATS
+            - LIGHT_UNIFORM_MEMBERS_WGSL
+            - LIGHT_UNIFORM_STRIDE_BYTES
+            - LIGHT_UNIFORM_STRIDE_FLOATS
+            - LIGHT_UNIFORM_WGSL
+            - PUNCTUAL_LIGHT_WGSL
+            - SHADED_MAP_BINDING_WGSL
+            - SHADED_MAP_BIND_GROUP_INDEX
+            - createLightsBindGroupLayout
+            - writeLightUniforms
+          reExport: true
+        - file: ./wgpu-lit.js
+          imports:
+            - NORMAL_BUFFER_LAYOUT
+            - NORMAL_MATRIX_WGSL
+            - NORMAL_SHADER_LOCATION
+            - litShaderSource
+            - shadedVertexBufferLayouts
+            - shadedVertexStageWgsl
+          reExport: true
+        - file: ./wgpu-render-target.js
+          imports:
+            - RENDER_TARGET_COLOR_FORMAT
+            - RENDER_TARGET_DEPTH_FORMAT
+            - RENDER_TARGET_DEPTH_STENCIL_FORMAT
+            - RENDER_TARGET_DEPTH_TEXTURE_FORMAT
+            - WgpuRenderTargetCache
+            - renderTargetDepthFormat
+          reExport: true
+        - file: ./wgpu-effect.js
+          imports:
+            - EFFECT_BIND_GROUP_INDEX
+            - EFFECT_GRADE_OFFSET
+            - EFFECT_PASS_VERTEX_COUNT
+            - EFFECT_UNIFORM_BYTES
+            - EFFECT_UNIFORM_WGSL
+            - createEffectBindGroupLayout
+            - effectShaderSource
+          reExport: true
+        - file: ./wgpu-readback.js
+          imports:
+            - READBACK_ROW_ALIGNMENT
+            - readTexturePixels
+            - readbackBytesPerRow
+          reExport: true
+        - file: ./wgpu-compute.js
+          imports:
+            - COMPUTE_ENTRY_POINT
+            - PARTICLE_INTEGRATOR_SHADER_SOURCE
+            - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
+            - PARTICLE_SIMULATION_PARAMS_FLOATS
+            - WgpuComputeBuffer
+            - WgpuComputeCache
+            - createComputeBuffer
+            - particleIntegratorWorkgroups
+            - readComputeBufferBytes
+            - writeComputeBuffer
+            - writeParticleSimulationParams
+          reExport: true
+        - file: ./wgpu-particles.js
+          imports:
+            - PARTICLE_INSTANCE_BUFFER_LAYOUT
+            - PARTICLE_INSTANCE_STRIDE_BYTES
+            - PARTICLE_MODEL_OFFSET
+            - PARTICLE_PROJECTION_OFFSET
+            - PARTICLE_SHADER_SOURCE
+            - PARTICLE_UNIFORM_BYTES
+            - PARTICLE_UNIFORM_WGSL
+            - PARTICLE_VERTEX_BUFFER_LAYOUTS
+            - PARTICLE_VIEW_OFFSET
+            - WgpuParticleCache
+            - createParticleBindGroupLayout
+          reExport: true
+        - file: ./wgpu-shadow.js
+          imports:
+            - SHADOW_FACTOR_WGSL
+            - SHADOW_LIGHT_UNIFORM_BYTES
+            - SHADOW_LIGHT_UNIFORM_WGSL
+            - SHADOW_MAP_BINDING
+            - SHADOW_MATRIX_OFFSET
+            - SHADOW_PARAMS_OFFSET
+            - SHADOW_SAMPLER_BINDING
+            - SHADOW_SHADER_SOURCE
+            - SHADOW_UNIFORM_SPARE_BYTES
+            - createShadowLightsBindGroupLayout
+            - createShadowSampler
+            - writeShadowUniforms
+          reExport: true
+        - file: ./wgpu-stencil.js
+          imports:
+            - CLEAR_STENCIL
+            - STENCIL_ALL_BITS
+            - applyStencilReference
+            - frameWantsStencil
+            - stencilDescriptor
+          reExport: true
+        - file: ./wgpu-standard.js
+          imports:
+            - STANDARD_BASE_COLOR_OFFSET
+            - STANDARD_EMISSIVE_OFFSET
+            - STANDARD_MODEL_OFFSET
+            - STANDARD_SURFACE_OFFSET
+            - STANDARD_UNIFORM_BYTES
+            - STANDARD_UNIFORM_WGSL
+            - STANDARD_VIEW_PROJECTION_OFFSET
+            - createStandardBindGroupLayout
+            - standardShaderSource
+          reExport: true
         - file: ./webgpu-device.js
           imports:
             - Gpu
@@ -11098,6 +11956,9 @@ modules:
             - GpuCanvasContext
             - GpuCommandBuffer
             - GpuCommandEncoder
+            - GpuComputePassEncoder
+            - GpuComputePipeline
+            - GpuComputePipelineDescriptor
             - GpuDevice
             - GpuDeviceLostInfo
             - GpuPipelineLayout
@@ -11144,9 +12005,39 @@ modules:
             - WgpuTextureRecord
           reExport: true
           typeOnly: true
+        - file: ./wgpu-render-target.js
+          imports:
+            - WgpuCacheableRenderTarget
+            - WgpuRenderTargetRecord
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-effect.js
+          imports:
+            - WgpuEffectKind
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-compute.js
+          imports:
+            - ComputeBinding
+            - ComputeBindingAccess
+            - ComputeBufferOptions
+            - ComputePassDescriptor
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-particles.js
+          imports:
+            - WgpuParticleRecord
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-stencil.js
+          imports:
+            - WgpuStencilSource
+          reExport: true
+          typeOnly: true
       workspaceDependencies: []
       exports:
         - GPU_BUFFER_USAGE
+        - GPU_MAP_MODE
         - GPU_SHADER_STAGE
         - GPU_TEXTURE_USAGE
         - UNIFORM_STRIDE_BYTES
@@ -11197,6 +12088,97 @@ modules:
         - VERTEX_ENTRY_POINT
         - unlitShaderSource
         - unlitVertexBufferLayouts
+        - LIGHTS_BIND_GROUP_INDEX
+        - LIGHT_AMBIENT_OFFSET
+        - LIGHT_CAMERA_OFFSET
+        - LIGHT_COLOR_OFFSET
+        - LIGHT_COUNTS_OFFSET
+        - LIGHT_DIRECTION_OFFSET
+        - LIGHT_PUNCTUAL_COLOR_OFFSET
+        - LIGHT_PUNCTUAL_DIRECTION_OFFSET
+        - LIGHT_PUNCTUAL_PARAMS_OFFSET
+        - LIGHT_PUNCTUAL_POSITION_OFFSET
+        - LIGHT_UNIFORM_BYTES
+        - LIGHT_UNIFORM_FLOATS
+        - LIGHT_UNIFORM_MEMBERS_WGSL
+        - LIGHT_UNIFORM_STRIDE_BYTES
+        - LIGHT_UNIFORM_STRIDE_FLOATS
+        - LIGHT_UNIFORM_WGSL
+        - PUNCTUAL_LIGHT_WGSL
+        - SHADED_MAP_BINDING_WGSL
+        - SHADED_MAP_BIND_GROUP_INDEX
+        - createLightsBindGroupLayout
+        - writeLightUniforms
+        - NORMAL_BUFFER_LAYOUT
+        - NORMAL_MATRIX_WGSL
+        - NORMAL_SHADER_LOCATION
+        - litShaderSource
+        - shadedVertexBufferLayouts
+        - shadedVertexStageWgsl
+        - RENDER_TARGET_COLOR_FORMAT
+        - RENDER_TARGET_DEPTH_FORMAT
+        - RENDER_TARGET_DEPTH_STENCIL_FORMAT
+        - RENDER_TARGET_DEPTH_TEXTURE_FORMAT
+        - WgpuRenderTargetCache
+        - renderTargetDepthFormat
+        - EFFECT_BIND_GROUP_INDEX
+        - EFFECT_GRADE_OFFSET
+        - EFFECT_PASS_VERTEX_COUNT
+        - EFFECT_UNIFORM_BYTES
+        - EFFECT_UNIFORM_WGSL
+        - createEffectBindGroupLayout
+        - effectShaderSource
+        - READBACK_ROW_ALIGNMENT
+        - readTexturePixels
+        - readbackBytesPerRow
+        - COMPUTE_ENTRY_POINT
+        - PARTICLE_INTEGRATOR_SHADER_SOURCE
+        - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
+        - PARTICLE_SIMULATION_PARAMS_FLOATS
+        - WgpuComputeBuffer
+        - WgpuComputeCache
+        - createComputeBuffer
+        - particleIntegratorWorkgroups
+        - readComputeBufferBytes
+        - writeComputeBuffer
+        - writeParticleSimulationParams
+        - PARTICLE_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_INSTANCE_STRIDE_BYTES
+        - PARTICLE_MODEL_OFFSET
+        - PARTICLE_PROJECTION_OFFSET
+        - PARTICLE_SHADER_SOURCE
+        - PARTICLE_UNIFORM_BYTES
+        - PARTICLE_UNIFORM_WGSL
+        - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - PARTICLE_VIEW_OFFSET
+        - WgpuParticleCache
+        - createParticleBindGroupLayout
+        - SHADOW_FACTOR_WGSL
+        - SHADOW_LIGHT_UNIFORM_BYTES
+        - SHADOW_LIGHT_UNIFORM_WGSL
+        - SHADOW_MAP_BINDING
+        - SHADOW_MATRIX_OFFSET
+        - SHADOW_PARAMS_OFFSET
+        - SHADOW_SAMPLER_BINDING
+        - SHADOW_SHADER_SOURCE
+        - SHADOW_UNIFORM_SPARE_BYTES
+        - createShadowLightsBindGroupLayout
+        - createShadowSampler
+        - writeShadowUniforms
+        - CLEAR_STENCIL
+        - STENCIL_ALL_BITS
+        - applyStencilReference
+        - frameWantsStencil
+        - stencilDescriptor
+        - STANDARD_BASE_COLOR_OFFSET
+        - STANDARD_EMISSIVE_OFFSET
+        - STANDARD_MODEL_OFFSET
+        - STANDARD_SURFACE_OFFSET
+        - STANDARD_UNIFORM_BYTES
+        - STANDARD_UNIFORM_WGSL
+        - STANDARD_VIEW_PROJECTION_OFFSET
+        - createStandardBindGroupLayout
+        - standardShaderSource
         - PACKAGE_NAME
         - Gpu
         - GpuAdapter
@@ -11212,6 +12194,9 @@ modules:
         - GpuCanvasContext
         - GpuCommandBuffer
         - GpuCommandEncoder
+        - GpuComputePassEncoder
+        - GpuComputePipeline
+        - GpuComputePipelineDescriptor
         - GpuDevice
         - GpuDeviceLostInfo
         - GpuPipelineLayout
@@ -11240,8 +12225,18 @@ modules:
         - ResolvedSamplerState
         - WgpuCacheableTexture
         - WgpuTextureRecord
+        - WgpuCacheableRenderTarget
+        - WgpuRenderTargetRecord
+        - WgpuEffectKind
+        - ComputeBinding
+        - ComputeBindingAccess
+        - ComputeBufferOptions
+        - ComputePassDescriptor
+        - WgpuParticleRecord
+        - WgpuStencilSource
       reExported:
         - GPU_BUFFER_USAGE
+        - GPU_MAP_MODE
         - GPU_SHADER_STAGE
         - GPU_TEXTURE_USAGE
         - UNIFORM_STRIDE_BYTES
@@ -11292,6 +12287,97 @@ modules:
         - VERTEX_ENTRY_POINT
         - unlitShaderSource
         - unlitVertexBufferLayouts
+        - LIGHTS_BIND_GROUP_INDEX
+        - LIGHT_AMBIENT_OFFSET
+        - LIGHT_CAMERA_OFFSET
+        - LIGHT_COLOR_OFFSET
+        - LIGHT_COUNTS_OFFSET
+        - LIGHT_DIRECTION_OFFSET
+        - LIGHT_PUNCTUAL_COLOR_OFFSET
+        - LIGHT_PUNCTUAL_DIRECTION_OFFSET
+        - LIGHT_PUNCTUAL_PARAMS_OFFSET
+        - LIGHT_PUNCTUAL_POSITION_OFFSET
+        - LIGHT_UNIFORM_BYTES
+        - LIGHT_UNIFORM_FLOATS
+        - LIGHT_UNIFORM_MEMBERS_WGSL
+        - LIGHT_UNIFORM_STRIDE_BYTES
+        - LIGHT_UNIFORM_STRIDE_FLOATS
+        - LIGHT_UNIFORM_WGSL
+        - PUNCTUAL_LIGHT_WGSL
+        - SHADED_MAP_BINDING_WGSL
+        - SHADED_MAP_BIND_GROUP_INDEX
+        - createLightsBindGroupLayout
+        - writeLightUniforms
+        - NORMAL_BUFFER_LAYOUT
+        - NORMAL_MATRIX_WGSL
+        - NORMAL_SHADER_LOCATION
+        - litShaderSource
+        - shadedVertexBufferLayouts
+        - shadedVertexStageWgsl
+        - RENDER_TARGET_COLOR_FORMAT
+        - RENDER_TARGET_DEPTH_FORMAT
+        - RENDER_TARGET_DEPTH_STENCIL_FORMAT
+        - RENDER_TARGET_DEPTH_TEXTURE_FORMAT
+        - WgpuRenderTargetCache
+        - renderTargetDepthFormat
+        - EFFECT_BIND_GROUP_INDEX
+        - EFFECT_GRADE_OFFSET
+        - EFFECT_PASS_VERTEX_COUNT
+        - EFFECT_UNIFORM_BYTES
+        - EFFECT_UNIFORM_WGSL
+        - createEffectBindGroupLayout
+        - effectShaderSource
+        - READBACK_ROW_ALIGNMENT
+        - readTexturePixels
+        - readbackBytesPerRow
+        - COMPUTE_ENTRY_POINT
+        - PARTICLE_INTEGRATOR_SHADER_SOURCE
+        - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
+        - PARTICLE_SIMULATION_PARAMS_FLOATS
+        - WgpuComputeBuffer
+        - WgpuComputeCache
+        - createComputeBuffer
+        - particleIntegratorWorkgroups
+        - readComputeBufferBytes
+        - writeComputeBuffer
+        - writeParticleSimulationParams
+        - PARTICLE_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_INSTANCE_STRIDE_BYTES
+        - PARTICLE_MODEL_OFFSET
+        - PARTICLE_PROJECTION_OFFSET
+        - PARTICLE_SHADER_SOURCE
+        - PARTICLE_UNIFORM_BYTES
+        - PARTICLE_UNIFORM_WGSL
+        - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - PARTICLE_VIEW_OFFSET
+        - WgpuParticleCache
+        - createParticleBindGroupLayout
+        - SHADOW_FACTOR_WGSL
+        - SHADOW_LIGHT_UNIFORM_BYTES
+        - SHADOW_LIGHT_UNIFORM_WGSL
+        - SHADOW_MAP_BINDING
+        - SHADOW_MATRIX_OFFSET
+        - SHADOW_PARAMS_OFFSET
+        - SHADOW_SAMPLER_BINDING
+        - SHADOW_SHADER_SOURCE
+        - SHADOW_UNIFORM_SPARE_BYTES
+        - createShadowLightsBindGroupLayout
+        - createShadowSampler
+        - writeShadowUniforms
+        - CLEAR_STENCIL
+        - STENCIL_ALL_BITS
+        - applyStencilReference
+        - frameWantsStencil
+        - stencilDescriptor
+        - STANDARD_BASE_COLOR_OFFSET
+        - STANDARD_EMISSIVE_OFFSET
+        - STANDARD_MODEL_OFFSET
+        - STANDARD_SURFACE_OFFSET
+        - STANDARD_UNIFORM_BYTES
+        - STANDARD_UNIFORM_WGSL
+        - STANDARD_VIEW_PROJECTION_OFFSET
+        - createStandardBindGroupLayout
+        - standardShaderSource
         - Gpu
         - GpuAdapter
         - GpuStencilFaceState
@@ -11306,6 +12392,9 @@ modules:
         - GpuCanvasContext
         - GpuCommandBuffer
         - GpuCommandEncoder
+        - GpuComputePassEncoder
+        - GpuComputePipeline
+        - GpuComputePipelineDescriptor
         - GpuDevice
         - GpuDeviceLostInfo
         - GpuPipelineLayout
@@ -11334,6 +12423,15 @@ modules:
         - ResolvedSamplerState
         - WgpuCacheableTexture
         - WgpuTextureRecord
+        - WgpuCacheableRenderTarget
+        - WgpuRenderTargetRecord
+        - WgpuEffectKind
+        - ComputeBinding
+        - ComputeBindingAccess
+        - ComputeBufferOptions
+        - ComputePassDescriptor
+        - WgpuParticleRecord
+        - WgpuStencilSource
       constants:
         - PACKAGE_NAME
     packages/render-webgpu/src/register.ts:
@@ -11368,6 +12466,7 @@ modules:
       workspaceDependencies: []
       exports:
         - GPU_BUFFER_USAGE
+        - GPU_MAP_MODE
         - GPU_TEXTURE_USAGE
         - GPU_SHADER_STAGE
         - UNIFORM_STRIDE_BYTES
@@ -11376,6 +12475,8 @@ modules:
         - GpuBuffer
         - GpuTextureViewDescriptor
         - GpuTexture
+        - GpuComputePipelineDescriptor
+        - GpuComputePassEncoder
         - GpuVertexBufferLayout
         - GpuBlendState
         - GpuBlendComponent
@@ -11398,6 +12499,7 @@ modules:
         - WebgpuCanvas
       constants:
         - GPU_BUFFER_USAGE
+        - GPU_MAP_MODE
         - GPU_TEXTURE_USAGE
         - GPU_SHADER_STAGE
         - UNIFORM_STRIDE_BYTES
@@ -11416,8 +12518,10 @@ modules:
             - GpuBindGroupLayout
             - GpuBuffer
             - GpuCanvasContext
+            - GpuCommandEncoder
             - GpuDevice
             - GpuRenderPassEncoder
+            - GpuSampler
             - GpuTexture
             - GpuTextureView
             - WebgpuCanvas
@@ -11433,24 +12537,86 @@ modules:
           imports:
             - WgpuRenderBatching
           typeOnly: true
+        - file: ./wgpu-effect.js
+          imports:
+            - EFFECT_BIND_GROUP_INDEX
+            - EFFECT_PASS_VERTEX_COUNT
+            - EFFECT_UNIFORM_BYTES
+            - createEffectBindGroupLayout
+            - WgpuEffectKind
         - file: ./wgpu-geometry.js
           imports:
             - WgpuGeometryCache
             - WgpuGeometryRecord
+        - file: ./wgpu-lights.js
+          imports:
+            - LIGHTS_BIND_GROUP_INDEX
+            - LIGHT_UNIFORM_BYTES
+            - LIGHT_UNIFORM_STRIDE_BYTES
+            - LIGHT_UNIFORM_STRIDE_FLOATS
+            - SHADED_MAP_BIND_GROUP_INDEX
+            - createLightsBindGroupLayout
+            - writeLightUniforms
+        - file: ./wgpu-compute.js
+          imports:
+            - WgpuComputeCache
+            - createComputeBuffer
+            - readComputeBufferBytes
+            - writeComputeBuffer
+            - ComputeBufferOptions
+            - ComputePassDescriptor
+            - WgpuComputeBuffer
+        - file: ./wgpu-particles.js
+          imports:
+            - PARTICLE_MODEL_OFFSET
+            - PARTICLE_PROJECTION_OFFSET
+            - PARTICLE_UNIFORM_BYTES
+            - PARTICLE_VIEW_OFFSET
+            - WgpuParticleCache
+            - createParticleBindGroupLayout
+            - WgpuParticleRecord
         - file: ./wgpu-pipeline-cache.js
           imports:
             - WgpuPipelineCache
             - WgpuPipelineDescriptor
             - WgpuStencilDescriptor
+        - file: ./wgpu-readback.js
+          imports:
+            - readTexturePixels
+        - file: ./wgpu-render-target.js
+          imports:
+            - RENDER_TARGET_COLOR_FORMAT
+            - WgpuRenderTargetCache
+            - WgpuRenderTargetRecord
+        - file: ./wgpu-standard.js
+          imports:
+            - STANDARD_EMISSIVE_OFFSET
+            - STANDARD_SURFACE_OFFSET
+            - STANDARD_UNIFORM_BYTES
+            - createStandardBindGroupLayout
         - file: ./wgpu-sprite.js
           imports:
             - SPRITE_QUAD_OFFSET
             - SPRITE_UNIFORM_BYTES
             - createSpriteBindGroupLayout
+        - file: ./wgpu-shadow.js
+          imports:
+            - SHADOW_LIGHT_UNIFORM_BYTES
+            - SHADOW_MAP_BINDING
+            - SHADOW_SAMPLER_BINDING
+            - createShadowLightsBindGroupLayout
+            - createShadowSampler
+            - writeShadowUniforms
+        - file: ./wgpu-stencil.js
+          imports:
+            - CLEAR_STENCIL
+            - applyStencilReference
+            - frameWantsStencil
+            - stencilDescriptor
         - file: ./wgpu-texture.js
           imports:
             - WgpuTextureCache
-            - WgpuTextureRecord
+            - WgpuCacheableTexture
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_VERTEX_COUNT
@@ -11458,8 +12624,10 @@ modules:
         - package: "@four/core"
           directory: packages/core
           imports:
+            - DEV
             - EventEmitter
             - FourError
+            - devWarnOnce
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -11468,9 +12636,15 @@ modules:
         - package: "@four/render"
           directory: packages/render
           imports:
+            - COLOR_GRADE_DEFAULTS
+            - RenderTarget
             - buildInterpolatedRenderList
             - buildRenderList
             - buildViewRenderList
+            - collectSceneLights
+            - createSceneLights
+            - isRenderTargetTexture
+            - EffectRenderPass
             - RenderBatch
             - RenderInterpolation
             - RenderItem
@@ -11565,6 +12739,93 @@ modules:
         - MAP_TEXTURE_BINDING
         - MAP_SAMPLER_BINDING
         - MAP_BINDING_WGSL
+    packages/render-webgpu/src/wgpu-compute.ts:
+      description: §82's GPU compute on the WebGPU backend (WP-R1.8) — compute pipelines, bind
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_MAP_MODE
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuComputePipeline
+            - GpuDevice
+            - GpuPipelineLayout
+            - GpuShaderModule
+            - GpuBuffer
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+      exports:
+        - COMPUTE_ENTRY_POINT
+        - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
+        - PARTICLE_SIMULATION_PARAMS_FLOATS
+        - PARTICLE_INTEGRATOR_SHADER_SOURCE
+        - createComputeBuffer
+        - writeComputeBuffer
+        - readComputeBufferBytes
+        - writeParticleSimulationParams
+        - particleIntegratorWorkgroups
+        - WgpuComputeBuffer
+        - WgpuComputeCache
+      classes:
+        - WgpuComputeBuffer
+        - WgpuComputeCache
+      interfaces:
+        - ComputeBinding
+        - ComputePassDescriptor
+        - ComputeBufferOptions
+      functions:
+        - createComputeBuffer
+        - writeComputeBuffer
+        - readComputeBufferBytes
+        - writeParticleSimulationParams
+        - particleIntegratorWorkgroups
+      constants:
+        - COMPUTE_ENTRY_POINT
+        - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
+        - PARTICLE_SIMULATION_PARAMS_FLOATS
+        - PARTICLE_INTEGRATOR_SHADER_SOURCE
+    packages/render-webgpu/src/wgpu-effect.ts:
+      description: §70's full-screen effects in hand-written WGSL — the blit, the colour grade,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuDevice
+        - file: ./wgpu-bindings.js
+          imports:
+            - MAP_SAMPLER_BINDING
+            - MAP_TEXTURE_BINDING
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies: []
+      exports:
+        - EFFECT_PASS_VERTEX_COUNT
+        - EFFECT_GRADE_OFFSET
+        - EFFECT_UNIFORM_BYTES
+        - EFFECT_BIND_GROUP_INDEX
+        - EFFECT_UNIFORM_WGSL
+        - createEffectBindGroupLayout
+        - effectShaderSource
+      functions:
+        - createEffectBindGroupLayout
+        - effectShaderSource
+      constants:
+        - EFFECT_PASS_VERTEX_COUNT
+        - EFFECT_GRADE_OFFSET
+        - EFFECT_UNIFORM_BYTES
+        - EFFECT_BIND_GROUP_INDEX
+        - EFFECT_UNIFORM_WGSL
     packages/render-webgpu/src/wgpu-geometry.ts:
       description: Per-device store of uploaded geometry (§61, §64 stage 7) — the WebGPU twin of
       externalDependencies: []
@@ -11586,6 +12847,171 @@ modules:
         - WgpuGeometryCache
       interfaces:
         - WgpuGeometryRecord
+    packages/render-webgpu/src/wgpu-lights.ts:
+      description: The frame's lighting as **one uniform buffer** (§68, WP-R1.5), plus the
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuDevice
+        - file: ./wgpu-bindings.js
+          imports:
+            - MAP_SAMPLER_BINDING
+            - MAP_TEXTURE_BINDING
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - MAX_PUNCTUAL_LIGHTS
+            - SceneLights
+      exports:
+        - LIGHTS_BIND_GROUP_INDEX
+        - SHADED_MAP_BIND_GROUP_INDEX
+        - LIGHT_AMBIENT_OFFSET
+        - LIGHT_DIRECTION_OFFSET
+        - LIGHT_COLOR_OFFSET
+        - LIGHT_CAMERA_OFFSET
+        - LIGHT_COUNTS_OFFSET
+        - LIGHT_PUNCTUAL_POSITION_OFFSET
+        - LIGHT_PUNCTUAL_COLOR_OFFSET
+        - LIGHT_PUNCTUAL_DIRECTION_OFFSET
+        - LIGHT_PUNCTUAL_PARAMS_OFFSET
+        - LIGHT_UNIFORM_BYTES
+        - LIGHT_UNIFORM_FLOATS
+        - LIGHT_UNIFORM_STRIDE_BYTES
+        - LIGHT_UNIFORM_STRIDE_FLOATS
+        - LIGHT_UNIFORM_MEMBERS_WGSL
+        - LIGHT_UNIFORM_WGSL
+        - PUNCTUAL_LIGHT_WGSL
+        - SHADED_MAP_BINDING_WGSL
+        - createLightsBindGroupLayout
+        - writeLightUniforms
+      functions:
+        - createLightsBindGroupLayout
+        - writeLightUniforms
+      constants:
+        - LIGHTS_BIND_GROUP_INDEX
+        - SHADED_MAP_BIND_GROUP_INDEX
+        - LIGHT_AMBIENT_OFFSET
+        - LIGHT_DIRECTION_OFFSET
+        - LIGHT_COLOR_OFFSET
+        - LIGHT_CAMERA_OFFSET
+        - LIGHT_COUNTS_OFFSET
+        - LIGHT_PUNCTUAL_POSITION_OFFSET
+        - LIGHT_PUNCTUAL_COLOR_OFFSET
+        - LIGHT_PUNCTUAL_DIRECTION_OFFSET
+        - LIGHT_PUNCTUAL_PARAMS_OFFSET
+        - LIGHT_UNIFORM_BYTES
+        - LIGHT_UNIFORM_FLOATS
+        - LIGHT_UNIFORM_STRIDE_BYTES
+        - LIGHT_UNIFORM_STRIDE_FLOATS
+        - LIGHT_UNIFORM_MEMBERS_WGSL
+        - LIGHT_UNIFORM_WGSL
+        - PUNCTUAL_LIGHT_WGSL
+        - SHADED_MAP_BINDING_WGSL
+    packages/render-webgpu/src/wgpu-lit.ts:
+      description: The Lambert-lit pipeline in hand-written WGSL (§57 `LitMaterial`, §68,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./wgpu-bindings.js
+          imports:
+            - DRAW_UNIFORM_WGSL
+        - file: ./webgpu-device.js
+          imports:
+            - GpuVertexBufferLayout
+          typeOnly: true
+        - file: ./wgpu-lights.js
+          imports:
+            - LIGHT_UNIFORM_WGSL
+            - PUNCTUAL_LIGHT_WGSL
+            - SHADED_MAP_BINDING_WGSL
+        - file: ./wgpu-shadow.js
+          imports:
+            - SHADOW_FACTOR_WGSL
+            - SHADOW_LIGHT_UNIFORM_WGSL
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+            - POSITION_BUFFER_LAYOUT
+            - POSITION_SHADER_LOCATION
+            - UV_BUFFER_LAYOUT
+            - UV_SHADER_LOCATION
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies: []
+      exports:
+        - NORMAL_SHADER_LOCATION
+        - NORMAL_BUFFER_LAYOUT
+        - NORMAL_MATRIX_WGSL
+        - shadedVertexBufferLayouts
+        - shadedVertexStageWgsl
+        - litShaderSource
+      functions:
+        - shadedVertexBufferLayouts
+        - shadedVertexStageWgsl
+        - litShaderSource
+      constants:
+        - NORMAL_SHADER_LOCATION
+        - NORMAL_BUFFER_LAYOUT
+        - NORMAL_MATRIX_WGSL
+    packages/render-webgpu/src/wgpu-particles.ts:
+      description: The batched particle pipeline for the WebGPU backend (§36, §64 stage 6,
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuBuffer
+            - GpuDevice
+            - GpuVertexBufferLayout
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+            - POSITION_BUFFER_LAYOUT
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - PARTICLE_COLOR_OFFSET
+            - PARTICLE_INSTANCE_FLOATS
+            - PARTICLE_POSITION_OFFSET
+            - PARTICLE_SIZE_OFFSET
+            - ParticleRenderItem
+      exports:
+        - PARTICLE_PROJECTION_OFFSET
+        - PARTICLE_VIEW_OFFSET
+        - PARTICLE_MODEL_OFFSET
+        - PARTICLE_UNIFORM_BYTES
+        - PARTICLE_INSTANCE_STRIDE_BYTES
+        - PARTICLE_UNIFORM_WGSL
+        - PARTICLE_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - PARTICLE_SHADER_SOURCE
+        - createParticleBindGroupLayout
+        - WgpuParticleCache
+      classes:
+        - WgpuParticleCache
+      interfaces:
+        - WgpuParticleRecord
+      functions:
+        - createParticleBindGroupLayout
+      constants:
+        - PARTICLE_PROJECTION_OFFSET
+        - PARTICLE_VIEW_OFFSET
+        - PARTICLE_MODEL_OFFSET
+        - PARTICLE_UNIFORM_BYTES
+        - PARTICLE_INSTANCE_STRIDE_BYTES
+        - PARTICLE_UNIFORM_WGSL
+        - PARTICLE_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - PARTICLE_SHADER_SOURCE
     packages/render-webgpu/src/wgpu-pipeline-cache.ts:
       description: The lazy, descriptor-keyed render-pipeline cache (§4.2 of the R-1 plan).
       externalDependencies: []
@@ -11604,9 +13030,27 @@ modules:
         - file: ./wgpu-batch.js
           imports:
             - batchVertexBufferLayout
+        - file: ./wgpu-effect.js
+          imports:
+            - effectShaderSource
+            - WgpuEffectKind
+        - file: ./wgpu-lit.js
+          imports:
+            - litShaderSource
+            - shadedVertexBufferLayouts
+        - file: ./wgpu-particles.js
+          imports:
+            - PARTICLE_SHADER_SOURCE
+            - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - file: ./wgpu-shadow.js
+          imports:
+            - SHADOW_SHADER_SOURCE
         - file: ./wgpu-sprite.js
           imports:
             - SPRITE_SHADER_SOURCE
+        - file: ./wgpu-standard.js
+          imports:
+            - standardShaderSource
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_SHADER_SOURCE
@@ -11631,6 +13075,125 @@ modules:
         - WgpuPipelineDescriptor
       functions:
         - pipelineKey
+    packages/render-webgpu/src/wgpu-readback.ts:
+      description: "`readPixels`' mechanism: `copyTextureToBuffer` + `mapAsync` (WP-R1.6; §61,"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_MAP_MODE
+            - GpuDevice
+            - GpuTexture
+      workspaceDependencies: []
+      exports:
+        - READBACK_ROW_ALIGNMENT
+        - readbackBytesPerRow
+        - readTexturePixels
+      functions:
+        - readbackBytesPerRow
+        - readTexturePixels
+      constants:
+        - READBACK_ROW_ALIGNMENT
+    packages/render-webgpu/src/wgpu-render-target.ts:
+      description: "GPU-side render targets for the WebGPU backend: one colour (and optional"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_TEXTURE_USAGE
+            - GpuBindGroup
+            - GpuBindGroupLayout
+            - GpuDevice
+            - GpuSampler
+            - GpuTexture
+            - GpuTextureView
+        - file: ./wgpu-bindings.js
+          imports:
+            - MAP_SAMPLER_BINDING
+            - MAP_TEXTURE_BINDING
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderTarget
+      exports:
+        - RENDER_TARGET_COLOR_FORMAT
+        - RENDER_TARGET_DEPTH_FORMAT
+        - RENDER_TARGET_DEPTH_TEXTURE_FORMAT
+        - RENDER_TARGET_DEPTH_STENCIL_FORMAT
+        - renderTargetDepthFormat
+        - WgpuRenderTargetCache
+      classes:
+        - WgpuRenderTargetCache
+      interfaces:
+        - WgpuRenderTargetRecord
+      functions:
+        - renderTargetDepthFormat
+      constants:
+        - RENDER_TARGET_COLOR_FORMAT
+        - RENDER_TARGET_DEPTH_FORMAT
+        - RENDER_TARGET_DEPTH_TEXTURE_FORMAT
+        - RENDER_TARGET_DEPTH_STENCIL_FORMAT
+    packages/render-webgpu/src/wgpu-shadow.ts:
+      description: "§69's shadow tier on WebGPU (WP-R1.7): the depth-only caster module, the"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuDevice
+            - GpuSampler
+        - file: ./wgpu-bindings.js
+          imports:
+            - DRAW_UNIFORM_WGSL
+        - file: ./wgpu-lights.js
+          imports:
+            - LIGHTS_BIND_GROUP_INDEX
+            - LIGHT_UNIFORM_BYTES
+            - LIGHT_UNIFORM_MEMBERS_WGSL
+            - LIGHT_UNIFORM_STRIDE_BYTES
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+            - POSITION_SHADER_LOCATION
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - SceneLights
+      exports:
+        - SHADOW_MATRIX_OFFSET
+        - SHADOW_PARAMS_OFFSET
+        - SHADOW_LIGHT_UNIFORM_BYTES
+        - SHADOW_MAP_BINDING
+        - SHADOW_SAMPLER_BINDING
+        - SHADOW_LIGHT_UNIFORM_WGSL
+        - SHADOW_FACTOR_WGSL
+        - SHADOW_SHADER_SOURCE
+        - SHADOW_UNIFORM_SPARE_BYTES
+        - createShadowLightsBindGroupLayout
+        - createShadowSampler
+        - writeShadowUniforms
+      functions:
+        - createShadowLightsBindGroupLayout
+        - createShadowSampler
+        - writeShadowUniforms
+      constants:
+        - SHADOW_MATRIX_OFFSET
+        - SHADOW_PARAMS_OFFSET
+        - SHADOW_LIGHT_UNIFORM_BYTES
+        - SHADOW_MAP_BINDING
+        - SHADOW_SAMPLER_BINDING
+        - SHADOW_LIGHT_UNIFORM_WGSL
+        - SHADOW_FACTOR_WGSL
+        - SHADOW_SHADER_SOURCE
+        - SHADOW_UNIFORM_SPARE_BYTES
     packages/render-webgpu/src/wgpu-sprite.ts:
       description: The sprite pipeline in hand-written WGSL (§55, WP-R1.3), plus the widened
       externalDependencies: []
@@ -11668,6 +13231,85 @@ modules:
         - SPRITE_UNIFORM_BYTES
         - SPRITE_UNIFORM_WGSL
         - SPRITE_SHADER_SOURCE
+    packages/render-webgpu/src/wgpu-standard.ts:
+      description: The metallic-roughness pipeline in hand-written WGSL (§57
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_SHADER_STAGE
+            - GpuBindGroupLayout
+            - GpuDevice
+        - file: ./wgpu-lights.js
+          imports:
+            - LIGHT_UNIFORM_WGSL
+            - PUNCTUAL_LIGHT_WGSL
+            - SHADED_MAP_BINDING_WGSL
+        - file: ./wgpu-lit.js
+          imports:
+            - shadedVertexStageWgsl
+        - file: ./wgpu-shadow.js
+          imports:
+            - SHADOW_FACTOR_WGSL
+            - SHADOW_LIGHT_UNIFORM_WGSL
+        - file: ./wgpu-unlit.js
+          imports:
+            - FRAGMENT_ENTRY_POINT
+      workspaceDependencies: []
+      exports:
+        - STANDARD_VIEW_PROJECTION_OFFSET
+        - STANDARD_MODEL_OFFSET
+        - STANDARD_BASE_COLOR_OFFSET
+        - STANDARD_EMISSIVE_OFFSET
+        - STANDARD_SURFACE_OFFSET
+        - STANDARD_UNIFORM_BYTES
+        - STANDARD_UNIFORM_WGSL
+        - createStandardBindGroupLayout
+        - standardShaderSource
+      functions:
+        - createStandardBindGroupLayout
+        - standardShaderSource
+      constants:
+        - STANDARD_VIEW_PROJECTION_OFFSET
+        - STANDARD_MODEL_OFFSET
+        - STANDARD_BASE_COLOR_OFFSET
+        - STANDARD_EMISSIVE_OFFSET
+        - STANDARD_SURFACE_OFFSET
+        - STANDARD_UNIFORM_BYTES
+        - STANDARD_UNIFORM_WGSL
+    packages/render-webgpu/src/wgpu-stencil.ts:
+      description: §57/§67 stencil parity for the WebGPU backend (WP-R1.7) — the per-frame
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GpuRenderPassEncoder
+          typeOnly: true
+        - file: ./wgpu-pipeline-cache.js
+          imports:
+            - WgpuStencilDescriptor
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - RenderItem
+            - RenderItemStencil
+      exports:
+        - STENCIL_ALL_BITS
+        - CLEAR_STENCIL
+        - stencilDescriptor
+        - applyStencilReference
+        - frameWantsStencil
+      functions:
+        - stencilDescriptor
+        - applyStencilReference
+        - frameWantsStencil
+      constants:
+        - STENCIL_ALL_BITS
+        - CLEAR_STENCIL
     packages/render-webgpu/src/wgpu-texture.ts:
       description: "GPU-side textures and samplers for the WebGPU backend: one `GPUTexture` per"
       externalDependencies: []
@@ -13014,6 +14656,25 @@ modules:
         - Button
       classes:
         - Button
+    packages/ui/src/canvas-view.ts:
+      description: "`CanvasViewWidget` (§73's \"canvas view\"; RFC 0004, accepted 2026-08-21) — a"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./numbers.js
+          imports:
+            - requireFinite
+        - file: ./widget.js
+          imports:
+            - UIWidget
+            - UIWidgetOptions
+      workspaceDependencies: []
+      exports:
+        - CanvasViewWidget
+      classes:
+        - CanvasViewWidget
+      interfaces:
+        - CanvasViewWidgetOptions
     packages/ui/src/checkable.ts:
       description: "`Toggle` and `Checkbox` (§73), over the checkable base they share"
       externalDependencies: []
@@ -13063,6 +14724,10 @@ modules:
         - file: ./button.js
           imports:
             - Button
+          reExport: true
+        - file: ./canvas-view.js
+          imports:
+            - CanvasViewWidget
           reExport: true
         - file: ./checkable.js
           imports:
@@ -13116,6 +14781,11 @@ modules:
         - file: ./button.js
           imports:
             - ButtonOptions
+          reExport: true
+          typeOnly: true
+        - file: ./canvas-view.js
+          imports:
+            - CanvasViewWidgetOptions
           reExport: true
           typeOnly: true
         - file: ./checkable.js
@@ -13183,6 +14853,7 @@ modules:
       workspaceDependencies: []
       exports:
         - Button
+        - CanvasViewWidget
         - CheckableWidget
         - Checkbox
         - Toggle
@@ -13207,6 +14878,7 @@ modules:
         - isUIWidget
         - PACKAGE_NAME
         - ButtonOptions
+        - CanvasViewWidgetOptions
         - CheckableWidgetOptions
         - CheckboxOptions
         - ToggleOptions
@@ -13235,6 +14907,7 @@ modules:
         - WidgetValueChangeEvent
       reExported:
         - Button
+        - CanvasViewWidget
         - CheckableWidget
         - Checkbox
         - Toggle
@@ -13258,6 +14931,7 @@ modules:
         - focusedWidget
         - isUIWidget
         - ButtonOptions
+        - CanvasViewWidgetOptions
         - CheckableWidgetOptions
         - CheckboxOptions
         - ToggleOptions
@@ -13528,12 +15202,15 @@ dependencyGraph:
       - - packages/physics/src/world.ts
         - packages/physics/src/solver-registry.ts
         - packages/physics/src/world.ts
+      - - packages/render/src/renderer.ts
+        - packages/render/src/picking.ts
+        - packages/render/src/renderer.ts
       - - packages/scene/src/node.ts
         - packages/scene/src/world-transforms.ts
         - packages/scene/src/node.ts
-    total: 2
+    total: 3
     runtimeCount: 0
-    typeOnlyCount: 2
+    typeOnlyCount: 3
   layers:
     - name: Packages/animation
       files:
@@ -13600,6 +15277,7 @@ dependencyGraph:
         - packages/four/src/physics-rapier.ts
         - packages/four/src/physics-soft.ts
         - packages/four/src/physics.ts
+        - packages/four/src/pick-provider.ts
         - packages/four/src/plugins.ts
         - packages/four/src/render-canvas.ts
         - packages/four/src/render-svg.ts
@@ -13639,6 +15317,9 @@ dependencyGraph:
         - packages/materials/src/index.ts
         - packages/materials/src/lit-material.ts
         - packages/materials/src/material.ts
+        - packages/materials/src/node-material-builder.ts
+        - packages/materials/src/node-material.ts
+        - packages/materials/src/shader-graph.ts
         - packages/materials/src/sprite-material.ts
         - packages/materials/src/standard-material.ts
         - packages/materials/src/stencil-state.ts
@@ -13735,6 +15416,8 @@ dependencyGraph:
         - packages/render/src/lights.ts
         - packages/render/src/mesh.ts
         - packages/render/src/particles.ts
+        - packages/render/src/picking.ts
+        - packages/render/src/raster.ts
         - packages/render/src/render-graph.ts
         - packages/render/src/render-list.ts
         - packages/render/src/render-target.ts
@@ -13758,7 +15441,10 @@ dependencyGraph:
         - packages/render-webgl/src/gl-batch.ts
         - packages/render-webgl/src/gl-effect.ts
         - packages/render-webgl/src/gl-geometry.ts
+        - packages/render-webgl/src/gl-node-program.ts
         - packages/render-webgl/src/gl-particles.ts
+        - packages/render-webgl/src/gl-picking-registry.ts
+        - packages/render-webgl/src/gl-picking.ts
         - packages/render-webgl/src/gl-program.ts
         - packages/render-webgl/src/gl-render-target.ts
         - packages/render-webgl/src/gl-shadow.ts
@@ -13767,6 +15453,7 @@ dependencyGraph:
         - packages/render-webgl/src/gl-standard.ts
         - packages/render-webgl/src/gl-texture.ts
         - packages/render-webgl/src/index.ts
+        - packages/render-webgl/src/node-pipeline-registry.ts
         - packages/render-webgl/src/register.ts
         - packages/render-webgl/src/webgl-renderer.ts
     - name: Packages/render-webgpu
@@ -13777,9 +15464,19 @@ dependencyGraph:
         - packages/render-webgpu/src/webgpu-renderer.ts
         - packages/render-webgpu/src/wgpu-batch.ts
         - packages/render-webgpu/src/wgpu-bindings.ts
+        - packages/render-webgpu/src/wgpu-compute.ts
+        - packages/render-webgpu/src/wgpu-effect.ts
         - packages/render-webgpu/src/wgpu-geometry.ts
+        - packages/render-webgpu/src/wgpu-lights.ts
+        - packages/render-webgpu/src/wgpu-lit.ts
+        - packages/render-webgpu/src/wgpu-particles.ts
         - packages/render-webgpu/src/wgpu-pipeline-cache.ts
+        - packages/render-webgpu/src/wgpu-readback.ts
+        - packages/render-webgpu/src/wgpu-render-target.ts
+        - packages/render-webgpu/src/wgpu-shadow.ts
         - packages/render-webgpu/src/wgpu-sprite.ts
+        - packages/render-webgpu/src/wgpu-standard.ts
+        - packages/render-webgpu/src/wgpu-stencil.ts
         - packages/render-webgpu/src/wgpu-texture.ts
         - packages/render-webgpu/src/wgpu-unlit.ts
     - name: Packages/scene
@@ -13815,6 +15512,7 @@ dependencyGraph:
     - name: Packages/ui
       files:
         - packages/ui/src/button.ts
+        - packages/ui/src/canvas-view.ts
         - packages/ui/src/checkable.ts
         - packages/ui/src/image.ts
         - packages/ui/src/index.ts
@@ -13827,19 +15525,19 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 243
+  totalTypeScriptFiles: 264
   totalModules: 24
-  totalLinesOfCode: 116157
-  totalExports: 2324
-  totalClasses: 159
-  totalInterfaces: 487
-  totalFunctions: 368
-  totalTypeGuards: 22
+  totalLinesOfCode: 127360
+  totalExports: 2644
+  totalClasses: 174
+  totalInterfaces: 516
+  totalFunctions: 411
+  totalTypeGuards: 23
   totalEnums: 0
-  totalConstants: 328
-  totalReExports: 1491
-  totalTypeOnlyImports: 284
+  totalConstants: 400
+  totalReExports: 1681
+  totalTypeOnlyImports: 311
   runtimeCircularDeps: 0
-  typeOnlyCircularDeps: 2
+  typeOnlyCircularDeps: 3
   unusedFilesCount: 0
-  unusedExportsCount: 1
+  unusedExportsCount: 2
