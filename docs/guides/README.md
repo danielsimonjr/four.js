@@ -46,8 +46,11 @@ assumes the ones above it:
 9. **[Performance optimization](performance-optimization.md)** — §86 targets,
    what the committed benchmarks actually measured, and the practices the
    engine's own hot paths use.
-10. **[Custom shaders](custom-shaders.md)** — the honest state of §60: what the
-    material/shader seam looks like today and what is staged.
+10. **[Custom shaders](custom-shaders.md)** — the landed §60 node-material
+    system (RFC 0001): shader graphs, `NodeMaterialBuilder`, screen-domain
+    graph effects, per-backend registration, and what stays deferred. (Until
+    2026-08-29 this entry read "the honest state of §60 … today and what is
+    staged", describing the pre-landing guide.)
 11. **[Custom solver adapters](custom-solver-adapters.md)** — the §37
     `PhysicsWorldAdapter` contract, capabilities, and the access seams the
     shipped adapters implement.
@@ -67,6 +70,14 @@ as a guide:
     and nesting bounds on the §79 and §34 document decoders, and the CSP
     posture, which `tests/integration/security-csp.test.ts` enforces rather than
     asserts.
+
+A fifteenth carries the §77a browser-adapter recipe RFC 0004 promised a guide
+for (until 2026-08-29 it lived only in `raster.ts`'s module header):
+
+15. **[Raster painting and dynamic textures](raster-painting.md)** — §77a's
+    `RasterSource`/`CanvasTexture` seam, the DOM-free browser adapter, the
+    "nothing polls — call `update()` yourself" rule, and the §33 display-only
+    boundary painted pixels live under.
 
 ## Conventions every guide assumes
 

@@ -28,6 +28,16 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 (doc-truth sweep): trust the backend, not the interface comment,
+  for capability coverage.** `renderer.ts`'s `RendererCapabilities` doc claims
+  all three shipped backends answer every member; the authority is each
+  backend's own record: `WebglRenderer` deliberately never reports
+  `maxUniformBufferBytes`/`maxBindings` (R-30b — querying at initialize would
+  move recorded GL transcripts), and `WebgpuRenderer` omits
+  `maximumSkinningJoints`. Any §90/§62 documentation of capability coverage must
+  be counted off `WEBGL_STATIC_CAPABILITIES` / `readCapabilities`, not off the
+  interface's prose.
+
 - **2026-08-29 — WP-R1.9: §62 capability declaration + the WGSL node pipeline
   (R-1 complete).** Decisions worth keeping:
   - **A required §62 capability is satisfied only by an affirmative `true` —

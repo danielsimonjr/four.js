@@ -34,14 +34,14 @@ Split deliberately into what is **verified** — something in this repository
 runs it and fails when it breaks — and what is **expected**, which is an
 engineering judgement with no gate behind it.
 
-| Target                                    | Status             | What backs the claim                                                                                                                                                                                              |
-| ----------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Node >= 20                                | verified           | Root `engines.node`. The unit suites, `tests/integration`, `tests/determinism` and every `tools/` script run here, headless and with no GPU.                                                                      |
-| Headless Chromium, ANGLE over SwiftShader | verified           | `playwright.config.ts` launches with `--use-gl=angle --use-angle=swiftshader` and drives six built example sites (`pnpm test:browser`); the `visual` project additionally compares committed SwiftShader goldens. |
-| Chromium on a real GPU                    | expected           | The same code path with a different rasteriser. No gate runs it, which is why the browser suite asserts thresholds rather than pixels in the `chromium` project.                                                  |
-| Firefox, Safari, other evergreen browsers | expected, untested | Nothing in the engine is Chromium-specific and the requirements below are all standard, but there is no Playwright project and no CI job for them. Do not read this row as support.                               |
-| Browsers with WebGL 1 only                | not supported      | §120 fixes the MVP renderer tier at WebGL 2, and `@four/render-webgl` is the only backend (section 2). There is no WebGL 1 fallback and none is planned.                                                          |
-| Deno, Bun, other non-Node runtimes        | untested           | The packages are plain ESM with no Node built-ins in the browser-safe set, so they are likely to work; nothing checks it.                                                                                         |
+| Target                                    | Status             | What backs the claim                                                                                                                                                                                                                                                                           |
+| ----------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node >= 20                                | verified           | Root `engines.node`. The unit suites, `tests/integration`, `tests/determinism` and every `tools/` script run here, headless and with no GPU.                                                                                                                                                   |
+| Headless Chromium, ANGLE over SwiftShader | verified           | `playwright.config.ts` launches with `--use-gl=angle --use-angle=swiftshader` and drives six built example sites (`pnpm test:browser`); the `visual` project additionally compares committed SwiftShader goldens.                                                                              |
+| Chromium on a real GPU                    | expected           | The same code path with a different rasteriser. No gate runs it, which is why the browser suite asserts thresholds rather than pixels in the `chromium` project.                                                                                                                               |
+| Firefox, Safari, other evergreen browsers | expected, untested | Nothing in the engine is Chromium-specific and the requirements below are all standard, but there is no Playwright project and no CI job for them. Do not read this row as support.                                                                                                            |
+| Browsers with WebGL 1 only                | not supported      | §120 fixes the MVP renderer tier at WebGL 2, and neither shipped GPU backend (section 2) has a WebGL 1 path. There is no WebGL 1 fallback and none is planned. (This row called `@four/render-webgl` "the only backend" until 2026-08-29 — stale since WP-R1.1 shipped `@four/render-webgpu`.) |
+| Deno, Bun, other non-Node runtimes        | untested           | The packages are plain ESM with no Node built-ins in the browser-safe set, so they are likely to work; nothing checks it.                                                                                                                                                                      |
 
 What an application needs at runtime:
 
@@ -49,9 +49,10 @@ What an application needs at runtime:
   `module: "NodeNext"`; every package declares `"type": "module"` and an
   `exports` map with an `import` condition and **no `require` condition**.
   There is no CommonJS entry point and no bundled UMD build.
-- **WebGL 2**, for anything that draws. Headless _simulation_ needs no GPU at
-  all — run the scene, motion and physics with `NullRenderer` or with no
-  renderer (§62, §104).
+- **WebGL 2 or WebGPU**, for anything that draws (section 2; WebGL 2 is the
+  §120 MVP tier, WebGPU an explicit opt-in). Headless _simulation_ needs no
+  GPU at all — run the scene, motion and physics with `NullRenderer` or with
+  no renderer (§62, §104).
 - **WebAssembly**, for physics. Both Rapier adapters load a
   `@dimforge/rapier{2,3}d-compat` wasm image (base64-embedded, so no separate
   fetch and no MIME configuration).
@@ -64,47 +65,96 @@ What an application needs at runtime:
 
 ## 2. Render backends and capability tiers (§62)
 
-§62 lists five backends. One ships, one headless tier ships, and three are
+§62 lists five backends. Two ship, one headless tier ships, and two are
 reserved package directories — `RendererBackend` names all five so that the
-interface does not change when a backend lands.
+interface does not change when a backend lands. (This section said "one ships
+… and three are reserved" until 2026-08-29, and its feature rows below were
+stale from as early as 2026-08-08; each corrected row keeps its old wording
+with the date it stopped being true.)
 
-| §62 backend | `RendererBackend` | Package               | Status                                                                                                                                                                                                                                                                                                 |
-| ----------- | ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| WebGL 2     | `"webgl2"`        | `@four/render-webgl`  | **shipped** — `WebglRenderer`; the §120 MVP tier                                                                                                                                                                                                                                                       |
-| headless    | `"null"`          | `@four/render`        | **shipped** — `NullRenderer`, alongside the `Renderer` interface                                                                                                                                                                                                                                       |
-| WebGPU      | `"webgpu"`        | `@four/render-webgpu` | **shipping in tiers (WP-R1.1–R1.6 landed 2026-08-21…28)** — `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard/batching, textures+samplers, §67 clips, render targets/effects/`readPixels`; shadows (R1.7), compute (R1.8) and the WGSL node-material emitter (R1.9) remain |
-| Canvas 2D   | `"canvas2d"`      | `@four/render-canvas` | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                          |
-| SVG         | `"svg"`           | `@four/render-svg`    | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                          |
+| §62 backend | `RendererBackend` | Package               | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------- | ----------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WebGPU      | `"webgpu"`        | `@four/render-webgpu` | **shipped (WP-R1.1–R1.9, 2026-08-21…29; the R-1 plan is complete)** — `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard families, opt-in §65 batching, textures + samplers, §67 clips + §57 stencil parity, render targets / §70 effects / `readPixels`, the §69 directional shadow tier, §36 instanced particles, §82 compute, and §60 node materials + §70 graph effects behind `registerWebgpuNodeMaterialPipeline()`. Absent, not stubbed: RFC 0003's skinned pipelines and §71 picking (`createPickingService` is not declared) |
+| WebGL 2     | `"webgl2"`        | `@four/render-webgl`  | **shipped** — `WebglRenderer` behind `registerWebglRenderer()`; the §120 MVP tier, feature table below                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| headless    | `"null"`          | `@four/render`        | **shipped** — `NullRenderer`, alongside the `Renderer` interface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Canvas 2D   | `"canvas2d"`      | `@four/render-canvas` | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| SVG         | `"svg"`           | `@four/render-svg`    | reserved stub — the package builds and exports `PACKAGE_NAME`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+Registering the WebGPU backend is a real decision, not a free upgrade:
+`AUTO_RENDERER_ORDER` prefers WebGPU, so an application that calls
+`registerWebgpuRenderer()` and selects `"auto"` moves off WebGL 2 wherever a
+device is granted.
 
 What the WebGL 2 tier actually carries:
 
-| Feature                        | State                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Pipelines                      | four — unlit, lit, sprite, particles (`gl-program.ts`, `gl-particles.ts`)                          |
-| Geometry                       | one vertex array object per geometry, cached and evicted (`gl-geometry.ts`)                        |
-| Clip depth                     | `"negative-one-to-one"` (plan D8) — the WebGL convention, not WebGPU's                             |
-| Context loss and restore (§61) | implemented; `contextlost`/`contextrestored` are emitted on `Renderer.events`                      |
-| Lighting                       | one directional light plus scene ambient, first light in scene-graph DFS order (§33-deterministic) |
-| Sprite batching (§65)          | absent — one draw call per sprite                                                                  |
-| Anti-aliasing                  | `RendererOptions.antialias` is a hint; a backend that cannot honour it never fails initialization  |
-| Picking (§71)                  | id-buffer + fence read-back, behind `registerPickingPipeline()` (RFC 0005, 2026-08-29)             |
+| Feature                        | State                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipelines, compiled at init    | seven — unlit, sprite, lit (`gl-program.ts`), particles (`gl-particles.ts`), §59 metallic-roughness standard (`gl-standard.ts`, R-13), §70 full-screen effect (`gl-effect.ts`, R-6), §69 depth-only shadow caster (`gl-shadow.ts`, R-18). This row said "four" until 2026-08-29 — stale since R-6/R-13/R-18 landed 2026-08-07…09                                                                                                                         |
+| Pipelines, registered (opt-in) | three seams an application links by calling them — a bundle that never calls one pays nothing for it: `registerSkinningPipeline()` (§54 skinned unlit + lit, RFC 0003), `registerPickingPipeline()` (§71 id-buffer pass, RFC 0005), `registerNodeMaterialPipeline()` (§60 GLSL emitter — one program compiled per distinct graph, on first draw, RFC 0001)                                                                                               |
+| Geometry                       | one vertex array object per geometry, cached and evicted (`gl-geometry.ts`)                                                                                                                                                                                                                                                                                                                                                                              |
+| Clip depth                     | `"negative-one-to-one"` (plan D8) — the WebGL convention, not WebGPU's                                                                                                                                                                                                                                                                                                                                                                                   |
+| Context loss and restore (§61) | implemented; `contextlost`/`contextrestored` are emitted on `Renderer.events`                                                                                                                                                                                                                                                                                                                                                                            |
+| Lighting (§68)                 | one directional light plus scene ambient, first light in scene-graph DFS order (§33-deterministic) — **plus up to `MAX_PUNCTUAL_LIGHTS = 8` point and spot lights** (R-17, 2026-08-09; overflow keeps the first eight in traversal order, deterministically, and warns once). This row stopped at the directional light until 2026-08-29                                                                                                                 |
+| Shadows (§69)                  | one tier: the directional light's shadow map — a depth-only caster pass into a `DEPTH_COMPONENT24` target, 3×3 percentage-closer filtering on receivers (R-18, 2026-08-09). §69's remaining features are staged with reasons in `@four/scene`'s `DirectionalLightShadow`                                                                                                                                                                                 |
+| Sprite batching (§65)          | **shipped, opt-in** (R-9, 2026-08-09): `renderer.batching = createGlBatching()` merges consecutive items sharing a pipeline and a material instance into one draw through the unlit program; without the opt-in it stays one draw call per sprite. Opt-in by measured decision — the batcher costs bundle bytes every non-batching application would otherwise carry (`gl-batch.ts`). This row said "absent — one draw call per sprite" until 2026-08-29 |
+| Post-processing (§70)          | copy, colour grade, the sRGB output transform (R-15), and §60 graph effects — driven as `RenderGraph` effect passes (R-6, 2026-08-07; RFC 0001, 2026-08-28)                                                                                                                                                                                                                                                                                              |
+| Anti-aliasing                  | `RendererOptions.antialias` is a hint; a backend that cannot honour it never fails initialization                                                                                                                                                                                                                                                                                                                                                        |
+| Picking (§71)                  | id-buffer + fence read-back, behind `registerPickingPipeline()` (RFC 0005, 2026-08-29)                                                                                                                                                                                                                                                                                                                                                                   |
 
 §62's capability-reporting clause lists eleven fields. `RendererCapabilities`
-carries **two** of them — `backend` and `maxTextureSize` — and that is
-deliberate rather than incomplete: the WP-3.4 decision is that a backend
+covers **all eleven** since WP-R1.1 (2026-08-21): `maxTextureSize`,
+`textureFormats`, `multisampling`, `floatRenderTargets`, `timestampQueries`,
+`storageBuffers`, `computeShaders`, `indirectDraw`,
+`compressedTextureFormats`, `shaderPrecision`, and — §62's "maximum uniforms
+and bindings", split into the two quantities a caller actually sizes against —
+`maxUniformBufferBytes` and `maxBindings`; plus `backend` and RFC 0003's
+`maximumSkinningJoints`, fourteen members in all. (This paragraph said the
+record carried **two** of the eleven until 2026-08-29 — true when WP-3.4
+wrote it, stale since the WP-R1.1 widening.) Every member the widening added
+is **optional, and absent means "not reported"**: `undefined` is a third
+answer distinct from `false` — "this backend has not been taught to answer",
+not "this backend cannot" — preserving WP-3.4's original rule that a backend
 reports only what it has queried, because "capability negotiation is precisely
-the place where a confident wrong answer costs a crash". The remaining nine
-fields (texture formats, multisampling, floating-point targets, timestamp
-queries, storage buffers, compute shaders, indirect draw, compressed textures,
-shader precision, uniform and binding limits) arrive with the packets that can
-query them, and §62's "applications may declare required and optional
-capabilities" has no API yet.
+the place where a confident wrong answer costs a crash". Concretely:
+`NullRenderer` answers every member with the floor; `WebgpuRenderer` answers
+from the device's own limits (and omits `maximumSkinningJoints`, matching its
+absent skinning tier); `WebglRenderer` answers everything **except**
+`maxUniformBufferBytes` and `maxBindings`, which it deliberately leaves
+unreported — querying them at initialization would move recorded GL
+transcripts for numbers nothing reads yet (R-30b's lazy-query law,
+`webgl-renderer.ts`).
 
-§62's `renderer: "auto"` selection — and the string backend form generally —
-is **not implemented**: `ApplicationOptions.renderer` takes a `Renderer`
-instance (gap A-8). An application therefore chooses its backend by importing
-it, which is also why the umbrella package does not statically pull in every
-backend.
+§62's other half — "applications may declare required and optional
+capabilities" — landed with WP-R1.9 (2026-08-29):
+`RendererResolveOptions.capabilities` takes `required` and `optional` lists
+over the six declarable boolean names (`RENDERER_CAPABILITY_NAMES`:
+`multisampling`, `floatRenderTargets`, `timestampQueries`, `storageBuffers`,
+`computeShaders`, `indirectDraw`). `"auto"` skips a backend that does not
+affirm every required name (`undefined` never satisfies a requirement) and
+reports the skip as `"missing-capability"`; an explicitly named backend that
+falls short fails fast instead of downgrading; optional shortfalls are
+reported through `onCapabilityShortfall` and never gate selection. The
+numeric members and format lists are deliberately not declarable yet — a
+requirement over a quantity needs a threshold grammar, and none has a
+consumer.
+
+§62's `renderer: "auto"` selection **is implemented** (R-2, closing gap A-8;
+registry landed 2026-08-07, the string form on `ApplicationOptions.renderer`
+with it — this paragraph said "not implemented" until 2026-08-29, which had
+been stale for three weeks). `ApplicationOptions.renderer` takes a `Renderer`
+instance, a backend name, or `"auto"`; a name resolves against the §62
+registry, into which an application opts each backend explicitly
+(`registerWebglRenderer()`, `registerWebgpuRenderer()`) — an explicit call,
+never a side-effect import, because every package declares
+`"sideEffects": false`. `"auto"` walks `AUTO_RENDERER_ORDER` (`webgpu`,
+`webgl2`, `canvas2d`, `svg`; `"null"` is never auto-chosen) and takes the
+first registered backend that reports support and initializes, reporting each
+one skipped through the `onFallback` callback — §62's diagnostics event; a
+named backend that cannot start fails fast with
+`RENDERER_INITIALIZATION_FAILED` (§89) rather than silently downgrading. An
+application still chooses its backends by importing them: nothing in
+`@four/render` or the umbrella package imports a backend, and a bundle that
+hands `Application` a constructed instance carries no registry at all.
 
 ## 3. Physics solver adapters (§37, §102)
 

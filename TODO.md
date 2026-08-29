@@ -25,8 +25,8 @@ changes in `CHANGELOG.md`.
       determinism argument; explicitly must not ride on 0004 or 0005); the §62
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
-      that packet's named obligation); a docs/guides page carrying the browser
-      adapter (recipe currently lives in `raster.ts`'s header and §77a).
+      that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
+      `docs/guides/raster-painting.md`, listed as guide 15).ts`'s header and §77a).
 
 - [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
@@ -36,18 +36,35 @@ changes in `CHANGELOG.md`.
       pointer-event dispatch on a `PickProvider` result is an input packet. The
       analytic `"geometry"` tier (+ `node.hitTestMode` per the adopted Q3)
       remains A-11's own follow-up packet, unblocked.
-- [ ] **docs/COMPATIBILITY.md §2 is stale beyond the two rows fixed 2026-08-29**
-      (WebGPU row updated to the R1.1–R1.6 truth; §71 picking row added): the
-      WebGL feature table still says four pipelines / batching absent / one
-      directional light, the capability paragraph still says two of eleven
-      fields, and the `renderer: "auto"` paragraph predates A-8's closure
-      (registries + "auto" landed 2026-08-07). Needs a §2 refresh packet or the
-      closing honesty pass.
+- [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
+      sweep): §2 rewritten to the tip — seven init pipelines + three registered
+      seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
+      capability fields across fourteen members with per-backend honesty,
+      WP-R1.9 declaration, "auto" implemented; WebGPU row moved to
+      R-1-complete; two §1 consequences corrected. check-compat green.
+- [ ] **packages/render/src/renderer.ts capability doc-comment overclaims** (found
+      2026-08-29): "the three backends… answer all of them" is false —
+      `WebglRenderer` deliberately omits `maxUniformBufferBytes`/`maxBindings`
+      (R-30b, `webgl-renderer.ts`), and the comment's
+      `MAX_VERTEX_UNIFORM_VECTORS` conversion aside describes code that does not
+      exist; `WebgpuRenderer` omits `maximumSkinningJoints`. Code-comment fix;
+      COMPATIBILITY §2 already states the truth.
+- [ ] **docs/guides/materials-and-render-graph.md is stale** (found 2026-08-29):
+      §60 "not implemented", §62 "render-webgpu scaffold-only", §65 "nothing else
+      is batched", §68–§70 "shadows and post-processing not implemented", and the
+      §55 `frame` "has not landed" claim all contradict the tip; guides README
+      item 5's description moves with it.
+- [ ] **tools/check-docs.mjs retired-claim pin №(§55 + "batched") has a stale rationale**
+      ("§65 batching is unshipped" — opt-in batching shipped R-9, 2026-08-09);
+      decide whether the pin itself still holds now the claim can be
+      conditionally true.
+
       0001's landing decides WP-R1.9's
-      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-      reachability are backend-independent and re-exported through `@four/render`;
-      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-      (screen domain included, for §70 graph effects).
+              input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+              reachability are backend-independent and re-exported through `@four/render`;
+              the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+              (screen domain included, for §70 graph effects).
+
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
       scope + call-site key), conditional variants (a second cache dimension),
@@ -57,10 +74,10 @@ changes in `CHANGELOG.md`.
       RFC, also the `materials/shader nodes` §81 token's gate); an angle operator
       (unlocks §58's conic gradient); the §58 Paint-object tier on `Shape2D`
       (R-16's shape-paint packet, now unblocked).
-- [ ] **docs/guides/custom-shaders.md is stale (2026-08-28):** it promises "expect
-      a declarative surface when §60 lands" — §60 landed. Needs a rewrite around
-      `NodeMaterialBuilder`/`GraphEffect`/`registerNodeMaterialPipeline`; the
-      security guide's shader row already moved.
+- [x] **docs/guides/custom-shaders.md — DONE 2026-08-29**: rewritten around the
+      landed §60 (builders, registration per backend, closed operator set,
+      GraphEffect, deferred list); samples typechecked against dist and graphs
+      validated at runtime.
 
 - [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);

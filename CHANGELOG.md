@@ -8,6 +8,54 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — Docs: the documentation truth sweep (COMPATIBILITY §2, custom shaders, §77a guide)
+
+#### Docs
+
+- **`docs/COMPATIBILITY.md` §2 refreshed to the tip** (the recorded staleness
+  item; every corrected row keeps its old wording with the date it stopped being
+  true). The WebGL feature table now counts **seven** pipelines compiled at
+  initialize (said "four"; stale since R-6/R-13/R-18, 2026-08-07…09) plus the
+  three registered opt-in seams (skinning, picking, node materials); lighting
+  gains the §68 punctual tier (`MAX_PUNCTUAL_LIGHTS = 8`, R-17); §65 sprite
+  batching reads **shipped, opt-in** (`createGlBatching()`, R-9; said "absent");
+  new §69 shadow and §70 post-processing rows. The capability paragraph now
+  states that `RendererCapabilities` covers **all eleven** §62 fields across
+  fourteen members (said "two of eleven"; stale since WP-R1.1), with the
+  per-backend honesty — including the two limits `WebglRenderer` deliberately
+  leaves unreported (R-30b) — and the WP-R1.9 required/optional declaration. The
+  `renderer: "auto"` paragraph reads **implemented** (said "not implemented";
+  stale since the §62 registry closed A-8 on 2026-08-07). The WebGPU row moved
+  from "shipping in tiers" to **shipped, R-1 complete** (WP-R1.7–R1.9 landed
+  2026-08-29), naming the honest absences (skinned pipelines, §71 picking). Two
+  §1 consequences corrected: the WebGL-1 row's "the only backend" and the
+  "WebGL 2, for anything that draws" runtime bullet.
+- **`docs/guides/custom-shaders.md` rewritten around the landed §60** (the
+  recorded staleness item — the guide promised "expect a declarative surface
+  when §60 lands"; RFC 0001 shipped 2026-08-28). It now documents the
+  graph-never-source-string §96 boundary (`ShaderMaterial` permanently
+  unshipped, rev 1.11), `NodeMaterialBuilder`/`ShaderGraphBuilder`/
+  `NodeMaterial`, per-backend registration (`registerNodeMaterialPipeline()` /
+  `registerWebgpuNodeMaterialPipeline()`, skipped-not-drawn-flat), the closed
+  operator set, vertex displacement, screen-domain `GraphEffect` passes, the
+  unlit-at-this-tier limitation, and the staged RFC 0001 residue. Every sample
+  typechecks against the built packages and every graph in them passes
+  `analyzeShaderGraph`.
+- **New guide: `docs/guides/raster-painting.md`** (§77a), closing RFC 0004's
+  guide residue: the DOM-free browser-adapter recipe reproduced from
+  `packages/render/src/raster.ts`'s module header, the Q6-mandated "nothing
+  polls — call `update()` yourself" rule, and the §33 display-only, origin-flip,
+  `"srgb"`-default, fixed-size, §96-limit and §83-lifetime rules. Listed as
+  guide 15 in `docs/guides/README.md`; guide 10's description updated to the
+  post-landing guide.
+- **Found and reported, not fixed**: `renderer.ts`'s capability doc-comment
+  overclaims ("the three backends answer all of them" — `WebglRenderer` omits
+  `maxUniformBufferBytes`/`maxBindings` by R-30b decision, and the comment's
+  WebGL byte-conversion aside describes code that does not exist);
+  `docs/guides/materials-and-render-graph.md` remains stale across its §60, §62,
+  §65 and §68–§70 rows and its §55 `frame` claim; `tools/check-docs.mjs`'s
+  `/§55; batched/` retired-claim rationale still says §65 batching is unshipped.
+
 ### 2026-08-29 — WP-R1.9: §62 capability declaration and the WGSL node pipeline (R-1 complete)
 
 #### Added
