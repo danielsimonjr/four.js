@@ -228,6 +228,15 @@ export class ParticleRenderable extends Node {
    * frame on a 100 000-particle budget into a 3.2 MB memset.
    */
   updateParticleInstances(): void {
+    // GPU mode (§36 `simulation: "gpu"`, R-31 wiring): this repack still
+    // runs whole — the size and colour lanes are CPU truth (ramps are
+    // functions of age, which never leaves the CPU) — but the position
+    // lanes then carry **spawn-time values only**: the live positions are
+    // device-resident, and the drawing backend sources them from the bound
+    // `ParticleGpuSimulation`'s position buffer (keyed by this node's id),
+    // reading past the stale lanes. A backend with no such binding draws
+    // the stale lanes; wiring the driver on the renderer that draws the
+    // scene is the application's contract (`emitter.ts`, "GPU mode").
     const pool = this.emitter.pool;
     const count = pool.aliveCount;
     const positions = pool.positions;
@@ -289,6 +298,15 @@ export class ParticleRenderable extends Node {
    * simulation since. Allocates nothing.
    */
   computeBounds(outMin: Vector3, outMax: Vector3): boolean {
+    if (this.emitter.simulationMode === "gpu") {
+      // No honest box (the WP-9.3 empty-pool rule, second application): a
+      // GPU-simulated system's positions live on the device (§36, R-31
+      // wiring) and the pool's lanes hold spawn values only. A box over
+      // spawn positions would confidently mislocate the system for culling
+      // or picking — "nothing knowable here" is the truthful answer, and a
+      // device-side bounds reduction is the staged fix.
+      return false;
+    }
     const pool = this.emitter.pool;
     const count = pool.aliveCount;
     if (count === 0) {

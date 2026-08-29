@@ -36,17 +36,49 @@
  * | forces                      | **ships** — gravity + §27 fields (WP-9.2 implements the fields) |
  * | colour and size over lifetime | **ships** — two-stop linear ramp            |
  * | collision                   | **MVP tier** — `collisionPlaneY` only         |
- * | GPU compute simulation      | staged (2026-08-02, P9-1: needs the WebGPU backend, itself a §62 stub) |
+ * | GPU compute simulation      | **integrator tier ships** (R-31 wiring, 2026-08-29): `simulation: "gpu"` + a bound {@link ParticleGpuSimulation} — CPU spawn, GPU semi-implicit Euler under constant gravity. §27 fields on the GPU and `collisions: "depth-buffer"` stay their own follow-up packets, and a GPU emitter **refuses** both options rather than pretending (see the constructor). |
  * | trails, attractors, custom data channels | staged (2026-08-02, P9-1): trails need a per-particle position-history channel (a ring buffer per slot) plus a ribbon render path — neither the SoA pool nor the "particles" render item carries history, and shipping a one-sample "trail" would be a lie; attractors are expressible today as a negative-strength {@link ../fields.js radialField}; custom data channels want a pool-layout extension API |
  *
- * `simulation: "gpu"` and `collisions: "depth-buffer"` are **not accepted
- * options** — their ABSENCE from `ParticleEmitterOptions` is the intended
- * "loud" rejection tier (a TS caller gets an excess-property error;
- * JSON-driven configuration arrives with Phase 11 serialization, which owns
- * runtime validation). Recorded 2026-08-02 (WP-9.1-fix3): type-level absence
- * is deliberate, not an oversight — an option that silently does nothing is
- * worse than one that does not exist yet. Rendering is WP-9.3; nothing in
- * this module draws, owns a node, or reads a clock.
+ * `collisions: "depth-buffer"` remains a **not-accepted option** — its
+ * ABSENCE from `ParticleEmitterOptions` is the intended "loud" rejection tier
+ * (a TS caller gets an excess-property error; JSON-driven configuration
+ * arrives with Phase 11 serialization, which owns runtime validation).
+ * Recorded 2026-08-02 (WP-9.1-fix3): type-level absence is deliberate, not an
+ * oversight — an option that silently does nothing is worse than one that
+ * does not exist yet. That same rule is why `simulation: "gpu"` was absent
+ * until 2026-08-29 and why it widened **in the very change** that wired
+ * `@four/render-webgpu`'s §36 integrator kernel to this class (R-31's
+ * residue; the type and the function arrived together). Rendering is WP-9.3;
+ * nothing in this module draws, owns a node, or reads a clock.
+ *
+ * ## GPU mode (§36 "GPU compute simulation" — the R-31 wiring, 2026-08-29)
+ *
+ * With `simulation: "gpu"` this emitter keeps every §33-bearing decision on
+ * the CPU — spawn draws, bursts, the accumulator, ageing, expiry, ramps —
+ * and delegates the per-particle integration to a bound
+ * {@link ParticleGpuSimulation} (`types.ts` owns the contract, the
+ * division-of-labour argument, and the §33/§34 posture). Consequences,
+ * stated plainly:
+ *
+ * - **The pool's position/velocity lanes hold spawn-time values only.**
+ *   The live state is device-resident and is drawn from the device (the
+ *   WebGPU backend binds the simulation's position buffer as the instance
+ *   position stream, keyed by the emitting node's id); it is never read
+ *   back per frame, because a per-frame readback would forfeit the point.
+ * - **A GPU emitter must be bound before it steps or emits** —
+ *   {@link ParticleEmitter.bindGpuSimulation}; an unbound `step()`/`emit()`
+ *   throws rather than silently simulating nothing (§85, the WP-9.1 rule
+ *   again). Binding is once: a driver's device dying takes the particle
+ *   state with it (§34 posture in `types.ts`), so recovery is a new
+ *   emitter, not a rebind.
+ * - **`fields` and `collisionPlaneY` are refused** in GPU mode — the §36
+ *   integrator kernel simulates constant gravity only; accepting a field
+ *   the device never samples would be the silent no-op WP-9.1 forbids.
+ * - The step order is the CPU order with integration hoisted: one
+ *   `integrate()` over the pre-expiry live count (every live particle
+ *   integrates exactly once, as on the CPU, where the swap-remove re-process
+ *   guarantees the same), then the age/expiry scan mirroring each
+ *   swap-remove to the device via `moveSlot`, then spawns via `writeSpawn`.
  *
  * ## The step, in order (pinned, WP-9.1)
  *
@@ -149,6 +181,7 @@
  * engine does.
  */
 
+import { FourError } from "@four/core";
 import { Vector3 } from "@four/math";
 
 import { ParticlePool } from "./pool.js";
@@ -157,8 +190,10 @@ import type {
   ParticleBurst,
   ParticleColor,
   ParticleForceField,
+  ParticleGpuSimulation,
   ParticleLifetimeRamp,
   ParticleRange,
+  ParticleSimulationMode,
 } from "./types.js";
 
 /** `2π`. */
@@ -209,6 +244,16 @@ export interface ParticleEmitterOptions {
    * reproducible; there is deliberately no clock- or entropy-derived default.
    */
   readonly seed?: number;
+
+  /**
+   * Who integrates (§36's `simulation` option). Default `"cpu"`. `"gpu"`
+   * requires a subsequent {@link ParticleEmitter.bindGpuSimulation} before
+   * the first `step()`/`emit()`, refuses `fields` and `collisionPlaneY`
+   * (module header, "GPU mode"), and requires `maxParticles > 0` (a
+   * zero-capacity device buffer cannot exist, so a zero-capacity GPU
+   * emitter could never bind — refused where it was written).
+   */
+  readonly simulation?: ParticleSimulationMode;
 
   /**
    * World position particles spawn at. Copied at construction; default the
@@ -374,6 +419,12 @@ export class ParticleEmitter {
   readonly #planeY: number;
   readonly #restitution: number;
 
+  /** §36's `simulation` option, frozen at construction. */
+  readonly #simulation: ParticleSimulationMode;
+
+  /** The bound GPU driver, or `null` (always `null` in CPU mode). */
+  #gpu: ParticleGpuSimulation | null = null;
+
   /** Scratch handed to `ParticleForceField.sample` — never allocated per step. */
   readonly #samplePosition = new Vector3();
   readonly #sampleVelocity = new Vector3();
@@ -398,6 +449,36 @@ export class ParticleEmitter {
   constructor(options: ParticleEmitterOptions) {
     this.pool = new ParticlePool(options.maxParticles);
     this.random = new SeededRandom(options.seed ?? DEFAULT_PARTICLE_SEED);
+
+    const simulation = options.simulation ?? "cpu";
+    if (simulation !== "cpu" && simulation !== "gpu") {
+      throw new RangeError(
+        `ParticleEmitter: simulation must be "cpu" or "gpu" (§36); received ${String(simulation)}`,
+      );
+    }
+    this.#simulation = simulation;
+    if (simulation === "gpu") {
+      // Refuse, never pretend (the WP-9.1 rule): the §36 GPU integrator
+      // simulates constant gravity only — §27 fields on the device and the
+      // depth-buffer collision tier are their own recorded follow-ups
+      // (R-31). The messages are terse by measurement: every particle
+      // bundle carries them, and this doc comment carries the argument.
+      if (options.fields !== undefined && options.fields.length > 0) {
+        throw new RangeError(
+          'ParticleEmitter: simulation "gpu" does not accept `fields` (§27 GPU fields are a follow-up; R-31)',
+        );
+      }
+      if (options.collisionPlaneY !== undefined) {
+        throw new RangeError(
+          'ParticleEmitter: simulation "gpu" does not accept `collisionPlaneY` (§36 depth-buffer collision is a follow-up; R-31)',
+        );
+      }
+      if (this.pool.capacity === 0) {
+        throw new RangeError(
+          'ParticleEmitter: simulation "gpu" requires maxParticles > 0',
+        );
+      }
+    }
 
     this.#emissionRate = assertFiniteAtLeast(
       options.emissionRate ?? 0,
@@ -562,6 +643,61 @@ export class ParticleEmitter {
     return this.#hasPlane ? this.#planeY : undefined;
   }
 
+  /** §36's `simulation` option, as constructed. */
+  get simulationMode(): ParticleSimulationMode {
+    return this.#simulation;
+  }
+
+  /**
+   * The bound GPU driver, or `null` — non-`null` exactly when this is a
+   * `simulation: "gpu"` emitter that has been wired
+   * ({@link ParticleEmitter.bindGpuSimulation}).
+   */
+  get gpuSimulation(): ParticleGpuSimulation | null {
+    return this.#gpu;
+  }
+
+  /**
+   * Wires a `simulation: "gpu"` emitter to its device driver (module header,
+   * "GPU mode"; the contract and posture live on
+   * {@link ParticleGpuSimulation}).
+   *
+   * Binding is **once**: the driver owns device state this emitter's whole
+   * history flows into, and a mid-life swap would splice two unrelated
+   * device histories. A driver whose device died takes the particle state
+   * with it — build a new emitter (§34 posture).
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` on a CPU-mode emitter, a
+   * second bind, or a driver whose `capacity` differs from the pool's.
+   */
+  bindGpuSimulation(simulation: ParticleGpuSimulation): void {
+    if (this.#simulation !== "gpu") {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        'bindGpuSimulation: this emitter is not simulation "gpu" (§36)',
+      );
+    }
+    if (this.#gpu !== null) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        "This emitter already has a GPU simulation bound (binding is once)",
+      );
+    }
+    if (simulation.capacity !== this.pool.capacity) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        "bindGpuSimulation: the driver's capacity must equal the pool's (§36)",
+        {
+          context: {
+            driverCapacity: simulation.capacity,
+            poolCapacity: this.pool.capacity,
+          },
+        },
+      );
+    }
+    this.#gpu = simulation;
+  }
+
   /**
    * Advances the simulation by `deltaSeconds` (§7a: seconds), sampling force
    * fields at absolute simulation time `time`.
@@ -593,7 +729,11 @@ export class ParticleEmitter {
       );
     }
 
-    this.#simulate(deltaSeconds, time);
+    if (this.#simulation === "gpu") {
+      this.#simulateGpu(this.#requireGpu("step"), deltaSeconds);
+    } else {
+      this.#simulate(deltaSeconds, time);
+    }
     this.#emitBursts(deltaSeconds);
     this.#emitFromRate(deltaSeconds);
     this.#elapsedTime += deltaSeconds;
@@ -614,6 +754,12 @@ export class ParticleEmitter {
       throw new RangeError(
         `ParticleEmitter.emit: count must be a non-negative safe integer; received ${String(count)}`,
       );
+    }
+    if (this.#simulation === "gpu") {
+      // Same guard as `step` (§85): a spawn the device never received would
+      // be a particle that exists on the CPU and nowhere the drawn state
+      // lives — the silent half-truth the WP-9.1 rule forbids.
+      this.#requireGpu("emit");
     }
     return this.#spawnMany(count);
   }
@@ -786,6 +932,69 @@ export class ParticleEmitter {
     }
   }
 
+  /**
+   * The bound GPU driver, or a loud `INVALID_APPLICATION_STATE` refusal —
+   * an unbound GPU emitter must not silently simulate nothing (§85; module
+   * header, "GPU mode").
+   */
+  #requireGpu(method: string): ParticleGpuSimulation {
+    const gpu = this.#gpu;
+    if (gpu === null) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `ParticleEmitter.${method}: no GPU simulation bound (§36) — call bindGpuSimulation first`,
+      );
+    }
+    return gpu;
+  }
+
+  /**
+   * Step phase 1, GPU mode — one `integrate()` over the pre-expiry live
+   * count, then the CPU age/expiry scan with each swap-remove mirrored to
+   * the device (module header, "GPU mode"; `types.ts` owns the call
+   * contract).
+   *
+   * Integration is hoisted before the scan rather than interleaved as in
+   * {@link ParticleEmitter.#simulate}: on the CPU the swap-remove re-process
+   * guarantees every live particle integrates exactly once, and one batched
+   * dispatch over `[0, aliveCount)` is the same guarantee — expiry reads
+   * only ages and lifetimes, never positions, so the order between the two
+   * halves is unobservable.
+   */
+  #simulateGpu(gpu: ParticleGpuSimulation, deltaSeconds: number): void {
+    const pool = this.pool;
+    const live = pool.aliveCount;
+    if (live > 0 && deltaSeconds > 0) {
+      gpu.integrate(
+        live,
+        deltaSeconds,
+        this.#gravityX,
+        this.#gravityY,
+        this.#gravityZ,
+      );
+    }
+
+    const ages = pool.ages;
+    const lifetimes = pool.lifetimes;
+    let index = 0;
+    while (index < pool.aliveCount) {
+      // Store first, then re-read — the CPU path's float32 expiry rule.
+      ages[index] = ages[index] + deltaSeconds;
+      if (ages[index] >= lifetimes[index]) {
+        const last = pool.aliveCount - 1;
+        if (index !== last) {
+          // Mirror the swap the pool is about to perform, in the same
+          // order, so slot contents on the device track slot contents in
+          // the CPU channels exactly (`types.ts` on chained moves).
+          gpu.moveSlot(last, index);
+        }
+        pool.kill(index);
+      } else {
+        index += 1;
+      }
+    }
+  }
+
   /** Step phase 2a — bursts whose time lies in `[elapsed, elapsed + dt)`. */
   #emitBursts(deltaSeconds: number): void {
     const bursts = this.#bursts;
@@ -876,6 +1085,21 @@ export class ParticleEmitter {
     const index = this.pool.spawn();
     this.pool.setPosition(index, this.#originX, this.#originY, this.#originZ);
     this.pool.setVelocity(index, dirX * speed, dirY * speed, dirZ * speed);
+    if (this.#gpu !== null) {
+      // GPU mode: the spawn state enters device residency here — read back
+      // from the pool so the device receives exactly the float32 values the
+      // CPU channels hold (`setVelocity` rounded the products above).
+      const base = index * 3;
+      this.#gpu.writeSpawn(
+        index,
+        this.pool.positions[base],
+        this.pool.positions[base + 1],
+        this.pool.positions[base + 2],
+        this.pool.velocities[base],
+        this.pool.velocities[base + 1],
+        this.pool.velocities[base + 2],
+      );
+    }
     this.pool.setLifetime(index, lifetime);
     this.pool.setSize(index, this.#startSize, this.#endSize);
     this.pool.setColor(

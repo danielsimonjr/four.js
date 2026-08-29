@@ -58,6 +58,7 @@ import { batchVertexBufferLayout } from "./wgpu-batch.js";
 import { effectShaderSource, type WgpuEffectKind } from "./wgpu-effect.js";
 import { litShaderSource, shadedVertexBufferLayouts } from "./wgpu-lit.js";
 import {
+  PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS,
   PARTICLE_SHADER_SOURCE,
   PARTICLE_VERTEX_BUFFER_LAYOUTS,
 } from "./wgpu-particles.js";
@@ -96,6 +97,19 @@ function blendState(srcFactor: string, dstFactor: string): GpuBlendState {
     operation: "add",
   });
   return Object.freeze({ color: component, alpha: component });
+}
+
+/**
+ * The WebGPU blend state for one §57 blend mode, or `undefined` for an opaque
+ * draw — the module's `BLEND_STATES` table behind a total function, exported
+ * (WP-R1.9) so the node pipeline store (`wgpu-node-program.ts`) builds its
+ * descriptors from the very objects every landed family bakes in, rather
+ * than from a second table that could drift.
+ */
+export function blendStateFor(
+  blend: WgpuPipelineDescriptor["blend"],
+): GpuBlendState | undefined {
+  return blend === "none" ? undefined : BLEND_STATES[blend];
 }
 
 /** All four colour channels writable (`GPUColorWrite.ALL`). */
@@ -286,6 +300,19 @@ export interface WgpuPipelineDescriptor {
    * the renderer may pass the flag unconditionally on shaded draws.
    */
   readonly shadow?: boolean;
+
+  /**
+   * Whether a `kind: "particles"` pipeline sources instance positions from
+   * a GPU simulation's storage buffer instead of the interleaved CPU stream
+   * (§36 `simulation: "gpu"`, R-31 wiring, 2026-08-29) — vertex-layout
+   * identity (`PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS` vs
+   * `PARTICLE_VERTEX_BUFFER_LAYOUTS`) over the **same** WGSL module.
+   * Appended to the key **only when `true`** (the `shadow` rule, second
+   * application): `false` and absent name the very pipeline every landed
+   * CPU-simulated transcript compiled, so its key and its `four:<key>`
+   * label stay byte-identical.
+   */
+  readonly gpuInstances?: boolean;
 }
 
 /**
@@ -342,6 +369,9 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   }
   if (descriptor.shadow === true) {
     key += "|sh:y";
+  }
+  if (descriptor.gpuInstances === true) {
+    key += "|gi:y";
   }
   return key;
 }
@@ -841,7 +871,12 @@ export class WgpuPipelineCache {
       return [POSITION_BUFFER_LAYOUT];
     }
     if (descriptor.kind === "particles") {
-      return PARTICLE_VERTEX_BUFFER_LAYOUTS;
+      // §36 `simulation: "gpu"` re-sources @location(1) from the
+      // simulation's storage buffer; the module is shared either way
+      // (`wgpu-particles.ts` on the two layout tables).
+      return descriptor.gpuInstances === true
+        ? PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
+        : PARTICLE_VERTEX_BUFFER_LAYOUTS;
     }
     if (descriptor.kind === "lit" || descriptor.kind === "standard") {
       return shadedVertexBufferLayouts(
@@ -876,8 +911,7 @@ export class WgpuPipelineCache {
       descriptor.effect ?? null,
       descriptor.shadow === true,
     );
-    const blend =
-      descriptor.blend === "none" ? undefined : BLEND_STATES[descriptor.blend];
+    const blend = blendStateFor(descriptor.blend);
     return this.#device.createRenderPipeline({
       label: `four:${key}`,
       layout,
@@ -924,35 +958,41 @@ export class WgpuPipelineCache {
               // stencil-free pipeline over a stencil-capable format omits
               // them — and a clipless frame's descriptors are then unchanged
               // to the byte from what WP-R1.1 recorded.
-              ...this.#stencilState(descriptor.stencil ?? null),
+              ...stencilStateFor(descriptor.stencil ?? null),
             },
           }),
     });
   }
+}
 
-  /** The four stencil members of `depthStencil`, or nothing (see `#create`). */
-  #stencilState(stencil: WgpuStencilDescriptor | null): {
-    stencilFront?: GpuStencilFaceState;
-    stencilBack?: GpuStencilFaceState;
-    stencilReadMask?: number;
-    stencilWriteMask?: number;
-  } {
-    if (stencil === null) {
-      return {};
-    }
-    // One state for both faces: GL's stencil calls are two-sided and culling
-    // is disabled on both backends (`GpuStencilFaceState`'s note).
-    const face: GpuStencilFaceState = {
-      compare: STENCIL_COMPARES[stencil.func],
-      failOp: STENCIL_OPERATIONS[stencil.failOp],
-      depthFailOp: STENCIL_OPERATIONS[stencil.depthFailOp],
-      passOp: STENCIL_OPERATIONS[stencil.passOp],
-    };
-    return {
-      stencilFront: face,
-      stencilBack: face,
-      stencilReadMask: stencil.readMask,
-      stencilWriteMask: stencil.writeMask,
-    };
+/**
+ * The four stencil members of a pipeline's `depthStencil` state, or nothing
+ * (see `WgpuPipelineCache`'s `#create`) — a module function rather than a
+ * cache method since WP-R1.9, because the node pipeline store bakes the same
+ * §57 mapping into its own descriptors and two spellings of the module's
+ * `STENCIL_COMPARES`/`STENCIL_OPERATIONS` tables could drift.
+ */
+export function stencilStateFor(stencil: WgpuStencilDescriptor | null): {
+  stencilFront?: GpuStencilFaceState;
+  stencilBack?: GpuStencilFaceState;
+  stencilReadMask?: number;
+  stencilWriteMask?: number;
+} {
+  if (stencil === null) {
+    return {};
   }
+  // One state for both faces: GL's stencil calls are two-sided and culling
+  // is disabled on both backends (`GpuStencilFaceState`'s note).
+  const face: GpuStencilFaceState = {
+    compare: STENCIL_COMPARES[stencil.func],
+    failOp: STENCIL_OPERATIONS[stencil.failOp],
+    depthFailOp: STENCIL_OPERATIONS[stencil.depthFailOp],
+    passOp: STENCIL_OPERATIONS[stencil.passOp],
+  };
+  return {
+    stencilFront: face,
+    stencilBack: face,
+    stencilReadMask: stencil.readMask,
+    stencilWriteMask: stencil.writeMask,
+  };
 }

@@ -36,7 +36,7 @@
  */
 
 import { DEV, devWarnOnce, EventEmitter, FourError } from "@four/core";
-import { Frustum, Matrix4 } from "@four/math";
+import { Frustum, Matrix4, type Rectangle2 } from "@four/math";
 import {
   MAX_SKINNING_JOINTS,
   RenderTarget,
@@ -53,6 +53,7 @@ import {
   isSkinnedUnlitItem,
   isSpriteItem,
   isStandardItem,
+  validateReadbackRegion,
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
   type GraphEffect,
@@ -2928,6 +2929,136 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       disposed: () => this.#disposed,
     };
     return factory.create(host);
+  }
+
+  /**
+   * Reads back `target`'s colour attachment — or the `region` rectangle of it
+   * — as tightly packed RGBA8 bytes: §61's `readPixels` (landed 2026-08-29,
+   * with `Rectangle2` in `@four/math` — RFC 0005's named prerequisite — after
+   * sitting on `gl-render-target.ts`'s staged list since R-4).
+   *
+   * **A `Promise` over a synchronous read, and that is the §62 contract, not
+   * a fib.** §61 types the member `Promise<ArrayBuffer>` because WebGPU has
+   * no synchronous readback at all, so the promise is the floor every
+   * backend meets; GL's `readPixels` is synchronous and this method simply
+   * resolves once it returns — the caller's shape never varies by backend,
+   * exactly as `pick()` promises through both of its paths (RFC 0005 §4).
+   *
+   * **The stalling form, deliberately.** The picking packet built a
+   * non-stalling fence path (`PIXEL_PACK_BUFFER` + `fenceSync` + a polled
+   * `clientWaitSync`, `gl-picking.ts`) because picks happen *every frame
+   * inside an interactive loop*, where a pipeline stall costs the frame
+   * budget. A target readback is the opposite shape of operation: §92's
+   * visual tier and RFC 0005's fallback path call it between frames, usually
+   * once, and its caller is already awaiting the full GPU round trip — a
+   * fence would add poll-granularity latency to save a stall nobody is
+   * racing, and reusing the picking path would couple this method to that
+   * service's pass state (or duplicate its ~80-line poll loop) for that
+   * non-benefit. The upgrade is invisible to callers if a profile ever
+   * disagrees: same member, same promise.
+   *
+   * The result is `width * height * 4` bytes (the region's, when given; the
+   * target's otherwise), rows **bottom-to-top** — GL's native order, and the
+   * §7a order the WebGPU backend flips into (`wgpu-readback.ts` records the
+   * decision), so the two backends agree byte for byte. `region` is measured
+   * in target texels from the **bottom-left** corner — GL's own readback
+   * space, passed straight through. Rows are tightly packed with no
+   * `PACK_ALIGNMENT` help needed: RGBA8 rows are always a multiple of 4
+   * bytes, so the default pack alignment never pads.
+   *
+   * A target that was never rendered into reads back its zero-filled
+   * allocation — transparent black, the same defined answer sampling one
+   * gives. Unlike the frame methods this one **rejects** rather than skips
+   * (the caller is awaiting a value; a silently empty buffer would be
+   * undefined content by another name): `INVALID_APPLICATION_STATE` for a
+   * disposed renderer, one never initialized, or a target that is disposed
+   * or that GL would not allocate; `CONTEXT_LOST` while the context is lost
+   * (§89 — this backend's loss code, as in `gl-picking.ts`);
+   * `UNSUPPORTED_GPU_FEATURE` on a context double without the `readPixels`
+   * entry point (presence is the capability, `gl-program.ts`). A malformed
+   * region rejects with `validateReadbackRegion`'s `RangeError` (§85,
+   * `@four/render`'s shared check, so both backends refuse with the same
+   * words).
+   *
+   * The framebuffer binding is borrowed and restored in a `finally`, exactly
+   * as the stalling pick read borrows it — nothing is left bound behind.
+   */
+  readPixels(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer> {
+    // An executor rather than an `async` body: the read never awaits (the
+    // module-level defence above), and a refusal must still arrive as a
+    // rejection, never a synchronous throw — a throw inside the executor is
+    // a rejection by construction, so the shape holds on both paths.
+    return new Promise((resolve) => {
+      resolve(this.#readPixelsSync(target, region));
+    });
+  }
+
+  /** The synchronous body of {@link WebglRenderer.readPixels}. */
+  #readPixelsSync(target: RenderTarget, region?: Rectangle2): ArrayBuffer {
+    this.#assertUsable("readPixels");
+    // Both fields are assigned together at initialize and only dropped by
+    // dispose (checked above), so the pair check is one reachable state —
+    // "never initialized" — not a defensive branch (`WebgpuRenderer`'s
+    // shape, and the recorded coverage-hole rule).
+    const gl = this.#gl;
+    const renderTargets = this.#renderTargets;
+    if (gl === null || renderTargets === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "WebglRenderer.readPixels() was called before initialize() (§61).",
+        { context: { method: "readPixels", initialized: false } },
+      );
+    }
+    if (this.#contextLost) {
+      throw new FourError(
+        "CONTEXT_LOST",
+        "WebglRenderer.readPixels() was called while the context is lost; " +
+          "there is no surface to read (§61, §89).",
+        { context: { method: "readPixels" } },
+      );
+    }
+    const record = renderTargets.acquire(target);
+    if (record === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        `readPixels() was asked for render target ${target.id}, which is ` +
+          "disposed (§83) or could not be allocated on this context.",
+        { context: { target: target.id } },
+      );
+    }
+    const readPixels = gl.readPixels;
+    if (readPixels === undefined) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "This context does not implement the readPixels entry point; " +
+          "presence is the capability (§62).",
+        { context: { entryPoint: "readPixels" } },
+      );
+    }
+    if (region !== undefined) {
+      validateReadbackRegion(region, record.width, record.height);
+    }
+    const x = region === undefined ? 0 : region.x;
+    const y = region === undefined ? 0 : region.y;
+    const width = region === undefined ? record.width : region.width;
+    const height = region === undefined ? record.height : region.height;
+    const pixels = new Uint8Array(width * height * 4);
+    gl.bindFramebuffer(GL.FRAMEBUFFER, record.framebuffer);
+    try {
+      readPixels.call(
+        gl,
+        x,
+        y,
+        width,
+        height,
+        GL.RGBA,
+        GL.UNSIGNED_BYTE,
+        pixels,
+      );
+    } finally {
+      gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+    }
+    return pixels.buffer;
   }
 
   resize(width: number, height: number, resolution = 1): void {

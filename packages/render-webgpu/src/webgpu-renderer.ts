@@ -38,16 +38,20 @@
  * buffer) and §82's **compute** tier (`wgpu-compute.ts`: `compute()`,
  * `createComputeBuffer`/`writeComputeBuffer`/`readComputeBuffer`, and the
  * §36 GPU particle integrator kernel — the first capability of this backend
- * WebGL 2 structurally cannot mirror). The remaining pipelines (RFC 0003's
- * `skinned-unlit`/`skinned-lit`, which need a joint-palette pipeline this
- * backend does not stage yet, and RFC 0001's `"graph"` effect, which waits on
- * the WGSL emitter) are *absent*, not stubbed: an item this tier cannot draw
- * is skipped, exactly as a draw with no geometry record is, because a
- * pipeline that silently draws the wrong thing is worse than one that does
- * not exist yet (the recorded WP-9.1 rule, applied to a backend). The one
- * exception is deliberate and narrow: a §67 **mask** is coverage, not
- * shading, so a clip node of any material family masks correctly today
- * through the flat unlit pipeline with colour writes off.
+ * WebGL 2 structurally cannot mirror). WP-R1.9 lands §60's **node
+ * materials** and §70's **`"graph"` effect** (RFC 0001's WGSL emitter,
+ * `wgpu-node-program.ts`, reached only through the
+ * `registerWebgpuNodeMaterialPipeline()` seam in `wgpu-node-registry.ts`).
+ * The remaining pipelines (RFC 0003's `skinned-unlit`/`skinned-lit`, which
+ * need a joint-palette pipeline this backend does not stage yet) are
+ * *absent*, not stubbed: an item this tier cannot draw is skipped, exactly
+ * as a draw with no geometry record is, because a pipeline that silently
+ * draws the wrong thing is worse than one that does not exist yet (the
+ * recorded WP-9.1 rule, applied to a backend) — and an *unregistered* node
+ * material is skipped on the same terms. The one exception is deliberate and
+ * narrow: a §67 **mask** is coverage, not shading, so a clip node of any
+ * material family masks correctly today through the flat unlit pipeline with
+ * colour writes off.
  *
  * ## `initialize()` finally earns its `Promise`
  *
@@ -98,7 +102,7 @@
  */
 
 import { DEV, EventEmitter, FourError, devWarnOnce } from "@four/core";
-import { Frustum, Matrix4 } from "@four/math";
+import { Frustum, Matrix4, type Rectangle2 } from "@four/math";
 import {
   COLOR_GRADE_DEFAULTS,
   RenderTarget,
@@ -108,6 +112,7 @@ import {
   collectSceneLights,
   createSceneLights,
   isRenderTargetTexture,
+  validateReadbackRegion,
   type EffectRenderPass,
   type RenderBatch,
   type RenderInterpolation,
@@ -187,6 +192,10 @@ import {
   type WgpuParticleRecord,
 } from "./wgpu-particles.js";
 import {
+  WgpuParticleSimulation,
+  type WgpuParticleSimulationOptions,
+} from "./wgpu-particle-simulation.js";
+import {
   WgpuPipelineCache,
   type WgpuPipelineDescriptor,
   type WgpuStencilDescriptor,
@@ -223,6 +232,16 @@ import {
   stencilDescriptor,
 } from "./wgpu-stencil.js";
 import { WgpuTextureCache, type WgpuCacheableTexture } from "./wgpu-texture.js";
+// The registry slot only, deliberately (the GL backend's node seam, restated):
+// a value import of `wgpu-node-program.ts` would link the WGSL emitter and the
+// pipeline store into every bundle that carries this renderer, whether the
+// application draws a node material or not. `registerWebgpuNodeMaterialPipeline`
+// is what links the heavy module; see `wgpu-node-registry.ts` for the seam.
+import {
+  resolveWebgpuNodeMaterialPipelineFactory,
+  type WgpuNodeFrameState,
+  type WgpuNodeMaterialPipelines,
+} from "./wgpu-node-registry.js";
 import { CLEAR_VERTEX_COUNT } from "./wgpu-unlit.js";
 
 /** Error code for use-after-dispose, mirroring the other two backends (§83, §89). */
@@ -646,6 +665,53 @@ export class WebgpuRenderer implements Renderer {
   #compute: WgpuComputeCache | null = null;
 
   /**
+   * §36 GPU particle simulations by emitting-node id (R-31 wiring,
+   * 2026-08-29) — the draw-time join `createParticleSimulation` registers
+   * into. The map holds registrations, not ownership: the application owns
+   * each simulation's `dispose()` (§83), which unhooks itself here; device
+   * loss clears the map whole (a dead device's residency cannot be drawn,
+   * and there is no restore on WebGPU). Empty for every application that
+   * never creates one, so the frame path's lookup is a miss against an
+   * empty map and CPU-simulated scenes stay byte-identical.
+   */
+  readonly #particleSimulations = new Map<string, WgpuParticleSimulation>();
+
+  /**
+   * §60's registered node pipeline store (RFC 0001; WP-R1.9,
+   * `wgpu-node-program.ts` through the `wgpu-node-registry.ts` slot), or
+   * `null` — before the first frame that carries a `"node"` item or a §70
+   * `"graph"` effect, when nothing is registered (those draws are then
+   * skipped with a one-time §85 warning, never approximated), and again
+   * after device loss (WebGPU has no restore; a next frame never runs).
+   */
+  #nodePipelines: WgpuNodeMaterialPipelines | null = null;
+
+  /**
+   * The pooled per-draw state handed to node draws (plan D7: the frame loop
+   * allocates nothing) — rewritten per draw, read synchronously, never
+   * retained by the store (`WgpuNodeFrameState`'s contract).
+   */
+  readonly #nodeFrame: WgpuNodeFrameState = {
+    viewProjection: new Matrix4(),
+    renderTime: 0,
+    colorFormat: FALLBACK_CANVAS_FORMAT,
+    depthFormat: null,
+    frameStencil: false,
+    stencilReference: 0,
+    activeTarget: null,
+    statistics: null,
+  };
+
+  /**
+   * §9 **render** time in seconds, read by §60 node graphs containing a
+   * `time` node (RFC 0001) — and by nothing else in this backend. `0` by
+   * default, so a time-less application pays nothing; the application (or
+   * `Application`'s frame loop) writes it before `render`. Never simulation
+   * time (§42/§43) — `WebglRenderer.renderTime`'s contract, verbatim.
+   */
+  renderTime = 0;
+
+  /**
    * §68's per-view light block (WP-R1.5, `wgpu-lights.ts`): the group-1
    * layout, one buffer holding a 768-byte-strided block per rendered view,
    * the single bind group the shaded draws offset into, and the CPU staging
@@ -1009,8 +1075,28 @@ export class WebgpuRenderer implements Renderer {
     // allocation, so whether the frame *may* stencil is the target's
     // `stencil` option — GL's `stencilAttached`, read off the record.
     const wantsClips = items.length > 0 && items[0].clip?.maskPass === true;
+    // §60 (WP-R1.9): does this frame carry node materials, and is the node
+    // pipeline registered? One `kind` comparison per item until the first
+    // hit — the `hasLitItems` scan's shape — and the store is resolved (or
+    // its absence warned, once) only for frames that actually carry one, so
+    // a nodeless frame records not one call more or less for it. Resolved
+    // *before* the stencil scan because a registered node item is a real
+    // draw whose §57 stencil must reach `frameWantsStencil` (WP-R1.7's
+    // parity), while an unregistered one must stay format-invisible.
+    let hasNodeItems = false;
+    for (const item of items) {
+      if (item.kind === "node") {
+        hasNodeItems = true;
+        break;
+      }
+    }
+    const nodePipelines = hasNodeItems
+      ? this.#acquireNodePipelines(device, geometries, textures, renderTargets)
+      : null;
     const frameStencil =
-      targetRecord === null ? frameWantsStencil(items) : targetRecord.stencil;
+      targetRecord === null
+        ? frameWantsStencil(items, nodePipelines !== null)
+        : targetRecord.stencil;
     const frameClips = wantsClips && frameStencil;
     // §67's exhaustion case, reachable here only off screen (the on-screen
     // attachment is this backend's own and always widens): a clip into a
@@ -1068,6 +1154,25 @@ export class WebgpuRenderer implements Renderer {
     // allocation, call, or byte: the byte-identity contract, not an
     // optimisation.
     const frameShadow = hasLitItems && sceneLights.hasShadow;
+
+    // §60's frame preparation (WP-R1.9): the store resolves — and on first
+    // sight compiles — every node graph and grows its own strided buffer,
+    // before this pass records anything (the sized-before-recording
+    // discipline, one buffer over). `material.graph` is an application
+    // accessor on a structural double, so the frame bails on a reentrant
+    // dispose right after — the stencil-scan rule, third application.
+    const nodeFrame =
+      nodePipelines !== null && nodePipelines.beginFrame(items, views.length)
+        ? nodePipelines
+        : null;
+    // The re-check is scoped to the accessors this scan actually ran: a
+    // nodeless frame keeps the landed behaviour for a reentrant dispose in a
+    // *light* accessor (the pinned frame-loses-its-shadows path), while a
+    // graph accessor's teardown bails before this frame allocates onto a
+    // dead device.
+    if (nodePipelines !== null && this.#disposed) {
+      return;
+    }
 
     // Sized before recording: one clear block per view plus, at worst, one
     // block per item per view — plus one block per caster when §69's pass
@@ -1368,13 +1473,38 @@ export class WebgpuRenderer implements Renderer {
           item.kind !== "sprite" &&
           item.kind !== "lit" &&
           item.kind !== "standard" &&
-          item.kind !== "particles"
+          item.kind !== "particles" &&
+          item.kind !== "node"
         ) {
           // RFC 0003's skinned kinds until a joint-palette pipeline exists
-          // here, and RFC 0001's node kind until the WGSL emitter. Skipped,
-          // never approximated — and skipped *before* the geometry cache
-          // uploads buffers nothing will bind. (`"particles"` left this list
-          // in WP-R1.8 — the deliberate flip of the R1.4-era absence.)
+          // here. Skipped, never approximated — and skipped *before* the
+          // geometry cache uploads buffers nothing will bind. (`"particles"`
+          // left this list in WP-R1.8, `"node"` in WP-R1.9 — each the
+          // deliberate flip of an earlier recorded absence.)
+          continue;
+        }
+        if (!maskPass && item.kind === "node") {
+          // §60's node materials (RFC 0001; WP-R1.9) — a self-contained arm
+          // ending in `continue`, the GL node arm's shape: the registered
+          // store owns the whole draw (its textures, its geometry streams,
+          // its pipeline, its uniform block), every skip resolves before the
+          // first recorded command, and the failure direction is absence.
+          // `nodeFrame` is `null` exactly when nothing is registered (warned
+          // once at `#acquireNodePipelines`) or no node draw survived
+          // `beginFrame` — the draw then contributes nothing at all.
+          if (nodeFrame === null) {
+            continue;
+          }
+          const state = this.#nodeFrame;
+          state.viewProjection = this.#viewProjection;
+          state.renderTime = this.renderTime;
+          state.colorFormat = this.#frameFormat;
+          state.depthFormat = depthFormat;
+          state.frameStencil = frameStencil;
+          state.stencilReference = stencilReference;
+          state.activeTarget = activeTarget;
+          state.statistics = statistics;
+          stencilReference = nodeFrame.draw(pass, item, state);
           continue;
         }
         if (!maskPass && item.kind === "particles") {
@@ -1826,6 +1956,10 @@ export class WebgpuRenderer implements Renderer {
         lightBlock * LIGHT_UNIFORM_STRIDE_FLOATS,
       );
     }
+    // §60's node blocks (WP-R1.9): the store's own one-upload-per-frame,
+    // beside the two above and before the submit that reads it (queue
+    // order); absent to the byte on a frame that recorded no node draw.
+    nodeFrame?.endFrame();
     device.queue.submit([encoder.finish()]);
   }
 
@@ -1853,8 +1987,9 @@ export class WebgpuRenderer implements Renderer {
    * Everything, on `render`'s terms — a lost device, a source that is not a
    * render-target texture (a caller that bypassed `validateEffectRenderPass`),
    * a disposed source or destination, an effect kind this backend does not
-   * draw (RFC 0001's `"graph"` waits on the WGSL emitter and is *absent*, not
-   * approximated — the closed-union rule), and the **feedback loop**: a pass
+   * draw (RFC 0001's `"graph"` kind is drawn since WP-R1.9, through the
+   * registered node store; unregistered, it skips — the closed-union rule
+   * either way), and the **feedback loop**: a pass
    * whose destination is the very surface it samples, refused here exactly as
    * R-4 refuses it per draw, with `RenderGraph.validate` reporting it
    * statically as `"feedback"` so the mistake is normally caught at setup.
@@ -1865,11 +2000,15 @@ export class WebgpuRenderer implements Renderer {
     const context = this.#context;
     const pipelines = this.#pipelines;
     const renderTargets = this.#renderTargets;
+    const geometries = this.#geometries;
+    const textures = this.#textures;
     if (
       device === null ||
       context === null ||
       pipelines === null ||
       renderTargets === null ||
+      geometries === null ||
+      textures === null ||
       this.#deviceLost
     ) {
       return;
@@ -1889,6 +2028,45 @@ export class WebgpuRenderer implements Renderer {
     }
     const effect = pass.effect;
     const kind = effect.kind;
+    if (kind === "graph") {
+      // §60's graph effect (RFC 0001; WP-R1.9) — drawn by the registered node
+      // store through its own pass and encoder, so it branches before the
+      // fixed-effect path rather than growing a switch inside it (the GL
+      // arm's shape). Everything the fixed path skips, the store skips too,
+      // on the same §61 terms; `colorView` is a thunk so an on-screen
+      // destination's `getCurrentTexture` is acquired only once the draw is
+      // certain.
+      const node = this.#acquireNodePipelines(
+        device,
+        geometries,
+        textures,
+        renderTargets,
+      );
+      if (node === null) {
+        return;
+      }
+      let graphDestination: WgpuRenderTargetRecord | null = null;
+      if (destination !== null) {
+        graphDestination = renderTargets.acquire(destination);
+        if (graphDestination === null) {
+          return;
+        }
+      }
+      const destinationRecord = graphDestination;
+      node.renderGraphEffect(
+        effect,
+        sourceTarget,
+        destination,
+        destinationRecord === null ? this.#format : RENDER_TARGET_COLOR_FORMAT,
+        () =>
+          destinationRecord === null
+            ? context.getCurrentTexture().createView()
+            : destinationRecord.colorView,
+        this.renderTime,
+        this.statistics,
+      );
+      return;
+    }
     if (kind !== "copy" && kind !== "grade" && kind !== "output-transform") {
       return;
     }
@@ -1978,17 +2156,20 @@ export class WebgpuRenderer implements Renderer {
   }
 
   /**
-   * Reads back `target`'s colour attachment as tightly packed RGBA8 bytes —
-   * §61's `readPixels`, in the whole-target form (WP-R1.6; the `region`
-   * parameter arrives with `Rectangle2` in `@four/math`, RFC 0005's named
-   * prerequisite, rather than with an invented rectangle type).
+   * Reads back `target`'s colour attachment — or the `region` rectangle of it
+   * — as tightly packed RGBA8 bytes: §61's `readPixels` (WP-R1.6 shipped the
+   * whole-target form; the region form arrived 2026-08-29 with `Rectangle2`
+   * in `@four/math`, RFC 0005's named prerequisite, cleared).
    *
    * **Asynchronous, honestly and permanently.** WebGPU has no synchronous
    * readback — `copyTextureToBuffer` + `mapAsync` is the only path (probe-
    * verified; `wgpu-readback.ts`) — and §61's own sketch types the member
    * `Promise<ArrayBuffer>`, which is the RFC 0005 argument this method is the
-   * standing evidence for. The result is `width * height * 4` bytes, rows
-   * **bottom-to-top** (§7a's Y-up; `wgpu-readback.ts` records the decision).
+   * standing evidence for. The result is `width * height * 4` bytes (the
+   * region's, when given; the target's otherwise), rows **bottom-to-top**
+   * (§7a's Y-up; `wgpu-readback.ts` records the decision). `region` is
+   * measured in target texels from the **bottom-left** corner, the same
+   * space the rows are defined in; a region copies only its own rectangle.
    *
    * A target that was never rendered into reads back its zero-filled
    * allocation — transparent black, the same defined answer sampling one
@@ -2000,9 +2181,15 @@ export class WebgpuRenderer implements Renderer {
    * `DEVICE_LOST` while the device is lost (§89's "a caller asks for
    * something that cannot be satisfied while lost");
    * `UNSUPPORTED_GPU_FEATURE` on a device double without the readback entry
-   * points (their presence is the capability — `webgpu-device.ts`).
+   * points (their presence is the capability — `webgpu-device.ts`). A
+   * malformed region — fractional, empty, or hanging off the target — rejects
+   * with `validateReadbackRegion`'s `RangeError` (§85, `@four/render`'s
+   * shared check, so both backends refuse with the same words).
    */
-  async readPixels(target: RenderTarget): Promise<ArrayBuffer> {
+  async readPixels(
+    target: RenderTarget,
+    region?: Rectangle2,
+  ): Promise<ArrayBuffer> {
     this.#assertUsable("readPixels");
     const device = this.#device;
     const renderTargets = this.#renderTargets;
@@ -2029,11 +2216,15 @@ export class WebgpuRenderer implements Renderer {
         { context: { target: target.id } },
       );
     }
+    if (region !== undefined) {
+      validateReadbackRegion(region, record.width, record.height);
+    }
     const pixels = await readTexturePixels(
       device,
       record.colorTexture,
       record.width,
       record.height,
+      region,
     );
     if (pixels === null) {
       throw new FourError(
@@ -2088,12 +2279,16 @@ export class WebgpuRenderer implements Renderer {
    * (cached on the source — `wgpu-compute.ts`), binds the storage buffers at
    * `@group(0)` in array order, and submits the dispatch.
    *
-   * **This is the seam the R-1 plan's Q3 promotes to `Renderer.compute?()`**
-   * — presence is the capability, the `statistics`/`renderEffect` pattern:
-   * WebGL 2 has no compute and never grows this member, and §62's
-   * `computeShaders` capability is how an application asks before reaching
-   * for it. The frame path never calls it — §82's "basic graphics … must not
-   * require compute support", held structurally.
+   * **This is `Renderer.compute?()`** — the R-1 plan's Q3 promotion,
+   * executed 2026-08-29: the descriptor now lives in `@four/render`
+   * (`compute.ts` there owns the story) and this method implements the
+   * optional interface member. Presence is the capability, the
+   * `statistics`/`renderEffect` pattern: WebGL 2 has no compute and never
+   * grows this member, and §62's `computeShaders` capability is how an
+   * application asks before reaching for it. The frame path never calls it —
+   * §82's "basic graphics … must not require compute support", held
+   * structurally. A buffer another backend minted is refused per binding
+   * (the promoted handle is structural; `wgpu-compute.ts`).
    *
    * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a disposed or
    * never-initialized renderer, for non-integer workgroup counts, or for a
@@ -2139,6 +2334,65 @@ export class WebgpuRenderer implements Renderer {
   }
 
   /**
+   * Creates the device residency of one §36 `simulation: "gpu"` particle
+   * system (R-31 wiring, 2026-08-29) — see `wgpu-particle-simulation.ts`'s
+   * header for the design: flat-lane storage buffers, the WP-R1.8 integrator
+   * kernel, `moveSlot` compaction mirroring, and the position buffer doubling
+   * as the draw's instance stream.
+   *
+   * The application binds the result to its emitter
+   * (`emitter.bindGpuSimulation(...)`) and **owns its disposal** (§83, the
+   * `createPickingService` ownership rule). This renderer registers it under
+   * `options.systemId` — the emitting node's id — and the §36 draw arm joins
+   * on that key: a frame drawing a particle item whose id has a live
+   * registered simulation binds the simulation's position buffer as the
+   * per-instance position stream (`gpuInstances` pipeline variant) instead
+   * of the interleaved CPU lanes; every other particle item, and every
+   * pre-existing scene, draws the landed CPU path byte-identically.
+   *
+   * One simulation per system id: a duplicate registration is refused —
+   * two residencies for one node would make the draw's join ambiguous —
+   * dispose the old one first.
+   *
+   * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a disposed or
+   * never-initialized renderer, a duplicate `systemId`, or a non-positive
+   * capacity; `DEVICE_LOST` while lost; `UNSUPPORTED_GPU_FEATURE` on a
+   * device surface without the §82 compute entry points or
+   * `copyBufferToBuffer` — which is how a backendless §36 GPU emitter fails
+   * at authoring time rather than drawing a wrong picture (§85; §62's
+   * `computeShaders` is the capability to ask first).
+   */
+  createParticleSimulation(
+    options: WgpuParticleSimulationOptions,
+  ): WgpuParticleSimulation {
+    const device = this.#computeDevice("createParticleSimulation");
+    const existing = this.#particleSimulations.get(options.systemId);
+    if (existing !== undefined) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "createParticleSimulation was called for a system id that already " +
+          "has a live simulation (§36) — dispose the existing one first.",
+        { context: { systemId: options.systemId } },
+      );
+    }
+    this.#compute ??= new WgpuComputeCache(device);
+    const simulation = new WgpuParticleSimulation(
+      device,
+      this.#compute,
+      options,
+      () => {
+        // Unhook only our own registration: a loss-cleared or replaced slot
+        // must not be clobbered by a late dispose of the old object.
+        if (this.#particleSimulations.get(options.systemId) === simulation) {
+          this.#particleSimulations.delete(options.systemId);
+        }
+      },
+    );
+    this.#particleSimulations.set(options.systemId, simulation);
+    return simulation;
+  }
+
+  /**
    * The compute methods' shared lifecycle gate: an initialized, un-lost
    * device or a thrown `FourError` — `readPixels`' opening checks, factored
    * because four §82 methods share them verbatim.
@@ -2162,6 +2416,51 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     return device;
+  }
+
+  /**
+   * The registered node pipeline store for this device, created on first
+   * need, or `null` when nothing registered (§60; RFC 0001; WP-R1.9).
+   *
+   * Two answers, both §61-safe: **created already** — one field read; or
+   * **nothing registered** — `null`, with a one-time §85 development warning
+   * naming `registerWebgpuNodeMaterialPipeline()`, and the node draw (or §70
+   * graph effect) is skipped rather than approximated. Creation allocates
+   * nothing — WGSL compiles per graph inside the store, on the first frame
+   * that needs it (`wgpu-node-program.ts`).
+   */
+  #acquireNodePipelines(
+    device: GpuDevice,
+    geometries: WgpuGeometryCache,
+    textures: WgpuTextureCache,
+    renderTargets: WgpuRenderTargetCache,
+  ): WgpuNodeMaterialPipelines | null {
+    const existing = this.#nodePipelines;
+    if (existing !== null) {
+      return existing;
+    }
+    const factory = resolveWebgpuNodeMaterialPipelineFactory();
+    if (factory === null) {
+      if (DEV) {
+        devWarnOnce(
+          "webgpu-node-material-unregistered",
+          "§60: this scene uses a node material (or §70 graph effect) but no " +
+            "node pipeline is registered on the WebGPU backend, so those " +
+            "draws are skipped (flat colour would be a different picture). " +
+            "Call registerWebgpuNodeMaterialPipeline() from " +
+            "@four/render-webgpu at application setup (RFC 0001).",
+        );
+      }
+      return null;
+    }
+    const created = factory.create({
+      device,
+      geometries,
+      textures,
+      renderTargets,
+    });
+    this.#nodePipelines = created;
+    return created;
   }
 
   /** Builds the pipeline descriptor for one §70 effect draw (WP-R1.6). */
@@ -2269,6 +2568,18 @@ export class WebgpuRenderer implements Renderer {
     // creator-owns — `WgpuComputeBuffer.dispose` is theirs to call.
     this.#compute?.dispose();
     this.#compute = null;
+    // §36 GPU particle simulations (R-31 wiring) are the same creator-owns
+    // story one type up: the registry drops its joins, the application owes
+    // each simulation's `dispose()` — which stays safe after this (destroy
+    // on a released device's buffer is a defined no-op).
+    this.#particleSimulations.clear();
+    // §60's node store (WP-R1.9): destroyed with the live device's caches.
+    // No lost-branch counterpart is needed — the loss handler below already
+    // forgot and dropped the store the moment the device died, so on this
+    // path a lost renderer's field is always `null` (an `if (lost) forget()`
+    // here would be the unreachable re-check the coverage rule forbids).
+    this.#nodePipelines?.dispose();
+    this.#nodePipelines = null;
     // §69's target is engine-side state this renderer owns (R-18): disposed
     // on both branches — its GPU rows were released (or died) with the cache
     // above, and the §83 accounting closes with the object.
@@ -2509,6 +2820,16 @@ export class WebgpuRenderer implements Renderer {
   ): number {
     const stencilRecord =
       frameStencil && clip !== null ? clip.stencil : undefined;
+    // §36 `simulation: "gpu"` (R-31 wiring): a live registered simulation
+    // for this system id re-sources the position stream from its storage
+    // buffer (`createParticleSimulation` owns the join's story). A disposed
+    // registration is treated as absent — drawing a destroyed buffer is a
+    // validation error, and the CPU stream is at worst spawn-stale, which
+    // the emitter's docs own. The lookup is one map get per particle item,
+    // a miss against an empty map for every CPU-simulated scene.
+    const registered = this.#particleSimulations.get(item.id);
+    const simulation =
+      registered !== undefined && !registered.disposed ? registered : null;
     const pipeline = pipelines.acquire({
       kind: "particles",
       vertexColors: false,
@@ -2524,6 +2845,7 @@ export class WebgpuRenderer implements Renderer {
       stencil:
         stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
       batch: null,
+      gpuInstances: simulation !== null,
     });
     if (pipeline === null) {
       // Unreachable for the unlit path's reason — this renderer always wires
@@ -2557,7 +2879,18 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     pass.setVertexBuffer(0, record.positionBuffer);
-    pass.setVertexBuffer(1, batch.buffer);
+    if (simulation !== null) {
+      // GPU residency: positions from the simulation's storage buffer at
+      // slot 1 (`PARTICLE_GPU_POSITION_BUFFER_LAYOUT`), the interleaved
+      // stream demoted to slot 2 for its CPU-truth size and colour lanes
+      // (`wgpu-particles.ts` on the two layout tables). The upload above
+      // still ran — ramps are CPU state — and its stale position lanes
+      // stride past unread.
+      pass.setVertexBuffer(1, simulation.positions.buffer);
+      pass.setVertexBuffer(2, batch.buffer);
+    } else {
+      pass.setVertexBuffer(1, batch.buffer);
+    }
     // Non-indexed and instanced, GL's `drawArraysInstanced` verbatim: the
     // instance mesh contract is the shared six-vertex quad (`particles.ts`),
     // so the record's index stream — which the GL arm equally ignores — has
@@ -2897,15 +3230,23 @@ export class WebgpuRenderer implements Renderer {
     for (const item of items) {
       // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
       // opt-out, sprites (a quad would cast its rectangle), and every kind
-      // this backend has no pipeline for (skinned, node — an invisible
-      // surface must not cast). Masks and particle items carry
-      // `castShadow: false` from the list builder — a §36 billboard has no
-      // surface to project, drawn (WP-R1.8) or not.
+      // this backend has no pipeline for (skinned — an invisible surface
+      // must not cast). Masks and particle items carry `castShadow: false`
+      // from the list builder — a §36 billboard has no surface to project,
+      // drawn (WP-R1.8) or not. §60 (WP-R1.9): a node material with **no**
+      // displacement casts its geometry exactly — depth ignores colour, so
+      // the shared caster module is right for it — while a displacing graph
+      // would cast its *undisplaced* silhouette, a different picture, so
+      // those casters skip: GL's node-caster rule, verbatim (and like GL's,
+      // registration-independent — the caster module is this backend's own).
       if (
         !item.castShadow ||
         (item.kind !== "unlit" &&
           item.kind !== "lit" &&
-          item.kind !== "standard")
+          item.kind !== "standard" &&
+          item.kind !== "node") ||
+        (item.kind === "node" &&
+          item.material.graph.positionOffset !== undefined)
       ) {
         continue;
       }
@@ -3202,6 +3543,17 @@ export class WebgpuRenderer implements Renderer {
       // device — dropped whole; the next compute() call reports the loss.
       this.#compute?.dispose();
       this.#compute = null;
+      // §36 GPU particle simulations (R-31 wiring): their residency died
+      // with the device and there is no WebGPU restore, so the joins drop —
+      // a GPU-simulated system's state does not survive device loss (the
+      // §34 posture; `@four/particles`' types.ts owns it). The application
+      // still owes each simulation's `dispose()`, now a defined no-op
+      // device-side.
+      this.#particleSimulations.clear();
+      // §60's node store (WP-R1.9): its modules, pipelines and buffers died
+      // with the device — dropped, never destroyed.
+      this.#nodePipelines?.forget();
+      this.#nodePipelines = null;
       this.#spriteLayout = null;
       this.#spriteBindGroup = null;
       this.#particleLayout = null;

@@ -96,10 +96,12 @@
  *   texture is not filterable, so the `LINEAR` state every material texture
  *   gets would make it incomplete. Both arrive with the packet that wants a
  *   depth buffer on screen — a debug view, §70's depth-of-field.
- * - **`readPixels`** (§61, §92) — §61 types it `readPixels?(target,
- *   region?: Rectangle2)`, and `Rectangle2` does not exist in `@four/math`
- *   (R-4's own effort note names it). It stays on `renderer.ts`'s typed TODO;
- *   the §92 pixel tier is its first consumer.
+ * - ~~**`readPixels`**~~ — **landed 2026-08-29** (§61, §92): `Rectangle2`
+ *   arrived in `@four/math` (RFC 0005's recorded prerequisite) and
+ *   `Renderer.readPixels?(target, region?)` left `renderer.ts`'s typed TODO
+ *   for the interface itself; `read-pixels.ts` carries the shared §85 region
+ *   check and the structural guard. The WebGPU and WebGL 2 backends both
+ *   implement it.
  */
 
 import type { Disposable } from "@four/core";

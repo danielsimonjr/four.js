@@ -3683,3 +3683,144 @@ describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
     expect(statistics.triangles).toBe(500);
   });
 });
+
+// ---------------------------------------------------------------------------
+// GPU particle simulations (§36 `simulation: "gpu"`, R-31 wiring, 2026-08-29).
+//
+// The emitter side and the WgpuParticleSimulation verbs have their own suites
+// (`@four/particles`' gpu-simulation.test.ts; wgpu-particle-simulation.test.ts
+// here); what this block pins is the *renderer's* half of the join — the
+// registry `createParticleSimulation` keeps by system id, and the draw arm
+// re-sourcing the position stream through the `|gi:y` pipeline variant.
+// ---------------------------------------------------------------------------
+
+describe("WebgpuRenderer GPU particle simulations (§36, R-31)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  /** Catches a synchronous `FourError` and returns it. */
+  function caught(body: () => unknown): FourError {
+    try {
+      body();
+    } catch (error: unknown) {
+      if (isFourError(error)) {
+        return error;
+      }
+      throw error;
+    }
+    throw new Error("expected the call to throw a FourError");
+  }
+
+  it("registers under the system id and refuses a duplicate", () => {
+    const particles = new TestParticles(8);
+    const simulation = harness.renderer.createParticleSimulation({
+      systemId: particles.id,
+      capacity: 8,
+    });
+    expect(simulation.systemId).toBe(particles.id);
+    const error = caught(() =>
+      harness.renderer.createParticleSimulation({
+        systemId: particles.id,
+        capacity: 8,
+      }),
+    );
+    expect(error.code).toBe("INVALID_APPLICATION_STATE");
+    expect(error.message).toMatch(/dispose the existing one first/);
+
+    // Disposal unhooks the registration, freeing the slot.
+    simulation.dispose();
+    const second = harness.renderer.createParticleSimulation({
+      systemId: particles.id,
+      capacity: 8,
+    });
+    expect(second.disposed).toBe(false);
+    second.dispose();
+  });
+
+  it("shares the lifecycle gate of the other §82 methods", async () => {
+    const fresh = new WebgpuRenderer();
+    expect(
+      caught(() =>
+        fresh.createParticleSimulation({ systemId: "x", capacity: 4 }),
+      ).code,
+    ).toBe("INVALID_APPLICATION_STATE");
+
+    harness.gpu.loseDevice();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(
+      caught(() =>
+        harness.renderer.createParticleSimulation({
+          systemId: "x",
+          capacity: 4,
+        }),
+      ).code,
+    ).toBe("DEVICE_LOST");
+  });
+
+  it("draws a registered system from its position buffer — the |gi:y variant", () => {
+    const particles = new TestParticles(8, 3);
+    const simulation = harness.renderer.createParticleSimulation({
+      systemId: particles.id,
+      capacity: 8,
+    });
+    harness.gpu.reset();
+
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    // Three vertex buffers: quad corners, the simulation's positions, the
+    // interleaved stream demoted to ramp duty.
+    const binds = harness.gpu.callsOf("pass.setVertexBuffer");
+    expect(binds).toHaveLength(3);
+    expect(binds.map((call) => call.args[0])).toEqual([0, 1, 2]);
+    expect(binds[1]?.args[1]).toBe(simulation.positions.buffer);
+    expect(binds[2]?.args[1]).not.toBe(simulation.positions.buffer);
+
+    // The pipeline variant carries the `|gi:y` key segment and bakes the
+    // three-buffer layout; the draw itself is the same instanced call.
+    const pipelines = harness.gpu
+      .callsOf("device.createRenderPipeline")
+      .map(
+        (call) =>
+          call.args[0] as {
+            label?: string;
+            vertex: { buffers: readonly unknown[] };
+          },
+      )
+      .filter((descriptor) => descriptor.label?.includes("particles") === true);
+    expect(pipelines).toHaveLength(1);
+    expect(pipelines[0]?.label).toContain("|gi:y");
+    expect(pipelines[0]?.vertex.buffers).toHaveLength(3);
+    const draws = harness.gpu.callsOf("pass.draw");
+    expect(draws[draws.length - 1]?.args.slice(0, 2)).toEqual([6, 3]);
+
+    // The ramp stream still uploads — size and colour are CPU truth.
+    expect(
+      instanceUploads(harness.gpu, 3 * PARTICLE_INSTANCE_FLOATS),
+    ).toHaveLength(1);
+    simulation.dispose();
+  });
+
+  it("falls back to the CPU stream for a disposed simulation", () => {
+    const particles = new TestParticles(8, 3);
+    const simulation = harness.renderer.createParticleSimulation({
+      systemId: particles.id,
+      capacity: 8,
+    });
+    simulation.dispose();
+    harness.gpu.reset();
+
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    // The landed two-buffer draw — no destroyed buffer is ever bound, and
+    // the pipeline is the CPU variant (no `|gi:y`).
+    expect(harness.gpu.callsOf("pass.setVertexBuffer")).toHaveLength(2);
+    const labels = harness.gpu
+      .callsOf("device.createRenderPipeline")
+      .map((call) => (call.args[0] as { label?: string }).label ?? "");
+    expect(labels.some((label) => label.includes("|gi:y"))).toBe(false);
+  });
+});

@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-29"
-  totalFiles: 264
+  totalFiles: 278
   totalModules: 24
-  totalExports: 2644
+  totalExports: 2776
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -35,7 +35,7 @@ entryPoints:
     description: Entry Point
   - file: packages/motion/src/index.ts
     type: main
-    description: Entry Point
+    description: §81's motion-side capability token (RFC 0002), declared by the package that
   - file: packages/particles/src/index.ts
     type: main
     description: "--- WP-9.2: §27 force fields (begin) ---"
@@ -53,7 +53,7 @@ entryPoints:
     description: Entry Point
   - file: packages/render/src/index.ts
     type: main
-    description: §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
+    description: §81's render-side capability tokens (RFC 0002), declared by the package
   - file: packages/render-canvas/src/index.ts
     type: main
     description: Entry Point
@@ -973,6 +973,57 @@ modules:
         - resolveGlobalTextDecoder
       constants:
         - CONTENT_HASH_ALGORITHM
+    packages/assets/src/gltf.ts:
+      description: The §78 glTF 2.0 loader — the **parse tier** (A-19's last half, 2026-08-29).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./asset-manager.js
+          imports:
+            - DEFAULT_MAXIMUM_BYTES
+            - AssetLoader
+            - FetchLike
+            - FetchResponse
+        - file: ./content-hash.js
+          imports:
+            - resolveGlobalTextDecoder
+            - TextDecodeLike
+        - file: ./texture.js
+          imports:
+            - createTextureDecoder
+            - TexelDecodeLike
+            - TexelProbeLike
+            - TextureAsset
+            - TextureFilterMode
+            - TextureWrapMode
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - cloneJsonValue
+            - devWarnOnce
+            - isFourError
+            - parseUntrustedJson
+            - Disposable
+            - JsonValue
+      exports:
+        - createGltfLoader
+        - GltfAsset
+      classes:
+        - GltfAsset
+      interfaces:
+        - GltfPrimitiveRecord
+        - GltfMeshRecord
+        - GltfMaterialRecord
+        - GltfNodeRecord
+        - GltfSceneRecord
+        - GltfSkinRecord
+        - GltfChannelRecord
+        - GltfAnimationRecord
+        - GltfLoaderOptions
+      functions:
+        - createGltfLoader
     packages/assets/src/index.ts:
       description: "`@four/assets` — the asset system (§76–78)."
       externalDependencies: []
@@ -1000,7 +1051,13 @@ modules:
             - DEFAULT_MAXIMUM_DECODED_BYTES
             - DEFAULT_MAXIMUM_EXPANSION_RATIO
             - TextureAsset
+            - createTextureDecoder
             - createTextureLoader
+          reExport: true
+        - file: ./gltf.js
+          imports:
+            - GltfAsset
+            - createGltfLoader
           reExport: true
         - file: ./loaders.js
           imports:
@@ -1048,6 +1105,21 @@ modules:
             - TextureWrapMode
           reExport: true
           typeOnly: true
+        - file: ./gltf.js
+          imports:
+            - GltfAnimationRecord
+            - GltfChannelPath
+            - GltfChannelRecord
+            - GltfLoaderOptions
+            - GltfMaterialRecord
+            - GltfMeshRecord
+            - GltfNodeRecord
+            - GltfPrimitiveMode
+            - GltfPrimitiveRecord
+            - GltfSceneRecord
+            - GltfSkinRecord
+          reExport: true
+          typeOnly: true
         - file: ./loaders.js
           imports:
             - ImageBitmapLike
@@ -1067,7 +1139,10 @@ modules:
         - DEFAULT_MAXIMUM_DECODED_BYTES
         - DEFAULT_MAXIMUM_EXPANSION_RATIO
         - TextureAsset
+        - createTextureDecoder
         - createTextureLoader
+        - GltfAsset
+        - createGltfLoader
         - ImageAsset
         - binaryLoader
         - createImageLoader
@@ -1096,6 +1171,17 @@ modules:
         - TextureFilterMode
         - TextureLoaderOptions
         - TextureWrapMode
+        - GltfAnimationRecord
+        - GltfChannelPath
+        - GltfChannelRecord
+        - GltfLoaderOptions
+        - GltfMaterialRecord
+        - GltfMeshRecord
+        - GltfNodeRecord
+        - GltfPrimitiveMode
+        - GltfPrimitiveRecord
+        - GltfSceneRecord
+        - GltfSkinRecord
         - ImageBitmapLike
         - ImageDecodeLike
       reExported:
@@ -1110,7 +1196,10 @@ modules:
         - DEFAULT_MAXIMUM_DECODED_BYTES
         - DEFAULT_MAXIMUM_EXPANSION_RATIO
         - TextureAsset
+        - createTextureDecoder
         - createTextureLoader
+        - GltfAsset
+        - createGltfLoader
         - ImageAsset
         - binaryLoader
         - createImageLoader
@@ -1138,6 +1227,17 @@ modules:
         - TextureFilterMode
         - TextureLoaderOptions
         - TextureWrapMode
+        - GltfAnimationRecord
+        - GltfChannelPath
+        - GltfChannelRecord
+        - GltfLoaderOptions
+        - GltfMaterialRecord
+        - GltfMeshRecord
+        - GltfNodeRecord
+        - GltfPrimitiveMode
+        - GltfPrimitiveRecord
+        - GltfSceneRecord
+        - GltfSkinRecord
         - ImageBitmapLike
         - ImageDecodeLike
       constants:
@@ -1220,6 +1320,7 @@ modules:
       exports:
         - DEFAULT_MAXIMUM_DECODED_BYTES
         - DEFAULT_MAXIMUM_EXPANSION_RATIO
+        - createTextureDecoder
         - createTextureLoader
         - TextureAsset
       classes:
@@ -1228,6 +1329,7 @@ modules:
         - DecodedTexels
         - TextureLoaderOptions
       functions:
+        - createTextureDecoder
         - createTextureLoader
       constants:
         - DEFAULT_MAXIMUM_DECODED_BYTES
@@ -2461,6 +2563,8 @@ modules:
           imports:
             - RenderStatistics
             - Renderer
+            - RendererCapabilityDeclaration
+            - RendererCapabilityShortfall
             - RendererFallbackReport
             - RendererRegistry
             - RendererSelection
@@ -2490,6 +2594,24 @@ modules:
       exports: []
       reExported:
         - "* from @four/assets"
+    packages/four/src/compute-pass.ts:
+      description: §82's `Four.ComputePass` — the named-map sugar over `@four/render`'s
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - ComputeBinding
+            - ComputeBuffer
+            - ComputePassDescriptor
+      exports:
+        - ComputePass
+      classes:
+        - ComputePass
+      interfaces:
+        - ComputePassOptions
     packages/four/src/core.ts:
       description: core module
       externalDependencies: []
@@ -2529,6 +2651,61 @@ modules:
       exports: []
       reExported:
         - "* from @four/geometry"
+    packages/four/src/gltf.ts:
+      description: §78 glTF assembly — `instantiateGltf` (A-19's closing packet, 2026-08-29).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies:
+        - package: "@four/assets"
+          directory: packages/assets
+          imports:
+            - GltfAsset
+        - package: "@four/animation"
+          directory: packages/animation
+          imports:
+            - AnimationClip
+            - AnimationTrack
+            - quaternionAdapter
+            - vector3Adapter
+            - AnimationTrackLike
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+            - devWarnOnce
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - BufferGeometry
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - StandardMaterial
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+            - Quaternion
+            - Vector3
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - Mesh
+            - Texture
+        - package: "@four/scene"
+          directory: packages/scene
+          imports:
+            - Bone
+            - Group
+            - Skeleton
+            - Node
+      exports:
+        - instantiateGltf
+      interfaces:
+        - GltfInstance
+      functions:
+        - instantiateGltf
     packages/four/src/index.ts:
       description: "The umbrella package (§98): one namespace per workspace package, plus the"
       externalDependencies: []
@@ -2589,6 +2766,14 @@ modules:
           imports:
             - Text
           reExport: true
+        - file: ./compute-pass.js
+          imports:
+            - ComputePass
+          reExport: true
+        - file: ./gltf.js
+          imports:
+            - instantiateGltf
+          reExport: true
         - file: ./pick-provider.js
           imports:
             - createPickProvider
@@ -2615,6 +2800,18 @@ modules:
         - file: ./text-node.js
           imports:
             - TextOptions
+          reExport: true
+          typeOnly: true
+        - file: ./compute-pass.js
+          imports:
+            - ComputePassBindingEntry
+            - ComputePassBindings
+            - ComputePassOptions
+          reExport: true
+          typeOnly: true
+        - file: ./gltf.js
+          imports:
+            - GltfInstance
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -2662,6 +2859,8 @@ modules:
         - resourceCatalog
         - restoreNodeId
         - Text
+        - ComputePass
+        - instantiateGltf
         - createPickProvider
         - ApplicationEventMap
         - ApplicationOptions
@@ -2675,6 +2874,10 @@ modules:
         - SceneSerializationSupport
         - UnknownResourcePolicy
         - TextOptions
+        - ComputePassBindingEntry
+        - ComputePassBindings
+        - ComputePassOptions
+        - GltfInstance
       reExported:
         - Application
         - COMPONENT_SERIALIZERS
@@ -2719,6 +2922,8 @@ modules:
         - resourceCatalog
         - restoreNodeId
         - Text
+        - ComputePass
+        - instantiateGltf
         - createPickProvider
         - ApplicationEventMap
         - ApplicationOptions
@@ -2732,6 +2937,10 @@ modules:
         - SceneSerializationSupport
         - UnknownResourcePolicy
         - TextOptions
+        - ComputePassBindingEntry
+        - ComputePassBindings
+        - ComputePassOptions
+        - GltfInstance
     packages/four/src/input.ts:
       description: input module
       externalDependencies: []
@@ -2872,47 +3081,43 @@ modules:
       functions:
         - createPickProvider
     packages/four/src/plugins.ts:
-      description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`).
+      description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
       workspaceDependencies:
-        - package: "@four/core"
-          directory: packages/core
-          imports:
-            - defineCapability
         - package: "@four/motion"
           directory: packages/motion
           imports:
-            - SystemRegistry
+            - SIMULATION_SYSTEMS
         - package: "@four/physics"
           directory: packages/physics
           imports:
-            - SolverRegistry
+            - SOLVER_REGISTRY
         - package: "@four/render"
           directory: packages/render
           imports:
-            - RenderGraph
-            - RendererRegistry
+            - RENDERER_REGISTRY
+            - RENDER_GRAPH
         - package: "@four/serialization"
           directory: packages/serialization
           imports:
-            - ComponentSerializerRegistry
-            - SceneMigrationRegistry
+            - COMPONENT_SERIALIZERS
+            - SCENE_MIGRATIONS
       exports:
         - SIMULATION_SYSTEMS
-        - RENDERER_REGISTRY
         - SOLVER_REGISTRY
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - COMPONENT_SERIALIZERS
         - SCENE_MIGRATIONS
-        - RENDER_GRAPH
-      constants:
+      reExported:
         - SIMULATION_SYSTEMS
-        - RENDERER_REGISTRY
         - SOLVER_REGISTRY
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - COMPONENT_SERIALIZERS
         - SCENE_MIGRATIONS
-        - RENDER_GRAPH
     packages/four/src/render-canvas.ts:
       description: render-canvas module
       externalDependencies: []
@@ -3002,6 +3207,7 @@ modules:
           directory: packages/materials
           imports:
             - Material
+            - MaterialTexture
             - SpriteMaterial
             - UnlitMaterial
         - package: "@four/motion"
@@ -3049,10 +3255,13 @@ modules:
             - Shape2D
             - Sprite
             - Star
+            - resolveShapePaintSupport
             - restoreMeshSkeleton
         - package: "@four/render"
           directory: packages/render
           imports:
+            - GradientStop
+            - Paint
             - ResolvedPaint
             - ResolvedShapeFill
             - ResolvedStrokeStyle
@@ -3071,6 +3280,7 @@ modules:
             - ScreenCamera
             - SpotLight
             - restoreNodeId
+            - HitTestMode
             - Node
         - package: "@four/serialization"
           directory: packages/serialization
@@ -3851,7 +4061,7 @@ modules:
       interfaces:
         - DragManagerOptions
     packages/input/src/index.ts:
-      description: Package entry point for @four/input (re-exports 37 symbols)
+      description: Package entry point for @four/input (re-exports 38 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -3917,6 +4127,7 @@ modules:
             - PickHit
             - Pickable
             - PickableAlphaMask
+            - PickableTriangles
             - PickProvider
           reExport: true
           typeOnly: true
@@ -3967,6 +4178,7 @@ modules:
         - PickHit
         - Pickable
         - PickableAlphaMask
+        - PickableTriangles
         - PickProvider
         - PointerDeviceType
         - PropagatingPointerEventType
@@ -4005,6 +4217,7 @@ modules:
         - PickHit
         - Pickable
         - PickableAlphaMask
+        - PickableTriangles
         - PickProvider
         - PointerDeviceType
         - PropagatingPointerEventType
@@ -4097,6 +4310,7 @@ modules:
       interfaces:
         - PickProvider
         - PickableAlphaMask
+        - PickableTriangles
         - Pickable
         - PickHit
       functions:
@@ -4730,7 +4944,7 @@ modules:
       classes:
         - Frustum
     packages/math/src/index.ts:
-      description: Package entry point for @four/math (re-exports 21 symbols)
+      description: Package entry point for @four/math (re-exports 22 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -4765,6 +4979,10 @@ modules:
         - file: ./quaternion.js
           imports:
             - Quaternion
+          reExport: true
+        - file: ./rectangle2.js
+          imports:
+            - Rectangle2
           reExport: true
         - file: ./vector2.js
           imports:
@@ -4806,6 +5024,7 @@ modules:
         - Matrix3
         - Matrix4
         - Quaternion
+        - Rectangle2
         - Vector2
         - Vector3
         - Vector4
@@ -4829,6 +5048,7 @@ modules:
         - Matrix3
         - Matrix4
         - Quaternion
+        - Rectangle2
         - Vector2
         - Vector3
         - Vector4
@@ -4892,6 +5112,19 @@ modules:
         - Quaternion
       functions:
         - setQuaternionFromBasis
+    packages/math/src/rectangle2.ts:
+      description: Default tolerance for {@link Rectangle2.equalsApprox}. See `vector2.ts` for
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./alloc-counter.js
+          imports:
+            - noteConstruction
+      workspaceDependencies: []
+      exports:
+        - Rectangle2
+      classes:
+        - Rectangle2
     packages/math/src/vector2.ts:
       description: Default tolerance for {@link Vector2.equalsApprox}. Chosen to sit a little
       externalDependencies: []
@@ -4977,6 +5210,24 @@ modules:
       constants:
         - DEFAULT_ORBIT_PITCH_LIMIT
         - DEFAULT_ORBIT_MIN_DISTANCE
+    packages/motion/src/capabilities.ts:
+      description: This package's §81 capability token (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./systems.js
+          imports:
+            - SystemRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - SIMULATION_SYSTEMS
+      constants:
+        - SIMULATION_SYSTEMS
     packages/motion/src/character-controller.ts:
       description: §12's **character controllers** — {@link CharacterController}, the one yaw
       externalDependencies: []
@@ -5093,10 +5344,14 @@ modules:
         - createTwoBoneIKSolution
         - solveTwoBoneIK
     packages/motion/src/index.ts:
-      description: Package entry point for @four/motion (re-exports 134 symbols)
+      description: §81's motion-side capability token (RFC 0002), declared by the package that
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./capabilities.js
+          imports:
+            - SIMULATION_SYSTEMS
+          reExport: true
         - file: ./camera-rigs.js
           imports:
             - DEFAULT_ORBIT_PITCH_LIMIT
@@ -5348,6 +5603,7 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - SIMULATION_SYSTEMS
         - DEFAULT_ORBIT_PITCH_LIMIT
         - FollowRig
         - OrbitRig
@@ -5484,6 +5740,7 @@ modules:
         - ParametricTrajectoryOptions
         - Trajectory
       reExported:
+        - SIMULATION_SYSTEMS
         - DEFAULT_ORBIT_PITCH_LIMIT
         - FollowRig
         - OrbitRig
@@ -6064,10 +6321,16 @@ modules:
             - ParticleBurst
             - ParticleColor
             - ParticleForceField
+            - ParticleGpuSimulation
             - ParticleLifetimeRamp
             - ParticleRange
+            - ParticleSimulationMode
           typeOnly: true
       workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
         - package: "@four/math"
           directory: packages/math
           imports:
@@ -6231,8 +6494,10 @@ modules:
             - ParticleBurst
             - ParticleColor
             - ParticleForceField
+            - ParticleGpuSimulation
             - ParticleLifetimeRamp
             - ParticleRange
+            - ParticleSimulationMode
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -6278,8 +6543,10 @@ modules:
         - ParticleBurst
         - ParticleColor
         - ParticleForceField
+        - ParticleGpuSimulation
         - ParticleLifetimeRamp
         - ParticleRange
+        - ParticleSimulationMode
       reExported:
         - DEFAULT_PARTICLE_LIFETIME_SECONDS
         - DEFAULT_PARTICLE_RESTITUTION
@@ -6321,8 +6588,10 @@ modules:
         - ParticleBurst
         - ParticleColor
         - ParticleForceField
+        - ParticleGpuSimulation
         - ParticleLifetimeRamp
         - ParticleRange
+        - ParticleSimulationMode
       constants:
         - PACKAGE_NAME
     packages/particles/src/particle-renderable.ts:
@@ -6412,6 +6681,7 @@ modules:
       exports: []
       interfaces:
         - ParticleForceField
+        - ParticleGpuSimulation
         - ParticleRange
         - ParticleLifetimeRamp
         - ParticleColor
@@ -6508,6 +6778,24 @@ modules:
         - missingSolverJointAccess
         - supportsSolverBodyTuning
         - missingSolverBodyTuning
+    packages/physics/src/capabilities.ts:
+      description: This package's §81 capability token (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./solver-registry.js
+          imports:
+            - SolverRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - SOLVER_REGISTRY
+      constants:
+        - SOLVER_REGISTRY
     packages/physics/src/collider.ts:
       description: The `Collider` component (§6a, §24) and its §25 effective-material
       externalDependencies: []
@@ -6727,6 +7015,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./capabilities.js
+          imports:
+            - SOLVER_REGISTRY
+          reExport: true
         - file: ./adapter.js
           imports:
             - NO_TUNING_CAPABILITIES
@@ -7085,6 +7377,7 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - SOLVER_REGISTRY
         - NO_TUNING_CAPABILITIES
         - resolveTuningCapabilities
         - missingSolverBodyTuning
@@ -7317,6 +7610,7 @@ modules:
         - WorldRaycastHit
         - WorldShapeCastHit
       reExported:
+        - SOLVER_REGISTRY
         - NO_TUNING_CAPABILITIES
         - resolveTuningCapabilities
         - missingSolverBodyTuning
@@ -9159,6 +9453,30 @@ modules:
         - BoundingSphere
       functions:
         - computeWorldBoundingSphere
+    packages/render/src/capabilities.ts:
+      description: This package's §81 capability tokens (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-graph.js
+          imports:
+            - RenderGraph
+          typeOnly: true
+        - file: ./renderer-registry.js
+          imports:
+            - RendererRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
+      constants:
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
     packages/render/src/clip.ts:
       description: §67 clipping — a node's drawn shape masks its subtree, expressed entirely in
       externalDependencies: []
@@ -9186,6 +9504,24 @@ modules:
         - ClipScope
       constants:
         - MAX_CLIP_PLANES
+    packages/render/src/compute.ts:
+      description: §82's `ComputePass`, as the backend-independent descriptor — the Q3
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies: []
+      workspaceDependencies: []
+      exports:
+        - COMPUTE_ENTRY_POINT
+        - supportsCompute
+      interfaces:
+        - ComputeBuffer
+        - ComputeBinding
+        - ComputePassDescriptor
+        - ComputeDispatcher
+      functions:
+        - supportsCompute
+      constants:
+        - COMPUTE_ENTRY_POINT
     packages/render/src/effect-pass.ts:
       description: "§70's post-processing at the **full-screen effect tier** (R-6, 2026-08-07):"
       externalDependencies: []
@@ -9227,7 +9563,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
+      description: §81's render-side capability tokens (RFC 0002), declared by the package
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -9240,10 +9576,20 @@ modules:
           imports:
             - computeWorldBoundingSphere
           reExport: true
+        - file: ./capabilities.js
+          imports:
+            - RENDERER_REGISTRY
+            - RENDER_GRAPH
+          reExport: true
         - file: ./clip.js
           imports:
             - ClipPlaneAllocator
             - MAX_CLIP_PLANES
+          reExport: true
+        - file: ./compute.js
+          imports:
+            - COMPUTE_ENTRY_POINT
+            - supportsCompute
           reExport: true
         - file: ./effect-pass.js
           imports:
@@ -9293,6 +9639,11 @@ modules:
           imports:
             - CanvasTexture
           reExport: true
+        - file: ./read-pixels.js
+          imports:
+            - supportsReadPixels
+            - validateReadbackRegion
+          reExport: true
         - file: ./picking.js
           imports:
             - MAX_PICK_CANDIDATES
@@ -9320,11 +9671,14 @@ modules:
         - file: ./renderer-registry.js
           imports:
             - AUTO_RENDERER_ORDER
+            - RENDERER_CAPABILITY_NAMES
             - RendererRegistry
             - clearRegisteredRenderers
+            - missingCapabilities
             - registerRenderer
             - registeredRenderers
             - resolveRenderer
+            - validateCapabilityDeclaration
           reExport: true
         - file: ./renderer.js
           imports:
@@ -9346,6 +9700,7 @@ modules:
           imports:
             - Arc
             - Circle
+            - clearRegisteredShapePaints
             - Ellipse
             - Line
             - PathShape
@@ -9353,10 +9708,16 @@ modules:
             - Polyline
             - Rectangle
             - RegularPolygon
+            - resolveShapePaintSupport
             - Ring
             - Sector
+            - setShapePaintSupport
             - Shape2D
             - Star
+          reExport: true
+        - file: ./shape-paint.js
+          imports:
+            - registerShapePaints
           reExport: true
         - file: ./sprite.js
           imports:
@@ -9389,6 +9750,15 @@ modules:
             - ClipScope
             - RenderItemClip
             - RenderItemStencil
+          reExport: true
+          typeOnly: true
+        - file: ./compute.js
+          imports:
+            - ComputeBinding
+            - ComputeBindingAccess
+            - ComputeBuffer
+            - ComputeDispatcher
+            - ComputePassDescriptor
           reExport: true
           typeOnly: true
         - file: ./effect-pass.js
@@ -9454,6 +9824,11 @@ modules:
             - RasterSource
           reExport: true
           typeOnly: true
+        - file: ./read-pixels.js
+          imports:
+            - PixelReader
+          reExport: true
+          typeOnly: true
         - file: ./picking.js
           imports:
             - PickRequest
@@ -9476,6 +9851,9 @@ modules:
           typeOnly: true
         - file: ./renderer-registry.js
           imports:
+            - RendererCapabilityDeclaration
+            - RendererCapabilityName
+            - RendererCapabilityShortfall
             - RendererFallbackReason
             - RendererFallbackReport
             - RendererRegistration
@@ -9505,20 +9883,33 @@ modules:
             - ArcOptions
             - CircleOptions
             - EllipseOptions
+            - GradientStop
+            - LinearGradientPaint
             - LineOptions
+            - ObjectPaint
             - Paint
             - PathShapeOptions
+            - PatternPaint
             - PolygonOptions
             - PolylineOptions
+            - RadialGradientPaint
             - RectangleOptions
             - RegularPolygonOptions
             - RingOptions
             - SectorOptions
+            - ResolvedGradientStop
+            - ResolvedLinearGradientPaint
+            - ResolvedObjectPaint
             - ResolvedPaint
+            - ResolvedPatternPaint
+            - ResolvedRadialGradientPaint
             - ResolvedShapeFill
+            - ResolvedSolidPaint
             - ResolvedStrokeStyle
             - Shape2DOptions
             - ShapeFill
+            - ShapePaintPlan
+            - ShapePaintSupport
             - SolidPaint
             - StarOptions
             - StrokeStyle
@@ -9572,8 +9963,12 @@ modules:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
         - computeWorldBoundingSphere
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - ClipPlaneAllocator
         - MAX_CLIP_PLANES
+        - COMPUTE_ENTRY_POINT
+        - supportsCompute
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -9610,6 +10005,8 @@ modules:
         - forEachShaderNodeReference
         - RenderGraph
         - CanvasTexture
+        - supportsReadPixels
+        - validateReadbackRegion
         - MAX_PICK_CANDIDATES
         - assertEncodableCandidateCount
         - collectPickCandidates
@@ -9623,11 +10020,14 @@ modules:
         - Mesh
         - restoreMeshSkeleton
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
         - RendererRegistry
         - clearRegisteredRenderers
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - resolveRenderer
+        - validateCapabilityDeclaration
         - NullRenderer
         - liveRenderTargetCount
         - liveTextureCount
@@ -9637,6 +10037,7 @@ modules:
         - supportsRenderStatistics
         - Arc
         - Circle
+        - clearRegisteredShapePaints
         - Ellipse
         - Line
         - PathShape
@@ -9644,10 +10045,13 @@ modules:
         - Polyline
         - Rectangle
         - RegularPolygon
+        - resolveShapePaintSupport
         - Ring
         - Sector
+        - setShapePaintSupport
         - Shape2D
         - Star
+        - registerShapePaints
         - Sprite
         - Texture
         - buildViewRenderList
@@ -9661,6 +10065,11 @@ modules:
         - ClipScope
         - RenderItemClip
         - RenderItemStencil
+        - ComputeBinding
+        - ComputeBindingAccess
+        - ComputeBuffer
+        - ComputeDispatcher
+        - ComputePassDescriptor
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -9712,6 +10121,7 @@ modules:
         - CanvasTextureOptions
         - RasterOrigin
         - RasterSource
+        - PixelReader
         - PickRequest
         - PickResult
         - PickingService
@@ -9720,6 +10130,9 @@ modules:
         - RenderTargetTexture
         - RenderableOptions
         - SurfaceMaterial
+        - RendererCapabilityDeclaration
+        - RendererCapabilityName
+        - RendererCapabilityShortfall
         - RendererFallbackReason
         - RendererFallbackReport
         - RendererRegistration
@@ -9737,20 +10150,33 @@ modules:
         - ArcOptions
         - CircleOptions
         - EllipseOptions
+        - GradientStop
+        - LinearGradientPaint
         - LineOptions
+        - ObjectPaint
         - Paint
         - PathShapeOptions
+        - PatternPaint
         - PolygonOptions
         - PolylineOptions
+        - RadialGradientPaint
         - RectangleOptions
         - RegularPolygonOptions
         - RingOptions
         - SectorOptions
+        - ResolvedGradientStop
+        - ResolvedLinearGradientPaint
+        - ResolvedObjectPaint
         - ResolvedPaint
+        - ResolvedPatternPaint
+        - ResolvedRadialGradientPaint
         - ResolvedShapeFill
+        - ResolvedSolidPaint
         - ResolvedStrokeStyle
         - Shape2DOptions
         - ShapeFill
+        - ShapePaintPlan
+        - ShapePaintSupport
         - SolidPaint
         - StarOptions
         - StrokeStyle
@@ -9765,8 +10191,12 @@ modules:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
         - computeWorldBoundingSphere
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - ClipPlaneAllocator
         - MAX_CLIP_PLANES
+        - COMPUTE_ENTRY_POINT
+        - supportsCompute
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
         - OUTPUT_TRANSFORM_EFFECT
@@ -9803,6 +10233,8 @@ modules:
         - forEachShaderNodeReference
         - RenderGraph
         - CanvasTexture
+        - supportsReadPixels
+        - validateReadbackRegion
         - MAX_PICK_CANDIDATES
         - assertEncodableCandidateCount
         - collectPickCandidates
@@ -9816,11 +10248,14 @@ modules:
         - Mesh
         - restoreMeshSkeleton
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
         - RendererRegistry
         - clearRegisteredRenderers
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - resolveRenderer
+        - validateCapabilityDeclaration
         - NullRenderer
         - liveRenderTargetCount
         - liveTextureCount
@@ -9830,6 +10265,7 @@ modules:
         - supportsRenderStatistics
         - Arc
         - Circle
+        - clearRegisteredShapePaints
         - Ellipse
         - Line
         - PathShape
@@ -9837,10 +10273,13 @@ modules:
         - Polyline
         - Rectangle
         - RegularPolygon
+        - resolveShapePaintSupport
         - Ring
         - Sector
+        - setShapePaintSupport
         - Shape2D
         - Star
+        - registerShapePaints
         - Sprite
         - Texture
         - buildViewRenderList
@@ -9853,6 +10292,11 @@ modules:
         - ClipScope
         - RenderItemClip
         - RenderItemStencil
+        - ComputeBinding
+        - ComputeBindingAccess
+        - ComputeBuffer
+        - ComputeDispatcher
+        - ComputePassDescriptor
         - ColorGradeEffect
         - CopyEffect
         - EffectRenderPass
@@ -9904,6 +10348,7 @@ modules:
         - CanvasTextureOptions
         - RasterOrigin
         - RasterSource
+        - PixelReader
         - PickRequest
         - PickResult
         - PickingService
@@ -9912,6 +10357,9 @@ modules:
         - RenderTargetTexture
         - RenderableOptions
         - SurfaceMaterial
+        - RendererCapabilityDeclaration
+        - RendererCapabilityName
+        - RendererCapabilityShortfall
         - RendererFallbackReason
         - RendererFallbackReport
         - RendererRegistration
@@ -9929,20 +10377,33 @@ modules:
         - ArcOptions
         - CircleOptions
         - EllipseOptions
+        - GradientStop
+        - LinearGradientPaint
         - LineOptions
+        - ObjectPaint
         - Paint
         - PathShapeOptions
+        - PatternPaint
         - PolygonOptions
         - PolylineOptions
+        - RadialGradientPaint
         - RectangleOptions
         - RegularPolygonOptions
         - RingOptions
         - SectorOptions
+        - ResolvedGradientStop
+        - ResolvedLinearGradientPaint
+        - ResolvedObjectPaint
         - ResolvedPaint
+        - ResolvedPatternPaint
+        - ResolvedRadialGradientPaint
         - ResolvedShapeFill
+        - ResolvedSolidPaint
         - ResolvedStrokeStyle
         - Shape2DOptions
         - ShapeFill
+        - ShapePaintPlan
+        - ShapePaintSupport
         - SolidPaint
         - StarOptions
         - StrokeStyle
@@ -10131,6 +10592,28 @@ modules:
       interfaces:
         - RasterSource
         - CanvasTextureOptions
+    packages/render/src/read-pixels.ts:
+      description: §61's `readPixels` seam, backend-independent half (2026-08-29).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-target.js
+          imports:
+            - RenderTarget
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Rectangle2
+      exports:
+        - supportsReadPixels
+        - validateReadbackRegion
+      interfaces:
+        - PixelReader
+      functions:
+        - supportsReadPixels
+        - validateReadbackRegion
     packages/render/src/render-graph.ts:
       description: "`RenderGraph` (§63) — an ordered list of passes, executed by one call, with"
       externalDependencies: []
@@ -10336,6 +10819,7 @@ modules:
           imports:
             - Renderer
             - RendererBackend
+            - RendererCapabilities
             - RendererOptions
           typeOnly: true
       workspaceDependencies:
@@ -10345,6 +10829,9 @@ modules:
             - FourError
       exports:
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
+        - validateCapabilityDeclaration
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - clearRegisteredRenderers
@@ -10354,20 +10841,29 @@ modules:
         - RendererRegistry
       interfaces:
         - RendererRegistration
+        - RendererCapabilityDeclaration
+        - RendererCapabilityShortfall
         - RendererFallbackReport
         - RendererResolveOptions
       functions:
+        - validateCapabilityDeclaration
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - clearRegisteredRenderers
         - resolveRenderer
       constants:
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
     packages/render/src/renderer.ts:
       description: The renderer interface (§61) — the seam every backend implements.
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./compute.js
+          imports:
+            - ComputePassDescriptor
+          typeOnly: true
         - file: ./effect-pass.js
           imports:
             - EffectRenderPass
@@ -10394,6 +10890,10 @@ modules:
           imports:
             - EventEmitter
             - FourError
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Rectangle2
         - package: "@four/scene"
           directory: packages/scene
           imports:
@@ -10429,6 +10929,48 @@ modules:
         - textureMemoryBytes
         - liveTextureCount
         - liveRenderTargetCount
+    packages/render/src/shape-paint.ts:
+      description: The §58 paint-object tier — validation and paint-to-graph lowering behind
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./shape.js
+          imports:
+            - setShapePaintSupport
+            - GradientStop
+            - LinearGradientPaint
+            - Paint
+            - PatternPaint
+            - RadialGradientPaint
+            - ResolvedGradientStop
+            - ResolvedLinearGradientPaint
+            - ResolvedObjectPaint
+            - ResolvedPaint
+            - ResolvedPatternPaint
+            - ResolvedRadialGradientPaint
+            - ResolvedShapeFill
+            - ResolvedStrokeStyle
+            - ShapePaintPlan
+      workspaceDependencies:
+        - package: "@four/materials"
+          directory: packages/materials
+          imports:
+            - NodeMaterialBuilder
+            - Material
+            - MaterialTexture
+            - ShaderExpression
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - ColorRGBA
+        - package: "@four/geometry"
+          directory: packages/geometry
+          imports:
+            - Point2D
+      exports:
+        - registerShapePaints
+      functions:
+        - registerShapePaints
     packages/render/src/shape.ts:
       description: §50's native 2D shape system — the node tier (R-23, 2026-08-09).
       externalDependencies: []
@@ -10463,11 +11005,15 @@ modules:
           directory: packages/materials
           imports:
             - Material
+            - MaterialTexture
         - package: "@four/math"
           directory: packages/math
           imports:
             - ColorRGBA
       exports:
+        - setShapePaintSupport
+        - resolveShapePaintSupport
+        - clearRegisteredShapePaints
         - Circle
         - Ellipse
         - Rectangle
@@ -10495,9 +11041,19 @@ modules:
         - Arc
       interfaces:
         - SolidPaint
-        - ResolvedPaint
+        - GradientStop
+        - LinearGradientPaint
+        - RadialGradientPaint
+        - PatternPaint
+        - ResolvedSolidPaint
+        - ResolvedGradientStop
+        - ResolvedLinearGradientPaint
+        - ResolvedRadialGradientPaint
+        - ResolvedPatternPaint
         - StrokeStyle
         - ResolvedStrokeStyle
+        - ShapePaintPlan
+        - ShapePaintSupport
         - Shape2DOptions
         - CircleOptions
         - EllipseOptions
@@ -10511,6 +11067,10 @@ modules:
         - LineOptions
         - PolylineOptions
         - ArcOptions
+      functions:
+        - setShapePaintSupport
+        - resolveShapePaintSupport
+        - clearRegisteredShapePaints
     packages/render/src/sprite.ts:
       description: "`Sprite` (§55) — a textured, tinted quad in the scene graph."
       externalDependencies: []
@@ -11693,6 +12253,7 @@ modules:
           imports:
             - Frustum
             - Matrix4
+            - Rectangle2
         - package: "@four/render"
           directory: packages/render
           imports:
@@ -11711,6 +12272,7 @@ modules:
             - isSkinnedUnlitItem
             - isSpriteItem
             - isStandardItem
+            - validateReadbackRegion
             - COLOR_GRADE_DEFAULTS
             - EffectRenderPass
             - GraphEffect
@@ -11776,7 +12338,9 @@ modules:
           reExport: true
         - file: ./wgpu-pipeline-cache.js
           imports:
+            - blendStateFor
             - pipelineKey
+            - stencilStateFor
             - WgpuPipelineCache
           reExport: true
         - file: ./wgpu-batch.js
@@ -11893,6 +12457,9 @@ modules:
           reExport: true
         - file: ./wgpu-particles.js
           imports:
+            - PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT
+            - PARTICLE_GPU_POSITION_BUFFER_LAYOUT
+            - PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
             - PARTICLE_INSTANCE_BUFFER_LAYOUT
             - PARTICLE_INSTANCE_STRIDE_BYTES
             - PARTICLE_MODEL_OFFSET
@@ -11904,6 +12471,12 @@ modules:
             - PARTICLE_VIEW_OFFSET
             - WgpuParticleCache
             - createParticleBindGroupLayout
+          reExport: true
+        - file: ./wgpu-particle-simulation.js
+          imports:
+            - PARTICLE_SIMULATION_SCRATCH_BYTES
+            - PARTICLE_SIMULATION_VECTOR_BYTES
+            - WgpuParticleSimulation
           reExport: true
         - file: ./wgpu-shadow.js
           imports:
@@ -11939,6 +12512,23 @@ modules:
             - STANDARD_VIEW_PROJECTION_OFFSET
             - createStandardBindGroupLayout
             - standardShaderSource
+          reExport: true
+        - file: ./wgpu-node-registry.js
+          imports:
+            - clearRegisteredWebgpuNodeMaterialPipeline
+            - resolveWebgpuNodeMaterialPipelineFactory
+            - setWebgpuNodeMaterialPipelineFactory
+          reExport: true
+        - file: ./wgpu-node-program.js
+          imports:
+            - NODE_SCREEN_BLOCK_BASE_BYTES
+            - NODE_SCREEN_TEXTURE_GROUP
+            - NODE_SURFACE_BLOCK_BASE_BYTES
+            - NODE_SURFACE_BLOCK_GROUP
+            - NODE_SURFACE_TEXTURE_GROUP
+            - WgpuNodePipelineStore
+            - emitShaderGraphWgsl
+            - registerWebgpuNodeMaterialPipeline
           reExport: true
         - file: ./webgpu-device.js
           imports:
@@ -12029,9 +12619,28 @@ modules:
             - WgpuParticleRecord
           reExport: true
           typeOnly: true
+        - file: ./wgpu-particle-simulation.js
+          imports:
+            - WgpuParticleSimulationOptions
+          reExport: true
+          typeOnly: true
         - file: ./wgpu-stencil.js
           imports:
             - WgpuStencilSource
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-node-registry.js
+          imports:
+            - WgpuNodeFrameState
+            - WgpuNodeItemMaterial
+            - WgpuNodeMaterialPipelineFactory
+            - WgpuNodeMaterialPipelines
+            - WgpuNodePipelineHost
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-node-program.js
+          imports:
+            - EmittedWgslNodeShader
           reExport: true
           typeOnly: true
       workspaceDependencies: []
@@ -12058,7 +12667,9 @@ modules:
         - createDrawBindGroupLayout
         - createTextureBindGroupLayout
         - WgpuGeometryCache
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
         - WgpuPipelineCache
         - WgpuBatching
         - batchVertexBufferLayout
@@ -12142,6 +12753,9 @@ modules:
         - readComputeBufferBytes
         - writeComputeBuffer
         - writeParticleSimulationParams
+        - PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_GPU_POSITION_BUFFER_LAYOUT
+        - PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
         - PARTICLE_INSTANCE_BUFFER_LAYOUT
         - PARTICLE_INSTANCE_STRIDE_BYTES
         - PARTICLE_MODEL_OFFSET
@@ -12153,6 +12767,9 @@ modules:
         - PARTICLE_VIEW_OFFSET
         - WgpuParticleCache
         - createParticleBindGroupLayout
+        - PARTICLE_SIMULATION_SCRATCH_BYTES
+        - PARTICLE_SIMULATION_VECTOR_BYTES
+        - WgpuParticleSimulation
         - SHADOW_FACTOR_WGSL
         - SHADOW_LIGHT_UNIFORM_BYTES
         - SHADOW_LIGHT_UNIFORM_WGSL
@@ -12179,6 +12796,17 @@ modules:
         - STANDARD_VIEW_PROJECTION_OFFSET
         - createStandardBindGroupLayout
         - standardShaderSource
+        - clearRegisteredWebgpuNodeMaterialPipeline
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - setWebgpuNodeMaterialPipelineFactory
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SCREEN_TEXTURE_GROUP
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - WgpuNodePipelineStore
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
         - PACKAGE_NAME
         - Gpu
         - GpuAdapter
@@ -12233,7 +12861,14 @@ modules:
         - ComputeBufferOptions
         - ComputePassDescriptor
         - WgpuParticleRecord
+        - WgpuParticleSimulationOptions
         - WgpuStencilSource
+        - WgpuNodeFrameState
+        - WgpuNodeItemMaterial
+        - WgpuNodeMaterialPipelineFactory
+        - WgpuNodeMaterialPipelines
+        - WgpuNodePipelineHost
+        - EmittedWgslNodeShader
       reExported:
         - GPU_BUFFER_USAGE
         - GPU_MAP_MODE
@@ -12257,7 +12892,9 @@ modules:
         - createDrawBindGroupLayout
         - createTextureBindGroupLayout
         - WgpuGeometryCache
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
         - WgpuPipelineCache
         - WgpuBatching
         - batchVertexBufferLayout
@@ -12341,6 +12978,9 @@ modules:
         - readComputeBufferBytes
         - writeComputeBuffer
         - writeParticleSimulationParams
+        - PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_GPU_POSITION_BUFFER_LAYOUT
+        - PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
         - PARTICLE_INSTANCE_BUFFER_LAYOUT
         - PARTICLE_INSTANCE_STRIDE_BYTES
         - PARTICLE_MODEL_OFFSET
@@ -12352,6 +12992,9 @@ modules:
         - PARTICLE_VIEW_OFFSET
         - WgpuParticleCache
         - createParticleBindGroupLayout
+        - PARTICLE_SIMULATION_SCRATCH_BYTES
+        - PARTICLE_SIMULATION_VECTOR_BYTES
+        - WgpuParticleSimulation
         - SHADOW_FACTOR_WGSL
         - SHADOW_LIGHT_UNIFORM_BYTES
         - SHADOW_LIGHT_UNIFORM_WGSL
@@ -12378,6 +13021,17 @@ modules:
         - STANDARD_VIEW_PROJECTION_OFFSET
         - createStandardBindGroupLayout
         - standardShaderSource
+        - clearRegisteredWebgpuNodeMaterialPipeline
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - setWebgpuNodeMaterialPipelineFactory
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SCREEN_TEXTURE_GROUP
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - WgpuNodePipelineStore
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
         - Gpu
         - GpuAdapter
         - GpuStencilFaceState
@@ -12431,7 +13085,14 @@ modules:
         - ComputeBufferOptions
         - ComputePassDescriptor
         - WgpuParticleRecord
+        - WgpuParticleSimulationOptions
         - WgpuStencilSource
+        - WgpuNodeFrameState
+        - WgpuNodeItemMaterial
+        - WgpuNodeMaterialPipelineFactory
+        - WgpuNodeMaterialPipelines
+        - WgpuNodePipelineHost
+        - EmittedWgslNodeShader
       constants:
         - PACKAGE_NAME
     packages/render-webgpu/src/register.ts:
@@ -12575,6 +13236,10 @@ modules:
             - WgpuParticleCache
             - createParticleBindGroupLayout
             - WgpuParticleRecord
+        - file: ./wgpu-particle-simulation.js
+          imports:
+            - WgpuParticleSimulation
+            - WgpuParticleSimulationOptions
         - file: ./wgpu-pipeline-cache.js
           imports:
             - WgpuPipelineCache
@@ -12617,6 +13282,11 @@ modules:
           imports:
             - WgpuTextureCache
             - WgpuCacheableTexture
+        - file: ./wgpu-node-registry.js
+          imports:
+            - resolveWebgpuNodeMaterialPipelineFactory
+            - WgpuNodeFrameState
+            - WgpuNodeMaterialPipelines
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_VERTEX_COUNT
@@ -12633,6 +13303,7 @@ modules:
           imports:
             - Frustum
             - Matrix4
+            - Rectangle2
         - package: "@four/render"
           directory: packages/render
           imports:
@@ -12644,6 +13315,7 @@ modules:
             - collectSceneLights
             - createSceneLights
             - isRenderTargetTexture
+            - validateReadbackRegion
             - EffectRenderPass
             - RenderBatch
             - RenderInterpolation
@@ -12760,6 +13432,14 @@ modules:
           directory: packages/core
           imports:
             - FourError
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - COMPUTE_ENTRY_POINT
+            - ComputeBinding
+            - ComputeBindingAccess
+            - ComputeBuffer
+            - ComputePassDescriptor
       exports:
         - COMPUTE_ENTRY_POINT
         - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
@@ -12776,8 +13456,6 @@ modules:
         - WgpuComputeBuffer
         - WgpuComputeCache
       interfaces:
-        - ComputeBinding
-        - ComputePassDescriptor
         - ComputeBufferOptions
       functions:
         - createComputeBuffer
@@ -12786,7 +13464,6 @@ modules:
         - writeParticleSimulationParams
         - particleIntegratorWorkgroups
       constants:
-        - COMPUTE_ENTRY_POINT
         - PARTICLE_INTEGRATOR_WORKGROUP_SIZE
         - PARTICLE_SIMULATION_PARAMS_FLOATS
         - PARTICLE_INTEGRATOR_SHADER_SOURCE
@@ -12957,6 +13634,190 @@ modules:
         - NORMAL_SHADER_LOCATION
         - NORMAL_BUFFER_LAYOUT
         - NORMAL_MATRIX_WGSL
+    packages/render-webgpu/src/wgpu-node-program.ts:
+      description: "The node-material pipeline for WebGPU (§60, §62; RFC 0001 — WP-R1.9): a"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_SHADER_STAGE
+            - GpuBindGroup
+            - GpuBindGroupEntry
+            - GpuBindGroupLayout
+            - GpuBuffer
+            - GpuPipelineLayout
+            - GpuRenderPassEncoder
+            - GpuRenderPipeline
+            - GpuShaderModule
+            - GpuTextureView
+            - GpuVertexBufferLayout
+        - file: ./wgpu-effect.js
+          imports:
+            - EFFECT_PASS_VERTEX_COUNT
+        - file: ./wgpu-lit.js
+          imports:
+            - NORMAL_BUFFER_LAYOUT
+        - file: ./wgpu-pipeline-cache.js
+          imports:
+            - blendStateFor
+            - stencilStateFor
+            - WgpuStencilDescriptor
+        - file: ./wgpu-node-registry.js
+          imports:
+            - setWebgpuNodeMaterialPipelineFactory
+            - WgpuNodeFrameState
+            - WgpuNodeItemMaterial
+            - WgpuNodeMaterialPipelines
+            - WgpuNodePipelineHost
+        - file: ./wgpu-render-target.js
+          imports:
+            - WgpuCacheableRenderTarget
+            - WgpuRenderTargetCache
+          typeOnly: true
+        - file: ./wgpu-stencil.js
+          imports:
+            - applyStencilReference
+            - stencilDescriptor
+        - file: ./wgpu-unlit.js
+          imports:
+            - COLOR_BUFFER_LAYOUT
+            - FRAGMENT_ENTRY_POINT
+            - POSITION_BUFFER_LAYOUT
+            - UV_BUFFER_LAYOUT
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - devWarnOnce
+            - Disposable
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - SHADER_VALUE_COMPONENTS
+            - analyzeShaderGraph
+            - isRenderTargetTexture
+            - GraphEffect
+            - NodeRenderItem
+            - RenderItem
+            - RenderStatistics
+            - ShaderAttributeName
+            - ShaderDomain
+            - ShaderGraph
+            - ShaderGraphAnalysis
+            - ShaderNode
+            - ShaderUniformReflection
+            - ShaderValueType
+      exports:
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - NODE_SCREEN_TEXTURE_GROUP
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
+        - WgpuNodePipelineStore
+      classes:
+        - WgpuNodePipelineStore
+      interfaces:
+        - EmittedWgslNodeShader
+      functions:
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
+      constants:
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - NODE_SCREEN_TEXTURE_GROUP
+    packages/render-webgpu/src/wgpu-node-registry.ts:
+      description: The WebGPU node-material pipeline's registration slot (§60, §62; RFC 0001;
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GpuDevice
+            - GpuRenderPassEncoder
+            - GpuTextureView
+          typeOnly: true
+        - file: ./wgpu-geometry.js
+          imports:
+            - WgpuGeometryCache
+          typeOnly: true
+        - file: ./wgpu-render-target.js
+          imports:
+            - WgpuCacheableRenderTarget
+            - WgpuRenderTargetCache
+          typeOnly: true
+        - file: ./wgpu-texture.js
+          imports:
+            - WgpuTextureCache
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - GraphEffect
+            - NodeRenderItem
+            - RenderItem
+            - RenderStatistics
+      exports:
+        - setWebgpuNodeMaterialPipelineFactory
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - clearRegisteredWebgpuNodeMaterialPipeline
+      interfaces:
+        - WgpuNodePipelineHost
+        - WgpuNodeFrameState
+        - WgpuNodeMaterialPipelines
+        - WgpuNodeMaterialPipelineFactory
+      functions:
+        - setWebgpuNodeMaterialPipelineFactory
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - clearRegisteredWebgpuNodeMaterialPipeline
+    packages/render-webgpu/src/wgpu-particle-simulation.ts:
+      description: "`WgpuParticleSimulation` — the device side of §36's `simulation: \"gpu\"`"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GpuBuffer
+            - GpuDevice
+        - file: ./wgpu-compute.js
+          imports:
+            - PARTICLE_INTEGRATOR_SHADER_SOURCE
+            - PARTICLE_SIMULATION_PARAMS_FLOATS
+            - WgpuComputeBuffer
+            - WgpuComputeCache
+            - createComputeBuffer
+            - particleIntegratorWorkgroups
+            - writeComputeBuffer
+            - writeParticleSimulationParams
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - FourError
+      exports:
+        - PARTICLE_SIMULATION_VECTOR_BYTES
+        - PARTICLE_SIMULATION_SCRATCH_BYTES
+        - WgpuParticleSimulation
+      classes:
+        - WgpuParticleSimulation
+      interfaces:
+        - WgpuParticleSimulationOptions
+      constants:
+        - PARTICLE_SIMULATION_VECTOR_BYTES
+        - PARTICLE_SIMULATION_SCRATCH_BYTES
     packages/render-webgpu/src/wgpu-particles.ts:
       description: The batched particle pipeline for the WebGPU backend (§36, §64 stage 6,
       externalDependencies: []
@@ -12993,6 +13854,9 @@ modules:
         - PARTICLE_UNIFORM_WGSL
         - PARTICLE_INSTANCE_BUFFER_LAYOUT
         - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - PARTICLE_GPU_POSITION_BUFFER_LAYOUT
+        - PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
         - PARTICLE_SHADER_SOURCE
         - createParticleBindGroupLayout
         - WgpuParticleCache
@@ -13011,6 +13875,9 @@ modules:
         - PARTICLE_UNIFORM_WGSL
         - PARTICLE_INSTANCE_BUFFER_LAYOUT
         - PARTICLE_VERTEX_BUFFER_LAYOUTS
+        - PARTICLE_GPU_POSITION_BUFFER_LAYOUT
+        - PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT
+        - PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
         - PARTICLE_SHADER_SOURCE
     packages/render-webgpu/src/wgpu-pipeline-cache.ts:
       description: The lazy, descriptor-keyed render-pipeline cache (§4.2 of the R-1 plan).
@@ -13040,6 +13907,7 @@ modules:
             - shadedVertexBufferLayouts
         - file: ./wgpu-particles.js
           imports:
+            - PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
             - PARTICLE_SHADER_SOURCE
             - PARTICLE_VERTEX_BUFFER_LAYOUTS
         - file: ./wgpu-shadow.js
@@ -13065,7 +13933,9 @@ modules:
           imports:
             - RenderItemStencil
       exports:
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
         - WgpuPipelineCache
       classes:
         - WgpuPipelineCache
@@ -13074,7 +13944,9 @@ modules:
         - WgpuBatchStream
         - WgpuPipelineDescriptor
       functions:
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
     packages/render-webgpu/src/wgpu-readback.ts:
       description: "`readPixels`' mechanism: `copyTextureToBuffer` + `mapAsync` (WP-R1.6; §61,"
       externalDependencies: []
@@ -13086,7 +13958,11 @@ modules:
             - GPU_MAP_MODE
             - GpuDevice
             - GpuTexture
-      workspaceDependencies: []
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Rectangle2
       exports:
         - READBACK_ROW_ALIGNMENT
         - readbackBytesPerRow
@@ -13461,7 +14337,7 @@ modules:
       classes:
         - Group
     packages/scene/src/index.ts:
-      description: Package entry point for @four/scene (re-exports 78 symbols)
+      description: Package entry point for @four/scene (re-exports 79 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -13611,6 +14487,7 @@ modules:
           typeOnly: true
         - file: ./node.js
           imports:
+            - HitTestMode
             - NodeEventMap
             - NodeHierarchyEvent
             - NodeOptions
@@ -13706,6 +14583,7 @@ modules:
         - SpotLightOptions
         - PoseSnapshotSystem
         - SnapshotSystemOptions
+        - HitTestMode
         - NodeEventMap
         - NodeHierarchyEvent
         - NodeOptions
@@ -13785,6 +14663,7 @@ modules:
         - SpotLightOptions
         - PoseSnapshotSystem
         - SnapshotSystemOptions
+        - HitTestMode
         - NodeEventMap
         - NodeHierarchyEvent
         - NodeOptions
@@ -14170,6 +15049,30 @@ modules:
         - resolveWorldTransforms
         - resolveWorldTransform
   packages/serialization:
+    packages/serialization/src/capabilities.ts:
+      description: This package's §81 capability tokens (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./migration.js
+          imports:
+            - SceneMigrationRegistry
+          typeOnly: true
+        - file: ./serializer.js
+          imports:
+            - ComponentSerializerRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
+      constants:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
     packages/serialization/src/format.ts:
       description: The §79 scene document — its types, its JSON encoding, and its canonical
       externalDependencies: []
@@ -14242,6 +15145,11 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./capabilities.js
+          imports:
+            - COMPONENT_SERIALIZERS
+            - SCENE_MIGRATIONS
+          reExport: true
         - file: ./format.js
           imports:
             - SCENE_FORMAT_VERSION
@@ -14304,6 +15212,8 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
         - SCENE_FORMAT_VERSION
         - asJsonObject
         - cloneJsonValue
@@ -14345,6 +15255,8 @@ modules:
         - SerializeSceneOptions
         - UnknownComponentPolicy
       reExported:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
         - SCENE_FORMAT_VERSION
         - asJsonObject
         - cloneJsonValue
@@ -15199,9 +16111,9 @@ dependencyGraph:
   circularDependencies:
     runtime: []
     typeOnly:
-      - - packages/physics/src/world.ts
-        - packages/physics/src/solver-registry.ts
+      - - packages/physics/src/solver-registry.ts
         - packages/physics/src/world.ts
+        - packages/physics/src/solver-registry.ts
       - - packages/render/src/renderer.ts
         - packages/render/src/picking.ts
         - packages/render/src/renderer.ts
@@ -15229,6 +16141,7 @@ dependencyGraph:
       files:
         - packages/assets/src/asset-manager.ts
         - packages/assets/src/content-hash.ts
+        - packages/assets/src/gltf.ts
         - packages/assets/src/index.ts
         - packages/assets/src/loaders.ts
         - packages/assets/src/manifest.ts
@@ -15264,9 +16177,11 @@ dependencyGraph:
         - packages/four/src/animation.ts
         - packages/four/src/application.ts
         - packages/four/src/assets.ts
+        - packages/four/src/compute-pass.ts
         - packages/four/src/core.ts
         - packages/four/src/diagnostics.ts
         - packages/four/src/geometry.ts
+        - packages/four/src/gltf.ts
         - packages/four/src/index.ts
         - packages/four/src/input.ts
         - packages/four/src/materials.ts
@@ -15334,12 +16249,14 @@ dependencyGraph:
         - packages/math/src/matrix3.ts
         - packages/math/src/matrix4.ts
         - packages/math/src/quaternion.ts
+        - packages/math/src/rectangle2.ts
         - packages/math/src/vector2.ts
         - packages/math/src/vector3.ts
         - packages/math/src/vector4.ts
     - name: Packages/motion
       files:
         - packages/motion/src/camera-rigs.ts
+        - packages/motion/src/capabilities.ts
         - packages/motion/src/character-controller.ts
         - packages/motion/src/clock.ts
         - packages/motion/src/constraints.ts
@@ -15372,6 +16289,7 @@ dependencyGraph:
       files:
         - packages/physics/src/adapter.ts
         - packages/physics/src/body-access.ts
+        - packages/physics/src/capabilities.ts
         - packages/physics/src/collider.ts
         - packages/physics/src/descriptors.ts
         - packages/physics/src/events.ts
@@ -15410,7 +16328,9 @@ dependencyGraph:
       files:
         - packages/render/src/batch.ts
         - packages/render/src/bounds.ts
+        - packages/render/src/capabilities.ts
         - packages/render/src/clip.ts
+        - packages/render/src/compute.ts
         - packages/render/src/effect-pass.ts
         - packages/render/src/index.ts
         - packages/render/src/lights.ts
@@ -15418,6 +16338,7 @@ dependencyGraph:
         - packages/render/src/particles.ts
         - packages/render/src/picking.ts
         - packages/render/src/raster.ts
+        - packages/render/src/read-pixels.ts
         - packages/render/src/render-graph.ts
         - packages/render/src/render-list.ts
         - packages/render/src/render-target.ts
@@ -15425,6 +16346,7 @@ dependencyGraph:
         - packages/render/src/renderer-registry.ts
         - packages/render/src/renderer.ts
         - packages/render/src/resource-memory.ts
+        - packages/render/src/shape-paint.ts
         - packages/render/src/shape.ts
         - packages/render/src/sprite.ts
         - packages/render/src/statistics.ts
@@ -15469,6 +16391,9 @@ dependencyGraph:
         - packages/render-webgpu/src/wgpu-geometry.ts
         - packages/render-webgpu/src/wgpu-lights.ts
         - packages/render-webgpu/src/wgpu-lit.ts
+        - packages/render-webgpu/src/wgpu-node-program.ts
+        - packages/render-webgpu/src/wgpu-node-registry.ts
+        - packages/render-webgpu/src/wgpu-particle-simulation.ts
         - packages/render-webgpu/src/wgpu-particles.ts
         - packages/render-webgpu/src/wgpu-pipeline-cache.ts
         - packages/render-webgpu/src/wgpu-readback.ts
@@ -15499,6 +16424,7 @@ dependencyGraph:
         - packages/scene/src/world-transforms.ts
     - name: Packages/serialization
       files:
+        - packages/serialization/src/capabilities.ts
         - packages/serialization/src/format.ts
         - packages/serialization/src/index.ts
         - packages/serialization/src/migration.ts
@@ -15525,18 +16451,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 264
+  totalTypeScriptFiles: 278
   totalModules: 24
-  totalLinesOfCode: 127360
-  totalExports: 2644
-  totalClasses: 174
-  totalInterfaces: 516
-  totalFunctions: 411
+  totalLinesOfCode: 136667
+  totalExports: 2776
+  totalClasses: 179
+  totalInterfaces: 550
+  totalFunctions: 430
   totalTypeGuards: 23
   totalEnums: 0
-  totalConstants: 400
-  totalReExports: 1681
-  totalTypeOnlyImports: 311
+  totalConstants: 411
+  totalReExports: 1777
+  totalTypeOnlyImports: 332
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 3
   unusedFilesCount: 0

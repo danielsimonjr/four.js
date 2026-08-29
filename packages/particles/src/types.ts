@@ -160,6 +160,125 @@ export interface ParticleForceField {
 }
 
 /**
+ * §36's `simulation` option: who integrates positions and velocities.
+ *
+ * - `"cpu"` — the emitter's own loop (`emitter.ts`), the default and the
+ *   only §33 `same-runtime` tier.
+ * - `"gpu"` — a bound {@link ParticleGpuSimulation} integrates on the
+ *   device; the pool's position/velocity lanes hold **spawn-time values
+ *   only** thereafter. See {@link ParticleGpuSimulation} for the contract
+ *   and the determinism posture.
+ *
+ * Widened from the historical type-level absence in the same change that
+ * wired the WebGPU integrator to the emitter (R-31 residue, 2026-08-29) —
+ * the recorded WP-9.1 rule: an option that silently does nothing is worse
+ * than one that does not exist yet, so the spelling and the function arrive
+ * together.
+ */
+export type ParticleSimulationMode = "cpu" | "gpu";
+
+/**
+ * The GPU integration driver a `simulation: "gpu"` emitter steps through
+ * (§36 "GPU compute simulation"; §82; gap row R-31).
+ *
+ * ## Who implements it, and how the pieces meet
+ *
+ * A compute-capable backend mints one — `@four/render-webgpu`'s
+ * `WebgpuRenderer.createParticleSimulation({ systemId, capacity })` is the
+ * implementor today — and the application binds it with
+ * `emitter.bindGpuSimulation(...)`. The interface is **structural**, like
+ * {@link ParticleForceField} and `@four/render`'s `ParticleDrawable`, because
+ * the frozen §3.1 matrix gives this package `core`, `math`, `scene` and
+ * nothing render-shaped: the two declarations are pinned against each other
+ * by tests on both sides, never by the compiler.
+ *
+ * ## The division of labour (decision, R-31 wiring)
+ *
+ * **CPU spawn + GPU integrate.** Every §33-bearing decision stays on the
+ * CPU — the seeded RNG stream and its pinned four-draws-per-spawn order,
+ * burst scheduling, the emission accumulator, capacity accounting, ageing
+ * and expiry, and the §36 ramps (functions of age, which never leaves the
+ * CPU). The device takes exactly the O(n)-arithmetic half: one semi-implicit
+ * Euler step per particle per fixed step, under constant gravity. That split
+ * is what keeps a GPU emitter's *spawn stream* bit-identical to a CPU
+ * emitter's with the same seed — pinned by test — while the integrated state
+ * lives where the work is.
+ *
+ * ## Determinism and snapshots — the honest posture (§33, §34)
+ *
+ * A GPU-simulated system's positions and velocities live **on the device**.
+ * They sit outside every §33 tier this engine claims: the kernel's
+ * arithmetic order is fixed, but WebGPU promises no cross-adapter float
+ * reproducibility, and device f32 arithmetic differs from the CPU
+ * integrator's binary64 intermediates by rounding — so GPU simulation is
+ * display-tier motion. No §33 golden may checksum a GPU pool, and none
+ * does. §34 follows: there is no particle snapshot surface today, this
+ * packet deliberately adds none for GPU emitters — a CPU-side snapshot
+ * would capture spawn-stale lanes and restoring it would be a lie — and a
+ * readback-based snapshot is its own future packet with its own
+ * determinism argument (the GPU-readback RFC the R-1 plan names).
+ * `reset()` stays valid: an empty pool needs no device state.
+ *
+ * ## Call contract (what the emitter guarantees the implementor)
+ *
+ * Per `step(dt, time)`, in order: one {@link ParticleGpuSimulation.integrate}
+ * over the pre-expiry live count (skipped when that count or the delta is
+ * zero — both are identity steps), then zero or more
+ * {@link ParticleGpuSimulation.moveSlot} calls mirroring the pool's
+ * swap-remove compaction exactly (never with `from === to`), then one
+ * {@link ParticleGpuSimulation.writeSpawn} per successfully spawned
+ * particle. All indices are pool slots in `[0, capacity)`.
+ */
+export interface ParticleGpuSimulation {
+  /**
+   * The brand, a literal `true` — the `isParticleDrawable` technique, so
+   * the cross-package check is one property load.
+   */
+  readonly isParticleGpuSimulation: true;
+
+  /**
+   * Slots the device buffers were allocated for. Must equal the emitter's
+   * pool capacity; `bindGpuSimulation` refuses a mismatch.
+   */
+  readonly capacity: number;
+
+  /**
+   * Integrates the first `count` slots by `deltaSeconds` under constant
+   * gravity — `v += g·dt`, then `p += v·dt`, the emitter's documented
+   * closed form. Never called with `count === 0`.
+   */
+  integrate(
+    count: number,
+    deltaSeconds: number,
+    gravityX: number,
+    gravityY: number,
+    gravityZ: number,
+  ): void;
+
+  /**
+   * Writes a freshly spawned particle's position and velocity into slot
+   * `index` — the CPU-owned spawn state entering device residency.
+   */
+  writeSpawn(
+    index: number,
+    positionX: number,
+    positionY: number,
+    positionZ: number,
+    velocityX: number,
+    velocityY: number,
+    velocityZ: number,
+  ): void;
+
+  /**
+   * Copies slot `from`'s position and velocity over slot `to` — the device
+   * mirror of `ParticlePool.kill`'s swap-remove (`from` is the last live
+   * slot, `to` the expired one; `from`'s old contents become dead). Called
+   * in exactly the CPU compaction order, never with `from === to`.
+   */
+  moveSlot(from: number, to: number): void;
+}
+
+/**
  * An inclusive-ish numeric interval drawn uniformly at spawn: the draw is
  * `min + (max − min) · u` with `u ∈ [0, 1)`, so `min` is attainable and `max` is
  * not. `min === max` is the way to spell "constant".

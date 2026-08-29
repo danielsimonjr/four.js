@@ -136,15 +136,27 @@ export function applyStencilReference(
  * cache record.
  *
  * Only the material-carrying kinds this backend draws are scanned: an item
- * with no pipeline (skinned, node — skipped draws) must not be able to
- * re-key every pipeline of a frame it contributes nothing to, and a
- * `"particles"` item — drawn since WP-R1.8 — carries **no material at all**
+ * with no pipeline (skinned — a skipped draw) must not be able to re-key
+ * every pipeline of a frame it contributes nothing to, and a `"particles"`
+ * item — drawn since WP-R1.8 — carries **no material at all**
  * (`material?: undefined` on the item), so it has nothing to scan and its
  * only stencil is §67's clip record, which clause 1 already answers. Mask
  * items short out at clause 1, so the scan body only ever reads content
  * materials.
+ *
+ * `"node"` items are scanned **exactly when `scanNode` is true** (WP-R1.9):
+ * the renderer passes whether a node pipeline is registered, because a node
+ * item is a real draw then — its §57 stencil must reach the hardware, the
+ * WP-R1.7 parity — while an *unregistered* one is a skipped draw that must
+ * not re-key the frame (the rule above; and the {scene} ≡ {scene + skipped
+ * node item} byte-identity depends on it). One honest corner remains: a
+ * registered graph whose emission later fails still selects the format here —
+ * the frame pays an unused stencil aspect, never a wrong picture.
  */
-export function frameWantsStencil(items: readonly RenderItem[]): boolean {
+export function frameWantsStencil(
+  items: readonly RenderItem[],
+  scanNode = false,
+): boolean {
   if (items.length === 0) {
     return false;
   }
@@ -157,7 +169,8 @@ export function frameWantsStencil(items: readonly RenderItem[]): boolean {
       kind !== "unlit" &&
       kind !== "sprite" &&
       kind !== "lit" &&
-      kind !== "standard"
+      kind !== "standard" &&
+      (kind !== "node" || !scanNode)
     ) {
       continue;
     }

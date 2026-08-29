@@ -85,8 +85,10 @@
 
 import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
+import type { Rectangle2 } from "@four/math";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
+import type { ComputePassDescriptor } from "./compute.js";
 import type { EffectRenderPass } from "./effect-pass.js";
 import type { PickingService } from "./picking.js";
 import type { RenderTarget } from "./render-target.js";
@@ -131,10 +133,19 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * third-party backend still satisfies the type unchanged, which is the hazard
  * §61 records about adding interface members.
  *
- * The three backends this monorepo ships answer **all** of them:
- * {@link NullRenderer} with the floor, `WebglRenderer` with WebGL 2's honest
- * conservative values (`computeShaders: false` is a true statement about
- * WebGL 2, not a shortfall), and `WebgpuRenderer` from the device's own limits.
+ * Coverage across the shipped backends is honest rather than total.
+ * {@link NullRenderer} answers every member with the floor; `WebglRenderer`
+ * answers with WebGL 2's honest conservative values (`computeShaders: false`
+ * is a true statement about WebGL 2, not a shortfall) but **deliberately
+ * omits `maxUniformBufferBytes` and `maxBindings`** — R-30b's recorded law, *a
+ * capability query must be lazy if the alternative moves recorded
+ * transcripts*, applies verbatim to the two extra `getParameter` calls, and
+ * nothing in the engine reads either number yet (see `webgl-renderer.ts`);
+ * `WebgpuRenderer` answers from the device's own limits but omits
+ * `maximumSkinningJoints`, having no skinned pipeline (RFC 0003). This
+ * paragraph claimed the three backends "answer **all** of them" until
+ * 2026-08-29; the omissions above were deliberate from the day each backend's
+ * record landed.
  *
  * A consumer therefore reads a member as a tri-state:
  *
@@ -145,9 +156,11 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * ```
  *
  * §62's *"applications may declare required and optional capabilities"* is the
- * half that still does not exist: a declaration mechanism belongs with the
- * `"auto"` selector (`renderer-registry.ts`), and it is filed as WP-R1.9 rather
- * than guessed at here.
+ * other half, and it lives where the selection does (WP-R1.9):
+ * `RendererResolveOptions.capabilities` in `renderer-registry.ts` — `"auto"`
+ * skips a backend that does not affirm every required name, a named backend
+ * fails fast, and optional shortfalls are reported. The tri-state above is
+ * load-bearing there: `undefined` never satisfies a requirement.
  *
  * Treat instances as immutable: a renderer publishes its capabilities once, at
  * {@link Renderer.initialize} time, and callers only read them.
@@ -226,9 +239,12 @@ export interface RendererCapabilities {
    * single shader may see. `0` for a backend with no shaders.
    *
    * Bytes rather than WebGL 2's "uniform vectors", because a byte size is the
-   * quantity both backends can state and the one a caller sizing a buffer
-   * actually needs; the WebGL 2 backend converts (`MAX_VERTEX_UNIFORM_VECTORS`
-   * counts `vec4`s, i.e. 16 bytes each).
+   * quantity a caller sizing a buffer actually needs. The WebGPU backend
+   * reports the device's `maxUniformBufferBindingSize`; the WebGL 2 backend
+   * deliberately reports nothing here (R-30b — see `webgl-renderer.ts` for the
+   * lazy-query law). Until 2026-08-29 this doc described a WebGL 2
+   * `MAX_VERTEX_UNIFORM_VECTORS`-to-bytes conversion; no such code ever
+   * existed.
    */
   readonly maxUniformBufferBytes?: number;
 
@@ -432,10 +448,10 @@ export interface RenderInterpolation {
  * ## Deferred §61 members (typed TODO)
  *
  * These are part of §61 and are **not** part of this interface. The list is
- * shorter than it was — {@link @four/render!RenderTarget | RenderTarget} and
- * {@link @four/render!Texture | Texture} both exist now — but the two
- * *factories* stay deferred **by decision, not by absence** (R-4, 2026-08-07),
- * and `readPixels` still names a type this monorepo does not have:
+ * shorter again — `readPixels` joined the interface when `Rectangle2` landed
+ * in `@four/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared) —
+ * but the two *factories* stay deferred **by decision, not by absence**
+ * (R-4, 2026-08-07):
  *
  * ```ts
  * createTexture(source: TextureSource): Texture;
@@ -450,10 +466,6 @@ export interface RenderInterpolation {
  * // full argument on the class it concerns. These land with the tier that
  * // genuinely needs renderer-owned resources — compressed or GPU-only
  * // formats, which have no CPU-side description at all.
- *
- * readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
- * // needs `Rectangle2`, which `@four/math` does not define; §92's visual
- * // regression tier is its first consumer. Optional in §61, stays optional.
  * ```
  */
 export interface Renderer extends Disposable {
@@ -671,6 +683,86 @@ export interface Renderer extends Disposable {
    * own id buffer; the caller owns it and disposes it (§83).
    */
   createPickingService?(): PickingService;
+
+  /**
+   * Records and submits one §82 compute dispatch — the kernel in
+   * `pass.shader`, `pass.workgroups` workgroups, `pass.bindings` bound in
+   * array order at `@group(0)` (WP-R1.8; promoted here by the R-1 plan's Q3,
+   * 2026-08-29).
+   *
+   * **Optional, and its presence is the capability** — the fourth instance of
+   * the {@link Renderer.statistics} / {@link Renderer.renderEffect} /
+   * {@link Renderer.createPickingService} stance, for the same two reasons: a
+   * required member would break every implementor, and a backend with no
+   * compute stage (WebGL 2, Canvas 2D, SVG, the null tier) must say so by
+   * omission rather than by emulating on the CPU — §82's own closing sentence
+   * makes compute an *advanced optional capability*, and §62's
+   * `computeShaders` capability is how an application asks before reaching
+   * for it. {@link supportsCompute} is the type-level test.
+   *
+   * A backend that declares it owes:
+   *
+   * - **Nothing in the frame path** — §82's "basic graphics and physics
+   *   functionality must not require compute support", held structurally:
+   *   `render` never calls this and this never draws;
+   * - refusal of a buffer another backend created, a disposed buffer, and a
+   *   malformed grid — loudly (`INVALID_APPLICATION_STATE`), never as a
+   *   silent no-op (§85);
+   * - `UNSUPPORTED_GPU_FEATURE` when the live device turns out to lack the
+   *   compute entry points the backend expected (`readPixels`' contract).
+   *
+   * Buffer allocation stays a backend API — see `compute.ts`'s module header
+   * for what deliberately did not move.
+   */
+  compute?(pass: ComputePassDescriptor): void;
+
+  /**
+   * Reads back `target`'s colour attachment — or the `region` rectangle of it
+   * — as tightly packed RGBA8 bytes (§61, §92; the member the module header's
+   * typed TODO carried until `Rectangle2` landed, 2026-08-29).
+   *
+   * **Optional, and its presence is the capability** — the
+   * {@link Renderer.statistics} / {@link Renderer.renderEffect} stance, for
+   * the same two reasons: a required member would break every implementor,
+   * and a backend with no readable pixels ({@link NullRenderer}, §62's SVG
+   * tier) says so by omission rather than by fabricating bytes.
+   *
+   * **Asynchronous, honestly and permanently** (RFC 0005's commitment, and
+   * §61's own signature). WebGPU has no synchronous readback at all —
+   * `copyTextureToBuffer` + `mapAsync` is the only path — so the `Promise` is
+   * the *floor* of what every backend can promise, and a backend whose native
+   * read happens to be synchronous (GL's `readPixels`) still resolves rather
+   * than returning bytes directly: the shape never varies by backend (§62).
+   * Callers must not assume resolution within any particular frame.
+   *
+   * The contract every backend that declares it owes:
+   *
+   * - **The result is `width × height × 4` bytes** (the region's, when given;
+   *   the target's otherwise) of tightly packed, straight-alpha RGBA8 — no
+   *   row padding, regardless of the backend's own alignment rules.
+   * - **Rows run bottom-to-top**: row 0 of the result is the bottom row of
+   *   the image, matching §7a's Y-up world (recorded decision, WP-R1.6;
+   *   GL's native order, flipped on the way out by WebGPU).
+   * - **`region` is measured in target texels from the bottom-left corner**,
+   *   +Y up — the same space the result's rows are defined in. It must be
+   *   non-empty, integer-valued, and lie inside the target
+   *   ({@link validateReadbackRegion} is the shared §85 check; a violation
+   *   rejects with its `RangeError`). Omitted means the whole target.
+   * - **Rejects rather than skips.** Unlike the frame methods this one is not
+   *   called inside a frame and its caller is awaiting a value, so a lost
+   *   context, a disposed renderer or target, and a device without the
+   *   readback entry points all reject with a
+   *   {@link @four/core!FourError | FourError} (`DEVICE_LOST` /
+   *   `CONTEXT_LOST`, `INVALID_APPLICATION_STATE`,
+   *   `UNSUPPORTED_GPU_FEATURE`; §89) — a silently empty buffer would be
+   *   undefined content by another name.
+   * - **A target never rendered into reads back its zero-filled allocation**
+   *   — transparent black, the same defined answer sampling one gives.
+   *
+   * §92's visual regression tier is the first consumer; RFC 0005 names the
+   * region form as the pixel-picking fallback path.
+   */
+  readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
 
   /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at

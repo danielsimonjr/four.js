@@ -33,8 +33,12 @@ assumes the ones above it:
 4. **[Transform authority](transform-authority.md)** — §42's one-owner rule,
    authority handovers, and the §19 physics-animation blending pipeline.
 5. **[Materials and the render graph](materials-and-render-graph.md)** — the
-   shipped unlit/sprite material tier, render lists, and the honest state of
-   the §63 render graph.
+   five shipped material classes over §57's complete base (§59's
+   `StandardMaterial` and §60's `NodeMaterial` included), render lists and
+   opt-in §65 batching, and the shipped §63 render graph with its §69/§70
+   tiers. (Until 2026-08-29 this entry read "the shipped unlit/sprite
+   material tier … and the honest state of the §63 render graph", describing
+   the guide's pre-rewrite staleness.)
 6. **[Collision filtering](collision-filtering.md)** — bodies, colliders,
    physics materials, groups and masks (§24), events (§29), and queries (§30).
 7. **[Units and numerical stability](units-and-numerical-stability.md)** —
@@ -46,8 +50,11 @@ assumes the ones above it:
 9. **[Performance optimization](performance-optimization.md)** — §86 targets,
    what the committed benchmarks actually measured, and the practices the
    engine's own hot paths use.
-10. **[Custom shaders](custom-shaders.md)** — the honest state of §60: what the
-    material/shader seam looks like today and what is staged.
+10. **[Custom shaders](custom-shaders.md)** — the landed §60 node-material
+    system (RFC 0001): shader graphs, `NodeMaterialBuilder`, screen-domain
+    graph effects, per-backend registration, and what stays deferred. (Until
+    2026-08-29 this entry read "the honest state of §60 … today and what is
+    staged", describing the pre-landing guide.)
 11. **[Custom solver adapters](custom-solver-adapters.md)** — the §37
     `PhysicsWorldAdapter` contract, capabilities, and the access seams the
     shipped adapters implement.
@@ -67,6 +74,14 @@ as a guide:
     and nesting bounds on the §79 and §34 document decoders, and the CSP
     posture, which `tests/integration/security-csp.test.ts` enforces rather than
     asserts.
+
+A fifteenth carries the §77a browser-adapter recipe RFC 0004 promised a guide
+for (until 2026-08-29 it lived only in `raster.ts`'s module header):
+
+15. **[Raster painting and dynamic textures](raster-painting.md)** — §77a's
+    `RasterSource`/`CanvasTexture` seam, the DOM-free browser adapter, the
+    "nothing polls — call `update()` yourself" rule, and the §33 display-only
+    boundary painted pixels live under.
 
 ## Conventions every guide assumes
 

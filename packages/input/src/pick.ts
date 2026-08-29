@@ -45,25 +45,43 @@
  * when a node moves; a candidate list is rebuilt only when the *set* of
  * candidates changes.
  *
- * §71's `node.hitTestMode` field is not implemented: `Node` has no such field
- * yet, and the mode selection it drives ("the engine should select the cheapest
- * valid method by default") is only meaningful once there are several methods
- * to select between. Until then the candidate list *is* the filter — a node
- * absent from it is not pickable, which is the honest spelling of
- * `hitTestMode = "none"`.
+ * ## `node.hitTestMode` (§71; A-11's analytic tier, adopted RFC 0005 Q3)
  *
- * TODO(§71, §50): analytic primitive tests (plane, circle, rectangle, path
- * geometry) arrive with the §50 shape nodes, whose parameters — a circle's
- * radius, a path's segments — are what an analytic test needs; a `Pickable`
- * carrying a box cannot express them, and inventing a shape union here would
- * pre-empt §50. Ray/triangle (`"geometry"`) needs `@four/geometry` index
- * data, so it stays with that packet. The other two landed with RFC 0005
- * (2026-08-28): pixel-alpha (`"pixel"`) for CPU-resident texels is
- * {@link Pickable.alphaMask} below, and the GPU identifier buffer (`"gpu"`)
- * — which needs a renderer this package may not import — reaches pointer
- * handlers through the structural {@link PickProvider} seam, implemented in
- * `@four/render` / `@four/render-webgl` and adapted by `@four/four`'s
- * `createPickProvider`.
+ * Since 2026-08-29 `Node.hitTestMode` exists and {@link pick} dispatches on it
+ * per candidate:
+ *
+ * - **`null`** — the default, §71's *"the engine should select the cheapest
+ *   valid method"*: the box test, refined by whatever data the candidate
+ *   carries ({@link Pickable.triangles} first, then {@link Pickable.alphaMask}
+ *   sampled at the refined distance). A candidate carrying neither is the
+ *   plain bounds tier, byte-for-byte what it was before the field existed.
+ * - **`"bounds"`** — the box alone; attached refinement data is deliberately
+ *   ignored, because the author forced the cheapest method.
+ * - **`"geometry"`** — exact ray/triangle against
+ *   {@link Pickable.triangles}, which must be present (§85).
+ * - **`"pixel"`** — the box hit must land on a present texel of
+ *   {@link Pickable.alphaMask}, which must be present (§85).
+ * - **`"gpu"`** — the candidate is skipped before its box is even tested:
+ *   RFC 0005's id-buffer pass is that strategy's implementation, reached
+ *   through {@link PickProvider}, and one pointer event must not resolve the
+ *   node twice.
+ *
+ * A node absent from the candidate list is still not pickable at all — the
+ * honest spelling of `hitTestMode = "none"`, unchanged.
+ *
+ * §71's remaining strategy names collapse into these tiers rather than into
+ * code of their own. **Analytic primitive testing** and **path geometry
+ * testing** are the `"geometry"` tier fed with a shape's tessellation: a §50
+ * circle's parameters reach picking as the triangles `toPath()` + the fill
+ * tessellator already produce for drawing, so what draws is what picks —
+ * §51's flattening tolerance included — through one exact code path instead
+ * of a per-primitive zoo. **Ray/triangle intersection** is that tier's own
+ * name. The **GPU identifier buffer** landed with RFC 0005 (2026-08-28) in
+ * `@four/render` / `@four/render-webgl`, adapted by `four`'s
+ * `createPickProvider`; **pixel-alpha testing** for CPU-resident texels is
+ * {@link Pickable.alphaMask} (alternative D). **Custom callbacks** are the
+ * one §71 strategy still absent, and `HitTestMode` deliberately omits
+ * `"custom"` until they exist.
  *
  * ## Why the box test runs in local space
  *
@@ -389,6 +407,60 @@ export interface PickableAlphaMask {
 }
 
 /**
+ * §71's `"geometry"` strategy (A-11's analytic tier, 2026-08-29): the
+ * tessellated triangles a candidate's true shape is made of, in the node's
+ * **local space**, so a box hit can be confirmed — or rejected — by exact
+ * ray/triangle intersection. The box stays the broad phase; the triangles are
+ * what say a concave silhouette's notch, a circle's corner gap, or a mesh's
+ * empty margin was *not* hit.
+ *
+ * The record is **structural** for the module header's reason: `@four/input`
+ * may not import `@four/geometry` (plan §3.1), so the layout is
+ * `BufferGeometry`'s own (`positions`/`indices`) without naming it, and the
+ * layer that sees geometry builds the record in one line:
+ *
+ * ```ts
+ * // in the application, which may import @four/geometry:
+ * pickable.triangles = { positions: geometry.positions, indices: geometry.indices };
+ * ```
+ *
+ * ## The test
+ *
+ * Möller–Trumbore per triangle, in the candidate's local space with the
+ * deliberately unnormalized local ray — so, exactly as the box test's, the
+ * reported parameter *is* the world-space distance under any affine
+ * transform. Triangles are tested in index order and the smallest `t >= 0`
+ * wins; **winding does not matter** (no backface culling — §71 states no
+ * winding rule, and a 2D shape must pick from either side of its plane). A
+ * triangle the ray runs exactly parallel to is skipped, as is any triangle
+ * whose arithmetic degenerates to `NaN` — the same fail-toward-miss
+ * discipline the internal box test (`intersectBox`) documents.
+ *
+ * ## Validation (§85), once per record
+ *
+ * A record is checked the first time it is consulted — lengths in threes, and
+ * every index inside `positions` ("invalid geometry indices", §85) — then
+ * remembered, because re-scanning an index array per pick would put an O(n)
+ * pass on a hot path (`BufferGeometry` validates on assignment for the same
+ * reason). In-place edits after that first consult are therefore **not**
+ * re-validated — `markDirty`'s own rule — and an index left dangling by one
+ * reads as `NaN` arithmetic, which misses rather than crashes.
+ */
+export interface PickableTriangles {
+  /**
+   * Vertex positions, 3 floats per vertex, in the node's local space —
+   * `BufferGeometry.positions`' layout, and usually that very array.
+   */
+  positions: Float32Array;
+  /**
+   * Triangle indices into `positions`, 3 per triangle —
+   * `BufferGeometry.indices`' layout. Absent means non-indexed: consecutive
+   * position triples are the triangles.
+   */
+  indices?: Uint16Array | Uint32Array;
+}
+
+/**
  * A picking candidate: a node plus the box, **in that node's local space**,
  * that stands in for its shape (§71's bounding-volume strategy).
  *
@@ -412,6 +484,15 @@ export interface Pickable {
    * bounds tier byte-for-byte what it was.
    */
   alphaMask?: PickableAlphaMask;
+  /**
+   * §71's `"geometry"` refinement (A-11's analytic tier): confirm a box hit
+   * by exact ray/triangle intersection against these local-space triangles,
+   * refining the hit's distance and point to the actual surface. Absent —
+   * every candidate before this field existed — means the box (and any
+   * {@link Pickable.alphaMask}) decides as before. Consulted under
+   * `hitTestMode` `null` and `"geometry"`; see {@link PickableTriangles}.
+   */
+  triangles?: PickableTriangles;
 }
 
 /** One intersection between a pick ray and a {@link Pickable}. */
@@ -552,6 +633,163 @@ function passesAlphaMask(
 }
 
 /**
+ * Records already validated by {@link assertTriangles}, so the O(n) index scan
+ * runs once per record rather than once per pick — see the §85 section on
+ * {@link PickableTriangles} for why (and for the in-place-edit caveat that
+ * cache buys). A `WeakSet`, so a discarded record takes its entry with it.
+ */
+const validatedTriangles = new WeakSet<PickableTriangles>();
+
+/**
+ * Refuses a malformed {@link PickableTriangles} (§85) — a `positions` or
+ * `indices` length that is not whole triangles, or an index outside
+ * `positions` (§85's "invalid geometry indices"; the typed index arrays
+ * cannot hold a negative or fractional one, so the upper bound is the whole
+ * check). Refused rather than skipped, for {@link assertAlphaMask}'s reason:
+ * a candidate that *asked* for exact testing and silently fell back to the
+ * box would pick where the author's real shape is not. Validated where the
+ * triangles are first consulted, then cached — see {@link validatedTriangles}.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`.
+ */
+function assertTriangles(triangles: PickableTriangles, node: Node): void {
+  if (validatedTriangles.has(triangles)) {
+    return;
+  }
+  const { positions, indices } = triangles;
+  const vertexCount = positions.length / 3;
+  if (
+    positions.length % 3 !== 0 ||
+    (indices === undefined ? vertexCount % 3 !== 0 : indices.length % 3 !== 0)
+  ) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `§71: malformed triangles on "${node.id}" — not whole triangles (§85).`,
+      {
+        context: {
+          node: node.id,
+          positionsLength: positions.length,
+          indicesLength: indices?.length ?? null,
+        },
+      },
+    );
+  }
+  if (indices !== undefined) {
+    for (let i = 0; i < indices.length; i += 1) {
+      if (indices[i] >= vertexCount) {
+        throw new FourError(
+          "INVALID_APPLICATION_STATE",
+          `§71: triangle index outside positions on "${node.id}" (§85).`,
+          { context: { node: node.id, index: indices[i], vertexCount } },
+        );
+      }
+    }
+  }
+  validatedTriangles.add(triangles);
+}
+
+/**
+ * Smallest `t >= 0` at which the module's local ray meets a triangle of
+ * `triangles`, or {@link MISS} — §71's ray/triangle strategy, Möller–Trumbore
+ * per triangle (see {@link PickableTriangles} for the contract: unnormalized
+ * local direction so `t` is world distance, index-order iteration so the
+ * result is §33-deterministic, no backface culling).
+ *
+ * The `u`/`v`/`t` guards are written in the **accepting** direction
+ * (`!(u >= 0 && …)`) so a `NaN` produced by degenerate data fails toward a
+ * miss — {@link intersectBox}'s discipline. An exactly-parallel ray makes
+ * `det === 0` and skips the triangle; a merely near-parallel one survives the
+ * division and is discarded by the barycentric bounds, since `1 / det` blows
+ * `u` and `v` far outside `[0, 1]`.
+ *
+ * Reads the module's local-ray scratch, so it must run while that still
+ * describes this candidate — immediately after {@link intersectBox}, exactly
+ * as {@link passesAlphaMask} must.
+ */
+function intersectTriangles(triangles: PickableTriangles): number {
+  const positions = triangles.positions;
+  const indices = triangles.indices;
+  const triangleCount =
+    (indices === undefined ? positions.length / 3 : indices.length) / 3;
+  const ox = localOrigin.x;
+  const oy = localOrigin.y;
+  const oz = localOrigin.z;
+  const dx = localDirection.x;
+  const dy = localDirection.y;
+  const dz = localDirection.z;
+
+  let best = MISS;
+  for (let i = 0; i < triangleCount; i += 1) {
+    const corner = 3 * i;
+    const a = 3 * (indices === undefined ? corner : indices[corner]);
+    const b = 3 * (indices === undefined ? corner + 1 : indices[corner + 1]);
+    const c = 3 * (indices === undefined ? corner + 2 : indices[corner + 2]);
+    const ax = positions[a];
+    const ay = positions[a + 1];
+    const az = positions[a + 2];
+
+    const edge1x = positions[b] - ax;
+    const edge1y = positions[b + 1] - ay;
+    const edge1z = positions[b + 2] - az;
+    const edge2x = positions[c] - ax;
+    const edge2y = positions[c + 1] - ay;
+    const edge2z = positions[c + 2] - az;
+
+    // p = direction × edge2; det = edge1 · p.
+    const px = dy * edge2z - dz * edge2y;
+    const py = dz * edge2x - dx * edge2z;
+    const pz = dx * edge2y - dy * edge2x;
+    const det = edge1x * px + edge1y * py + edge1z * pz;
+    if (det === 0) {
+      continue;
+    }
+    const inverseDet = 1 / det;
+
+    const sx = ox - ax;
+    const sy = oy - ay;
+    const sz = oz - az;
+    const u = (sx * px + sy * py + sz * pz) * inverseDet;
+    if (!(u >= 0 && u <= 1)) {
+      continue;
+    }
+
+    // q = s × edge1.
+    const qx = sy * edge1z - sz * edge1y;
+    const qy = sz * edge1x - sx * edge1z;
+    const qz = sx * edge1y - sy * edge1x;
+    const v = (dx * qx + dy * qy + dz * qz) * inverseDet;
+    if (!(v >= 0 && u + v <= 1)) {
+      continue;
+    }
+
+    const t = (edge2x * qx + edge2y * qy + edge2z * qz) * inverseDet;
+    if (t >= 0 && (best === MISS || t < best)) {
+      best = t;
+    }
+  }
+  return best;
+}
+
+/**
+ * Refuses a candidate whose node demanded a strategy its `Pickable` carries
+ * no data for (§85) — `"geometry"` without {@link Pickable.triangles},
+ * `"pixel"` without {@link Pickable.alphaMask}. Refused rather than fallen
+ * back, because an explicit `hitTestMode` is precisely the author saying the
+ * box is *not* an acceptable answer; and refused from here — after the box
+ * gate, where the data would first be consulted — matching where a malformed
+ * mask or triangle record is caught.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`.
+ */
+function refuseMissingModeData(node: Node, mode: string, field: string): never {
+  throw new FourError(
+    "INVALID_APPLICATION_STATE",
+    `§71: hitTestMode "${mode}" on "${node.id}" but its candidate carries no ${field} (§85).`,
+    { context: { node: node.id, mode, field } },
+  );
+}
+
+/**
  * Tests the picking ray through `(ndcX, ndcY)` against every candidate and
  * returns the hits, **nearest first** (§71).
  *
@@ -579,6 +817,16 @@ function passesAlphaMask(
  * a node collapsed to nothing. A degenerate camera whose ray has no direction
  * yields no hits at all.
  *
+ * `node.hitTestMode` selects each candidate's strategy — the module header
+ * has the full table. In brief: `null` (the default) refines the box hit by
+ * whatever the candidate carries; `"bounds"`, `"geometry"` and `"pixel"`
+ * force one strategy, the latter two **throwing** `FourError`
+ * (`INVALID_APPLICATION_STATE`, §85) when their box is hit but the candidate
+ * carries no {@link Pickable.triangles} / {@link Pickable.alphaMask}; and a
+ * `"gpu"` candidate is never tested here at all. A geometry-refined hit
+ * reports the distance and point of the triangle actually under the pointer,
+ * not the box entry.
+ *
  * Allocation follows plan D7: pass `out` and the steady state allocates
  * nothing — the hits are pooled per array and rewritten in place, which is why
  * a hit (and its `point`) read after the next `pick` into the same array
@@ -604,6 +852,14 @@ export function pick(
   if (rayDirection.lengthSq() > 0) {
     for (let i = 0; i < pickables.length; i += 1) {
       const pickable = pickables[i];
+      const mode = pickable.node.hitTestMode;
+      // §71's "gpu" strategy is the id-buffer pass's to answer (RFC 0005),
+      // reached through a PickProvider — the ray tier stands aside before the
+      // box is even tested, so one pointer event cannot resolve the node
+      // twice.
+      if (mode === "gpu") {
+        continue;
+      }
       const min = pickable.boundsMin;
       const max = pickable.boundsMax;
       if (!(min.x <= max.x && min.y <= max.y && min.z <= max.z)) {
@@ -621,18 +877,43 @@ export function pick(
 
       // `t` is a world-space distance despite being solved in local space —
       // the local direction is deliberately left unnormalized.
-      const t = intersectBox(localOrigin, localDirection, min, max);
+      let t = intersectBox(localOrigin, localDirection, min, max);
       if (t === MISS) {
         continue;
       }
 
-      // §71's `"pixel"` refinement (RFC 0005 alternative D): a candidate that
-      // carries texels is hit only where they are present. Validated here —
-      // the first moment the mask is actually consulted — and absent on every
-      // pre-existing candidate, which is what keeps the bounds tier's results
-      // byte-for-byte what they were.
-      const mask = pickable.alphaMask;
-      if (mask !== undefined) {
+      // §71's refinements, dispatched on `node.hitTestMode` (module header):
+      // the default `null` applies whatever the candidate carries — triangles
+      // first, the mask sampled at the refined distance — which is exactly
+      // the pre-field behaviour for every candidate that carries neither; an
+      // explicit mode selects one strategy and requires its data (§85);
+      // "bounds" runs neither block. Validated here — the first moment each
+      // record is actually consulted.
+      const triangles =
+        mode === null || mode === "geometry" ? pickable.triangles : undefined;
+      if (triangles === undefined) {
+        if (mode === "geometry") {
+          refuseMissingModeData(pickable.node, mode, "triangles");
+        }
+      } else {
+        // §71's `"geometry"` refinement (A-11's analytic tier): the exact
+        // surface distance replaces the box-entry distance, so the reported
+        // hit lies on the triangle actually under the pointer.
+        assertTriangles(triangles, pickable.node);
+        t = intersectTriangles(triangles);
+        if (t === MISS) {
+          continue;
+        }
+      }
+      const mask =
+        mode === null || mode === "pixel" ? pickable.alphaMask : undefined;
+      if (mask === undefined) {
+        if (mode === "pixel") {
+          refuseMissingModeData(pickable.node, mode, "alphaMask");
+        }
+      } else {
+        // §71's `"pixel"` refinement (RFC 0005 alternative D): a candidate
+        // that carries texels is hit only where they are present.
         assertAlphaMask(mask, pickable.node);
         if (!passesAlphaMask(mask, min, max, t)) {
           continue;

@@ -56,6 +56,8 @@ export type {
   ParticleBurst,
   ParticleColor,
   ParticleForceField,
+  ParticleGpuSimulation,
   ParticleLifetimeRamp,
   ParticleRange,
+  ParticleSimulationMode,
 } from "./types.js";

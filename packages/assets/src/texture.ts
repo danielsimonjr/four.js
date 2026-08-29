@@ -311,19 +311,25 @@ function flipRows(texels: DecodedTexels): Uint8Array {
 }
 
 /**
- * Builds a texture loader around a platform decoder (§77, §96).
+ * Builds the fetch-free half of the texture tier: encoded bytes in, a
+ * checked, flipped, tagged {@link TextureAsset} out (§77, §96).
  *
- * @param options - The decoder, the sampler metadata to attach, and the §96
- *   decoded-size bounds. See the module comment for the row-order flip and for
- *   why the bounds are post-decode without a {@link TextureLoaderOptions.probe}.
- * @returns A loader producing a `Disposable`, `TextureSource`-shaped
- *   {@link TextureAsset}. Each call returns a distinct object, hence a distinct
- *   asset-manager cache slot — hoist it to a module constant.
+ * This is {@link createTextureLoader}'s whole decode path as a standalone
+ * function, for callers that already hold the encoded bytes — the §78 glTF
+ * loader's embedded and buffer-view images are the first (`gltf.ts`), and an
+ * application streaming images from somewhere `fetch` cannot reach is the
+ * same shape. Every rule is identical because it is literally the same code:
+ * the §96 pre-/post-decode bounds, the §85 dimension checks, and the §7a row
+ * flip.
+ *
+ * @param options - As {@link createTextureLoader}.
+ * @returns An async `(encoded, url) => TextureAsset` decoder; `url` labels
+ *   errors only.
  * @throws FourError `INVALID_APPLICATION_STATE` for a non-positive limit.
  */
-export function createTextureLoader(
+export function createTextureDecoder(
   options: TextureLoaderOptions,
-): AssetLoader<TextureAsset> {
+): (encoded: ArrayBuffer, url: string) => Promise<TextureAsset> {
   const name = options.name ?? "texture";
   const flipY = options.flipY ?? true;
   const maximumDecodedBytes = positiveBound(
@@ -371,64 +377,85 @@ export function createTextureLoader(
     }
   };
 
-  return {
-    name,
-    async load(response: FetchResponse, url: string): Promise<TextureAsset> {
-      const encoded = await response.arrayBuffer();
+  return async (encoded: ArrayBuffer, url: string): Promise<TextureAsset> => {
+    // Pre-decode refusal, when the caller gave this loader a way to look.
+    const claimed = options.probe?.(encoded);
+    if (claimed !== undefined) {
+      check(
+        url,
+        claimed.width * claimed.height * 4,
+        encoded.byteLength,
+        "probe",
+      );
+    }
 
-      // Pre-decode refusal, when the caller gave this loader a way to look.
-      const claimed = options.probe?.(encoded);
-      if (claimed !== undefined) {
-        check(
-          url,
-          claimed.width * claimed.height * 4,
-          encoded.byteLength,
-          "probe",
-        );
-      }
-
-      const texels = await options.decode(encoded);
-      const { width, height, data } = texels;
-      if (
-        !Number.isInteger(width) ||
-        width < 1 ||
-        !Number.isInteger(height) ||
-        height < 1
-      ) {
-        throw new FourError(
-          "ASSET_LOAD_FAILED",
-          `"${url}" decoded to ${String(width)} × ${String(height)}; a texture ` +
-            `needs finite integer dimensions of at least 1 (§85).`,
-          { context: { url, loader: name, width, height } },
-        );
-      }
-      if (data.length !== width * height * 4) {
-        throw new FourError(
-          "ASSET_LOAD_FAILED",
-          `"${url}" decoded to ${String(data.length)} bytes for a ` +
-            `${String(width)} × ${String(height)} RGBA8 image, which needs ` +
-            `${String(width * height * 4)} (§77).`,
-          {
-            context: {
-              url,
-              loader: name,
-              width,
-              height,
-              observed: data.length,
-            },
-          },
-        );
-      }
-      check(url, data.length, encoded.byteLength, "decode");
-
-      return new TextureAsset(
-        flipY ? { width, height, data: flipRows(texels) } : texels,
+    const texels = await options.decode(encoded);
+    const { width, height, data } = texels;
+    if (
+      !Number.isInteger(width) ||
+      width < 1 ||
+      !Number.isInteger(height) ||
+      height < 1
+    ) {
+      throw new FourError(
+        "ASSET_LOAD_FAILED",
+        `"${url}" decoded to ${String(width)} × ${String(height)}; a texture ` +
+          `needs finite integer dimensions of at least 1 (§85).`,
+        { context: { url, loader: name, width, height } },
+      );
+    }
+    if (data.length !== width * height * 4) {
+      throw new FourError(
+        "ASSET_LOAD_FAILED",
+        `"${url}" decoded to ${String(data.length)} bytes for a ` +
+          `${String(width)} × ${String(height)} RGBA8 image, which needs ` +
+          `${String(width * height * 4)} (§77).`,
         {
-          colorSpace: options.colorSpace,
-          filter: options.filter,
-          wrap: options.wrap,
+          context: {
+            url,
+            loader: name,
+            width,
+            height,
+            observed: data.length,
+          },
         },
       );
+    }
+    check(url, data.length, encoded.byteLength, "decode");
+
+    return new TextureAsset(
+      flipY ? { width, height, data: flipRows(texels) } : texels,
+      {
+        colorSpace: options.colorSpace,
+        filter: options.filter,
+        wrap: options.wrap,
+      },
+    );
+  };
+}
+
+/**
+ * Builds a texture loader around a platform decoder (§77, §96).
+ *
+ * The whole decode path is {@link createTextureDecoder}; this wraps it as an
+ * {@link AssetLoader} for the manager's fetch pipeline.
+ *
+ * @param options - The decoder, the sampler metadata to attach, and the §96
+ *   decoded-size bounds. See the module comment for the row-order flip and for
+ *   why the bounds are post-decode without a {@link TextureLoaderOptions.probe}.
+ * @returns A loader producing a `Disposable`, `TextureSource`-shaped
+ *   {@link TextureAsset}. Each call returns a distinct object, hence a distinct
+ *   asset-manager cache slot — hoist it to a module constant.
+ * @throws FourError `INVALID_APPLICATION_STATE` for a non-positive limit.
+ */
+export function createTextureLoader(
+  options: TextureLoaderOptions,
+): AssetLoader<TextureAsset> {
+  const decode = createTextureDecoder(options);
+  return {
+    name: options.name ?? "texture",
+    async load(response: FetchResponse, url: string): Promise<TextureAsset> {
+      return decode(await response.arrayBuffer(), url);
     },
   };
 }

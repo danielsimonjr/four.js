@@ -40,6 +40,11 @@
 
 export const PACKAGE_NAME = "@four/physics";
 
+// §81's physics-side capability token (RFC 0002), declared by the package
+// that owns the §37 registry; `@four/four`'s `plugins.ts` re-exports the same
+// object, so both import paths hand out one identity.
+export { SOLVER_REGISTRY } from "./capabilities.js";
+
 export type {
   PhysicsCapabilities,
   PhysicsQueryCapabilities,

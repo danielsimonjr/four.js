@@ -11,8 +11,22 @@ export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
 export type { BoundingSphere } from "./bounds.js";
 export { computeWorldBoundingSphere } from "./bounds.js";
 
+// §81's render-side capability tokens (RFC 0002), declared by the package
+// that owns each registry; `@four/four`'s `plugins.ts` re-exports the same
+// objects, so both import paths hand out one identity.
+export { RENDERER_REGISTRY, RENDER_GRAPH } from "./capabilities.js";
+
 export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
 export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
+
+export type {
+  ComputeBinding,
+  ComputeBindingAccess,
+  ComputeBuffer,
+  ComputeDispatcher,
+  ComputePassDescriptor,
+} from "./compute.js";
+export { COMPUTE_ENTRY_POINT, supportsCompute } from "./compute.js";
 
 export type {
   ColorGradeEffect,
@@ -134,6 +148,8 @@ export type {
   RasterSource,
 } from "./raster.js";
 export { CanvasTexture } from "./raster.js";
+export type { PixelReader } from "./read-pixels.js";
+export { supportsReadPixels, validateReadbackRegion } from "./read-pixels.js";
 export type { PickRequest, PickResult, PickingService } from "./picking.js";
 export {
   MAX_PICK_CANDIDATES,
@@ -153,6 +169,9 @@ export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export { MAX_SKINNING_JOINTS, Mesh, restoreMeshSkeleton } from "./mesh.js";
 export type {
+  RendererCapabilityDeclaration,
+  RendererCapabilityName,
+  RendererCapabilityShortfall,
   RendererFallbackReason,
   RendererFallbackReport,
   RendererRegistration,
@@ -161,11 +180,14 @@ export type {
 } from "./renderer-registry.js";
 export {
   AUTO_RENDERER_ORDER,
+  RENDERER_CAPABILITY_NAMES,
   RendererRegistry,
   clearRegisteredRenderers,
+  missingCapabilities,
   registerRenderer,
   registeredRenderers,
   resolveRenderer,
+  validateCapabilityDeclaration,
 } from "./renderer-registry.js";
 export type {
   RenderInterpolation,
@@ -195,20 +217,33 @@ export type {
   ArcOptions,
   CircleOptions,
   EllipseOptions,
+  GradientStop,
+  LinearGradientPaint,
   LineOptions,
+  ObjectPaint,
   Paint,
   PathShapeOptions,
+  PatternPaint,
   PolygonOptions,
   PolylineOptions,
+  RadialGradientPaint,
   RectangleOptions,
   RegularPolygonOptions,
   RingOptions,
   SectorOptions,
+  ResolvedGradientStop,
+  ResolvedLinearGradientPaint,
+  ResolvedObjectPaint,
   ResolvedPaint,
+  ResolvedPatternPaint,
+  ResolvedRadialGradientPaint,
   ResolvedShapeFill,
+  ResolvedSolidPaint,
   ResolvedStrokeStyle,
   Shape2DOptions,
   ShapeFill,
+  ShapePaintPlan,
+  ShapePaintSupport,
   SolidPaint,
   StarOptions,
   StrokeStyle,
@@ -216,6 +251,7 @@ export type {
 export {
   Arc,
   Circle,
+  clearRegisteredShapePaints,
   Ellipse,
   Line,
   PathShape,
@@ -223,11 +259,14 @@ export {
   Polyline,
   Rectangle,
   RegularPolygon,
+  resolveShapePaintSupport,
   Ring,
   Sector,
+  setShapePaintSupport,
   Shape2D,
   Star,
 } from "./shape.js";
+export { registerShapePaints } from "./shape-paint.js";
 export type { SpriteFrame, SpriteOptions } from "./sprite.js";
 export { Sprite } from "./sprite.js";
 export type {

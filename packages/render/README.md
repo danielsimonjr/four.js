@@ -14,9 +14,9 @@ Implements the MVP tier of §61–66 in [`docs/SPECIFICATION.md`](../../docs/SPE
 - **`Sprite` and `Texture`** — the §55/§77 MVP tier (`TextureSource` accepts what `@four/text`'s glyph atlas emits).
 - **Particle contract** — `ParticleDrawable` (duck-typed toward `@four/particles`; the dependency matrix forbids the direct edge), `particleQuadGeometry`, and the stride-8 instance layout constants (`PARTICLE_INSTANCE_FLOATS` and offsets).
 - **`Shape2D` and §50's twelve shape nodes** — `Circle`, `Ellipse`, `Rectangle` (rounded or not), `RegularPolygon`, `Polygon`, `Star`, `Sector`, `Ring`, `PathShape`, and the three stroke-only primitives `Line`, `Polyline`, `Arc`. Every one derives and owns its geometry from a §51 `Path`.
-- **§58 paints, fills and strokes** — `Paint`/`SolidPaint` at the solid tier, `ShapeFill`, and `StrokeStyle` over §52's `expandStroke`. The two colours travel as per-vertex colour through the existing unlit pipeline, so a stroked, painted shape is still one draw with no new render-item kind. Gradients, patterns and the anti-alias fringe are staged with the `ShapeMaterial` pipeline that would give them an exact tier.
+- **§58 paints, fills and strokes** — `Paint`/`SolidPaint` at the solid tier, `ShapeFill`, and `StrokeStyle` over §52's `expandStroke`. Solid colours travel as per-vertex colour through the existing unlit pipeline, so a stroked, painted shape is still one draw with no new render-item kind. The **paint-object tier** (2026-08-29, behind `registerShapePaints()`) adds `LinearGradientPaint`, `RadialGradientPaint`, and `PatternPaint` (image _and_ render-target textures): a shape constructed without a `material` derives a §60 `NodeMaterial` that evaluates its paints exactly per fragment, drawn through RFC 0001's `"node"` pipeline — still one geometry, one draw. Conic gradients are refused naming §60's missing angle operator; the anti-alias fringe remains staged (it needs a coverage attribute no §57 pipeline reads).
 
-_Added 2026-08-09 (gaps `R-23`, `R-16`, `R-8`): the sections above listed neither the shape family, the paint model, nor the per-view lists._
+_Added 2026-08-09 (gaps `R-23`, `R-16`, `R-8`): the sections above listed neither the shape family, the paint model, nor the per-view lists. Paint-object tier added 2026-08-29 (R-16's follow-up)._
 
 ## Staged / not yet implemented
 

@@ -22,6 +22,8 @@ import {
   registerRenderer,
   type RendererBackend,
   type RendererCapabilities,
+  type RendererCapabilityDeclaration,
+  type RendererCapabilityShortfall,
   type RendererFallbackReport,
 } from "@four/render";
 import {
@@ -1574,6 +1576,68 @@ describe("Application — §45 renderer selection (R-2 / A-8)", () => {
     expect(reports).toHaveLength(1);
     expect(reports[0]?.backend).toBe("webgpu");
     expect(reports[0]?.reason).toBe("initialization-failed");
+  });
+
+  it("forwards §62's capability declaration and its shortfall report (WP-R1.9)", async () => {
+    const { registry } = registryWith([
+      { backend: "webgpu" },
+      { backend: "webgl2" },
+    ]);
+    // The doubles report no `computeShaders` member at all — the tri-state's
+    // "not taught to answer", which must not satisfy a requirement — so
+    // `"auto"` skips webgpu and webgl2 alike and the selection exhausts;
+    // requiring nothing but declaring the optional interest selects webgpu
+    // and reports the shortfall instead.
+    const fallbacks: RendererFallbackReport[] = [];
+    const strict = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      rendererCapabilities: { required: ["computeShaders"] },
+      onRendererFallback: (report) => fallbacks.push(report),
+    });
+    let thrown: unknown;
+    try {
+      await strict.initialize();
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(isFourError(thrown)).toBe(true);
+    expect(fallbacks.map((report) => report.reason)).toEqual([
+      "missing-capability",
+      "missing-capability",
+    ]);
+
+    const relaxed = registryWith([{ backend: "webgpu" }]);
+    const shortfalls: RendererCapabilityShortfall[] = [];
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: relaxed.registry,
+      rendererCapabilities: { optional: ["computeShaders"] },
+      onRendererCapabilityShortfall: (report) => shortfalls.push(report),
+    });
+    await app.initialize();
+    expect(app.renderer?.capabilities.backend).toBe("webgpu");
+    expect(shortfalls).toEqual([
+      {
+        backend: "webgpu",
+        capability: "computeShaders",
+        answer: undefined,
+        requirement: "optional",
+      },
+    ]);
+  });
+
+  it("rejects initialize for a malformed capability declaration (§85)", async () => {
+    const { registry } = registryWith([{ backend: "webgl2" }]);
+    const app = new Application({
+      renderer: "auto",
+      rendererRegistry: registry,
+      rendererCapabilities: {
+        required: ["bloom"],
+      } as unknown as RendererCapabilityDeclaration,
+    });
+    await expect(app.initialize()).rejects.toThrow(RangeError);
+    expect(app.initialized).toBe(false);
   });
 
   it("rejects initialize when the selection cannot be satisfied (§62, §89)", async () => {

@@ -10,12 +10,23 @@ changes in `CHANGELOG.md`.
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
 
+- [x] **Gap-analysis campaign CLOSED 2026-08-29 — v2 written.**
+      `docs/GAP ANALYSIS v2.md` supersedes v1 (banner added): 74 closed / 21
+      partial / 2 open (`R-32`, `R-33`) / 0 RFC-blocked of 97 filings. The
+      owner-only remainder is v2 §5's table: stub packaging (row 10),
+      NPM_TOKEN + Pages (row 11), §93 stand-ins (row 12), the spec-amendment
+      successor queue (row 13 — its original four items were discharged by
+      revision 1.8; only §60's angle operator survives), payload policy
+      (row 14), PH-11c, the §60a defaults flip, the prettier exemption,
+      PH-22f/j/l, R-26's XML seam, A-24's §83 corner. Full gate suite green on
+      `df572c6` incl. the 101-test browser gate (readpixels-region first run
+      recorded, goldens byte-unchanged).
 - [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
       2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → ~~0001 shader/node
       materials (done 2026-08-28)~~ → ~~0005 pixel picking (done
       2026-08-29)~~ → ~~0004 raster
       painting (done 2026-08-29)~~. **The RFC queue (0001–0005) is COMPLETE.**
-      Remaining R-1 packets: WP-R1.8 (in flight), WP-R1.9 WGSL emitter.
+      R-1 completed 2026-08-29 (WP-R1.1–R1.9 all landed).
 - [ ] **RFC 0004 residue (all deferred by the RFC's own §6 table, none
       scheduled):** video textures (frame-arrival signal, DOM-free);
       `ImageBitmap`/decoded-image raster sources (A-18's generic
@@ -25,29 +36,56 @@ changes in `CHANGELOG.md`.
       determinism argument; explicitly must not ride on 0004 or 0005); the §62
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
-      that packet's named obligation); a docs/guides page carrying the browser
-      adapter (recipe currently lives in `raster.ts`'s header and §77a).
+      that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
+      `docs/guides/raster-painting.md`, listed as guide 15).
 
+- [x] **A-11 analytic tier (`"geometry"`) — DONE 2026-08-29** (adopted RFC 0005
+      Q3 executed): `node.hitTestMode` (`null` default = engine-selects;
+      `"custom"` omitted until a callback strategy exists) +
+      `Pickable.triangles` + exact ray/triangle in `@four/input` (no new edge),
+      §79 via one wrapper over every umbrella pair (unset scenes
+      byte-identical), §85 refusals, §33 pure-math determinism pinned. 36 new
+      tests; input/four/geometry 100×4. **A-11 is closed.** ui-demo budget
+      bumped 44 → 44.5 kB at landing (A/B: the tier riding ui-demo's `pick()`).
 - [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
       then particle systems pick by bounds only); §86 rows still owed: id-pass
       cost vs the flagship list and measured fence-vs-stall pick latency;
       WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material; §72
-      pointer-event dispatch on a `PickProvider` result is an input packet. The
-      analytic `"geometry"` tier (+ `node.hitTestMode` per the adopted Q3)
-      remains A-11's own follow-up packet, unblocked.
-- [ ] **docs/COMPATIBILITY.md §2 is stale beyond the two rows fixed 2026-08-29**
-      (WebGPU row updated to the R1.1–R1.6 truth; §71 picking row added): the
-      WebGL feature table still says four pipelines / batching absent / one
-      directional light, the capability paragraph still says two of eleven
-      fields, and the `renderer: "auto"` paragraph predates A-8's closure
-      (registries + "auto" landed 2026-08-07). Needs a §2 refresh packet or the
-      closing honesty pass.
+      pointer-event dispatch on a `PickProvider` result is an input packet. The analytic
+      `"geometry"` tier + `node.hitTestMode` landed 2026-08-29 — A-11 closed;
+      only the render-side residues above remain here.
+- [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
+      sweep): §2 rewritten to the tip — seven init pipelines + three registered
+      seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
+      capability fields across fourteen members with per-backend honesty,
+      WP-R1.9 declaration, "auto" implemented; WebGPU row moved to
+      R-1-complete; two §1 consequences corrected. check-compat green.
+- [x] **packages/render/src/renderer.ts capability doc-comment overclaims — DONE
+      2026-08-29**: the doc now records the R-30b omissions
+      (`maxUniformBufferBytes`/`maxBindings` on `WebglRenderer`) and
+      `WebgpuRenderer`'s absent `maximumSkinningJoints`; the phantom
+      `MAX_VERTEX_UNIFORM_VECTORS` conversion aside is deleted. Comment-only;
+      `@four/render` 627 tests and `pnpm run docs` (0 warnings) green.
+- [x] **docs/guides/materials-and-render-graph.md — DONE 2026-08-29**: rewritten
+      to the tip (§60 RFC 0001, §62 R-1 complete, §65 opt-in R-9, §68–§70
+      R-17/R-18/R-6, §55 `frame` R-29), every claim verified in source; four
+      further stale claims found and fixed (§57–§59 row, class count, blending
+      and colour-edit bullets, sort keys). Guides README item 5 updated. The
+      packet's own found-not-fixed items (AUDIT-120 sprites row, CLAUDE.md stub
+      count) were fixed at landing.
+- [x] **tools/check-docs.mjs §55-batched pin — DONE 2026-08-29**: pin kept
+      (batching is opt-in — `renderer.batching` defaults to `null`, so the
+      unqualified "batched" is still false of the default path; a truthful
+      sentence says "opt-in" and cannot match the retired form); rationale
+      rewritten to say so. check-docs green, 10 pins.
+
       0001's landing decides WP-R1.9's
-      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-      reachability are backend-independent and re-exported through `@four/render`;
-      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-      (screen domain included, for §70 graph effects).
+                                          input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                                          reachability are backend-independent and re-exported through `@four/render`;
+                                          the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                                          (screen domain included, for §70 graph effects).
+
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
       scope + call-site key), conditional variants (a second cache dimension),
@@ -55,12 +93,11 @@ changes in `CHANGELOG.md`.
       path ships source + driver log); lighting-aware graphs (R-17's light-uniform
       contract first); alternative E (data-declared custom operators — a follow-up
       RFC, also the `materials/shader nodes` §81 token's gate); an angle operator
-      (unlocks §58's conic gradient); the §58 Paint-object tier on `Shape2D`
-      (R-16's shape-paint packet, now unblocked).
-- [ ] **docs/guides/custom-shaders.md is stale (2026-08-28):** it promises "expect
-      a declarative surface when §60 lands" — §60 landed. Needs a rewrite around
-      `NodeMaterialBuilder`/`GraphEffect`/`registerNodeMaterialPipeline`; the
-      security guide's shader row already moved.
+      (unlocks §58's conic gradient); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
+- [x] **docs/guides/custom-shaders.md — DONE 2026-08-29**: rewritten around the
+      landed §60 (builders, registration per backend, closed operator set,
+      GraphEffect, deferred list); samples typechecked against dist and graphs
+      validated at runtime.
 
 - [ ] **RFC 0003 residue (staged in source, 2026-08-28):** GPU morph path (the
       extra-vertex-stream layout decision, stated in `mesh.ts`/`render-list.ts`/§54);
@@ -74,16 +111,26 @@ changes in `CHANGELOG.md`.
       60 bones ×1/×10 (the number that decides whether alternative A ever returns)
       and controller channel cost at 180 channels. §86 has no skinned-mesh
       performance target yet — propose one from those measurements.
-- [ ] **glTF loader (§78) unblocked 2026-08-28** — all three blockers cleared
-      (`A-19` textures, `R-12`/`R-13` materials, RFC 0003 skinning). Needs a packet
-      of its own.
+- [x] **glTF loader (§78) shipped 2026-08-29** — `createGltfLoader`/`GltfAsset`
+      (`@four/assets`) + `instantiateGltf` (`four`), glTF 2.0 core tier: both
+      containers, all six §53 attributes, §59 factors + base-colour texture,
+      skins (landed 48-joint refusal), LINEAR/STEP animations via the RFC 0003
+      binding form. Refusal list recorded in `gltf.ts`'s header; digests pinned
+      in `tests/determinism/gltf-load.test.ts`; browser gate
+      `tests/browser/gltf.spec.ts`.
+- [ ] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
+      `StandardMaterial` carries `map` only, so a loaded glTF's
+      metallicRoughness/normal/occlusion/emissive textures are warned-inert.
+      Needs the unit allocator `packages/render-webgl/src/gl-program.ts` has
+      named since WP-3a.3; when it lands, extend the glTF loader's decoded-slot
+      set (one list in `packages/assets/src/gltf.ts`) and drop the
+      `ignoredTextures` warning for the newly sampleable slots.
 
-- [ ] **Move the six capability tokens to their owning packages** when
-      `packages/render`/`motion`/`physics`/`serialization` are free (RFC 0002 §2's
-      spelling). They ship in `four/plugins.ts` because the A-3 packet could not
-      touch `packages/render*`; `four` already depends on all four so no §3.1 edge
-      moves either way, and the migration is a re-export — a token's identity is its
-      `name` string.
+- [x] **Move the six capability tokens to their owning packages — DONE
+      2026-08-29** (RFC 0002 §2's spelling executed): each owner declares its
+      token in `capabilities.ts`; `four/plugins.ts` re-exports the very objects
+      (identity pinned by `toBe`); §96 boundary test now splits host machinery
+      (banned) from token declaration (the four owners, dated).
 - [ ] **Tokens for the five absent §81 extension points** arrive with the registries
       they need: asset formats (`asset-manager.ts` states there is no registry by
       design), materials/shader nodes (RFC 0001's deferred alternative E), UI
@@ -144,7 +191,7 @@ changes in `CHANGELOG.md`.
       exclusivity's independent reason); `renderEffect` per (kind × format)
       through the shared lazy cache (`|e:` conditional suffix, landed keys
       byte-identical); `readPixels` whole-target via `copyTextureToBuffer` +
-      `mapAsync` (`Rectangle2` still not landed — `region` stays with it), rows
+      `mapAsync` (region form landed 2026-08-29), rows
       bottom-to-top by decision; R-4 feedback refusal restated at both seams and
       cross-checked against `RenderGraph.validate()`; `RenderGraph` unchanged,
       graph-vs-hand tape identity pinned. Browser specs written
@@ -172,22 +219,37 @@ changes in `CHANGELOG.md`.
       readback), pending the next `test:browser` run — record first-run
       measurements into the spec headers then. `simulation: "gpu"` deliberately
       unwidened (WP-9.1 rule).
-- [ ] **R-31 residue — wire the GPU integrator to `@four/particles`** (its own
-      packet; needs that package): widen `simulation: "gpu"` in the same change
-      that connects `PARTICLE_INTEGRATOR_SHADER_SOURCE` to the emitter (the
-      WP-9.1 rule, standing). §27 GPU fields and §36 `collisions: "depth-buffer"`
-      remain separate follow-ups. R-31's _mechanism_ is closed on WebGPU
-      (WP-R1.8); WebGL 2 declares the tier absent.
-- [ ] **Q3 promotion (one re-export, when `packages/render` is free):**
-      move/mirror `ComputePassDescriptor` into `@four/render` and add optional
-      `Renderer.compute?()`; `render-webgpu` re-exports (token-identity
-      precedent); the umbrella's named-map `Four.ComputePass` sugar decides the
-      spec's `{ positions, velocities, parameters }` spelling then. WP-R1.9
-      (capability declaration + the WGSL emitter twin) is now the sole remaining
-      R-1 packet.
-- [ ] **§62's "applications may declare required and optional capabilities"** — still
-      unimplemented; now that the capability record is complete it is cheap
-      (WP-R1.9's first half, dispatches with the `R-14` wave).
+- [x] **R-1 / WP-R1.9 — §62 capability declaration + the WGSL node pipeline —
+      landed 2026-08-29. R-1 COMPLETE.** Declaration at the resolve tier
+      (tri-state honesty, refuse-not-warn, §45 forwarded); `wgpu-node-program.ts`
+      behind `registerWebgpuNodeMaterialPipeline()` (source-keyed lazy modules,
+      per-program strided block, groups as data, §33 golden
+      `node-material-wgsl.json` over the GLSL golden's graphs); §70 `"graph"`
+      drawn on WebGPU (R1.6 pin flipped); undisplaced node casters cast; full
+      browser gate 91/91 with the deferred R1.7/R1.8 first-runs recorded.
+- [x] **R-31 residue DONE 2026-08-29** — `simulation: "gpu"` widened in the
+      same change that wired the integrator (WP-9.1 rule held). Remaining §36
+      GPU items, each its own packet: §27 GPU fields,
+      `collisions: "depth-buffer"`, GPU-side bounds (a `computeBounds` on a GPU
+      system honestly returns `false` — RFC 0005 bounds-picking reports nothing
+      for it), GPU-emitter §79 serialization + §34 snapshots (blocked on the
+      GPU-readback RFC), device-loss recovery (today: new emitter).
+      particles-demo budget bumped 35.5 → 36 kB with the +0.55 kB measurement.
+- [x] **Q3 promotion DONE 2026-08-29** — `ComputePassDescriptor` (+ structural
+      `ComputeBuffer`, `supportsCompute`) in `@four/render`; optional
+      `Renderer.compute?()` (fourth optional-member instance); `render-webgpu`
+      re-exports the very tokens; the umbrella's `Four.ComputePass` named-map
+      sugar landed with it (§82 names it — key insertion order = binding
+      order). Buffer allocation deliberately stays backend API. WP-R1.9 landed 2026-08-29 — the R-1 plan (R1.1–R1.9) is complete. What
+      remains around R-1 is not R-1's: this Q3 one-re-export promotion, the R-31
+      emitter wiring, the §62 canvas2d/svg stub tiers, and WebGPU skinned kinds
+      (joint-palette pipeline, unstaged — RFC 0003's successor filing).
+- [x] **§62's "applications may declare required and optional capabilities" —
+      DONE 2026-08-29 (WP-R1.9 first half).** `RendererResolveOptions.capabilities`
+      (+ §45's `rendererCapabilities`/`onRendererCapabilityShortfall`), closed
+      name union, §85 validation, tri-state honesty (`undefined` never satisfies
+      a requirement), `"auto"` skip with `"missing-capability"` reports, named
+      fail-fast, optional-never-gates.
 
 - [x] **R-31 mechanism closed on WebGPU (WP-R1.8, 2026-08-29)** — see the R-31
       residue item above for the remaining `@four/particles` wiring; WebGL 2
@@ -218,30 +280,25 @@ changes in `CHANGELOG.md`.
       against §23's mass, and whether it may wake a §32 sleeper. The seam is
       `RigidBody.applyImpulseAtPoint` at `ShapeCastHit.point`. Effort S once the
       policy is chosen; blocked on the choice, not on engineering.
-- [ ] **Character-controller example follow-up (extended):** nothing in `examples/`
-      exercises `CharacterController`, `FirstPersonLook` **or**
-      `SweptCharacterController` — the only first-person camera and the only swept
-      capsule in the repo live in tests. A single first-person example would exercise
-      all three and the §39 ordering at once.
+- [x] **Character-controller example follow-up — DONE 2026-08-29 (both
+      filings, one page):** `examples/character-controller`, a first-person
+      example exercising `CharacterController` (patrolling plane tier),
+      `FirstPersonLook` (child-eye pitch) and `SweptCharacterController`
+      (WASD capsule: slide, 3-riser step-up, jump) plus the §39
+      input → kinematics → solve ordering. Tenth browser-gate site (4182),
+      5 threshold specs; one Rapier wasm image, 0.90 MB gzip, budgeted
+      0.95 MB; landed atomically with AUDIT-120's examples row 9 → 10.
 
-- [ ] **Character-controller example follow-up:** nothing in `examples/` exercises the
-      new components — the only first-person camera in the repo lives in a test. Worth
-      folding into the next examples packet.
 - [x] **Tests typecheck sweep DONE 2026-08-21** — `pnpm typecheck:tests` added and
       wired into CI after `Build`; 21 errors in five classes fixed as the misspelled
       intent; the text visual golden regenerated deliberately (the fixture now clears
       as it always intended). Closes the hole R-8 identified.
-- [ ] **A-11 / RFC 0005 — owner decision** on pixel + GPU-id picking
-      (`docs/rfcs/0005-pixel-picking.md`). Six questions in the §5 register (rows
-      18–20). Blocked on the owner, not on engineering.
-- [ ] **A-11 analytic tier (`"geometry"`)** — unblocked since R-23/R-24's `toPath()`
-      and **not** covered by RFC 0005: a normal packet in a layer that may import
-      `@four/geometry`. RFC 0005 recommends it also add `node.hitTestMode` (§71's
-      field, currently a silent divergence; §79 field + §90 scene-format row).
-- [ ] **`Rectangle2` in `@four/math`** — still the shared prerequisite for §61's
-      `readPixels`, staged in `render/src/renderer.ts` _and_
-      `render-webgl/src/gl-render-target.ts`. RFC 0005 Q5 asks whether picking should
-      bypass it entirely (it reads one texel, not a region).
+- [x] **`Rectangle2` in `@four/math` — DONE 2026-08-29**, and §61's
+      `readPixels(target, region?)` landed with it on the interface and both
+      backends (WebGPU region via `copyTextureToBuffer` origin; WebGL via the
+      stalling form in the promise shape, defended in-source). RFC 0005 Q5's
+      adopted disposition stands: picking's single-texel path still bypasses
+      `readPixels`; a _regional pick_ form remains that packet's residue.
 - [ ] **Playground sensor-zone browser test failing on the shared tree (2026-08-21,
       under investigation):** `playground.spec.ts` "each sensor zone repaints" fails
       consistently while the character-controllers agent holds in-flight
@@ -323,10 +380,14 @@ changes in `CHANGELOG.md`.
       adapter RFC for path planning;
       `PH-22l` `Clock` is naming-only (owner call); `PH-22n` remainder — §10's
       dropped-time warning is app-tier in `packages/four`'s `Application`.
-- [ ] **Step-8 sensor bookkeeping example.** `PRIORITY_SENSOR_UPDATE` is now genuinely
-      reachable (a system there runs before listeners at 900). Worth one worked example
-      in `examples/physics-playground` showing a sensor tally read at 800 and consumed
-      at 900.
+- [x] **Step-8 sensor bookkeeping example — DONE 2026-08-29.**
+      `examples/physics-playground` runs PH-21's split
+      (`dispatchEvents: false` + `PhysicsEventSystem` at 900) with a
+      `ZoneTallySystem` at 800: §30 `overlapBox` re-measure per step, consumed
+      by the step-9 listeners for the repaint; `data-tally*` mirrored beside
+      `data-zone*` and gated by `tests/browser/sensor-tally.spec.ts` (±1
+      agreement band — an exact contact boundary may legitimately disagree by
+      one). +405 B gzip; existing playground specs untouched and green.
 - [x] **R-8 DONE 2026-08-09** — §64 per-view render lists (`buildViewRenderList`, derive
       not rebuild), §87 frustum culling (`Frustum` in `@four/math`,
       `computeWorldBoundingSphere`, default-on, fails towards drawing), §49
@@ -472,15 +533,16 @@ changes in `CHANGELOG.md`.
       module; `Line`/`Polyline`/`Arc` complete all fourteen §50 rows (twelve classes);
       fill+stroke travel as per-vertex colour — no `RenderItemKind`, no pipeline, no
       frame-path edit. **Group 5 (the 2D vector stack) is closed.**
-- [ ] **The shape paint pipeline** _(R-16 residue — unblocked 2026-08-28: RFC 0001
-      decided the shape as `"node"` item kind + structural program cache, and
-      linear/radial gradients, patterns, procedural and render-target paints are
-      already exact via `NodeMaterial`)_: what remains is the §58 `Paint`-object
-      integration on `Shape2D` fill/stroke, the conic gradient (needs an angle
-      operator — closed-union amendment), and §52's anti-alias fringe (needs a
-      per-vertex coverage attribute no §57 pipeline reads). This is also what would
-      finally give `ShapeMaterial` content (re-examined and deliberately unshipped
-      twice — R-23, R-16).
+- [x] **The shape paint pipeline — the §58 `Paint`-object tier DONE 2026-08-29**
+      (`registerShapePaints()`: linear/radial gradients + image/render-target
+      patterns lowered to `NodeMaterial` graphs; unregistered =
+      skipped-not-approximated; golden `shape-paint-glsl.json`). What remains,
+      each with a named owner: **conic** (waits solely on §60's angle operator —
+      RFC 0001's one-row closed-union amendment); **§52's anti-alias fringe**
+      (per-vertex coverage attribute no §57 pipeline reads). **`ShapeMaterial`'s
+      fate is settled** — unshipped a third time, argument recorded in
+      `shape.ts`'s header. New staged residue: values-as-uniforms lowering for
+      animated gradient stops (noted in `shape-paint.ts`'s determinism section).
 - [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
       R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
       geometry operations (§51's four, the shared planar-subdivision packet), world
@@ -655,11 +717,14 @@ changes in `CHANGELOG.md`.
       — walk a document's resource keys, `loadFromManifest` each, hand the resulting map
       to `resourceCatalog(...)`. `tests/integration/texture-manifest.test.ts` runs the
       seam by hand today
-- [ ] **A-19 remainder:** §78 glTF/GLB (three blockers unchanged: §55/§59 materials, the
-      renderer-side texture tier, skins/morph targets — RFC 0003 answers the third on
-      paper) and renderer-side §77 (`R-30b`). The assets-side texture loader tier
-      shipped 2026-08-21 (`createTextureLoader`, `TextureAsset`, §96 decompression
-      bounds)
+- [ ] **A-19 remainder:** renderer-side §77 only (`R-30b`: cube/array/3D,
+      compressed containers, video). §78 glTF/GLB shipped 2026-08-29 at the
+      glTF 2.0-core tier; its staged residue lives with other rows: morph
+      targets wait on the GPU morph path (RFC 0003 staging), CUBICSPLINE waits
+      on a squad/tangent decision in `@four/animation`, and the four
+      unsampleable material texture slots (`ignoredTextures`) wait on the
+      multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
+      the loader parses them already and widens without a format change.
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
       closed operators and a new operator is out of scope in both RFCs). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a

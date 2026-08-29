@@ -3,9 +3,9 @@
  *
  * Phase 11 (WP-11.2) ships the MVP tier: a deduplicating, reference-counted
  * {@link AssetManager} over an injectable `fetch`, plus text, JSON, binary, and
- * image loaders. glTF/GLB (§78) and the texture system (§77) are staged with
- * dated notes in `loaders.ts` and `asset-manager.ts` — they need the §55
- * material tier and a texture representation that do not exist yet.
+ * image loaders. The §77 texture tier landed 2026-08-21 (`texture.ts`), and the
+ * §78 glTF 2.0 parse tier landed 2026-08-29 (`gltf.ts` — its module header
+ * states the exact tier, the refusal list, and why assembly lives in `four`).
  *
  * §96's "asset loaders … shall treat external content as untrusted" is enforced
  * by the manager, not the loaders: an input-size limit
@@ -71,8 +71,23 @@ export {
   DEFAULT_MAXIMUM_DECODED_BYTES,
   DEFAULT_MAXIMUM_EXPANSION_RATIO,
   TextureAsset,
+  createTextureDecoder,
   createTextureLoader,
 } from "./texture.js";
+export type {
+  GltfAnimationRecord,
+  GltfChannelPath,
+  GltfChannelRecord,
+  GltfLoaderOptions,
+  GltfMaterialRecord,
+  GltfMeshRecord,
+  GltfNodeRecord,
+  GltfPrimitiveMode,
+  GltfPrimitiveRecord,
+  GltfSceneRecord,
+  GltfSkinRecord,
+} from "./gltf.js";
+export { GltfAsset, createGltfLoader } from "./gltf.js";
 export type { ImageBitmapLike, ImageDecodeLike } from "./loaders.js";
 export {
   ImageAsset,

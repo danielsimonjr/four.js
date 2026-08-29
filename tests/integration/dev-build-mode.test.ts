@@ -223,11 +223,23 @@ const GATED: ReadonlyMap<string, string> = new Map([
   ],
   [
     join("packages", "render-webgpu", "src", "webgpu-renderer.ts"),
-    "§67's clip-into-a-stencil-less-render-target warning (WP-R1.6, 2026-08-28) — the WebGPU restatement of the GL entry above, reachable only off screen (the on-screen attachment always widens to carry stencil). Diagnostic only, and O(1): the check is one read of the frame's first item beside the target record's `stencil` flag, records no command, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, the same fail-toward-drawing behaviour the warning describes. Rendering is outside the §33 envelope regardless; nothing a frame draws re-enters simulation state (§42/§43)",
+    "§67's clip-into-a-stencil-less-render-target warning (WP-R1.6, 2026-08-28) — the WebGPU restatement of the GL entry above, reachable only off screen (the on-screen attachment always widens to carry stencil). Diagnostic only, and O(1): the check is one read of the frame's first item beside the target record's `stencil` flag, records no command, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, the same fail-toward-drawing behaviour the warning describes. WP-R1.9 (2026-08-29) added §60's unregistered-node-pipeline notice under the GL entry's rule: the draws are skipped identically in both builds (absence, never a flat-coloured stand-in), and only the message naming registerWebgpuNodeMaterialPipeline() moves with the flag. Rendering is outside the §33 envelope regardless; nothing a frame draws re-enters simulation state (§42/§43)",
+  ],
+  [
+    join("packages", "render-webgpu", "src", "wgpu-node-program.ts"),
+    "§60's three node-store notices (WP-R1.9, 2026-08-29) — the WebGPU twin of gl-node-program.ts's entry: the per-graph emission-failure latch (latched `null` in both builds; the latch is the behaviour, only the console.warn moves), the unresolvable-node-texture notice (the draw is skipped identically), and the missing-vertex-stream notice (skipped identically — the recorded GL divergence's diagnostic). Rendering is outside the §33 envelope regardless; nothing a shader draws re-enters simulation state (§42/§43)",
   ],
   [
     join("packages", "render-webgl", "src", "gl-picking.ts"),
     "§71's id-program compile-failure notice (RFC 0005, 2026-08-28). Message only: the failure is latched per context era in both builds — picking passes are skipped identically, and `pick` refuses identically for want of an id buffer — and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
+  ],
+  [
+    join("packages", "assets", "src", "gltf.ts"),
+    "§78's ignored-feature notices (A-19, 2026-08-29). Message only: every ignored feature is recorded unconditionally in GltfAsset.ignored — the §33 evidence is the determinism suite's pinned digest, which is computed over the parse output and holds in both builds — and only the console.warn naming each feature moves with the flag. Parsing is IO, runs before any fixed step, and its output is a pure function of the input bytes either way",
+  ],
+  [
+    join("packages", "four", "src", "gltf.ts"),
+    "§78's ignored-texture-slot warning at instantiation (A-19, 2026-08-29). Message only: the instantiated nodes, materials (factors applied, unsampleable slots absent), and clips are identical in both builds — the slot list itself is parse data on the material record — and only the console.warn saying the base map is the one sampled moves with the flag. Assembly runs outside the fixed step and writes nothing any simulation reads",
   ],
   [
     join("packages", "render-webgl", "src", "gl-node-program.ts"),

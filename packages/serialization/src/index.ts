@@ -17,6 +17,13 @@
 
 export const PACKAGE_NAME = "@four/serialization";
 
+// §81's serialization-side capability tokens (RFC 0002), declared by the
+// package that owns the §79/§80 registries; `@four/four`'s `plugins.ts`
+// re-exports the same objects, so both import paths hand out one identity.
+// Declaring a token does not reach the §96 plugin host — `capabilities.ts`
+// states the boundary argument.
+export { COMPONENT_SERIALIZERS, SCENE_MIGRATIONS } from "./capabilities.js";
+
 export type {
   ComponentDocument,
   JsonObject,

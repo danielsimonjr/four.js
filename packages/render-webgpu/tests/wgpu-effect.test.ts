@@ -17,7 +17,7 @@ import {
   type EffectRenderPass,
   type ScreenEffect,
 } from "@four/render";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createRecordingGpu,
@@ -341,12 +341,41 @@ describe("WebgpuRenderer.renderEffect", () => {
     live.dispose();
   });
 
-  it("skips RFC 0001's graph kind — absent, never approximated", async () => {
+  it("dispatches RFC 0001's graph kind to the node seam — unregistered skips (WP-R1.9)", async () => {
+    // The deliberate flip of WP-R1.6's absence pin: `"graph"` is no longer
+    // the fixed-effect path's to refuse — it branches to the registered node
+    // store before the kind guard, and with nothing registered it skips with
+    // the one-time §85 warning, recording nothing. The registered path lives
+    // in wgpu-node-program.test.ts.
+    const warned = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    try {
+      const { gpu, renderer } = await initialized();
+      const source = new RenderTarget({ width: 16, height: 16 });
+
+      renderer.renderEffect(
+        effectPass(source, { kind: "graph" } as unknown as ScreenEffect),
+      );
+
+      expect(gpu.calls).toHaveLength(0);
+      expect(warned).toHaveBeenCalledTimes(1);
+      expect(String(warned.mock.calls[0][0])).toContain(
+        "registerWebgpuNodeMaterialPipeline",
+      );
+      renderer.dispose();
+      source.dispose();
+    } finally {
+      warned.mockRestore();
+    }
+  });
+
+  it("skips an unknown effect kind — the closed-union guard, still absent", async () => {
     const { gpu, renderer } = await initialized();
     const source = new RenderTarget({ width: 16, height: 16 });
 
     renderer.renderEffect(
-      effectPass(source, { kind: "graph" } as unknown as ScreenEffect),
+      effectPass(source, { kind: "bloom" } as unknown as ScreenEffect),
     );
 
     expect(gpu.calls).toHaveLength(0);

@@ -291,25 +291,49 @@ export class WgpuRenderTargetCache {
       return null;
     }
     if (record.sampleBindGroup === null) {
-      this.#sampler ??= this.#device.createSampler({
-        label: "four:render-target-sampler",
-        addressModeU: "clamp-to-edge",
-        addressModeV: "clamp-to-edge",
-        magFilter: "linear",
-        minFilter: "linear",
-        // One level — a target has no mip chain to filter between.
-        mipmapFilter: "nearest",
-      });
       record.sampleBindGroup = this.#device.createBindGroup({
         label: `four:render-target-map:${target.id}`,
         layout: this.#sampleLayout(),
         entries: [
           { binding: MAP_TEXTURE_BINDING, resource: record.colorView },
-          { binding: MAP_SAMPLER_BINDING, resource: this.#sampler },
+          { binding: MAP_SAMPLER_BINDING, resource: this.sampleSampler() },
         ],
       });
     }
     return record.sampleBindGroup;
+  }
+
+  /**
+   * The colour view a **multi-binding** consumer samples `target` through
+   * (§60's node texture groups, WP-R1.9): a node program binds several
+   * texture/sampler pairs in one group, so the two-binding
+   * {@link WgpuRenderTargetCache.sample} group cannot serve it and the raw
+   * view is handed out instead, paired with
+   * {@link WgpuRenderTargetCache.sampleSampler}. `null` exactly when
+   * {@link WgpuRenderTargetCache.acquire} answers `null` (§83).
+   */
+  sampleView(target: WgpuCacheableRenderTarget): GpuTextureView | null {
+    return this.acquire(target)?.colorView ?? null;
+  }
+
+  /**
+   * The one sampler every sampled target shares — linear, clamped, the fixed
+   * state `gl-render-target.ts` writes on every colour attachment — created
+   * on first use, by whichever of {@link WgpuRenderTargetCache.sample} or a
+   * node program's group composition asks first (WP-R1.9: one object, so a
+   * frame mixing both paths allocates one sampler, not two).
+   */
+  sampleSampler(): GpuSampler {
+    this.#sampler ??= this.#device.createSampler({
+      label: "four:render-target-sampler",
+      addressModeU: "clamp-to-edge",
+      addressModeV: "clamp-to-edge",
+      magFilter: "linear",
+      minFilter: "linear",
+      // One level — a target has no mip chain to filter between.
+      mipmapFilter: "nearest",
+    });
+    return this.#sampler;
   }
 
   /**
