@@ -198,6 +198,20 @@ function assignNodeId(id?: string): string {
 }
 
 /**
+ * §71's hit-test strategy selector — the value set of {@link Node.hitTestMode}.
+ *
+ * Four of §71's five spelled values: `"bounds"` (the box test alone),
+ * `"geometry"` (exact ray/triangle against the candidate's tessellated
+ * triangles — A-11's analytic tier), `"pixel"` (a hit must land on a present
+ * texel of the candidate's alpha mask — RFC 0005 alternative D), and `"gpu"`
+ * (RFC 0005's id-buffer pass answers; the ray tier stands aside). `"custom"`
+ * is absent until a custom-callback strategy exists — see the field's own
+ * documentation. "No mode chosen" is spelled `null` on the field, not a fifth
+ * string, so this union stays exactly §71's.
+ */
+export type HitTestMode = "bounds" | "geometry" | "pixel" | "gpu";
+
+/**
  * Construction options every node accepts (§6).
  *
  * Subclass option interfaces extend this, so `id` is available wherever a node
@@ -347,6 +361,48 @@ export abstract class Node
    * hold that §85 would refuse.
    */
   clip = false;
+
+  /**
+   * Which §71 hit-test strategy answers for this node, or `null` — the
+   * default — for §71's own default rule: *"the engine should select the
+   * cheapest valid method"* (A-11; the field ships with the analytic tier per
+   * the adopted RFC 0005 Q3, 2026-08-29).
+   *
+   * ```ts
+   * mesh.hitTestMode = "geometry";   // exact ray/triangle, never just the box
+   * decal.hitTestMode = "pixel";     // a hit must land on a present texel
+   * hull.hitTestMode = "bounds";     // the box alone, whatever data is attached
+   * boid.hitTestMode = "gpu";        // the id-buffer pass answers, not the ray
+   * ```
+   *
+   * The node carries only the **choice**; the data each strategy needs rides
+   * the `Pickable` candidate (`@four/input` may not import `@four/geometry` or
+   * a render type, plan §3.1 — the recorded reason picking takes a structural
+   * candidate list). Under `null`, `pick()` runs the bounding-volume test and
+   * refines it by whatever the candidate carries — triangles, an alpha mask,
+   * or nothing — which is the cheapest method that is *valid* for that
+   * candidate, and is byte-for-byte the pre-field behaviour. An explicit mode
+   * selects exactly one strategy and **requires** its data (§85: a candidate
+   * that asked for precision and silently fell back would pick where the
+   * author said not to); `"gpu"` excludes the node from the ray tier
+   * altogether, because RFC 0005's id-buffer pass is that strategy's
+   * implementation and one pointer event must not resolve the node twice.
+   *
+   * **The mode gates this node only, not its subtree** — the `layers` scope,
+   * not the `clip` scope: every descendant is its own picking candidate with
+   * its own mode, exactly as it is its own layer member.
+   *
+   * §71's `"custom"` value is deliberately absent from the union: no
+   * custom-callback strategy exists yet, and a selector value with nothing
+   * behind it would be a silent no-op. It joins {@link HitTestMode} with that
+   * strategy.
+   *
+   * A plain field, like `visible`, `layers` and `clip`, and for their reason:
+   * `pick()` reads it once per candidate per pick, and the union is the check —
+   * there is no assignable value §85 would refuse (a §79 document's value is
+   * filtered on read instead, restoring `null` for anything unrecognized).
+   */
+  hitTestMode: HitTestMode | null = null;
 
   /** Free-form user data (§6). Its own object per node. */
   metadata: Record<string, unknown> = {};

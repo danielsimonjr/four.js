@@ -20,6 +20,7 @@ export type {
   PickHit,
   Pickable,
   PickableAlphaMask,
+  PickableTriangles,
   PickProvider,
 } from "./pick.js";
 export { createPickRay, pick } from "./pick.js";

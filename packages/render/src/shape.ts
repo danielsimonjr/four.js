@@ -47,10 +47,23 @@
  * tessellator, and that is where it went (`expandStroke`); this module
  * decides what a stroke *is* and lets §52 decide where its triangles are.
  *
+ * The §58 **paint-object tier** joined on 2026-08-29 (R-16's recorded
+ * follow-up, unblocked by RFC 0001): {@link LinearGradientPaint},
+ * {@link RadialGradientPaint} and {@link PatternPaint} — the latter covering
+ * §58's "image pattern" *and* "render-target texture" rows, because a
+ * `RenderTarget.colorTexture` is a `MaterialTexture` — are accepted by
+ * {@link ShapeFill} and {@link StrokeStyle} and lowered to a §60 `NodeMaterial`
+ * the shape derives and owns as its material (see {@link Paint} for the
+ * mechanism, and `shape-paint.ts` for the lowering). The tier is opt-in:
+ * `registerShapePaints()` links the lowering, exactly as
+ * `registerNodeMaterialPipeline()` links the emitter that draws it.
+ *
  * What §58 still asks for and this does not answer, each with a named owner:
- * the six non-solid paints ({@link Paint} states the argument and the measured
- * price), and §52's anti-alias fringe, which needs a coverage attribute no
- * §57 pipeline reads. Both land with the `ShapeMaterial` packet below.
+ * the **conic** gradient (refused by the lowering — §60's closed operator set
+ * has no angle operator; RFC 0001's recorded one-row amendment), the
+ * "procedural shader" row as a paint *object* (a procedural paint **is** a
+ * `NodeMaterial`, authored directly — see {@link Paint}), and §52's
+ * anti-alias fringe, which needs a coverage attribute no §57 pipeline reads.
  *
  * The fourteen §50 rows and the classes that answer them:
  *
@@ -113,26 +126,25 @@
  * material one), and a stroke's width and joins are geometry rather than
  * shading in any case.
  *
- * What would give the class content is the paint tier it cannot express —
- * gradients, patterns, a coverage-aware anti-alias fringe — and that is a
- * *pipeline*, which costs:
+ * The pipeline that was to give the class content arrived — RFC 0001's §60
+ * node pipeline, the `RenderItemKind` arm and compiled program R-16 priced as
+ * the exact tier's cost — and the answer is **still** no `ShapeMaterial`,
+ * re-decided a third time (2026-08-29, the paint-object tier): a
+ * gradient-painted shape's material is a §60 `NodeMaterial` the shape derives
+ * from its own paints (see {@link Paint}), so a class named `ShapeMaterial`
+ * would either *be* `NodeMaterial` renamed or carry a `kind: "node"`
+ * discriminant that lies about what it discriminates — R-16's argument, one
+ * material family later. The paints stay on the **node**, where §50's own
+ * example puts them, and the material is derived data.
  *
- * - a new `RenderItemKind` arm, whose union is closed on purpose (`R-12`'s
- *   staging mechanism), *and* which `RFC 0001` and `RFC 0003` are both queued
- *   to widen — the first to land owns the shape of `pipelineId`; or
- * - a `kind: "unlit"` discriminant on a class called `ShapeMaterial`, i.e. a
- *   discriminant that lies about what it discriminates.
- *
- * The first also buys a backend pipeline compiled at renderer initialisation,
- * measured at **0.75–1.9 kB gzip in every bundle carrying `WebglRenderer`**
- * whether or not the application draws a shape (`R-6`, `R-13`, `R-18` all
- * measured it). So a shape carries a `SurfaceMaterial` and draws through the
- * existing flat-colour pipeline — with `vertexColors` doing the work, which is
- * a uniform switch the pipeline already has. The consequence worth stating
- * plainly, and now true of a *stroked* shape too: **this module changes no
- * backend, adds no render-item kind, and touches no frame path.** A scene that
- * draws no shape issues exactly the GL calls it issued before, by construction
- * rather than by measurement.
+ * A shape that names no object paint carries a `SurfaceMaterial` and draws
+ * through the existing flat-colour pipeline — with `vertexColors` doing the
+ * work, which is a uniform switch the pipeline already has. The consequence
+ * worth stating plainly, and true of the paint-object tier too: **this module
+ * changes no backend, adds no render-item kind, and touches no frame path.**
+ * A gradient-painted shape is an ordinary `"node"` item to `buildRenderList`,
+ * and a scene that draws no shape issues exactly the GL calls it issued
+ * before, by construction rather than by measurement.
  *
  * Like `Renderable`, every class here is generic in its material and defaults
  * to `SurfaceMaterial`, for that class's reason: the render list picks a
@@ -202,7 +214,7 @@ import {
   type StrokeLineJoin,
   type StrokeMesh,
 } from "@four/geometry";
-import type { Material } from "@four/materials";
+import type { Material, MaterialTexture } from "@four/materials";
 import type { ColorRGBA } from "@four/math";
 
 import {
@@ -289,49 +301,174 @@ export interface SolidPaint {
 }
 
 /**
+ * One colour stop of a §58 gradient paint: where along the gradient's axis it
+ * sits (`0…1`) and the colour there.
+ *
+ * Stops must be authored **sorted** — offsets non-decreasing — and are refused
+ * out of order rather than re-sorted (§85: nothing is silently reinterpreted).
+ * Two stops may share an offset, which is a hard edge: the earlier colour
+ * holds strictly before it, the later one from it on. Before the first stop
+ * and past the last the gradient **pads** with that stop's colour (CSS's and
+ * Canvas's rule), which is also what the lowering's `saturate` arithmetic
+ * produces with no case of its own.
+ */
+export interface GradientStop {
+  /** Position along the gradient axis; finite, in 0…1 (§85). */
+  readonly offset: number;
+  /** Straight, linear-light RGBA at this stop (§60a). Copied on assignment. */
+  readonly color: ColorRGBA;
+}
+
+/**
+ * A §58 **linear gradient**: colour as a function of signed distance along the
+ * axis from `from` to `to`, both in the shape's own local space — the space
+ * its path coordinates live in, so a gradient authored across a `Rectangle`'s
+ * width stays put when the node moves (Canvas's user-space rule).
+ *
+ * ```ts
+ * const sky: LinearGradientPaint = {
+ *   kind: "linear-gradient",
+ *   from: { x: 0, y: -1 },
+ *   to: { x: 0, y: 1 },
+ *   stops: [
+ *     { offset: 0, color: [0.02, 0.05, 0.2, 1] },
+ *     { offset: 1, color: [0.4, 0.7, 1, 1] },
+ *   ],
+ * };
+ * ```
+ *
+ * `from` and `to` must differ (§85): a zero-length axis has no direction, and
+ * inventing one would draw a picture the author never described. Any stop
+ * count ≥ 2 is exact — the lowering evaluates the piecewise ramp per
+ * *fragment*, so there is no per-vertex facet to see (the R-16 boundary,
+ * closed).
+ */
+export interface LinearGradientPaint {
+  /** Discriminant (§58 "linear gradient"). */
+  readonly kind: "linear-gradient";
+  /** Where the gradient reads offset 0, in local space; finite (§85). */
+  readonly from: Point2D;
+  /** Where it reads offset 1, in local space; finite, not `from` (§85). */
+  readonly to: Point2D;
+  /** At least two sorted stops (§85) — see {@link GradientStop}. */
+  readonly stops: readonly GradientStop[];
+  /** See {@link SolidPaint.opacity}; multiplies every stop's alpha. */
+  readonly opacity?: number;
+}
+
+/**
+ * A §58 **radial gradient**: colour as a function of distance from `center`,
+ * reaching offset 1 at `radius`, both in the shape's local space (see
+ * {@link LinearGradientPaint} for the space and the stop rules). Beyond the
+ * radius the gradient pads with the last stop's colour.
+ */
+export interface RadialGradientPaint {
+  /** Discriminant (§58 "radial gradient"). */
+  readonly kind: "radial-gradient";
+  /** The gradient's centre, in local space; finite (§85). */
+  readonly center: Point2D;
+  /** Distance at which offset 1 is reached; finite, positive (§85). */
+  readonly radius: number;
+  /** At least two sorted stops (§85) — see {@link GradientStop}. */
+  readonly stops: readonly GradientStop[];
+  /** See {@link SolidPaint.opacity}; multiplies every stop's alpha. */
+  readonly opacity?: number;
+}
+
+/**
+ * A §58 **pattern**: a texture sampled over the shape's own uv — the
+ * `[0, 1]²` parameterization of its bounding box that every shape geometry
+ * already carries — covering *two* of §58's rows at once, because the texture
+ * seam is `MaterialTexture`: an **image pattern** binds a `Texture`, and a
+ * **render-target texture** binds a `RenderTarget.colorTexture`, with no
+ * adapter between them (R-4's seam, exactly as `NodeMaterial.setTexture`
+ * documents it).
+ *
+ * ```ts
+ * const tiles: PatternPaint = {
+ *   kind: "pattern",
+ *   texture: bricks,                 // or offscreenTarget.colorTexture
+ *   repeat: { x: 4, y: 2 },          // uv is multiplied, then offset
+ * };
+ * ```
+ *
+ * Tiling past `[0, 1]` is the texture's own `wrap` mode's business (§77) —
+ * the paint transforms the coordinate and the sampler decides what lies
+ * beyond, so `repeat: { x: 4 }` tiles a `"repeat"` texture four times and
+ * clamps a `"clamp"` one, both honestly.
+ */
+export interface PatternPaint {
+  /** Discriminant (§58 "image pattern" / "render-target texture"). */
+  readonly kind: "pattern";
+  /** What is sampled — a `Texture` or a `RenderTarget.colorTexture` (§77). */
+  readonly texture: MaterialTexture;
+  /** Uv scale; finite and non-zero per axis (§85), defaults to `(1, 1)`. */
+  readonly repeat?: Point2D;
+  /** Uv offset, applied after `repeat`; finite (§85), defaults to `(0, 0)`. */
+  readonly offset?: Point2D;
+  /** See {@link SolidPaint.opacity}; multiplies the sampled alpha. */
+  readonly opacity?: number;
+}
+
+/**
+ * The §58 paints that carry more than a flat colour — the **paint-object
+ * tier** (2026-08-29, R-16's follow-up unblocked by RFC 0001). A shape whose
+ * fill or stroke names one derives its own §60 `NodeMaterial` — see
+ * {@link Paint}.
+ */
+export type ObjectPaint =
+  LinearGradientPaint | RadialGradientPaint | PatternPaint;
+
+/**
  * What a shape's fill or stroke is painted with (§58).
  *
- * §58 lists seven kinds of paint — solid colour, linear, radial and conic
- * gradients, image patterns, procedural shaders, and render-target textures.
- * **This union has one member**, and the single member carries a discriminant
- * precisely so widening it is additive and typechecked: `{ kind: "linear-
- * gradient", … }` is a *compile error* today rather than an object silently
- * ignored at rebuild time. That is `R-6`'s `ScreenEffect` staging mechanism,
- * applied a second time.
+ * §58 lists seven kinds of paint. Four are members here — solid colour,
+ * linear and radial gradients, and patterns, the last covering both of §58's
+ * texture rows ({@link PatternPaint}) — and each member carries a
+ * discriminant so widening stays additive and typechecked (`R-6`'s
+ * `ScreenEffect` staging mechanism, kept from R-16's one-member era). The
+ * remaining §58 rows, honestly:
  *
- * ## Why the other six are not here (decision, 2026-08-09)
+ * - **conic gradient** — *refused*, §85-precisely: a conic gradient is an
+ *   angle, and §60's closed operator set has no angle operator (`atan`).
+ *   RFC 0001 records the one-row closed-union amendment that unlocks it; the
+ *   refusal names it so the day a consumer wants conics the trail is short.
+ * - **procedural shader** — *is not a paint object and does not need to be*:
+ *   a procedural paint is a §60 `NodeMaterial`, authored directly and worn as
+ *   the shape's material. Wrapping a shader graph in a `Paint` would add a
+ *   second spelling for the same object with §79 obligations §60 already
+ *   declined (a material is a catalog reference, not a document).
  *
- * A shape's paints are baked into the geometry's per-vertex colours (see
- * {@link Shape2D}), and per-vertex colour is *exact* for exactly one of §58's
- * kinds beyond a solid: a **two-stop linear** gradient, which is an affine
- * function of position and is therefore reproduced exactly by the barycentric
- * interpolation a rasterizer already performs. Every other kind is not:
+ * ## How each tier reaches the screen (R-16, extended 2026-08-29)
  *
- * - a linear gradient of **three or more stops** is piecewise affine, and the
- *   pieces are only right if the triangulation has vertices exactly on the
- *   stop lines — an ear-clipped fill does not, and cannot be made to without
- *   re-tessellating per gradient;
- * - a **radial** or **conic** gradient is not affine at all, so it comes out
- *   as a faceted approximation whose error depends on how finely the shape
- *   happened to be flattened;
- * - **patterns**, **procedural** paints and **render-target** paints are
- *   texture reads, which need §77's texture-unit allocator and a uv the shape
- *   does not have.
+ * A **solid** paint travels as §53 per-vertex colour through the material the
+ * author supplied — R-16's tier, unchanged to the byte: no new item kind, no
+ * pipeline, no frame-path edit, and per-vertex colour is *exact* for a flat
+ * colour.
  *
- * Shipping the first case alone would be a `Paint` union whose members work
- * for some of their own arguments, which is worse than one that is honestly
- * narrow. The exact tier for all six is a paint **pipeline** — a
- * `ShapeMaterial` with a gradient-aware shader, or a generated gradient
- * texture behind §77's allocator — and a new compiled-at-initialisation
- * pipeline is measured at **~1.9 kB gzip in every bundle carrying
- * `WebglRenderer`** whether or not the application draws a gradient (`R-6`
- * 0.75 kB, `R-13`, `R-18` 1.9 kB — the standing bundle-cost law). It also
- * needs a `RenderItemKind` arm, whose shape `RFC 0001` and `RFC 0003` are both
- * queued to decide (first to land owns `pipelineId`). **Named owner: the
- * `ShapeMaterial` packet that lands with that pipeline**, which is also where
- * §52's anti-alias fringe goes.
+ * An **object** paint cannot ride that path exactly (a radial gradient is not
+ * affine; a pattern is a texture read), so it takes the pipeline RFC 0001
+ * built: the shape **derives its own material** — a §60 `NodeMaterial` whose
+ * graph evaluates the paint per fragment, exactly — and is an ordinary
+ * `"node"` item to the render list. That is why an object-painted shape is
+ * constructed *without* a `material` (§85 refuses the pair loudly): the paint
+ * *is* the material, and R-16's two objections to a shape inventing one
+ * dissolve at this tier — the derived material owns no GPU resource the
+ * application must dispose, and §79 writes the paint itself, not a key.
+ *
+ * The tier is **opt-in**: call `registerShapePaints()` once (it installs the
+ * paint-to-graph lowering, the same move as `registerNodeMaterialPipeline()`
+ * and the §37/§62 registries), or authoring an object paint throws naming the
+ * call. A bundle that never registers carries none of the lowering.
+ *
+ * N shapes naming the same paint values lower to the same graph bytes, so the
+ * backend's source-keyed program cache compiles **one** program for all of
+ * them (RFC 0001 §2; the lowering is a pure function, §33). The paint values
+ * are baked into the graph as constants — re-authoring a paint every frame
+ * therefore compiles per distinct value and is the wrong tool for animation;
+ * animate the node, the material's §57 state, or a pattern's texture instead.
  */
-export type Paint = SolidPaint;
+export type Paint = SolidPaint | ObjectPaint;
 
 /**
  * A {@link SolidPaint} with every optional field resolved — what a shape
@@ -343,7 +480,7 @@ export type Paint = SolidPaint;
  * accessor's two halves says that in the type system instead of in a sentence
  * nobody reads.
  */
-export interface ResolvedPaint {
+export interface ResolvedSolidPaint {
   /** See {@link SolidPaint.kind}. */
   readonly kind: "solid";
   /** See {@link SolidPaint.color}; a copy of the authored tuple. */
@@ -351,6 +488,69 @@ export interface ResolvedPaint {
   /** See {@link SolidPaint.opacity}; `1` when none was authored. */
   readonly opacity: number;
 }
+
+/** A {@link GradientStop} as a shape stores it — validated and copied. */
+export interface ResolvedGradientStop {
+  /** See {@link GradientStop.offset}. */
+  readonly offset: number;
+  /** See {@link GradientStop.color}; a copy of the authored tuple. */
+  readonly color: ColorRGBA;
+}
+
+/** {@link LinearGradientPaint} resolved — see {@link ResolvedSolidPaint}. */
+export interface ResolvedLinearGradientPaint {
+  /** See {@link LinearGradientPaint.kind}. */
+  readonly kind: "linear-gradient";
+  /** See {@link LinearGradientPaint.from}; a copy. */
+  readonly from: Point2D;
+  /** See {@link LinearGradientPaint.to}; a copy. */
+  readonly to: Point2D;
+  /** See {@link LinearGradientPaint.stops}; validated copies. */
+  readonly stops: readonly ResolvedGradientStop[];
+  /** See {@link LinearGradientPaint.opacity}; `1` when none was authored. */
+  readonly opacity: number;
+}
+
+/** {@link RadialGradientPaint} resolved — see {@link ResolvedSolidPaint}. */
+export interface ResolvedRadialGradientPaint {
+  /** See {@link RadialGradientPaint.kind}. */
+  readonly kind: "radial-gradient";
+  /** See {@link RadialGradientPaint.center}; a copy. */
+  readonly center: Point2D;
+  /** See {@link RadialGradientPaint.radius}. */
+  readonly radius: number;
+  /** See {@link RadialGradientPaint.stops}; validated copies. */
+  readonly stops: readonly ResolvedGradientStop[];
+  /** See {@link RadialGradientPaint.opacity}; `1` when none was authored. */
+  readonly opacity: number;
+}
+
+/**
+ * {@link PatternPaint} resolved — see {@link ResolvedSolidPaint}. The texture
+ * is held **by reference**, exactly as a material holds its `map`: a shape
+ * points at a texture it does not own (§83).
+ */
+export interface ResolvedPatternPaint {
+  /** See {@link PatternPaint.kind}. */
+  readonly kind: "pattern";
+  /** See {@link PatternPaint.texture}; the authored reference, not a copy. */
+  readonly texture: MaterialTexture;
+  /** See {@link PatternPaint.repeat}; `(1, 1)` when none was authored. */
+  readonly repeat: Point2D;
+  /** See {@link PatternPaint.offset}; `(0, 0)` when none was authored. */
+  readonly offset: Point2D;
+  /** See {@link PatternPaint.opacity}; `1` when none was authored. */
+  readonly opacity: number;
+}
+
+/** {@link ObjectPaint} as a shape stores it — see {@link ResolvedSolidPaint}. */
+export type ResolvedObjectPaint =
+  | ResolvedLinearGradientPaint
+  | ResolvedRadialGradientPaint
+  | ResolvedPatternPaint;
+
+/** {@link Paint} as a shape stores it — see {@link ResolvedSolidPaint}. */
+export type ResolvedPaint = ResolvedSolidPaint | ResolvedObjectPaint;
 
 /**
  * What fills a shape's interior (§50 "fill and stroke", §58).
@@ -471,14 +671,104 @@ export interface ResolvedStrokeStyle {
 /** The colour a vertex carries when its half of the shape names no paint. */
 const UNPAINTED: ColorRGBA = [1, 1, 1, 1];
 
-/** Validates a §58 paint and copies its colour (§85). */
+/**
+ * What a registered paint lowering answers for one fill/stroke pair — the
+ * derived §60 material and whether the geometry must carry the fill/stroke
+ * **selector** stream (see {@link ShapePaintSupport.plan}).
+ */
+export interface ShapePaintPlan {
+  /**
+   * The derived material — a §60 `NodeMaterial` whose graph evaluates the
+   * pair's paints per fragment. Owned by the shape that asked; a new plan
+   * replaces it wholesale.
+   */
+  readonly material: Material;
+  /**
+   * Whether the two halves draw different paints, so the geometry must bake
+   * the selector colour stream (`(0,0,0,0)` fill, `(1,1,1,1)` stroke) the
+   * graph's `mix` reads. `false` when one half is absent or both name the
+   * same paint value — the geometry then carries no colour stream at all.
+   */
+  readonly selector: boolean;
+}
+
+/**
+ * What `registerShapePaints()` installs — the §58 paint-object tier's
+ * validation and paint-to-graph lowering, kept behind a module `let` so a
+ * bundle that never authors a gradient carries none of it (the
+ * `registerNodeMaterialPipeline()` / §62 / §37 registry move, applied to the
+ * authoring side).
+ */
+export interface ShapePaintSupport {
+  /**
+   * Validates and resolves one non-solid §58 paint (§85: refuse, never
+   * clamp; a conic gradient is refused naming §60's missing angle operator).
+   * `name` prefixes every refusal, exactly as the solid tier's do.
+   */
+  resolvePaint(name: string, paint: Paint): ResolvedObjectPaint;
+
+  /**
+   * Lowers a fill/stroke pair to its derived material — a pure function of
+   * the paint **values** (§33): the same pair lowers to the same graph bytes
+   * on every call, which is what lets the backend's source-keyed program
+   * cache compile one program for N shapes sharing a paint.
+   */
+  plan(
+    fill: ResolvedShapeFill,
+    stroke: ResolvedStrokeStyle | null,
+  ): ShapePaintPlan;
+}
+
+/** The slot. `null` until `registerShapePaints()` fills it. */
+let shapePaintSupport: ShapePaintSupport | null = null;
+
+/**
+ * Installs `support` as the process's §58 paint-object tier. Called by
+ * `registerShapePaints()` (`shape-paint.ts`); replaces any previous support.
+ * Shapes that already derived a material keep it — the plan is re-asked only
+ * when a paint is assigned.
+ */
+export function setShapePaintSupport(support: ShapePaintSupport): void {
+  shapePaintSupport = support;
+}
+
+/**
+ * The registered paint support, or `null` — the seam the §79 readers use to
+ * restore an object paint from a document: a build that has not registered
+ * the tier genuinely cannot draw the paint, so the reader's drop-what-this-
+ * build-cannot-draw rule falls out of one `null` check.
+ */
+export function resolveShapePaintSupport(): ShapePaintSupport | null {
+  return shapePaintSupport;
+}
+
+/**
+ * Empties the slot — for tests that must exercise the unregistered path after
+ * another suite registered (the `clearRegisteredNodeMaterialPipeline`
+ * precedent). Not an application API: an application that wants the tier off
+ * simply never registers.
+ */
+export function clearRegisteredShapePaints(): void {
+  shapePaintSupport = null;
+}
+
+/**
+ * Validates a §58 paint and resolves it (§85) — inline for the solid tier,
+ * through the registered {@link ShapePaintSupport} for everything else, so
+ * the object tier's validation ships only in bundles that registered it.
+ */
 function requirePaint(name: string, paint: Paint): ResolvedPaint {
   if (paint.kind !== "solid") {
-    throw new RangeError(
-      `${name} must be a §58 paint; got kind ` +
-        `${JSON.stringify((paint as { kind: unknown }).kind)}. Only "solid" ` +
-        "ships today — see the Paint union for the six staged kinds (§58).",
-    );
+    const support = shapePaintSupport;
+    if (support === null) {
+      throw new RangeError(
+        `${name} names a §58 ${JSON.stringify(
+          (paint as { kind: unknown }).kind,
+        )} paint, but the paint-object tier is not registered — call ` +
+          "registerShapePaints() once at startup (§58, §85).",
+      );
+    }
+    return support.resolvePaint(name, paint);
   }
   const color = paint.color;
   for (let i = 0; i < 4; i += 1) {
@@ -496,6 +786,28 @@ function requirePaint(name: string, paint: Paint): ResolvedPaint {
     color: [color[0], color[1], color[2], color[3]],
     opacity,
   };
+}
+
+/** Whether a resolved fill or paint names a §58 object paint. */
+function isObjectPaint(
+  value: ResolvedShapeFill | ResolvedPaint | undefined,
+): boolean {
+  return (
+    value !== undefined &&
+    value !== "inherit" &&
+    value !== "none" &&
+    value.kind !== "solid"
+  );
+}
+
+/**
+ * The registered support, for a shape that provably resolved an object paint
+ * through it — the resolution is what proves registration, so the cast
+ * documents an invariant rather than hoping (`clearRegisteredShapePaints` is
+ * test-only and documented as such).
+ */
+function requireShapePaintSupport(): ShapePaintSupport {
+  return shapePaintSupport as ShapePaintSupport;
 }
 
 /** Validates a {@link ShapeFill} (§85), copying any paint it carries. */
@@ -596,6 +908,25 @@ function requirePaintableMaterial(material: Material, paints: boolean): void {
       "geometry's per-vertex colours — pass `vertexColors: true` (§57, §58). " +
       `Its material (kind ${JSON.stringify(material.kind)}) does not, so the ` +
       "fill and the stroke would both draw the material's own colour.",
+  );
+}
+
+/**
+ * Refuses a §58 object paint on a shape that carries its own material (§85).
+ *
+ * The two tiers are exclusive by design (see {@link Shape2DOptions.material}):
+ * an object paint *derives* the material, so authoring one onto a shape that
+ * was constructed with a material would silently ignore that material — the
+ * same "accepted and ignored" failure {@link requirePaintableMaterial}
+ * refuses, from the other side.
+ */
+function requireMateriallessObjectPaint(painted: boolean): void {
+  if (!painted) {
+    return;
+  }
+  throw new RangeError(
+    "A §58 gradient or pattern paint derives the shape's own material — " +
+      "construct the shape without `material` to use one (§58, §85).",
   );
 }
 
@@ -796,14 +1127,27 @@ function writeVertexColors(
   }
 }
 
-/** A paint's drawn RGBA — its colour with its opacity folded into the alpha. */
-function paintColor(paint: ResolvedPaint | undefined): ColorRGBA | undefined {
+/** A solid paint's drawn RGBA — its colour with its opacity folded in. */
+function paintColor(
+  paint: ResolvedSolidPaint | undefined,
+): ColorRGBA | undefined {
   if (paint === undefined) {
     return undefined;
   }
   const color = paint.color;
   return [color[0], color[1], color[2], color[3] * paint.opacity];
 }
+
+/**
+ * The selector colours a paint-derived geometry bakes when its two halves
+ * draw different paints: the derived graph reads the colour stream's first
+ * component as the fill/stroke mix factor, and `0` and `1` are exactly
+ * representable, so `mix(fill, stroke, t)` is exact at both ends.
+ */
+const SELECTOR_FILL: ColorRGBA = [0, 0, 0, 0];
+
+/** See {@link SELECTOR_FILL}. */
+const SELECTOR_STROKE: ColorRGBA = [1, 1, 1, 1];
 
 /**
  * The options every §50 shape takes: the material it is filled with, the
@@ -814,19 +1158,32 @@ export interface Shape2DOptions<
   M extends Material = SurfaceMaterial,
 > extends RenderableOptions {
   /**
-   * Surface appearance (§57). **Required**, exactly as `Renderable`'s is: a
-   * shape without a material draws nothing, and defaulting it would both hide
-   * the mistake behind an invisible node and hand the application a resource it
-   * never created and now owes a `dispose()` to (§83).
+   * Surface appearance (§57). **Required unless a §58 object paint derives
+   * one** — a shape without either draws nothing, and that mistake is refused
+   * at construction (§85) rather than hidden behind an invisible node.
    *
-   * §50's example writes `fill: "#4466ff"` *instead of* a material. That
-   * remains deliberately unsupported: a shape that invented a material would
-   * hand the application a resource it never created and now owes a
-   * `dispose()` to, and §79 has no key to write for it. {@link
-   * Shape2DOptions.fill} is §58's paint and sits **beside** the material —
-   * see {@link Shape2D.fill}.
+   * The two states are exclusive, both ways (§85, refused loudly):
+   *
+   * - **material, no object paint** — R-16's tier: solid paints travel as
+   *   per-vertex colour through this material, which must multiply them
+   *   (`vertexColors: true`).
+   * - **object paint, no material** — the paint-object tier: the shape
+   *   derives a §60 `NodeMaterial` from its paints and wears it as
+   *   {@link Renderable.material} (typed by `M`, which stays at its default
+   *   — the derived material is the one place the family's parameter is
+   *   wider than its type; see {@link Paint}). Passing a material *and* an
+   *   object paint is refused: the material would be silently ignored, which
+   *   is "accepted and ignored" wearing a disguise.
+   *
+   * §50's example writes `fill: "#4466ff"` *instead of* a material, and at
+   * the solid tier that stays unsupported for R-16's recorded reasons (an
+   * invented material is an undisclosed §83 liability and §79 has no key for
+   * it). At the object tier both objections dissolve — the derived material
+   * owns nothing the application must dispose, and §79 writes the paint
+   * itself — which is exactly why the object tier is spelled *without* a
+   * material.
    */
-  material: M;
+  material?: M;
   /**
    * Initial {@link Shape2D.tolerance} in world units; defaults to §51's
    * `DEFAULT_FLATTEN_TOLERANCE`.
@@ -875,6 +1232,21 @@ export interface Shape2DOptions<
  *   authoring one on such a material throws (§85) naming `vertexColors: true`;
  * - the drawn colour is `material.color × paint`, so a material left at its
  *   `UnlitMaterial` default of white draws the paint exactly.
+ *
+ * ## …and how an *object* paint reaches it (the paint tier, 2026-08-29)
+ *
+ * A gradient or pattern is not a colour per vertex, so the per-vertex channel
+ * carries something else: a shape constructed without a material (see
+ * {@link Shape2DOptions.material}) derives a §60 `NodeMaterial` whose graph
+ * evaluates its paints **per fragment**, and when fill and stroke draw
+ * different paints the colour stream bakes the two-valued *selector* the
+ * graph's `mix` reads — `0` on every fill vertex, `1` on every stroke vertex,
+ * both exact. Still one geometry, one draw, one material; the item's kind is
+ * `"node"`, so drawing it needs the backend's node pipeline registered
+ * (`registerNodeMaterialPipeline()` on WebGL 2) and an unregistered frame
+ * **skips** the shape with the pipeline's own one-time warning rather than
+ * approximating it — a paint the author wrote is a specific picture (§60's
+ * rule, which this tier inherits rather than re-decides).
  */
 export abstract class Shape2D<M extends Material = SurfaceMaterial>
   extends Renderable<M>
@@ -894,6 +1266,12 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
 
   #stroke: ResolvedStrokeStyle | null;
 
+  /** Whether this shape derives its material from its paints — see below. */
+  readonly #paintDerived: boolean;
+
+  /** Whether the derived graph needs the selector stream (paint tier only). */
+  #selector = false;
+
   /** Whether the geometry still matches the shape's parameters. */
   #stale = true;
 
@@ -903,25 +1281,54 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
    * Builds the shared half of a shape. The geometry is created **before**
    * `super()`, because `Renderable`'s constructor takes the geometry: a shape
    * owns its own rather than being handed one, so it hands its own to the base
-   * and keeps the reference.
+   * and keeps the reference. The fill and stroke are validated before
+   * `super()` too, because on the paint-object tier the **material is derived
+   * from them** (see {@link Shape2DOptions.material}) and the base wants it.
    */
   protected constructor(options: Shape2DOptions<M>) {
     const derived = new BufferGeometry({
       positions: new Float32Array(0),
       mode: "triangles",
     });
-    super(derived, options.material, options);
+    const fill = requireFill(options.fill ?? "inherit");
+    const stroke =
+      options.stroke === undefined || options.stroke === null
+        ? null
+        : requireStroke(options.stroke);
+    const painted = isObjectPaint(fill) || isObjectPaint(stroke?.paint);
+    const material = options.material;
+    let selector = false;
+    let worn: Material;
+    if (material === undefined) {
+      if (!painted) {
+        throw new RangeError(
+          "Shape2D needs a material, or a §58 gradient/pattern paint to " +
+            "derive one from; got neither (§57, §85).",
+        );
+      }
+      const plan = requireShapePaintSupport().plan(fill, stroke);
+      worn = plan.material;
+      selector = plan.selector;
+    } else {
+      requireMateriallessObjectPaint(painted);
+      worn = material;
+    }
+    // Sound where `material` was supplied; on the derived path the cast is
+    // the one place the family's parameter is wider than its type, documented
+    // on `Shape2DOptions.material`.
+    super(derived, worn as M, options);
     this.#derived = derived;
     this.#tolerance = requirePositive(
       "Shape2D tolerance",
       options.tolerance ?? DEFAULT_FLATTEN_TOLERANCE,
     );
-    this.#fill = requireFill(options.fill ?? "inherit");
-    this.#stroke =
-      options.stroke === undefined || options.stroke === null
-        ? null
-        : requireStroke(options.stroke);
-    requirePaintableMaterial(this.material, this.#paints);
+    this.#fill = fill;
+    this.#stroke = stroke;
+    this.#paintDerived = material === undefined;
+    this.#selector = selector;
+    if (!this.#paintDerived) {
+      requirePaintableMaterial(this.material, this.#paints);
+    }
   }
 
   /**
@@ -956,10 +1363,15 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
 
   set fill(value: ShapeFill) {
     const fill = requireFill(value);
-    requirePaintableMaterial(
-      this.material,
-      fill !== "inherit" && fill !== "none",
-    );
+    if (this.#paintDerived) {
+      this.#replan(fill, this.#stroke);
+    } else {
+      requireMateriallessObjectPaint(isObjectPaint(fill));
+      requirePaintableMaterial(
+        this.material,
+        fill !== "inherit" && fill !== "none",
+      );
+    }
     this.#fill = fill;
     this.markDirty();
   }
@@ -986,9 +1398,41 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
 
   set stroke(value: StrokeStyle | null) {
     const stroke = value === null ? null : requireStroke(value);
-    requirePaintableMaterial(this.material, stroke?.paint !== undefined);
+    if (this.#paintDerived) {
+      this.#replan(this.#fill, stroke);
+    } else {
+      requireMateriallessObjectPaint(isObjectPaint(stroke?.paint));
+      requirePaintableMaterial(this.material, stroke?.paint !== undefined);
+    }
     this.#stroke = stroke;
     this.markDirty();
+  }
+
+  /**
+   * Whether this shape derives its material from its §58 paints — `true`
+   * exactly when it was constructed without a `material` (see
+   * {@link Shape2DOptions.material}). Fixed for the shape's lifetime: the two
+   * tiers resolve different mistakes to different refusals, and a shape that
+   * silently switched tier on a paint write would move its material out from
+   * under the author. The §79 writer reads it to decide whether a material
+   * key exists to write.
+   */
+  get paintDerived(): boolean {
+    return this.#paintDerived;
+  }
+
+  /**
+   * Re-derives the material for a new fill/stroke pair (paint tier only) —
+   * assigning replaces the worn material and the selector decision together,
+   * so the graph and the geometry it reads can never disagree. Any §57 state
+   * an author wrote onto the previous derived material goes with it,
+   * deliberately: the material is derived data, like the geometry.
+   */
+  #replan(fill: ResolvedShapeFill, stroke: ResolvedStrokeStyle | null): void {
+    const plan = requireShapePaintSupport().plan(fill, stroke);
+    // The same documented cast as the constructor's.
+    this.material = plan.material as M;
+    this.#selector = plan.selector;
   }
 
   /** Whether either half of this shape names a §58 paint of its own. */
@@ -1116,6 +1560,26 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
     }
     const path = this.toPath();
     const stroke = this.#stroke;
+    let fillColor: ColorRGBA | undefined;
+    let strokeColor: ColorRGBA | undefined;
+    if (this.#paintDerived) {
+      // The derived graph evaluates the paints itself; the colour stream is
+      // either absent (one paint for everything drawn) or the selector its
+      // `mix` reads — see `ShapePaintPlan.selector`.
+      if (this.#selector) {
+        fillColor = SELECTOR_FILL;
+        strokeColor = SELECTOR_STROKE;
+      }
+    } else {
+      // Sound casts: a shape with its own material can only hold solid
+      // paints — `requireMateriallessObjectPaint` maintains the invariant at
+      // every write.
+      fillColor =
+        this.#fill === "inherit" || this.#fill === "none"
+          ? undefined
+          : paintColor(this.#fill as ResolvedSolidPaint);
+      strokeColor = paintColor(stroke?.paint as ResolvedSolidPaint | undefined);
+    }
     rebuildFill(
       this.#derived,
       this.#fill === "none" ? [] : path.fillRings(this.#tolerance),
@@ -1125,10 +1589,8 @@ export abstract class Shape2D<M extends Material = SurfaceMaterial>
             ...stroke,
             tolerance: this.#tolerance,
           }),
-      this.#fill === "inherit" || this.#fill === "none"
-        ? undefined
-        : paintColor(this.#fill),
-      paintColor(stroke?.paint),
+      fillColor,
+      strokeColor,
     );
   }
 }

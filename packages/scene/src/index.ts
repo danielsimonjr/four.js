@@ -73,6 +73,7 @@ export {
   createSnapshotSystem,
 } from "./interpolation.js";
 export type {
+  HitTestMode,
   NodeEventMap,
   NodeHierarchyEvent,
   NodeOptions,

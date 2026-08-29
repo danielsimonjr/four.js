@@ -8,6 +8,47 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — §71 analytic picking + node.hitTestMode (A-11 closed) and the §58 paint-object tier (R-16 closed)
+
+#### Added
+
+- **§71's analytic tier and its mode selector (A-11's last half; adopted RFC
+  0005 Q3).** `Node.hitTestMode` exists:
+  `"bounds" | "geometry" | "pixel" | "gpu"` or `null` — the default, §71's "the
+  engine should select the cheapest valid method", resolved per candidate from
+  what the candidate carries, which is byte-for-byte the pre-field behaviour.
+  The mode gates the node, not the subtree (the `layers` scope, not the `clip`
+  scope); `"custom"` is deliberately absent until a callback strategy exists.
+  `@four/input` gains `Pickable.triangles` (structural `positions`/`indices` —
+  `BufferGeometry`'s layout without the import; plan §3.1 intact) and `pick()`
+  refines a box hit by exact Möller–Trumbore ray/triangle intersection:
+  unnormalized-local-ray world distances, index-order iteration and
+  NaN-fails-toward-miss (§33), §85 refusals for non-whole-triangle lengths,
+  out-of-range indices (WeakSet-cached scan), and an explicit mode whose
+  candidate carries no data. "What draws is what picks": a §50 shape's
+  candidate is built from its own tessellation. §79: `hitTestMode` rides one
+  wrapper around every umbrella node-type pair (widgets included), written only
+  when set — unset scenes serialize byte-identically — and corrupt values
+  (`"custom"` included) restore `null`. Scenes that never pick carry ~0 B; the
+  tier rides only `pick()`-using bundles (+0.60 kB gzip in ui-demo — budget
+  44 → 44.5 kB with the A/B). Closes `A-11`.
+- **§58 paint-object tier on `Shape2D` (R-16 follow-up, unblocked by RFC
+  0001):** `LinearGradientPaint`, `RadialGradientPaint`, and `PatternPaint`
+  (image _and_ render-target textures via the `MaterialTexture` seam) accepted
+  by `ShapeFill`/`StrokeStyle` behind `registerShapePaints()`. A shape
+  constructed without a `material` derives a §60 `NodeMaterial` that evaluates
+  its paints exactly per fragment — one geometry, one `"node"` draw; different
+  fill/stroke paints blend through a baked selector stream. Conic refused
+  naming §60's missing angle operator; procedural covered by `NodeMaterial`
+  directly. §79: paints written whole, paint-derived shapes write no material
+  key, pattern textures key against a new `textures` catalog. New §33 golden
+  `shape-paint-glsl.json`; browser gate now 94 tests (`shape-paint.spec.ts`,
+  worst channel difference 3/255 over 34 analytic probes). Byte-identity for
+  every scene naming no object paint; 0 B in bundles that never register
+  (+0.41 kB shape-glue in the twin only). Unregistered = skipped-not-
+  approximated (inherits §60's rule; transcript-pinned). `ShapeMaterial`
+  unshipped a third time: the derived material _is_ `NodeMaterial`.
+
 ### 2026-08-29 — Fixed: three recorded truth fixes + two follow-ons
 
 #### Fixed

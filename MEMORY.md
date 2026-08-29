@@ -28,6 +28,83 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — A-11 analytic tier + `node.hitTestMode` (adopted RFC 0005 Q3).**
+  Decisions worth keeping:
+  - **`hitTestMode` is `HitTestMode | null = null`, and `null` is not a fifth
+    string.** §71's union stays verbatim (`"custom"` omitted until a strategy
+    exists — a selector value with nothing behind it would be a silent no-op);
+    "no author decision" is `null`, resolved per candidate at pick time from
+    what the candidate carries. Scope stated per the §46/§67 precedent: the mode
+    gates the node, not the subtree (`layers`' scope, `clip`'s opposite).
+  - **Presence-opts-in composes under `null`; explicit modes are exclusive and
+    refuse missing data.** The alphaMask precedent extended: `null` = box →
+    triangles (if present, refining `t`/`point` to the surface) → mask at the
+    refined `t`; `"geometry"`/`"pixel"` select one strategy and throw §85
+    (`INVALID_APPLICATION_STATE`) when box-hit without their data — an explicit
+    mode is the author saying the box is not an acceptable answer; `"gpu"`
+    skips before the box test (the id pass answers; no double-resolve).
+  - **`Pickable.triangles` is `BufferGeometry`'s layout without the import** —
+    `{ positions, indices? }`, the fifth structural-seam instance; §3.1's
+    `core, math, scene` row survived the analytic tier too.
+  - **Triangle-record validation is WeakSet-cached** — O(n) index scan once per
+    record at first consult (hot-path rule; `markDirty`'s no-revalidation
+    caveat restated), and Möller–Trumbore's guards are written in the accepting
+    direction so NaN fails toward a miss (`intersectBox`'s discipline, third
+    statement). Unnormalized local ray ⇒ `t` is world distance (the box test's
+    trick, inherited free).
+  - **§79 rides one wrapper, not five writers.** `withHitTestMode(support)`
+    wraps every umbrella pair (widgets included), writes the key **only when
+    set** — argued against the flags' written-always rule: `null` is
+    absence-of-decision frozen by the spec, and eliding it keeps unset scenes
+    byte-identical — and restores by post-construction assignment, so
+    `RenderableOptions` (a render-package record) was not widened.
+  - **Measured:** tier symbols in only the 4 `pick()`-using bundles; first-3d
+    ±0, particles +0.01 kB (inert field initializer); ui-demo 43.74 → 44.34 kB
+    — budget bumped 44 → 44.5 with the A/B. input/four/geometry 100×4; scene
+    99.85/99.72 (≥ baseline).
+- **2026-08-29 — §58 paint-object tier (R-16 closed).** Decisions worth keeping:
+  - **An object paint derives the shape's material; a supplied material
+    excludes object paints — both directions refused (§85).** The tiers never
+    mix: solids stay per-vertex through the author's material (byte-identical);
+    object paints make the shape a `"node"` item wearing a derived
+    `NodeMaterial`. `Shape2DOptions.material` became optional;
+    `shape.paintDerived` is fixed for the shape's lifetime. R-16's two
+    objections to a shape inventing a material dissolve exactly here: the
+    derived material owns nothing disposable, and §79 writes the paint itself.
+  - **The fill/stroke selector rides the colour stream** — `(0,0,0,0)` fill /
+    `(1,1,1,1)` stroke, `mix(fill, stroke, color.x)`, exact at both ends —
+    emitted only when the halves' paint values differ (value keys; patterns key
+    on texture object identity).
+  - **Paint values are graph constants, not uniforms** (recorded trade): the
+    lowering is a pure value→bytes function, so RFC 0001's source-keyed program
+    cache does all sharing with no cache in the lowering; one program per
+    distinct paint value — re-authoring a paint per frame is the wrong tool,
+    stated on `Paint`. Values-as-uniforms is the staged upgrade for animated
+    stops.
+  - **The stop ramp** `c₀ + Σ Δcᵢ·saturate((t−pᵢ₋₁)/Δpᵢ)` is exact for any stop
+    count, pads both ends for free, and spells hard edges as `step(pᵢ, t)` —
+    graph structure is a function of the value, which is fine because program
+    identity already is.
+  - **Unregistered = skipped, in the frame and in §79** — the tier inherits
+    §60's skip-not-flat rule (the R-16 per-vertex fallback would be a
+    _different picture_, R-6's rule; R-8's fails-toward-drawing governs culling
+    of the same picture, not substitution), and the reader lets a material key
+    win over object paints so a document's picture never depends on
+    registration; keyless unrestorable documents refuse loudly naming
+    `registerShapePaints()`.
+  - **`registerShapePaints()` is the authoring-side registration slot** (A-3's
+    module-`let` move applied to authoring rather than drawing): the lowering
+    is 0 B unless called; the in-`shape.ts` glue is +414 B gzip and reaches
+    only Shape2D-carrying bundles (today: the twin alone).
+  - **`ShapeMaterial` unshipped a third time** — the pipeline that was to give
+    it content arrived, and the derived material is `NodeMaterial`; a
+    `ShapeMaterial` would be it renamed or a `kind: "node"` discriminant that
+    lies.
+  - **§79 grew a `textures` catalog** (`SceneNodeTypeOptions.textures`,
+    additive): a pattern's texture is the one _resource_ inside a paint, so it
+    follows the resource rules (loud unresolvable-key refusal; `null` under
+    `"skip"`), not the drop rules.
+
 - **A retired-claim pin can outlive the feature's shipping when the ship was
   opt-in** (2026-08-29, check-docs §55-batched pin): the pin guards the
   _original unqualified wording_, not the feature's absence. §65 batching

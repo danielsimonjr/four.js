@@ -142,7 +142,12 @@
 
 import { FourError, type JsonValue } from "@four/core";
 import { Path, type BufferGeometry, type Point2D } from "@four/geometry";
-import type { Material, SpriteMaterial, UnlitMaterial } from "@four/materials";
+import type {
+  Material,
+  MaterialTexture,
+  SpriteMaterial,
+  UnlitMaterial,
+} from "@four/materials";
 import {
   CHARACTER_CONTROLLER_SERIALIZER,
   CharacterController,
@@ -184,9 +189,12 @@ import {
   Shape2D,
   Sprite,
   Star,
+  resolveShapePaintSupport,
   restoreMeshSkeleton,
 } from "@four/render";
 import type {
+  GradientStop,
+  Paint,
   ResolvedPaint,
   ResolvedShapeFill,
   ResolvedStrokeStyle,
@@ -204,6 +212,7 @@ import {
   ScreenCamera,
   SpotLight,
   restoreNodeId,
+  type HitTestMode,
   type Node,
 } from "@four/scene";
 import {
@@ -447,8 +456,17 @@ export interface SceneNodeTypeOptions {
   /** Names and resolves the materials drawables point at (§57, §79). */
   readonly materials?: SceneResourceCatalog<Material>;
   /**
-   * What a resource that {@link SceneNodeTypeOptions.geometries} or
-   * {@link SceneNodeTypeOptions.materials} does not name does to a save.
+   * Names and resolves the textures §58 **pattern paints** point at (§77,
+   * §79; the paint-object tier, 2026-08-29). A pattern's texture is the one
+   * piece of a paint that is a *resource* rather than a value, so it travels
+   * as a logical key exactly as a material does; gradients need no entry —
+   * they are values and the document carries them whole.
+   */
+  readonly textures?: SceneResourceCatalog<MaterialTexture>;
+  /**
+   * What a resource that {@link SceneNodeTypeOptions.geometries},
+   * {@link SceneNodeTypeOptions.materials} or
+   * {@link SceneNodeTypeOptions.textures} does not name does to a save.
    * Defaults to `"throw"`.
    */
   readonly unknownResources?: UnknownResourcePolicy;
@@ -1074,6 +1092,80 @@ function requireSpriteMaterial(
   );
 }
 
+/**
+ * §71's mode as a document value, filtered to `HitTestMode`'s four strings —
+ * anything else (a missing key, a corrupted value, a `"custom"` written by a
+ * build that has the strategy this one does not) restores the class default,
+ * `null`, per the `Sprite` corrupt-field policy and §96's filter-don't-trust
+ * rule.
+ */
+function readHitTestMode(
+  value: JsonValue | undefined,
+): HitTestMode | undefined {
+  return value === "bounds" ||
+    value === "geometry" ||
+    value === "pixel" ||
+    value === "gpu"
+    ? value
+    : undefined;
+}
+
+/**
+ * Rides §71's `hitTestMode` on every node type of `support` (A-11; the field
+ * ships with the analytic tier per the adopted RFC 0005 Q3, 2026-08-29). Each
+ * pair below returns through this wrapper, so the field serializes uniformly
+ * for **every class the umbrella writes** — widgets included, since §73's
+ * pixel-accurate UI hit testing is one of the field's consumers — without a
+ * line in any individual writer. It composes transparently: the wrapped
+ * writer still answers `undefined` for a foreign node, so
+ * {@link composeSceneNodeTypes}'s fall-through is untouched.
+ *
+ * Written **only when set** — unlike the four drawable flags, which are
+ * written always. Their recorded rule exists so a reader never has to know a
+ * build's defaults; `null` is not that kind of default. It is the *absence of
+ * an author decision* (§71's "the engine should select the cheapest valid
+ * method" — resolved per candidate at pick time, from what the candidate
+ * carries), its meaning is frozen by the spec rather than by a build, and §79
+ * documents state what a node **is** — a node whose mode was never chosen
+ * says nothing. Eliding it also keeps every document written before this
+ * field byte-identical on a round trip, which is the A-11 packet's
+ * behaviour-identity obligation.
+ *
+ * On the way back in the field is assigned after construction rather than
+ * through an option: it is a plain writable `Node` field (like `clip`,
+ * whose option lives on `RenderableOptions` — a record this package does not
+ * own and has no §71 reason to widen), and one assignment here covers every
+ * factory branch of every pair.
+ *
+ * The write side narrows `data` to a record by assertion rather than by
+ * check, because the invariant is this module's own: every `nodeDataOf`
+ * below answers a JSON **record** or `undefined`, never a bare value — a
+ * guard branch for the impossible shape would be untestable by construction.
+ */
+function withHitTestMode(support: SceneNodeTypeSupport): SceneNodeTypeSupport {
+  return {
+    write: {
+      nodeTypeOf: support.write.nodeTypeOf,
+      nodeDataOf: (node: Node): JsonValue | undefined => {
+        const data = support.write.nodeDataOf(node);
+        const mode = node.hitTestMode;
+        if (data === undefined || mode === null) return data;
+        return { ...(data as Record<string, JsonValue>), hitTestMode: mode };
+      },
+    },
+    read: {
+      nodeFactory: (document: SceneNodeDocument): Node | undefined => {
+        const node = support.read.nodeFactory(document);
+        if (node !== undefined) {
+          const mode = readHitTestMode(record(document.data).hitTestMode);
+          if (mode !== undefined) node.hitTestMode = mode;
+        }
+        return node;
+      },
+    },
+  };
+}
+
 // --- the pairs ---------------------------------------------------------------
 
 /**
@@ -1097,7 +1189,7 @@ export function registerUISerializers(
   options: SceneNodeTypeOptions = {},
 ): SceneNodeTypeSupport {
   const atlas = options.atlas;
-  return {
+  return withHitTestMode({
     write: {
       nodeTypeOf: (node: Node): string | undefined => {
         const constructor = node.constructor;
@@ -1287,7 +1379,7 @@ export function registerUISerializers(
         return undefined;
       },
     },
-  };
+  });
 }
 
 /**
@@ -1368,7 +1460,7 @@ export function registerRenderSerializers(
   const geometries = options.geometries;
   const materials = options.materials;
   const policy = options.unknownResources ?? "throw";
-  return {
+  return withHitTestMode({
     write: {
       nodeTypeOf: (node: Node): string | undefined => {
         const constructor = node.constructor;
@@ -1715,7 +1807,7 @@ export function registerRenderSerializers(
         return undefined;
       },
     },
-  };
+  });
 }
 
 // --- §50's shape family (2026-08-09, R-23) -----------------------------------
@@ -1832,45 +1924,285 @@ function requireShapeNumber(
   return number_;
 }
 
+/** What the §58 paint writer needs beyond the paint — see {@link paintJson}. */
+interface PaintWriteContext {
+  /** The node being written, for refusal messages. */
+  readonly node: Node;
+  /** The texture catalog a pattern's texture keys against (§77, §79). */
+  readonly textures: SceneResourceCatalog<MaterialTexture> | undefined;
+  /** The unknown-resource policy in force. */
+  readonly policy: UnknownResourcePolicy;
+}
+
+/** What the §58 paint reader needs beyond the JSON — see {@link readPaint}. */
+interface PaintReadContext {
+  /** The document node being read, for refusal messages. */
+  readonly document: SceneNodeDocument;
+  /** The texture catalog a pattern's texture key resolves through. */
+  readonly textures: SceneResourceCatalog<MaterialTexture> | undefined;
+  /**
+   * Whether object paints may be read at all — `false` when the document
+   * names a material key, because the two tiers are exclusive
+   * (`Shape2DOptions.material`): a hand-assembled document carrying both
+   * restores the material tier, which is also what an unregistered build
+   * would draw, so the picture does not depend on registration.
+   */
+  readonly objectPaints: boolean;
+}
+
 /**
- * A §58 paint as JSON — tagged, so widening {@link Paint} beyond its one
- * member stays an additive read.
+ * The key a pattern paint's texture is written under, or `null` under
+ * {@link UnknownResourcePolicy} `"skip"` — {@link resourceKeyJson}'s rule,
+ * restated for the one resource a *paint* carries.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE` under the default policy
  */
-function paintJson(paint: ResolvedPaint): JsonValue {
-  return {
-    kind: paint.kind,
-    color: [paint.color[0], paint.color[1], paint.color[2], paint.color[3]],
-    opacity: paint.opacity,
-  };
+function patternTextureJson(
+  context: PaintWriteContext,
+  texture: MaterialTexture,
+): JsonValue {
+  const key = context.textures?.keyOf?.(texture);
+  if (key !== undefined) return key;
+  if (context.policy === "skip") return null;
+  throw new FourError(
+    "INVALID_APPLICATION_STATE",
+    `Node ${context.node.id} carries a §58 pattern paint whose texture no catalog names, so the document could not be loaded back; supply registerSceneNodeTypes's \`textures\` option, or pass { unknownResources: "skip" } to write a null reference (§79).`,
+    { context: { node: context.node.id, field: "paint.texture" } },
+  );
+}
+
+/**
+ * A §58 paint as JSON — tagged by kind, exactly as the shape stores it. A
+ * solid paint writes the byte-identical payload it wrote at R-16; the three
+ * object forms (2026-08-29) carry their values whole, except a pattern's
+ * texture, which is a *resource* and travels as a logical key
+ * ({@link patternTextureJson}).
+ */
+function paintJson(
+  paint: ResolvedPaint,
+  context: PaintWriteContext,
+): JsonValue {
+  switch (paint.kind) {
+    case "solid":
+      return {
+        kind: paint.kind,
+        color: [paint.color[0], paint.color[1], paint.color[2], paint.color[3]],
+        opacity: paint.opacity,
+      };
+    case "linear-gradient":
+      return {
+        kind: paint.kind,
+        from: pairJson(paint.from.x, paint.from.y),
+        to: pairJson(paint.to.x, paint.to.y),
+        stops: stopsJson(paint.stops),
+        opacity: paint.opacity,
+      };
+    case "radial-gradient":
+      return {
+        kind: paint.kind,
+        center: pairJson(paint.center.x, paint.center.y),
+        radius: paint.radius,
+        stops: stopsJson(paint.stops),
+        opacity: paint.opacity,
+      };
+    default:
+      return {
+        kind: paint.kind,
+        texture: patternTextureJson(context, paint.texture),
+        repeat: pairJson(paint.repeat.x, paint.repeat.y),
+        offset: pairJson(paint.offset.x, paint.offset.y),
+        opacity: paint.opacity,
+      };
+  }
+}
+
+/** A gradient's stops as JSON — offsets and colours, in order. */
+function stopsJson(
+  stops: readonly { offset: number; color: readonly number[] }[],
+): JsonValue {
+  return stops.map((stop) => ({
+    offset: stop.offset,
+    color: [stop.color[0], stop.color[1], stop.color[2], stop.color[3]],
+  }));
 }
 
 /**
  * A §58 paint from a document, or `undefined` when it carries none this build
  * can draw.
  *
- * A paint of an *unknown* kind reads as `undefined` rather than as a refusal:
- * §58 lists seven and this release draws one, so a document written by a later
- * build is a document whose gradient this build cannot honour — dropping the
- * paint leaves a shape in its material's colour, which is visible and
- * recoverable, where refusing the node would lose the artwork entirely. Every
- * *malformed* field inside a solid paint restores that field's default, the
- * A-12/R-18 rule.
+ * The reading rules, tier by tier:
+ *
+ * - a **solid** paint reads exactly as it has since R-16: every malformed
+ *   field restores its default, the A-12/R-18 rule;
+ * - an **object** paint (2026-08-29) is validated by the very support that
+ *   will draw it — `resolveShapePaintSupport()`, the same slot the shape's
+ *   own setters use — so the reader and the constructor can never disagree
+ *   about what is legal. A build that has not registered the tier, a
+ *   malformed paint, and a paint of an *unknown* kind all read as
+ *   `undefined` (dropped): the build genuinely cannot honour them, and where
+ *   a material key exists dropping leaves the shape in that material's
+ *   colour, visible and recoverable. Where none exists the caller refuses
+ *   loudly instead — see `registerShapeSerializers`;
+ * - a pattern's **texture key** follows the resource rule, not the drop
+ *   rule: a key this application's catalog does not publish is a distinct,
+ *   fixable mistake and is refused naming it (`resolveResource`'s stance). A
+ *   `null` texture (written under `"skip"`) drops the paint.
  */
-function readPaint(value: JsonValue | undefined): ResolvedPaint | undefined {
+function readPaint(
+  value: JsonValue | undefined,
+  context: PaintReadContext,
+): ResolvedPaint | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return undefined;
   }
   const source = value as { readonly [key: string]: JsonValue };
-  if (readString(source.kind) !== "solid") return undefined;
-  const color = readColorRGBA(source.color);
-  if (color === undefined) return undefined;
-  const opacity = readFinite(source.opacity);
-  return {
-    kind: "solid",
-    color,
-    opacity:
-      opacity !== undefined && opacity >= 0 && opacity <= 1 ? opacity : 1,
-  };
+  const kind = readString(source.kind);
+  if (kind === "solid") {
+    const color = readColorRGBA(source.color);
+    if (color === undefined) return undefined;
+    const opacity = readFinite(source.opacity);
+    return {
+      kind: "solid",
+      color,
+      opacity:
+        opacity !== undefined && opacity >= 0 && opacity <= 1 ? opacity : 1,
+    };
+  }
+  if (!context.objectPaints) return undefined;
+  const support = resolveShapePaintSupport();
+  if (support === null) return undefined;
+  const candidate = objectPaintCandidate(kind, source, context);
+  if (candidate === undefined) return undefined;
+  try {
+    return support.resolvePaint(
+      `Scene document node ${JSON.stringify(context.document.id ?? null)} paint`,
+      candidate,
+    );
+  } catch {
+    // Malformed content inside a known kind — unsorted stops, a zero-length
+    // axis — drops the paint, the same visible fallback as a malformed solid
+    // colour.
+    return undefined;
+  }
+}
+
+/**
+ * Assembles the structural candidate {@link readPaint} hands to the paint
+ * support — arrays into points and stops, a texture key into the texture it
+ * names — or `undefined` where the structure itself is missing.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE` for an unresolvable texture
+ * key (the resource rule — see {@link readPaint})
+ */
+function objectPaintCandidate(
+  kind: string | undefined,
+  source: { readonly [key: string]: JsonValue },
+  context: PaintReadContext,
+): Paint | undefined {
+  if (kind === "linear-gradient") {
+    const from = readFinitePair(source.from);
+    const to = readFinitePair(source.to);
+    const stops = readStops(source.stops);
+    if (from === undefined || to === undefined || stops === undefined) {
+      return undefined;
+    }
+    return {
+      kind,
+      from: { x: from[0], y: from[1] },
+      to: { x: to[0], y: to[1] },
+      stops,
+      ...paintOpacityOption(source.opacity),
+    };
+  }
+  if (kind === "radial-gradient") {
+    const center = readFinitePair(source.center);
+    const radius = readFinite(source.radius);
+    const stops = readStops(source.stops);
+    if (center === undefined || radius === undefined || stops === undefined) {
+      return undefined;
+    }
+    return {
+      kind,
+      center: { x: center[0], y: center[1] },
+      radius,
+      stops,
+      ...paintOpacityOption(source.opacity),
+    };
+  }
+  if (kind === "pattern") {
+    const key = readString(source.texture);
+    if (key === undefined) return undefined;
+    const texture = context.textures?.get?.(key);
+    if (texture === undefined) {
+      const node = context.document.id ?? null;
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Scene document node ${JSON.stringify(node)} carries a §58 pattern paint referencing the texture ${JSON.stringify(key)}, which no catalog resolves; supply the matching \`textures\` option (§77, §79).`,
+        { context: { node, key, field: "paint.texture" } },
+      );
+    }
+    const repeat = readFinitePair(source.repeat);
+    const offset = readFinitePair(source.offset);
+    return {
+      kind,
+      texture,
+      ...(repeat === undefined
+        ? {}
+        : { repeat: { x: repeat[0], y: repeat[1] } }),
+      ...(offset === undefined
+        ? {}
+        : { offset: { x: offset[0], y: offset[1] } }),
+      ...paintOpacityOption(source.opacity),
+    };
+  }
+  // An unknown kind — §58 lists paints no build draws yet (conic), and a
+  // later build may know more. Dropped, exactly as R-16 decided.
+  return undefined;
+}
+
+/** An opacity option spread — present only when the document's is usable. */
+function paintOpacityOption(value: JsonValue | undefined): {
+  opacity?: number;
+} {
+  const opacity = readFinite(value);
+  return opacity !== undefined && opacity >= 0 && opacity <= 1
+    ? { opacity }
+    : {};
+}
+
+/** A gradient's stops from a document, or `undefined` where not an array. */
+function readStops(value: JsonValue | undefined): GradientStop[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const stops: GradientStop[] = [];
+  for (const entry of value as readonly JsonValue[]) {
+    const source = record(entry);
+    const offset = readFinite(source.offset);
+    const color = readColorRGBA(source.color);
+    if (offset === undefined || color === undefined) return undefined;
+    stops.push({ offset, color });
+  }
+  return stops;
+}
+
+/** Whether a document value has an object paint's shape — any non-solid kind. */
+function looksLikeObjectPaint(value: JsonValue | undefined): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const kind = readString((value as { readonly kind?: JsonValue }).kind);
+  return kind !== undefined && kind !== "solid";
+}
+
+/** Whether a resolved fill or paint is a §58 object paint. */
+function isObjectPaintValue(
+  value: ResolvedShapeFill | ResolvedPaint | undefined,
+): boolean {
+  return (
+    value !== undefined &&
+    value !== "inherit" &&
+    value !== "none" &&
+    value.kind !== "solid"
+  );
 }
 
 /** Four finite numbers, or `undefined` — a §60a linear-light RGBA. */
@@ -1888,8 +2220,13 @@ function readColorRGBA(
 }
 
 /** A shape's fill as JSON: one of §58's two words, or a paint. */
-function fillJson(fill: ResolvedShapeFill): JsonValue {
-  return fill === "inherit" || fill === "none" ? fill : paintJson(fill);
+function fillJson(
+  fill: ResolvedShapeFill,
+  context: PaintWriteContext,
+): JsonValue {
+  return fill === "inherit" || fill === "none"
+    ? fill
+    : paintJson(fill, context);
 }
 
 /**
@@ -1899,14 +2236,18 @@ function fillJson(fill: ResolvedShapeFill): JsonValue {
 function readFill(
   value: JsonValue | undefined,
   fallback: ResolvedShapeFill,
+  context: PaintReadContext,
 ): ResolvedShapeFill {
   const word = readString(value);
   if (word === "inherit" || word === "none") return word;
-  return readPaint(value) ?? fallback;
+  return readPaint(value, context) ?? fallback;
 }
 
 /** A §58 `StrokeStyle` as JSON — every field, already resolved by the shape. */
-function strokeJson(stroke: ResolvedStrokeStyle): JsonValue {
+function strokeJson(
+  stroke: ResolvedStrokeStyle,
+  context: PaintWriteContext,
+): JsonValue {
   const payload: Record<string, JsonValue> = {
     width: stroke.width,
     alignment: stroke.alignment,
@@ -1915,7 +2256,9 @@ function strokeJson(stroke: ResolvedStrokeStyle): JsonValue {
     miterLimit: stroke.miterLimit,
     dashOffset: stroke.dashOffset,
   };
-  if (stroke.paint !== undefined) payload.paint = paintJson(stroke.paint);
+  if (stroke.paint !== undefined) {
+    payload.paint = paintJson(stroke.paint, context);
+  }
   if (stroke.dash !== undefined) payload.dash = stroke.dash.slice();
   return payload;
 }
@@ -1933,6 +2276,7 @@ function strokeJson(stroke: ResolvedStrokeStyle): JsonValue {
 function readStroke(
   document: SceneNodeDocument,
   value: JsonValue | undefined,
+  context: PaintReadContext,
 ): ResolvedStrokeStyle | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     if (!STROKE_ONLY_NODE_TYPES.has(document.type)) return null;
@@ -1949,7 +2293,7 @@ function readStroke(
     );
   }
   const source = value as { readonly [key: string]: JsonValue };
-  const paint = readPaint(source.paint);
+  const paint = readPaint(source.paint, context);
   const alignment = readString(source.alignment);
   const lineCap = readString(source.lineCap);
   const lineJoin = readString(source.lineJoin);
@@ -2268,20 +2612,30 @@ function readPath(
  * `Sprite` derives its quad, so the payload rebuilds it exactly and a document
  * that named one would be naming a resource the application never created.
  *
- * ## §58 is additive in both directions (`R-16`, 2026-08-09)
+ * A **paint-derived** shape (the §58 object tier, 2026-08-29) writes **no
+ * material key**, for the geometry key's exact reason: its material is
+ * derived from the paints the payload carries whole, and the reader
+ * re-derives it. The one resource inside a paint — a pattern's texture —
+ * travels as a logical key against {@link SceneNodeTypeOptions.textures}.
+ *
+ * ## §58 is additive in both directions (`R-16`, 2026-08-09; object tier 2026-08-29)
  *
  * `fill` and `stroke` are written **only when they differ from the class's own
  * default** — `"inherit"`/`null` for the nine closed primitives, `"none"` for
  * the three stroke-only ones. So a shape that names no paint writes the
  * byte-identical document `R-23` wrote, and a document written before §58
- * existed restores a fill-only shape with no field missing. A paint of a kind
- * this build does not draw (§58 lists seven; one ships) is **dropped rather
- * than refused**: §58 lists seven paints and this release draws one, so a
- * gradient written by a later build is one this build cannot honour — dropping
- * it leaves a shape in its material's colour, which is visible and
- * recoverable, where refusing the node would lose the artwork entirely. A
- * paint the material cannot draw at all is a different matter and *is* refused,
- * the way a `Sprite` whose material key resolves to a lit one is.
+ * existed restores a fill-only shape with no field missing. A paint this
+ * build cannot draw — an unknown kind (§58's conic, or a later build's), a
+ * malformed object paint, or any object paint in a build that never called
+ * `registerShapePaints()` — is **dropped rather than refused** wherever a
+ * material key exists to fall back to: the shape reloads in that material's
+ * colour, visible and recoverable, where refusing the node would lose the
+ * artwork entirely. A paint-derived document has no such fallback, so there
+ * the drop becomes a loud `FourError` naming the paint and the registration
+ * call — inventing a material the document never named is the substituted
+ * triangle again. A paint the material cannot draw at all is a different
+ * matter and *is* refused, the way a `Sprite` whose material key resolves to
+ * a lit one is.
  *
  * ## Two reading rules, and where the line between them is
  *
@@ -2330,8 +2684,9 @@ export function registerShapeSerializers(
   options: SceneNodeTypeOptions = {},
 ): SceneNodeTypeSupport {
   const materials = options.materials;
+  const textures = options.textures;
   const policy = options.unknownResources ?? "throw";
-  return {
+  return withHitTestMode({
     write: {
       nodeTypeOf: (node: Node): string | undefined =>
         SHAPE_NODE_TYPES.get(node.constructor as ShapeClass),
@@ -2340,14 +2695,24 @@ export function registerShapeSerializers(
         const type = SHAPE_NODE_TYPES.get(constructor);
         if (type === undefined) return undefined;
         const shape = node as Shape2D<Material>;
+        const paintContext: PaintWriteContext = { node, textures, policy };
         const payload: Record<string, JsonValue> = {
-          material: resourceKeyJson<Material>(
-            node,
-            "material",
-            shape.material,
-            materials,
-            policy,
-          ),
+          // A paint-derived shape (§58's object tier, 2026-08-29) writes no
+          // material key, for the geometry key's exact reason: its material
+          // is derived from the paints this payload carries whole, and the
+          // reader re-derives it. Every other shape writes the key it
+          // always has, in the position it always had.
+          ...(shape.paintDerived
+            ? {}
+            : {
+                material: resourceKeyJson<Material>(
+                  node,
+                  "material",
+                  shape.material,
+                  materials,
+                  policy,
+                ),
+              }),
           tolerance: shape.tolerance,
           renderLayer: shape.renderLayer,
           renderOrder: shape.renderOrder,
@@ -2361,8 +2726,12 @@ export function registerShapeSerializers(
         const defaultFill = STROKE_ONLY_NODE_TYPES.has(type)
           ? "none"
           : "inherit";
-        if (shape.fill !== defaultFill) payload.fill = fillJson(shape.fill);
-        if (shape.stroke !== null) payload.stroke = strokeJson(shape.stroke);
+        if (shape.fill !== defaultFill) {
+          payload.fill = fillJson(shape.fill, paintContext);
+        }
+        if (shape.stroke !== null) {
+          payload.stroke = strokeJson(shape.stroke, paintContext);
+        }
         if (constructor === Circle) {
           payload.radius = (node as Circle<Material>).radius;
         } else if (constructor === Ellipse) {
@@ -2418,16 +2787,57 @@ export function registerShapeSerializers(
       nodeFactory: (document: SceneNodeDocument): Node | undefined => {
         if (!SHAPE_NODE_TYPE_NAMES.has(document.type)) return undefined;
         const data = record(document.data);
-        const stroke = readStroke(document, data.stroke);
+        // The two tiers are exclusive (`Shape2DOptions.material`): a material
+        // key selects the material tier and object paints are not read at
+        // all — the same picture an unregistered build draws, so what a
+        // document restores never depends on registration. Without a key the
+        // paints must carry the shape, or the refusal below names why not.
+        const materialKey = readString(data.material);
+        const paintContext: PaintReadContext = {
+          document,
+          textures,
+          objectPaints: materialKey === undefined,
+        };
+        const stroke = readStroke(document, data.stroke, paintContext);
+        const fill = readFill(
+          data.fill,
+          STROKE_ONLY_NODE_TYPES.has(document.type) ? "none" : "inherit",
+          paintContext,
+        );
+        const painted =
+          isObjectPaintValue(fill) || isObjectPaintValue(stroke?.paint);
+        if (materialKey === undefined && !painted) {
+          const strokeData = record(data.stroke);
+          if (
+            looksLikeObjectPaint(data.fill) ||
+            looksLikeObjectPaint(strokeData.paint)
+          ) {
+            // A paint-derived document whose paint this build cannot restore
+            // has no material to fall back to — dropping would invent a
+            // material the document never named (the substituted triangle),
+            // so the refusal names the paint and the fix instead.
+            const node = document.id ?? null;
+            throw new FourError(
+              "INVALID_APPLICATION_STATE",
+              `Scene document node ${JSON.stringify(node)} of type ${JSON.stringify(document.type)} derives its material from a §58 paint this build cannot restore, and names no material to fall back to; call registerShapePaints() at startup, or re-save from a build that could draw it (§58, §79).`,
+              { context: { node, type: document.type, field: "fill" } },
+            );
+          }
+        }
         const shared = {
-          material: resolveResource<Material>(document, "material", materials),
+          ...(painted
+            ? {}
+            : {
+                material: resolveResource<Material>(
+                  document,
+                  "material",
+                  materials,
+                ),
+              }),
           ...positiveOptions(data, ["tolerance"]),
           ...finiteOptions(data, ["renderLayer", "renderOrder"]),
           ...readRenderableFlags(data),
-          fill: readFill(
-            data.fill,
-            STROKE_ONLY_NODE_TYPES.has(document.type) ? "none" : "inherit",
-          ),
+          fill,
           stroke,
         };
         const strokeOnly = { ...shared, stroke: stroke as ResolvedStrokeStyle };
@@ -2573,7 +2983,7 @@ export function registerShapeSerializers(
         }
       },
     },
-  };
+  });
 }
 
 /**
@@ -2661,7 +3071,7 @@ export function registerTextSerializers(
   const atlas = options.atlas;
   const materials = options.materials;
   const policy = options.unknownResources ?? "throw";
-  return {
+  return withHitTestMode({
     write: {
       nodeTypeOf: (node: Node): string | undefined =>
         node.constructor === Text ? TEXT_NODE_TYPE : undefined,
@@ -2721,7 +3131,7 @@ export function registerTextSerializers(
         });
       },
     },
-  };
+  });
 }
 
 /**

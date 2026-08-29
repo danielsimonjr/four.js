@@ -28,14 +28,22 @@ changes in `CHANGELOG.md`.
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
       `docs/guides/raster-painting.md`, listed as guide 15).ts`'s header and §77a).
 
+- [x] **A-11 analytic tier (`"geometry"`) — DONE 2026-08-29** (adopted RFC 0005
+      Q3 executed): `node.hitTestMode` (`null` default = engine-selects;
+      `"custom"` omitted until a callback strategy exists) +
+      `Pickable.triangles` + exact ray/triangle in `@four/input` (no new edge),
+      §79 via one wrapper over every umbrella pair (unset scenes
+      byte-identical), §85 refusals, §33 pure-math determinism pinned. 36 new
+      tests; input/four/geometry 100×4. **A-11 is closed.** ui-demo budget
+      bumped 44 → 44.5 kB at landing (A/B: the tier riding ui-demo's `pick()`).
 - [ ] **RFC 0005 residue (staged in source, 2026-08-29):** the instanced particle
       id arm (a `ParticleIdProgram` sharing the §36 billboard vertex stage — until
       then particle systems pick by bounds only); §86 rows still owed: id-pass
       cost vs the flagship list and measured fence-vs-stall pick latency;
       WebGPU's `PickingService` (`mapAsync`) is WP-R1.x material; §72
-      pointer-event dispatch on a `PickProvider` result is an input packet. The
-      analytic `"geometry"` tier (+ `node.hitTestMode` per the adopted Q3)
-      remains A-11's own follow-up packet, unblocked.
+      pointer-event dispatch on a `PickProvider` result is an input packet. The analytic
+      `"geometry"` tier + `node.hitTestMode` landed 2026-08-29 — A-11 closed;
+      only the render-side residues above remain here.
 - [x] **docs/COMPATIBILITY.md §2 — DONE 2026-08-29** (documentation truth
       sweep): §2 rewritten to the tip — seven init pipelines + three registered
       seams, punctual lights, opt-in §65 batching, §69/§70 rows, all-eleven
@@ -62,10 +70,10 @@ changes in `CHANGELOG.md`.
       rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                          input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                          reachability are backend-independent and re-exported through `@four/render`;
-                          the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                          (screen domain included, for §70 graph effects).
+                              input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                              reachability are backend-independent and re-exported through `@four/render`;
+                              the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                              (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -74,8 +82,7 @@ changes in `CHANGELOG.md`.
       path ships source + driver log); lighting-aware graphs (R-17's light-uniform
       contract first); alternative E (data-declared custom operators — a follow-up
       RFC, also the `materials/shader nodes` §81 token's gate); an angle operator
-      (unlocks §58's conic gradient); the §58 Paint-object tier on `Shape2D`
-      (R-16's shape-paint packet, now unblocked).
+      (unlocks §58's conic gradient); ~~the §58 Paint-object tier on `Shape2D`~~ (done 2026-08-29).
 - [x] **docs/guides/custom-shaders.md — DONE 2026-08-29**: rewritten around the
       landed §60 (builders, registration per backend, closed operator set,
       GraphEffect, deferred list); samples typechecked against dist and graphs
@@ -517,15 +524,16 @@ changes in `CHANGELOG.md`.
       module; `Line`/`Polyline`/`Arc` complete all fourteen §50 rows (twelve classes);
       fill+stroke travel as per-vertex colour — no `RenderItemKind`, no pipeline, no
       frame-path edit. **Group 5 (the 2D vector stack) is closed.**
-- [ ] **The shape paint pipeline** _(R-16 residue — unblocked 2026-08-28: RFC 0001
-      decided the shape as `"node"` item kind + structural program cache, and
-      linear/radial gradients, patterns, procedural and render-target paints are
-      already exact via `NodeMaterial`)_: what remains is the §58 `Paint`-object
-      integration on `Shape2D` fill/stroke, the conic gradient (needs an angle
-      operator — closed-union amendment), and §52's anti-alias fringe (needs a
-      per-vertex coverage attribute no §57 pipeline reads). This is also what would
-      finally give `ShapeMaterial` content (re-examined and deliberately unshipped
-      twice — R-23, R-16).
+- [x] **The shape paint pipeline — the §58 `Paint`-object tier DONE 2026-08-29**
+      (`registerShapePaints()`: linear/radial gradients + image/render-target
+      patterns lowered to `NodeMaterial` graphs; unregistered =
+      skipped-not-approximated; golden `shape-paint-glsl.json`). What remains,
+      each with a named owner: **conic** (waits solely on §60's angle operator —
+      RFC 0001's one-row closed-union amendment); **§52's anti-alias fringe**
+      (per-vertex coverage attribute no §57 pipeline reads). **`ShapeMaterial`'s
+      fate is settled** — unshipped a third time, argument recorded in
+      `shape.ts`'s header. New staged residue: values-as-uniforms lowering for
+      animated gradient stops (noted in `shape-paint.ts`'s determinism section).
 - [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
       R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
       geometry operations (§51's four, the shared planar-subdivision packet), world
