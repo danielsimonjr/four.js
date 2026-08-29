@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-29"
-  totalFiles: 272
+  totalFiles: 278
   totalModules: 24
-  totalExports: 2757
+  totalExports: 2776
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -35,7 +35,7 @@ entryPoints:
     description: Entry Point
   - file: packages/motion/src/index.ts
     type: main
-    description: Entry Point
+    description: §81's motion-side capability token (RFC 0002), declared by the package that
   - file: packages/particles/src/index.ts
     type: main
     description: "--- WP-9.2: §27 force fields (begin) ---"
@@ -53,7 +53,7 @@ entryPoints:
     description: Entry Point
   - file: packages/render/src/index.ts
     type: main
-    description: §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
+    description: §81's render-side capability tokens (RFC 0002), declared by the package
   - file: packages/render-canvas/src/index.ts
     type: main
     description: Entry Point
@@ -3081,47 +3081,43 @@ modules:
       functions:
         - createPickProvider
     packages/four/src/plugins.ts:
-      description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`).
+      description: The §81 capability tokens (RFC 0002, accepted 2026-08-21; gap `A-3`) —
       externalDependencies: []
       nodeDependencies: []
       internalDependencies: []
       workspaceDependencies:
-        - package: "@four/core"
-          directory: packages/core
-          imports:
-            - defineCapability
         - package: "@four/motion"
           directory: packages/motion
           imports:
-            - SystemRegistry
+            - SIMULATION_SYSTEMS
         - package: "@four/physics"
           directory: packages/physics
           imports:
-            - SolverRegistry
+            - SOLVER_REGISTRY
         - package: "@four/render"
           directory: packages/render
           imports:
-            - RenderGraph
-            - RendererRegistry
+            - RENDERER_REGISTRY
+            - RENDER_GRAPH
         - package: "@four/serialization"
           directory: packages/serialization
           imports:
-            - ComponentSerializerRegistry
-            - SceneMigrationRegistry
+            - COMPONENT_SERIALIZERS
+            - SCENE_MIGRATIONS
       exports:
         - SIMULATION_SYSTEMS
-        - RENDERER_REGISTRY
         - SOLVER_REGISTRY
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - COMPONENT_SERIALIZERS
         - SCENE_MIGRATIONS
-        - RENDER_GRAPH
-      constants:
+      reExported:
         - SIMULATION_SYSTEMS
-        - RENDERER_REGISTRY
         - SOLVER_REGISTRY
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - COMPONENT_SERIALIZERS
         - SCENE_MIGRATIONS
-        - RENDER_GRAPH
     packages/four/src/render-canvas.ts:
       description: render-canvas module
       externalDependencies: []
@@ -4948,7 +4944,7 @@ modules:
       classes:
         - Frustum
     packages/math/src/index.ts:
-      description: Package entry point for @four/math (re-exports 21 symbols)
+      description: Package entry point for @four/math (re-exports 22 symbols)
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -4983,6 +4979,10 @@ modules:
         - file: ./quaternion.js
           imports:
             - Quaternion
+          reExport: true
+        - file: ./rectangle2.js
+          imports:
+            - Rectangle2
           reExport: true
         - file: ./vector2.js
           imports:
@@ -5024,6 +5024,7 @@ modules:
         - Matrix3
         - Matrix4
         - Quaternion
+        - Rectangle2
         - Vector2
         - Vector3
         - Vector4
@@ -5047,6 +5048,7 @@ modules:
         - Matrix3
         - Matrix4
         - Quaternion
+        - Rectangle2
         - Vector2
         - Vector3
         - Vector4
@@ -5110,6 +5112,19 @@ modules:
         - Quaternion
       functions:
         - setQuaternionFromBasis
+    packages/math/src/rectangle2.ts:
+      description: Default tolerance for {@link Rectangle2.equalsApprox}. See `vector2.ts` for
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./alloc-counter.js
+          imports:
+            - noteConstruction
+      workspaceDependencies: []
+      exports:
+        - Rectangle2
+      classes:
+        - Rectangle2
     packages/math/src/vector2.ts:
       description: Default tolerance for {@link Vector2.equalsApprox}. Chosen to sit a little
       externalDependencies: []
@@ -5195,6 +5210,24 @@ modules:
       constants:
         - DEFAULT_ORBIT_PITCH_LIMIT
         - DEFAULT_ORBIT_MIN_DISTANCE
+    packages/motion/src/capabilities.ts:
+      description: This package's §81 capability token (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./systems.js
+          imports:
+            - SystemRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - SIMULATION_SYSTEMS
+      constants:
+        - SIMULATION_SYSTEMS
     packages/motion/src/character-controller.ts:
       description: §12's **character controllers** — {@link CharacterController}, the one yaw
       externalDependencies: []
@@ -5311,10 +5344,14 @@ modules:
         - createTwoBoneIKSolution
         - solveTwoBoneIK
     packages/motion/src/index.ts:
-      description: Package entry point for @four/motion (re-exports 134 symbols)
+      description: §81's motion-side capability token (RFC 0002), declared by the package that
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./capabilities.js
+          imports:
+            - SIMULATION_SYSTEMS
+          reExport: true
         - file: ./camera-rigs.js
           imports:
             - DEFAULT_ORBIT_PITCH_LIMIT
@@ -5566,6 +5603,7 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - SIMULATION_SYSTEMS
         - DEFAULT_ORBIT_PITCH_LIMIT
         - FollowRig
         - OrbitRig
@@ -5702,6 +5740,7 @@ modules:
         - ParametricTrajectoryOptions
         - Trajectory
       reExported:
+        - SIMULATION_SYSTEMS
         - DEFAULT_ORBIT_PITCH_LIMIT
         - FollowRig
         - OrbitRig
@@ -6739,6 +6778,24 @@ modules:
         - missingSolverJointAccess
         - supportsSolverBodyTuning
         - missingSolverBodyTuning
+    packages/physics/src/capabilities.ts:
+      description: This package's §81 capability token (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./solver-registry.js
+          imports:
+            - SolverRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - SOLVER_REGISTRY
+      constants:
+        - SOLVER_REGISTRY
     packages/physics/src/collider.ts:
       description: The `Collider` component (§6a, §24) and its §25 effective-material
       externalDependencies: []
@@ -6958,6 +7015,10 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./capabilities.js
+          imports:
+            - SOLVER_REGISTRY
+          reExport: true
         - file: ./adapter.js
           imports:
             - NO_TUNING_CAPABILITIES
@@ -7316,6 +7377,7 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - SOLVER_REGISTRY
         - NO_TUNING_CAPABILITIES
         - resolveTuningCapabilities
         - missingSolverBodyTuning
@@ -7548,6 +7610,7 @@ modules:
         - WorldRaycastHit
         - WorldShapeCastHit
       reExported:
+        - SOLVER_REGISTRY
         - NO_TUNING_CAPABILITIES
         - resolveTuningCapabilities
         - missingSolverBodyTuning
@@ -9390,6 +9453,30 @@ modules:
         - BoundingSphere
       functions:
         - computeWorldBoundingSphere
+    packages/render/src/capabilities.ts:
+      description: This package's §81 capability tokens (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-graph.js
+          imports:
+            - RenderGraph
+          typeOnly: true
+        - file: ./renderer-registry.js
+          imports:
+            - RendererRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
+      constants:
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
     packages/render/src/clip.ts:
       description: §67 clipping — a node's drawn shape masks its subtree, expressed entirely in
       externalDependencies: []
@@ -9476,7 +9563,7 @@ modules:
         - COLOR_GRADE_DEFAULTS
         - COPY_EFFECT
     packages/render/src/index.ts:
-      description: §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
+      description: §81's render-side capability tokens (RFC 0002), declared by the package
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
@@ -9488,6 +9575,11 @@ modules:
         - file: ./bounds.js
           imports:
             - computeWorldBoundingSphere
+          reExport: true
+        - file: ./capabilities.js
+          imports:
+            - RENDERER_REGISTRY
+            - RENDER_GRAPH
           reExport: true
         - file: ./clip.js
           imports:
@@ -9546,6 +9638,11 @@ modules:
         - file: ./raster.js
           imports:
             - CanvasTexture
+          reExport: true
+        - file: ./read-pixels.js
+          imports:
+            - supportsReadPixels
+            - validateReadbackRegion
           reExport: true
         - file: ./picking.js
           imports:
@@ -9727,6 +9824,11 @@ modules:
             - RasterSource
           reExport: true
           typeOnly: true
+        - file: ./read-pixels.js
+          imports:
+            - PixelReader
+          reExport: true
+          typeOnly: true
         - file: ./picking.js
           imports:
             - PickRequest
@@ -9861,6 +9963,8 @@ modules:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
         - computeWorldBoundingSphere
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - ClipPlaneAllocator
         - MAX_CLIP_PLANES
         - COMPUTE_ENTRY_POINT
@@ -9901,6 +10005,8 @@ modules:
         - forEachShaderNodeReference
         - RenderGraph
         - CanvasTexture
+        - supportsReadPixels
+        - validateReadbackRegion
         - MAX_PICK_CANDIDATES
         - assertEncodableCandidateCount
         - collectPickCandidates
@@ -10015,6 +10121,7 @@ modules:
         - CanvasTextureOptions
         - RasterOrigin
         - RasterSource
+        - PixelReader
         - PickRequest
         - PickResult
         - PickingService
@@ -10084,6 +10191,8 @@ modules:
         - DEFAULT_MAX_BATCH_VERTICES
         - RenderBatcher
         - computeWorldBoundingSphere
+        - RENDERER_REGISTRY
+        - RENDER_GRAPH
         - ClipPlaneAllocator
         - MAX_CLIP_PLANES
         - COMPUTE_ENTRY_POINT
@@ -10124,6 +10233,8 @@ modules:
         - forEachShaderNodeReference
         - RenderGraph
         - CanvasTexture
+        - supportsReadPixels
+        - validateReadbackRegion
         - MAX_PICK_CANDIDATES
         - assertEncodableCandidateCount
         - collectPickCandidates
@@ -10237,6 +10348,7 @@ modules:
         - CanvasTextureOptions
         - RasterOrigin
         - RasterSource
+        - PixelReader
         - PickRequest
         - PickResult
         - PickingService
@@ -10480,6 +10592,28 @@ modules:
       interfaces:
         - RasterSource
         - CanvasTextureOptions
+    packages/render/src/read-pixels.ts:
+      description: §61's `readPixels` seam, backend-independent half (2026-08-29).
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./render-target.js
+          imports:
+            - RenderTarget
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Rectangle2
+      exports:
+        - supportsReadPixels
+        - validateReadbackRegion
+      interfaces:
+        - PixelReader
+      functions:
+        - supportsReadPixels
+        - validateReadbackRegion
     packages/render/src/render-graph.ts:
       description: "`RenderGraph` (§63) — an ordered list of passes, executed by one call, with"
       externalDependencies: []
@@ -10756,6 +10890,10 @@ modules:
           imports:
             - EventEmitter
             - FourError
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Rectangle2
         - package: "@four/scene"
           directory: packages/scene
           imports:
@@ -12115,6 +12253,7 @@ modules:
           imports:
             - Frustum
             - Matrix4
+            - Rectangle2
         - package: "@four/render"
           directory: packages/render
           imports:
@@ -12133,6 +12272,7 @@ modules:
             - isSkinnedUnlitItem
             - isSpriteItem
             - isStandardItem
+            - validateReadbackRegion
             - COLOR_GRADE_DEFAULTS
             - EffectRenderPass
             - GraphEffect
@@ -13163,6 +13303,7 @@ modules:
           imports:
             - Frustum
             - Matrix4
+            - Rectangle2
         - package: "@four/render"
           directory: packages/render
           imports:
@@ -13174,6 +13315,7 @@ modules:
             - collectSceneLights
             - createSceneLights
             - isRenderTargetTexture
+            - validateReadbackRegion
             - EffectRenderPass
             - RenderBatch
             - RenderInterpolation
@@ -13816,7 +13958,11 @@ modules:
             - GPU_MAP_MODE
             - GpuDevice
             - GpuTexture
-      workspaceDependencies: []
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Rectangle2
       exports:
         - READBACK_ROW_ALIGNMENT
         - readbackBytesPerRow
@@ -14903,6 +15049,30 @@ modules:
         - resolveWorldTransforms
         - resolveWorldTransform
   packages/serialization:
+    packages/serialization/src/capabilities.ts:
+      description: This package's §81 capability tokens (RFC 0002; declared here since
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./migration.js
+          imports:
+            - SceneMigrationRegistry
+          typeOnly: true
+        - file: ./serializer.js
+          imports:
+            - ComponentSerializerRegistry
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - defineCapability
+      exports:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
+      constants:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
     packages/serialization/src/format.ts:
       description: The §79 scene document — its types, its JSON encoding, and its canonical
       externalDependencies: []
@@ -14975,6 +15145,11 @@ modules:
       externalDependencies: []
       nodeDependencies: []
       internalDependencies:
+        - file: ./capabilities.js
+          imports:
+            - COMPONENT_SERIALIZERS
+            - SCENE_MIGRATIONS
+          reExport: true
         - file: ./format.js
           imports:
             - SCENE_FORMAT_VERSION
@@ -15037,6 +15212,8 @@ modules:
           typeOnly: true
       workspaceDependencies: []
       exports:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
         - SCENE_FORMAT_VERSION
         - asJsonObject
         - cloneJsonValue
@@ -15078,6 +15255,8 @@ modules:
         - SerializeSceneOptions
         - UnknownComponentPolicy
       reExported:
+        - COMPONENT_SERIALIZERS
+        - SCENE_MIGRATIONS
         - SCENE_FORMAT_VERSION
         - asJsonObject
         - cloneJsonValue
@@ -15932,9 +16111,9 @@ dependencyGraph:
   circularDependencies:
     runtime: []
     typeOnly:
-      - - packages/physics/src/world.ts
-        - packages/physics/src/solver-registry.ts
+      - - packages/physics/src/solver-registry.ts
         - packages/physics/src/world.ts
+        - packages/physics/src/solver-registry.ts
       - - packages/render/src/renderer.ts
         - packages/render/src/picking.ts
         - packages/render/src/renderer.ts
@@ -16070,12 +16249,14 @@ dependencyGraph:
         - packages/math/src/matrix3.ts
         - packages/math/src/matrix4.ts
         - packages/math/src/quaternion.ts
+        - packages/math/src/rectangle2.ts
         - packages/math/src/vector2.ts
         - packages/math/src/vector3.ts
         - packages/math/src/vector4.ts
     - name: Packages/motion
       files:
         - packages/motion/src/camera-rigs.ts
+        - packages/motion/src/capabilities.ts
         - packages/motion/src/character-controller.ts
         - packages/motion/src/clock.ts
         - packages/motion/src/constraints.ts
@@ -16108,6 +16289,7 @@ dependencyGraph:
       files:
         - packages/physics/src/adapter.ts
         - packages/physics/src/body-access.ts
+        - packages/physics/src/capabilities.ts
         - packages/physics/src/collider.ts
         - packages/physics/src/descriptors.ts
         - packages/physics/src/events.ts
@@ -16146,6 +16328,7 @@ dependencyGraph:
       files:
         - packages/render/src/batch.ts
         - packages/render/src/bounds.ts
+        - packages/render/src/capabilities.ts
         - packages/render/src/clip.ts
         - packages/render/src/compute.ts
         - packages/render/src/effect-pass.ts
@@ -16155,6 +16338,7 @@ dependencyGraph:
         - packages/render/src/particles.ts
         - packages/render/src/picking.ts
         - packages/render/src/raster.ts
+        - packages/render/src/read-pixels.ts
         - packages/render/src/render-graph.ts
         - packages/render/src/render-list.ts
         - packages/render/src/render-target.ts
@@ -16240,6 +16424,7 @@ dependencyGraph:
         - packages/scene/src/world-transforms.ts
     - name: Packages/serialization
       files:
+        - packages/serialization/src/capabilities.ts
         - packages/serialization/src/format.ts
         - packages/serialization/src/index.ts
         - packages/serialization/src/migration.ts
@@ -16266,18 +16451,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 272
+  totalTypeScriptFiles: 278
   totalModules: 24
-  totalLinesOfCode: 136059
-  totalExports: 2757
-  totalClasses: 178
-  totalInterfaces: 549
-  totalFunctions: 428
+  totalLinesOfCode: 136667
+  totalExports: 2776
+  totalClasses: 179
+  totalInterfaces: 550
+  totalFunctions: 430
   totalTypeGuards: 23
   totalEnums: 0
   totalConstants: 411
-  totalReExports: 1761
-  totalTypeOnlyImports: 324
+  totalReExports: 1777
+  totalTypeOnlyImports: 332
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 3
   unusedFilesCount: 0
