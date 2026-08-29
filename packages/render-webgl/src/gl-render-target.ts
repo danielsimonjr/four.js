@@ -83,9 +83,11 @@
  *   colour *renderbuffer*, plus `blitFramebuffer` into a resolve texture, plus
  *   a `MAX_SAMPLES` query. Three entry points and a second framebuffer per
  *   target; deliberately not paid for by the minimal tier.
- * - **`readPixels`** (§61, §92) — one entry point here, but `@four/math` has no
- *   `Rectangle2` for §61's `region` argument. Recorded on `@four/render`'s
- *   `Renderer` as a typed TODO.
+ * - ~~**`readPixels`**~~ (§61, §92) — **landed 2026-08-29**: `Rectangle2`
+ *   arrived in `@four/math` and `WebglRenderer.readPixels(target, region?)`
+ *   reads a cached target's framebuffer through the optional `readPixels`
+ *   entry point (the stalling form, wrapped in §61's promise shape — the
+ *   method's own doc defends the choice against the picking fence path).
  */
 
 import type { RenderTarget } from "@four/render";

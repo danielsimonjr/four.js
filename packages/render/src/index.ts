@@ -11,6 +11,11 @@ export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
 export type { BoundingSphere } from "./bounds.js";
 export { computeWorldBoundingSphere } from "./bounds.js";
 
+// §81's render-side capability tokens (RFC 0002), declared by the package
+// that owns each registry; `@four/four`'s `plugins.ts` re-exports the same
+// objects, so both import paths hand out one identity.
+export { RENDERER_REGISTRY, RENDER_GRAPH } from "./capabilities.js";
+
 export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
 export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
 
@@ -143,6 +148,8 @@ export type {
   RasterSource,
 } from "./raster.js";
 export { CanvasTexture } from "./raster.js";
+export type { PixelReader } from "./read-pixels.js";
+export { supportsReadPixels, validateReadbackRegion } from "./read-pixels.js";
 export type { PickRequest, PickResult, PickingService } from "./picking.js";
 export {
   MAX_PICK_CANDIDATES,

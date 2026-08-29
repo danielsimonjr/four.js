@@ -268,6 +268,25 @@ describe("ApplicationOptions.plugins", () => {
 });
 
 describe("capability tokens", () => {
+  it("re-exports the owning packages' very objects — identity, not copies (RFC 0002 §2)", async () => {
+    // The 2026-08-29 migration moved each token to the package that owns its
+    // registry, leaving this module as a re-export of the same objects. A
+    // token's identity is its `name` string, but object identity is what
+    // makes the move invisible: a host provides against one token and a
+    // plugin requires with the other, and both spellings must be the same
+    // key. `toBe`, deliberately — `toEqual` would pass for a forgotten copy.
+    const motion = await import("@four/motion");
+    const physics = await import("@four/physics");
+    const render = await import("@four/render");
+    const serialization = await import("@four/serialization");
+    expect(SIMULATION_SYSTEMS).toBe(motion.SIMULATION_SYSTEMS);
+    expect(SOLVER_REGISTRY).toBe(physics.SOLVER_REGISTRY);
+    expect(RENDERER_REGISTRY).toBe(render.RENDERER_REGISTRY);
+    expect(RENDER_GRAPH).toBe(render.RENDER_GRAPH);
+    expect(COMPONENT_SERIALIZERS).toBe(serialization.COMPONENT_SERIALIZERS);
+    expect(SCENE_MIGRATIONS).toBe(serialization.SCENE_MIGRATIONS);
+  });
+
   it("names every token once, with RFC 0002's revocability dispositions", () => {
     expect([
       SIMULATION_SYSTEMS,

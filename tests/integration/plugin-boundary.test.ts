@@ -49,11 +49,31 @@ const packagesRoot = join(repositoryRoot, "packages");
  * The names that only the plugin host and its declarers may mention.
  *
  * A package appearing here has been confirmed *not* to be on a deserialization
- * path: `core` declares the machinery, `four` declares the capability tokens
+ * path: `core` declares the machinery, `four` re-exports the capability tokens
  * and installs from §45's option. Adding a third entry means someone has
  * decided that package may host plugins — write the reason and the date.
  */
 const ALLOWED = new Set(["core", "four"]);
+
+/**
+ * The packages that may additionally *declare* capability tokens
+ * ({@link TOKEN_NAMES}): the four registry owners RFC 0002 §2 names, joined
+ * 2026-08-29 when the tokens moved home from `four/plugins.ts` (the recorded
+ * reversible spelling difference, reversed). Declaring a token is naming a
+ * `{ name, revocable }` key — it confers no ability to install a plugin or
+ * to acquire a capability, so `serialization` declaring
+ * `COMPONENT_SERIALIZERS` does not weaken the §96 claim: the *host* names
+ * ({@link HOST_NAMES}) stay banned there, and nothing a document names can
+ * become a plugin, exactly as before.
+ */
+const TOKEN_DECLARERS = new Set([
+  "core",
+  "four",
+  "motion",
+  "physics",
+  "render",
+  "serialization",
+]);
 
 /**
  * The packages §96's sentence is about: everything that turns external content
@@ -61,14 +81,24 @@ const ALLOWED = new Set(["core", "four"]);
  */
 const DESERIALIZING = ["serialization", "assets"];
 
-/** Identifiers that only exist because a module is talking to the plugin host. */
+/**
+ * Identifiers that only exist because a module is talking to the plugin
+ * host — the machinery that accepts and installs plugins and hands
+ * capabilities over.
+ */
 const HOST_NAMES = [
   "PluginHost",
   "installPlugins",
-  "defineCapability",
   "FourPlugin",
   "PluginContext",
 ];
+
+/**
+ * Identifiers that only exist because a module *declares* a capability token
+ * (RFC 0002 §2). Split from {@link HOST_NAMES} 2026-08-29: a token is a key,
+ * not authority — see {@link TOKEN_DECLARERS}.
+ */
+const TOKEN_NAMES = ["defineCapability", "PluginCapability"];
 
 /** Every `.ts` file under `packages/<name>/src`, recursively. */
 function sourceFiles(packageName: string): string[] {
@@ -95,12 +125,12 @@ function packageNames(): string[] {
   );
 }
 
-/** Repo-relative source files under `packageName` that mention a host name. */
-function mentionsOfHost(packageName: string): string[] {
+/** Repo-relative source files under `packageName` mentioning one of `names`. */
+function mentionsOf(packageName: string, names: readonly string[]): string[] {
   return sourceFiles(packageName)
     .filter((path) => {
       const text = readFileSync(path, "utf8");
-      return HOST_NAMES.some((name) => text.includes(name));
+      return names.some((name) => text.includes(name));
     })
     .map((path) => relative(repositoryRoot, path).split(sep).join("/"));
 }
@@ -109,7 +139,7 @@ describe("§96: untrusted content can never become a plugin", () => {
   it("keeps the plugin host out of every deserializing package", () => {
     for (const packageName of DESERIALIZING) {
       expect(
-        mentionsOfHost(packageName),
+        mentionsOf(packageName, HOST_NAMES),
         `${packageName} must not reach the §81 plugin host: a document names a registered type name, never a module (§79, §96)`,
       ).toEqual([]);
     }
@@ -118,7 +148,14 @@ describe("§96: untrusted content can never become a plugin", () => {
   it("keeps it out of every package but the two that declare it", () => {
     const offenders = packageNames()
       .filter((name) => !ALLOWED.has(name))
-      .flatMap((name) => mentionsOfHost(name));
+      .flatMap((name) => mentionsOf(name, HOST_NAMES));
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps token declaration to the registry owners RFC 0002 §2 names", () => {
+    const offenders = packageNames()
+      .filter((name) => !TOKEN_DECLARERS.has(name))
+      .flatMap((name) => mentionsOf(name, TOKEN_NAMES));
     expect(offenders).toEqual([]);
   });
 

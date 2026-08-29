@@ -70,10 +70,10 @@ changes in `CHANGELOG.md`.
       rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                              input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                              reachability are backend-independent and re-exported through `@four/render`;
-                              the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                              (screen domain included, for §70 graph effects).
+                                  input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                                  reachability are backend-independent and re-exported through `@four/render`;
+                                  the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                                  (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -115,12 +115,11 @@ changes in `CHANGELOG.md`.
       set (one list in `packages/assets/src/gltf.ts`) and drop the
       `ignoredTextures` warning for the newly sampleable slots.
 
-- [ ] **Move the six capability tokens to their owning packages** when
-      `packages/render`/`motion`/`physics`/`serialization` are free (RFC 0002 §2's
-      spelling). They ship in `four/plugins.ts` because the A-3 packet could not
-      touch `packages/render*`; `four` already depends on all four so no §3.1 edge
-      moves either way, and the migration is a re-export — a token's identity is its
-      `name` string.
+- [x] **Move the six capability tokens to their owning packages — DONE
+      2026-08-29** (RFC 0002 §2's spelling executed): each owner declares its
+      token in `capabilities.ts`; `four/plugins.ts` re-exports the very objects
+      (identity pinned by `toBe`); §96 boundary test now splits host machinery
+      (banned) from token declaration (the four owners, dated).
 - [ ] **Tokens for the five absent §81 extension points** arrive with the registries
       they need: asset formats (`asset-manager.ts` states there is no registry by
       design), materials/shader nodes (RFC 0001's deferred alternative E), UI
@@ -181,7 +180,7 @@ changes in `CHANGELOG.md`.
       exclusivity's independent reason); `renderEffect` per (kind × format)
       through the shared lazy cache (`|e:` conditional suffix, landed keys
       byte-identical); `readPixels` whole-target via `copyTextureToBuffer` +
-      `mapAsync` (`Rectangle2` still not landed — `region` stays with it), rows
+      `mapAsync` (region form landed 2026-08-29), rows
       bottom-to-top by decision; R-4 feedback refusal restated at both seams and
       cross-checked against `RenderGraph.validate()`; `RenderGraph` unchanged,
       graph-vs-hand tape identity pinned. Browser specs written
@@ -290,10 +289,12 @@ changes in `CHANGELOG.md`.
       and **not** covered by RFC 0005: a normal packet in a layer that may import
       `@four/geometry`. RFC 0005 recommends it also add `node.hitTestMode` (§71's
       field, currently a silent divergence; §79 field + §90 scene-format row).
-- [ ] **`Rectangle2` in `@four/math`** — still the shared prerequisite for §61's
-      `readPixels`, staged in `render/src/renderer.ts` _and_
-      `render-webgl/src/gl-render-target.ts`. RFC 0005 Q5 asks whether picking should
-      bypass it entirely (it reads one texel, not a region).
+- [x] **`Rectangle2` in `@four/math` — DONE 2026-08-29**, and §61's
+      `readPixels(target, region?)` landed with it on the interface and both
+      backends (WebGPU region via `copyTextureToBuffer` origin; WebGL via the
+      stalling form in the promise shape, defended in-source). RFC 0005 Q5's
+      adopted disposition stands: picking's single-texel path still bypasses
+      `readPixels`; a _regional pick_ form remains that packet's residue.
 - [ ] **Playground sensor-zone browser test failing on the shared tree (2026-08-21,
       under investigation):** `playground.spec.ts` "each sensor zone repaints" fails
       consistently while the character-controllers agent holds in-flight

@@ -457,7 +457,18 @@ export interface GpuCommandEncoder {
    * `COPY_BYTES_PER_ROW_ALIGNMENT`); `wgpu-readback.ts` owns that arithmetic.
    */
   copyTextureToBuffer?(
-    source: { readonly texture: GpuTexture; readonly mipLevel?: number },
+    source: {
+      readonly texture: GpuTexture;
+      readonly mipLevel?: number;
+      /**
+       * Top-left corner of the copied rectangle in the texture's own
+       * top-first coordinates, `[x, y]` — §61's region form (2026-08-29).
+       * Omitted for a whole-texture copy, and *only* then, so the
+       * whole-target tape WP-R1.6 recorded stays byte-identical.
+       * `wgpu-readback.ts` owns the §7a bottom-origin conversion.
+       */
+      readonly origin?: readonly [number, number];
+    },
     destination: {
       readonly buffer: GpuBuffer;
       readonly bytesPerRow: number;

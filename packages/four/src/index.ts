@@ -34,10 +34,10 @@ export type {
 } from "./application.js";
 export { Application } from "./application.js";
 
-// §81's capability tokens (RFC 0002, A-3). The third API this package owns
-// rather than re-exports, and `plugins.ts` records why the umbrella is their
-// home: `@four/core` owns the plugin machinery and may name no registry, and
-// `four` is the one package that sees all four registry owners at once.
+// §81's capability tokens (RFC 0002, A-3). Declared by their owning packages
+// since 2026-08-29 (RFC 0002 §2's spelling) and re-exported here as the very
+// same objects, so every import that predates the move keeps working —
+// `plugins.ts` records the history and the identity argument.
 export {
   COMPONENT_SERIALIZERS,
   RENDERER_REGISTRY,

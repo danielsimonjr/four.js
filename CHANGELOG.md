@@ -8,6 +8,62 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — RFC 0002 §2's token spelling executed, and §61's `readPixels` lands whole (Rectangle2 prerequisite cleared)
+
+#### Added
+
+- **`Rectangle2` in `@four/math`** (RFC 0005's recorded prerequisite, cleared):
+  a mutable `x/y/width/height` type in the §7b family spelling — plan-D3
+  changed hook, `clone` the only allocating method, `equalsApprox` at the
+  family tolerance, half-open `containsPoint`, `isEmpty`. Deliberately
+  origin-agnostic: each consuming API documents its own origin (`readPixels`:
+  bottom-left, §7a). No §85 validation, per the family — consumers validate.
+- **§61's `readPixels?(target, region?: Rectangle2)` joined the `Renderer`
+  interface** — the last line of WP-R1.6's typed TODO, shipped exactly as
+  sketched: optional (presence is the capability — `supportsReadPixels` /
+  `PixelReader` in the `renderEffect` discipline), `Promise`-returning forever
+  (RFC 0005), tightly packed RGBA8, rows bottom-to-top (§7a; the recorded
+  WP-R1.6 decision), region in target texels from the bottom-left,
+  rejects-not-skips. `validateReadbackRegion` is the shared §85 check, so both
+  backends refuse a malformed region with the same words.
+- **The region form on `WebgpuRenderer`**: `copyTextureToBuffer` gains an
+  optional `origin` (presence-is-the-capability descriptor widening); the §7a
+  bottom origin converts to WebGPU's top-first origin in exactly one place, and
+  the region rides the existing 256-byte alignment, strip, and flip machinery.
+  A whole-target call records no `origin` member at all — pinned, which is
+  what keeps WP-R1.6's transcripts byte-identical.
+- **`readPixels` on `WebglRenderer`** — the staged `gl-render-target.ts`
+  entry, landed: the stalling `gl.readPixels` wrapped in §61's promise shape
+  (the method doc defends the choice against the picking fence path: a
+  readback is a between-frames, once-per-call operation; a fence buys nothing
+  its caller is racing for). GL's native row order and read space are already
+  §7a's, so the two backends agree byte for byte. Rejection contract mirrors
+  WebGPU's with `CONTEXT_LOST` as this backend's loss code. A self-skipping
+  region pixel proof waits in
+  `tests/browser/webgpu/webgpu-readpixels-region.spec.ts` for the next
+  browser-gate run.
+
+#### Changed
+
+- **The six §81 capability tokens moved to their owning packages** (RFC 0002
+  §2's spelling; the recorded reversible spelling-difference, reversed):
+  `SIMULATION_SYSTEMS` → `@four/motion`, `RENDERER_REGISTRY` + `RENDER_GRAPH`
+  → `@four/render`, `SOLVER_REGISTRY` → `@four/physics`,
+  `COMPONENT_SERIALIZERS` + `SCENE_MIGRATIONS` → `@four/serialization` — each
+  a `capabilities.ts` declaring only `defineCapability` plus type-only
+  registry imports, `@__PURE__`-annotated. `four/plugins.ts` re-exports the
+  very objects, so every existing import keeps working; identity is pinned by
+  `toBe` in `plugins.test.ts`. No §3.1 edge moved in either direction. The §96
+  boundary test now distinguishes host machinery (banned everywhere but
+  `core`/`four`, deserializers absolutely) from token declaration (allowed in
+  exactly the four registry owners, reason and date recorded): a token is a
+  key, not authority, and nothing a document names can become a plugin,
+  exactly as before. The four tokens `Application` never references still
+  grep 0 in every bundle. Measured: +0.56 kB gzip per WebGL-bearing bundle
+  (the `readPixels` method on the class — the `createPickingService`
+  precedent); token migration ±0.01 kB; budgets first-3d 37.5→38, particles
+  36→36.5, ui-demo 44.5→45 with the A/B.
+
 ### 2026-08-29 — §71 analytic picking + node.hitTestMode (A-11 closed) and the §58 paint-object tier (R-16 closed)
 
 #### Added

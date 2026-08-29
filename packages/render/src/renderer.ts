@@ -85,6 +85,7 @@
 
 import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
+import type { Rectangle2 } from "@four/math";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
 import type { ComputePassDescriptor } from "./compute.js";
@@ -447,10 +448,10 @@ export interface RenderInterpolation {
  * ## Deferred §61 members (typed TODO)
  *
  * These are part of §61 and are **not** part of this interface. The list is
- * shorter than it was — {@link @four/render!RenderTarget | RenderTarget} and
- * {@link @four/render!Texture | Texture} both exist now — but the two
- * *factories* stay deferred **by decision, not by absence** (R-4, 2026-08-07),
- * and `readPixels` still names a type this monorepo does not have:
+ * shorter again — `readPixels` joined the interface when `Rectangle2` landed
+ * in `@four/math` (2026-08-29; RFC 0005's recorded prerequisite, cleared) —
+ * but the two *factories* stay deferred **by decision, not by absence**
+ * (R-4, 2026-08-07):
  *
  * ```ts
  * createTexture(source: TextureSource): Texture;
@@ -465,10 +466,6 @@ export interface RenderInterpolation {
  * // full argument on the class it concerns. These land with the tier that
  * // genuinely needs renderer-owned resources — compressed or GPU-only
  * // formats, which have no CPU-side description at all.
- *
- * readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
- * // needs `Rectangle2`, which `@four/math` does not define; §92's visual
- * // regression tier is its first consumer. Optional in §61, stays optional.
  * ```
  */
 export interface Renderer extends Disposable {
@@ -718,6 +715,54 @@ export interface Renderer extends Disposable {
    * for what deliberately did not move.
    */
   compute?(pass: ComputePassDescriptor): void;
+
+  /**
+   * Reads back `target`'s colour attachment — or the `region` rectangle of it
+   * — as tightly packed RGBA8 bytes (§61, §92; the member the module header's
+   * typed TODO carried until `Rectangle2` landed, 2026-08-29).
+   *
+   * **Optional, and its presence is the capability** — the
+   * {@link Renderer.statistics} / {@link Renderer.renderEffect} stance, for
+   * the same two reasons: a required member would break every implementor,
+   * and a backend with no readable pixels ({@link NullRenderer}, §62's SVG
+   * tier) says so by omission rather than by fabricating bytes.
+   *
+   * **Asynchronous, honestly and permanently** (RFC 0005's commitment, and
+   * §61's own signature). WebGPU has no synchronous readback at all —
+   * `copyTextureToBuffer` + `mapAsync` is the only path — so the `Promise` is
+   * the *floor* of what every backend can promise, and a backend whose native
+   * read happens to be synchronous (GL's `readPixels`) still resolves rather
+   * than returning bytes directly: the shape never varies by backend (§62).
+   * Callers must not assume resolution within any particular frame.
+   *
+   * The contract every backend that declares it owes:
+   *
+   * - **The result is `width × height × 4` bytes** (the region's, when given;
+   *   the target's otherwise) of tightly packed, straight-alpha RGBA8 — no
+   *   row padding, regardless of the backend's own alignment rules.
+   * - **Rows run bottom-to-top**: row 0 of the result is the bottom row of
+   *   the image, matching §7a's Y-up world (recorded decision, WP-R1.6;
+   *   GL's native order, flipped on the way out by WebGPU).
+   * - **`region` is measured in target texels from the bottom-left corner**,
+   *   +Y up — the same space the result's rows are defined in. It must be
+   *   non-empty, integer-valued, and lie inside the target
+   *   ({@link validateReadbackRegion} is the shared §85 check; a violation
+   *   rejects with its `RangeError`). Omitted means the whole target.
+   * - **Rejects rather than skips.** Unlike the frame methods this one is not
+   *   called inside a frame and its caller is awaiting a value, so a lost
+   *   context, a disposed renderer or target, and a device without the
+   *   readback entry points all reject with a
+   *   {@link @four/core!FourError | FourError} (`DEVICE_LOST` /
+   *   `CONTEXT_LOST`, `INVALID_APPLICATION_STATE`,
+   *   `UNSUPPORTED_GPU_FEATURE`; §89) — a silently empty buffer would be
+   *   undefined content by another name.
+   * - **A target never rendered into reads back its zero-filled allocation**
+   *   — transparent black, the same defined answer sampling one gives.
+   *
+   * §92's visual regression tier is the first consumer; RFC 0005 names the
+   * region form as the pixel-picking fallback path.
+   */
+  readPixels?(target: RenderTarget, region?: Rectangle2): Promise<ArrayBuffer>;
 
   /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at

@@ -28,6 +28,46 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — RFC 0002 token migration + §61 `readPixels` whole
+  (Rectangle2).** Decisions worth keeping:
+  - **The reversible spelling-difference reversed on schedule, and the reversal
+    cost one test split.** Each token moved to its registry's owner; `four`
+    re-exports the very objects (`toBe`-pinned — object identity, not just the
+    `name` string, is what makes provide-by-one-spelling/require-by-the-other
+    one key). §3.1: no edge either way — every owner already had `core` and
+    its own registry type. The §96 boundary test's name list split into HOST
+    (authority: banned everywhere but core/four) vs TOKEN (declaration: the
+    four owners, dated) — declaring `{ name, revocable }` confers nothing, so
+    serialization declaring its tokens does not weaken "untrusted content can
+    never become a plugin". The ban is textual and blunt on purpose: the new
+    capability modules _reword their prose_ to avoid banned identifiers rather
+    than weakening the check to skip comments.
+  - **`Rectangle2` is deliberately origin-agnostic.** A rectangle is four
+    numbers; the space belongs to the consuming API (`readPixels`: bottom-left
+    §7a; §55's `frame` will state its own). `containsPoint` is half-open so
+    adjacent rectangles partition — texel-region semantics.
+  - **The region form rides the whole-target machinery unchanged.** WebGPU's
+    §7a-to-top-first conversion happens in exactly one place; the repack never
+    branches on region-vs-whole (a region's rows are just shorter); a
+    whole-target copy passes no `origin` member at all — tape-pinned, which is
+    the byte-identity proof for WP-R1.6's transcripts.
+  - **WebGL `readPixels` is the stalling form, and that is a shape decision,
+    not a shortcut**: a target readback is between-frames/once, its caller
+    already awaits the GPU round trip; the picking fence path exists for
+    every-frame picks racing a frame budget, and reusing it would couple this
+    member to that service's pass state. The promise contract makes a later
+    upgrade invisible. Lint corollary: an await-less async is
+    `require-await`-red — a promise _executor_ keeps refusals as rejections
+    without one.
+  - **Coverage-hole rule, another confirmation:** a `renderTargets === null`
+    guard behind `#requireContext` was unreachable; mirroring WebgpuRenderer's
+    shape — assert-usable then one reachable pair-null check — made every
+    branch real (render-webgl 99.92/99.62).
+  - **A §61 member implemented as a class method rides every bundle of that
+    backend** (a used class's methods don't tree-shake): +0.56 kB gzip per
+    WebGL bundle, ±0.01 for the token migration. The `createPickingService`
+    precedent accepted; budgets 37.5→38 / 36→36.5 / 44.5→45.
+
 - **2026-08-29 — A-11 analytic tier + `node.hitTestMode` (adopted RFC 0005 Q3).**
   Decisions worth keeping:
   - **`hitTestMode` is `HitTestMode | null = null`, and `null` is not a fifth

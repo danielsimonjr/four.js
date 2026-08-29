@@ -38,7 +38,7 @@
  */
 
 import { FourError, isFourError, resetDevWarnings } from "@four/core";
-import { Matrix4, Quaternion, Vector3 } from "@four/math";
+import { Matrix4, Quaternion, Rectangle2, Vector3 } from "@four/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
   PARTICLE_INSTANCE_FLOATS,
@@ -195,6 +195,20 @@ interface FakeGlOptions {
    * cannot render into (R-4).
    */
   framebufferStatus?: number;
+  /**
+   * When false, the double declares **no** `readPixels` at all — a context
+   * without the optional read-back entry point (§62's presence-is-the-
+   * capability stance; `gl-picking.test.ts` builds the same absence for the
+   * picking service). Default true.
+   *
+   * When present, the fake writes the deterministic byte
+   * `(fy * 1024 + fx * 4 + channel) % 251` for framebuffer texel
+   * `(fx, fy)` — a function of *absolute* coordinates, so a region read
+   * yields exactly the sub-rectangle of a whole read and an offset mistake
+   * changes bytes rather than hiding (the `recording-gpu.ts` prime-period
+   * trick, extended to 2D).
+   */
+  canReadPixels?: boolean;
   /** When false, `getUniformLocation` returns null. Default true. */
   resolveUniforms?: boolean;
   /**
@@ -264,6 +278,7 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     allocateFramebuffers = true,
     allocateRenderbuffers = true,
     framebufferStatus = GL.FRAMEBUFFER_COMPLETE,
+    canReadPixels = true,
     resolveUniforms = true,
     infoLog = "",
   } = options;
@@ -445,6 +460,34 @@ function createFakeGl(options: FakeGlOptions = {}): FakeGl {
     deleteFramebuffer(framebuffer) {
       record("deleteFramebuffer", framebuffer);
     },
+    ...(canReadPixels
+      ? {
+          readPixels(
+            x: number,
+            y: number,
+            width: number,
+            height: number,
+            format: number,
+            type: number,
+            into: ArrayBufferView | number,
+          ): void {
+            record("readPixels", x, y, width, height, format, type);
+            if (typeof into === "number" || !(into instanceof Uint8Array)) {
+              return;
+            }
+            // GL's own layout: row 0 of the destination is framebuffer row
+            // `y` — the bottom of the read rectangle — rows ascending.
+            for (let row = 0; row < height; row += 1) {
+              for (let col = 0; col < width; col += 1) {
+                for (let channel = 0; channel < 4; channel += 1) {
+                  into[(row * width + col) * 4 + channel] =
+                    ((y + row) * 1024 + (x + col) * 4 + channel) % 251;
+                }
+              }
+            }
+          },
+        }
+      : {}),
 
     createRenderbuffer() {
       record("createRenderbuffer");
@@ -11281,7 +11324,12 @@ describe("WebglRenderer.createPickingService (§71, RFC 0005)", () => {
   it("builds a service whose host window tracks the live renderer state", async () => {
     registerPickingPipeline();
     try {
-      const { renderer, gl, camera } = await initialized();
+      // Built without the optional read-back entry point (`canReadPixels`,
+      // 2026-08-29 — the fake used to lack the whole group), so the pick
+      // below still exercises the refusal-by-name path.
+      const { renderer, gl, camera } = await initialized({
+        canReadPixels: false,
+      });
       renderer.resize(8, 8);
       const service = renderer.createPickingService();
       expect(service).toBeInstanceOf(WebglPickingService);
@@ -11300,8 +11348,8 @@ describe("WebglRenderer.createPickingService (§71, RFC 0005)", () => {
       service.update(root, view);
       expect(gl.countOf("drawArrays")).toBeGreaterThan(0);
 
-      // The fake context predates the optional read-back group, and
-      // presence is the capability (§62): the pick refuses by name.
+      // A context without the read-back entry point: presence is the
+      // capability (§62), so the pick refuses by name.
       const error = await rejection(
         service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
       );
@@ -11344,5 +11392,151 @@ describe("WebglRenderer.createPickingService (§71, RFC 0005)", () => {
     } finally {
       clearRegisteredPickingPipeline();
     }
+  });
+});
+
+describe("WebglRenderer.readPixels (§61, §92; 2026-08-29)", () => {
+  /** The fake's deterministic byte for framebuffer texel (fx, fy), channel. */
+  function patternByte(fx: number, fy: number, channel: number): number {
+    return (fy * 1024 + fx * 4 + channel) % 251;
+  }
+
+  it("reads a whole target back as tightly packed bytes, rows bottom-to-top", async () => {
+    const { renderer, gl } = await initialized();
+    const target = new RenderTarget({ width: 3, height: 2 });
+    gl.reset();
+
+    const pixels = new Uint8Array(await renderer.readPixels(target));
+    expect(pixels.byteLength).toBe(3 * 2 * 4);
+    // Row 0 of the result is framebuffer row 0 — the bottom — exactly as the
+    // fake (and real GL) writes it; no flip happens or is needed.
+    for (let fy = 0; fy < 2; fy += 1) {
+      for (let fx = 0; fx < 3; fx += 1) {
+        for (let channel = 0; channel < 4; channel += 1) {
+          expect(pixels[(fy * 3 + fx) * 4 + channel]).toBe(
+            patternByte(fx, fy, channel),
+          );
+        }
+      }
+    }
+    // One whole-target read off the target's framebuffer, binding restored.
+    expect(gl.callsOf("readPixels")[0]?.args).toEqual([
+      0,
+      0,
+      3,
+      2,
+      GL.RGBA,
+      GL.UNSIGNED_BYTE,
+    ]);
+    const names = gl.names();
+    const bindings = gl.callsOf("bindFramebuffer").map((call) => call.args[1]);
+    expect(bindings.at(-1)).toBeNull();
+    expect(names.indexOf("readPixels")).toBeGreaterThan(
+      names.indexOf("bindFramebuffer"),
+    );
+    renderer.dispose();
+    target.dispose();
+  });
+
+  it("reads a region as exactly the sub-rectangle of the whole read (§7a bottom-left origin)", async () => {
+    const { renderer, gl } = await initialized();
+    const target = new RenderTarget({ width: 4, height: 4 });
+
+    const whole = new Uint8Array(await renderer.readPixels(target));
+    gl.reset();
+    const region = new Rectangle2(1, 2, 2, 2);
+    const part = new Uint8Array(await renderer.readPixels(target, region));
+
+    expect(part.byteLength).toBe(2 * 2 * 4);
+    // The region's coordinates pass straight through to GL — no flip, no
+    // origin conversion: GL's readback space is already §7a's.
+    expect(gl.callsOf("readPixels")[0]?.args).toEqual([
+      1,
+      2,
+      2,
+      2,
+      GL.RGBA,
+      GL.UNSIGNED_BYTE,
+    ]);
+    // Byte-for-byte the sub-rectangle of the whole-target read.
+    for (let row = 0; row < 2; row += 1) {
+      for (let col = 0; col < 2; col += 1) {
+        for (let channel = 0; channel < 4; channel += 1) {
+          expect(part[(row * 2 + col) * 4 + channel]).toBe(
+            whole[((row + 2) * 4 + (col + 1)) * 4 + channel],
+          );
+        }
+      }
+    }
+    renderer.dispose();
+    target.dispose();
+  });
+
+  it("rejects a malformed region with the shared §85 RangeError", async () => {
+    const { renderer } = await initialized();
+    const target = new RenderTarget({ width: 4, height: 4 });
+
+    await expect(
+      renderer.readPixels(target, new Rectangle2(0, 0, 5, 1)),
+    ).rejects.toThrow(/does not lie inside the 4 × 4 target/);
+    await expect(
+      renderer.readPixels(target, new Rectangle2(0.5, 0, 1, 1)),
+    ).rejects.toThrow(/region x must be an integer/);
+    await expect(
+      renderer.readPixels(target, new Rectangle2(0, 0, 0, 1)),
+    ).rejects.toThrow(/non-empty/);
+    renderer.dispose();
+    target.dispose();
+  });
+
+  it("rejects with INVALID_APPLICATION_STATE before initialize, after dispose, and for a disposed target", async () => {
+    const target = new RenderTarget({ width: 2, height: 2 });
+    const uninitialized = new WebglRenderer();
+    expect((await rejection(uninitialized.readPixels(target))).code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+
+    const { renderer } = await initialized();
+    const disposedTarget = new RenderTarget({ width: 2, height: 2 });
+    disposedTarget.dispose();
+    expect((await rejection(renderer.readPixels(disposedTarget))).code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+
+    renderer.dispose();
+    expect((await rejection(renderer.readPixels(target))).code).toBe(
+      "INVALID_APPLICATION_STATE",
+    );
+    target.dispose();
+  });
+
+  it("rejects with INVALID_APPLICATION_STATE for a target GL cannot allocate", async () => {
+    const { renderer } = await initialized({ allocateFramebuffers: false });
+    const target = new RenderTarget({ width: 2, height: 2 });
+    const error = await rejection(renderer.readPixels(target));
+    expect(error.code).toBe("INVALID_APPLICATION_STATE");
+    expect(error.message).toContain("could not be allocated");
+    renderer.dispose();
+    target.dispose();
+  });
+
+  it("rejects with CONTEXT_LOST while the context is lost — rejects, never skips", async () => {
+    const { renderer, canvas } = await initialized();
+    const target = new RenderTarget({ width: 2, height: 2 });
+    canvas.dispatch("webglcontextlost");
+    expect((await rejection(renderer.readPixels(target))).code).toBe(
+      "CONTEXT_LOST",
+    );
+    renderer.dispose();
+    target.dispose();
+  });
+
+  it("rejects with UNSUPPORTED_GPU_FEATURE on a context without the entry point", async () => {
+    const { renderer } = await initialized({ canReadPixels: false });
+    const target = new RenderTarget({ width: 2, height: 2 });
+    const error = await rejection(renderer.readPixels(target));
+    expect(error.code).toBe("UNSUPPORTED_GPU_FEATURE");
+    renderer.dispose();
+    target.dispose();
   });
 });

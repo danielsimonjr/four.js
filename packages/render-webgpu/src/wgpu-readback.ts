@@ -9,10 +9,16 @@
  * resolves when the GPU is done — so a `readPixels` that pretended to be
  * synchronous could not be implemented here honestly. §61's own sketch already
  * concedes the point (`readPixels?(…): Promise<ArrayBuffer>`), and
- * `WebgpuRenderer.readPixels` implements exactly that sketch's whole-target
- * form; the `region` parameter waits for `Rectangle2` in `@four/math` (RFC
- * 0005's named prerequisite, not landed), and shipping the whole-target form
- * rather than inventing a rectangle type is the plan's explicit instruction.
+ * `WebgpuRenderer.readPixels` implements exactly that sketch. WP-R1.6 shipped
+ * the whole-target form (shipping it rather than inventing a rectangle type
+ * was the plan's explicit instruction); the `region` form arrived 2026-08-29
+ * with `Rectangle2` in `@four/math` (RFC 0005's named prerequisite, cleared).
+ * A region copies only its own rectangle — `copyTextureToBuffer`'s `origin` —
+ * and rides the very same alignment, strip, and flip machinery: a region's
+ * rows are simply shorter, so the repack below never distinguishes the cases.
+ * A whole-target call records exactly the calls it recorded before the region
+ * form existed (no `origin` member at all), which is what keeps WP-R1.6's
+ * transcripts byte-identical.
  *
  * ## The 256-byte row (§62's alignment, owned here)
  *
@@ -36,6 +42,8 @@
  * the repack loop writes them in reverse; the flip rides the padding strip
  * this function performs anyway and costs no extra pass.
  */
+
+import type { Rectangle2 } from "@four/math";
 
 import {
   GPU_BUFFER_USAGE,
@@ -66,31 +74,43 @@ export function readbackBytesPerRow(width: number): number {
 }
 
 /**
- * Copies `texture`'s texels into a tightly packed RGBA8 `ArrayBuffer` — rows
- * bottom-to-top (module header), `width * height * 4` bytes.
+ * Copies `texture`'s texels — or `region`'s rectangle of them — into a
+ * tightly packed RGBA8 `ArrayBuffer`, rows bottom-to-top (module header):
+ * `width * height * 4` bytes for the whole texture,
+ * `region.width * region.height * 4` with a region.
+ *
+ * `region` is measured in texels from the texture's **bottom-left** corner
+ * (§7a, the space the result's rows are defined in) and must already be
+ * validated against `width` × `height` — `validateReadbackRegion` in
+ * `@four/render` is the shared §85 check, and `WebgpuRenderer.readPixels`
+ * runs it before calling here. The conversion to WebGPU's top-first `origin`
+ * happens in exactly one place, below.
  *
  * Resolves `null` when the device surface does not carry the readback entry
  * points (`copyTextureToBuffer`, `mapAsync` — optional members whose presence
  * is the capability); the caller turns that into `UNSUPPORTED_GPU_FEATURE`.
  * The staging buffer is created per call and destroyed before resolving: a
- * whole-target readback is a diagnostic-tier operation (§92's visual tier,
- * RFC 0005's fallback path), and pooling a buffer that is mapped across an
- * `await` would trade a transient allocation for a reentrancy hazard.
+ * readback is a diagnostic-tier operation (§92's visual tier, RFC 0005's
+ * fallback path), and pooling a buffer that is mapped across an `await` would
+ * trade a transient allocation for a reentrancy hazard.
  */
 export async function readTexturePixels(
   device: GpuDevice,
   texture: GpuTexture,
   width: number,
   height: number,
+  region?: Rectangle2,
 ): Promise<ArrayBuffer | null> {
   const encoder = device.createCommandEncoder({ label: "four:readback" });
   if (encoder.copyTextureToBuffer === undefined) {
     return null;
   }
-  const bytesPerRow = readbackBytesPerRow(width);
+  const readWidth = region === undefined ? width : region.width;
+  const readHeight = region === undefined ? height : region.height;
+  const bytesPerRow = readbackBytesPerRow(readWidth);
   const buffer = device.createBuffer({
     label: "four:readback",
-    size: bytesPerRow * height,
+    size: bytesPerRow * readHeight,
     usage: GPU_BUFFER_USAGE.COPY_DST | GPU_BUFFER_USAGE.MAP_READ,
   });
   if (
@@ -103,24 +123,29 @@ export async function readTexturePixels(
   }
 
   encoder.copyTextureToBuffer(
-    { texture },
-    { buffer, bytesPerRow, rowsPerImage: height },
-    [width, height],
+    // §7a's bottom-origin `region.y` becomes WebGPU's top-first origin here,
+    // and nowhere else. A whole-texture copy passes no `origin` at all, so
+    // the call is byte-for-byte the one WP-R1.6's transcripts recorded.
+    region === undefined
+      ? { texture }
+      : { texture, origin: [region.x, height - region.y - region.height] },
+    { buffer, bytesPerRow, rowsPerImage: readHeight },
+    [readWidth, readHeight],
   );
   device.queue.submit([encoder.finish()]);
 
   try {
     await buffer.mapAsync(GPU_MAP_MODE.READ);
     const mapped = new Uint8Array(buffer.getMappedRange());
-    const rowBytes = width * BYTES_PER_TEXEL;
-    const packed = new Uint8Array(rowBytes * height);
-    for (let row = 0; row < height; row += 1) {
+    const rowBytes = readWidth * BYTES_PER_TEXEL;
+    const packed = new Uint8Array(rowBytes * readHeight);
+    for (let row = 0; row < readHeight; row += 1) {
       const source = row * bytesPerRow;
       // Top-first copy rows written bottom-first into the result — the §7a
       // order the module header fixes.
       packed.set(
         mapped.subarray(source, source + rowBytes),
-        (height - 1 - row) * rowBytes,
+        (readHeight - 1 - row) * rowBytes,
       );
     }
     buffer.unmap();

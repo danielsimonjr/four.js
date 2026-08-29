@@ -102,7 +102,7 @@
  */
 
 import { DEV, EventEmitter, FourError, devWarnOnce } from "@four/core";
-import { Frustum, Matrix4 } from "@four/math";
+import { Frustum, Matrix4, type Rectangle2 } from "@four/math";
 import {
   COLOR_GRADE_DEFAULTS,
   RenderTarget,
@@ -112,6 +112,7 @@ import {
   collectSceneLights,
   createSceneLights,
   isRenderTargetTexture,
+  validateReadbackRegion,
   type EffectRenderPass,
   type RenderBatch,
   type RenderInterpolation,
@@ -2155,17 +2156,20 @@ export class WebgpuRenderer implements Renderer {
   }
 
   /**
-   * Reads back `target`'s colour attachment as tightly packed RGBA8 bytes —
-   * §61's `readPixels`, in the whole-target form (WP-R1.6; the `region`
-   * parameter arrives with `Rectangle2` in `@four/math`, RFC 0005's named
-   * prerequisite, rather than with an invented rectangle type).
+   * Reads back `target`'s colour attachment — or the `region` rectangle of it
+   * — as tightly packed RGBA8 bytes: §61's `readPixels` (WP-R1.6 shipped the
+   * whole-target form; the region form arrived 2026-08-29 with `Rectangle2`
+   * in `@four/math`, RFC 0005's named prerequisite, cleared).
    *
    * **Asynchronous, honestly and permanently.** WebGPU has no synchronous
    * readback — `copyTextureToBuffer` + `mapAsync` is the only path (probe-
    * verified; `wgpu-readback.ts`) — and §61's own sketch types the member
    * `Promise<ArrayBuffer>`, which is the RFC 0005 argument this method is the
-   * standing evidence for. The result is `width * height * 4` bytes, rows
-   * **bottom-to-top** (§7a's Y-up; `wgpu-readback.ts` records the decision).
+   * standing evidence for. The result is `width * height * 4` bytes (the
+   * region's, when given; the target's otherwise), rows **bottom-to-top**
+   * (§7a's Y-up; `wgpu-readback.ts` records the decision). `region` is
+   * measured in target texels from the **bottom-left** corner, the same
+   * space the rows are defined in; a region copies only its own rectangle.
    *
    * A target that was never rendered into reads back its zero-filled
    * allocation — transparent black, the same defined answer sampling one
@@ -2177,9 +2181,15 @@ export class WebgpuRenderer implements Renderer {
    * `DEVICE_LOST` while the device is lost (§89's "a caller asks for
    * something that cannot be satisfied while lost");
    * `UNSUPPORTED_GPU_FEATURE` on a device double without the readback entry
-   * points (their presence is the capability — `webgpu-device.ts`).
+   * points (their presence is the capability — `webgpu-device.ts`). A
+   * malformed region — fractional, empty, or hanging off the target — rejects
+   * with `validateReadbackRegion`'s `RangeError` (§85, `@four/render`'s
+   * shared check, so both backends refuse with the same words).
    */
-  async readPixels(target: RenderTarget): Promise<ArrayBuffer> {
+  async readPixels(
+    target: RenderTarget,
+    region?: Rectangle2,
+  ): Promise<ArrayBuffer> {
     this.#assertUsable("readPixels");
     const device = this.#device;
     const renderTargets = this.#renderTargets;
@@ -2206,11 +2216,15 @@ export class WebgpuRenderer implements Renderer {
         { context: { target: target.id } },
       );
     }
+    if (region !== undefined) {
+      validateReadbackRegion(region, record.width, record.height);
+    }
     const pixels = await readTexturePixels(
       device,
       record.colorTexture,
       record.width,
       record.height,
+      region,
     );
     if (pixels === null) {
       throw new FourError(
