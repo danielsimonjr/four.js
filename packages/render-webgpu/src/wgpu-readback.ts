@@ -109,20 +109,23 @@ export async function readTexturePixels(
   );
   device.queue.submit([encoder.finish()]);
 
-  await buffer.mapAsync(GPU_MAP_MODE.READ);
-  const mapped = new Uint8Array(buffer.getMappedRange());
-  const rowBytes = width * BYTES_PER_TEXEL;
-  const packed = new Uint8Array(rowBytes * height);
-  for (let row = 0; row < height; row += 1) {
-    const source = row * bytesPerRow;
-    // Top-first copy rows written bottom-first into the result — the §7a
-    // order the module header fixes.
-    packed.set(
-      mapped.subarray(source, source + rowBytes),
-      (height - 1 - row) * rowBytes,
-    );
+  try {
+    await buffer.mapAsync(GPU_MAP_MODE.READ);
+    const mapped = new Uint8Array(buffer.getMappedRange());
+    const rowBytes = width * BYTES_PER_TEXEL;
+    const packed = new Uint8Array(rowBytes * height);
+    for (let row = 0; row < height; row += 1) {
+      const source = row * bytesPerRow;
+      // Top-first copy rows written bottom-first into the result — the §7a
+      // order the module header fixes.
+      packed.set(
+        mapped.subarray(source, source + rowBytes),
+        (height - 1 - row) * rowBytes,
+      );
+    }
+    buffer.unmap();
+    return packed.buffer;
+  } finally {
+    buffer.destroy();
   }
-  buffer.unmap();
-  buffer.destroy();
-  return packed.buffer;
 }
