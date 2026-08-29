@@ -37,7 +37,7 @@
  * `buildRenderList` are used for real: `@four/render` *is* a dependency.
  */
 
-import { FourError, isFourError } from "@four/core";
+import { FourError, isFourError, resetDevWarnings } from "@four/core";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
@@ -49,7 +49,10 @@ import {
   createSceneLights,
   particleQuadGeometry,
   resetRenderStatistics,
+  type EffectRenderPass,
+  type GraphEffect,
   type RenderBatch,
+  type ShaderGraph,
   type RenderStatistics,
   type LitRenderItem,
   type ParticleRenderItem,
@@ -59,7 +62,7 @@ import {
   type StandardRenderItem,
   type UnlitRenderItem,
 } from "@four/render";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   COLOR_ATTRIBUTE_LOCATION,
@@ -67,6 +70,7 @@ import {
   EffectProgram,
   GL,
   GeometryCache,
+  JOINTS_ATTRIBUTE_LOCATION,
   LitProgram,
   MAP_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
@@ -83,11 +87,24 @@ import {
   SpriteProgram,
   StandardProgram,
   TextureCache,
+  SkinnedLitProgram,
+  SkinnedUnlitProgram,
   UV_ATTRIBUTE_LOCATION,
   UnlitProgram,
+  WEIGHTS_ATTRIBUTE_LOCATION,
+  NODE_SURFACE_TEXTURE_UNIT_BASE,
   WebglRenderer,
+  WebglPickingService,
+  clearRegisteredNodeMaterialPipeline,
+  clearRegisteredPickingPipeline,
+  clearRegisteredSkinningPipeline,
   createGlBatching,
+  registerPickingPipeline,
+  registerNodeMaterialPipeline,
+  registerSkinningPipeline,
+  resolveSkinningPipelineFactory,
   type BatchGlContext,
+  type NodeItemMaterial,
   type ParticleGlContext,
   type WebglCanvas,
   type WebglContextAttributes,
@@ -685,6 +702,12 @@ class TestGeometry {
   /** Optional per-vertex colour stream (§53, §60a; R-19) — undefined too. */
   colors: Float32Array | undefined;
 
+  /** Optional joint-index stream (§53, §54; RFC 0003) — undefined too. */
+  joints: Uint16Array | undefined;
+
+  /** Optional joint-weight stream (§53, §54; RFC 0003) — undefined too. */
+  weights: Float32Array | undefined;
+
   indices: Uint16Array | Uint32Array | undefined;
 
   mode: "triangles" | "lines" = "triangles";
@@ -729,6 +752,8 @@ class TestGeometry {
     this.normals = undefined;
     this.uvs = undefined;
     this.colors = undefined;
+    this.joints = undefined;
+    this.weights = undefined;
     this.indices = undefined;
     this.markDirty();
   }
@@ -9870,5 +9895,1454 @@ describe("RenderTargetCache — the packed stencil attachment (§67, R-7)", () =
     expect(gl.callsOf("framebufferRenderbuffer")[0].args[1]).toBe(
       GL.DEPTH_ATTACHMENT,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §67's engine-composed clips (R-23, 2026-08-28).
+//
+// The render list composes the records (`@four/render`'s `clip.ts` — mask
+// draws first, one shared test per subtree); what this backend owes them is
+// three things, and this block pins each: a mask pass draws colourlessly,
+// depthlessly, writing exactly its bit plane; a clipped draw's record replaces
+// the material's own §57 stencil; and a scene that names no clip reaches
+// `applyMaterialState` with `null` and issues the GL sequence it always did —
+// which the whole rest of this file is the recorded proof of.
+// ---------------------------------------------------------------------------
+
+describe("WebglRenderer.render — §67 clips (R-23)", () => {
+  /** A harness whose drawing buffer actually has the stencil bits (R-7). */
+  async function initializedWithStencil(): Promise<Harness> {
+    const gl = createFakeGl();
+    const canvas = new TestCanvas(gl);
+    const renderer = new WebglRenderer();
+    await renderer.initialize({ canvas, stencil: true });
+    return { gl, canvas, renderer, camera: new TestCamera() };
+  }
+
+  /** A clipping panel with one child, over plain unlit materials. */
+  function clippedScene(): Renderable {
+    const root = createRoot();
+    const panel = renderable(triangleGeometry());
+    panel.clip = true;
+    panel.add(renderable(triangleGeometry()));
+    root.add(panel);
+    return root;
+  }
+
+  it("draws the mask first: stencil write on its plane, colour and depth off", async () => {
+    const { renderer, gl, camera } = await initializedWithStencil();
+    const root = clippedScene();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(stencilCalls(gl)).toEqual([
+      // The mask draw: always/replace onto plane 0, write mask = its bit.
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.ALWAYS, 0b1, 0xff],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.REPLACE],
+      ["stencilMask", 0b1],
+      // The panel's own draw is not clipped by its own clip: test off.
+      ["disable", GL.STENCIL_TEST],
+      // The child: read-only equality test over the accumulated bits.
+      ["enable", GL.STENCIL_TEST],
+      ["stencilFunc", GL.EQUAL, 0b1, 0b1],
+      ["stencilOp", GL.KEEP, GL.KEEP, GL.KEEP],
+      ["stencilMask", 0],
+      // The frame's exit envelope (R-7): the test off, the write mask open so
+      // the next clear is not masked by the child's read-only state.
+      ["disable", GL.STENCIL_TEST],
+      ["stencilMask", 0xff],
+    ]);
+    // The mask contributes no pixels and no depth: colour and depth writes and
+    // the depth test go off for it and come back for the panel's own draw.
+    expect(gl.callsOf("colorMask").map((call) => call.args)).toEqual([
+      [false, false, false, false],
+      [true, true, true, true],
+    ]);
+    expect(gl.callsOf("depthMask").map((call) => call.args[0])).toEqual([
+      false,
+      true,
+    ]);
+    // Three draws: the mask, the panel, the child — the mask is a real draw.
+    expect(gl.countOf("drawArrays")).toBe(3);
+  });
+
+  it("clears the stencil buffer with every view, so no mask leaks a frame", async () => {
+    const { renderer, gl, camera } = await initializedWithStencil();
+    const root = clippedScene();
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    const clears = gl.callsOf("clear");
+    expect(clears).toHaveLength(1);
+    expect(Number(clears[0].args[0]) & GL.STENCIL_BUFFER_BIT).toBe(
+      GL.STENCIL_BUFFER_BIT,
+    );
+  });
+
+  it("lets the engine's record outrank the material's own §57 stencil", async () => {
+    const { renderer, gl, camera } = await initializedWithStencil();
+    const root = createRoot();
+    const panel = renderable(triangleGeometry());
+    panel.clip = true;
+    // The child's material composes a mask by hand (R-7's tier) — and it is
+    // *inside* an engine-composed clip, so the engine's containment wins.
+    const child = stateful({
+      stencil: { func: "notequal", ref: 7, writeMask: 0xf0 },
+    });
+    panel.add(child);
+    root.add(panel);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const funcs = gl.callsOf("stencilFunc").map((call) => call.args);
+    // Mask write, then the engine's equality test — never NOTEQUAL/7.
+    expect(funcs).toEqual([
+      [GL.ALWAYS, 0b1, 0xff],
+      [GL.EQUAL, 0b1, 0b1],
+    ]);
+  });
+
+  it("warns once, in a development build, for a clip with no stencil buffer", async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // The default surface: no stencil bits (R-7's context attribute).
+      const { renderer, gl, camera } = await initialized();
+      const root = clippedScene();
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain("§67");
+      expect(warn.mock.calls[0]?.[0]).toContain("stencil: true");
+      // The defined behaviour is fail-toward-drawing: the draws still happen —
+      // mask included, though the buffer it writes does not exist — and GL
+      // treats every test as passing.
+      expect(gl.countOf("drawArrays")).toBe(6);
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("does not warn for a clipless frame on a stencil-less surface", async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §54's skinned pipelines (RFC 0003 — gaps PH-10 + R-22).
+// ---------------------------------------------------------------------------
+
+/**
+ * A `Skeleton` reduced to what the backend's render list and draw path read
+ * (§54): the bone count, the palette, and `update` — a double for the reason
+ * every scene-side object here is one (`@four/scene` is outside the frozen
+ * dependency matrix). The palette starts at per-joint identities and a test
+ * writes recognisable values into it directly.
+ */
+class TestSkeleton {
+  readonly bones: readonly null[];
+
+  readonly jointMatrices: Float32Array;
+
+  updates = 0;
+
+  constructor(count = 1) {
+    this.bones = new Array<null>(count).fill(null);
+    this.jointMatrices = new Float32Array(count * 16);
+    for (let i = 0; i < count; i += 1) {
+      const base = i * 16;
+      this.jointMatrices[base] = 1;
+      this.jointMatrices[base + 5] = 1;
+      this.jointMatrices[base + 10] = 1;
+      this.jointMatrices[base + 15] = 1;
+    }
+  }
+
+  update(): void {
+    this.updates += 1;
+  }
+}
+
+/** A drawable carrying §54's skin surface — `Mesh`, structurally. */
+class SkinnedTestNode extends Renderable {
+  skeleton: TestSkeleton | null = null;
+}
+
+/** A triangle carrying §53's full skin layout. */
+function skinnedGeometry(): TestGeometry {
+  const geometry = triangleGeometry();
+  geometry.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  geometry.weights = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
+  return geometry;
+}
+
+/** A root holding one skinned drawable over `material`. */
+function skinnedScene(
+  material: TestMaterial | TestLitMaterial = new TestMaterial(),
+  skeleton = new TestSkeleton(),
+): { root: Renderable; node: SkinnedTestNode; skeleton: TestSkeleton } {
+  const root = createRoot();
+  const node = new SkinnedTestNode(
+    skinnedGeometry().asGeometry,
+    material.asMaterial,
+  );
+  node.skeleton = skeleton;
+  root.add(node);
+  return { root, node, skeleton };
+}
+
+/** The per-program uniform maps that resolved `jointMatrices[0]`. */
+function skinnedUniformMaps(gl: FakeGl): Map<string, object>[] {
+  const maps: Map<string, object>[] = [];
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("jointMatrices[0]")) {
+      maps.push(perProgram);
+    }
+  }
+  return maps;
+}
+
+/** The skinned-unlit program's uniforms (declares `useVertexColors`). */
+function skinnedUnlitUniforms(gl: FakeGl): Map<string, object> {
+  for (const map of skinnedUniformMaps(gl)) {
+    if (map.has("useVertexColors")) {
+      return map;
+    }
+  }
+  throw new Error("the skinned-unlit program never resolved its uniforms");
+}
+
+/** The skinned-lit program's uniforms (declares `ambientLight`). */
+function skinnedLitUniforms(gl: FakeGl): Map<string, object> {
+  for (const map of skinnedUniformMaps(gl)) {
+    if (map.has("ambientLight")) {
+      return map;
+    }
+  }
+  throw new Error("the skinned-lit program never resolved its uniforms");
+}
+
+describe("registerSkinningPipeline — the registry slot (RFC 0003)", () => {
+  beforeEach(() => {
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("starts empty, fills on registration, and clears for tests", () => {
+    expect(resolveSkinningPipelineFactory()).toBeNull();
+    registerSkinningPipeline();
+    const factory = resolveSkinningPipelineFactory();
+    expect(factory).not.toBeNull();
+    // Idempotent: registering again installs an equivalent factory.
+    registerSkinningPipeline();
+    expect(resolveSkinningPipelineFactory()).not.toBeNull();
+    clearRegisteredSkinningPipeline();
+    expect(resolveSkinningPipelineFactory()).toBeNull();
+  });
+
+  it("compiles both programs through the factory, paired for disposal", () => {
+    registerSkinningPipeline();
+    const gl = createFakeGl();
+    const programs = resolveSkinningPipelineFactory()?.create(gl);
+    expect(programs).toBeDefined();
+    // Both linked; the registry interface is satisfied by the real classes.
+    expect(gl.countOf("linkProgram")).toBe(2);
+    programs?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+    // Idempotent per program.
+    programs?.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+  });
+
+  it("disposes the unlit half when the lit half fails to compile", () => {
+    registerSkinningPipeline();
+    const gl = createFakeGl({ failProgramAt: 2 });
+    expect(() => resolveSkinningPipelineFactory()?.create(gl)).toThrow();
+    // The first program was built and must not leak (§83).
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("SkinnedUnlitProgram / SkinnedLitProgram (RFC 0003)", () => {
+  it("uploads the palette verbatim and mirrors its feature switches", () => {
+    const gl = createFakeGl();
+    const program = SkinnedUnlitProgram.create(gl);
+    program.use();
+    const palette = new Float32Array(32);
+    palette[0] = 7;
+    palette[17] = 9;
+    program.setJointMatrices(palette);
+    const location = skinnedUnlitUniforms(gl).get("jointMatrices[0]");
+    const uploads = uploadsAt(gl, location);
+    expect(uploads).toHaveLength(1);
+    expect((uploads[0] as number[])[0]).toBe(7);
+    expect((uploads[0] as number[])[17]).toBe(9);
+
+    // The mirror-at-GL-initial rule, inherited from the unlit program: both
+    // features off uploads nothing; a change uploads once.
+    const before = gl.countOf("uniform1i");
+    program.setFeatures(false, false);
+    expect(gl.countOf("uniform1i")).toBe(before);
+    program.setFeatures(true, true);
+    program.setFeatures(true, true);
+    // map sampler + useMap + useVertexColors, each exactly once.
+    expect(gl.countOf("uniform1i")).toBe(before + 3);
+    expect(program.disposed).toBe(false);
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    program.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("carries the lit contract: lights, shadow state, colour, palette", () => {
+    const gl = createFakeGl();
+    const program = SkinnedLitProgram.create(gl);
+    program.use();
+    program.setViewProjection(new Matrix4());
+    program.setModel(new Matrix4());
+    program.setColor([1, 0.5, 0.25, 1], 0.5);
+    program.setAmbientLight([0.1, 0.2, 0.3]);
+    program.setDirectionalLight(new Vector3(0, -1, 0), [1, 1, 1]);
+    const lights = createSceneLights();
+    program.setPunctualLights(lights);
+    program.setShadow(lights);
+    program.setReceivesShadow(false); // mirrored at GL's initial false
+    const uniformCalls = gl.countOf("uniform1i");
+    program.setReceivesShadow(true);
+    expect(gl.countOf("uniform1i")).toBe(uniformCalls + 1);
+    const colorUpload = uploadsAt(
+      gl,
+      skinnedLitUniforms(gl).get("color"),
+    )[0] as number[];
+    expect(colorUpload).toEqual([1, 0.5, 0.25, 0.5]);
+    program.setFeatures(true);
+    program.setFeatures(true);
+    program.setJointMatrices(new Float32Array(16));
+    program.dispose();
+    program.dispose();
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+
+  it("cleans up when its own uniforms are missing from the link (§89)", () => {
+    const gl = createFakeGl({ resolveUniforms: false });
+    expect(() => SkinnedUnlitProgram.create(gl)).toThrow();
+    expect(() => SkinnedLitProgram.create(gl)).toThrow();
+    expect(gl.countOf("deleteProgram")).toBe(2);
+  });
+});
+
+describe("GeometryCache — the joint and weight streams (§53, §54)", () => {
+  it("uploads joints and weights at locations 4 and 5, and deletes them", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    const geometry = skinnedGeometry();
+    const record = cache.acquire(geometry.asGeometry);
+    expect(record?.jointBuffer).not.toBeNull();
+    expect(record?.weightBuffer).not.toBeNull();
+
+    const pointers = gl.callsOf("vertexAttribPointer");
+    const joints = pointers.find(
+      (call) => call.args[0] === JOINTS_ATTRIBUTE_LOCATION,
+    );
+    const weights = pointers.find(
+      (call) => call.args[0] === WEIGHTS_ATTRIBUTE_LOCATION,
+    );
+    // Non-normalized UNSIGNED_SHORT floats — see JOINTS_ATTRIBUTE_LOCATION.
+    expect(joints?.args.slice(1)).toEqual([4, GL.UNSIGNED_SHORT, false, 0, 0]);
+    expect(weights?.args.slice(1)).toEqual([4, GL.FLOAT, false, 0, 0]);
+
+    geometry.dispose();
+    cache.acquire(geometry.asGeometry);
+    // position + joints + weights buffers all deleted with the stale record.
+    expect(gl.countOf("deleteBuffer")).toBe(3);
+  });
+
+  it("uploads neither stream for a geometry that carries none", () => {
+    const gl = createFakeGl();
+    const cache = new GeometryCache(gl);
+    cache.acquire(triangleGeometry().asGeometry);
+    const locations = gl
+      .callsOf("enableVertexAttribArray")
+      .map((call) => call.args[0]);
+    expect(locations).not.toContain(JOINTS_ATTRIBUTE_LOCATION);
+    expect(locations).not.toContain(WEIGHTS_ATTRIBUTE_LOCATION);
+  });
+
+  it("abandons a half-allocated skinned upload without leaking (§83)", () => {
+    // Buffers: 1 position, 2 joints, 3 weights — fail the third.
+    const gl = createFakeGl();
+    let created = 0;
+    const original = gl.createBuffer.bind(gl);
+    gl.createBuffer = () => {
+      created += 1;
+      return created === 3 ? null : original();
+    };
+    const cache = new GeometryCache(gl);
+    expect(cache.acquire(skinnedGeometry().asGeometry)).toBeNull();
+    // The two live buffers and the vertex array are unwound.
+    expect(gl.countOf("deleteBuffer")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("WebglRenderer.render — skinned draws (§54, §62; RFC 0003)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("reports the declared joint limit as a §62 capability", async () => {
+    const { renderer } = await initialized();
+    expect(renderer.capabilities.maximumSkinningJoints).toBe(48);
+  });
+
+  it("skips skinned draws with one warning when nothing is registered", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const { root } = skinnedScene();
+      gl.reset();
+
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+
+      // No draw, no compile — and the warning names the fix, once.
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(gl.countOf("createProgram")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerSkinningPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("keeps a skinless frame's transcript byte-identical under registration", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(triangleGeometry()));
+    const views = [createView(camera)];
+    renderer.render(root, views);
+    gl.reset();
+    renderer.render(root, views);
+    const before = JSON.stringify(gl.calls);
+
+    registerSkinningPipeline();
+    try {
+      gl.reset();
+      renderer.render(root, views);
+      expect(JSON.stringify(gl.calls)).toBe(before);
+    } finally {
+      clearRegisteredSkinningPipeline();
+    }
+  });
+
+  it("compiles lazily on the first skinned draw, once, and draws through it", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const { root, skeleton } = skinnedScene();
+    skeleton.jointMatrices[13] = 5;
+    const views = [createView(camera)];
+    // Seven programs at initialize, none of them skinned.
+    expect(gl.countOf("createProgram")).toBe(7);
+    gl.reset();
+
+    renderer.render(root, views);
+
+    // Two more programs, compiled inside the frame — the first skinned draw.
+    expect(gl.countOf("createProgram")).toBe(2);
+    // The render list ran the palette update in the same build (the
+    // particle-repack precedent), and the draw uploaded the palette verbatim.
+    expect(skeleton.updates).toBe(1);
+    const palette = uploadsAt(
+      gl,
+      skinnedUnlitUniforms(gl).get("jointMatrices[0]"),
+    );
+    expect(palette).toHaveLength(1);
+    expect((palette[0] as number[])[13]).toBe(5);
+    expect(gl.countOf("drawArrays")).toBe(1);
+
+    // The second frame reuses the compiled pair.
+    gl.reset();
+    renderer.render(root, views);
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("shades a skinned-lit draw with the frame's lights", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.2, 0.3, 0.4]);
+    const node = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial([1, 0, 0, 1]).asMaterial,
+    );
+    node.skeleton = new TestSkeleton(2);
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const uniforms = skinnedLitUniforms(gl);
+    const ambient = uploadsAt(gl, uniforms.get("ambientLight"))[0] as number[];
+    // Uploaded through a Float32Array scratch, so compare at f32 precision.
+    expect(ambient.map((v) => Math.fround(v))).toEqual(
+      [0.2, 0.3, 0.4].map((v) => Math.fround(v)),
+    );
+    expect(uploadsAt(gl, uniforms.get("jointMatrices[0]"))).toHaveLength(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("latches a compile failure: one warning, no draw, no retry", async () => {
+    registerSkinningPipeline();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // Program 8 is the first skinned compile (7 at initialize).
+      const { renderer, gl, camera } = await initialized({ failProgramAt: 8 });
+      const { root } = skinnedScene();
+      const views = [createView(camera)];
+      gl.reset();
+
+      renderer.render(root, views);
+      renderer.render(root, views);
+
+      // Asked once, refused once, never asked again (§61: no throw escaped).
+      expect(gl.countOf("createProgram")).toBe(1);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("failed to compile");
+    } finally {
+      warn.mockRestore();
+      resetDevWarnings();
+    }
+  });
+
+  it("drops the pair on context loss and recompiles lazily after restore", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, canvas, camera } = await initialized();
+    const { root } = skinnedScene();
+    const views = [createView(camera)];
+    renderer.render(root, views);
+
+    canvas.dispatch("webglcontextlost");
+    gl.reset();
+    canvas.dispatch("webglcontextrestored");
+    // The restore rebuilds the seven eager programs only — the skinned pair
+    // waits for the next skinned draw.
+    expect(gl.countOf("createProgram")).toBe(7);
+
+    gl.reset();
+    renderer.render(root, views);
+    expect(gl.countOf("createProgram")).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("disposes the compiled pair with the renderer (§83)", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const { root } = skinnedScene();
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.dispose();
+
+    // Seven eager programs plus the skinned pair.
+    expect(gl.countOf("deleteProgram")).toBe(9);
+  });
+
+  it("excludes skinned casters from the §69 shadow pass (bind pose)", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = new AmbientRoot([0.1, 0.1, 0.1]);
+    const light = new TestShadowLight(8);
+    const caster = litRenderable();
+    const skinned = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    skinned.skeleton = new TestSkeleton();
+    root.add(light, caster, skinned);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // One caster in the map — the unskinned one. A skinned caster would cast
+    // its bind pose, which is a different picture.
+    const shadowModel = shadowUniforms(gl).get("model");
+    expect(uploadsAt(gl, shadowModel)).toHaveLength(1);
+    // The skinned draw itself still happened, in the colour pass.
+    expect(
+      uploadsAt(gl, skinnedLitUniforms(gl).get("jointMatrices[0]")),
+    ).toHaveLength(1);
+  });
+});
+
+describe("skinned draws — textures and feature mirrors (RFC 0003, R-19)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("binds a skinned-unlit material's map and mirrors the switches", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture().asTexture;
+    material.vertexColors = true;
+    const node = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      material.asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    // A second, untextured skinned draw after it: the unit stays active and
+    // the switches mirror back off.
+    const plainMaterial = new TestMaterial();
+    const plain = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      plainMaterial.asMaterial,
+    );
+    plain.skeleton = new TestSkeleton();
+    root.add(node, plain);
+    const views = [createView(camera)];
+    gl.reset();
+
+    renderer.render(root, views);
+
+    // One activeTexture for the map unit, one bind for the one texture.
+    expect(gl.countOf("activeTexture")).toBe(1);
+    const uniforms = skinnedUnlitUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1, 0]);
+    expect(uploadsAt(gl, uniforms.get("useVertexColors"))).toEqual([1, 0]);
+    expect(gl.countOf("drawArrays")).toBe(2);
+
+    // A second frame re-binds the map on the already-active unit — the
+    // sampler is uploaded once for the program's life.
+    gl.reset();
+    renderer.render(root, views);
+    const sampler = uploadsAt(gl, uniforms.get("map"));
+    expect(sampler).toEqual([]);
+  });
+
+  it("binds a skinned-lit material's map, and drops a disposed one's draw", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    const texture = new TestTexture();
+    material.map = texture.asTexture;
+    const node = new SkinnedTestNode(
+      skinnedGeometry().asGeometry,
+      material.asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    root.add(node);
+    const views = [createView(camera)];
+    gl.reset();
+
+    renderer.render(root, views);
+    const uniforms = skinnedLitUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([1]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+
+    // A disposed map degrades the draw to untextured — §83's rule, exactly as
+    // the lit pipeline treats it (a texture the cache cannot resolve).
+    texture.dispose();
+    gl.reset();
+    renderer.render(root, views);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([0]);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+});
+
+describe("skinned program mirrors — the sampler uploads once", () => {
+  it("re-raising useMap after a drop does not re-upload the unit (unlit)", () => {
+    const gl = createFakeGl();
+    const program = SkinnedUnlitProgram.create(gl);
+    program.use();
+    program.setFeatures(true, false);
+    program.setFeatures(false, false);
+    program.setFeatures(true, false);
+    const sampler = uploadsAt(gl, skinnedUnlitUniforms(gl).get("map"));
+    expect(sampler).toEqual([0]);
+    // The vertex-colour switch moves independently of the map switch.
+    program.setFeatures(true, true);
+    expect(
+      uploadsAt(gl, skinnedUnlitUniforms(gl).get("useVertexColors")),
+    ).toEqual([1]);
+  });
+
+  it("re-raising useMap after a drop does not re-upload the unit (lit)", () => {
+    const gl = createFakeGl();
+    const program = SkinnedLitProgram.create(gl);
+    program.use();
+    expect(program.disposed).toBe(false);
+    program.setFeatures(true);
+    program.setFeatures(false);
+    program.setFeatures(true);
+    const sampler = uploadsAt(gl, skinnedLitUniforms(gl).get("map"));
+    expect(sampler).toEqual([0]);
+    program.dispose();
+    expect(program.disposed).toBe(true);
+  });
+});
+
+describe("GeometryCache — the joint buffer's own failure path (§83)", () => {
+  it("abandons the upload when the joint buffer will not allocate", () => {
+    const gl = createFakeGl();
+    let created = 0;
+    const original = gl.createBuffer.bind(gl);
+    gl.createBuffer = () => {
+      created += 1;
+      // 1 position, 2 joints — fail the joints allocation itself.
+      return created === 2 ? null : original();
+    };
+    const cache = new GeometryCache(gl);
+    expect(cache.acquire(skinnedGeometry().asGeometry)).toBeNull();
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+  });
+});
+
+describe("skinned draws — indexed geometry, statistics, disposed skips", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredSkinningPipeline();
+  });
+
+  it("draws an indexed skinned geometry through drawElements and counts it", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const geometry = quadGeometry();
+    geometry.joints = new Uint16Array(16);
+    geometry.weights = new Float32Array(16);
+    for (let i = 0; i < 4; i += 1) {
+      geometry.weights[i * 4] = 1;
+    }
+    const node = new SkinnedTestNode(
+      geometry.asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    root.add(node);
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.countOf("drawElements")).toBe(1);
+    // §84: one submitted draw, two triangles, one instance.
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("skips a skinned draw with nothing to draw (§83's empty geometry)", async () => {
+    registerSkinningPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    // Zero vertices carrying (empty) influence streams: the render list still
+    // classifies the draw skinned, and the geometry cache answers "nothing to
+    // draw" — the same skip a disposed geometry takes, after the pipeline
+    // resolution rather than before it.
+    const geometry = new TestGeometry(new Float32Array(0));
+    geometry.joints = new Uint16Array(0);
+    geometry.weights = new Float32Array(0);
+    const node = new SkinnedTestNode(
+      geometry.asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    node.skeleton = new TestSkeleton();
+    root.add(node);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §60 — node materials (RFC 0001, 2026-08-28).
+// ---------------------------------------------------------------------------
+
+let nextTestNodeMaterialId = 0;
+
+/**
+ * A `NodeMaterial` reduced to what the backend reads (§57, §60): the `kind`
+ * discriminant the render list branches on, the frozen graph the program
+ * cache keys on, and the per-name uniform/texture reads the draw uploads.
+ * Same technique, same reason, as every double above — and what proves the
+ * backend reads nothing outside the structural surface.
+ */
+class TestNodeMaterial {
+  readonly kind = "node" as const;
+
+  readonly id: string;
+
+  readonly graph: ShaderGraph;
+
+  opacity?: number;
+
+  transparent?: boolean;
+
+  /** Bound textures by sampler name; unset names read as `null`. */
+  readonly textures = new Map<string, TestTexture | null>();
+
+  /** Uniform values by name; unset names read as zeroed vec4s. */
+  readonly uniforms = new Map<string, Float32Array>();
+
+  constructor(graph: ShaderGraph) {
+    nextTestNodeMaterialId += 1;
+    this.id = `test-node-material-${String(nextTestNodeMaterialId)}`;
+    this.graph = graph;
+  }
+
+  getUniform(name: string): Float32Array {
+    return this.uniforms.get(name) ?? new Float32Array(4);
+  }
+
+  getTexture(name: string): TestTexture | null {
+    return this.textures.get(name) ?? null;
+  }
+
+  get asMaterial(): NodeItemMaterial {
+    return this as unknown as NodeItemMaterial;
+  }
+}
+
+/** A constant-colour surface graph — no samplers, no uniforms, no time. */
+function flatNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [{ kind: "constant", type: "vec4", value: [1, 0, 0, 1] }],
+    color: 0,
+  };
+}
+
+/** A surface graph sampling one texture named `map` over the uv stream. */
+function texturedNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [
+      { kind: "attribute", name: "uv" },
+      { kind: "texture", name: "map", uv: 0 },
+    ],
+    color: 1,
+  };
+}
+
+/** A surface graph whose colour pulses with §9 render time. */
+function timedNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [
+      { kind: "time" },
+      { kind: "compose", type: "vec4", parts: [0, 0, 0, 0] },
+    ],
+    color: 1,
+  };
+}
+
+/** A displaced surface graph — the §69 caster exclusion's subject. */
+function displacedNodeGraph(): ShaderGraph {
+  return {
+    domain: "surface",
+    nodes: [
+      { kind: "constant", type: "vec3", value: [0, 1, 0] },
+      { kind: "constant", type: "vec4", value: [0, 1, 0, 1] },
+    ],
+    color: 1,
+    positionOffset: 0,
+  };
+}
+
+/** A screen graph copying `source`, optionally scaled by a uniform. */
+function screenNodeGraph(withUniform = false): ShaderGraph {
+  const nodes: ShaderGraph["nodes"] = withUniform
+    ? [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+        { kind: "uniform", type: "float", name: "gain" },
+        { kind: "binary", op: "multiply", left: 1, right: 2 },
+      ]
+    : [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+      ];
+  return { domain: "screen", nodes, color: nodes.length - 1 };
+}
+
+/** A node-material renderable over `geometry`. */
+function nodeRenderable(
+  material: TestNodeMaterial,
+  geometry: TestGeometry = triangleGeometry(),
+): Renderable<NodeItemMaterial> {
+  return new Renderable(geometry.asGeometry, material.asMaterial);
+}
+
+/** The node program's uniform handles — `spriteUniforms`' pattern. */
+function nodeUniforms(gl: FakeGl): Map<string, object> {
+  for (const perProgram of gl.uniformsByProgram.values()) {
+    if (perProgram.has("opacity")) {
+      return perProgram;
+    }
+  }
+  throw new Error("the node program never resolved its uniforms");
+}
+
+describe("WebglRenderer — §60 node materials (RFC 0001)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredNodeMaterialPipeline();
+  });
+
+  it("skips an unregistered node draw — absent, never flat-coloured", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      const withoutNode = gl.calls.map((call) => call.name).join("|");
+
+      const rig = await initialized();
+      const rigRoot = createRoot();
+      rigRoot.add(renderable(triangleGeometry()));
+      rigRoot.add(nodeRenderable(new TestNodeMaterial(flatNodeGraph())));
+      rig.gl.reset();
+      rig.renderer.render(rigRoot, [createView(rig.camera)]);
+
+      expect(rig.gl.calls.map((call) => call.name).join("|")).toBe(withoutNode);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        "registerNodeMaterialPipeline",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("compiles one program per graph structure on the first draw, shared by materials", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+    );
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    // Two materials, structurally one graph: exactly one new program, one
+    // `useProgram` switch onto it, two draws.
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(statistics.drawCalls).toBe(2);
+    expect(gl.countOf("drawArrays")).toBe(2);
+
+    // The next frame compiles nothing further.
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("createProgram")).toBe(0);
+  });
+
+  it("uploads view state once per view per program, and per-draw state per draw", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph())),
+    );
+    gl.reset();
+    renderer.render(root, [
+      createView(camera),
+      createView(camera, { id: "second" }),
+    ]);
+
+    const uniforms = nodeUniforms(gl);
+    const viewUploads = uploadsAt(gl, uniforms.get("viewProjection"));
+    const modelUploadsList = uploadsAt(gl, uniforms.get("model"));
+    // Two views: two view-projection uploads; two draws per view: four models.
+    expect(viewUploads).toHaveLength(2);
+    expect(modelUploadsList).toHaveLength(4);
+    // Opacity: mirror starts at GL's 0, both materials report 1 — one upload.
+    expect(uploadsAt(gl, uniforms.get("opacity"))).toEqual([1]);
+  });
+
+  it("feeds §9 render time to a graph that reads it", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(nodeRenderable(new TestNodeMaterial(timedNodeGraph())));
+    renderer.renderTime = 1.25;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    const uniforms = nodeUniforms(gl);
+    expect(uploadsAt(gl, uniforms.get("time"))).toEqual([1.25]);
+  });
+
+  it("binds node textures above the fixed units and unbinds them in the finally", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const material = new TestNodeMaterial(texturedNodeGraph());
+    material.textures.set("map", new TestTexture(2, 2));
+    root.add(nodeRenderable(material));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    const nodeUnit = GL.TEXTURE0 + NODE_SURFACE_TEXTURE_UNIT_BASE;
+    const unitSelections = gl
+      .callsOf("activeTexture")
+      .map((call) => call.args[0]);
+    // Selected to bind, re-selected to unbind, ending back at unit 0.
+    expect(unitSelections).toEqual([
+      nodeUnit,
+      GL.TEXTURE0,
+      nodeUnit,
+      GL.TEXTURE0,
+    ]);
+    const binds = gl.callsOf("bindTexture");
+    expect(binds[binds.length - 1].args[1]).toBeNull();
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("skips a node draw whose sampler is unbound or disposed — nothing at all", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      registerNodeMaterialPipeline();
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      const unbound = new TestNodeMaterial(texturedNodeGraph());
+      const disposed = new TestNodeMaterial(texturedNodeGraph());
+      const gone = new TestTexture(2, 2);
+      gone.disposed = true;
+      disposed.textures.set("map", gone);
+      root.add(nodeRenderable(unbound), nodeRenderable(disposed));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(gl.countOf("bufferData")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(2);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("skips a node draw whose graph the cache refused, with one warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      registerNodeMaterialPipeline();
+      const { renderer, gl, camera } = await initialized();
+      const root = createRoot();
+      const broken: ShaderGraph = { domain: "surface", nodes: [], color: 0 };
+      root.add(nodeRenderable(new TestNodeMaterial(broken)));
+      gl.reset();
+      renderer.render(root, [createView(camera)]);
+      renderer.render(root, [createView(camera)]);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("draws an indexed node geometry through drawElements", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(new TestNodeMaterial(flatNodeGraph()), quadGeometry()),
+    );
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("drawElements")).toBe(1);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("skips a node draw with nothing to draw (§83's empty geometry)", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(
+      nodeRenderable(
+        new TestNodeMaterial(flatNodeGraph()),
+        new TestGeometry(new Float32Array(0)),
+      ),
+    );
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("drawArrays")).toBe(0);
+    expect(gl.countOf("drawElements")).toBe(0);
+  });
+
+  it("drops the cache on context loss and dispose", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera, canvas } = await initialized();
+    const root = createRoot();
+    root.add(nodeRenderable(new TestNodeMaterial(flatNodeGraph())));
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("deleteProgram")).toBe(0);
+
+    canvas.dispatch("webglcontextlost");
+    canvas.dispatch("webglcontextrestored");
+    gl.reset();
+    // The next node frame recreates the cache and recompiles the graph.
+    renderer.render(root, [createView(camera)]);
+    expect(gl.countOf("createProgram")).toBe(1);
+
+    gl.reset();
+    renderer.dispose();
+    // Eight eager programs (7 pipelines + restore already counted) — assert
+    // only that the node program's delete is among them.
+    expect(gl.countOf("deleteProgram")).toBeGreaterThanOrEqual(8);
+  });
+
+  it("a displaced node material casts nothing; an undisplaced one casts exactly (§69)", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(new TestShadowLight());
+    const lit = new Renderable(
+      triangleGeometry().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    root.add(lit);
+    root.add(nodeRenderable(new TestNodeMaterial(flatNodeGraph())));
+    root.add(nodeRenderable(new TestNodeMaterial(displacedNodeGraph())));
+    gl.reset();
+    renderer.render(root, [createView(camera)]);
+
+    // The caster pass drew the lit triangle and the undisplaced node mesh:
+    // two model uploads through the shadow program, never a third.
+    const casters = uploadsAt(gl, shadowUniforms(gl).get("model"));
+    expect(casters).toHaveLength(2);
+    // Both node materials still drew in the colour pass (3 surface draws +
+    // 2 caster draws).
+    expect(gl.countOf("drawArrays")).toBe(5);
+  });
+});
+
+describe("WebglRenderer.renderEffect — §70 graph effects (§60; RFC 0001)", () => {
+  beforeEach(() => {
+    resetDevWarnings();
+    clearRegisteredNodeMaterialPipeline();
+  });
+
+  /** A pass over a fresh 8×8 source, with `effect` and an optional target. */
+  function graphPass(
+    effect: GraphEffect,
+    destination?: RenderTarget,
+  ): { pass: EffectRenderPass; source: RenderTarget } {
+    const source = new RenderTarget({ width: 8, height: 8 });
+    return {
+      pass: {
+        kind: "effect",
+        source: source.colorTexture,
+        effect,
+        ...(destination === undefined ? {} : { target: destination }),
+      },
+      source,
+    };
+  }
+
+  it("skips silently while nothing is registered, warning once", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { renderer, gl } = await initialized();
+      const { pass } = graphPass({ kind: "graph", graph: screenNodeGraph() });
+      gl.reset();
+      renderer.renderEffect(pass);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("draws the full-screen triangle over the source, on and off screen", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl } = await initialized();
+    const destination = new RenderTarget({ width: 4, height: 4 });
+    const { pass } = graphPass(
+      { kind: "graph", graph: screenNodeGraph() },
+      destination,
+    );
+    gl.reset();
+    renderer.renderEffect(pass);
+    // One compile, one framebuffer bind + unbind, the destination's whole
+    // rectangle, one triangle, and the source bound at unit 0 then released.
+    expect(gl.countOf("createProgram")).toBe(1);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    const scissor = gl.callsOf("scissor")[0];
+    expect(scissor.args).toEqual([0, 0, 4, 4]);
+    const frameBinds = gl.callsOf("bindFramebuffer");
+    expect(frameBinds[frameBinds.length - 1].args[1]).toBeNull();
+    const unitSelections = gl
+      .callsOf("activeTexture")
+      .map((call) => call.args[0]);
+    expect(unitSelections).toEqual([GL.TEXTURE0, GL.TEXTURE0]);
+
+    // On screen: once the source's framebuffer is cached, no framebuffer
+    // call at all — and the compiled program is reused for the structurally
+    // identical graph.
+    const onScreen = graphPass({ kind: "graph", graph: screenNodeGraph() });
+    renderer.renderEffect(onScreen.pass); // warms the source's record
+    gl.reset();
+    renderer.renderEffect(onScreen.pass);
+    expect(gl.countOf("createProgram")).toBe(0);
+    expect(gl.countOf("bindFramebuffer")).toBe(0);
+    expect(gl.countOf("drawArrays")).toBe(1);
+  });
+
+  it("uploads pass uniforms — scalars and arrays — and §9 render time", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl } = await initialized();
+    const graph: ShaderGraph = {
+      domain: "screen",
+      nodes: [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+        { kind: "uniform", type: "float", name: "gain" },
+        { kind: "uniform", type: "vec4", name: "tint" },
+        { kind: "time" },
+        { kind: "binary", op: "multiply", left: 1, right: 2 },
+        { kind: "binary", op: "multiply", left: 5, right: 3 },
+        { kind: "binary", op: "multiply", left: 6, right: 4 },
+      ],
+      color: 7,
+    };
+    renderer.renderTime = 0.5;
+    const { pass } = graphPass({
+      kind: "graph",
+      graph,
+      uniforms: { tint: [1, 2, 3, 4], gain: 2 },
+    });
+    gl.reset();
+    renderer.renderEffect(pass);
+    // A screen program has no `opacity`; find it by its own uniform.
+    let uniforms: Map<string, object> | undefined;
+    for (const perProgram of gl.uniformsByProgram.values()) {
+      if (perProgram.has("u_gain")) {
+        uniforms = perProgram;
+      }
+    }
+    if (uniforms === undefined) {
+      throw new Error("the graph-effect program never resolved its uniforms");
+    }
+    expect(uploadsAt(gl, uniforms.get("u_gain"))).toEqual([2]);
+    expect(uploadsAt(gl, uniforms.get("u_tint"))).toEqual([[1, 2, 3, 4]]);
+    expect(uploadsAt(gl, uniforms.get("time"))).toEqual([0.5]);
+    // §84: the triangle counted as one submitted draw.
+    const statistics = createRenderStatistics();
+    renderer.statistics = statistics;
+    renderer.renderEffect(pass);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+  });
+
+  it("resolves declared extra inputs and refuses a feedback loop through one", async () => {
+    registerNodeMaterialPipeline();
+    const { renderer, gl } = await initialized();
+    const noise = new RenderTarget({ width: 8, height: 8 });
+    const graph: ShaderGraph = {
+      domain: "screen",
+      nodes: [
+        { kind: "attribute", name: "uv" },
+        { kind: "texture", name: "source", uv: 0 },
+        { kind: "texture", name: "noise", uv: 0 },
+        { kind: "binary", op: "add", left: 1, right: 2 },
+      ],
+      color: 3,
+    };
+    const good = graphPass({
+      kind: "graph",
+      graph,
+      textures: { noise: noise.colorTexture },
+    });
+    gl.reset();
+    renderer.renderEffect(good.pass);
+    expect(gl.countOf("drawArrays")).toBe(1);
+    // Two samplers: units 0 and 1, bound then unbound in reverse.
+    const unitSelections = gl
+      .callsOf("activeTexture")
+      .map((call) => call.args[0]);
+    expect(unitSelections).toEqual([
+      GL.TEXTURE0,
+      GL.TEXTURE0 + 1,
+      GL.TEXTURE0 + 1,
+      GL.TEXTURE0,
+    ]);
+
+    // The same pass aimed *at* its own extra input: skipped before any state.
+    const feedback = graphPass(
+      { kind: "graph", graph, textures: { noise: noise.colorTexture } },
+      noise,
+    );
+    gl.reset();
+    renderer.renderEffect(feedback.pass);
+    expect(gl.countOf("drawArrays")).toBe(0);
+
+    // A sampler the pass never declared: skipped too.
+    const undeclared = graphPass({ kind: "graph", graph });
+    gl.reset();
+    renderer.renderEffect(undeclared.pass);
+    expect(gl.countOf("drawArrays")).toBe(0);
+
+    // A declared input that is not a render-target texture (a caller that
+    // bypassed validation): skipped structurally, like the fixed path's
+    // source check.
+    const wrongKind = graphPass({
+      kind: "graph",
+      graph,
+      textures: { noise: {} as never },
+    });
+    gl.reset();
+    renderer.renderEffect(wrongKind.pass);
+    expect(gl.countOf("drawArrays")).toBe(0);
+  });
+
+  it("skips a graph the cache latched as failed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      registerNodeMaterialPipeline();
+      const { renderer, gl } = await initialized();
+      const broken: ShaderGraph = { domain: "screen", nodes: [], color: 0 };
+      const { pass } = graphPass({ kind: "graph", graph: broken });
+      gl.reset();
+      renderer.renderEffect(pass);
+      expect(gl.countOf("drawArrays")).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §71's picking service seam (RFC 0005) — the renderer's half: the gated
+// factory method and the live host window it opens. The service's own pass
+// and read-back live in `gl-picking.test.ts`.
+// ---------------------------------------------------------------------------
+
+describe("WebglRenderer.createPickingService (§71, RFC 0005)", () => {
+  it("refuses when no picking pipeline is registered (§85)", async () => {
+    clearRegisteredPickingPipeline();
+    const { renderer } = await initialized();
+    const error = thrown(() => renderer.createPickingService());
+    expect(error.code).toBe("INVALID_APPLICATION_STATE");
+    expect(String(error.message)).toContain("registerPickingPipeline");
+  });
+
+  it("refuses on a disposed renderer (§83)", async () => {
+    registerPickingPipeline();
+    try {
+      const { renderer } = await initialized();
+      renderer.dispose();
+      const error = thrown(() => renderer.createPickingService());
+      expect(error.code).toBe("INVALID_APPLICATION_STATE");
+    } finally {
+      clearRegisteredPickingPipeline();
+    }
+  });
+
+  it("builds a service whose host window tracks the live renderer state", async () => {
+    registerPickingPipeline();
+    try {
+      const { renderer, gl, camera } = await initialized();
+      renderer.resize(8, 8);
+      const service = renderer.createPickingService();
+      expect(service).toBeInstanceOf(WebglPickingService);
+      // Creation alone issues no GL call (the lazy-compile contract).
+      const before = gl.calls.length;
+      expect(gl.calls.length).toBe(before);
+
+      // The host's surface size and caches are live: an update over the
+      // renderer's own context compiles the id program and draws through
+      // the renderer's geometry cache.
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      const view = createView(camera);
+      camera.projectionMatrix.identity();
+      camera.viewMatrix.identity();
+      service.update(root, view);
+      expect(gl.countOf("drawArrays")).toBeGreaterThan(0);
+
+      // The fake context predates the optional read-back group, and
+      // presence is the capability (§62): the pick refuses by name.
+      const error = await rejection(
+        service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
+      );
+      expect(error.code).toBe("UNSUPPORTED_GPU_FEATURE");
+
+      // Disposal under a live renderer releases through the shared caches.
+      service.dispose();
+      expect(service.disposed).toBe(true);
+    } finally {
+      clearRegisteredPickingPipeline();
+    }
+  });
+
+  it("hands the service a lost-context view of the renderer (§61)", async () => {
+    registerPickingPipeline();
+    try {
+      const { renderer, gl, canvas, camera } = await initialized();
+      renderer.resize(8, 8);
+      const service = renderer.createPickingService();
+      const root = createRoot();
+      root.add(renderable(triangleGeometry()));
+      const view = createView(camera);
+      service.update(root, view);
+      const drawsBefore = gl.countOf("drawArrays");
+
+      canvas.dispatch("webglcontextlost");
+      // The standing buffer did not survive the loss the host reports.
+      const lost = await rejection(
+        service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
+      );
+      expect(lost.code).toBe("CONTEXT_LOST");
+      // A pass attempted while lost is skipped and drops the stale buffer,
+      // so the refusal becomes "no id buffer" rather than a stale answer.
+      service.update(root, view);
+      expect(gl.countOf("drawArrays")).toBe(drawsBefore);
+      const noBuffer = await rejection(
+        service.pick({ viewport: view, ndcX: 0, ndcY: 0 }),
+      );
+      expect(noBuffer.code).toBe("INVALID_APPLICATION_STATE");
+    } finally {
+      clearRegisteredPickingPipeline();
+    }
   });
 });

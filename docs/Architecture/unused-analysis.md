@@ -1,6 +1,6 @@
 # Unused Files and Exports Analysis
 
-**Generated**: 2026-08-21
+**Generated**: 2026-08-29
 
 ## Summary
 
@@ -8,9 +8,9 @@
 - **Dormant files** (runtime code on disk, unreachable from any entry/build root): 0
   - **Orphaned (reachable from nothing — delete/wire candidates)**: 0
   - **Test-only (exercised by a test, ships nothing)**: 0
-- **Potentially unused exports**: 1
+- **Potentially unused exports**: 2
   - **Unreferenced anywhere (deletion candidates)**: 0
-  - **Referenced in-module (type contracts / helpers backing live exports)**: 1
+  - **Referenced in-module (type contracts / helpers backing live exports)**: 2
 
 ## Dormant Files — Orphaned (delete/wire candidates)
 
@@ -45,6 +45,10 @@ parser can't see (dynamic access, docs examples, published-API contract) before 
 Not imported cross-file, but referenced within their own module — they type or
 support exports that ARE used, so they cannot be deleted in isolation. Mostly
 interfaces typing live guards and per-package API completeness, not rot.
+
+### `packages/four/src/scene-serializers.ts`
+
+- `CANVAS_VIEW_NODE_TYPE` (constant) — 3 in-file refs
 
 ### `packages/geometry/src/geometry.ts`
 

@@ -211,7 +211,27 @@ const GATED: ReadonlyMap<string, string> = new Map([
   ],
   [
     join("packages", "render", "src", "render-list.ts"),
-    "§85's layer-mask refusal (R-38). Refusal only: a well-formed mask — the only kind `layerMask()` can build — passes the check untouched, so the list, its order, and every item in it are identical either way. What the guard drops is the *diagnostic* for a `NaN` or fractional mask, which a production build answers with the empty view it would have drawn anyway. `@four/scene`'s `assertLayerMask` is unconditional, because §33 forbids that package from branching on the build mode at all; this is the render tier's copy of the call, gated because it costs ~115 B gzip in every shipped bundle",
+    "§85's layer-mask refusal (R-38). Refusal only: a well-formed mask — the only kind `layerMask()` can build — passes the check untouched, so the list, its order, and every item in it are identical either way. What the guard drops is the *diagnostic* for a `NaN` or fractional mask, which a production build answers with the empty view it would have drawn anyway. `@four/scene`'s `assertLayerMask` is unconditional, because §33 forbids that package from branching on the build mode at all; this is the render tier's copy of the call, gated because it costs ~115 B gzip in every shipped bundle. R-23 (2026-08-28) added §67's clip-on-a-non-drawable warning under the same rule: the clip is inert in both builds — the subtree is not narrowed either way — and only the message moves with the flag",
+  ],
+  [
+    join("packages", "render", "src", "clip.ts"),
+    "§67's plane-exhaustion diagnostic (R-23, 2026-08-28). Message only: `allocate` returns `null` for the ninth clip in both builds — the over-limit clip is dropped and its subtree keeps the eight that fit, identically, whatever the flag says — so the list, its order, its stencil records, and every GL call derived from them are the same either way. If the gated block never ran, no number the engine computes would change; what the guard drops is the console.warn naming the first refused clip",
+  ],
+  [
+    join("packages", "render-webgl", "src", "webgl-renderer.ts"),
+    "§67's clip-without-a-stencil-buffer warning (R-23, 2026-08-28). Diagnostic only, and O(1): mask draws sort to the head of the frame list, so the check is one read of the first item, issues no GL call, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, which is the same fail-toward-drawing behaviour the warning describes. RFC 0001 (2026-08-28) added two §60 warnings under the same rule: the unregistered-node-pipeline notice and the unresolvable-node-texture notice — in both builds the draw is skipped identically (absence, never a flat-coloured stand-in), and only the message naming the fix moves with the flag",
+  ],
+  [
+    join("packages", "render-webgpu", "src", "webgpu-renderer.ts"),
+    "§67's clip-into-a-stencil-less-render-target warning (WP-R1.6, 2026-08-28) — the WebGPU restatement of the GL entry above, reachable only off screen (the on-screen attachment always widens to carry stencil). Diagnostic only, and O(1): the check is one read of the frame's first item beside the target record's `stencil` flag, records no command, and writes no value any later code reads — a production build draws the identical (unclipped) frame silently, the same fail-toward-drawing behaviour the warning describes. Rendering is outside the §33 envelope regardless; nothing a frame draws re-enters simulation state (§42/§43)",
+  ],
+  [
+    join("packages", "render-webgl", "src", "gl-picking.ts"),
+    "§71's id-program compile-failure notice (RFC 0005, 2026-08-28). Message only: the failure is latched per context era in both builds — picking passes are skipped identically, and `pick` refuses identically for want of an id buffer — and only the console.warn carrying §89's log moves with the flag. Picking is outside the §33 envelope regardless: a pick is a §34 *input*, its result never enters a checksum, and nothing an id pass draws re-enters simulation state (§42/§43)",
+  ],
+  [
+    join("packages", "render-webgl", "src", "gl-node-program.ts"),
+    "§60's per-graph compile-failure notice (RFC 0001, 2026-08-28). Message only: the cache latches the failed graph `null` in both builds — its draws are skipped identically, the latch is the behaviour and it is unconditional — and only the console.warn carrying §89's log moves with the flag. Rendering is outside the §33 envelope regardless; nothing a shader draws re-enters simulation state (§42/§43)",
   ],
 ]);
 

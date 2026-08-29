@@ -435,6 +435,135 @@ describe("BufferGeometry", () => {
     });
   });
 
+  describe("joints and weights (§53, §54; RFC 0003)", () => {
+    /** Four influences per triangle() vertex. */
+    function triangleJoints(): Uint16Array {
+      return new Uint16Array([0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0]);
+    }
+
+    function triangleWeights(): Float32Array {
+      return new Float32Array([1, 0, 0, 0, 0.5, 0.5, 0, 0, 0.25, 0.75, 0, 0]);
+    }
+
+    it("are optional and default to undefined", () => {
+      const geometry = new BufferGeometry({ positions: triangle() });
+      expect(geometry.joints).toBeUndefined();
+      expect(geometry.weights).toBeUndefined();
+    });
+
+    it("are accepted at construction and held by reference", () => {
+      const joints = triangleJoints();
+      const weights = triangleWeights();
+      const geometry = new BufferGeometry({
+        positions: triangle(),
+        joints,
+        weights,
+      });
+      expect(geometry.joints).toBe(joints);
+      expect(geometry.weights).toBe(weights);
+      expect(geometry.version).toBe(0);
+    });
+
+    it("rejects joints and weights that are not four per vertex", () => {
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            joints: new Uint16Array([0, 1, 2]),
+          }),
+      ).toThrow(/index-aligned/);
+      expect(
+        () =>
+          new BufferGeometry({
+            positions: triangle(),
+            weights: new Float32Array([1, 0, 0]),
+          }),
+      ).toThrow(/index-aligned/);
+    });
+
+    it("rejects non-finite weights, and never re-checks integer joints", () => {
+      const weights = triangleWeights();
+      weights[5] = Number.NaN;
+      expect(
+        () => new BufferGeometry({ positions: triangle(), weights }),
+      ).toThrow(/must be finite/);
+      // A Uint16Array cannot carry a non-finite value; the finiteness pass is
+      // skipped rather than run for show, so this simply constructs.
+      expect(
+        new BufferGeometry({
+          positions: triangle(),
+          joints: triangleJoints(),
+        }).joints,
+      ).toBeDefined();
+    });
+
+    it("does not renormalize weights — the sum is the author's contract", () => {
+      const weights = new Float32Array([
+        2, 0, 0, 0, 0.1, 0.1, 0, 0, 0, 0, 0, 0,
+      ]);
+      const geometry = new BufferGeometry({ positions: triangle(), weights });
+      expect(geometry.weights).toBe(weights);
+      expect(geometry.weights?.[0]).toBe(2);
+    });
+
+    it("validates and bumps the version through both setters", () => {
+      const geometry = new BufferGeometry({ positions: triangle() });
+
+      geometry.joints = triangleJoints();
+      expect(geometry.version).toBe(1);
+      geometry.weights = triangleWeights();
+      expect(geometry.version).toBe(2);
+
+      geometry.joints = undefined;
+      geometry.weights = undefined;
+      expect(geometry.joints).toBeUndefined();
+      expect(geometry.weights).toBeUndefined();
+      expect(geometry.version).toBe(4);
+
+      expect(() => {
+        geometry.joints = new Uint16Array([0]);
+      }).toThrow(RangeError);
+      expect(() => {
+        geometry.weights = new Float32Array([1]);
+      }).toThrow(RangeError);
+      expect(geometry.version).toBe(4);
+    });
+
+    it("pins positions to the same vertex count while either is present", () => {
+      const geometry = new BufferGeometry({
+        positions: triangle(),
+        joints: triangleJoints(),
+        weights: triangleWeights(),
+      });
+      expect(() => {
+        geometry.positions = new Float32Array(18);
+      }).toThrow(/index-aligned/);
+    });
+
+    it("counts into byteLength, clones deep, and dies with dispose (§83)", () => {
+      const geometry = new BufferGeometry({
+        positions: triangle(),
+        joints: triangleJoints(),
+        weights: triangleWeights(),
+      });
+      // 9 position floats + 12 weights floats at 4 bytes, + 12 uint16 joints.
+      expect(geometry.byteLength).toBe(9 * 4 + 12 * 4 + 12 * 2);
+
+      const clone = geometry.clone();
+      expect(clone.joints).not.toBe(geometry.joints);
+      expect(Array.from(clone.joints ?? [])).toEqual(
+        Array.from(geometry.joints ?? []),
+      );
+      expect(clone.weights).not.toBe(geometry.weights);
+
+      geometry.dispose();
+      expect(geometry.joints).toBeUndefined();
+      expect(geometry.weights).toBeUndefined();
+      expect(geometry.byteLength).toBe(0);
+      clone.dispose();
+    });
+  });
+
   describe("bounds", () => {
     it("computes the axis-aligned box of the positions", () => {
       const geometry = new BufferGeometry({

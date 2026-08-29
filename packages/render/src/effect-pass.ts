@@ -67,7 +67,7 @@
  * | screen-space ambient occlusion      | **staged** — samplable depth *and* normals: MRT plus depth textures, both above                                                                                                                                                           |
  * | outlines and selection highlighting | **staged** — needs a §71 GPU identifier buffer, a depth/normal edge pass, or §67's stencil (R-7). Named in the gap analysis as R-6's most-wanted consumer, and honestly still blocked on one of those three                                |
  * | distortion                          | **staged** — a screen-space displacement samples a second input (a flow map or a normal buffer); a pass here carries exactly one {@link EffectRenderPass.source}                                                                           |
- * | custom full-screen passes           | **staged deliberately** — user-authored shader source is R-14's RFC (§60), which the `custom-shaders.md` guide already scopes and which §96 constrains to a declarative form. {@link ScreenEffect} is a **closed union** so that widening it is that RFC's job and an unsupported request is a compile error today, not a silent no-op |
+ * | custom full-screen passes           | **shipped** (RFC 0001, 2026-08-28) — {@link GraphEffect}: a §60 shader graph in the `"screen"` domain, as data. The union stays closed; it gained one member whose payload is itself a closed structure, so `{ kind: "bloom" }` is still a compile error. No user shader *source* exists at any tier — that is the RFC's decision, made binding by spec revision 1.11 |
  * | "composable per viewport"           | **partial** — composition is per *pass*: a chain of effect passes ping-ponging between two targets composes freely, and a per-viewport chain is expressible by giving each viewport its own target. A per-viewport *rectangle* inside one effect pass is not: an effect covers its whole destination surface (see {@link EffectRenderPass}) |
  *
  * ## The closed union is the point, not a placeholder
@@ -90,6 +90,12 @@
  * a hand-written `renderer.render` bypasses {@link RenderGraph.validate}, and
  * may call {@link validateEffectRenderPass} itself.
  */
+
+import {
+  SHADER_VALUE_COMPONENTS,
+  analyzeShaderGraph,
+  type ShaderGraph,
+} from "@four/materials";
 
 import type { RenderTarget, RenderTargetTexture } from "./render-target.js";
 import { isRenderTargetTexture } from "./render-target.js";
@@ -242,11 +248,70 @@ export const OUTPUT_TRANSFORM_EFFECT: OutputTransformEffect = Object.freeze({
 });
 
 /**
+ * §70's "custom full-screen passes", **as data** (§60; RFC 0001, R-14) — a
+ * shader graph in the `"screen"` domain over the pass's declared inputs.
+ *
+ * ```ts
+ * const screen = new ShaderGraphBuilder("screen");
+ * const texel = screen.sampler("source");
+ * screen.output.color = texel.multiply(screen.uniform("gain", "float"));
+ * graph.addPass("warm", {
+ *   kind: "effect",
+ *   source: sceneColor.colorTexture,
+ *   effect: { kind: "graph", graph: screen.graph(), uniforms: { gain: 1.2 } },
+ * });
+ * ```
+ *
+ * ## The graph keeps the pass checkable — the whole point
+ *
+ * A `texture` node names its sampler, and every name resolves against the
+ * pass's declared inputs: `"source"` is {@link EffectRenderPass.source}, and
+ * any other name must appear in {@link GraphEffect.textures}. **Every texture
+ * a graph samples is therefore enumerable from the pass**, which is what lets
+ * `RenderGraph.validate()` run its feedback and ordering checks over a graph
+ * effect exactly as over a built-in one — so a `GraphEffect` pass does *not*
+ * emit the `"opaque"` info issue a `CustomRenderPass` does. That asymmetry is
+ * R-5/R-6's recorded principle applied in the affirmative: the escape hatch
+ * reports its opacity because the graph cannot see inside it; a node graph
+ * does not, because the graph can. A shader *source string* is what would
+ * have destroyed this, and none exists at any tier (§96; RFC 0001).
+ *
+ * The graph must be `"screen"`-domain: it may read `"uv"` (the pass's own
+ * normalized coordinate), `uniform` nodes (valued per pass, below), `texture`
+ * nodes, and `time` (§9 render time) — and nothing of a mesh, which a
+ * full-screen pass does not have.
+ */
+export interface GraphEffect {
+  /** Required, and the only value — the discriminant. */
+  readonly kind: "graph";
+
+  /** The `"screen"`-domain §60 graph — validated at `addPass` (§85). */
+  readonly graph: ShaderGraph;
+
+  /**
+   * Values for the graph's `uniform` nodes, by name — the per-pass analogue
+   * of `NodeMaterial.setUniform`. Optional per uniform: an unset uniform
+   * reads as zeroes on every backend (GL's own initial value). Validated
+   * against the graph's reflection at `addPass` (§85).
+   */
+  readonly uniforms?: Readonly<Record<string, number | readonly number[]>>;
+
+  /**
+   * Additional sampled inputs, by the sampler names the graph uses —
+   * `EffectRenderPass.source` carries exactly one surface, and it is bound to
+   * the graph's `"source"` sampler; a graph naming more declares each here,
+   * which is precisely what keeps the pass's full sample set visible to
+   * `RenderGraph.validate()`.
+   */
+  readonly textures?: Readonly<Record<string, RenderTargetTexture>>;
+}
+
+/**
  * One §70 effect, as a closed discriminated union — see the module header for
  * why it is closed and what widening it means.
  */
 export type ScreenEffect =
-  CopyEffect | ColorGradeEffect | OutputTransformEffect;
+  CopyEffect | ColorGradeEffect | OutputTransformEffect | GraphEffect;
 
 /** {@link ScreenEffect}'s discriminant, for a caller switching over it. */
 export type ScreenEffectKind = ScreenEffect["kind"];
@@ -427,6 +492,107 @@ function validateOutputTransform(pass: EffectRenderPass): void {
 }
 
 /**
+ * Runs the §60/§85 checks for a {@link GraphEffect} pass: the graph is a
+ * valid `"screen"`-domain graph, every sampler it reaches is a declared input
+ * of the pass, every declared input is really a render-target texture (and is
+ * actually sampled), and every supplied uniform value names a reachable
+ * uniform with the right shape. Setup-time, like every other check here — a
+ * backend never validates inside a frame (§61) and skips, rather than draws,
+ * anything this would have refused.
+ */
+function validateGraphEffect(effect: GraphEffect): void {
+  const graph = effect.graph;
+  if (graph.domain !== "screen") {
+    throw new RangeError(
+      `A GraphEffect's graph must be "screen"-domain; got ` +
+        `${JSON.stringify(graph.domain)} — a full-screen pass has no mesh ` +
+        "(§60, §70, §85).",
+    );
+  }
+  // Throws on any §60 IR violation; what remains is the pass wiring.
+  const reflection = analyzeShaderGraph(graph).reflection;
+
+  const declared = effect.textures ?? {};
+  const sampled = new Set<string>();
+  for (const texture of reflection.textures) {
+    sampled.add(texture.name);
+    if (texture.name === "source") {
+      continue;
+    }
+    const input = declared[texture.name];
+    if (input === undefined) {
+      throw new RangeError(
+        `GraphEffect samples ${JSON.stringify(texture.name)}, which the pass ` +
+          'does not declare; "source" is the pass\'s source and every other ' +
+          "sampler needs an entry in effect.textures (§60, §70, §85).",
+      );
+    }
+    if (!isRenderTargetTexture(input)) {
+      throw new RangeError(
+        `GraphEffect input ${JSON.stringify(texture.name)} must be a ` +
+          "RenderTarget's colorTexture (§70, §85).",
+      );
+    }
+  }
+  // Sorted so the first refusal is a deterministic function of the pass, not
+  // of a record's key order (§33).
+  for (const name of Object.keys(declared).sort()) {
+    if (!sampled.has(name)) {
+      throw new RangeError(
+        `GraphEffect declares texture ${JSON.stringify(name)}, which the ` +
+          "graph never samples — an input nothing reads is an authoring " +
+          "mistake, not head-room (§85).",
+      );
+    }
+  }
+
+  const uniforms = effect.uniforms ?? {};
+  const uniformTypes = new Map(
+    reflection.uniforms.map((uniform) => [uniform.name, uniform.type] as const),
+  );
+  for (const name of Object.keys(uniforms).sort()) {
+    const type = uniformTypes.get(name);
+    if (type === undefined) {
+      throw new RangeError(
+        `GraphEffect values uniform ${JSON.stringify(name)}, which the graph ` +
+          "does not (reachably) declare (§60, §85).",
+      );
+    }
+    const value = uniforms[name];
+    const components = SHADER_VALUE_COMPONENTS[type];
+    if (typeof value === "number") {
+      if (components !== 1) {
+        throw new RangeError(
+          `GraphEffect uniform ${JSON.stringify(name)} is a ${type}; a ` +
+            "single number only fits a float (§85).",
+        );
+      }
+      if (!Number.isFinite(value)) {
+        throw new RangeError(
+          `GraphEffect uniform ${JSON.stringify(name)} must be finite; got ` +
+            `${String(value)} (§85).`,
+        );
+      }
+      continue;
+    }
+    if (value.length !== components) {
+      throw new RangeError(
+        `GraphEffect uniform ${JSON.stringify(name)} is a ${type} and needs ` +
+          `${String(components)} components; got ${String(value.length)} (§85).`,
+      );
+    }
+    for (const component of value) {
+      if (!Number.isFinite(component)) {
+        throw new RangeError(
+          `GraphEffect uniform ${JSON.stringify(name)} components must be ` +
+            `finite; got ${String(component)} (§85).`,
+        );
+      }
+    }
+  }
+}
+
+/**
  * Checks an {@link EffectRenderPass} against §85, throwing a `RangeError` on
  * the first violation and returning nothing when the pass is well formed.
  *
@@ -473,12 +639,15 @@ export function validateEffectRenderPass(pass: EffectRenderPass): void {
     case "output-transform":
       validateOutputTransform(pass);
       return;
+    case "graph":
+      validateGraphEffect(effect);
+      return;
     default:
       throw new RangeError(
         `Unknown ScreenEffect kind ${JSON.stringify(
           (effect as { kind: unknown }).kind,
-        )}; this tier ships "copy", "grade" and "output-transform" ` +
-          "(§70, §60a, §85).",
+        )}; this tier ships "copy", "grade", "output-transform" and "graph" ` +
+          "(§70, §60, §60a, §85).",
       );
   }
 }

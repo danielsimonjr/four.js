@@ -95,12 +95,13 @@
  * the next build into the same array.
  */
 
-import { DEV } from "@four/core";
+import { DEV, devWarnOnce } from "@four/core";
 import type { BufferGeometry } from "@four/geometry";
 import { Matrix4, Quaternion, Vector3 } from "@four/math";
 import type {
   LitMaterial,
   Material,
+  NodeMaterial,
   SpriteMaterial,
   StandardMaterial,
   UnlitMaterial,
@@ -114,9 +115,11 @@ import {
   type LayerMask,
   type Node,
   type PoseBuffer,
+  type Skeleton,
   type Viewport,
 } from "@four/scene";
 
+import { ClipPlaneAllocator, type RenderItemClip } from "./clip.js";
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
 import type { SpriteFrame } from "./sprite.js";
@@ -136,6 +139,22 @@ import type { SpriteFrame } from "./sprite.js";
  */
 interface FramedDrawable {
   readonly frame?: SpriteFrame | null;
+}
+
+/**
+ * A drawable that may carry §54's skin and morph state, as this module reads
+ * it (RFC 0003, 2026-08-28).
+ *
+ * Structural, and deliberately not `node instanceof Mesh`, for
+ * {@link FramedDrawable}'s reason exactly: the read is one property load on
+ * every renderable, a plain `Renderable` reports `undefined` for both, and
+ * the type-only shape keeps `mesh.ts` out of every bundle whose scene never
+ * constructs one. The `Skeleton` named here is a type import — no runtime
+ * edge.
+ */
+interface SkinnedDrawable {
+  readonly skeleton?: Skeleton | null;
+  readonly morphTargetWeights?: Float32Array;
 }
 
 /**
@@ -164,9 +183,56 @@ interface FramedDrawable {
  * union is the **staging mechanism**, not the destination — it keeps every arm
  * type-checked end to end while the pipeline registry §64 asks for is designed
  * (see `pipelineOf`).
+ *
+ * `"skinned-unlit"` and `"skinned-lit"` joined with §54's skinning (RFC 0003,
+ * 2026-08-28), and they are the one pair whose discriminant is **not** the
+ * material's `kind` alone: a skinned draw is the same §57 material family
+ * through a different *vertex* stage, so the kind is the material's family
+ * crossed with "this node has an active skin" — a `Mesh` with a `Skeleton`
+ * over a geometry carrying `joints`/`weights` (see `collect`). Skinning is a
+ * separate pipeline rather than a uniform switch because `useMap`'s trade
+ * inverts in the vertex stage: a `useSkinning` uniform would add four palette
+ * fetches and a weighted sum to **every vertex of every draw** to serve the
+ * rare skinned one (RFC 0003 §5, alternative B rejected).
+ *
+ * ## Note for RFC 0001 (which inherits this shape)
+ *
+ * RFC 0003 landed first, so this widened closed union — one string member per
+ * compiled pipeline, discriminating the item union, with the backend's draw
+ * loop switching on it — is the shape RFC 0001's `pipelineId` follow-up
+ * refines rather than reinvents: a registry-issued pipeline id would replace
+ * the *closed-ness* (a consumer material could bring its own arm), not the
+ * discriminant-on-the-item design, and the two skinned members show what a
+ * vertex-stage variant looks like in it (family × vertex path, decided at
+ * item-generation time, never per draw). Until then, widening remains an edit
+ * to this file, and an exhaustive consumer `switch` over `RenderItemKind` is
+ * broken by every widening — the §90 note both RFCs record.
+ *
+ * `"node"` joined with §60's node materials (RFC 0001, 2026-08-28), and it is
+ * the shape that note anticipated, implemented at the item tier: **one**
+ * member discriminates the whole node-material family — decided at
+ * item-generation time from the material's `kind`, like every other member —
+ * while the *compiled-pipeline* identity inside that family is the graph's
+ * structure, resolved by the backend's program cache off
+ * `item.material.graph` (one program per distinct graph, however many
+ * materials share it). The registry-issued `pipelineId` that would replace
+ * this union's closed-ness therefore remains a follow-up; what §60 needed was
+ * a member whose pipeline *count* is open while the member set stays closed.
+ * An unregistered backend **skips** a `"node"` item with a one-time §85
+ * warning — `pipelineOf`'s flat-colour fallback is deliberately excluded for
+ * it, because a graph the author wrote is a specific picture and drawing an
+ * unrelated one is R-6's "a JSON value must not become a different picture"
+ * in the material domain.
  */
 export type RenderItemKind =
-  "unlit" | "lit" | "standard" | "sprite" | "particles";
+  | "unlit"
+  | "lit"
+  | "standard"
+  | "sprite"
+  | "particles"
+  | "skinned-unlit"
+  | "skinned-lit"
+  | "node";
 
 /**
  * The fields every render item carries, whatever pipeline draws it — one draw in
@@ -310,6 +376,58 @@ interface RenderItemBase {
    * it without having sorted reads that `0`.
    */
   viewDepth: number;
+
+  /**
+   * §67's clip, or `null` for a draw no clip touches (R-23, 2026-08-21) — the
+   * overwhelmingly common case, and the one every scene had before clipping
+   * existed.
+   *
+   * Three things read it. A backend applies `clip.stencil` **in place of** the
+   * material's own §57 `stencil` and, when `clip.maskPass` is set, forces
+   * colour writes, depth writes and the depth test off; §65's batcher breaks a
+   * run where two consecutive items carry different records, because the same
+   * material under two different clips is two different draws; and the
+   * comparators below sort mask draws to the front of the list.
+   *
+   * The record is a **shared, pooled object** — every item under one clip
+   * carries the identical reference — which is what makes the batcher's check
+   * one `!==` rather than a seven-field comparison. Like every other field on a
+   * pooled item it is rewritten by the next build; see `clip.ts` for what it
+   * means and why it is not a `StencilState`.
+   *
+   * **Optional, and `undefined` means exactly what `null` means.** The
+   * builders always write it (`null` for the unclipped case), so an item this
+   * module produced answers with one property load; the field is optional so
+   * that a **hand-built item literal or structural double predating §67** —
+   * R-38's recorded gotcha, answered structurally this time — still
+   * typechecks, and reports `undefined`, which every reader treats as "no
+   * clip". Same move as `RendererCapabilities`' optional members (R-1): widen
+   * a shipped shape additively, and let absence mean the pre-feature
+   * behaviour.
+   */
+  clip?: RenderItemClip | null;
+
+  /**
+   * §54's morph-target weights — the node's `MorphWeights` component array —
+   * or `null` for the overwhelmingly common draw that carries none (RFC 0003,
+   * 2026-08-28).
+   *
+   * A **reference to the component's own array**, snapshotted like `frame` and
+   * `instances`: the item is pooled and the weights may be rewritten by the
+   * next fixed step, so a consumer reads them during the call that built the
+   * list. Nothing in the shipped backends consumes it yet — the GPU morph
+   * path (additional vertex streams) is deferred by RFC 0003 §7 — so today it
+   * is the plumbing that lets that packet, a CPU morpher, or a diagnostic read
+   * the animated weights off the item without a node reference (§64's
+   * compact-item rule).
+   *
+   * **Optional, and `undefined` means exactly what `null` means** — the R-23
+   * move, third application: the builders always write it, the field is
+   * optional so a hand-built item literal or structural double predating RFC
+   * 0003 still typechecks, and `MutableRenderItem` re-declares it required so
+   * a pooled slot cannot go stale.
+   */
+  morphWeights?: Float32Array | null;
 }
 
 /** A draw generated from a `Renderable` (§49) — flat colour, no texture. */
@@ -317,6 +435,46 @@ export interface UnlitRenderItem extends RenderItemBase {
   kind: "unlit";
   /** Surface appearance (§57). */
   material: UnlitMaterial;
+}
+
+/**
+ * The palette half every skinned item carries (§54; RFC 0003) — what the
+ * backend uploads as `uniform mat4 jointMatrices[]` for the draw.
+ *
+ * `jointMatrices` is a **reference to the skeleton's own palette**, rewritten
+ * by `Skeleton.update` — which `collect` ran in the same pass that built this
+ * item (the particle-repack precedent: the uploaded array can never be a step
+ * older than the item pointing at it). Upload it during the call; never retain
+ * it. `jointCount` bounds the upload: the array holds exactly
+ * `16 × jointCount` floats.
+ */
+interface SkinnedRenderItemBase extends RenderItemBase {
+  /** The skeleton's palette: 16 floats per joint, in joint-index order (§33). */
+  jointMatrices: Float32Array;
+  /** Number of joints in the palette; positive on every skinned item. */
+  jointCount: number;
+}
+
+/**
+ * A skinned draw over §57's `UnlitMaterial` (§54; RFC 0003) — the unlit
+ * pipeline's vertex-stage variant. Produced only for a `Mesh` whose skeleton
+ * and geometry agree; see {@link RenderItemKind}.
+ */
+export interface SkinnedUnlitRenderItem extends SkinnedRenderItemBase {
+  kind: "skinned-unlit";
+  /** Surface appearance (§57). */
+  material: UnlitMaterial;
+}
+
+/**
+ * A skinned draw over §57's `LitMaterial` (§54, §68; RFC 0003) — the Lambert
+ * pipeline's vertex-stage variant, shaded by the same frame `SceneLights`
+ * record every lit item is.
+ */
+export interface SkinnedLitRenderItem extends SkinnedRenderItemBase {
+  kind: "skinned-lit";
+  /** Surface appearance (§57, §68). */
+  material: LitMaterial;
 }
 
 /**
@@ -347,6 +505,27 @@ export interface StandardRenderItem extends RenderItemBase {
   kind: "standard";
   /** Surface appearance (§57, §59, §68). */
   material: StandardMaterial;
+}
+
+/**
+ * A draw generated from a `Renderable` carrying a `NodeMaterial` (§49, §57,
+ * §60; RFC 0001) — shaded by the material's own compiled graph.
+ *
+ * Structurally a base item: the graph, the material's uniform values, and its
+ * texture bindings all travel on the **material** (`material.graph`,
+ * `material.getUniform`, `material.getTexture`), one property load away, and
+ * the backend's program cache keys on the graph's structure — a thousand
+ * materials sharing one graph share one compiled program and differ only in
+ * the per-draw uniform uploads (RFC 0001 §3; Q3's per-material tier).
+ *
+ * Unlit at this tier: the frame's `SceneLights` record is deliberately not
+ * consumed by this pipeline (RFC 0001 §6 — lighting-aware graphs wait on
+ * R-17's light-uniform contract).
+ */
+export interface NodeRenderItem extends RenderItemBase {
+  kind: "node";
+  /** Surface appearance (§57, §60): the frozen graph plus its bindings. */
+  material: NodeMaterial;
 }
 
 /** A draw generated from a {@link Sprite} (§55) — one textured, tinted quad. */
@@ -447,7 +626,10 @@ export type RenderItem =
   | LitRenderItem
   | StandardRenderItem
   | SpriteRenderItem
-  | ParticleRenderItem;
+  | ParticleRenderItem
+  | SkinnedUnlitRenderItem
+  | SkinnedLitRenderItem
+  | NodeRenderItem;
 
 /**
  * The pooled item as the builders write it: one mutable shape covering every
@@ -466,11 +648,32 @@ export type RenderItem =
  */
 interface MutableRenderItem extends RenderItemBase {
   kind: RenderItemKind;
-  material?: UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
+  material?:
+    | UnlitMaterial
+    | LitMaterial
+    | StandardMaterial
+    | SpriteMaterial
+    | NodeMaterial;
   frame: SpriteFrame | null;
   id: string;
   count: number;
   instances: Float32Array;
+  /** RFC 0003's palette; meaningful only on the two skinned arms. */
+  jointMatrices: Float32Array;
+  jointCount: number;
+  /**
+   * Required here though optional on the base, for `clip`'s reason: the
+   * builders write it on every drawable item, so a pooled slot cannot hand a
+   * stale weights array to whatever lands in it next.
+   */
+  morphWeights: Float32Array | null;
+  /**
+   * Required here though optional on the base: the builders must write it on
+   * every item (a pooled slot must not hand a stale clip to whatever lands in
+   * it next), and re-declaring it non-optional makes forgetting that a type
+   * error rather than a leak.
+   */
+  clip: RenderItemClip | null;
 }
 
 /**
@@ -499,6 +702,13 @@ function pipelineOf(material: Material): RenderItemKind {
   if (material.kind === "sprite") {
     return "sprite";
   }
+  // §60's node material (RFC 0001) — deliberately **not** part of the
+  // flat-colour fallback below: a backend with no registered node pipeline
+  // skips the draw with a one-time §85 warning, because a graph the author
+  // wrote is a specific picture and flat colour would be a different one.
+  if (material.kind === "node") {
+    return "node";
+  }
   return "unlit";
 }
 
@@ -508,6 +718,12 @@ function pipelineOf(material: Material): RenderItemKind {
  * not allocate a thousand empty buffers.
  */
 const EMPTY_INSTANCES = new Float32Array(0);
+
+/**
+ * The `jointMatrices` a non-skinned pooled item carries: shared, empty, never
+ * uploaded — {@link EMPTY_INSTANCES}' twin for RFC 0003's palette.
+ */
+const EMPTY_JOINT_MATRICES = new Float32Array(0);
 
 /** Narrows `item` to the textured-quad pipeline (§55). */
 export function isSpriteItem(item: RenderItem): item is SpriteRenderItem {
@@ -535,6 +751,25 @@ export function isStandardItem(item: RenderItem): item is StandardRenderItem {
 /** Narrows `item` to the batched particle pipeline (§36; see `particles.ts`). */
 export function isParticlesItem(item: RenderItem): item is ParticleRenderItem {
   return item.kind === "particles";
+}
+
+/** Narrows `item` to the node-material pipeline (§60; RFC 0001). */
+export function isNodeItem(item: RenderItem): item is NodeRenderItem {
+  return item.kind === "node";
+}
+
+/** Narrows `item` to the skinned flat-colour pipeline (§54; RFC 0003). */
+export function isSkinnedUnlitItem(
+  item: RenderItem,
+): item is SkinnedUnlitRenderItem {
+  return item.kind === "skinned-unlit";
+}
+
+/** Narrows `item` to the skinned Lambert-lit pipeline (§54, §68; RFC 0003). */
+export function isSkinnedLitItem(
+  item: RenderItem,
+): item is SkinnedLitRenderItem {
+  return item.kind === "skinned-lit";
 }
 
 /**
@@ -578,6 +813,14 @@ interface ListPool {
   /** Item objects, indexed by generation order (not by final sorted order). */
   readonly items: MutableRenderItem[];
   /**
+   * §67's bit-plane allocator for this list (R-23). Reset by both builders
+   * before traversal, so a clip's plane depends on the scene and not on how
+   * many frames have been drawn. Pooled with the items for the same reason they
+   * are: two simultaneously live lists must not share one buffer's eight
+   * planes.
+   */
+  readonly clips: ClipPlaneAllocator;
+  /**
    * World matrices for the interpolated builder, index-aligned with `items` and
    * grown only when that builder runs — {@link buildRenderList} never
    * constructs one.
@@ -598,7 +841,7 @@ const pools = new WeakMap<readonly RenderItem[], ListPool>();
 function poolFor(out: RenderItem[]): ListPool {
   let pool = pools.get(out);
   if (pool === undefined) {
-    pool = { items: [], matrices: [] };
+    pool = { items: [], matrices: [], clips: new ClipPlaneAllocator() };
     pools.set(out, pool);
   }
   return pool;
@@ -634,9 +877,13 @@ function itemAt(
       receiveShadow: false,
       frustumCulled: true,
       viewDepth: 0,
+      clip: null,
       id: "",
       count: 0,
       instances: EMPTY_INSTANCES,
+      jointMatrices: EMPTY_JOINT_MATRICES,
+      jointCount: 0,
+      morphWeights: null,
     };
     pool.items[index] = item;
   }
@@ -812,6 +1059,8 @@ function collect(
   poses: PoseBuffer | null,
   alpha: number,
   mask: LayerMask,
+  clipBits: number,
+  clip: RenderItemClip | null,
 ): number {
   if (!node.visible || !node.enabled) {
     return count;
@@ -837,69 +1086,148 @@ function collect(
     // whatever it was handed.
     const geometry = node.geometry;
     const material = node.material;
-    const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
-    item.kind = pipelineOf(material);
-    item.geometry = geometry;
-    // The cast is the union's, not the material's: `MutableRenderItem` types
-    // this slot as the four known surface materials, and `pipelineOf` has just
-    // decided which of them the backend will read it as.
-    item.material = material as
-      UnlitMaterial | LitMaterial | StandardMaterial | SpriteMaterial;
-    // §55's frame (R-29), read structurally and only where it can mean
-    // something. Written on **every** renderable, not only framed sprites: the
-    // item is pooled, so a slot that carried a framed sprite last frame would
-    // otherwise hand a stale sub-rectangle to whatever lands in it next — the
-    // same hazard the `material = undefined` line in the particle arm below
-    // exists for. `?? null` because a `Renderable` with a sprite material has
-    // no such property at all.
-    item.frame =
-      item.kind === "sprite" ? ((node as FramedDrawable).frame ?? null) : null;
-    item.renderLayer = node.renderLayer;
-    item.renderOrder = node.renderOrder;
-    // §46's mask, snapshotted so a per-view filter needs no node reference.
-    item.layers = nodeLayers;
-    // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
-    // read: a material double built before the flag existed reports
-    // `undefined`, which classifies opaque — the behaviour every scene had
-    // before the key landed.
-    item.transparent = material.transparent === true;
-    // §66 key 3's material half (R-10), snapshotted like every other field.
-    // `?? ""` for `transparent`'s reason, with a sharper consequence: a
-    // **structurally typed** material double predating §57's `id` reports
-    // `undefined`, and `undefined < undefined` is `false` in both directions —
-    // a comparator reading it would answer "after" for both orders, which is
-    // not a total order and makes the sort's result implementation-defined.
-    // `""` collapses every such double into one group that keeps scene order,
-    // which is what those items had before key 3 existed.
-    item.materialId = material.id ?? "";
-    // §49's two shadow flags (§69, R-18), snapshotted like every other field.
-    // `!== false` rather than a truthy read, for `transparent`'s reason turned
-    // around: both default to `true` on a `Renderable`, so a **structurally
-    // typed** drawable predating the fields — a host's own minimal node —
-    // reports `undefined`, which must read as "casts and receives", the
-    // behaviour a `Renderable` authored today has.
-    item.castShadow = node.castShadow !== false;
-    item.receiveShadow = node.receiveShadow !== false;
-    // §49's culling flag (§87, R-8), snapshotted like every other field, with
-    // `!== false` for `castShadow`'s reason: it defaults to `true` on a
-    // `Renderable`, so a **structurally typed** drawable predating the field —
-    // a host's own minimal node — reports `undefined`, which must read as "may
-    // be culled", the behaviour a `Renderable` authored today has.
-    item.frustumCulled = node.frustumCulled !== false;
-    // §66 key 4 has no value until a view measures it (`view-list.ts`). Written
-    // rather than left, so a pooled slot cannot hand a stale depth to a caller
-    // that reads the field without sorting.
-    item.viewDepth = 0;
-    writeWorldMatrix(item, node, pool, next, poses, alpha);
-    // The one cast in the module, and the only place the `kind`/`material`
-    // correlation is established: both were just written from the same node, so
-    // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
-    // a "standard" item a `StandardMaterial`, and an "unlit" item an
-    // `UnlitMaterial` by construction. TypeScript cannot
-    // see that across two assignments to a pooled object — see
-    // `MutableRenderItem`.
-    out[next] = item as RenderItem;
-    next += 1;
+    let kind = pipelineOf(material);
+    // §54's skin (RFC 0003): a `Mesh` with a skeleton over a geometry
+    // carrying joints and weights draws through the skinned variant of its
+    // material's family — see `RenderItemKind`. Read structurally, like
+    // `frame`, so this costs every plain renderable one property load.
+    const skeleton = (node as SkinnedDrawable).skeleton ?? null;
+    let activeSkin: Skeleton | null = null;
+    let skinSkipped = false;
+    if (skeleton !== null) {
+      if (geometry.joints === undefined || geometry.weights === undefined) {
+        // §85, development only: the skin cannot apply, and with no weights
+        // there is no other picture — the mesh draws its geometry unskinned.
+        if (DEV) {
+          devWarnOnce(
+            `skin-no-attributes:${node.id}`,
+            `§54: node "${node.id}" has a skeleton but its geometry carries ` +
+              "no joints/weights attributes, so there is nothing to deform " +
+              "and the mesh draws unskinned (RFC 0003).",
+          );
+        }
+      } else if (kind === "unlit") {
+        kind = "skinned-unlit";
+        activeSkin = skeleton;
+      } else if (kind === "lit") {
+        kind = "skinned-lit";
+        activeSkin = skeleton;
+      } else {
+        // No skinned variant exists for this material family at this tier
+        // (RFC 0003 §7 ships unlit and lit). The draw is skipped rather than
+        // issued in bind pose: a character standing in T-pose is a different
+        // picture, and the recorded rule is that a value must not become one
+        // — the same direction the unregistered-pipeline case fails in
+        // (`@four/render-webgl`).
+        skinSkipped = true;
+        if (DEV) {
+          devWarnOnce(
+            `skin-material:${node.id}`,
+            `§54: node "${node.id}" is skinned but carries a "${kind}" ` +
+              "material, which has no skinned pipeline at this tier " +
+              "(unlit and lit ship; RFC 0003); the draw is skipped rather " +
+              "than shown in bind pose.",
+          );
+        }
+      }
+    }
+    if (skinSkipped) {
+      // Skipped with the one-time warning above; children are still visited.
+    } else {
+      const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
+      item.kind = kind;
+      item.geometry = geometry;
+      // The cast is the union's, not the material's: `MutableRenderItem` types
+      // this slot as the four known surface materials, and `pipelineOf` has just
+      // decided which of them the backend will read it as.
+      item.material = material as
+        | UnlitMaterial
+        | LitMaterial
+        | StandardMaterial
+        | SpriteMaterial
+        | NodeMaterial;
+      // §55's frame (R-29), read structurally and only where it can mean
+      // something. Written on **every** renderable, not only framed sprites: the
+      // item is pooled, so a slot that carried a framed sprite last frame would
+      // otherwise hand a stale sub-rectangle to whatever lands in it next — the
+      // same hazard the `material = undefined` line in the particle arm below
+      // exists for. `?? null` because a `Renderable` with a sprite material has
+      // no such property at all.
+      item.frame =
+        item.kind === "sprite"
+          ? ((node as FramedDrawable).frame ?? null)
+          : null;
+      item.renderLayer = node.renderLayer;
+      item.renderOrder = node.renderOrder;
+      // §46's mask, snapshotted so a per-view filter needs no node reference.
+      item.layers = nodeLayers;
+      // §66 key 2, snapshotted from §57's flag. `=== true` rather than a truthy
+      // read: a material double built before the flag existed reports
+      // `undefined`, which classifies opaque — the behaviour every scene had
+      // before the key landed.
+      item.transparent = material.transparent === true;
+      // §66 key 3's material half (R-10), snapshotted like every other field.
+      // `?? ""` for `transparent`'s reason, with a sharper consequence: a
+      // **structurally typed** material double predating §57's `id` reports
+      // `undefined`, and `undefined < undefined` is `false` in both directions —
+      // a comparator reading it would answer "after" for both orders, which is
+      // not a total order and makes the sort's result implementation-defined.
+      // `""` collapses every such double into one group that keeps scene order,
+      // which is what those items had before key 3 existed.
+      item.materialId = material.id ?? "";
+      // §49's two shadow flags (§69, R-18), snapshotted like every other field.
+      // `!== false` rather than a truthy read, for `transparent`'s reason turned
+      // around: both default to `true` on a `Renderable`, so a **structurally
+      // typed** drawable predating the fields — a host's own minimal node —
+      // reports `undefined`, which must read as "casts and receives", the
+      // behaviour a `Renderable` authored today has.
+      item.castShadow = node.castShadow !== false;
+      item.receiveShadow = node.receiveShadow !== false;
+      // §49's culling flag (§87, R-8), snapshotted like every other field, with
+      // `!== false` for `castShadow`'s reason: it defaults to `true` on a
+      // `Renderable`, so a **structurally typed** drawable predating the field —
+      // a host's own minimal node — reports `undefined`, which must read as "may
+      // be culled", the behaviour a `Renderable` authored today has.
+      item.frustumCulled = node.frustumCulled !== false;
+      // §66 key 4 has no value until a view measures it (`view-list.ts`). Written
+      // rather than left, so a pooled slot cannot hand a stale depth to a caller
+      // that reads the field without sorting.
+      item.viewDepth = 0;
+      // §67 (R-23): the accumulated test of every enclosing clip, or `null` where
+      // there is none. Written rather than left, for the reason the `material`,
+      // `frame` and shadow resets in the particle arm below are — a pooled slot
+      // must not hand a stale clip to whatever lands in it next.
+      item.clip = clip;
+      writeWorldMatrix(item, node, pool, next, poses, alpha);
+      // §54's morph weights (RFC 0003), snapshotted like every other field and
+      // written on **every** drawable for `clip`'s reason: the item is pooled,
+      // and a slot that carried a morphing mesh last frame must not hand its
+      // weights to whatever lands in it next. `?? undefined ?? null`-free: a
+      // plain `Renderable` has no such property and reports `undefined`.
+      item.morphWeights = (node as SkinnedDrawable).morphTargetWeights ?? null;
+      // §54's palette (RFC 0003), refreshed in the same pass that builds the
+      // item — the particle-repack precedent: the uploaded matrices can never
+      // be a step older than the item that points at them. `update` reads the
+      // bones' *resolved* world transforms (§7); interpolating the palette at
+      // §43's alpha is deferred with CPU skinning, so under the interpolated
+      // builder a skin deforms at the last fixed step's pose while the mesh's
+      // own matrix interpolates.
+      if (activeSkin !== null) {
+        activeSkin.update(node);
+        item.jointMatrices = activeSkin.jointMatrices;
+        item.jointCount = activeSkin.bones.length;
+      }
+      // The one cast in the module, and the only place the `kind`/`material`
+      // correlation is established: both were just written from the same node, so
+      // a "sprite" item carries a `SpriteMaterial`, a "lit" item a `LitMaterial`,
+      // a "standard" item a `StandardMaterial`, an "unlit" item an
+      // `UnlitMaterial`, and a skinned item its family's material, by
+      // construction. TypeScript cannot
+      // see that across two assignments to a pooled object — see
+      // `MutableRenderItem`.
+      out[next] = item as RenderItem;
+      next += 1;
+    }
   } else if (onLayer && isParticleDrawable(node)) {
     // §36's whole system becomes **one** item (plan P9-3). The repack is the
     // node's own work and happens here, at list-build time, so the uploaded
@@ -916,8 +1244,10 @@ function collect(
     // have discarded.
     item.material = undefined;
     // Likewise (R-29): a particle system has no texture sub-rectangle, and a
-    // pooled slot must not keep one a sprite left in it.
+    // pooled slot must not keep one a sprite left in it — nor RFC 0003's
+    // morph weights, for the same reason.
     item.frame = null;
+    item.morphWeights = null;
     item.id = node.id;
     item.count = node.particleCount;
     item.instances = node.particleInstances;
@@ -952,14 +1282,95 @@ function collect(
     // the reason the `material`, `frame` and shadow resets above are.
     item.frustumCulled = false;
     item.viewDepth = 0;
+    // §67 (R-23): a particle system inside a clipped subtree is clipped like
+    // everything else — the test is per draw, and §36's batched item is one
+    // draw. Written rather than left, for the reason the resets above are.
+    item.clip = clip;
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;
   }
 
+  // §67's clip (R-23), resolved *after* this node's own item and *before* the
+  // children: the mirror of §46's layers, which gate the node and not the
+  // subtree. A panel paints its own background unclipped by itself and then
+  // contains what is inside it.
+  let childBits = clipBits;
+  let childClip = clip;
+  if (node.clip === true) {
+    if (isRenderable(node)) {
+      const scope = pool.clips.allocate(clipBits, node.id);
+      // `null` is §67's exhaustion case: the frame's eight bit planes are gone,
+      // `clip.ts` has warned, and this subtree keeps the clips it inherited —
+      // it spills past this boundary rather than vanishing behind it.
+      if (scope !== null) {
+        // The mask draw: this node's own geometry again, writing the plane and
+        // nothing else. It carries §46's every-layer mask and `frustumCulled:
+        // false` deliberately — a mask is not content, and a view that dropped
+        // it would draw *none* of this subtree rather than less of it.
+        const geometry = node.geometry;
+        const material = node.material;
+        const item = itemAt(pool, next, geometry, node.transform.worldMatrix);
+        item.kind = pipelineOf(material);
+        item.geometry = geometry;
+        item.material = material as
+          | UnlitMaterial
+          | LitMaterial
+          | StandardMaterial
+          | SpriteMaterial
+          | NodeMaterial;
+        item.frame =
+          item.kind === "sprite"
+            ? ((node as FramedDrawable).frame ?? null)
+            : null;
+        // A mask is not content (R-23), so it is never skinned or morphed:
+        // the mask a skinned mesh writes is its bind-pose shape, the §67
+        // analogue of the bind-pose bounds `Mesh` documents.
+        item.morphWeights = null;
+        item.renderLayer = node.renderLayer;
+        item.renderOrder = node.renderOrder;
+        item.layers = ALL_LAYERS;
+        item.transparent = false;
+        item.materialId = material.id ?? "";
+        item.castShadow = false;
+        item.receiveShadow = false;
+        item.frustumCulled = false;
+        item.viewDepth = 0;
+        item.clip = scope.write;
+        writeWorldMatrix(item, node, pool, next, poses, alpha);
+        out[next] = item as RenderItem;
+        next += 1;
+        childBits = scope.bits;
+        childClip = scope.test;
+      }
+    } else if (DEV) {
+      // §85, and a development build only: a `Group` has no shape to mask
+      // with, so the clip is inert. Warned rather than refused — §61 forbids
+      // throwing inside a frame — and inert *toward drawing*: the subtree is
+      // not narrowed, rather than being masked to nothing.
+      devWarnOnce(
+        `clip-not-drawable:${node.id}`,
+        `§67: node "${node.id}" sets clip = true but draws no geometry, so ` +
+          "there is no shape to mask its subtree with and the clip does " +
+          "nothing. Put the clip on the node that draws the region (a Shape, " +
+          "a Renderable, a Sprite), not on a Group above it.",
+      );
+    }
+  }
+
   const children = node.children;
   for (let i = 0; i < children.length; i += 1) {
-    next = collect(children[i], out, pool, next, poses, alpha, mask);
+    next = collect(
+      children[i],
+      out,
+      pool,
+      next,
+      poses,
+      alpha,
+      mask,
+      childBits,
+      childClip,
+    );
   }
   return next;
 }
@@ -983,6 +1394,16 @@ function collect(
  * key 1 and outranks this.
  */
 function compareRenderItems(a: RenderItem, b: RenderItem): number {
+  // §67's mask draws first, ahead of every other key (R-23): the stencil
+  // buffer must be complete before the first clipped fragment is tested, and
+  // nothing else in §66's order can be allowed to interleave content between a
+  // mask and the draws it masks. `false !== false` in every scene that names no
+  // clip, so this key is a single comparison and never a reordering.
+  const aMask = a.clip?.maskPass === true;
+  const bMask = b.clip?.maskPass === true;
+  if (aMask !== bMask) {
+    return aMask ? -1 : 1;
+  }
   if (a.renderLayer !== b.renderLayer) {
     return a.renderLayer - b.renderLayer;
   }
@@ -1010,6 +1431,16 @@ function compareRenderItems(a: RenderItem, b: RenderItem): number {
  * or a camera, so the result is a pure function of the list (§33).
  */
 function comparePipelineGroupedItems(a: RenderItem, b: RenderItem): number {
+  // §67's mask draws first, ahead of every other key (R-23): the stencil
+  // buffer must be complete before the first clipped fragment is tested, and
+  // nothing else in §66's order can be allowed to interleave content between a
+  // mask and the draws it masks. `false !== false` in every scene that names no
+  // clip, so this key is a single comparison and never a reordering.
+  const aMask = a.clip?.maskPass === true;
+  const bMask = b.clip?.maskPass === true;
+  if (aMask !== bMask) {
+    return aMask ? -1 : 1;
+  }
   if (a.renderLayer !== b.renderLayer) {
     return a.renderLayer - b.renderLayer;
   }
@@ -1150,7 +1581,8 @@ export function buildRenderList(
 ): RenderItem[] {
   if (DEV) assertLayerMask(layerMask, "buildRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, null, 0, layerMask);
+  pool.clips.begin();
+  const count = collect(root, out, pool, 0, null, 0, layerMask, 0, null);
   out.length = count;
   out.sort(compareRenderItems);
   return out;
@@ -1198,7 +1630,8 @@ export function buildInterpolatedRenderList(
 ): RenderItem[] {
   if (DEV) assertLayerMask(layerMask, "buildInterpolatedRenderList(layerMask)");
   const pool = poolFor(out);
-  const count = collect(root, out, pool, 0, poses, alpha, layerMask);
+  pool.clips.begin();
+  const count = collect(root, out, pool, 0, poses, alpha, layerMask, 0, null);
   out.length = count;
   out.sort(compareRenderItems);
   return out;

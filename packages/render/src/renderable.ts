@@ -94,6 +94,16 @@ export interface RenderableOptions {
   receiveShadow?: boolean;
   /** Initial {@link Renderable.frustumCulled}; defaults to `true` (§87). */
   frustumCulled?: boolean;
+  /**
+   * Initial `Node.clip`; defaults to `false` (§67).
+   *
+   * Here rather than on a `Node` options record because a clip is only
+   * meaningful on a node that draws — the mask is the node's own geometry —
+   * and this is the options record every drawable funnels through. It is also
+   * what gives the §79 readers one spelling for the field beside the three
+   * §49 flags above.
+   */
+  clip?: boolean;
 }
 
 /**
@@ -245,6 +255,7 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
     this.castShadow = options.castShadow ?? true;
     this.receiveShadow = options.receiveShadow ?? true;
     this.frustumCulled = options.frustumCulled ?? true;
+    this.clip = options.clip ?? false;
   }
 
   /**

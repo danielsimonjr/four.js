@@ -11,10 +11,14 @@ export { DEFAULT_MAX_BATCH_VERTICES, RenderBatcher } from "./batch.js";
 export type { BoundingSphere } from "./bounds.js";
 export { computeWorldBoundingSphere } from "./bounds.js";
 
+export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
+export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
+
 export type {
   ColorGradeEffect,
   CopyEffect,
   EffectRenderPass,
+  GraphEffect,
   OutputTransformEffect,
   ScreenEffect,
   ScreenEffectKind,
@@ -55,9 +59,12 @@ export {
 } from "./particles.js";
 export type {
   LitRenderItem,
+  NodeRenderItem,
   ParticleRenderItem,
   RenderItem,
   RenderItemKind,
+  SkinnedLitRenderItem,
+  SkinnedUnlitRenderItem,
   SpriteRenderItem,
   StandardRenderItem,
   UnlitRenderItem,
@@ -67,12 +74,45 @@ export {
   buildRenderList,
   groupRenderListByPipeline,
   isLitItem,
+  isNodeItem,
   isParticlesItem,
+  isSkinnedLitItem,
+  isSkinnedUnlitItem,
   isSpriteItem,
   isStandardItem,
   isUnlitItem,
   viewLayerMask,
 } from "./render-list.js";
+
+// §60's shader-graph IR (RFC 0001), re-exported from `@four/materials` so a
+// backend reads it through the package it already depends on — `render-webgl`'s
+// frozen §3.1 row is `core, math, render`, and this re-export is what keeps a
+// GLSL emitter legal there without a new edge (the RFC's own legality
+// argument, and the §62-registry precedent). Types and the pure analysis
+// functions only; `NodeMaterial` itself stays a `@four/materials` export, and
+// backends meet it through the `NodeRenderItem` union member.
+export type {
+  ShaderAttributeName,
+  ShaderBinaryOp,
+  ShaderDomain,
+  ShaderGraph,
+  ShaderGraphAnalysis,
+  ShaderNode,
+  ShaderNodeId,
+  ShaderReflection,
+  ShaderTextureReflection,
+  ShaderUnaryOp,
+  ShaderUniformReflection,
+  ShaderValueType,
+} from "@four/materials";
+export {
+  MAX_SHADER_GRAPH_NODES,
+  MAX_SHADER_GRAPH_TEXTURES,
+  SHADER_ATTRIBUTE_TYPES,
+  SHADER_VALUE_COMPONENTS,
+  analyzeShaderGraph,
+  forEachShaderNodeReference,
+} from "@four/materials";
 export type {
   AddPassOptions,
   CustomRenderPass,
@@ -85,6 +125,24 @@ export type {
   SceneRenderPass,
 } from "./render-graph.js";
 export { RenderGraph } from "./render-graph.js";
+// §77a raster painting (RFC 0004). Nothing on the render path references this
+// module — a backend meets a `CanvasTexture` only through `MaterialTexture`,
+// which is what keeps the tier at 0 B in every bundle that never paints.
+export type {
+  CanvasTextureOptions,
+  RasterOrigin,
+  RasterSource,
+} from "./raster.js";
+export { CanvasTexture } from "./raster.js";
+export type { PickRequest, PickResult, PickingService } from "./picking.js";
+export {
+  MAX_PICK_CANDIDATES,
+  assertEncodableCandidateCount,
+  collectPickCandidates,
+  decodePickId,
+  encodePickId,
+  supportsPicking,
+} from "./picking.js";
 export type {
   RenderTargetFormat,
   RenderTargetOptions,
@@ -93,6 +151,7 @@ export type {
 export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
 export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
+export { MAX_SKINNING_JOINTS, Mesh, restoreMeshSkeleton } from "./mesh.js";
 export type {
   RendererFallbackReason,
   RendererFallbackReport,

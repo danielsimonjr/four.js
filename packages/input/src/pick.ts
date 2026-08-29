@@ -56,9 +56,14 @@
  * geometry) arrive with the §50 shape nodes, whose parameters — a circle's
  * radius, a path's segments — are what an analytic test needs; a `Pickable`
  * carrying a box cannot express them, and inventing a shape union here would
- * pre-empt §50. Ray/triangle (`"geometry"`), pixel-alpha (`"pixel"`), and the
- * GPU identifier buffer (`"gpu"`) need `@four/geometry` index data and a
- * renderer respectively, so they belong to a packet that may import those.
+ * pre-empt §50. Ray/triangle (`"geometry"`) needs `@four/geometry` index
+ * data, so it stays with that packet. The other two landed with RFC 0005
+ * (2026-08-28): pixel-alpha (`"pixel"`) for CPU-resident texels is
+ * {@link Pickable.alphaMask} below, and the GPU identifier buffer (`"gpu"`)
+ * — which needs a renderer this package may not import — reaches pointer
+ * handlers through the structural {@link PickProvider} seam, implemented in
+ * `@four/render` / `@four/render-webgl` and adapted by `@four/four`'s
+ * `createPickProvider`.
  *
  * ## Why the box test runs in local space
  *
@@ -92,6 +97,7 @@
  * mid-pick.
  */
 
+import { FourError } from "@four/core";
 import { Matrix4, Vector3, type DepthRange } from "@four/math";
 import { resolveWorldTransform, type Camera, type Node } from "@four/scene";
 
@@ -306,6 +312,83 @@ export function createPickRay(
 }
 
 /**
+ * A picking result provider this package does not implement (§71's `"gpu"` /
+ * `"pixel"` id-buffer tier; RFC 0005, 2026-08-28) — the structural seam that
+ * lets §72's event propagation dispatch on a pixel-picked target without
+ * `@four/input` gaining a render dependency.
+ *
+ * The whole contract: two normalized device coordinates in (the same
+ * `[-1, 1]`, +Y-up pair {@link pick} takes), a `Node.id` out — or
+ * `undefined` for "nothing there" — **asynchronously**, because every honest
+ * GPU read-back is (RFC 0005 §4; a §9-tier explanation lives on
+ * `@four/render`'s `PickingService`, which is one implementation of this
+ * seam via `@four/four`'s `createPickProvider`). It names no render type, no
+ * target, no texture, no scene — the fourth instance of the `FetchLike` /
+ * `SurfaceSizedCamera` move — so a test satisfies it with a `Map` lookup and
+ * no GPU at all:
+ *
+ * ```ts
+ * const provider: PickProvider = {
+ *   pick: (x, y) => Promise.resolve(x > 0 ? "node-3" : undefined),
+ * };
+ * ```
+ *
+ * The synchronous {@link pick} below is not changed and not deprecated: the
+ * bounds tier stays the cheap default, and a provider is what a pointer
+ * handler consults when bounds are not precise enough.
+ */
+export interface PickProvider {
+  /** Resolves the front-most node id under `(ndcX, ndcY)`, or `undefined`. */
+  pick(ndcX: number, ndcY: number): Promise<string | undefined>;
+}
+
+/**
+ * §71's `"pixel"` strategy for the CPU-resident case (RFC 0005 alternative D,
+ * adopted): the texels a candidate's visible shape comes from, so a bounds
+ * hit can be confirmed — or rejected — by the alpha actually under the point.
+ *
+ * The common carrier is a §55 sprite: its `TextureSource.data` is already
+ * CPU-side RGBA8, so a transparent corner of a quad stops picking **without a
+ * renderer, a read-back, or a new package edge** — which is why this tier
+ * lives here and the id-buffer tier does not. It composes with the box test
+ * rather than replacing it: the box says *where* the ray meets the candidate,
+ * the mask says whether that texel is really there.
+ *
+ * ## Sampling
+ *
+ * The box entry point's local `x`/`y` are normalized against the box extents
+ * to `u`/`v` in `[0, 1]` (an axis of zero extent — a flat sprite's thickness
+ * — reads as `0`), then nearest-sampled: `u` maps across
+ * {@link PickableAlphaMask.region}'s columns, `v` across its rows, **row 0
+ * being the box's −Y edge** — exactly the orientation `texImage2D` gives the
+ * same array, so what picks is what shows. The hit is kept when the sampled
+ * alpha is strictly greater than {@link PickableAlphaMask.threshold}.
+ */
+export interface PickableAlphaMask {
+  /**
+   * RGBA8 texels, row-major, 4 bytes per texel — `TextureSource.data`'s
+   * layout, and usually that very array.
+   */
+  data: Uint8Array | Uint8ClampedArray;
+  /** Width of `data` in texels. A positive integer (§85). */
+  width: number;
+  /** Height of `data` in texels. A positive integer (§85). */
+  height: number;
+  /**
+   * The sub-rectangle of `data` the candidate's shape shows, in texels —
+   * §55's frame, for a sprite that atlases. Absent means all of `data`.
+   * Must lie inside `width` × `height` (§85).
+   */
+  region?: { x: number; y: number; width: number; height: number };
+  /**
+   * Alpha in `[0, 1]` a texel must **exceed** to count as present. Defaults
+   * to `0` — any nonzero alpha picks, which is §71's reading of "pixel-alpha
+   * testing"; raise it to ignore soft edges.
+   */
+  threshold?: number;
+}
+
+/**
  * A picking candidate: a node plus the box, **in that node's local space**,
  * that stands in for its shape (§71's bounding-volume strategy).
  *
@@ -322,6 +405,13 @@ export interface Pickable {
   boundsMin: Vector3;
   /** Upper corner of the box, in `node`'s local space. */
   boundsMax: Vector3;
+  /**
+   * §71's `"pixel"` refinement (RFC 0005 alternative D): confirm a box hit
+   * against these texels' alpha before reporting it. Absent — every candidate
+   * before this field existed — means the box alone decides, which keeps the
+   * bounds tier byte-for-byte what it was.
+   */
+  alphaMask?: PickableAlphaMask;
 }
 
 /** One intersection between a pick ray and a {@link Pickable}. */
@@ -379,6 +469,86 @@ function hitAt(pool: HitPool, index: number, node: Node): PickHit {
 /** Nearest first (§71). Ties keep candidate-list order, since `sort` is stable. */
 function compareHits(a: PickHit, b: PickHit): number {
   return a.distance - b.distance;
+}
+
+/**
+ * Refuses a malformed {@link PickableAlphaMask} (§85) — a dimension that is
+ * not a positive integer, a `data` too short for it, or a `region` outside
+ * it. Refused rather than skipped, because a candidate that *asked* for
+ * alpha testing and silently fell back to the box would pick texels the
+ * author declared transparent; and refused from here — the call that can see
+ * the mistake — because the mask is only ever read when its box is hit.
+ *
+ * @throws FourError `INVALID_APPLICATION_STATE`.
+ */
+function assertAlphaMask(mask: PickableAlphaMask, node: Node): void {
+  const { width, height, data, region } = mask;
+  if (
+    !(Number.isInteger(width) && width > 0) ||
+    !(Number.isInteger(height) && height > 0) ||
+    data.length < width * height * 4
+  ) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `§71: malformed alphaMask on "${node.id}" (§85).`,
+      { context: { node: node.id, width, height, dataLength: data.length } },
+    );
+  }
+  if (
+    region !== undefined &&
+    (!(Number.isInteger(region.x) && region.x >= 0) ||
+      !(Number.isInteger(region.y) && region.y >= 0) ||
+      !(Number.isInteger(region.width) && region.width > 0) ||
+      !(Number.isInteger(region.height) && region.height > 0) ||
+      region.x + region.width > width ||
+      region.y + region.height > height)
+  ) {
+    throw new FourError(
+      "INVALID_APPLICATION_STATE",
+      `§71: alphaMask region outside the mask on "${node.id}" (§85).`,
+      { context: { node: node.id, region: { ...region }, width, height } },
+    );
+  }
+}
+
+/**
+ * Whether the box hit at parameter `t` lands on a present texel of `mask`
+ * (§71's `"pixel"` strategy; see {@link PickableAlphaMask} for the sampling
+ * contract). Reads the module's local-ray scratch, so it must run while that
+ * still describes this candidate — immediately after {@link intersectBox}.
+ */
+function passesAlphaMask(
+  mask: PickableAlphaMask,
+  min: Vector3,
+  max: Vector3,
+  t: number,
+): boolean {
+  const regionX = mask.region?.x ?? 0;
+  const regionY = mask.region?.y ?? 0;
+  const regionWidth = mask.region?.width ?? mask.width;
+  const regionHeight = mask.region?.height ?? mask.height;
+
+  // The entry point, in the candidate's local space — the same
+  // parameterization the world-space `hit.point` uses, one transform earlier.
+  const hitX = localOrigin.x + t * localDirection.x;
+  const hitY = localOrigin.y + t * localDirection.y;
+  const extentX = max.x - min.x;
+  const extentY = max.y - min.y;
+  // A zero-extent axis (a flat sprite's thickness, a degenerate box the
+  // caller still gave a mask) reads as 0 rather than dividing to NaN.
+  const u = extentX > 0 ? (hitX - min.x) / extentX : 0;
+  const v = extentY > 0 ? (hitY - min.y) / extentY : 0;
+
+  // Nearest sample, clamped so the box's far edges land on the last texel
+  // rather than one past it (a hit exactly on the max edge has `u = 1`, and
+  // float error can put it a hair outside `[0, 1]`).
+  const sampleIndex = (value: number, count: number): number =>
+    value <= 0 ? 0 : value >= 1 ? count - 1 : Math.floor(value * count);
+  const column = regionX + sampleIndex(u, regionWidth);
+  const row = regionY + sampleIndex(v, regionHeight);
+
+  const alpha = mask.data[(row * mask.width + column) * 4 + 3] / 255;
+  return alpha > (mask.threshold ?? 0);
 }
 
 /**
@@ -454,6 +624,19 @@ export function pick(
       const t = intersectBox(localOrigin, localDirection, min, max);
       if (t === MISS) {
         continue;
+      }
+
+      // §71's `"pixel"` refinement (RFC 0005 alternative D): a candidate that
+      // carries texels is hit only where they are present. Validated here —
+      // the first moment the mask is actually consulted — and absent on every
+      // pre-existing candidate, which is what keeps the bounds tier's results
+      // byte-for-byte what they were.
+      const mask = pickable.alphaMask;
+      if (mask !== undefined) {
+        assertAlphaMask(mask, pickable.node);
+        if (!passesAlphaMask(mask, min, max, t)) {
+          continue;
+        }
       }
 
       const hit = hitAt(pool, count, pickable.node);

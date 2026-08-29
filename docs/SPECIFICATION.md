@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.8 — 2026-08-08**
+**Specification revision 1.11 — 2026-08-28**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -23,6 +23,10 @@
 | 1.6 | 2026-07-29 | Publish names decided (owner): packages publish under the owner's personal npm scope — umbrella `@danielsimonjr/fourjs`, sub-packages `@danielsimonjr/fourjs-<name>`. No org claim or name dispute needed; §98 note updated. Workspace names remain `four`/`@four/*`. |
 | 1.7 | 2026-08-06 | Public-API reconciliation (gap analysis A-22/PH-18, owner decision — amend the specification rather than alias the shipped surface). New §97a "Namespace and Naming Conventions" records the per-package umbrella barrel (decision WP-0.7-fix1: collision avoidance plus §91 tree-shaking, so every `Four.X` of Parts VII and X reads `Four.<package>.X`), the shipped-name mapping (`Mesh`→`Renderable`; `*Geometry` classes→geometry factory functions; `*Collider` classes→one `Collider` component over a `CollisionShape` descriptor union; `Motion`→`MotionComponent`; `SceneMigrator.upgrade`→`migrateSceneDocument` + `SceneMigrationRegistry`; `scene.activeCamera`→§48 viewports on `app.views`; `physicsWeight`/`animationWeight` on the `RigidBody` component, not the node), the names with no shipped equivalent yet (a `Text` node, `AnimationController`, `Circle`, `StandardMaterial`, §8 space modes, `Node.animation`), and the deferred string-selection affordances (`renderer: "auto"`, `solver: "auto"`). §97 and §114–§117 and the inline snippets of §11, §15, §16, §18, §20, §111 are rewritten against the shipped API; where a feature is unshipped the example shows the available-today form and cites §97a. Frozen §1–120 numbering respected: the new section takes a letter suffix. |
 | 1.8 | 2026-08-08 | Consolidated staleness-and-conflict pass over the queued spec-revisit register (owner standing instruction; recommendations recorded with each item adopted and named as such). **Shipped since revision 1.7, so the specification's own "not implemented" wording was reversed:** §18 and §97a's `AnimationController` row (state machines ship; seven of §18's nine features, with `target` and typed predicate records as the two recorded spelling differences and blend trees / layered animation named as scheduled); §20's and §97a's `solver: "auto"` deferral and §97a's `renderer: "auto"` deferral (both resolve through explicit-registration registries — the whole "Deferred string selection" subsection is rewritten, retaining §45's `physics` option record as the one remaining instance and stating the `"sideEffects": false` reason registration can never be an import side effect); §97a's `StandardMaterial` row and §97's "a world is built and tracked, not an app option" comment. **Corrections of statements that were never implementable:** §54's `morphTargetWeights`, placed on a `@four/render` node that the frozen package dependency matrix forbids `@four/animation` from seeing, moves its storage to a §6a scene component with the declared field retained as an accessor (RFC 0003, register item 8's recommendation adopted — a spec statement that cannot be implemented under a frozen constraint is corrected in the spec); §17's *morph weight* and *skeletal joint* track types are identified as binding forms over existing value kinds, not new value kinds, so no duplicate discriminants get added by inference (RFC 0003 §2). **Additions:** §57's material family gains `LitMaterial` (present in the implementation since 2026-08-04, absent from the list) and a provisional-withdrawal note on `ShaderMaterial` recording RFC 0001's no-raw-source position and marking it *draft, owner decision pending*; §61 records `createTexture`/`createRenderTarget` as deferred by decision — descriptor-plus-backend-cache — rather than by omission. Frozen §1–120 numbering untouched: every change is in-place text in an existing section, and no new section was needed. |
+| 1.9 | 2026-08-28 | RFC 0002 (plugin system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `A-3` implemented. **§45** gains `plugins?: readonly FourPlugin[]` and the paragraph stating that installation happens in `initialize` — open question 1's disposition (a), *amend §45*: the §40 precedent against inventing an option turned on `units` being absent from §45's own list, whereas §81 requires an install lifecycle and §45 owns the lifecycle, so §81 had nowhere else to live. **§81** gains the two fields its own closing sentence already required and its code block omitted (`dependencies`, `engineRange`), the statement that `PluginContext` is a set of capability tokens rather than a fixed interface (forced by §3.1: every registry §81 hands over sits downstream of `core`), the specified install order (topological over `dependencies`, ties broken by supply order — a §33 requirement, since a plugin may register a §39 system and equal-priority systems run in registration order), the revocability rule (a capability declares it; a plugin that acquired a non-revocable one cannot be uninstalled and the attempt is refused naming what pins it), and the §96 boundary (a plugin is a value; no URL, no module specifier, no name from a document; no sandbox is described or provided). §96's requirements list is unchanged — it states requirements, not status. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
+| 1.10 | 2026-08-28 | RFC 0003 (skinning and skeletal animation) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gaps `PH-10` + `R-22` implemented. Revision 1.8 already carried the two corrections the RFC forced (§54's `morphTargetWeights` storage moved to a scene component; §17's *morph weight* and *skeletal joint* entries identified as binding forms); this revision records the remaining adopted dispositions and ends §54's silent staging. **§54** gains the shipped/staged split of its eleven rows, the layout commitments (four influences per vertex at fixed attribute locations 4 joints / 5 weights, `JOINTS_1`/`WEIGHTS_1` named as the extension point at the next two locations; joint index = position in `Skeleton.bones`, insertion order being the §33 ABI), the bone-axis disposition (the engine imposes **no** bone-axis convention on the data model — the inverse bind matrix absorbs the authoring tool's; **+Y as the bone's length axis is a helper convention only**), the joint-limit rule (a rig over the declared `maximumSkinningJoints` is refused at setup with `UNSUPPORTED_GPU_FEATURE`, §89 — never clamped, never a frame-time throw, §61), the §79 document form (a skeleton is written inline on its mesh as bone ids plus inverse bind matrices — intra-file references are by id), and the §33 boundary rule (**no engine API returns skinned vertex positions**: the palette is the last CPU value in the envelope; picking and culling therefore use bind-pose bounds, stated as known inaccuracies). **§62**'s capability list gains "maximum skinning joints"; the WebGL 2 tier reports a declared portability constant rather than a device query. Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
+| 1.11 | 2026-08-28 | RFC 0001 (shader and node-material system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `R-14` implemented. **§57**: `ShaderMaterial`'s provisional withdrawal (revision 1.8) becomes **permanent** — the row is retained so the name stays reserved and cannot be implemented by inference, and a source-string material is never implemented (Q1's disposition: a raw GLSL/WGSL payload re-opens §96's "no arbitrary code execution from scene files" and makes §63's resource checks unable to see what a pass samples). **§60** gains the normative narrowing the owner-decision register's row 3 asked for: the backend-independent shader model is a **serializable graph of closed operators** — no user shader source at any tier — with the shipped/deferred split of §60's feature list recorded (the node graph, uniforms, textures and samplers, the four fixed vertex attributes, reflection metadata and GLSL ES 3.00 generation ship; WGSL generation follows the WebGPU backend; uniform blocks, reusable functions, conditional variants, storage buffers and source maps are deferred with RFC 0001 §6's recorded reasons; node materials are unlit at this tier, sequenced R-14 → R-17 → R-13), and §60's example is rewritten against the shipped authoring surface (`NodeMaterialBuilder`, §97a's namespace spelling) per revision 1.7's example-compilation discipline. Uniform ownership is per material (Q3); a displacing graph on a collider-carrying node raises no §85 warning (Q4 — a vertex displacement is not a transform, §42). Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
+| 1.12 | 2026-08-29 | RFC 0004 (2D raster painting stack) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted (tier (b) — the seam tier; unlike RFCs 0001–0003 it closes no filed gap: the owner asked for it, and the analysis records that plainly). New **§77a** "Raster Painting and Dynamic Textures": a structural, DOM-free raster source contract feeding §77's texture system through the existing id/version upload path (no backend change, no new duck-typed contract), with explicit application-driven dirty tracking; the §7a row-order rule written once in the engine (`"top-left"` sources are flipped during the read); an sRGB colour-space default deliberately unlike the texture system's linear one, with the reason recorded at both (Q3's disposition); the §33 rule that painted pixels are display content and never simulation input — no §79 representation, no §34 replay content, mechanically enforced in the pattern §40's display-only rule established; the §96 finite size limit (64 MiB default) and the statement that a paint hook is a value, never loaded content; and the constant-size rule, with in-place resize refused (`INVALID_APPLICATION_STATE`) and explicitly gated on §77 change notification, `R-30` (Q5's disposition). **§73** records the canvas view as a **skin-drawn** control requiring no drawing API in the UI package (the widget ships independently of the render tier, Q4's disposition), correcting the implementation's staging note that said otherwise. §62's Canvas 2D backend is explicitly a separate concern and remains an unchanged reserved stub. Frozen §1–120 numbering respected: the new section takes a letter suffix (Q2's disposition — §77 over §55/§58/§62), added to `ALLOWED_LETTERED` in `tools/check-spec.mjs`. |
 
 ---
 
@@ -1448,8 +1452,19 @@ interface ApplicationOptions {
   fixedTimeStep?: number;
   maximumSubSteps?: number;
   physics?: PhysicsWorldOptions | false;
+  plugins?: readonly FourPlugin[];
 }
 ```
+
+`plugins` (revision 1.9) lists the §81 plugins the application installs. §81
+requires an install lifecycle and types `install` as `void | Promise<void>`, so
+installation cannot happen in a constructor; §45 owns the lifecycle, and the
+`initialize` step is where installation happens. Plugins are **values** the
+application supplies, never names resolved from a document (§96); a plugin is
+handed the capabilities the application itself owns, and asking for one the
+application does not provide is refused by name (§85). An application whose
+plugins need a capability the Application does not hold installs them through a
+standalone plugin host instead (§81).
 
 The application lifecycle shall expose:
 - initialize;
@@ -1750,6 +1765,49 @@ The engine shall support:
 - level-of-detail selection;
 - impostors and billboards;
 - geometry merging and batching tools.
+
+**Shipped/staged status of this list (RFC 0003, 2026-08-28 — this note ends
+the section's silent staging).** Shipped: `Mesh` itself; **skeletal
+deformation** (bones are ordinary scene nodes — `Bone extends Node`, so §42
+authority, §19 blending, §79 serialization, and animation all apply with no
+new mechanism; `Skeleton` derives the joint-matrix palette on the CPU); the
+**morph-target plumbing** (the `MorphWeights` component, §17's binding form,
+and the weights snapshotted onto the render item — the GPU morph path is
+additional vertex streams and is staged as its own layout decision).
+Staged, deliberately: multiple material groups; hardware instancing; indirect
+rendering (WebGPU); dynamic GPU buffer usage; level of detail; impostors and
+billboards; merging and batching tools; CPU skinning; bone textures;
+dual-quaternion skinning.
+
+Layout commitments (RFC 0003): **four influences per vertex** — `joints` (4
+joint indices, `Uint16Array`) and `weights` (4 floats) on `BufferGeometry`,
+index-aligned with positions, at fixed attribute locations **4 (joints)** and
+**5 (weights)**; a second influence set (`JOINTS_1`/`WEIGHTS_1`) is the named
+extension point at the next two locations. The joint index is the position in
+`Skeleton.bones`, and insertion order is the ABI (§33). In a §79 document a
+skeleton is written inline on its mesh as bone **ids** plus the inverse bind
+matrices (intra-file references are by id); weights are the author's contract
+(a per-vertex sum of 1 is not validated or renormalized, the `normals`
+precedent).
+
+**The engine imposes no bone-axis convention on the data model.** A bone is a
+node with an arbitrary local frame; the inverse bind matrix absorbs whatever
+convention the authoring tool used. **+Y as the bone's length axis is a
+convention for helpers only** (procedural rigs, look-down-a-bone,
+angle-producing IK), matching §7a's Y-up world — never a format requirement,
+and never a constraint on authored rigs.
+
+**Limits and determinism.** A skeleton whose bone count exceeds the backend's
+reported `maximumSkinningJoints` (§62) is refused **at setup** with
+`UNSUPPORTED_GPU_FEATURE` (§89) — never clamped, and never a throw from
+inside a frame (§61). Skeletal animation is deterministic (§33): bone
+transforms and the palette are CPU values inside the envelope. Vertex
+deformation happens in the GPU vertex stage, outside the envelope by
+construction, and **no engine API returns skinned vertex positions** — the
+palette is uploaded and nothing is read back; §33's checksum is over bodies,
+never vertices. Consequently §71 picking and §87 culling evaluate a skinned
+mesh at its bind-pose bounds, a known inaccuracy stated here and at the type
+rather than discovered by a user.
 ### 55. Sprite and Raster System
 Sprites shall support:
 - screen-space and world-space sizing;
@@ -1852,17 +1910,17 @@ Two notes on that family, both amendments rather than restatements:
   `StandardMaterial`, because a scene that wants flat diffuse shading should not
   be made to carry roughness, metalness, and their maps. `UnlitMaterial`,
   `LitMaterial`, and `StandardMaterial` all ship.
-- **`ShaderMaterial` is provisionally withdrawn.** RFC 0001 (§60) proposes that
-  it never be implemented, because `ShaderMaterial` has no meaning other than
-  "material carrying raw GLSL or WGSL source", and §96 forbids exactly that: a
-  shader expressed as a string is an opaque pass that §63's graph validation
-  cannot check, it is not backend-independent, and it pins internal shader
-  sources as public contract. §60's node/graph material is the sanctioned
-  extension surface, and `NodeMaterial` is the family member that carries it.
-  **Status: RFC 0001 is a draft with the owner's decision pending**; the row is
-  retained here so it cannot be implemented by inference from this list alone.
-  Accepting the RFC makes the withdrawal permanent and gets its own amendments
-  row; rejecting it restores the row unchanged.
+- **`ShaderMaterial` is permanently unshipped (revision 1.11; RFC 0001
+  accepted by the owner 2026-08-21, Q1's recommended disposition adopted).**
+  `ShaderMaterial` has no meaning other than "material carrying raw GLSL or
+  WGSL source", and §96 forbids exactly that: a shader expressed as a string
+  is an opaque pass that §63's graph validation cannot check, it is not
+  backend-independent, and it pins internal shader sources as public contract.
+  The row is **retained in the list above so the name stays reserved** and the
+  material cannot be re-introduced by inference from this list alone;
+  implementing it would need a new owner decision and a new amendments row.
+  §60's node/graph material is the sanctioned extension surface, and
+  `NodeMaterial` — shipped 2026-08-28 — is the family member that carries it.
 ### 58. Paints, Fills, and Strokes
 A shape paint may be:
 - solid color;
@@ -1913,10 +1971,11 @@ Later physical extensions may include:
 Advanced users require a backend-independent shader model.
 
 ```ts
-const material = new Four.NodeMaterial();
+const material = new Four.materials.NodeMaterialBuilder();
 const albedo = material.texture(albedoTexture);
 const pulse = material.sin(material.time().multiply(2));
 material.output.color = albedo.multiply(pulse.add(1));
+const built = material.build(); // NodeMaterial
 ```
 
 The compiler should generate:
@@ -1932,6 +1991,37 @@ Shader features:
 - conditional variants;
 - reflection metadata;
 - source maps and readable compiler diagnostics.
+
+Two notes on that model, both amendments rather than restatements (revision
+1.11; RFC 0001 accepted 2026-08-21, implemented 2026-08-28):
+
+- **The shader model is a serializable graph of closed operators, and no user
+  shader source exists at any tier.** This is a normative narrowing of
+  "backend-independent shader model", recorded here because a reader would
+  otherwise find it only in the RFC: nothing in the public surface accepts
+  GLSL or WGSL text, because §96 requires "no arbitrary code execution from
+  scene files; safe shader boundaries", and because a shader expressed as a
+  graph is one §63's validation can see inside — every texture a graph
+  samples is enumerable from the graph, so a §70 graph effect keeps the
+  render graph's feedback and ordering checks instead of switching them off.
+  The IR is `ShaderGraph` in `@four/materials` (JSON by construction); the
+  authoring surface is the builder above; the operator set grows only by a
+  versioned amendment, and a data-declared custom operator is RFC 0001's
+  deferred alternative E. Backends compile lazily behind explicit
+  registration (`registerNodeMaterialPipeline()` on WebGL 2), and a backend
+  with no registered pipeline skips a node draw rather than approximating it.
+- **The shipped tier (2026-08-28), against the lists above:** the node graph,
+  individual uniforms, textures and samplers, vertex attributes (the four
+  fixed streams of §53's baseline: position, normal, uv, color), reflection
+  metadata, and GLSL ES 3.00 generation for WebGL 2 ship; readable
+  diagnostics ship as §89's `SHADER_COMPILATION_FAILED` carrying the emitted
+  source and the driver log. WGSL generation follows the WebGPU backend's
+  emitter packet; Canvas/SVG fallbacks follow those backends. Uniform
+  blocks, reusable functions, conditional variants, storage buffers (§82)
+  and source maps are deferred with the reasons recorded in RFC 0001 §6.
+  Uniform values are owned **per material**. A node material at this tier is
+  **unlit** — it does not see §68's lights; lighting-aware graphs are
+  sequenced behind the light-uniform contract (R-14 → R-17 → R-13).
 ### 60a. Color Management
 The rendering pipeline is linear-light on the GPU backends:
 - color textures default to sRGB-encoded and are decoded to linear on sample; data
@@ -2010,7 +2100,12 @@ Capability reporting shall include:
 - indirect draw;
 - compressed textures;
 - shader precision;
-- maximum uniforms and bindings.
+- maximum uniforms and bindings;
+- maximum skinning joints (§54; RFC 0003) — the most bones one skinned draw
+  may use, `0` where skinning is unsupported. The WebGL 2 tier reports a
+  declared portability constant sized to the guaranteed-minimum vertex
+  uniform budget rather than a per-device query; a per-device (or unbounded,
+  bone-texture) palette is the staged successor.
 Applications may declare required and optional capabilities.
 ### 63. Render Graph
 Rendering shall be organized as a directed acyclic graph of passes and resources.
@@ -2210,6 +2305,15 @@ The optional @four/ui package shall provide:
 - canvas view;
 - embedded 3D viewport.
 UI objects are scene nodes and therefore share animation, input, clipping, serialization, and diagnostics.
+
+**Canvas view.** The canvas view is a **skin-drawn** control, in the split
+`image` already follows: the widget owns its box, its device-pixel backing
+size, and a content revision; the application-supplied skin owns the texture
+and the quad. The UI package gains no drawing API — §73 does not require one,
+and the frozen package dependency matrix forbids it. The painting surface it
+draws into is §77a. This corrects the implementation's earlier staging note,
+which claimed the control needed an immediate-mode drawing surface inside the
+UI package. *(RFC 0004, accepted by the owner 2026-08-21; revision 1.12.)*
 ### 74. Layout
 Required layout modes:
 - absolute;
@@ -2310,6 +2414,82 @@ Texture requirements:
 - video textures;
 - canvas and image-bitmap sources;
 - asynchronous upload and residency diagnostics.
+### 77a. Raster Painting and Dynamic Textures
+*(Added by revision 1.12 — RFC 0004, accepted by the owner 2026-08-21. §77 lists
+"canvas and image-bitmap sources" among the texture system's requirements; this
+section is the production side of exactly those rows.)*
+
+An application may paint pixels — imperatively, at runtime, with the host's own
+2D facilities — and have the engine carry them as a texture. The engine's whole
+contribution is a buffer, a version, a size rule, and a place to put it.
+
+**The raster source contract.** The seam is a *read model*: a `RasterSource`
+declares a constant integer size, an optional row order, an optional colour
+space, an optional parameterless `paint()` hook, and a
+`readPixels(out)` that writes exactly `width × height × 4` tightly packed,
+straight-alpha RGBA8 bytes into an engine-owned buffer. The contract is
+**structural and DOM-free**, in the discipline every host seam in this
+specification follows (`FetchLike`, `PointerSurface`, `RendererOptions.canvas`):
+the engine names a shape, the host supplies a value, and the browser adapter is
+a few lines in the application. `paint()` deliberately takes no parameter — a
+callback receiving an engine-defined drawing context would make the engine
+define a drawing API, and one receiving the host's context would make the seam
+DOM-typed; the source closes over whatever it paints with.
+
+**The texture.** `CanvasTexture` reads a raster source into one buffer
+allocated for its life, and satisfies the same structural texture contract
+(`id`, `version`, size, `data`, `disposed`, colour space) every material and
+every rendering backend already consume — a painted surface reaches the GPU
+through §77's existing id/version upload path, and no backend changes for it.
+Dirty tracking is explicit and application-driven: `invalidate()` marks the
+surface stale, `update()` repaints and re-reads only if stale (returning
+whether it did), and nothing in the engine polls or subscribes. The surface
+participates in §83's lifecycle and accounting like any texture.
+
+**Conventions, and where they differ from §77's texture source.** Texel row 0
+is `v = 0` (§7a); a source declaring the `"top-left"` order every host 2D API
+produces has its rows reversed by the engine during the read — the flip rule is
+written once, in the engine, not once per application. The colour space
+defaults to **sRGB**, deliberately unlike the texture system's linear default:
+that default exists to protect content authored before colour management
+(§60a), which a painted surface cannot have, and a host 2D canvas produces
+sRGB-encoded bytes unambiguously. The reason is recorded at both defaults.
+
+**The constant-size rule.** A raster surface's size is fixed for its life;
+a source that changes size is refused (`INVALID_APPLICATION_STATE`, §89), and
+resizing means constructing a new surface. In-place resize is explicitly gated
+on §77's change notification: a version bump tells a cache to re-read, not a
+dependent to re-validate, and §55 sprite frames validate against a texture's
+size at write time only.
+
+**Determinism (§33–§34): painted pixels are display and content only.**
+Host-rendered raster output is not reproducible across platforms, browsers, or
+drivers. Nothing inside §33's determinism envelope may read painted pixels: no
+value derived from a raster source or a painted texture may reach a fixed step,
+a §33 checksum, a §34 snapshot, or a replay document — §40's display-only rule
+with "inexact" replaced by "unreproducible", and mechanically enforced the same
+way (an import scan over every package source, with a visible allowlist).
+Consequently a painted surface has **no §79 representation** — resources are
+keys, and a painted surface has none — and §34 replay never records painted
+content: a replayed simulation is identical, the pictures may not be, which is
+the standing status of shading. `paint()` and `update()` belong to §9's render
+or real time domain and must never run from a fixed step.
+
+**Untrusted content (§96).** The byte size of a surface is bounded by a finite
+default limit (64 MiB), with an explicit in-source opt-out. A paint hook is a
+function **value** the application constructed and passed — it is never loaded
+content, never named by a scene document, and the painting API accepts no URL
+and no module specifier. Sources whose dimensions or bytes derive from decoded
+external content belong to §76's decode tier, which is where §96's
+untrusted-input refusal applies when such sources land.
+
+**What this section is not.** It defines no drawing API: no `fillRect`, no
+path builder, no font rasterizer, no compositing model — §50–§52 and §58 are
+the engine's drawing model, and every raster pixel is painted by the host or
+the application. It is also not §62's Canvas 2D rendering *backend*, which
+draws the scene graph into a host canvas; this section reads arbitrary pixels
+out of one. The two share a host surface and nothing else, and the Canvas 2D
+backend remains a reserved stub.
 ### 78. Model and Scene Loading
 The glTF loader should support:
 - geometry;
@@ -2387,10 +2567,44 @@ Migrations must be:
 interface FourPlugin {
   name: string;
   version: string;
+  dependencies?: readonly PluginDependency[];
+  engineRange?: string;
   install(context: PluginContext): void | Promise<void>;
   uninstall?(context: PluginContext): void;
 }
 ```
+
+`dependencies` and `engineRange` (revision 1.9) are the declaration this
+section's closing sentence already required and the original code block omitted:
+`dependencies` names other plugins and the range of each one's `version` this
+plugin accepts, and `engineRange` names the range of the plugin API version this
+plugin accepts. The plugin API version is versioned independently of package
+versions, as the scene format version is (§79, §90).
+
+`PluginContext` is a set of **capability tokens** rather than a fixed interface.
+A token is declared by the package that owns the value it hands over and carries
+that value's type; the context resolves a token to the value or refuses by name
+(§85). This is what lets §98's `core` own the plugin host without naming the
+registries the extension points below live in, all of which sit downstream of it
+in the package dependency matrix (§3.1).
+
+Install order is **topological over `dependencies`, with ties broken by the
+order the plugins were supplied in**, and uninstall order is its reverse. This
+is a determinism requirement, not a convenience: a plugin may register a
+simulation system, and equal-priority systems run in registration order (§39),
+so an unspecified install order would be an unspecified fixed-step order (§33).
+
+Capabilities declare whether they are revocable. A plugin that acquired a
+capability that is not revocable cannot be uninstalled, and the attempt is
+refused naming the capability that pins it rather than running `uninstall` and
+leaving a registration behind that nothing can remove (§85).
+
+A plugin is a **value** the application installs. The host accepts no URL, no
+module specifier, and no name resolved out of a document, and no deserialization
+path reaches it: a scene document names a registered type name, never a module
+(§79). This is what §96's *safe plugin boundaries* requires and all it provides
+— a plugin runs with the authority of the application that imported it, and
+this specification does not describe a sandbox.
 
 Plugin extension points:
 - render passes;

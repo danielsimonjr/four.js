@@ -35,9 +35,10 @@
  * calls checkable.
  */
 
-import { EventEmitter, FourError } from "@four/core";
+import { DEV, devWarnOnce, EventEmitter, FourError } from "@four/core";
 import { Frustum, Matrix4 } from "@four/math";
 import {
+  MAX_SKINNING_JOINTS,
   RenderTarget,
   buildInterpolatedRenderList,
   buildRenderList,
@@ -45,12 +46,17 @@ import {
   collectSceneLights,
   createSceneLights,
   isLitItem,
+  isNodeItem,
   isParticlesItem,
   isRenderTargetTexture,
+  isSkinnedLitItem,
+  isSkinnedUnlitItem,
   isSpriteItem,
   isStandardItem,
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
+  type GraphEffect,
+  type PickingService,
   type RenderItem,
   type RenderItemKind,
   type RenderStatistics,
@@ -89,9 +95,23 @@ import {
   type GlTexture,
 } from "./gl-program.js";
 import {
+  resolvePickingServiceFactory,
+  type PickingRendererHost,
+} from "./gl-picking-registry.js";
+import {
   RenderTargetCache,
   type RenderTargetRecord,
 } from "./gl-render-target.js";
+import {
+  resolveSkinningPipelineFactory,
+  type SkinnedPrograms,
+} from "./gl-skinning-registry.js";
+import {
+  NODE_SURFACE_TEXTURE_UNIT_BASE,
+  resolveNodeMaterialPipelineFactory,
+  type NodeMaterialProgram,
+  type NodeMaterialPrograms,
+} from "./node-pipeline-registry.js";
 import { ShadowProgram } from "./gl-shadow.js";
 import { StandardProgram } from "./gl-standard.js";
 import { TextureCache, type CacheableTexture } from "./gl-texture.js";
@@ -193,7 +213,11 @@ export interface WebglContextAttributes {
   antialias?: boolean;
   /** A depth buffer — required, since every view clears and tests depth (§61). */
   depth?: boolean;
-  /** No stencil until §67's masks land. */
+  /**
+   * Stencil bits for §67's masks and clips, driven by
+   * `RendererOptions.stencil` (R-7; consumed by R-23's node-level clips).
+   * `false` unless asked — the attribute every renderer built before R-7 got.
+   */
   stencil?: boolean;
 }
 
@@ -311,6 +335,27 @@ const sceneLights = createSceneLights();
 const rect = { x: 0, y: 0, width: 0, height: 0 };
 
 /**
+ * §60's per-view upload stamp (RFC 0001), incremented once per view of every
+ * frame. A node program records the stamp it last saw, so the frame uploads
+ * each program's view-projection (and render time) once per view however many
+ * materials share the program — with no per-frame map and no allocation.
+ * Module-level and monotonic, so two renderers sharing the process can never
+ * replay a stamp a program has already seen.
+ */
+let nodeViewStamp = 0;
+
+/**
+ * Resolved GL textures for the node draw about to be issued, index-aligned
+ * with the program's sampler list — resolved *before* any state changes so a
+ * draw skipped for a missing texture contributes nothing at all. Bounded by
+ * the IR's sampler cap; reused every draw ({@link renderList}'s policy).
+ */
+const nodeTextureScratch: GlTexture[] = [];
+
+/** Scratch for a §70 graph effect's scalar uniform values. */
+const effectUniformScratch = new Float32Array(1);
+
+/**
  * §57's material as this backend reads it, derived from the render item union
  * rather than imported.
  *
@@ -345,6 +390,17 @@ const BLEND_FUNCTIONS: Record<ItemBlendMode, readonly [number, number]> = {
 
 /** §57's optional `stencil` record, derived from the material for the same reason. */
 type ItemStencil = NonNullable<ItemMaterial["stencil"]>;
+
+/**
+ * §67's per-item clip record, derived from the render item exactly as
+ * {@link ItemMaterial} is and for the same frozen-matrix reason (R-23,
+ * 2026-08-21). `RenderItem.clip` is optional-or-null — `undefined` and `null`
+ * both mean "no clip touches this draw" — so the non-nullable half is the
+ * record a clipped draw actually carries: the §57-shaped stencil state the
+ * engine composed for it, and whether this draw *writes* the mask
+ * (`maskPass`) rather than being tested by it.
+ */
+type ItemClip = NonNullable<RenderItem["clip"]>;
 
 /**
  * Every bit of the stencil buffer — see `GlState.stencilReadMask` for why the
@@ -561,8 +617,10 @@ function applyDepthColorState(
  * Applies §57's optional stencil state for the draw about to be issued (§67,
  * R-7).
  *
- * `stencil` is the material's record, or `undefined` for the overwhelmingly
- * common material that declares none — which means *disable the test*, GL's
+ * `stencil` is the material's record, §67's engine-composed clip record (R-23
+ * — structurally §57's shape with every field present, so the defensive `??`
+ * reads below never fire on one), or `undefined` for the overwhelmingly
+ * common draw that carries neither — which means *disable the test*, GL's
  * initial state and the only stencil state this engine had before R-7.
  *
  * ## The three calls, and why they are three
@@ -588,7 +646,7 @@ function applyDepthColorState(
 function applyStencilState(
   gl: ParticleGlContext,
   state: GlState,
-  stencil: ItemStencil | undefined,
+  stencil: ItemStencil | ItemClip["stencil"] | undefined,
 ): void {
   if (stencil === undefined) {
     if (state.stencilTest) {
@@ -669,12 +727,28 @@ function restoreStencilWriteMask(gl: ParticleGlContext, state: GlState): void {
  * a bad value on assignment as well as at construction (F14) — so a fallback
  * that no structural double could reach has been removed rather than left to
  * read as a live defence.
+ *
+ * ## §67's clip (R-23, 2026-08-21)
+ *
+ * `clip` is the item's engine-composed clip record, or `null` for the
+ * overwhelmingly common draw no clip touches — every draw of every scene that
+ * predates §67, whose path through this function is unchanged to the byte.
+ * A clipped draw's record **replaces** the material's own §57 `stencil` (the
+ * documented collision: a node that declares a clip is asking the engine to
+ * compose the mask, and the engine's record is what keeps the containment
+ * guarantee true). A **mask pass** (`clip.maskPass`) additionally forces the
+ * depth test, depth writes, and colour writes off, whatever the material says:
+ * a mask contributes no pixels and must neither occlude, be occluded by, nor
+ * be depth-rejected against the content it masks. Blending is left to the
+ * material — with colour writes off it cannot reach the framebuffer either
+ * way, and skipping the call would leave the mirror wrong for the next draw.
  */
 function applyMaterialState(
   gl: ParticleGlContext,
   state: GlState,
   material: ItemMaterial | undefined,
   alwaysBlend: boolean,
+  clip: ItemClip | null = null,
 ): void {
   applyBlendState(
     gl,
@@ -682,20 +756,28 @@ function applyMaterialState(
     alwaysBlend || material?.transparent === true,
     material?.blendMode ?? "normal",
   );
-  applyDepthColorState(
-    gl,
-    state,
-    material?.depthTest !== false,
-    material?.depthWrite !== false,
-    material?.colorWrite !== false,
-  );
+  if (clip !== null && clip.maskPass) {
+    // §67's mask draw — see the function documentation.
+    applyDepthColorState(gl, state, false, false, false);
+  } else {
+    applyDepthColorState(
+      gl,
+      state,
+      material?.depthTest !== false,
+      material?.depthWrite !== false,
+      material?.colorWrite !== false,
+    );
+  }
   // §67's seam, and its whole per-item cost (R-7): one property load and one
   // comparison. The second disjunct is what makes the *first* draw after a
   // stencil material put the test back — without it a frame would need
   // `applyStencilState` unconditionally, which is a call per draw for a feature
   // almost no scene uses. Measured: no change in bundle size or frame time for
-  // a scene that names no stencil (see the packet's A/B).
-  const stencil = material?.stencil;
+  // a scene that names no stencil (see the packet's A/B). R-23 widened the
+  // resolution by one comparison: the engine's clip record outranks the
+  // material's own stencil, and `null` — every pre-§67 draw — resolves to
+  // exactly what this line resolved to before the parameter existed.
+  const stencil = clip !== null ? clip.stencil : material?.stencil;
   if (stencil !== undefined || state.stencilTest) {
     applyStencilState(gl, state, stencil);
   }
@@ -930,6 +1012,12 @@ const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   indirectDraw: false,
   compressedTextureFormats: Object.freeze([]),
   shaderPrecision: "highp",
+  // §54's joint limit (RFC 0003): a declared constant, not a `getParameter`
+  // read — `@four/render`'s `MAX_SKINNING_JOINTS` documents the portability
+  // arithmetic, and R-30b's law is why no query happens here. The capability
+  // says what this backend *can* do; drawing skinned additionally requires
+  // `registerSkinningPipeline()` (see `gl-skinning-registry.ts`).
+  maximumSkinningJoints: MAX_SKINNING_JOINTS,
 } satisfies Partial<RendererCapabilities>);
 
 /** Reads the §62 limits this tier can honestly report. */
@@ -1235,6 +1323,40 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    */
   #shadowTarget: RenderTarget | null = null;
 
+  /**
+   * The registered skinning pipeline's two programs (§54; RFC 0003), or
+   * `null` — before the first skinned draw, while the context is lost, when
+   * nothing registered, and forever in a scene that never skins. **Compiled
+   * lazily by {@link WebglRenderer.render}**, never at initialize: the other
+   * seven programs compile up front because §61 forbids a frame from
+   * throwing, and the skinned pair cannot (this module does not link them) —
+   * so the frame compiles inside a `try` and a driver refusal costs skinning,
+   * not the frame. A skinless scene therefore issues the byte-identical GL
+   * sequence it always did — the RFC's acceptance gate.
+   */
+  #skinnedPrograms: SkinnedPrograms | null = null;
+
+  /**
+   * Whether a skinned-program compile failed on the current context — the
+   * once-per-context latch that keeps a refusing driver from being asked
+   * again every frame. Cleared on context restore: a fresh context may
+   * compile.
+   */
+  #skinnedProgramsFailed = false;
+
+  /**
+   * The registered node-material pipeline's per-context program cache (§60;
+   * RFC 0001), or `null` — before the first node-material draw (or §70 graph
+   * effect), while the context is lost, when nothing registered, and forever
+   * in a scene that never uses one. **Created lazily**, never at initialize,
+   * and creating it compiles nothing: programs compile per distinct graph on
+   * first sight, inside the frame's `try`, and a per-graph failure is
+   * latched by the cache itself (§61, §89). A scene without node materials
+   * therefore issues the byte-identical GL sequence it always did — the
+   * RFC's acceptance gate, the skinning slot's shape one seam over.
+   */
+  #nodePrograms: NodeMaterialPrograms | null = null;
+
   #geometries: GeometryCache | null = null;
 
   #textures: TextureCache | null = null;
@@ -1295,6 +1417,22 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    */
   batching: RenderBatching | null = null;
 
+  /**
+   * §9 **render** time in seconds, read by §60 node graphs containing a
+   * `time` node (RFC 0001) — and by nothing else in this backend. `0` by
+   * default, which is GL's own initial value for the uniform, so a scene
+   * whose graphs never read time pays nothing whether or not this moves.
+   *
+   * Assign it between frames, exactly as {@link WebglRenderer.statistics}
+   * asks — typically `renderer.renderTime = timeState.renderTime` in the
+   * application's frame callback. Deliberately render time and never
+   * simulation time: a shader is a rendering artefact, and §42/§43 forbid
+   * anything downstream of one becoming simulation input. Must be finite; a
+   * plain field (the `statistics`/`batching` precedent) because it is
+   * assigned per frame on the application's hot path.
+   */
+  renderTime = 0;
+
   #contextLost = false;
 
   #disposed = false;
@@ -1338,6 +1476,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#standardProgram = null;
     this.#effectProgram = null;
     this.#shadowProgram = null;
+    // §54's lazily compiled pair (RFC 0003) died with the context like every
+    // other handle; the next skinned draw recompiles.
+    this.#skinnedPrograms = null;
+    this.#skinnedProgramsFailed = false;
+    // §60's node-program cache (RFC 0001) died with the context too; the
+    // next node-material draw re-creates it and recompiles per graph.
+    this.#nodePrograms = null;
     this.#geometries?.forget();
     this.#textures?.forget();
     this.#renderTargets?.forget();
@@ -1619,6 +1764,15 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
     // unbind. A frame in which nothing casts never touches unit 1 at all.
     let shadowBound = false;
+    // §60 (RFC 0001): how many node-material texture units this frame has
+    // bound above the fixed pair, so the `finally` knows what to release. `0`
+    // for every frame of every scene without node materials — and for a node
+    // scene that samples nothing — which is what keeps those frames'
+    // sequences untouched.
+    let nodeUnitsBound = 0;
+    // The node program currently in use, if `activeKind` is `"node"`: the
+    // kind alone cannot say which of several compiled graphs is current.
+    let activeNodeProgram: NodeMaterialProgram | null = null;
     // Whether **anything** in this frame has bound a framebuffer (F13, R-4,
     // extended by R-18). `targetRecord !== null` stopped being the answer when
     // §69's caster pass arrived: that pass binds a framebuffer on the
@@ -1649,6 +1803,30 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               renderList,
             );
 
+      // §67's other exhaustion case, and a development build only (R-23): a
+      // clip on a surface with no stencil buffer has nothing to write its mask
+      // into, so GL treats every stencil test as passing and the subtree draws
+      // **unclipped** — failing toward drawing, like the ninth clip, but
+      // silently. The check is O(1), not a scan: mask draws sort ahead of
+      // every other item in the frame list, so "does this frame clip at all"
+      // is one read of the first item. Diagnostic only — no GL call, no value
+      // any later code reads (§33's A-4 rule).
+      if (
+        DEV &&
+        !stencilAttached &&
+        items.length > 0 &&
+        items[0].clip?.maskPass === true
+      ) {
+        devWarnOnce(
+          "webgl-clip-without-stencil",
+          "§67: this scene sets `clip = true` but the surface being drawn " +
+            "into has no stencil buffer, so there is nothing to write the " +
+            "mask into and the clipped subtrees draw unclipped. Construct " +
+            "the renderer with `{ stencil: true }` (or give the render " +
+            "target `{ stencil: true }`) to allocate one (R-7).",
+        );
+      }
+
       // The frame's lights (§68), collected only when something will be shaded
       // by them: one `kind` comparison per item decides, so a scene with no lit
       // materials adds nothing to its frame but this loop. Collected once per
@@ -1659,7 +1837,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // this comparison.
       let hasLitItems = false;
       for (const item of items) {
-        if (item.kind === "lit" || item.kind === "standard") {
+        if (
+          item.kind === "lit" ||
+          item.kind === "standard" ||
+          item.kind === "skinned-lit"
+        ) {
           hasLitItems = true;
           break;
         }
@@ -1731,6 +1913,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       resetGlState(state);
 
       for (const view of views) {
+        // §60's per-view stamp (RFC 0001): one increment per view, so each
+        // node program uploads its view state once per view however many
+        // materials share it. No GL call — see `nodeViewStamp`.
+        nodeViewStamp += 1;
         // §61's clears are masked by the depth and colour write state, so a view
         // that follows a `depthWrite: false` or `colorWrite: false` draw would
         // clear nothing at all. Put both back first; with §57's defaults this
@@ -1788,6 +1974,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         let particleViewUploaded = false;
         let litViewUploaded = false;
         let standardViewUploaded = false;
+        let skinnedUnlitViewUploaded = false;
+        let skinnedLitViewUploaded = false;
 
         // §64 stages 2–3, per view (R-8, 2026-08-09). The frame's list is built
         // once, above; this derives *this view's* draws from it — §46's layer
@@ -1862,6 +2050,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                   state,
                   batch.material,
                   batch.kind === "sprite",
+                  // §67 (R-23): the run's shared clip — the batcher broke the
+                  // run wherever the record changed, so one apply covers every
+                  // merged draw. `?? null` for a hand-built batch predating
+                  // the field.
+                  batch.clip ?? null,
                 );
                 if (batchTexture !== null) {
                   if (!mapUnitActive) {
@@ -1891,6 +2084,237 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             }
           }
 
+          // §54's skinned draws (RFC 0003) — a self-contained arm ending in
+          // `continue`, like the particle arm below, because the skinned
+          // pipeline must be resolved *before* the geometry upload: a draw
+          // skipped for an unregistered pipeline (or a failed compile)
+          // contributes nothing at all — not even a buffer upload. The two
+          // programs compile lazily on this renderer's first skinned draw —
+          // see `#acquireSkinnedPrograms` for the whole policy; the failure
+          // direction is absence with a one-time warning, never a bind pose
+          // (a character standing in T-pose is a different picture).
+          if (isSkinnedUnlitItem(item) || isSkinnedLitItem(item)) {
+            const skinnedPrograms = this.#acquireSkinnedPrograms(gl);
+            if (skinnedPrograms === null) {
+              continue;
+            }
+            const skinnedRecord = geometries.acquire(item.geometry);
+            if (skinnedRecord === null) {
+              continue;
+            }
+            if (isSkinnedUnlitItem(item)) {
+              const skinnedProgram = skinnedPrograms.unlit;
+              if (activeKind !== "skinned-unlit") {
+                skinnedProgram.use();
+                activeKind = "skinned-unlit";
+              }
+              applyMaterialState(
+                gl,
+                state,
+                item.material,
+                false,
+                item.clip ?? null,
+              );
+              if (!skinnedUnlitViewUploaded) {
+                skinnedProgram.setViewProjection(viewProjection);
+                skinnedUnlitViewUploaded = true;
+              }
+              const map = mapOf(item.material);
+              const texture =
+                map === null
+                  ? null
+                  : resolveTexture(textures, renderTargets, activeTarget, map);
+              if (texture !== null) {
+                if (!mapUnitActive) {
+                  gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                  mapUnitActive = true;
+                }
+                gl.bindTexture(GL.TEXTURE_2D, texture);
+                textureBound = true;
+              }
+              skinnedProgram.setFeatures(
+                texture !== null,
+                item.material.vertexColors === true,
+              );
+              skinnedProgram.setModel(item.worldMatrix);
+              skinnedProgram.setColor(
+                item.material.color,
+                opacityOf(item.material),
+              );
+              skinnedProgram.setJointMatrices(item.jointMatrices);
+            } else {
+              const skinnedProgram = skinnedPrograms.lit;
+              if (activeKind !== "skinned-lit") {
+                skinnedProgram.use();
+                activeKind = "skinned-lit";
+              }
+              applyMaterialState(
+                gl,
+                state,
+                item.material,
+                false,
+                item.clip ?? null,
+              );
+              if (!skinnedLitViewUploaded) {
+                // The same per-view state the lit branch uploads, through the
+                // same shared uniform classes, so the skip rules agree.
+                skinnedProgram.setViewProjection(viewProjection);
+                skinnedProgram.setAmbientLight(sceneLights.ambientColor);
+                skinnedProgram.setDirectionalLight(
+                  sceneLights.direction,
+                  sceneLights.directionalColor,
+                );
+                skinnedProgram.setPunctualLights(sceneLights);
+                skinnedProgram.setShadow(sceneLights);
+                skinnedLitViewUploaded = true;
+              }
+              const map = mapOf(item.material);
+              const texture =
+                map === null
+                  ? null
+                  : resolveTexture(textures, renderTargets, activeTarget, map);
+              if (texture !== null) {
+                if (!mapUnitActive) {
+                  gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
+                  mapUnitActive = true;
+                }
+                gl.bindTexture(GL.TEXTURE_2D, texture);
+                textureBound = true;
+              }
+              skinnedProgram.setFeatures(texture !== null);
+              skinnedProgram.setReceivesShadow(
+                shadowActive && item.receiveShadow,
+              );
+              skinnedProgram.setModel(item.worldMatrix);
+              skinnedProgram.setColor(
+                item.material.color,
+                opacityOf(item.material),
+              );
+              skinnedProgram.setJointMatrices(item.jointMatrices);
+            }
+            gl.bindVertexArray(skinnedRecord.vertexArray);
+            if (skinnedRecord.indexType === null) {
+              gl.drawArrays(skinnedRecord.mode, 0, skinnedRecord.count);
+            } else {
+              gl.drawElements(
+                skinnedRecord.mode,
+                skinnedRecord.count,
+                skinnedRecord.indexType,
+                0,
+              );
+            }
+            if (statistics !== null) {
+              countDraw(statistics, skinnedRecord.mode, skinnedRecord.count, 1);
+            }
+            continue;
+          }
+
+          // §60's node materials (RFC 0001) — a self-contained arm ending in
+          // `continue`, like the skinned arm above, and resolved in the same
+          // order: pipeline first, then this draw's textures, then the
+          // geometry, so a draw skipped at any step contributes nothing at
+          // all — not even a buffer upload (the with/without-registration
+          // transcript A/B's exactness). The program cache compiles one
+          // program per distinct graph on first sight (`gl-node-program.ts`);
+          // the failure direction is absence with a one-time warning, never a
+          // flat-coloured stand-in (a graph is a specific picture).
+          if (isNodeItem(item)) {
+            const nodePrograms = this.#acquireNodePrograms(gl);
+            if (nodePrograms === null) {
+              continue;
+            }
+            const nodeMaterial = item.material;
+            const nodeProgram = nodePrograms.acquire(nodeMaterial.graph);
+            if (nodeProgram === null) {
+              continue;
+            }
+            const samplers = nodeProgram.textures;
+            let texturesResolved = true;
+            for (let unit = 0; unit < samplers.length; unit += 1) {
+              const bound = nodeMaterial.getTexture(samplers[unit]);
+              const handle =
+                bound === null
+                  ? null
+                  : resolveTexture(
+                      textures,
+                      renderTargets,
+                      activeTarget,
+                      bound,
+                    );
+              if (handle === null) {
+                texturesResolved = false;
+                break;
+              }
+              nodeTextureScratch[unit] = handle;
+            }
+            if (!texturesResolved) {
+              // A sampler with no binding, a disposed texture, or a feedback
+              // loop on the current target: skipped, exactly as a sprite
+              // whose texture will not resolve is (§83; R-4's rule).
+              if (DEV) {
+                devWarnOnce(
+                  `webgl-node-texture:${nodeMaterial.id}`,
+                  `§60: node material "${nodeMaterial.id}" samples a texture ` +
+                    "that is unbound, disposed, or the surface being drawn " +
+                    "into; its draws are skipped (§83).",
+                );
+              }
+              continue;
+            }
+            const nodeRecord = geometries.acquire(item.geometry);
+            if (nodeRecord === null) {
+              continue;
+            }
+            if (activeKind !== "node" || activeNodeProgram !== nodeProgram) {
+              nodeProgram.use();
+              activeNodeProgram = nodeProgram;
+              activeKind = "node";
+            }
+            applyMaterialState(
+              gl,
+              state,
+              nodeMaterial,
+              false,
+              item.clip ?? null,
+            );
+            if (nodeProgram.viewStamp !== nodeViewStamp) {
+              nodeProgram.setViewProjection(viewProjection);
+              nodeProgram.setTime(this.renderTime);
+              nodeProgram.viewStamp = nodeViewStamp;
+            }
+            for (let unit = 0; unit < samplers.length; unit += 1) {
+              gl.activeTexture(GL.TEXTURE0 + nodeProgram.unitBase + unit);
+              gl.bindTexture(GL.TEXTURE_2D, nodeTextureScratch[unit]);
+            }
+            if (samplers.length > 0) {
+              if (samplers.length > nodeUnitsBound) {
+                nodeUnitsBound = samplers.length;
+              }
+              // Leave the active unit where every other path's mirror
+              // expects it: unit 0, which `mapUnitActive` then truthfully
+              // reports as selected.
+              gl.activeTexture(GL.TEXTURE0);
+              mapUnitActive = true;
+            }
+            nodeProgram.setMaterial(nodeMaterial);
+            nodeProgram.setModel(item.worldMatrix);
+            gl.bindVertexArray(nodeRecord.vertexArray);
+            if (nodeRecord.indexType === null) {
+              gl.drawArrays(nodeRecord.mode, 0, nodeRecord.count);
+            } else {
+              gl.drawElements(
+                nodeRecord.mode,
+                nodeRecord.count,
+                nodeRecord.indexType,
+                0,
+              );
+            }
+            if (statistics !== null) {
+              countDraw(statistics, nodeRecord.mode, nodeRecord.count, 1);
+            }
+            continue;
+          }
+
           const record = geometries.acquire(item.geometry);
           if (record === null) {
             continue;
@@ -1916,7 +2340,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             // carry no material to say otherwise, so they blend with the straight
             // alpha function and draw with §57's default depth and colour state —
             // see `gl-particles.ts` for the whole policy.
-            applyMaterialState(gl, state, undefined, true);
+            // §67 (R-23): a particle system inside a clipped subtree is
+            // tested like everything else — the clip is per draw, and §36's
+            // batched item is one draw. `?? null` for a structurally-typed
+            // item predating the field.
+            applyMaterialState(gl, state, undefined, true, item.clip ?? null);
             if (!particleViewUploaded) {
               // The billboard offset happens between the view and the projection,
               // so this pipeline takes the two matrices separately rather than
@@ -1960,7 +2388,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             // channel has to composite whatever the flag says — so `alwaysBlend`
             // is `true` here. Everything else the material declares (blend mode,
             // depth test, depth write, colour write) applies as usual.
-            applyMaterialState(gl, state, material, true);
+            applyMaterialState(gl, state, material, true, item.clip ?? null);
             if (!spriteViewUploaded) {
               spriteProgram.setViewProjection(viewProjection);
               spriteViewUploaded = true;
@@ -2017,7 +2445,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               litProgram.use();
               activeKind = "lit";
             }
-            applyMaterialState(gl, state, item.material, false);
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              false,
+              item.clip ?? null,
+            );
             if (!litViewUploaded) {
               // The view-projection and the frame's lights, once per view —
               // uniforms live in the program object, so they hold for every lit
@@ -2076,7 +2510,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               standardProgram.use();
               activeKind = "standard";
             }
-            applyMaterialState(gl, state, item.material, false);
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              false,
+              item.clip ?? null,
+            );
             if (!standardViewUploaded) {
               // Per-view state: uniforms live in the program object, so one
               // upload holds for every standard draw into this view even when
@@ -2139,7 +2579,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               program.use();
               activeKind = "unlit";
             }
-            applyMaterialState(gl, state, item.material, false);
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              false,
+              item.clip ?? null,
+            );
             const map = mapOf(item.material);
             const texture =
               map === null
@@ -2194,6 +2640,17 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       restoreGlState(gl, state);
       if (textureBound) {
         gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      // §60's node texture units (RFC 0001), released on the same terms as
+      // unit 0's albedo: bound during the frame, left bound by nothing. Zero
+      // iterations — and zero calls — in every frame that drew no textured
+      // node material.
+      for (let unit = 0; unit < nodeUnitsBound; unit += 1) {
+        gl.activeTexture(GL.TEXTURE0 + NODE_SURFACE_TEXTURE_UNIT_BASE + unit);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      if (nodeUnitsBound > 0) {
+        gl.activeTexture(GL.TEXTURE0);
       }
       gl.bindVertexArray(null);
       // Back to the default drawing buffer (R-4, widened by R-18). Same
@@ -2313,11 +2770,28 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       }
     }
 
+    // §60's graph effect (RFC 0001): drawn by the registered node pipeline
+    // through its own envelope — a different program per graph, its own
+    // sampler set, its own uniform values — so it branches before the
+    // fixed-effect path rather than growing a switch inside it. Everything
+    // the fixed path skips, this skips too, on the same §61 terms.
+    const effect = pass.effect;
+    if (effect.kind === "graph") {
+      this.#renderGraphEffect(
+        gl,
+        effect,
+        sourceRecord,
+        destinationRecord,
+        destination,
+        renderTargets,
+      );
+      return;
+    }
+
     // An effect kind this build does not implement is skipped, never quietly
     // copied: `ScreenEffect` is a closed union precisely so that a staged §70
     // effect is a compile error, and a value that arrived from JSON or from
     // JavaScript must not become a different picture than the one asked for.
-    const effect = pass.effect;
     if (
       effect.kind !== "copy" &&
       effect.kind !== "grade" &&
@@ -2408,6 +2882,54 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
    *
    * Cameras are not touched — `aspect` is the application's to set (§47).
    */
+  /**
+   * Builds a `PickingService` over this renderer — §71's `"gpu"` tier
+   * (RFC 0005), gated on `registerPickingPipeline()` exactly as skinned
+   * draws are gated on `registerSkinningPipeline()`: this method resolves the
+   * registry slot and refuses (§85) when nothing registered, so the id
+   * program, the service, and its read-back live only in bundles that opted
+   * in (the pipeline-cost law; `gl-picking-registry.ts`).
+   *
+   * What the service receives is a **live window** onto exactly the renderer
+   * state an id pass needs — context, the two shared caches, the surface
+   * size, and the two lifecycle flags — as accessors, so a §61 restore's new
+   * caches are seen rather than captured stale (`PickingRendererHost`). Each
+   * call builds an independent service; the caller owns and disposes it
+   * (§83). No GL call is issued here — the id program compiles on the
+   * service's first pass.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` on a disposed renderer, or
+   * when no picking pipeline is registered.
+   */
+  createPickingService(): PickingService {
+    this.#assertUsable("createPickingService");
+    const factory = resolvePickingServiceFactory();
+    if (factory === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "§71: call registerPickingPipeline() from @four/render-webgl " +
+          "before createPickingService() (§85).",
+        { context: { registered: false } },
+      );
+    }
+    // Seven `this`-capturing arrows are the whole window: the host outlives
+    // this call and must keep seeing the *live* renderer state (a §61 restore
+    // swaps the caches), which is why the seam is accessor methods rather
+    // than a snapshot — and arrows rather than getters is what keeps this
+    // method's ride-along in never-picking bundles small (the A-3
+    // trim-the-refusal precedent, applied to a factory).
+    const host: PickingRendererHost = {
+      context: () => this.#gl,
+      geometries: () => this.#geometries,
+      renderTargets: () => this.#renderTargets,
+      surfaceWidth: () => this.#bufferWidth,
+      surfaceHeight: () => this.#bufferHeight,
+      contextLost: () => this.#contextLost,
+      disposed: () => this.#disposed,
+    };
+    return factory.create(host);
+  }
+
   resize(width: number, height: number, resolution = 1): void {
     this.#assertUsable("resize");
     this.#sizeRequested = true;
@@ -2450,6 +2972,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#standardProgram?.dispose();
       this.#effectProgram?.dispose();
       this.#shadowProgram?.dispose();
+      this.#skinnedPrograms?.dispose();
+      this.#nodePrograms?.dispose();
       this.#geometries?.dispose();
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
@@ -2464,6 +2988,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#standardProgram = null;
     this.#effectProgram = null;
     this.#shadowProgram = null;
+    this.#skinnedPrograms = null;
+    this.#nodePrograms = null;
     // The one `RenderTarget` this renderer created for itself (R-18), so the
     // one it owes a `dispose()` to (§83) — its bytes leave the process-wide
     // totals here. The framebuffer behind it is the cache's and was released
@@ -2623,6 +3149,210 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   }
 
   /**
+   * The registered skinning pipeline's programs for this context, compiled on
+   * first use, or `null` when there is nothing to draw skinned with (§54;
+   * RFC 0003).
+   *
+   * Three answers, all §61-safe (never a throw from inside the frame):
+   *
+   * - **compiled already** — the pair, one field read;
+   * - **nothing registered** — `null`, with a one-time §85 development
+   *   warning naming `registerSkinningPipeline()`; the skinned draw is
+   *   skipped rather than shown in bind pose (RFC 0003 §5);
+   * - **the compile failed** — `null` forever on this context (the latch),
+   *   with a one-time warning carrying the driver's §89 failure; a context
+   *   restore clears the latch, because a fresh context may compile.
+   */
+  #acquireSkinnedPrograms(gl: ParticleGlContext): SkinnedPrograms | null {
+    const existing = this.#skinnedPrograms;
+    if (existing !== null) {
+      return existing;
+    }
+    if (this.#skinnedProgramsFailed) {
+      return null;
+    }
+    const factory = resolveSkinningPipelineFactory();
+    if (factory === null) {
+      if (DEV) {
+        devWarnOnce(
+          "webgl-skinning-unregistered",
+          "§54: this scene contains a skinned mesh but no skinning pipeline " +
+            "is registered, so its draws are skipped (a bind pose would be " +
+            "a different picture). Call registerSkinningPipeline() from " +
+            "@four/render-webgl at application setup (RFC 0003).",
+        );
+      }
+      return null;
+    }
+    try {
+      const compiled = factory.create(gl);
+      this.#skinnedPrograms = compiled;
+      return compiled;
+    } catch (error: unknown) {
+      // §61: a driver's compile refusal costs skinning, never the frame. The
+      // latch keeps a refusing driver from being asked once per skinned item.
+      this.#skinnedProgramsFailed = true;
+      if (DEV) {
+        devWarnOnce(
+          "webgl-skinning-compile-failed",
+          "§54: the skinning pipeline failed to compile on this context; " +
+            `skinned draws are skipped (§61, §89). ${String(error)}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
+   * The registered node-material program cache for this context, created on
+   * first need, or `null` when nothing registered (§60; RFC 0001).
+   *
+   * Two answers, both §61-safe: **created already** — one field read; or
+   * **nothing registered** — `null`, with a one-time §85 development warning
+   * naming `registerNodeMaterialPipeline()`, and the node draw (or §70 graph
+   * effect) is skipped rather than approximated. Creation compiles nothing —
+   * per-graph compiles and their per-graph failure latch live in the cache
+   * (`gl-node-program.ts`), so no compile-failure latch is needed here.
+   */
+  #acquireNodePrograms(gl: ParticleGlContext): NodeMaterialPrograms | null {
+    const existing = this.#nodePrograms;
+    if (existing !== null) {
+      return existing;
+    }
+    const factory = resolveNodeMaterialPipelineFactory();
+    if (factory === null) {
+      if (DEV) {
+        devWarnOnce(
+          "webgl-node-material-unregistered",
+          "§60: this scene uses a node material (or §70 graph effect) but no " +
+            "node pipeline is registered, so those draws are skipped (flat " +
+            "colour would be a different picture). Call " +
+            "registerNodeMaterialPipeline() from @four/render-webgl at " +
+            "application setup (RFC 0001).",
+        );
+      }
+      return null;
+    }
+    const created = factory.create(gl);
+    this.#nodePrograms = created;
+    return created;
+  }
+
+  /**
+   * Draws one §70 **graph** effect (§60; RFC 0001) — the graph-shaped arm of
+   * {@link WebglRenderer.renderEffect}, bound by the same three rules and the
+   * same F13 envelope.
+   *
+   * The graph's samplers resolve against the pass's declared inputs:
+   * `"source"` is the pass's source record, every other name reads
+   * `effect.textures`. Anything that will not resolve — an unregistered
+   * pipeline, a graph the driver refused (latched per graph by the cache), a
+   * missing or disposed input, or an input that **is** the destination
+   * (R-4's feedback rule, applied per sampled surface) — skips the effect
+   * entirely, before any state is touched (§61, §83).
+   */
+  #renderGraphEffect(
+    gl: ParticleGlContext,
+    effect: GraphEffect,
+    sourceRecord: RenderTargetRecord,
+    destinationRecord: RenderTargetRecord | null,
+    destination: RenderTargetArgument | null,
+    renderTargets: RenderTargetCache,
+  ): void {
+    const nodePrograms = this.#acquireNodePrograms(gl);
+    if (nodePrograms === null) {
+      return;
+    }
+    const program = nodePrograms.acquire(effect.graph);
+    if (program === null) {
+      return;
+    }
+    const samplers = program.textures;
+    for (let unit = 0; unit < samplers.length; unit += 1) {
+      const name = samplers[unit];
+      let handle: GlTexture | null = null;
+      if (name === "source") {
+        handle = sourceRecord.texture;
+      } else {
+        const input = effect.textures?.[name];
+        if (input !== undefined && isRenderTargetTexture(input)) {
+          const inputTarget = input.renderTarget;
+          if (inputTarget !== destination) {
+            handle = renderTargets.acquire(inputTarget)?.texture ?? null;
+          }
+        }
+      }
+      if (handle === null) {
+        return;
+      }
+      nodeTextureScratch[unit] = handle;
+    }
+
+    const width = destinationRecord?.width ?? this.#bufferWidth;
+    const height = destinationRecord?.height ?? this.#bufferHeight;
+    const state = this.#glState;
+    const statistics = this.statistics;
+    let unitsBound = 0;
+
+    try {
+      if (destinationRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, destinationRecord.framebuffer);
+      }
+      // The whole destination surface, no blend, no depth test — an effect
+      // replaces what the destination held; `renderEffect`'s fixed path
+      // documents each choice and this arm repeats them exactly.
+      gl.scissor(0, 0, width, height);
+      gl.viewport(0, 0, width, height);
+      applyBlendState(gl, state, false, "normal");
+      applyDepthColorState(gl, state, false, true, true);
+
+      program.use();
+      const uniforms = effect.uniforms;
+      if (uniforms !== undefined) {
+        // Sorted so the upload order is a function of the pass, not of a
+        // record's key order (§33). Setup-scale work: an effect pass draws
+        // once, not once per item.
+        for (const name of Object.keys(uniforms).sort()) {
+          const value = uniforms[name];
+          if (typeof value === "number") {
+            effectUniformScratch[0] = value;
+            program.setUniform(name, effectUniformScratch);
+          } else {
+            program.setUniform(name, value);
+          }
+        }
+      }
+      program.setTime(this.renderTime);
+      for (let unit = 0; unit < samplers.length; unit += 1) {
+        // A "screen" program's units start at 0 (`unitBase`); the fixed
+        // shadow/map units belong to scene frames, not effect draws.
+        gl.activeTexture(GL.TEXTURE0 + program.unitBase + unit);
+        gl.bindTexture(GL.TEXTURE_2D, nodeTextureScratch[unit]);
+        unitsBound += 1;
+      }
+      // No vertex data at all — the triangle's corners come from
+      // `gl_VertexID`, exactly as the fixed effect pipeline's do.
+      gl.bindVertexArray(null);
+      gl.drawArrays(GL.TRIANGLES, 0, EFFECT_VERTEX_COUNT);
+      if (statistics !== null) {
+        countDraw(statistics, GL.TRIANGLES, EFFECT_VERTEX_COUNT, 1);
+      }
+    } finally {
+      restoreGlState(gl, state);
+      for (let unit = unitsBound - 1; unit >= 0; unit -= 1) {
+        gl.activeTexture(GL.TEXTURE0 + program.unitBase + unit);
+        gl.bindTexture(GL.TEXTURE_2D, null);
+      }
+      // The loop above ends with unit `unitBase` selected — 0 for every
+      // screen program — so nothing further to restore; a samplerless graph
+      // touched no unit at all.
+      if (destinationRecord !== null) {
+        gl.bindFramebuffer(GL.FRAMEBUFFER, null);
+      }
+    }
+  }
+
+  /**
    * Renders §69's directional shadow map and returns the framebuffer record it
    * drew into, or `null` if the map could not be produced (R-18, 2026-08-09).
    *
@@ -2716,7 +3446,33 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     shadowProgram.use();
     shadowProgram.setViewProjection(sceneLights.shadowMatrix);
     for (const item of items) {
-      if (!item.castShadow || item.kind === "sprite") {
+      // §67's clip is deliberately not consulted here (R-23). A stencil clip
+      // is a per-view, screen-space construct and this framebuffer carries no
+      // stencil attachment (R-7: samplable depth is a DEPTH_COMPONENT24
+      // texture, which structurally excludes the packed stencil format), so a
+      // clipped surface casts its **whole** shadow — the §69 analogue of a
+      // sprite casting its rectangle, and honest for the same reason: a
+      // depth-only pass writes geometry, not visibility. Mask draws never
+      // reach this loop at all; the list builder writes `castShadow: false`
+      // on every one, because a mask is not content.
+      // §54 (RFC 0003): skinned draws are excluded beside sprites, and for
+      // the analogous reason — this depth-only program does not skin, so a
+      // skinned caster would cast its **bind pose**, which is a different
+      // picture. A skinned caster program is deferred with CPU skinning;
+      // until it lands, a skinned mesh casts no shadow, documented on `Mesh`.
+      // §60 (RFC 0001): a node material with **no** displacement casts its
+      // geometry exactly — depth ignores colour, so the caster program is
+      // right for it — but one whose graph displaces vertices would cast its
+      // *undisplaced* silhouette, which is a different picture (the skinned
+      // bind-pose rule, one pipeline over), so those casters are skipped.
+      if (
+        !item.castShadow ||
+        item.kind === "sprite" ||
+        item.kind === "skinned-unlit" ||
+        item.kind === "skinned-lit" ||
+        (item.kind === "node" &&
+          item.material.graph.positionOffset !== undefined)
+      ) {
         continue;
       }
       const geometry = geometries.acquire(item.geometry);

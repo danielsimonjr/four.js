@@ -22,6 +22,7 @@ export const PACKAGE_NAME = "@four/render-webgpu";
 export type {
   Gpu,
   GpuAdapter,
+  GpuStencilFaceState,
   GpuBindGroup,
   GpuBindGroupEntry,
   GpuBindGroupLayout,
@@ -33,6 +34,9 @@ export type {
   GpuCanvasContext,
   GpuCommandBuffer,
   GpuCommandEncoder,
+  GpuComputePassEncoder,
+  GpuComputePipeline,
+  GpuComputePipelineDescriptor,
   GpuDevice,
   GpuDeviceLostInfo,
   GpuPipelineLayout,
@@ -40,16 +44,21 @@ export type {
   GpuRenderPassDescriptor,
   GpuRenderPassEncoder,
   GpuRenderPipeline,
+  GpuBufferBinding,
   GpuRenderPipelineDescriptor,
+  GpuSampler,
+  GpuSamplerDescriptor,
   GpuShaderModule,
   GpuTexture,
   GpuTextureDescriptor,
   GpuTextureView,
+  GpuTextureViewDescriptor,
   GpuVertexBufferLayout,
   WebgpuCanvas,
 } from "./webgpu-device.js";
 export {
   GPU_BUFFER_USAGE,
+  GPU_MAP_MODE,
   GPU_SHADER_STAGE,
   GPU_TEXTURE_USAGE,
   UNIFORM_STRIDE_BYTES,
@@ -63,15 +72,50 @@ export {
   DRAW_UNIFORM_FLOATS,
   DRAW_UNIFORM_WGSL,
   DRAW_VIEW_PROJECTION_OFFSET,
+  MAP_BINDING_WGSL,
+  MAP_BIND_GROUP_INDEX,
+  MAP_SAMPLER_BINDING,
+  MAP_TEXTURE_BINDING,
   createDrawBindGroupLayout,
+  createTextureBindGroupLayout,
 } from "./wgpu-bindings.js";
 export type { CacheableGeometry, WgpuGeometryRecord } from "./wgpu-geometry.js";
 export { WgpuGeometryCache } from "./wgpu-geometry.js";
 export type {
+  WgpuBatchStream,
   WgpuPipelineDescriptor,
   WgpuPipelineKind,
+  WgpuStencilDescriptor,
 } from "./wgpu-pipeline-cache.js";
 export { pipelineKey, WgpuPipelineCache } from "./wgpu-pipeline-cache.js";
+export type { WgpuRenderBatching } from "./wgpu-batch.js";
+export {
+  WgpuBatching,
+  batchVertexBufferLayout,
+  createWgpuBatching,
+} from "./wgpu-batch.js";
+export {
+  SPRITE_MODEL_OFFSET,
+  SPRITE_QUAD_OFFSET,
+  SPRITE_SHADER_SOURCE,
+  SPRITE_TINT_OFFSET,
+  SPRITE_UNIFORM_BYTES,
+  SPRITE_UNIFORM_WGSL,
+  SPRITE_VIEW_PROJECTION_OFFSET,
+  createSpriteBindGroupLayout,
+} from "./wgpu-sprite.js";
+export type {
+  ResolvedSamplerState,
+  WgpuCacheableTexture,
+  WgpuTextureRecord,
+} from "./wgpu-texture.js";
+export {
+  MIPMAP_SHADER_SOURCE,
+  WgpuTextureCache,
+  mipLevelCount,
+  samplerKey,
+  textureByteLength,
+} from "./wgpu-texture.js";
 export {
   CLEAR_SHADER_SOURCE,
   CLEAR_VERTEX_COUNT,
@@ -80,7 +124,133 @@ export {
   FRAGMENT_ENTRY_POINT,
   POSITION_BUFFER_LAYOUT,
   POSITION_SHADER_LOCATION,
+  UV_BUFFER_LAYOUT,
+  UV_SHADER_LOCATION,
   VERTEX_ENTRY_POINT,
   unlitShaderSource,
   unlitVertexBufferLayouts,
 } from "./wgpu-unlit.js";
+export {
+  LIGHTS_BIND_GROUP_INDEX,
+  LIGHT_AMBIENT_OFFSET,
+  LIGHT_CAMERA_OFFSET,
+  LIGHT_COLOR_OFFSET,
+  LIGHT_COUNTS_OFFSET,
+  LIGHT_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_COLOR_OFFSET,
+  LIGHT_PUNCTUAL_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_PARAMS_OFFSET,
+  LIGHT_PUNCTUAL_POSITION_OFFSET,
+  LIGHT_UNIFORM_BYTES,
+  LIGHT_UNIFORM_FLOATS,
+  LIGHT_UNIFORM_MEMBERS_WGSL,
+  LIGHT_UNIFORM_STRIDE_BYTES,
+  LIGHT_UNIFORM_STRIDE_FLOATS,
+  LIGHT_UNIFORM_WGSL,
+  PUNCTUAL_LIGHT_WGSL,
+  SHADED_MAP_BINDING_WGSL,
+  SHADED_MAP_BIND_GROUP_INDEX,
+  createLightsBindGroupLayout,
+  writeLightUniforms,
+} from "./wgpu-lights.js";
+export {
+  NORMAL_BUFFER_LAYOUT,
+  NORMAL_MATRIX_WGSL,
+  NORMAL_SHADER_LOCATION,
+  litShaderSource,
+  shadedVertexBufferLayouts,
+  shadedVertexStageWgsl,
+} from "./wgpu-lit.js";
+export type {
+  WgpuCacheableRenderTarget,
+  WgpuRenderTargetRecord,
+} from "./wgpu-render-target.js";
+export {
+  RENDER_TARGET_COLOR_FORMAT,
+  RENDER_TARGET_DEPTH_FORMAT,
+  RENDER_TARGET_DEPTH_STENCIL_FORMAT,
+  RENDER_TARGET_DEPTH_TEXTURE_FORMAT,
+  WgpuRenderTargetCache,
+  renderTargetDepthFormat,
+} from "./wgpu-render-target.js";
+export type { WgpuEffectKind } from "./wgpu-effect.js";
+export {
+  EFFECT_BIND_GROUP_INDEX,
+  EFFECT_GRADE_OFFSET,
+  EFFECT_PASS_VERTEX_COUNT,
+  EFFECT_UNIFORM_BYTES,
+  EFFECT_UNIFORM_WGSL,
+  createEffectBindGroupLayout,
+  effectShaderSource,
+} from "./wgpu-effect.js";
+export {
+  READBACK_ROW_ALIGNMENT,
+  readTexturePixels,
+  readbackBytesPerRow,
+} from "./wgpu-readback.js";
+export type {
+  ComputeBinding,
+  ComputeBindingAccess,
+  ComputeBufferOptions,
+  ComputePassDescriptor,
+} from "./wgpu-compute.js";
+export {
+  COMPUTE_ENTRY_POINT,
+  PARTICLE_INTEGRATOR_SHADER_SOURCE,
+  PARTICLE_INTEGRATOR_WORKGROUP_SIZE,
+  PARTICLE_SIMULATION_PARAMS_FLOATS,
+  WgpuComputeBuffer,
+  WgpuComputeCache,
+  createComputeBuffer,
+  particleIntegratorWorkgroups,
+  readComputeBufferBytes,
+  writeComputeBuffer,
+  writeParticleSimulationParams,
+} from "./wgpu-compute.js";
+export type { WgpuParticleRecord } from "./wgpu-particles.js";
+export {
+  PARTICLE_INSTANCE_BUFFER_LAYOUT,
+  PARTICLE_INSTANCE_STRIDE_BYTES,
+  PARTICLE_MODEL_OFFSET,
+  PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_SHADER_SOURCE,
+  PARTICLE_UNIFORM_BYTES,
+  PARTICLE_UNIFORM_WGSL,
+  PARTICLE_VERTEX_BUFFER_LAYOUTS,
+  PARTICLE_VIEW_OFFSET,
+  WgpuParticleCache,
+  createParticleBindGroupLayout,
+} from "./wgpu-particles.js";
+export {
+  SHADOW_FACTOR_WGSL,
+  SHADOW_LIGHT_UNIFORM_BYTES,
+  SHADOW_LIGHT_UNIFORM_WGSL,
+  SHADOW_MAP_BINDING,
+  SHADOW_MATRIX_OFFSET,
+  SHADOW_PARAMS_OFFSET,
+  SHADOW_SAMPLER_BINDING,
+  SHADOW_SHADER_SOURCE,
+  SHADOW_UNIFORM_SPARE_BYTES,
+  createShadowLightsBindGroupLayout,
+  createShadowSampler,
+  writeShadowUniforms,
+} from "./wgpu-shadow.js";
+export type { WgpuStencilSource } from "./wgpu-stencil.js";
+export {
+  CLEAR_STENCIL,
+  STENCIL_ALL_BITS,
+  applyStencilReference,
+  frameWantsStencil,
+  stencilDescriptor,
+} from "./wgpu-stencil.js";
+export {
+  STANDARD_BASE_COLOR_OFFSET,
+  STANDARD_EMISSIVE_OFFSET,
+  STANDARD_MODEL_OFFSET,
+  STANDARD_SURFACE_OFFSET,
+  STANDARD_UNIFORM_BYTES,
+  STANDARD_UNIFORM_WGSL,
+  STANDARD_VIEW_PROJECTION_OFFSET,
+  createStandardBindGroupLayout,
+  standardShaderSource,
+} from "./wgpu-standard.js";

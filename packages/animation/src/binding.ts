@@ -23,6 +23,33 @@
  * would drop the hook and leave the transform permanently stale (§7). Primitive
  * and discrete values have nothing to write through and are assigned.
  *
+ * ## Indexed-array targets — §17's two "missing" track types (RFC 0003 §2)
+ *
+ * A path segment that is a decimal index addresses **an element of an array or
+ * typed array**, because an element *is* a property of its array — `"2" in
+ * float32Array` is true exactly for an in-range index, and reading and writing
+ * `owner["2"]` is the element access. That one fact is the whole of §17's
+ * *morph weight* and *skeletal joint* track types (they are binding forms, not
+ * value kinds — the amendment §17 records):
+ *
+ * ```ts
+ * // A morph-weight track: a number track into one element of the
+ * // MorphWeights component's array (§54; @four/scene).
+ * createBinding(morphWeights, "weights.2");
+ * // A skeletal-joint track: ordinary vector3/quaternion tracks into a bone
+ * // reached through Skeleton.bones — insertion order is the ABI (§33).
+ * createBinding(skeleton, "bones.0.transform.rotation");
+ * ```
+ *
+ * Everything a property binding promises holds unchanged: the index resolves
+ * **once** (an out-of-range index fails loudly at creation, not per frame),
+ * the write is `owner[index] = value` for the primitive kinds, and no new
+ * `ValueKind`, adapter, or track type exists — a joint track holds vectors and
+ * quaternions, a morph track holds numbers, and duplicating those
+ * discriminants was rejected by RFC 0003 alternative D.
+ * {@link createArrayElementBinding} is the explicit spelling for the last
+ * segment; the dotted grammar above is the one clips and controllers use.
+ *
  * ## Not handled here
  *
  * Transform authority (§42) and last-started-wins conflict warnings (§16) are
@@ -32,7 +59,7 @@
 
 import { FourError } from "@four/core";
 
-import { detectAdapter, type ValueAdapter } from "./values.js";
+import { detectAdapter, numberAdapter, type ValueAdapter } from "./values.js";
 
 /**
  * A resolved reference to one property, plus the adapter for its value type.
@@ -201,4 +228,41 @@ export function createBinding(
         },
   };
   return binding;
+}
+
+/**
+ * Resolves `path` against `target` and binds **element `index`** of the array
+ * it names — the explicit spelling of the indexed-array binding form (§16,
+ * §17; RFC 0003 §2), equivalent to
+ * `createBinding(target, path + "." + index, numberAdapter)`.
+ *
+ * ```ts
+ * const weight = createArrayElementBinding(morphWeights, "weights", 0);
+ * weight.set(0.5);                        // writes weights.weights[0]
+ * ```
+ *
+ * The element must exist when the binding is created (§16: resolved once) —
+ * an index at or past the array's length is refused loudly here rather than
+ * silently growing a plain array or dropping writes into a typed one. The
+ * value kind is `number`: §17's morph-weight track is a scalar track, and an
+ * element of any numeric array binds through {@link numberAdapter}.
+ *
+ * @param target Root object of the path.
+ * @param path Dot-separated path to the array; must be non-empty.
+ * @param index Element index; a non-negative integer inside the array.
+ * @throws FourError `INVALID_APPLICATION_STATE` — the path does not resolve,
+ * or `index` is not a non-negative integer inside the named array.
+ */
+export function createArrayElementBinding(
+  target: object,
+  path: string,
+  index: number,
+): PropertyBinding {
+  if (!Number.isInteger(index) || index < 0) {
+    invalidBinding(
+      `Array-element binding "${path}"[${String(index)}] needs a non-negative integer index.`,
+      { path, index },
+    );
+  }
+  return createBinding(target, `${path}.${String(index)}`, numberAdapter);
 }

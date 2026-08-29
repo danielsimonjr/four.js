@@ -8,7 +8,7 @@ import {
 import { Group } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
-import { createBinding } from "../src/binding.js";
+import { createArrayElementBinding, createBinding } from "../src/binding.js";
 import {
   colorAdapter,
   discreteAdapterFor,
@@ -258,5 +258,65 @@ describe("createBinding — allocation discipline (§7b)", () => {
     expect(constructionCount()).toBe(0);
     expect(accumulator).toBeGreaterThan(0);
     expect(node.transform.position.x).toBeCloseTo(9.99, 9);
+  });
+});
+
+describe("indexed-array targets — §17's binding form (RFC 0003 §2)", () => {
+  it("addresses an element of a typed array through a numeric segment", () => {
+    const target = { weights: new Float32Array([0.1, 0.2, 0.3]) };
+    const binding = createBinding(target, "weights.1");
+
+    expect(binding.adapter.kind).toBe("number");
+    expect(binding.get()).toBeCloseTo(0.2, 6);
+    binding.set(0.9);
+    expect(target.weights[1]).toBeCloseTo(0.9, 6);
+    // The neighbours are untouched — the binding is one element, not the array.
+    expect(target.weights[0]).toBeCloseTo(0.1, 6);
+  });
+
+  it("refuses an out-of-range index loudly, at creation (§16, §85)", () => {
+    const target = { weights: new Float32Array(2) };
+    expect(() => createBinding(target, "weights.5")).toThrowError(
+      /does not exist/,
+    );
+  });
+
+  it("reaches a skeletal-joint channel through an array of bones (§33)", () => {
+    // The Skeleton shape, reduced: `bones` is an array, so `bones.0` resolves
+    // by index and the rest of the path is ordinary property walking. The
+    // joint index in the path is stable because insertion order is the ABI.
+    const bone = { transform: { rotation: { value: 0 } } };
+    const skeleton = { bones: [bone] };
+    const binding = createBinding(skeleton, "bones.0.transform.rotation.value");
+    binding.set(1.25);
+    expect(bone.transform.rotation.value).toBe(1.25);
+  });
+
+  it("createArrayElementBinding is the explicit spelling of the same form", () => {
+    const target = { weights: new Float32Array([0, 0]) };
+    const binding = createArrayElementBinding(target, "weights", 0);
+    expect(binding.path).toBe("weights.0");
+    expect(binding.adapter.kind).toBe("number");
+    binding.set(0.5);
+    expect(target.weights[0]).toBe(0.5);
+
+    // Plain numeric arrays bind the same way.
+    const plain = { values: [1, 2, 3] };
+    const second = createArrayElementBinding(plain, "values", 2);
+    second.set(9);
+    expect(plain.values[2]).toBe(9);
+  });
+
+  it("refuses a negative, fractional, or out-of-range explicit index", () => {
+    const target = { weights: new Float32Array(2) };
+    expect(() => createArrayElementBinding(target, "weights", -1)).toThrowError(
+      /non-negative integer/,
+    );
+    expect(() =>
+      createArrayElementBinding(target, "weights", 0.5),
+    ).toThrowError(/non-negative integer/);
+    expect(() => createArrayElementBinding(target, "weights", 2)).toThrowError(
+      /does not exist/,
+    );
   });
 });

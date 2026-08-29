@@ -52,8 +52,11 @@ import {
  * (scalar, vector, quaternion, color, Boolean, discrete); the vector entry is
  * split by arity because the three vector types are distinct classes.
  *
- * Morph-weight and skeletal-joint tracks (§17) are staged for a later phase
- * (plan P4-3) and add their kinds here when they land.
+ * §17's morph-weight and skeletal-joint tracks add **no** kinds here (RFC
+ * 0003 §2, 2026-08-28; this doc used to stage them per plan P4-3): a joint
+ * track holds `vector3`/`quaternion` values and a morph track holds `number`s
+ * — what they needed was a binding form that addresses an array element,
+ * which `./binding.js` documents.
  */
 export type ValueKind =
   | "number"

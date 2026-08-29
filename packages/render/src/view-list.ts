@@ -196,6 +196,16 @@ export function buildViewRenderList(
  * by key 2, so the direction is decided once per comparison and never mixes.
  */
 function compareDepthOrderedItems(a: RenderItem, b: RenderItem): number {
+  // §67's mask draws first, ahead of every other key (R-23): the stencil
+  // buffer must be complete before the first clipped fragment is tested, and
+  // nothing else in §66's order can be allowed to interleave content between a
+  // mask and the draws it masks. `false !== false` in every scene that names no
+  // clip, so this key is a single comparison and never a reordering.
+  const aMask = a.clip?.maskPass === true;
+  const bMask = b.clip?.maskPass === true;
+  if (aMask !== bMask) {
+    return aMask ? -1 : 1;
+  }
   if (a.renderLayer !== b.renderLayer) {
     return a.renderLayer - b.renderLayer;
   }

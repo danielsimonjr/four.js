@@ -37,11 +37,20 @@
  * discriminant: {@link ValueAdapter.kind} already *is* that discriminant, and a
  * parallel enum would only have to be kept in sync with it.
  *
- * **Morph-weight and skeletal-joint tracks are deliberately absent.** They are
- * staged out of Phase 4 (plan decision P4-3) together with §18's state machines
- * and blend trees; §107 does not list them. They arrive with the phase that
- * introduces skinning, and will add their kinds to {@link ValueKind} then. The
- * rest of §17 ships now.
+ * **Morph-weight and skeletal-joint tracks are binding forms, not track
+ * types** — §17's list is 9 of 9 as of RFC 0003 (2026-08-28), and this
+ * paragraph corrects the staged note that used to stand here (P4-3 promised
+ * the two would "add their kinds to `ValueKind`"; read against the shipped
+ * design, that is not what they need, and §17's amendment records why —
+ * duplicate discriminants for values the adapters already represent). A
+ * *skeletal joint* track animates a bone's translation/rotation/scale: those
+ * are `vector3` and `quaternion` values, the `quaternionAdapter` already
+ * slerps (§17's fifth interpolation entry), and a bone is addressed through
+ * `Skeleton.bones` — `"bones.3.transform.rotation"`, insertion order being
+ * the ABI (§33). A *morph weight* track animates a `number` into one element
+ * of the `MorphWeights` component's array — `"weights.0"`. Both resolve
+ * through the indexed-array binding form `./binding.js` documents; no new
+ * `ValueKind`, adapter, or track type exists.
  *
  * ## Interpolation modes (§17)
  *

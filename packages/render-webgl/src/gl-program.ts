@@ -287,6 +287,9 @@ export type GlFramebuffer = object;
 /** Opaque `WebGLRenderbuffer` handle (R-4, `gl-render-target.ts`). */
 export type GlRenderbuffer = object;
 
+/** Opaque `WebGLSync` handle (§71's fence read-back; RFC 0005, `gl-picking.ts`). */
+export type GlSync = object;
+
 /**
  * The GL 2 entry points this package calls — the whole of them.
  *
@@ -438,6 +441,50 @@ export interface WebglContext {
   ): void;
   deleteRenderbuffer(renderbuffer: GlRenderbuffer): void;
 
+  // --- Read-back (`gl-picking.ts`; §71, RFC 0005) ---
+  //
+  // Every member of this group is **optional, and its presence is the
+  // capability** — `generateMipmap`/`getExtension`'s stance (R-30b): real
+  // WebGL 2 has them all unconditionally, a double written before this group
+  // existed reports `undefined` and keeps compiling, and the picking service
+  // degrades path by path (fence read-back → stalling read-back → a §89
+  // refusal naming the missing entry point) rather than crashing a frame.
+  // Nothing on the *draw* path calls any of them.
+
+  /**
+   * Reads one rectangle of the bound framebuffer (§71's id read-back; RFC
+   * 0005 Q5's adopted disposition: the single-texel path, deliberately not
+   * §61's `readPixels(target, region)` — that member still waits on
+   * `Rectangle2`). `into` is a destination view for the direct, **stalling**
+   * form, or a byte offset into the bound `PIXEL_PACK_BUFFER` for the
+   * non-stalling fence form — WebGL 2's own two overloads, collapsed.
+   */
+  readPixels?: (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    format: number,
+    type: number,
+    into: ArrayBufferView | number,
+  ) => void;
+  /** Inserts a fence the GPU signals when prior commands complete. */
+  fenceSync?: (condition: number, flags: number) => GlSync | null;
+  /**
+   * Polls `sync` without blocking (`timeout` is 0 in this package — a
+   * *blocking* client wait would be the stall the fence path exists to
+   * avoid). Returns one of `ALREADY_SIGNALED` / `TIMEOUT_EXPIRED` /
+   * `CONDITION_SATISFIED` / `WAIT_FAILED` (`PICKING_GL`, `gl-picking.ts`).
+   */
+  clientWaitSync?: (sync: GlSync, flags: number, timeout: number) => number;
+  deleteSync?: (sync: GlSync) => void;
+  /** Copies the bound `PIXEL_PACK_BUFFER`'s bytes back to the CPU. */
+  getBufferSubData?: (
+    target: number,
+    sourceByteOffset: number,
+    into: ArrayBufferView,
+  ) => void;
+
   // --- Buffers and vertex arrays (`gl-geometry.ts`) ---
 
   createBuffer(): GlBuffer | null;
@@ -571,6 +618,30 @@ export const UV_ATTRIBUTE_LOCATION = 2;
 export const COLOR_ATTRIBUTE_LOCATION = 3;
 
 /**
+ * Vertex attribute slot the optional joint-index stream is bound to (§53,
+ * §54; RFC 0003, 2026-08-28) — fixed by `layout(location = 4)` in the skinned
+ * vertex stages (`gl-skinning.ts`), continuing R-19's numbering, and a public
+ * layout commitment: `@four/geometry`'s `BufferGeometry.joints` documents it,
+ * and glTF's second influence set (`JOINTS_1`/`WEIGHTS_1`) is the named
+ * extension point at the next two locations.
+ *
+ * The stream is uploaded as **non-normalized `UNSIGNED_SHORT` floats**
+ * (`vertexAttribPointer`, not `vertexAttribIPointer`): the shader declares
+ * `in vec4 joints` and indexes with `int(...)`, which is exact for every
+ * index a `Uint16Array` can carry and keeps this package's GL surface — and
+ * every recorded double — free of an integer-attribute entry point. A program
+ * that does not declare the slot ignores it, as with every optional stream.
+ */
+export const JOINTS_ATTRIBUTE_LOCATION = 4;
+
+/**
+ * Vertex attribute slot the optional joint-weight stream is bound to (§53,
+ * §54; RFC 0003) — `layout(location = 5)`, four floats per vertex,
+ * index-parallel with {@link JOINTS_ATTRIBUTE_LOCATION}'s stream.
+ */
+export const WEIGHTS_ATTRIBUTE_LOCATION = 5;
+
+/**
  * The texture unit the `map` sampler of the unlit and lit pipelines reads from.
  *
  * Unit 0, permanently, and the same unit the sprite pipeline uses: this tier
@@ -647,8 +718,13 @@ void main() {
  *
  * With both off, `fragColor` is assigned `color` with no arithmetic in between,
  * so the frame is bit-identical to the one this shader drew before R-19.
+ *
+ * Exported (RFC 0003, 2026-08-28) because the skinned unlit pipeline
+ * (`gl-skinning.ts`) is this fragment stage over a different **vertex** stage
+ * — one source, not a copy that could drift, and no new bytes in any bundle,
+ * since the string already rides wherever `WebglRenderer` does.
  */
-const FRAGMENT_SHADER_SOURCE = `#version 300 es
+export const FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
 
 uniform vec4 color;
@@ -1243,7 +1319,7 @@ void main() {
  * along because the receiver's normal is what the normal-bias offsets, and a
  * geometry with no normal stream has none to offset.
  */
-const LIT_FRAGMENT_SHADER_SOURCE = `#version 300 es
+export const LIT_FRAGMENT_SHADER_SOURCE = `#version 300 es
 precision highp float;
 
 uniform vec4 color;

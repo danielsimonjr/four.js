@@ -21,11 +21,15 @@
  *
  * ## What is deliberately *not* modelled
  *
- * Everything this packet does not call: `mapAsync`, `copyTextureToBuffer`,
- * compute pipelines, query sets, external textures. Each joins the interface
- * with the packet that calls it (WP-R1.6's readback, WP-R1.8's compute), so the
- * double never has to fake a member no code path reaches — the property that
- * keeps it a double rather than a reimplementation.
+ * Everything this backend does not call: query sets, external textures. Each
+ * joins the interface with the packet that calls it, so the double never has
+ * to fake a member no code path reaches — the property that keeps it a double
+ * rather than a reimplementation. `mapAsync` and `copyTextureToBuffer` joined
+ * with WP-R1.6's readback, and §82's compute members (`createComputePipeline`,
+ * `beginComputePass`, `copyBufferToBuffer`) with WP-R1.8, all as **optional**
+ * members: presence is the capability (R-30b's rule), so every double written
+ * before them still satisfies the surface — and WebGL 2, which has no compute
+ * at all, keeps an honest structural mirror of that absence.
  *
  * ## Names
  *
@@ -59,6 +63,16 @@ export const GPU_BUFFER_USAGE = Object.freeze({
   UNIFORM: 0x0040,
   /** Buffer may be bound as a storage buffer (§82, WP-R1.8). */
   STORAGE: 0x0080,
+});
+
+/**
+ * Bit flags for `GpuBuffer.mapAsync`'s mode (`GPUMapMode`) — WP-R1.6's
+ * readback. Written out for {@link GPU_BUFFER_USAGE}'s reason: `GPUMapMode`
+ * does not exist in Node, and the value is a normative constant.
+ */
+export const GPU_MAP_MODE = Object.freeze({
+  /** Map for reading — the only mode `readPixels` needs. */
+  READ: 0x0001,
 });
 
 /** Bit flags for `GpuTextureDescriptor.usage` (`GPUTextureUsage`). */
@@ -104,22 +118,73 @@ export interface GpuDeviceLostInfo {
   readonly message?: string;
 }
 
-/** An opaque GPU buffer handle. */
+/**
+ * An opaque GPU buffer handle.
+ *
+ * The three mapping members are **optional, and presence is the capability** —
+ * R-30b's optional-context-member rule, applied here so every double built
+ * before WP-R1.6's readback still satisfies the type. Only a buffer created
+ * with `MAP_READ` usage may be mapped, and only `readPixels` creates one;
+ * `WebgpuRenderer.readPixels` rejects with `UNSUPPORTED_GPU_FEATURE` on a
+ * device whose buffers cannot map, rather than crashing into an absent member.
+ */
 export interface GpuBuffer {
   /** Releases the allocation (§83). */
   destroy(): void;
+  /**
+   * Resolves when the buffer's contents are mapped into CPU memory —
+   * WP-R1.6's readback path. `mode` is a {@link GPU_MAP_MODE} bit.
+   */
+  mapAsync?(mode: number): Promise<void>;
+  /** The mapped bytes. Valid only between `mapAsync` resolving and `unmap`. */
+  getMappedRange?(): ArrayBuffer;
+  /** Returns the mapped range to the GPU; the `ArrayBuffer` is detached. */
+  unmap?(): void;
 }
 
-/** An opaque texture view — what a render pass attaches. */
+/** An opaque texture view — what a render pass attaches, and what a shader samples. */
 export type GpuTextureView = object;
+
+/**
+ * Which levels of a texture a view exposes (`GPUTextureViewDescriptor`).
+ *
+ * Every member is optional and the whole descriptor is optional, so
+ * `createView()` still means "the whole texture" — which is the only form
+ * WP-R1.1 needed and the form the swap chain and the depth attachment still
+ * use. The two members are here because mip generation cannot be expressed
+ * without them: a blit reads level *n* and writes level *n + 1*, and a WebGPU
+ * pass attaches a **view**, not a texture, so "write level 3" is spelled as a
+ * one-level view based at 3 (§77, WP-R1.2).
+ */
+export interface GpuTextureViewDescriptor {
+  /** Diagnostic name. */
+  readonly label?: string;
+  /** First mip level the view exposes; `0` — the whole texture — by default. */
+  readonly baseMipLevel?: number;
+  /** How many levels from `baseMipLevel`; all of them by default. */
+  readonly mipLevelCount?: number;
+}
 
 /** An opaque GPU texture handle. */
 export interface GpuTexture {
-  /** A view of the whole texture; the only form this packet needs. */
-  createView(): GpuTextureView;
+  /** A view of the whole texture, or of the mip range `descriptor` names. */
+  createView(descriptor?: GpuTextureViewDescriptor): GpuTextureView;
   /** Releases the allocation (§83). Absent on a swap-chain texture. */
   destroy?(): void;
 }
+
+/**
+ * An opaque sampler — filter and wrap state as an **object** (§77).
+ *
+ * The one structural difference between this backend's texture tier and the
+ * WebGL one, and the reason `wgpu-texture.ts` has a second cache in it: GL
+ * writes filter and wrap onto the texture with `texParameteri`, so R-30's
+ * sampler state is per-texture and costs nothing to vary. WebGPU makes it a
+ * separate, immutable object bound alongside the texture, so a thousand
+ * textures sharing one filter/wrap pair should share **one** sampler rather
+ * than allocate a thousand identical ones.
+ */
+export type GpuSampler = object;
 
 /** A compiled WGSL module. */
 export type GpuShaderModule = object;
@@ -136,6 +201,37 @@ export type GpuBindGroup = object;
 /** An immutable, fully specified render pipeline (§4.2 of the R-1 plan). */
 export type GpuRenderPipeline = object;
 
+/** An immutable compute pipeline (§82, WP-R1.8). */
+export type GpuComputePipeline = object;
+
+/** A compute pipeline descriptor, reduced to the members this backend sets. */
+export interface GpuComputePipelineDescriptor {
+  /** Diagnostic name. */
+  readonly label?: string;
+  /** Explicit layout — never `"auto"`, `wgpu-bindings.ts`'s standing rule. */
+  readonly layout: GpuPipelineLayout;
+  /** The kernel: module and entry point. */
+  readonly compute: {
+    readonly module: GpuShaderModule;
+    readonly entryPoint: string;
+  };
+}
+
+/**
+ * The commands a compute pass records (§82, WP-R1.8) — no viewport, no
+ * scissor, no vertex state: a dispatch is a grid, not a rasterisation.
+ */
+export interface GpuComputePassEncoder {
+  /** Selects the pipeline subsequent dispatches use. */
+  setPipeline(pipeline: GpuComputePipeline): void;
+  /** Binds a bind group of storage buffers. */
+  setBindGroup(index: number, bindGroup: GpuBindGroup): void;
+  /** Dispatches a workgroup grid. A zero count is a defined no-op. */
+  dispatchWorkgroups(x: number, y?: number, z?: number): void;
+  /** Closes the pass. Every `beginComputePass` owes exactly one of these. */
+  end(): void;
+}
+
 /** A recorded, submittable command buffer. */
 export type GpuCommandBuffer = object;
 
@@ -143,7 +239,7 @@ export type GpuCommandBuffer = object;
 export interface GpuVertexBufferLayout {
   /** Distance between consecutive elements, in bytes. */
   readonly arrayStride: number;
-  /** `"vertex"` (this packet) or `"instance"` (WP-R1.8's particles). */
+  /** `"vertex"`, or `"instance"` for §36's particle stream (WP-R1.8). */
   readonly stepMode?: "vertex" | "instance";
   /** The attributes read out of this buffer. */
   readonly attributes: readonly {
@@ -204,7 +300,35 @@ export interface GpuRenderPipelineDescriptor {
     readonly format: string;
     readonly depthWriteEnabled: boolean;
     readonly depthCompare: string;
+    /**
+     * §67's stencil test and operations (WP-R1.3), present only on a pipeline
+     * that actually tests or writes stencil bits — a clipless pipeline's
+     * descriptor omits all four members, which is what keeps its recorded
+     * `createRenderPipeline` line byte-identical to WP-R1.1's.
+     *
+     * Front and back are always the same state in this backend: GL's
+     * `stencilFunc`/`stencilOp` are two-sided, and culling is disabled on both
+     * backends, so a per-face split would be a distinction nothing draws.
+     */
+    readonly stencilFront?: GpuStencilFaceState;
+    readonly stencilBack?: GpuStencilFaceState;
+    /** The bits the test looks at (§57's `readMask`). */
+    readonly stencilReadMask?: number;
+    /** The bits a write may change (§57's `writeMask`). */
+    readonly stencilWriteMask?: number;
   };
+}
+
+/** One face's stencil comparison and operations (`GPUStencilFaceState`). */
+export interface GpuStencilFaceState {
+  /** The comparison, against the pass's stencil reference. */
+  readonly compare: string;
+  /** Stored on stencil-test failure. */
+  readonly failOp: string;
+  /** Stored when the stencil test passes and the depth test fails. */
+  readonly depthFailOp: string;
+  /** Stored when both tests pass. */
+  readonly passOp: string;
 }
 
 /** A render pass descriptor, reduced to what this packet attaches. */
@@ -224,6 +348,16 @@ export interface GpuRenderPassDescriptor {
     readonly depthLoadOp: "load" | "clear";
     readonly depthStoreOp: "store" | "discard";
     readonly depthClearValue?: number;
+    /**
+     * Stencil-aspect ops (§67, WP-R1.3) — **required by validation when the
+     * attachment's format carries a stencil aspect, and forbidden when it does
+     * not**, which is why they are optional here and written only on a frame
+     * whose depth attachment is `depth24plus-stencil8`. Always `"load"`: §61
+     * confines clears to the viewport rectangle, so the stencil clear is a
+     * scissored draw per view, exactly as the colour and depth clears are.
+     */
+    readonly stencilLoadOp?: "load" | "clear";
+    readonly stencilStoreOp?: "store" | "discard";
   };
 }
 
@@ -263,6 +397,13 @@ export interface GpuRenderPassEncoder {
   ): void;
   /** Confines writes — including this backend's clear draws — to a rectangle. */
   setScissorRect(x: number, y: number, width: number, height: number): void;
+  /**
+   * Sets the stencil reference the pipeline's `compare` and `"replace"` op
+   * read (§67, WP-R1.3). Pass state, initially `0` — the renderer mirrors it
+   * per frame and issues this only when a stencil-carrying draw needs a
+   * different value, so a clipless frame records none at all.
+   */
+  setStencilReference(reference: number): void;
   /** Non-indexed draw. */
   draw(
     vertexCount: number,
@@ -286,6 +427,44 @@ export interface GpuRenderPassEncoder {
 export interface GpuCommandEncoder {
   /** Opens a render pass. */
   beginRenderPass(descriptor: GpuRenderPassDescriptor): GpuRenderPassEncoder;
+  /**
+   * Opens a compute pass (§82, WP-R1.8). Optional for
+   * {@link GpuBuffer.mapAsync}'s reason: presence is the capability, and only
+   * the compute path calls it — the frame path never does (§82's "basic
+   * graphics … must not require compute support", held structurally).
+   */
+  beginComputePass?(descriptor?: {
+    readonly label?: string;
+  }): GpuComputePassEncoder;
+  /**
+   * Copies a buffer range into another buffer — compute readback's mechanism
+   * (`wgpu-compute.ts`), the buffer-to-buffer half of WP-R1.6's
+   * `copyTextureToBuffer`, optional on the same presence-is-the-capability
+   * terms.
+   */
+  copyBufferToBuffer?(
+    source: GpuBuffer,
+    sourceOffset: number,
+    destination: GpuBuffer,
+    destinationOffset: number,
+    size: number,
+  ): void;
+  /**
+   * Copies a texture's texels into a buffer — `readPixels`' mechanism
+   * (WP-R1.6, RFC 0005). Optional for {@link GpuBuffer.mapAsync}'s reason:
+   * presence is the capability, and only the readback path calls it.
+   * `bytesPerRow` must be a multiple of 256 (the WebGPU constant
+   * `COPY_BYTES_PER_ROW_ALIGNMENT`); `wgpu-readback.ts` owns that arithmetic.
+   */
+  copyTextureToBuffer?(
+    source: { readonly texture: GpuTexture; readonly mipLevel?: number },
+    destination: {
+      readonly buffer: GpuBuffer;
+      readonly bytesPerRow: number;
+      readonly rowsPerImage?: number;
+    },
+    size: readonly [number, number],
+  ): void;
   /** Closes the encoder and yields the buffer to submit. */
   finish(): GpuCommandBuffer;
 }
@@ -300,8 +479,52 @@ export interface GpuQueue {
     dataOffset?: number,
     size?: number,
   ): void;
+  /**
+   * Uploads CPU bytes into a texture's mip level.
+   *
+   * The WebGPU counterpart of `texImage2D`, and note what it is *not*: there is
+   * no bound texture and no unit, so an upload triggered mid-frame cannot
+   * disturb anything the frame has already bound — the `gl.bindTexture(…, null)`
+   * the WebGL cache issues after every upload has no counterpart here because
+   * it has nothing to undo.
+   */
+  writeTexture(
+    destination: { readonly texture: GpuTexture; readonly mipLevel?: number },
+    data: ArrayBufferView,
+    dataLayout: {
+      readonly offset?: number;
+      readonly bytesPerRow: number;
+      readonly rowsPerImage?: number;
+    },
+    size: readonly [number, number],
+  ): void;
   /** Submits recorded command buffers, in order. */
   submit(commandBuffers: readonly GpuCommandBuffer[]): void;
+}
+
+/** A sampler allocation request (`GPUSamplerDescriptor`) — see {@link GpuSampler}. */
+export interface GpuSamplerDescriptor {
+  /** Diagnostic name. */
+  readonly label?: string;
+  /** §77's wrap mode on the U axis. */
+  readonly addressModeU: string;
+  /** §77's wrap mode on the V axis; one field feeds both (§77's single `wrap`). */
+  readonly addressModeV: string;
+  /** §77's magnification filter. */
+  readonly magFilter: string;
+  /** The in-level half of §77's `minFilter`. */
+  readonly minFilter: string;
+  /** The between-levels half of §77's `minFilter`. */
+  readonly mipmapFilter: string;
+  /** §77's anisotropy, present only above 1 — see `wgpu-texture.ts`. */
+  readonly maxAnisotropy?: number;
+  /**
+   * The comparison a `sampler_comparison` evaluates per tap (§69, WP-R1.7) —
+   * present exactly on the shadow sampler (`wgpu-shadow.ts`), absent on every
+   * ordinary sampler, mirroring the WebGPU descriptor: presence is what makes
+   * the object a comparison sampler.
+   */
+  readonly compare?: string;
 }
 
 /** A buffer allocation request. */
@@ -314,7 +537,7 @@ export interface GpuBufferDescriptor {
   readonly usage: number;
 }
 
-/** A texture allocation request — the depth attachment, in this packet. */
+/** A texture allocation request — the depth attachment and §77's uploads. */
 export interface GpuTextureDescriptor {
   /** Diagnostic name. */
   readonly label?: string;
@@ -324,6 +547,13 @@ export interface GpuTextureDescriptor {
   readonly format: string;
   /** Bit set from {@link GPU_TEXTURE_USAGE}. */
   readonly usage: number;
+  /**
+   * How many mip levels to allocate; `1` — a single level — when omitted.
+   *
+   * Omitted rather than passed as `1` for the whole tier that does not mipmap,
+   * so the depth attachment's descriptor is the object it always was.
+   */
+  readonly mipLevelCount?: number;
 }
 
 /** One entry of a bind-group layout — see `wgpu-bindings.ts`. */
@@ -332,24 +562,47 @@ export interface GpuBindGroupLayoutEntry {
   readonly binding: number;
   /** Bit set from {@link GPU_SHADER_STAGE}. */
   readonly visibility: number;
-  /** Buffer binding shape; the only kind this packet declares. */
+  /** Buffer binding shape — group 0's uniform block. */
   readonly buffer?: {
     readonly type: "uniform" | "storage" | "read-only-storage";
     readonly hasDynamicOffset?: boolean;
     readonly minBindingSize?: number;
   };
+  /** Sampled-texture binding shape — group 1's `map` (§77). */
+  readonly texture?: {
+    readonly sampleType: string;
+    readonly viewDimension: string;
+  };
+  /** Sampler binding shape — group 1's `mapSampler` (§77). */
+  readonly sampler?: {
+    readonly type: string;
+  };
 }
 
-/** A bound resource, in this packet always a buffer range. */
+/** A bound buffer range — group 0's dynamically-offset uniform block. */
+export interface GpuBufferBinding {
+  /** The buffer the range lives in. */
+  readonly buffer: GpuBuffer;
+  /** Byte offset of the range; `0` when omitted. */
+  readonly offset?: number;
+  /** Byte length of the range; the rest of the buffer when omitted. */
+  readonly size?: number;
+}
+
+/** A bound resource: a buffer range, a texture view, or a sampler. */
 export interface GpuBindGroupEntry {
   /** Binding number, matching the layout's. */
   readonly binding: number;
-  /** The bound resource. */
-  readonly resource: {
-    readonly buffer: GpuBuffer;
-    readonly offset?: number;
-    readonly size?: number;
-  };
+  /**
+   * The bound resource: a buffer range, a texture view, or a sampler.
+   *
+   * Typed as two constituents though the prose names three, because
+   * {@link GpuTextureView} and {@link GpuSampler} are both opaque `object`
+   * aliases on this surface — naming both would duplicate one union
+   * constituent — and it is the matching *layout entry*, never the handle's
+   * shape, that tells WebGPU which kind it received.
+   */
+  readonly resource: GpuBufferBinding | GpuTextureView;
 }
 
 /** The device: everything the backend allocates and submits through. */
@@ -373,6 +626,8 @@ export interface GpuDevice {
   createBuffer(descriptor: GpuBufferDescriptor): GpuBuffer;
   /** Allocates a texture. */
   createTexture(descriptor: GpuTextureDescriptor): GpuTexture;
+  /** Creates a sampler — §77's filter and wrap state as an object. */
+  createSampler(descriptor: GpuSamplerDescriptor): GpuSampler;
   /** Compiles a WGSL module. */
   createShaderModule(descriptor: {
     readonly label?: string;
@@ -398,6 +653,14 @@ export interface GpuDevice {
   createRenderPipeline(
     descriptor: GpuRenderPipelineDescriptor,
   ): GpuRenderPipeline;
+  /**
+   * Creates an immutable compute pipeline (§82, WP-R1.8). Optional —
+   * presence is the capability, and it is the one member `compute()` gates
+   * on before recording anything (`wgpu-compute.ts`).
+   */
+  createComputePipeline?(
+    descriptor: GpuComputePipelineDescriptor,
+  ): GpuComputePipeline;
   /** Opens a command encoder. */
   createCommandEncoder(descriptor?: {
     readonly label?: string;

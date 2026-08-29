@@ -2,7 +2,7 @@
 
 - **Status:** accepted (owner, 2026-08-21 — "Continue with the remaining WPs and the RFCs"; the recommended dispositions of the flagged questions are adopted)
 - **Date:** 2026-08-07
-- **Owner decision:** pending
+- **Owner decision:** accepted (2026-08-21)
 - **Spec sections affected:** §54 (primary), §14, §17, §18, §19, §33, §42, §49, §53, §62, §71, §79, §85, §86, §98, §100, §113a
 
 ## Context

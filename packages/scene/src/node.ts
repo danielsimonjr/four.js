@@ -305,6 +305,49 @@ export abstract class Node
    */
   layers: LayerMask = DEFAULT_LAYER_MASK;
 
+  /**
+   * Whether this node's own drawn shape **clips its subtree** (§67; R-23,
+   * 2026-08-21). Default `false`.
+   *
+   * ```ts
+   * panel.clip = true;          // children are masked to the panel's shape
+   * panel.add(content);         // …including everything below them
+   * ```
+   *
+   * The mask is the node's *own geometry*, drawn with colour writes off, so a
+   * §50 `Shape` clips to its path, a rectangle clips to a rectangle, and a
+   * `Sprite` clips to its quad — §67's "path masks" and "UI overflow clipping"
+   * with no second authoring surface and nothing new to build a region out of.
+   * `@four/render`'s `clip.ts` states the tier and what it deliberately leaves
+   * to a later packet (alpha masks, 3D clipping planes, true scissor
+   * rectangles).
+   *
+   * **The clip gates this node's descendants and not this node**, which is the
+   * exact mirror of `layers` above (§46 gates the node and not its subtree).
+   * That is what a UI panel needs — it paints its own background and border and
+   * then contains its children — and it is why the two fields sit next to each
+   * other with opposite scopes rather than sharing a spelling.
+   *
+   * Nested clips **intersect**: a clipped subtree that contains another clip
+   * draws only where both shapes cover. Eight clips can be live in one frame,
+   * because a stencil bit plane is spent on each and every stencil buffer WebGL
+   * 2 can allocate is eight bits deep; the ninth is dropped with a §67
+   * diagnostic, and its subtree spills rather than vanishing (see
+   * `ClipPlaneAllocator`).
+   *
+   * Two conditions make this field inert, both warned about in a development
+   * build and both failing toward *drawing* rather than toward an empty screen:
+   * a node with no geometry to draw (a plain `Group`) has no shape to mask
+   * with, and a renderer whose drawing buffer carries no stencil buffer
+   * (`new WebglRenderer({ stencil: true })`, R-7) has nothing to write a mask
+   * into.
+   *
+   * A plain field, like `visible` and `layers` and for the same reason: the
+   * render list reads it once per node per frame and there is no value it can
+   * hold that §85 would refuse.
+   */
+  clip = false;
+
   /** Free-form user data (§6). Its own object per node. */
   metadata: Record<string, unknown> = {};
 

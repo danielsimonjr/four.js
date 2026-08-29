@@ -22,7 +22,7 @@ export type {
 export { AnimationSystem } from "./animation-system.js";
 
 export type { PropertyBinding } from "./binding.js";
-export { createBinding } from "./binding.js";
+export { createArrayElementBinding, createBinding } from "./binding.js";
 
 export type {
   AnimationClipOptions,

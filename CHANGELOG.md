@@ -8,6 +8,436 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — WP-R1.8: WebGPU instanced particles and §82 compute
+
+#### Added
+
+- **render-webgpu: WP-R1.8 — §36 instanced particles and §82 compute.** The
+  `"particles"` item kind draws on WebGPU: one instanced draw of the shared unit
+  quad per system (`wgpu-particles.ts`, the `gl-particles.ts` port — view-space
+  billboard over separate view/projection matrices in a third lazily-created
+  192-byte group-0 block, straight-alpha blend, §67 clip stencils honoured), fed
+  by a per-system instance buffer uploaded once per frame (queue-ordering forbids
+  GL's per-view cadence; stated in source). Zero-count systems are skipped before
+  the geometry cache uploads anything — stricter than GL, pinned as a full-tape
+  A/B — and particle-less scenes record byte-identical transcripts. §82 lands as
+  `WebgpuRenderer.compute()` plus
+  `createComputeBuffer`/`writeComputeBuffer`/`readComputeBuffer`
+  (`wgpu-compute.ts`): storage-buffer bind groups, lazy source-keyed compute
+  pipelines, dispatch, exact readback — over **optional** device members
+  (presence is the capability; WebGL 2's absence stays structural) — plus the
+  §36 GPU particle integrator kernel (semi-implicit Euler, the emitter's closed
+  form, count as f32). The `ComputePass` descriptor lives in
+  `@four/render-webgpu` pending Q3's `@four/render` promotion (one re-export +
+  optional `Renderer.compute?()`; RFC 0004 held `packages/render` concurrently).
+  `simulation: "gpu"` in `@four/particles` is deliberately **not** widened (the
+  WP-9.1 rule: it widens in the change that wires the kernel to the emitter).
+  R-31 closes on WebGPU only. Browser specs written (particle rasterisation; an
+  exact integrator readback), pending the next `test:browser` run.
+
+### 2026-08-29 — RFC 0004: the 2D raster painting stack (§77a)
+
+#### Added
+
+- **§77a raster painting (RFC 0004, accepted 2026-08-21; tier (b) — the seam
+  tier).** `@four/render` gains `RasterSource` — a structural, DOM-free read seam
+  in the `TextureSource`/`FetchLike` discipline: the application paints with
+  whatever it likes (its `paint()` hook takes no parameter and the engine never
+  learns what it closed over), `readPixels(out)` writes RGBA8 into an
+  engine-owned buffer — and `CanvasTexture`, a `MaterialTexture` that reaches
+  every backend through the existing id/version upload path with **zero backend
+  changes**. One buffer for the texture's life (§83-accounted via `noteTexture`);
+  explicit dirty tracking (`invalidate()`/`update()` — nothing polls, per the
+  adopted Q6); the §7a row flip written once in the engine
+  (`origin: "top-left"`); `colorSpace` defaulting `"srgb"`, deliberately unlike
+  `TextureSource`'s `"linear"`, with the reason at both (Q3); size constant for
+  the texture's life, in-place resize refused `INVALID_APPLICATION_STATE` and
+  gated on R-30 (Q5); §96's 64 MiB default byte ceiling with `Infinity` as the
+  explicit opt-out. Painted pixels are **display content, never simulation
+  input** (§33): no §79 representation, no §34 replay content, enforced by
+  `tests/integration/raster-display-only.test.ts` — §40's display-only scan with
+  "inexact" replaced by "unreproducible".
+- **§73's canvas view ships** (`@four/ui` `CanvasViewWidget`, document type
+  `ui:canvas-view`): a skin-drawn control — box, supplied device-pixel
+  `resolution` (`pixelWidth`/`pixelHeight`), and a monotonic `contentVersion`
+  bumped by `invalidate()` through the existing `onContentChange` hook; no new
+  skin hook, no dependency edge, and the widget names no texture type. Its
+  recorded blocker ("needs the immediate-mode drawing surface the dependency
+  matrix keeps out of this package") was **wrong** and is corrected in
+  `UI_STAGED` — the widget never draws; the skin owns the §77a surface. Ten of
+  §73's sixteen controls now ship. §79 payload is the box and `resolution` only —
+  painted pixels are never serialized.
+- Spec revision **1.12**: new §77a (letter suffix; `"77a"` added to
+  `ALLOWED_LETTERED`), the §73 skin-drawn note, and the amendments row recording
+  every adopted disposition. §62's Canvas 2D backend is explicitly untouched and
+  `render-canvas` stays a reserved stub.
+- Browser proof `tests/browser/raster.spec.ts`: a real 2D canvas painted by
+  application code renders the right way up through a real WebGL 2 driver
+  (upper-red/lower-blue 400/400 box counts), and only `update()` re-uploads — a
+  host repaint alone and `invalidate()` alone leave the frame unchanged. Measured
+  A/B: painting symbols in 0 of 9 example bundles; six bundles byte-identical,
+  ui-demo +28 B / flagship +30 B (the corrected `UI_STAGED` prose), twin +213 B
+  (the `ui:canvas-view` serializer pair — the one example calling
+  `registerSceneNodeTypes`). No budget bumps.
+
+### 2026-08-29 — WP-R1.7: WebGPU shadows and stencil parity
+
+#### Added
+
+- **WebGPU shadows and stencil parity (WP-R1.7).** §69's directional shadow tier
+  lands on the WebGPU backend: a depth-only caster pass into the renderer's own
+  samplable `depth32float` map (`wgpu-shadow.ts`), GL's 3×3 PCF as nine explicit
+  `textureSampleCompareLevel` taps through a nearest `less-equal`
+  `sampler_comparison` — a structurally distinct binding that joins a widened
+  lights group riding the light buffer's spare stride bytes — and a lazy `|sh`
+  variant of both shaded families, so shadowless scenes record byte-identical
+  transcripts and non-receivers share the shadowless pipeline. §57 stencil parity
+  completes (`wgpu-stencil.ts`): R1.3's recorded residue is retired — a
+  `material.stencil` alone now selects the stencil-carrying frame format on
+  screen via a frame scan (R-7's mask-by-hand tier, no renderer option needed;
+  off screen the target's `stencil` option still decides, GL's parity). New
+  browser parity specs (shadow threshold; the stencil 1/6 mirror) under
+  `tests/browser/webgpu/`.
+
+### 2026-08-29 — RFC 0005: pixel/GPU-id picking (A-11's remaining half)
+
+#### Added
+
+- **§71 pixel/GPU-id picking (RFC 0005 — A-11's remaining half).** `@four/render`
+  gains the backend-neutral seam (`PickingService`,
+  `Renderer.createPickingService?()` — presence-is-the-capability; Canvas 2D/SVG
+  declare the tier absent by omission per the adopted Q6), the §33 candidate-table
+  rules (`collectPickCandidates`, traversal-ordered, rebuilt per pass) and the
+  exact id codec (`encodePickId`/`decodePickId`, index+1 in RGBA8, 0 = nothing,
+  overflow refused per §85). `@four/render-webgl` executes it behind
+  `registerPickingPipeline()` (fifth registration seam): a lazily compiled flat id
+  program draws the frame's own view list — §66 order, frustum cull, material
+  depth/colour state and §67 clip stencils included; skinned and particle items
+  resolve through absence, stated — into a service-owned target, read back
+  asynchronously on WebGL 2's fence path (`PIXEL_PACK_BUFFER` + `fenceSync`,
+  stalling `readPixels` as the degradation) with `CONTEXT_LOST`-honest staleness
+  by cache-era identity. `@four/input` gains the render-free `PickProvider` seam
+  and RFC 0005's adopted Alternative D: `Pickable.alphaMask` confirms a bounds hit
+  against CPU-resident texel alpha (§55 frames via `region`). `four` gains the
+  promised adapter `createPickProvider(service, viewport)`. Scenes that never pick
+  are byte-identical (transcript-proven, including the frame _after_ an id pass);
+  the GPU tier is grep-absent from all nine example bundles; browser-proven on a
+  real driver (`tests/browser/picking.spec.ts`: co-planar submission order
+  resolves the front-most id). ui-demo budget 43.5→44 kB with the measurement.
+
+### 2026-08-28 — WP-R1.6: WebGPU render targets, effects, readPixels
+
+#### Added
+
+- **render-webgpu: WP-R1.6 — render targets, §70 effects, §63 graph
+  participation, §61 `readPixels` (§48, §61, §62, §63, §67, §69, §70, §92;
+  RFC 0005).** The WebGPU backend renders off screen: `wgpu-render-target.ts` is
+  the fourth id/version cache (colour `rgba8unorm` with attachment+sampling+copy
+  usage; depth per an exported format table — `depth24plus` plain,
+  **`depth32float`** for the samplable `depthTexture` form (guaranteed sampleable
+  _and_ copyable, unlike `depth24plus`'s depth aspect), `depth24plus-stencil8`
+  for `stencil: true`, so §67's `stencil` ⊥ `depthTexture` exclusivity survives
+  the port for WebGPU's own reason). A rendered target is sampled back through
+  R-4's `resolveTexture` seam — one lazy bind group over the texture cache's own
+  layout object, one shared linear-clamp sampler, and the same feedback refusal:
+  a draw sampling the active target is dropped, an effect writing its own source
+  is skipped, and `RenderGraph.validate()` names both statically. `renderEffect`
+  draws §70's copy, grade and output transform as lazy per-(kind × format)
+  pipelines through the shared cache (conditional `|e:` key suffix — landed keys
+  byte-identical); each kind is its own WGSL module with no per-fragment branch,
+  only the grade touches a 16-byte uniform block, and there is no state envelope
+  to restore because a WebGPU pass has no ambient state. RFC 0001's `"graph"`
+  kind is absent-not-approximated until the WGSL emitter lands. `RenderGraph`
+  needed no change — `graph.execute` over this backend emits the byte-identical
+  transcript of the hand-written `render`+`renderEffect` sequence (pinned in
+  `tests/integration/webgpu-render-to-texture.test.ts`).
+  `WebgpuRenderer.readPixels(target)` ships §61's member in the whole-target
+  form (`region` waits on `Rectangle2`, RFC 0005's named prerequisite):
+  `copyTextureToBuffer` + `mapAsync` — WebGPU has no synchronous readback, the
+  standing evidence for RFC 0005's Promise-forever contract — with 256-byte row
+  alignment stripped on repack and rows returned bottom-to-top (§7a's order, and
+  the order GL's `readPixels` will naturally produce). §67 into targets: a
+  stencilled target masks and serves `material.stencil` without clips; a clip
+  into a stencil-less target warns once (DEV) and fails toward drawing. Browser
+  specs written (`tests/browser/webgpu/webgpu-effects.spec.ts`, self-skipping):
+  a compile-and-rasterise line per effect module — copy bit-exact, grade and
+  encode threshold-matched against CPU models. Coverage 99.70/99.41 → 99.75/99.53
+  (new files 100×4); 0 B in every bundle (rebuilt bundles byte-identical; no
+  WebGPU symbol in any of 9, `createVertexArray` control 9/9); no budget bump.
+
+### 2026-08-28 — RFC 0001: the §60 shader and node-material system (R-14)
+
+#### Added
+
+- **RFC 0001 — §60 shader and node-material system (gap R-14; §57, §58, §60, §63,
+  §70, §96).** The unit of extension is a serializable graph, never a source
+  string. `@four/materials` gains the §60 IR — `ShaderGraph`, a closed-operator,
+  JSON-ready graph validated and reflected by `analyzeShaderGraph` (§85 caps on
+  nodes and samplers) — the fluent `NodeMaterialBuilder`/`ShaderGraphBuilder`
+  authoring surface (§60's own example compiles), and §57's `NodeMaterial` (frozen
+  graph; per-material uniforms and textures, RFC Q3's decided tier; unlit at this
+  tier, sequenced R-14 → R-17 → R-13). `RenderItemKind` gains `"node"` — one
+  member for the family, decided at item-generation time; the per-graph
+  compiled-pipeline identity is the graph's structure, resolved by the backend's
+  program cache, and `pipelineOf`'s flat-colour fallback deliberately excludes it
+  (an unregistered node draw is skipped with one §85 warning, never substituted).
+  `ScreenEffect` gains `GraphEffect` — §70's custom full-screen passes as data,
+  moved staged → shipped — whose full sample set stays visible to
+  `RenderGraph.validate()` (declared inputs; no `"opaque"` issue; feedback and
+  ordering checks run over them, and over a scene pass's node-material bindings).
+  The WebGL 2 backend emits GLSL ES 3.00 behind `registerNodeMaterialPipeline()` —
+  the fifth explicit-registration seam — compiling lazily, per distinct graph, on
+  first draw; one program serves any number of materials (structural source-pair
+  key), per-graph compile failures are latched and warned once, and vec2/mat3
+  uniforms travel padded as vec4/mat4 so the backend's GL budget is unchanged.
+  Emission is §33-deterministic (array-order walk; dead-node elimination is the
+  only transform), pinned byte-for-byte by
+  `tests/determinism/shader-graph-glsl.test.ts` + `golden/node-material-glsl.json`.
+  Byte-identity for node-material-free scenes proven by whole-transcript A/B
+  (with/without registration; with/without the node renderable) in
+  `tests/integration/node-materials.test.ts`; real-driver proof
+  `tests/browser/node-material.spec.ts` — a radial-gradient graph (the picture
+  per-vertex colour cannot produce) matches its analytic model within 3/255 over
+  24 probes, one draw. Spec revision 1.11 records §57's `ShaderMaterial` as
+  permanently unshipped and §60's no-raw-source narrowing + shipped/deferred
+  tier; the security guide's shader row moved partial → met. §58's linear/radial
+  gradients, image pattern, procedural and render-target paints are now
+  expressible exactly per fragment (conic waits on an angle operator). Measured
+  +0.60–0.79 kB gzip frame-path cost per WebglRenderer bundle (A/B against a HEAD
+  worktree); the emitter is 0 B unless registered (grep: emitted-GLSL strings in
+  0 of 9 bundles). Budgets bumped 36.5→37.5, 34.5→35.5, 43→43.5 with the numbers.
+
+### 2026-08-28 — WP-R1.5: WebGPU lit and standard pipelines, lights
+
+#### Added
+
+- **render-webgpu: WP-R1.5 — lit and standard pipelines, lights (§68, §59,
+  §60a).** The WebGPU backend shades: `wgpu-lit.ts` and `wgpu-standard.ts`
+  hand-port the GL backend's Lambert and Cook-Torrance (GGX/Smith/Schlick) stages
+  to WGSL — same operation order, 1/π folded out of both lobes per R-13, same
+  guards; shadows arrive with WP-R1.7, and until then the stages match GL with
+  `useShadow` at its initial `false`, exactly. `wgpu-lights.ts` replaces GL's five
+  per-program uniform uploads with **one uniform buffer**: a 592-byte all-`vec4`
+  block per rendered view (768-byte stride), bound at group 1 with a dynamic
+  offset, packed from the same `collectSceneLights` record both backends consume —
+  same eight-light limit, same first-in-scene-order selection. `useMap` and the
+  normal stream are lazy pipeline _variants_ (eight WGSL modules across the two
+  families, each compiled only when drawn, each with its own browser
+  compile-and-rasterise line); §59's extra uniforms ride a third group-0 layout
+  over the same strided buffer (the sprite precedent). Normals upload per shaded
+  acquisition, so a scene with no lit materials — normal-carrying geometry
+  included — records the byte-identical transcript it always did.
+
+### 2026-08-28 — WP-R1.4: WebGPU shapes and vertex colours
+
+#### Added
+
+- **WP-R1.4 (R-1): §50 shapes and §53/§58 vertex colours proven on the WebGPU
+  backend** — a tests-only packet, as planned: a scene of `Shape2D`s records the
+  byte-identical WebGPU command transcript (tape, serials and uniform bytes
+  included) as plain `Renderable`s over the same geometries; a painted, stroked
+  shape is one draw through the lazy `unlit|vc` variant with its colour stream at
+  slot 1; the render-list consumption contract holds kind for kind between WebGL 2
+  and WebGPU for tessellated shape scenes; and RFC 0003's skinned kinds are pinned
+  as transcript-invisibly skipped (no upload, no draw, never bind pose) until a
+  joint-palette pipeline exists. New self-skipping browser spec compiles the vc
+  variant's WGSL on a real adapter — the one unlit variant no adapter had run. No
+  backend behavior changed; comment-only staging notes in `webgpu-renderer.ts`.
+  (`tests/integration/webgpu-shapes.test.ts`,
+  `tests/browser/webgpu/webgpu-vertex-colors.spec.ts`)
+
+### 2026-08-28 — RFC 0003: §54 skinning and skeletal animation (PH-10 + R-22)
+
+#### Added
+
+- **RFC 0003 implemented — §54 skinning and skeletal animation (gaps `PH-10` +
+  `R-22`; spec revision 1.10).** `@four/scene` gains `Bone` (an ordinary `Node` —
+  §42 authority, §19 blending, §79 and animation apply with no new mechanism),
+  `Skeleton` (joint index = position in `bones`, insertion order the §33 ABI;
+  `update` derives the palette `inverse(skinRootWorld)·boneWorld·inverseBind[i]`
+  in a fixed association order), and the `MorphWeights` component (+ serializer,
+  registered the same packet). `BufferGeometry` gains the §53 `joints`/`weights`
+  attributes (4 influences/vertex, §85-validated; weight sums are the author's
+  contract), bound by the WebGL backend at fixed locations **4/5**. `@four/render`
+  gains §54's `Mesh` (skeleton refused over `MAX_SKINNING_JOINTS = 48` at setup
+  with `UNSUPPORTED_GPU_FEATURE`; `morphTargetWeights` is an accessor over the
+  component; §79 skeleton reference restored by id on first read via
+  `restoreMeshSkeleton`), the `"skinned-unlit"`/`"skinned-lit"` render-item kinds
+  with the palette refreshed in the same list build, and the optional
+  `RendererCapabilities.maximumSkinningJoints`. `@four/render-webgl` gains the
+  lazily-registered skinning pipeline (`registerSkinningPipeline()`; programs
+  compile on a renderer's first skinned draw — skinless scenes transcribe
+  byte-identically, transcript-asserted; unregistered/uncompilable/unskinnable
+  draws are skipped with one warning, never shown in bind pose). §17 is **9 of 9**
+  with zero new `ValueKind`s — the two "missing" track types are the indexed-array
+  binding form (`bones.<i>.…`, `weights.<i>`), documented and tested in
+  `@four/animation` (+ `createArrayElementBinding`). New determinism golden
+  `skinned-pose.json` (§33 `same-runtime`; the palette is the envelope's last CPU
+  value — no engine API returns skinned vertex positions), new browser proof
+  (two-bone column bends 90° on a real driver: arm region 0→480 px, top 560→0,
+  one draw). Bone-axis disposition adopted: the engine imposes **none**; +Y is a
+  helper convention only (`ik.ts` reconciled). Bundle cost: +0.75–0.80 kB gzip per
+  WebglRenderer bundle (frame-path); the pipeline itself is 0 B unless registered.
+  Budgets: first-3d-scene 36→36.5, particles-demo 34→34.5, ui-demo 42→43 kB.
+
+### 2026-08-28 — WP-R1.3: WebGPU sprites, text, batching and §67 clips
+
+#### Added
+
+- **WP-R1.3 — WebGPU sprites, text, §65 batching and §67 clip application.**
+  `@four/render-webgpu` gains the §55 sprite pipeline (`wgpu-sprite.ts`: quad-uniform
+  uv derivation, `texture × tint`, always-blend, R-29 frame reparametrization) over a
+  second, lazily-created group-0 layout — the shared `DrawUniforms` layout does not
+  move, so spriteless transcripts are byte-identical; §56 text needs nothing new
+  (a label is one textured unlit draw since R-28, proved on WebGPU in
+  `tests/integration/webgpu-sprites-text.test.ts`); and the §65 uploader
+  (`wgpu-batch.ts`, `createWgpuBatching`) behind the shared planner — opt-in,
+  type-only-imported, drawing merged runs through the unlit WGSL modules over one
+  interleaved vertex buffer. Structural note recorded in source: `queue.writeBuffer`
+  executes in queue order, not issue order, so the uploader keeps a buffer pair per
+  batch slot rather than GL's single pair; §65's staging ring is noted, not built.
+  §67 clips now apply: mask draws write stencil bit planes (colour/depth forced off,
+  through the flat unlit pipeline — a mask is coverage, not shading), clipped draws
+  test `equal` over the accumulated planes, `item.clip` outranks `material.stencil`,
+  batch runs break on record identity, and the stencil reference is the one §57
+  field left as a pass command (issued only on change). The depth format is decided
+  per frame from R-23's O(1) sort-key question: `depth24plus-stencil8` only when the
+  frame clips — no `stencil` option and no no-stencil diagnostic, because this
+  backend owns its depth attachment and can always widen it. Clipless scenes record
+  the WP-R1.1/R1.2 transcript byte for byte (every landed expectation unmodified).
+  New browser specs (self-skipping): sprite/batch rasterisation with real texture
+  sampling (the deferred WP-R1.2 evidence), and two-plane stencil intersection.
+  Coverage 99.61/99.24, new files 100×4; no bundle carries a WebGPU symbol (grep).
+
+### 2026-08-28 — R-23: §67's clipping API
+
+#### Added
+
+- **R-23 — §67's clipping API (2026-08-28).** `node.clip = true` on any drawable
+  masks its subtree to the node's own drawn shape, expressed entirely in §57
+  stencil records over R-7's substrate: the render list emits a colour/depth-less
+  mask draw per clip ahead of all content, assigns stencil bit planes 0–7 in
+  traversal order (§33), and hands every clipped item one shared read-only `equal`
+  test over the accumulated planes — so nested clips intersect by construction and
+  a clip boundary ends a §65 batch run by record identity. The ninth concurrent
+  clip is dropped with §67's required diagnostic and its subtree spills rather
+  than vanishing; a clip on a non-drawing node and a clip without a stencil buffer
+  warn in development and fail toward drawing. §79 writes `clip` beside the three
+  §49 flags on every drawable (`RenderableOptions.clip`, `SpriteOptions.clip`).
+  New browser gate: nested clips visibly intersect on a real driver (69 browser
+  tests). Scenes with no clips are byte-identical at the GL boundary
+  (`FRAME_BEFORE_R7` unmoved); +0.50 kB gzip in every bundle, no budget bumps.
+
+### 2026-08-28 — WP-R1.2: WebGPU texture and sampler caches (§77, §83)
+
+#### Added
+
+- **WP-R1.2 — WebGPU texture and sampler caches (§77, §83).** `@four/render-webgpu`
+  gains `WgpuTextureCache`: id/version-keyed `queue.writeTexture` uploads
+  (`rgba8unorm`, `rgba8unorm-srgb` for §60a-tagged textures), a separate sampler
+  cache deduplicating `GPUSampler`s on the canonical resolved key
+  (wrap | magFilter | minFilter | mipmapFilter | anisotropy), and blit-based mip
+  generation — WebGPU has no `generateMipmap`, so the chain is drawn, one half-size
+  pass per level, through a lazily compiled generator that costs nothing when
+  unused. The unlit tier gains its `map` variant: uv stream at `@location(2)`,
+  texture+sampler bound at group 1 with the layout declared as data; the geometry
+  cache uploads uvs. §84 accounting matches the GL backend byte for byte
+  (4 × 4 mipmapped = 84 bytes, asserted against `Texture.byteLength`). New
+  cross-package suite `tests/integration/webgpu-textures.test.ts`;
+  `recording-gpu.ts` gained `writeTexture`, `createSampler`, and mip-level view
+  recording. Coverage 99.57/99.18 (from 99.33/98.75); all six bundles unchanged.
+
+### 2026-08-28 — A-3: the §81 plugin system (RFC 0002)
+
+#### Added
+
+- **`@four/core` gains the §81 plugin host (RFC 0002, gap `A-3`).** `FourPlugin`,
+  `PluginContext`, `PluginHost`, `installPlugins`, `defineCapability`,
+  `bindCapability`, `satisfiesPluginRange`, and `PLUGIN_API_VERSION`. A plugin
+  declares `name`, `version`, optional `dependencies`, and an optional
+  `engineRange`; `install` may be asynchronous. Install order is **topological
+  over `dependencies`, ties broken by the order plugins were supplied** — a §33
+  requirement, not a convenience, because a plugin may register a `SimulationSystem`
+  and equal-priority systems run in registration order, so an unspecified install
+  order would be an unspecified fixed-step order.
+- **Six capability tokens, exported from `four`** (the umbrella is the one package
+  that sees all four registry owners at once, and `@four/core` may name none of
+  them under the frozen §3.1 matrix): `SIMULATION_SYSTEMS` (§39),
+  `RENDERER_REGISTRY` (§62), `SOLVER_REGISTRY` (§37), `COMPONENT_SERIALIZERS` (§79),
+  `SCENE_MIGRATIONS` (§80), `RENDER_GRAPH` (§63). §79's shipped promise —
+  "components serialize under registered type names; plugins register theirs
+  (§81)" — is executable for the first time.
+  **Five of §81's eleven extension points have no token at all** (asset formats,
+  materials and shader nodes, UI controls, editor tools, compute workloads): there
+  is no registry to hand over, so a plugin asking is refused by name rather than
+  registering into nothing. Adding a token later is additive.
+- **`ApplicationOptions.plugins`** (§45, as amended — see below). Installed in
+  `initialize()`, last, so a plugin sees a resolved renderer and an initialized
+  world; a refusal rejects `initialize` and leaves the application uninitialized.
+  `Application` provides `SIMULATION_SYSTEMS` always and `RENDERER_REGISTRY` when
+  §45's `rendererRegistry` option supplied one; a plugin needing a solver registry,
+  a serializer registry, or a render graph installs through a standalone
+  `PluginHost`, because an `Application` holds none of those and naming them would
+  put `@four/physics` and `@four/serialization` in every bundle. `app.pluginContext`
+  publishes the sealed context.
+- **`PLUGIN_API_VERSION` starts at `0.1.0`** and is versioned independently of
+  package semver (§90), like the §79 scene format. The range grammar is
+  deliberately restricted to `*`, `X.Y.Z`, `^X.Y.Z`, `~X.Y.Z`, `>=X.Y.Z`; anything
+  else is refused with a message saying so, rather than taking a semver dependency
+  into the package every other package depends on. Consequence worth knowing:
+  a caret range below 1.0.0 is minor-locked, so `^0.1.0` refuses `0.2.0`.
+
+#### Changed
+
+- **Specification revision 1.9.** §45's `ApplicationOptions` gains
+  `plugins?: readonly FourPlugin[]` and the paragraph stating that installation
+  happens in `initialize` (RFC 0002 open question 1, owner disposition (a) —
+  the §40 "don't invent §45 options" precedent turned on `units` being absent from
+  §45's own list, whereas §81 requires an install lifecycle and §45 owns the
+  lifecycle). §81 gains `dependencies`/`engineRange` (the declaration its own
+  closing sentence already required and its code block omitted), the
+  capability-token statement, the specified install order, the revocability rule,
+  and the §96 boundary. Frozen §1–120 numbering untouched.
+- **`docs/guides/security-and-untrusted-content.md`:** §96's _"safe shader/plugin
+  boundaries"_ row moves **absent → partial**. See below.
+
+#### Security
+
+- **§96's plugin half is answered, and the answer is a boundary rather than a
+  sandbox.** A plugin is JavaScript the application imported and runs with the
+  application's authority; nothing here isolates it and nothing claims to. What is
+  enforced is that **untrusted content can never become a plugin**: `PluginHost.add`
+  and `ApplicationOptions.plugins` take a `FourPlugin` _value_ — no URL, no module
+  specifier, no name resolved out of a document — so no deserialization path can
+  reach the host, and a scene document naming an unregistered component type gets
+  §79's existing error rather than a load. Plugins named in a scene file were
+  rejected outright rather than staged, because that is arbitrary code execution
+  from a scene file in the plainest possible form. Both halves are checked, not
+  asserted: `tests/integration/plugin-boundary.test.ts` fails if any package but
+  `core` and `four` so much as mentions the host, and pins that `add`'s parameter
+  admits no string.
+
+#### Fixed
+
+- Nothing. `A-3` was an absence, not a defect.
+
+#### Notes
+
+- **Uninstall is not symmetric, and the design says so instead of pretending.**
+  A capability declares its revocability (default `false`, owner decision), and a
+  plugin that acquired a non-revocable one **cannot be uninstalled**: the attempt
+  raises `INVALID_APPLICATION_STATE` naming the capability that pins it, rather than
+  running `uninstall` and leaving a half-removed registration behind. Only
+  `SIMULATION_SYSTEMS` is revocable, because only `SystemRegistry` has real removal;
+  `ComponentSerializerRegistry` has none, deliberately, so a document's shape cannot
+  depend on evaluation order. For most plugins the honest lifecycle is install-once.
+- **Measured: `PluginHost` tree-shakes out of every bundle** (grep-verified in all
+  four tight examples), but the **installer does not**, and cannot: a plugin is a
+  value passed at runtime, and side-effect registration is forbidden, so
+  `Application.initialize` must statically reach it. **+1.28–1.31 kB gzip in every
+  bundle carrying an `Application`** (A/B by revert-and-rebuild). Three budgets
+  bumped with the measurements: first-3d 34.5→36, particles 32→34, ui-demo 40.5→42.
+
 ### 2026-08-21 — RFCs 0001–0005 accepted
 
 #### Decided

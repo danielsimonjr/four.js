@@ -34,12 +34,14 @@
  *
  * ## What is covered, and what is deliberately not
  *
- * Covered: the nine §73 widgets — `Panel`, `Label`, `Button`, and, since
+ * Covered: the ten §73 widgets — `Panel`, `Label`, `Button`; since
  * 2026-08-07 (A-12), `Toggle`, `Checkbox`, `RadioButton`, `Slider`,
- * `ProgressIndicator`, and `ImageWidget` — with their §74 box model and layout,
+ * `ProgressIndicator`, and `ImageWidget`; and, since 2026-08-29 (RFC 0004),
+ * `CanvasViewWidget` — with their §74 box model and layout,
  * their interaction flags, their §75 accessibility record, and whatever state
  * each control adds (checkedness, a group name, a range and its value, an image
- * key); the five drawing-tier node classes A-16 named, added 2026-08-07 —
+ * key, a canvas view's device-pixel resolution — never its painted pixels,
+ * §77a); the five drawing-tier node classes A-16 named, added 2026-08-07 —
  * §49's `Renderable`, §55's `Sprite`, §47's `PerspectiveCamera` and
  * `OrthographicCamera`, and §68's `DirectionalLight`
  * ({@link registerRenderSerializers}); `MotionComponent` (§11),
@@ -170,6 +172,7 @@ import {
   Circle,
   Ellipse,
   Line,
+  Mesh,
   PathShape,
   Polygon,
   Polyline,
@@ -181,6 +184,7 @@ import {
   Shape2D,
   Sprite,
   Star,
+  restoreMeshSkeleton,
 } from "@four/render";
 import type {
   ResolvedPaint,
@@ -188,7 +192,10 @@ import type {
   ResolvedStrokeStyle,
 } from "@four/render";
 import {
+  Bone,
   DirectionalLight,
+  MORPH_WEIGHTS_SERIALIZER,
+  MorphWeights,
   OrthographicCamera,
   PerspectiveCamera,
   PointLight,
@@ -209,6 +216,7 @@ import {
 import type { GlyphAtlas, TextAlign } from "@four/text";
 import {
   Button,
+  CanvasViewWidget,
   Checkbox,
   ImageWidget,
   Label,
@@ -258,11 +266,47 @@ export const PROGRESS_NODE_TYPE = "ui:progress";
  */
 export const IMAGE_NODE_TYPE = "ui:image";
 
+/**
+ * The document `type` a {@link CanvasViewWidget} serializes as (§73, §77a;
+ * RFC 0004, 2026-08-29).
+ *
+ * The payload is the widget's box and its `resolution`, and **nothing else**:
+ * painted pixels are display content with no §79 representation (§77a's
+ * display-only rule — a painted surface has no logical key and its bytes are
+ * produced by code), and `contentVersion` is transient repaint state, not
+ * authored scene state. A reloaded canvas view is blank until the
+ * application's skin paints it, which is what it is.
+ */
+export const CANVAS_VIEW_NODE_TYPE = "ui:canvas-view";
+
 /** The document `type` a {@link Renderable} serializes as (2026-08-07, A-16). */
 export const RENDERABLE_NODE_TYPE = "render:renderable";
 
 /** The document `type` a {@link Sprite} serializes as (§55). */
 export const SPRITE_NODE_TYPE = "render:sprite";
+
+/**
+ * The document `type` a {@link Mesh} serializes as (§54; RFC 0003,
+ * 2026-08-28). Its payload is a `Renderable`'s — geometry and material keys,
+ * the ordering pair, the four drawable flags — plus `skeleton`: `null`, or
+ * bone **ids** in joint-index order with the inverse bind matrices inline
+ * (§79: intra-file references are by id; the ids resolve against the reloaded
+ * `scene:bone` nodes on the first `skeleton` read — see `restoreMeshSkeleton`).
+ * Morph weights are not here: they are a §6a component (`MorphWeights`) and
+ * round-trip through the component registry like every other component.
+ */
+export const MESH_NODE_TYPE = "render:mesh";
+
+/**
+ * The document `type` a {@link Bone} serializes as (§54; RFC 0003).
+ *
+ * A bone's whole state is its base-node state — transform, id, name — which
+ * §79 already carries for every node, so the payload is empty; what the type
+ * name preserves is the **class**, which `Mesh.skeleton`'s id resolution
+ * requires (a skeleton's joints index bones and only bones) and which a bare
+ * `Node` fallback would silently lose (A-15's failure mode).
+ */
+export const BONE_NODE_TYPE = "scene:bone";
 
 /**
  * The document `type` a {@link Text} serializes as (§49, §56; R-28,
@@ -575,36 +619,42 @@ function finiteOptions(
 }
 
 /**
- * §49's boolean flags as document fields — the two shadow flags (§69; R-18,
- * 2026-08-09) and `frustumCulled` (§87; R-8, 2026-08-09).
+ * A drawable's boolean flags as document fields — §49's two shadow flags (§69;
+ * R-18, 2026-08-09) and `frustumCulled` (§87; R-8, 2026-08-09), plus §67's
+ * `clip` (R-23, 2026-08-28), which is a `Node` field but is written *here*
+ * because it only means something on a node that draws: the mask is the
+ * node's own geometry, and a document putting it on a `Group` would restore a
+ * warned-inert flag.
  *
  * Written **always**, not only when they differ from the default, for the
  * reason every other field here is: §79 documents state what a node *is*, and a
  * reader that has to know this build's defaults to interpret a document is a
- * reader that breaks the day a default changes. All three default to `true`, so
- * a document written before this build carries none of the keys, `readBoolean`
- * answers `undefined`, and the node restores casting, receiving, and being
- * culled — which is exactly how a `Renderable` authored today behaves.
+ * reader that breaks the day a default changes. A document written before this
+ * build carries none of the keys, `readBoolean` answers `undefined`, and the
+ * node restores casting, receiving, being culled, and not clipping — which is
+ * exactly how a `Renderable` authored today behaves.
  *
- * One helper for all three because they land in the same place on the same
+ * One helper for all four because they land in the same place on the same
  * classes and are read back into the same options record; splitting them per
- * feature would put three spreads on every writer for no reader's benefit.
+ * feature would put four spreads on every writer for no reader's benefit.
  */
 function renderableFlagsJson(node: {
   readonly castShadow: boolean;
   readonly receiveShadow: boolean;
   readonly frustumCulled: boolean;
+  readonly clip: boolean;
 }): Record<string, JsonValue> {
   return {
     castShadow: node.castShadow,
     receiveShadow: node.receiveShadow,
     frustumCulled: node.frustumCulled,
+    clip: node.clip,
   };
 }
 
 /**
- * §49's boolean flags as `RenderableOptions` (§69, §87), dropping whatever the
- * payload does not carry as a boolean.
+ * The drawable boolean flags as `RenderableOptions` (§69, §87, §67), dropping
+ * whatever the payload does not carry as a boolean.
  */
 function readRenderableFlags(data: {
   readonly [key: string]: JsonValue;
@@ -616,6 +666,8 @@ function readRenderableFlags(data: {
   if (receiveShadow !== undefined) options.receiveShadow = receiveShadow;
   const frustumCulled = readBoolean(data.frustumCulled);
   if (frustumCulled !== undefined) options.frustumCulled = frustumCulled;
+  const clip = readBoolean(data.clip);
+  if (clip !== undefined) options.clip = clip;
   return options;
 }
 
@@ -1027,8 +1079,9 @@ function requireSpriteMaterial(
 /**
  * The §73/§79 node-type pair for every widget class `@four/ui` ships — `Panel`,
  * `Label`, `Button`, `Toggle`, `Checkbox`, `RadioButton`, `Slider`,
- * `ProgressIndicator`, and `ImageWidget` (A-14; the six controls added
- * 2026-08-07, A-12).
+ * `ProgressIndicator`, `ImageWidget`, and `CanvasViewWidget` (A-14; the six
+ * controls added 2026-08-07, A-12; the canvas view added 2026-08-29,
+ * RFC 0004).
  *
  * Matched by **exact class identity**, exactly as `@four/serialization` matches
  * its own two: a subclass of `Button` is not a `Button` for this purpose, and
@@ -1057,6 +1110,7 @@ export function registerUISerializers(
         if (constructor === Slider) return SLIDER_NODE_TYPE;
         if (constructor === ProgressIndicator) return PROGRESS_NODE_TYPE;
         if (constructor === ImageWidget) return IMAGE_NODE_TYPE;
+        if (constructor === CanvasViewWidget) return CANVAS_VIEW_NODE_TYPE;
         return undefined;
       },
       nodeDataOf: (node: Node): JsonValue | undefined => {
@@ -1109,6 +1163,12 @@ export function registerUISerializers(
             naturalWidth: image.naturalWidth,
             naturalHeight: image.naturalHeight,
           };
+        }
+        if (constructor === CanvasViewWidget) {
+          const view = node as CanvasViewWidget;
+          // The box and the resolution only — no pixels, no contentVersion
+          // (§77a; see CANVAS_VIEW_NODE_TYPE).
+          return { ...widgetDataJson(view), resolution: view.resolution };
         }
         return undefined;
       },
@@ -1195,6 +1255,19 @@ export function registerUISerializers(
               : {}),
           });
         }
+        if (document.type === CANVAS_VIEW_NODE_TYPE) {
+          const data = record(document.data);
+          const resolution = readFinite(data.resolution);
+          // The class refuses a non-positive resolution (§85), so a corrupted
+          // payload restores the default rather than taking the scene down —
+          // the same tolerance every control here applies.
+          return new CanvasViewWidget({
+            ...widgetOptions,
+            ...(resolution !== undefined && resolution > 0
+              ? { resolution }
+              : {}),
+          });
+        }
         if (document.type === LABEL_NODE_TYPE) {
           const data = record(document.data);
           const label = new Label(widgetOptions);
@@ -1233,13 +1306,14 @@ export function registerUISerializers(
  *
  * - **`Renderable`** — a `geometry` key, a `material` key (see the module
  *   header), `renderLayer`, `renderOrder`, `castShadow`/`receiveShadow` (§69,
- *   R-18) and `frustumCulled` (§87, R-8). §49's `depthMode` is still not
+ *   R-18), `frustumCulled` (§87, R-8) and `clip` (§67, R-23, 2026-08-28).
+ *   §49's `depthMode` is still not
  *   written because the class does not have it yet; it joins the payload with
  *   the feature. (This bullet claimed all four were unwritten until
  *   2026-08-09 — it predated R-18.)
  * - **`Sprite`** — a `material` key, `width`, `height`, `anchor`,
- *   `renderLayer`, `renderOrder`, the same three §49 flags, and **no geometry
- *   key at all**: a sprite
+ *   `renderLayer`, `renderOrder`, the same four drawable flags, and **no
+ *   geometry key at all**: a sprite
  *   derives its quad from the anchor and the size and owns it (§55), so the
  *   payload above rebuilds it exactly. Its `dispose()` state is not written —
  *   a disposed sprite is a released resource, not authored scene state.
@@ -1299,6 +1373,8 @@ export function registerRenderSerializers(
       nodeTypeOf: (node: Node): string | undefined => {
         const constructor = node.constructor;
         if (constructor === Renderable) return RENDERABLE_NODE_TYPE;
+        if (constructor === Mesh) return MESH_NODE_TYPE;
+        if (constructor === Bone) return BONE_NODE_TYPE;
         if (constructor === Sprite) return SPRITE_NODE_TYPE;
         if (constructor === PerspectiveCamera) {
           return PERSPECTIVE_CAMERA_NODE_TYPE;
@@ -1338,6 +1414,41 @@ export function registerRenderSerializers(
             renderLayer: renderable.renderLayer,
             renderOrder: renderable.renderOrder,
             ...renderableFlagsJson(renderable),
+          };
+        }
+        if (constructor === Mesh) {
+          const mesh = node as Mesh<Material>;
+          // Reading `skeleton` resolves any pending §79 reference first, so a
+          // reloaded scene re-serializes the identical record — the textual
+          // idempotency the P11-1 gate demands.
+          const skeleton = mesh.skeleton;
+          return {
+            geometry: resourceKeyJson<BufferGeometry>(
+              node,
+              "geometry",
+              mesh.geometry,
+              geometries,
+              policy,
+            ),
+            material: resourceKeyJson<Material>(
+              node,
+              "material",
+              mesh.material,
+              materials,
+              policy,
+            ),
+            renderLayer: mesh.renderLayer,
+            renderOrder: mesh.renderOrder,
+            ...renderableFlagsJson(mesh),
+            skeleton:
+              skeleton === null
+                ? null
+                : {
+                    bones: skeleton.bones.map((bone) => bone.id),
+                    inverseBindMatrices: Array.from(
+                      skeleton.inverseBindMatrices,
+                    ),
+                  },
           };
         }
         if (constructor === Sprite) {
@@ -1463,6 +1574,52 @@ export function registerRenderSerializers(
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
           });
+        }
+        if (document.type === MESH_NODE_TYPE) {
+          const geometry = resolveResource<BufferGeometry>(
+            document,
+            "geometry",
+            geometries,
+          );
+          const material = resolveResource<Material>(
+            document,
+            "material",
+            materials,
+          );
+          const mesh = new Mesh<Material>(geometry, material, {
+            ...finiteOptions(data, ["renderLayer", "renderOrder"]),
+            ...readRenderableFlags(data),
+          });
+          // The skeleton record: shape-corrupt restores no skeleton (the
+          // motion serializers' corrupt-field policy — a mesh without its rig
+          // is a usable mesh), while a well-formed record the classes refuse
+          // (a duplicate id, a mis-sized matrix array, a rig over the joint
+          // limit) is refused loudly at resolution (§85).
+          const skeletonRecord = record(data.skeleton);
+          const boneIds = skeletonRecord.bones;
+          const binds = skeletonRecord.inverseBindMatrices;
+          if (
+            Array.isArray(boneIds) &&
+            boneIds.length > 0 &&
+            boneIds.every((id) => typeof id === "string") &&
+            Array.isArray(binds) &&
+            binds.every(
+              (value) => typeof value === "number" && Number.isFinite(value),
+            )
+          ) {
+            restoreMeshSkeleton(
+              mesh,
+              boneIds,
+              new Float32Array(binds as number[]),
+            );
+          }
+          return mesh;
+        }
+        if (document.type === BONE_NODE_TYPE) {
+          // A bone's state is its node state, which the instantiator applies
+          // after this factory returns; the id goes through the constructor so
+          // it is reserved against the counter (A-17).
+          return new Bone(document.id === undefined ? {} : { id: document.id });
         }
         if (document.type === SPRITE_NODE_TYPE) {
           const material = resolveResource<Material>(
@@ -2462,7 +2619,7 @@ function requireUnlitMaterial(
  * ## What a text document carries
  *
  * A `material` key, `text`, `size`, `letterSpacing`, `align`, `renderLayer`,
- * `renderOrder`, and §49's three boolean flags — and **no geometry key**, for
+ * `renderOrder`, and the four drawable boolean flags — and **no geometry key**, for
  * `Sprite`'s reason: a `Text` derives its glyph quads from the four fields above
  * and owns them, so that payload rebuilds the geometry exactly.
  *
@@ -2728,6 +2885,12 @@ export function registerSceneNodeTypes(
   // intent — see the serializers in `@four/motion`.
   components.register(CharacterController, CHARACTER_CONTROLLER_SERIALIZER);
   components.register(FirstPersonLook, FIRST_PERSON_LOOK_SERIALIZER);
+  // §54's morph weights (RFC 0003, 2026-08-28), registered in the same packet
+  // that shipped the component — the one-packet rule the enumerating test
+  // below this module enforces. The serializer lives in `@four/scene` beside
+  // the class, declared against the same structural shape the motion
+  // serializers use.
+  components.register(MorphWeights, MORPH_WEIGHTS_SERIALIZER);
   registerPhysicsSerializers(components);
   return {
     components,

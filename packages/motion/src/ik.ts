@@ -16,10 +16,13 @@
  * - **CCD** and **FABRIK** (iterative solvers for chains of arbitrary length) —
  *   they need a joint/skeleton model (per-joint limits, chain ownership, a
  *   convergence and iteration-budget contract) that Phase 8 does not define, and
- *   an honest test for either is a convergence test, not an identity. They
- *   arrive with the skeletal-animation work that gives them a chain to solve.
- * - **Joint limits, twist, and full-body/multi-effector IK** — same reason: no
- *   skeleton model yet.
+ *   an honest test for either is a convergence test, not an identity. The
+ *   skeleton model now exists — `@four/scene`'s `Bone`/`Skeleton` (RFC 0003,
+ *   2026-08-28), whose bones are ordinary nodes this solver can already aim —
+ *   but the limits/ownership/convergence contract is still undefined, so both
+ *   stay staged with that as the remaining blocker.
+ * - **Joint limits, twist, and full-body/multi-effector IK** — same remaining
+ *   reason: a chain exists, its constraint contract does not.
  * - **Path-planning adapters** (§111) — pending an adapter RFC.
  *
  * Nothing here fakes any of that: this file solves two bones and says so.
@@ -30,12 +33,17 @@
  * of the chain tip ({@link TwoBoneIKSolution}), not Euler angles or quaternions.
  * Angles are not convention-free: turning this pose into rotations requires a
  * pinned bone-orientation convention (which local axis points down the bone, how
- * the roll around it is chosen, what the rest pose is), and this repository has
- * not pinned one — §7b fixes the world's handedness and units, not a skeleton's
- * bone frames. Positions are the whole geometric answer and the caller can build
+ * the roll around it is chosen, what the rest pose is), and this repository
+ * deliberately pins none — RFC 0003's adopted disposition (2026-08-28): the
+ * engine imposes **no** bone-axis convention on the data model, because the
+ * inverse bind matrix absorbs whatever convention an authoring tool used, so a
+ * `Bone`'s local frame stays arbitrary and this solver stays correct as
+ * written. Positions are the whole geometric answer and the caller can build
  * whatever rotation its rig wants from `root → joint → end` plus its own rest
- * pose. When a skeleton model lands, a rotation-producing wrapper can be layered
- * on this without changing it.
+ * pose. A rotation-producing wrapper, when one lands, uses **+Y as the bone's
+ * length axis** — RFC 0003's *helper* convention, matching §7a's Y-up world,
+ * a promise about helpers and never about authored rigs — and layers on this
+ * without changing it.
  *
  * ## Conventions
  *

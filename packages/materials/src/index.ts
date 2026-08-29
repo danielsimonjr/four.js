@@ -4,6 +4,38 @@ export type { LitMaterialOptions } from "./lit-material.js";
 export { LitMaterial } from "./lit-material.js";
 export type { BlendMode, MaterialOptions } from "./material.js";
 export { Material } from "./material.js";
+export type { NodeMaterialOptions } from "./node-material.js";
+export { NodeMaterial } from "./node-material.js";
+export type { ShaderOperand } from "./node-material-builder.js";
+export {
+  NodeMaterialBuilder,
+  ShaderExpression,
+  ShaderGraphBuilder,
+  ShaderGraphOutput,
+} from "./node-material-builder.js";
+export type {
+  ShaderAttributeName,
+  ShaderBinaryOp,
+  ShaderDomain,
+  ShaderGraph,
+  ShaderGraphAnalysis,
+  ShaderNode,
+  ShaderNodeId,
+  ShaderReflection,
+  ShaderTextureReflection,
+  ShaderUnaryOp,
+  ShaderUniformReflection,
+  ShaderValueType,
+} from "./shader-graph.js";
+export {
+  MAX_SHADER_GRAPH_NODES,
+  MAX_SHADER_GRAPH_TEXTURES,
+  SHADER_ATTRIBUTE_TYPES,
+  SHADER_VALUE_COMPONENTS,
+  analyzeShaderGraph,
+  forEachShaderNodeReference,
+  freezeShaderGraph,
+} from "./shader-graph.js";
 export type {
   SpriteMaterialOptions,
   SpriteTexture,

@@ -88,6 +88,7 @@ import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
 import type { EffectRenderPass } from "./effect-pass.js";
+import type { PickingService } from "./picking.js";
 import type { RenderTarget } from "./render-target.js";
 import type { RenderStatistics } from "./statistics.js";
 
@@ -237,6 +238,24 @@ export interface RendererCapabilities {
    * for a backend that binds nothing.
    */
   readonly maxBindings?: number;
+
+  /**
+   * The most bones one skinned draw may use (§54, §62; RFC 0003), or `0`
+   * where skinning is unsupported.
+   *
+   * Optional with the tri-state every WP-R1.1 member carries — `undefined`
+   * means "this backend has not been taught to answer", distinct from `0` —
+   * which is a recorded deviation from RFC 0003's required-member sketch: the
+   * RFC predates the widening law WP-R1.1 landed (*every added member is
+   * optional, absent means not reported*), and a required member here would
+   * break every third-party `Renderer` for a number most backends answer with
+   * a constant. The WebGL 2 backend reports `@four/render`'s declared
+   * `MAX_SKINNING_JOINTS` (see `mesh.ts` for the portability arithmetic); a
+   * skinned draw against it additionally requires its
+   * `registerSkinningPipeline()` — the capability says what the backend *can*
+   * do, registration is the application opting in to paying for it.
+   */
+  readonly maximumSkinningJoints?: number;
 }
 
 /**
@@ -630,6 +649,30 @@ export interface Renderer extends Disposable {
   renderEffect?(pass: EffectRenderPass): void;
 
   /**
+   * Builds a {@link PickingService} over this backend — §71's `"gpu"`/`"pixel"`
+   * picking tier (RFC 0005, 2026-08-28).
+   *
+   * **Optional, and its presence is the capability** — the
+   * {@link Renderer.statistics} / {@link Renderer.renderEffect} stance, for
+   * the same two reasons: a required member would break every implementor,
+   * and a backend with no readable pixels should say so by omission rather
+   * than by emulating. {@link supportsPicking} is the runtime test. Absent on
+   * {@link NullRenderer} (no pixels at all), and deliberately absent on the
+   * future Canvas 2D / SVG tiers even though both could answer `"pixel"`
+   * natively (`isPointInPath`, SVG hit testing): emulation would make §71's
+   * result *quality* vary by backend, and the owner's decision on RFC 0005 Q6
+   * is that the tier is declared absent there instead.
+   *
+   * The WebGL 2 backend declares it, gated on its `registerPickingPipeline()`
+   * (the skinning seam's shape): the member says what the backend *can* do,
+   * registration is the application opting in to paying for it, and calling
+   * this without registering is refused with `INVALID_APPLICATION_STATE`
+   * (§85) naming the fix. Each call builds an independent service with its
+   * own id buffer; the caller owns it and disposes it (§83).
+   */
+  createPickingService?(): PickingService;
+
+  /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at
    * `resolution` device pixels per logical pixel (§61, §45).
    *
@@ -755,6 +798,7 @@ export class NullRenderer implements Renderer {
     shaderPrecision: "none",
     maxUniformBufferBytes: 0,
     maxBindings: 0,
+    maximumSkinningJoints: 0,
   } satisfies RendererCapabilities);
 
   /** The §6b channel required by {@link Renderer}. Never emitted to by this class. */

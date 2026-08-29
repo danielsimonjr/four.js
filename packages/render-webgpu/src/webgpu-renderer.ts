@@ -10,14 +10,44 @@
  * renderer.dispose();
  * ```
  *
- * This is WP-R1.1 of the R-1 plan: device and context acquisition, the registry
- * opt-in, per-view clears, and the **unlit** tier drawn through the real
- * `buildRenderList` → `buildViewRenderList` → draw path. The remaining
- * pipelines (sprites and text, lit, standard, particles, shadows, effects,
- * compute) are packets R1.2–R1.8 and are *absent*, not stubbed: an item this
- * tier cannot draw is skipped, exactly as a draw with no geometry record is,
- * because a pipeline that silently draws the wrong thing is worse than one that
- * does not exist yet (the recorded WP-9.1 rule, applied to a backend).
+ * This is WP-R1.1 through WP-R1.7 of the R-1 plan: device and context
+ * acquisition, the registry opt-in, per-view clears, the **unlit** tier —
+ * flat, vertex-coloured and §57-`map`-textured — plus WP-R1.3's **sprite**
+ * pipeline (§55; §56's `Text` needs nothing more — a label is one textured
+ * unlit draw, R-28), the opt-in §65 **batching** uploader (`wgpu-batch.ts`),
+ * §67's **clip** application (masks write stencil bit planes, clipped
+ * draws test them — see `DEPTH_STENCIL_FORMAT` below for the per-frame
+ * stencil-format decision), WP-R1.5's two **shaded** tiers — §68's
+ * Lambert `lit` family and §59's metallic-roughness `standard` family, both
+ * under one per-view light uniform block (`wgpu-lights.ts`) — and WP-R1.6's
+ * off-screen tier: **render targets** (`wgpu-render-target.ts`, sampled back
+ * through R-4's `resolveTexture` seam with the same feedback refusal), §70's
+ * **effects** (`renderEffect`, `wgpu-effect.ts`), and §61's **`readPixels`**
+ * (`wgpu-readback.ts` — the whole-target, honestly asynchronous form). All of
+ * it drawn through the real `buildRenderList` → `buildViewRenderList` → draw
+ * path; WP-R1.4 added no pipeline — §50 shapes and §58 paints were already
+ * ordinary unlit draws, and that packet's deliverable is the
+ * transcript-identity tests saying so. WP-R1.7 lands §69's **shadow** tier
+ * (`wgpu-shadow.ts`: a depth-only caster pass into the renderer's own
+ * samplable target, the comparison-sampler bindings, and a lazy `shadow`
+ * variant of both shaded families) and completes §57 **stencil parity**
+ * (`wgpu-stencil.ts`: R-7's mask-by-hand tier now selects the stencil format
+ * on clipless frames too). WP-R1.8 lands §36's **particle** pipeline
+ * (`wgpu-particles.ts`: the instanced billboard port of `gl-particles.ts`,
+ * one draw per system over the shared unit quad and a per-system instance
+ * buffer) and §82's **compute** tier (`wgpu-compute.ts`: `compute()`,
+ * `createComputeBuffer`/`writeComputeBuffer`/`readComputeBuffer`, and the
+ * §36 GPU particle integrator kernel — the first capability of this backend
+ * WebGL 2 structurally cannot mirror). The remaining pipelines (RFC 0003's
+ * `skinned-unlit`/`skinned-lit`, which need a joint-palette pipeline this
+ * backend does not stage yet, and RFC 0001's `"graph"` effect, which waits on
+ * the WGSL emitter) are *absent*, not stubbed: an item this tier cannot draw
+ * is skipped, exactly as a draw with no geometry record is, because a
+ * pipeline that silently draws the wrong thing is worse than one that does
+ * not exist yet (the recorded WP-9.1 rule, applied to a backend). The one
+ * exception is deliberate and narrow: a §67 **mask** is coverage, not
+ * shading, so a clip node of any material family masks correctly today
+ * through the flat unlit pipeline with colour writes off.
  *
  * ## `initialize()` finally earns its `Promise`
  *
@@ -67,12 +97,19 @@
  * it.
  */
 
-import { EventEmitter, FourError } from "@four/core";
+import { DEV, EventEmitter, FourError, devWarnOnce } from "@four/core";
 import { Frustum, Matrix4 } from "@four/math";
 import {
+  COLOR_GRADE_DEFAULTS,
+  RenderTarget,
   buildInterpolatedRenderList,
   buildRenderList,
   buildViewRenderList,
+  collectSceneLights,
+  createSceneLights,
+  isRenderTargetTexture,
+  type EffectRenderPass,
+  type RenderBatch,
   type RenderInterpolation,
   type RenderItem,
   type RenderStatistics,
@@ -92,8 +129,10 @@ import {
   type GpuBindGroupLayout,
   type GpuBuffer,
   type GpuCanvasContext,
+  type GpuCommandEncoder,
   type GpuDevice,
   type GpuRenderPassEncoder,
+  type GpuSampler,
   type GpuTexture,
   type GpuTextureView,
   type WebgpuCanvas,
@@ -103,13 +142,87 @@ import {
   DRAW_MODEL_OFFSET,
   DRAW_UNIFORM_BYTES,
   DRAW_VIEW_PROJECTION_OFFSET,
+  MAP_BIND_GROUP_INDEX,
   createDrawBindGroupLayout,
 } from "./wgpu-bindings.js";
-import { WgpuGeometryCache } from "./wgpu-geometry.js";
+// **`import type` only**, deliberately (R-9's seam, restated for this
+// backend): a value import here would link §65's uploader — and the planner
+// behind it — into every bundle that carries this renderer, whether the
+// application batches or not. An application opts in by constructing one with
+// `createWgpuBatching` and assigning it; see `wgpu-batch.ts`.
+import type { WgpuRenderBatching } from "./wgpu-batch.js";
+import {
+  EFFECT_BIND_GROUP_INDEX,
+  EFFECT_PASS_VERTEX_COUNT,
+  EFFECT_UNIFORM_BYTES,
+  createEffectBindGroupLayout,
+  type WgpuEffectKind,
+} from "./wgpu-effect.js";
+import { WgpuGeometryCache, type WgpuGeometryRecord } from "./wgpu-geometry.js";
+import {
+  LIGHTS_BIND_GROUP_INDEX,
+  LIGHT_UNIFORM_BYTES,
+  LIGHT_UNIFORM_STRIDE_BYTES,
+  LIGHT_UNIFORM_STRIDE_FLOATS,
+  SHADED_MAP_BIND_GROUP_INDEX,
+  createLightsBindGroupLayout,
+  writeLightUniforms,
+} from "./wgpu-lights.js";
+import {
+  WgpuComputeCache,
+  createComputeBuffer,
+  readComputeBufferBytes,
+  writeComputeBuffer,
+  type ComputeBufferOptions,
+  type ComputePassDescriptor,
+  type WgpuComputeBuffer,
+} from "./wgpu-compute.js";
+import {
+  PARTICLE_MODEL_OFFSET,
+  PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_UNIFORM_BYTES,
+  PARTICLE_VIEW_OFFSET,
+  WgpuParticleCache,
+  createParticleBindGroupLayout,
+  type WgpuParticleRecord,
+} from "./wgpu-particles.js";
 import {
   WgpuPipelineCache,
   type WgpuPipelineDescriptor,
+  type WgpuStencilDescriptor,
 } from "./wgpu-pipeline-cache.js";
+import { readTexturePixels } from "./wgpu-readback.js";
+import {
+  RENDER_TARGET_COLOR_FORMAT,
+  WgpuRenderTargetCache,
+  type WgpuRenderTargetRecord,
+} from "./wgpu-render-target.js";
+import {
+  STANDARD_EMISSIVE_OFFSET,
+  STANDARD_SURFACE_OFFSET,
+  STANDARD_UNIFORM_BYTES,
+  createStandardBindGroupLayout,
+} from "./wgpu-standard.js";
+import {
+  SPRITE_QUAD_OFFSET,
+  SPRITE_UNIFORM_BYTES,
+  createSpriteBindGroupLayout,
+} from "./wgpu-sprite.js";
+import {
+  SHADOW_LIGHT_UNIFORM_BYTES,
+  SHADOW_MAP_BINDING,
+  SHADOW_SAMPLER_BINDING,
+  createShadowLightsBindGroupLayout,
+  createShadowSampler,
+  writeShadowUniforms,
+} from "./wgpu-shadow.js";
+import {
+  CLEAR_STENCIL,
+  applyStencilReference,
+  frameWantsStencil,
+  stencilDescriptor,
+} from "./wgpu-stencil.js";
+import { WgpuTextureCache, type WgpuCacheableTexture } from "./wgpu-texture.js";
 import { CLEAR_VERTEX_COUNT } from "./wgpu-unlit.js";
 
 /** Error code for use-after-dispose, mirroring the other two backends (§83, §89). */
@@ -118,17 +231,86 @@ const LIFECYCLE_ERROR_CODE = "INVALID_APPLICATION_STATE";
 /** The depth format this tier allocates (§62's tier; `depth24plus` is universal). */
 const DEPTH_FORMAT = "depth24plus";
 
+/**
+ * The depth format of a frame that clips (§67, WP-R1.3): the same 24-bit depth
+ * plus the eight stencil bit planes `MAX_CLIP_PLANES` budgets — WebGPU's
+ * spelling of the packed `DEPTH24_STENCIL8` the WebGL backend's `stencil`
+ * option allocates, and guaranteed available on every device.
+ *
+ * **Per frame, not always** — the R-6 pipeline-cost law applied to a format:
+ * the depth format is baked into every pipeline, so allocating stencil
+ * unconditionally would re-key (and recompile) every pipeline of every
+ * application and move every landed transcript's `createTexture` and
+ * `createRenderPipeline` lines. Instead the frame asks `frameWantsStencil`
+ * (WP-R1.7, `wgpu-stencil.ts`) — R-23's O(1) clip read plus a scan for §57
+ * material stencils — and only a frame that actually masks pays for
+ * stencil-carrying pipelines and the attachment's extra byte per pixel. A
+ * scene that starts or stops masking reallocates the depth texture and
+ * compiles the other format's pipelines once, which is the same class of
+ * cost as its first frame; a scene that never masks records the WP-R1.1
+ * transcript byte for byte.
+ *
+ * There is deliberately **no `stencil` renderer option and no no-stencil
+ * diagnostic** here. The WebGL backend needs both because its stencil buffer
+ * is a context-creation attribute it cannot add after the fact, so a clip can
+ * arrive on a surface that has nowhere to write its mask. This backend owns
+ * its depth attachment and can always allocate the stencil aspect the frame
+ * needs — the diagnostic's condition is unreachable, and an option would gate
+ * something that costs nothing when unused. R1.3's recorded residue — §57
+ * `material.stencil` inert on clipless frames — is retired by the same scan
+ * (WP-R1.7): R-7's mask-by-hand tier reaches the hardware on any on-screen
+ * frame that names it, no option required.
+ */
+const DEPTH_STENCIL_FORMAT = "depth24plus-stencil8";
+
 /** The swap-chain format used when the host will not name a preferred one. */
 const FALLBACK_CANVAS_FORMAT = "bgra8unorm";
 
 /** `UNIFORM_STRIDE_BYTES` in `Float32Array` elements. */
 const UNIFORM_STRIDE_FLOATS = UNIFORM_STRIDE_BYTES / 4;
 
-/** An unlit render item — the one kind this tier draws (§64). */
+/** An unlit render item (§64). */
 type UnlitItem = Extract<RenderItem, { kind: "unlit" }>;
 
 /** §57's state as this backend reads it off an unlit item's material. */
 type UnlitMaterialLike = UnlitItem["material"];
+
+/** A sprite render item (§55, WP-R1.3). */
+type SpriteItem = Extract<RenderItem, { kind: "sprite" }>;
+
+/** A particle render item (§36, WP-R1.8) — one instanced draw per system. */
+type ParticleItem = Extract<RenderItem, { kind: "particles" }>;
+
+/** §55's material as this backend reads it — texture, tint, §57 state. */
+type SpriteMaterialLike = SpriteItem["material"];
+
+/** A shaded render item (§68 lit or §59 standard, WP-R1.5). */
+type ShadedItem = Extract<RenderItem, { kind: "lit" | "standard" }>;
+
+/** §59's material as this backend reads it — base colour, surface, §57 state. */
+type StandardMaterialLike = Extract<
+  ShadedItem,
+  { kind: "standard" }
+>["material"];
+
+/**
+ * The frame's flattened lighting (§68), pooled across frames exactly as the
+ * GL backend's module-level record is: `collectSceneLights` rewrites every
+ * field in place, and the frame consumes it synchronously. Only refreshed for
+ * frames that contain a lit or standard item, so a scene that never shades
+ * never pays the collection walk.
+ */
+const sceneLights = createSceneLights();
+
+/**
+ * Scratch for the grade's uniform upload (WP-R1.6) — one per module, exactly
+ * like the GL backend's `gradeScratch`, and copied at record time by the
+ * recording double, so per-call reuse cannot alias transcripts.
+ */
+const effectGradeScratch = new Float32Array(4);
+
+/** §67's per-item clip record, non-null — `webgl-renderer.ts`'s `ItemClip`. */
+type ItemClip = NonNullable<RenderItem["clip"]>;
 
 /**
  * The `navigator`-shaped host object, read off `globalThis`.
@@ -220,9 +402,11 @@ function readCapabilities(device: GpuDevice): RendererCapabilities {
     multisampling: true,
     // WebGPU *devices* can render to `rgba16float`; this **backend** cannot
     // yet, because `RenderTargetFormat` is the single-member union `"rgba8"`
-    // and off-screen targets are WP-R1.6. §62's report is about what the
-    // backend offers, not about what the device could do if asked — the same
-    // stance the WebGL backend takes on the same member.
+    // — WP-R1.6's targets allocate exactly that (`wgpu-render-target.ts`),
+    // and the report moves when the union widens (R-4's staged format tier).
+    // §62's report is about what the backend offers, not about what the
+    // device could do if asked — the same stance the WebGL backend takes on
+    // the same member.
     floatRenderTargets: false,
     timestampQueries: has("timestamp-query"),
     storageBuffers: limit("maxStorageBuffersPerShaderStage") > 0,
@@ -267,6 +451,46 @@ function resolveRect(
   out.y = Math.round(view.y * scaleY);
   out.width = Math.max(0, Math.round(view.width * scaleX));
   out.height = Math.max(0, Math.round(view.height * scaleY));
+}
+
+/**
+ * Turns a texture a material points at into the bind group to set, whichever
+ * kind it is (R-4's `resolveTexture` seam, WP-R1.6) — the one place in the
+ * draw path that knows there are two.
+ *
+ * An ordinary `Texture` resolves through {@link WgpuTextureCache}, exactly as
+ * before — one marker read away from the call it always made, which is what
+ * keeps a scene that never renders to texture byte-identical at the device
+ * boundary. A render-target texture has no CPU texels — it *is* a target's
+ * colour attachment — so it resolves through {@link WgpuRenderTargetCache}
+ * instead, which allocates the target if this is the first the backend has
+ * heard of it (sampling a never-rendered target reads WebGPU's zero-filled
+ * allocation: transparent black, the GL answer).
+ *
+ * `null` means "skip this draw": a disposed resource, or — the case only this
+ * function can see — a **feedback loop**, a material sampling the very target
+ * this frame is drawing into. Reading and writing one surface in a single
+ * pass is undefined behaviour on every backend, and undefined content is
+ * worse than a missing draw (§83, R-4). Ping-pong between two targets to
+ * express what that draw was reaching for.
+ *
+ * Returns the bind group itself rather than a record: the group is the one
+ * member every draw arm sets, and wrapping it would allocate per draw.
+ */
+function resolveFrameTexture(
+  textures: WgpuTextureCache,
+  renderTargets: WgpuRenderTargetCache,
+  activeTarget: RenderTarget | null,
+  texture: WgpuCacheableTexture,
+): GpuBindGroup | null {
+  if (!isRenderTargetTexture(texture)) {
+    return textures.acquire(texture)?.bindGroup ?? null;
+  }
+  const source = texture.renderTarget;
+  if (source === activeTarget) {
+    return null;
+  }
+  return renderTargets.sample(source);
 }
 
 /** Adds one *submitted* draw to §84's counters — the twin of the GL backend's. */
@@ -351,11 +575,147 @@ export class WebgpuRenderer implements Renderer {
 
   #geometries: WgpuGeometryCache | null = null;
 
+  #textures: WgpuTextureCache | null = null;
+
+  /**
+   * §61's render targets (WP-R1.6, `wgpu-render-target.ts`) — the fourth
+   * id/version cache. Constructed at initialization (which allocates
+   * nothing) and consulted only by a frame that names a target, an effect,
+   * a readback, or a material sampling one.
+   */
+  #renderTargets: WgpuRenderTargetCache | null = null;
+
   #bindGroupLayout: GpuBindGroupLayout | null = null;
 
   #uniformBuffer: GpuBuffer | null = null;
 
   #bindGroup: GpuBindGroup | null = null;
+
+  /**
+   * §55's group-0 layout, created by the first sprite draw and by nothing
+   * else (`wgpu-sprite.ts`) — the WP-R1.2 group-1 precedent, so a spriteless
+   * application records the identical initialization transcript.
+   */
+  #spriteLayout: GpuBindGroupLayout | null = null;
+
+  /**
+   * The sprite draws' bind group over {@link WebgpuRenderer.#uniformBuffer} —
+   * the same strided blocks, bound at {@link SPRITE_UNIFORM_BYTES} instead of
+   * 144. Dropped (not destroyed — bind groups have no `destroy`) whenever the
+   * buffer is regrown, and recreated by the next sprite draw.
+   */
+  #spriteBindGroup: GpuBindGroup | null = null;
+
+  /**
+   * The standard draws' group-0 layout and bind group over the same strided
+   * buffer, bound at {@link STANDARD_UNIFORM_BYTES} (WP-R1.5) — the sprite
+   * pair's lifecycle verbatim: layout created by the first standard draw,
+   * bind group dropped on regrowth and recreated by the next one.
+   */
+  #standardLayout: GpuBindGroupLayout | null = null;
+
+  #standardBindGroup: GpuBindGroup | null = null;
+
+  /**
+   * §36's particle tier (WP-R1.8, `wgpu-particles.ts`), on the sprite pair's
+   * lifecycle: the three-matrix group-0 layout and its bind group over the
+   * same strided uniform buffer — layout created by the first particle draw,
+   * group dropped on buffer regrowth and on device loss — plus the
+   * per-system instance-buffer cache, constructed at initialization (which
+   * allocates nothing) and consulted only by a frame that draws particles.
+   */
+  #particleLayout: GpuBindGroupLayout | null = null;
+
+  #particleBindGroup: GpuBindGroup | null = null;
+
+  #particles: WgpuParticleCache | null = null;
+
+  /**
+   * Which `render` call is running, for the once-per-frame instance upload
+   * (`wgpu-particles.ts` on the cadence). Starts at 0 so a fresh record's
+   * `uploadedFrame: 0` never matches a frame that has actually run.
+   */
+  #frameOrdinal = 0;
+
+  /**
+   * §82's compute caches (WP-R1.8, `wgpu-compute.ts`), created by the first
+   * `compute()` call — the lazy-subsystem precedent, so an application that
+   * never dispatches allocates none of it — and dropped whole on device loss
+   * and disposal.
+   */
+  #compute: WgpuComputeCache | null = null;
+
+  /**
+   * §68's per-view light block (WP-R1.5, `wgpu-lights.ts`): the group-1
+   * layout, one buffer holding a 768-byte-strided block per rendered view,
+   * the single bind group the shaded draws offset into, and the CPU staging
+   * the view loop packs. All `null`/empty until the first frame that contains
+   * a lit or standard item — the WP-R1.2 lazy-subsystem precedent — so an
+   * unshaded application records not one of these allocations.
+   */
+  #lightsLayout: GpuBindGroupLayout | null = null;
+
+  #lightsBuffer: GpuBuffer | null = null;
+
+  #lightsBindGroup: GpuBindGroup | null = null;
+
+  #lightsStaging = new Float32Array(0);
+
+  /** Light blocks the buffer and staging can hold. Only grows. */
+  #lightsCapacity = 0;
+
+  /**
+   * §70's grade uniform block (WP-R1.6, `wgpu-effect.ts`): the group-1
+   * layout, the 16-byte buffer, and the one bind group over it. All `null`
+   * until the first **grade** — a copy or an output transform binds no
+   * uniforms at all, and an application that never runs an effect allocates
+   * none of these (the lazy-subsystem precedent, fourth application).
+   */
+  #effectLayout: GpuBindGroupLayout | null = null;
+
+  #effectBuffer: GpuBuffer | null = null;
+
+  #effectBindGroup: GpuBindGroup | null = null;
+
+  /**
+   * §69's shadow tier (WP-R1.7, `wgpu-shadow.ts`), every member lazy on the
+   * WP-R1.2 terms — a shadowless application allocates none of it:
+   *
+   * - the off-screen surface the caster pass draws into — the one
+   *   `RenderTarget` this renderer *owns* (R-18's rule: it is the
+   *   implementation of `castShadow`, not a surface an application composes
+   *   with), allocated `depthTexture: true` so the cache's R1.6 format table
+   *   answers `depth32float`, the samplable row;
+   * - the widened group-1 layout, the shared comparison sampler, and the one
+   *   bind group every receiving draw sets — over the *lights buffer* the
+   *   unshadowed draws already offset into, plus the map's depth view. The
+   *   group is dropped whenever either half moves: a lights-buffer regrowth
+   *   (`#growLights`) or a reallocated map (`#shadowBindGroupView` tracks
+   *   the view it was built against).
+   */
+  #shadowTarget: RenderTarget | null = null;
+
+  #shadowLightsLayout: GpuBindGroupLayout | null = null;
+
+  #shadowSampler: GpuSampler | null = null;
+
+  #shadowBindGroup: GpuBindGroup | null = null;
+
+  #shadowBindGroupView: GpuTextureView | null = null;
+
+  /**
+   * §65 batching, or `null` (the default) to batch nothing — the opt-in seam
+   * R-9 recorded for the GL backend, restated here byte for byte: the field is
+   * read once per frame, the whole no-batching cost is one comparison per
+   * item, and this class names the uploader `import type` only, so a bundle
+   * that never calls `createWgpuBatching` never links it.
+   *
+   * ```ts
+   * import { createWgpuBatching } from "@four/render-webgpu";
+   * renderer.batching = createWgpuBatching();
+   * ```
+   */
+  batching: WgpuRenderBatching | null = null;
 
   /** Blocks the uniform buffer and the staging array can hold. Only grows. */
   #uniformCapacity = 0;
@@ -367,6 +727,20 @@ export class WebgpuRenderer implements Renderer {
   #depthWidth = 0;
 
   #depthHeight = 0;
+
+  /** The format `#depthTexture` holds — §67's clip frames upgrade it. */
+  #depthFormat = DEPTH_FORMAT;
+
+  /**
+   * The colour format of the surface the **current** `render` call draws
+   * into — the swap chain's for an on-screen frame,
+   * {@link RENDER_TARGET_COLOR_FORMAT} for an off-screen one (WP-R1.6).
+   * Written at the top of every frame and read by the descriptor builders,
+   * so the six draw arms did not each grow a parameter; on-screen frames
+   * write the value the arms always read, which is what keeps their
+   * transcripts byte-identical.
+   */
+  #frameFormat = FALLBACK_CANVAS_FORMAT;
 
   #width = 300;
 
@@ -485,8 +859,36 @@ export class WebgpuRenderer implements Renderer {
 
     const bindGroupLayout = createDrawBindGroupLayout(device);
     this.#bindGroupLayout = bindGroupLayout;
-    this.#pipelines = new WgpuPipelineCache(device, bindGroupLayout);
+    const textures = new WgpuTextureCache(device);
+    this.#textures = textures;
+    // Providers, not layouts: group 1 is created by the first textured
+    // upload and by nothing else (`wgpu-texture.ts`), §55's group-0
+    // layout by the first sprite draw (`wgpu-sprite.ts`), and the grade's
+    // block by the first grade (`wgpu-effect.ts`) — so the pipelines
+    // and the bind groups are built against one object each, without any
+    // cache allocating anything at initialization.
+    this.#pipelines = new WgpuPipelineCache(
+      device,
+      bindGroupLayout,
+      () => textures.bindGroupLayout,
+      () => this.#acquireSpriteLayout(device),
+      () => this.#acquireLightsLayout(device),
+      () => this.#acquireStandardLayout(device),
+      () => this.#acquireEffectLayout(device),
+      () => this.#acquireShadowLightsLayout(device),
+      () => this.#acquireParticleLayout(device),
+    );
     this.#geometries = new WgpuGeometryCache(device);
+    // Constructed here because construction allocates nothing (the family
+    // rule); a particle-less application records not one call from it.
+    this.#particles = new WgpuParticleCache(device);
+    // Constructed here because construction allocates nothing (the family
+    // rule); its sampling layout provider is the texture cache's, so a
+    // sampled target binds against the object every `map` pipeline names.
+    this.#renderTargets = new WgpuRenderTargetCache(
+      device,
+      () => textures.bindGroupLayout,
+    );
     this.#growUniforms(device, bindGroupLayout, 1);
     this.#watchDeviceLoss(device);
   }
@@ -522,37 +924,68 @@ export class WebgpuRenderer implements Renderer {
    * cleared only where the view carries a `clearColor`, depth is cleared for
    * every view, and both are confined to the rectangle.
    *
-   * Items this tier has no pipeline for are skipped (see the module header), as
-   * is a draw whose geometry will not upload. Returns without drawing while the
-   * device is lost, when `views` is empty, and — for now — when a `target` is
-   * passed: render-to-texture is WP-R1.6, and skipping the frame is the
-   * behaviour §61 already defines for a target this backend cannot provide,
-   * rather than a new failure mode.
+   * Items this tier has no pipeline for are skipped (see the module header),
+   * as is a draw whose geometry will not upload. Returns without drawing
+   * while the device is lost, when `views` is empty, and when `target` is a
+   * disposed render target (§83's "disposed resources still in use" — the
+   * frame must not draw into a released surface). An off-screen frame
+   * (WP-R1.6) attaches the target's own colour and depth views, resolves its
+   * viewport rectangles against the target's size, and bakes the target's
+   * formats into its pipelines; everything else — clears, culling, the draw
+   * arms — is the identical code path, which is what makes "the same scene
+   * draws the same way off screen" true by construction.
    */
   render(
     root: Node,
     views: readonly Viewport[],
     interpolation?: RenderInterpolation,
-    target?: unknown,
+    target?: RenderTarget | null,
   ): void {
     this.#assertUsable("render");
     const device = this.#device;
     const context = this.#context;
     const pipelines = this.#pipelines;
     const geometries = this.#geometries;
+    const textures = this.#textures;
+    const renderTargets = this.#renderTargets;
+    const particles = this.#particles;
     const layout = this.#bindGroupLayout;
     if (
       device === null ||
       context === null ||
       pipelines === null ||
       geometries === null ||
+      textures === null ||
+      renderTargets === null ||
+      particles === null ||
       layout === null ||
       this.#deviceLost ||
-      views.length === 0 ||
-      (target !== undefined && target !== null)
+      views.length === 0
     ) {
       return;
     }
+
+    // §36's once-per-frame instance-upload gate (WP-R1.8): pure CPU state,
+    // advanced per render call, compared by nothing else — a particle-less
+    // frame records not one call more or less for it.
+    this.#frameOrdinal += 1;
+
+    // §61's fourth argument (R-4): resolved before anything else, because a
+    // disposed target skips the whole frame and an allocation is what gives
+    // the frame its attachment views, size, and formats.
+    const activeTarget = target ?? null;
+    let targetRecord: WgpuRenderTargetRecord | null = null;
+    if (activeTarget !== null) {
+      targetRecord = renderTargets.acquire(activeTarget);
+      if (targetRecord === null) {
+        return;
+      }
+    }
+    // The surface's colour format, baked into every pipeline this frame
+    // acquires — the swap chain's on screen, `rgba8unorm` off screen
+    // (`wgpu-render-target.ts` on why the two differ).
+    this.#frameFormat =
+      targetRecord === null ? this.#format : RENDER_TARGET_COLOR_FORMAT;
 
     const items =
       interpolation === undefined
@@ -564,28 +997,169 @@ export class WebgpuRenderer implements Renderer {
             this.#renderList,
           );
 
+    // §67: does this frame *ask* to clip? One property read, not a scan —
+    // mask draws carry the comparators' first key, so a frame that clips puts
+    // one at `items[0]` (R-23). On screen the frame's depth format is
+    // `frameWantsStencil`'s answer (WP-R1.7, `wgpu-stencil.ts`): that same
+    // O(1) clip read, plus the material scan that retired R1.3's
+    // material-stencil-inert-on-clipless-frames residue — R-7's mask-by-hand
+    // tier now reaches the hardware on any frame that names it (see
+    // `DEPTH_STENCIL_FORMAT` for why stencil stays per-frame rather than
+    // always). Off screen the target's attachment is fixed at its
+    // allocation, so whether the frame *may* stencil is the target's
+    // `stencil` option — GL's `stencilAttached`, read off the record.
+    const wantsClips = items.length > 0 && items[0].clip?.maskPass === true;
+    const frameStencil =
+      targetRecord === null ? frameWantsStencil(items) : targetRecord.stencil;
+    const frameClips = wantsClips && frameStencil;
+    // §67's exhaustion case, reachable here only off screen (the on-screen
+    // attachment is this backend's own and always widens): a clip into a
+    // stencil-less target has nowhere to write its mask, so the mask draws
+    // are skipped and the subtree draws **unclipped** — failing toward
+    // drawing, like the ninth clip (R-23), and warned like GL's same case.
+    if (DEV && wantsClips && !frameStencil) {
+      devWarnOnce(
+        "webgpu-clip-without-stencil",
+        "§67: this scene sets `clip = true` but the render target being " +
+          "drawn into has no stencil buffer, so there is nothing to write " +
+          "the mask into and the clipped subtrees draw unclipped. Give the " +
+          "render target `{ stencil: true }` to allocate one (R-7).",
+      );
+    }
+    const depthFormat: string | null =
+      targetRecord === null
+        ? frameStencil
+          ? DEPTH_STENCIL_FORMAT
+          : DEPTH_FORMAT
+        : targetRecord.depthFormat;
+    // The stencil scan above ran §57 material accessors — application code,
+    // which can do anything, including disposing this renderer (the pinned
+    // reentrant family, reached one step earlier than the draw arms reach
+    // it). Bail before anything is allocated: a §61 skip, and no buffer is
+    // resurrected onto a dead device (the R1.6 reentrant-grade rule).
+    if (this.#disposed) {
+      return;
+    }
+
+    // §68 (WP-R1.5): does this frame shade at all? One `kind` comparison per
+    // item, the GL backend's scan — minus the skinned-lit kind it includes
+    // there, deliberately: a skinned item is transcript-invisible on this
+    // backend (WP-R1.4's pinned claim), and collecting lights for draws that
+    // will be skipped would allocate the light block into that byte-identical
+    // tape. Collected once per call, not per view — lights are frame state,
+    // like the render list; the eye is the per-view half, packed per view
+    // below.
+    let hasLitItems = false;
+    for (const item of items) {
+      if (item.kind === "lit" || item.kind === "standard") {
+        hasLitItems = true;
+        break;
+      }
+    }
+    if (hasLitItems) {
+      collectSceneLights(root, sceneLights);
+      // Sized before recording, like the draw uniforms below: one block per
+      // view at most, and growth mid-pass would orphan the bound group.
+      this.#growLights(device, views.length);
+    }
+    // §69 (WP-R1.7): does this frame want a shadow map? The GL condition,
+    // verbatim — a light asked (`hasShadow`) and something shaded will read
+    // it (`hasLitItems`) — so a scene without both records not one shadow
+    // allocation, call, or byte: the byte-identity contract, not an
+    // optimisation.
+    const frameShadow = hasLitItems && sceneLights.hasShadow;
+
     // Sized before recording: one clear block per view plus, at worst, one
-    // block per item per view. Growing mid-pass would orphan the bind group
-    // the pass has already been handed.
-    this.#growUniforms(device, layout, views.length * (1 + items.length));
+    // block per item per view — plus one block per caster when §69's pass
+    // will run (WP-R1.7; `+ 0` on every other frame, so the growth sequence
+    // is untouched). Growing mid-pass would orphan the bind group the pass
+    // has already been handed.
+    this.#growUniforms(
+      device,
+      layout,
+      views.length * (1 + items.length) + (frameShadow ? items.length : 0),
+    );
     const bindGroup = this.#bindGroup;
     const uniformBuffer = this.#uniformBuffer;
     if (bindGroup === null || uniformBuffer === null) {
       return;
     }
 
-    const surfaceWidth = Math.max(
-      1,
-      Math.round(this.#width * this.#resolution),
-    );
-    const surfaceHeight = Math.max(
-      1,
-      Math.round(this.#height * this.#resolution),
-    );
-    const depthView = this.#acquireDepth(device, surfaceWidth, surfaceHeight);
-    const colorView = context.getCurrentTexture().createView();
+    // Normalized viewport rectangles resolve against the surface actually
+    // being drawn into: the drawing buffer on screen, the target's own size
+    // off screen — read off the *record*, so the `setViewport` call and the
+    // allocation agree even if the application resized the target after this
+    // call began (the GL backend's rule, unchanged).
+    const surfaceWidth =
+      targetRecord?.width ??
+      Math.max(1, Math.round(this.#width * this.#resolution));
+    const surfaceHeight =
+      targetRecord?.height ??
+      Math.max(1, Math.round(this.#height * this.#resolution));
+    // On screen the depth attachment is this renderer's own, sized to the
+    // drawing buffer and format-upgraded for a clipping frame; off screen it
+    // is the target's — or absent, for a `depth: false` target, in which case
+    // the pass carries no depth attachment at all and §61's per-view depth
+    // clear has nothing to owe.
+    const depthView =
+      targetRecord === null
+        ? this.#acquireDepth(
+            device,
+            surfaceWidth,
+            surfaceHeight,
+            frameStencil ? DEPTH_STENCIL_FORMAT : DEPTH_FORMAT,
+          )
+        : targetRecord.depthView;
+    const colorView =
+      targetRecord === null
+        ? context.getCurrentTexture().createView()
+        : targetRecord.colorView;
 
+    const statistics = this.statistics;
     const encoder = device.createCommandEncoder({ label: "four:frame" });
+    let block = 0;
+
+    // §69's shadow map (WP-R1.7), recorded **before** the views pass — §63's
+    // own pipeline diagram puts "Shadow Passes" between scene preparation and
+    // the opaque world, and the map is per-*frame* state (one light, one
+    // volume, shared by every view and by an off-screen frame alike), exactly
+    // as `sceneLights` is. Backend-internal rather than a §63 graph pass, for
+    // the GL call site's recorded reasons. Structurally unlike GL's: a pass of
+    // its own on this frame's encoder, borrowing no framebuffer, rectangles,
+    // or program and owing its caller no re-bind — the mirror-state
+    // discipline the GL shadow pass needs has nothing to guard here
+    // (`wgpu-shadow.ts`).
+    let shadowRecord: WgpuRenderTargetRecord | null = null;
+    if (frameShadow) {
+      const shadow = this.#renderShadowMap(
+        device,
+        encoder,
+        pipelines,
+        geometries,
+        renderTargets,
+        bindGroup,
+        items,
+        block,
+        statistics,
+      );
+      shadowRecord = shadow.record;
+      block = shadow.block;
+    }
+    // §69's receiver binding, resolved once per frame — GL binds the map to
+    // its unit once and leaves it for the whole frame, and this is that
+    // decision one object later: the widened group over the very lights
+    // buffer the plain draws offset into, plus the map's depth view and the
+    // shared comparison sampler. `null` exactly when the frame has no map to
+    // compare against (nothing cast, or the map could not be produced —
+    // which costs the frame its shadows, never the frame, §61), and the
+    // draws then never ask.
+    const shadowView = shadowRecord?.depthView ?? null;
+    const shadowLightsBuffer = this.#lightsBuffer;
+    const shadowGroup =
+      shadowView !== null && shadowLightsBuffer !== null
+        ? this.#acquireShadowBindGroup(device, shadowLightsBuffer, shadowView)
+        : null;
+
     const pass = encoder.beginRenderPass({
       label: "four:views",
       colorAttachments: [
@@ -597,15 +1171,45 @@ export class WebgpuRenderer implements Renderer {
           storeOp: "store",
         },
       ],
-      depthStencilAttachment: {
-        view: depthView,
-        depthLoadOp: "load",
-        depthStoreOp: "store",
-      },
+      // The stencil-aspect ops exist exactly when the format has the aspect —
+      // WebGPU validation requires the pair on `depth24plus-stencil8` and
+      // forbids it on `depth24plus`, which conveniently makes the clipless
+      // descriptor the object WP-R1.1 recorded. Off screen the aspect is the
+      // target's `stencil` option, whether or not this frame clips.
+      ...(depthView === null
+        ? {}
+        : {
+            depthStencilAttachment: frameStencil
+              ? {
+                  view: depthView,
+                  depthLoadOp: "load",
+                  depthStoreOp: "store",
+                  stencilLoadOp: "load",
+                  stencilStoreOp: "store",
+                }
+              : {
+                  view: depthView,
+                  depthLoadOp: "load",
+                  depthStoreOp: "store",
+                },
+          }),
     });
 
-    const statistics = this.statistics;
-    let block = 0;
+    // §65's uploader (R-9's seam), read once for the frame exactly as
+    // `statistics` is, and `null` by default: a renderer that never opted in
+    // pays one comparison per item and records not a single extra call.
+    const batching = this.batching;
+    if (batching !== null) {
+      batching.beginFrame();
+    }
+    // §68: how many light blocks the view loop has packed — one per *rendered*
+    // view, so skipped (zero-area) views leave no gap and every uploaded byte
+    // was written this frame (`writeLightUniforms`' determinism contract).
+    let lightBlock = 0;
+    // §67: the pass's stencil reference, a pass command mirrored here so it is
+    // issued only when a stencil-carrying draw needs a different value.
+    // WebGPU's initial value is 0, so a clipless frame issues none at all.
+    let stencilReference = 0;
 
     for (const view of views) {
       resolveRect(view, surfaceWidth, surfaceHeight, this.#rect);
@@ -627,25 +1231,67 @@ export class WebgpuRenderer implements Renderer {
         .copy(camera.projectionMatrix)
         .multiply(camera.viewMatrix);
 
-      // The clear draw: colour where the view asks for it, depth always.
+      // §68 (WP-R1.5): this view's light block — the frame's lights plus the
+      // per-view eye, read straight out of the camera's world matrix
+      // translation column (`updateViewMatrix()` above resolved it; the GL
+      // standard branch's read, verbatim). CPU packing only; the one upload
+      // happens after the pass, beside the draw uniforms'.
+      let lightBase = 0;
+      if (hasLitItems) {
+        lightBase = lightBlock * LIGHT_UNIFORM_STRIDE_BYTES;
+        const eye = camera.transform.worldMatrix.elements;
+        writeLightUniforms(
+          this.#lightsStaging,
+          lightBlock * LIGHT_UNIFORM_STRIDE_FLOATS,
+          sceneLights,
+          eye[12],
+          eye[13],
+          eye[14],
+        );
+        // §69's tail of the same block (WP-R1.7): the shadow matrix and
+        // biases when a light casts, zeros when none does — written on every
+        // shaded view either way, so the uploaded stride is a function of
+        // this frame alone and a landed shadowless upload stays
+        // byte-identical (`wgpu-shadow.ts`).
+        writeShadowUniforms(
+          this.#lightsStaging,
+          lightBlock * LIGHT_UNIFORM_STRIDE_FLOATS,
+          sceneLights,
+        );
+        lightBlock += 1;
+      }
+
+      // The clear draw: colour where the view asks for it, depth whenever the
+      // surface has a depth buffer (§61's shared clear semantics — a
+      // `depth: false` target has no buffer to owe a clear, and a view of one
+      // that also names no clearColor has nothing to clear at all, so the
+      // draw is skipped whole rather than issued empty).
       const clearColor = view.clearColor;
-      this.#writeBlock(
-        block,
-        this.#viewProjection,
-        null,
-        clearColor?.[0] ?? 0,
-        clearColor?.[1] ?? 0,
-        clearColor?.[2] ?? 0,
-        clearColor?.[3] ?? 0,
-      );
-      this.#drawClear(
-        pass,
-        pipelines,
-        bindGroup,
-        block,
-        clearColor !== undefined,
-      );
-      block += 1;
+      if (clearColor !== undefined || depthFormat !== null) {
+        this.#writeBlock(
+          block,
+          this.#viewProjection,
+          null,
+          clearColor?.[0] ?? 0,
+          clearColor?.[1] ?? 0,
+          clearColor?.[2] ?? 0,
+          clearColor?.[3] ?? 0,
+        );
+        this.#drawClear(
+          pass,
+          pipelines,
+          bindGroup,
+          block,
+          clearColor !== undefined,
+          depthFormat,
+          // §67: on a stencil-carrying surface the same triangle zeroes the
+          // stencil rectangle — a stencil buffer that is never cleared is a
+          // mask leaking between frames and between views (the §33 defect,
+          // not a feature).
+          frameStencil,
+        );
+        block += 1;
+      }
 
       // §87's cull, against the un-remapped matrix in the WebGL clip convention
       // both backends share (see the module header on clip depth).
@@ -654,20 +1300,452 @@ export class WebgpuRenderer implements Renderer {
         frustum: this.#frustum,
       });
 
-      for (const item of viewItems) {
-        if (item.kind !== "unlit") {
-          // WP-R1.2 onwards. Skipped, never approximated.
+      for (let index = 0; index < viewItems.length; index += 1) {
+        const item = viewItems[index];
+
+        // §65 (R-9), and only when the application assigned an uploader: does
+        // a run of compatible draws start here? The planner already broke runs
+        // at clip-record boundaries (R-23), so the batch's clip is one value
+        // for the whole merged draw, exactly as its material is. The check
+        // sits above `geometries.acquire` for `webgl-renderer.ts`'s reason: a
+        // batched run draws from the uploader's own buffers.
+        if (batching !== null) {
+          const batch = batching.next(viewItems, index);
+          if (batch !== null) {
+            // §55 and §57 resolve their texture from different fields; the
+            // batch carries whichever one its material named (`batch.ts`). A
+            // sprite batch whose texture will not resolve is skipped whole —
+            // the run shares the material that named it — while an unlit
+            // batch draws on untextured, exactly the two answers the
+            // unbatched paths give (`gl-batch.ts`'s rule, restated). Resolved
+            // through the R-4 seam, so a batch sampling the active target is
+            // a feedback loop and resolves `null` like any other draw's.
+            const batchTexture =
+              batch.texture === null
+                ? null
+                : resolveFrameTexture(
+                    textures,
+                    renderTargets,
+                    activeTarget,
+                    batch.texture,
+                  );
+            if (batch.kind !== "sprite" || batchTexture !== null) {
+              stencilReference = this.#drawBatch(
+                pass,
+                pipelines,
+                bindGroup,
+                batching,
+                device,
+                batch,
+                batchTexture,
+                block,
+                depthFormat,
+                frameStencil,
+                stencilReference,
+                statistics,
+              );
+              block += 1;
+            }
+            // Consumed either way: a run skipped for an unresolvable texture
+            // is skipped item by item in the unbatched path too.
+            index += batch.items - 1;
+            continue;
+          }
+        }
+
+        const clip = item.clip ?? null;
+        const maskPass = clip !== null && clip.maskPass;
+        // §67 into a stencil-less target (the DEV warning above): the mask
+        // has no planes to write, so its draw is skipped and its subtree —
+        // whose stencil records resolve to nothing on this frame's format —
+        // draws unclipped.
+        if (maskPass && !frameClips) {
           continue;
         }
-        const record = geometries.acquire(item.geometry);
+        if (
+          !maskPass &&
+          item.kind !== "unlit" &&
+          item.kind !== "sprite" &&
+          item.kind !== "lit" &&
+          item.kind !== "standard" &&
+          item.kind !== "particles"
+        ) {
+          // RFC 0003's skinned kinds until a joint-palette pipeline exists
+          // here, and RFC 0001's node kind until the WGSL emitter. Skipped,
+          // never approximated — and skipped *before* the geometry cache
+          // uploads buffers nothing will bind. (`"particles"` left this list
+          // in WP-R1.8 — the deliberate flip of the R1.4-era absence.)
+          continue;
+        }
+        if (!maskPass && item.kind === "particles") {
+          // §36's whole system, one instanced draw (WP-R1.8) — the
+          // `gl-particles.ts` arm, restated: the geometry record is the
+          // *shared unit quad* every particle item points at, and this
+          // system's own instance buffer rides beside it as the pipeline's
+          // second, per-instance vertex stream. A zero-particle system is
+          // skipped **before** the quad uploads — the skinned-absence
+          // discipline, deliberately stricter than GL, which acquires its
+          // geometry record first: a draw that contributes nothing must
+          // contribute not even a buffer. A reentrant mid-frame dispose
+          // surfaces as the caches' `null` answers below (the pinned
+          // WP-R1.3 scenario), skipping this and every remaining draw.
+          if (item.count === 0) {
+            continue;
+          }
+          const quad = geometries.acquire(item.geometry);
+          if (quad === null) {
+            continue;
+          }
+          // `null` for a capacity-less instance array — a structural double
+          // whose `count` outruns its storage draws nothing, GL's answer —
+          // and for a cache racing teardown.
+          const batch = particles.acquire(item);
+          if (batch === null) {
+            continue;
+          }
+          stencilReference = this.#drawParticles(
+            device,
+            pass,
+            pipelines,
+            uniformBuffer,
+            particles,
+            item,
+            quad,
+            batch,
+            camera,
+            block,
+            depthFormat,
+            frameStencil,
+            clip,
+            stencilReference,
+            statistics,
+          );
+          block += 1;
+          continue;
+        }
+        // A shaded draw asks the cache for the normal stream too (WP-R1.5);
+        // a mask does not — coverage, not shading — and every other kind
+        // passes the default `false`, i.e. exactly the call it always made.
+        const record = geometries.acquire(
+          item.geometry,
+          !maskPass && (item.kind === "lit" || item.kind === "standard"),
+        );
         if (record === null) {
           continue;
         }
-        const material = item.material;
+
+        if (maskPass) {
+          // §67's mask draw — **coverage, not shading**, whatever pipeline the
+          // node's material names. The GL backend draws a mask through the
+          // item's own program because a program costs nothing to reuse there;
+          // here a pipeline is a compiled object, and with colour writes
+          // forced off every family rasterises the identical fragment set, so
+          // one flat unlit variant serves every mask (a lit or standard clip
+          // node therefore masks correctly on this backend even before
+          // WP-R1.5 gives its *content* a pipeline). Depth test and writes are
+          // forced off with colour, per `RenderItemClip`'s contract: a mask
+          // must not occlude, be occluded by, or be depth-rejected against
+          // the content it masks.
+          const pipeline = pipelines.acquire({
+            kind: "unlit",
+            vertexColors: false,
+            map: false,
+            blend: "none",
+            depthTest: false,
+            depthWrite: false,
+            colorWrite: false,
+            topology: record.topology,
+            colorFormat: this.#frameFormat,
+            depthFormat,
+            stencil: stencilDescriptor(clip.stencil),
+            batch: null,
+          });
+          if (pipeline === null) {
+            // Unreachable for the reason the unlit path states; same
+            // narrowing.
+            continue;
+          }
+          // The colour is never read — writes are off — so the block carries
+          // zeros rather than the material's colour: one canonical mask block,
+          // whatever material the clip node wears.
+          this.#writeBlock(
+            block,
+            this.#viewProjection,
+            item.worldMatrix,
+            0,
+            0,
+            0,
+            0,
+          );
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+          stencilReference = applyStencilReference(
+            pass,
+            stencilReference,
+            clip.stencil.ref,
+          );
+          pass.setVertexBuffer(0, record.positionBuffer);
+          if (record.indexBuffer !== null && record.indexFormat !== null) {
+            pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
+            pass.drawIndexed(record.count);
+          } else {
+            pass.draw(record.count);
+          }
+          if (statistics !== null) {
+            countDraw(statistics, record.topology, record.count, 1);
+          }
+          block += 1;
+          continue;
+        }
+
+        if (item.kind === "sprite") {
+          // §55's texture is required, and a sprite whose texture will not
+          // resolve — a disposed one (§83), a structurally typed material
+          // double that carries none (`?? null`, the F16 defensive read), or
+          // a feedback loop on the active target (WP-R1.6, R-4's rule) —
+          // skips its draw, exactly as the GL sprite path skips it.
+          const spriteMap = item.material.texture ?? null;
+          const spriteTexture =
+            spriteMap === null
+              ? null
+              : resolveFrameTexture(
+                  textures,
+                  renderTargets,
+                  activeTarget,
+                  spriteMap,
+                );
+          if (spriteTexture !== null) {
+            stencilReference = this.#drawSprite(
+              device,
+              pass,
+              pipelines,
+              uniformBuffer,
+              item,
+              record,
+              spriteTexture,
+              block,
+              depthFormat,
+              frameStencil,
+              clip,
+              stencilReference,
+              statistics,
+            );
+            block += 1;
+          }
+          continue;
+        }
+
+        if (item.kind === "lit" || item.kind === "standard") {
+          // WP-R1.5's two shaded arms — the unlit arm's shape with three
+          // additions: the normal stream picks a variant, the light block
+          // binds at group 1 with this view's offset, and the standard kind
+          // writes its widened uniform block through its own group-0 layout.
+          const material = item.material;
+          // The variant is the record's answer, not the geometry's: a
+          // normal-less geometry selects the normal-less variant, whose
+          // vertex stage writes the zero vector GL's default attribute
+          // yields — "ambient only", the documented shading (`wgpu-lit.ts`).
+          const normals = record.normalBuffer !== null;
+          // §57's `map`, resolved exactly as the unlit arm resolves it: draws
+          // only with uvs to sample by and a texture that resolves; a named
+          // texture that fails — disposed (§83), or a feedback loop on the
+          // active target (R-4) — skips the draw, a missing uv stream
+          // degrades to the untextured variant's absence.
+          const map = material.map ?? null;
+          const mapBindGroup =
+            map === null || record.uvBuffer === null
+              ? null
+              : resolveFrameTexture(textures, renderTargets, activeTarget, map);
+          if (
+            map !== null &&
+            record.uvBuffer !== null &&
+            mapBindGroup === null
+          ) {
+            continue;
+          }
+          const useMap = mapBindGroup !== null;
+          // The lights group is read off the *field*, not a frame local, and
+          // read here — after the material's getters have run — so a
+          // reentrant mid-frame `dispose()` inside application code (the
+          // pinned WP-R1.3 scenario, reachable through a material accessor
+          // too) skips this and every remaining shaded draw instead of
+          // binding a dropped group (§61: the frame must not throw).
+          const lightsBindGroup = this.#lightsBindGroup;
+          if (lightsBindGroup === null) {
+            continue;
+          }
+          // §69 (WP-R1.7): GL's `shadowActive && item.receiveShadow`, folded
+          // here into pipeline identity rather than a uniform — the two
+          // reasons a draw is not shadowed are "nothing casts" and "this
+          // node opted out", and both select the plain variant a shadowless
+          // frame compiles (`wgpu-shadow.ts` on the inversion). A receiver
+          // binds the frame's widened group at the same offset.
+          let receiving = false;
+          let shadedLights = lightsBindGroup;
+          if (shadowGroup !== null && item.receiveShadow) {
+            receiving = true;
+            shadedLights = shadowGroup;
+          }
+          // §67's resolution, the unlit arm's verbatim.
+          const stencilRecord = frameStencil
+            ? clip !== null
+              ? clip.stencil
+              : material.stencil
+            : undefined;
+          const pipeline = pipelines.acquire({
+            kind: item.kind,
+            vertexColors: false,
+            map: useMap,
+            blend:
+              material.transparent === true
+                ? (material.blendMode ?? "normal")
+                : "none",
+            // A pass with no depth attachment normalizes both depth bits off
+            // (`depth: false` targets, WP-R1.6): the pipeline omits its
+            // depth-stencil state either way, and the normalization keeps
+            // the cache key canonical for that one pipeline.
+            depthTest: depthFormat !== null && material.depthTest !== false,
+            depthWrite: depthFormat !== null && material.depthWrite !== false,
+            colorWrite: material.colorWrite !== false,
+            topology: record.topology,
+            colorFormat: this.#frameFormat,
+            depthFormat,
+            stencil:
+              stencilRecord === undefined
+                ? null
+                : stencilDescriptor(stencilRecord),
+            batch: null,
+            normals,
+            shadow: receiving,
+          });
+          if (pipeline === null) {
+            // Unreachable given the class invariant — the unlit arm's
+            // narrowing, same reason: §61 forbids throwing here.
+            continue;
+          }
+
+          const opacity = material.opacity ?? 1;
+          if (item.kind === "standard") {
+            // §59's block: base colour in `DrawUniforms.color`'s slot, then
+            // the two vec4s only this family reads — bound through the
+            // widened group-0 layout over the same strided buffer.
+            const baseColor = item.material.baseColor;
+            this.#writeBlock(
+              block,
+              this.#viewProjection,
+              item.worldMatrix,
+              baseColor[0],
+              baseColor[1],
+              baseColor[2],
+              baseColor[3] * opacity,
+            );
+            this.#writeSurface(block, item.material);
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(
+              0,
+              this.#acquireStandardBindGroup(device, uniformBuffer),
+              [block * UNIFORM_STRIDE_BYTES],
+            );
+          } else {
+            const color = item.material.color;
+            this.#writeBlock(
+              block,
+              this.#viewProjection,
+              item.worldMatrix,
+              color[0],
+              color[1],
+              color[2],
+              color[3] * opacity,
+            );
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+          }
+          // The view's light block, at this view's dynamic offset — bound per
+          // draw rather than mirrored, because slot 1 is also where the unlit
+          // family binds its textures, so "what group 1 holds" is not a
+          // per-view constant (and eliding rebinds here would have to model
+          // that, for a saving the GL backend's per-draw uniform calls never
+          // had either). A receiving draw binds the widened shadow group
+          // over the same buffer at the same offset (WP-R1.7).
+          pass.setBindGroup(LIGHTS_BIND_GROUP_INDEX, shadedLights, [lightBase]);
+          if (stencilRecord !== undefined) {
+            stencilReference = applyStencilReference(
+              pass,
+              stencilReference,
+              stencilRecord.ref,
+            );
+          }
+          // Slots are positional, in `shadedVertexBufferLayouts`' order:
+          // position, then normals if the variant shades with them, then uvs
+          // if it samples. One counter, both sides.
+          let slot = 0;
+          pass.setVertexBuffer(slot, record.positionBuffer);
+          if (normals) {
+            slot += 1;
+            pass.setVertexBuffer(slot, record.normalBuffer);
+          }
+          if (mapBindGroup !== null) {
+            slot += 1;
+            pass.setVertexBuffer(slot, record.uvBuffer);
+            pass.setBindGroup(SHADED_MAP_BIND_GROUP_INDEX, mapBindGroup);
+          }
+          if (record.indexBuffer !== null && record.indexFormat !== null) {
+            pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
+            pass.drawIndexed(record.count);
+          } else {
+            pass.draw(record.count);
+          }
+          if (statistics !== null) {
+            countDraw(statistics, record.topology, record.count, 1);
+          }
+          block += 1;
+          continue;
+        }
+        // By elimination this is the unlit arm: masks, particles, sprites and
+        // the shaded kinds continued above, and the early guard skipped every
+        // other kind. The cast is the loop's one, for `render-list.ts`'s `itemAt`
+        // reason — TypeScript cannot carry the invariant across two
+        // `continue`s.
+        const material = (item as UnlitItem).material;
         const vertexColors =
           material.vertexColors === true && record.colorBuffer !== null;
+        // §57's `map` draws only when the geometry carries the uvs to sample it
+        // with and the texture will upload — a texture disposed while still
+        // referenced skips the draw rather than painting undefined content
+        // (§83), which is the rule `gl-texture.ts` states and this honours by
+        // falling through to the untextured variant's *absence*, not to it.
+        const map = material.map ?? null;
+        const mapBindGroup =
+          map === null || record.uvBuffer === null
+            ? null
+            : resolveFrameTexture(textures, renderTargets, activeTarget, map);
+        if (map !== null && record.uvBuffer !== null && mapBindGroup === null) {
+          continue;
+        }
+        const useMap = mapBindGroup !== null;
+        // §67's resolution, one comparison (R-23): the engine's clip record
+        // outranks the material's own §57 stencil, and `null` — every pre-§67
+        // draw — resolves to the material's, which on a stencil-free surface
+        // resolves to nothing at all (see `DEPTH_STENCIL_FORMAT` on the
+        // material-stencil tier; off screen the aspect is the target's
+        // `stencil` option, so R-7's mask-by-hand tier works into a
+        // stencilled target whether or not the frame clips — GL's parity).
+        const stencilRecord = frameStencil
+          ? clip !== null
+            ? clip.stencil
+            : material.stencil
+          : undefined;
         const pipeline = pipelines.acquire(
-          this.#unlitDescriptor(material, vertexColors, record.topology),
+          this.#unlitDescriptor(
+            material,
+            vertexColors,
+            useMap,
+            record.topology,
+            depthFormat,
+            stencilRecord === undefined
+              ? null
+              : stencilDescriptor(stencilRecord),
+          ),
         );
         if (pipeline === null) {
           // Unreachable given the class invariant — the cache answers `null`
@@ -691,9 +1769,26 @@ export class WebgpuRenderer implements Renderer {
 
         pass.setPipeline(pipeline);
         pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
-        pass.setVertexBuffer(0, record.positionBuffer);
+        if (stencilRecord !== undefined) {
+          stencilReference = applyStencilReference(
+            pass,
+            stencilReference,
+            stencilRecord.ref,
+          );
+        }
+        // Slots are positional, in `unlitVertexBufferLayouts`' order: position,
+        // then colours if the variant reads them, then uvs if it samples. One
+        // counter, on both sides, so the two orders cannot drift.
+        let slot = 0;
+        pass.setVertexBuffer(slot, record.positionBuffer);
         if (vertexColors && record.colorBuffer !== null) {
-          pass.setVertexBuffer(1, record.colorBuffer);
+          slot += 1;
+          pass.setVertexBuffer(slot, record.colorBuffer);
+        }
+        if (mapBindGroup !== null && record.uvBuffer !== null) {
+          slot += 1;
+          pass.setVertexBuffer(slot, record.uvBuffer);
+          pass.setBindGroup(MAP_BIND_GROUP_INDEX, mapBindGroup);
         }
         if (record.indexBuffer !== null && record.indexFormat !== null) {
           pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
@@ -717,7 +1812,421 @@ export class WebgpuRenderer implements Renderer {
       0,
       block * UNIFORM_STRIDE_FLOATS,
     );
+    // §68: the frame's light blocks, one strided block per rendered view —
+    // the same one-upload-per-frame shape, absent to the byte on a frame with
+    // no shaded item. The buffer is re-read off the field so a reentrant
+    // mid-frame dispose skips the upload along with the draws.
+    const lightsBuffer = this.#lightsBuffer;
+    if (lightBlock > 0 && lightsBuffer !== null) {
+      device.queue.writeBuffer(
+        lightsBuffer,
+        0,
+        this.#lightsStaging,
+        0,
+        lightBlock * LIGHT_UNIFORM_STRIDE_FLOATS,
+      );
+    }
     device.queue.submit([encoder.finish()]);
+  }
+
+  /**
+   * Draws one §70 full-screen effect (WP-R1.6) — `pass.source`'s colour
+   * attachment over the whole of `pass.target`, or of the swap chain, through
+   * `pass.effect`. The normative contract is on `@four/render`'s
+   * `Renderer.renderEffect`; the GL backend's method documents the shared
+   * readings and this one differs in exactly two ways, both structural:
+   *
+   * - **There is no state envelope.** GL borrows the framebuffer binding, the
+   *   rectangles, the depth test and a texture unit inside a `try`/`finally`;
+   *   here the effect is its own render pass in its own command encoder, and
+   *   a WebGPU pass has no ambient state to corrupt — the one place this
+   *   backend is structurally safer, restated for §70. No scissor or viewport
+   *   is set: a pass's defaults are the whole attachment, which is exactly
+   *   what "an effect covers its destination surface" means.
+   * - **The effect kind is pipeline identity, not uniform state** — a lazy
+   *   per-(kind × format) pipeline (`wgpu-effect.ts` carries the inverted
+   *   R-19 argument), so a chain that only ever copies compiles one module
+   *   and uploads no uniforms at all; only a grade touches the 16-byte block.
+   *
+   * ## What is skipped rather than thrown (§61, §83)
+   *
+   * Everything, on `render`'s terms — a lost device, a source that is not a
+   * render-target texture (a caller that bypassed `validateEffectRenderPass`),
+   * a disposed source or destination, an effect kind this backend does not
+   * draw (RFC 0001's `"graph"` waits on the WGSL emitter and is *absent*, not
+   * approximated — the closed-union rule), and the **feedback loop**: a pass
+   * whose destination is the very surface it samples, refused here exactly as
+   * R-4 refuses it per draw, with `RenderGraph.validate` reporting it
+   * statically as `"feedback"` so the mistake is normally caught at setup.
+   */
+  renderEffect(pass: EffectRenderPass): void {
+    this.#assertUsable("renderEffect");
+    const device = this.#device;
+    const context = this.#context;
+    const pipelines = this.#pipelines;
+    const renderTargets = this.#renderTargets;
+    if (
+      device === null ||
+      context === null ||
+      pipelines === null ||
+      renderTargets === null ||
+      this.#deviceLost
+    ) {
+      return;
+    }
+
+    // Read structurally, like every argument this backend meets: the marker
+    // guard rather than the type, so a plain `Texture` handed over from
+    // JavaScript gets a skipped effect instead of a black screen.
+    const source = pass.source;
+    if (!isRenderTargetTexture(source)) {
+      return;
+    }
+    const sourceTarget = source.renderTarget;
+    const destination = pass.target ?? null;
+    if (destination === sourceTarget) {
+      return;
+    }
+    const effect = pass.effect;
+    const kind = effect.kind;
+    if (kind !== "copy" && kind !== "grade" && kind !== "output-transform") {
+      return;
+    }
+
+    // Resolved before anything is recorded: `sample`/`acquire` never throw,
+    // so a disposed surface skips the effect rather than half-drawing it.
+    const sourceGroup = renderTargets.sample(sourceTarget);
+    if (sourceGroup === null) {
+      return;
+    }
+    let destinationRecord: WgpuRenderTargetRecord | null = null;
+    if (destination !== null) {
+      destinationRecord = renderTargets.acquire(destination);
+      if (destinationRecord === null) {
+        return;
+      }
+    }
+
+    if (kind === "grade") {
+      // The coefficient reads are *application accessors* (a structurally
+      // typed effect object may compute them), and application code can do
+      // anything — including disposing this renderer (the pinned reentrant
+      // scenario, reachable here through an effect descriptor's getter). So
+      // they run before anything is acquired, and the pipeline acquisition
+      // below is what notices a mid-call teardown: a disposed cache answers
+      // `null` and the effect is skipped without resurrecting an allocation.
+      // The padding lane is written, not assumed — an uploaded byte nobody
+      // wrote is history (§33).
+      effectGradeScratch[0] = effect.exposure ?? COLOR_GRADE_DEFAULTS.exposure;
+      effectGradeScratch[1] = effect.contrast ?? COLOR_GRADE_DEFAULTS.contrast;
+      effectGradeScratch[2] =
+        effect.saturation ?? COLOR_GRADE_DEFAULTS.saturation;
+      effectGradeScratch[3] = 0;
+    }
+
+    const pipeline = pipelines.acquire(
+      this.#effectDescriptor(
+        kind,
+        destinationRecord === null ? this.#format : RENDER_TARGET_COLOR_FORMAT,
+      ),
+    );
+    if (pipeline === null) {
+      // A reentrant dispose inside a coefficient accessor above — the one
+      // reachable path — or a broken class invariant; §61 forbids throwing
+      // here either way, so the effect is skipped (the draw arms' narrowing).
+      return;
+    }
+
+    let gradeGroup: GpuBindGroup | null = null;
+    if (kind === "grade") {
+      // The coefficients ride the shared 16-byte block, uploaded before the
+      // submit that reads them (queue order).
+      device.queue.writeBuffer(
+        this.#acquireEffectBuffer(device),
+        0,
+        effectGradeScratch,
+      );
+      gradeGroup = this.#acquireEffectBindGroup(device);
+    }
+
+    const colorView =
+      destinationRecord === null
+        ? context.getCurrentTexture().createView()
+        : destinationRecord.colorView;
+    const encoder = device.createCommandEncoder({ label: "four:effect" });
+    const renderPass = encoder.beginRenderPass({
+      label: `four:effect:${kind}`,
+      // "load", not "clear": an effect replaces every covered texel with its
+      // own fragment, so there is nothing to clear — and §70's contract is
+      // that it *replaces* what the destination held, never composites.
+      colorAttachments: [{ view: colorView, loadOp: "load", storeOp: "store" }],
+    });
+    renderPass.setPipeline(pipeline);
+    renderPass.setBindGroup(0, sourceGroup);
+    if (gradeGroup !== null) {
+      renderPass.setBindGroup(EFFECT_BIND_GROUP_INDEX, gradeGroup);
+    }
+    renderPass.draw(EFFECT_PASS_VERTEX_COUNT);
+    renderPass.end();
+    device.queue.submit([encoder.finish()]);
+    const statistics = this.statistics;
+    if (statistics !== null) {
+      // One draw call, one instance, one triangle (§84) — counted because it
+      // was submitted, exactly as a scene draw is.
+      countDraw(statistics, "triangle-list", EFFECT_PASS_VERTEX_COUNT, 1);
+    }
+  }
+
+  /**
+   * Reads back `target`'s colour attachment as tightly packed RGBA8 bytes —
+   * §61's `readPixels`, in the whole-target form (WP-R1.6; the `region`
+   * parameter arrives with `Rectangle2` in `@four/math`, RFC 0005's named
+   * prerequisite, rather than with an invented rectangle type).
+   *
+   * **Asynchronous, honestly and permanently.** WebGPU has no synchronous
+   * readback — `copyTextureToBuffer` + `mapAsync` is the only path (probe-
+   * verified; `wgpu-readback.ts`) — and §61's own sketch types the member
+   * `Promise<ArrayBuffer>`, which is the RFC 0005 argument this method is the
+   * standing evidence for. The result is `width * height * 4` bytes, rows
+   * **bottom-to-top** (§7a's Y-up; `wgpu-readback.ts` records the decision).
+   *
+   * A target that was never rendered into reads back its zero-filled
+   * allocation — transparent black, the same defined answer sampling one
+   * gives. Unlike the frame methods this one **rejects** rather than skips:
+   * it is not called inside a frame, its caller is awaiting a value, and a
+   * silently empty buffer would be undefined content by another name.
+   * Rejections carry a `FourError`: `INVALID_APPLICATION_STATE` for a
+   * disposed renderer, one never initialized, or a disposed target;
+   * `DEVICE_LOST` while the device is lost (§89's "a caller asks for
+   * something that cannot be satisfied while lost");
+   * `UNSUPPORTED_GPU_FEATURE` on a device double without the readback entry
+   * points (their presence is the capability — `webgpu-device.ts`).
+   */
+  async readPixels(target: RenderTarget): Promise<ArrayBuffer> {
+    this.#assertUsable("readPixels");
+    const device = this.#device;
+    const renderTargets = this.#renderTargets;
+    if (device === null || renderTargets === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "WebgpuRenderer.readPixels() needs an initialized renderer (§61).",
+        { context: { method: "readPixels" } },
+      );
+    }
+    if (this.#deviceLost) {
+      throw new FourError(
+        "DEVICE_LOST",
+        "WebgpuRenderer.readPixels() was called while the device is lost; " +
+          "there is no surface to read (§61, §89).",
+      );
+    }
+    const record = renderTargets.acquire(target);
+    if (record === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        `readPixels() was asked for render target ${target.id}, which is ` +
+          "disposed (§83).",
+        { context: { target: target.id } },
+      );
+    }
+    const pixels = await readTexturePixels(
+      device,
+      record.colorTexture,
+      record.width,
+      record.height,
+    );
+    if (pixels === null) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "This device surface does not implement the readback entry points " +
+          "(copyTextureToBuffer / mapAsync); presence is the capability " +
+          "(WP-R1.6).",
+      );
+    }
+    return pixels;
+  }
+
+  /**
+   * Allocates one §82 storage buffer (WP-R1.8, `wgpu-compute.ts`) — the
+   * application owns it and owes its `dispose()` (§83).
+   *
+   * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a renderer that is
+   * disposed or was never initialized, or for an option record naming both
+   * `size` and `data`, neither, or a size that is not a positive multiple of
+   * 4; `DEVICE_LOST` while the device is lost (§89).
+   */
+  createComputeBuffer(options: ComputeBufferOptions): WgpuComputeBuffer {
+    return createComputeBuffer(
+      this.#computeDevice("createComputeBuffer"),
+      options,
+    );
+  }
+
+  /**
+   * Uploads `data` into a compute buffer at `byteOffset` (§82) — the per-step
+   * params refresh the integrator tier needs, without reallocating.
+   *
+   * The error contract is {@link WebgpuRenderer.createComputeBuffer}'s, plus
+   * `INVALID_APPLICATION_STATE` for a disposed buffer or an out-of-range or
+   * misaligned write.
+   */
+  writeComputeBuffer(
+    buffer: WgpuComputeBuffer,
+    data: ArrayBufferView,
+    byteOffset = 0,
+  ): void {
+    writeComputeBuffer(
+      this.#computeDevice("writeComputeBuffer"),
+      buffer,
+      data,
+      byteOffset,
+    );
+  }
+
+  /**
+   * Runs one §82 `ComputePass` (WP-R1.8): compiles the kernel on first use
+   * (cached on the source — `wgpu-compute.ts`), binds the storage buffers at
+   * `@group(0)` in array order, and submits the dispatch.
+   *
+   * **This is the seam the R-1 plan's Q3 promotes to `Renderer.compute?()`**
+   * — presence is the capability, the `statistics`/`renderEffect` pattern:
+   * WebGL 2 has no compute and never grows this member, and §62's
+   * `computeShaders` capability is how an application asks before reaching
+   * for it. The frame path never calls it — §82's "basic graphics … must not
+   * require compute support", held structurally.
+   *
+   * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a disposed or
+   * never-initialized renderer, for non-integer workgroup counts, or for a
+   * disposed buffer in `bindings`; `DEVICE_LOST` while lost;
+   * `UNSUPPORTED_GPU_FEATURE` on a device surface without the compute entry
+   * points. A kernel that fails to *compile* does not throw — WebGPU surfaces
+   * compilation failure through the device's error scopes and the dispatch
+   * does nothing, the pipeline cache's recorded reading of the error model.
+   */
+  compute(pass: ComputePassDescriptor): void {
+    const device = this.#computeDevice("compute");
+    this.#compute ??= new WgpuComputeCache(device);
+    if (!this.#compute.dispatch(pass)) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "This device surface does not implement the §82 compute entry " +
+          "points (createComputePipeline / beginComputePass); presence is " +
+          "the capability (WP-R1.8).",
+      );
+    }
+  }
+
+  /**
+   * Reads a compute buffer back as a tightly packed `ArrayBuffer` (§82) —
+   * `copyBufferToBuffer` + `mapAsync`, `readPixels`' honestly-asynchronous
+   * contract for a buffer: rejects rather than skips, with the same codes
+   * (`INVALID_APPLICATION_STATE` for a disposed renderer, one never
+   * initialized, or a disposed buffer; `DEVICE_LOST` while lost;
+   * `UNSUPPORTED_GPU_FEATURE` on a device surface without the entry points).
+   */
+  async readComputeBuffer(buffer: WgpuComputeBuffer): Promise<ArrayBuffer> {
+    const device = this.#computeDevice("readComputeBuffer");
+    const bytes = await readComputeBufferBytes(device, buffer);
+    if (bytes === null) {
+      throw new FourError(
+        "UNSUPPORTED_GPU_FEATURE",
+        "This device surface does not implement the compute readback entry " +
+          "points (copyBufferToBuffer / mapAsync); presence is the " +
+          "capability (WP-R1.8).",
+      );
+    }
+    return bytes;
+  }
+
+  /**
+   * The compute methods' shared lifecycle gate: an initialized, un-lost
+   * device or a thrown `FourError` — `readPixels`' opening checks, factored
+   * because four §82 methods share them verbatim.
+   */
+  #computeDevice(method: string): GpuDevice {
+    this.#assertUsable(method);
+    const device = this.#device;
+    if (device === null) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        `WebgpuRenderer.${method}() needs an initialized renderer (§61).`,
+        { context: { method } },
+      );
+    }
+    if (this.#deviceLost) {
+      throw new FourError(
+        "DEVICE_LOST",
+        `WebgpuRenderer.${method}() was called while the device is lost ` +
+          "(§61, §89).",
+        { context: { method } },
+      );
+    }
+    return device;
+  }
+
+  /** Builds the pipeline descriptor for one §70 effect draw (WP-R1.6). */
+  #effectDescriptor(
+    kind: WgpuEffectKind,
+    colorFormat: string,
+  ): WgpuPipelineDescriptor {
+    return {
+      kind: "effect",
+      vertexColors: false,
+      // An effect always samples its source; the flag is fixed, as §55's is.
+      map: true,
+      // §70: no blending — an effect replaces — and no depth attachment at
+      // all, so both depth bits are off and `depthFormat` is `null`.
+      blend: "none",
+      depthTest: false,
+      depthWrite: false,
+      colorWrite: true,
+      topology: "triangle-list",
+      colorFormat,
+      depthFormat: null,
+      stencil: null,
+      batch: null,
+      effect: kind,
+    };
+  }
+
+  /** The grade's 16-byte uniform buffer, created by the first grade. */
+  #acquireEffectBuffer(device: GpuDevice): GpuBuffer {
+    this.#effectBuffer ??= device.createBuffer({
+      label: "four:effect-uniforms",
+      size: EFFECT_UNIFORM_BYTES,
+      usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
+    });
+    return this.#effectBuffer;
+  }
+
+  /** §70's group-1 layout, one per renderer, created on first use (WP-R1.6). */
+  #acquireEffectLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#effectLayout ??= createEffectBindGroupLayout(device);
+    return this.#effectLayout;
+  }
+
+  /**
+   * The grade's bind group over the shared block — the sprite pair's
+   * lifecycle, fourth subsystem: created by the first grade, dropped on
+   * device loss and disposal. The buffer never regrows (it is one block), so
+   * unlike the sprite group nothing else ever drops it.
+   */
+  #acquireEffectBindGroup(device: GpuDevice): GpuBindGroup {
+    this.#effectBindGroup ??= device.createBindGroup({
+      label: "four:effect-uniforms",
+      layout: this.#acquireEffectLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: this.#acquireEffectBuffer(device),
+            offset: 0,
+            size: EFFECT_UNIFORM_BYTES,
+          },
+        },
+      ],
+    });
+    return this.#effectBindGroup;
   }
 
   /**
@@ -735,19 +2244,60 @@ export class WebgpuRenderer implements Renderer {
     this.#disposed = true;
     if (this.#deviceLost) {
       this.#geometries?.forget();
+      this.#textures?.forget();
+      this.#renderTargets?.forget();
+      this.#particles?.forget();
+      // §65's uploader, when the application assigned one (R-9): its buffers
+      // belong to the lost device — dropped, never destroyed.
+      this.batching?.forget();
     } else {
       this.#geometries?.dispose();
+      this.#textures?.dispose();
+      this.#renderTargets?.dispose();
+      this.#particles?.dispose();
+      this.batching?.dispose();
       this.#uniformBuffer?.destroy();
+      this.#lightsBuffer?.destroy();
+      this.#effectBuffer?.destroy();
       this.#depthTexture?.destroy?.();
       this.#context?.unconfigure?.();
       this.#device?.destroy();
     }
     this.#pipelines?.dispose();
+    // §82's compute caches (WP-R1.8): nothing here has a destroy(); dropping
+    // is the release. Application-created compute *buffers* are §83's
+    // creator-owns — `WgpuComputeBuffer.dispose` is theirs to call.
+    this.#compute?.dispose();
+    this.#compute = null;
+    // §69's target is engine-side state this renderer owns (R-18): disposed
+    // on both branches — its GPU rows were released (or died) with the cache
+    // above, and the §83 accounting closes with the object.
+    this.#shadowTarget?.dispose();
+    this.#shadowTarget = null;
+    this.#shadowLightsLayout = null;
+    this.#shadowSampler = null;
+    this.#shadowBindGroup = null;
+    this.#shadowBindGroupView = null;
     this.#geometries = null;
+    this.#textures = null;
+    this.#renderTargets = null;
+    this.#particles = null;
     this.#pipelines = null;
     this.#uniformBuffer = null;
     this.#bindGroup = null;
     this.#bindGroupLayout = null;
+    this.#spriteLayout = null;
+    this.#spriteBindGroup = null;
+    this.#particleLayout = null;
+    this.#particleBindGroup = null;
+    this.#standardLayout = null;
+    this.#standardBindGroup = null;
+    this.#lightsLayout = null;
+    this.#lightsBuffer = null;
+    this.#lightsBindGroup = null;
+    this.#effectLayout = null;
+    this.#effectBuffer = null;
+    this.#effectBindGroup = null;
     this.#depthTexture = null;
     this.#context = null;
     this.#device = null;
@@ -759,21 +2309,28 @@ export class WebgpuRenderer implements Renderer {
   #unlitDescriptor(
     material: UnlitMaterialLike,
     vertexColors: boolean,
+    map: boolean,
     topology: "triangle-list" | "line-list",
+    depthFormat: string | null,
+    stencil: WgpuStencilDescriptor | null,
   ): WgpuPipelineDescriptor {
     return {
       kind: "unlit",
       vertexColors,
+      map,
       blend:
         material.transparent === true
           ? (material.blendMode ?? "normal")
           : "none",
-      depthTest: material.depthTest !== false,
-      depthWrite: material.depthWrite !== false,
+      // Normalized off on a depthless pass (WP-R1.6) — the shaded arm's note.
+      depthTest: depthFormat !== null && material.depthTest !== false,
+      depthWrite: depthFormat !== null && material.depthWrite !== false,
       colorWrite: material.colorWrite !== false,
       topology,
-      colorFormat: this.#format,
-      depthFormat: DEPTH_FORMAT,
+      colorFormat: this.#frameFormat,
+      depthFormat,
+      stencil,
+      batch: null,
     };
   }
 
@@ -784,20 +2341,30 @@ export class WebgpuRenderer implements Renderer {
     bindGroup: GpuBindGroup,
     block: number,
     clearColor: boolean,
+    depthFormat: string | null,
+    frameStencil: boolean,
   ): void {
     const pipeline = pipelines.acquire({
       kind: "clear",
       vertexColors: false,
+      map: false,
       blend: "none",
       // `depthTest: false` compiles to `depthCompare: "always"`, which is what
       // makes this draw *set* depth to the far plane rather than test against
       // whatever the previous frame left there.
       depthTest: false,
-      depthWrite: true,
+      // Off exactly when the surface has no depth buffer to clear — a
+      // `depth: false` target's colour-only clear (WP-R1.6).
+      depthWrite: depthFormat !== null,
       colorWrite: clearColor,
       topology: "triangle-list",
-      colorFormat: this.#format,
-      depthFormat: DEPTH_FORMAT,
+      colorFormat: this.#frameFormat,
+      // §67: a stencil-carrying surface's clear also zeroes the stencil
+      // rectangle — see `CLEAR_STENCIL`. Both comparisons ignore the stencil
+      // reference, so no `setStencilReference` accompanies this draw.
+      depthFormat,
+      stencil: frameStencil ? CLEAR_STENCIL : null,
+      batch: null,
     });
     if (pipeline === null) {
       // Unreachable for the reason the unlit path states; same narrowing.
@@ -806,6 +2373,694 @@ export class WebgpuRenderer implements Renderer {
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
     pass.draw(CLEAR_VERTEX_COUNT);
+  }
+
+  /**
+   * Records one §55 sprite draw (WP-R1.3): the sprite pipeline over the
+   * quad's position stream, §55's uv derived in the vertex stage from the
+   * `quad` uniform, the texture at group 1, the tint and quad in the sprite's
+   * widened uniform block. Returns the stencil reference now in effect.
+   *
+   * §55's pipeline blends **by construction** — it did before §57's
+   * `transparent` flag existed, and a textured quad with an alpha channel has
+   * to composite whatever the flag says — so the blend state ignores
+   * `transparent` and takes only the mode. Everything else the material
+   * declares (depth test, depth write, colour write, §67's stencil) applies as
+   * on any draw.
+   */
+  #drawSprite(
+    device: GpuDevice,
+    pass: GpuRenderPassEncoder,
+    pipelines: WgpuPipelineCache,
+    uniformBuffer: GpuBuffer,
+    item: SpriteItem,
+    record: WgpuGeometryRecord,
+    mapBindGroup: GpuBindGroup,
+    block: number,
+    depthFormat: string | null,
+    frameStencil: boolean,
+    clip: ItemClip | null,
+    stencilReference: number,
+    statistics: RenderStatistics | null,
+  ): number {
+    const material = item.material;
+    // §67's resolution — the unlit path's, verbatim: the engine's clip record
+    // outranks the material's own §57 stencil.
+    const stencilRecord = frameStencil
+      ? clip !== null
+        ? clip.stencil
+        : material.stencil
+      : undefined;
+    const pipeline = pipelines.acquire({
+      kind: "sprite",
+      vertexColors: false,
+      // Not a variant: a sprite always samples (§55), so the flag is fixed
+      // and the family has exactly one WGSL module.
+      map: true,
+      blend: material.blendMode ?? "normal",
+      // Normalized off on a depthless pass (WP-R1.6) — the shaded arm's note.
+      depthTest: depthFormat !== null && material.depthTest !== false,
+      depthWrite: depthFormat !== null && material.depthWrite !== false,
+      colorWrite: material.colorWrite !== false,
+      topology: record.topology,
+      colorFormat: this.#frameFormat,
+      depthFormat,
+      stencil:
+        stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
+      batch: null,
+    });
+    if (pipeline === null) {
+      // Unreachable for the unlit path's reason — this renderer always wires
+      // both layout providers; same narrowing.
+      return stencilReference;
+    }
+
+    const opacity = material.opacity ?? 1;
+    const tint = material.tint;
+    this.#writeBlock(
+      block,
+      this.#viewProjection,
+      item.worldMatrix,
+      tint[0],
+      tint[1],
+      tint[2],
+      tint[3] * opacity,
+    );
+    this.#writeQuad(block, item, material);
+
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, this.#acquireSpriteBindGroup(device, uniformBuffer), [
+      block * UNIFORM_STRIDE_BYTES,
+    ]);
+    pass.setBindGroup(MAP_BIND_GROUP_INDEX, mapBindGroup);
+    let reference = stencilReference;
+    if (stencilRecord !== undefined) {
+      reference = applyStencilReference(
+        pass,
+        stencilReference,
+        stencilRecord.ref,
+      );
+    }
+    pass.setVertexBuffer(0, record.positionBuffer);
+    if (record.indexBuffer !== null && record.indexFormat !== null) {
+      pass.setIndexBuffer(record.indexBuffer, record.indexFormat);
+      pass.drawIndexed(record.count);
+    } else {
+      pass.draw(record.count);
+    }
+    if (statistics !== null) {
+      countDraw(statistics, record.topology, record.count, 1);
+    }
+    return reference;
+  }
+
+  /**
+   * Records one §36 particle draw (WP-R1.8): the instanced billboard pipeline
+   * over the shared quad's position stream and the system's per-instance
+   * buffer, with the three matrices — projection and view **separately**,
+   * because the billboard offset happens between them (`wgpu-particles.ts`) —
+   * in the particle-widened uniform block. Returns the stencil reference now
+   * in effect.
+   *
+   * The state is the GL arm's, held as pipeline identity instead of ambient
+   * calls: particles are transparent by construction (§36's colour ramp) and
+   * carry no material to say otherwise, so the blend is always `"normal"`
+   * straight alpha; depth test, depth writes and colour writes are §57's
+   * defaults; and §67's clip record is the only stencil a material-less item
+   * can carry (R-23: the clip is per draw, and §36's batched item is one
+   * draw).
+   */
+  #drawParticles(
+    device: GpuDevice,
+    pass: GpuRenderPassEncoder,
+    pipelines: WgpuPipelineCache,
+    uniformBuffer: GpuBuffer,
+    particles: WgpuParticleCache,
+    item: ParticleItem,
+    record: WgpuGeometryRecord,
+    batch: WgpuParticleRecord,
+    camera: Viewport["camera"],
+    block: number,
+    depthFormat: string | null,
+    frameStencil: boolean,
+    clip: ItemClip | null,
+    stencilReference: number,
+    statistics: RenderStatistics | null,
+  ): number {
+    const stencilRecord =
+      frameStencil && clip !== null ? clip.stencil : undefined;
+    const pipeline = pipelines.acquire({
+      kind: "particles",
+      vertexColors: false,
+      map: false,
+      blend: "normal",
+      // Normalized off on a depthless pass (WP-R1.6) — the shaded arm's note.
+      depthTest: depthFormat !== null,
+      depthWrite: depthFormat !== null,
+      colorWrite: true,
+      topology: record.topology,
+      colorFormat: this.#frameFormat,
+      depthFormat,
+      stencil:
+        stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
+      batch: null,
+    });
+    if (pipeline === null) {
+      // Unreachable for the unlit path's reason — this renderer always wires
+      // the particle layout provider; same narrowing.
+      return stencilReference;
+    }
+
+    this.#writeParticleBlock(
+      block,
+      camera.projectionMatrix,
+      camera.viewMatrix,
+      item.worldMatrix,
+    );
+    // The instance stream, uploaded once per frame however many views draw
+    // it (`wgpu-particles.ts` on the cadence); `queue.writeBuffer` copies at
+    // call time and executes before the submit that reads it.
+    particles.upload(batch, item, this.#frameOrdinal);
+
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(
+      0,
+      this.#acquireParticleBindGroup(device, uniformBuffer),
+      [block * UNIFORM_STRIDE_BYTES],
+    );
+    let reference = stencilReference;
+    if (stencilRecord !== undefined) {
+      reference = applyStencilReference(
+        pass,
+        stencilReference,
+        stencilRecord.ref,
+      );
+    }
+    pass.setVertexBuffer(0, record.positionBuffer);
+    pass.setVertexBuffer(1, batch.buffer);
+    // Non-indexed and instanced, GL's `drawArraysInstanced` verbatim: the
+    // instance mesh contract is the shared six-vertex quad (`particles.ts`),
+    // so the record's index stream — which the GL arm equally ignores — has
+    // no role here.
+    pass.draw(record.count, item.count);
+    if (statistics !== null) {
+      // One draw call, `item.count` instances of the shared quad — the §36
+      // system's whole per-frame GPU cost, and the one place in this backend
+      // where `instances` exceeds `drawCalls` (§84).
+      countDraw(statistics, record.topology, record.count, item.count);
+    }
+    return reference;
+  }
+
+  /** §36's group-0 layout, one per renderer, created on first use (WP-R1.8). */
+  #acquireParticleLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#particleLayout ??= createParticleBindGroupLayout(device);
+    return this.#particleLayout;
+  }
+
+  /**
+   * The particle draws' bind group over the current uniform buffer, created
+   * by the first particle draw after initialization or after a regrowth —
+   * `#acquireSpriteBindGroup`'s lifecycle, fourth block size over one buffer.
+   */
+  #acquireParticleBindGroup(
+    device: GpuDevice,
+    buffer: GpuBuffer,
+  ): GpuBindGroup {
+    this.#particleBindGroup ??= device.createBindGroup({
+      label: "four:particle-uniforms",
+      layout: this.#acquireParticleLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: PARTICLE_UNIFORM_BYTES },
+        },
+      ],
+    });
+    return this.#particleBindGroup;
+  }
+
+  /**
+   * Packs one `ParticleUniforms` block — projection, view, model, in
+   * `wgpu-particles.ts`'s layout — into the staging array at `block`'s
+   * stride. All 48 floats of the binding are written, so no uploaded byte of
+   * the block is history (§33); the narrowing from the matrices' f64
+   * elements happens here, element by element, as in `#writeBlock`.
+   */
+  #writeParticleBlock(
+    block: number,
+    projection: Matrix4,
+    view: Matrix4,
+    model: Matrix4,
+  ): void {
+    const staging = this.#uniformStaging;
+    const base = block * UNIFORM_STRIDE_FLOATS;
+    const projectionBase = base + PARTICLE_PROJECTION_OFFSET / 4;
+    const viewBase = base + PARTICLE_VIEW_OFFSET / 4;
+    const modelBase = base + PARTICLE_MODEL_OFFSET / 4;
+    for (let index = 0; index < 16; index += 1) {
+      staging[projectionBase + index] = projection.elements[index];
+      staging[viewBase + index] = view.elements[index];
+      staging[modelBase + index] = model.elements[index];
+    }
+  }
+
+  /**
+   * Records one §65 merged draw (WP-R1.3): the batch pipeline — the unlit
+   * shader family over the planner's interleaved stream — with the identity
+   * model (positions arrive baked into world space, `batch.ts`), the shared
+   * material's colour or tint, and the run's one clip record. The uploader
+   * owns the buffers and the `drawIndexed`; see `wgpu-batch.ts`. Returns the
+   * stencil reference now in effect.
+   */
+  #drawBatch(
+    pass: GpuRenderPassEncoder,
+    pipelines: WgpuPipelineCache,
+    bindGroup: GpuBindGroup,
+    batching: WgpuRenderBatching,
+    device: GpuDevice,
+    batch: RenderBatch,
+    mapBindGroup: GpuBindGroup | null,
+    block: number,
+    depthFormat: string | null,
+    frameStencil: boolean,
+    stencilReference: number,
+    statistics: RenderStatistics | null,
+  ): number {
+    const material = batch.material;
+    const clip = batch.clip ?? null;
+    const stencilRecord = frameStencil
+      ? clip !== null
+        ? clip.stencil
+        : material.stencil
+      : undefined;
+    // An unlit batch whose named texture failed to resolve draws untextured
+    // over the same interleaved stream — the uv floats are strided over
+    // (`batchVertexBufferLayout`). A sprite batch never reaches here with
+    // `null`; the caller skipped the whole run.
+    const mapGroup = batch.hasUvs ? mapBindGroup : null;
+    const topology = batch.mode === "lines" ? "line-list" : "triangle-list";
+    const pipeline = pipelines.acquire({
+      kind: "batch",
+      vertexColors: batch.hasColors,
+      map: mapGroup !== null,
+      // §55's pipeline blends by construction, so a sprite batch does too;
+      // an unlit batch blends only when its material asks (§57).
+      blend:
+        batch.kind === "sprite" || material.transparent === true
+          ? (material.blendMode ?? "normal")
+          : "none",
+      // Normalized off on a depthless pass (WP-R1.6) — the shaded arm's note.
+      depthTest: depthFormat !== null && material.depthTest !== false,
+      depthWrite: depthFormat !== null && material.depthWrite !== false,
+      colorWrite: material.colorWrite !== false,
+      topology,
+      colorFormat: this.#frameFormat,
+      depthFormat,
+      stencil:
+        stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
+      batch: { uvs: batch.hasUvs, colors: batch.hasColors },
+    });
+    if (pipeline === null) {
+      // Unreachable for the unlit path's reason; same narrowing.
+      return stencilReference;
+    }
+
+    // `model: null` is the identity — positions arrive in world space.
+    const color = batch.color;
+    this.#writeBlock(
+      block,
+      this.#viewProjection,
+      null,
+      color[0],
+      color[1],
+      color[2],
+      color[3] * batch.opacity,
+    );
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+    if (mapGroup !== null) {
+      pass.setBindGroup(MAP_BIND_GROUP_INDEX, mapGroup);
+    }
+    let reference = stencilReference;
+    if (stencilRecord !== undefined) {
+      reference = applyStencilReference(
+        pass,
+        stencilReference,
+        stencilRecord.ref,
+      );
+    }
+    batching.draw(device, pass, batch);
+    if (statistics !== null) {
+      // One draw call for `batch.items` items — which is exactly what §65
+      // asks a diagnostic to make visible (§84): the triangle count is
+      // unchanged and `drawCalls` falls.
+      countDraw(statistics, topology, batch.indexCount, 1);
+    }
+    return reference;
+  }
+
+  /** §55's group-0 layout, one per renderer, created on first use. */
+  #acquireSpriteLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#spriteLayout ??= createSpriteBindGroupLayout(device);
+    return this.#spriteLayout;
+  }
+
+  /**
+   * The sprite draws' bind group over the current uniform buffer, created by
+   * the first sprite draw after initialization or after a regrowth — see the
+   * field's note.
+   */
+  #acquireSpriteBindGroup(device: GpuDevice, buffer: GpuBuffer): GpuBindGroup {
+    this.#spriteBindGroup ??= device.createBindGroup({
+      label: "four:sprite-uniforms",
+      layout: this.#acquireSpriteLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: SPRITE_UNIFORM_BYTES },
+        },
+      ],
+    });
+    return this.#spriteBindGroup;
+  }
+
+  /** §68's group-1 layout, one per renderer, created on first use (WP-R1.5). */
+  #acquireLightsLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#lightsLayout ??= createLightsBindGroupLayout(device);
+    return this.#lightsLayout;
+  }
+
+  /** §59's group-0 layout, one per renderer, created on first use (WP-R1.5). */
+  #acquireStandardLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#standardLayout ??= createStandardBindGroupLayout(device);
+    return this.#standardLayout;
+  }
+
+  /**
+   * The standard draws' bind group over the current uniform buffer, created
+   * by the first standard draw after initialization or after a regrowth —
+   * `#acquireSpriteBindGroup`'s lifecycle, third block size over one buffer.
+   */
+  #acquireStandardBindGroup(
+    device: GpuDevice,
+    buffer: GpuBuffer,
+  ): GpuBindGroup {
+    this.#standardBindGroup ??= device.createBindGroup({
+      label: "four:standard-uniforms",
+      layout: this.#acquireStandardLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: STANDARD_UNIFORM_BYTES },
+        },
+      ],
+    });
+    return this.#standardBindGroup;
+  }
+
+  /** §69's group-1 layout for receiving draws, created on first use (WP-R1.7). */
+  #acquireShadowLightsLayout(device: GpuDevice): GpuBindGroupLayout {
+    this.#shadowLightsLayout ??= createShadowLightsBindGroupLayout(device);
+    return this.#shadowLightsLayout;
+  }
+
+  /**
+   * The receiving draws' group-1 bind group (WP-R1.7): the widened light
+   * block over the **same** lights buffer the plain group offsets into, plus
+   * the shadow map's depth view and the shared comparison sampler — resolved
+   * once per shadowed frame, beside the caster pass.
+   *
+   * Cached per (buffer, view) pair: `#growLights` drops it when the buffer is
+   * regrown, and a reallocated map (a `mapSize` change — the cache row's
+   * version bump) hands this a different view and rebuilds.
+   */
+  #acquireShadowBindGroup(
+    device: GpuDevice,
+    buffer: GpuBuffer,
+    view: GpuTextureView,
+  ): GpuBindGroup {
+    if (this.#shadowBindGroup !== null && this.#shadowBindGroupView === view) {
+      return this.#shadowBindGroup;
+    }
+    this.#shadowSampler ??= createShadowSampler(device);
+    this.#shadowBindGroup = device.createBindGroup({
+      label: "four:shadow-lights",
+      layout: this.#acquireShadowLightsLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: SHADOW_LIGHT_UNIFORM_BYTES },
+        },
+        { binding: SHADOW_MAP_BINDING, resource: view },
+        { binding: SHADOW_SAMPLER_BINDING, resource: this.#shadowSampler },
+      ],
+    });
+    this.#shadowBindGroupView = view;
+    return this.#shadowBindGroup;
+  }
+
+  /**
+   * Records §69's directional shadow map as its own depth-clearing render
+   * pass on the frame's encoder, and returns the cache record it drew into —
+   * `null` when the map could not be produced, which costs the frame its
+   * shadows and nothing else (§61) — plus the next free uniform block.
+   *
+   * The GL `#renderShadowMap`'s contract, restated for this backend's seams:
+   *
+   * - **The target is the renderer's own `RenderTarget`**, described
+   *   `depthTexture: true` the first time a frame asks and `resize`d when
+   *   §69's `mapSize` changes — the version bump is what makes the cache
+   *   reallocate on this very frame (R-4), and the R1.6 format table is what
+   *   makes the depth row samplable `depth32float`.
+   * - **`loadOp` clears here, legitimately** — the second member of the mip
+   *   blit's exception: a shadow pass has no sub-rectangle to honour, so
+   *   §61's clears-are-scissored-draws argument does not reach it, and
+   *   `depthLoadOp: "clear"` to the far plane is the whole-map clear GL
+   *   spells as an opened scissor plus `clear(DEPTH_BUFFER_BIT)`. The colour
+   *   attachment loads: it is written by the caster stage and read by
+   *   nothing (`wgpu-shadow.ts`).
+   * - **It draws from the frame's list, in list order** — same items, same
+   *   `worldMatrix`, including §43's interpolated pose — filtered to
+   *   `castShadow` items of the kinds this backend draws; `wgpu-shadow.ts`'s
+   *   header owns each exclusion. §46 layer masks are deliberately not
+   *   applied (frame state must not depend on which viewport is first) and
+   *   §67 clips cannot be (the map's format carries no stencil planes).
+   * - **Caster blocks ride the frame's strided uniform buffer** — the
+   *   light's matrix in the `viewProjection` slot, the caster's world matrix
+   *   in `model`, the never-read colour as the mask draws' canonical zeros —
+   *   so the pass needs no allocation of its own and the one
+   *   `queue.writeBuffer` at the end of the frame covers it.
+   */
+  #renderShadowMap(
+    device: GpuDevice,
+    encoder: GpuCommandEncoder,
+    pipelines: WgpuPipelineCache,
+    geometries: WgpuGeometryCache,
+    renderTargets: WgpuRenderTargetCache,
+    bindGroup: GpuBindGroup,
+    items: readonly RenderItem[],
+    blockStart: number,
+    statistics: RenderStatistics | null,
+  ): { record: WgpuRenderTargetRecord | null; block: number } {
+    let block = blockStart;
+    const size = sceneLights.shadowMapSize;
+    let target = this.#shadowTarget;
+    if (target === null) {
+      target = new RenderTarget({
+        width: size,
+        height: size,
+        depthTexture: true,
+      });
+      this.#shadowTarget = target;
+    } else if (target.width !== size) {
+      target.resize(size, size);
+    }
+
+    const record = renderTargets.acquire(target);
+    if (record === null || record.depthView === null) {
+      return { record: null, block };
+    }
+
+    const pass = encoder.beginRenderPass({
+      label: "four:shadow",
+      colorAttachments: [
+        { view: record.colorView, loadOp: "load", storeOp: "store" },
+      ],
+      depthStencilAttachment: {
+        view: record.depthView,
+        depthLoadOp: "clear",
+        depthClearValue: 1,
+        depthStoreOp: "store",
+      },
+    });
+    for (const item of items) {
+      // The caster filter — `wgpu-shadow.ts`'s header owns the list: §49's
+      // opt-out, sprites (a quad would cast its rectangle), and every kind
+      // this backend has no pipeline for (skinned, node — an invisible
+      // surface must not cast). Masks and particle items carry
+      // `castShadow: false` from the list builder — a §36 billboard has no
+      // surface to project, drawn (WP-R1.8) or not.
+      if (
+        !item.castShadow ||
+        (item.kind !== "unlit" &&
+          item.kind !== "lit" &&
+          item.kind !== "standard")
+      ) {
+        continue;
+      }
+      const geometry = geometries.acquire(item.geometry);
+      if (geometry === null) {
+        continue;
+      }
+      const pipeline = pipelines.acquire({
+        kind: "shadow",
+        vertexColors: false,
+        map: false,
+        blend: "none",
+        depthTest: true,
+        depthWrite: true,
+        colorWrite: true,
+        topology: geometry.topology,
+        colorFormat: RENDER_TARGET_COLOR_FORMAT,
+        depthFormat: record.depthFormat,
+        stencil: null,
+        batch: null,
+      });
+      if (pipeline === null) {
+        // Unreachable for the reason the unlit path states; same narrowing.
+        continue;
+      }
+      this.#writeBlock(
+        block,
+        sceneLights.shadowMatrix,
+        item.worldMatrix,
+        0,
+        0,
+        0,
+        0,
+      );
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup, [block * UNIFORM_STRIDE_BYTES]);
+      pass.setVertexBuffer(0, geometry.positionBuffer);
+      if (geometry.indexBuffer !== null && geometry.indexFormat !== null) {
+        pass.setIndexBuffer(geometry.indexBuffer, geometry.indexFormat);
+        pass.drawIndexed(geometry.count);
+      } else {
+        pass.draw(geometry.count);
+      }
+      if (statistics !== null) {
+        // A caster pass draw is a draw (§84) — the GL pass's counter
+        // argument, verbatim.
+        countDraw(statistics, geometry.topology, geometry.count, 1);
+      }
+      block += 1;
+    }
+    pass.end();
+    return { record, block };
+  }
+
+  /**
+   * Packs §59's two extra vec4s — the emissive term, then metalness and
+   * roughness — into the spare bytes of `block`'s stride, after the
+   * `DrawUniforms`-shaped 144 `#writeBlock` wrote (`wgpu-standard.ts`'s
+   * layout). The unused slots are written, not assumed: the staging array is
+   * reused across frames, and an uploaded byte nobody wrote this frame is a
+   * transcript that depends on history.
+   */
+  #writeSurface(block: number, material: StandardMaterialLike): void {
+    const staging = this.#uniformStaging;
+    const base = block * UNIFORM_STRIDE_FLOATS;
+    const emissiveBase = base + STANDARD_EMISSIVE_OFFSET / 4;
+    const emissive = material.emissive;
+    staging[emissiveBase] = emissive[0];
+    staging[emissiveBase + 1] = emissive[1];
+    staging[emissiveBase + 2] = emissive[2];
+    staging[emissiveBase + 3] = 0;
+    const surfaceBase = base + STANDARD_SURFACE_OFFSET / 4;
+    staging[surfaceBase] = material.metalness;
+    staging[surfaceBase + 1] = material.roughness;
+    staging[surfaceBase + 2] = 0;
+    staging[surfaceBase + 3] = 0;
+  }
+
+  /**
+   * Grows the lights buffer, its staging array and its bind group to hold at
+   * least `blocks` per-view blocks (WP-R1.5). `#growUniforms`' contract one
+   * buffer over: never shrinks, doubles, and everything it creates is created
+   * lazily — an application that never shades never reaches this method, so
+   * never allocates a lights layout, buffer or group at all.
+   */
+  #growLights(device: GpuDevice, blocks: number): void {
+    if (blocks <= this.#lightsCapacity) {
+      return;
+    }
+    const capacity = Math.max(blocks, this.#lightsCapacity * 2, 4);
+    this.#lightsBuffer?.destroy();
+    const buffer = device.createBuffer({
+      label: "four:lights",
+      size: capacity * LIGHT_UNIFORM_STRIDE_BYTES,
+      usage: GPU_BUFFER_USAGE.UNIFORM | GPU_BUFFER_USAGE.COPY_DST,
+    });
+    this.#lightsBuffer = buffer;
+    this.#lightsStaging = new Float32Array(
+      capacity * LIGHT_UNIFORM_STRIDE_FLOATS,
+    );
+    this.#lightsCapacity = capacity;
+    this.#lightsBindGroup = device.createBindGroup({
+      label: "four:lights",
+      layout: this.#acquireLightsLayout(device),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer, offset: 0, size: LIGHT_UNIFORM_BYTES },
+        },
+      ],
+    });
+    // §69's group pointed at the destroyed buffer (WP-R1.7) — dropped here
+    // and recreated by the next receiving draw, the sprite group's rule.
+    this.#shadowBindGroup = null;
+    this.#shadowBindGroupView = null;
+  }
+
+  /**
+   * Packs §55's `quad` — the local rectangle the whole texture maps onto —
+   * into the sprite block's last sixteen bytes: the geometry's own bounds for
+   * a frameless sprite, R-29's affine reparametrization for a framed one. The
+   * same two expressions the GL sprite path uploads through `setQuad`, over
+   * the same cached `computeBounds()` (a version comparison per draw, not a
+   * pass over the vertices).
+   */
+  #writeQuad(
+    block: number,
+    item: SpriteItem,
+    material: SpriteMaterialLike,
+  ): void {
+    const bounds = item.geometry.computeBounds();
+    const minX = bounds.min.x;
+    const minY = bounds.min.y;
+    const width = bounds.max.x - minX;
+    const height = bounds.max.y - minY;
+    const staging = this.#uniformStaging;
+    const base = block * UNIFORM_STRIDE_FLOATS + SPRITE_QUAD_OFFSET / 4;
+    // `?? null` for the render list's reason: a structurally typed sprite item
+    // built before frames existed reports `undefined`, which reads "no frame".
+    const frame = item.frame ?? null;
+    if (frame === null) {
+      staging[base] = minX;
+      staging[base + 1] = minY;
+      staging[base + 2] = width;
+      staging[base + 3] = height;
+      return;
+    }
+    // The rectangle the *whole* texture would occupy, given that the quad
+    // shows `frame` of it — `map` is the engine-side texture (its texel size),
+    // not the GPU record this draw binds.
+    const map = material.texture;
+    staging[base] = minX - (frame.x * width) / frame.width;
+    staging[base + 1] = minY - (frame.y * height) / frame.height;
+    staging[base + 2] = (width * map.width) / frame.width;
+    staging[base + 3] = (height * map.height) / frame.height;
   }
 
   /** Packs one `DrawUniforms` block into the staging array at `block`'s stride. */
@@ -872,28 +3127,44 @@ export class WebgpuRenderer implements Renderer {
         },
       ],
     });
+    // The sprite, standard and particle bind groups pointed at the destroyed
+    // buffer; dropped here and recreated lazily by the next draw of each
+    // kind, so a scene whose sprites (or standard surfaces, or particle
+    // systems) are gone stops paying for one. Growth happens before the pass
+    // is recorded, so no recorded draw can be holding a dropped group.
+    this.#spriteBindGroup = null;
+    this.#standardBindGroup = null;
+    this.#particleBindGroup = null;
   }
 
-  /** Allocates (or reuses) the depth attachment for the current surface size. */
+  /**
+   * Allocates (or reuses) the depth attachment for the current surface size
+   * and the frame's format — `depth24plus`, upgraded to carry §67's stencil
+   * planes for a frame that clips (see `DEPTH_STENCIL_FORMAT`). A scene that
+   * starts or stops clipping reallocates once, like a resize.
+   */
   #acquireDepth(
     device: GpuDevice,
     width: number,
     height: number,
+    format: string,
   ): GpuTextureView {
     if (
       this.#depthTexture === null ||
       this.#depthWidth !== width ||
-      this.#depthHeight !== height
+      this.#depthHeight !== height ||
+      this.#depthFormat !== format
     ) {
       this.#depthTexture?.destroy?.();
       this.#depthTexture = device.createTexture({
         label: "four:depth",
         size: [width, height],
-        format: DEPTH_FORMAT,
+        format,
         usage: GPU_TEXTURE_USAGE.RENDER_ATTACHMENT,
       });
       this.#depthWidth = width;
       this.#depthHeight = height;
+      this.#depthFormat = format;
     }
     return this.#depthTexture.createView();
   }
@@ -918,7 +3189,42 @@ export class WebgpuRenderer implements Renderer {
       }
       this.#deviceLost = true;
       this.#geometries?.forget();
+      this.#textures?.forget();
+      this.#renderTargets?.forget();
+      // §36's instance buffers (WP-R1.8): same terms — the allocations died
+      // with the device.
+      this.#particles?.forget();
+      // §65's uploader (R-9): its buffers died with the device, like every
+      // other handle — dropped, never destroyed.
+      this.batching?.forget();
       this.#pipelines?.dispose();
+      // §82's compute caches (WP-R1.8): pipelines and layouts of a dead
+      // device — dropped whole; the next compute() call reports the loss.
+      this.#compute?.dispose();
+      this.#compute = null;
+      this.#spriteLayout = null;
+      this.#spriteBindGroup = null;
+      this.#particleLayout = null;
+      this.#particleBindGroup = null;
+      // §68's block, like every allocation above: the handles died with the
+      // device — dropped, never destroyed.
+      this.#standardLayout = null;
+      this.#standardBindGroup = null;
+      this.#lightsLayout = null;
+      this.#lightsBuffer = null;
+      this.#lightsBindGroup = null;
+      this.#lightsCapacity = 0;
+      // §70's grade block (WP-R1.6): same terms.
+      this.#effectLayout = null;
+      this.#effectBuffer = null;
+      this.#effectBindGroup = null;
+      // §69's layout, sampler and group (WP-R1.7): same terms — the target
+      // object itself survives (it is engine-side, and `render` returns
+      // quietly while lost anyway).
+      this.#shadowLightsLayout = null;
+      this.#shadowSampler = null;
+      this.#shadowBindGroup = null;
+      this.#shadowBindGroupView = null;
       this.events.emit("contextlost", { renderer: this });
     });
   }

@@ -104,6 +104,7 @@ import type {
 import type { ColorRGBA } from "@four/math";
 import { ALL_LAYERS, type LayerMask } from "@four/scene";
 
+import type { RenderItemClip } from "./clip.js";
 import type {
   RenderItem,
   SpriteRenderItem,
@@ -224,6 +225,26 @@ export interface RenderBatch {
   readonly mode: BufferGeometry["mode"];
 
   /**
+   * §67's clip, shared by every merged item, or `null` where none of them is
+   * clipped (R-23, 2026-08-21).
+   *
+   * A run breaks where the record changes, so this is one value for the whole
+   * batch exactly as the material is: the same material under two different
+   * clips is two different draws, and merging them would let one scroll view's
+   * content escape into another's. A backend applies it exactly as it applies
+   * a single item's.
+   *
+   * Never a mask pass: every clip owns its own bit plane and emits exactly one
+   * mask draw, so two consecutive mask items never share a record and a run of
+   * them never forms.
+   *
+   * Optional for `RenderItem.clip`'s reason — a hand-built batch predating §67
+   * must still typecheck, and `undefined` reads as "unclipped" — but the
+   * batcher itself always writes it.
+   */
+  readonly clip?: RenderItemClip | null;
+
+  /**
    * How many consecutive render items this batch consumed. Always ≥ 2 — a run
    * of one is not a batch (see the module header).
    */
@@ -270,6 +291,7 @@ interface MutableBatch {
   color: ColorRGBA;
   opacity: number;
   mode: BufferGeometry["mode"];
+  clip: RenderItemClip | null;
   items: number;
   vertexCount: number;
   indexCount: number;
@@ -390,6 +412,7 @@ export class RenderBatcher {
     color: [1, 1, 1, 1],
     opacity: 1,
     mode: "triangles",
+    clip: null,
     items: 0,
     vertexCount: 0,
     indexCount: 0,
@@ -450,6 +473,10 @@ export class RenderBatcher {
     // pipeline. `null` for an unlit run is what tells `#writeVertices` to copy
     // the geometry's uv instead of deriving §55's.
     const spriteMaterial = first.kind === "sprite" ? first.material : null;
+    // §67's clip for the whole run (R-23) — see `RenderBatch.clip`. `?? null`
+    // so a structurally-typed item predating the field compares equal to the
+    // builders' own unclipped `null` rather than ending every run at it.
+    const clip = first.clip ?? null;
     const kind = first.kind;
     const mode = first.geometry.mode;
     let vertexCount = first.geometry.vertexCount;
@@ -467,6 +494,12 @@ export class RenderBatcher {
       if (
         (item.layers & layerMask) === 0 ||
         item.material !== material ||
+        // §67 (R-23): the same material under a different clip is a different
+        // draw. Identity, not equality — every item under one clip carries the
+        // same pooled record — and `null !== null` is `false`, so an unclipped
+        // scene's runs are exactly the runs it had before clipping existed.
+        // `?? null` for `first`'s reason above.
+        (item.clip ?? null) !== clip ||
         item.geometry.mode !== mode ||
         !isBatchable(item)
       ) {
@@ -540,6 +573,7 @@ export class RenderBatcher {
       first.kind === "sprite" ? first.material.tint : first.material.color;
     batch.opacity = material.opacity ?? 1;
     batch.mode = mode;
+    batch.clip = clip;
     batch.items = count;
     batch.vertexCount = vertexCount;
     batch.indexCount = indexCount;

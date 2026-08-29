@@ -27,15 +27,17 @@
  */
 
 import { isFourError, type FourError } from "@four/core";
-import { Matrix4 } from "@four/math";
+import { Matrix4, type Vector3 } from "@four/math";
 import {
+  PARTICLE_INSTANCE_FLOATS,
   Renderable,
+  RenderTarget,
   createRenderStatistics,
   type RenderItem,
   type Renderer,
   type UnlitRenderItem,
 } from "@four/render";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createRecordingGpu,
@@ -45,8 +47,33 @@ import {
 import {
   DRAW_COLOR_OFFSET,
   DRAW_MODEL_OFFSET,
+  LIGHT_AMBIENT_OFFSET,
+  LIGHT_CAMERA_OFFSET,
+  LIGHT_COLOR_OFFSET,
+  LIGHT_COUNTS_OFFSET,
+  LIGHT_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_COLOR_OFFSET,
+  LIGHT_PUNCTUAL_DIRECTION_OFFSET,
+  LIGHT_PUNCTUAL_PARAMS_OFFSET,
+  LIGHT_PUNCTUAL_POSITION_OFFSET,
+  LIGHT_UNIFORM_STRIDE_BYTES,
+  LIGHT_UNIFORM_STRIDE_FLOATS,
+  PARTICLE_INSTANCE_BUFFER_LAYOUT,
+  PARTICLE_MODEL_OFFSET,
+  PARTICLE_PROJECTION_OFFSET,
+  PARTICLE_UNIFORM_BYTES,
+  PARTICLE_VIEW_OFFSET,
+  POSITION_BUFFER_LAYOUT,
+  SHADOW_LIGHT_UNIFORM_BYTES,
+  SHADOW_MATRIX_OFFSET,
+  SHADOW_PARAMS_OFFSET,
+  SPRITE_QUAD_OFFSET,
+  SPRITE_TINT_OFFSET,
+  STANDARD_EMISSIVE_OFFSET,
+  STANDARD_SURFACE_OFFSET,
   UNIFORM_STRIDE_BYTES,
   WebgpuRenderer,
+  createWgpuBatching,
   hostGpu,
 } from "../src/index.js";
 
@@ -66,6 +93,10 @@ class TestGeometry {
   positions: Float32Array;
 
   normals: Float32Array | undefined;
+
+  joints: Uint16Array | undefined;
+
+  weights: Float32Array | undefined;
 
   uvs: Float32Array | undefined;
 
@@ -103,9 +134,74 @@ class TestGeometry {
     this.version += 1;
   }
 
+  /** §53's cached local bounds, reduced to what the sprite path reads. */
+  computeBounds(): {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  } {
+    const min = { x: Infinity, y: Infinity, z: Infinity };
+    const max = { x: -Infinity, y: -Infinity, z: -Infinity };
+    for (let i = 0; i < this.positions.length; i += 3) {
+      min.x = Math.min(min.x, this.positions[i]);
+      min.y = Math.min(min.y, this.positions[i + 1]);
+      min.z = Math.min(min.z, this.positions[i + 2]);
+      max.x = Math.max(max.x, this.positions[i]);
+      max.y = Math.max(max.y, this.positions[i + 1]);
+      max.z = Math.max(max.z, this.positions[i + 2]);
+    }
+    return { min, max };
+  }
+
   get asGeometry(): ItemGeometry {
     return this as unknown as ItemGeometry;
   }
+}
+
+let nextTextureId = 0;
+
+/** §77's `MaterialTexture` read contract, reduced to what the cache reads. */
+class TestTexture {
+  readonly id: string;
+
+  version = 0;
+
+  readonly width: number;
+
+  readonly height: number;
+
+  data: Uint8Array | null;
+
+  disposed = false;
+
+  mipmaps?: boolean;
+
+  constructor(width = 2, height = 2) {
+    nextTextureId += 1;
+    this.id = `test-texture-${String(nextTextureId)}`;
+    this.width = width;
+    this.height = height;
+    this.data = new Uint8Array(width * height * 4);
+  }
+
+  markDirty(): void {
+    this.version += 1;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    this.version += 1;
+  }
+}
+
+/** A partial §57 stencil record, as a structurally-typed double carries one. */
+interface TestStencil {
+  func?: string;
+  ref?: number;
+  readMask?: number;
+  writeMask?: number;
+  failOp?: string;
+  depthFailOp?: string;
+  passOp?: string;
 }
 
 /** §57's `UnlitMaterial`, reduced to the state the pipeline descriptor reads. */
@@ -126,12 +222,59 @@ class TestMaterial {
 
   vertexColors?: boolean;
 
+  map?: TestTexture | null;
+
+  stencil?: TestStencil;
+
   constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
     this.color = color;
   }
 
   get asMaterial(): ItemMaterial {
     return this as unknown as ItemMaterial;
+  }
+}
+
+/** §55's `SpriteMaterial`, reduced to what the sprite path reads (WP-R1.3). */
+class TestSpriteMaterial {
+  /** The discriminant `pipelineOf` routes on. */
+  readonly kind = "sprite";
+
+  readonly tint: [number, number, number, number];
+
+  texture: TestTexture | null;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  depthTest?: boolean;
+
+  depthWrite?: boolean;
+
+  colorWrite?: boolean;
+
+  opacity?: number;
+
+  stencil?: TestStencil;
+
+  constructor(
+    texture: TestTexture | null = new TestTexture(),
+    tint: [number, number, number, number] = [1, 1, 1, 1],
+  ) {
+    this.texture = texture;
+    this.tint = tint;
+  }
+
+  get asMaterial(): ItemMaterial {
+    return this as unknown as ItemMaterial;
+  }
+}
+
+/** A §55 sprite node: a renderable that may carry the frame sub-rectangle. */
+class SpriteNode extends Renderable {
+  frame: { x: number; y: number; width: number; height: number } | null = null;
+
+  constructor(geometry: TestGeometry, material: TestSpriteMaterial) {
+    super(geometry.asGeometry, material.asMaterial);
   }
 }
 
@@ -164,6 +307,13 @@ function triangle(colors?: Float32Array): TestGeometry {
     "triangles",
     colors,
   );
+}
+
+/** A triangle carrying the uv stream §77's textured variant samples with. */
+function texturedTriangle(colors?: Float32Array): TestGeometry {
+  const geometry = triangle(colors);
+  geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+  return geometry;
 }
 
 function renderable(
@@ -224,6 +374,20 @@ function uniformUpload(gpu: RecordingGpu): number[] {
     throw new Error("the frame uploaded no uniforms");
   }
   return last.args[2] as number[];
+}
+
+/**
+ * How many §77 map textures the tape allocates — `createTexture` calls minus
+ * the frame's own depth attachment, told apart by the cache's label.
+ */
+function mapAllocations(gpu: RecordingGpu): number {
+  return gpu
+    .callsOf("device.createTexture")
+    .filter((call) =>
+      String((call.args[0] as { label?: string }).label).startsWith(
+        "four:texture:",
+      ),
+    ).length;
 }
 
 /** Awaits a rejection and returns the `FourError` it carried. */
@@ -495,8 +659,10 @@ describe("WebgpuRenderer.render", () => {
     expect(harness.gpu.calls).toHaveLength(0);
   });
 
-  it("skips the frame when a render target is passed (WP-R1.6)", () => {
-    harness.renderer.render(createRoot(), [createView()], undefined, {});
+  it("skips the frame for a disposed render target (§83, WP-R1.6)", () => {
+    const target = new RenderTarget({ width: 8, height: 8 });
+    target.dispose();
+    harness.renderer.render(createRoot(), [createView()], undefined, target);
     expect(harness.gpu.calls).toHaveLength(0);
   });
 
@@ -706,6 +872,136 @@ describe("WebgpuRenderer.render", () => {
     expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(3);
   });
 
+  it("samples §57's map through group 1 when the geometry carries uvs", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    // The texture uploads once and binds beside its sampler at group 1. (The
+    // frame's other `createTexture` is the depth attachment.)
+    expect(mapAllocations(harness.gpu)).toBe(1);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(1);
+    const groupBinds = harness.gpu
+      .callsOf("pass.setBindGroup")
+      .map((call) => call.args[0]);
+    expect(groupBinds).toContain(1);
+
+    // Positions at slot 0, uvs at slot 1 — the positional order.
+    const slots = harness.gpu
+      .callsOf("pass.setVertexBuffer")
+      .map((call) => call.args[0]);
+    expect(slots).toEqual([0, 1]);
+
+    // The textured module is its own variant, and it samples.
+    const sources = harness.gpu
+      .callsOf("device.createShaderModule")
+      .map((call) => (call.args[0] as { code: string }).code);
+    expect(sources.some((code) => code.includes("textureSample"))).toBe(true);
+  });
+
+  it("reuses the uploaded texture across frames, until markDirty", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    const map = new TestTexture();
+    material.map = map;
+    root.add(renderable(texturedTriangle(), material));
+    harness.renderer.render(root, [createView()]);
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(1);
+
+    map.markDirty();
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(2);
+    expect(harness.gpu.countOf("texture.destroy")).toBe(1);
+  });
+
+  it("shares one sampler and one pipeline across textures sharing state", () => {
+    const root = createRoot();
+    const first = new TestMaterial();
+    first.map = new TestTexture();
+    const second = new TestMaterial();
+    second.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), first));
+    root.add(renderable(texturedTriangle(), second));
+    harness.renderer.render(root, [createView()]);
+
+    // Two textures, two bind groups — one sampler between them (§77), and
+    // one textured pipeline plus the clear.
+    expect(mapAllocations(harness.gpu)).toBe(2);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(1);
+    expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(2);
+  });
+
+  it("draws untextured when the geometry carries no uvs to sample with", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    // Clear + triangle: the draw happens, flat, with nothing uploaded.
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+    expect(mapAllocations(harness.gpu)).toBe(0);
+    expect(harness.gpu.countOf("queue.writeTexture")).toBe(0);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("skips the draw when its map has been disposed (§83)", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    const map = new TestTexture();
+    material.map = map;
+    root.add(renderable(texturedTriangle(), material));
+    map.dispose();
+    harness.renderer.render(root, [createView()]);
+
+    // The clear draws; the textured item is skipped, never painted undefined.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("binds colours and uvs in slot order for a variant reading all three", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.vertexColors = true;
+    material.map = new TestTexture();
+    root.add(
+      renderable(texturedTriangle(new Float32Array(12).fill(1)), material),
+    );
+    harness.renderer.render(root, [createView()]);
+
+    const slots = harness.gpu
+      .callsOf("pass.setVertexBuffer")
+      .map((call) => call.args[0]);
+    expect(slots).toEqual([0, 1, 2]);
+    // Position, colour and uv buffers, in the geometry cache's upload order:
+    // positions → uvs → colours (matching `gl-geometry.ts`), bound as
+    // position → colours → uvs (the variant's slot order).
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(3);
+  });
+
+  it("generates a mip chain for a mipmapped map, inside the frame", () => {
+    const root = createRoot();
+    const material = new TestMaterial();
+    const map = new TestTexture(4, 4);
+    map.mipmaps = true;
+    material.map = map;
+    root.add(renderable(texturedTriangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    // The chain's own encoder submits before the frame's: two blit passes for
+    // levels 1 and 2, then the frame pass — three passes, two submits.
+    expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(3);
+    expect(harness.gpu.countOf("queue.submit")).toBe(2);
+    const submits = harness.gpu.calls
+      .map((call) => call.name)
+      .filter((name) => name === "queue.submit" || name === "pass.end");
+    expect(submits[submits.length - 1]).toBe("queue.submit");
+  });
+
   it("takes §57's blend mode from the material, defaulting to normal", () => {
     const root = createRoot();
     const plain = new TestMaterial();
@@ -753,15 +1049,73 @@ describe("WebgpuRenderer.render", () => {
     expect(descriptor.fragment.targets[0]?.writeMask).toBe(0);
   });
 
+  it("skips the draw when a material accessor disposes the renderer mid-arm (§61)", () => {
+    // The reentrant family, one accessor later than the pinned map/stencil
+    // getters: `map` runs inside the unlit arm *before* the pipeline is
+    // acquired, so a teardown there surfaces as the disposed cache's null —
+    // the narrowing the draw path encodes — and the draw is skipped, not
+    // thrown.
+    const material = new TestMaterial();
+    Object.defineProperty(material, "map", {
+      get: (): null => {
+        harness.renderer.dispose();
+        return null;
+      },
+    });
+    const root = createRoot();
+    root.add(renderable(triangle(), material));
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The clear drew; the unlit draw found its pipeline cache disposed.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("skips a sprite whose material accessor disposes the renderer mid-draw (§61)", () => {
+    // The same family inside `#drawSprite`: the texture resolved while the
+    // renderer was live, and `blendMode` — read while building the pipeline
+    // descriptor — tears it down. The disposed cache answers null and the
+    // sprite is skipped without a throw.
+    const material = new TestSpriteMaterial();
+    Object.defineProperty(material, "blendMode", {
+      get: (): undefined => {
+        harness.renderer.dispose();
+        return undefined;
+      },
+    });
+    const root = createRoot();
+    root.add(new SpriteNode(texturedTriangle(), material));
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
   it("skips an item this tier has no pipeline for", () => {
     const root = createRoot();
-    const item = renderable(triangle());
-    // A sprite-material item: `pipelineOf` gives it kind `"sprite"`, which
-    // WP-R1.3 owns. It must be skipped, never approximated.
-    (item.material as unknown as { kind: string }).kind = "sprite";
+    // A skinned item (RFC 0003): a renderable with a structural skeleton over
+    // a geometry carrying joints and weights builds as `"skinned-unlit"`,
+    // which needs the joint-palette pipeline this backend does not stage. It
+    // must be skipped, never approximated — and skipped before the geometry
+    // cache uploads buffers nothing will bind (WP-R1.4's pinned rule; before
+    // WP-R1.5 this test pinned the `"lit"` kind, which now draws).
+    const geometry = triangle();
+    geometry.joints = new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    geometry.weights = new Float32Array(12).fill(0.25);
+    const item = renderable(geometry);
+    (item as unknown as { skeleton: unknown }).skeleton = {
+      update: (): void => {},
+      jointMatrices: new Float32Array(16),
+      bones: [null],
+    };
     root.add(item);
     harness.renderer.render(root, [createView()]);
     expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
   });
 
   it("skips a draw whose geometry has nothing to draw", () => {
@@ -906,6 +1260,23 @@ describe("WebgpuRenderer device loss (§61)", () => {
     expect(gpu.calls).toHaveLength(0);
   });
 
+  it("forgets uploaded textures on loss without touching the dead device", async () => {
+    const { gpu, renderer } = await initialized();
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), material));
+    renderer.render(root, [createView()]);
+
+    gpu.loseDevice();
+    await Promise.resolve();
+    await Promise.resolve();
+    gpu.reset();
+    renderer.dispose();
+    // No `texture.destroy` for the map: its allocation died with the device.
+    expect(gpu.countOf("texture.destroy")).toBe(0);
+  });
+
   it("does not report teardown as a loss", async () => {
     const { gpu, renderer } = await initialized();
     let lost = 0;
@@ -972,6 +1343,20 @@ describe("WebgpuRenderer.dispose", () => {
     expect(gpu.countOf("texture.destroy")).toBe(1);
   });
 
+  it("destroys uploaded textures alongside the depth texture", async () => {
+    const { gpu, renderer } = await initialized();
+    const root = createRoot();
+    const material = new TestMaterial();
+    material.map = new TestTexture();
+    root.add(renderable(texturedTriangle(), material));
+    renderer.render(root, [createView()]);
+    gpu.reset();
+
+    renderer.dispose();
+    // The map's allocation and the depth attachment.
+    expect(gpu.countOf("texture.destroy")).toBe(2);
+  });
+
   it("is idempotent", async () => {
     const { gpu, renderer } = await initialized();
     renderer.dispose();
@@ -1009,5 +1394,2292 @@ describe("WebgpuRenderer.dispose", () => {
     const renderer = new WebgpuRenderer();
     renderer.render(createRoot(), [createView()]);
     expect(renderer.capabilities.backend).toBe("webgpu");
+  });
+});
+
+/** The labels of every pipeline the frame compiled, in creation order. */
+function pipelineLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createRenderPipeline")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/**
+ * The recorded `createRenderPipeline` descriptor whose label contains `part` —
+ * `unknown`, for the caller to narrow to the members its assertion reads.
+ */
+function pipelineDescriptor(gpu: RecordingGpu, part: string): unknown {
+  const call = gpu
+    .callsOf("device.createRenderPipeline")
+    .find((candidate) =>
+      String((candidate.args[0] as { label?: string }).label).includes(part),
+    );
+  if (call === undefined) {
+    throw new Error(`no pipeline whose label contains ${part}`);
+  }
+  return call.args[0];
+}
+
+/** Every recorded stencil reference, in order — `[]` for a clipless frame. */
+function stencilReferences(gpu: RecordingGpu): number[] {
+  return gpu
+    .callsOf("pass.setStencilReference")
+    .map((call) => call.args[0] as number);
+}
+
+describe("WebgpuRenderer sprites (§55, WP-R1.3)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("draws a sprite through the sprite pipeline, texture at group 1", () => {
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+
+    // Clear plus the sprite.
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("four:sprite|"),
+      ),
+    ).toBe(true);
+    // The sprite's own group-0 layout and the texture's group 1, both created
+    // by this first sprite frame (the lazy WP-R1.2 pattern), plus their two
+    // bind groups.
+    expect(harness.gpu.countOf("device.createBindGroupLayout")).toBe(2);
+    expect(harness.gpu.countOf("device.createBindGroup")).toBe(2);
+    const groups = harness.gpu
+      .callsOf("pass.setBindGroup")
+      .map((call) => call.args[0]);
+    expect(groups).toContain(1);
+  });
+
+  it("uploads tint × opacity and the quad rectangle in the sprite block", () => {
+    const root = createRoot();
+    const material = new TestSpriteMaterial(
+      new TestTexture(),
+      [1, 0.5, 0.25, 0.8],
+    );
+    material.opacity = 0.5;
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    const data = uniformUpload(harness.gpu);
+    const stride = UNIFORM_STRIDE_BYTES / 4;
+    const tint = stride + SPRITE_TINT_OFFSET / 4;
+    expect(data.slice(tint, tint + 3)).toEqual([1, 0.5, 0.25]);
+    expect(data[tint + 3]).toBeCloseTo(0.4);
+    // The triangle's local bounds: x, y ∈ [-0.5, 0.5].
+    const quad = stride + SPRITE_QUAD_OFFSET / 4;
+    expect(data.slice(quad, quad + 4)).toEqual([-0.5, -0.5, 1, 1]);
+  });
+
+  it("reparametrizes the quad for §55's frame, exactly as the GL path does", () => {
+    const root = createRoot();
+    const material = new TestSpriteMaterial(new TestTexture(4, 4));
+    const sprite = new SpriteNode(triangle(), material);
+    sprite.frame = { x: 2, y: 2, width: 2, height: 2 };
+    root.add(sprite);
+    harness.renderer.render(root, [createView()]);
+
+    const data = uniformUpload(harness.gpu);
+    const quad = UNIFORM_STRIDE_BYTES / 4 + SPRITE_QUAD_OFFSET / 4;
+    // The rectangle the whole 4×4 texture would occupy so that the quad shows
+    // the (2, 2, 2, 2) frame of it — R-29's affine reparametrization.
+    expect(data.slice(quad, quad + 4)).toEqual([-1.5, -1.5, 2, 2]);
+  });
+
+  it("blends by construction, whatever `transparent` says (§55)", () => {
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+
+    const descriptor = pipelineDescriptor(harness.gpu, "four:sprite|") as {
+      fragment: { targets: { blend?: { color: { srcFactor: string } } }[] };
+    };
+    expect(descriptor.fragment.targets[0]?.blend?.color.srcFactor).toBe(
+      "src-alpha",
+    );
+  });
+
+  it("skips a sprite whose texture is disposed (§83)", () => {
+    const root = createRoot();
+    const material = new TestSpriteMaterial();
+    material.texture?.dispose();
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+  });
+
+  it("skips a sprite material double that carries no texture at all", () => {
+    const root = createRoot();
+    // The F16 defensive read: a structurally-typed §55 double predating the
+    // contract reports nothing, which must mean "no texture", not a crash.
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial(null)));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("draws an indexed sprite quad through drawIndexed", () => {
+    const root = createRoot();
+    const quad = new TestGeometry(
+      new Float32Array([
+        -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
+      ]),
+      new Uint16Array([0, 1, 2, 0, 2, 3]),
+    );
+    root.add(new SpriteNode(quad, new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(6);
+  });
+
+  it("reuses the sprite bind group until the uniform buffer regrows", () => {
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    // Frame 2: no new layout, no new bind group — everything is cached.
+    expect(harness.gpu.countOf("device.createBindGroup")).toBe(0);
+
+    // Growing the uniform buffer orphans both bind groups; the next sprite
+    // draw recreates its own against the new buffer.
+    for (let index = 0; index < 40; index += 1) {
+      root.add(renderable(triangle()));
+    }
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    // The draw bind group (in growUniforms) and the sprite's (lazily).
+    expect(harness.gpu.countOf("device.createBindGroup")).toBe(2);
+  });
+
+  it("counts §84's statistics for a sprite draw", () => {
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    harness.renderer.render(root, [createView()]);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+  });
+});
+
+describe("WebgpuRenderer clipping (§67, WP-R1.3)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  /** A clip node over a triangle, with one clipped child. */
+  function clippedScene(): Renderable {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle(), new TestMaterial([1, 0, 0, 1])));
+    root.add(panel);
+    return root;
+  }
+
+  it("records no stencil content at all for a clipless frame — byte identity", () => {
+    const root = createRoot();
+    root.add(renderable(triangle()));
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).not.toContain("depth24plus-stencil8");
+    expect(transcript).not.toContain("stencilLoadOp");
+    expect(transcript).not.toContain("stencilFront");
+    expect(transcript).not.toContain("setStencilReference");
+  });
+
+  it("upgrades the depth format and the pass for a frame that clips", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+
+    const depth = harness.gpu.callsOf("device.createTexture")[0]?.args[0] as {
+      label: string;
+      format: string;
+    };
+    expect(depth.label).toBe("four:depth");
+    expect(depth.format).toBe("depth24plus-stencil8");
+    const pass = harness.gpu.callsOf("encoder.beginRenderPass")[0]?.args[0] as {
+      depthStencilAttachment: {
+        stencilLoadOp?: string;
+        stencilStoreOp?: string;
+      };
+    };
+    expect(pass.depthStencilAttachment.stencilLoadOp).toBe("load");
+    expect(pass.depthStencilAttachment.stencilStoreOp).toBe("store");
+  });
+
+  it("clears the stencil rectangle with the clear draw (passOp zero)", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+    const clear = pipelineDescriptor(harness.gpu, "four:clear") as {
+      depthStencil: {
+        stencilFront: { compare: string; passOp: string };
+        stencilWriteMask: number;
+      };
+    };
+    expect(clear.depthStencil.stencilFront.compare).toBe("always");
+    expect(clear.depthStencil.stencilFront.passOp).toBe("zero");
+    expect(clear.depthStencil.stencilWriteMask).toBe(0xff);
+  });
+
+  it("writes the mask's plane with colour and depth off, and tests content equal", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+
+    // Clear, mask, panel (unclipped), child (clipped) — four draws.
+    expect(harness.gpu.countOf("pass.draw")).toBe(4);
+
+    const mask = pipelineDescriptor(harness.gpu, "|s:always,255,1,") as {
+      fragment: { targets: { writeMask: number }[] };
+      depthStencil: {
+        depthWriteEnabled: boolean;
+        depthCompare: string;
+        stencilFront: { compare: string; passOp: string };
+        stencilWriteMask: number;
+      };
+    };
+    expect(mask.fragment.targets[0]?.writeMask).toBe(0);
+    expect(mask.depthStencil.depthWriteEnabled).toBe(false);
+    expect(mask.depthStencil.depthCompare).toBe("always");
+    expect(mask.depthStencil.stencilFront.compare).toBe("always");
+    expect(mask.depthStencil.stencilFront.passOp).toBe("replace");
+    expect(mask.depthStencil.stencilWriteMask).toBe(1);
+
+    const content = pipelineDescriptor(harness.gpu, "|s:equal,1,0,") as {
+      depthStencil: {
+        stencilFront: { compare: string; passOp: string };
+        stencilReadMask: number;
+        stencilWriteMask: number;
+      };
+    };
+    expect(content.depthStencil.stencilFront.compare).toBe("equal");
+    expect(content.depthStencil.stencilFront.passOp).toBe("keep");
+    expect(content.depthStencil.stencilReadMask).toBe(1);
+    expect(content.depthStencil.stencilWriteMask).toBe(0);
+
+    // The mask's reference is bit 1, the content's test is the same value —
+    // one recorded pass command serves both.
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("intersects nested clips through the accumulated planes", () => {
+    const root = createRoot();
+    const outer = renderable(triangle());
+    outer.clip = true;
+    const inner = renderable(triangle());
+    inner.clip = true;
+    inner.add(renderable(triangle(), new TestMaterial([0, 1, 0, 1])));
+    outer.add(inner);
+    root.add(outer);
+    harness.renderer.render(root, [createView()]);
+
+    // Masks 1 and 2 first; the outer's own item resets nothing (unclipped);
+    // the inner's own item tests the outer's plane (1); the leaf tests the
+    // conjunction (3).
+    expect(stencilReferences(harness.gpu)).toEqual([1, 2, 1, 3]);
+  });
+
+  it("lets the engine's clip record outrank the material's own §57 stencil", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    const child = renderable(triangle());
+    (child.material as unknown as TestMaterial).stencil = { func: "never" };
+    panel.add(child);
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).toContain('"compare":"equal"');
+    expect(transcript).not.toContain('"compare":"never"');
+  });
+
+  it("applies a material's own stencil beside a clip, defaults filled in", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    // Two unclipped siblings composing R-7's mask by hand, with *partial*
+    // structural records: every missing field takes §57's documented default
+    // — `always`, masks `0xff`, ops `keep`, and a missing `ref` reads 0.
+    const byHand = new TestMaterial();
+    byHand.stencil = { ref: 5 };
+    root.add(renderable(triangle(), byHand));
+    const refless = new TestMaterial();
+    refless.stencil = {};
+    root.add(renderable(triangle(), refless));
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).toContain('"stencilWriteMask":255');
+    // Mask (1), the by-hand ref (5), then back to 0 for the record naming
+    // none.
+    expect(stencilReferences(harness.gpu)).toEqual([1, 5, 0]);
+  });
+
+  it("applies a material stencil on a clipless frame — R-7's tier, WP-R1.7", () => {
+    const root = createRoot();
+    const byHand = new TestMaterial();
+    byHand.stencil = { func: "never", ref: 3 };
+    root.add(renderable(triangle(), byHand));
+    harness.renderer.render(root, [createView()]);
+
+    // R1.3's recorded residue, retired: the frame scan finds the material
+    // stencil, so the clipless frame allocates the stencil-carrying format,
+    // clears its planes per view, and bakes the test into the pipeline — no
+    // clip and no renderer option required (`wgpu-stencil.ts`).
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).toContain("depth24plus-stencil8");
+    expect(transcript).toContain('"stencilLoadOp":"load"');
+    expect(transcript).toContain('"compare":"never"');
+    expect(stencilReferences(harness.gpu)).toEqual([3]);
+  });
+
+  it("keeps a clipless off-screen frame's material stencil inert without the target option", () => {
+    // Off screen the attachment is fixed at allocation, so the answer stays
+    // the target's `stencil` option — GL's `stencilAttached`, exactly: a
+    // plain target leaves R-7's record inert, a stencilled one applies it.
+    const root = createRoot();
+    const byHand = new TestMaterial();
+    byHand.stencil = { func: "equal" };
+    root.add(renderable(triangle(), byHand));
+    const plain = new RenderTarget({ width: 32, height: 32 });
+    harness.renderer.render(root, [createView()], undefined, plain);
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(transcript).not.toContain("stencilFront");
+
+    harness.gpu.reset();
+    const stencilled = new RenderTarget({
+      width: 32,
+      height: 32,
+      stencil: true,
+    });
+    harness.renderer.render(root, [createView()], undefined, stencilled);
+    expect(harness.gpu.transcript().join("\n")).toContain('"compare":"equal"');
+  });
+
+  it("tests a clipped sprite against its clip's planes", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(new SpriteNode(triangle(), new TestSpriteMaterial()));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:sprite|"),
+    );
+    expect(label).toContain("|s:equal,1,0,");
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("clips a sprite subtree — the mask is coverage, not shading", () => {
+    const root = createRoot();
+    const panel = new SpriteNode(triangle(), new TestSpriteMaterial());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    // The sprite's mask draws through the flat unlit pipeline (one vertex
+    // buffer, no texture bind), then the sprite's own item draws textured.
+    const mask = pipelineDescriptor(harness.gpu, "|s:always,255,1,") as {
+      vertex: { buffers: unknown[] };
+    };
+    expect(mask.vertex.buffers).toHaveLength(1);
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("four:sprite|"),
+      ),
+    ).toBe(true);
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("draws the masks again in every view — a stencil buffer is per surface", () => {
+    harness.renderer.render(clippedScene(), [
+      createView({ id: "a", width: 0.5 }),
+      createView({ id: "b", x: 0.5, width: 0.5 }),
+    ]);
+    // Each view: clear, mask, panel, child.
+    expect(harness.gpu.countOf("pass.draw")).toBe(8);
+    // The reference returns to the mask bit at the second view's mask: the
+    // pass command survives across views, so the mirror re-issues only on
+    // change — [mask 1, content 1] twice collapses to one call.
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("reallocates the depth attachment when a scene stops clipping", () => {
+    harness.renderer.render(clippedScene(), [createView()]);
+    const clipless = createRoot();
+    clipless.add(renderable(triangle()));
+    harness.renderer.render(clipless, [createView()]);
+
+    const formats = harness.gpu
+      .callsOf("device.createTexture")
+      .map((call) => (call.args[0] as { format: string }).format);
+    expect(formats).toEqual(["depth24plus-stencil8", "depth24plus"]);
+    expect(harness.gpu.countOf("texture.destroy")).toBe(1);
+  });
+
+  it("counts mask draws in §84's statistics, like the GL backend", () => {
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    harness.renderer.render(clippedScene(), [createView()]);
+    // Mask, panel, child — the clear stays the backend's own.
+    expect(statistics.drawCalls).toBe(3);
+  });
+
+  it("draws an indexed clip node's mask through drawIndexed", () => {
+    const root = createRoot();
+    const panel = renderable(
+      new TestGeometry(
+        new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]),
+        new Uint16Array([0, 1, 2]),
+      ),
+    );
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+    // The mask and the panel's own item share the indexed geometry.
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(2);
+  });
+});
+
+describe("WebgpuRenderer batching (§65, WP-R1.3)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  /** Two triangles over one shared material — the smallest §65 run. */
+  function batchableScene(
+    material = new TestMaterial([0, 0, 1, 1]),
+  ): Renderable {
+    const root = createRoot();
+    root.add(renderable(triangle(), material));
+    root.add(renderable(triangle(), material));
+    return root;
+  }
+
+  it("merges a run into one drawIndexed through the batch pipeline", () => {
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(batchableScene(), [createView()]);
+
+    // The clear, then one merged draw for both triangles.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    expect(harness.gpu.callsOf("pass.drawIndexed")[0]?.args[0]).toBe(6);
+    expect(harness.gpu.callsOf("pass.setIndexBuffer")[0]?.args[1]).toBe(
+      "uint32",
+    );
+    expect(
+      pipelineLabels(harness.gpu).some((label) =>
+        label.startsWith("four:batch|"),
+      ),
+    ).toBe(true);
+    // The per-item geometry is never uploaded: the run draws from the
+    // uploader's own two buffers.
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(2);
+  });
+
+  it("uploads the identity model and the shared colour for the run", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestMaterial([0, 0.5, 1, 1]);
+    material.opacity = 0.5;
+    harness.renderer.render(batchableScene(material), [createView()]);
+
+    const data = uniformUpload(harness.gpu);
+    const stride = UNIFORM_STRIDE_BYTES / 4;
+    const model = stride + DRAW_MODEL_OFFSET / 4;
+    expect(data[model]).toBe(1);
+    expect(data[model + 5]).toBe(1);
+    expect(data[model + 12]).toBe(0);
+    const color = stride + DRAW_COLOR_OFFSET / 4;
+    expect(data.slice(color, color + 3)).toEqual([0, 0.5, 1]);
+    expect(data[color + 3]).toBeCloseTo(0.5);
+  });
+
+  it("records the identical frame when the batcher finds nothing to merge", async () => {
+    // One scene object, rendered by both renderers, so the geometry ids in
+    // the recorded upload labels are the same on both tapes.
+    const root = createRoot();
+    root.add(renderable(triangle(), new TestMaterial([1, 0, 0, 1])));
+    root.add(renderable(triangle(), new TestMaterial([0, 1, 0, 1])));
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(root, [createView()]);
+    const withBatcher = harness.gpu.transcript();
+
+    const plain = await initialized();
+    plain.renderer.render(root, [createView()]);
+    expect(withBatcher).toEqual(plain.gpu.transcript());
+  });
+
+  it("reuses each slot's buffers across frames", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const root = batchableScene();
+    harness.renderer.render(root, [createView()]);
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    // One uniform upload plus the slot's vertex and index streams.
+    expect(harness.gpu.countOf("queue.writeBuffer")).toBe(3);
+  });
+
+  it("merges a sprite run, tinted and textured at group 1", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestSpriteMaterial(new TestTexture(), [1, 0, 1, 1]);
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), material));
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    expect(label).toContain("|map|");
+    const groups = harness.gpu
+      .callsOf("pass.setBindGroup")
+      .map((call) => call.args[0]);
+    expect(groups).toContain(1);
+    const data = uniformUpload(harness.gpu);
+    const color = UNIFORM_STRIDE_BYTES / 4 + DRAW_COLOR_OFFSET / 4;
+    expect(data.slice(color, color + 4)).toEqual([1, 0, 1, 1]);
+  });
+
+  it("skips a sprite run whose texture will not resolve, whole", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestSpriteMaterial();
+    material.texture?.dispose();
+    const root = createRoot();
+    root.add(new SpriteNode(triangle(), material));
+    root.add(new SpriteNode(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+  });
+
+  it("merges a lines run under the line-list topology", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    const material = new TestMaterial();
+    const segment = (): TestGeometry =>
+      new TestGeometry(
+        new Float32Array([-0.5, 0, 0, 0.5, 0, 0]),
+        undefined,
+        "lines",
+      );
+    const root = createRoot();
+    root.add(renderable(segment(), material));
+    root.add(renderable(segment(), material));
+    harness.renderer.render(root, [createView()]);
+
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    expect(label).toContain("line-list");
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(0);
+  });
+
+  it("carries the run's clip record onto the merged draw (§67)", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestMaterial([1, 1, 0, 1]);
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle(), material));
+    panel.add(renderable(triangle(), material));
+    root.add(panel);
+    harness.renderer.render(root, [createView()]);
+
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    expect(label).toContain("|s:equal,1,0,");
+    expect(stencilReferences(harness.gpu)).toEqual([1]);
+  });
+
+  it("leaves an unclipped run stencil-free on a frame that clips elsewhere", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const material = new TestMaterial([0, 1, 1, 1]);
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    root.add(renderable(triangle(), material));
+    root.add(renderable(triangle(), material));
+    harness.renderer.render(root, [createView()]);
+
+    const label = pipelineLabels(harness.gpu).find((candidate) =>
+      candidate.startsWith("four:batch|"),
+    );
+    // Stencil-capable format, no stencil segment: the run tests nothing.
+    expect(label).toContain("depth24plus-stencil8");
+    expect(label).not.toContain("|s:");
+  });
+
+  it("counts one §84 draw call for the whole run", () => {
+    harness.renderer.batching = createWgpuBatching();
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+    harness.renderer.render(batchableScene(), [createView()]);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(2);
+  });
+
+  it("survives a reentrant dispose mid-frame, skipping every remaining draw", () => {
+    // `updateViewMatrix` is application code running inside the frame; §61
+    // forbids the frame to throw whatever it does — including tearing the
+    // renderer down. Every cache then answers null and every draw is skipped,
+    // which is the invariant the "unreachable" narrowings in the draw paths
+    // actually encode.
+    harness.renderer.batching = createWgpuBatching();
+    const root = batchableScene();
+    const camera = new TestCamera();
+    camera.updateViewMatrix = (): void => {
+      harness.renderer.dispose();
+    };
+    expect(() => {
+      harness.renderer.render(root, [createView({ camera: camera.asCamera })]);
+    }).not.toThrow();
+    expect(harness.gpu.countOf("pass.draw")).toBe(0);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+  });
+
+  it("destroys the uploader's buffers at dispose, on a live device", () => {
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(batchableScene(), [createView()]);
+    harness.gpu.reset();
+    harness.renderer.dispose();
+    // The uniform buffer plus the slot's vertex and index buffers.
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(3);
+  });
+
+  it("forgets the uploader's buffers on device loss, destroying nothing", async () => {
+    harness.renderer.batching = createWgpuBatching();
+    harness.renderer.render(batchableScene(), [createView()]);
+    harness.gpu.loseDevice();
+    await Promise.resolve();
+    await Promise.resolve();
+    harness.gpu.reset();
+    harness.renderer.dispose();
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(0);
+  });
+});
+
+/** §68's ambient carrier: a root that offers `Scene.ambientLight`'s shape. */
+class AmbientRoot extends Renderable {
+  ambientLight: [number, number, number];
+
+  constructor(ambient: [number, number, number] = [0, 0, 0]) {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    this.ambientLight = ambient;
+  }
+}
+
+/** §68's directional light, as the structural contract the collector reads. */
+class DirectionalLightNode extends Renderable {
+  readonly isDirectionalLight = true;
+
+  color: [number, number, number] = [1, 1, 1];
+
+  intensity = 1;
+
+  direction: [number, number, number] = [0, 0, -1];
+
+  constructor() {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+  }
+
+  getWorldDirection(out: Vector3): Vector3 {
+    return out.set(this.direction[0], this.direction[1], this.direction[2]);
+  }
+}
+
+/** §68's point light, structurally. */
+class PointLightNode extends Renderable {
+  readonly isPunctualLight = true;
+
+  readonly lightType: "point" | "spot" = "point";
+
+  color: [number, number, number] = [1, 1, 1];
+
+  intensity = 1;
+
+  range = 0;
+
+  worldPosition: [number, number, number] = [0, 0, 0];
+
+  constructor(position: [number, number, number] = [0, 0, 0]) {
+    super(
+      new TestGeometry(new Float32Array(0)).asGeometry,
+      new TestMaterial().asMaterial,
+    );
+    this.worldPosition = position;
+  }
+
+  getWorldPosition(out: Vector3): Vector3 {
+    return out.set(
+      this.worldPosition[0],
+      this.worldPosition[1],
+      this.worldPosition[2],
+    );
+  }
+}
+
+/** §68's spot light, structurally. */
+class SpotLightNode extends PointLightNode {
+  override readonly lightType: "point" | "spot" = "spot";
+
+  innerConeAngle = Math.PI / 8;
+
+  outerConeAngle = Math.PI / 4;
+
+  axis: [number, number, number] = [0, 0, -1];
+
+  getWorldDirection(out: Vector3): Vector3 {
+    return out.set(this.axis[0], this.axis[1], this.axis[2]);
+  }
+}
+
+/** §57's `LitMaterial`, reduced to the state the shaded arm reads (WP-R1.5). */
+class TestLitMaterial {
+  readonly kind: string = "lit";
+
+  readonly color: [number, number, number, number];
+
+  transparent?: boolean;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  depthTest?: boolean;
+
+  depthWrite?: boolean;
+
+  colorWrite?: boolean;
+
+  opacity?: number;
+
+  map?: TestTexture | null;
+
+  stencil?: TestStencil;
+
+  constructor(color: [number, number, number, number] = [1, 1, 1, 1]) {
+    this.color = color;
+  }
+
+  get asMaterial(): ItemMaterial {
+    return this as unknown as ItemMaterial;
+  }
+}
+
+/** §59's `StandardMaterial`, reduced the same way. */
+class TestStandardMaterial {
+  readonly kind: string = "standard";
+
+  readonly baseColor: [number, number, number, number];
+
+  metalness = 0;
+
+  roughness = 1;
+
+  emissive: [number, number, number] = [0, 0, 0];
+
+  transparent?: boolean;
+
+  blendMode?: "normal" | "additive" | "multiply" | "screen";
+
+  opacity?: number;
+
+  map?: TestTexture | null;
+
+  constructor(baseColor: [number, number, number, number] = [1, 1, 1, 1]) {
+    this.baseColor = baseColor;
+  }
+
+  get asMaterial(): ItemMaterial {
+    return this as unknown as ItemMaterial;
+  }
+}
+
+/** A triangle carrying the normal stream the shaded variants transform. */
+function litTriangle(): TestGeometry {
+  const geometry = triangle();
+  geometry.normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  return geometry;
+}
+
+/** The frame's lights upload — the last `writeBuffer` of a shaded frame. */
+function lightsUpload(gpu: RecordingGpu): { floats: number[]; size: number } {
+  const uploads = gpu.callsOf("queue.writeBuffer");
+  const last = uploads[uploads.length - 1];
+  if (last === undefined) {
+    throw new Error("the frame uploaded nothing");
+  }
+  return { floats: last.args[2] as number[], size: last.args[4] as number };
+}
+
+/** One vec4 slot of a light block, by block index and byte offset. */
+function lightSlot(
+  floats: number[],
+  block: number,
+  byteOffset: number,
+): number[] {
+  const base = block * LIGHT_UNIFORM_STRIDE_FLOATS + byteOffset / 4;
+  return floats.slice(base, base + 4);
+}
+
+/** The frame's draw-uniform upload on a shaded frame — second to last. */
+function drawUniformUpload(gpu: RecordingGpu): number[] {
+  const uploads = gpu.callsOf("queue.writeBuffer");
+  const call = uploads[uploads.length - 2];
+  if (call === undefined) {
+    throw new Error("the frame uploaded no draw uniforms");
+  }
+  return call.args[2] as number[];
+}
+
+/** The labels of every buffer the tape allocated, in order. */
+function bufferLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createBuffer")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/** The labels of every bind-group layout the tape declared, in order. */
+function layoutLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createBindGroupLayout")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/** The labels of every WGSL module the tape compiled, in order. */
+function moduleLabels(gpu: RecordingGpu): string[] {
+  return gpu
+    .callsOf("device.createShaderModule")
+    .map((call) => String((call.args[0] as { label?: string }).label));
+}
+
+/** Every `setBindGroup` at `index`, as its dynamic-offset arrays. */
+function bindGroupOffsets(gpu: RecordingGpu, index: number): unknown[] {
+  return gpu
+    .callsOf("pass.setBindGroup")
+    .filter((call) => call.args[0] === index)
+    .map((call) => call.args[2]);
+}
+
+describe("WebgpuRenderer shading (§68, §59, WP-R1.5)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("records the byte-identical frame for an unshaded scene, normals or not", async () => {
+    // The packet's byte-identity claim, made mechanically: the same unlit
+    // scene over the same-id geometry — one copy carrying a normal stream,
+    // one not — records the identical transcript, because nothing unshaded
+    // ever touches normals, lights, or the standard block.
+    const render = async (withNormals: boolean): Promise<string[]> => {
+      const rig = await initialized();
+      const geometry = withNormals ? litTriangle() : triangle();
+      (geometry as unknown as { id: string }).id = "shared-identity";
+      const root = createRoot();
+      root.add(renderable(geometry));
+      rig.renderer.render(root, [createView()]);
+      return rig.gpu.transcript();
+    };
+    expect(await render(true)).toEqual(await render(false));
+  });
+
+  it("draws a lit item through the lit pipeline with the light block at group 1", () => {
+    const root = new AmbientRoot([0.1, 0.2, 0.3]);
+    const sun = new DirectionalLightNode();
+    sun.color = [1, 0.5, 0.25];
+    sun.intensity = 2;
+    sun.direction = [0, -1, 0];
+    root.add(sun);
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+    expect(moduleLabels(harness.gpu)).toContain("four:lit|n");
+    // The lazy lights subsystem: one layout, one buffer, one bind group.
+    expect(
+      layoutLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+    // The normal stream uploaded for the shaded draw, in GL's order.
+    expect(
+      bufferLabels(harness.gpu).some((label) =>
+        label.startsWith("four:normals:"),
+      ),
+    ).toBe(true);
+    // The draw binds the view's block at group 1, offset 0.
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0]]);
+
+    // The block's contents: ambient, direction, premultiplied colour, count.
+    const { floats, size } = lightsUpload(harness.gpu);
+    expect(size).toBe(LIGHT_UNIFORM_STRIDE_FLOATS);
+    expect(lightSlot(floats, 0, LIGHT_AMBIENT_OFFSET)).toEqual([
+      Math.fround(0.1),
+      Math.fround(0.2),
+      Math.fround(0.3),
+      0,
+    ]);
+    expect(lightSlot(floats, 0, LIGHT_DIRECTION_OFFSET)).toEqual([0, -1, 0, 0]);
+    expect(lightSlot(floats, 0, LIGHT_COLOR_OFFSET)).toEqual([2, 1, 0.5, 0]);
+    expect(lightSlot(floats, 0, LIGHT_COUNTS_OFFSET)).toEqual([0, 0, 0, 0]);
+  });
+
+  it("shades a normal-less geometry through the normal-less variant", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(triangle().asGeometry, new TestLitMaterial().asMaterial),
+    );
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("four:lit");
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.endsWith("|n:-")),
+    ).toBe(true);
+    expect(
+      bufferLabels(harness.gpu).some((label) =>
+        label.startsWith("four:normals:"),
+      ),
+    ).toBe(false);
+    // One vertex buffer bound: position alone, slot 0.
+    expect(harness.gpu.countOf("pass.setVertexBuffer")).toBe(1);
+  });
+
+  it("samples §57's map at group 2 over the uv stream", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestLitMaterial();
+    material.map = new TestTexture();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+
+    expect(moduleLabels(harness.gpu)).toContain("four:lit|n|map");
+    // position, normal, uv — three slots, one counter.
+    expect(
+      harness.gpu.callsOf("pass.setVertexBuffer").map((call) => call.args[0]),
+    ).toEqual([0, 1, 2]);
+    // The texture rides group 2 on the shaded families; group 1 is lights.
+    expect(bindGroupOffsets(harness.gpu, 2)).toHaveLength(1);
+    expect(mapAllocations(harness.gpu)).toBe(1);
+  });
+
+  it("skips a lit draw whose named texture will not resolve (§83)", () => {
+    const root = createRoot();
+    const geometry = litTriangle();
+    geometry.uvs = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+    const material = new TestLitMaterial();
+    material.map = new TestTexture();
+    material.map.dispose();
+    root.add(new Renderable(geometry.asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    // The clear alone drew.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+  });
+
+  it("degrades a mapped lit draw without uvs to the untextured variant", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    material.map = new TestTexture();
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(moduleLabels(harness.gpu)).toContain("four:lit|n");
+    expect(mapAllocations(harness.gpu)).toBe(0);
+    expect(harness.gpu.countOf("pass.draw")).toBe(2);
+  });
+
+  it("carries §57's state and opacity into the lit pipeline and block", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial([0.5, 0.25, 0.125, 0.8]);
+    material.transparent = true;
+    material.blendMode = "additive";
+    material.depthWrite = false;
+    material.opacity = 0.5;
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+
+    harness.renderer.render(root, [createView()]);
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:lit|-|-|additive|dt|-|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+    const floats = drawUniformUpload(harness.gpu);
+    const colorBase = UNIFORM_STRIDE_BYTES / 4 + DRAW_COLOR_OFFSET / 4;
+    expect(floats.slice(colorBase, colorBase + 4)).toEqual([
+      0.5,
+      0.25,
+      0.125,
+      Math.fround(0.8 * 0.5),
+    ]);
+  });
+
+  it("draws a standard item through the widened block and its own group 0", () => {
+    const root = createRoot();
+    const material = new TestStandardMaterial([0.5, 0.25, 0.125, 1]);
+    material.metalness = 0.75;
+    material.roughness = 0.3;
+    material.emissive = [0.01, 0.02, 0.03];
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    const view = createView();
+    const camera = view.camera as unknown as TestCamera;
+    camera.transform.worldMatrix.elements[12] = 1;
+    camera.transform.worldMatrix.elements[13] = 2;
+    camera.transform.worldMatrix.elements[14] = 3;
+
+    harness.renderer.render(root, [view]);
+
+    expect(moduleLabels(harness.gpu)).toContain("four:standard|n");
+    expect(
+      layoutLabels(harness.gpu).filter(
+        (label) => label === "four:standard-uniforms",
+      ),
+    ).toHaveLength(1);
+    // §59's two extra vec4s, in the block's spare stride bytes.
+    const floats = drawUniformUpload(harness.gpu);
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(floats.slice(base + 32, base + 36)).toEqual([0.5, 0.25, 0.125, 1]);
+    expect(
+      floats.slice(
+        base + STANDARD_EMISSIVE_OFFSET / 4,
+        base + STANDARD_EMISSIVE_OFFSET / 4 + 4,
+      ),
+    ).toEqual([Math.fround(0.01), Math.fround(0.02), Math.fround(0.03), 0]);
+    expect(
+      floats.slice(
+        base + STANDARD_SURFACE_OFFSET / 4,
+        base + STANDARD_SURFACE_OFFSET / 4 + 4,
+      ),
+    ).toEqual([0.75, Math.fround(0.3), 0, 0]);
+    // The eye rides the light block, for the specular lobe.
+    const { floats: lightFloats } = lightsUpload(harness.gpu);
+    expect(lightSlot(lightFloats, 0, LIGHT_CAMERA_OFFSET)).toEqual([
+      1, 2, 3, 0,
+    ]);
+  });
+
+  it("packs the punctual set exactly as the GL backend selects it (§68, §84)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const root = createRoot();
+      for (let index = 0; index < 9; index += 1) {
+        const light = new PointLightNode([index + 1, 0, 0]);
+        light.color = [1, 0, 0];
+        light.intensity = 2;
+        light.range = 20;
+        root.add(light);
+      }
+      const spot = new SpotLightNode([0, 5, 0]);
+      spot.range = 10;
+      root.add(spot);
+      root.add(
+        new Renderable(
+          litTriangle().asGeometry,
+          new TestLitMaterial().asMaterial,
+        ),
+      );
+
+      harness.renderer.render(root, [createView()]);
+
+      const { floats } = lightsUpload(harness.gpu);
+      // Nine points and a spot arrived; the first eight in scene order win —
+      // the spot, tenth, is dropped with the ninth point (the GL rule).
+      expect(lightSlot(floats, 0, LIGHT_COUNTS_OFFSET)).toEqual([8, 0, 0, 0]);
+      expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_POSITION_OFFSET)).toEqual([
+        1, 0, 0, 0,
+      ]);
+      expect(
+        lightSlot(floats, 0, LIGHT_PUNCTUAL_POSITION_OFFSET + 7 * 16),
+      ).toEqual([8, 0, 0, 0]);
+      expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_COLOR_OFFSET)).toEqual([
+        2, 0, 0, 0,
+      ]);
+      expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_PARAMS_OFFSET)).toEqual([
+        20, 0, 0, 0,
+      ]);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("packs a spot light's cone the way `SceneLights` precomputes it", () => {
+    const root = createRoot();
+    const spot = new SpotLightNode([0, 5, 0]);
+    spot.color = [0, 1, 0];
+    spot.intensity = 3;
+    spot.range = 10;
+    spot.axis = [0, -1, 0];
+    root.add(spot);
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+
+    harness.renderer.render(root, [createView()]);
+    const { floats } = lightsUpload(harness.gpu);
+    expect(lightSlot(floats, 0, LIGHT_COUNTS_OFFSET)).toEqual([1, 0, 0, 0]);
+    expect(lightSlot(floats, 0, LIGHT_PUNCTUAL_DIRECTION_OFFSET)).toEqual([
+      0, -1, 0, 0,
+    ]);
+    const params = lightSlot(floats, 0, LIGHT_PUNCTUAL_PARAMS_OFFSET);
+    expect(params[0]).toBe(10);
+    expect(params[1]).toBeCloseTo(Math.cos(Math.PI / 4), 5);
+    expect(params[2]).toBeCloseTo(
+      1 / (Math.cos(Math.PI / 8) - Math.cos(Math.PI / 4)),
+      4,
+    );
+    expect(params[3]).toBe(1);
+  });
+
+  it("writes one light block per rendered view, at strided offsets", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    const first = createView();
+    const second = createView();
+    const camera = second.camera as unknown as TestCamera;
+    camera.transform.worldMatrix.elements[12] = 5;
+    camera.transform.worldMatrix.elements[13] = 6;
+    camera.transform.worldMatrix.elements[14] = 7;
+
+    harness.renderer.render(root, [first, second]);
+
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([
+      [0],
+      [LIGHT_UNIFORM_STRIDE_BYTES],
+    ]);
+    const { floats, size } = lightsUpload(harness.gpu);
+    expect(size).toBe(2 * LIGHT_UNIFORM_STRIDE_FLOATS);
+    expect(lightSlot(floats, 0, LIGHT_CAMERA_OFFSET)).toEqual([0, 0, 0, 0]);
+    expect(lightSlot(floats, 1, LIGHT_CAMERA_OFFSET)).toEqual([5, 6, 7, 0]);
+  });
+
+  it("leaves no gap for a zero-area view's light block", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    harness.renderer.render(root, [createView({ width: 0 }), createView()]);
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0]]);
+    expect(lightsUpload(harness.gpu).size).toBe(LIGHT_UNIFORM_STRIDE_FLOATS);
+  });
+
+  it("reuses the lights buffer across frames and grows it for more views", () => {
+    const root = createRoot();
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    harness.renderer.render(root, [createView()]);
+    harness.renderer.render(root, [createView()]);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+
+    // A fifth view exceeds the four-block floor: the buffer regrows once and
+    // the old allocation is destroyed.
+    const views = [
+      createView(),
+      createView(),
+      createView(),
+      createView(),
+      createView(),
+    ];
+    harness.renderer.render(root, views);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(2);
+    expect(lightsUpload(harness.gpu).size).toBe(
+      5 * LIGHT_UNIFORM_STRIDE_FLOATS,
+    );
+  });
+
+  it("recreates the standard bind group after a uniform regrowth", () => {
+    const standardScene = (count: number): Renderable => {
+      const root = createRoot();
+      for (let index = 0; index < count; index += 1) {
+        root.add(
+          new Renderable(
+            litTriangle().asGeometry,
+            new TestStandardMaterial().asMaterial,
+          ),
+        );
+      }
+      return root;
+    };
+    harness.renderer.render(standardScene(1), [createView()]);
+    // 21 blocks exceed the 16-block floor: the buffer regrows, the standard
+    // bind group pointed at the destroyed buffer, and the next standard draw
+    // recreates it.
+    harness.renderer.render(standardScene(20), [createView()]);
+    const standardGroups = harness.gpu
+      .callsOf("device.createBindGroup")
+      .filter(
+        (call) =>
+          (call.args[0] as { label?: string }).label ===
+          "four:standard-uniforms",
+      );
+    expect(standardGroups).toHaveLength(2);
+  });
+
+  it("survives a reentrant dispose inside a material accessor (§61)", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    let dispose: () => void = () => undefined;
+    Object.defineProperty(material, "map", {
+      get: (): null => {
+        dispose();
+        return null;
+      },
+    });
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The clear drew; the lit draw — and the lights upload — were skipped.
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("survives a reentrant dispose inside a stencil accessor on a clipping frame", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(renderable(triangle()));
+    root.add(panel);
+    const material = new TestLitMaterial();
+    let dispose: () => void = () => undefined;
+    Object.defineProperty(material, "stencil", {
+      get: (): undefined => {
+        dispose();
+        return undefined;
+      },
+    });
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The lit pipeline was never created: the cache was disposed by the time
+    // the arm asked it.
+    expect(
+      pipelineLabels(harness.gpu).some((label) => label.includes("four:lit")),
+    ).toBe(false);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("bakes §67's clip into a shaded pipeline and sets its reference", () => {
+    const root = createRoot();
+    const panel = renderable(triangle());
+    panel.clip = true;
+    panel.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    root.add(panel);
+
+    harness.renderer.render(root, [createView()]);
+    const clippedLit = pipelineLabels(harness.gpu).find(
+      (label) => label.includes("four:lit") && label.includes("|s:equal"),
+    );
+    expect(clippedLit).toBeDefined();
+    expect(clippedLit).toContain("|n:y");
+    expect(stencilReferences(harness.gpu).length).toBeGreaterThan(0);
+  });
+
+  it("blends a transparent lit draw with the normal mode by default", () => {
+    const root = createRoot();
+    const material = new TestLitMaterial();
+    material.transparent = true;
+    root.add(new Renderable(litTriangle().asGeometry, material.asMaterial));
+    harness.renderer.render(root, [createView()]);
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:lit|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+  });
+
+  it("draws an indexed lit geometry through drawIndexed and counts §84", () => {
+    const root = createRoot();
+    const geometry = new TestGeometry(
+      new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]),
+      new Uint16Array([0, 1, 2]),
+    );
+    geometry.normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    root.add(
+      new Renderable(geometry.asGeometry, new TestLitMaterial().asMaterial),
+    );
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+
+    harness.renderer.render(root, [createView()]);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(1);
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.triangles).toBe(1);
+  });
+
+  it("mixes the two shaded families over one light block and one collect", () => {
+    const root = new AmbientRoot([0.2, 0.2, 0.2]);
+    root.add(new DirectionalLightNode());
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestStandardMaterial().asMaterial,
+      ),
+    );
+
+    harness.renderer.render(root, [createView()]);
+    expect(
+      bufferLabels(harness.gpu).filter((label) => label === "four:lights"),
+    ).toHaveLength(1);
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([[0], [0]]);
+    expect(moduleLabels(harness.gpu)).toEqual(
+      expect.arrayContaining(["four:lit|n", "four:standard|n"]),
+    );
+  });
+});
+
+/**
+ * §69's casting directional light — the structural triple `collectSceneLights`
+ * checks (`castShadow`, a `shadow` record, `computeShadowMatrix`).
+ */
+class CastingLightNode extends DirectionalLightNode {
+  override castShadow = true;
+
+  shadow = { mapSize: 256, bias: 0.004, normalBias: 0.01 };
+
+  computeShadowMatrix(out: Matrix4): Matrix4 {
+    out.identity();
+    return out;
+  }
+}
+
+/** A lit triangle plus a casting light — the smallest shadowed scene. */
+function shadowedScene(): {
+  root: Renderable;
+  light: CastingLightNode;
+  receiver: Renderable;
+} {
+  const root = createRoot();
+  const light = new CastingLightNode();
+  root.add(light);
+  const receiver = new Renderable(
+    litTriangle().asGeometry,
+    new TestLitMaterial().asMaterial,
+  );
+  root.add(receiver);
+  return { root, light, receiver };
+}
+
+/** The recorded render-pass descriptors, in order. */
+function passDescriptors(gpu: RecordingGpu): {
+  label?: string;
+  colorAttachments?: { loadOp?: string }[];
+  depthStencilAttachment?: {
+    depthLoadOp?: string;
+    depthClearValue?: number;
+    stencilLoadOp?: string;
+  };
+}[] {
+  return gpu.callsOf("encoder.beginRenderPass").map(
+    (call) =>
+      call.args[0] as {
+        label?: string;
+        colorAttachments?: { loadOp?: string }[];
+        depthStencilAttachment?: {
+          depthLoadOp?: string;
+          depthClearValue?: number;
+          stencilLoadOp?: string;
+        };
+      },
+  );
+}
+
+describe("WebgpuRenderer shadows (§69, WP-R1.7)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("keeps a shadowless lit frame free of every shadow spelling", () => {
+    // The byte-identity contract, asserted from the shadowless side: a lit
+    // scene whose light does not cast records one render pass and not one
+    // shadow allocation, module, layout, sampler, or key segment.
+    const root = createRoot();
+    root.add(new DirectionalLightNode());
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestLitMaterial().asMaterial,
+      ),
+    );
+    harness.renderer.render(root, [createView()]);
+
+    const transcript = harness.gpu.transcript().join("\n");
+    expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(1);
+    expect(transcript).not.toContain("four:shadow");
+    expect(transcript).not.toContain("sampler_comparison");
+    expect(transcript).not.toContain("|sh:y");
+    expect(harness.gpu.countOf("device.createSampler")).toBe(0);
+  });
+
+  it("records the caster pass before the views pass, into the samplable target", () => {
+    const { root } = shadowedScene();
+    harness.renderer.render(root, [createView()]);
+
+    // Two passes on one encoder, shadow first — §63's own stage order —
+    // with the map's whole-attachment depth clear (the one legitimate
+    // depthLoadOp: "clear" outside the mip blits) and a loading colour
+    // attachment nothing reads.
+    const passes = passDescriptors(harness.gpu);
+    expect(passes.map((pass) => pass.label)).toEqual([
+      "four:shadow",
+      "four:views",
+    ]);
+    expect(passes[0].depthStencilAttachment).toEqual({
+      view: expect.anything() as unknown,
+      depthLoadOp: "clear",
+      depthClearValue: 1,
+      depthStoreOp: "store",
+    });
+    expect(passes[0].colorAttachments?.[0]?.loadOp).toBe("load");
+
+    // The target rides the R1.6 cache: a depthTexture row, so the depth
+    // format is the samplable depth32float with TEXTURE_BINDING usage.
+    const depthAllocation = harness.gpu
+      .callsOf("device.createTexture")
+      .map(
+        (call) =>
+          call.args[0] as { label?: string; format?: string; usage?: number },
+      )
+      .find((descriptor) =>
+        String(descriptor.label).startsWith("four:render-target-depth:"),
+      );
+    expect(depthAllocation?.format).toBe("depth32float");
+    expect((depthAllocation?.usage ?? 0) & 0x04).toBe(0x04);
+
+    // The caster drew through the one shadow pipeline over the shared
+    // one-group layout, at the shadow target's own formats.
+    expect(moduleLabels(harness.gpu)).toContain("four:shadow");
+    expect(pipelineLabels(harness.gpu)).toContain(
+      "four:shadow|-|-|none|dt|dw|cw|triangle-list|rgba8unorm|depth32float",
+    );
+  });
+
+  it("packs the light block's shadow tail per view, and zeros it shadowless", () => {
+    const { root, light } = shadowedScene();
+    harness.renderer.render(root, [createView()]);
+    const { floats, size } = lightsUpload(harness.gpu);
+    // The upload covers the stride, shadow tail included.
+    expect(size).toBe(LIGHT_UNIFORM_STRIDE_FLOATS);
+    const matrix = SHADOW_MATRIX_OFFSET / 4;
+    expect(floats.slice(matrix, matrix + 4)).toEqual([1, 0, 0, 0]);
+    const params = floats.slice(
+      SHADOW_PARAMS_OFFSET / 4,
+      SHADOW_PARAMS_OFFSET / 4 + 4,
+    );
+    expect(params[0]).toBe(Math.fround(0.004));
+    expect(params[1]).toBe(Math.fround(0.01));
+    expect(params[2]).toBe(Math.fround(1 / 256));
+    expect(params[3]).toBe(0);
+
+    // The same scene with the cast switched off zeroes the tail on the very
+    // next frame — the uploaded stride is a function of this frame alone.
+    light.castShadow = false;
+    harness.gpu.reset();
+    harness.renderer.render(root, [createView()]);
+    const shadowless = lightsUpload(harness.gpu).floats;
+    for (let index = 0; index < 20; index += 1) {
+      expect(shadowless[matrix + index]).toBe(0);
+    }
+  });
+
+  it("gives a receiving draw the |sh:y variant and the widened group; a non-receiver shares the plain pipeline", () => {
+    const { root } = shadowedScene();
+    const optOut = new Renderable(
+      litTriangle().asGeometry,
+      new TestLitMaterial().asMaterial,
+    );
+    optOut.receiveShadow = false;
+    root.add(optOut);
+    root.add(
+      new Renderable(
+        litTriangle().asGeometry,
+        new TestStandardMaterial().asMaterial,
+      ),
+    );
+    harness.renderer.render(root, [createView()]);
+
+    const labels = pipelineLabels(harness.gpu);
+    // The receiver's variant, the opt-out's plain landed pipeline (same key
+    // a shadowless frame compiles), and the standard receiver's variant.
+    expect(labels).toContain(
+      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y|sh:y",
+    );
+    expect(labels).toContain(
+      "four:lit|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y",
+    );
+    expect(labels).toContain(
+      "four:standard|-|-|none|dt|dw|cw|triangle-list|bgra8unorm|depth24plus|n:y|sh:y",
+    );
+    expect(moduleLabels(harness.gpu)).toEqual(
+      expect.arrayContaining([
+        "four:lit|n|sh",
+        "four:lit|n",
+        "four:standard|n|sh",
+      ]),
+    );
+
+    // One widened layout, one comparison sampler, one shadow group — over
+    // the same lights buffer the plain group binds.
+    expect(
+      layoutLabels(harness.gpu).filter(
+        (label) => label === "four:shadow-lights",
+      ),
+    ).toHaveLength(1);
+    expect(harness.gpu.countOf("device.createSampler")).toBe(1);
+    const shadowGroups = harness.gpu
+      .callsOf("device.createBindGroup")
+      .map((call) => call.args[0] as { label?: string; entries: unknown[] })
+      .filter((descriptor) => descriptor.label === "four:shadow-lights");
+    expect(shadowGroups).toHaveLength(1);
+    expect(shadowGroups[0].entries).toHaveLength(3);
+    expect(
+      (shadowGroups[0].entries[0] as { resource: { size?: number } }).resource
+        .size,
+    ).toBe(SHADOW_LIGHT_UNIFORM_BYTES);
+  });
+
+  it("excludes sprites, opted-out casters, and undrawable kinds from the pass", () => {
+    const { root } = shadowedScene();
+    const optOut = renderable(triangle());
+    optOut.castShadow = false;
+    root.add(optOut);
+    root.add(new SpriteNode(texturedTriangle(), new TestSpriteMaterial()));
+    // A skinned item — transcript-invisible on this backend (WP-R1.4), and
+    // its shadow with it (an invisible surface must not cast).
+    const skinnedGeometry = litTriangle();
+    skinnedGeometry.joints = new Uint16Array(12);
+    skinnedGeometry.weights = new Float32Array(12).fill(0.25);
+    const skinned = renderable(skinnedGeometry);
+    (skinned as unknown as { skeleton: unknown }).skeleton = {
+      update: (): void => {},
+      jointMatrices: new Float32Array(16),
+      bones: [null],
+    };
+    root.add(skinned);
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+
+    harness.renderer.render(root, [createView()]);
+
+    // The shadow pass drew exactly one caster: the lit receiver. Everything
+    // between the two beginRenderPass lines is the caster pass's tape.
+    const names = harness.gpu.calls.map((call) => call.name);
+    const shadowStart = names.indexOf("encoder.beginRenderPass");
+    const viewsStart = names.indexOf(
+      "encoder.beginRenderPass",
+      shadowStart + 1,
+    );
+    const casterDraws = names
+      .slice(shadowStart, viewsStart)
+      .filter((name) => name === "pass.draw" || name === "pass.drawIndexed");
+    expect(casterDraws).toHaveLength(1);
+  });
+
+  it("reallocates the map and rebuilds the shadow group when mapSize changes", () => {
+    const { root, light } = shadowedScene();
+    harness.renderer.render(root, [createView()]);
+    harness.renderer.render(root, [createView()]);
+    // A steady mapSize allocates once and reuses the group.
+    const shadowGroupCount = (): number =>
+      harness.gpu
+        .callsOf("device.createBindGroup")
+        .filter(
+          (call) =>
+            (call.args[0] as { label?: string }).label === "four:shadow-lights",
+        ).length;
+    expect(shadowGroupCount()).toBe(1);
+
+    light.shadow = { mapSize: 512, bias: 0.004, normalBias: 0.01 };
+    harness.renderer.render(root, [createView()]);
+    // The resize bumped the target's version: the cache reallocated on this
+    // frame, and the receiving group was rebuilt against the new depth view.
+    expect(shadowGroupCount()).toBe(2);
+    const depthAllocations = harness.gpu
+      .callsOf("device.createTexture")
+      .map((call) => call.args[0] as { label?: string; size?: number[] })
+      .filter((descriptor) =>
+        String(descriptor.label).startsWith("four:render-target-depth:"),
+      );
+    expect(depthAllocations.map((descriptor) => descriptor.size)).toEqual([
+      [256, 256],
+      [512, 512],
+    ]);
+  });
+
+  it("draws the map once per frame, shared by every view", () => {
+    const { root } = shadowedScene();
+    harness.renderer.render(root, [
+      createView({ id: "a", width: 0.5 }),
+      createView({ id: "b", x: 0.5, width: 0.5 }),
+    ]);
+    // One caster pass, two view rectangles: the map is frame state.
+    expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(2);
+    expect(bindGroupOffsets(harness.gpu, 1)).toEqual([
+      [0],
+      [LIGHT_UNIFORM_STRIDE_BYTES],
+    ]);
+  });
+
+  it("survives a reentrant dispose inside the frame's stencil scan (§61)", () => {
+    // The WP-R1.7 scan reads material accessors before anything is recorded
+    // — application code, which can do anything, including tearing the
+    // renderer down. The frame must bail without throwing and without
+    // resurrecting one allocation onto the dead device (the R1.6 rule).
+    const { root } = shadowedScene();
+    const material = new TestMaterial();
+    let dispose: () => void = () => undefined;
+    Object.defineProperty(material, "stencil", {
+      get: (): undefined => {
+        dispose();
+        return undefined;
+      },
+    });
+    root.add(renderable(triangle(), material));
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    expect(harness.gpu.countOf("pass.draw")).toBe(0);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(0);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("survives a reentrant dispose inside a light's shadow accessor (§61)", () => {
+    // `collectSceneLights` reads the light's `shadow` record — application
+    // code too. A small scene's frame then finds its uniform bind group
+    // dropped and skips before recording anything.
+    const { root, light } = shadowedScene();
+    let dispose: () => void = () => undefined;
+    const record = { mapSize: 256, bias: 0.004, normalBias: 0.01 };
+    Object.defineProperty(light, "shadow", {
+      get: (): typeof record => {
+        dispose();
+        return record;
+      },
+    });
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    expect(harness.gpu.countOf("encoder.beginRenderPass")).toBe(0);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("costs a torn-down frame its shadows when the map cannot be produced (§61)", () => {
+    // The same reentrant teardown on a frame large enough to regrow its
+    // uniform buffer: the frame proceeds to the caster pass, the disposed
+    // target cache answers null, and the frame loses its shadows — and its
+    // draws, since every other cache is gone too — without throwing.
+    const { root, light } = shadowedScene();
+    for (let index = 0; index < 9; index += 1) {
+      root.add(
+        new Renderable(
+          litTriangle().asGeometry,
+          new TestLitMaterial().asMaterial,
+        ),
+      );
+    }
+    let dispose: () => void = () => undefined;
+    const record = { mapSize: 256, bias: 0.004, normalBias: 0.01 };
+    Object.defineProperty(light, "shadow", {
+      get: (): typeof record => {
+        dispose();
+        return record;
+      },
+    });
+    dispose = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(root, [createView()]);
+    }).not.toThrow();
+    // The encoder opened only the views pass: the shadow pass returned
+    // before beginning, because its target could not be acquired.
+    expect(passDescriptors(harness.gpu).map((pass) => pass.label)).toEqual([
+      "four:views",
+    ]);
+    expect(harness.gpu.countOf("pass.draw")).toBe(0);
+  });
+
+  it("casts an indexed caster through drawIndexed", () => {
+    const { root } = shadowedScene();
+    const geometry = new TestGeometry(
+      new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]),
+      new Uint16Array([0, 1, 2]),
+    );
+    root.add(renderable(geometry));
+    harness.renderer.render(root, [createView()]);
+    // Caster pass: one plain draw (the lit receiver) and one indexed; views
+    // pass repeats both plus the clear.
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(2);
+  });
+
+  it("disposes the shadow target with the renderer (§83)", () => {
+    const { root } = shadowedScene();
+    harness.renderer.render(root, [createView()]);
+    harness.renderer.dispose();
+    // The map's two textures die with the target cache; a second dispose is
+    // the usual no-op.
+    const destroyed = harness.gpu.countOf("texture.destroy");
+    expect(destroyed).toBeGreaterThanOrEqual(2);
+    harness.renderer.dispose();
+    expect(harness.gpu.countOf("texture.destroy")).toBe(destroyed);
+  });
+
+  it("renders the map for an off-screen frame too, at the target's formats", () => {
+    const { root } = shadowedScene();
+    const target = new RenderTarget({ width: 64, height: 64 });
+    harness.renderer.render(root, [createView()], undefined, target);
+
+    const passes = passDescriptors(harness.gpu);
+    expect(passes.map((pass) => pass.label)).toEqual([
+      "four:shadow",
+      "four:views",
+    ]);
+    // The caster pipeline keeps the map's own formats; the receiver bakes
+    // the off-screen colour format — two families, two format tuples.
+    const labels = pipelineLabels(harness.gpu);
+    expect(labels).toContain(
+      "four:shadow|-|-|none|dt|dw|cw|triangle-list|rgba8unorm|depth32float",
+    );
+    expect(
+      labels.some(
+        (label) =>
+          label.startsWith("four:lit") &&
+          label.includes("|rgba8unorm|") &&
+          label.endsWith("|sh:y"),
+      ),
+    ).toBe(true);
+  });
+
+  it("drops the shadow group with a lights-buffer regrowth and rebuilds it", () => {
+    const { root } = shadowedScene();
+    harness.renderer.render(root, [createView()]);
+    // Five views exceed the four-block floor: the lights buffer regrows,
+    // the shadow group pointed at the destroyed buffer, and the next
+    // receiving draw recreates it.
+    harness.renderer.render(root, [
+      createView({ id: "a" }),
+      createView({ id: "b" }),
+      createView({ id: "c" }),
+      createView({ id: "d" }),
+      createView({ id: "e" }),
+    ]);
+    const shadowGroups = harness.gpu
+      .callsOf("device.createBindGroup")
+      .filter(
+        (call) =>
+          (call.args[0] as { label?: string }).label === "four:shadow-lights",
+      );
+    expect(shadowGroups).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Particles (§36, §64 stage 6, WP-R1.8).
+//
+// The emitting node is a double for the GL suite's recorded reason:
+// `@four/particles`' `ParticleRenderable` is outside this package's dependency
+// matrix — and, by design, outside `@four/render`'s too. What `buildRenderList`
+// recognises is the *structural* `ParticleDrawable` contract, so a double
+// implementing that contract is not a shortcut here: it is the contract,
+// exercised exactly as the real class is (the real class runs in
+// `tests/integration/webgpu-particles.test.ts`).
+// ---------------------------------------------------------------------------
+
+type RenderNode = Parameters<Renderer["render"]>[0];
+
+let nextTestParticlesId = 0;
+
+/**
+ * A particle system node reduced to what the render list reads — the GL
+ * suite's double, minus the interpolated-path transform members these tests
+ * never touch. Particle `i` sits at `(i, i + 0.5, 0)` with size `i + 1` and
+ * colour `(i, 0, 0, 0.5)`, so an upload assertion can name its floats.
+ */
+class TestParticles {
+  readonly isParticleDrawable = true;
+
+  readonly id: string;
+
+  readonly parent = null;
+
+  readonly children: unknown[] = [];
+
+  visible = true;
+
+  enabled = true;
+
+  renderLayer = 0;
+
+  renderOrder = 0;
+
+  particleCount: number;
+
+  /** Mutable so a capacity-growth test can swap in a larger array. */
+  particleInstances: Float32Array;
+
+  /** Calls to `updateParticleInstances` — the list owes exactly one per build. */
+  updateCalls = 0;
+
+  readonly transform = { worldMatrix: new Matrix4() };
+
+  constructor(capacity: number, count = capacity) {
+    nextTestParticlesId += 1;
+    this.id = `test-particles-${String(nextTestParticlesId)}`;
+    this.particleInstances = new Float32Array(
+      capacity * PARTICLE_INSTANCE_FLOATS,
+    );
+    this.particleCount = count;
+    for (let i = 0; i < capacity; i += 1) {
+      const base = i * PARTICLE_INSTANCE_FLOATS;
+      this.particleInstances[base] = i;
+      this.particleInstances[base + 1] = i + 0.5;
+      this.particleInstances[base + 2] = 0;
+      this.particleInstances[base + 3] = i + 1;
+      this.particleInstances[base + 4] = i;
+      this.particleInstances[base + 7] = 0.5;
+    }
+  }
+
+  updateParticleInstances(): void {
+    this.updateCalls += 1;
+  }
+
+  get asNode(): RenderNode {
+    return this as unknown as RenderNode;
+  }
+}
+
+/**
+ * A container node reduced to §6's traversal surface, so a test can put a
+ * particle double and a real `Renderable` under one root — `Node.add` takes a
+ * real node, which a double is not (the GL suite's `TestGroup`, verbatim).
+ */
+class TestGroup {
+  visible = true;
+
+  enabled = true;
+
+  readonly parent = null;
+
+  readonly children: unknown[] = [];
+
+  add(...nodes: { asNode: RenderNode }[]): this {
+    for (const node of nodes) {
+      this.children.push(node.asNode);
+    }
+    return this;
+  }
+
+  addRenderables(...nodes: Renderable[]): this {
+    this.children.push(...nodes);
+    return this;
+  }
+
+  get asNode(): RenderNode {
+    return this as unknown as RenderNode;
+  }
+}
+
+/** The instance-stream uploads on the tape: `writeBuffer`s of `floats` elements. */
+function instanceUploads(
+  gpu: RecordingGpu,
+  floats: number,
+): { args: readonly unknown[] }[] {
+  return gpu
+    .callsOf("queue.writeBuffer")
+    .filter((call) => call.args[4] === floats);
+}
+
+describe("WebgpuRenderer particles (§36, §112, WP-R1.8)", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await initialized();
+  });
+
+  it("draws the whole system in ONE instanced draw of the shared quad", () => {
+    const particles = new TestParticles(1000, 250);
+
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    // The clear triangle, then the system: six quad vertices, 250 instances —
+    // and no per-particle draw anywhere.
+    const draws = harness.gpu.callsOf("pass.draw");
+    expect(draws).toHaveLength(2);
+    expect(draws[1]?.args[0]).toBe(6);
+    expect(draws[1]?.args[1]).toBe(250);
+    expect(harness.gpu.countOf("pass.drawIndexed")).toBe(0);
+    expect(particles.updateCalls).toBe(1);
+    // Slot 0 is the shared quad's positions, slot 1 the instance buffer —
+    // two distinct buffers, positionally bound (`wgpu-particles.ts`).
+    const vertexBuffers = harness.gpu.callsOf("pass.setVertexBuffer");
+    expect(vertexBuffers).toHaveLength(2);
+    expect(vertexBuffers[0]?.args[0]).toBe(0);
+    expect(vertexBuffers[1]?.args[0]).toBe(1);
+    expect(vertexBuffers[1]?.args[1]).not.toBe(vertexBuffers[0]?.args[1]);
+  });
+
+  it("compiles the particle pipeline lazily, instance layout baked in", () => {
+    harness.renderer.render(new TestParticles(4).asNode, [createView()]);
+
+    // The clear pipeline, then the particle pipeline — created by this first
+    // particle frame, not at initialization.
+    expect(pipelineLabels(harness.gpu)).toEqual([
+      "four:clear|-|-|none|-|dw|-|triangle-list|bgra8unorm|depth24plus",
+      "four:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|depth24plus",
+    ]);
+    const descriptor = harness.gpu.callsOf("device.createRenderPipeline")[1]
+      ?.args[0] as {
+      vertex: { buffers: unknown[] };
+      fragment: { targets: { blend?: { color: { srcFactor: string } } }[] };
+      depthStencil: { depthWriteEnabled: boolean; depthCompare: string };
+    };
+    expect(descriptor.vertex.buffers).toEqual([
+      POSITION_BUFFER_LAYOUT,
+      PARTICLE_INSTANCE_BUFFER_LAYOUT,
+    ]);
+    // §66's straight alpha, always — a material-less item cannot opt out.
+    expect(descriptor.fragment.targets[0]?.blend?.color.srcFactor).toBe(
+      "src-alpha",
+    );
+    // §57's default depth state: tested and written.
+    expect(descriptor.depthStencil).toMatchObject({
+      depthWriteEnabled: true,
+      depthCompare: "less",
+    });
+    // The widened group-0 layout arrived with the draw, once, and its bind
+    // group reads the particle block off the shared strided buffer.
+    expect(
+      layoutLabels(harness.gpu).filter(
+        (label) => label === "four:particle-uniforms",
+      ),
+    ).toHaveLength(1);
+    const groups = harness.gpu
+      .callsOf("device.createBindGroup")
+      .map((call) => call.args[0] as { label?: string; entries: unknown[] })
+      .filter((descriptor_) => descriptor_.label === "four:particle-uniforms");
+    expect(groups).toHaveLength(1);
+    expect(
+      (groups[0]?.entries[0] as { resource: { size?: number } }).resource.size,
+    ).toBe(PARTICLE_UNIFORM_BYTES);
+  });
+
+  it("packs projection, view and model separately into the particle block", () => {
+    const particles = new TestParticles(2);
+    particles.transform.worldMatrix.elements[13] = 7;
+    const camera = new TestCamera();
+    camera.projectionMatrix.elements[0] = 2;
+    camera.viewMatrix.elements[12] = 5;
+
+    harness.renderer.render(particles.asNode, [
+      createView({ camera: camera.asCamera }),
+    ]);
+
+    const data = uniformUpload(harness.gpu);
+    // Block 0 is the clear; block 1 the system, three matrices at the
+    // wgpu-particles.ts offsets — the billboard offset happens *between*
+    // view and projection, which is why they travel separately.
+    const base = UNIFORM_STRIDE_BYTES / 4;
+    expect(data[base + PARTICLE_PROJECTION_OFFSET / 4]).toBe(2);
+    expect(data[base + PARTICLE_VIEW_OFFSET / 4 + 12]).toBe(5);
+    expect(data[base + PARTICLE_MODEL_OFFSET / 4 + 13]).toBe(7);
+  });
+
+  it("uploads the instance stream once per frame, shared by every view", () => {
+    const particles = new TestParticles(8, 3);
+    const floats = 3 * PARTICLE_INSTANCE_FLOATS;
+    const views = [
+      createView({ id: "a", width: 0.5 }),
+      createView({ id: "b", x: 0.5, width: 0.5 }),
+    ];
+
+    harness.renderer.render(particles.asNode, views);
+
+    // Two views, two instanced draws — one upload (`wgpu-particles.ts` on
+    // the deviation from GL's per-view cadence, forced by queue ordering).
+    expect(
+      harness.gpu.callsOf("pass.draw").filter((call) => call.args[1] === 3),
+    ).toHaveLength(2);
+    const uploads = instanceUploads(harness.gpu, floats);
+    expect(uploads).toHaveLength(1);
+    // Particle 1 of the double: centre (1, 1.5, 0), size 2, colour (1,0,0,0.5).
+    expect((uploads[0]?.args[2] as number[]).slice(8, 16)).toEqual([
+      1, 1.5, 0, 2, 1, 0, 0, 0.5,
+    ]);
+
+    // The next frame uploads again, into the same warm buffer.
+    harness.gpu.reset();
+    harness.renderer.render(particles.asNode, views);
+    expect(instanceUploads(harness.gpu, floats)).toHaveLength(1);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    expect(harness.gpu.countOf("device.createRenderPipeline")).toBe(0);
+  });
+
+  it("skips a zero-count system before its buffer is allocated", () => {
+    const emptyish = new TestParticles(8, 0);
+    const empty = new TestParticles(0, 0);
+
+    harness.renderer.render(new TestGroup().add(emptyish, empty).asNode, [
+      createView(),
+    ]);
+
+    // The clear alone drew, and neither the shared quad nor an instance
+    // buffer was allocated — the skip sits *before* the geometry cache, the
+    // skinned-absence discipline (stricter than GL's arm, which acquires its
+    // record first; stated in source).
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(harness.gpu.countOf("device.createBuffer")).toBe(0);
+    // …but the list still repacked each system once (§64's contract).
+    expect(emptyish.updateCalls).toBe(1);
+  });
+
+  it("is byte-identical with and without a zero-count system — full tape", async () => {
+    // Two fresh renderers over two fresh devices, the WP-R1.4 skinned A/B
+    // restated for §36: {scene} and {scene + zero-count system} must record
+    // the identical tape from initialization on, handle serials included.
+    // One shared geometry, so its id — which the upload labels carry — is
+    // the same byte sequence on both tapes.
+    const shared = triangle();
+    const tapeOf = async (withEmpty: boolean): Promise<string[]> => {
+      const gpu = createRecordingGpu();
+      const renderer = new WebgpuRenderer();
+      await withHostGpu(gpu.gpu, async () => {
+        await renderer.initialize({ canvas: gpu.canvas });
+      });
+      renderer.resize(256, 256, 1);
+      const group = new TestGroup();
+      group.addRenderables(renderable(shared));
+      if (withEmpty) {
+        group.add(new TestParticles(4, 0));
+      }
+      renderer.render(group.asNode, [createView()]);
+      return gpu.transcript();
+    };
+
+    expect(await tapeOf(true)).toEqual(await tapeOf(false));
+  });
+
+  it("rebuilds the instance buffer when the system's capacity grows", () => {
+    const particles = new TestParticles(2);
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    particles.particleInstances = new Float32Array(
+      8 * PARTICLE_INSTANCE_FLOATS,
+    );
+    particles.particleCount = 8;
+    harness.renderer.render(particles.asNode, [createView()]);
+
+    const allocations = harness.gpu
+      .callsOf("device.createBuffer")
+      .map((call) => call.args[0] as { label?: string; size?: number })
+      .filter((descriptor) =>
+        String(descriptor.label).startsWith("four:particles:"),
+      );
+    expect(allocations.map((descriptor) => descriptor.size)).toEqual([
+      2 * PARTICLE_INSTANCE_FLOATS * 4,
+      8 * PARTICLE_INSTANCE_FLOATS * 4,
+    ]);
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(1);
+  });
+
+  it("tests a clipped particle system against its clip's planes (§67)", () => {
+    // A §67 panel over a real geometry, with the particle double reached
+    // through the live children array — `Node.add` takes a real node, and
+    // the clip record must come from a real, renderable clip node (R-23).
+    const panel = renderable(triangle());
+    panel.clip = true;
+    const particles = new TestParticles(4);
+    (panel.children as unknown as RenderNode[]).push(particles.asNode);
+
+    harness.renderer.render(panel, [createView()]);
+
+    // Clear, mask, panel content (unclipped), particles (clipped).
+    expect(harness.gpu.countOf("pass.draw")).toBe(4);
+    const label = pipelineLabels(harness.gpu).find((entry) =>
+      entry.startsWith("four:particles"),
+    );
+    // The engine's clip record is the particle pipeline's stencil — an
+    // `equal` test over the accumulated planes, on the stencil-carrying
+    // frame format.
+    expect(label).toBe(
+      "four:particles|-|-|normal|dt|dw|cw|triangle-list|bgra8unorm|" +
+        "depth24plus-stencil8|s:equal,1,0,keep,keep,keep",
+    );
+    // …and the clipped draw put the pass's reference where the mask left it.
+    expect(harness.gpu.callsOf("pass.setStencilReference")).toHaveLength(1);
+  });
+
+  it("skips a double whose count outruns its instance storage — GL's answer", () => {
+    // A structurally typed node lying about its count: `buildRenderList`
+    // copies both fields verbatim, and a capacity-less instance array can
+    // draw nothing. The quad is acquired (count > 0 reads as a live system)
+    // but the instance cache refuses, and the draw is skipped whole.
+    const malformed = new TestParticles(0, 5);
+
+    harness.renderer.render(malformed.asNode, [createView()]);
+
+    expect(harness.gpu.countOf("pass.draw")).toBe(1);
+    expect(
+      harness.gpu
+        .callsOf("device.createBuffer")
+        .filter((call) =>
+          String((call.args[0] as { label?: string }).label).startsWith(
+            "four:particles:",
+          ),
+        ),
+    ).toHaveLength(0);
+  });
+
+  it("survives a reentrant dispose mid-frame, skipping the particle draw (§61)", () => {
+    // The pinned WP-R1.3 scenario, reaching the particle arm: application
+    // code inside `camera.updateViewMatrix` tears the renderer down, the
+    // geometry cache answers null for the shared quad, and the frame skips
+    // every draw without throwing and without resurrecting an allocation.
+    const camera = new TestCamera();
+    camera.updateViewMatrix = (): void => {
+      harness.renderer.dispose();
+    };
+
+    expect(() => {
+      harness.renderer.render(new TestParticles(4).asNode, [
+        createView({ camera: camera.asCamera }),
+      ]);
+    }).not.toThrow();
+    // Not even the clear drew: the teardown ran before the view's clear.
+    expect(harness.gpu.countOf("pass.draw")).toBe(0);
+    expect(
+      harness.gpu
+        .callsOf("device.createBuffer")
+        .filter((call) =>
+          String((call.args[0] as { label?: string }).label).startsWith(
+            "four:",
+          ),
+        ),
+    ).toHaveLength(0);
+    expect(harness.renderer.disposed).toBe(true);
+  });
+
+  it("forgets the instance buffers on device loss — dropped, never destroyed", async () => {
+    const particles = new TestParticles(4);
+    harness.renderer.render(particles.asNode, [createView()]);
+    harness.gpu.reset();
+
+    harness.gpu.loseDevice();
+    await Promise.resolve();
+    harness.renderer.dispose();
+
+    // §61: the allocations died with the device; nothing calls destroy on a
+    // handle that no longer exists.
+    expect(harness.gpu.countOf("buffer.destroy")).toBe(0);
+  });
+
+  it("destroys the instance buffers with the renderer (§83)", () => {
+    harness.renderer.render(new TestParticles(4).asNode, [createView()]);
+    harness.gpu.reset();
+
+    harness.renderer.dispose();
+
+    // The instance buffer and the frame's uniform buffer both die here.
+    expect(harness.gpu.countOf("buffer.destroy")).toBeGreaterThanOrEqual(2);
+  });
+
+  it("counts §84's statistics as one call, count instances, 2·count triangles", () => {
+    const statistics = createRenderStatistics();
+    harness.renderer.statistics = statistics;
+
+    harness.renderer.render(new TestParticles(250).asNode, [createView()]);
+
+    // The clear is the backend's own; the system is one submitted draw of
+    // 250 quad instances — the one place `instances` exceeds `drawCalls`.
+    expect(statistics.drawCalls).toBe(1);
+    expect(statistics.instances).toBe(250);
+    expect(statistics.triangles).toBe(500);
   });
 });

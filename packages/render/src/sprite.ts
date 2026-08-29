@@ -214,8 +214,9 @@ interface MutableSpriteFrame {
 
 /**
  * Optional construction arguments of {@link Sprite} — the quad's own size and
- * anchor, plus the two `RenderableOptions` fields every drawable takes, spelled
- * out here so the sprite's own options read as one list.
+ * anchor, plus the three `RenderableOptions` fields a sprite honours
+ * (`renderLayer`, `renderOrder`, and §67's `clip`), spelled out here so the
+ * sprite's own options read as one list.
  */
 export interface SpriteOptions {
   /**
@@ -237,6 +238,13 @@ export interface SpriteOptions {
   renderLayer?: number;
   /** Initial {@link Sprite.renderOrder}; defaults to 0. */
   renderOrder?: number;
+  /**
+   * Initial `Node.clip`; defaults to `false` (§67, R-23). A clipping sprite
+   * masks its subtree to its **quad** — the anchored rectangle, not the
+   * texture's alpha (§67's alpha masks are a staged tier; see
+   * `@four/render`'s `clip.ts`) — which is §73's overflow-clipping shape.
+   */
+  clip?: boolean;
 }
 
 /** Vertices of the quad: bottom-left, bottom-right, top-right, top-left. */
@@ -444,6 +452,7 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
     super(quad, material, {
       renderLayer: options.renderLayer ?? 0,
       renderOrder: options.renderOrder ?? 0,
+      clip: options.clip ?? false,
     });
     this.#quad = quad;
     this.#width = requirePositive("width", options.width ?? 1);

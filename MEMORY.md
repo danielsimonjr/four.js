@@ -28,6 +28,661 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — WP-R1.8: WebGPU particles (§36) and compute (§82).** Decisions
+  worth keeping:
+  - **The particle block is a third group-0 layout — 192 B, projection/view/model,
+    vertex-only.** The sprite second-layout precedent, again for a byte reason
+    (`minBindingSize` in landed init transcripts); the matrices travel separately
+    because the billboard offset happens _between_ view and projection; the block
+    fills its binding exactly, so no uploaded byte of it is history.
+  - **Instance streams upload once per frame, not per view — a stated deviation
+    from GL.** `updateParticleInstances` runs once per render call, so the bytes
+    cannot differ between views; and `queue.writeBuffer` executes in queue order,
+    so a per-view re-upload would overwrite the first before either recorded draw
+    executes (the `wgpu-batch.ts` hazard). Identical bytes make per-view
+    harmless; one upload makes it impossible. Gate = a renderer frame ordinal on
+    the record.
+  - **A zero-count (or count-outruns-capacity) system skips before the geometry
+    cache** — stricter than GL, which acquires its record first; {scene} ≡
+    {scene + zero-count system} is pinned as a full-tape A/B across two fresh
+    devices. No VAO to guard: the record is two fields where GL's is four,
+    because attribute layouts are pipeline state.
+  - **Q3 executed conservatively: `ComputePass` lives in `render-webgpu`,
+    promotion recorded as one re-export** + optional `Renderer.compute?()`
+    (token-identity precedent) — RFC 0004 held `packages/render` concurrently and
+    landed mid-session (ec6aab5); zero file overlap, clean diff separation.
+    Bindings are an **ordered array** (index _i_ = `@binding(i)`); the spec's
+    named map is the umbrella sugar's, at promotion.
+  - **Compute joined the device surface as optional members**
+    (`createComputePipeline`, `beginComputePass`, `copyBufferToBuffer`) —
+    presence-is-the-capability; every pre-R1.8 double compiles;
+    `UNSUPPORTED_GPU_FEATURE` on absence (`readPixels`' contract); WebGL 2's
+    no-compute stays an honest structural mirror.
+  - **Compute pipelines cache on (access pattern | entry point | source)** — the
+    RFC 0001 source-keyed program cache one stage over; one module per source; a
+    binding-less kernel's pipeline layout carries no bind-group layouts at all,
+    so nothing requires a group the dispatch never sets.
+  - **The integrator's `count` travels as f32** (the light-block one-packer
+    precedent; exact far past §112's budget); params bind read-only storage,
+    positions/velocities read-write flat f32 lanes in the pool's own x,y,z
+    layout; `v += g·dt` then `p += v·dt`, the emitter's documented closed form —
+    the browser spec reads one exact step back and observes the count guard on an
+    untouched lane.
+  - **`frameWantsStencil` keeps excluding `"particles"`, for a new reason:**
+    drawn now, but material-less (`material?: undefined`) — there is nothing to
+    scan, and §67's clip record (clause 1) is a particle item's only stencil.
+  - **Two more reentrant-family pins made two "unreachable" narrowings honest**
+    (a disposing unlit `map` getter; a disposing sprite `blendMode` getter — both
+    surface as the disposed pipeline cache's null); the mask/shadow/particle
+    pipeline-null narrowings remain genuinely unreachable — no application
+    accessor runs between cache and acquire — and say so in source.
+  - Measured: coverage 99.77/99.58 → **99.85/99.73** (new files 100×4); 0/9
+    bundles carry any WebGPU or compute symbol (`computeMain`/
+    `dispatchWorkgroups`/`ParticleUniforms` joined the grep; `createVertexArray`
+    control 9/9); all size budgets green, no bumps.
+
+- **2026-08-29 — RFC 0004 / §77a: the raster painting stack.** Decisions worth
+  keeping:
+  - **R-4's `MaterialTexture` seam paid off a third time**: `CanvasTexture`
+    uploads through the id/version path with zero backend edits and no new
+    duck-typed contract (count stays five). A new texture _producer_ needs no
+    consumer change anywhere — quote this before ever proposing an upload-path
+    edit.
+  - **The flip is folded into the read, and the scratch is one row.**
+    `"top-left"` sources are reversed in place via a `width*4` scratch allocated
+    at construction — no per-repaint allocation. Measured: the flip costs the
+    same order as the `readPixels` copy itself (2048²: 0.96 ms vs 1.32 ms; 256²:
+    24 µs), both far under a frame.
+  - **The constant-size check runs _after_ `paint()` and before the read** — the
+    obvious hazard is a panel-resize repaint that grows its own canvas mid-paint,
+    and the rule must catch the size the read would see, not the size at entry.
+  - **A node class must not carry `static typeName` — second application** (the
+    `Bone` rule): RFC 0004 §2b's sketch shows one on `CanvasViewWidget` and is
+    overridden by RFC 0003's recorded deviation; the §79 identity is
+    `"ui:canvas-view"` via `registerUISerializers`.
+  - **The display-only scan catches prose, and that is a feature.** The widget's
+    first draft mentioned `CanvasTexture` in a doc comment; the scan flagged it
+    and the docs were reworded — "the widget names no texture type" is now true
+    of comments too, which is what keeps the claim greppable.
+  - **`UI_STAGED` text is bundle mass** (R-29's finding, reconfirmed): correcting
+    the canvas-view blocker note cost +109 B gzip in every `@four/ui` bundle at
+    first draft, trimmed to +28 B — the full story lives in `canvas-view.ts`'s
+    header, the staged array carries one line.
+  - **§96's two error paths split on who built the value** (A-23, applied): the
+    over-budget refusal is a `RangeError` because the size came from the
+    application's own source object; `UNTRUSTED_INPUT_REJECTED` is specified for
+    decoded-external-content sources and deliberately unbuilt — decode is
+    deferred with `ImageBitmap` sources on A-18's remaining half, and a stub that
+    refuses nothing would have been dishonest.
+  - **Measured:** painting symbols in 0 of 9 bundles; six bundles byte-identical;
+    ui-demo 43.63/44 (no bump); twin +213 B carries the serializer pair (only
+    `registerSceneNodeTypes` caller). Browser: orientation 400/400 box counts
+    both ways; paint-only and invalidate-only frames byte-stable on screen.
+    Suites bit-exact; goldens untouched.
+  - **Multi-agent note (seventh confirmation):** shared-tree lint (17 errors) and
+    TypeDoc (2 warnings) failures were entirely the WP-R1.8 sibling's mid-flight
+    `render-webgpu` files; a HEAD+packet clean-room worktree ran every gate
+    green.
+
+- **2026-08-29 — WP-R1.7: WebGPU shadows and stencil parity.** Decisions worth
+  keeping:
+  - **The shadow binding joins the lights group, widened — not a fourth group.**
+    `sampler_comparison`/`texture_depth_2d` cannot ride the `map` layout
+    (API-invalid pairing), so they join a second group-1 layout whose uniform
+    half is the landed light block plus 80 bytes in the stride's spare (592…672
+    of 768; `SHADOW_UNIFORM_SPARE_BYTES` pins what's left). No landed layout,
+    `minBindingSize` or transcript moves; the member list is one shared string so
+    the two structs cannot drift. Frame-level group like GL's frame-level unit
+    bind; dropped on lights-buffer regrowth and on map reallocation (view
+    identity is the cache key).
+  - **`useShadow` is a variant appended only-when-true** (`|sh:y` — the
+    conditional-suffix rule's fifth application, with a twist): `false` and
+    absent share one key _deliberately_, because they name identical pipeline
+    content — a non-receiver in a shadowed frame draws the shadowless frame's
+    very pipeline, which is the transcript-label half of GL's
+    mirror-at-initial-false byte-identity claim. The R1.5 statement "shaded
+    stages are GL-with-`useShadow`-false" now describes the unshadowed variant
+    only.
+  - **`textureSampleCompareLevel`, never `textureSampleCompare`** — the `Level`
+    form has no implicit derivatives, so the nine taps are legal inside the
+    non-uniform `len > 0` guard where GL also evaluates them; with a nearest
+    comparison sampler each tap is exactly one `receiver <= occluder`, keeping
+    §33's explicit-arithmetic filter. The receiver's `v` flips
+    (`0.5 − ndc.y·0.5`) for the top-left map origin; the caster's §3.3.8 remap
+    lands stored depth on GL's [0,1] convention, so the comparison needs no
+    depth-side correction.
+  - **Skinned and node casters are excluded by absence, not by rule**: the caster
+    whitelist is "what this backend draws" (unlit/lit/standard) — an invisible
+    surface must not cast. GL's finer undisplaced-node-casts-exactly rule becomes
+    reachable only with the WGSL emitter; recorded in source as a deviation, not
+    an omission.
+  - **The stencil residue retired by a frame scan, and the scan follows from a
+    landed decision**: with no `{stencil:true}` option (R1.3 — the backend owns
+    its attachment), the frame's list is the only place "does this frame need
+    stencil bits" can be answered. `frameWantsStencil` = the O(1) clip read plus
+    an early-exit material scan over drawable kinds; GL asks its surface, WebGPU
+    asks its frame, both ask the target off screen. The R1.3-pinned inertness
+    test was flipped in the same packet that retired the residue it pinned.
+  - **The scan moved application accessors ahead of every allocation, so the
+    frame now bails on `#disposed` right after it** — a reentrant dispose in a
+    stencil getter resurrects nothing (the R1.6 rule); a dispose in a _light_
+    accessor (collect-time, pre-existing exposure) still costs only the frame,
+    pinned including the map-not-produced path.
+  - **`depthLoadOp:"clear"` is the shadow pass's to use** — the mip blits'
+    exception gains its second member: a shadow pass has no sub-rectangle, so
+    §61's scissored-clear argument does not reach it. And the caster pass is
+    where the GL mirror-state discipline visibly evaporates: GL's
+    `#renderShadowMap` borrows framebuffer/rectangles/program and owes re-binds;
+    here it is a pass of its own borrowing nothing — recorded per the plan as the
+    place this backend is structurally safer.
+  - **Multi-agent note:** the RFC 0005 sibling committed mid-session, moving the
+    tip under this packet's working tree; the forecast gl-picking GATED failure
+    never fired (their commit carried the entry), suites ran green on the moved
+    tree, and the packet's staged diff separated cleanly.
+  - Measured: coverage 99.75/99.53 → **99.77/99.58** (new files 100×4); 0/9
+    bundles carry any WebGPU shadow/stencil symbol (`createVertexArray` control
+    9/9); all size budgets green.
+
+- **2026-08-29 — RFC 0005 / A-11 pixel half: GPU-id picking.** Decisions worth
+  keeping:
+  - **The item→node join is the worldMatrix object.** Render items carry no node
+    reference (§64), but the non-interpolated builder documents
+    `item.worldMatrix` as the node's own matrix — one object per node, so
+    `Map<Matrix4, index>` joins the sorted draw list to the traversal-ordered §33
+    table exactly, allocation-free. Breaks if the plain builder ever pools
+    matrices; the doc on `RenderItemBase.worldMatrix` is now load-bearing.
+  - **Staleness is detected by cache-era identity, not flags.** A WebGL restore
+    keeps the context _object_; what changes identity is the renderer's rebuilt
+    caches. The pass records `host.geometries()` as its era; `pick` compares and
+    rejects `CONTEXT_LOST` — and an update skipped under §61 drops the previous
+    pass, because a stale `undefined` is indistinguishable from "nothing there"
+    (the RFC's own argument, applied twice).
+  - **The host seam is seven `this`-capturing arrows, and that is a bundle
+    decision.** Getter-object and this-alias forms cost ~250 B more per
+    WebglRenderer bundle and the latter is lint-banned; accessor _methods_ keep
+    the window live across restores (new caches seen, never captured). The
+    `createPickingService` ride-along is the seam's whole never-picking cost
+    (~0.15 kB gzip), the `maximumSkinningJoints` precedent.
+  - **The id pass mirrors what decides "on top", and nothing else**: material
+    depthTest/depthWrite/colorWrite and §67 clip stencils (the target takes the
+    packed stencil form per pass via `items[0].clip?.maskPass` — WP-R1.3's O(1)
+    decision on a target option). Ignored on purpose, stated in source: blending
+    (D's CPU tier answers alpha), R-7's `material.stencil`, skinned items (§69's
+    caster-exclusion, third application), particles (staged: needs the instanced
+    billboard vertex stage).
+  - **Every skip resolves before the first state or uniform call** — otherwise a
+    never-drawn item (empty geometry, mid-build reentrancy miss) uploads an id or
+    moves the mirror; found by the unit tape, fixed by ordering, matching the
+    frame renderer's "a skipped draw contributes nothing at all".
+  - **An unreachable presence re-check is a coverage hole (sixth confirmation)** —
+    the fenced reader takes the four narrowed entry points as values instead of
+    re-probing gl; and the §85 count refusal lives in an exported pure function so
+    the 2³² branch is testable.
+  - **WebglContext read-back members are function-typed properties, not
+    methods** — method syntax + extraction trips
+    `@typescript-eslint/unbound-method`; property syntax keeps `.call(gl, …)`
+    (needed for real contexts) lint-clean.
+  - **Measured:** GPU-tier symbols in 0 of 9 bundles; +0.15–0.17 kB gzip (seam)
+    in WebglRenderer bundles, +~0.4 kB more where `pick()` rides (Alternative D);
+    ui-demo 43.60/43.5 — bumped 43.5→44. Transcripts: frame-after-id-pass
+    byte-identical.
+  - **Multi-agent note:** HEAD advanced mid-packet (sibling landed WP-R1.6,
+    2ff733c); one `pnpm run docs` run failed on the sibling's mid-flight
+    `wgpu-shadow.ts` and passed unchanged on re-run — another confirmation that a
+    red gate on a loaded shared tree indicts the tree state first.
+
+- **2026-08-28 — WP-R1.6: WebGPU render targets, effects, `readPixels`.**
+  Decisions worth keeping:
+  - **The samplable depth form is `depth32float`, and the table is exported
+    data.** The plan's wording allowed `depth24plus`; `depth32float` is the
+    format WebGPU guarantees can be both sampled and copied out
+    (`copyTextureToBuffer` forbids `depth24plus`'s depth aspect), and its
+    4 B/texel is what R-18's accounting already bills. `renderTargetDepthFormat()`
+    is the whole decision — R1.7's shadow sampling and the R-4 float-format
+    widening target the table, not string literals.
+  - **Off-screen colour is `rgba8unorm`, deliberately not the preferred canvas
+    format**: `"rgba8"` means precision, channel order is backend detail — and
+    RGBA order is what makes `readPixels` swizzle-free. The consequence —
+    off-screen pipelines carry a different `colorFormat` — is exactly what the
+    per-format pipeline cache absorbs; an application's first off-screen frame
+    compiles its variants a second time, by design.
+  - **`readPixels` rows are bottom-to-top by decision** (§61's sketch is silent;
+    first implementation fixes it): §7a's Y-up, and the order GL's `readPixels`
+    produces natively, so cross-backend byte agreement was decided once instead
+    of discovered as a flip. The flip rides the 256-byte padding strip the map
+    forces anyway.
+  - **The frame's stencil question split in two**: `frameStencil` (does the
+    surface carry the aspect — the pass descriptor's ops, `material.stencil`'s
+    reach, the clear's stencil zeroing) vs `frameClips` (do masks draw). On
+    screen they coincide with the landed behaviour byte-for-byte; off screen
+    `frameStencil` is the target's `stencil` option (GL's `stencilAttached`), so
+    R-7's mask-by-hand tier works into stencilled targets clipless, and a clip
+    into a plain target warns-inert (`webgpu-clip-without-stencil`,
+    GATED-registered) — the condition GL always had is reachable on WebGPU only
+    off screen.
+  - **`renderEffect` has no state envelope, and the kinds are modules.** GL's
+    try/finally borrows four states; here each effect is its own pass in its own
+    encoder and there is nothing ambient to restore. The R-19 inversion's third
+    application: GL's `useGrade`/`useEncode` uniform switches became three lazy
+    modules; only the grade binds uniforms, so a copy chain has zero uniform
+    traffic _structurally_ rather than by mirror discipline.
+  - **A grade coefficient accessor is application code — the reentrant-dispose
+    family's fourth member.** The scratch write (app getters) runs before
+    `pipelines.acquire`, so a mid-call teardown surfaces as the cache's `null`
+    and skips the effect without resurrecting an allocation; pinned as a test,
+    which is what made the "unreachable" narrowing coverable.
+  - **The device surface grew only optional members** (`copyTextureToBuffer`,
+    `mapAsync`/`getMappedRange`/`unmap`; `GPU_MAP_MODE`) —
+    presence-is-the-capability, so every pre-R1.6 double still compiles, and
+    `readPixels` rejects `UNSUPPORTED_GPU_FEATURE` on one that lacks them.
+    `recording-gpu.ts`'s `getMappedRange` returns an `i % 251` byte pattern — a
+    prime period can never align with 256-byte rows, so the padding strip and
+    row flip are assertable exactly.
+  - **Graph participation cost zero graph edits**, as the plan said:
+    `supportsScreenEffects` detects the new member, and graph-vs-hand
+    **full-tape** transcript identity is pinned
+    (`webgpu-render-to-texture.test.ts`) — R-5's "the graph is a driver" now
+    holds on two backends.
+  - **Multi-agent note, fifth confirmation:** the RFC 0001 sibling committed
+    mid-session and an RFC 0005 picking wave started on the shared tree; one
+    shared-tree `pnpm run docs` run failed on its unexported symbols and 56
+    prettier warnings are its files'. A clean-room worktree (HEAD + this packet
+    only) ran every gate green — a red gate on a loaded shared tree indicts the
+    tree state first.
+  - Measured: coverage 99.70/99.41 → **99.75/99.53** (new files 100×4); rebuilt
+    example bundles byte-identical, 0/9 carry any WebGPU symbol.
+
+- **2026-08-28 — RFC 0001 / R-14: §60 node materials.** Decisions worth keeping:
+  - **The IR lives in `@four/materials`; backends read it through `@four/render`'s
+    re-export** — the RFC's §3.1 legality argument executed: `analyzeShaderGraph`
+    and the graph types are re-exported from `render`, so `render-webgl`'s frozen
+    `core, math, render` row gained no edge.
+  - **The program cache keys on the emitted source pair, not a hash of the
+    graph.** Two graphs that emit the same GLSL are one program (a `Map` on the
+    source; a `WeakMap` identity fast path in front); a per-graph compile failure
+    is latched `null` in the same `WeakMap` — the skinning latch, per graph
+    instead of per context.
+  - **vec2/mat3 uniforms are declared vec4/mat4 and read back narrow** (`u_x.xy`,
+    `mat3(u_x)`), uploads padded: the `WebglContext` GL budget has no
+    `uniform2fv`/`uniformMatrix3fv`, and growing it would have touched every
+    recorded double. IR, reflection and `setUniform` validation stay narrow; only
+    declaration and upload widen. Reuse this transport move before growing the GL
+    budget.
+  - **The screen domain gets exactly one attribute: `"uv"` means the pass's own
+    normalized coordinate** — a recorded deviation from RFC §5's blanket attribute
+    rejection, because without a coordinate the domain cannot express even a copy.
+    The other three stay rejected there.
+  - **`texture` nodes are refused reachable-from-`positionOffset`** (the
+    displacement runs in the vertex stage, where implicit-derivative sampling does
+    not exist) — a §85 validation rule, not a driver's discretion.
+  - **Node texture units start at 2** (0 is the map's, 1 the §69 shadow's — both
+    can be live in a node frame); screen programs start at 0; the constant lives
+    in the registry module so the renderer's `finally` can unbind without linking
+    the emitter.
+  - **Per-view uploads with many programs need no map: a module-level monotonic
+    view stamp** (`nodeViewStamp`), each program recording the last stamp it saw —
+    one view-projection (+ time) upload per program per view, allocation-free.
+  - **§9 render time reaches the backend as `WebglRenderer.renderTime`**, a plain
+    public field on the statistics/batching precedent, defaulting to GL's initial
+    0 so time-less scenes pay nothing. Never simulation time (§42/§43).
+  - **A displaced node caster is excluded from the §69 pass; an undisplaced one
+    casts exactly** — depth ignores colour, so the caster program is right for it
+    (the skinned bind-pose rule, applied only where the picture would actually
+    differ).
+  - **Conic is the one §58 paint the closed operator set cannot spell** (no
+    `atan`); the other five non-solid paints are now exact per fragment. An angle
+    operator is a one-row closed-union amendment when a consumer wants it.
+  - **Lazy, observed:** initialize compiles 7 programs registered or not; the
+    first node frame adds exactly 1; three materials sharing a graph structure
+    still add exactly 1.
+  - **Measured: +0.60–0.79 kB gzip frame path in every WebglRenderer bundle**
+    (A/B against a HEAD worktree); the emitter is 0 B unless
+    `registerNodeMaterialPipeline()` is called (grep: `uniform sampler2D s_` in 0
+    of 9 bundles; the twin's one text hit is the DEV warning string — it builds
+    with DEV on). Budgets moved 36.5→37.5, 34.5→35.5, 43→43.5.
+
+- **2026-08-28 — WP-R1.5: WebGPU lit/standard pipelines and the light block.**
+  Decisions worth keeping:
+  - **The light block is all-`vec4`, and that is the alignment answer, not a
+    style.** WGSL's `vec3<f32>` is 16-byte aligned, so any `vec3` member means
+    implicit padding the CPU packer must know about; a layout with no `vec3` slot
+    makes every byte named. The count travels as **f32** (`counts.x`, read back
+    with `i32()`) because the block is packed through one `Float32Array` and a
+    `u32` word would need a second view over the same bytes — exact over 0…8.
+  - **The per-view group arrived at group 1 as promised, which pushed the shaded
+    families' `map` to group 2** — the _same_ texture layout object and bind
+    groups, because a bind group carries no index (the pipeline layout assigns
+    it). Corollary: the map group index is now per-family data
+    (`MAP_BIND_GROUP_INDEX` for unlit/sprite, `SHADED_MAP_BIND_GROUP_INDEX` for
+    lit/standard).
+  - **Light blocks index by _rendered_ view ordinal, not view array index** — a
+    zero-area view writes no block and leaves no gap, so every uploaded byte was
+    written this frame (the `clearSceneLights` transcript-determinism argument,
+    one buffer later). The eye rides the light block (per-view state like the
+    lights); the lit WGSL simply never reads it.
+  - **Normals upload per shaded acquisition, not per geometry** —
+    `acquire(geometry, normals)` with an in-place one-buffer upgrade. Forced by
+    byte-identity: `planeGeometry` carries normals, so the GL cache's
+    upload-whatever-exists rule would have moved every landed sprite/shape
+    transcript. The honest unit of need on a loose-buffer backend is the draw,
+    not the package.
+  - **The hasLit scan excludes `skinned-lit`, deliberately** — a skinned item is
+    transcript-invisible here (WP-R1.4), and a light block allocated for skipped
+    draws would break that byte-identity from the side. Pinned as a transcript
+    A/B.
+  - **WGSL has no `inverse()`** — the inverse-transpose is a hand-written
+    cofactor function (`transpose(inverse(A)) = [a₁×a₂ a₂×a₀ a₀×a₁]/det`), per
+    vertex like GL's, hoistable to a per-draw uniform for both backends at once
+    when `Matrix3` grows the utility. And WGSL has no `out` params — the punctual
+    chunk returns a two-member struct.
+  - **GL's default-attribute zero normal becomes a variant** (a WebGPU pipeline
+    cannot leave a declared vertex buffer unbound): the normal-less variant's
+    vertex stage writes the same zero vector, the shared fragment guard shades it
+    ambient-only — two variants, one arithmetic. The descriptor's `normals?`
+    field appends `|n:y`/`|n:-` only when carried (conditional-suffix rule, third
+    application).
+  - **A reentrant mid-frame dispose is reachable through a material accessor**,
+    not just `camera.updateViewMatrix` — pinned twice (a `map` getter and a
+    `stencil` getter), which is what made the shaded arm's two "unreachable"
+    narrowings coverable: the lights group is read off the field _after_ the
+    material getters run.
+  - **Multi-agent note, fourth confirmation:** one `pnpm run docs` run failed on
+    the RFC 0001 sibling's mid-flight `render-webgl` test edits and passed
+    unchanged on re-run; the three tight-bundle size overruns (+61…576 B) at this
+    packet's gate run carry the sibling's staged `render`/`materials` changes —
+    zero WebGPU symbols reach any bundle (control grep unchanged).
+  - Measured: coverage 99.61/99.24 → **99.70/99.41**; 0 B in every tight bundle.
+
+- **2026-08-28 — WP-R1.4: WebGPU shapes and vertex colours.** Decisions worth keeping:
+  - **The packet proved a negative, which was its point**: no unlit-variant plumbing
+    was deferred from R1.1 — colour-only-no-uv was already a lazy variant with a
+    positional vertex layout — so WP-R1.4 shipped zero behavior lines. The WebGPU
+    identity test is _stronger_ than the GL original it restates: full-tape equality
+    (handle serials and uniform bytes included), not names+draw-args, because
+    `recording-gpu.ts` copies typed arrays at record time and the uniform path is one
+    strided upload.
+  - **A skinned item is transcript-invisible on this backend, and that is now pinned
+    from both sides**: {scene + skinned mesh} records the byte-identical tape of
+    {scene}, and the same scene through GL-with-registerSkinningPipeline draws one
+    more item than WebGPU — the honest "closed on WebGL 2, absent on WebGPU"
+    wording, in a test rather than a sentence.
+  - **The vc variant's WGSL had never met a real adapter** — the browser gate
+    compiled only `unlitShaderSource(false)`. Rule worth keeping: a _variant_
+    family's browser evidence covers only the variants it compiles; each generated
+    module needs its own compile-and-rasterise line once, or "the WGSL compiles"
+    quietly means "one of the four compiles".
+
+- **2026-08-28 — RFC 0003 / PH-10 + R-22: §54 skinning.** Decisions worth keeping:
+  - **A skinned draw's failure direction is absence, and the check sits above the
+    geometry upload.** Unregistered pipeline, failed compile (latched per context,
+    cleared on restore), and a material family with no skinned variant all skip with
+    one §85 warning — a T-pose is a different picture. The skinned arm is a
+    self-contained `continue` block like the particle arm, resolved _before_
+    `geometries.acquire`, so a skipped draw contributes not even a buffer; that is
+    what made the with/without-mesh transcript A/B exact.
+  - **The joint limit is a declared constant, not a query — R-30b's law decided
+    it.** `MAX_SKINNING_JOINTS = 48` (192 of WebGL 2's guaranteed 256 vertex uniform
+    vec4s), reported through the optional-tri-state
+    `RendererCapabilities.maximumSkinningJoints` (WP-R1.1's widening law overrode
+    the RFC's required-member sketch), enforced at `Mesh.skeleton` assignment with
+    `UNSUPPORTED_GPU_FEATURE` — setup-time, per §61. The unbounded path is a bone
+    texture, deferred.
+  - **A node class must not carry `static typeName`** — that key is §6a's component
+    key and the umbrella completeness test enumerates it; `Bone`'s §79 identity is
+    the node type `"scene:bone"`. Deviation from RFC 0003's sketch, recorded at the
+    class.
+  - **A §79 intra-file object reference resolves on first read.** A mesh's skeleton
+    is written as bone ids + inverse binds and resolved by walking to the mesh's
+    root when `skeleton` is first read — the earliest moment mesh and bones share a
+    tree (a factory runs mid-assembly; `restoreNodeId`'s reasoning one level up).
+    Missing ids stay pending and retry; a non-Bone id throws. The serializer's
+    writer triggers resolution, which is what keeps the P11-1 textual idempotency
+    exact.
+  - **§17's "missing track types" cost zero code** — an element _is_ a property of
+    its array (`"2" in float32Array`), so the existing dotted path grammar already
+    addresses `weights.2` and `bones.0.transform.rotation`; the packet's whole §2
+    was documentation, tests, and `createArrayElementBinding`. Check whether a
+    "missing" feature is a missing _spelling_ before building machinery.
+  - **The palette follows the particle-repack precedent**: `Skeleton.update` runs
+    inside `collect`, so the uploaded matrices can never be a step older than the
+    item pointing at them; under the §43 interpolated builder the palette uses the
+    last _resolved_ pose (palette interpolation deferred with CPU skinning, stated
+    in source). Skinned casters are excluded from the §69 pass — a bind-pose shadow
+    is a different picture too.
+  - **Measured: +0.75–0.80 kB gzip in every WebglRenderer bundle** (frame-path:
+    draw arm, collect decision, geometry streams; A/B against a HEAD worktree —
+    worktrees are the sanctioned baseline mechanism, never stash). The pipeline
+    itself is 0 B unless `registerSkinningPipeline()` is called (grep: `skinMatrix`
+    in 0 of 9 bundles). Budgets moved: 36→36.5, 34→34.5, 42→43 (ui-demo's 0.40 kB
+    headroom was consumed exactly as R-23 warned).
+  - **Purity, observed**: the skinned-pose golden's 600 steps contain only 121
+    distinct digests — a looping clip reproduces every pose bit-exactly across
+    loops, the strongest cheap purity evidence a determinism scenario has produced
+    yet.
+
+- **2026-08-28 — WP-R1.3: WebGPU sprites, text, batching, §67 clips.** Decisions worth
+  keeping:
+  - **The stencil format is a per-frame decision, and R-23's sort key is what makes it
+    O(1).** `items[0].clip?.maskPass` picks `depth24plus-stencil8` over `depth24plus`;
+    only clipping frames pay for stencil-carrying pipelines and the attachment byte —
+    the pipeline-cost law applied to a _format_ (it is baked into every pipeline key).
+    A scene that starts/stops clipping reallocates once, like a resize. Corollary: no
+    `stencil` renderer option and no no-stencil diagnostic on WebGPU — the backend
+    owns its depth attachment and can always widen it; GL needs both only because its
+    stencil buffer is a context-creation attribute. Honest residue, stated in source:
+    §57 `material.stencil` is inert on clipless frames (= GL without
+    `{stencil:true}`).
+  - **§57's stencil record splits across WebGPU's seam: test/ops/masks are pipeline
+    identity, `ref` is a pass command.** `ref` stays out of the descriptor and the
+    key, so a mask writing bit 4 shares the pipeline of one writing bit 1; the
+    renderer mirrors the pass's reference and issues `setStencilReference` only on
+    change — a clipless frame records none.
+  - **A §67 mask is coverage, not shading.** With colour writes forced off, every
+    material family rasterises the identical fragment set, so one flat unlit variant
+    draws every mask — and a lit/standard clip node masks correctly on WebGPU before
+    WP-R1.5 gives its content a pipeline. (GL reuses the item's own program because a
+    program costs nothing to switch; a pipeline is a compiled object.)
+  - **`queue.writeBuffer` executes in queue order, not issue order — so the GL batch
+    uploader's single buffer pair cannot be ported.** A second batch's upload into a
+    shared buffer would land before the first batch's recorded draw executes.
+    `wgpu-batch.ts` keeps a buffer pair per batch _slot_ (slot k of every frame
+    reuses pair k; `beginFrame()` resets the counter — the one contract member GL
+    lacks); growth destroys immediately because a slot's previous use was an
+    already-submitted frame. §65's staging ring is the noted follow-up, not built.
+  - **A second group-0 layout is how a per-draw uniform block widens without moving
+    anything.** §55's `quad` needs 16 bytes `DrawUniforms` doesn't have; widening the
+    shared block would move `minBindingSize` in every recorded init transcript. The
+    sprite layout (160 B) binds the _same_ strided buffer and is created by the first
+    sprite draw — the WP-R1.2 "group 1 is created by the first textured upload"
+    precedent, second application. The stride's spare bytes were already allocated.
+  - **`pipelineKey` grows by conditional suffix, and that is what byte-identity
+    demands.** `|s:…`/`|b:…` append only when carried; absence appends nothing, no
+    required field can spell the prefixes, so the key stays total and injective while
+    every pre-R1.3 key — and every `four:<key>` label in landed transcripts — is
+    byte-identical. Batches key as their own _kind_ but share the unlit _modules_
+    (one compile per variant across both families).
+  - **Text was already done, and knowing why saved a pipeline.** R-28 made a label
+    one textured unlit item with per-glyph uvs, so WP-R1.2's `map` variant draws text
+    with zero new code; WP-R1.3's text deliverable is the WebGPU restatement of the
+    R-28 claims as tests. The plan's "text rides the sprite path" was stale by one
+    packet.
+  - **A reentrant mid-frame `dispose()` (application code inside
+    `camera.updateViewMatrix`) is the one reachable path to a disposed cache inside a
+    frame** — pinned as a test: the frame skips every remaining draw and does not
+    throw (§61), which is what the draw paths' "unreachable" null-narrowings actually
+    encode.
+  - **Multi-agent note, third confirmation:** two suite tests failed once while the
+    RFC 0003 sibling's edits were mid-flight on the shared tree and passed unchanged
+    on re-run. A red suite on a loaded shared tree indicts the tree state first.
+  - **Measured: 0 B in every bundle** — no WebGPU symbol (`vertexMain`,
+    `requestAdapter`, `depth24plus`, `SpriteUniforms`, `batch-vertices`,
+    `setStencilReference`) reaches any tight bundle; `createVertexArray` control 3×
+    each. The three tight-budget overruns observed at this packet's gate run
+    (+134…385 B) carry the sibling's `jointMatrices` and are RFC 0003's to account.
+
+- **2026-08-28 — R-23: §67's clipping API.** Decisions worth keeping:
+  - **A clip is one extra draw and one shared record, and the record's _identity_ is
+    the API.** Every item under one clip carries the identical pooled
+    `RenderItemClip`, which is what makes the batcher's boundary check one `!==`,
+    the backend's read one property load, and nesting free: the subtree test is
+    `equal` over the accumulated bits, so no mask ever needs masking — an inner mask
+    writing outside the outer region is harmless because the conjunction requires
+    the outer bit.
+  - **Self-not-subtree has a mirror: subtree-not-self.** §46's layers gate the node
+    and not its children; §67's clip gates the children and not the node (a panel
+    paints its own background, then contains). The two fields sit adjacent in
+    `node.ts` with opposite scopes stated — when adding a per-node render field,
+    decide and _say_ which scope it has.
+  - **The ninth clip fails toward drawing, and toward a superset.** It is dropped;
+    its subtree keeps the eight clips that fit — content spills at a visible
+    boundary that points at the offending clip, instead of vanishing
+    indistinguishably from a culling bug (R-8's precedent, second application).
+    Same direction for the other two failure modes: a clip on a `Group` and a clip
+    with no stencil buffer are warned-inert, never masked-to-nothing.
+  - **The exhaustion warning is once per allocator, not once per frame** — `begin()`
+    resets the plane counter, not the warned flag. An over-budget scene is over
+    budget every frame, and a frame-rate warning hides its own first line (§42/§39
+    precedent). The _count_ (`refused`) is still per build — it is §84-shaped
+    state, unwired until a diagnostics packet wants it.
+  - **"Masks first" is a sort key, not a list phase — and it makes a diagnostic
+    O(1).** The comparators' key 0 puts mask draws ahead of every §66 key; a single
+    `items[0].clip?.maskPass` read then answers "does this frame clip at all",
+    which is how the backend's no-stencil-buffer warning costs one comparison
+    instead of a scan.
+  - **Optional-with-required-override is how a pooled interface widens.**
+    `RenderItemBase.clip?` keeps every hand-built item literal and pre-§67
+    structural double compiling (`undefined` ≡ `null` ≡ unclipped — R-38's gotcha
+    answered structurally); `MutableRenderItem` re-declares it required so the
+    builders cannot leave a pooled slot stale. Batcher and backend normalize with
+    `?? null`.
+  - **The engine's record outranks `material.stencil` on clipped draws** — a
+    documented collision, resolved for the containment guarantee an author cannot
+    restore by hand. R-7's mask-by-hand tier is untouched everywhere else.
+  - **Clips are screen-space, per view; shadows are not clipped, structurally.**
+    Plane assignment is frame state (one traversal), mask draws happen per view
+    after that view's stencil clear; the §69 pass ignores clips because its
+    framebuffer _cannot_ carry stencil bits (R-7's packed-format exclusion) —
+    stated in source as the analogue of a sprite casting its rectangle.
+  - **A browser gate can prove _intersection_, not just masking, without a golden**:
+    full-view content under two offset 4×4 clips leaves 1/6 — a footprint one mask
+    (1/3) or the union (5/9) cannot produce. Measured exactly: 76 800 → 12 800
+    orange pixels, ratio 0.1667, box x 120…199 y 40…199.
+  - **Gotcha (found, not fixed): `Sprite`'s constructor drops the three §49 flags
+    its §79 writer writes.** `clip` was passed through by hand;
+    `castShadow`/`receiveShadow`/`frustumCulled` still are not — a sprite
+    round-trips those as defaults. Filed in TODO.
+  - **Measured: +0.50 kB gzip in every bundle** (the allocator and mask emission
+    ride in `buildRenderList` — R-6/R-7's law), +0.68/+1.26 kB where §79 and the ui
+    staging note ride along. No bumps; **ui-demo is at 41.60/42 kB — 0.40 kB of
+    headroom**, the next ui-touching packet must A/B first.
+
+- **2026-08-28 — WP-R1.2: the WebGPU texture tier.** Decisions worth keeping:
+  - **Mipmaps are generated, not degraded — and the generator is lazy.** WebGPU has no
+    `generateMipmap`; degrading (R-30b's no-`generateMipmap`-context path) would make
+    the §62-first backend strictly worse than GL at a feature WebGPU supports, and
+    would falsify §84's chain-billed `byteLength`. The blit's module/layout/sampler/
+    pipeline are first-chain-lazy and format-keyed, so an application that mipmaps
+    nothing records the identical WP-R1.1 transcript — the pipeline-cost law applied
+    to a subsystem. `data: null` chains allocate but skip generation (zero-filled
+    levels) and skip `RENDER_ATTACHMENT`.
+  - **The blit passes are the one legitimate `loadOp: "clear"` in this backend** —
+    they are not §61 viewport clears; the whole level is the triangle's.
+  - **Sampler-state-as-upload-state becomes sampler-state-as-object**: a second cache
+    keyed on the canonical string of the five _resolved_ values, so "names the
+    default" and "names nothing" share one sampler. Total key coverage is what makes
+    a hit mean something.
+  - **WebGPU has no queryable anisotropy limit** — `limits.maxAnisotropy` is honored
+    if a device ever reports one, else 16 is assumed (GL's de-facto ceiling, so both
+    backends clamp 64→16); and `maxAnisotropy > 1` is API-invalid without full
+    trilinear filtering, so non-trilinear textures degrade to isotropic — §62's
+    degrade reached for an API-validity reason.
+  - **Group 1 is per-texture; group 0 stays per-draw.** Merging them would allocate
+    one bind group per (draw × texture) inside the frame. The pipeline cache takes a
+    layout _provider_ so the compiled-against and bound-against layout are one
+    object, created lazily.
+  - **Vertex slots are positional, shader locations are names**: uv keeps
+    `@location(2)` whether it lands in slot 1 or 2; both sides are one counter.
+    Getting it wrong validates cleanly and draws garbage — stated in source.
+  - **Two opaque `object` aliases cannot share a union**
+    (`no-duplicate-type-constituents`): `GpuBindGroupEntry.resource` is typed
+    `GpuBufferBinding | GpuTextureView` with the prose naming three kinds — the
+    layout entry, not the handle's type, disambiguates.
+  - **`recording-gpu.ts` records `createView`'s descriptor only when passed**, so
+    WP-R1.1 transcript lines stayed byte-identical while mip-level views became
+    assertable.
+  - Map without uvs degrades to the flat draw; map disposed skips the draw (§83) —
+    degradation to a variant's _absence_, never to undefined content.
+
+- **2026-08-28 — A-3 / RFC 0002: the §81 plugin system.** Decisions worth keeping:
+  - **§3.1 chose the design, not taste: a capability _token_ beats a fixed
+    `PluginContext`.** Five of the six registries §81 hands over live downstream of
+    `core`, so an interface naming them would invert five edges of a frozen matrix,
+    and `unknown` members would type nothing. A token is `{ name, revocable }` plus a
+    phantom `T`, declared by whoever owns the value — so `core` names a string and a
+    type parameter, a plugin gets `context.require(RENDERER_REGISTRY): RendererRegistry`
+    checked by the compiler, and a sixth capability is additive. Use this move whenever
+    a lower package must hand over a higher package's type.
+  - **The phantom is a plain optional property, not a `unique symbol` brand.** A
+    module-private `declare const brand: unique symbol` breaks declaration emit
+    (`tsc -b` writes `.d.ts` for every package), and exporting it would ship a runtime
+    name with no runtime value. `readonly capabilityType?: T` costs nothing and emits.
+  - **Absence is the honest signal, and it is worth saying eleven times.** Six of §81's
+    extension points have a token; five (asset formats, shader nodes, UI controls,
+    editor tools, compute) have **none**, because there is no registry to hand over. A
+    plugin asking is refused _by name_ at install. The alternative — a fixed interface
+    with five `undefined`-valued members — would make "not implemented" and "not
+    provided by this host" indistinguishable.
+  - **Acquisition is the enforceable proxy for "wrote into".** The host cannot observe
+    a write into a registry it does not own; it can observe that a plugin _asked_. So
+    asking for a non-revocable capability is what pins a plugin, and `uninstall` refuses
+    naming it — `removeCollider`-returns-false vs `addCollider`-throws, again.
+    `SIMULATION_SYSTEMS` is the one revocable token because `SystemRegistry` is the one
+    registry with real removal.
+  - **Sealing the context beat wrapping a registry.** RFC 0002 proposed an
+    `isSealed`-aware wrapper for `SIMULATION_SYSTEMS`. Sealing the _context_ after
+    `install()` — `get`/`require` refuse, `plugins`/`capabilities` still read — is
+    general over all six capabilities, needs no edit in any registry's package, and is
+    sealed in a `finally` so a plugin whose `install` threw cannot keep fetching. What
+    a plugin does with a registry it already fetched remains beyond the seam's reach,
+    and the source says so rather than implying otherwise.
+  - **A defensive branch no caller can reach is a coverage hole (fifth confirmation).**
+    Three of them appeared in the first cut — an `isInstalled` check for a runtime that
+    can only install once, a `?? []` for a map every install path populates, a
+    `#current === undefined` guard on a method only a running plugin can reach.
+    Restructuring so the state cannot be missing (`#currentName: string`, `#pins` keyed
+    by plugin name, first-non-revocable recorded off the token at acquisition) took
+    `plugin.ts` from 99.13% branches to **100×4** and deleted code.
+  - **The zero-cost-when-unused target is unreachable once §45 owns the option, and
+    the reason generalizes.** `resolveRenderer`'s lazy module-`let` works because a
+    _backend package_ calls `registerRenderer` and thereby brings the registry in. A
+    plugin is a **value passed at runtime**, and the same RFC forbids side-effect
+    registration (`"sideEffects": false`), so nothing a plugin-using application imports
+    can populate a slot. `Application.initialize` must statically reach the installer.
+    What _was_ achievable and is achieved: `installPlugins` is the front door and
+    `PluginHost` references _it_, so the host class and all its messages tree-shake out
+    (grep-verified 0 occurrences in four bundles). **Measured +1.28–1.31 kB gzip in
+    every Application-bearing bundle**; trimming the refusal messages once bought
+    0.36 kB of the original 1.64. Rule: _a lazily-created module `let` only helps when
+    the thing that needs the feature is a module, not a value._
+  - **§96's plugin boundary is a rule about arrival, not about containment, and saying
+    so is the deliverable.** No sandbox is proposed or provided. The enforceable claim
+    — untrusted content can never _become_ a plugin — is pinned by an A-2-style
+    allowlist test (no package but `core`/`four` may mention the host) plus
+    `@ts-expect-error` that `add` admits no string. Plugins named in a scene document
+    were rejected without a staging note, because staging would imply it is coming.
+  - **Install order is a §33 property because it becomes fixed-step order.** Two
+    plugins registering equal-priority systems produce different transcripts by install
+    order. Kahn driven by a scan of the supplied list gives topological order with
+    supply-order tie-breaks; `tests/integration/plugin-order.test.ts` asserts two
+    listings differ **only** where the declared dependencies permit.
+  - **Gotcha (tracking): GAP v1 register row 4's recommendation text still said
+    "defer explicitly (Alternative E)" while the same row was marked DECIDED/accepted
+    and the RFC header says accepted.** Implemented per the RFC header and rows 5–6;
+    row 4's wording reconciled at landing. A row whose _recommendation_ and
+    _decision_ disagree is worth reading twice before implementing either.
+  - **Landed with the batch:** `docs/COMPATIBILITY.md` §5 rewritten (was "n/a — the
+    §81 plugin system is not implemented", which became false at this landing).
+
 - **2026-08-21 — WP-R1.1: the WebGPU backend's foundation.** Decisions worth keeping:
   - **A clear is a draw on WebGPU, and that is forced rather than chosen.** §61 confines
     a clear to the viewport rectangle; `loadOp` clears the whole attachment and has no

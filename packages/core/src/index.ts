@@ -27,6 +27,26 @@ export type { FourErrorCode, FourErrorOptions } from "./errors.js";
 export { FourError, isFourError } from "./errors.js";
 export type { EventListener, Unsubscribe } from "./events.js";
 export { EventEmitter } from "./events.js";
+// §81 plugin system (RFC 0002, A-3, 2026-08-28). `core` owns the machinery and
+// names no registry: the capability tokens live in the packages that own what
+// they hand over (`four/plugins.ts` today). See `plugin.ts` for the §96 posture
+// — a plugin is a value the application installs, never a name from a document.
+export type {
+  DefineCapabilityOptions,
+  FourPlugin,
+  PluginCapability,
+  PluginCapabilityBinding,
+  PluginContext,
+  PluginDependency,
+} from "./plugin.js";
+export {
+  PLUGIN_API_VERSION,
+  PluginHost,
+  bindCapability,
+  defineCapability,
+  installPlugins,
+  satisfiesPluginRange,
+} from "./plugin.js";
 // §8 space modes (PH-12, 2026-08-09). The vocabulary lives here because §8's
 // two halves belong to two pillars that may not import each other; see
 // `space.ts` for what declaring a mode does and does not do today.
