@@ -26,6 +26,12 @@
  * is a string because this repository pins no WebGPU typings; the page is
  * *served* (an opaque origin loses `navigator.gpu`); the spec **skips** when
  * `requestAdapter()` resolves `null`.
+ *
+ * **Measured on the first run (2026-08-29, SwiftShader — the WP-R1.9 gate,
+ * this spec's first execution since WP-R1.7 committed it):** the caster
+ * module and all eight `|sh` shaded variants compiled with no validation
+ * error and rasterised lit; the occluded region read darker than the open
+ * region by the spec's threshold.
  */
 
 import {

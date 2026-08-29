@@ -28,6 +28,68 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — WP-R1.9: §62 capability declaration + the WGSL node pipeline
+  (R-1 complete).** Decisions worth keeping:
+  - **A required §62 capability is satisfied only by an affirmative `true` —
+    refuse, never warn.** `undefined` ("not taught to answer") refuses exactly
+    as `false`: silence promoted to satisfaction is the confident wrong answer
+    the capability record's own doc warns about, and §62's "rather than silently
+    downgrading" reaches sufficing, not just starting. The two non-answers stay
+    distinguishable (`RendererCapabilityShortfall.answer`), the check runs after
+    `initialize` (only then is the record authoritative, §61), `"auto"`
+    disposes-and-skips with reason `"missing-capability"`, a named backend
+    throws. The declarable set is the six boolean members as a closed union —
+    quantities need a threshold grammar and stay undeclarable until a consumer
+    asks. Optional shortfalls report and never gate.
+  - **The WGSL emitter's uniform transport is all-`vec4` lanes in one block**
+    (`node.u[k].x/.xy/.xyz`, mat3 = 3 lanes with written-zero w, mat4 = 4) —
+    the GLSL declare-wide/read-narrow padding rule generalised to a buffer, and
+    the light-block alignment answer applied to a generated shader. Mixed
+    min/max/step splat the scalar explicitly (WGSL builtins want matching
+    types; identical componentwise arithmetic, spelled out).
+  - **Node surface draws ride the store's own per-program-strided buffer**
+    (stride = block bytes aligned to 256), sized in `beginFrame` before the
+    pass records — the sized-before-recording discipline holds even though
+    stride varies per program; every stride byte including pad lanes is written
+    per frame (§33). Compilation moved to `beginFrame` with it, so first-sight
+    modules appear before the frame's clear module on the tape.
+  - **Screen-domain texture samples flip `v` (`(u, 1−v)`); the `"uv"`
+    coordinate itself stays §7a bottom-up.** A sampled target stores its
+    picture top-down on WebGPU, so the flip is what makes a graph copy the
+    per-pixel identity (browser-measured over an asymmetric source);
+    surface-domain samples are unflipped, the landed `map` path's convention.
+    Screen groups: textures at 0, block behind them (or at 0 texture-less),
+    present only when time/uniforms are reachable — a graph copy has zero
+    uniform traffic structurally.
+  - **`frameWantsStencil` scans node materials exactly when the node pipeline
+    is registered** — a registered node item is a real draw whose §57 stencil
+    must reach the format decision (R1.7's parity), an unregistered one must
+    stay format-invisible ({scene} ≡ {scene + skipped node item}). One honest
+    corner recorded: a registered graph whose emission later fails still
+    selects the format — an unused stencil aspect, never a wrong picture.
+  - **Missing vertex streams skip on WebGPU where GL shades with the default
+    attribute** — a pipeline must be given every buffer it declares, and a
+    default-value variant per missing-stream subset would multiply modules for
+    an authoring error; recorded divergence, §85-warned. Cross-domain draws
+    (screen graph on a renderable, surface graph as an effect) likewise skip —
+    the domains bake different bind-group/vertex shapes here.
+  - **Undisplaced node casters joined §69's caster pass** (GL's rule verbatim,
+    registration-independent — the caster module is the backend's own); R1.7's
+    "reachable only with the WGSL emitter" deviation retired.
+  - **The renderer's post-scan disposal re-check is scoped to the accessors the
+    new scan runs** (`nodePipelines !== null && this.#disposed`): a nodeless
+    frame keeps the pinned lose-its-shadows behaviour for a light-accessor
+    teardown; a graph-accessor teardown bails before allocating onto a dead
+    device.
+  - Measured: render-webgpu coverage 99.85/99.73 → **99.89/99.80** (new files
+    100×4); render 99.94/99.91; node symbols in 0/9 bundles (control 9/9);
+    declaration surface +0.10–0.12 kB gzip per Application bundle (worktree
+    A/B), all budgets green, no bumps. Browser gate **91/91**, including the
+    first executions of the R1.7/R1.8 specs (all passed as committed;
+    measurements recorded in headers). One §119 twin frame-pacing flake on the
+    first full run, green in isolation and on the rerun — the recorded
+    load-sensitivity, reconfirmed.
+
 - **2026-08-29 — WP-R1.8: WebGPU particles (§36) and compute (§82).** Decisions
   worth keeping:
   - **The particle block is a third group-0 layout — 192 B, projection/view/model,

@@ -16,6 +16,12 @@
  * `navigator.gpu`); the spec **skips** when `requestAdapter()` resolves
  * `null`; every assertion is a threshold or a specification-fixed value — no
  * goldens (§92, R-1 plan §5).
+ *
+ * **Measured on the first run (2026-08-29, SwiftShader — the WP-R1.9 gate,
+ * this spec's first execution since WP-R1.8 committed it):** the billboard
+ * module compiled with no validation error, every instance's quad sampled
+ * its own colour at its own position, and the uncovered corner stayed the
+ * clear colour.
  */
 
 import {

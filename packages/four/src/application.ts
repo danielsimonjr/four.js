@@ -189,6 +189,8 @@ import {
 import type {
   RenderStatistics,
   Renderer,
+  RendererCapabilityDeclaration,
+  RendererCapabilityShortfall,
   RendererFallbackReport,
   RendererRegistry,
   RendererSelection,
@@ -441,6 +443,37 @@ export interface ApplicationOptions {
    * one means it must work, so its failure is thrown rather than reported.
    */
   onRendererFallback?: (report: RendererFallbackReport) => void;
+
+  /**
+   * §62's *"applications may declare required and optional capabilities"*
+   * (WP-R1.9), forwarded verbatim as `RendererResolveOptions.capabilities` for
+   * the string form of {@link ApplicationOptions.renderer}.
+   *
+   * The selection rule and the tri-state honesty rule live on
+   * `RendererCapabilityDeclaration` in `@four/render`: `"auto"` skips a
+   * backend that does not affirm every `required` name (reported through
+   * {@link ApplicationOptions.onRendererFallback} with reason
+   * `"missing-capability"`), a named backend that cannot rejects
+   * {@link Application.initialize} with `RENDERER_INITIALIZATION_FAILED`, and
+   * `optional` shortfalls of the selected backend are reported through
+   * {@link ApplicationOptions.onRendererCapabilityShortfall}. A malformed
+   * declaration rejects `initialize` with a `RangeError` (§85).
+   *
+   * Unread for an instance — an author who constructed the backend has its
+   * record in hand and needs no negotiation — and ignored when no renderer is
+   * configured.
+   */
+  rendererCapabilities?: RendererCapabilityDeclaration;
+
+  /**
+   * Called once per declared capability a tried backend did not answer `true`
+   * (§62's diagnostics report, capability half; WP-R1.9) — forwarded verbatim
+   * as `RendererResolveOptions.onCapabilityShortfall`, on
+   * {@link ApplicationOptions.onRendererFallback}'s terms: a callback because
+   * the frozen §3.1 matrix gives `@four/render` no diagnostics edge, unread
+   * for an instance.
+   */
+  onRendererCapabilityShortfall?: (report: RendererCapabilityShortfall) => void;
 
   /**
    * The §62 registry {@link ApplicationOptions.renderer}'s string form resolves
@@ -1075,6 +1108,13 @@ export class Application extends EventEmitter<ApplicationEventMap> {
   readonly #onRendererFallback:
     ((report: RendererFallbackReport) => void) | undefined;
 
+  /** {@link ApplicationOptions.rendererCapabilities}; §62's declaration (WP-R1.9). */
+  readonly #rendererCapabilities: RendererCapabilityDeclaration | undefined;
+
+  /** {@link ApplicationOptions.onRendererCapabilityShortfall}; its report. */
+  readonly #onRendererCapabilityShortfall:
+    ((report: RendererCapabilityShortfall) => void) | undefined;
+
   /** {@link ApplicationOptions.rendererRegistry}; the shared one when absent. */
   readonly #rendererRegistry: RendererRegistry | undefined;
 
@@ -1206,6 +1246,8 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     this.#rendererSelection =
       typeof rendererOption === "string" ? rendererOption : null;
     this.#onRendererFallback = options.onRendererFallback;
+    this.#rendererCapabilities = options.rendererCapabilities;
+    this.#onRendererCapabilityShortfall = options.onRendererCapabilityShortfall;
     this.#rendererRegistry = options.rendererRegistry;
     this.#canvas = options.canvas;
     this.#antialias = options.antialias;
@@ -1502,6 +1544,11 @@ export class Application extends EventEmitter<ApplicationEventMap> {
             canvas: this.#canvas,
             antialias: this.#antialias,
             onFallback: this.#onRendererFallback,
+            // §62's capability declaration (WP-R1.9), forwarded verbatim —
+            // `undefined` fields cost the resolver nothing and this call no
+            // branch.
+            capabilities: this.#rendererCapabilities,
+            onCapabilityShortfall: this.#onRendererCapabilityShortfall,
           },
           this.#rendererRegistry,
         );

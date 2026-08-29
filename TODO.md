@@ -172,6 +172,14 @@ changes in `CHANGELOG.md`.
       readback), pending the next `test:browser` run — record first-run
       measurements into the spec headers then. `simulation: "gpu"` deliberately
       unwidened (WP-9.1 rule).
+- [x] **R-1 / WP-R1.9 — §62 capability declaration + the WGSL node pipeline —
+      landed 2026-08-29. R-1 COMPLETE.** Declaration at the resolve tier
+      (tri-state honesty, refuse-not-warn, §45 forwarded); `wgpu-node-program.ts`
+      behind `registerWebgpuNodeMaterialPipeline()` (source-keyed lazy modules,
+      per-program strided block, groups as data, §33 golden
+      `node-material-wgsl.json` over the GLSL golden's graphs); §70 `"graph"`
+      drawn on WebGPU (R1.6 pin flipped); undisplaced node casters cast; full
+      browser gate 91/91 with the deferred R1.7/R1.8 first-runs recorded.
 - [ ] **R-31 residue — wire the GPU integrator to `@four/particles`** (its own
       packet; needs that package): widen `simulation: "gpu"` in the same change
       that connects `PARTICLE_INTEGRATOR_SHADER_SOURCE` to the emitter (the
@@ -182,12 +190,16 @@ changes in `CHANGELOG.md`.
       move/mirror `ComputePassDescriptor` into `@four/render` and add optional
       `Renderer.compute?()`; `render-webgpu` re-exports (token-identity
       precedent); the umbrella's named-map `Four.ComputePass` sugar decides the
-      spec's `{ positions, velocities, parameters }` spelling then. WP-R1.9
-      (capability declaration + the WGSL emitter twin) is now the sole remaining
-      R-1 packet.
-- [ ] **§62's "applications may declare required and optional capabilities"** — still
-      unimplemented; now that the capability record is complete it is cheap
-      (WP-R1.9's first half, dispatches with the `R-14` wave).
+      spec's `{ positions, velocities, parameters }` spelling then. WP-R1.9 landed 2026-08-29 — the R-1 plan (R1.1–R1.9) is complete. What
+      remains around R-1 is not R-1's: this Q3 one-re-export promotion, the R-31
+      emitter wiring, the §62 canvas2d/svg stub tiers, and WebGPU skinned kinds
+      (joint-palette pipeline, unstaged — RFC 0003's successor filing).
+- [x] **§62's "applications may declare required and optional capabilities" —
+      DONE 2026-08-29 (WP-R1.9 first half).** `RendererResolveOptions.capabilities`
+      (+ §45's `rendererCapabilities`/`onRendererCapabilityShortfall`), closed
+      name union, §85 validation, tri-state honesty (`undefined` never satisfies
+      a requirement), `"auto"` skip with `"missing-capability"` reports, named
+      fail-fast, optional-never-gates.
 
 - [x] **R-31 mechanism closed on WebGPU (WP-R1.8, 2026-08-29)** — see the R-31
       residue item above for the remaining `@four/particles` wiring; WebGL 2

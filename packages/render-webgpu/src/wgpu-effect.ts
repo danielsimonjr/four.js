@@ -54,9 +54,11 @@ import { MAP_SAMPLER_BINDING, MAP_TEXTURE_BINDING } from "./wgpu-bindings.js";
 import { FRAGMENT_ENTRY_POINT, VERTEX_ENTRY_POINT } from "./wgpu-unlit.js";
 
 /**
- * The effect kinds this backend draws — `ScreenEffect`'s closed union minus
- * `"graph"`, which is RFC 0001's WGSL emitter and deliberately **absent** on
- * this backend (skipped, never approximated) until that emitter exists.
+ * The effect kinds this *fixed-effect family* draws — `ScreenEffect`'s closed
+ * union minus `"graph"`, which is RFC 0001's WGSL emitter (WP-R1.9): drawn by
+ * the registered node pipeline through its own per-graph modules
+ * (`wgpu-node-program.ts`), so it is dispatched before this family and never
+ * becomes a fourth member here.
  */
 export type WgpuEffectKind = "copy" | "grade" | "output-transform";
 

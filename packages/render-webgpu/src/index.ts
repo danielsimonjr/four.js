@@ -87,7 +87,12 @@ export type {
   WgpuPipelineKind,
   WgpuStencilDescriptor,
 } from "./wgpu-pipeline-cache.js";
-export { pipelineKey, WgpuPipelineCache } from "./wgpu-pipeline-cache.js";
+export {
+  blendStateFor,
+  pipelineKey,
+  stencilStateFor,
+  WgpuPipelineCache,
+} from "./wgpu-pipeline-cache.js";
 export type { WgpuRenderBatching } from "./wgpu-batch.js";
 export {
   WgpuBatching,
@@ -254,3 +259,30 @@ export {
   createStandardBindGroupLayout,
   standardShaderSource,
 } from "./wgpu-standard.js";
+// §60's node-material seam (RFC 0001; WP-R1.9). The registration slot and
+// its interfaces are always exported; `registerWebgpuNodeMaterialPipeline`
+// is what links the WGSL emitter and the pipeline store into a bundle —
+// `wgpu-node-registry.ts` owns the whole seam.
+export type {
+  WgpuNodeFrameState,
+  WgpuNodeItemMaterial,
+  WgpuNodeMaterialPipelineFactory,
+  WgpuNodeMaterialPipelines,
+  WgpuNodePipelineHost,
+} from "./wgpu-node-registry.js";
+export {
+  clearRegisteredWebgpuNodeMaterialPipeline,
+  resolveWebgpuNodeMaterialPipelineFactory,
+  setWebgpuNodeMaterialPipelineFactory,
+} from "./wgpu-node-registry.js";
+export type { EmittedWgslNodeShader } from "./wgpu-node-program.js";
+export {
+  NODE_SCREEN_BLOCK_BASE_BYTES,
+  NODE_SCREEN_TEXTURE_GROUP,
+  NODE_SURFACE_BLOCK_BASE_BYTES,
+  NODE_SURFACE_BLOCK_GROUP,
+  NODE_SURFACE_TEXTURE_GROUP,
+  WgpuNodePipelineStore,
+  emitShaderGraphWgsl,
+  registerWebgpuNodeMaterialPipeline,
+} from "./wgpu-node-program.js";

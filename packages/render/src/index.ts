@@ -153,6 +153,9 @@ export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export { MAX_SKINNING_JOINTS, Mesh, restoreMeshSkeleton } from "./mesh.js";
 export type {
+  RendererCapabilityDeclaration,
+  RendererCapabilityName,
+  RendererCapabilityShortfall,
   RendererFallbackReason,
   RendererFallbackReport,
   RendererRegistration,
@@ -161,11 +164,14 @@ export type {
 } from "./renderer-registry.js";
 export {
   AUTO_RENDERER_ORDER,
+  RENDERER_CAPABILITY_NAMES,
   RendererRegistry,
   clearRegisteredRenderers,
+  missingCapabilities,
   registerRenderer,
   registeredRenderers,
   resolveRenderer,
+  validateCapabilityDeclaration,
 } from "./renderer-registry.js";
 export type {
   RenderInterpolation,

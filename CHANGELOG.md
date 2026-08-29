@@ -8,6 +8,73 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — WP-R1.9: §62 capability declaration and the WGSL node pipeline (R-1 complete)
+
+#### Added
+
+- **render: §62's "applications may declare required and optional capabilities"
+  (WP-R1.9, first half).** `RendererResolveOptions.capabilities` takes a
+  `RendererCapabilityDeclaration` over a closed `RendererCapabilityName` union
+  (the six boolean §62 members; quantities deliberately undeclarable at this
+  tier), validated per §85 before any backend is constructed
+  (`validateCapabilityDeclaration`, exported). The tri-state honesty rule is
+  law: a **required** capability is satisfied only by an affirmative `true` —
+  `undefined` ("not taught to answer") refuses exactly as `false` does, and the
+  two non-answers stay distinguishable in every report. Under `"auto"` a
+  shortfalling backend is disposed and skipped with fallback reason
+  `"missing-capability"` (plus per-capability
+  `RendererResolveOptions.onCapabilityShortfall` reports); an explicitly named
+  backend fails fast with `RENDERER_INITIALIZATION_FAILED`, spelling out each
+  non-answer — §62's "rather than silently downgrading", extended from starting
+  to sufficing. **Optional never gates**: the selected backend's shortfalls are
+  reported, that is all. The check runs after `initialize` (§61 — the record is
+  authoritative only then). §45: `ApplicationOptions.rendererCapabilities` and
+  `onRendererCapabilityShortfall` forward verbatim for the string form.
+  Declaration-less resolutions are unchanged; measured cost +0.10–0.12 kB gzip
+  per Application bundle (the §45 fields), all budgets green, no bumps.
+- **render-webgpu: WP-R1.9 — §60 node materials and §70 graph effects: the WGSL
+  emitter (second half; the R-1 plan is complete).** `wgpu-node-program.ts`
+  emits WGSL from the shader-graph IR — §33-deterministic (two runs
+  byte-identical; new golden `tests/determinism/golden/node-material-wgsl.json`
+  beside the GLSL one, pinned over structurally identical graphs) — with the
+  GLSL emitter's closed-operator semantics: identical componentwise arithmetic,
+  mixed `min`/`max`/`step` splat the scalar explicitly, `saturate` is the
+  builtin, the §3.3.8 depth remap rides the surface vertex stage, and uniforms
+  travel as all-`vec4` lanes in one block (the declare-wide/read-narrow padding
+  rule, generalised to a buffer). Reached only through
+  `registerWebgpuNodeMaterialPipeline()` (`wgpu-node-registry.ts`, the GL
+  seam's twin — the renderer imports the slot, never the emitter): modules
+  compile lazily per distinct graph on the first frame that needs one, keyed on
+  the emitted source (one module for N materials sharing a structure), with
+  §57-state pipelines beneath each. Surface draws ride the store's own
+  256-strided uniform block (group 0: matrices + opacity/§9 time + uniform
+  lanes; texture/sampler pairs at group 1, reflection order — groups documented
+  as data); `positionOffset` displaces in the vertex stage; §67 clips,
+  `material.stencil` (via `frameWantsStencil`'s registration-scoped node
+  clause), blend/depth/colour-write state and §84 counters all apply; an
+  undisplaced node caster joins §69's map (GL's rule verbatim), a displacing
+  one is excluded. **§70's `"graph"` kind now draws on WebGPU** — the recorded
+  R1.6 absence retired, its pin flipped deliberately — through the same store
+  in its own pass: `"source"` plus declared inputs as one texture group, pass
+  uniforms sorted into the screen block (zero uniform traffic for a graph copy,
+  structurally), R-4's feedback refusal per sampled surface. Failure direction
+  is absence throughout: unregistered, latched-emission,
+  unbound/disposed/feedback textures, and missing vertex streams (a recorded
+  divergence — GL shades with the default attribute) all skip with one §85
+  warning. Byte-identity held: nodeless scenes transcript-identical registered
+  or not, and {scene} ≡ {scene + unregistered node item}, pinned as full tapes
+  on the fake device and in `tests/integration/webgpu-node-materials.test.ts`.
+  Emitter 0 B unless registered (grep: node symbols in 0 of 9 bundles; control
+  9/9). Browser (SwiftShader, all self-skipping without an adapter): five
+  emitted module shapes compiled and rasterised to exact texels; the graph copy
+  proven a per-pixel identity over an asymmetric source (the screen-domain
+  `(u, 1−v)` sample flip, measured); the radial-gradient proof through the
+  registered renderer — worst channel difference 3/255 over 24 probes, one
+  draw call; the graph effect halving a specification-fixed source. The full
+  `test:browser` gate ran 91/91, executing WP-R1.7's and WP-R1.8's
+  committed-but-never-run specs for the first time — all passed unchanged;
+  first-run measurements recorded into their headers per the gate convention.
+
 ### 2026-08-29 — WP-R1.8: WebGPU instanced particles and §82 compute
 
 #### Added

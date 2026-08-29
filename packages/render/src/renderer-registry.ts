@@ -77,7 +77,12 @@
 
 import { FourError } from "@four/core";
 
-import type { Renderer, RendererBackend, RendererOptions } from "./renderer.js";
+import type {
+  Renderer,
+  RendererBackend,
+  RendererCapabilities,
+  RendererOptions,
+} from "./renderer.js";
 
 /**
  * What an application may ask for (§45, §62): `"auto"` for §62's ordered
@@ -145,12 +150,109 @@ export interface RendererRegistration {
   create(options?: RendererOptions): Renderer | Promise<Renderer>;
 }
 
+/**
+ * The §62 capabilities an application may **declare** — the boolean members of
+ * {@link RendererCapabilities}, by their field names.
+ *
+ * A closed union rather than `string`, for the closed-union house reason: a
+ * capability this record cannot answer must be a compile error, never a name
+ * the resolver quietly fails to find. The numeric members
+ * (`maxTextureSize`, `maxUniformBufferBytes`, `maxBindings`,
+ * `maximumSkinningJoints`) and the format lists are deliberately not
+ * declarable at this tier — a requirement over a *quantity* needs a threshold
+ * grammar, and inventing one before a consumer asks would be §62 guessed at
+ * rather than implemented. Widening this union is additive.
+ */
+export type RendererCapabilityName =
+  | "multisampling"
+  | "floatRenderTargets"
+  | "timestampQueries"
+  | "storageBuffers"
+  | "computeShaders"
+  | "indirectDraw";
+
+/** Every declarable name, in {@link RendererCapabilities}' field order (§33). */
+export const RENDERER_CAPABILITY_NAMES = [
+  "multisampling",
+  "floatRenderTargets",
+  "timestampQueries",
+  "storageBuffers",
+  "computeShaders",
+  "indirectDraw",
+] as const satisfies readonly RendererCapabilityName[];
+
+/**
+ * §62's *"applications may declare required and optional capabilities"*, as
+ * the declaration {@link resolveRenderer} accepts (WP-R1.9).
+ *
+ * - **`required`** gates selection. `"auto"` skips a backend that does not
+ *   answer every required name `true` (reported through
+ *   {@link RendererResolveOptions.onFallback} with reason
+ *   `"missing-capability"`), and an explicitly named backend that cannot
+ *   fails fast with `RENDERER_INITIALIZATION_FAILED` — §62's own
+ *   "rather than silently downgrading", extended from *starting* to
+ *   *sufficing*.
+ * - **`optional`** never gates selection. Each optional name the selected
+ *   backend does not answer `true` is reported through
+ *   {@link RendererResolveOptions.onCapabilityShortfall}, so an application
+ *   configures its fallback path from one report instead of probing fields.
+ *
+ * ## The tri-state honesty rule
+ *
+ * {@link RendererCapabilities} answers each member `true`, `false`, or
+ * `undefined` — and `undefined` means *"this backend has not been taught to
+ * answer"*, which is not a yes. A required capability is therefore satisfied
+ * **only by an affirmative `true`**: treating silence as satisfaction would
+ * hand an application a backend on the strength of a question never answered,
+ * which is precisely the confident wrong answer the record's documentation
+ * warns costs a crash. The shortfall report distinguishes the two non-answers
+ * (`answer: false` vs `answer: undefined`) so a diagnostics channel can tell
+ * "cannot" from "did not say".
+ *
+ * The check runs **after** {@link Renderer.initialize}, because §61 lets a
+ * backend publish its real record only once it has queried a device; under
+ * `"auto"` a backend skipped for a missing capability is disposed exactly as
+ * one whose initialization rejected.
+ */
+export interface RendererCapabilityDeclaration {
+  /** Capabilities the application cannot run without. */
+  readonly required?: readonly RendererCapabilityName[];
+  /** Capabilities the application would use, and will adapt without. */
+  readonly optional?: readonly RendererCapabilityName[];
+}
+
+/**
+ * One declared capability a backend did not affirm, as
+ * {@link RendererResolveOptions.onCapabilityShortfall} sees it (§62's
+ * diagnostics report, capability half).
+ */
+export interface RendererCapabilityShortfall {
+  /** The backend whose record fell short. */
+  readonly backend: RendererBackend;
+  /** The declared capability. */
+  readonly capability: RendererCapabilityName;
+  /**
+   * The record's actual answer: `false` — the backend reports it cannot — or
+   * `undefined` — the backend has not been taught to answer (the tri-state's
+   * third value, never silently promoted to satisfaction).
+   */
+  readonly answer: false | undefined;
+  /** Which half of the declaration named it. */
+  readonly requirement: "required" | "optional";
+}
+
 /** Why `"auto"` moved past a registered backend (§62's "diagnostics event"). */
 export type RendererFallbackReason =
   /** {@link RendererRegistration.isSupported} answered `false`. */
   | "unsupported"
   /** The backend was built, and {@link Renderer.initialize} rejected. */
-  | "initialization-failed";
+  | "initialization-failed"
+  /**
+   * The backend initialized, but did not answer every
+   * {@link RendererCapabilityDeclaration.required} capability `true`
+   * (WP-R1.9); it was disposed and the walk moved on.
+   */
+  | "missing-capability";
 
 /** One skipped backend, as {@link RendererResolveOptions.onFallback} sees it. */
 export interface RendererFallbackReport {
@@ -160,6 +262,11 @@ export interface RendererFallbackReport {
   readonly reason: RendererFallbackReason;
   /** The rejection, for `"initialization-failed"`; absent otherwise. */
   readonly error?: unknown;
+  /**
+   * The required capabilities the backend did not affirm, in declaration
+   * order — present exactly for `"missing-capability"` (WP-R1.9).
+   */
+  readonly missing?: readonly RendererCapabilityName[];
 }
 
 /**
@@ -177,6 +284,27 @@ export interface RendererResolveOptions extends RendererOptions {
    * propagates — this is the application's own code.
    */
   onFallback?: (report: RendererFallbackReport) => void;
+
+  /**
+   * §62's required/optional capability declaration (WP-R1.9) — see
+   * {@link RendererCapabilityDeclaration} for the selection rule and the
+   * tri-state honesty rule. Validated per §85 before anything is constructed;
+   * an unknown name, a non-array half, or a name declared in both halves is
+   * refused with a `RangeError` at the resolve call, never discovered as a
+   * capability that silently matched nothing.
+   */
+  capabilities?: RendererCapabilityDeclaration;
+
+  /**
+   * Called once per declared capability a tried backend did not answer `true`
+   * (WP-R1.9): for every **required** shortfall of a backend `"auto"` skips —
+   * beside its {@link RendererResolveOptions.onFallback} report — and for
+   * every **optional** shortfall of the backend actually selected, whichever
+   * way it was selected. Required shortfalls of an *explicitly named* backend
+   * are thrown rather than reported, {@link RendererResolveOptions.onFallback}'s
+   * rule. A throwing listener propagates — this is the application's own code.
+   */
+  onCapabilityShortfall?: (report: RendererCapabilityShortfall) => void;
 }
 
 /** §89's code for every failure in this module. */
@@ -187,6 +315,102 @@ function describeBackends(backends: readonly RendererBackend[]): string {
   return backends.length === 0
     ? "none"
     : backends.map((backend) => JSON.stringify(backend)).join(", ");
+}
+
+/** The declarable-name set, for {@link validateCapabilityDeclaration}. */
+const CAPABILITY_NAME_SET: ReadonlySet<string> = new Set(
+  RENDERER_CAPABILITY_NAMES,
+);
+
+/** Checks one half of a declaration; returns the validated list. */
+function requireCapabilityNames(
+  half: "required" | "optional",
+  names: readonly RendererCapabilityName[] | undefined,
+): readonly RendererCapabilityName[] {
+  if (names === undefined) {
+    return [];
+  }
+  // The alias is `unknown` so `Array.isArray` cannot narrow the parameter
+  // itself to `any[]` (`analyzeShaderGraph`'s note, same reason).
+  const raw: unknown = names;
+  if (!Array.isArray(raw)) {
+    throw new RangeError(
+      `RendererCapabilityDeclaration.${half} must be an array of capability ` +
+        `names; got ${typeof names} (§62, §85).`,
+    );
+  }
+  for (const name of names) {
+    if (!CAPABILITY_NAME_SET.has(name)) {
+      throw new RangeError(
+        `RendererCapabilityDeclaration.${half} names ${JSON.stringify(name)}, ` +
+          "which is not a declarable §62 capability; the declarable set is " +
+          `${RENDERER_CAPABILITY_NAMES.map((known) => JSON.stringify(known)).join(", ")} (§85).`,
+      );
+    }
+  }
+  return names;
+}
+
+/**
+ * Validates a {@link RendererCapabilityDeclaration} (§62, §85) — the one
+ * validation, run by {@link RendererRegistry.resolve} before any backend is
+ * constructed, and exported so an application layer forwarding a declaration
+ * (§45) can refuse it at *its* setup edge with the same rule.
+ *
+ * @throws RangeError for a half that is not an array, a name outside
+ * {@link RENDERER_CAPABILITY_NAMES}, or a name declared in both halves — a
+ * requirement already implies the interest an optional declaration states, so
+ * the duplicate is a contradiction in the caller's intent, refused rather
+ * than resolved by precedence.
+ */
+export function validateCapabilityDeclaration(
+  declaration: RendererCapabilityDeclaration | undefined,
+): void {
+  if (declaration === undefined) {
+    return;
+  }
+  const required = requireCapabilityNames("required", declaration.required);
+  const optional = requireCapabilityNames("optional", declaration.optional);
+  for (const name of optional) {
+    if (required.includes(name)) {
+      throw new RangeError(
+        `RendererCapabilityDeclaration declares ${JSON.stringify(name)} both ` +
+          "required and optional; a requirement already implies the " +
+          "interest, so declare it once (§62, §85).",
+      );
+    }
+  }
+}
+
+/**
+ * The declared `names` that `capabilities` does not answer `true`, in
+ * declaration order (§33) — the tri-state honesty rule as a pure function:
+ * `false` and `undefined` are both shortfalls, and the report tells them
+ * apart. Exported so the rule is testable — and quotable — without a registry.
+ */
+export function missingCapabilities(
+  capabilities: RendererCapabilities,
+  names: readonly RendererCapabilityName[] | undefined,
+): RendererCapabilityName[] {
+  const missing: RendererCapabilityName[] = [];
+  if (names !== undefined) {
+    for (const name of names) {
+      if (capabilities[name] !== true) {
+        missing.push(name);
+      }
+    }
+  }
+  return missing;
+}
+
+/** Renders one shortfall for the fail-fast message, tri-state spelled out. */
+function describeShortfall(
+  capabilities: RendererCapabilities,
+  name: RendererCapabilityName,
+): string {
+  return capabilities[name] === false
+    ? `${JSON.stringify(name)} (reports it cannot)`
+    : `${JSON.stringify(name)} (does not report it — not an affirmative answer)`;
 }
 
 /**
@@ -284,6 +508,10 @@ export class RendererRegistry {
     selection: RendererSelection,
     options?: RendererResolveOptions,
   ): Promise<Renderer> {
+    // §62's declaration, validated once, before any backend is constructed
+    // (§85's setup-time stance): a typo must be a refusal at this line, never
+    // a requirement that silently matched nothing.
+    validateCapabilityDeclaration(options?.capabilities);
     if (selection !== "auto") {
       return this.#resolveExplicit(selection, options);
     }
@@ -316,6 +544,39 @@ export class RendererRegistry {
           options,
         );
         continue;
+      }
+      // §62's required declaration (WP-R1.9), answered against the record the
+      // backend published at initialize — the only moment it is authoritative
+      // (§61). A shortfall disposes the renderer exactly as a rejected
+      // initialize does, reports each capability with its tri-state answer,
+      // and moves the walk on.
+      const missing = missingCapabilities(
+        renderer.capabilities,
+        options?.capabilities?.required,
+      );
+      if (missing.length > 0) {
+        for (const capability of missing) {
+          this.#shortfall(renderer, capability, "required", options);
+        }
+        try {
+          renderer.dispose();
+        } catch {
+          // Intentionally ignored: the disposal-must-not-mask rule above.
+        }
+        this.#report(
+          reports,
+          { backend, reason: "missing-capability", missing },
+          options,
+        );
+        continue;
+      }
+      // The selected backend's optional shortfalls (§62's optional half):
+      // reported, never gating — that is what "optional" means.
+      for (const capability of missingCapabilities(
+        renderer.capabilities,
+        options?.capabilities?.optional,
+      )) {
+        this.#shortfall(renderer, capability, "optional", options);
       }
       return renderer;
     }
@@ -368,6 +629,41 @@ export class RendererRegistry {
     }
     const renderer = await registration.create(options);
     await renderer.initialize(options);
+    // §62's required declaration, fail-fast form (WP-R1.9): a named backend
+    // that initialized but cannot affirm a required capability is disposed
+    // and refused — handing it back would be the silent downgrade §62
+    // forbids, one sentence later than it forbids it at initialization. The
+    // tri-state rule holds here too: `undefined` ("not taught to answer") is
+    // not an affirmative answer, and the message says which non-answer each
+    // capability gave.
+    const missing = missingCapabilities(
+      renderer.capabilities,
+      options?.capabilities?.required,
+    );
+    if (missing.length > 0) {
+      const detail = missing
+        .map((name) => describeShortfall(renderer.capabilities, name))
+        .join(", ");
+      try {
+        renderer.dispose();
+      } catch {
+        // Intentionally ignored: disposal must not mask the refusal (§83).
+      }
+      throw new FourError(
+        SELECTION_ERROR_CODE,
+        `The ${JSON.stringify(backend)} renderer initialized but does not ` +
+          `affirm required capabilities: ${detail} (§62). An explicitly ` +
+          'named backend fails fast rather than downgrading; use renderer: "auto" ' +
+          "to fall back, or drop the requirement.",
+        { context: { selection: backend, missing } },
+      );
+    }
+    for (const capability of missingCapabilities(
+      renderer.capabilities,
+      options?.capabilities?.optional,
+    )) {
+      this.#shortfall(renderer, capability, "optional", options);
+    }
     return renderer;
   }
 
@@ -379,6 +675,23 @@ export class RendererRegistry {
   ): void {
     reports.push(report);
     options?.onFallback?.(report);
+  }
+
+  /** Forwards one capability shortfall to the §62 report callback (WP-R1.9). */
+  #shortfall(
+    renderer: Renderer,
+    capability: RendererCapabilityName,
+    requirement: "required" | "optional",
+    options?: RendererResolveOptions,
+  ): void {
+    options?.onCapabilityShortfall?.({
+      backend: renderer.capabilities.backend,
+      capability,
+      // The record's own value, narrowed by the shortfall's definition: not
+      // `true` means `false` or `undefined`, and the report keeps which.
+      answer: renderer.capabilities[capability] === false ? false : undefined,
+      requirement,
+    });
   }
 }
 

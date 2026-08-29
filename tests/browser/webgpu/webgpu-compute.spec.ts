@@ -17,6 +17,12 @@
  *
  * Mechanics follow the sibling specs' recorded decisions verbatim: imported
  * WGSL, a string page program, a served page, self-skip without an adapter.
+ *
+ * **Measured on the first run (2026-08-29, SwiftShader — the WP-R1.9 gate,
+ * this spec's first execution since WP-R1.8 committed it):** the §36
+ * integrator's one semi-implicit-Euler step read back **exactly** (bit
+ * equality on every lane), and the count guard left the untouched lane
+ * untouched.
  */
 
 import {

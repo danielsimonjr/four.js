@@ -145,9 +145,11 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * ```
  *
  * §62's *"applications may declare required and optional capabilities"* is the
- * half that still does not exist: a declaration mechanism belongs with the
- * `"auto"` selector (`renderer-registry.ts`), and it is filed as WP-R1.9 rather
- * than guessed at here.
+ * other half, and it lives where the selection does (WP-R1.9):
+ * `RendererResolveOptions.capabilities` in `renderer-registry.ts` — `"auto"`
+ * skips a backend that does not affirm every required name, a named backend
+ * fails fast, and optional shortfalls are reported. The tri-state above is
+ * load-bearing there: `undefined` never satisfies a requirement.
  *
  * Treat instances as immutable: a renderer publishes its capabilities once, at
  * {@link Renderer.initialize} time, and callers only read them.

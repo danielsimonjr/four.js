@@ -20,6 +20,11 @@
  * three assertions that each catch a different failure (a blank surface, a
  * wrong ratio, a right ratio in the wrong place). Thresholds and ratios,
  * never goldens (§92; R-1 plan §5).
+ *
+ * **Measured on the first run (2026-08-29, SwiftShader — the WP-R1.9 gate,
+ * this spec's first execution since WP-R1.7 committed it):** 18 432 orange
+ * pixels unmasked, 3 072 masked — ratio 0.1667 against the geometric 1/6
+ * exactly; masked box x 72…119, y 64…127.
  */
 
 import { unlitShaderSource } from "@four/render-webgpu";
