@@ -42,28 +42,30 @@ changes in `CHANGELOG.md`.
       capability fields across fourteen members with per-backend honesty,
       WP-R1.9 declaration, "auto" implemented; WebGPU row moved to
       R-1-complete; two §1 consequences corrected. check-compat green.
-- [ ] **packages/render/src/renderer.ts capability doc-comment overclaims** (found
-      2026-08-29): "the three backends… answer all of them" is false —
-      `WebglRenderer` deliberately omits `maxUniformBufferBytes`/`maxBindings`
-      (R-30b, `webgl-renderer.ts`), and the comment's
-      `MAX_VERTEX_UNIFORM_VECTORS` conversion aside describes code that does not
-      exist; `WebgpuRenderer` omits `maximumSkinningJoints`. Code-comment fix;
-      COMPATIBILITY §2 already states the truth.
-- [ ] **docs/guides/materials-and-render-graph.md is stale** (found 2026-08-29):
-      §60 "not implemented", §62 "render-webgpu scaffold-only", §65 "nothing else
-      is batched", §68–§70 "shadows and post-processing not implemented", and the
-      §55 `frame` "has not landed" claim all contradict the tip; guides README
-      item 5's description moves with it.
-- [ ] **tools/check-docs.mjs retired-claim pin №(§55 + "batched") has a stale rationale**
-      ("§65 batching is unshipped" — opt-in batching shipped R-9, 2026-08-09);
-      decide whether the pin itself still holds now the claim can be
-      conditionally true.
+- [x] **packages/render/src/renderer.ts capability doc-comment overclaims — DONE
+      2026-08-29**: the doc now records the R-30b omissions
+      (`maxUniformBufferBytes`/`maxBindings` on `WebglRenderer`) and
+      `WebgpuRenderer`'s absent `maximumSkinningJoints`; the phantom
+      `MAX_VERTEX_UNIFORM_VECTORS` conversion aside is deleted. Comment-only;
+      `@four/render` 627 tests and `pnpm run docs` (0 warnings) green.
+- [x] **docs/guides/materials-and-render-graph.md — DONE 2026-08-29**: rewritten
+      to the tip (§60 RFC 0001, §62 R-1 complete, §65 opt-in R-9, §68–§70
+      R-17/R-18/R-6, §55 `frame` R-29), every claim verified in source; four
+      further stale claims found and fixed (§57–§59 row, class count, blending
+      and colour-edit bullets, sort keys). Guides README item 5 updated. The
+      packet's own found-not-fixed items (AUDIT-120 sprites row, CLAUDE.md stub
+      count) were fixed at landing.
+- [x] **tools/check-docs.mjs §55-batched pin — DONE 2026-08-29**: pin kept
+      (batching is opt-in — `renderer.batching` defaults to `null`, so the
+      unqualified "batched" is still false of the default path; a truthful
+      sentence says "opt-in" and cannot match the retired form); rationale
+      rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                      reachability are backend-independent and re-exported through `@four/render`;
-                      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                      (screen domain included, for §70 graph effects).
+                          input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                          reachability are backend-independent and re-exported through `@four/render`;
+                          the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                          (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission

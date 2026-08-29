@@ -28,6 +28,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **A retired-claim pin can outlive the feature's shipping when the ship was
+  opt-in** (2026-08-29, check-docs §55-batched pin): the pin guards the
+  _original unqualified wording_, not the feature's absence. §65 batching
+  shipped (R-9) but defaults off, so "batched" without "opt-in" is still false —
+  keep such pins and rewrite their `why` to name the default-path truth, rather
+  than deleting them because the claim became conditionally true.
+
 - **2026-08-29 — A-19 / §78: the glTF loader.** Decisions worth keeping:
   - **The parse/assembly split is the TextureAsset seam one level up.**
     `@four/assets` (§3.1 row: `core` alone) parses to plain validated data —

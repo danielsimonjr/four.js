@@ -132,10 +132,19 @@ export type RendererBackend = "webgpu" | "webgl2" | "canvas2d" | "svg" | "null";
  * third-party backend still satisfies the type unchanged, which is the hazard
  * §61 records about adding interface members.
  *
- * The three backends this monorepo ships answer **all** of them:
- * {@link NullRenderer} with the floor, `WebglRenderer` with WebGL 2's honest
- * conservative values (`computeShaders: false` is a true statement about
- * WebGL 2, not a shortfall), and `WebgpuRenderer` from the device's own limits.
+ * Coverage across the shipped backends is honest rather than total.
+ * {@link NullRenderer} answers every member with the floor; `WebglRenderer`
+ * answers with WebGL 2's honest conservative values (`computeShaders: false`
+ * is a true statement about WebGL 2, not a shortfall) but **deliberately
+ * omits `maxUniformBufferBytes` and `maxBindings`** — R-30b's recorded law, *a
+ * capability query must be lazy if the alternative moves recorded
+ * transcripts*, applies verbatim to the two extra `getParameter` calls, and
+ * nothing in the engine reads either number yet (see `webgl-renderer.ts`);
+ * `WebgpuRenderer` answers from the device's own limits but omits
+ * `maximumSkinningJoints`, having no skinned pipeline (RFC 0003). This
+ * paragraph claimed the three backends "answer **all** of them" until
+ * 2026-08-29; the omissions above were deliberate from the day each backend's
+ * record landed.
  *
  * A consumer therefore reads a member as a tri-state:
  *
@@ -229,9 +238,12 @@ export interface RendererCapabilities {
    * single shader may see. `0` for a backend with no shaders.
    *
    * Bytes rather than WebGL 2's "uniform vectors", because a byte size is the
-   * quantity both backends can state and the one a caller sizing a buffer
-   * actually needs; the WebGL 2 backend converts (`MAX_VERTEX_UNIFORM_VECTORS`
-   * counts `vec4`s, i.e. 16 bytes each).
+   * quantity a caller sizing a buffer actually needs. The WebGPU backend
+   * reports the device's `maxUniformBufferBindingSize`; the WebGL 2 backend
+   * deliberately reports nothing here (R-30b — see `webgl-renderer.ts` for the
+   * lazy-query law). Until 2026-08-29 this doc described a WebGL 2
+   * `MAX_VERTEX_UNIFORM_VECTORS`-to-bytes conversion; no such code ever
+   * existed.
    */
   readonly maxUniformBufferBytes?: number;
 

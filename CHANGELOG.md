@@ -8,6 +8,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — Fixed: three recorded truth fixes + two follow-ons
+
+#### Fixed
+
+- **Three recorded truth fixes (the 2026-08-29 sweep's found-not-fixed items).**
+  `packages/render/src/renderer.ts`'s capability doc no longer claims the three
+  backends "answer **all** of them" — it now records `WebglRenderer`'s
+  deliberate omission of `maxUniformBufferBytes`/`maxBindings` (R-30b's
+  lazy-query law) and `WebgpuRenderer`'s omission of `maximumSkinningJoints`,
+  and the phantom `MAX_VERTEX_UNIFORM_VECTORS` byte-conversion aside is deleted
+  (no such code ever existed). Comment-only; `@four/render` tests green
+  unchanged. `docs/guides/materials-and-render-graph.md` rewritten to the tip:
+  §60 shipped (RFC 0001), §62's WebGPU backend shipped (R-1 complete), §65
+  opt-in batching (R-9), §68–§70's punctual-light/shadow/post-processing tiers,
+  and `Sprite.frame` (R-29) replace the "not implemented" rows and the
+  atlas-cutting workaround; the §57–§59 row, material-class count, blending and
+  colour-edit bullets, and the sort description were also stale and now match
+  `render-list.ts`, `material.ts` and `unlit-material.ts`.
+  `docs/guides/README.md` item 5's description moved with it.
+  `tools/check-docs.mjs`'s §55-batched pin is kept — `renderer.batching`
+  defaults to `null`, so the unqualified "batched" is still false of the
+  default path — with its stale "§65 batching is unshipped" rationale replaced
+  by the opt-in truth.
+- **Two follow-ons at landing** (the packet's own found-not-fixed items):
+  `docs/AUDIT-120.md`'s sprites row no longer says §65 batching is unshipped
+  (opt-in since R-9, dated correction in place), and `CLAUDE.md`'s repository
+  state counts **four** reserved stubs — `render-webgpu` left the list with the
+  R-1 plan (WP-R1.1–R1.9).
+
 ### 2026-08-29 — §78 glTF 2.0 loader (A-19 closed: parse tier in `@four/assets`, assembly in `four`)
 
 #### Added

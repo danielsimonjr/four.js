@@ -10,8 +10,10 @@ physics in one shared scene model. **The implementation plan (§103–§113a) is
 `packages/*` packages build, test, and lint — ~3,000 unit tests with a tooling-enforced
 ≥95% per-package coverage gate, cross-package suites in `tests/{integration,determinism}/`,
 Playwright browser gates in `tests/browser/`, pixel-golden visual tests in `tests/visual/`,
-and performance records in `benchmarks/`. Five packages are deliberate reserved stubs
-(`physics-box2d`, `physics-soft`, `render-webgpu`, `render-canvas`, `render-svg`).
+and performance records in `benchmarks/`. Four packages are deliberate reserved stubs
+(`physics-box2d`, `physics-soft`, `render-canvas`, `render-svg`); `render-webgpu`
+left the stub list 2026-08-21…29 (the R-1 plan, WP-R1.1–R1.9 — a full second GPU
+backend).
 
 Toolchain (§91, pins in plan §3.2): strict TypeScript, ESM with `.js` import suffixes, pnpm
 workspace (`pnpm -r` replaced Turborepo 2026-08-03), Vitest, Playwright, ESLint, Prettier,
@@ -58,7 +60,7 @@ participate. Key cross-cutting designs to understand before implementing anythin
   negative Y), radians everywhere, **all times in seconds** (tween/timeline durations
   included — no milliseconds anywhere), mutable math types with `out`-parameter hot paths.
 - **Components and events (§6a/§6b):** `RigidBody`, colliders, and `MotionComponent` are
-  *components* attached via `node.addComponent(...)` (one per type); one typed
+  _components_ attached via `node.addComponent(...)` (one per type); one typed
   `EventEmitter` API serves nodes and the application; physics events dispatch after each
   fixed step.
 - **Fixed-step simulation loop (§10):** physics steps on a fixed-delta accumulator clamped
@@ -71,7 +73,7 @@ participate. Key cross-cutting designs to understand before implementing anythin
   `physics`, `blended`, `constraint`, `network`) owns a node's transform; conflicts must
   warn rather than silently overwrite. `"blended"` selects the §19 physics-animation
   pipeline. Render interpolation never feeds back into physics state.
-- **Motion vs. animation vs. physics:** animation specifies how something *should* move,
+- **Motion vs. animation vs. physics:** animation specifies how something _should_ move,
   kinematics moves objects directly, dynamics derives motion from forces — the engine
   supports all of these with controlled blending (§19: animation pose → kinematic
   modification → physics solve → interpolated render pose).

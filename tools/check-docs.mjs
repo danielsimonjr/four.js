@@ -273,7 +273,16 @@ const RETIRED = [
     re: /§55; batched/,
     where: ["docs/AUDIT-120.md"],
     allow: ["CHANGELOG.md"],
-    why: "the WebGL backend draws one sprite per draw call; §65 batching is unshipped",
+    // The pin outlives R-9 (2026-08-09), which shipped §65 batching *opt-in*
+    // (`createGlBatching()`/`createWgpuBatching()`): a default renderer still
+    // draws one sprite per draw call, so the original unqualified wording this
+    // regex matches stays false — a truthful sentence must say "opt-in", and
+    // in saying so stops matching the retired form.
+    why:
+      "the WebGL backend draws one sprite per draw call unless batching is " +
+      "opted into (§65 shipped opt-in as R-9, 2026-08-09); the unqualified " +
+      '"batched" this pins was false when written and is still false of ' +
+      "the default path",
   },
   {
     re: /There are no golden images/,

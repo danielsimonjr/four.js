@@ -33,8 +33,12 @@ assumes the ones above it:
 4. **[Transform authority](transform-authority.md)** — §42's one-owner rule,
    authority handovers, and the §19 physics-animation blending pipeline.
 5. **[Materials and the render graph](materials-and-render-graph.md)** — the
-   shipped unlit/sprite material tier, render lists, and the honest state of
-   the §63 render graph.
+   five shipped material classes over §57's complete base (§59's
+   `StandardMaterial` and §60's `NodeMaterial` included), render lists and
+   opt-in §65 batching, and the shipped §63 render graph with its §69/§70
+   tiers. (Until 2026-08-29 this entry read "the shipped unlit/sprite
+   material tier … and the honest state of the §63 render graph", describing
+   the guide's pre-rewrite staleness.)
 6. **[Collision filtering](collision-filtering.md)** — bodies, colliders,
    physics materials, groups and masks (§24), events (§29), and queries (§30).
 7. **[Units and numerical stability](units-and-numerical-stability.md)** —
