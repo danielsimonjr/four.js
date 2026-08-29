@@ -2,9 +2,9 @@ metadata:
   name: four.js-monorepo
   version: 0.0.0
   lastUpdated: "2026-08-29"
-  totalFiles: 264
+  totalFiles: 266
   totalModules: 24
-  totalExports: 2644
+  totalExports: 2685
 entryPoints:
   - file: packages/animation/src/index.ts
     type: main
@@ -2461,6 +2461,8 @@ modules:
           imports:
             - RenderStatistics
             - Renderer
+            - RendererCapabilityDeclaration
+            - RendererCapabilityShortfall
             - RendererFallbackReport
             - RendererRegistry
             - RendererSelection
@@ -9320,11 +9322,14 @@ modules:
         - file: ./renderer-registry.js
           imports:
             - AUTO_RENDERER_ORDER
+            - RENDERER_CAPABILITY_NAMES
             - RendererRegistry
             - clearRegisteredRenderers
+            - missingCapabilities
             - registerRenderer
             - registeredRenderers
             - resolveRenderer
+            - validateCapabilityDeclaration
           reExport: true
         - file: ./renderer.js
           imports:
@@ -9476,6 +9481,9 @@ modules:
           typeOnly: true
         - file: ./renderer-registry.js
           imports:
+            - RendererCapabilityDeclaration
+            - RendererCapabilityName
+            - RendererCapabilityShortfall
             - RendererFallbackReason
             - RendererFallbackReport
             - RendererRegistration
@@ -9623,11 +9631,14 @@ modules:
         - Mesh
         - restoreMeshSkeleton
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
         - RendererRegistry
         - clearRegisteredRenderers
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - resolveRenderer
+        - validateCapabilityDeclaration
         - NullRenderer
         - liveRenderTargetCount
         - liveTextureCount
@@ -9720,6 +9731,9 @@ modules:
         - RenderTargetTexture
         - RenderableOptions
         - SurfaceMaterial
+        - RendererCapabilityDeclaration
+        - RendererCapabilityName
+        - RendererCapabilityShortfall
         - RendererFallbackReason
         - RendererFallbackReport
         - RendererRegistration
@@ -9816,11 +9830,14 @@ modules:
         - Mesh
         - restoreMeshSkeleton
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
         - RendererRegistry
         - clearRegisteredRenderers
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - resolveRenderer
+        - validateCapabilityDeclaration
         - NullRenderer
         - liveRenderTargetCount
         - liveTextureCount
@@ -9912,6 +9929,9 @@ modules:
         - RenderTargetTexture
         - RenderableOptions
         - SurfaceMaterial
+        - RendererCapabilityDeclaration
+        - RendererCapabilityName
+        - RendererCapabilityShortfall
         - RendererFallbackReason
         - RendererFallbackReport
         - RendererRegistration
@@ -10336,6 +10356,7 @@ modules:
           imports:
             - Renderer
             - RendererBackend
+            - RendererCapabilities
             - RendererOptions
           typeOnly: true
       workspaceDependencies:
@@ -10345,6 +10366,9 @@ modules:
             - FourError
       exports:
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
+        - validateCapabilityDeclaration
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - clearRegisteredRenderers
@@ -10354,15 +10378,20 @@ modules:
         - RendererRegistry
       interfaces:
         - RendererRegistration
+        - RendererCapabilityDeclaration
+        - RendererCapabilityShortfall
         - RendererFallbackReport
         - RendererResolveOptions
       functions:
+        - validateCapabilityDeclaration
+        - missingCapabilities
         - registerRenderer
         - registeredRenderers
         - clearRegisteredRenderers
         - resolveRenderer
       constants:
         - AUTO_RENDERER_ORDER
+        - RENDERER_CAPABILITY_NAMES
     packages/render/src/renderer.ts:
       description: The renderer interface (§61) — the seam every backend implements.
       externalDependencies: []
@@ -11776,7 +11805,9 @@ modules:
           reExport: true
         - file: ./wgpu-pipeline-cache.js
           imports:
+            - blendStateFor
             - pipelineKey
+            - stencilStateFor
             - WgpuPipelineCache
           reExport: true
         - file: ./wgpu-batch.js
@@ -11940,6 +11971,23 @@ modules:
             - createStandardBindGroupLayout
             - standardShaderSource
           reExport: true
+        - file: ./wgpu-node-registry.js
+          imports:
+            - clearRegisteredWebgpuNodeMaterialPipeline
+            - resolveWebgpuNodeMaterialPipelineFactory
+            - setWebgpuNodeMaterialPipelineFactory
+          reExport: true
+        - file: ./wgpu-node-program.js
+          imports:
+            - NODE_SCREEN_BLOCK_BASE_BYTES
+            - NODE_SCREEN_TEXTURE_GROUP
+            - NODE_SURFACE_BLOCK_BASE_BYTES
+            - NODE_SURFACE_BLOCK_GROUP
+            - NODE_SURFACE_TEXTURE_GROUP
+            - WgpuNodePipelineStore
+            - emitShaderGraphWgsl
+            - registerWebgpuNodeMaterialPipeline
+          reExport: true
         - file: ./webgpu-device.js
           imports:
             - Gpu
@@ -12034,6 +12082,20 @@ modules:
             - WgpuStencilSource
           reExport: true
           typeOnly: true
+        - file: ./wgpu-node-registry.js
+          imports:
+            - WgpuNodeFrameState
+            - WgpuNodeItemMaterial
+            - WgpuNodeMaterialPipelineFactory
+            - WgpuNodeMaterialPipelines
+            - WgpuNodePipelineHost
+          reExport: true
+          typeOnly: true
+        - file: ./wgpu-node-program.js
+          imports:
+            - EmittedWgslNodeShader
+          reExport: true
+          typeOnly: true
       workspaceDependencies: []
       exports:
         - GPU_BUFFER_USAGE
@@ -12058,7 +12120,9 @@ modules:
         - createDrawBindGroupLayout
         - createTextureBindGroupLayout
         - WgpuGeometryCache
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
         - WgpuPipelineCache
         - WgpuBatching
         - batchVertexBufferLayout
@@ -12179,6 +12243,17 @@ modules:
         - STANDARD_VIEW_PROJECTION_OFFSET
         - createStandardBindGroupLayout
         - standardShaderSource
+        - clearRegisteredWebgpuNodeMaterialPipeline
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - setWebgpuNodeMaterialPipelineFactory
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SCREEN_TEXTURE_GROUP
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - WgpuNodePipelineStore
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
         - PACKAGE_NAME
         - Gpu
         - GpuAdapter
@@ -12234,6 +12309,12 @@ modules:
         - ComputePassDescriptor
         - WgpuParticleRecord
         - WgpuStencilSource
+        - WgpuNodeFrameState
+        - WgpuNodeItemMaterial
+        - WgpuNodeMaterialPipelineFactory
+        - WgpuNodeMaterialPipelines
+        - WgpuNodePipelineHost
+        - EmittedWgslNodeShader
       reExported:
         - GPU_BUFFER_USAGE
         - GPU_MAP_MODE
@@ -12257,7 +12338,9 @@ modules:
         - createDrawBindGroupLayout
         - createTextureBindGroupLayout
         - WgpuGeometryCache
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
         - WgpuPipelineCache
         - WgpuBatching
         - batchVertexBufferLayout
@@ -12378,6 +12461,17 @@ modules:
         - STANDARD_VIEW_PROJECTION_OFFSET
         - createStandardBindGroupLayout
         - standardShaderSource
+        - clearRegisteredWebgpuNodeMaterialPipeline
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - setWebgpuNodeMaterialPipelineFactory
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SCREEN_TEXTURE_GROUP
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - WgpuNodePipelineStore
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
         - Gpu
         - GpuAdapter
         - GpuStencilFaceState
@@ -12432,6 +12526,12 @@ modules:
         - ComputePassDescriptor
         - WgpuParticleRecord
         - WgpuStencilSource
+        - WgpuNodeFrameState
+        - WgpuNodeItemMaterial
+        - WgpuNodeMaterialPipelineFactory
+        - WgpuNodeMaterialPipelines
+        - WgpuNodePipelineHost
+        - EmittedWgslNodeShader
       constants:
         - PACKAGE_NAME
     packages/render-webgpu/src/register.ts:
@@ -12617,6 +12717,11 @@ modules:
           imports:
             - WgpuTextureCache
             - WgpuCacheableTexture
+        - file: ./wgpu-node-registry.js
+          imports:
+            - resolveWebgpuNodeMaterialPipelineFactory
+            - WgpuNodeFrameState
+            - WgpuNodeMaterialPipelines
         - file: ./wgpu-unlit.js
           imports:
             - CLEAR_VERTEX_COUNT
@@ -12957,6 +13062,154 @@ modules:
         - NORMAL_SHADER_LOCATION
         - NORMAL_BUFFER_LAYOUT
         - NORMAL_MATRIX_WGSL
+    packages/render-webgpu/src/wgpu-node-program.ts:
+      description: "The node-material pipeline for WebGPU (§60, §62; RFC 0001 — WP-R1.9): a"
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GPU_BUFFER_USAGE
+            - GPU_SHADER_STAGE
+            - GpuBindGroup
+            - GpuBindGroupEntry
+            - GpuBindGroupLayout
+            - GpuBuffer
+            - GpuPipelineLayout
+            - GpuRenderPassEncoder
+            - GpuRenderPipeline
+            - GpuShaderModule
+            - GpuTextureView
+            - GpuVertexBufferLayout
+        - file: ./wgpu-effect.js
+          imports:
+            - EFFECT_PASS_VERTEX_COUNT
+        - file: ./wgpu-lit.js
+          imports:
+            - NORMAL_BUFFER_LAYOUT
+        - file: ./wgpu-pipeline-cache.js
+          imports:
+            - blendStateFor
+            - stencilStateFor
+            - WgpuStencilDescriptor
+        - file: ./wgpu-node-registry.js
+          imports:
+            - setWebgpuNodeMaterialPipelineFactory
+            - WgpuNodeFrameState
+            - WgpuNodeItemMaterial
+            - WgpuNodeMaterialPipelines
+            - WgpuNodePipelineHost
+        - file: ./wgpu-render-target.js
+          imports:
+            - WgpuCacheableRenderTarget
+            - WgpuRenderTargetCache
+          typeOnly: true
+        - file: ./wgpu-stencil.js
+          imports:
+            - applyStencilReference
+            - stencilDescriptor
+        - file: ./wgpu-unlit.js
+          imports:
+            - COLOR_BUFFER_LAYOUT
+            - FRAGMENT_ENTRY_POINT
+            - POSITION_BUFFER_LAYOUT
+            - UV_BUFFER_LAYOUT
+            - VERTEX_ENTRY_POINT
+      workspaceDependencies:
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - devWarnOnce
+            - Disposable
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - SHADER_VALUE_COMPONENTS
+            - analyzeShaderGraph
+            - isRenderTargetTexture
+            - GraphEffect
+            - NodeRenderItem
+            - RenderItem
+            - RenderStatistics
+            - ShaderAttributeName
+            - ShaderDomain
+            - ShaderGraph
+            - ShaderGraphAnalysis
+            - ShaderNode
+            - ShaderUniformReflection
+            - ShaderValueType
+      exports:
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - NODE_SCREEN_TEXTURE_GROUP
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
+        - WgpuNodePipelineStore
+      classes:
+        - WgpuNodePipelineStore
+      interfaces:
+        - EmittedWgslNodeShader
+      functions:
+        - emitShaderGraphWgsl
+        - registerWebgpuNodeMaterialPipeline
+      constants:
+        - NODE_SURFACE_BLOCK_BASE_BYTES
+        - NODE_SCREEN_BLOCK_BASE_BYTES
+        - NODE_SURFACE_BLOCK_GROUP
+        - NODE_SURFACE_TEXTURE_GROUP
+        - NODE_SCREEN_TEXTURE_GROUP
+    packages/render-webgpu/src/wgpu-node-registry.ts:
+      description: The WebGPU node-material pipeline's registration slot (§60, §62; RFC 0001;
+      externalDependencies: []
+      nodeDependencies: []
+      internalDependencies:
+        - file: ./webgpu-device.js
+          imports:
+            - GpuDevice
+            - GpuRenderPassEncoder
+            - GpuTextureView
+          typeOnly: true
+        - file: ./wgpu-geometry.js
+          imports:
+            - WgpuGeometryCache
+          typeOnly: true
+        - file: ./wgpu-render-target.js
+          imports:
+            - WgpuCacheableRenderTarget
+            - WgpuRenderTargetCache
+          typeOnly: true
+        - file: ./wgpu-texture.js
+          imports:
+            - WgpuTextureCache
+          typeOnly: true
+      workspaceDependencies:
+        - package: "@four/math"
+          directory: packages/math
+          imports:
+            - Matrix4
+        - package: "@four/render"
+          directory: packages/render
+          imports:
+            - GraphEffect
+            - NodeRenderItem
+            - RenderItem
+            - RenderStatistics
+      exports:
+        - setWebgpuNodeMaterialPipelineFactory
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - clearRegisteredWebgpuNodeMaterialPipeline
+      interfaces:
+        - WgpuNodePipelineHost
+        - WgpuNodeFrameState
+        - WgpuNodeMaterialPipelines
+        - WgpuNodeMaterialPipelineFactory
+      functions:
+        - setWebgpuNodeMaterialPipelineFactory
+        - resolveWebgpuNodeMaterialPipelineFactory
+        - clearRegisteredWebgpuNodeMaterialPipeline
     packages/render-webgpu/src/wgpu-particles.ts:
       description: The batched particle pipeline for the WebGPU backend (§36, §64 stage 6,
       externalDependencies: []
@@ -13065,7 +13318,9 @@ modules:
           imports:
             - RenderItemStencil
       exports:
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
         - WgpuPipelineCache
       classes:
         - WgpuPipelineCache
@@ -13074,7 +13329,9 @@ modules:
         - WgpuBatchStream
         - WgpuPipelineDescriptor
       functions:
+        - blendStateFor
         - pipelineKey
+        - stencilStateFor
     packages/render-webgpu/src/wgpu-readback.ts:
       description: "`readPixels`' mechanism: `copyTextureToBuffer` + `mapAsync` (WP-R1.6; §61,"
       externalDependencies: []
@@ -15469,6 +15726,8 @@ dependencyGraph:
         - packages/render-webgpu/src/wgpu-geometry.ts
         - packages/render-webgpu/src/wgpu-lights.ts
         - packages/render-webgpu/src/wgpu-lit.ts
+        - packages/render-webgpu/src/wgpu-node-program.ts
+        - packages/render-webgpu/src/wgpu-node-registry.ts
         - packages/render-webgpu/src/wgpu-particles.ts
         - packages/render-webgpu/src/wgpu-pipeline-cache.ts
         - packages/render-webgpu/src/wgpu-readback.ts
@@ -15525,18 +15784,18 @@ dependencyGraph:
         - packages/ui/src/slider.ts
         - packages/ui/src/widget.ts
 statistics:
-  totalTypeScriptFiles: 264
+  totalTypeScriptFiles: 266
   totalModules: 24
-  totalLinesOfCode: 127360
-  totalExports: 2644
-  totalClasses: 174
-  totalInterfaces: 516
-  totalFunctions: 411
+  totalLinesOfCode: 129888
+  totalExports: 2685
+  totalClasses: 175
+  totalInterfaces: 523
+  totalFunctions: 420
   totalTypeGuards: 23
   totalEnums: 0
-  totalConstants: 400
-  totalReExports: 1681
-  totalTypeOnlyImports: 311
+  totalConstants: 406
+  totalReExports: 1706
+  totalTypeOnlyImports: 318
   runtimeCircularDeps: 0
   typeOnlyCircularDeps: 3
   unusedFilesCount: 0

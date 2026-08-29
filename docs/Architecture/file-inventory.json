@@ -1,12 +1,12 @@
 {
   "generated": "2026-08-29",
-  "totalFiles": 664,
+  "totalFiles": 673,
   "byDisposition": {
-    "reachable": 216,
+    "reachable": 218,
     "build-entry": 48,
     "test-only": 0,
     "orphan": 0,
-    "test": 378,
+    "test": 385,
     "tool": 1,
     "config": 12,
     "example": 9
@@ -14,12 +14,12 @@
   "byArea": {
     "examples": 9,
     "config": 12,
-    "src": 264,
-    "tests": 378,
+    "src": 266,
+    "tests": 385,
     "tools": 1
   },
   "byPackage": {
-    "(root)": 179,
+    "(root)": 184,
     "@four/animation": 25,
     "@four/assets": 14,
     "@four/core": 24,
@@ -38,8 +38,8 @@
     "@four/render-canvas": 2,
     "@four/render-svg": 2,
     "@four/render-webgl": 23,
-    "@four/render-webgpu": 34,
-    "@four/render": 47,
+    "@four/render-webgpu": 37,
+    "@four/render": 48,
     "@four/scene": 32,
     "@four/serialization": 9,
     "@four/text": 6,
@@ -758,7 +758,7 @@
       "package": "four",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 2052
+      "loc": 2099
     },
     {
       "file": "packages/four/src/assets.ts",
@@ -954,7 +954,7 @@
       "package": "four",
       "area": "tests",
       "disposition": "test",
-      "loc": 2230
+      "loc": 2294
     },
     {
       "file": "packages/four/tests/barrels.test.ts",
@@ -2501,7 +2501,7 @@
       "package": "@four/render-webgpu",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 257
+      "loc": 289
     },
     {
       "file": "packages/render-webgpu/src/register.ts",
@@ -2522,7 +2522,7 @@
       "package": "@four/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 3243
+      "loc": 3468
     },
     {
       "file": "packages/render-webgpu/src/wgpu-batch.ts",
@@ -2550,7 +2550,7 @@
       "package": "@four/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 192
+      "loc": 194
     },
     {
       "file": "packages/render-webgpu/src/wgpu-geometry.ts",
@@ -2574,6 +2574,20 @@
       "loc": 279
     },
     {
+      "file": "packages/render-webgpu/src/wgpu-node-program.ts",
+      "package": "@four/render-webgpu",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 1627
+    },
+    {
+      "file": "packages/render-webgpu/src/wgpu-node-registry.ts",
+      "package": "@four/render-webgpu",
+      "area": "src",
+      "disposition": "reachable",
+      "loc": 219
+    },
+    {
       "file": "packages/render-webgpu/src/wgpu-particles.ts",
       "package": "@four/render-webgpu",
       "area": "src",
@@ -2585,7 +2599,7 @@
       "package": "@four/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 959
+      "loc": 977
     },
     {
       "file": "packages/render-webgpu/src/wgpu-readback.ts",
@@ -2599,7 +2613,7 @@
       "package": "@four/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 399
+      "loc": 423
     },
     {
       "file": "packages/render-webgpu/src/wgpu-shadow.ts",
@@ -2627,7 +2641,7 @@
       "package": "@four/render-webgpu",
       "area": "src",
       "disposition": "reachable",
-      "loc": 170
+      "loc": 183
     },
     {
       "file": "packages/render-webgpu/src/wgpu-texture.ts",
@@ -2690,7 +2704,7 @@
       "package": "@four/render-webgpu",
       "area": "tests",
       "disposition": "test",
-      "loc": 397
+      "loc": 426
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-lit.test.ts",
@@ -2698,6 +2712,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 509
+    },
+    {
+      "file": "packages/render-webgpu/tests/wgpu-node-program.test.ts",
+      "package": "@four/render-webgpu",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 1548
     },
     {
       "file": "packages/render-webgpu/tests/wgpu-particles.test.ts",
@@ -2767,7 +2788,7 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "build-entry",
-      "loc": 242
+      "loc": 248
     },
     {
       "file": "packages/render/src/lights.ts",
@@ -2837,14 +2858,14 @@
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 477
+      "loc": 790
     },
     {
       "file": "packages/render/src/renderer.ts",
       "package": "@four/render",
       "area": "src",
       "disposition": "reachable",
-      "loc": 971
+      "loc": 973
     },
     {
       "file": "packages/render/src/resource-memory.ts",
@@ -3006,6 +3027,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 432
+    },
+    {
+      "file": "packages/render/tests/renderer-capabilities-declaration.test.ts",
+      "package": "@four/render",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 377
     },
     {
       "file": "packages/render/tests/renderer-registry.test.ts",
@@ -3708,6 +3736,13 @@
       "loc": 181
     },
     {
+      "file": "tests/browser/fixtures/webgpu-node-material-page.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 234
+    },
+    {
       "file": "tests/browser/interaction.spec.ts",
       "package": "(root)",
       "area": "tests",
@@ -3831,7 +3866,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 167
+      "loc": 173
     },
     {
       "file": "tests/browser/webgpu/webgpu-effects.spec.ts",
@@ -3848,18 +3883,25 @@
       "loc": 566
     },
     {
+      "file": "tests/browser/webgpu/webgpu-node-materials.spec.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 757
+    },
+    {
       "file": "tests/browser/webgpu/webgpu-particles.spec.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 236
+      "loc": 242
     },
     {
       "file": "tests/browser/webgpu/webgpu-shadows.spec.ts",
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 666
+      "loc": 672
     },
     {
       "file": "tests/browser/webgpu/webgpu-sprites.spec.ts",
@@ -3873,7 +3915,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 335
+      "loc": 340
     },
     {
       "file": "tests/browser/webgpu/webgpu-unlit.spec.ts",
@@ -3958,6 +4000,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 367
+    },
+    {
+      "file": "tests/determinism/helpers/node-shader-scenarios.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 58
     },
     {
       "file": "tests/determinism/helpers/path-scenario.ts",
@@ -4142,6 +4191,13 @@
       "loc": 123
     },
     {
+      "file": "tests/determinism/shader-graph-wgsl.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 86
+    },
+    {
       "file": "tests/determinism/skinned-pose.test.ts",
       "package": "(root)",
       "area": "tests",
@@ -4230,7 +4286,7 @@
       "package": "(root)",
       "area": "tests",
       "disposition": "test",
-      "loc": 341
+      "loc": 345
     },
     {
       "file": "tests/integration/examples-build-coverage.test.ts",
@@ -4616,6 +4672,13 @@
       "area": "tests",
       "disposition": "test",
       "loc": 335
+    },
+    {
+      "file": "tests/integration/webgpu-node-materials.test.ts",
+      "package": "(root)",
+      "area": "tests",
+      "disposition": "test",
+      "loc": 242
     },
     {
       "file": "tests/integration/webgpu-particles.test.ts",
