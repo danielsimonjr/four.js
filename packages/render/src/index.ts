@@ -15,6 +15,15 @@ export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
 export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
 
 export type {
+  ComputeBinding,
+  ComputeBindingAccess,
+  ComputeBuffer,
+  ComputeDispatcher,
+  ComputePassDescriptor,
+} from "./compute.js";
+export { COMPUTE_ENTRY_POINT, supportsCompute } from "./compute.js";
+
+export type {
   ColorGradeEffect,
   CopyEffect,
   EffectRenderPass,

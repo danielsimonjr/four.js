@@ -87,6 +87,7 @@ import type { Disposable } from "@four/core";
 import { EventEmitter, FourError } from "@four/core";
 import type { Node, PoseBuffer, Viewport } from "@four/scene";
 
+import type { ComputePassDescriptor } from "./compute.js";
 import type { EffectRenderPass } from "./effect-pass.js";
 import type { PickingService } from "./picking.js";
 import type { RenderTarget } from "./render-target.js";
@@ -673,6 +674,38 @@ export interface Renderer extends Disposable {
    * own id buffer; the caller owns it and disposes it (§83).
    */
   createPickingService?(): PickingService;
+
+  /**
+   * Records and submits one §82 compute dispatch — the kernel in
+   * `pass.shader`, `pass.workgroups` workgroups, `pass.bindings` bound in
+   * array order at `@group(0)` (WP-R1.8; promoted here by the R-1 plan's Q3,
+   * 2026-08-29).
+   *
+   * **Optional, and its presence is the capability** — the fourth instance of
+   * the {@link Renderer.statistics} / {@link Renderer.renderEffect} /
+   * {@link Renderer.createPickingService} stance, for the same two reasons: a
+   * required member would break every implementor, and a backend with no
+   * compute stage (WebGL 2, Canvas 2D, SVG, the null tier) must say so by
+   * omission rather than by emulating on the CPU — §82's own closing sentence
+   * makes compute an *advanced optional capability*, and §62's
+   * `computeShaders` capability is how an application asks before reaching
+   * for it. {@link supportsCompute} is the type-level test.
+   *
+   * A backend that declares it owes:
+   *
+   * - **Nothing in the frame path** — §82's "basic graphics and physics
+   *   functionality must not require compute support", held structurally:
+   *   `render` never calls this and this never draws;
+   * - refusal of a buffer another backend created, a disposed buffer, and a
+   *   malformed grid — loudly (`INVALID_APPLICATION_STATE`), never as a
+   *   silent no-op (§85);
+   * - `UNSUPPORTED_GPU_FEATURE` when the live device turns out to lack the
+   *   compute entry points the backend expected (`readPixels`' contract).
+   *
+   * Buffer allocation stays a backend API — see `compute.ts`'s module header
+   * for what deliberately did not move.
+   */
+  compute?(pass: ComputePassDescriptor): void;
 
   /**
    * Resizes the drawing surface to `width` × `height` **logical** pixels at

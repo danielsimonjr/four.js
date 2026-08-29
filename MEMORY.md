@@ -28,6 +28,51 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — R-31 wiring + Q3 promotion (§36 `simulation: "gpu"`; §82
+  `ComputePass` promoted).** Decisions worth keeping:
+  - **CPU spawn + GPU integrate.** Every §33-bearing decision (RNG stream,
+    4-draw order, bursts, accumulator, ageing, expiry, ramps) stays CPU-side — a
+    GPU emitter's spawn stream is bit-identical to a CPU emitter's, pinned; the
+    device takes only the O(n) Euler step. GPU-resident state is
+    **display-tier**: outside every §33 tier the engine claims (no cross-adapter
+    float promise; f32 vs binary64-intermediate rounding), no golden may
+    checksum it, and §34 has no surface for it by design — a CPU-side snapshot
+    would be spawn-stale and restoring it a lie.
+  - **The draw joins by node id, not by an item field.** The renderer registry
+    (`createParticleSimulation({ systemId })`) is what let the wiring land
+    without touching `ParticleDrawable`/`ParticleRenderItem`;
+    `WgpuParticleCache` already keys on the same id. Residual stated hazard: a
+    different renderer drawing a GPU system shows spawn positions.
+  - **The position buffer is the instance stream** —
+    `STORAGE|VERTEX|COPY_DST|COPY_SRC` (the one usage deviation from the
+    compute trio), bound at 12-byte stride to the same `@location(1)`;
+    size/colour keep riding the interleaved CPU repack (ramps are functions of
+    CPU age). One pipeline variant `gpuInstances` (`|gi:y`, appended
+    only-when-true — landed keys byte-identical), zero new WGSL.
+  - **Swap-remove mirrors through a 24-byte scratch** (WebGPU forbids
+    same-buffer copies), in exactly the CPU compaction order; never
+    `from === to`. Batching many moves per encoder is a recorded, unbuilt
+    refinement.
+  - **Refuse, never degrade:** unbound GPU `step()`/`emit()` throw; GPU mode
+    refuses `fields`/`collisionPlaneY`/capacity 0; only a compute-capable
+    surface mints a driver (`UNSUPPORTED_GPU_FEATURE`, probed at creation);
+    binding is once (device loss ⇒ new emitter). Silent CPU fallback would
+    change results silently — §62's anti-downgrade sentence reaches simulation.
+  - **Q3 executed as recorded:** one re-export; the promoted handle is
+    structural (`ComputeBuffer`, branded), so the backend dispatch now refuses
+    foreign buffers loudly; allocation stays backend API; `Four.ComputePass`
+    maps record-key insertion order to `@binding(i)` and never reflects on the
+    shader.
+  - Measured: render-webgpu 99.89/99.80 held exactly (new files 100×4);
+    particles/four 100×4; compute symbols 0/9 bundles (`createVertexArray`
+    control 9/9); 7 of 9 bundles hash-identical; particles-demo +0.55 kB
+    (budget bumped 35.5 → 36 kB with the measurement).
+  - **Multi-agent note (eighth confirmation):** the glTF sibling shared
+    `packages/four/src/index.ts` (both packets' export blocks coexisted; the
+    file was left unstaged so neither packet claimed the other's hunk — the
+    second landing took it); a docs sibling moved the tip mid-session; all
+    gates ran green on the moved tree.
+
 - **2026-08-29 (doc-truth sweep): trust the backend, not the interface comment,
   for capability coverage.** `renderer.ts`'s `RendererCapabilities` doc claims
   all three shipped backends answer every member; the authority is each

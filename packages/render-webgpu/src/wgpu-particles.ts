@@ -187,6 +187,68 @@ export const PARTICLE_VERTEX_BUFFER_LAYOUTS: readonly GpuVertexBufferLayout[] =
   Object.freeze([POSITION_BUFFER_LAYOUT, PARTICLE_INSTANCE_BUFFER_LAYOUT]);
 
 /**
+ * Vertex layout of a **GPU-simulated** system's position stream (§36
+ * `simulation: "gpu"`, R-31 wiring): the simulation's flat x,y,z storage
+ * buffer — `wgpu-particle-simulation.ts`'s `positions`, allocated with
+ * `VERTEX` for exactly this bind — read per instance at the same
+ * `@location(1)` the interleaved stream feeds, 12-byte stride.
+ *
+ * Same shader module, different plumbing: the WGSL above never changes,
+ * because a location is a name and this layout merely re-sources it — which
+ * is what makes the GPU variant one pipeline-cache entry
+ * (`gpuInstances: true`, `wgpu-pipeline-cache.ts`) and zero new WGSL.
+ */
+export const PARTICLE_GPU_POSITION_BUFFER_LAYOUT: GpuVertexBufferLayout =
+  Object.freeze({
+    arrayStride: 12,
+    stepMode: "instance",
+    attributes: Object.freeze([
+      Object.freeze({
+        format: "float32x3",
+        offset: 0,
+        shaderLocation: 1,
+      }),
+    ]),
+  });
+
+/**
+ * Vertex layout of the CPU half of a GPU-simulated draw: the **same**
+ * interleaved 32-byte instance stream, minus the position attribute — size
+ * and colour are ramp values, functions of CPU-side age, and keep riding the
+ * per-frame repack; the stale position lanes in that stream stride past
+ * unread (`@four/particles`' `updateParticleInstances` documents the lanes).
+ */
+export const PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT: GpuVertexBufferLayout =
+  Object.freeze({
+    arrayStride: PARTICLE_INSTANCE_STRIDE_BYTES,
+    stepMode: "instance",
+    attributes: Object.freeze([
+      Object.freeze({
+        format: "float32",
+        offset: PARTICLE_SIZE_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 2,
+      }),
+      Object.freeze({
+        format: "float32x4",
+        offset: PARTICLE_COLOR_OFFSET * Float32Array.BYTES_PER_ELEMENT,
+        shaderLocation: 3,
+      }),
+    ]),
+  });
+
+/**
+ * The GPU-simulated particle pipeline's three vertex buffers, in slot order:
+ * the shared corner quad, the simulation's position storage buffer, then the
+ * interleaved stream for size and colour.
+ */
+export const PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS: readonly GpuVertexBufferLayout[] =
+  Object.freeze([
+    POSITION_BUFFER_LAYOUT,
+    PARTICLE_GPU_POSITION_BUFFER_LAYOUT,
+    PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT,
+  ]);
+
+/**
  * The particle WGSL module — the GL vertex/fragment pair, translated.
  *
  * One variant, like the sprite's: a particle always carries its colour in the

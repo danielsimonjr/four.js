@@ -58,6 +58,7 @@ import { batchVertexBufferLayout } from "./wgpu-batch.js";
 import { effectShaderSource, type WgpuEffectKind } from "./wgpu-effect.js";
 import { litShaderSource, shadedVertexBufferLayouts } from "./wgpu-lit.js";
 import {
+  PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS,
   PARTICLE_SHADER_SOURCE,
   PARTICLE_VERTEX_BUFFER_LAYOUTS,
 } from "./wgpu-particles.js";
@@ -299,6 +300,19 @@ export interface WgpuPipelineDescriptor {
    * the renderer may pass the flag unconditionally on shaded draws.
    */
   readonly shadow?: boolean;
+
+  /**
+   * Whether a `kind: "particles"` pipeline sources instance positions from
+   * a GPU simulation's storage buffer instead of the interleaved CPU stream
+   * (§36 `simulation: "gpu"`, R-31 wiring, 2026-08-29) — vertex-layout
+   * identity (`PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS` vs
+   * `PARTICLE_VERTEX_BUFFER_LAYOUTS`) over the **same** WGSL module.
+   * Appended to the key **only when `true`** (the `shadow` rule, second
+   * application): `false` and absent name the very pipeline every landed
+   * CPU-simulated transcript compiled, so its key and its `four:<key>`
+   * label stay byte-identical.
+   */
+  readonly gpuInstances?: boolean;
 }
 
 /**
@@ -355,6 +369,9 @@ export function pipelineKey(descriptor: WgpuPipelineDescriptor): string {
   }
   if (descriptor.shadow === true) {
     key += "|sh:y";
+  }
+  if (descriptor.gpuInstances === true) {
+    key += "|gi:y";
   }
   return key;
 }
@@ -854,7 +871,12 @@ export class WgpuPipelineCache {
       return [POSITION_BUFFER_LAYOUT];
     }
     if (descriptor.kind === "particles") {
-      return PARTICLE_VERTEX_BUFFER_LAYOUTS;
+      // §36 `simulation: "gpu"` re-sources @location(1) from the
+      // simulation's storage buffer; the module is shared either way
+      // (`wgpu-particles.ts` on the two layout tables).
+      return descriptor.gpuInstances === true
+        ? PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS
+        : PARTICLE_VERTEX_BUFFER_LAYOUTS;
     }
     if (descriptor.kind === "lit" || descriptor.kind === "standard") {
       return shadedVertexBufferLayouts(

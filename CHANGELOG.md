@@ -8,6 +8,32 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — §36 GPU particle simulation wired + the Q3 ComputePass promotion (R-31 closed)
+
+#### Added
+
+- **§36 `simulation: "gpu"` + the Q3 `ComputePass` promotion (R-31 residue
+  closed, 2026-08-29).** `@four/render` gains `compute.ts`
+  (`ComputePassDescriptor`, structural `ComputeBuffer`, `supportsCompute`) and
+  optional `Renderer.compute?()` — the optional-member pattern's fourth
+  instance; `@four/render-webgpu` re-exports the promoted tokens (identity
+  preserved, no call site moved) and refuses foreign buffer handles per binding;
+  the umbrella ships §82's `Four.ComputePass` named-map sugar (record-key
+  insertion order = binding order). `@four/particles` widens
+  `ParticleEmitterOptions.simulation` **in the same change** that wires
+  `PARTICLE_INTEGRATOR_SHADER_SOURCE` to the emitter (the WP-9.1 rule): CPU
+  spawn + GPU integrate through the structural `ParticleGpuSimulation`
+  contract, implemented by `WebgpuRenderer.createParticleSimulation` —
+  GPU-resident flat-lane buffers, swap-remove mirrored via a scratch, and the
+  draw re-sourcing `@location(1)` from the simulation's `STORAGE|VERTEX`
+  position buffer (`|gi:y` pipeline variant, zero new WGSL, joined by node id).
+  GPU mode refuses `fields`/`collisionPlaneY`/unbound stepping loudly;
+  GPU-simulated state is display-tier (§33) with no snapshot surface (§34) —
+  recorded in `types.ts`. CPU-simulated scenes byte-identical (suites
+  bit-exact; seven of nine example bundles hash-identical); compute symbols in
+  0/9 bundles; particles-demo +0.55 kB (the emitter's non-shakeable option
+  branch — budget bumped 35.5 → 36 kB with the measurement).
+
 ### 2026-08-29 — Docs: the documentation truth sweep (COMPATIBILITY §2, custom shaders, §77a guide)
 
 #### Docs

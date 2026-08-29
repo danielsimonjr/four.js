@@ -214,6 +214,9 @@ export {
 } from "./wgpu-compute.js";
 export type { WgpuParticleRecord } from "./wgpu-particles.js";
 export {
+  PARTICLE_GPU_INSTANCE_BUFFER_LAYOUT,
+  PARTICLE_GPU_POSITION_BUFFER_LAYOUT,
+  PARTICLE_GPU_VERTEX_BUFFER_LAYOUTS,
   PARTICLE_INSTANCE_BUFFER_LAYOUT,
   PARTICLE_INSTANCE_STRIDE_BYTES,
   PARTICLE_MODEL_OFFSET,
@@ -226,6 +229,12 @@ export {
   WgpuParticleCache,
   createParticleBindGroupLayout,
 } from "./wgpu-particles.js";
+export type { WgpuParticleSimulationOptions } from "./wgpu-particle-simulation.js";
+export {
+  PARTICLE_SIMULATION_SCRATCH_BYTES,
+  PARTICLE_SIMULATION_VECTOR_BYTES,
+  WgpuParticleSimulation,
+} from "./wgpu-particle-simulation.js";
 export {
   SHADOW_FACTOR_WGSL,
   SHADOW_LIGHT_UNIFORM_BYTES,

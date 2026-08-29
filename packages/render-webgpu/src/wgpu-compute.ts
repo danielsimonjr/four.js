@@ -3,26 +3,28 @@
  * groups over storage buffers, dispatch, and buffer readback, plus the §36
  * GPU particle **integrator** kernel that makes gap row `R-31` movable.
  *
- * ## Where §82's `ComputePass` lives, for now — the Q3 seam, stated
+ * ## Where §82's `ComputePass` lives — the Q3 promotion, executed
  *
- * The R-1 plan's owner question Q3 recommends the descriptor in
- * `@four/render` with `Renderer.compute?()` as the optional-member-is-the-
- * capability seam (the `statistics`/`renderEffect` pattern's third instance).
- * This packet lands the descriptor **here**, in the only backend that can run
- * it, because `packages/render` is inside RFC 0004's concurrent scope and a
- * shared-file edit there would collide with an in-flight sibling. The
- * promotion is a **one-re-export follow-up**: `@four/render` gains the
- * descriptor type and the optional `Renderer.compute?()` member, this module
- * re-exports the type from there, and no call site moves — the capability-
- * token identity precedent. Nothing in the shape below assumes this package:
- * {@link ComputePassDescriptor} names only WGSL, workgroup counts, and buffer
- * handles.
+ * WP-R1.8 landed the descriptor **here** because `packages/render` was inside
+ * RFC 0004's concurrent scope; the recorded follow-up — the R-1 plan's owner
+ * question Q3 — executed on 2026-08-29 as the promised **one re-export**:
+ * {@link ComputePassDescriptor}, {@link ComputeBinding},
+ * {@link ComputeBindingAccess} and {@link COMPUTE_ENTRY_POINT} now live in
+ * `@four/render`'s `compute.ts` (with the structural `ComputeBuffer` handle
+ * and the optional `Renderer.compute?()` member), and this module re-exports
+ * them — the capability-token identity precedent, so no call site moved.
+ * What stays here is everything device-shaped: {@link WgpuComputeBuffer}
+ * (the one `ComputeBuffer` implementor), the cache, the helpers, and the §36
+ * integrator kernel.
  *
  * §82's spec example spells `bindings` as a *named map*
- * (`{ positions, velocities, parameters }`); the backend seam takes an
- * **ordered array**, where index *i* is `@group(0) @binding(i)` — order is
- * what a bind-group layout actually consumes, and the named-map sugar is the
- * umbrella-level `Four.ComputePass`'s to add when the Q3 promotion lands.
+ * (`{ positions, velocities, parameters }`); the seam takes an **ordered
+ * array**, where index *i* is `@group(0) @binding(i)` — order is what a
+ * bind-group layout actually consumes, and the named-map sugar is the
+ * umbrella-level `Four.ComputePass`, landed with the same promotion. Because
+ * the handle type is now structural, {@link WgpuComputeCache.dispatch}
+ * additionally refuses a buffer some *other* backend minted — an
+ * `instanceof` narrowing per binding, loud rather than a guess (§85).
  *
  * ## Presence is the capability (§62, R-30b)
  *
@@ -66,6 +68,13 @@
  */
 
 import { FourError } from "@four/core";
+import {
+  COMPUTE_ENTRY_POINT,
+  type ComputeBinding,
+  type ComputeBindingAccess,
+  type ComputeBuffer,
+  type ComputePassDescriptor,
+} from "@four/render";
 
 import {
   GPU_BUFFER_USAGE,
@@ -79,48 +88,11 @@ import {
   type GpuBuffer,
 } from "./webgpu-device.js";
 
-/** Entry point name of every compute stage this backend ships. */
-export const COMPUTE_ENTRY_POINT = "computeMain";
-
-/**
- * How a dispatch binds one storage buffer: writable, or read-only.
- *
- * `"read-write"` is WGSL's `var<storage, read_write>`; `"read-only"` is
- * `var<storage, read>`. The access mode is **layout identity** — WebGPU
- * validates the shader's declared access against the bind-group layout's
- * buffer type — which is why it is part of the descriptor rather than assumed.
- */
-export type ComputeBindingAccess = "read-write" | "read-only";
-
-/** One storage-buffer binding of a {@link ComputePassDescriptor}. */
-export interface ComputeBinding {
-  /** The buffer to bind. */
-  readonly buffer: WgpuComputeBuffer;
-  /** The shader's declared access; `"read-write"` when omitted. */
-  readonly access?: ComputeBindingAccess;
-}
-
-/**
- * §82's `ComputePass`, as this backend runs it: a WGSL kernel, the workgroup
- * grid to dispatch, and the storage buffers it reads and writes — bound at
- * `@group(0)`, `@binding(i)` for array index *i* (module header on the
- * ordered-array shape).
- */
-export interface ComputePassDescriptor {
-  /** Diagnostic name, echoed on the pass and pipeline labels. */
-  readonly label?: string;
-  /** The compute shader, as WGSL source. */
-  readonly shader: string;
-  /** The kernel's entry point; {@link COMPUTE_ENTRY_POINT} when omitted. */
-  readonly entryPoint?: string;
-  /**
-   * Workgroup counts along x, y, z — §82's `workgroups: [1024, 1, 1]`.
-   * Non-negative integers; a zero count is WebGPU's defined no-op dispatch.
-   */
-  readonly workgroups: readonly [number, number, number];
-  /** The storage buffers, in binding order. A bare buffer binds read-write. */
-  readonly bindings: readonly (WgpuComputeBuffer | ComputeBinding)[];
-}
+// The Q3 promotion's re-export (module header): the descriptor vocabulary is
+// `@four/render`'s and these are the very tokens, so a pre-promotion import
+// from this package still names identical types.
+export { COMPUTE_ENTRY_POINT };
+export type { ComputeBinding, ComputeBindingAccess, ComputePassDescriptor };
 
 /** Options for {@link createComputeBuffer}: a byte size, or initial contents. */
 export interface ComputeBufferOptions {
@@ -143,8 +115,18 @@ export interface ComputeBufferOptions {
  * written (`writeComputeBuffer`), bound to a kernel, and read back
  * (`readComputeBufferBytes`) — three usage bits against a per-usage-tier
  * split that would complicate §82's tiny surface for no measured saving.
+ * (`wgpu-particle-simulation.ts` mints one with `VERTEX` added, for a buffer
+ * the §36 draw also binds as an instance stream — its header owns the
+ * deviation.)
+ *
+ * The one implementor of `@four/render`'s structural {@link ComputeBuffer}
+ * (the Q3 promotion): the brand plus the §83 trio are the cross-seam face;
+ * {@link WgpuComputeBuffer.buffer} stays this backend's own.
  */
-export class WgpuComputeBuffer {
+export class WgpuComputeBuffer implements ComputeBuffer {
+  /** The {@link ComputeBuffer} brand — one property load discriminates. */
+  readonly isComputeBuffer = true;
+
   /**
    * The device allocation — a backend seam, not an application surface: the
    * dispatch and readback paths read it, and nothing else should.
@@ -403,11 +385,28 @@ export class WgpuComputeCache {
         );
       }
     }
-    const bindings: ResolvedBinding[] = pass.bindings.map((entry) =>
-      entry instanceof WgpuComputeBuffer
-        ? { buffer: entry, access: "read-write" }
-        : { buffer: entry.buffer, access: entry.access ?? "read-write" },
-    );
+    const bindings: ResolvedBinding[] = pass.bindings.map((entry) => {
+      const bare = (entry as Partial<ComputeBuffer>).isComputeBuffer === true;
+      const buffer: unknown = bare ? entry : (entry as ComputeBinding).buffer;
+      if (!(buffer instanceof WgpuComputeBuffer)) {
+        // The promoted handle type is structural (`@four/render`'s
+        // `ComputeBuffer`), so a buffer minted by some other backend
+        // type-checks; only this class carries a device allocation this
+        // dispatch can bind. Loud, never a guess (§85).
+        refuse(
+          "ComputePass.bindings names a buffer this backend did not " +
+            "create (§82) — compute buffers are only meaningful to the " +
+            "renderer that allocated them.",
+          { label: pass.label },
+        );
+      }
+      return {
+        buffer,
+        access: bare
+          ? "read-write"
+          : ((entry as ComputeBinding).access ?? "read-write"),
+      };
+    });
     for (const binding of bindings) {
       if (binding.buffer.disposed) {
         refuse("ComputePass.bindings names a disposed buffer (§83).", {

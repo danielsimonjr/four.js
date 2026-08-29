@@ -191,6 +191,10 @@ import {
   type WgpuParticleRecord,
 } from "./wgpu-particles.js";
 import {
+  WgpuParticleSimulation,
+  type WgpuParticleSimulationOptions,
+} from "./wgpu-particle-simulation.js";
+import {
   WgpuPipelineCache,
   type WgpuPipelineDescriptor,
   type WgpuStencilDescriptor,
@@ -658,6 +662,18 @@ export class WebgpuRenderer implements Renderer {
    * and disposal.
    */
   #compute: WgpuComputeCache | null = null;
+
+  /**
+   * §36 GPU particle simulations by emitting-node id (R-31 wiring,
+   * 2026-08-29) — the draw-time join `createParticleSimulation` registers
+   * into. The map holds registrations, not ownership: the application owns
+   * each simulation's `dispose()` (§83), which unhooks itself here; device
+   * loss clears the map whole (a dead device's residency cannot be drawn,
+   * and there is no restore on WebGPU). Empty for every application that
+   * never creates one, so the frame path's lookup is a miss against an
+   * empty map and CPU-simulated scenes stay byte-identical.
+   */
+  readonly #particleSimulations = new Map<string, WgpuParticleSimulation>();
 
   /**
    * §60's registered node pipeline store (RFC 0001; WP-R1.9,
@@ -2249,12 +2265,16 @@ export class WebgpuRenderer implements Renderer {
    * (cached on the source — `wgpu-compute.ts`), binds the storage buffers at
    * `@group(0)` in array order, and submits the dispatch.
    *
-   * **This is the seam the R-1 plan's Q3 promotes to `Renderer.compute?()`**
-   * — presence is the capability, the `statistics`/`renderEffect` pattern:
-   * WebGL 2 has no compute and never grows this member, and §62's
-   * `computeShaders` capability is how an application asks before reaching
-   * for it. The frame path never calls it — §82's "basic graphics … must not
-   * require compute support", held structurally.
+   * **This is `Renderer.compute?()`** — the R-1 plan's Q3 promotion,
+   * executed 2026-08-29: the descriptor now lives in `@four/render`
+   * (`compute.ts` there owns the story) and this method implements the
+   * optional interface member. Presence is the capability, the
+   * `statistics`/`renderEffect` pattern: WebGL 2 has no compute and never
+   * grows this member, and §62's `computeShaders` capability is how an
+   * application asks before reaching for it. The frame path never calls it —
+   * §82's "basic graphics … must not require compute support", held
+   * structurally. A buffer another backend minted is refused per binding
+   * (the promoted handle is structural; `wgpu-compute.ts`).
    *
    * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a disposed or
    * never-initialized renderer, for non-integer workgroup counts, or for a
@@ -2297,6 +2317,65 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     return bytes;
+  }
+
+  /**
+   * Creates the device residency of one §36 `simulation: "gpu"` particle
+   * system (R-31 wiring, 2026-08-29) — see `wgpu-particle-simulation.ts`'s
+   * header for the design: flat-lane storage buffers, the WP-R1.8 integrator
+   * kernel, `moveSlot` compaction mirroring, and the position buffer doubling
+   * as the draw's instance stream.
+   *
+   * The application binds the result to its emitter
+   * (`emitter.bindGpuSimulation(...)`) and **owns its disposal** (§83, the
+   * `createPickingService` ownership rule). This renderer registers it under
+   * `options.systemId` — the emitting node's id — and the §36 draw arm joins
+   * on that key: a frame drawing a particle item whose id has a live
+   * registered simulation binds the simulation's position buffer as the
+   * per-instance position stream (`gpuInstances` pipeline variant) instead
+   * of the interleaved CPU lanes; every other particle item, and every
+   * pre-existing scene, draws the landed CPU path byte-identically.
+   *
+   * One simulation per system id: a duplicate registration is refused —
+   * two residencies for one node would make the draw's join ambiguous —
+   * dispose the old one first.
+   *
+   * Throws a `FourError`: `INVALID_APPLICATION_STATE` on a disposed or
+   * never-initialized renderer, a duplicate `systemId`, or a non-positive
+   * capacity; `DEVICE_LOST` while lost; `UNSUPPORTED_GPU_FEATURE` on a
+   * device surface without the §82 compute entry points or
+   * `copyBufferToBuffer` — which is how a backendless §36 GPU emitter fails
+   * at authoring time rather than drawing a wrong picture (§85; §62's
+   * `computeShaders` is the capability to ask first).
+   */
+  createParticleSimulation(
+    options: WgpuParticleSimulationOptions,
+  ): WgpuParticleSimulation {
+    const device = this.#computeDevice("createParticleSimulation");
+    const existing = this.#particleSimulations.get(options.systemId);
+    if (existing !== undefined) {
+      throw new FourError(
+        LIFECYCLE_ERROR_CODE,
+        "createParticleSimulation was called for a system id that already " +
+          "has a live simulation (§36) — dispose the existing one first.",
+        { context: { systemId: options.systemId } },
+      );
+    }
+    this.#compute ??= new WgpuComputeCache(device);
+    const simulation = new WgpuParticleSimulation(
+      device,
+      this.#compute,
+      options,
+      () => {
+        // Unhook only our own registration: a loss-cleared or replaced slot
+        // must not be clobbered by a late dispose of the old object.
+        if (this.#particleSimulations.get(options.systemId) === simulation) {
+          this.#particleSimulations.delete(options.systemId);
+        }
+      },
+    );
+    this.#particleSimulations.set(options.systemId, simulation);
+    return simulation;
   }
 
   /**
@@ -2475,6 +2554,11 @@ export class WebgpuRenderer implements Renderer {
     // creator-owns — `WgpuComputeBuffer.dispose` is theirs to call.
     this.#compute?.dispose();
     this.#compute = null;
+    // §36 GPU particle simulations (R-31 wiring) are the same creator-owns
+    // story one type up: the registry drops its joins, the application owes
+    // each simulation's `dispose()` — which stays safe after this (destroy
+    // on a released device's buffer is a defined no-op).
+    this.#particleSimulations.clear();
     // §60's node store (WP-R1.9): destroyed with the live device's caches.
     // No lost-branch counterpart is needed — the loss handler below already
     // forgot and dropped the store the moment the device died, so on this
@@ -2722,6 +2806,16 @@ export class WebgpuRenderer implements Renderer {
   ): number {
     const stencilRecord =
       frameStencil && clip !== null ? clip.stencil : undefined;
+    // §36 `simulation: "gpu"` (R-31 wiring): a live registered simulation
+    // for this system id re-sources the position stream from its storage
+    // buffer (`createParticleSimulation` owns the join's story). A disposed
+    // registration is treated as absent — drawing a destroyed buffer is a
+    // validation error, and the CPU stream is at worst spawn-stale, which
+    // the emitter's docs own. The lookup is one map get per particle item,
+    // a miss against an empty map for every CPU-simulated scene.
+    const registered = this.#particleSimulations.get(item.id);
+    const simulation =
+      registered !== undefined && !registered.disposed ? registered : null;
     const pipeline = pipelines.acquire({
       kind: "particles",
       vertexColors: false,
@@ -2737,6 +2831,7 @@ export class WebgpuRenderer implements Renderer {
       stencil:
         stencilRecord === undefined ? null : stencilDescriptor(stencilRecord),
       batch: null,
+      gpuInstances: simulation !== null,
     });
     if (pipeline === null) {
       // Unreachable for the unlit path's reason — this renderer always wires
@@ -2770,7 +2865,18 @@ export class WebgpuRenderer implements Renderer {
       );
     }
     pass.setVertexBuffer(0, record.positionBuffer);
-    pass.setVertexBuffer(1, batch.buffer);
+    if (simulation !== null) {
+      // GPU residency: positions from the simulation's storage buffer at
+      // slot 1 (`PARTICLE_GPU_POSITION_BUFFER_LAYOUT`), the interleaved
+      // stream demoted to slot 2 for its CPU-truth size and colour lanes
+      // (`wgpu-particles.ts` on the two layout tables). The upload above
+      // still ran — ramps are CPU state — and its stale position lanes
+      // stride past unread.
+      pass.setVertexBuffer(1, simulation.positions.buffer);
+      pass.setVertexBuffer(2, batch.buffer);
+    } else {
+      pass.setVertexBuffer(1, batch.buffer);
+    }
     // Non-indexed and instanced, GL's `drawArraysInstanced` verbatim: the
     // instance mesh contract is the shared six-vertex quad (`particles.ts`),
     // so the record's index stream — which the GL arm equally ignores — has
@@ -3423,6 +3529,13 @@ export class WebgpuRenderer implements Renderer {
       // device — dropped whole; the next compute() call reports the loss.
       this.#compute?.dispose();
       this.#compute = null;
+      // §36 GPU particle simulations (R-31 wiring): their residency died
+      // with the device and there is no WebGPU restore, so the joins drop —
+      // a GPU-simulated system's state does not survive device loss (the
+      // §34 posture; `@four/particles`' types.ts owns it). The application
+      // still owes each simulation's `dispose()`, now a defined no-op
+      // device-side.
+      this.#particleSimulations.clear();
       // §60's node store (WP-R1.9): its modules, pipelines and buffers died
       // with the device — dropped, never destroyed.
       this.#nodePipelines?.forget();

@@ -60,10 +60,10 @@ changes in `CHANGELOG.md`.
       conditionally true.
 
       0001's landing decides WP-R1.9's
-              input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-              reachability are backend-independent and re-exported through `@four/render`;
-              the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-              (screen domain included, for §70 graph effects).
+                  input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                  reachability are backend-independent and re-exported through `@four/render`;
+                  the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                  (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -197,17 +197,20 @@ changes in `CHANGELOG.md`.
       `node-material-wgsl.json` over the GLSL golden's graphs); §70 `"graph"`
       drawn on WebGPU (R1.6 pin flipped); undisplaced node casters cast; full
       browser gate 91/91 with the deferred R1.7/R1.8 first-runs recorded.
-- [ ] **R-31 residue — wire the GPU integrator to `@four/particles`** (its own
-      packet; needs that package): widen `simulation: "gpu"` in the same change
-      that connects `PARTICLE_INTEGRATOR_SHADER_SOURCE` to the emitter (the
-      WP-9.1 rule, standing). §27 GPU fields and §36 `collisions: "depth-buffer"`
-      remain separate follow-ups. R-31's _mechanism_ is closed on WebGPU
-      (WP-R1.8); WebGL 2 declares the tier absent.
-- [ ] **Q3 promotion (one re-export, when `packages/render` is free):**
-      move/mirror `ComputePassDescriptor` into `@four/render` and add optional
-      `Renderer.compute?()`; `render-webgpu` re-exports (token-identity
-      precedent); the umbrella's named-map `Four.ComputePass` sugar decides the
-      spec's `{ positions, velocities, parameters }` spelling then. WP-R1.9 landed 2026-08-29 — the R-1 plan (R1.1–R1.9) is complete. What
+- [x] **R-31 residue DONE 2026-08-29** — `simulation: "gpu"` widened in the
+      same change that wired the integrator (WP-9.1 rule held). Remaining §36
+      GPU items, each its own packet: §27 GPU fields,
+      `collisions: "depth-buffer"`, GPU-side bounds (a `computeBounds` on a GPU
+      system honestly returns `false` — RFC 0005 bounds-picking reports nothing
+      for it), GPU-emitter §79 serialization + §34 snapshots (blocked on the
+      GPU-readback RFC), device-loss recovery (today: new emitter).
+      particles-demo budget bumped 35.5 → 36 kB with the +0.55 kB measurement.
+- [x] **Q3 promotion DONE 2026-08-29** — `ComputePassDescriptor` (+ structural
+      `ComputeBuffer`, `supportsCompute`) in `@four/render`; optional
+      `Renderer.compute?()` (fourth optional-member instance); `render-webgpu`
+      re-exports the very tokens; the umbrella's `Four.ComputePass` named-map
+      sugar landed with it (§82 names it — key insertion order = binding
+      order). Buffer allocation deliberately stays backend API. WP-R1.9 landed 2026-08-29 — the R-1 plan (R1.1–R1.9) is complete. What
       remains around R-1 is not R-1's: this Q3 one-re-export promotion, the R-31
       emitter wiring, the §62 canvas2d/svg stub tiers, and WebGPU skinned kinds
       (joint-palette pipeline, unstaged — RFC 0003's successor filing).
