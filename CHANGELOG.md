@@ -8,6 +8,24 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — Gap Analysis v2: the campaign-closing honesty pass
+
+- **`docs/GAP ANALYSIS v2.md`** — every v1 row (97 filings, 22 register rows)
+  re-read against source at `df572c6`. Final ledger: **74 closed / 21 partially
+  closed / 2 open (`R-32`, `R-33`) / 0 RFC-blocked**. Four statuses corrected
+  against the tree — `A-19`, `A-20`, `R-3`, `R-31`, all closed; their v1 rows
+  lagged the packets that closed them. v1 gains the superseded banner (v0's
+  convention); nothing below it rewritten. v1's internal defects (a duplicated
+  §3 table, duplicated §4 rows, frozen §1 counts) are itemised in v2 §7 rather
+  than edited away.
+- **The full house gate suite ran green on `df572c6`**: build, coverage, suites
+  (90 files / 661 tests), the full browser gate (**101/101**, 5.6 m — including
+  `webgpu-readpixels-region.spec.ts`'s first run, measurement recorded into its
+  header; existing goldens byte-unchanged), lint, docs (0 warnings),
+  typecheck:tests, check-spec, check-docs, check-compat, graph:check,
+  graph:duplicates, size (all seven budgets in limit). No package code changed:
+  a closing pass records, it does not patch.
+
 ### 2026-08-29 — the two recorded example follow-ups: §12 character controllers and §39 step-8 sensor bookkeeping
 
 #### Added

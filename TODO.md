@@ -10,12 +10,23 @@ changes in `CHANGELOG.md`.
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
 
+- [x] **Gap-analysis campaign CLOSED 2026-08-29 — v2 written.**
+      `docs/GAP ANALYSIS v2.md` supersedes v1 (banner added): 74 closed / 21
+      partial / 2 open (`R-32`, `R-33`) / 0 RFC-blocked of 97 filings. The
+      owner-only remainder is v2 §5's table: stub packaging (row 10),
+      NPM_TOKEN + Pages (row 11), §93 stand-ins (row 12), the spec-amendment
+      successor queue (row 13 — its original four items were discharged by
+      revision 1.8; only §60's angle operator survives), payload policy
+      (row 14), PH-11c, the §60a defaults flip, the prettier exemption,
+      PH-22f/j/l, R-26's XML seam, A-24's §83 corner. Full gate suite green on
+      `df572c6` incl. the 101-test browser gate (readpixels-region first run
+      recorded, goldens byte-unchanged).
 - [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
       2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → ~~0001 shader/node
       materials (done 2026-08-28)~~ → ~~0005 pixel picking (done
       2026-08-29)~~ → ~~0004 raster
       painting (done 2026-08-29)~~. **The RFC queue (0001–0005) is COMPLETE.**
-      Remaining R-1 packets: WP-R1.8 (in flight), WP-R1.9 WGSL emitter.
+      R-1 completed 2026-08-29 (WP-R1.1–R1.9 all landed).
 - [ ] **RFC 0004 residue (all deferred by the RFC's own §6 table, none
       scheduled):** video textures (frame-arrival signal, DOM-free);
       `ImageBitmap`/decoded-image raster sources (A-18's generic
@@ -26,7 +37,7 @@ changes in `CHANGELOG.md`.
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
-      `docs/guides/raster-painting.md`, listed as guide 15).ts`'s header and §77a).
+      `docs/guides/raster-painting.md`, listed as guide 15).
 
 - [x] **A-11 analytic tier (`"geometry"`) — DONE 2026-08-29** (adopted RFC 0005
       Q3 executed): `node.hitTestMode` (`null` default = engine-selects;
@@ -70,10 +81,10 @@ changes in `CHANGELOG.md`.
       rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                                      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                                      reachability are backend-independent and re-exported through `@four/render`;
-                                      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                                      (screen domain included, for §70 graph effects).
+                                          input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                                          reachability are backend-independent and re-exported through `@four/render`;
+                                          the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                                          (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -278,20 +289,10 @@ changes in `CHANGELOG.md`.
       5 threshold specs; one Rapier wasm image, 0.90 MB gzip, budgeted
       0.95 MB; landed atomically with AUDIT-120's examples row 9 → 10.
 
-- [ ] **Character-controller example follow-up:** nothing in `examples/` exercises the
-      new components — the only first-person camera in the repo lives in a test. Worth
-      folding into the next examples packet.
 - [x] **Tests typecheck sweep DONE 2026-08-21** — `pnpm typecheck:tests` added and
       wired into CI after `Build`; 21 errors in five classes fixed as the misspelled
       intent; the text visual golden regenerated deliberately (the fixture now clears
       as it always intended). Closes the hole R-8 identified.
-- [ ] **A-11 / RFC 0005 — owner decision** on pixel + GPU-id picking
-      (`docs/rfcs/0005-pixel-picking.md`). Six questions in the §5 register (rows
-      18–20). Blocked on the owner, not on engineering.
-- [ ] **A-11 analytic tier (`"geometry"`)** — unblocked since R-23/R-24's `toPath()`
-      and **not** covered by RFC 0005: a normal packet in a layer that may import
-      `@four/geometry`. RFC 0005 recommends it also add `node.hitTestMode` (§71's
-      field, currently a silent divergence; §79 field + §90 scene-format row).
 - [x] **`Rectangle2` in `@four/math` — DONE 2026-08-29**, and §61's
       `readPixels(target, region?)` landed with it on the interface and both
       backends (WebGPU region via `copyTextureToBuffer` origin; WebGL via the

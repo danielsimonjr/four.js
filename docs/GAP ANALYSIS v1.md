@@ -1,5 +1,17 @@
 # four.js — Gap Analysis v1
 
+> **SUPERSEDED 2026-08-29 by `docs/GAP ANALYSIS v2.md`** (the campaign-closing honesty pass,
+> which re-verified every row below against the tree at `df572c6` and ran the full house
+> gate suite). This document is kept in place as the campaign's running record — unlike v0
+> it was amended in place as the campaign advanced, so its rows carry dated closure banners
+> through 2026-08-29 and remain the per-row evidence trail behind v2's final ledger. Read v2
+> for final status and the corrected counts; read this for the arguments and the order
+> things fell in. Caveats a reader should carry, itemised in v2 §7: the §3 partially-closed
+> table and several §4 rows are **duplicated**, with the stale copy following the current
+> one; §1's counts were frozen at 2026-08-08 and contradict the later in-place banners; and
+> four rows lag the tree (`A-19`, `A-20`, `R-3`, `R-31` — all closed by 2026-08-29). Per the
+> `MEMORY.md` convention, nothing below was rewritten.
+
 **Date:** 2026-08-08
 **Tree ref:** `e0ddd3b` on branch `claude/tools-integration-rji2sr` (working tree clean; this
 analysis is read-only apart from the superseded-pointer paragraph it adds to v0).

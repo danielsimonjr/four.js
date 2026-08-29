@@ -23,6 +23,14 @@
  * suite); `about:blank` is an opaque origin where `navigator.gpu` is absent,
  * so the first example site's origin is borrowed; and the assertion is
  * self-relative, never a committed image (§92 — SwiftShader is not a GPU).
+ *
+ * **Measured on the first run (2026-08-29, SwiftShader — the v2 closing gate,
+ * this spec's first execution since the `Rectangle2` packet committed it):**
+ * the adapter was present (no skip), `popErrorScope` reported no validation
+ * error, and the 11 × 7 region read back **byte-for-byte equal** to the
+ * corresponding sub-rectangle of the 64 × 64 whole-target read — all 308
+ * bytes, every channel — pinning the `origin` semantics the backend's §7a
+ * bottom-origin conversion relies on.
  */
 
 import { expect, test } from "@playwright/test";

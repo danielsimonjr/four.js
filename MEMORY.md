@@ -28,6 +28,25 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — Gap Analysis v2 (campaign close).** Lessons worth keeping:
+  - **A status document amended in place by many hands rots like unreviewed
+    code** — v1 accumulated a wholesale duplicate of its §3 table, duplicated
+    §4 rows (R-28/R-29/R-30, R-36/R-37), garbled §4.6 paragraphs, §1 counts
+    frozen at its birth date, and four rows lagging the tree. The working
+    alternatives are v0's (append-only banners, never edit) and v2's (one
+    closing re-reader). Concurrent in-place row edits are the worst of both.
+  - **A closure that rides another packet doesn't update its own row** — A-20
+    closed as a side effect of WP-R1.8 + the ComputePass promotion, R-3 as a
+    side effect of WP-R1.1/R1.9; neither packet owned the gap row, so nobody
+    moved it. When a packet discharges another filing's content, moving that
+    filing's row belongs in the packet's definition of done.
+  - **Register markers must land same-day** — row 13's items were discharged by
+    spec revision 1.8 on v1's own date and the row was never marked, making
+    the owner remainder look longer than it was for three weeks.
+  - Gate facts for the record: the full browser gate is 101 tests / ~5.6 m on
+    this host, 0 skips with the WebGPU adapter present; the blending RECOVER
+    flake did not reproduce at the closing run; goldens byte-unchanged.
+
 - **2026-08-29 — the examples follow-up packet (character-controller + sensor
   tally).**
   - **An example lands atomically with docs/AUDIT-120.md's examples row.**
