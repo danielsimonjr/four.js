@@ -24,7 +24,36 @@
  * | **gravity**    | every dynamic body starts in the air and falls at −9.81 m/s² on **Y**, in *both* dimensions (§7a) |
  * | **collisions** | the bodies land on a static floor, stack, and settle (and then §32-sleep) |
  * | **impulses**   | **click a body** — the pointer's world-space hit point becomes an off-centre `applyImpulseAtPoint`, so a poke both launches and spins it (§26) |
- * | **sensors**    | the coloured slab at the bottom of each half is a §24 *sensor*: it exerts no force, and its collider's `triggerenter`/`triggerexit` (§29) flip its colour while a body is inside it |
+ * | **sensors**    | the coloured slab at the bottom of each half is a §24 *sensor*: it exerts no force, and its collider's `triggerenter`/`triggerexit` (§29) flip its colour while a body is inside it — repainted from the step-8 tally below |
+ *
+ * ## Step-8 sensor bookkeeping, consumed at step 9 (§39, PH-21)
+ *
+ * Since PH-21 the §39 order is genuinely *configurable* around the solve: this
+ * page runs `PhysicsSystem` with `dispatchEvents: false` and moves dispatch to
+ * a `PhysicsEventSystem` at `PRIORITY_EVENT_DISPATCH` (900) — which is what
+ * makes `PRIORITY_SENSOR_UPDATE` (800) a real slot *between* the solve and the
+ * listeners. {@link ZoneTallySystem} occupies it, and the arrangement is the
+ * worked example of §39's steps 8 and 9:
+ *
+ * ```text
+ * 600  PhysicsSystem        both worlds step; §29 events are queued, not fired
+ * 800  ZoneTallySystem      overlapBox over each zone's volume (§30) → tally
+ * 900  PhysicsEventSystem   the queued trigger events fire; the listeners
+ *                           REPAINT FROM THE TALLY the step-8 system recorded
+ * ```
+ *
+ * Why bookkeep at 800 when §29 already delivers enter/exit at 900? Because the
+ * two answer differently-shaped questions. The event counter is a **delta
+ * accumulation** — `+1` on enter, `−1` on exit — which is why {@link watchZone}
+ * has always had to clamp it at zero: one missed event and the count is wrong
+ * for ever. The step-8 tally is an **absolute re-measure**: every fixed step it
+ * asks the §30 query "how many dynamic colliders overlap this volume *right
+ * now*?", against exactly the post-solve geometry the step-9 listeners are
+ * about to observe. The listeners then *consume* the tally — the repaint colour
+ * is `tally > 0` — so the picture is driven by measured state and the events
+ * carry what they are good at: the moments of change. Both counts are mirrored
+ * onto `#status` (`data-zone*` for the event counter, `data-tally*` for the
+ * query), so the browser gate can hold them against each other.
  *
  * ## Two worlds, one coordinate system (a deliberate simplification)
  *
@@ -45,7 +74,8 @@
  *
  * The loop at the bottom feeds real elapsed **seconds** to `app.step(...)`;
  * inside, both worlds advance in fixed 1/60 s steps in registration order and
- * their §29 events are dispatched afterwards (§39 step 9). The frame is drawn
+ * their §29 events are dispatched at §39 step 9 — through the split systems
+ * described above, with the sensor tally taken between the two. The frame is drawn
  * from §43-interpolated poses: each world is handed `app.poses`, so it tracks
  * the node of every **dynamic** body it registers and the application's
  * step-10 snapshot system captures them. Physics never sees the wall clock —
@@ -90,8 +120,10 @@ import {
 import { PointerInput, type Pickable } from "four/input";
 import { UnlitMaterial } from "four/materials";
 import { Vector2, Vector3 } from "four/math";
+import { PRIORITY_SENSOR_UPDATE, type SimulationSystem } from "four/motion";
 import {
   Collider,
+  PhysicsEventSystem,
   PhysicsSystem,
   PhysicsWorld,
   RigidBody,
@@ -260,11 +292,13 @@ const app = new Application({
 renderer.resize(WIDTH, HEIGHT, window.devicePixelRatio);
 app.scene.add(camera);
 
-// One system for both worlds (§39): it steps every tracked world, then
-// dispatches every tracked world's events, so a listener always sees worlds
-// that have finished stepping.
-const physics = new PhysicsSystem();
+// One solve system for both worlds (§39 step 6) — with dispatch split off to
+// step 9 (PH-21), so that step 8 exists to occupy: see the header's step-8
+// section. `dispatchEvents: false` is what makes the split legal, and
+// `PhysicsEventSystem`'s constructor refuses a source that still dispatches.
+const physics = new PhysicsSystem({ dispatchEvents: false });
 app.systems.register(physics);
+app.systems.register(new PhysicsEventSystem({ source: physics }));
 
 // --- the two halves, as data (§21, §37) --------------------------------------
 
@@ -562,10 +596,23 @@ const DROPS: readonly Drop[] = [
 /** One built half: its dynamic bodies and the state its sensor zone carries. */
 interface Half {
   readonly kit: HalfKit;
+  /** The world this half simulates in — what {@link ZoneTallySystem} queries. */
+  readonly world: PhysicsWorld;
   readonly bodies: readonly Body[];
   readonly zone: Zone;
-  /** How many colliders are currently inside {@link Half.zone} (§29). */
+  /**
+   * The §29 event counter: `+1` per `triggerenter`, `−1` per `triggerexit`,
+   * clamped at zero. A delta accumulation — see the header's step-8 section
+   * for why the repaint no longer trusts it alone.
+   */
   occupancy: number;
+  /**
+   * The step-8 tally: how many **dynamic** colliders the §30 overlap query
+   * found inside the zone's volume this fixed step. Written by
+   * {@link ZoneTallySystem} at `PRIORITY_SENSOR_UPDATE` (800), consumed by the
+   * step-9 listeners in {@link watchZone}.
+   */
+  tally: number;
 }
 
 /**
@@ -637,29 +684,107 @@ function buildHalf(world: PhysicsWorld, kit: HalfKit): Half {
     );
   });
 
-  return { kit, bodies, zone, occupancy: 0 };
+  return { kit, world, bodies, zone, occupancy: 0, tally: 0 };
+}
+
+// --- the step-8 bookkeeping (§39 step 8, §30) --------------------------------
+
+/** Scratch for the tally query's centre (§7b, D7: no per-step allocation). */
+const tallyCenter = new Vector3();
+
+/** The zone's half-extents, restated once for the query side. */
+const tallyHalfExtents = new Vector3(
+  ZONE_HALF_WIDTH,
+  ZONE_HALF_HEIGHT,
+  ZONE_HALF_WIDTH,
+);
+
+/**
+ * §39 step 8, occupied: re-measures each zone's occupancy from the §30 overlap
+ * query, once per fixed step, into {@link Half.tally}.
+ *
+ * Three things make this the honest shape for sensor bookkeeping:
+ *
+ * - **It runs after the solve and before the listeners.** At 800 the query
+ *   sees exactly the post-step geometry the step-9 listeners are about to be
+ *   told about, which is the ordering PH-21's split exists to provide — at the
+ *   old combined step 6 there was nowhere to stand between the two.
+ * - **It is absolute, not accumulated.** `overlapBox` over the zone's own
+ *   volume answers "who is inside *now*"; it cannot drift the way a ±1 counter
+ *   can, and needs no clamp.
+ * - **It counts dynamic colliders only.** The query already excludes sensors
+ *   by default (§30's `includeSensors`), so the zone cannot count itself; the
+ *   `"dynamic"` filter keeps the floor and walls out of the tally in the same
+ *   way the zone's placement keeps them out of its §29 events.
+ *
+ * The DOM is deliberately not touched here: the tally is *read* at 800 and
+ * *consumed* at 900, by the listeners in {@link watchZone} — which is the
+ * split the §39 example order describes.
+ */
+class ZoneTallySystem implements SimulationSystem {
+  priority = PRIORITY_SENSOR_UPDATE;
+
+  readonly #halves: readonly Half[];
+
+  constructor(halves: readonly Half[]) {
+    this.#halves = halves;
+  }
+
+  /** No per-registration setup is needed (§39). */
+  initialize(): void {
+    // Intentionally empty: the halves own their worlds and zones.
+  }
+
+  /** Re-measures every half's tally against its post-solve world. */
+  fixedUpdate(): void {
+    for (const half of this.#halves) {
+      tallyCenter.set(half.kit.centerX, ZONE_CENTER_Y, 0);
+      const hits = half.world.overlapBox(tallyCenter, tallyHalfExtents);
+      let count = 0;
+      for (const hit of hits) {
+        if (hit.body.type === "dynamic") {
+          count += 1;
+        }
+      }
+      half.tally = count;
+    }
+  }
+
+  /** Nothing to release (§39 teardown): the halves outlive the registry. */
+  dispose(): void {
+    // Intentionally empty — see the doc comment.
+  }
 }
 
 // --- the sensor zones (§24, §29) ---------------------------------------------
 
 /**
- * Subscribes a half's zone to §29's two trigger names and repaints it.
+ * Subscribes a half's zone to §29's two trigger names and repaints it — from
+ * the step-8 tally, which is what "consumed at 900" means concretely.
  *
  * The listeners are registered on the **sensor's collider**, which is what §29
  * says (`sensor.on("triggerenter", …)`) and not on the body: a body may carry
  * several colliders and only the sensor among them is a trigger volume.
  *
  * Emission happens after the fixed step, never inside it (§39 step 9, §6b), so
- * a listener may safely do anything — here, write a material colour and a DOM
- * attribute.
+ * a listener may safely do anything — here, write a material colour and two DOM
+ * attributes. Because dispatch now runs at `PRIORITY_EVENT_DISPATCH` (900),
+ * every listener below observes a {@link Half.tally} that
+ * {@link ZoneTallySystem} recorded at 800 **in the same fixed step** as the
+ * event it is handling: the event says *something changed*, the tally says
+ * *what the measured occupancy now is*, and the colour follows the
+ * measurement. The ±1 event counter is kept, mirrored, and held against the
+ * tally by the browser gate — but it no longer drives the picture.
  */
 function watchZone(half: Half): void {
   const repaint = (): void => {
-    const color = half.occupancy > 0 ? ZONE_OCCUPIED_COLOR : ZONE_EMPTY_COLOR;
+    const color = half.tally > 0 ? ZONE_OCCUPIED_COLOR : ZONE_EMPTY_COLOR;
     half.zone.face.material.setColor(color[0], color[1], color[2], color[3]);
-    // Mirrored onto the page as `data-zone2d` / `data-zone3d`, so the state is
-    // legible to a test without reading pixels.
+    // Mirrored onto the page as `data-zone2d` / `data-zone3d` (the §29 event
+    // counter) and `data-tally2d` / `data-tally3d` (the §30 re-measure), so
+    // both accounts are legible to a test without reading pixels.
     status.dataset[`zone${half.kit.dimension}`] = String(half.occupancy);
+    status.dataset[`tally${half.kit.dimension}`] = String(half.tally);
   };
 
   half.zone.collider.on("triggerenter", () => {
@@ -846,10 +971,16 @@ async function main(): Promise<void> {
   // images, so they load concurrently.
   await Promise.all([world2d.initialize(), world3d.initialize()]);
 
-  buildScene();
+  const halves = buildScene();
+  // §39 step 8, occupied now that the scene's zones exist. Registration order
+  // against the systems above is irrelevant — the registry runs by priority.
+  app.systems.register(new ZoneTallySystem(halves));
 
   status.textContent = RUNNING_TEXT;
   status.dataset["state"] = "running";
+  // Self-description for the browser gate: dispatch runs at §39 step 9, split
+  // from the solve — the arrangement the step-8 tally depends on.
+  status.dataset["dispatch"] = "step-9";
 
   app.start();
   requestAnimationFrame(frame);

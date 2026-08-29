@@ -8,15 +8,17 @@ import { defineConfig } from "@playwright/test";
  * WP-6.6, WP-7.7, WP-9.4, the post-plan UI proof and the §93 first-3D-scene
  * proof).
  *
- * The suite drives **nine built example sites** in headless Chromium (six until
+ * The suite drives **ten built example sites** in headless Chromium (six until
  * 2026-08-07, when `first-3d-scene` and then the §118 flagship joined; nine on
- * 2026-08-08, when §119's motor digital twin joined):
+ * 2026-08-08, when §119's motor digital twin joined; ten on 2026-08-29, when
+ * the §12 character-controller example joined):
  *
  * | site | port | specs | what it gates |
  * | ---- | ---- | ----- | ------------- |
  * | `examples/first-2d-scene` | {@link PORT} | `example`, `smoothness`, `animation`, `interaction` | the page loads clean, the canvas is not blank, it animates smoothly, and the pointer reaches it (§106, §106a) |
  * | `examples/first-3d-scene` | {@link SCENE_3D_PORT} | `first-3d-scene` | §93's first 3D scene: a `PerspectiveCamera` over `LitMaterial` meshes under a `DirectionalLight` plus scene ambient — the first browser evidence for the §47 perspective path, the §68 lighting MVP and the §53 3D primitives |
- * | `examples/physics-playground` | {@link PLAYGROUND_PORT} | `playground` | §108's mixed 2D/3D physics demo: gravity, collisions, impulses and sensors through one API |
+ * | `examples/physics-playground` | {@link PLAYGROUND_PORT} | `playground`, `sensor-tally` | §108's mixed 2D/3D physics demo: gravity, collisions, impulses and sensors through one API — since 2026-08-29 with §39's step-8/step-9 split (`PhysicsEventSystem` + a `PRIORITY_SENSOR_UPDATE` tally, PH-21's seam occupied) |
+ * | `examples/character-controller` | {@link CHARACTER_PORT} | `character-controller` | the §12 controller family: `SweptCharacterController` (§30 capsule sweeps, step-up, wall slide), `FirstPersonLook` on a child eye (§44's yaw ∘ pitch decomposition) and the plane-tier `CharacterController` on patrol, under the §39 input → kinematics → solve ordering |
  * | `examples/mechanism` | {@link MECHANISM_PORT} | `mechanism` | §109's jointed mechanism: a motorised shaft, three hinges, a limited slider, a spring and two limit switches, stable under a real-time load and reconfigurable while running |
  * | `examples/blending` | {@link BLENDING_PORT} | `blending` | §110's physics-animation blending: an animated chain handed to the solver as a ragdoll and blended back onto its animation, without abrupt discontinuities |
  * | `examples/particles-demo` | {@link PARTICLES_PORT} | `particles` | §112's particle demonstration: a seeded CPU fountain under §27 fields bouncing off a collision plane, plus a click burst, each drawn as one instanced draw call |
@@ -33,7 +35,7 @@ import { defineConfig } from "@playwright/test";
  * because both sides of its comparison are SwiftShader. See the comment on the
  * `visual` project for the scope of the exception.
  *
- * Run **all nine** builds first — or just `pnpm examples:build`, which is the
+ * Run **all ten** builds first — or just `pnpm examples:build`, which is the
  * one place they are listed: the web servers below serve the *built* `dist`
  * directories, which are gitignored and may be absent.
  *
@@ -47,6 +49,7 @@ import { defineConfig } from "@playwright/test";
  * pnpm ui-demo:build          # examples/ui-demo/dist
  * pnpm flagship:build         # examples/flagship/one-scene-everything-moves/dist
  * pnpm twin:build             # examples/flagship/motor-digital-twin/dist
+ * pnpm character:build        # examples/character-controller/dist
  * pnpm test:browser
  * ```
  *
@@ -227,6 +230,22 @@ const FLAGSHIP_PORT = 4180;
  */
 const TWIN_PORT = 4181;
 
+/**
+ * Preview port for `examples/character-controller` — the §12 controller-family
+ * example (the PH-11/PH-11b follow-up, 2026-08-29).
+ *
+ * A tenth entry rather than a tenth run, for {@link PLAYGROUND_PORT}'s reason:
+ * `vite preview` serves exactly one `dist`, and Playwright starts every entry
+ * of a `webServer` array before the first test. 4182 is the next free port
+ * above the twin's and is restated verbatim in
+ * `tests/browser/character-controller.spec.ts`.
+ *
+ * The mechanism's tier: one Rapier wasm image (a directly-constructed
+ * `Rapier3dAdapter` — the page needs no §37 registry), measured 2.46 MB raw /
+ * 0.90 MB gzip at landing.
+ */
+const CHARACTER_PORT = 4182;
+
 export default defineConfig({
   testDir: "tests/browser",
   // Failure artifacts (traces, error context) live inside the already-ignored
@@ -313,7 +332,7 @@ export default defineConfig({
       },
     },
   ],
-  // All nine sites are started before the first test and torn down after the
+  // All ten sites are started before the first test and torn down after the
   // last, so one `pnpm test:browser` run covers every spec in `testDir`. The
   // entries use different ports, so they coexist rather than race for one.
   webServer: [
@@ -392,7 +411,7 @@ export default defineConfig({
       reuseExistingServer: false,
       // The playground's tier and then some: two Rapier wasm images reach this
       // bundle through the §37 registry, so it is ~4.2 MB raw and the *first*
-      // request is the slowest of the nine. The server itself still starts in
+      // request is the slowest of the ten. The server itself still starts in
       // well under a second.
       timeout: 60_000,
       stdout: "ignore",
@@ -405,6 +424,16 @@ export default defineConfig({
       // One Rapier wasm image (a directly-constructed `Rapier3dAdapter`) plus a
       // development build of the engine: ~2.5 MB raw, between the mechanism's
       // tier and the §118 flagship's.
+      timeout: 60_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `npx vite preview examples/character-controller --port ${String(CHARACTER_PORT)} --strictPort`,
+      url: `http://localhost:${String(CHARACTER_PORT)}`,
+      reuseExistingServer: false,
+      // One Rapier wasm image, the mechanism's tier: ~2.5 MB raw, so the first
+      // request is slower than the page's own start.
       timeout: 60_000,
       stdout: "ignore",
       stderr: "pipe",

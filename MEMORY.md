@@ -28,6 +28,22 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-08-29 — the examples follow-up packet (character-controller + sensor
+  tally).**
+  - **An example lands atomically with docs/AUDIT-120.md's examples row.**
+    `check-docs` counts _tracked_ `examples/*/main.ts` (git index included)
+    against the row's `**N** runnable example` — staging a new example without
+    the same-change AUDIT bump fails the gate.
+  - **The wasm size-budget precedent was split and is now decided by row:**
+    `character-controller` is budgeted (0.95 MB over its measured 0.90 MB
+    gzip, the flagship precedent); playground/mechanism/blending stay
+    row-less.
+  - **A §29 event counter and a §30 overlap re-measure may disagree by one at
+    an exact contact boundary** — the playground's drop layout rests
+    stack-top's underside mathematically on the zone's top face (y = −1.6),
+    which is why `sensor-tally.spec.ts` asserts a ±1 band, not equality
+    (reference run: 0 disagreement in both halves).
+
 - **2026-08-29 — RFC 0002 token migration + §61 `readPixels` whole
   (Rectangle2).** Decisions worth keeping:
   - **The reversible spelling-difference reversed on schedule, and the reversal

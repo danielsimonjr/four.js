@@ -8,6 +8,43 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-29 — the two recorded example follow-ups: §12 character controllers and §39 step-8 sensor bookkeeping
+
+#### Added
+
+- **`examples/character-controller` — the §12 controller family in one
+  first-person page (tenth example; the PH-11/PH-11b follow-up).** A
+  `SweptCharacterController` capsule walked with WASD through §30 shape casts
+  on real Rapier 3D — walls slide it, three 0.24 m risers are climbed by the
+  step-up (`stepHeight` 0.32, the browser gate counts exactly 3), Space
+  jumps — with `FirstPersonLook` on a child eye node (§44's yaw ∘ pitch
+  decomposition, arrow-key and drag look) and a plane-tier
+  `CharacterController` patrolling a circle with no physics body at all, under
+  the §39 ordering spelled out in the header: input (100) → patrol commands
+  (200) → KinematicSystem + SweptCharacterSystem (400, disjoint component
+  types) → solve (600). Two dynamic balls collide with the character's
+  kinematic-position body. One wasm image (directly-constructed
+  `Rapier3dAdapter`), 2.46 MB raw / 0.90 MB gzip — budgeted at 0.95 MB. Tenth
+  browser-gate site (port 4182); 5 new threshold specs in
+  `tests/browser/character-controller.spec.ts` (platform height 1.580 reached
+  with 3 step-ups, wall stop at z = −3.140, jump apex, yaw/pitch + a
+  376 941-pixel view swing, patrol drift vs. an idle player that writes
+  nothing).
+- **Step-8 sensor bookkeeping in `examples/physics-playground` (the PH-21
+  follow-up).** The playground now runs
+  `PhysicsSystem({ dispatchEvents: false })` with `PhysicsEventSystem` at
+  900 — PH-21's split, consumed outside a test for the first time — and a
+  `ZoneTallySystem` at `PRIORITY_SENSOR_UPDATE` (800) re-measures each zone
+  per fixed step with a §30 `overlapBox` (sensors excluded by the query
+  default, dynamic bodies only). The step-9 listeners consume the tally: the
+  repaint colour is `tally > 0`, with the ±1 §29 event counter kept and
+  mirrored beside it (`data-zone*` vs `data-tally*`,
+  `data-dispatch="step-9"`). +405 B gzip (A/B); all four existing playground
+  gate tests unchanged and green; new `tests/browser/sensor-tally.spec.ts`
+  holds the two accounts against each other at rest (reference run: 3 = 3 in
+  both halves). `docs/AUDIT-120.md`'s examples row moves 9 → 10 in the same
+  change (check-docs counts tracked `main.ts` files).
+
 ### 2026-08-29 — RFC 0002 §2's token spelling executed, and §61's `readPixels` lands whole (Rectangle2 prerequisite cleared)
 
 #### Added

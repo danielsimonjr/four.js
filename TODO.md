@@ -70,10 +70,10 @@ changes in `CHANGELOG.md`.
       rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                                  input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                                  reachability are backend-independent and re-exported through `@four/render`;
-                                  the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                                  (screen domain included, for §70 graph effects).
+                                      input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                                      reachability are backend-independent and re-exported through `@four/render`;
+                                      the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                                      (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -269,11 +269,14 @@ changes in `CHANGELOG.md`.
       against §23's mass, and whether it may wake a §32 sleeper. The seam is
       `RigidBody.applyImpulseAtPoint` at `ShapeCastHit.point`. Effort S once the
       policy is chosen; blocked on the choice, not on engineering.
-- [ ] **Character-controller example follow-up (extended):** nothing in `examples/`
-      exercises `CharacterController`, `FirstPersonLook` **or**
-      `SweptCharacterController` — the only first-person camera and the only swept
-      capsule in the repo live in tests. A single first-person example would exercise
-      all three and the §39 ordering at once.
+- [x] **Character-controller example follow-up — DONE 2026-08-29 (both
+      filings, one page):** `examples/character-controller`, a first-person
+      example exercising `CharacterController` (patrolling plane tier),
+      `FirstPersonLook` (child-eye pitch) and `SweptCharacterController`
+      (WASD capsule: slide, 3-riser step-up, jump) plus the §39
+      input → kinematics → solve ordering. Tenth browser-gate site (4182),
+      5 threshold specs; one Rapier wasm image, 0.90 MB gzip, budgeted
+      0.95 MB; landed atomically with AUDIT-120's examples row 9 → 10.
 
 - [ ] **Character-controller example follow-up:** nothing in `examples/` exercises the
       new components — the only first-person camera in the repo lives in a test. Worth
@@ -376,10 +379,14 @@ changes in `CHANGELOG.md`.
       adapter RFC for path planning;
       `PH-22l` `Clock` is naming-only (owner call); `PH-22n` remainder — §10's
       dropped-time warning is app-tier in `packages/four`'s `Application`.
-- [ ] **Step-8 sensor bookkeeping example.** `PRIORITY_SENSOR_UPDATE` is now genuinely
-      reachable (a system there runs before listeners at 900). Worth one worked example
-      in `examples/physics-playground` showing a sensor tally read at 800 and consumed
-      at 900.
+- [x] **Step-8 sensor bookkeeping example — DONE 2026-08-29.**
+      `examples/physics-playground` runs PH-21's split
+      (`dispatchEvents: false` + `PhysicsEventSystem` at 900) with a
+      `ZoneTallySystem` at 800: §30 `overlapBox` re-measure per step, consumed
+      by the step-9 listeners for the repaint; `data-tally*` mirrored beside
+      `data-zone*` and gated by `tests/browser/sensor-tally.spec.ts` (±1
+      agreement band — an exact contact boundary may legitimately disagree by
+      one). +405 B gzip; existing playground specs untouched and green.
 - [x] **R-8 DONE 2026-08-09** — §64 per-view render lists (`buildViewRenderList`, derive
       not rebuild), §87 frustum culling (`Frustum` in `@four/math`,
       `computeWorldBoundingSphere`, default-on, fails towards drawing), §49

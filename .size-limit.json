@@ -28,5 +28,10 @@
     "path": "examples/flagship/motor-digital-twin/dist/assets/*.js",
     "limit": "1.00 MB",
     "gzip": true
+  },
+  {
+    "path": "examples/character-controller/dist/assets/*.js",
+    "limit": "0.95 MB",
+    "gzip": true
   }
 ]

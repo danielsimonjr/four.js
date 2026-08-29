@@ -3,9 +3,9 @@
 Runnable examples planned by the documentation plan (§93) and the flagship demonstrations
 (§118–119). Every major feature should have a runnable example (§93).
 
-**Nine examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
+**Ten examples are implemented** (six until 2026-08-07, when `first-3d-scene` and then
 the §118 flagship were written; nine on 2026-08-08, when §119's motor digital twin was
-written). The other three entries below are **not yet written; the
+written; ten on 2026-08-29, when the §12 character-controller example was written). The other three entries below are **not yet written; the
 directory is a placeholder** — each holds a `.gitkeep` and nothing else. Until 2026-08-05
 they were described only as "scaffold only" in this paragraph while reading like a catalogue
 of demos in the list; each such row now carries the marker on its own line. The absence is
@@ -31,6 +31,10 @@ guide points at one of them without the marker.
 - [`physics-playground/`](physics-playground/) — **Implemented.** The §108 Phase 5 exit
   demonstration: a 2D world and a 3D world stepping side by side through one API —
   gravity, collisions, click impulses, sensor zones (`pnpm run playground:build`).
+  Since 2026-08-29 it is also the worked example of §39's steps 8 and 9: dispatch split
+  to `PhysicsEventSystem` at 900 (PH-21), with a `ZoneTallySystem` at
+  `PRIORITY_SENSOR_UPDATE` (800) re-measuring each zone through a §30 overlap query that
+  the step-9 listeners consume for the repaint.
   Fulfils the role sketched for `first-physics-scene/` (placeholder entry kept until the
   owner retires it).
 - [`ui-demo/`](ui-demo/) — **Implemented.** §73–§75's retained-mode UI: a `@four/ui` panel of
@@ -45,6 +49,15 @@ guide points at one of them without the marker.
   Build it with `pnpm run first-3d-scene:build`; it is non-wasm and ~23 kB gzip.
   This entry read "**not yet written; directory is a placeholder** … the one placeholder
   with no stand-in" until that date.
+- [`character-controller/`](character-controller/) — **Implemented (2026-08-29).** The
+  §12 controller family in one first-person page (the PH-11/PH-11b follow-up): a
+  `SweptCharacterController` capsule walked with WASD through §30 shape casts — walls
+  slide it, three stair risers are climbed by the step-up, Space jumps — with
+  `FirstPersonLook` on a child eye node (§44's yaw ∘ pitch decomposition, mouse-drag and
+  arrow-key look) and a plane-tier `CharacterController` patrolling a circle with no
+  physics body at all, all under the §39 input → kinematics → solve ordering. Build it
+  with `pnpm run character:build`; it carries **one** Rapier wasm image (a
+  directly-constructed `Rapier3dAdapter`) and is ~0.90 MB gzip.
 - [`first-animated-scene/`](first-animated-scene/) — **Not yet written; directory is a
   placeholder.** Planned as §93's first animated scene: tweens and a timeline. Animation
   ships inside `first-2d-scene/`.
