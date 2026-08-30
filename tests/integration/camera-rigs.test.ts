@@ -3,8 +3,8 @@
  * that have to agree (R-36 rig half + PH-11, 2026-08-13).
  *
  * `ConstraintSystem` is the first producing system §42's `"constraint"`
- * authority has ever had, and the two claims that no unit test inside
- * `@four/motion` can make are both about what happens *between* packages:
+ * authority has ever had, and the claims that no unit test inside
+ * `@four/motion` can make are about what happens *between* packages:
  *
  * 1. **The refusal is the one §42 describes.** A node owned by `"physics"`
  *    carrying a targeted rig is refused every step, warned about **once**, in a
@@ -18,6 +18,8 @@
  *    `"kinematic"` (`KinematicController.followPath`) carrying an aimed child
  *    under `"constraint"`. This file flies one for 120 fixed steps and checks
  *    the subject lands dead centre of the frame on **every** step, through
+ *    `viewMatrix · projectionMatrix` — the §47 chain, not the rig's own
+ *    arithmetic.
  * 3. **§44's physics attachment is not just the priority numbers.** A
  *    `FollowRig` + `LookAtConstraint` under `"constraint"` authority chase a
  *    Rapier 3D dynamic body stepped at `PRIORITY_PHYSICS_SOLVE` (600); the

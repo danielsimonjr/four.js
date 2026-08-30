@@ -387,17 +387,21 @@ function prosePaths() {
       if (existsSync(join(root, readme))) paths.add(readme);
     }
   }
-  return [...paths].filter(
-    (p) =>
-      existsSync(join(root, p)) &&
-      !QUOTES_DEFECTS.has(p) &&
-      // Generated graph dumps quote whatever the tree said the day they
-      // were regenerated; they are not prose we author by hand.
-      !p.startsWith("docs/Architecture/DEPENDENCY") &&
-      p !== "docs/Architecture/FILE_INVENTORY.md" &&
-      p !== "docs/Architecture/duplicate-symbols.md" &&
-      p !== "docs/Architecture/unused-analysis.md",
-  );
+  return [...paths].filter((p) => {
+    if (!existsSync(join(root, p)) || QUOTES_DEFECTS.has(p)) return false;
+    // Generated Architecture dumps quote whatever the tree said the day they
+    // were regenerated; they are not prose we author by hand. DEPENDENCY*
+    // is the graph dump (its header says "Last Updated", not "Generated").
+    // TEST_COVERAGE.md, FILE_INVENTORY.md, duplicate-symbols.md and
+    // unused-analysis.md stamp `**Generated**:` in the first lines.
+    if (p.startsWith("docs/Architecture/DEPENDENCY")) return false;
+    if (p.startsWith("docs/Architecture/dependency")) return false;
+    if (p.startsWith("docs/Architecture/")) {
+      const header = read(p)?.slice(0, 400) ?? "";
+      if (/\*\*Generated\*\*:/.test(header)) return false;
+    }
+    return true;
+  });
 }
 
 for (const rel of prosePaths()) {

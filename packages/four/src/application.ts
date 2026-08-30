@@ -1800,18 +1800,20 @@ export class Application extends EventEmitter<ApplicationEventMap> {
     // records the number; the application is the place that can tell an author
     // a frame just lost simulation time. Once per process — a warning that
     // fired every long frame would be a warning nobody reads (`devWarnOnce`).
-    // Format only on a frame that actually dropped: `devWarnOnce` still
-    // evaluates its message argument after the key has been seen.
+    // Format only on a frame that actually dropped, so later frames do not
+    // allocate the template string. Arguments are evaluated before the call;
+    // this guard is what skips the work, not `devWarnOnce`.
     if (DEV) {
       const dropped = this.scheduler.time.droppedTime;
       if (dropped > droppedBefore) {
+        const thisFrame = dropped - droppedBefore;
         const cap = this.scheduler.maximumSubSteps;
         const dt = this.scheduler.fixedDeltaTime;
         devWarnOnce(
           "application.dropped-time",
-          `§10 dropped ${dropped.toFixed(4)}s of simulation time ` +
+          `§10 dropped ${thisFrame.toFixed(4)}s of simulation time this frame ` +
             `(maximumSubSteps=${String(cap)}, ${String(cap)} × ${String(dt)}s); ` +
-            "excess beyond the clamp is recorded in TimeState.droppedTime and is not recovered.",
+            `TimeState.droppedTime is now ${dropped.toFixed(4)}s and is not recovered.`,
         );
       }
     }

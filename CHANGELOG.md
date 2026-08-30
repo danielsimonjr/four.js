@@ -27,7 +27,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - **§10 dropped-time warning (PH-22n).** `Application.step` emits a
   `devWarnOnce` when `TimeState.droppedTime` is non-zero — the scheduler
   already recorded the number; nothing told an author a frame had just
-  lost simulation time. Application tests swallow `console.warn` and
+  lost simulation time. The message reports **this frame's** drop, then
+  the cumulative total. Application tests swallow `console.warn` and
   `resetDevWarnings()` between cases so a long-frame determinism run no
   longer prints the once-per-process warning to stderr.
 - **`examples-build-coverage` nested paths.** The capture stopped at `/`,
@@ -50,6 +51,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   longer claim camera rigs are unshipped.
 - `tools/check-docs.mjs` scans `docs/Architecture/` hand-written files and
   `packages/*/README.md`, and pins the retired `render-webgpu (stub)` wording.
+  Generated Architecture reports (`**Generated**:` stamp, plus the
+  `DEPENDENCY*` graph dumps) stay excluded, including `TEST_COVERAGE.md`.
 - Tracker honesty: A-6's "members still absent" row, the §93/§118 examples
   `.gitkeep` row, and "§65 batching is unshipped" were all false of the
   tree. Camera-rig remainder no longer claims `ConstraintSystem` is empty.

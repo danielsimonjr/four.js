@@ -563,7 +563,9 @@ changes in `CHANGELOG.md`.
       must decide what it does to `golden/svg-path.json`; ~~(e) doc-truth gap found:
       `tools/check-docs.mjs` does not scan `packages/*/README.md`~~ (**done
       2026-08-30**: scans `packages/*/README.md` and `docs/Architecture/`
-      hand-written files; generated graph dumps stay excluded).
+      hand-written files; generated Architecture reports stay excluded — the
+      `**Generated**:` stamp plus `DEPENDENCY*` dumps, including
+      `TEST_COVERAGE.md`).
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
       R-13} - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing

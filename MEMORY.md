@@ -51,7 +51,9 @@ readable; never delete the pointer itself.
     `docs/Architecture/` will not catch a stub README that outlived the
     implementation.** `render-webgpu`'s README still said "barrel exports
     only `PACKAGE_NAME`" two days after R-1 closed. The scan now covers
-    both surfaces; generated graph dumps stay excluded.
+    both surfaces; generated Architecture reports (`**Generated**:` stamp
+    plus the `DEPENDENCY*` dumps, including `TEST_COVERAGE.md`) stay
+    excluded.
   - **An examples-build-coverage capture that stops at `/` makes two
     nested flagships look like one example.** Nested path capture, plus
     an assertion that `"flagship"` itself is not in the list.

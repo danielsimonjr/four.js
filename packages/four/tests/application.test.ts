@@ -278,12 +278,32 @@ describe("Application — main-loop events (§10, §6b)", () => {
     ]);
     expect(app.time.droppedTime).toBeGreaterThan(0);
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(String(warnSpy.mock.calls[0]?.[0])).toMatch(
-      /\[four\] §10 dropped .+s of simulation time/,
+    const first = String(warnSpy.mock.calls[0]?.[0]);
+    expect(first).toMatch(
+      /\[four\] §10 dropped .+s of simulation time this frame/,
+    );
+    expect(first).toContain(
+      `${app.time.droppedTime.toFixed(4)}s and is not recovered`,
     );
     // A second long frame must not repeat the warning — once per process.
     app.step(FIXED * 20);
     expect(warnSpy).toHaveBeenCalledTimes(1);
+    const afterSecond = app.time.droppedTime;
+    // After a reset the next drop reports *this frame*, not the cumulative total.
+    resetDevWarnings();
+    warnSpy.mockClear();
+    app.step(FIXED * 20);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const again = String(warnSpy.mock.calls[0]?.[0]);
+    const thisFrame = app.time.droppedTime - afterSecond;
+    expect(again).toContain(
+      `${thisFrame.toFixed(4)}s of simulation time this frame`,
+    );
+    expect(again).not.toMatch(
+      new RegExp(
+        `dropped ${app.time.droppedTime.toFixed(4)}s of simulation time this frame`,
+      ),
+    );
   });
 
   it("passes the scheduler's live TimeState to every listener", async () => {
