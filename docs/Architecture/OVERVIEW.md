@@ -68,7 +68,7 @@ single transform-authority model (§42).
 | Text                       | §56 MVP bitmap tier (built-in 6×12 font, 95 glyphs, glyph atlases, layout); SDF/shaping staged behind an RFC                                                                                                        |
 | Input & picking            | §71 ray/AABB/oriented-box picking, §72 pointer + keyboard propagation with capture keys, `DragManager` world-delta handoff                                                                                          |
 | UI                         | Retained-mode `Panel` / `Button` / `Label` scene nodes with flex/stack/absolute layout, keyboard traversal + Enter/Space activation, and the app-supplied `WidgetSkin` seam (§73–75 subset); a11y DOM mirror staged |
-| Assets                     | `AssetManager` with coalescing refcounted cache; text/JSON/binary/image loaders; glTF staged (needs §55 textures + non-unlit materials)                                                                             |
+| Assets                     | `AssetManager` with coalescing refcounted cache; text/JSON/binary/image loaders; glTF 2.0 core (`createGltfLoader` / `instantiateGltf`)                                                                             |
 | Serialization              | `SceneDocument` v1 with canonical validation, component-serializer registry, §80 migrations; byte-identical round trips (§79)                                                                                       |
 | Determinism & replay       | Same-runtime tier (§33): `SeededRandom`, float checksums, §34 snapshot envelopes, `ReplayRecorder` / `ReplayPlayer` with bit-identical replay proof                                                                 |
 | Diagnostics                | Debug-draw buffer + seven duck-typed providers (origins, velocities, centers of mass, contacts, impulses, solver/joint statistics) (§84, §113)                                                                      |
@@ -90,7 +90,7 @@ single transform-authority model (§42).
 │  Seams                                                          │
 │    PhysicsSolverAdapter (§37)     Renderer (§61)                │
 │      ├ physics-rapier  (shipped)    ├ render-webgl   (shipped)  │
-│      ├ physics-box2d   (stub)       ├ render-webgpu  (stub)     │
+│      ├ physics-box2d   (stub)       ├ render-webgpu  (shipped)  │
 │      └ physics-soft    (stub)       ├ render-canvas  (stub)     │
 │                                     └ render-svg     (stub)     │
 ├─────────────────────────────────────────────────────────────────┤
@@ -118,7 +118,7 @@ dependency matrix (implementation plan §3.1).
 | `scene`          | 2    | Node/Group/Scene, transforms, cameras + viewports (§47–48), `DirectionalLight`, transform authority (§42), `PoseBuffer`/`PoseTarget` | Shipped                      |
 | `geometry`       | 2    | `BufferGeometry` + MVP primitives (box, plane, 2D circle) with optional normals (§53)                                                | Shipped                      |
 | `materials`      | 2    | `UnlitMaterial`, `LitMaterial`, `SpriteMaterial` with a `kind` pipeline discriminant (§57)                                           | Shipped                      |
-| `assets`         | 2    | `AssetManager`, built-in loaders, `ImageAsset` (§76)                                                                                 | Shipped (glTF staged)        |
+| `assets`         | 2    | `AssetManager`, built-in loaders, `ImageAsset`, glTF 2.0 core (§76, §78)                                                             | Shipped                      |
 | `motion`         | 3    | Clock/`TimeState`, §10 scheduler, §39 system registry, `MotionComponent`, integrators, trajectories, kinematics, steering, PID, IK   | Shipped                      |
 | `input`          | 3    | Pointer input, propagation, picking, dragging (§71–72)                                                                               | Shipped                      |
 | `serialization`  | 3    | `SceneDocument`, validation, migrations (§79–80)                                                                                     | Shipped                      |
@@ -129,7 +129,7 @@ dependency matrix (implementation plan §3.1).
 | `animation`      | 4    | Tweens, easing, timelines, clips/tracks, mixer, animation system (Part III)                                                          | Shipped                      |
 | `physics`        | 4    | The stable physics API: world, bodies, colliders, joints, queries, adapter contract (§101)                                           | Shipped                      |
 | `render-webgl`   | 4    | WebGL 2 backend: four GL programs, structural GL seam, caches (§62)                                                                  | Shipped                      |
-| `render-webgpu`  | 4    | WebGPU backend                                                                                                                       | Reserved stub                |
+| `render-webgpu`  | 4    | WebGPU backend — unlit/sprite/lit/standard, clips, shadows, compute, node materials (§62)                                            | Shipped (R-1, 2026-08-29)    |
 | `render-canvas`  | 4    | Canvas 2D backend                                                                                                                    | Reserved stub                |
 | `render-svg`     | 4    | SVG backend                                                                                                                          | Reserved stub                |
 | `ui`             | 4    | Retained-mode widgets, layout, keyboard traversal, `WidgetSkin` seam (§73–75)                                                        | Shipped (a11y mirror staged) |
@@ -138,9 +138,11 @@ dependency matrix (implementation plan §3.1).
 | `physics-soft`   | 5    | Soft bodies / deformables (§35, not a solver adapter)                                                                                | Reserved stub                |
 | `four`           | 6    | Umbrella: the §45 `Application` composition root + one namespace/subpath per package                                                 | Shipped                      |
 
-The five reserved stubs each contain a single placeholder file exporting
+The four reserved stubs (`physics-box2d`, `physics-soft`, `render-canvas`,
+`render-svg`) each contain a single placeholder file exporting
 `PACKAGE_NAME`, and their READMEs say so honestly ("interface reserved; not
-yet implemented"). Per ERRATA E-3, `physics-matter` and `physics-cannon`
+yet implemented"). `@four/render-webgpu` left that list 2026-08-21…29 (the
+R-1 plan). Per ERRATA E-3, `physics-matter` and `physics-cannon`
 directories must **not** be added without a spec amendment.
 
 ## Conventions everything assumes

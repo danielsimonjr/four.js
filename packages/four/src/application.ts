@@ -114,6 +114,7 @@ import {
   EventEmitter,
   FourError,
   bindCapability,
+  devWarnOnce,
   installPlugins,
   type FourPlugin,
   type PluginCapabilityBinding,
@@ -1787,11 +1788,34 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       }
       frameStarted = (this.#now ?? monotonicNowSeconds)();
     }
+    const droppedBefore = DEV ? this.scheduler.time.droppedTime : 0;
     this.#stepping = true;
     try {
       this.scheduler.step(elapsedSeconds);
     } finally {
       this.#stepping = false;
+    }
+    // §10's diagnostics warning (PH-22n, 2026-08-30): excess beyond
+    // `maximumSubSteps` is dropped into `TimeState.droppedTime`. The scheduler
+    // records the number; the application is the place that can tell an author
+    // a frame just lost simulation time. Once per process — a warning that
+    // fired every long frame would be a warning nobody reads (`devWarnOnce`).
+    // Format only on a frame that actually dropped, so later frames do not
+    // allocate the template string. Arguments are evaluated before the call;
+    // this guard is what skips the work, not `devWarnOnce`.
+    if (DEV) {
+      const dropped = this.scheduler.time.droppedTime;
+      if (dropped > droppedBefore) {
+        const thisFrame = dropped - droppedBefore;
+        const cap = this.scheduler.maximumSubSteps;
+        const dt = this.scheduler.fixedDeltaTime;
+        devWarnOnce(
+          "application.dropped-time",
+          `§10 dropped ${thisFrame.toFixed(4)}s of simulation time this frame ` +
+            `(maximumSubSteps=${String(cap)}, ${String(cap)} × ${String(dt)}s); ` +
+            `TimeState.droppedTime is now ${dropped.toFixed(4)}s and is not recovered.`,
+        );
+      }
     }
     if (stats !== null) {
       if (this.#renderStatistics !== null) {

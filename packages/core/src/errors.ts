@@ -25,6 +25,16 @@ export type FourErrorCode =
   | "DEVICE_LOST"
   | "INVALID_SCENE_GRAPH"
   | "INVALID_APPLICATION_STATE"
+  /**
+   * A render graph was asked to exist in a shape that cannot: a duplicate
+   * pass name, an unknown input, a removal that would orphan a consumer, an
+   * execute of an effect pass on a backend that has no `renderEffect`.
+   * Distinct from `"INVALID_APPLICATION_STATE"` so a host can tell a graph
+   * authoring mistake from a lifecycle one without parsing the message
+   * (R-5 follow-up, 2026-08-30). The code lives here because §89's vocabulary
+   * is one union in this file; `@four/render` is the only thrower.
+   */
+  | "INVALID_RENDER_GRAPH"
   | "PHYSICS_SOLVER_FAILED"
   | "SERIALIZATION_VERSION_MISMATCH"
   /**

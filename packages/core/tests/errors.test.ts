@@ -87,8 +87,12 @@ describe("FourError (§89)", () => {
     }
   });
 
-  it("covers the §89 code list, including CONTEXT_LOST and DEVICE_LOST", () => {
-    const codes: FourErrorCode[] = [
+  it("covers the §89 code list exhaustively", () => {
+    // `satisfies` plus the `Missing extends never` check below means adding a
+    // code to the union and forgetting this list is a compile error, not a
+    // silently-untested variant (the previous list omitted three shipped
+    // codes and would have omitted `INVALID_RENDER_GRAPH` the same way).
+    const codes = [
       "RENDERER_INITIALIZATION_FAILED",
       "UNSUPPORTED_GPU_FEATURE",
       "ASSET_LOAD_FAILED",
@@ -96,14 +100,21 @@ describe("FourError (§89)", () => {
       "CONTEXT_LOST",
       "DEVICE_LOST",
       "INVALID_SCENE_GRAPH",
+      "INVALID_APPLICATION_STATE",
+      "INVALID_RENDER_GRAPH",
       "PHYSICS_SOLVER_FAILED",
       "SERIALIZATION_VERSION_MISMATCH",
-    ];
+      "UNTRUSTED_INPUT_REJECTED",
+      "NOT_IMPLEMENTED",
+    ] as const satisfies readonly FourErrorCode[];
+    type Missing = Exclude<FourErrorCode, (typeof codes)[number]>;
+    const exhaustive: Missing extends never ? true : Missing = true;
+    expect(exhaustive).toBe(true);
 
     for (const code of codes) {
       expect(new FourError(code, code).code).toBe(code);
     }
-    expect(codes).toHaveLength(9);
+    expect(codes).toHaveLength(13);
   });
 });
 

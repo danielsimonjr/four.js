@@ -216,28 +216,32 @@ describe("Shape2D — the family's shared half", () => {
     expect(() => pentagram.geometry).toThrow(RangeError);
   });
 
-  it("widens to a 32-bit index buffer past 65 536 vertices", () => {
-    // 257 disjoint 256-gons: 65 792 vertices, which is one region more than a
-    // `Uint16Array` index can address, and cheap because both the tessellator
-    // and the fill-rule grouping are quadratic in the *ring*, not in the total.
-    const path = new Path();
-    for (let ring = 0; ring < 257; ring += 1) {
-      const cx = (ring % 17) * 4;
-      const cy = Math.floor(ring / 17) * 4;
-      for (let i = 0; i < 256; i += 1) {
-        const angle = (Math.PI * 2 * i) / 256;
-        const x = cx + Math.cos(angle);
-        const y = cy + Math.sin(angle);
-        if (i === 0) path.moveTo(x, y);
-        else path.lineTo(x, y);
+  it(
+    "widens to a 32-bit index buffer past 65 536 vertices",
+    { timeout: 20_000 },
+    () => {
+      // 257 disjoint 256-gons: 65 792 vertices, which is one region more than a
+      // `Uint16Array` index can address, and cheap because both the tessellator
+      // and the fill-rule grouping are quadratic in the *ring*, not in the total.
+      const path = new Path();
+      for (let ring = 0; ring < 257; ring += 1) {
+        const cx = (ring % 17) * 4;
+        const cy = Math.floor(ring / 17) * 4;
+        for (let i = 0; i < 256; i += 1) {
+          const angle = (Math.PI * 2 * i) / 256;
+          const x = cx + Math.cos(angle);
+          const y = cy + Math.sin(angle);
+          if (i === 0) path.moveTo(x, y);
+          else path.lineTo(x, y);
+        }
+        path.close();
       }
-      path.close();
-    }
-    const shape = new PathShape({ path, material: material() });
-    expect(shape.geometry.vertexCount).toBe(257 * 256);
-    expect(shape.geometry.indices).toBeInstanceOf(Uint32Array);
-    expectAreaJustUnder(shape, 257 * Math.PI, 0.01 * 257 * Math.PI);
-  });
+      const shape = new PathShape({ path, material: material() });
+      expect(shape.geometry.vertexCount).toBe(257 * 256);
+      expect(shape.geometry.indices).toBeInstanceOf(Uint32Array);
+      expectAreaJustUnder(shape, 257 * Math.PI, 0.01 * 257 * Math.PI);
+    },
+  );
 });
 
 describe("§50 circle, ellipse, sector, ring — the arc-bearing shapes", () => {

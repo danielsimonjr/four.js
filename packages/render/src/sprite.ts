@@ -152,7 +152,7 @@ import { BufferGeometry } from "@four/geometry";
 import { Vector2 } from "@four/math";
 import type { SpriteMaterial } from "@four/materials";
 
-import { Renderable } from "./renderable.js";
+import { Renderable, type RenderableOptions } from "./renderable.js";
 
 /**
  * §55's `frame?: Rectangle2` — the sub-rectangle of the texture a sprite
@@ -214,11 +214,16 @@ interface MutableSpriteFrame {
 
 /**
  * Optional construction arguments of {@link Sprite} — the quad's own size and
- * anchor, plus the three `RenderableOptions` fields a sprite honours
- * (`renderLayer`, `renderOrder`, and §67's `clip`), spelled out here so the
- * sprite's own options read as one list.
+ * anchor, plus every {@link RenderableOptions} field.
+ *
+ * Extending the base record (rather than restating a subset) is the
+ * round-trip contract: the §79 writer always writes the drawable flags, the
+ * reader spreads them into this record, and `super(…, options)` forwards
+ * whatever the base knows. Restating a subset dropped `castShadow` /
+ * `receiveShadow` / `frustumCulled` until 2026-08-30; a new `Renderable`
+ * field cannot be dropped the same way again.
  */
-export interface SpriteOptions {
+export interface SpriteOptions extends RenderableOptions {
   /**
    * Initial {@link Sprite.frame}, copied into the sprite's own record and
    * validated against the material's texture (§85). Omitted means the whole
@@ -234,17 +239,6 @@ export interface SpriteOptions {
    * Defaults to the centre, `(0.5, 0.5)`.
    */
   anchor?: { readonly x: number; readonly y: number };
-  /** Initial {@link Sprite.renderLayer}; defaults to 0. */
-  renderLayer?: number;
-  /** Initial {@link Sprite.renderOrder}; defaults to 0. */
-  renderOrder?: number;
-  /**
-   * Initial `Node.clip`; defaults to `false` (§67, R-23). A clipping sprite
-   * masks its subtree to its **quad** — the anchored rectangle, not the
-   * texture's alpha (§67's alpha masks are a staged tier; see
-   * `@four/render`'s `clip.ts`) — which is §73's overflow-clipping shape.
-   */
-  clip?: boolean;
 }
 
 /** Vertices of the quad: bottom-left, bottom-right, top-right, top-left. */
@@ -449,11 +443,7 @@ export class Sprite extends Renderable<SpriteMaterial> implements Disposable {
       indices: QUAD_INDICES.slice(),
       mode: "triangles",
     });
-    super(quad, material, {
-      renderLayer: options.renderLayer ?? 0,
-      renderOrder: options.renderOrder ?? 0,
-      clip: options.clip ?? false,
-    });
+    super(quad, material, options);
     this.#quad = quad;
     this.#width = requirePositive("width", options.width ?? 1);
     this.#height = requirePositive("height", options.height ?? 1);

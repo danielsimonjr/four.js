@@ -21,12 +21,10 @@ changes in `CHANGELOG.md`.
       PH-22f/j/l, R-26's XML seam, A-24's §83 corner. Full gate suite green on
       `df572c6` incl. the 101-test browser gate (readpixels-region first run
       recorded, goldens byte-unchanged).
-- [ ] **RFC implementation queue (accepted 2026-08-21):** ~~0002 plugins (done
-      2026-08-28)~~ → ~~0003 skinning (done 2026-08-28)~~ → ~~0001 shader/node
-      materials (done 2026-08-28)~~ → ~~0005 pixel picking (done
-      2026-08-29)~~ → ~~0004 raster
-      painting (done 2026-08-29)~~. **The RFC queue (0001–0005) is COMPLETE.**
-      R-1 completed 2026-08-29 (WP-R1.1–R1.9 all landed).
+- [x] **RFC implementation queue (accepted 2026-08-21):** 0002 plugins → 0003
+      skinning → 0001 shader/node materials → 0005 pixel picking → 0004 raster
+      painting. **The RFC queue (0001–0005) is COMPLETE** (2026-08-29). R-1
+      completed 2026-08-29 (WP-R1.1–R1.9 all landed).
 - [ ] **RFC 0004 residue (all deferred by the RFC's own §6 table, none
       scheduled):** video textures (frame-arrival signal, DOM-free);
       `ImageBitmap`/decoded-image raster sources (A-18's generic
@@ -81,10 +79,10 @@ changes in `CHANGELOG.md`.
       rewritten to say so. check-docs green, 10 pins.
 
       0001's landing decides WP-R1.9's
-                                          input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
-                                          reachability are backend-independent and re-exported through `@four/render`;
-                                          the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
-                                          (screen domain included, for §70 graph effects).
+                                              input: the WGSL emitter is now unblocked — the IR, analysis, reflection and
+                                              reachability are backend-independent and re-exported through `@four/render`;
+                                              the WebGPU packet mirrors `gl-node-program.ts` over the wgpu pipeline cache
+                                              (screen domain included, for §70 graph effects).
 
 - [ ] **RFC 0001 residue (staged in source, 2026-08-28):** uniform blocks (std140,
       with a measurement), reusable functions (named subgraphs need an emission
@@ -299,12 +297,9 @@ changes in `CHANGELOG.md`.
       stalling form in the promise shape, defended in-source). RFC 0005 Q5's
       adopted disposition stands: picking's single-texel path still bypasses
       `readPixels`; a _regional pick_ form remains that packet's residue.
-- [ ] **Playground sensor-zone browser test failing on the shared tree (2026-08-21,
-      under investigation):** `playground.spec.ts` "each sensor zone repaints" fails
-      consistently while the character-controllers agent holds in-flight
-      `packages/motion`/`physics` edits; the spec is untouched by any landed batch.
-      Re-check on the settled tree at the controllers landing — it is that batch's
-      gate to pass.
+- [x] **Playground sensor-zone browser test — re-checked 2026-08-29** at the
+      controllers landing and again in the v2 closing gate (101/101); the
+      2026-08-21 failure was the in-flight `packages/motion`/`physics` tree.
 - [x] **R-37 CLOSED 2026-08-21** — §47's `ScreenCamera` (three origins × two unit
       systems, §7a defaults, negative near, §85 refusals, §79 pair) plus
       `Application.resize` feeding it through the structural `SurfaceSizedCamera`
@@ -356,17 +351,18 @@ changes in `CHANGELOG.md`.
       (rides WP-R1.7's stencil-parity packet): §57 `material.stencil` on a frame that
       never clips is inert on WebGPU — GL-without-`{stencil:true}` parity, stated in
       source.
-- [ ] **Sprite §79 flag drop (pre-existing, found 2026-08-28):** the writer writes
-      `castShadow`/`receiveShadow`/`frustumCulled` for sprites; `Sprite`'s
-      constructor filters its options and drops all three, so they do not survive a
-      round trip. `clip` was plumbed through explicitly; the other three need the
-      same one-line pass-through plus a round-trip test.
+- [x] **Sprite §79 flag drop — DONE 2026-08-30.** `SpriteOptions` now
+      _extends_ `RenderableOptions` and the constructor forwards the whole
+      record to `super` (the Shape2D pattern). Restating a subset had dropped
+      `castShadow`/`receiveShadow`/`frustumCulled`; a new drawable field
+      cannot be dropped the same way again. Round-trip asserted in
+      `scene-serializers.test.ts` and a constructor unit in `sprite.test.ts`.
 - [ ] **Scissor clipping (§67's first bullet, small)** — unrelated to the stencil and
       unblocked: the backend already keeps `SCISSOR_TEST` enabled and sets the rect per
       view. A per-item scissor is a render-list field, not a buffer.
-- [ ] **Flake to watch (pre-existing):** `packages/render/tests/shape.test.ts`'s "widens
-      to a 32-bit index buffer" times out under `--coverage` on a loaded box. Either
-      raise that one test's timeout or shrink the fixture; do not weaken the assertion.
+- [x] **Flake to watch — DONE 2026-08-30:** `packages/render/tests/shape.test.ts`'s
+      "widens to a 32-bit index buffer" now has a 20 s timeout so `--coverage`
+      on a loaded box cannot flake the assertion.
 - [x] **PH-21 — §39 step 9 occupiable (2026-08-21).** `PhysicsEventSystem` at
       `PRIORITY_EVENT_DISPATCH` + `PhysicsSystemOptions.dispatchEvents`; golden
       `event-dispatch-split.json`. Steps 7–8 closed as not splittable, documented in
@@ -378,8 +374,10 @@ changes in `CHANGELOG.md`.
       model shipped 2026-08-28 (RFC 0003 `Bone`/`Skeleton`); CCD/FABRIK/limits now
       wait on a limits/ownership/convergence contract (`ik.ts` staging note) + an
       adapter RFC for path planning;
-      `PH-22l` `Clock` is naming-only (owner call); `PH-22n` remainder — §10's
-      dropped-time warning is app-tier in `packages/four`'s `Application`.
+      `PH-22l` `Clock` is naming-only (owner call); ~~`PH-22n` remainder — §10's
+      dropped-time warning is app-tier in `packages/four`'s `Application`~~
+      (**done 2026-08-30**: `Application.step` emits a `devWarnOnce` when
+      `TimeState.droppedTime` is non-zero).
 - [x] **Step-8 sensor bookkeeping example — DONE 2026-08-29.**
       `examples/physics-playground` runs PH-21's split
       (`dispatchEvents: false` + `PhysicsEventSystem` at 900) with a
@@ -508,17 +506,17 @@ changes in `CHANGELOG.md`.
       `SeededRandom`, blocked only on choosing an interpolated value-noise function —
       per-step white noise is a jitter whose character changes with the fixed rate
       (§33).
-- [ ] **Nothing exercises a rig against a live solver (2026-08-09)** — §44's _physics
-      attachment_ is argued from the priority numbers (`PRIORITY_CONSTRAINTS` 700 >
-      `PRIORITY_PHYSICS_SOLVE` 600) and from a rig reading rather than writing its
-      target. Cheap to make evidence: add a `@four/physics-rapier` arm to
-      `tests/integration/camera-rigs.test.ts` chasing a dynamic body.
-- [ ] **§44/§47 camera rigs (R-36 rig half + PH-11)** — orbit, fly, first-person,
-      trackball, follow target, spring arm, shake/impulse, path animation, physics
-      attachment; plus §12's orbit motion and character controllers. Build on
-      `Node.lookAt`. The look-at _constraint_ wants §42's `"constraint"` authority,
-      which has no producing system: seam is a `LookAtConstraint` component + a system
-      at `PRIORITY_CONSTRAINTS` (empty today, PH-21). One packet, effort L.
+- [x] **Nothing exercises a rig against a live solver — DONE 2026-08-30.**
+      `tests/integration/camera-rigs.test.ts` now chases a Rapier 3D dynamic
+      body with `FollowRig` + `LookAtConstraint`; priority 600 then 700 is
+      the observable, not an argument.
+- [ ] **§44/§47 camera rigs residue** — shipped: orbit, follow, spring arm,
+      look-at, path-composed aim, physics attachment, first-person look
+      (`OrbitRig`, `FollowRig` + `SpringDamper`, `LookAtConstraint` +
+      `ConstraintSystem` at 700, Rapier chase in `camera-rigs.test.ts`,
+      `FirstPersonLook` + `CharacterController`). Remaining: trackball
+      (`ScreenCamera` packet), fly (application snippet), shake/impulse
+      (staged under "Staged rigs" above).
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
@@ -544,10 +542,12 @@ changes in `CHANGELOG.md`.
       `shape.ts`'s header. New staged residue: values-as-uniforms lowering for
       animated gradient stops (noted in `shape-paint.ts`'s determinism section).
 - [ ] **R-23 follow-ups (solid-fill tier shipped 2026-08-09):** (a) §50 residue after
-      R-16 — clipping and masks (needs §57's `stencil`, which no backend reads), Boolean
-      geometry operations (§51's four, the shared planar-subdivision packet), world
-      bounds (§87), analytic hit testing (`A-11`, whose §50 blocker fell — every shape
-      answers `toPath()`); (b) screen-space flattening tolerance — `Shape2D.tolerance`
+      R-16 — ~~clipping and masks (needs §57's `stencil`, which no backend reads)~~
+      (stencil masks + nested clips shipped 2026-08-28; residue is alpha masks,
+      3D clip planes, per-item scissor, named in `clip.ts`), Boolean
+      geometry operations (§51's four, the shared planar-subdivision packet),
+      world bounds (§87), ~~analytic hit testing (`A-11`)~~ (closed 2026-08-29);
+      (b) screen-space flattening tolerance — `Shape2D.tolerance`
       is a world-space length by decision; a screen-space one needs a per-view render
       list (`R-8`) and a rebuild inside the frame, which §61 forbids throwing in.
 - [ ] **R-26 follow-ups (path-data tier shipped 2026-08-09):** (a) the `<svg>` document
@@ -560,9 +560,12 @@ changes in `CHANGELOG.md`.
       segment — tangentially continuous, no §52 refusal observed, but the general fix
       needs §51 to express "this arc starts exactly here"; (d) a lossy
       `formatSvgPathData` precision option is deliberately absent — the packet adding it
-      must decide what it does to `golden/svg-path.json`; (e) doc-truth gap found:
-      `tools/check-docs.mjs` does not scan `packages/*/README.md` — 24 unguarded prose
-      surfaces (geometry's was two days stale).
+      must decide what it does to `golden/svg-path.json`; ~~(e) doc-truth gap found:
+      `tools/check-docs.mjs` does not scan `packages/*/README.md`~~ (**done
+      2026-08-30**: scans `packages/*/README.md` and `docs/Architecture/`
+      hand-written files; generated Architecture reports stay excluded — the
+      `**Generated**:` stamp plus `DEPENDENCY*` dumps, including
+      `TEST_COVERAGE.md`).
 - [x] **RFCs 0001–0003 drafted 2026-08-07** (R-14, A-3, PH-10/R-22) — all three
       **owner decision pending**; packets blocked on acceptance: - R-14 packet gate: byte-identical GL for node-material-free scenes (F13 method) + grep-proven bundle A/B; sequence R-12 (done) → R-14 → {R-1, R-6 widening,
       R-13} - PH-10/R-22 named owner question: bone-axis convention (RFC recommends imposing
@@ -603,18 +606,23 @@ changes in `CHANGELOG.md`.
       rule enforced by an integration test that forbids any other package importing it
 - [ ] **§40 follow-ups:** physics §41-envelope-in-SI (`PhysicsWorldOptions.units`, a
       `@four/physics` packet); §79 header units (after A-16); text parsing
-      (`parseAngle("90°")` — needs locale + failure policy); consider a row for
-      `packages/math/src/color.ts` at 0% coverage (pre-existing, spotted during gates)
+      (`parseAngle("90°")` — needs locale + failure policy); ~~consider a row for
+      `packages/math/src/color.ts` at 0% coverage (pre-existing, spotted during gates)~~
+      (**done**: `packages/math/tests/color.test.ts` covers parse + transfer)
 - [x] **R-5 CLOSED (linear-pass tier) 2026-08-07:** `RenderGraph` in `@four/render` —
       passes over R-4's target seam, transcript-identical to hand-written calls,
       tree-shakes out of all bundles. **R-6 (§70 post-FX) now unblocked — effects are
       graph passes; do not build a parallel mechanism**
-- [ ] **R-5 follow-ups:** add `INVALID_RENDER_GRAPH` to §89's `FourErrorCode` union and
-      switch `GRAPH_ERROR_CODE` to it; adopt `tests/integration/helpers/recording-gl.ts`
-      in `render-to-texture.test.ts` (mechanical dedupe); §63's on-screen pass-output
-      debug view waits on §70's full-screen blit; format the two pre-existing prettier
-      warnings (`packages/render/package.json`,
-      `tests/integration/examples-build-coverage.test.ts`)
+- [x] **R-5 follow-ups — `INVALID_RENDER_GRAPH` + prettier DONE 2026-08-30.**
+      Added to §89's `FourErrorCode` union (spec revision 1.13) and
+      `GRAPH_ERROR_CODE` switched; `errors.test.ts` exhaustiveness-checks the
+      whole union. The two pre-existing prettier warnings
+      (`packages/render/package.json`,
+      `tests/integration/examples-build-coverage.test.ts`) formatted.
+      Remaining: adopt `tests/integration/helpers/recording-gl.ts` in
+      `render-to-texture.test.ts` (mechanical dedupe; helper header still
+      warns against rewriting a landed gate); §63's on-screen pass-output
+      debug view waits on §70's full-screen blit.
 - [x] **PH-5 CLOSED 2026-08-07:** `PhysicsWorld.addCollider`/`removeCollider` — one
       collider on a live body, handle/id/checksum position/joints/pose all surviving;
       mass proven both directions on authored- and derived-mass bodies; §34 needed
@@ -647,13 +655,12 @@ changes in `CHANGELOG.md`.
       measuring browser tests (49 total), first user of the §62/§37 registries and
       the §113 overlay streams. Remaining under A-21/S-8: the three §93 stand-in
       scenes (owner retire-or-write decision) and §119's motor-digital-twin
-- [ ] **Flagship follow-ups:** (a) per-dimension Rapier registration to halve the
-      1.54 MB payload (registerRapierSolver pulls both wasm images); (b) widen
-      `examples-build-coverage`'s regex to nested example paths (matches only the
-      first segment today); (c) `collectBodyOrigins`' default cross size is invisible
-      in 3D (drawn inside the body; 0 pixels at 0.18, 251 at 0.55) — consider a
-      larger default or a doc note; (d) §46 layers would let the panel move to its
-      own viewport
+- [x] **Flagship follow-up (b) — DONE 2026-08-30.** `examples-build-coverage`
+      captures nested paths (`flagship/one-scene-everything-moves`,
+      `flagship/motor-digital-twin`); the original `[a-z0-9-]+` capture
+      collapsed both to `"flagship"`. Remaining: (a) per-dimension Rapier
+      registration; (c) `collectBodyOrigins` default cross size; (d) §46
+      layers for the panel viewport.
 - [x] **A-5 partial DONE 2026-08-07 (accounting tier):** byte + live-instance
       accounting on BufferGeometry/Texture/RenderTarget; §84's two memory counters
       live. A-1 follow-up (b) closed
@@ -832,23 +839,27 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       the injected `SceneResourceCatalog` seam; §79's manifest (key → URL + content
       hash) remains staged behind A-18 content hashing. Still open under A-16: the §80
       `.four` binary package format and the manifest document itself
-- [ ] **A-6 remainder:** `application.ts`'s header note is now a dated post-plan note, but
-      `app.input` / `app.assets` / `app.diagnostics` / `app.stats` / `app.physics` and
-      `autoResize`/`reducedMotion` are still absent
+- [x] **A-6 remainder — re-read 2026-08-30.** `app.assets`, `app.stats`
+      (`FrameStats`; this is §45's diagnostics surface), `app.physics`,
+      `autoResize`, and `reducedMotion` all shipped. `app.input` is
+      **refused by design** (`application.ts` header: §45 names "input
+      routing" in prose, lists no input option, and `@four/input` has two
+      coequal subsystems — electing one to _be_ `app.input` would invent
+      an API).
 
 ### Backlog additions (doc-truth sweep, 2026-08-05)
 
-- [ ] The §93/§118–119 examples: five of the six directories still do not exist
-      (`docs/AUDIT-120.md` **S-8**, partially closed 2026-08-07 — `first-3d-scene` was
-      written): `first-animated-scene`, `first-physics-scene`, `mixed-scene`,
-      `flagship/one-scene-everything-moves`, `flagship/motor-digital-twin` are
-      `.gitkeep`-only. All three remaining §93 scenes have shipped stand-ins (animation
-      inside `first-2d-scene`; physics and mixed 2D/3D by `physics-playground`), so what
-      is left is the two §118–119 flagships plus an owner decision to retire the three
-      stand-in directories
-- [ ] §65 sprite/glyph batching is unshipped and now says so in three places
-      (AUDIT-120 sprites row + S-4, the render-graph guide, `benchmarks/README.md`);
-      it blocks two §86 benchmark rows outright
+- [x] **The §93/§118–119 examples — truth as of 2026-08-30.** Ten runnable
+      `examples/**/main.ts`: both flagships, `first-2d-scene`, `first-3d-scene`,
+      `physics-playground`, `blending`, `particles-demo`, `ui-demo`,
+      `mechanism`, `character-controller`. Remaining: owner retire-or-write
+      on the three unused §93 directory names (`first-animated-scene`,
+      `first-physics-scene`, `mixed-scene`) whose content lives in stand-ins.
+- [x] **§65 sprite/glyph batching — opt-in shipped 2026-08-09 (R-9).**
+      `renderer.batching = createGlBatching()`; default remains one draw per
+      sprite (`docs/AUDIT-120.md` sprites row). Glyphs batch as consecutive
+      same-material `Text` (R-28). Residue: grouping labels that do not share
+      a material (atlas grouping, R-9's own remainder).
 - [ ] Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear
       (candidates: package counts, test-suite counts in `tests/README.md`, the
       §120 verdict totals) — each addition must stay decidable by reading files
@@ -930,6 +941,13 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
+- [x] 2026-08-30 — **Unblocked-defect sanitization.** Sprite §79 flags via
+      `SpriteOptions extends RenderableOptions`; `INVALID_RENDER_GRAPH` + §89
+      list (spec 1.13); PH-22n dropped-time `devWarnOnce`; nested example-path
+      coverage; shape 32-bit timeout; Rapier chase in `camera-rigs.test.ts`;
+      docs truth (WebGPU not a stub; camera rigs shipped; A-6/examples/§65
+      tracker rows); `check-docs` scans package READMEs + Architecture prose.
+      Per-item scissor, RFC residue, R-32/R-33, PH-11c remain owner-gated.
 - [x] 2026-08-04 — **Lighting MVP shipped** (§120's last unshipped bullet; owner-directed,
       minimal tier): `DirectionalLight` node + `Scene.ambientLight` in @four/scene (§68),
       `LitMaterial` + `kind` discriminants in @four/materials (§57), optional `normals`

@@ -26,7 +26,11 @@ const root = join(import.meta.dirname, "..", "..");
 function previewedExamples(): string[] {
   const cfg = readFileSync(join(root, "playwright.config.ts"), "utf8");
   // `npx vite preview examples/<name> --port ...`
-  return [...cfg.matchAll(/vite preview examples\/([a-z0-9-]+)/g)].map((m) => m[1]).sort();
+  return [
+    ...cfg.matchAll(/vite preview examples\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)/g),
+  ]
+    .map((m) => m[1])
+    .sort();
 }
 
 /** Example directories `pnpm examples:build` actually builds. */
@@ -42,7 +46,11 @@ function builtExamples(): string[] {
   return [...agg.matchAll(/pnpm ([a-z0-9:-]+)/g)]
     .map((m) => pkg.scripts[m[1]])
     .filter((cmd): cmd is string => Boolean(cmd))
-    .flatMap((cmd) => [...cmd.matchAll(/vite build examples\/([a-z0-9-]+)/g)].map((m) => m[1]))
+    .flatMap((cmd) =>
+      [
+        ...cmd.matchAll(/vite build examples\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)/g),
+      ].map((m) => m[1]),
+    )
     .sort();
 }
 
@@ -51,7 +59,10 @@ describe("examples build coverage", () => {
     const previewed = previewedExamples();
     const built = builtExamples();
 
-    expect(previewed.length, "playwright.config.ts should preview at least one example").toBeGreaterThan(0);
+    expect(
+      previewed.length,
+      "playwright.config.ts should preview at least one example",
+    ).toBeGreaterThan(0);
 
     const missing = previewed.filter((e) => !built.includes(e));
     expect(
@@ -67,6 +78,20 @@ describe("examples build coverage", () => {
     // only if the new name happens to be built. This closes that.
     const previewed = previewedExamples();
     const orphans = builtExamples().filter((e) => !previewed.includes(e));
-    expect(orphans, `examples:build builds ${orphans.join(", ")}, which no webServer entry previews`).toEqual([]);
+    expect(
+      orphans,
+      `examples:build builds ${orphans.join(", ")}, which no webServer entry previews`,
+    ).toEqual([]);
+  });
+
+  it("captures nested example paths, not only the first segment", () => {
+    // The original `[a-z0-9-]+` capture stopped at `/`, so both flagships
+    // collapsed to `"flagship"` and a missing twin would still look covered.
+    const previewed = previewedExamples();
+    expect(previewed).toContain("flagship/one-scene-everything-moves");
+    expect(previewed).toContain("flagship/motor-digital-twin");
+    expect(previewed).not.toContain("flagship");
+    expect(builtExamples()).toContain("flagship/one-scene-everything-moves");
+    expect(builtExamples()).toContain("flagship/motor-digital-twin");
   });
 });

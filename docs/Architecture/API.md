@@ -683,7 +683,7 @@ console.log(player.verifyChecksum()); // true ⇔ the run reproduced the recordi
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `EventEmitter<TMap>` (`four/core`)                     | The one typed emitter (§6b) under nodes, worlds, and the application; re-entrant emits queue-and-defer.                                |
 | `Component` / `ComponentRegistry` / `ComponentHost`    | The §6a model: `typeName`-keyed, one per type per host.                                                                                |
-| `FourError` / `FourErrorCode` / `isFourError`          | §89 closed error-code union (`INVALID_APPLICATION_STATE`, `NOT_IMPLEMENTED`, …) with structured `context`.                             |
+| `FourError` / `FourErrorCode` / `isFourError`          | §89 closed error-code union (`INVALID_APPLICATION_STATE`, `INVALID_RENDER_GRAPH`, `NOT_IMPLEMENTED`, …) with structured `context`.     |
 | `Disposable` / `disposeAll`                            | §83 disposal contract — whoever created a resource disposes it.                                                                        |
 | `SeededRandom`                                         | xorshift128 + splitmix32 seeding (§33) — canonical home; re-exported by `four/motion` and `four/particles` with bit-identical streams. |
 | `JsonValue` / `cloneJsonValue`                         | Structured-clone-safe JSON with `__proto__` refusal (TypeError, not silent re-parenting).                                              |

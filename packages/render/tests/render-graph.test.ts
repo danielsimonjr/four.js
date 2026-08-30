@@ -238,7 +238,7 @@ describe("RenderGraph — passes and construction rules (§63)", () => {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(FourError);
-    expect((thrown as FourError).code).toBe("INVALID_APPLICATION_STATE");
+    expect((thrown as FourError).code).toBe("INVALID_RENDER_GRAPH");
     expect((thrown as FourError).message).toMatch(/declares input "world"/);
     // The failed add left nothing behind.
     expect(graph.passes).toEqual([]);
@@ -736,7 +736,7 @@ describe("RenderGraph — §70 effect passes (R-6)", () => {
       thrown = error;
     }
     expect(thrown).toBeInstanceOf(FourError);
-    expect((thrown as FourError).code).toBe("INVALID_APPLICATION_STATE");
+    expect((thrown as FourError).code).toBe("INVALID_RENDER_GRAPH");
     expect((thrown as FourError).message).toMatch(
       /does not implement renderEffect/,
     );

@@ -312,6 +312,21 @@ const RETIRED = [
       "ScreenCamera, layerMask per view); the camera-parenting workaround R-37 " +
       "unblocked is gone from examples/flagship/*",
   },
+  {
+    re: /render-webgpu\s+\(stub\)|render-webgpu is a (declared )?reserved stub/i,
+    where: ["docs/Architecture/COMPONENTS.md", "docs/Architecture/OVERVIEW.md"],
+    allow: [
+      "CHANGELOG.md",
+      "MEMORY.md",
+      "TODO.md",
+      "docs/GAP ANALYSIS v0.md",
+      "docs/GAP ANALYSIS v1.md",
+      "docs/GAP ANALYSIS v2.md",
+      "docs/Architecture/COMPONENTS.md",
+      "docs/Architecture/OVERVIEW.md",
+    ],
+    why: "R-1 closed 2026-08-29; @four/render-webgpu is a shipped backend (WP-R1.1–R1.9)",
+  },
 ];
 
 // Documents whose *subject* is the false claims: a gap analysis or a review
@@ -351,7 +366,11 @@ function prosePaths() {
     "tests/README.md",
     "benchmarks/README.md",
   ]);
-  for (const dir of [join("docs"), join("docs", "guides")]) {
+  for (const dir of [
+    join("docs"),
+    join("docs", "guides"),
+    join("docs", "Architecture"),
+  ]) {
     const abs = join(root, dir);
     if (!existsSync(abs)) continue;
     for (const name of readdirSync(abs)) {
@@ -361,9 +380,28 @@ function prosePaths() {
       }
     }
   }
-  return [...paths].filter(
-    (p) => existsSync(join(root, p)) && !QUOTES_DEFECTS.has(p),
-  );
+  const packages = join(root, "packages");
+  if (existsSync(packages)) {
+    for (const name of readdirSync(packages)) {
+      const readme = join("packages", name, "README.md");
+      if (existsSync(join(root, readme))) paths.add(readme);
+    }
+  }
+  return [...paths].filter((p) => {
+    if (!existsSync(join(root, p)) || QUOTES_DEFECTS.has(p)) return false;
+    // Generated Architecture dumps quote whatever the tree said the day they
+    // were regenerated; they are not prose we author by hand. DEPENDENCY*
+    // is the graph dump (its header says "Last Updated", not "Generated").
+    // TEST_COVERAGE.md, FILE_INVENTORY.md, duplicate-symbols.md and
+    // unused-analysis.md stamp `**Generated**:` in the first lines.
+    if (p.startsWith("docs/Architecture/DEPENDENCY")) return false;
+    if (p.startsWith("docs/Architecture/dependency")) return false;
+    if (p.startsWith("docs/Architecture/")) {
+      const header = read(p)?.slice(0, 400) ?? "";
+      if (/\*\*Generated\*\*:/.test(header)) return false;
+    }
+    return true;
+  });
 }
 
 for (const rel of prosePaths()) {

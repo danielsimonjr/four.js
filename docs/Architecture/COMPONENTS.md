@@ -50,7 +50,7 @@ four.js is a pnpm workspace of 24 `@four/`-scoped packages (the umbrella is plai
 
 **Total** (from [`FILE_INVENTORY.md`](./FILE_INVENTORY.md), generated 2026-08-05): 335 tracked TypeScript files — 161 `src/`, 158 tests, plus tools/configs/examples. Zero orphans, zero runtime circular dependencies. Repo test counts as of the last recorded exit (`MEMORY.md`, 2026-08-04): 3,077 unit + 174 suite + 38 browser/visual tests; coverage ≥95% in every package; the §86 payload gate stands at 33.28 of 150 kB gzip.
 
-**Implementation status**: 19 of 24 packages are implemented. Five are **reserved stubs** whose barrels export only `PACKAGE_NAME` (each holds a truthful README and a single smoke test): `physics-box2d`, `physics-soft`, `render-webgpu`, `render-canvas`, `render-svg`. Each stub's entry below says what it is reserved for.
+**Implementation status**: 20 of 24 packages are implemented. Four are **reserved stubs** whose barrels export only `PACKAGE_NAME` (each holds a truthful README and a single smoke test): `physics-box2d`, `physics-soft`, `render-canvas`, `render-svg`. `@four/render-webgpu` left that list 2026-08-21…29 (the R-1 plan). Each stub's entry below says what it is reserved for.
 
 Conventions in force everywhere (§7a/§7b): right-handed **Y-up world in both 2D and 3D** (2D gravity is negative Y), radians, **all times in seconds**, mutable math types with `out`-parameter hot paths, deterministic iteration (insertion order, never hash-map order), no wall clocks or unseeded RNG in engine code (§33).
 
@@ -340,9 +340,9 @@ Key exports (selected from ~30): `WebglRenderer`, `WebglContext`/`WebglCanvas` (
 
 ---
 
-### @four/render-webgpu — reserved stub
+### @four/render-webgpu
 
-**Purpose**: Reserved for the WebGPU backend (WGSL) per §62 — the preferred backend once `renderer: "auto"` selection lands. WebGPU is an optional tier; the §120 MVP renders with WebGL 2 only. **Direct deps** (declared): `core`, `math`, `render`. **Status**: **stub — barrel exports only `PACKAGE_NAME`**.
+**Purpose**: The WebGPU backend — §62 backend 1. `WebgpuRenderer` behind `registerWebgpuRenderer()`: unlit/sprite/lit/standard families, opt-in §65 batching, textures + samplers, §67 clips + §57 stencil parity, render targets / §70 effects / `readPixels`, the §69 directional shadow tier, §36 instanced particles, §82 compute, and §60 node materials + §70 graph effects behind `registerWebgpuNodeMaterialPipeline()`. Absent, not stubbed: RFC 0003's skinned pipelines and §71 picking. **Direct deps**: `core`, `math`, `scene`, `render`. **Status**: implemented (R-1, WP-R1.1–R1.9, 2026-08-21…29). This entry said "reserved stub" until 2026-08-30.
 
 ---
 

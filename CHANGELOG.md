@@ -8,6 +8,56 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-08-30 — Unblocked-defect sanitization (sprite flags, graph errors, docs truth)
+
+#### Fixed
+
+- **Sprite §79 round trip.** `SpriteOptions` now _extends_ `RenderableOptions`
+  and the constructor forwards the whole record to `super` (the Shape2D
+  pattern). Restating a subset had dropped `castShadow` / `receiveShadow` /
+  `frustumCulled`; a new drawable field cannot be dropped the same way
+  again. Constructor unit + scene-serializer round trip.
+- **`INVALID_RENDER_GRAPH` (§89, R-5 follow-up).** Added to the
+  `FourErrorCode` union; `RenderGraph`'s `GRAPH_ERROR_CODE` switched.
+  `errors.test.ts` exhaustiveness-checks the whole union so a new code
+  cannot ship unlisted. Spec revision **1.13** brings §89's example-code
+  list in line with the shipped union (it had lagged `INVALID_APPLICATION_STATE`,
+  `UNTRUSTED_INPUT_REJECTED`, `NOT_IMPLEMENTED`, and the new graph code);
+  the header revision number was also lagging the table (1.11 vs 1.12).
+- **§10 dropped-time warning (PH-22n).** `Application.step` emits a
+  `devWarnOnce` when `TimeState.droppedTime` is non-zero — the scheduler
+  already recorded the number; nothing told an author a frame had just
+  lost simulation time. The message reports **this frame's** drop, then
+  the cumulative total. Application tests swallow `console.warn` and
+  `resetDevWarnings()` between cases so a long-frame determinism run no
+  longer prints the once-per-process warning to stderr.
+- **`examples-build-coverage` nested paths.** The capture stopped at `/`,
+  so both flagships collapsed to `"flagship"` and a missing twin would
+  still look covered.
+- **Shape 32-bit-index test timeout.** 20 s so `--coverage` on a loaded
+  box cannot flake the assertion.
+
+#### Tests
+
+- `tests/integration/camera-rigs.test.ts` now chases a Rapier 3D dynamic
+  body with `FollowRig` + `LookAtConstraint` — §44's physics attachment
+  is no longer argued from priority numbers alone.
+
+#### Docs
+
+- `@four/render-webgpu`'s README, `docs/Architecture/{OVERVIEW,ARCHITECTURE,COMPONENTS}.md`,
+  `AGENTS.md`, and `MEMORY.md` standing facts no longer call WebGPU a reserved
+  stub (R-1 closed 2026-08-29). `@four/scene` / `@four/motion` READMEs no
+  longer claim camera rigs are unshipped.
+- `tools/check-docs.mjs` scans `docs/Architecture/` hand-written files and
+  `packages/*/README.md`, and pins the retired `render-webgpu (stub)` wording.
+  Generated Architecture reports (`**Generated**:` stamp, plus the
+  `DEPENDENCY*` graph dumps) stay excluded, including `TEST_COVERAGE.md`.
+- Tracker honesty: A-6's "members still absent" row, the §93/§118 examples
+  `.gitkeep` row, and "§65 batching is unshipped" were all false of the
+  tree. Camera-rig remainder no longer claims `ConstraintSystem` is empty.
+  Per-item scissor stays open.
+
 ### 2026-08-29 — Gap Analysis v2: the campaign-closing honesty pass
 
 - **`docs/GAP ANALYSIS v2.md`** — every v1 row (97 filings, 22 register rows)
