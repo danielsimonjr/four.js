@@ -17,11 +17,12 @@ shared scene model.
 this block said "scaffold only" until 2026-08-05 — it predated Phase 0).
 
 - All 24 `packages/*` packages carry real source and colocated tests (~3,000 unit tests,
-  ≥95% per-package coverage enforced); five are deliberate reserved stubs
-  (`physics-box2d`, `physics-soft`, `render-webgpu`, `render-canvas`, `render-svg`).
+  ≥95% per-package coverage enforced); four are deliberate reserved stubs
+  (`physics-box2d`, `physics-soft`, `render-canvas`, `render-svg`). `render-webgpu`
+  left the stub list 2026-08-21…29 (the R-1 plan).
 - Root `package.json` + pnpm workspace + CI workflow exist; `tests/{integration,
   determinism}/` hold cross-package suites, `tests/browser/` the Playwright gates,
-  `tests/visual/` pixel goldens, `benchmarks/` committed performance records, and six
+  `tests/visual/` pixel goldens, `benchmarks/` committed performance records, and ten
   `examples/` sites build and are browser-tested.
 - Common commands: `pnpm build` / `test` / `test:suites` / `test:browser` / `lint` /
   `run coverage` / `run docs` / `graph` / `check-spec` / `run size`. See

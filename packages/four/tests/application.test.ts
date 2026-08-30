@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isFourError } from "@four/core";
+import { isFourError, resetDevWarnings } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import {
   DEFAULT_FIXED_DELTA_TIME,
@@ -43,6 +43,18 @@ import {
 } from "../src/application.js";
 
 const FIXED = DEFAULT_FIXED_DELTA_TIME;
+
+/**
+ * §10 dropped-time (and any other `devWarn`) must not leak to stderr from
+ * tests that step past `maximumSubSteps`. Keys reset between tests so a
+ * later suite can still assert the once-per-process warning.
+ */
+const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+afterEach(() => {
+  resetDevWarnings();
+  warnSpy.mockClear();
+});
 
 /** A started application, ready to step. */
 async function startedApplication(
@@ -265,6 +277,13 @@ describe("Application — main-loop events (§10, §6b)", () => {
       "render",
     ]);
     expect(app.time.droppedTime).toBeGreaterThan(0);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0]?.[0])).toMatch(
+      /\[four\] §10 dropped .+s of simulation time/,
+    );
+    // A second long frame must not repeat the warning — once per process.
+    app.step(FIXED * 20);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
   it("passes the scheduler's live TimeState to every listener", async () => {

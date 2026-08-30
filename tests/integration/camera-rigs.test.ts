@@ -18,8 +18,12 @@
  *    `"kinematic"` (`KinematicController.followPath`) carrying an aimed child
  *    under `"constraint"`. This file flies one for 120 fixed steps and checks
  *    the subject lands dead centre of the frame on **every** step, through
- *    `viewMatrix · projectionMatrix` — the §47 chain, not the rig's own
- *    arithmetic.
+ * 3. **§44's physics attachment is not just the priority numbers.** A
+ *    `FollowRig` + `LookAtConstraint` under `"constraint"` authority chase a
+ *    Rapier 3D dynamic body stepped at `PRIORITY_PHYSICS_SOLVE` (600); the
+ *    camera writes at 700, so it sees the pose the solver produced this step.
+ *    Until 2026-08-30 this file faked the solver by writing `body.position`
+ *    by hand.
  */
 
 import { Vector3 } from "@four/math";
@@ -33,9 +37,17 @@ import {
   OrbitRig,
   PRIORITY_CONSTRAINTS,
   PRIORITY_KINEMATICS,
+  PRIORITY_PHYSICS_SOLVE,
   SystemRegistry,
   createTimeState,
 } from "@four/motion";
+import {
+  Collider,
+  PhysicsSystem,
+  PhysicsWorld,
+  RigidBody,
+} from "@four/physics";
+import { Rapier3dAdapter } from "@four/physics-rapier";
 import { Group, PerspectiveCamera, Scene } from "@four/scene";
 import * as four from "four";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -225,5 +237,60 @@ describe("§44 path animation, composed from two nodes", () => {
     expect(four.motion.LookAtConstraint).toBe(LookAtConstraint);
     expect(four.motion.ConstraintSystem).toBe(ConstraintSystem);
     expect(four.motion.DEFAULT_ORBIT_PITCH_LIMIT).toBe(Math.PI / 2 - 1e-3);
+  });
+
+  it("lets a FollowRig chase a live Rapier dynamic body (§44 physics attachment)", async () => {
+    const world = new PhysicsWorld({
+      dimension: "3d",
+      adapter: new Rapier3dAdapter(),
+    });
+    await world.initialize();
+    try {
+      const body = new Group();
+      body.transformAuthority = "physics";
+      body.position.set(0, 4, 0);
+      body.addComponent(new RigidBody({ type: "dynamic", mass: 1 }));
+      body.addComponent(
+        new Collider({ shape: { type: "sphere", radius: 0.5 } }),
+      );
+      world.addBody(body);
+
+      const camera = new PerspectiveCamera({ aspect: 1 });
+      camera.transformAuthority = "constraint";
+      const offset = new Vector3(0, 2, 6);
+      camera.addComponent(new FollowRig({ target: body, offset }));
+      camera.addComponent(new LookAtConstraint({ target: body }));
+
+      const scene = new Scene();
+      scene.add(body, camera);
+
+      const physics = new PhysicsSystem({ worlds: [world] });
+      const constraints = new ConstraintSystem();
+      constraints.track(camera);
+      const registry = new SystemRegistry();
+      registry.register(physics);
+      registry.register(constraints);
+      expect(physics.priority).toBe(PRIORITY_PHYSICS_SOLVE);
+      expect(constraints.priority).toBe(PRIORITY_CONSTRAINTS);
+      expect(PRIORITY_PHYSICS_SOLVE).toBeLessThan(PRIORITY_CONSTRAINTS);
+
+      const time = createTimeState({ fixedDeltaTime: DT });
+      const startY = body.position.y;
+      for (let step = 0; step < 30; step += 1) {
+        registry.runFixedStep(time);
+      }
+
+      expect(body.position.y).toBeLessThan(startY - 0.5);
+      expect(camera.position.x).toBeCloseTo(body.position.x + offset.x, 5);
+      expect(camera.position.y).toBeCloseTo(body.position.y + offset.y, 5);
+      expect(camera.position.z).toBeCloseTo(body.position.z + offset.z, 5);
+
+      camera.updateViewMatrix();
+      const ndc = projectToNdc(camera, body.position);
+      expect(ndc.x).toBeCloseTo(0, 4);
+      expect(ndc.y).toBeCloseTo(0, 4);
+    } finally {
+      world.dispose();
+    }
   });
 });

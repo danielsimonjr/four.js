@@ -12,11 +12,13 @@ readable; never delete the pointer itself.
 
 - The repository is **fully implemented** (implementation plan complete 2026-08-02; this
   bullet said "scaffold only" until 2026-08-05 — it predated Phase 0): 24 packages build,
-  test (~3,000 unit + suites + browser/visual), and lint, with ≥95% coverage gates. Five
-  packages are deliberate reserved stubs (physics-box2d/soft, render-webgpu/canvas/svg).
+  test (~3,000 unit + suites + browser/visual), and lint, with ≥95% coverage gates. Four
+  packages are deliberate reserved stubs (physics-box2d/soft, render-canvas/svg).
+  `render-webgpu` left that list 2026-08-21…29 (the R-1 plan; standing-fact wording
+  corrected 2026-08-30).
 - `docs/SPECIFICATION.md` is the working reference — the current revision is whatever tops
-  its amendments table (1.6 as of 2026-07-29; this bullet froze at "1.2") (amendments
-  table at its top; § numbering 1–120 frozen, lettered sections for insertions).
+  its amendments table (1.13 as of 2026-08-30; do not freeze the number in other files)
+  (amendments table at its top; § numbering 1–120 frozen, lettered sections for insertions).
   `docs/archive/four-js-specification.pdf` is the unmodified original, frozen at the pre-1.0
   text, and still contains the old duplicate numbering — translate its references via the map
   in `docs/ERRATA.md`. Run `node tools/check-spec.mjs` after any spec edit.
@@ -27,6 +29,32 @@ readable; never delete the pointer itself.
   above `render-*` backends; the logical scene never depends on a concrete backend.
 
 ## Decisions
+
+- **2026-08-30 — unblocked-defect sanitization.** Lessons:
+  - **A constructor that filters `RenderableOptions` is a serializer bug
+    waiting to happen.** The §79 writer always writes `castShadow` /
+    `receiveShadow` / `frustumCulled`; the reader spreads them into the
+    options record; if the class's options type omits them, restore
+    silently drops authored flags. `clip` was plumbed through explicitly
+    in R-23; the other three were not. The durable fix is
+    `SpriteOptions extends RenderableOptions` + `super(…, options)` —
+    the Shape2D pattern — not another one-line pass-through that will
+    miss the next field. A round-trip that _asserts the non-default_ is
+    the test.
+  - **§89's example-code list is not the union, but a host matching on
+    documented names should see every code the engine throws.** The
+    previous `errors.test.ts` list omitted three shipped codes; the new
+    `satisfies` + `Exclude` exhaustiveness check makes that a compile
+    error. `INVALID_RENDER_GRAPH` is the first code added because a
+    graph authoring mistake is not a lifecycle one.
+  - **`check-docs` that does not scan `packages/*/README.md` or
+    `docs/Architecture/` will not catch a stub README that outlived the
+    implementation.** `render-webgpu`'s README still said "barrel exports
+    only `PACKAGE_NAME`" two days after R-1 closed. The scan now covers
+    both surfaces; generated graph dumps stay excluded.
+  - **An examples-build-coverage capture that stops at `/` makes two
+    nested flagships look like one example.** Nested path capture, plus
+    an assertion that `"flagship"` itself is not in the list.
 
 - **2026-08-29 — Gap Analysis v2 (campaign close).** Lessons worth keeping:
   - **A status document amended in place by many hands rots like unreviewed

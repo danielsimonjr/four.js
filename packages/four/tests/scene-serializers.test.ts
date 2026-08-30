@@ -1169,6 +1169,9 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
       anchor: { x: 0, y: 1 },
       renderLayer: 1,
       renderOrder: -1,
+      castShadow: false,
+      receiveShadow: false,
+      frustumCulled: false,
     });
     scene.add(camera, minimap, light, lamp, spot, floor, badge);
     return scene;
@@ -1257,6 +1260,9 @@ describe("registerRenderSerializers — the drawing tier survives §79 (A-16)", 
     expect([badge.width, badge.height]).toEqual([3, 2]);
     expect([badge.anchor.x, badge.anchor.y]).toEqual([0, 1]);
     expect([badge.renderLayer, badge.renderOrder]).toEqual([1, -1]);
+    expect(badge.castShadow).toBe(false);
+    expect(badge.receiveShadow).toBe(false);
+    expect(badge.frustumCulled).toBe(false);
     // A sprite owns and derives its quad (§55), so it comes back with its own
     // — never the catalog's, which is why no geometry key is written for one.
     expect(badge.geometry).not.toBe(plane);

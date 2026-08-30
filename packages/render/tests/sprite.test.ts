@@ -491,6 +491,19 @@ describe("Sprite — defaults and validation (§55, §85)", () => {
     expect(sprite.renderOrder).toBe(5);
   });
 
+  it("takes the §49 drawable flags from its options (round-trip seam)", () => {
+    const sprite = new Sprite(spriteMaterial(), {
+      castShadow: false,
+      receiveShadow: false,
+      frustumCulled: false,
+      clip: true,
+    });
+    expect(sprite.castShadow).toBe(false);
+    expect(sprite.receiveShadow).toBe(false);
+    expect(sprite.frustumCulled).toBe(false);
+    expect(sprite.clip).toBe(true);
+  });
+
   it("copies the anchor rather than holding the caller's object", () => {
     const anchor = { x: 0.25, y: 0.75 };
     const sprite = new Sprite(spriteMaterial(), { anchor });

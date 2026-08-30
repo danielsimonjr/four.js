@@ -105,14 +105,15 @@ import type { RenderInterpolation, Renderer } from "./renderer.js";
 /**
  * The §89 code every structural failure in this module carries.
  *
- * `INVALID_APPLICATION_STATE` rather than a dedicated `INVALID_RENDER_GRAPH`
- * because §89's vocabulary is one union in `@four/core` (`errors.ts` says so),
- * and R-5's file scope is `packages/render`. A duplicate pass name, an unknown
- * input, and a removal that would orphan a consumer are all "the application
- * asked for a graph that cannot exist", which is what the existing code means
- * — `NullRenderer` already uses it for the same class of caller mistake.
+ * `INVALID_RENDER_GRAPH` (R-5 follow-up, 2026-08-30). A duplicate pass name,
+ * an unknown input, a removal that would orphan a consumer, and an execute of
+ * an effect pass on a backend that has no `renderEffect` are all "the
+ * application asked for a graph that cannot exist". The dedicated code lets a
+ * host tell a graph authoring mistake from a lifecycle one without parsing
+ * the message; §89's union lives in `@four/core` (`errors.ts`) and this is
+ * the packet that named the gap.
  */
-const GRAPH_ERROR_CODE = "INVALID_APPLICATION_STATE";
+const GRAPH_ERROR_CODE = "INVALID_RENDER_GRAPH";
 
 /**
  * What a {@link CustomRenderPass} is handed besides the renderer.

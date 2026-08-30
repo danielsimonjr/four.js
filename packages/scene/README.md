@@ -9,7 +9,7 @@ Implements §6–8, §42–43, and §46–48 of [`docs/SPECIFICATION.md`](../../
 - **Hierarchy** — `Node` (single inheritance over `@four/core`'s `EventEmitter`, typed `NodeEventMap`, component host), `Group`, `Scene`.
 - **`Transform`** — position/rotation/scale with a dirty channel driven by math change-hooks, plus `resolveWorldTransform` / `resolveWorldTransforms` (world matrices resolve per fixed step; staleness tracking includes parent identity).
 - **Transform authority (§42)** — `TransformAuthority` (`manual`, `animation`, `kinematic`, `physics`, `blended`, `constraint`, `network`), `DEFAULT_TRANSFORM_AUTHORITY`, and `warnAuthorityConflict` (conflicts warn, never silently overwrite; takes a structural `AuthorityNode`).
-- **Cameras and viewport (§47–48)** — `PerspectiveCamera` / `OrthographicCamera` with depth-range-parameterized projection, `Viewport` / `createFullscreenViewport`. Camera _rigs/controls_ belong to `@four/motion` (not yet implemented there).
+- **Cameras and viewport (§47–48)** — `PerspectiveCamera` / `OrthographicCamera` / `ScreenCamera` with depth-range-parameterized projection, `Viewport` / `createFullscreenViewport`. Camera _rigs/controls_ belong to `@four/motion` (`OrbitRig`, `FollowRig`, `LookAtConstraint`; `TrackballRig` lives here because it is defined over a viewport in screen space).
 - **Render interpolation (§43)** — `PoseBuffer` (lerp/slerp between physics poses), `PoseSnapshotSystem` / `createSnapshotSystem`, and `PoseTarget` (position + rotation history; the §19 blending input captured by `@four/physics`'s capture system).
 
 ## Staged / not yet implemented
