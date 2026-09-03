@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
+## 2026-09-03 - security: js-yaml 4.3.0 -> 4.3.2 (CVE-2026-59870, HIGH)
+
+- Dependabot alert #2: quadratic CPU consumption in `!!omap` resolution, affecting
+  `>= 4.0.0, < 4.3.1`. Only reachable through `tools/create-dependency-graph`, which is a
+  build-time tool rather than shipped runtime code.
+- Verified the patched copy is actually INSTALLED and works, not merely written into the
+  lockfile: `npm ci` then a parse of a document containing `!!omap` -- the exact construct
+  the advisory names -- against js-yaml 4.3.2. A lockfile edit alone proves nothing about
+  what runs.
+- First change since the 08-28 development hold on this repo was lifted 2026-09-03.
+
 ## [Unreleased]
 
 ### 2026-08-30 — Unblocked-defect sanitization (sprite flags, graph errors, docs truth)
