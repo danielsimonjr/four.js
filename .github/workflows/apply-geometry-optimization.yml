@@ -1,0 +1,75 @@
+name: Validate geometry optimization
+
+on:
+  push:
+    branches: [perf/geometry-buffer-reuse]
+    paths: [.github/workflows/apply-geometry-optimization.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/geometry-buffer-reuse
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Apply exact locally validated patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/geometry.patch.br"
+          for sha in 59f9773079fe39d869a0dfcd73965fb85bbe2b28 f908f03284d8b75f4a034460f4a0a48f205c7712 e6fa2d1182854445be5deb9986d047343bf0a61a; do
+            gh api "repos/danielsimonjr/four.js/git/blobs/$sha" --jq .content | base64 --decode >> "$RUNNER_TEMP/geometry.patch.br"
+          done
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { brotliDecompressSync } from 'node:zlib';
+          import { createHash } from 'node:crypto';
+          const path = `${process.env.RUNNER_TEMP}/geometry.patch`;
+          const patch = brotliDecompressSync(readFileSync(`${path}.br`));
+          const digest = createHash('sha256').update(patch).digest('hex');
+          if (digest !== '8af9d9a92b8f0b48e5280dfa27725c391b3a656438be6f3f7f578eead45f3e3e') {
+            throw new Error(`Patch checksum mismatch: ${digest}`);
+          }
+          writeFileSync(path, patch);
+          NODE
+          git apply --check "$RUNNER_TEMP/geometry.patch"
+          git apply --index "$RUNNER_TEMP/geometry.patch"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Geometry backend tests and coverage
+        run: |
+          pnpm --filter @four/render-webgl test
+          pnpm --filter @four/render-webgl exec vitest run --coverage --config ../../vitest.coverage.config.ts
+      - name: Type and lint checks
+        run: |
+          pnpm run typecheck:tests
+          pnpm run typecheck:examples
+          pnpm lint
+      - run: pnpm examples:build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Real browser queued-pixel regression tests
+        run: pnpm exec playwright test tests/browser/geometry-refresh.spec.ts --project=chromium --reporter=line
+      - name: Preserve existing bundle budgets
+        run: pnpm size
+      - name: Commit validated code on feature branch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'perf(render-webgl): reuse geometry buffers across compatible updates'
+          git push origin HEAD:perf/geometry-buffer-reuse
