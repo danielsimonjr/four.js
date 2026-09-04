@@ -10,14 +10,14 @@ library — warm up, measure, reduce to order statistics, stamp the host, write 
 record, print a report — extracted unchanged in substance from `particles-100k.mjs`, the
 Phase 9 script that was deliberately written without a framework until there was more than
 one script to design around. A benchmark here is still a plain `node` script that imports a
-handful of small functions; `run-all.mjs` drives all eight of them and is the whole of the
+handful of small functions; `run-all.mjs` drives every registered benchmark and is the whole of the
 scheduling. (Until 2026-08-08 this paragraph read _"There is still no runner and no CI
 integration"_; the runner landed with A-27's two CPU benchmarks, and **CI integration is
 still absent** — see [The runner](#the-runner).)
 
 ```sh
 pnpm run build               # every script imports the built dist, not src
-pnpm bench                   # runs all eight, one process each
+pnpm bench                   # runs every registered benchmark, one process each
 node benchmarks/harness.mjs  # prints the suite index and how to run it
 ```
 
@@ -27,6 +27,7 @@ the module loads. The whole suite takes about **77 s** on the recorded host, dom
 
 | script                                                                                        | what it measures                                                             | §86 row                                                                                   |
 | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`geometry-updates.mjs`](#geometry-updatesmjs--dynamic-webgl-geometry) | Geometry-cache GL call/object counts and CPU preparation, dirty/static controls | no GPU or FPS claim |
 | [`math-ops.mjs`](#math-opsmjs--7b-math-throughput-and-allocation)                             | `Vector3`/`Quaternion`/`Matrix4` throughput **and per-operation allocation** | none — the foundation the rows sit on                                                     |
 | [`scene-propagation.mjs`](#scene-propagationmjs--7-world-transform-resolution)                | `resolveWorldTransforms` over deep and wide trees, dirty and clean           | _idle scene_, for the scene graph                                                         |
 | [`physics-step.mjs`](#physics-stepmjs--86s-5-000-active-rigid-bodies)                         | Rapier 3D fixed step at 500–5 000 **active** bodies                          | **active rigid bodies: 5 000 simple bodies baseline**                                     |
@@ -573,3 +574,31 @@ Findings, as shapes rather than values (2026-08-09, first record):
 - **The run-to-run spread is the one this file warns about.** The `rebuild/filter` column
   moves between 0.74× and 0.95× at one view across node counts, which is noise around 1.0,
   not a trend. Read the column's growth with view count, not its absolute values.
+
+## `geometry-updates.mjs` — dynamic WebGL geometry
+
+`node benchmarks/geometry-updates.mjs` measures 1,000 geometries per iteration,
+100 warm-up iterations and 200 measured iterations, for position-only, indexed
+quad and all-attribute layouts. A counting GL seam records API calls, object
+creation/deletion and uploaded bytes. Array mutation and counter resets happen
+outside the clock; static acquisitions are the zero-call control. The script
+is registered in `harness.mjs` and writes `results/geometry-updates.json`.
+
+For a same-checkout comparison, preserve the old built `gl-geometry.js` beside
+its original `gl-program.js` before rebuilding, then run:
+
+```sh
+node benchmarks/geometry-updates.mjs --baseline=packages/render-webgl/dist/gl-geometry.baseline.js
+```
+
+The committed comparison uses main `6a22580a960858fc96d39a7852d6008598f259d2`
+as the baseline. Dirty acquisitions issue **11 → 5**, **15 → 7**, and
+**45 → 17** GL calls respectively. Reused layouts create/delete no GL handles;
+full upload bytes remain **36**, **60**, and **300** per geometry. These exact
+counts are the primary result. Wall times include the counting seam, JIT and GC,
+not a driver or GPU; they are **not FPS or GPU-time measurements**.
+
+`tests/browser/geometry-refresh.spec.ts` supplies the separate real-driver
+regression: old and new versions are drawn into adjacent viewports before any
+readback, then compared pixel-for-pixel against independent fresh allocations.
+Resizing, index widening/narrowing and attribute add/remove are exercised.

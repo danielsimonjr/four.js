@@ -1798,7 +1798,7 @@ describe("GeometryCache — vertex arrays keyed by id and version (§53, §64)",
     expect(gl.countOf("createVertexArray")).toBe(1);
   });
 
-  it("evicts and re-uploads when the version advances (§53 cache key)", () => {
+  it("refreshes data without rebuilding an unchanged layout (§53 cache key)", () => {
     const gl = createFakeGl();
     const cache = new GeometryCache(gl);
     const geometry = quadGeometry();
@@ -1809,9 +1809,11 @@ describe("GeometryCache — vertex arrays keyed by id and version (§53, §64)",
     geometry.markDirty();
     const record = cache.acquire(geometry.asGeometry);
 
-    expect(gl.countOf("deleteVertexArray")).toBe(1);
-    expect(gl.countOf("deleteBuffer")).toBe(2);
-    expect(gl.countOf("createVertexArray")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+    expect(gl.countOf("deleteBuffer")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+    expect(gl.countOf("createBuffer")).toBe(0);
+    expect(gl.countOf("bufferData")).toBe(2);
     expect(record?.version).toBe(1);
     expect(cache.size).toBe(1);
   });
@@ -2219,8 +2221,9 @@ describe("WebglRenderer.render — uniforms and draws (§64, §57)", () => {
     geometry.markDirty();
     renderer.render(root, [createView(camera)]);
 
-    expect(gl.countOf("deleteVertexArray")).toBe(1);
-    expect(gl.countOf("createVertexArray")).toBe(1);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+    expect(gl.countOf("createVertexArray")).toBe(0);
+    expect(gl.countOf("bufferData")).toBe(2);
     expect(gl.countOf("drawElements")).toBe(1);
   });
 
@@ -4625,7 +4628,7 @@ describe("GeometryCache — the normal stream (§53, §68)", () => {
     ).toEqual([POSITION_ATTRIBUTE_LOCATION]);
   });
 
-  it("deletes the normal buffer when a stale version re-uploads (§53)", () => {
+  it("retains the normal buffer when a stale version re-uploads (§53)", () => {
     const gl = createFakeGl();
     const cache = new GeometryCache(gl);
     const geometry = litTriangleGeometry();
@@ -4635,9 +4638,11 @@ describe("GeometryCache — the normal stream (§53, §68)", () => {
     geometry.markDirty();
     cache.acquire(geometry.asGeometry);
 
-    expect(gl.countOf("deleteVertexArray")).toBe(1);
-    // Both attribute buffers of the stale record.
-    expect(gl.countOf("deleteBuffer")).toBe(2);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+    expect(gl.countOf("deleteBuffer")).toBe(0);
+    expect(gl.countOf("createBuffer")).toBe(0);
+    // Both attribute data stores are replaced, but their handles stay live.
+    expect(gl.countOf("bufferData")).toBe(2);
   });
 
   it("cleans up the position buffer when GL refuses the normal buffer", () => {
@@ -5264,7 +5269,7 @@ describe("GeometryCache — the uv and colour streams (§53, R-19)", () => {
     expect(gl.countOf("createBuffer")).toBe(1);
   });
 
-  it("deletes every attribute buffer when a stale version re-uploads (§53)", () => {
+  it("retains every attribute buffer when a stale version re-uploads (§53)", () => {
     const gl = createFakeGl();
     const cache = new GeometryCache(gl);
     const geometry = new TestGeometry(
@@ -5281,8 +5286,10 @@ describe("GeometryCache — the uv and colour streams (§53, R-19)", () => {
     geometry.markDirty();
     cache.acquire(geometry.asGeometry);
 
-    expect(gl.countOf("deleteVertexArray")).toBe(1);
-    expect(gl.countOf("deleteBuffer")).toBe(4);
+    expect(gl.countOf("deleteVertexArray")).toBe(0);
+    expect(gl.countOf("deleteBuffer")).toBe(0);
+    expect(gl.countOf("createBuffer")).toBe(0);
+    expect(gl.countOf("bufferData")).toBe(4);
   });
 
   it("unwinds every buffer it allocated when GL refuses a later one", () => {

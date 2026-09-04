@@ -30,6 +30,22 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-04 — geometry cache: reuse objects, not in-flight storage.**
+  Supersedes the WebGL dirty-version delete/recreate policy recorded earlier.
+  `bufferData` replaces each data store while retaining buffer handles and the
+  VAO's fixed layout. Rebuilding is needed for attribute/index presence changes,
+  not array length, primitive mode or index width. The version still invalidates
+  all streams; reference equality does not prove an array was not edited in place.
+  Keep the element buffer write inside its VAO and unbind the VAO before clearing
+  ARRAY_BUFFER. Disposed caches must not resurrect. A typed optional-stream
+  table owns allocation/cleanup; a private layout mask and unrolled shared
+  writer avoid dynamic-key loops on dirty updates. No WebGPU change:
+  queued writes and deferred command submission need a separate lifetime review.
+  Counting-seam timings are not driver/GPU timing. The committed benchmark names
+  baseline `6a22580`; call counts/bytes are primary, browser pixels are separate.
+  Local Node 22.16 needs `NODE_OPTIONS=--experimental-strip-types` for existing
+  fresh-process determinism helpers; newer Node 22 CI enables stripping by default.
+
 - **2026-08-30 — unblocked-defect sanitization.** Lessons:
   - **A constructor that filters `RenderableOptions` is a serializer bug
     waiting to happen.** The §79 writer always writes `castShadow` /

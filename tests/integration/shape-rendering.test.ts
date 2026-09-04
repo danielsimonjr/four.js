@@ -198,10 +198,8 @@ describe("R-23 — §50 shapes draw through the pipeline that already existed", 
       test.recorder.calls.filter((call) => call.name === "bufferData"),
     ).toHaveLength(0);
 
-    // A parameter write re-uploads the one geometry, and **replaces** its
-    // cache entry rather than adding a second one: the id is a cache key, so a
-    // rebuild that minted a new geometry would create buffers without ever
-    // deleting the old ones. Equal creates and deletes is what says it did not.
+    // A parameter write replaces the data stores, not the geometry id or GL
+    // handles. A larger tessellation keeps the same vertex/index layout.
     circle.radius = 3;
     test.recorder.calls.length = 0;
     test.renderer.render(test.scene, test.views);
@@ -215,8 +213,8 @@ describe("R-23 — §50 shapes draw through the pipeline that already existed", 
     expect(
       test.recorder.calls.filter((call) => call.name === "bufferData").length,
     ).toBeGreaterThan(0);
-    expect(created).toBe(deleted);
-    expect(created).toBeGreaterThan(0);
+    expect(created).toBe(0);
+    expect(deleted).toBe(0);
     expect(draws(test.recorder.calls)[0][1]).toBeGreaterThan(
       firstDraw[0][1] as number,
     );
