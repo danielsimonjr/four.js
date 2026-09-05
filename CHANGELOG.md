@@ -8,6 +8,23 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-05 — repository configuration repairs (Docs, Release, Dependabot)
+
+- **GitHub Pages enabled (`build_type: workflow`).** The `Docs` workflow had been failing on every
+  run with `Get Pages site failed. Please verify that the repository has Pages enabled` — it was
+  built to deploy to Pages, and Pages had never been turned on. Docs is green and the site serves
+  HTTP 200 at https://danielsimonjr.github.io/four.js/.
+- **Actions may now create pull requests.** `Release` failed with
+  `GitHub Actions is not permitted to create or approve pull requests`, so the changesets flow
+  could never open its version PR — 24 packages sat at `0.0.0` with the workflow itself warning
+  that `changeset version` had to run first. `can_approve_pull_request_reviews` is now true while
+  `default_workflow_permissions` stays **read**, matching MathTS and memoryjs. Release is green.
+- **Dependabot enabled and configured.** Security updates were `disabled` and there was no
+  `.github/dependabot.yml` at all: alerts were detected but nothing remediated them. Both fixed.
+  The config uses the **npm** ecosystem, not bun — Dependabot's bun parser handles only `bun.lock`
+  lockfileVersion 1 and this repo's is 2, so a bun ecosystem would fail every run while leaving
+  "0 open PRs" looking healthy.
+
 ### 2026-09-05 — TypeScript-on-Bun toolchain (RFC 0006)
 
 #### Changed
