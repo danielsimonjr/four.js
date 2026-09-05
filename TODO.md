@@ -6,6 +6,18 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **Repository configuration repaired 2026-09-05.** Pages enabled (`build_type: workflow`) —
+      `Docs` green and the site serves HTTP 200 at https://danielsimonjr.github.io/four.js/;
+      Actions permitted to create PRs (`default_workflow_permissions` left at **read**) — `Release`
+      green and its version PR (#55) merged; Dependabot security updates enabled and
+      `.github/dependabot.yml` added (npm ecosystem, not bun). All four workflows green on `main`.
+- [x] **PR #54 closed as fully superseded** — zero code delta against `main`; 0 of 104 CHANGELOG and
+      0 of 117 MEMORY entries were absent from `main`. Evidence recorded on the PR.
+- [ ] **Dependabot bumps will need manual `bun.lock` regeneration.** Dependabot cannot write
+      `bun.lock`, and CI runs `bun install --frozen-lockfile`, so any bump whose resolution changes
+      will fail until the lockfile is regenerated on the branch — and a human push costs that PR
+      its automerge. Same tax as math-mcp #103. Needs a pipeline answer, not a per-PR fix.
+
 - [x] **RFC 0006 TypeScript-on-Bun toolchain — DONE 2026-09-05.** Bun is the
       workspace package manager/script runner; `bun.lock` + `bunfig.toml`;
       Vitest/`tsc -b` retained; spec revision 1.14. Follow-up (not scheduled):
