@@ -1,5 +1,5 @@
 // Unit tests for tools/apply-publish-names.mjs.
-// Usage: node --test tools/apply-publish-names.test.mjs   (pnpm publish-names:test)
+// Usage: node --test tools/apply-publish-names.test.mjs   (bun run publish-names:test)
 //
 // Half of these run against fixtures and half against the real workspace. The
 // real-workspace half is the point: the §98 mapping has exactly one chance to be
@@ -41,7 +41,7 @@ test("publishName maps the umbrella and the scoped packages, and only those", ()
   assert.equal(publishName("fourier"), null); // a prefix of "four" is not "four"
 });
 
-test("resolveWorkspaceRange reproduces pnpm's publish-time substitution", () => {
+test("resolveWorkspaceRange reproduces workspace publish-time substitution", () => {
   assert.equal(resolveWorkspaceRange("workspace:*", "0.1.0"), "0.1.0");
   assert.equal(resolveWorkspaceRange("workspace:^", "0.1.0"), "^0.1.0");
   assert.equal(resolveWorkspaceRange("workspace:~", "0.1.0"), "~0.1.0");

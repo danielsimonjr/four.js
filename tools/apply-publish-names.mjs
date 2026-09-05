@@ -21,7 +21,7 @@
 //
 //   2. **Rename and nothing else.** In the manifest the only fields touched are
 //      `name`, the four dependency maps' workspace-owned keys, and the
-//      `workspace:` ranges those keys carry (which npm cannot resolve — pnpm
+//      `workspace:` ranges those keys carry (which npm cannot resolve — a workspace manager
 //      rewrites them during its own publish, and publishing from a staging tree
 //      means doing it here). In particular `exports` is copied through
 //      untouched: the umbrella's 25 subpath entries are the §91 tree-shaking
@@ -89,7 +89,7 @@ export function publishName(name) {
 
 /**
  * Resolves one `workspace:` range against the depended package's version, the
- * way pnpm does when it publishes: bare `*` pins the exact version, `^`/`~`
+ * way workspace publish helpers substitute: bare `*` pins the exact version, `^`/`~`
  * become that prefix on it, and an explicit range is kept as written. Anything
  * that is not a `workspace:` protocol range passes through untouched.
  */
@@ -230,27 +230,24 @@ function walkFiles(dir) {
 }
 
 /**
- * Expands `pnpm-workspace.yaml`'s `packages:` list. Deliberately understands only
- * the two forms this repository uses — a literal directory and a `dir/*` glob —
- * and fails loudly on anything else rather than guessing, because a silently
- * mis-expanded pattern here means a package quietly missing from a release.
+ * Expands root `package.json`'s `workspaces` list (RFC 0006 / Bun). Deliberately
+ * understands only the two forms this repository uses — a literal directory and
+ * a `dir/*` glob — and fails loudly on anything else rather than guessing,
+ * because a silently mis-expanded pattern here means a package quietly missing
+ * from a release.
  */
 export function workspacePatterns(root) {
-  const text = readFileSync(join(root, "pnpm-workspace.yaml"), "utf8");
-  const patterns = [];
-  let inPackages = false;
-  for (const line of text.split("\n")) {
-    if (/^packages:\s*$/.test(line)) {
-      inPackages = true;
-      continue;
-    }
-    if (inPackages) {
-      const m = line.match(/^\s+-\s*"?([^"#]+?)"?\s*$/);
-      if (m) patterns.push(m[1]);
-      else if (line.trim() !== "") inPackages = false;
-    }
+  const manifest = JSON.parse(
+    readFileSync(join(root, "package.json"), "utf8"),
+  );
+  const raw = manifest.workspaces;
+  if (Array.isArray(raw)) return raw.map(String);
+  if (raw && typeof raw === "object" && Array.isArray(raw.packages)) {
+    return raw.packages.map(String);
   }
-  return patterns;
+  throw new Error(
+    'root package.json must declare "workspaces": ["packages/*"] (or { packages: [...] })',
+  );
 }
 
 /** Reads every workspace package: `{ relDir, dir, manifest }`, sorted by directory. */
@@ -260,7 +257,7 @@ export function readWorkspacePackages(root = DEFAULT_ROOT) {
     if (pattern.includes("**") || pattern.startsWith("!")) {
       throw new Error(
         `apply-publish-names understands only "dir" and "dir/*" workspace patterns; ` +
-          `pnpm-workspace.yaml carries "${pattern}"`,
+          `package.json workspaces carries "${pattern}"`,
       );
     }
     if (pattern.endsWith("/*")) {
@@ -290,7 +287,7 @@ export function readWorkspacePackages(root = DEFAULT_ROOT) {
  * Copies one package's publishable content into `<outDir>/<name>/`: the rewritten
  * manifest, everything its `files` array names, and the three files npm always
  * includes regardless of `files`. A package with no LICENSE of its own inherits
- * the repository's, which is what `pnpm publish` does and what npm alone does not.
+ * the repository's, which is what workspace publish helpers do and npm alone does not.
  */
 function stagePackage(root, pkg, rewritten, outDir) {
   const problems = [];

@@ -20,11 +20,11 @@ this block said "scaffold only" until 2026-08-05 — it predated Phase 0).
   ≥95% per-package coverage enforced); four are deliberate reserved stubs
   (`physics-box2d`, `physics-soft`, `render-canvas`, `render-svg`). `render-webgpu`
   left the stub list 2026-08-21…29 (the R-1 plan).
-- Root `package.json` + pnpm workspace + CI workflow exist; `tests/{integration,
+- Root `package.json` + Bun workspace + CI workflow exist; `tests/{integration,
   determinism}/` hold cross-package suites, `tests/browser/` the Playwright gates,
   `tests/visual/` pixel goldens, `benchmarks/` committed performance records, and ten
   `examples/` sites build and are browser-tested.
-- Common commands: `pnpm build` / `test` / `test:suites` / `test:browser` / `lint` /
+- Common commands: `bun run build` / `test` / `test:suites` / `test:browser` / `lint` /
   `run coverage` / `run docs` / `graph` / `check-spec` / `run size`. See
   `docs/Architecture/OVERVIEW.md` for orientation.
 
@@ -80,7 +80,7 @@ Management; Appendices A Normative Defaults and B Glossary), followed by revisio
 `four`, MVP phases §106a/§113a added, publish names decided
 (`@danielsimonjr/fourjs`). The archived PDF is **frozen at the pre-1.0 text** and
 predates all of this. Amendments are recorded in the spec's own amendments table; ERRATA.md
-covers only the PDF's extraction defects. Run `node tools/check-spec.mjs` after any spec
+covers only the PDF's extraction defects. Run `bun tools/check-spec.mjs` (or `bun run check-spec`) after any spec
 edit.
 
 ## 4. Core concept and design principles
@@ -335,7 +335,7 @@ See §7 below (package map).
 ### Part IX — Implementation Plan (§103–113 = Phases 0–10)
 | Phase | Scope | Exit criterion |
 |---|---|---|
-| 0 | Root files: `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `eslint.config.js`, `.github/workflows/ci.yml`, CONTRIBUTING, CODE_OF_CONDUCT, ROADMAP — plus the implementation plan, which lives at `docs/plans/IMPLEMENTATION_PLAN.md` (owner decision; §103 names the file without a path) | Monorepo installs; packages compile; tests run; docs build; example starts |
+| 0 | Root files: `package.json`, `bun.lock`, `bunfig.toml`, `tsconfig.base.json`, `eslint.config.js`, `.github/workflows/ci.yml`, CONTRIBUTING, CODE_OF_CONDUCT, ROADMAP — plus the implementation plan, which lives at `docs/plans/IMPLEMENTATION_PLAN.md` (owner decision; §103 names the file without a path) | Monorepo installs; packages compile; tests run; docs build; example starts |
 | 1 | Vector2/3/4, Matrix3/4, Quaternion, Transform, Node, Group, Scene, component model (§6a), EventEmitter (§6b), Clock, TimeState, fixed-step scheduler, dirty transform propagation | Scene graph deterministically steps **without a renderer** |
 | 2 | MotionComponent, kinematic controller, paths, trajectories, spring motion, transform authority, interpolation buffers | Motion is deterministic, renderer-independent, unit tested |
 | 3 | Renderer interface, **WebGL 2 backend**, cameras, render list, buffers, shaders, textures, viewports, interpolation-aware rendering | Moving 2D/3D primitives render smoothly under fixed-step simulation |
@@ -368,7 +368,7 @@ See §7 below (package map).
 ## 6. Toolchain, standards, and testing (spec §91–95)
 
 When implementation begins, the prescribed baseline is: **strict TypeScript** (no implicit
-`any`), **ESM**, **pnpm workspace**, **Turborepo or Nx**, **Vitest**, **Playwright**,
+`any`), **ESM**, **Bun workspace**, **Vitest**, **Playwright**,
 **ESLint**, **Prettier**, **API Extractor or TypeDoc**, **Vite**, **Changesets**, **GitHub
 Actions**. Requirements: documented public APIs, tree-shakable modules, package-boundary
 checks, browser compatibility matrix, changelogs.
@@ -439,7 +439,7 @@ concrete backend; `four` aggregates everything.
    don't edit the PDF, and don't reintroduce its dual numbering. Substantive spec changes
    need an owner decision, recorded in the spec's **amendments table**; § numbering 1–120 is
    frozen (new sections use letter suffixes). `docs/ERRATA.md` covers only PDF extraction
-   defects. Run `node tools/check-spec.mjs` after spec edits.
+   defects. Run `bun tools/check-spec.mjs` (or `bun run check-spec`) after spec edits.
 3. **Plain "§N" means `SPECIFICATION.md` numbering.** When citing the PDF, say so explicitly
    and translate through the ERRATA numbering map (PDF second-range §45–67 = §98–120). Keep
    `docs/ERRATA.md` updated if new defects are genuinely discovered (check its "non-defects"

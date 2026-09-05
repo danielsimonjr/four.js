@@ -24,7 +24,7 @@ Companion documents: [ARCHITECTURE.md](./ARCHITECTURE.md) (system design), [OVER
 
 ## Overview
 
-four.js is a pnpm workspace of 24 `@four/`-scoped packages (the umbrella is plain `four`), layered strictly by the §3.1 dependency matrix — never add or reverse an edge:
+four.js is a Bun workspace of 24 `@four/`-scoped packages (the umbrella is plain `four`), layered strictly by the §3.1 dependency matrix — never add or reverse an edge:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -487,7 +487,7 @@ Where the matrix forbids an edge the codebase needs, the standing pattern is a *
 - `particles`/`ui` → `motion`: `ParticleSystem` and the widgets satisfy `SimulationSystem`/`Pickable` structurally.
 - `render` → `scene` lights: `collectSceneLights` duck-types `DirectionalLight` (`isDirectionalLightSource` brand) even though the edge exists, so fake-GL tests can double it — here drift **is** type-pinned.
 
-Per-file dependency data lives in [`dependency-graph.json`](./dependency-graph.json) / [`dependency-reverse.json`](./dependency-reverse.json); the CI gates (`pnpm graph:check`, `pnpm graph:duplicates`) hold every report at zero findings.
+Per-file dependency data lives in [`dependency-graph.json`](./dependency-graph.json) / [`dependency-reverse.json`](./dependency-reverse.json); the CI gates (`bun run graph:check`, `bun run graph:duplicates`) hold every report at zero findings.
 
 ---
 

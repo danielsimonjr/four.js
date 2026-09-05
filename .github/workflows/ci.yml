@@ -16,31 +16,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      # Bun is the workspace package manager and script runner (RFC 0006).
+      # Node stays installed for Playwright's browser install helpers and the
+      # two `node --test` tool suites (`publish-names:test`, `graph:test`).
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10.33.0
+          bun-version: 1.4.2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
-          cache: pnpm
+          node-version: "22.22"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Build
-        run: pnpm build
+        run: bun run build
 
       # The examples are consumers, not workspace packages: they import the
       # umbrella package by its published specifier, which resolves to
       # `packages/four/dist/*.d.ts`. The build step above must therefore precede
       # this one.
       - name: Typecheck examples
-        run: pnpm run typecheck:examples
+        run: bun run typecheck:examples
 
       # `tests/` is outside every package's tsc project and outside the examples
       # project, so until 2026-08-21 nothing type-checked the cross-package
@@ -51,22 +53,22 @@ jobs:
       # it. Placed after Build for the same reason as the examples: the suites
       # import `four/*` through the workspace symlink into `packages/four/dist`.
       - name: Typecheck tests
-        run: pnpm run typecheck:tests
+        run: bun run typecheck:tests
 
       - name: Test
-        run: pnpm -r --workspace-concurrency=4 run test
+        run: bun run test
 
       # Same unit tests, re-run per package under v8 instrumentation against the
       # shared thresholds in vitest.coverage.config.ts. Kept separate so the
       # plain `test` path above stays uninstrumented and fast.
       - name: Unit test coverage thresholds
-        run: pnpm run coverage
+        run: bun run coverage
 
       - name: Lint
-        run: pnpm lint
+        run: bun run lint
 
       - name: Check specification
-        run: pnpm check-spec
+        run: bun run check-spec
 
       # Doc-truth gate (added 2026-08-05). Prose has no type checker: the sweep
       # that added this found claims that were false when written and survived
@@ -75,7 +77,7 @@ jobs:
       # not send readers to, and the exact retired wordings — so a revert or a
       # copy-paste from an old revision fails here instead of shipping.
       - name: Check documentation truth
-        run: pnpm check-docs
+        run: bun run check-docs
 
       # §90 compatibility drift (added 2026-08-07). The solver-adapter block of
       # docs/COMPATIBILITY.md is generated from the adapters' live capability
@@ -83,7 +85,7 @@ jobs:
       # the committed document being regenerated. Needs the build step above
       # (the generator imports each package's dist).
       - name: Check compatibility tables
-        run: pnpm check-compat
+        run: bun run check-compat
 
       # Architecture invariants. `graph` regenerates docs/Architecture from a full
       # parse; `graph:check` then asserts every browser-facing `.` entry stays free
@@ -94,45 +96,39 @@ jobs:
       # TRUE_DUPLICATE symbol name beyond docs/Architecture/duplicate-baseline.json.
       - name: Check architecture invariants (dependency graph)
         run: |
-          pnpm graph
-          pnpm graph:check
-          pnpm graph:duplicates
-          pnpm graph:test
+          bun run graph
+          bun run graph:check
+          bun run graph:duplicates
+          bun run graph:test
 
-      # `pnpm docs` without `run` is a pnpm builtin no-op; the build step above
-      # must precede this because TypeDoc reads the built reference chain.
+      # TypeDoc reads the built reference chain; `bun run docs` (not a bare
+      # `bun docs`) is required so the root script wins.
       - name: Build API docs
-        run: pnpm run docs
+        run: bun run docs
 
-      # All three example sites must be built: playwright.config.ts starts a
+      # All example sites must be built: playwright.config.ts starts a
       # vite preview server per example, and vite preview hard-errors on a
       # missing dist (found at the Phase 6 exit, WP-6.6-fix1).
-      # Builds EVERY example, because playwright.config.ts starts a `vite preview`
-      # for each entry of its webServer array and preview serves a prebuilt dist.
-      # This was three separate steps covering three of five examples; `blending`
-      # and `particles-demo` were added to the config in e6072ee without matching
-      # steps, so preview died with "The directory dist does not exist" and the
-      # browser job had been red ever since. One script = one place to update.
       - name: Build examples
-        run: pnpm examples:build
+        run: bun run examples:build
 
       # CI runners ship no browsers, and this repository deliberately keeps
       # browser downloads out of the local scripts: the dev sandbox already has
       # Chromium (PLAYWRIGHT_BROWSERS_PATH), which playwright.config.ts finds.
       - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       # Runs against the example built above; SwiftShader supplies WebGL 2.
       - name: Browser test
-        run: pnpm test:browser
+        run: bun run test:browser
 
       - name: Check bundle size
-        run: pnpm size
+        run: bun run size
 
       - name: Cross-package test suites
-        run: pnpm test:suites
+        run: bun run test:suites
 
       # Visibility only: unfixable advisories must not block the pipeline.
       - name: Audit dependencies
-        run: pnpm audit --audit-level=high
+        run: bun audit --audit-level=high
         continue-on-error: true

@@ -5,7 +5,7 @@ design behind these surfaces see [ARCHITECTURE.md](ARCHITECTURE.md) and
 [OVERVIEW.md](OVERVIEW.md); for per-package internals see
 [COMPONENTS.md](COMPONENTS.md); for how data moves through a frame see
 [DATAFLOW.md](DATAFLOW.md). This document is deliberately **not**
-per-member-exhaustive — TypeDoc (`pnpm run docs`) generates that — it names
+per-member-exhaustive — TypeDoc (`bun run docs`) generates that — it names
 the entry points for each task, gives their contracts and main signatures,
 and links into the prose guides in [`docs/guides/`](../guides/README.md).
 
@@ -714,5 +714,5 @@ without a spec amendment (ERRATA E-3).
 _Cross-references: [ARCHITECTURE.md](ARCHITECTURE.md) ·
 [OVERVIEW.md](OVERVIEW.md) · [COMPONENTS.md](COMPONENTS.md) ·
 [DATAFLOW.md](DATAFLOW.md) · [TEST_COVERAGE.md](TEST_COVERAGE.md) ·
-[guides index](../guides/README.md) · generated API reference: `pnpm run docs`
+[guides index](../guides/README.md) · generated API reference: `bun run docs`
 (TypeDoc)._
