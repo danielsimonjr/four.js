@@ -6,6 +6,12 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **RFC 0006 TypeScript-on-Bun toolchain — DONE 2026-09-05.** Bun is the
+      workspace package manager/script runner; `bun.lock` + `bunfig.toml`;
+      Vitest/`tsc -b` retained; spec revision 1.14. Follow-up (not scheduled):
+      optional migration of unit suites to `bun:test` once coverage parity is
+      proven.
+
 - [ ] **The implementation plan is COMPLETE (2026-08-02).** All 13 phase sections
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
@@ -940,6 +946,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- **2026-09-05 — RFC 0006 TypeScript-on-Bun toolchain.** Bun workspace; spec 1.14; Vitest/`tsc -b` retained.
 
 - [x] 2026-09-04 — **WebGL geometry-buffer reuse** (§53, §64, §83).
       Preserve handles for unchanged layouts, keep full data-store replacement,

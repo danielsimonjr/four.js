@@ -6,18 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 are published, releases will follow [Semantic Versioning](https://semver.org/) per §90 of the
 specification; until then, entries are grouped by date under **Unreleased**.
 
-## 2026-09-03 - security: js-yaml 4.3.0 -> 4.3.2 (CVE-2026-59870, HIGH)
-
-- Dependabot alert #2: quadratic CPU consumption in `!!omap` resolution, affecting
-  `>= 4.0.0, < 4.3.1`. Only reachable through `tools/create-dependency-graph`, which is a
-  build-time tool rather than shipped runtime code.
-- Verified the patched copy is actually INSTALLED and works, not merely written into the
-  lockfile: `npm ci` then a parse of a document containing `!!omap` -- the exact construct
-  the advisory names -- against js-yaml 4.3.2. A lockfile edit alone proves nothing about
-  what runs.
-- First change since the 08-28 development hold on this repo was lifted 2026-09-03.
-
 ## [Unreleased]
+
+### 2026-09-05 — TypeScript-on-Bun toolchain (RFC 0006)
+
+#### Changed
+
+- Workspace package manager and script runner is **Bun** (≥ 1.2). Root
+  `package.json` declares `"workspaces": ["packages/*"]`; committed lockfile is
+  text `bun.lock`; `bunfig.toml` enables the text lockfile. Removed
+  `pnpm-workspace.yaml` / `pnpm-lock.yaml` / the `tsx` root dependency.
+- Root scripts, CI (`ci.yml` / `docs.yml` / `release.yml`), CONTRIBUTING,
+  README, AGENTS/CLAUDE, and tools docs use `bun install` / `bun run` /
+  `bunx`. Coverage uses `tools/run-in-packages.mjs`. Publish-name discovery
+  reads `package.json` workspaces.
+- Spec revision **1.14**: §91 baseline is a Bun workspace (Turborepo/Nx
+  dropped from the recommended list); §103 Phase 0 lists `bun.lock` /
+  `bunfig.toml`. Library emit remains `tsc -b`; Vitest remains the unit/suite
+  runner (`bun:test` staged).
+
+#### Added
+
+- `docs/rfcs/0006-typescript-on-bun.md` (accepted).
+
+#### Fixed
+
+- `examples-build-coverage` matches `bun run <script>` chains (was hard-coded to
+  `pnpm`). Determinism fresh-process spawns pass `--experimental-strip-types`
+  so Node < 22.18 can load `.ts` scenario helpers; CI pins Node 22.22.
+- Package `test` runs with `--concurrency=4` (via `tools/run-in-packages.mjs`)
+  instead of unbounded `--parallel`, matching the old pnpm workspace cap; the
+  glyph-atlas determinism assertion compares TypedArrays directly so it does
+  not time out under CI load.
 
 ### 2026-09-04 — WebGL geometry-buffer reuse
 
@@ -47,6 +67,16 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - Add two real-driver pixel comparisons of queued old/new draws against fresh
   allocations, for indexed and unindexed geometry.
 
+## 2026-09-03 - security: js-yaml 4.3.0 -> 4.3.2 (CVE-2026-59870, HIGH)
+
+- Dependabot alert #2: quadratic CPU consumption in `!!omap` resolution, affecting
+  `>= 4.0.0, < 4.3.1`. Only reachable through `tools/create-dependency-graph`, which is a
+  build-time tool rather than shipped runtime code.
+- Verified the patched copy is actually INSTALLED and works, not merely written into the
+  lockfile: `npm ci` then a parse of a document containing `!!omap` -- the exact construct
+  the advisory names -- against js-yaml 4.3.2. A lockfile edit alone proves nothing about
+  what runs.
+- First change since the 08-28 development hold on this repo was lifted 2026-09-03.
 
 ### 2026-08-30 — Unblocked-defect sanitization (sprite flags, graph errors, docs truth)
 

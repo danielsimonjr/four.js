@@ -19,8 +19,8 @@ before quoting the count. The packages are not yet published to npm.
 ## Quick start (§93)
 
 Until first publish, clone the repository and build the workspace
-(`pnpm install && pnpm build`), then run any example with
-`npx vite examples/first-2d-scene`. The smallest program looks like this:
+(`bun install && bun run build`), then run any example with
+`bunx vite examples/first-2d-scene`. The smallest program looks like this:
 
 ```ts
 import { Application } from "four/application";
@@ -84,8 +84,8 @@ requestAnimationFrame(function frame(now) {
 
 ## Examples
 
-Each example is a small Vite app; build them all with `pnpm examples:build` or serve one
-directly with `npx vite examples/<name>`.
+Each example is a small Vite app; build them all with `bun run examples:build` or serve one
+directly with `bunx vite examples/<name>`.
 
 | Example                               | Shows                                                                                                                                                                                                           |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -118,16 +118,16 @@ times in seconds**, fixed-step simulation with render interpolation (§10). See
 ## Development
 
 ```sh
-pnpm install          # workspace install (Node >= 20, pnpm 10)
-pnpm build            # tsc -b, all 24 packages, topological
-pnpm test             # per-package unit tests
-pnpm test:suites      # cross-package integration + determinism suites
-pnpm test:browser     # Playwright + SwiftShader browser gates
-pnpm lint             # eslint (type-checked)
-pnpm run docs         # TypeDoc API reference
-pnpm check-spec       # specification consistency checks
-pnpm graph            # regenerate docs/Architecture (dependency graph)
-pnpm run size         # §86 payload budget (150 kB gzip ceiling)
+bun install --frozen-lockfile   # workspace install (Bun >= 1.2; RFC 0006)
+bun run build                   # tsc -b across packages/* (sequential)
+bun run test                    # per-package unit tests (Vitest)
+bun run test:suites             # cross-package integration + determinism suites
+bun run test:browser            # Playwright + SwiftShader browser gates
+bun run lint                    # eslint (type-checked)
+bun run docs                    # TypeDoc API reference
+bun run check-spec              # specification consistency checks
+bun run graph                   # regenerate docs/Architecture (dependency graph)
+bun run size                    # §86 payload budget (150 kB gzip ceiling)
 ```
 
 ## Specification

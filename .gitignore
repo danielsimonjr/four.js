@@ -6,3 +6,4 @@ docs/api
 examples/**/dist
 .claude/worktrees
 *.tsbuildinfo
+.bun

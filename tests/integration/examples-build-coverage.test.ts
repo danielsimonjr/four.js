@@ -25,7 +25,7 @@ const root = join(import.meta.dirname, "..", "..");
 /** Example directories Playwright will `vite preview`, read from the real config. */
 function previewedExamples(): string[] {
   const cfg = readFileSync(join(root, "playwright.config.ts"), "utf8");
-  // `npx vite preview examples/<name> --port ...`
+  // `vite preview examples/<name> --port ...`
   return [
     ...cfg.matchAll(/vite preview examples\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)/g),
   ]
@@ -33,7 +33,7 @@ function previewedExamples(): string[] {
     .sort();
 }
 
-/** Example directories `pnpm examples:build` actually builds. */
+/** Example directories `bun run examples:build` actually builds. */
 function builtExamples(): string[] {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
     scripts: Record<string, string>;
@@ -43,7 +43,7 @@ function builtExamples(): string[] {
 
   // examples:build chains the individual `<x>:build` scripts; resolve each to the
   // directory its `vite build` targets, rather than trusting the script names.
-  return [...agg.matchAll(/pnpm ([a-z0-9:-]+)/g)]
+  return [...agg.matchAll(/(?:bun run|pnpm(?: run)?) ([a-z0-9:-]+)/g)]
     .map((m) => pkg.scripts[m[1]])
     .filter((cmd): cmd is string => Boolean(cmd))
     .flatMap((cmd) =>
