@@ -34,6 +34,10 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - `examples-build-coverage` matches `bun run <script>` chains (was hard-coded to
   `pnpm`). Determinism fresh-process spawns pass `--experimental-strip-types`
   so Node < 22.18 can load `.ts` scenario helpers; CI pins Node 22.22.
+- Package `test` runs with `--concurrency=4` (via `tools/run-in-packages.mjs`)
+  instead of unbounded `--parallel`, matching the old pnpm workspace cap; the
+  glyph-atlas determinism assertion compares TypedArrays directly so it does
+  not time out under CI load.
 
 ### 2026-09-04 — WebGL geometry-buffer reuse
 
