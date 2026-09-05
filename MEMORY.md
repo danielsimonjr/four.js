@@ -21,7 +21,7 @@ readable; never delete the pointer itself.
   (amendments table at its top; § numbering 1–120 frozen, lettered sections for insertions).
   `docs/archive/four-js-specification.pdf` is the unmodified original, frozen at the pre-1.0
   text, and still contains the old duplicate numbering — translate its references via the map
-  in `docs/ERRATA.md`. Run `node tools/check-spec.mjs` after any spec edit.
+  in `docs/ERRATA.md`. Run `bun tools/check-spec.mjs` after any spec edit.
 - Plain "§N" citations mean `SPECIFICATION.md` numbering. Cite the PDF explicitly when meant
   ("PDF §49, second range").
 - All 24 packages under `packages/` are `@four/`-scoped; `four` is the umbrella package.
@@ -29,6 +29,17 @@ readable; never delete the pointer itself.
   above `render-*` backends; the logical scene never depends on a concrete backend.
 
 ## Decisions
+
+- **2026-09-05 — TypeScript-on-Bun toolchain (RFC 0006).** The workspace package
+  manager and script runner is Bun (≥ 1.2). `package.json` declares
+  `"workspaces": ["packages/*"]`; committed lockfile is text `bun.lock`;
+  `bunfig.toml` sets `saveTextLockfile` / `exact`. CI uses `oven-sh/setup-bun`
+  and `bun install --frozen-lockfile`. Library emit stays `tsc -b` (composite
+  project references); unit/suite tests stay on Vitest for this landing
+  (`bun:test` is staged). Spec revision **1.14** updates §91 and §103.
+  Supersedes the pnpm-10 + `pnpm -r` orchestration decision (itself the
+  2026-08-03 replacement for Turborepo). Node remains available for Playwright
+  browser install and the two `node --test` tool suites.
 
 - **2026-09-04 — geometry cache: reuse objects, not in-flight storage.**
   Supersedes the WebGL dirty-version delete/recreate policy recorded earlier.

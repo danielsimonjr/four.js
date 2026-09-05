@@ -1,0 +1,8 @@
+# four.js — Bun workspace config (RFC 0006).
+# Text lockfile stays reviewable in PRs; CI uses `bun install --frozen-lockfile`.
+
+[install]
+exact = true
+saveTextLockfile = true
+
+[install.scopes]

@@ -38,7 +38,7 @@ transform-authority model.
 
 Numbers below are extracted from the authoritative
 `dependency-summary.compact.json` produced by the vendored dependency-graph
-tooling (`pnpm graph` regenerates everything under `docs/Architecture/`),
+tooling (`bun run graph` regenerates everything under `docs/Architecture/`),
 last regenerated 2026-08-05.
 
 | Metric                          | Value                            |
@@ -235,8 +235,8 @@ reverse an edge without an owner decision (RFC/ADR per §95).
   each would-be edge through a deliberate decision instead of an expedient
   import.
 - The matrix is machine-checked: the dependency-graph tooling regenerates the
-  real graph (`pnpm graph`) and CI gates (`pnpm graph:check`,
-  `pnpm graph:duplicates`) fail on violations — including any `node:` builtin
+  real graph (`bun run graph`) and CI gates (`bun run graph:check`,
+  `bun run graph:duplicates`) fail on violations — including any `node:` builtin
   reaching a browser-facing entry point.
 
 **Trade-offs**:
@@ -353,7 +353,7 @@ dependency cone (and its wave), permanently, for a stride constant or a
 `step()` signature. Duck-typing keeps the contract exactly as wide as its
 use. The cost — silent drift — is managed explicitly: cross-package contract
 tests exercise the real classes against the duck types, and the
-duplicate-symbol CI gate (`pnpm graph:duplicates`) fails on any duplicated
+duplicate-symbol CI gate (`bun run graph:duplicates`) fails on any duplicated
 symbol not listed in `duplicate-allowlist.json` (legitimately independent
 forever) or `duplicate-baseline.json` (an accepted, shrinking backlog —
 currently empty).
@@ -599,9 +599,9 @@ in CI.
 ## Build & Packaging
 
 - **Toolchain** (§91, exact pins in plan §3.2): strict TypeScript 5.9.3, ESM
-  only, pnpm workspace, Vitest, Playwright, ESLint 9 + typescript-eslint,
+  only, Bun workspace, Vitest, Playwright, ESLint 9 + typescript-eslint,
   Prettier, Vite 8, TypeDoc, Changesets (release workflow deferred to first
-  publish). Task orchestration is `pnpm -r --workspace-concurrency=4`
+  publish). Task orchestration is `bun run --filter './packages/*'`
   (Turborepo was replaced 2026-08-03).
 - **Build**: `tsc -b` with project references mirroring the §3.1 matrix. Each
   package carries two tsconfigs — `tsconfig.json` (dev/lint, `noEmit`) and
@@ -617,8 +617,8 @@ in CI.
     (core + math + scene + render-webgl) at **33.28 kB gzip of a 150 kB
     budget**; example sites carry their own budgets. Solver wasm is outside
     the budget by §86's wording.
-  - **Graph gates**: `pnpm graph:check` (e.g. no `node:` builtin may reach a
-    browser-facing `.` entry, 24/24 pass) and `pnpm graph:duplicates`
+  - **Graph gates**: `bun run graph:check` (e.g. no `node:` builtin may reach a
+    browser-facing `.` entry, 24/24 pass) and `bun run graph:duplicates`
     (fails on unallowlisted duplicate symbols).
   - **Spec checker**: `node tools/check-spec.mjs` after any spec edit
     (section sequence, fence balance, TOC anchors, banned terms).

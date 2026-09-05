@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env bun
 
 /**
  * Generic Dependency Graph Generator
@@ -9,7 +9,7 @@
  * - docs/Architecture/dependency-graph.yaml (compact, ~40% smaller than JSON)
  * - docs/Architecture/unused-analysis.md (unused exports + DORMANT FILES)
  *
- * Usage: npx tsx tools/create-dependency-graph.ts
+ * Usage: bun tools/create-dependency-graph/create-dependency-graph.ts --root=.
  *
  * This tool is generic and does not depend on any codebase-specific functions.
  * It dynamically discovers the project structure from the filesystem.

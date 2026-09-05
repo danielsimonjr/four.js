@@ -6,9 +6,9 @@ request, and merging that PR is what cuts a release. Nothing here publishes on i
 "The publish is an owner step" below.
 
 ```sh
-pnpm exec changeset          # describe a change: pick packages, pick a bump, write a summary
-pnpm exec changeset status   # what would be released right now
-pnpm exec changeset version  # apply the bumps locally (CI normally does this)
+bunx changeset          # describe a change: pick packages, pick a bump, write a summary
+bunx changeset status   # what would be released right now
+bunx changeset version  # apply the bumps locally (CI normally does this)
 ```
 
 The general docs are at

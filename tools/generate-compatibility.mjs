@@ -41,7 +41,7 @@
 //
 // ## Requires a built tree
 //
-// The adapters are imported from `dist/`, so `pnpm build` has to have run.
+// The adapters are imported from `dist/`, so `bun run build` has to have run.
 // That is deliberate: parsing the capability object literal out of the
 // TypeScript source would re-implement a const evaluator and would quietly
 // disagree with what an application actually gets.
@@ -104,7 +104,7 @@ function interfaceMembers(declarationText, name) {
 
 if (!existsSync(bodyAccessDeclaration)) {
   fail(
-    "packages/physics/dist/body-access.d.ts is missing — run `pnpm build` " +
+    "packages/physics/dist/body-access.d.ts is missing — run `bun run build` " +
       "(this tool reads the shipped declarations, not the TypeScript source)",
   );
 }
@@ -147,7 +147,7 @@ for (const dir of solverPackageDirs) {
   const barrel = join(packageDir, "dist", "index.js");
   if (!existsSync(barrel)) {
     fail(
-      `${manifest.name} is not built (${dir}/dist/index.js is missing) — run \`pnpm build\``,
+      `${manifest.name} is not built (${dir}/dist/index.js is missing) — run \`bun run build\``,
     );
   }
   const module = await import(pathToFileURL(barrel).href);

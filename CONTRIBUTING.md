@@ -11,14 +11,14 @@ same license.
 ## 1. Current state of the repository
 
 - The **specification** — [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md), currently
-  **revision 1.6** — is the working reference for everything in this repository. Parts
-  I–XIII, sections 1–120 plus lettered insertions (6a, 6b, 7a, 7b, 60a) and Appendices A–B.
+  whatever revision tops its amendments table — is the working reference for everything
+  in this repository. Parts I–XIII, sections 1–120 plus lettered insertions (6a, 6b, 7a,
+  7b, 60a, …) and Appendices A–B.
 - The **executable plan** is
-  [`docs/plans/IMPLEMENTATION_PLAN.md`](docs/plans/IMPLEMENTATION_PLAN.md) (revision 2.1):
+  [`docs/plans/IMPLEMENTATION_PLAN.md`](docs/plans/IMPLEMENTATION_PLAN.md):
   small, self-contained **work packets** dispatched one at a time, phase by phase.
-- **Implementation is in progress**, starting from Phase 0 (project foundation, §103).
-  Packages under `packages/*` are being filled in; not everything described in the spec
-  exists yet. Check `TODO.md` and `CHANGELOG.md` for where things stand.
+- **Implementation of the plan (§103–§113a) is complete.** Post-plan work continues via
+  RFCs and gap filings. Check `TODO.md` and `CHANGELOG.md` for where things stand.
 - Supporting docs: [`docs/POSITIONING.md`](docs/POSITIONING.md) (why the project exists),
   [`docs/ERRATA.md`](docs/ERRATA.md) (the archived PDF's defects and its numbering map),
   [`AGENTS.md`](AGENTS.md) (detailed orientation for contributors and AI agents),
@@ -26,24 +26,23 @@ same license.
 
 ## 2. Commands
 
-The workspace is a pnpm + Turborepo monorepo (Node ≥ 20, pnpm 10, ESM only, strict
-TypeScript). Root scripts, and the level each one gates (plan §8, "Verification stack"):
+The workspace is a **Bun** monorepo (Bun ≥ 1.2, ESM only, strict TypeScript; RFC 0006).
+Root scripts, and the level each one gates (plan §8, "Verification stack"):
 
 | Command | Purpose | Gate |
 |---|---|---|
-| `pnpm install --frozen-lockfile` | Install; never change the lockfile by hand | always |
-| `pnpm build` | `tsc -b` through Turborepo | every change |
-| `pnpm test` | Per-package unit tests (Vitest) | every change |
-| `pnpm test:suites` | Root cross-package suites in `tests/` | phase exits |
-| `pnpm lint` | ESLint (type-checked) | every change |
-| `pnpm format` | Prettier write | as needed |
-| `pnpm check-spec` | `tools/check-spec.mjs` — spec integrity | any change touching `docs/` |
-| `pnpm docs` | TypeDoc API docs into `docs/api` | CI |
-| `pnpm example:build` | Build `examples/first-2d-scene` | CI |
-| `pnpm size` | size-limit — built example ≤ 150 kB gzip (§86) | CI |
+| `bun install --frozen-lockfile` | Install; never change the lockfile by hand | always |
+| `bun run build` | `tsc -b` across `packages/*` (sequential) | every change |
+| `bun run test` | Per-package unit tests (Vitest) | every change |
+| `bun run test:suites` | Root cross-package suites in `tests/` | phase exits |
+| `bun run lint` | ESLint (type-checked) | every change |
+| `bun run format` | Prettier write | as needed |
+| `bun run check-spec` | `tools/check-spec.mjs` — spec integrity | any change touching `docs/` |
+| `bun run docs` | TypeDoc API docs into `docs/api` | CI |
+| `bun run example:build` | Build `examples/first-2d-scene` | CI |
+| `bun run size` | size-limit — built example ≤ 150 kB gzip (§86) | CI |
 
-These scripts are defined by the Phase 0 root manifest; if a script is missing, that part
-of Phase 0 has not landed yet. Toolchain versions are **pinned exactly** in plan §3.2 —
+These scripts live in the root `package.json`. Toolchain versions are **pinned exactly** —
 do not install, upgrade, or add dependencies as part of an unrelated change.
 
 ## 3. How work is organized: work packets
@@ -111,7 +110,7 @@ Amendments are an **owner decision**. When one is made:
   with a revision number, date, and summary;
 - **§ numbering 1–120 is frozen** — new material gets letter-suffixed sections
   (e.g. 6a, 7b, 60a), never a renumbering;
-- `node tools/check-spec.mjs` (`pnpm check-spec`) must pass afterwards — it verifies
+- `bun run check-spec` (`tools/check-spec.mjs`) must pass afterwards — it verifies
   section sequence, fence balance, TOC anchors, and banned pre-revision terms;
 - `docs/archive/four-js-specification.pdf` is never edited. It is frozen at the pre-1.0
   text and still contains the original numbering defects; translate references through
@@ -120,8 +119,8 @@ Amendments are an **owner decision**. When one is made:
 ## 6. Pull requests
 
 - Branch from the default branch; keep the change to one packet's worth of work.
-- Before opening a PR, run at minimum `pnpm build`, `pnpm test`, and
-  `pnpm lint`; add `pnpm check-spec` if you touched anything under `docs/`.
+- Before opening a PR, run at minimum `bun run build`, `bun run test`, and
+  `bun run lint`; add `bun run check-spec` if you touched anything under `docs/`.
 - Describe which packet (or which spec section) the change implements, and call out
   anything you had to decide that the packet or spec did not pin down.
 - CI runs the full verification stack; it must be green before merge.

@@ -1,9 +1,9 @@
 # Test Coverage Analysis
 
 **Generated**: 2026-08-05, from commands run against this working tree:
-`pnpm run coverage` (and its sequential variant
-`pnpm -r --workspace-concurrency=1 --filter "./packages/*" exec vitest run --coverage --config ../../vitest.coverage.config.ts`,
-used to attribute rows to packages unambiguously), `pnpm run test:suites`, and
+`bun run coverage` (and its sequential variant
+`bun tools/run-in-packages.mjs --sequential vitest run --coverage --config ../../vitest.coverage.config.ts`,
+used to attribute rows to packages unambiguously), `bun run test:suites`, and
 `npx playwright test --list`. Every number below comes from one of those runs;
 nothing is copied from an earlier report.
 
@@ -27,8 +27,8 @@ nothing is copied from an earlier report.
 Testing follows the §92 taxonomy, split across four runners:
 
 1. **Per-package unit tests, colocated** (`packages/<name>/tests/`, §92) —
-   `pnpm test` runs each package's own `vitest run` with no instrumentation.
-   The coverage gate is a _separate_ command: `pnpm run coverage` runs every
+   `bun run test` runs each package's own `vitest run` with no instrumentation.
+   The coverage gate is a _separate_ command: `bun run coverage` runs every
    package against the shared
    [`vitest.coverage.config.ts`](../../vitest.coverage.config.ts), which sets
    `thresholds: { lines: 95, statements: 95, functions: 95, branches: 95 }`
@@ -37,11 +37,11 @@ Testing follows the §92 taxonomy, split across four runners:
    The config emits the text reporter only (the HTML/JSON reporters would
    land un-eslint-ignored artifacts in `packages/*/coverage/`).
 2. **Cross-package suites** (`tests/integration/`, `tests/determinism/`) —
-   `pnpm run test:suites` via `vitest.suites.config.ts`. Integration proves
+   `bun run test:suites` via `vitest.suites.config.ts`. Integration proves
    the packages compose (scene+physics round trips, joints, blending, replay,
    live Rapier); determinism proves runs reproduce (see
    [the golden mechanism](#the-determinism-golden-mechanism)).
-3. **Browser gates** (`tests/browser/`) — `pnpm test:browser` runs Playwright
+3. **Browser gates** (`tests/browser/`) — `bun run test:browser` runs Playwright
    against Chromium with ANGLE/SwiftShader pinned, one `webServer` per built
    example app (6 servers: first-2d-scene, physics-playground, mechanism,
    blending, particles-demo, ui-demo). These assert _behavior and readback_
@@ -56,9 +56,9 @@ Testing follows the §92 taxonomy, split across four runners:
 Performance tests live in [`benchmarks/`](../../benchmarks/README.md) and are
 **recorded measurements, not gates** — every committed
 `benchmarks/results/*.json` opens with a `_note` saying exactly that.
-Adjacent non-test CI gates (for completeness): `pnpm lint`, `pnpm graph:check`
-(no `node:` builtin may reach a browser-facing entry), `pnpm graph:duplicates`,
-`pnpm check-spec`, and `pnpm run size` (§86: `first-2d-scene` ≤ 150 kB gzip,
+Adjacent non-test CI gates (for completeness): `bun run lint`, `bun run graph:check`
+(no `node:` builtin may reach a browser-facing entry), `bun run graph:duplicates`,
+`bun run check-spec`, and `bun run size` (§86: `first-2d-scene` ≤ 150 kB gzip,
 `particles-demo` ≤ 25 kB, `ui-demo` ≤ 30 kB, per `.size-limit.json`).
 
 ---
@@ -66,7 +66,7 @@ Adjacent non-test CI gates (for completeness): `pnpm lint`, `pnpm graph:check`
 ## Per-package coverage (measured 2026-08-05)
 
 Each row is the `All files` line of that package's v8 coverage report from
-the sequential `pnpm run coverage` variant above; `Tests` is the package's
+the sequential `bun run coverage` variant above; `Tests` is the package's
 `Tests N passed` count from the same run. All 24 packages clear the ≥ 95%
 gate on all four metrics.
 
@@ -113,7 +113,7 @@ of 24 packages.
 
 ## Cross-package suites (174 tests, 15 files)
 
-From `pnpm run test:suites` — `Test Files 15 passed (15)`,
+From `bun run test:suites` — `Test Files 15 passed (15)`,
 `Tests 174 passed (174)`, all green in 7.8 s.
 
 **`tests/integration/`** (7 files): `examples-build-coverage`,
@@ -204,7 +204,7 @@ All numbers in this document were produced on 2026-08-05 by:
 
 ```sh
 pnpm run coverage            # per-package unit tests + v8 coverage, ≥95% gate
-pnpm -r --workspace-concurrency=1 --filter "./packages/*" \
+bun tools/run-in-packages.mjs --sequential \
   exec vitest run --coverage --config ../../vitest.coverage.config.ts
                              # same gate, serialized, for unambiguous row→package mapping
 pnpm run test:suites         # tests/{integration,determinism}: 174 passed (15 files)
