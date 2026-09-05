@@ -14,23 +14,23 @@ guide points at one of them without the marker.
 
 - [`first-2d-scene/`](first-2d-scene/) — **Implemented.** First 2D scene (§93) grown into
   the interactive demo: shapes, motion, picking, dragging, text, animation
-  (`pnpm run example:build`).
+  (`bun run example:build`).
 - [`blending/`](blending/) — **Implemented.** The §110 Phase 7 demonstration: an articulated
   chain cycling between animated, ragdoll and blended-recovery control on a click — pose
   targets, §19 weights, velocity inheritance, live continuity measurement
-  (`pnpm run blending:build`).
+  (`bun run blending:build`).
 - [`particles-demo/`](particles-demo/) — **Implemented.** The §112 Phase 9 demonstration: a
   seeded CPU particle fountain under §27 force fields (gravity, drag, vortex), bouncing off a
   §36 collision plane, plus a click burst — each system drawn as one instanced draw call
-  (`pnpm run particles-demo:build`). Non-wasm and ~19 kB gzip; the 100 000-particle half of
+  (`bun run particles-demo:build`). Non-wasm and ~19 kB gzip; the 100 000-particle half of
   §112 is measured headlessly by `benchmarks/particles-100k.mjs`.
 - [`mechanism/`](mechanism/) — **Implemented.** The §109 Phase 6 demonstration: a
   motor-driven slider–crank — rotating shaft, hinges, limited slider, spring buffer,
   limit-switch lamps, click-to-coast motor with speed controls
-  (`pnpm run mechanism:build`).
+  (`bun run mechanism:build`).
 - [`physics-playground/`](physics-playground/) — **Implemented.** The §108 Phase 5 exit
   demonstration: a 2D world and a 3D world stepping side by side through one API —
-  gravity, collisions, click impulses, sensor zones (`pnpm run playground:build`).
+  gravity, collisions, click impulses, sensor zones (`bun run playground:build`).
   Since 2026-08-29 it is also the worked example of §39's steps 8 and 9: dispatch split
   to `PhysicsEventSystem` at 900 (PH-21), with a `ZoneTallySystem` at
   `PRIORITY_SENSOR_UPDATE` (800) re-measuring each zone through a §30 overlap query that
@@ -39,14 +39,14 @@ guide points at one of them without the marker.
   owner retires it).
 - [`ui-demo/`](ui-demo/) — **Implemented.** §73–§75's retained-mode UI: a `@four/ui` panel of
   buttons and labels laid out by the package and skinned by the application, driven by real
-  pointer and keyboard input, with a drawn focus ring (`pnpm run ui-demo:build`). Listed
+  pointer and keyboard input, with a drawn focus ring (`bun run ui-demo:build`). Listed
   here from 2026-08-05; it shipped earlier and this file had never mentioned it.
 - [`first-3d-scene/`](first-3d-scene/) — **Implemented (2026-08-07).** §93's first 3D
   scene, and the first example of any kind to use a `PerspectiveCamera`: two identical
   spheres at different depths (the projection measured in pixels, not asserted by class
   name), a tumbling torus, a bobbing capsule and a ground plane, all `LitMaterial` under one
   `DirectionalLight` plus scene ambient (§47, §53, §57, §68).
-  Build it with `pnpm run first-3d-scene:build`; it is non-wasm and ~23 kB gzip.
+  Build it with `bun run first-3d-scene:build`; it is non-wasm and ~23 kB gzip.
   This entry read "**not yet written; directory is a placeholder** … the one placeholder
   with no stand-in" until that date.
 - [`character-controller/`](character-controller/) — **Implemented (2026-08-29).** The
@@ -56,7 +56,7 @@ guide points at one of them without the marker.
   `FirstPersonLook` on a child eye node (§44's yaw ∘ pitch decomposition, mouse-drag and
   arrow-key look) and a plane-tier `CharacterController` patrolling a circle with no
   physics body at all, all under the §39 input → kinematics → solve ordering. Build it
-  with `pnpm run character:build`; it carries **one** Rapier wasm image (a
+  with `bun run character:build`; it carries **one** Rapier wasm image (a
   directly-constructed `Rapier3dAdapter`) and is ~0.90 MB gzip.
 - [`first-animated-scene/`](first-animated-scene/) — **Not yet written; directory is a
   placeholder.** Planned as §93's first animated scene: tweens and a timeline. Animation
@@ -78,7 +78,7 @@ guide points at one of them without the marker.
   and pause / slow-motion / single-step controls that are keyboard-operable. It is also the first example to select its backend _and_ its solver
   through the §62/§37 registries (`renderer: "auto"`, `solver: "auto"`), and the first to
   assemble the §113 debug overlay from `@four/diagnostics` streams.
-  Build it with `pnpm run flagship:build`; it carries **both** Rapier wasm images (the cost
+  Build it with `bun run flagship:build`; it carries **both** Rapier wasm images (the cost
   of `registerRapierSolver()`, measured) and is ~1.54 MB gzip. This entry read "**not yet
   written; directory is a placeholder**" until that date.
 - [`flagship/motor-digital-twin/`](flagship/motor-digital-twin/) —
@@ -93,6 +93,6 @@ guide points at one of them without the marker.
   It is the first example to read §84's `app.stats`, the first to use §40's unit-conversion
   helpers (RPM, degrees, millimetres, milliseconds at the display edge only), and the only
   one built in **development** mode, because §84's statistics path is gated on
-  `__FOUR_DEV__` (A-4). Build it with `pnpm run twin:build`; it carries **one** Rapier wasm
+  `__FOUR_DEV__` (A-4). Build it with `bun run twin:build`; it carries **one** Rapier wasm
   image (a directly-constructed `Rapier3dAdapter`) and is ~0.93 MB gzip. This entry read
   "**not yet written; directory is a placeholder**" until that date.

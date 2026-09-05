@@ -21,7 +21,7 @@ readable; never delete the pointer itself.
   (amendments table at its top; § numbering 1–120 frozen, lettered sections for insertions).
   `docs/archive/four-js-specification.pdf` is the unmodified original, frozen at the pre-1.0
   text, and still contains the old duplicate numbering — translate its references via the map
-  in `docs/ERRATA.md`. Run `node tools/check-spec.mjs` after any spec edit.
+  in `docs/ERRATA.md`. Run `bun tools/check-spec.mjs` after any spec edit.
 - Plain "§N" citations mean `SPECIFICATION.md` numbering. Cite the PDF explicitly when meant
   ("PDF §49, second range").
 - All 24 packages under `packages/` are `@four/`-scoped; `four` is the umbrella package.
@@ -29,6 +29,55 @@ readable; never delete the pointer itself.
   above `render-*` backends; the logical scene never depends on a concrete backend.
 
 ## Decisions
+
+- **2026-09-05 — repository configuration was three-quarters broken, and none of it showed in
+  the tree.** `Docs` had failed on every run because **Pages was never enabled**, while the
+  workflow existed solely to deploy to it. `Release` had failed because **Actions were not
+  permitted to create pull requests**, so the changesets flow could never open a version PR —
+  which is why 24 packages sat at `0.0.0` with the workflow itself warning that
+  `changeset version` had to run first. **Dependabot security updates were `disabled` and there
+  was no `.github/dependabot.yml` at all**, while vulnerability alerts were on: problems were
+  detected and nothing remediated them.
+  Lesson worth keeping: **a repo can be green in CI and still be broken everywhere CI does not
+  look.** Three of these were repository *settings*, invisible to any check that reads the
+  working tree, and each had been failing quietly for weeks. When a workflow fails on a step it
+  does not own (`Configure Pages`, `Create version pull request`), suspect a setting before
+  suspecting the code.
+  Dependabot uses the **npm** ecosystem deliberately, not bun: its bun parser handles only
+  `bun.lock` lockfileVersion 1 and this repo writes 2, so a bun ecosystem fails every run while
+  leaving "0 open PRs" looking like health. Diagnosed three times elsewhere in the workspace
+  (deepthinking-mcp `524ada7f`, fzf-mcp `387ee494`, MathTS `c0dd0d12`) before it was written down.
+
+- **2026-09-05 — TypeScript-on-Bun toolchain (RFC 0006).** The workspace package
+  manager and script runner is Bun (≥ 1.2). `package.json` declares
+  `"workspaces": ["packages/*"]`; committed lockfile is text `bun.lock`;
+  `bunfig.toml` sets `saveTextLockfile` / `exact`. CI uses `oven-sh/setup-bun`
+  and `bun install --frozen-lockfile`. Library emit stays `tsc -b` (composite
+  project references); unit/suite tests stay on Vitest for this landing
+  (`bun:test` is staged). Spec revision **1.14** updates §91 and §103.
+  Supersedes the pnpm-10 + `pnpm -r` orchestration decision (itself the
+  2026-08-03 replacement for Turborepo). Node remains available for Playwright
+  browser install and the two `node --test` tool suites. Fresh-process
+  determinism helpers now pass `--experimental-strip-types` explicitly so
+  Node < 22.18 (and local 22.14 sandboxes) can import the `.ts` scenario
+  files; CI pins Node 22.22. The `examples:build` coverage test accepts
+  `bun run <script>` chains.
+
+- **2026-09-04 — geometry cache: reuse objects, not in-flight storage.**
+  Supersedes the WebGL dirty-version delete/recreate policy recorded earlier.
+  `bufferData` replaces each data store while retaining buffer handles and the
+  VAO's fixed layout. Rebuilding is needed for attribute/index presence changes,
+  not array length, primitive mode or index width. The version still invalidates
+  all streams; reference equality does not prove an array was not edited in place.
+  Keep the element buffer write inside its VAO and unbind the VAO before clearing
+  ARRAY_BUFFER. Disposed caches must not resurrect. A typed optional-stream
+  table owns allocation/cleanup; a private layout mask and unrolled shared
+  writer avoid dynamic-key loops on dirty updates. No WebGPU change:
+  queued writes and deferred command submission need a separate lifetime review.
+  Counting-seam timings are not driver/GPU timing. The committed benchmark names
+  baseline `6a22580`; call counts/bytes are primary, browser pixels are separate.
+  Local Node 22.16 needs `NODE_OPTIONS=--experimental-strip-types` for existing
+  fresh-process determinism helpers; newer Node 22 CI enables stripping by default.
 
 - **2026-08-30 — unblocked-defect sanitization.** Lessons:
   - **A constructor that filters `RenderableOptions` is a serializer bug

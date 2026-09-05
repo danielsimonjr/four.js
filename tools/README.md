@@ -1,14 +1,11 @@
 # Tools
 
 Repository tooling (build scripts, code generation, release/CI helpers) supporting the
-toolchain baseline of §91: pnpm workspace, Vitest, Playwright, ESLint, Prettier, TypeDoc,
-Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
+toolchain baseline of §91 (revision 1.14 / RFC 0006): Bun workspace, Vitest, Playwright,
+ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
 
-> §91 also lists **Turborepo**, but this repo no longer uses it. `turbo run build` was
-> replaced by `pnpm -r --workspace-concurrency=4 run build` on 2026-08-03 after `turbo.exe`
-> terminated a critical system process and bugchecked the build machine. pnpm's default
-> recursive walk is already topological over `workspace:*` deps, so ordering is preserved;
-> what was lost is turbo's cache. See `CHANGELOG.md`.
+> Task orchestration is `bun run --filter './packages/*'` (sequential for `build`,
+> parallel for `test`). Library emit remains `tsc -b`. See RFC 0006 and `CHANGELOG.md`.
 
 ## Available now
 
@@ -18,7 +15,7 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   (`MotionAuthority`, `syncToScene`, positive-Y 2D gravity, …). Run after any spec edit:
 
   ```sh
-  pnpm check-spec
+  bun run check-spec
   ```
 
 - `check-docs.mjs` — doc-truth CI gate (added 2026-08-05): pins mechanically-checkable
@@ -27,7 +24,7 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   a stale copy-paste fails in CI instead of shipping.
 
   ```sh
-  pnpm check-docs
+  bun run check-docs
   ```
 
 - `generate-compatibility.mjs` — §90 compatibility-table generator (added 2026-08-07, gap
@@ -39,21 +36,21 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   tool edit.
 
   ```sh
-  pnpm check-compat                # CI gate — fails if the committed doc drifted
+  bun run check-compat                # CI gate — fails if the committed doc drifted
   node tools/generate-compatibility.mjs   # regenerate in place after an adapter change
   ```
 
 - `apply-publish-names.mjs` — §98 publish-name mapping (added 2026-08-07, gap A-25).
   Rewrites `@four/x` → `@danielsimonjr/fourjs-x` (and `four` → `@danielsimonjr/fourjs`)
   into a **staging copy**, never in place: package manifests, `workspace:*` ranges
-  (resolved the way pnpm would), and quoted workspace specifiers in emitted `.js`/`.d.ts`
+  (resolved the way the workspace protocol publishes), and quoted workspace specifiers in emitted `.js`/`.d.ts`
   (tsc writes workspace names straight through, so manifests alone would publish 24
   mutually-unresolvable packages). Check mode by default; `--out=<dir>` stages.
 
   ```sh
-  pnpm publish-names               # check mode: verify the mapping, write nothing
-  pnpm publish-names:test          # its own node --test suite
-  pnpm release:publish             # staging + npm publish loop (owner-gated; see
+  bun run publish-names               # check mode: verify the mapping, write nothing
+  bun run publish-names:test          # its own node --test suite
+  bun run release:publish             # staging + npm publish loop (owner-gated; see
                                    # .changeset/README.md)
   ```
 
@@ -63,17 +60,17 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   changes, not on every edit.
 
   ```sh
-  pnpm graph
+  bun run graph
   ```
 
   CDG's directory also carries the **duplicate-symbol gate**:
 
   ```sh
-  pnpm graph:duplicates            # CI gate — fails on NEW TRUE_DUPLICATE names
+  bun run graph:duplicates            # CI gate — fails on NEW TRUE_DUPLICATE names
   ```
 
   `check-duplicates.mjs` reads `docs/Architecture/duplicate-symbols.json` (fresh after
-  `pnpm graph`; the script's `--no-regen` flag skips its own re-parse) and fails if any
+  `bun run graph`; the script's `--no-regen` flag skips its own re-parse) and fails if any
   `TRUE_DUPLICATE` name exists beyond `docs/Architecture/duplicate-baseline.json` — the
   accepted, shrinking consolidation backlog (seeded 2026-08-04: `cloneJsonValue`,
   `DEFAULT_GRAVITY_Y`, `SeededRandom`, `ColorRGBA`, `JsonValue`). Legitimately-independent
@@ -91,9 +88,9 @@ Vite, Changesets (choices recorded in `MEMORY.md`, 2026-07-29).
   `node-safety.json`.
 
   ```sh
-  pnpm graph:query                 # emit derived artifacts
-  pnpm graph:check                 # CI gate — see below
-  pnpm graph:test                  # QDG's own unit tests
+  bun run graph:query                 # emit derived artifacts
+  bun run graph:check                 # CI gate — see below
+  bun run graph:test                  # QDG's own unit tests
 
   node tools/query-dependency-graph/query-dependency-graph.mjs cycles
   node tools/query-dependency-graph/query-dependency-graph.mjs dependents <file>
@@ -112,13 +109,11 @@ existing mess.
 
 ### Origin
 
-CDG and QDG were written for MathTS and are vendored here rather than published. One
-upstream change was required for four.js: CDG discovered workspaces only from
-`package.json`'s `workspaces` field, which pnpm does not use, so a pnpm repo looked like a
-single package and the scan found zero files. `readWorkspacePatterns()` now also reads
-`pnpm-workspace.yaml`'s `packages:` list (and yarn's `{ packages: [...] }` object form),
-dropping pnpm's negated globs rather than treating them as literal directory names. Keep
-this copy in sync with `llm-wiki/tools/`, which carries the same fix.
+CDG and QDG were written for MathTS and are vendored here rather than published. Workspace
+discovery reads `package.json`'s `workspaces` field (array form or `{ packages: [...] }`),
+which is what Bun uses (RFC 0006). Negated globs are dropped rather than treated as literal
+directory names. Keep this copy in sync with `llm-wiki/tools/` when that tree carries the
+same fix.
 
 The byte-identity rule covers the tool **code** only. `duplicate-allowlist.json` is
 per-repo _data_ (it ships with MathTS's entries, which are inert here because their file

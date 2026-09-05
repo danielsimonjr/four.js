@@ -15,11 +15,11 @@ and performance records in `benchmarks/`. Four packages are deliberate reserved 
 left the stub list 2026-08-21…29 (the R-1 plan, WP-R1.1–R1.9 — a full second GPU
 backend).
 
-Toolchain (§91, pins in plan §3.2): strict TypeScript, ESM with `.js` import suffixes, pnpm
-workspace (`pnpm -r` replaced Turborepo 2026-08-03), Vitest, Playwright, ESLint, Prettier,
-Vite, TypeDoc, Changesets. Common commands: `pnpm build`, `pnpm test`, `pnpm test:suites`,
-`pnpm test:browser`, `pnpm lint`, `pnpm run coverage`, `pnpm run docs` (always with `run`),
-`pnpm graph` + `graph:check`/`graph:duplicates`, `pnpm check-spec`, `pnpm run size`.
+Toolchain (§91, RFC 0006): strict TypeScript, ESM with `.js` import suffixes, Bun
+workspace, Vitest, Playwright, ESLint, Prettier, Vite, TypeDoc, Changesets. Common
+commands: `bun run build`, `bun run test`, `bun run test:suites`,
+`bun run test:browser`, `bun run lint`, `bun run coverage`, `bun run docs` (always with `run`),
+`bun run graph` + `graph:check`/`graph:duplicates`, `bun run check-spec`, `bun run size`.
 Architecture orientation lives in `docs/Architecture/` (OVERVIEW, ARCHITECTURE, COMPONENTS,
 DATAFLOW, API, TEST_COVERAGE + the generated dependency-graph reports).
 
@@ -44,7 +44,7 @@ and add substantive changes to `CHANGELOG.md`.
   numbers 45–67 assigned twice) and predates all revisions — when reading the PDF,
   translate references via the numbering map in `docs/ERRATA.md` (PDF second-range §45–67 =
   Markdown §98–120). Do not edit the PDF.
-- Run `node tools/check-spec.mjs` after editing the spec — it verifies section sequence,
+- Run `bun tools/check-spec.mjs` (or `bun run check-spec`) after editing the spec — it verifies section sequence,
   fence balance, TOC anchors, and the absence of banned pre-revision terms.
 - ERRATA E-3 (resolved): the scaffold deliberately contains only `physics-rapier`,
   `physics-box2d`, and `physics-soft`, matching §102 (Solver Packages). Do **not** add

@@ -10,7 +10,7 @@ dashboards, digital twins), and API documentation generated from TypeScript decl
 `index.html` here, plus `.github/workflows/docs.yml`, which on every push to `main` builds
 and deploys to GitHub Pages:
 
-- **the API reference** — TypeDoc output for all 24 packages (`pnpm run docs`), at `/api/`;
+- **the API reference** — TypeDoc output for all 24 packages (`bun run docs`), at `/api/`;
 - **the eight runnable examples** (six until 2026-08-07, when `first-3d-scene` and then
   the §118 flagship were written) — `first-2d-scene`, `first-3d-scene`,
   `physics-playground`, `mechanism`, `blending`, `particles-demo`, `ui-demo`,

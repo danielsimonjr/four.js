@@ -45,43 +45,40 @@ jobs:
     steps:
       # Changesets compares against `baseBranch`, so it needs real history.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10.33.0
+          bun-version: 1.4.2
 
       # `registry-url` is what makes setup-node write an ~/.npmrc that reads
-      # NODE_AUTH_TOKEN; without it `npm publish` has no credentials.
+      # NODE_AUTH_TOKEN; without it `npm publish` has no credentials. Node stays
+      # for the publish loop and `node --test` publish-names suite (RFC 0006).
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
-          cache: pnpm
+          node-version: "22.22"
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       # The staging copy publishes each package's `files` entries, which for
       # every package here means `dist`. Nothing is publishable unbuilt.
       - name: Build
-        run: pnpm build
+        run: bun run build
 
       # Fails the release before anything is versioned if the §98 mapping cannot
       # be applied cleanly — an unmapped package name, a lost subpath export, a
       # `workspace:` range that would reach npm unresolved.
-      # `pnpm run <script>` everywhere below: a bare `pnpm <name>` can collide
-      # with a pnpm builtin (this repository already has that gotcha with
-      # `pnpm docs`), and `publish` is one of pnpm's own commands.
       - name: Check the publish-name mapping
-        run: pnpm run publish-names
+        run: bun run publish-names
 
       - name: Test the publish-name mapping
-        run: pnpm run publish-names:test
+        run: bun run publish-names:test
 
       # `secrets` cannot be read from a step-level `if`, so the presence of the
       # token becomes a step output. The token value itself is never printed.
@@ -105,12 +102,12 @@ jobs:
       # creates no GitHub releases. If those are wanted, add a `changeset tag`
       # step after this one — deliberately left out rather than shipped untested.
       - name: Create version pull request, and publish when enabled
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          version: pnpm run release:version
+          version: bun run release:version
           # An empty `publish` means "do not publish" to the action, so this
           # expression is the whole owner gate.
-          publish: ${{ steps.npm.outputs.configured == 'true' && 'pnpm run release:publish' || '' }}
+          publish: ${{ steps.npm.outputs.configured == 'true' && 'bun run release:publish' || '' }}
           title: "Release: version packages"
           commit: "chore: version packages"
         env:

@@ -10,7 +10,7 @@
 > defects. See [ERRATA.md](ERRATA.md) for the correction log and the old-to-new
 > numbering map.
 
-**Specification revision 1.13 — 2026-08-30**
+**Specification revision 1.14 — 2026-09-05**
 
 | Revision | Date | Summary |
 |---|---|---|
@@ -28,6 +28,7 @@
 | 1.11 | 2026-08-28 | RFC 0001 (shader and node-material system) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted; gap `R-14` implemented. **§57**: `ShaderMaterial`'s provisional withdrawal (revision 1.8) becomes **permanent** — the row is retained so the name stays reserved and cannot be implemented by inference, and a source-string material is never implemented (Q1's disposition: a raw GLSL/WGSL payload re-opens §96's "no arbitrary code execution from scene files" and makes §63's resource checks unable to see what a pass samples). **§60** gains the normative narrowing the owner-decision register's row 3 asked for: the backend-independent shader model is a **serializable graph of closed operators** — no user shader source at any tier — with the shipped/deferred split of §60's feature list recorded (the node graph, uniforms, textures and samplers, the four fixed vertex attributes, reflection metadata and GLSL ES 3.00 generation ship; WGSL generation follows the WebGPU backend; uniform blocks, reusable functions, conditional variants, storage buffers and source maps are deferred with RFC 0001 §6's recorded reasons; node materials are unlit at this tier, sequenced R-14 → R-17 → R-13), and §60's example is rewritten against the shipped authoring surface (`NodeMaterialBuilder`, §97a's namespace spelling) per revision 1.7's example-compilation discipline. Uniform ownership is per material (Q3); a displacing graph on a collider-carrying node raises no §85 warning (Q4 — a vertex displacement is not a transform, §42). Frozen §1–120 numbering untouched: every change is in-place text in an existing section. |
 | 1.12 | 2026-08-29 | RFC 0004 (2D raster painting stack) accepted by the owner 2026-08-21, with the recommended disposition of every flagged question adopted (tier (b) — the seam tier; unlike RFCs 0001–0003 it closes no filed gap: the owner asked for it, and the analysis records that plainly). New **§77a** "Raster Painting and Dynamic Textures": a structural, DOM-free raster source contract feeding §77's texture system through the existing id/version upload path (no backend change, no new duck-typed contract), with explicit application-driven dirty tracking; the §7a row-order rule written once in the engine (`"top-left"` sources are flipped during the read); an sRGB colour-space default deliberately unlike the texture system's linear one, with the reason recorded at both (Q3's disposition); the §33 rule that painted pixels are display content and never simulation input — no §79 representation, no §34 replay content, mechanically enforced in the pattern §40's display-only rule established; the §96 finite size limit (64 MiB default) and the statement that a paint hook is a value, never loaded content; and the constant-size rule, with in-place resize refused (`INVALID_APPLICATION_STATE`) and explicitly gated on §77 change notification, `R-30` (Q5's disposition). **§73** records the canvas view as a **skin-drawn** control requiring no drawing API in the UI package (the widget ships independently of the render tier, Q4's disposition), correcting the implementation's staging note that said otherwise. §62's Canvas 2D backend is explicitly a separate concern and remains an unchanged reserved stub. Frozen §1–120 numbering respected: the new section takes a letter suffix (Q2's disposition — §77 over §55/§58/§62), added to `ALLOWED_LETTERED` in `tools/check-spec.mjs`. |
 | 1.13 | 2026-08-30 | Honesty pass over §89's example-code list: the shipped `FourErrorCode` union had grown `INVALID_APPLICATION_STATE`, `UNTRUSTED_INPUT_REJECTED`, `NOT_IMPLEMENTED`, and (this revision) `INVALID_RENDER_GRAPH` without the spec's example list following. The list is examples, not a closed set, but a host matching on the documented names should see every code the engine currently throws. Header revision number was lagging at 1.11 while the table already carried 1.12. Frozen §1–120 numbering untouched. |
+| 1.14 | 2026-09-05 | RFC 0006 (TypeScript-on-Bun toolchain) accepted: §91 recommended baseline replaces "pnpm workspace" and "Turborepo or Nx" with a **Bun workspace** (package manager + script runner); Vitest, Playwright, ESLint, Prettier, TypeDoc, Vite, Changesets, and GitHub Actions stay. Library emit remains `tsc -b` with composite project references — Bun does not replace the TypeScript compiler for published `dist`. §103 Phase 0 deliverables list `bun.lock` / `bunfig.toml` instead of `pnpm-workspace.yaml`. Frozen §1–120 numbering untouched. |
 
 ---
 
@@ -2796,9 +2797,8 @@ The project should publish compatibility tables for:
 Recommended baseline:
 - strict TypeScript;
 - ESM;
-- pnpm workspace;
-- Turborepo or Nx;
-- Vitest;
+- Bun workspace (package manager and script runner);
+- Vitest (unit and cross-package suites; `bun:test` is a staged alternative);
 - Playwright;
 - ESLint;
 - Prettier;
@@ -3296,7 +3296,8 @@ SPECIFICATION.md
 IMPLEMENTATION_PLAN.md
 ROADMAP.md
 package.json
-pnpm-workspace.yaml
+bun.lock
+bunfig.toml
 tsconfig.base.json
 eslint.config.js
 .github/workflows/ci.yml

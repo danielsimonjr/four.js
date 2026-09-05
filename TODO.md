@@ -6,6 +6,24 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **Repository configuration repaired 2026-09-05.** Pages enabled (`build_type: workflow`) —
+      `Docs` green and the site serves HTTP 200 at https://danielsimonjr.github.io/four.js/;
+      Actions permitted to create PRs (`default_workflow_permissions` left at **read**) — `Release`
+      green and its version PR (#55) merged; Dependabot security updates enabled and
+      `.github/dependabot.yml` added (npm ecosystem, not bun). All four workflows green on `main`.
+- [x] **PR #54 closed as fully superseded** — zero code delta against `main`; 0 of 104 CHANGELOG and
+      0 of 117 MEMORY entries were absent from `main`. Evidence recorded on the PR.
+- [ ] **Dependabot bumps will need manual `bun.lock` regeneration.** Dependabot cannot write
+      `bun.lock`, and CI runs `bun install --frozen-lockfile`, so any bump whose resolution changes
+      will fail until the lockfile is regenerated on the branch — and a human push costs that PR
+      its automerge. Same tax as math-mcp #103. Needs a pipeline answer, not a per-PR fix.
+
+- [x] **RFC 0006 TypeScript-on-Bun toolchain — DONE 2026-09-05.** Bun is the
+      workspace package manager/script runner; `bun.lock` + `bunfig.toml`;
+      Vitest/`tsc -b` retained; spec revision 1.14. Follow-up (not scheduled):
+      optional migration of unit suites to `bun:test` once coverage parity is
+      proven.
+
 - [ ] **The implementation plan is COMPLETE (2026-08-02).** All 13 phase sections
       (§103–§113a) built, tested, verified. What remains is post-plan work, in the
       verifier's priority order:
@@ -940,6 +958,15 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- **2026-09-05 — RFC 0006 TypeScript-on-Bun toolchain.** Bun workspace; spec 1.14; Vitest/`tsc -b` retained.
+
+- [x] 2026-09-04 — **WebGL geometry-buffer reuse** (§53, §64, §83).
+      Preserve handles for unchanged layouts, keep full data-store replacement,
+      reject acquisition after disposal, and centralize attribute setup/cleanup.
+      Add 76 unit regressions, two browser pixel comparisons and a registered
+      benchmark. Public API and size limits unchanged; WebGPU lifetime handling
+      and hardware frame-time profiling are outside this patch.
 
 - [x] 2026-08-30 — **Unblocked-defect sanitization.** Sprite §79 flags via
       `SpriteOptions extends RenderableOptions`; `INVALID_RENDER_GRAPH` + §89

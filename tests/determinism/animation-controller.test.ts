@@ -111,7 +111,7 @@ function runScenarioInChildProcess(): ControllerScenarioResult {
 
   const child = spawnSync(
     process.execPath,
-    ["--input-type=module", "-e", source],
+    ["--experimental-strip-types", "--input-type=module", "-e", source],
     {
       cwd: REPO_ROOT,
       encoding: "utf8",
