@@ -29,6 +29,12 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 - `docs/rfcs/0006-typescript-on-bun.md` (accepted).
 
+#### Fixed
+
+- `examples-build-coverage` matches `bun run <script>` chains (was hard-coded to
+  `pnpm`). Determinism fresh-process spawns pass `--experimental-strip-types`
+  so Node < 22.18 can load `.ts` scenario helpers; CI pins Node 22.22.
+
 ### 2026-09-04 — WebGL geometry-buffer reuse
 
 #### Changed

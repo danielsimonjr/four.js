@@ -39,7 +39,11 @@ readable; never delete the pointer itself.
   (`bun:test` is staged). Spec revision **1.14** updates §91 and §103.
   Supersedes the pnpm-10 + `pnpm -r` orchestration decision (itself the
   2026-08-03 replacement for Turborepo). Node remains available for Playwright
-  browser install and the two `node --test` tool suites.
+  browser install and the two `node --test` tool suites. Fresh-process
+  determinism helpers now pass `--experimental-strip-types` explicitly so
+  Node < 22.18 (and local 22.14 sandboxes) can import the `.ts` scenario
+  files; CI pins Node 22.22. The `examples:build` coverage test accepts
+  `bun run <script>` chains.
 
 - **2026-09-04 — geometry cache: reuse objects, not in-flight storage.**
   Supersedes the WebGL dirty-version delete/recreate policy recorded earlier.
