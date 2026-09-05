@@ -30,6 +30,24 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-05 — repository configuration was three-quarters broken, and none of it showed in
+  the tree.** `Docs` had failed on every run because **Pages was never enabled**, while the
+  workflow existed solely to deploy to it. `Release` had failed because **Actions were not
+  permitted to create pull requests**, so the changesets flow could never open a version PR —
+  which is why 24 packages sat at `0.0.0` with the workflow itself warning that
+  `changeset version` had to run first. **Dependabot security updates were `disabled` and there
+  was no `.github/dependabot.yml` at all**, while vulnerability alerts were on: problems were
+  detected and nothing remediated them.
+  Lesson worth keeping: **a repo can be green in CI and still be broken everywhere CI does not
+  look.** Three of these were repository *settings*, invisible to any check that reads the
+  working tree, and each had been failing quietly for weeks. When a workflow fails on a step it
+  does not own (`Configure Pages`, `Create version pull request`), suspect a setting before
+  suspecting the code.
+  Dependabot uses the **npm** ecosystem deliberately, not bun: its bun parser handles only
+  `bun.lock` lockfileVersion 1 and this repo writes 2, so a bun ecosystem fails every run while
+  leaving "0 open PRs" looking like health. Diagnosed three times elsewhere in the workspace
+  (deepthinking-mcp `524ada7f`, fzf-mcp `387ee494`, MathTS `c0dd0d12`) before it was written down.
+
 - **2026-09-05 — TypeScript-on-Bun toolchain (RFC 0006).** The workspace package
   manager and script runner is Bun (≥ 1.2). `package.json` declares
   `"workspaces": ["packages/*"]`; committed lockfile is text `bun.lock`;
