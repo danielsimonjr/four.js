@@ -79,7 +79,7 @@
     },
     "packages/four": {
       "name": "four",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/animation": "workspace:*",
         "@four/assets": "workspace:*",
@@ -174,8 +174,8 @@
       "name": "@four/physics-rapier",
       "version": "0.0.0",
       "dependencies": {
-        "@dimforge/rapier2d-compat": "0.19.3",
-        "@dimforge/rapier3d-compat": "0.19.3",
+        "@dimforge/rapier2d-compat": "0.20.0",
+        "@dimforge/rapier3d-compat": "0.20.0",
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
         "@four/physics": "workspace:*",
@@ -219,7 +219,7 @@
     },
     "packages/render-webgl": {
       "name": "@four/render-webgl",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "dependencies": {
         "@four/core": "workspace:*",
         "@four/math": "workspace:*",
@@ -322,9 +322,9 @@
 
     "@changesets/write": ["@changesets/write@0.4.0", "", { "dependencies": { "@changesets/types": "^6.1.0", "fs-extra": "^7.0.1", "human-id": "^4.1.1", "prettier": "^2.7.1" } }, "sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q=="],
 
-    "@dimforge/rapier2d-compat": ["@dimforge/rapier2d-compat@0.19.3", "", {}, "sha512-5HZUgiSpu9Uba3He+4SCPVte3h2vgxcodkxWThRjd3X/zgq/Z4OyRUKpNEOsOR6AC+OfulPkkZ5asZGzRMpcwA=="],
+    "@dimforge/rapier2d-compat": ["@dimforge/rapier2d-compat@0.20.0", "", {}, "sha512-FFYwGrfJov7d5kn4fxblG/ip5C+sYQL+Jl/hqLvDvu4BcMD/Mhrz7cTvnZTtuIRDXY8CLuraObqB/prip4wdWQ=="],
 
-    "@dimforge/rapier3d-compat": ["@dimforge/rapier3d-compat@0.19.3", "", {}, "sha512-mMVdSj1PRTT108s9Swbu2GQOmHbn8kbJANRV5xfczL3s0T4vkgZAuoMRgvBzQcHanpKusbC0ZJj6z3mC3aj3vg=="],
+    "@dimforge/rapier3d-compat": ["@dimforge/rapier3d-compat@0.20.0", "", {}, "sha512-X4W9pJBdGRX5CO3c/gUNjBFEFG2fn4nYxp9k8STdBDaLa0/w5XTW2ArpayS+9jGFojTi3uFSOWAElCd4rkpekA=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.1", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ=="],
 
