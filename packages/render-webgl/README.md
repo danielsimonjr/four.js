@@ -17,3 +17,17 @@ Implements §62 backend 2 of [`docs/SPECIFICATION.md`](../../docs/SPECIFICATION.
 Unit tests are colocated in `tests/` per §92.
 
 Workspace name `@four/render-webgl`; publishes as `@danielsimonjr/fourjs-render-webgl`.
+
+## Dynamic geometry updates
+
+A version bump with unchanged attribute/index presence retains the geometry's
+VAO and buffer objects. Every stream still receives a full `bufferData` upload;
+array resizing, primitive mode changes and 16/32-bit index changes do not need
+new handles. Adding/removing a stream rebuilds the layout. Empty geometry evicts
+its record, context loss forgets handles, and a disposed cache cannot allocate
+again. Initial uploads and refreshes share one unrolled writer; a private
+layout mask keeps compatibility checks cheap.
+
+This reduces handle churn and attribute setup, not upload bandwidth or draw
+count. See [`geometry-updates.mjs`](../../benchmarks/geometry-updates.mjs) for the
+counting benchmark and its explicit CPU/GPU measurement boundary.

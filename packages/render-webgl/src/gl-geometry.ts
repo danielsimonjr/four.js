@@ -6,8 +6,10 @@
  * mutation the geometry can see, and states the contract this module is the
  * first consumer of: *"Backends cache GPU buffers per geometry. The cache key
  * is `BufferGeometry.version`."* So the cache is keyed by `id` and validated by
- * `version` — an `id` hit with a stale `version` deletes the old GL objects and
- * re-uploads, which is exactly what `markDirty()` and the setters are for.
+ * `version`. A dirty geometry with the same attribute/index presence reuses its
+ * VAO and buffer objects, replacing each buffer's data store with `bufferData`.
+ * Attribute additions/removals rebuild the record. `markDirty()` still uploads
+ * every stream: the version does not say which array changed.
  *
  * ## What one entry holds
  *
@@ -39,8 +41,10 @@
  * background sweep and no finalization hook:
  *
  * - A **version bump** (in-place edit plus `markDirty()`, or an assignment
- *   through a setter) is detected on the next `acquire`, which deletes the
- *   stale VAO and buffers and uploads fresh ones. Nothing is retained twice.
+ *   through a setter) is detected on the next `acquire`. The fixed attribute
+ *   layout survives changes to array length, index width, and primitive mode;
+ *   only adding/removing an attribute or the index stream requires new handles.
+ *   Data is always re-uploaded. Nothing is retained twice.
  * - **`geometry.dispose()`** bumps the version and empties the arrays (§53), so
  *   the next `acquire` deletes the stale GL objects and — finding nothing left
  *   to draw — returns `null` without creating a new entry. A geometry that is
@@ -154,6 +158,39 @@ export interface GeometryRecord {
   readonly indexType: number | null;
 }
 
+/** Fixed optional streams shared by allocation and cleanup. */
+const OPTIONAL_ATTRIBUTES = [
+  ["normals", "normalBuffer"],
+  ["uvs", "uvBuffer"],
+  ["colors", "colorBuffer"],
+  ["joints", "jointBuffer"],
+  ["weights", "weightBuffer"],
+] as const;
+
+/** Mutable only while a new record's optional buffers are being allocated. */
+type AllocatingGeometryRecord = {
+  -readonly [Key in keyof GeometryRecord]: GeometryRecord[Key];
+};
+
+/** Private cache metadata; callers still receive only a GeometryRecord. */
+interface GeometryCacheEntry {
+  record: GeometryRecord;
+  readonly layout: number;
+}
+
+/** Direct reads avoid dynamic-key iteration on every dirty acquisition. */
+function attributeMask(geometry: CacheableGeometry): number {
+  // Typed arrays are truthy even at length zero. Pack presence, not length.
+  return (
+    +!!geometry.normals |
+    (+!!geometry.uvs << 1) |
+    (+!!geometry.colors << 2) |
+    (+!!geometry.joints << 3) |
+    (+!!geometry.weights << 4) |
+    (+!!geometry.indices << 5)
+  );
+}
+
 /** Maps §53's draw mode onto its GL enumerant. */
 function glMode(mode: CacheableGeometry["mode"]): number {
   return mode === "lines" ? GL.LINES : GL.TRIANGLES;
@@ -161,13 +198,15 @@ function glMode(mode: CacheableGeometry["mode"]): number {
 
 /**
  * Maps an index array onto its GL element type. `BufferGeometry` accepts
- * exactly `Uint16Array` and `Uint32Array` (§53), which are exactly WebGL 2's
- * two element types, so the mapping is total.
+ * `Uint16Array` and `Uint32Array` (§53); absent indices select non-indexed draws.
+ * WebGL also supports byte indices, but this geometry contract does not.
  */
-function glIndexType(
-  indices: NonNullable<CacheableGeometry["indices"]>,
-): number {
-  return indices instanceof Uint16Array ? GL.UNSIGNED_SHORT : GL.UNSIGNED_INT;
+function glIndexType(indices: CacheableGeometry["indices"]): number | null {
+  return indices === undefined
+    ? null
+    : indices instanceof Uint16Array
+      ? GL.UNSIGNED_SHORT
+      : GL.UNSIGNED_INT;
 }
 
 /**
@@ -190,7 +229,7 @@ export class GeometryCache {
   readonly #gl: WebglContext;
 
   /** Records by `BufferGeometry.id`; see the module header for eviction. */
-  readonly #records = new Map<string, GeometryRecord>();
+  readonly #records = new Map<string, GeometryCacheEntry>();
 
   #disposed = false;
 
@@ -210,20 +249,33 @@ export class GeometryCache {
 
   /**
    * Returns the vertex array for `geometry`, uploading it on first use and
-   * re-uploading it whenever `geometry.version` has advanced.
+   * re-uploading it whenever `geometry.version` has advanced. Compatible layouts
+   * retain their GL objects; returned metadata belongs to the acquired version.
    *
    * Returns `null` — and creates no entry — when there is nothing to draw
-   * (`drawCount === 0`, which includes every disposed geometry) or when GL
-   * refuses to allocate an object. **Never throws**: this runs inside
-   * `Renderer.render`, and §61 forbids throwing there for a lost context; a
+   * (`drawCount === 0`, which includes every disposed geometry), after this
+   * cache is disposed, or when GL refuses to allocate an object. **Never throws**:
+   * this runs inside `Renderer.render`, and §61 forbids throwing there for a lost context; a
    * failed allocation is the same class of asynchronous, driver-scheduled
    * event, so it skips the object rather than unwinding the frame.
    */
   acquire(geometry: CacheableGeometry): GeometryRecord | null {
-    const existing = this.#records.get(geometry.id);
-    if (existing !== undefined) {
+    if (this.#disposed) {
+      return null;
+    }
+    const entry = this.#records.get(geometry.id);
+    if (entry !== undefined) {
+      const existing = entry.record;
       if (existing.version === geometry.version) {
         return existing;
+      }
+      if (
+        geometry.drawCount !== 0 &&
+        entry.layout === attributeMask(geometry)
+      ) {
+        const record = this.#refresh(geometry, existing);
+        entry.record = record;
+        return record;
       }
       this.#deleteRecord(existing);
       this.#records.delete(geometry.id);
@@ -237,7 +289,10 @@ export class GeometryCache {
     if (record === null) {
       return null;
     }
-    this.#records.set(geometry.id, record);
+    this.#records.set(geometry.id, {
+      record,
+      layout: attributeMask(geometry),
+    });
     return record;
   }
 
@@ -261,8 +316,8 @@ export class GeometryCache {
       return;
     }
     this.#disposed = true;
-    for (const record of this.#records.values()) {
-      this.#deleteRecord(record);
+    for (const entry of this.#records.values()) {
+      this.#deleteRecord(entry.record);
     }
     this.#records.clear();
   }
@@ -284,194 +339,157 @@ export class GeometryCache {
       return null;
     }
 
-    // Buffers are allocated before anything is bound, in the fixed order
-    // positions → normals → uvs → colors → joints → weights → indices, so
-    // that a refusal part way
-    // through unwinds exactly what it created and the geometry is skipped
-    // rather than half-uploaded. `allocated` records them for that unwind; the
-    // list is the reason adding two optional streams did not multiply the
-    // cleanup branches (R-19).
-    const allocated: GlBuffer[] = [];
-    const allocate = (): GlBuffer | null => {
-      const buffer = gl.createBuffer();
-      if (buffer !== null) {
-        allocated.push(buffer);
-      }
-      return buffer;
-    };
-    const abandon = (): null => {
-      for (const buffer of allocated) {
-        gl.deleteBuffer(buffer);
-      }
+    // Allocate before binding, in positions → optional attributes → indices
+    // order. The partial record owns each successful allocation and can be
+    // unwound directly: no temporary buffer list or allocation closures.
+    const positionBuffer = gl.createBuffer();
+    if (positionBuffer === null) {
       gl.deleteVertexArray(vertexArray);
       return null;
-    };
-
-    const positionBuffer = allocate();
-    if (positionBuffer === null) {
-      return abandon();
-    }
-
-    const normals = geometry.normals;
-    let normalBuffer: GlBuffer | null = null;
-    if (normals !== undefined) {
-      normalBuffer = allocate();
-      if (normalBuffer === null) {
-        return abandon();
-      }
-    }
-
-    const uvs = geometry.uvs;
-    let uvBuffer: GlBuffer | null = null;
-    if (uvs !== undefined) {
-      uvBuffer = allocate();
-      if (uvBuffer === null) {
-        return abandon();
-      }
-    }
-
-    const colors = geometry.colors;
-    let colorBuffer: GlBuffer | null = null;
-    if (colors !== undefined) {
-      colorBuffer = allocate();
-      if (colorBuffer === null) {
-        return abandon();
-      }
-    }
-
-    const joints = geometry.joints;
-    let jointBuffer: GlBuffer | null = null;
-    if (joints !== undefined) {
-      jointBuffer = allocate();
-      if (jointBuffer === null) {
-        return abandon();
-      }
-    }
-
-    const weights = geometry.weights;
-    let weightBuffer: GlBuffer | null = null;
-    if (weights !== undefined) {
-      weightBuffer = allocate();
-      if (weightBuffer === null) {
-        return abandon();
-      }
     }
 
     const indices = geometry.indices;
-    let indexBuffer: GlBuffer | null = null;
-    if (indices !== undefined) {
-      indexBuffer = allocate();
-      if (indexBuffer === null) {
-        return abandon();
-      }
-    }
-
-    gl.bindVertexArray(vertexArray);
-
-    gl.bindBuffer(GL.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(GL.ARRAY_BUFFER, geometry.positions, GL.STATIC_DRAW);
-    gl.enableVertexAttribArray(POSITION_ATTRIBUTE_LOCATION);
-    gl.vertexAttribPointer(
-      POSITION_ATTRIBUTE_LOCATION,
-      3,
-      GL.FLOAT,
-      false,
-      0,
-      0,
-    );
-
-    // The optional streams (§53, §68, R-19): each its own buffer at its own
-    // fixed slot. `vertexAttribPointer` captures the *current* ARRAY_BUFFER
-    // binding into the vertex array, so rebinding here does not disturb the
-    // attributes recorded above.
-    if (normals !== undefined && normalBuffer !== null) {
-      gl.bindBuffer(GL.ARRAY_BUFFER, normalBuffer);
-      gl.bufferData(GL.ARRAY_BUFFER, normals, GL.STATIC_DRAW);
-      gl.enableVertexAttribArray(NORMAL_ATTRIBUTE_LOCATION);
-      gl.vertexAttribPointer(
-        NORMAL_ATTRIBUTE_LOCATION,
-        3,
-        GL.FLOAT,
-        false,
-        0,
-        0,
-      );
-    }
-
-    if (uvs !== undefined && uvBuffer !== null) {
-      gl.bindBuffer(GL.ARRAY_BUFFER, uvBuffer);
-      gl.bufferData(GL.ARRAY_BUFFER, uvs, GL.STATIC_DRAW);
-      gl.enableVertexAttribArray(UV_ATTRIBUTE_LOCATION);
-      gl.vertexAttribPointer(UV_ATTRIBUTE_LOCATION, 2, GL.FLOAT, false, 0, 0);
-    }
-
-    if (colors !== undefined && colorBuffer !== null) {
-      gl.bindBuffer(GL.ARRAY_BUFFER, colorBuffer);
-      gl.bufferData(GL.ARRAY_BUFFER, colors, GL.STATIC_DRAW);
-      gl.enableVertexAttribArray(COLOR_ATTRIBUTE_LOCATION);
-      gl.vertexAttribPointer(
-        COLOR_ATTRIBUTE_LOCATION,
-        4,
-        GL.FLOAT,
-        false,
-        0,
-        0,
-      );
-    }
-
-    if (joints !== undefined && jointBuffer !== null) {
-      gl.bindBuffer(GL.ARRAY_BUFFER, jointBuffer);
-      gl.bufferData(GL.ARRAY_BUFFER, joints, GL.STATIC_DRAW);
-      gl.enableVertexAttribArray(JOINTS_ATTRIBUTE_LOCATION);
-      // Non-normalized UNSIGNED_SHORT: the indices arrive in the vertex stage
-      // as exact floats (see `JOINTS_ATTRIBUTE_LOCATION` for why not an
-      // integer attribute).
-      gl.vertexAttribPointer(
-        JOINTS_ATTRIBUTE_LOCATION,
-        4,
-        GL.UNSIGNED_SHORT,
-        false,
-        0,
-        0,
-      );
-    }
-
-    if (weights !== undefined && weightBuffer !== null) {
-      gl.bindBuffer(GL.ARRAY_BUFFER, weightBuffer);
-      gl.bufferData(GL.ARRAY_BUFFER, weights, GL.STATIC_DRAW);
-      gl.enableVertexAttribArray(WEIGHTS_ATTRIBUTE_LOCATION);
-      gl.vertexAttribPointer(
-        WEIGHTS_ATTRIBUTE_LOCATION,
-        4,
-        GL.FLOAT,
-        false,
-        0,
-        0,
-      );
-    }
-
-    if (indices !== undefined && indexBuffer !== null) {
-      gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
-      gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STATIC_DRAW);
-    }
-
-    gl.bindVertexArray(null);
-    gl.bindBuffer(GL.ARRAY_BUFFER, null);
-
-    return {
+    const record: AllocatingGeometryRecord = {
       vertexArray,
       positionBuffer,
-      normalBuffer,
-      uvBuffer,
-      colorBuffer,
-      jointBuffer,
-      weightBuffer,
-      indexBuffer,
+      normalBuffer: null,
+      uvBuffer: null,
+      colorBuffer: null,
+      jointBuffer: null,
+      weightBuffer: null,
+      indexBuffer: null,
       version: geometry.version,
       mode: glMode(geometry.mode),
       count: geometry.drawCount,
-      indexType: indices === undefined ? null : glIndexType(indices),
+      indexType: glIndexType(indices),
     };
+    for (const [attribute, field] of OPTIONAL_ATTRIBUTES) {
+      if (geometry[attribute] !== undefined) {
+        const buffer = gl.createBuffer();
+        if (buffer === null) {
+          this.#deleteRecord(record);
+          return null;
+        }
+        record[field] = buffer;
+      }
+    }
+    if (indices !== undefined) {
+      record.indexBuffer = gl.createBuffer();
+      if (record.indexBuffer === null) {
+        this.#deleteRecord(record);
+        return null;
+      }
+    }
+
+    this.#writeGeometry(geometry, record, true);
+    return record;
+  }
+
+  /**
+   * Replaces data stores without rebuilding an unchanged vertex layout.
+   *
+   * `bufferData` deliberately stays the upload primitive: it accepts resized
+   * arrays and lets the driver replace storage still referenced by earlier
+   * draws. Reusing a buffer *object* does not require overwriting its in-flight
+   * storage with `bufferSubData`. Attribute pointers reference those objects,
+   * not a particular store, so no pointer/enable calls need to be repeated.
+   *
+   * The VAO must be bound for the element-array write, then unbound before
+   * clearing ARRAY_BUFFER — exactly the initial upload's state contract.
+   */
+  #refresh(
+    geometry: CacheableGeometry,
+    existing: GeometryRecord,
+  ): GeometryRecord {
+    this.#writeGeometry(geometry, existing, false);
+    return {
+      ...existing,
+      version: geometry.version,
+      mode: glMode(geometry.mode),
+      count: geometry.drawCount,
+      indexType: glIndexType(geometry.indices),
+    };
+  }
+
+  /**
+   * Shared writer, deliberately unrolled: dynamic-key loops cost more for the
+   * many small geometries in a 2D scene (see the counting-seam benchmark).
+   * Only initial uploads configure attributes; refreshes keep VAO attachments.
+   */
+  #writeGeometry(
+    geometry: CacheableGeometry,
+    record: GeometryRecord,
+    setup: boolean,
+  ): void {
+    const gl = this.#gl;
+    gl.bindVertexArray(record.vertexArray);
+    this.#writeAttribute(
+      setup,
+      record.positionBuffer,
+      geometry.positions,
+      POSITION_ATTRIBUTE_LOCATION,
+    );
+    this.#writeAttribute(
+      setup,
+      record.normalBuffer,
+      geometry.normals,
+      NORMAL_ATTRIBUTE_LOCATION,
+    );
+    this.#writeAttribute(
+      setup,
+      record.uvBuffer,
+      geometry.uvs,
+      UV_ATTRIBUTE_LOCATION,
+      2,
+    );
+    this.#writeAttribute(
+      setup,
+      record.colorBuffer,
+      geometry.colors,
+      COLOR_ATTRIBUTE_LOCATION,
+      4,
+    );
+    this.#writeAttribute(
+      setup,
+      record.jointBuffer,
+      geometry.joints,
+      JOINTS_ATTRIBUTE_LOCATION,
+      4,
+      GL.UNSIGNED_SHORT,
+    );
+    this.#writeAttribute(
+      setup,
+      record.weightBuffer,
+      geometry.weights,
+      WEIGHTS_ATTRIBUTE_LOCATION,
+      4,
+    );
+    if (geometry.indices !== undefined) {
+      gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, record.indexBuffer);
+      gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, geometry.indices, GL.STATIC_DRAW);
+    }
+    gl.bindVertexArray(null);
+    gl.bindBuffer(GL.ARRAY_BUFFER, null);
+  }
+
+  /** Uploads a present stream; configures its VAO slot only on first upload. */
+  #writeAttribute(
+    setup: boolean,
+    buffer: GlBuffer | null,
+    data: Float32Array | Uint16Array | undefined,
+    location: number,
+    components = 3,
+    type: number = GL.FLOAT,
+  ): void {
+    if (data !== undefined) {
+      const gl = this.#gl;
+      gl.bindBuffer(GL.ARRAY_BUFFER, buffer);
+      gl.bufferData(GL.ARRAY_BUFFER, data, GL.STATIC_DRAW);
+      if (setup) {
+        gl.enableVertexAttribArray(location);
+        gl.vertexAttribPointer(location, components, type, false, 0, 0);
+      }
+    }
   }
 
   /** Deletes one record's GL objects. Live context only. */
@@ -479,17 +497,10 @@ export class GeometryCache {
     const gl = this.#gl;
     gl.deleteVertexArray(record.vertexArray);
     gl.deleteBuffer(record.positionBuffer);
-    for (const buffer of [
-      record.normalBuffer,
-      record.uvBuffer,
-      record.colorBuffer,
-      record.jointBuffer,
-      record.weightBuffer,
-      record.indexBuffer,
-    ]) {
-      if (buffer !== null) {
-        gl.deleteBuffer(buffer);
-      }
+    for (const [, field] of OPTIONAL_ATTRIBUTES) {
+      const buffer = record[field];
+      if (buffer !== null) gl.deleteBuffer(buffer);
     }
+    if (record.indexBuffer !== null) gl.deleteBuffer(record.indexBuffer);
   }
 }

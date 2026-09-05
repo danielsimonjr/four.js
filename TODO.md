@@ -941,6 +941,13 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
+- [x] 2026-09-04 — **WebGL geometry-buffer reuse** (§53, §64, §83).
+      Preserve handles for unchanged layouts, keep full data-store replacement,
+      reject acquisition after disposal, and centralize attribute setup/cleanup.
+      Add 76 unit regressions, two browser pixel comparisons and a registered
+      benchmark. Public API and size limits unchanged; WebGPU lifetime handling
+      and hardware frame-time profiling are outside this patch.
+
 - [x] 2026-08-30 — **Unblocked-defect sanitization.** Sprite §79 flags via
       `SpriteOptions extends RenderableOptions`; `INVALID_RENDER_GRAPH` + §89
       list (spec 1.13); PH-22n dropped-time `devWarnOnce`; nested example-path

@@ -125,6 +125,11 @@ export const SUITE = Object.freeze(
       what: "§86's 20 000-animated-glyph row, layout half",
     },
     {
+      file: "geometry-updates.mjs",
+      record: "geometry-updates",
+      what: "§53 dynamic geometry uploads: GL call/object counts and CPU preparation",
+    },
+    {
       file: "render-batching.mjs",
       record: "render-batching",
       what: "§86's batched-sprite and batched-shape rows, preparation half",

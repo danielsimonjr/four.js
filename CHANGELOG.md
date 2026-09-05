@@ -19,6 +19,35 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-04 — WebGL geometry-buffer reuse
+
+#### Changed
+
+- Reuse VAOs and buffers for dirty geometries whose attribute/index presence is
+  unchanged. Full `bufferData` uploads preserve resized stores and prior queued
+  draws; draw count, mode and index width update with each acquired version.
+- Share a typed optional-attribute table and upload helper across allocation,
+  refresh and cleanup. Initial uploads no longer allocate temporary buffer lists
+  or allocation closures. No new public API, dependency or bundle-budget change.
+- Add a registered counting benchmark: dirty geometry calls fall 11 → 5 for
+  position-only, 15 → 7 for indexed quads, and 45 → 17 for all seven streams.
+  Upload bytes are unchanged; these are not GPU-time/FPS claims.
+
+#### Fixed
+
+- A disposed `GeometryCache` no longer silently allocates new GPU resources.
+
+#### Tests
+
+- 76 new unit cases cover all 64 stream combinations, data/binding integrity,
+  growth/shrinkage, index-width changes, layout changes, allocation refusal,
+  empty geometry, disposal and context loss. Update obsolete recreation-count
+  assertions in existing unit and shape integration tests without removing
+  their data/draw assertions.
+- Add two real-driver pixel comparisons of queued old/new draws against fresh
+  allocations, for indexed and unindexed geometry.
+
+
 ### 2026-08-30 — Unblocked-defect sanitization (sprite flags, graph errors, docs truth)
 
 #### Fixed
