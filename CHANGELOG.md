@@ -25,8 +25,10 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-09-06 — Size budget headroom after R-36 measurements
 
-- **`.size-limit.json`.** first-3d 38→38.5 kB, particles-demo 36.5→37 kB,
-  ui-demo 45→45.5 kB gzip (+0.5 kB margin each; fresh A/B on this branch).
+- **`.size-limit.json`.** first-3d-scene 38 → 38.5 kB, particles-demo 36.5 → 37
+  kB, ui-demo 45 → 45.5 kB (measured A/B: 38.18/36.77/45.27 kB gzip; closes the
+  R-36 thin-budget TODO — the original 32/37.5/29.5 kB proposal was absorbed
+  through intermediate bumps).
 
 ### 2026-09-06 — Windows animation browser gate sweep cost
 
