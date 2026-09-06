@@ -6,6 +6,21 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **`FollowRig.apply()` kills the frame loop on a zero-delta frame.** FIXED — skips a Found by the
+      flight-sim persona dogfood: the chase camera threw on frame 1 and the rAF loop never
+      recovered. `apply()` passes `deltaSeconds` straight into `SpringDamper`, which
+      deliberately rejects `0` (`it.each([0, -DT, NaN, Infinity])` asserts the throw), and
+      the RangeError propagates out of `app.step()`. The README’s own loop shape produces
+      the zero: `app.step(Math.max(0, now - last) / 1000)` clamps to 0 when rAF’s frame
+      timestamp precedes the `performance.now()` captured just before the loop. Never caught
+      because `FollowRig` appears only in unit tests — no example drives it in a real loop.
+      Fix belongs in the rig, not the spring: `FollowRig` already has `skippedSteps` for
+      "could not act this frame" (three call sites), so a zero-length step is that same case.
+      NOT changing `SpringDamper`’s rejection of 0 — that is a deliberate, tested invariant
+      and widening it is the owner’s call. Fixed with a failing test first; motion's
+      full suite stays green at 476/476, and the flight-sim page now survives frame 1
+      with the workaround removed.
+
 - [ ] **The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is
       green (103/103).** Measured 2026-09-06 on an otherwise idle machine. Not a library
       defect and not a CI coverage hole; both were checked before writing this down.

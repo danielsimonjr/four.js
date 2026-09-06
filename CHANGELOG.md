@@ -8,6 +8,38 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — `FollowRig` killed the frame loop on a zero-length step
+
+- **`FollowRig.apply()` threw on the first frame and the application never recovered.**
+  It handed `deltaSeconds` straight to its `SpringDamper`, which deliberately rejects a
+  non-positive delta, and the `RangeError` escaped through `Application.step()` into the
+  caller's `requestAnimationFrame` loop — one zero-length frame and nothing rendered again:
+
+  ```
+  RangeError: SpringDamper step deltaSeconds must be a finite positive number of
+  seconds (§7a); received 0
+  ```
+
+  The zero is not exotic. `README.md`'s own loop is
+  `app.step(Math.max(0, now - last) / 1000)`, and `requestAnimationFrame`'s frame
+  timestamp can precede the `performance.now()` captured just before the loop starts, so
+  the clamp yields exactly `0` on the first frame.
+
+  `apply()` now counts a non-positive step as a **skip** — the case the class already
+  models with `skippedSteps` at three other call sites — and returns `false`. A
+  zero-length step advances nothing, so there is nothing to place. The condition is
+  written `!(deltaSeconds > 0)` so `NaN` is skipped rather than handed to the spring.
+
+  Deliberately narrow in two directions. A spring-less rig never reads the delta, so it
+  still places at `dt === 0` exactly as before. And `SpringDamper`'s rejection of `0` is
+  **unchanged** — `it.each([0, -DT, NaN, Infinity])` asserts it, so it is a deliberate
+  invariant, and widening it is a separate decision for the owner.
+
+  Found by building a flight simulator against the library: the chase camera threw before
+  it drew a single frame. It had never surfaced because `FollowRig` appears only in unit
+  tests — no example drives it inside a real animation loop, and unit tests always pass a
+  positive `DT`.
+
 ### 2026-09-06 — the README quick-start could not run; found by running it
 
 - **`README.md`'s quick-start snippet threw before drawing anything.** It awaited

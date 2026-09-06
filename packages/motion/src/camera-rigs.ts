@@ -571,6 +571,25 @@ export class FollowRig implements Component {
     let placed: boolean;
     if (spring === null) {
       placed = placeAtWorldPosition(node, goal.x, goal.y, goal.z);
+    } else if (!(deltaSeconds > 0)) {
+      // A zero-length (or NaN) step is not an error here: nothing has advanced, so
+      // the smoothed placement is unchanged and there is nothing to write. It is
+      // counted as a skip, like every other "could not act this frame" case below.
+      //
+      // It must not reach the spring. `SpringDamper` deliberately rejects a
+      // non-positive delta, and that RangeError used to escape through
+      // `Application.step()` and kill the caller's requestAnimationFrame loop
+      // permanently — one zero-length frame and the app never rendered again.
+      //
+      // The zero is not exotic: the README's loop is
+      // `app.step(Math.max(0, now - last) / 1000)`, and rAF's frame timestamp can
+      // precede the `performance.now()` taken just before the loop, so the clamp
+      // yields exactly 0 on the first frame. Found 2026-09-06 by building a flight
+      // simulator against this rig — the chase camera threw before it ever drew.
+      //
+      // Deliberately `!(deltaSeconds > 0)` rather than `deltaSeconds <= 0`, so NaN
+      // is skipped too instead of being handed to the spring.
+      placed = false;
     } else {
       const smoothed = this.#smoothed;
       if (!this.#smoothing) {

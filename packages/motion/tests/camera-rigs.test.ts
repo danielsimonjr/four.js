@@ -444,6 +444,34 @@ describe("FollowRig (§44 follow rig and spring arm)", () => {
     expect(rig.skippedSteps).toBe(1);
   });
 
+  it("counts a skip on a zero-length step instead of throwing (frame-1 crash)", () => {
+    const subject = new Group();
+    subject.position.set(10, 0, 0);
+    const node = new Group();
+    const rig = new FollowRig({
+      target: subject,
+      spring: new SpringDamper({ stiffness: 100, damping: 20 }),
+    });
+
+    // A zero-length step is well defined -- nothing has advanced -- but the spring
+    // deliberately rejects 0 (see spring-damper's `rejects deltaSeconds` cases), and
+    // `apply` used to hand its delta straight over. The RangeError escaped through
+    // `Application.step()` and killed the caller's requestAnimationFrame loop for
+    // good: one bad frame, and the app never rendered again.
+    //
+    // The zero is not exotic. The README's loop is
+    // `app.step(Math.max(0, now - last) / 1000)`, and rAF's frame timestamp can
+    // precede the `performance.now()` captured just before the loop, so the clamp
+    // yields exactly 0 on the first frame.
+    expect(() => rig.apply(node, 0)).not.toThrow();
+    expect(rig.apply(node, 0)).toBe(false);
+    expect(rig.skippedSteps).toBeGreaterThan(0);
+
+    // The rig is not poisoned by the skip: a real step still follows the target.
+    rig.apply(node, DT);
+    expect(worldPosition(node).x).toBeGreaterThan(0);
+  });
+
   it("counts a skip when a spring step cannot be written to a singular parent", () => {
     const parent = new Group();
     parent.scale.set(0, 1, 1);
