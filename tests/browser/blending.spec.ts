@@ -35,9 +35,9 @@
  * | test | §  | assertion |
  * | ---- | -- | --------- |
  * | loads | §45, §110 | `#status` reaches `data-state="running"` and the page starts in `data-mode="animated"` with no cycles behind it |
- * | ANIMATED | §16, §19 | over ~4 s the chain's band changes every 200 ms while the ground slab and an empty corner of background do not change **at all**, and the chain's bright pixels stay inside the wave's band |
- * | RAGDOLL | §19, §22, §110 | a click on the MODE plate reaches `data-mode="ragdoll"`, the plate repaints, the chain's pixels *descend* past the floor line — and no pair of consecutive screenshots shows the chain moving faster than anything on the page can move |
- * | RECOVER | §19, §110 | a second click reaches `"recovering"` and then `"animated"`, the sweep really takes its 1.5 s rather than snapping, the cycle counter increments, and the chain is back inside the wave's band |
+ * | ANIMATED | §16, §19 | a few framebuffer pairs show the chain's band changing while the ground slab and an empty corner of background do not change **at all**; the wave's span is read from `data-chain-y` until it is met |
+ * | RAGDOLL | §19, §22, §110 | a click on the MODE plate reaches `data-mode="ragdoll"`, the plate repaints, and `data-chain-y` *descends* past the floor line without a teleport |
+ * | RECOVER | §19, §110 | a second click reaches `"recovering"` and then `"animated"`, the sweep really takes its 1.5 s rather than snapping, the cycle counter increments, and `data-chain-y` is back inside the wave's band and swinging |
  *
  * Every threshold below states the number the reference run measured and how
  * much margin the threshold leaves. Nothing here is a golden image: the gate
@@ -328,16 +328,28 @@ const READY_TIMEOUT_MS = 45_000;
 /** Milliseconds between the paired frames every motion measurement compares. */
 const FRAME_GAP_MS = 200;
 
-/** Seconds of animated running the wave is watched over (~one wave period + 10 %). */
-const WATCH_SECONDS = 4;
+/**
+ * Deadline for a published-attribute watch, milliseconds.
+ *
+ * Generous on purpose: the exit condition is "enough samples **and** the wave
+ * span / floor drop has been seen". A fixed 4 s wall-clock window is what made
+ * the span assertion measure dropped simulation time rather than the wave.
+ */
+const CHAIN_WATCH_DEADLINE_MS = 30_000;
 
 /**
  * The sample floor for the §16 wave watch, matching the `>= 8` its assertion wants.
  *
- * Same reason as {@link RAGDOLL_MINIMUM_SAMPLES}: a 4 s window yields ~10 on a normal
- * runner and 7 on one 19% slower — a number about the machine, not about the wave.
+ * These samples are `data-chain-y` reads, not screenshots: the count is no longer
+ * a measure of how fast the runner can encode a PNG.
  */
 const WAVE_MINIMUM_SAMPLES = 8;
+
+/** Least published-height span that counts as a travelling wave, world units. */
+const WAVE_SPAN_MINIMUM = 0.2;
+
+/** Framebuffer pairs that prove the wave reached the pixels. */
+const PIXEL_PROOF_PAIRS = 3;
 
 /**
  * Least mean per-pixel channel-sum difference, between two frames
@@ -389,18 +401,11 @@ const RAGDOLL_MINIMUM_DROP = 1.0;
 const RAGDOLL_FLOOR_Y = 0.6;
 
 /**
- * Seconds the falling chain is watched for.
+ * The sample floor for {@link watchPublishedChain} during the ragdoll, above the
+ * `> 10` its assertions want.
  *
- * The collapse takes about a second and the chain then swings and settles;
- * 4 s covers all of it at ~7 screenshots per second.
- */
-const RAGDOLL_WATCH_SECONDS = 4;
-
-/**
- * The sample floor for {@link watchCentroid}, above the `> 10` its assertions want.
- *
- * A 4 s window at a normal screenshot cost yields comfortably more; this only binds when
- * the runner is slow enough that the clock alone would not.
+ * These are `data-chain-y` reads paced by rAF, so the floor is "did the watch
+ * actually run" rather than "did the runner encode twelve PNGs".
  */
 const RAGDOLL_MINIMUM_SAMPLES = 12;
 
@@ -710,45 +715,59 @@ function brightCentroid(image: DecodedImage, box: WorldBox): Centroid {
   };
 }
 
-/** One timed centroid sample. */
-interface CentroidSample {
-  readonly centroid: Centroid;
+/** One timed `data-chain-y` sample. */
+interface ChainYSample {
+  readonly y: number;
   /** Milliseconds since the watch began, from the wall clock (never assumed). */
   readonly at: number;
 }
 
+/** Yields until the page's next animation frame, so the simulation can run. */
+async function nextAnimationFrame(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      }),
+  );
+}
+
+/** Span of published chain heights in `samples`. */
+function chainYSpan(samples: readonly ChainYSample[]): number {
+  const values = samples.map((sample) => sample.y);
+  return Math.max(...values) - Math.min(...values);
+}
+
 /**
- * Samples the chain's centroid as fast as the machine can screenshot, until **both**
- * `milliseconds` of wall clock have passed and `minimumSamples` have been taken.
+ * Samples `#status[data-chain-y]` until `enough` is true **or** the deadline.
  *
- * No fixed cadence: a screenshot costs what it costs, and every consecutive-pair
- * assertion below divides by the measured gap rather than an assumed one.
- *
- * The floor is why this is not bounded by the clock alone. An iteration costs one
- * screenshot, so a duration-only bound makes the sample count a measure of the runner's
- * throughput — and the caller then asserts on that count. A 19%-slower CI runner turned
- * a comfortable margin into 8 samples and failed a `> 10` floor twice on 2026-09-06,
- * with nothing about the chain's motion wrong. On a normal machine the duration still
- * dominates and behaviour is unchanged; on a slow one the window simply grows, which only
- * strengthens the "did the centroid actually move" assertions these samples feed.
+ * No screenshots: a framebuffer grab is what starved the simulation and made a
+ * 4 s wall-clock watch shorter than one 3.6 s wave period. One rAF between
+ * reads so the loop cannot outrun the page. The deadline is a ceiling, not a
+ * window that then asserts a count — a machine that never publishes enough
+ * motion fails the caller's assertion, not a sample-count floor about the
+ * runner.
  */
-async function watchCentroid(
-  canvas: Locator,
-  milliseconds: number,
+async function watchPublishedChain(
+  page: Page,
+  enough: (samples: readonly ChainYSample[]) => boolean,
   minimumSamples: number,
-): Promise<readonly CentroidSample[]> {
-  const samples: CentroidSample[] = [];
+  deadlineMs: number = CHAIN_WATCH_DEADLINE_MS,
+): Promise<readonly ChainYSample[]> {
+  const samples: ChainYSample[] = [];
   const startedAt = Date.now();
   do {
-    const frame = await grab(canvas);
     samples.push({
-      centroid: brightCentroid(frame, SCENE_REGION),
+      y: await readNumber(page, "chain-y"),
       at: Date.now() - startedAt,
     });
-  } while (
-    Date.now() - startedAt < milliseconds ||
-    samples.length < minimumSamples
-  );
+    if (samples.length >= minimumSamples && enough(samples)) {
+      break;
+    }
+    await nextAnimationFrame(page);
+  } while (Date.now() - startedAt < deadlineMs);
   return samples;
 }
 
@@ -871,11 +890,11 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
 
     let previous = await grab(canvas);
     const bandDeltas: number[] = [];
-    const centroids: number[] = [];
-    // Both bounds: the clock alone made `bandDeltas.length` a measure of how fast the
-    // runner can screenshot, and the floor below then asserted on it.
-    const deadline = Date.now() + WATCH_SECONDS * 1000;
-    while (Date.now() < deadline || bandDeltas.length < WAVE_MINIMUM_SAMPLES) {
+    // A handful of framebuffer pairs prove the wave reached the pixels and the
+    // scenery did not. The wave *period* is watched below via `data-chain-y`:
+    // screenshotting for that long is what starved the simulation.
+    const pixelDeadline = Date.now() + FRAME_GAP_MS * (PIXEL_PROOF_PAIRS + 5);
+    while (bandDeltas.length < PIXEL_PROOF_PAIRS && Date.now() < pixelDeadline) {
       await page.waitForTimeout(FRAME_GAP_MS);
       const frame = await grab(canvas);
 
@@ -902,27 +921,33 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
         ).toBeLessThanOrEqual(STATIC_REGION_CHANGED_MAXIMUM);
       }
 
-      // The chain stays in its band: the wave is a wave, not a drift.
+      // The chain is drawn, and it is where the wave puts it.
       const centroid = brightCentroid(frame, SCENE_REGION);
       expect(centroid.count).toBeGreaterThan(MINIMUM_BRIGHT_PIXELS);
-      centroids.push(centroid.y);
       expect(centroid.y).toBeGreaterThan(WAVE_BAND_MINIMUM_Y);
       expect(centroid.y).toBeLessThan(WAVE_BAND_MAXIMUM_Y);
 
       previous = frame;
     }
+    expect(bandDeltas.length).toBeGreaterThanOrEqual(PIXEL_PROOF_PAIRS);
 
-    // Watched over more than one wave period, the chain visibly swings rather
-    // than sitting at one height (measured span ≈ 0.68 world units).
-    //
-    // 8 intervals is the "did this loop actually run" guard: 4 s of watching at
-    // {@link FRAME_GAP_MS} plus one screenshot each measured exactly 10, and a
-    // machine slower than that must weaken the sample count rather than fail.
-    expect(bandDeltas.length).toBeGreaterThanOrEqual(8);
+    // The travelling-wave assertion is a published height, not a PNG: sample
+    // until the span is met or the deadline, so a slow machine grows the
+    // window instead of failing a count about the runner.
+    const wave = await watchPublishedChain(
+      page,
+      (samples) => chainYSpan(samples) > WAVE_SPAN_MINIMUM,
+      WAVE_MINIMUM_SAMPLES,
+    );
+    expect(wave.length).toBeGreaterThanOrEqual(WAVE_MINIMUM_SAMPLES);
+    for (const sample of wave) {
+      expect(sample.y).toBeGreaterThan(WAVE_BAND_MINIMUM_Y);
+      expect(sample.y).toBeLessThan(WAVE_BAND_MAXIMUM_Y);
+    }
     expect(
-      Math.max(...centroids) - Math.min(...centroids),
-      "the chain's centroid never moved: this is a still picture, not a wave",
-    ).toBeGreaterThan(0.2);
+      chainYSpan(wave),
+      "the chain's published height never moved: this is a still pose, not a wave",
+    ).toBeGreaterThan(WAVE_SPAN_MINIMUM);
 
     // The page stayed animated throughout, and §110's per-fixed-step number for
     // an animated phase is the wave's own — 0.0146 m, the same figure
@@ -955,27 +980,23 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     // §19's weights went the other way with it.
     await expect(status).toHaveAttribute("data-weight", "0.000");
 
-    const samples = await watchCentroid(
-      canvas,
-      RAGDOLL_WATCH_SECONDS * 1000,
+    const samples = await watchPublishedChain(
+      page,
+      (seen) => Math.min(...seen.map((sample) => sample.y)) < RAGDOLL_FLOOR_Y,
       RAGDOLL_MINIMUM_SAMPLES,
     );
     expect(samples.length).toBeGreaterThan(10);
 
-    // The chain is still on screen the whole time, so "the centroid dropped"
-    // cannot be an artefact of the chain vanishing.
-    for (const sample of samples) {
-      expect(
-        sample.centroid.count,
-        `only ${String(sample.centroid.count)} link pixels ${String(sample.at)} ms into the collapse`,
-      ).toBeGreaterThan(MINIMUM_BRIGHT_PIXELS);
-    }
+    // The chain is still drawn after the fall, so "the height dropped" cannot
+    // be an artefact of the links vanishing from the page's own account.
+    const after = brightCentroid(await grab(canvas), SCENE_REGION);
+    expect(after.count).toBeGreaterThan(MINIMUM_BRIGHT_PIXELS);
 
     // It descended — out of the wave band and past the floor line.
-    const lowest = Math.min(...samples.map((sample) => sample.centroid.y));
+    const lowest = Math.min(...samples.map((sample) => sample.y));
     expect(
       lowest,
-      `the chain's lowest centroid over the collapse was ${lowest.toFixed(3)}, ` +
+      `the chain's lowest published height over the collapse was ${lowest.toFixed(3)}, ` +
         `starting from ${before.y.toFixed(3)}`,
     ).toBeLessThan(RAGDOLL_FLOOR_Y);
     expect(before.y - lowest).toBeGreaterThan(RAGDOLL_MINIMUM_DROP);
@@ -985,10 +1006,10 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     // proportionally larger allowance rather than a spurious failure.
     for (let i = 1; i < samples.length; i += 1) {
       const gapSeconds = (samples[i].at - samples[i - 1].at) / 1000;
-      const jump = Math.abs(samples[i].centroid.y - samples[i - 1].centroid.y);
+      const jump = Math.abs(samples[i].y - samples[i - 1].y);
       expect(
         jump,
-        `the chain's centroid moved ${jump.toFixed(4)} world units in ` +
+        `the chain's published height moved ${jump.toFixed(4)} world units in ` +
           `${(gapSeconds * 1000).toFixed(0)} ms (${(jump / gapSeconds).toFixed(2)} units/s) ` +
           `at ${String(samples[i].at)} ms into the collapse — that is a teleport, not a fall`,
       ).toBeLessThanOrEqual(MAX_CENTROID_SPEED * gapSeconds);
@@ -1025,7 +1046,7 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
     await clickWorldPoint(page, rect, PLATE_POINT);
     await expect(status).toHaveAttribute("data-mode", "ragdoll");
     await expect
-      .poll(async () => brightCentroid(await grab(canvas), SCENE_REGION).y, {
+      .poll(async () => readNumber(page, "chain-y"), {
         message:
           "the chain never left the wave band, so there is nothing to recover from",
         timeout: COLLAPSE_TIMEOUT_MS,
@@ -1069,32 +1090,38 @@ test.describe("§110: animated ↔ kinematic ↔ physical control in the browser
       `the re-type moved a link ${entry.toFixed(4)} m in its first fixed step`,
     ).toBeLessThanOrEqual(ENTRY_STEP_MAXIMUM);
 
-    // The chain is back on the wave — measured over more than one wave period,
-    // so "back in the band" means it is riding the wave and not resting at one
-    // height that happens to be inside it.
-    const centroids: number[] = [];
-    const chainYs: number[] = [];
-    const deadline = Date.now() + WATCH_SECONDS * 1000;
-    while (Date.now() < deadline) {
-      const centroid = brightCentroid(await grab(canvas), SCENE_REGION);
-      expect(centroid.count).toBeGreaterThan(MINIMUM_BRIGHT_PIXELS);
-      expect(
-        centroid.y,
-        `the chain's centroid is at ${centroid.y.toFixed(3)} after the recovery, not back in the wave band`,
-      ).toBeGreaterThan(WAVE_BAND_MINIMUM_Y);
-      expect(centroid.y).toBeLessThan(WAVE_BAND_MAXIMUM_Y);
-      centroids.push(centroid.y);
-      chainYs.push(await readNumber(page, "chain-y"));
-      await page.waitForTimeout(FRAME_GAP_MS);
-    }
+    // The chain is back on the wave — measured until the published height
+    // spans more than {@link WAVE_SPAN_MINIMUM}, so "back in the band" means
+    // it is riding the wave and not resting at one height that happens to be
+    // inside it. Screenshots here starved the simulation: 4 s of wall clock
+    // was less than one 3.6 s period once §10 dropped time.
+    const wave = await watchPublishedChain(
+      page,
+      (samples) => chainYSpan(samples) > WAVE_SPAN_MINIMUM,
+      WAVE_MINIMUM_SAMPLES,
+    );
+    expect(wave.length).toBeGreaterThanOrEqual(WAVE_MINIMUM_SAMPLES);
     expect(
-      Math.max(...centroids) - Math.min(...centroids),
+      chainYSpan(wave),
       "the chain came back but stopped moving: the wave did not resume",
-    ).toBeGreaterThan(0.2);
+    ).toBeGreaterThan(WAVE_SPAN_MINIMUM);
 
-    // The page's own height agrees with the pixels (measured 1.55–2.05 m).
-    expect(Math.min(...chainYs)).toBeGreaterThan(WAVE_BAND_MINIMUM_Y);
-    expect(Math.max(...chainYs)).toBeLessThan(WAVE_BAND_MAXIMUM_Y);
+    // The page's own height stayed inside the wave band (measured 1.55–2.05 m).
+    expect(Math.min(...wave.map((sample) => sample.y))).toBeGreaterThan(
+      WAVE_BAND_MINIMUM_Y,
+    );
+    expect(Math.max(...wave.map((sample) => sample.y))).toBeLessThan(
+      WAVE_BAND_MAXIMUM_Y,
+    );
+
+    // One framebuffer check: the pixels agree with the published height.
+    const recovered = brightCentroid(await grab(canvas), SCENE_REGION);
+    expect(recovered.count).toBeGreaterThan(MINIMUM_BRIGHT_PIXELS);
+    expect(
+      recovered.y,
+      `the chain's centroid is at ${recovered.y.toFixed(3)} after the recovery, not back in the wave band`,
+    ).toBeGreaterThan(WAVE_BAND_MINIMUM_Y);
+    expect(recovered.y).toBeLessThan(WAVE_BAND_MAXIMUM_Y);
 
     // And the whole cycle's §110 worst case: 0.131–0.135 m, all of it in the
     // physical phase. The lower bound says the ragdoll really happened; the

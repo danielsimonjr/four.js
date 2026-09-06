@@ -54,8 +54,14 @@
  * interpolated rendering, and no amount of unit testing over `PoseBuffer` can
  * establish that the assembled application, renderer and GL backend deliver it.
  *
- * Sampling is still coarse — screenshots are far slower than frames, so the
- * suite watches at ~7 Hz — and none of this resolves single-frame judder.
+ * The interpolation sampler is **frame-synchronised**, not wall-clock
+ * synchronised. A time-spaced screenshot loop aliases against the two-frame
+ * alpha cycle: if a consistently even number of virtual frames elapses between
+ * captures, every sample lands on the same phase and `midStep` is 0 even
+ * though §43 is working. After the clock is installed, the test waits for a
+ * known number of rAF callbacks (1, 2, 3, … so both phases appear), freezes
+ * the injected clock on that frame, and only then screenshots. None of this
+ * resolves single-frame judder.
  *
  * ## Method notes
  *
@@ -73,6 +79,23 @@
 import { inflateSync } from "node:zlib";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
+
+declare global {
+  interface Window {
+    /** rAF callbacks delivered by {@link useVirtualFrameClock}. */
+    __fourVirtualFrames?: number;
+    /**
+     * When true, the injected clock holds virtual time so a screenshot observes
+     * the frame that was just drawn rather than a later one.
+     */
+    __fourVirtualClockPaused?: boolean;
+    /**
+     * Frame count at which the injected clock pauses itself, after delivering
+     * that callback. `null` means "run freely".
+     */
+    __fourVirtualFrameTarget?: number | null;
+  }
+}
 
 // --- PNG decoding (copied from example.spec.ts) -----------------------------
 
@@ -361,18 +384,15 @@ const MID_STEP_HIGH = 0.8;
 /**
  * How many of the {@link INTERPOLATION_SAMPLE_COUNT} frames must land mid-step.
  *
- * Half of them should, and the reference run measured 8 of 12. Requiring 2
- * leaves room for the sampling to catch alpha-0 frames repeatedly while still
- * being impossible for a renderer that snaps to the latest fixed step, which
- * would score 0.
+ * Half of them should: the sampler now advances one virtual frame at a time,
+ * so the 0.5 / 0.0 alternation is *chosen*. Requiring 2 still leaves room for
+ * a missed odd frame while remaining impossible for a renderer that snaps to
+ * the latest fixed step, which would score 0.
  */
 const MINIMUM_MID_STEP_FRAMES = 2;
 
 /** Frames sampled by the interpolation test. */
 const INTERPOLATION_SAMPLE_COUNT = 12;
-
-/** Spacing between those samples, seconds. */
-const INTERPOLATION_SAMPLE_INTERVAL_SECONDS = 0.09;
 
 /** Nominal spacing between samples, seconds. */
 const SAMPLE_INTERVAL_SECONDS = 0.15;
@@ -562,12 +582,49 @@ async function useVirtualFrameClock(
   await page.addInitScript((milliseconds: number) => {
     const schedule = globalThis.requestAnimationFrame.bind(globalThis);
     let virtualTime = 0;
-    globalThis.requestAnimationFrame = (callback: FrameRequestCallback) =>
-      schedule(() => {
+    const clock = globalThis as typeof globalThis & Window;
+    clock.__fourVirtualFrames = 0;
+    clock.__fourVirtualClockPaused = false;
+    clock.__fourVirtualFrameTarget = null;
+    clock.requestAnimationFrame = (callback: FrameRequestCallback) =>
+      schedule(function tick() {
+        if (clock.__fourVirtualClockPaused) {
+          schedule(tick);
+          return;
+        }
         virtualTime += milliseconds;
+        clock.__fourVirtualFrames += 1;
         callback(virtualTime);
+        const target = clock.__fourVirtualFrameTarget;
+        if (target !== null && clock.__fourVirtualFrames >= target) {
+          clock.__fourVirtualClockPaused = true;
+        }
       });
   }, frameSeconds * 1000);
+}
+
+/** How many virtual frames the injected clock has delivered. */
+async function virtualFrameCount(page: Page): Promise<number> {
+  return page.evaluate(() => window.__fourVirtualFrames ?? 0);
+}
+
+/**
+ * Lets the injected clock deliver exactly `count` more rAF callbacks, then
+ * holds it there so a screenshot observes that phase.
+ */
+async function advanceVirtualFrames(page: Page, count: number): Promise<void> {
+  const target = (await virtualFrameCount(page)) + count;
+  await page.evaluate((next: number) => {
+    window.__fourVirtualFrameTarget = next;
+    window.__fourVirtualClockPaused = false;
+  }, target);
+  await page.waitForFunction(
+    (next: number) =>
+      (window.__fourVirtualFrames ?? 0) >= next &&
+      window.__fourVirtualClockPaused === true,
+    target,
+    { timeout: 10_000 },
+  );
 }
 
 /** Screenshots until a drawn frame appears or the budget runs out. */
@@ -737,15 +794,27 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
     // 0.5 and 0.0 no matter what the machine's real refresh rate is. Without
     // this the two rates are equal here and alpha never leaves ~0, which is
     // exactly the case §106's "despite fixed-step simulation" is not about.
+    // Samples are taken after 1, 2, 3, … virtual frames — not after a wall-clock
+    // interval — so the phase is chosen instead of inherited.
     await useVirtualFrameClock(page, VIRTUAL_FRAME_RATIO * FIXED_DELTA_SECONDS);
     const errors = await openExample(page);
     const canvas = page.locator("#scene");
     await expect(canvas).toBeVisible();
     await waitForDrawnFrame(canvas);
 
+    // Freeze the virtual clock so the first advance starts from a known count
+    // rather than from whatever the drawn-frame wait happened to land on.
+    await page.evaluate(() => {
+      window.__fourVirtualClockPaused = true;
+    });
+
     const fractions: number[] = [];
+    const frameNumbers: number[] = [];
     for (let i = 0; i < INTERPOLATION_SAMPLE_COUNT; i++) {
-      await page.waitForTimeout(INTERPOLATION_SAMPLE_INTERVAL_SECONDS * 1000);
+      // One virtual frame per sample: the injected clock's odd frames are
+      // alpha 0.5 and the even frames are 0.0, so both phases appear.
+      await advanceVirtualFrames(page, 1);
+      frameNumbers.push(await virtualFrameCount(page));
       const image = await grab(canvas);
       const fix = locateOrbiter(image);
       expect(
@@ -770,7 +839,8 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
       (f) => f >= MID_STEP_LOW && f <= MID_STEP_HIGH,
     ).length;
     console.log(
-      `position within fixed step: ${fractions.map((f) => f.toFixed(3)).join(", ")}`,
+      `virtual frames: ${frameNumbers.join(", ")}; ` +
+        `position within fixed step: ${fractions.map((f) => f.toFixed(3)).join(", ")}`,
     );
     console.log(
       `frames drawn strictly between simulation states: ${String(midStep)}/${String(INTERPOLATION_SAMPLE_COUNT)}`,
