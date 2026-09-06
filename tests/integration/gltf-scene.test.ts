@@ -43,11 +43,18 @@ import { describe, expect, it } from "vitest";
 
 import { RecordingCanvas, createRecordingGl } from "./helpers/recording-gl.js";
 
-const FIXTURES = fileURLToPath(new URL("../fixtures/gltf/", import.meta.url));
+/**
+ * The fixture directory **as a URL** — see `tests/determinism/gltf-load.test.ts` for the
+ * full reason. `@four/assets` resolves a glTF's relative URIs against the asset's URL by
+ * splitting on "/", so a native Windows path collapses the base to "" and sends
+ * `quad.bin` to the process CWD.
+ */
+const FIXTURES = new URL("../fixtures/gltf/", import.meta.url).href;
 
 /** A `FetchLike` over the fixtures directory — the documented wiring. */
 async function fetchFile(url: string): Promise<FetchResponse> {
-  const bytes = await readFile(url);
+  // The one place that touches the filesystem, so the one place a URL becomes a path.
+  const bytes = await readFile(fileURLToPath(url));
   const buffer = bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,

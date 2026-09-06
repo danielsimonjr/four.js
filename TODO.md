@@ -6,16 +6,27 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] **No `.gitattributes`, so digest-pinned fixtures break on any Windows checkout.**
-      `tests/fixtures/gltf/quad.gltf` arrives with **104 CRLF and 0 LF** here, because
-      nothing tells git to leave it alone. Three suites fail locally as a result and pass
-      in CI: `determinism/gltf-load` (both "agree byte-for-byte" and "the fixture digests
-      are pinned"), `integration/gltf-scene`, and `determinism/path`.
-      A §33 determinism test that hashes file bytes cannot survive a line-ending rewrite,
-      so the fixtures need `-text` (or the repo needs `* text=auto` with fixtures pinned).
-      Same class as the two Windows-only defects already fixed today: invisible on CI
-      because no gate runs there.
+- [x] **Three cross-package suites failed on Windows — a test handed a native path where
+      a URL belongs.** `bun run test:suites` is now **90/90 green here**, for the first time.
 
+      **My first diagnosis was wrong and is recorded as such.** I filed this as a missing
+      `.gitattributes`, on the evidence that `tests/fixtures/gltf/quad.gltf` checks out
+      with 104 CRLF and 0 LF. That observation is true and irrelevant: the pinned digest is
+      taken over *parsed* content, and `JSON.parse` does not care about line endings.
+
+      The real error was `ENOENT: open 'C:/Users/danie/Github/four.js/quad.bin'` — the
+      buffer URI resolving against the process CWD. `resolveUri` in `@four/assets`
+      resolves a glTF's relative URIs against the asset's **URL**, lexically, splitting on
+      `/`. That is correct and deliberate (§33: the package names no `URL` global). The
+      tests passed `fileURLToPath(...)` — a *native* path — so on Windows
+      `lastIndexOf("/")` returns −1, the base collapses to `""`, and `quad.bin` went to
+      the CWD. Invisible on POSIX, where a native path is also `/`-separated.
+
+      Fixed in `tests/determinism/gltf-load.test.ts` and `tests/integration/gltf-scene.test.ts`:
+      the fixture directory stays a URL all the way to the loader, and becomes a path only
+      at the single call that touches the filesystem. The library was not changed — it was
+      never wrong. The third failure, `determinism/path.test.ts`, passes on a quiet machine;
+      it was contention, not a defect.
 - [ ] **Five tests time out under `bun run test` on Windows; none is a code defect.**
       Surfaced the moment the runner above started working. All are 5 s `testTimeout`
       expiries, not wrong answers:

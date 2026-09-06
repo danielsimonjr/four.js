@@ -29,10 +29,22 @@ import {
 } from "@four/assets";
 import { describe, expect, it } from "vitest";
 
-const FIXTURES = fileURLToPath(new URL("../fixtures/gltf/", import.meta.url));
+/**
+ * The fixture directory **as a URL**, not as a native path.
+ *
+ * `resolveUri` in `@four/assets` resolves a glTF's relative URIs against the asset's URL
+ * by splitting on "/" -- correct, and deliberate: a glTF URL is always "/"-separated and
+ * that package names no `URL` global (§33). Handing it `fileURLToPath(...)` worked only
+ * because a POSIX native path is also "/"-separated. On Windows the separator is "\\",
+ * `lastIndexOf("/")` returns -1, the base collapses to "", and `quad.bin` resolved
+ * against the process CWD -- so this determinism test could not open its own fixture.
+ */
+const FIXTURES = new URL("../fixtures/gltf/", import.meta.url).href;
 
 async function fetchFile(url: string): Promise<FetchResponse> {
-  const bytes = await readFile(url);
+  // The loader hands back a `file:` URL, because that is what it was given. This is the
+  // one place that touches the filesystem, so this is where it becomes a path.
+  const bytes = await readFile(fileURLToPath(url));
   const buffer = bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,
@@ -53,7 +65,7 @@ function loadFixture(name: string): Promise<GltfAsset> {
       ok: true,
       status: 200,
       arrayBuffer: async () => {
-        const bytes = await readFile(`${FIXTURES}${name}`);
+        const bytes = await readFile(fileURLToPath(`${FIXTURES}${name}`));
         return bytes.buffer.slice(
           bytes.byteOffset,
           bytes.byteOffset + bytes.byteLength,

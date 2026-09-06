@@ -8,6 +8,25 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — the glTF tests could not open their own fixture on Windows
+
+- **`tests/determinism/gltf-load.test.ts` and `tests/integration/gltf-scene.test.ts`**
+  failed here with `ENOENT: open 'C:/Users/.../four.js/quad.bin'` — the relative buffer
+  URI resolving against the process working directory instead of the asset's folder.
+
+  The loader is not at fault. `resolveUri` in `@four/assets` resolves a glTF's relative
+  URIs against the asset's **URL**, lexically, splitting on `/`; its docblock says why
+  (§33 — the package names no `URL` global, so resolution is identical everywhere). The
+  tests handed it `fileURLToPath(...)`, a *native* path. On Windows the separator is `\`,
+  so `lastIndexOf("/")` is −1, the base collapses to `""`, and every relative URI
+  resolves against the CWD. On POSIX a native path is also `/`-separated, which is why a
+  determinism suite could prove determinism on CI and fail to open its own fixture here.
+
+  Both tests now keep the fixture directory as a URL all the way to the loader and convert
+  to a path at the one call that touches the filesystem. **No library change.**
+
+  `bun run test:suites` is now 90/90 on Windows, where it had never completed.
+
 ### 2026-09-06 — reverted the `new Node()` guard: §33 forbids the flag in `@four/scene`
 
 - **The DEV-gated `new Node()` warning is withdrawn.** It put `if (DEV && …)` in
