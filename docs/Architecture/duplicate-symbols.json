@@ -8,7 +8,7 @@
       "TRUE_DUPLICATE": 0,
       "DISPATCH_VARIANT": 0,
       "ALIAS_DELEGATION": 0,
-      "ALLOWLISTED": 3
+      "ALLOWLISTED": 4
     },
     "typeByTag": {
       "TRUE_DUPLICATE": 0,
@@ -229,6 +229,28 @@
         }
       ],
       "canonicalHint": "internal-only",
+      "tag": "ALLOWLISTED"
+    },
+    {
+      "name": "TRAIL_VERTEX_FLOATS",
+      "category": "constant",
+      "definers": [
+        {
+          "file": "packages/particles/src/trail.ts",
+          "package": "@four/particles",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
+        },
+        {
+          "file": "packages/render/src/particles.ts",
+          "package": "@four/render",
+          "public": true,
+          "tag": "ALLOWLISTED",
+          "reason": "four.js: deliberate duck-typed cross-package contract for CPU particle trail ribbon vertices (position xyz + rgba), same matrix constraint as PARTICLE_INSTANCE_FLOATS — @four/particles builds the mesh and @four/render types the render-item stride without a forbidden particles↔render dependency edge; drift is caught by shared tests. 2026-09-06 trail tier gate wiring."
+        }
+      ],
+      "canonicalHint": "AMBIGUOUS",
       "tag": "ALLOWLISTED"
     }
   ],
