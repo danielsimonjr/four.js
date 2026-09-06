@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 // Shared coverage gate for the per-package unit suites.
@@ -14,6 +16,32 @@ import { defineConfig } from "vitest/config";
 // package's own source. `coverage.all` (Vitest's default) keeps files that no
 // test ever imports in the denominator, so a package cannot pass by shipping
 // untested modules.
+//
+// Two gates, stacked (measured 2026-09-06 against all 24 packages):
+//
+// 1. Package aggregate ≥ 95% lines / statements / functions / branches — the
+//    existing CI threshold. Do not raise this; a strong file may still lift a
+//    package average.
+// 2. Per-file floor 80% lines / functions / statements. A 0% file can no longer
+//    hide behind that average. Branches are omitted here: `math/src/alloc-counter.ts`
+//    is 75% branches on the `Number.MAX_SAFE_INTEGER` wrap, and a four-branch
+//    file's percentage is too volatile for a per-file branch gate. The package
+//    95% still covers branches in aggregate.
+//
+// Why a reporter, not `thresholds.perFile: true`: Vitest 3.2.7 applies that
+// flag to the *same* numbers as the package gate, so enabling it would require
+// every file ≥ 95% (or would force the package numbers down). The object form
+// (`perFile: { lines: 80 }`) is a later Vitest API. The Istanbul reporter in
+// `tools/per-file-coverage-floor.cjs` is the 3.2.7-compatible split.
+//
+// Weakest intentional file: `physics-rapier/src/init.ts` at 86.95% lines — the
+// transcribed Rapier wasm typings / load cache (§37). 80% sits just below that
+// with a few points of remapping headroom. No other measured file is below 95%
+// lines or functions. Stubs (`physics-box2d`, `physics-soft`, `render-canvas`,
+// `render-svg`) stay *included*: each is a one-line `PACKAGE_NAME` export with a
+// smoke test at 100%. Type-only modules are empty (0 statements → skipped by
+// the reporter, 100% in the table). There is no generated `src/`. Vitest's
+// default exclude already drops `**/*.d.ts`.
 export default defineConfig({
   test: {
     passWithNoTests: true,
@@ -35,12 +63,25 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      // Text only. Vitest's default reporter set also writes `html`, `clover`,
-      // and `json` into `packages/*/coverage/`; that directory is gitignored but
-      // NOT ignored by `eslint.config.js`, so the generated `block-navigation.js`
-      // and friends turn `bun run lint` red after any coverage run. This gate
-      // only needs the terminal table and the threshold check.
-      reporter: ["text"],
+      // Text plus the per-file floor reporter (writes nothing). Vitest's default
+      // reporter set also writes `html`, `clover`, and `json` into
+      // `packages/*/coverage/`; that directory is gitignored but NOT ignored by
+      // `eslint.config.js`, so the generated `block-navigation.js` and friends
+      // turn `bun run lint` red after any coverage run. This gate only needs the
+      // terminal table, the package threshold check, and the per-file floor.
+      reporter: [
+        "text",
+        [
+          fileURLToPath(
+            new URL("./tools/per-file-coverage-floor.cjs", import.meta.url),
+          ),
+          {
+            lines: 80,
+            functions: 80,
+            statements: 80,
+          },
+        ],
+      ],
       thresholds: {
         lines: 95,
         statements: 95,
