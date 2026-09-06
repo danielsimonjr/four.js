@@ -33,6 +33,10 @@ specification; until then, entries are grouped by date under **Unreleased**.
   was reusing unrestored spies and counting leftover §19 / §42 /
   `jointMotorEffortCap` warnings from earlier tests in the same file. That
   was the #62 / eslint-10 blocker. Assertions were not widened.
+- **A-16 manifest catalog.** `preloadManifestIntoCatalog` walks a §79
+  manifest, loads each key, and returns a synchronous `SceneResourceCatalog`.
+- **§27 field batch + interceptTime.** `ForceField.sampleAll` is the optional
+  stride-3 SoA path; steering's intercept-time now calls prediction's export.
 
 ### 2026-09-06 — `js-yaml 5` breaks the dependency-graph tool, and the fix is not ours
 

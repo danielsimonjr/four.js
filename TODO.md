@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **68 open**, 121 done (six closed this pass: Windows Chromium binaries, Windows unit-test timeouts, Dependabot `bun.lock` pipeline, A-26 renderer table, §42 warn-spy isolation / #62).
+Counts as of 2026-09-06: **65 open**, 124 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -41,7 +41,6 @@ Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
 - Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is invisible; schedule blending with §60a color management work
-- §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API is the scoped fix; benchmark attribution in benchmarks/results/)
 - Size budgets are thin after R-36 (measured A/B, 2026-08-09)
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
 - Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear (candidates: package counts, test-suite counts in `tests/README.md`, the §120 verdict totals) — each addition must stay decidable by reading files
@@ -61,7 +60,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export (dated note in steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -98,7 +97,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-5 follow-ups:
 - A-1 follow-ups:
 - A-18 remainder:
-- A-16 remainder (manifest half):
+- A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
 - §96 residue:
 - R-19/R-20 follow-ups:
@@ -1227,12 +1226,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       DONE 2026-08-21** (SHA-256 behind an injected `digest`, `expectedHash`
       verification that refuses rather than passes, §79 manifest in `src/manifest.ts`)
       — `A-16`'s manifest is unblocked
-- [ ] **A-16 remainder (manifest half):** the §79 manifest substrate ships in
-      `@four/assets` (2026-08-21). What is left is `@four/four`:
-      `SceneResourceCatalog.get(key)` is synchronous, so wiring is preload-then-catalog
-      — walk a document's resource keys, `loadFromManifest` each, hand the resulting map
-      to `resourceCatalog(...)`. `tests/integration/texture-manifest.test.ts` runs the
-      seam by hand today
+- [x] **A-16 remainder (manifest half):** DONE 2026-09-06 —
+      `preloadManifestIntoCatalog` in `@four/four` walks a manifest, loads each
+      key, and returns `resourceCatalog(...)`. `get(key)` stays synchronous.
+      `tests/integration/texture-manifest.test.ts` uses the helper; the
+      hand-rolled walk remains as a lower-level proof.
 - [ ] **A-19 remainder:** renderer-side §77 only (`R-30b`: cube/array/3D,
       compressed containers, video). §78 glTF/GLB shipped 2026-08-29 at the
       glTF 2.0-core tier; its staged residue lives with other rows: morph
@@ -1401,15 +1399,16 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 9, 2026-08-02)
 
-- [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
-      is the scoped fix; benchmark attribution in benchmarks/results/)
+- [x] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
+      is the scoped fix; benchmark attribution in benchmarks/results/) —
+      DONE 2026-09-06: `ForceField.sampleAll` + `ForceFieldSystem` uses it when present.
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
       GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
-      steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      steering.ts) — **interceptTime fold DONE 2026-09-06**; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
       (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
