@@ -81,7 +81,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-32 — textured / rotated / soft particles.
 - R-33 — §112's exit, rendered as well as simulated.
 - R-31 — GPU particle simulation integrator tier — DONE 2026-08-29 (`simulation: "gpu"`); §27 GPU fields / depth-buffer collision / GPU snapshots remain under R-31 residue.
-- PH-22 residue (re-read 2026-08-21):
+- PH-22 residue (re-read 2026-08-21): PH-22f anchors DONE 2026-09-06; path-planning RFC Proposed.
 - R-8 follow-ups:
 - §8 node-level `NodeSpace` component — DONE 2026-09-06.
 - §21 `"local-plane"` simulation frame — DONE 2026-09-06.
