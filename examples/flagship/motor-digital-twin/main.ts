@@ -264,6 +264,7 @@ import {
   PerspectiveCamera,
   ScreenCamera,
   Transform,
+  applyLayers,
   createFullscreenViewport,
   defineLayer,
   layerMask,
@@ -2634,6 +2635,10 @@ uiRoot.skin = panelSkin(PANEL_COLOR, PANEL_QUAD_Z);
 panelTitle.skin = labelSkin();
 panelStatus.skin = labelSkin();
 uiRoot.layout();
+// §46: the UI viewport already masks to `UI_LAYER`; the panel widgets
+// themselves stayed on the default layer. One walk after skins attach
+// puts the whole panel on the pass that draws it.
+applyLayers(uiRoot, UI_LAYER);
 
 // --- picking, pointer and keyboard (§71, §72, §75) ---------------------------
 
@@ -2808,14 +2813,15 @@ function collectOverlaySegments(): void {
   // `world.adapter` is a `SolverBodyAccess`, which satisfies the diagnostics
   // package's structural `DebugBodyAccess` without either package importing the
   // other — so an application can assemble the overlay while §3.1 stays frozen.
-  // The arms are deliberately **longer than the bodies they mark** — a cross
-  // drawn inside an opaque mesh is hidden by the depth test, and an overlay
-  // nobody can see is not a diagnostic. The §118 flagship measured the same
-  // thing (at 0.18 m its crosses contributed exactly zero pixels); this machine
-  // is a metre across, so the arms are 1.3 m each — and no longer, because the
-  // cross's Z arm projects as a long slant toward the vanishing point when the
-  // machine is off the camera's axis, and at 2.6 m it reached across the
-  // instrument column (measured, then shortened).
+  // The documented default (`CollectBodyOriginsOptions.size`, 0.1 world units)
+  // is far shorter than this machine. The arms are deliberately **longer than
+  // the bodies they mark** — a cross drawn inside an opaque mesh is hidden by
+  // the depth test. The §118 flagship measured the same thing (at 0.18 m its
+  // crosses contributed exactly zero pixels); this machine is a metre across,
+  // so the arms are 1.3 m each — and no longer, because the cross's Z arm
+  // projects as a long slant toward the vanishing point when the machine is
+  // off the camera's axis, and at 2.6 m it reached across the instrument
+  // column (measured, then shortened).
   collectBodyOrigins(world.adapter, overlayBuffer, {
     size: OVERLAY_CROSS_SIZE,
     color: OVERLAY_ORIGIN_COLOR,

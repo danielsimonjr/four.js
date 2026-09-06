@@ -15,13 +15,18 @@
  * | `SIMULATION_SYSTEMS` | `@four/motion` | the §39 `SystemRegistry` |
  * | `RENDERER_REGISTRY` | `@four/render` | the §62 `RendererRegistry` |
  * | `RENDER_GRAPH` | `@four/render` | the application's §63 `RenderGraph` |
+ * | `COMPUTE_WORKLOADS` | `@four/render` | a named `ComputePassDescriptor` factory table |
  * | `SOLVER_REGISTRY` | `@four/physics` | the §37 `SolverRegistry` |
  * | `COMPONENT_SERIALIZERS` | `@four/serialization` | the §79 registry |
  * | `SCENE_MIGRATIONS` | `@four/serialization` | the §80 upgrade chain |
+ * | `ASSET_LOADERS` | `@four/assets` | a named `AssetLoader` table |
+ * | `SHADER_OPERATORS` | `@four/materials` | a named shader-operator factory table |
+ * | `UI_CONTROLS` | `@four/ui` | a named widget-constructor table |
+ * | `EDITOR_TOOLS` | `four` (host-side) | a named editor-tool factory table |
  *
  * Each owner's `capabilities.ts` carries the token's full documentation:
- * what §81 point it answers, who provides it, and why it is (or, five times
- * out of six, is not) revocable.
+ * what §81 point it answers, who provides it, and why it is (or, once out
+ * of eleven, is not) revocable.
  *
  * ## Why this module still exists
  *
@@ -38,18 +43,29 @@
  * depends on `core` (for `defineCapability`) and owns its registry type, and
  * `four` already depends on all four owners.
  *
- * ## What is absent, and why absence is the honest signal
+ * ## All eleven §81 points now have a token
  *
- * §81 lists eleven extension points. Six have a capability; five — asset
- * formats, materials and shader nodes, UI controls, editor tools, and
- * compute workloads — have **no token at all**, because there is no registry
- * to hand over. A plugin that asks for one it needs therefore fails at
- * install, loudly, naming the capability, instead of registering into
- * nothing. Adding a token later is additive: its owner declares it, this
- * module re-exports it, and `@four/core` never changes.
+ * §81 lists eleven extension points. Six shipped with the 2026-08-29 move;
+ * the remaining five — asset formats, materials and shader nodes, UI
+ * controls, editor tools, and compute workloads — arrive here with a real
+ * (minimal) registry each. A plugin that asks for one an `Application`
+ * does not hold still fails at install, loudly, naming the capability:
+ * `Application` continues to provide only the two registries it actually
+ * owns (`SIMULATION_SYSTEMS`, and `RENDERER_REGISTRY` when scoped). A
+ * standalone host provides the rest.
  */
 
+export { ASSET_LOADERS } from "@four/assets";
+export { SHADER_OPERATORS } from "@four/materials";
 export { SIMULATION_SYSTEMS } from "@four/motion";
 export { SOLVER_REGISTRY } from "@four/physics";
-export { RENDERER_REGISTRY, RENDER_GRAPH } from "@four/render";
+export {
+  COMPUTE_WORKLOADS,
+  RENDERER_REGISTRY,
+  RENDER_GRAPH,
+} from "@four/render";
 export { COMPONENT_SERIALIZERS, SCENE_MIGRATIONS } from "@four/serialization";
+export { UI_CONTROLS } from "@four/ui";
+export { EDITOR_TOOLS } from "./capabilities.js";
+export type { EditorToolFactory } from "./editor-tools.js";
+export { EditorToolRegistry } from "./editor-tools.js";

@@ -40,6 +40,12 @@
 
 export const PACKAGE_NAME = "@four/ui";
 
+// §81's UI-control token (RFC 0002): declared here; `@four/four`'s
+// `plugins.ts` re-exports the same object.
+export { UI_CONTROLS } from "./capabilities.js";
+export type { UIControlConstructor } from "./control-registry.js";
+export { UIControlRegistry } from "./control-registry.js";
+
 export type {
   AccessibilityMirror,
   AccessibilityMirrorOptions,

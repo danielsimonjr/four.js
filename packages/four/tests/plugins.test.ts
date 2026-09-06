@@ -19,12 +19,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import { Application } from "../src/application.js";
 import {
+  ASSET_LOADERS,
   COMPONENT_SERIALIZERS,
+  COMPUTE_WORKLOADS,
+  EDITOR_TOOLS,
   RENDERER_REGISTRY,
   RENDER_GRAPH,
   SCENE_MIGRATIONS,
+  SHADER_OPERATORS,
   SIMULATION_SYSTEMS,
   SOLVER_REGISTRY,
+  UI_CONTROLS,
 } from "../src/plugins.js";
 
 /** A §39 system that counts the fixed steps it sees. */
@@ -164,6 +169,11 @@ describe("ApplicationOptions.plugins", () => {
       COMPONENT_SERIALIZERS,
       SCENE_MIGRATIONS,
       RENDER_GRAPH,
+      ASSET_LOADERS,
+      SHADER_OPERATORS,
+      UI_CONTROLS,
+      EDITOR_TOOLS,
+      COMPUTE_WORKLOADS,
     ];
     for (const capability of unheld) {
       const app = new Application({
@@ -279,12 +289,21 @@ describe("capability tokens", () => {
     const physics = await import("@four/physics");
     const render = await import("@four/render");
     const serialization = await import("@four/serialization");
+    const assets = await import("@four/assets");
+    const materials = await import("@four/materials");
+    const ui = await import("@four/ui");
+    const own = await import("../src/capabilities.js");
     expect(SIMULATION_SYSTEMS).toBe(motion.SIMULATION_SYSTEMS);
     expect(SOLVER_REGISTRY).toBe(physics.SOLVER_REGISTRY);
     expect(RENDERER_REGISTRY).toBe(render.RENDERER_REGISTRY);
     expect(RENDER_GRAPH).toBe(render.RENDER_GRAPH);
+    expect(COMPUTE_WORKLOADS).toBe(render.COMPUTE_WORKLOADS);
     expect(COMPONENT_SERIALIZERS).toBe(serialization.COMPONENT_SERIALIZERS);
     expect(SCENE_MIGRATIONS).toBe(serialization.SCENE_MIGRATIONS);
+    expect(ASSET_LOADERS).toBe(assets.ASSET_LOADERS);
+    expect(SHADER_OPERATORS).toBe(materials.SHADER_OPERATORS);
+    expect(UI_CONTROLS).toBe(ui.UI_CONTROLS);
+    expect(EDITOR_TOOLS).toBe(own.EDITOR_TOOLS);
   });
 
   it("names every token once, with RFC 0002's revocability dispositions", () => {
@@ -295,6 +314,11 @@ describe("capability tokens", () => {
       COMPONENT_SERIALIZERS,
       SCENE_MIGRATIONS,
       RENDER_GRAPH,
+      ASSET_LOADERS,
+      SHADER_OPERATORS,
+      UI_CONTROLS,
+      EDITOR_TOOLS,
+      COMPUTE_WORKLOADS,
     ]).toEqual([
       { name: "four:simulation-systems", revocable: true },
       { name: "four:renderer-registry", revocable: false },
@@ -302,6 +326,11 @@ describe("capability tokens", () => {
       { name: "four:component-serializers", revocable: false },
       { name: "four:scene-migrations", revocable: false },
       { name: "four:render-graph", revocable: false },
+      { name: "four:asset-loaders", revocable: false },
+      { name: "four:shader-operators", revocable: false },
+      { name: "four:ui-controls", revocable: false },
+      { name: "four:editor-tools", revocable: false },
+      { name: "four:compute-workloads", revocable: false },
     ]);
   });
 });

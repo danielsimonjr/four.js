@@ -992,8 +992,10 @@ export class Application extends EventEmitter<ApplicationEventMap> {
    * count after the frame. Two of §84's eleven counters still have no producer
    * anywhere in this repository:
    *
-   * - `gpuFrameTime` needs the GPU timestamp queries §62's capabilities do not
-   *   report yet;
+   * - `gpuFrameTime` needs a last-frame GPU duration. §62's
+   *   `RendererCapabilities.timestampQueries` is reported, but no renderer
+   *   exposes a cheap timestamp-query read this class can copy, and inventing
+   *   that read is a `@four/render` change. Left `NaN`;
    * - `contacts` has no reader at all. `PhysicsWorld` publishes contact
    *   *events* (§29's `collisionstart`/`collisionend`) and no live manifold
    *   count, and counting the events of a step — or differencing begin against

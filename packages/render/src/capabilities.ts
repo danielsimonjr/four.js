@@ -20,6 +20,7 @@
 
 import { defineCapability } from "@four/core";
 
+import type { ComputeWorkloadRegistry } from "./compute-workloads.js";
 import type { RenderGraph } from "./render-graph.js";
 import type { RendererRegistry } from "./renderer-registry.js";
 
@@ -67,3 +68,17 @@ export const RENDERER_REGISTRY =
  */
 export const RENDER_GRAPH =
   /* @__PURE__ */ defineCapability<RenderGraph>("four:render-graph");
+
+/**
+ * §81's *"compute workloads"*: a named {@link ComputeWorkloadRegistry} of
+ * `ComputePassDescriptor` factories.
+ *
+ * Lives on this package, not a GPU backend, because the descriptor is
+ * already backend-independent (`compute.ts`). Not revocable — the registry
+ * has no removal. A plugin that registered a workload has no way to take
+ * it back; re-registering the identical factory is a no-op.
+ */
+export const COMPUTE_WORKLOADS =
+  /* @__PURE__ */ defineCapability<ComputeWorkloadRegistry>(
+    "four:compute-workloads",
+  );

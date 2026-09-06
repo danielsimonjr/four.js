@@ -1,5 +1,11 @@
 export const PACKAGE_NAME = "@four/materials";
 
+// §81's materials / shader-node token (RFC 0002): declared here;
+// `@four/four`'s `plugins.ts` re-exports the same object.
+export { SHADER_OPERATORS } from "./capabilities.js";
+export type { ShaderOperatorFactory } from "./shader-operators.js";
+export { ShaderOperatorRegistry } from "./shader-operators.js";
+
 export type { LitMaterialOptions } from "./lit-material.js";
 export { LitMaterial } from "./lit-material.js";
 export type { BlendMode, MaterialOptions } from "./material.js";

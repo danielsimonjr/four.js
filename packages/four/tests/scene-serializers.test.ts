@@ -20,6 +20,7 @@ import {
   type Material,
 } from "@four/materials";
 import {
+  CameraShake,
   FollowRig,
   KinematicController,
   LookAtConstraint,
@@ -767,6 +768,43 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     expect(restored?.translationActive).toBe(false);
   });
 
+  it("round-trips CameraShake trauma as scene state", () => {
+    const io = registerSceneNodeTypes();
+    const root = new Group();
+    const shake = root.addComponent(
+      new CameraShake({
+        amplitude: new Vector3(2, 1, 0.5),
+        frequency: 8,
+        seed: 17,
+        trauma: 0.4,
+        traumaDecay: 1.5,
+      }),
+    );
+    shake.rotationAmplitude.set(0.1, 0, 0);
+
+    const reloaded = instantiateScene(
+      decodeSceneDocument(
+        encodeSceneDocument(serializeScene(root, io.components, io.write)),
+      ),
+      io.components,
+      io.read,
+    );
+
+    const restored = reloaded.getComponent(CameraShake);
+    expect(restored).toBeInstanceOf(CameraShake);
+    expect(restored?.host).toBe(reloaded);
+    expect(restored?.frequency).toBe(8);
+    expect(restored?.seed).toBe(17);
+    expect(restored?.trauma).toBe(0.4);
+    expect(restored?.traumaDecay).toBe(1.5);
+    expect(restored?.amplitude.x).toBe(2);
+    expect(restored?.amplitude.y).toBe(1);
+    expect(restored?.amplitude.z).toBe(0.5);
+    expect(restored?.rotationAmplitude.x).toBe(0.1);
+    expect(restored?.rotationAmplitude.y).toBe(0);
+    expect(restored?.rotationAmplitude.z).toBe(0);
+  });
+
   it("round-trips the §44 camera rigs and §12's look-at constraint (2026-08-13)", () => {
     // The three components that arrived with `ConstraintSystem`. What a
     // document carries is the authored configuration: a `Vector3` target is
@@ -916,6 +954,7 @@ describe("registerSceneNodeTypes — components (PH-17)", () => {
     // The list is asserted as well as walked: a component that stops being
     // exported would otherwise make this test pass by finding less.
     expect([...shipped.keys()].sort()).toEqual([
+      "CameraShake",
       "character-controller",
       "collider",
       "first-person-look",

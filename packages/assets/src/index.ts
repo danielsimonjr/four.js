@@ -28,6 +28,12 @@
 
 export const PACKAGE_NAME = "@four/assets";
 
+// §81's asset-format token (RFC 0002): declared here; `@four/four`'s
+// `plugins.ts` re-exports the same object.
+export { ASSET_LOADERS } from "./capabilities.js";
+export type { RegisteredAssetLoader } from "./loader-registry.js";
+export { AssetLoaderRegistry } from "./loader-registry.js";
+
 export type {
   AbortHandle,
   AbortSignalLike,
