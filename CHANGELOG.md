@@ -8,6 +8,20 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Smoothness interpolation waiter
+
+- **`waitForVirtualFrameParity`.** Poll `__fourVirtualFrames` through
+  `page.evaluate`, not `waitForFunction`. Playwright's default rAF
+  polling deadlocks against this test's `requestAnimationFrame`
+  override and ate the 120 s test timeout on CI (`b55a8c1`).
+- **Size budgets after #70.** first-3d 38 → 38.5 kB (measured 38.18),
+  particles-demo 36.5 → 37 kB (36.77), ui-demo 45 → 45.5 kB (45.27).
+  The growth is #70's field torque / unlit blend / metal-roughness
+  path, not this waiter.
+- **§33 GATED list.** `asset-manager.ts` is allowlisted (duplicate-load
+  warn). `warnAuthorityConflict` no longer imports `DEV` — `@four/scene`
+  cannot gate on the build flag.
+
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
 - **Unlit draw order.** Texture bind and `setFeatures` run before

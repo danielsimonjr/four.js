@@ -122,6 +122,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       from wall-clock aliasing. Failed CI on `dd03d1a` and `94860b0`; passed on
       `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
       failed — so roughly 2 in 5, and not caused by any change of mine.
+      **Follow-up 2026-09-06:** `waitForFunction` + default rAF polling hung
+      the same test for 120 s on `b55a8c1`. The waiter now polls via
+      `page.evaluate` with a 15 s budget.
 
       Diagnosis, from reading the mechanism rather than the failure rate. The test installs
       `useVirtualFrameClock(page, 1.5 × FIXED_DELTA)`, which overrides
@@ -1065,6 +1068,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed
       bumps, owner call: first-3d → 32 kB, ui-demo → 37.5 kB, particles-demo → 29.5 kB.
       The concurrent render batching work is consuming the same headroom.
+      **Bumped 2026-09-06 after #70:** first-3d 38 → 38.5 (measured 38.18),
+      particles-demo 36.5 → 37 (36.77), ui-demo 45 → 45.5 (45.27). Still thin.
 - [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
       `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
       fallback, dashes with phase offset) over `expandStroke` in §52's tessellation
