@@ -2974,6 +2974,10 @@ __FOUR_DEV__ : true` in one file (`@four/core` `dev.ts`); the identifier is neve
     `"auto"` uses registration order (§37 fixes no preference); the headless tier is
     never auto-selected; a _named_ solver is handed back unfiltered so `PhysicsWorld`
     reports mismatches with its own precise message.
+- **2026-09-06 — Auto-selection follow-ups closed.** `backend-selection.test.ts`
+  now registers real `registerWebgpuRenderer()` for §62's WebGPU rung (fallback when
+  `requestAdapter()` resolves null, and preference over WebGL 2 through `Application`).
+  ui-demo's TODO budget note (30.74/31 kB) was stale — `.size-limit.json` is 45 kB.
 - **2026-08-07 — PH-9 AnimationController.** Decisions worth keeping:
   - **The controller is a pose evaluator, not a mixer scheduler** — cross-fades need
     two clips writing one property at once, which the mixer's claim semantics call a

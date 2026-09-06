@@ -8,6 +8,41 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Auto-selection follow-ups (A-8/R-2 residue)
+
+- **`backend-selection.test.ts`.** The §62 fallback and preference tests now
+  register real `registerWebgpuRenderer()` instead of a WebGPU double — the
+  WebGPU rung of `"auto"` is exercised end-to-end through `Application`.
+  ui-demo's §86 budget note in TODO was stale (limit is 45 kB in
+  `.size-limit.json`).
+
+### 2026-09-06 — RenderTarget byteLength follows depth/stencil formats (A-5)
+
+- **`render-target-bytes.ts`.** Centralises per-texel accounting for colour,
+  plain depth (`DEPTH_COMPONENT16`), samplable depth (`depthTexture`), and packed
+  stencil (`DEPTH24_STENCIL8`). Staged float colour constants are wired for when
+  §62 widens `RenderTargetFormat`. `RenderTarget.byteLength` delegates here.
+
+### 2026-09-06 — Size budget headroom after R-36 measurements
+
+- **`.size-limit.json`.** first-3d 38→38.5 kB, particles-demo 36.5→37 kB,
+  ui-demo 45→45.5 kB gzip (+0.5 kB margin each; fresh A/B on this branch).
+
+### 2026-09-06 — Windows animation browser gate sweep cost
+
+- **`animation.spec.ts`.** Four cases shared one 16-sample SwiftShader sweep
+  in `beforeAll` instead of four independent 22-screenshot sweeps (~56 s each
+  on Windows against a 60 s budget).
+
+### 2026-09-06 — Camera rigs TODO residue (docs)
+
+- **`docs/guides/cameras-and-coordinate-conversion.md`.** Added §44 rig
+  coverage: `OrbitRig`/`FollowRig`, `TrackballRig` (`@four/scene`, R-37), and
+  the fly-camera application snippet. Updated the stale "no rig classes
+  shipped" honest-state bullet.
+- **`TODO.md`.** Closed trackball and fly items in §44/§47 residue and staged
+  rigs; `CameraShake` remains open (value-noise decision).
+
 ### 2026-09-06 — Size budgets: R-36 headroom restore
 
 - **`.size-limit.json`.** first-3d-scene 38 → 38.5 kB, particles-demo 36.5 → 37

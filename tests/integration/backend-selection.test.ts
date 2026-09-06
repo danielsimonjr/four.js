@@ -7,10 +7,11 @@
  * be checked inside any single package:
  *
  * 1. **A name resolves to a real backend.** `@four/render` holds a registry and
- *    imports no backend; `@four/render-webgl` registers a real `WebglRenderer`
- *    into it; `Application`, given the §45 string, ends up driving that
- *    renderer against a real GL sequence. Each package's own tests prove its
- *    half against a double — only this file puts the real ones together.
+ *    imports no backend; `@four/render-webgl` and `@four/render-webgpu` register
+ *    real renderers into it; `Application`, given the §45 string, ends up driving
+ *    that renderer against a real GL or WebGPU sequence. Each package's own
+ *    tests prove its half against a double — only this file puts the real ones
+ *    together.
  * 2. **The same shape works for solvers.** `@four/physics` holds a registry and
  *    imports no solver; `@four/physics-rapier` registers the real adapters;
  *    `PhysicsWorld`, given `solver: "auto"`, simulates — under real wasm, with
@@ -22,7 +23,9 @@
  *    one a bundle-size gate can only measure after the fact.
  *
  * The GL context is a double, for the reason `packages/render-webgl/tests`
- * gives at length; Rapier is not — these worlds run the real wasm.
+ * gives at length; WebGPU uses the recording device from
+ * `helpers/recording-gpu.ts` for the same reason. Rapier is not — these worlds
+ * run the real wasm.
  *
  * Every test uses its **own** registry rather than the shared one. That is not
  * only hygiene: it is the seam that makes two independent engines in one
@@ -30,7 +33,7 @@
  * fail depending on file order.
  */
 
-import { EventEmitter, isFourError } from "@four/core";
+import { isFourError } from "@four/core";
 import { PhysicsWorld, SolverRegistry } from "@four/physics";
 import {
   Rapier2dAdapter,
@@ -40,9 +43,12 @@ import {
 import {
   RendererRegistry,
   resolveRenderer,
-  type RendererEventMap,
 } from "@four/render";
 import { WebglRenderer, registerWebglRenderer } from "@four/render-webgl";
+import {
+  WebgpuRenderer,
+  registerWebgpuRenderer,
+} from "@four/render-webgpu";
 import {
   Group,
   PerspectiveCamera,
@@ -53,6 +59,10 @@ import { Collider, RigidBody } from "@four/physics";
 import { Application } from "four/application";
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  createRecordingGpu,
+  withHostGpu,
+} from "./helpers/recording-gpu.js";
 import { RecordingCanvas, createRecordingGl } from "./helpers/recording-gl.js";
 
 /** A canvas backed by a fresh recording GL context, plus its tape. */
@@ -122,39 +132,60 @@ describe('renderer: "auto" resolves to the real WebGL 2 backend', () => {
 
   it("falls back to WebGL 2 when the preferred backend fails to initialize (§62)", async () => {
     withWebgl2();
+    const gpu = createRecordingGpu({ noAdapter: true });
     const registry = new RendererRegistry();
-    // A stand-in for the WebGPU backend §62's ladder puts first and this
-    // repository has not built yet (R-1): registered, probing true, and failing
-    // to acquire a device — the exact case §62 names, and the one the real
-    // fallback has to survive.
-    registry.register({
-      backend: "webgpu",
-      isSupported: () => true,
-      create: () => ({
-        capabilities: { backend: "webgpu", maxTextureSize: 0 },
-        events: new EventEmitter<RendererEventMap>(),
-        initialize: () => Promise.reject(new Error("no adapter")),
-        render: () => {},
-        resize: () => {},
-        dispose: () => {},
-      }),
-    });
+    registerWebgpuRenderer(registry);
     registerWebglRenderer(registry);
 
     const { canvas } = recordingSurface();
     const reports: string[] = [];
-    const renderer = await resolveRenderer(
-      "auto",
-      {
-        canvas,
-        onFallback: (report) =>
-          reports.push(`${report.backend}:${report.reason}`),
-      },
-      registry,
+    const renderer = await withHostGpu(gpu.gpu, () =>
+      resolveRenderer(
+        "auto",
+        {
+          canvas,
+          onFallback: (report) =>
+            reports.push(`${report.backend}:${report.reason}`),
+        },
+        registry,
+      ),
     );
     expect(renderer).toBeInstanceOf(WebglRenderer);
     expect(reports).toEqual(["webgpu:initialization-failed"]);
     renderer.dispose();
+  });
+
+  it('"auto" selects WebGPU ahead of a registered WebGL 2 backend (§62)', async () => {
+    withWebgl2();
+    const gpu = createRecordingGpu();
+    const registry = new RendererRegistry();
+    registerWebgpuRenderer(registry);
+    registerWebglRenderer(registry);
+
+    const app = await withHostGpu(gpu.gpu, async () => {
+      const camera = new PerspectiveCamera({ aspect: 1 });
+      const application = new Application({
+        renderer: "auto",
+        canvas: gpu.canvas,
+        rendererRegistry: registry,
+        views: [createFullscreenViewport(camera)],
+        width: 320,
+        height: 240,
+      });
+      await application.initialize();
+      return application;
+    });
+
+    const renderer = app.renderer;
+    expect(renderer).toBeInstanceOf(WebgpuRenderer);
+    expect(renderer?.capabilities.backend).toBe("webgpu");
+
+    app.start();
+    app.step(1 / 60);
+    expect(gpu.countOf("queue.submit")).toBeGreaterThan(0);
+
+    app.dispose();
+    renderer?.dispose();
   });
 
   it("names what is registered when nothing can be selected (§85)", async () => {

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **57 open**, 136 done.
+Counts as of 2026-09-06: **50 open**, 143 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -1192,8 +1192,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
       materials + solver
       handles unaccounted (§83 names "GPU and solver resources");
-      `RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
-      with §67's DEPTH24_STENCIL8 and float formats
+      ~~`RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
+      with §67's DEPTH24_STENCIL8 and float formats~~ **DONE 2026-09-06**
 - [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
       belongs to the packet that gives `Application` a physics world (A-6);
       (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
