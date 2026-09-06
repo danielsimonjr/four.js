@@ -3,10 +3,7 @@ import { Node } from "@four/scene";
 import { describe, expect, it } from "vitest";
 
 import { AnimationClip } from "../src/clip.js";
-import {
-  ANY_STATE,
-  AnimationController,
-} from "../src/controller.js";
+import { ANY_STATE, AnimationController } from "../src/controller.js";
 import { AnimationTrack } from "../src/track.js";
 import { numberAdapter } from "../src/values.js";
 
@@ -251,7 +248,9 @@ describe("AnimationController — blend trees (PH-9)", () => {
               kind: "blend2d",
               parameterX: "x",
               parameterY: "y",
-              points: [{ x: Number.POSITIVE_INFINITY, y: 0, clip: holdClip("a", 1) }],
+              points: [
+                { x: Number.POSITIVE_INFINITY, y: 0, clip: holdClip("a", 1) },
+              ],
             },
           },
           parameters: { numbers: { x: 0, y: 0 } },
@@ -563,7 +562,17 @@ describe("AnimationController — liveInterrupt (PH-9)", () => {
       target: frozenWidget,
       states: {
         idle: holdClip("idle", 0),
-        walk: rampClip("walk", "opacity", 0, 1),
+        walk: new AnimationClip({
+          name: "walk",
+          tracks: [
+            new AnimationTrack({
+              path: "opacity",
+              adapter: numberAdapter,
+              times: [0, 2],
+              values: [0, 2],
+            }),
+          ],
+        }),
         run: holdClip("run", 10),
       },
       parameters: { numbers: { speed: 0 } },
@@ -589,7 +598,17 @@ describe("AnimationController — liveInterrupt (PH-9)", () => {
       liveInterrupt: true,
       states: {
         idle: holdClip("idle", 0),
-        walk: rampClip("walk", "opacity", 0, 1),
+        walk: new AnimationClip({
+          name: "walk",
+          tracks: [
+            new AnimationTrack({
+              path: "opacity",
+              adapter: numberAdapter,
+              times: [0, 2],
+              values: [0, 2],
+            }),
+          ],
+        }),
         run: holdClip("run", 10),
       },
       parameters: { numbers: { speed: 0 } },

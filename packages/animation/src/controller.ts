@@ -236,11 +236,15 @@ export interface AnimationStateOptions {
  * {@link BlendTree}.
  */
 export type AnimationStateInput =
-  | AnimationClip
-  | AnimationStateOptions
-  | BlendTree;
+  AnimationClip | AnimationStateOptions | BlendTree;
 
-export type { BlendTree, BlendTree1D, BlendTree2D, BlendTree1DPoint, BlendTree2DPoint } from "./blend-tree.js";
+export type {
+  BlendTree,
+  BlendTree1D,
+  BlendTree2D,
+  BlendTree1DPoint,
+  BlendTree2DPoint,
+} from "./blend-tree.js";
 
 /** The comparisons a numeric parameter condition can make (§18). */
 export type NumericComparison =
@@ -294,9 +298,7 @@ export type TransitionCondition =
  * One `when` clause: a typed predicate, a restricted string that compiles to
  * one, or an AND-list of either.
  */
-export type TransitionWhen =
-  | string
-  | readonly (string | TransitionCondition)[];
+export type TransitionWhen = string | readonly (string | TransitionCondition)[];
 
 /** One authored edge of the state machine (§18 transitions). */
 export interface AnimationTransition {
@@ -547,7 +549,11 @@ interface CompiledTransition {
  */
 interface StateMix {
   count: number;
-  clips: [CompiledClip | undefined, CompiledClip | undefined, CompiledClip | undefined];
+  clips: [
+    CompiledClip | undefined,
+    CompiledClip | undefined,
+    CompiledClip | undefined,
+  ];
   weights: [number, number, number];
 }
 
@@ -799,7 +805,10 @@ export class AnimationController implements Advanceable {
         continue;
       }
       for (const clip of definition.blend.clips) {
-        padTracks(clip.tracks as (AnimationTrackLike | undefined)[], channelSpecs.length);
+        padTracks(
+          clip.tracks as (AnimationTrackLike | undefined)[],
+          channelSpecs.length,
+        );
       }
     }
     this.#channelSpecs = channelSpecs;
@@ -1346,7 +1355,12 @@ export class AnimationController implements Advanceable {
       let blend: CompiledBlend | undefined;
       let primary: CompiledClip;
       if (options.blendTree !== undefined) {
-        blend = this.#compileBlend(name, options.blendTree, channelSpecs, channelIndex);
+        blend = this.#compileBlend(
+          name,
+          options.blendTree,
+          channelSpecs,
+          channelIndex,
+        );
         primary = blend.clips[0];
       } else {
         const tracks = this.#ingestClip(
@@ -1449,11 +1463,17 @@ export class AnimationController implements Advanceable {
         kind: "blend1d",
         parameter: tree.parameter,
         values: indexed.map((point) => point.value),
-        clips: indexed.map((point) => ({ clip: point.source, tracks: point.clip })),
+        clips: indexed.map((point) => ({
+          clip: point.source,
+          tracks: point.clip,
+        })),
       };
     }
 
-    if (!this.#numbers.has(tree.parameterX) || !this.#numbers.has(tree.parameterY)) {
+    if (
+      !this.#numbers.has(tree.parameterX) ||
+      !this.#numbers.has(tree.parameterY)
+    ) {
       invalidController(
         `AnimationController state "${state}" blend2d parameters "${tree.parameterX}" / "${tree.parameterY}" must both be declared number parameters.`,
         { state, parameterX: tree.parameterX, parameterY: tree.parameterY },
@@ -1663,7 +1683,10 @@ export class AnimationController implements Advanceable {
     const from = (this.#current.definition as StateDefinition).name;
     const elapsed = this.#current.elapsed;
     for (const transition of this.#transitions) {
-      if (elapsed < transition.exitTime || !this.#matchesFrom(transition, from)) {
+      if (
+        elapsed < transition.exitTime ||
+        !this.#matchesFrom(transition, from)
+      ) {
         continue;
       }
       if (!this.#conditionsHold(transition.when)) {
@@ -1848,7 +1871,12 @@ export class AnimationController implements Advanceable {
         index,
         channel.fromScratch,
       );
-      from = channel.adapter.lerp(a, b, this.#liveMidWeight, channel.midScratch);
+      from = channel.adapter.lerp(
+        a,
+        b,
+        this.#liveMidWeight,
+        channel.midScratch,
+      );
     } else {
       from = this.#sampleMix(
         this.#outgoingMix,
@@ -1924,9 +1952,7 @@ export class AnimationController implements Advanceable {
     }
     if (mix.count === 1) {
       const track = (mix.clips[0] as CompiledClip).tracks[index];
-      return track === undefined
-        ? channel.baseline
-        : track.sample(local, out);
+      return track === undefined ? channel.baseline : track.sample(local, out);
     }
     const samples = channel.treeScratch;
     for (let entry = 0; entry < mix.count; entry += 1) {
@@ -2098,8 +2124,13 @@ function fireClipEvents(
     return;
   }
   const lastIteration = iterationAt(toElapsed, duration, iterations);
-  const firstIteration = fromElapsed <= 0 ? 0 : iterationAt(fromElapsed, duration, iterations);
-  for (let iteration = firstIteration; iteration <= lastIteration; iteration += 1) {
+  const firstIteration =
+    fromElapsed <= 0 ? 0 : iterationAt(fromElapsed, duration, iterations);
+  for (
+    let iteration = firstIteration;
+    iteration <= lastIteration;
+    iteration += 1
+  ) {
     const localTo =
       iteration === lastIteration
         ? localAt(toElapsed, duration, iterations)

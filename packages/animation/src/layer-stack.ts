@@ -26,7 +26,10 @@ import type { TransformAuthority } from "@four/scene";
 
 import type { Advanceable } from "./animation-system.js";
 import { createBinding, type PropertyBinding } from "./binding.js";
-import type { AnimationController, ControllerPlaybackState } from "./controller.js";
+import type {
+  AnimationController,
+  ControllerPlaybackState,
+} from "./controller.js";
 import {
   claimProperty,
   isTransformOwner,
@@ -110,10 +113,7 @@ export class AnimationLayerStack implements Advanceable {
     this.#target = options.target;
     this.#declaredNode = options.authority;
     if (options.layers.length === 0) {
-      invalidStack(
-        "AnimationLayerStack needs at least one layer.",
-        {},
-      );
+      invalidStack("AnimationLayerStack needs at least one layer.", {});
     }
     const controllers: AnimationController[] = [];
     const additive: boolean[] = [];
@@ -213,13 +213,17 @@ export class AnimationLayerStack implements Advanceable {
         if (index === undefined) {
           index = specs.length;
           specIndex.set(path, index);
-          const layerIndices = new Array<number>(this.#controllers.length).fill(-1);
+          const layerIndices = new Array<number>(this.#controllers.length).fill(
+            -1,
+          );
           specs.push({
             path,
             adapter: controller.channelAdapter(channel),
             layerIndices,
           });
-        } else if (specs[index].adapter.kind !== controller.channelAdapter(channel).kind) {
+        } else if (
+          specs[index].adapter.kind !== controller.channelAdapter(channel).kind
+        ) {
           invalidStack(
             `AnimationLayerStack channel "${path}" has mixed value kinds across layers.`,
             {
@@ -239,7 +243,10 @@ export class AnimationLayerStack implements Advanceable {
       const adapter = spec.adapter;
       const binding = createBinding(this.#target, spec.path, adapter);
       const detected = detectAdapter(binding.get());
-      if (adapter.kind !== "discrete" && (detected === undefined || detected.kind !== adapter.kind)) {
+      if (
+        adapter.kind !== "discrete" &&
+        (detected === undefined || detected.kind !== adapter.kind)
+      ) {
         invalidStack(
           `AnimationLayerStack has a ${adapter.kind} channel on "${spec.path}", but that property holds ${detected === undefined ? "a value of no known type" : `a ${detected.kind}`}.`,
           { path: spec.path, expected: adapter.kind, received: detected?.kind },
@@ -249,7 +256,10 @@ export class AnimationLayerStack implements Advanceable {
         node !== undefined && isTransformOwner(node, binding.owner);
       hasTransformChannels = hasTransformChannels || isTransform;
       const current = binding.get();
-      const claim: PropertyClaim = { writerKind: STACK_WRITER_KIND, held: false };
+      const claim: PropertyClaim = {
+        writerKind: STACK_WRITER_KIND,
+        held: false,
+      };
       channels.push({
         path: spec.path,
         adapter,
@@ -305,7 +315,11 @@ export class AnimationLayerStack implements Advanceable {
       return this;
     }
     for (const channel of this.#channels) {
-      releaseProperty(channel.binding.owner, channel.binding.key, channel.claim);
+      releaseProperty(
+        channel.binding.owner,
+        channel.binding.key,
+        channel.claim,
+      );
       channel.claim.held = false;
     }
     for (const controller of this.#controllers) {
@@ -321,7 +335,10 @@ export class AnimationLayerStack implements Advanceable {
    * @throws FourError `INVALID_APPLICATION_STATE` — negative or non-finite delta.
    */
   advance(deltaSeconds: number): this {
-    requireNonNegativeSeconds(deltaSeconds, "AnimationLayerStack advance delta");
+    requireNonNegativeSeconds(
+      deltaSeconds,
+      "AnimationLayerStack advance delta",
+    );
     if (this.#state !== "running") {
       return this;
     }
@@ -333,11 +350,14 @@ export class AnimationLayerStack implements Advanceable {
   }
 
   #requireLayer(index: number): void {
-    if (!Number.isInteger(index) || index < 0 || index >= this.#weights.length) {
-      invalidStack(
-        `AnimationLayerStack has no layer ${String(index)}.`,
-        { index },
-      );
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= this.#weights.length
+    ) {
+      invalidStack(`AnimationLayerStack has no layer ${String(index)}.`, {
+        index,
+      });
     }
   }
 

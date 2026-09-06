@@ -229,6 +229,13 @@ export const vector4Adapter: ValueAdapter<Vector4> = {
 };
 
 /**
+ * Module-level scratch for {@link quaternionAdapter.add}: the identity-lerped
+ * delta. One allocation at load, none per frame (§7b). Animation evaluation is
+ * single-threaded, so a shared scratch is safe.
+ */
+const quaternionAddDelta = new Quaternion();
+
+/**
  * Quaternion adapter (§17 "quaternion", interpolation mode "spherical linear").
  *
  * Delegates to `Quaternion.slerp`, which is shortest-arc: it negates the
@@ -237,13 +244,6 @@ export const vector4Adapter: ValueAdapter<Vector4> = {
  * rotation as `b`, with opposite components. Verified against
  * `packages/math/src/quaternion.ts` (plan D8) rather than assumed.
  */
-/**
- * Module-level scratch for {@link quaternionAdapter.add}: the identity-lerped
- * delta. One allocation at load, none per frame (§7b). Animation evaluation is
- * single-threaded, so a shared scratch is safe.
- */
-const quaternionAddDelta = new Quaternion();
-
 export const quaternionAdapter: ValueAdapter<Quaternion> = {
   kind: "quaternion",
   mutatesInPlace: true,
@@ -256,7 +256,12 @@ export const quaternionAdapter: ValueAdapter<Quaternion> = {
   lerp(a: Quaternion, b: Quaternion, t: number, out: Quaternion): Quaternion {
     return out.copy(a).slerp(b, t);
   },
-  add(a: Quaternion, b: Quaternion, weight: number, out: Quaternion): Quaternion {
+  add(
+    a: Quaternion,
+    b: Quaternion,
+    weight: number,
+    out: Quaternion,
+  ): Quaternion {
     quaternionAddDelta.identity().slerp(b, weight);
     return out.copy(a).multiply(quaternionAddDelta);
   },

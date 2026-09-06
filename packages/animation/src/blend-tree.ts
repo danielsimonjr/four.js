@@ -65,7 +65,7 @@ export function isBlendTree(input: object): input is BlendTree {
   if (!("kind" in input)) {
     return false;
   }
-  const kind = (input as { kind: unknown }).kind;
+  const kind = input.kind;
   return kind === "blend1d" || kind === "blend2d";
 }
 

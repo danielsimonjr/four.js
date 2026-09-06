@@ -1,6 +1,6 @@
 import { isFourError } from "@four/core";
 import { Vector3 } from "@four/math";
-import { Node } from "@four/scene";
+import { Group, Node } from "@four/scene";
 import { describe, expect, it, vi } from "vitest";
 
 import { AnimationClip } from "../src/clip.js";
@@ -9,7 +9,11 @@ import { AnimationLayerStack } from "../src/layer-stack.js";
 import { AnimationMixer } from "../src/mixer.js";
 import { AnimationTrack } from "../src/track.js";
 import { animate } from "../src/tween.js";
-import { discreteAdapterFor, numberAdapter, vector3Adapter } from "../src/values.js";
+import {
+  discreteAdapterFor,
+  numberAdapter,
+  vector3Adapter,
+} from "../src/values.js";
 
 class Widget extends Node {
   opacity = 0;
@@ -78,10 +82,7 @@ describe("AnimationLayerStack", () => {
     });
     new AnimationLayerStack({
       target: widget,
-      layers: [
-        { controller: base },
-        { controller: overlay, weight: 0.25 },
-      ],
+      layers: [{ controller: base }, { controller: overlay, weight: 0.25 }],
     }).play();
 
     expect(widget.opacity).toBeCloseTo(2.5, 12);
@@ -127,10 +128,11 @@ describe("AnimationLayerStack", () => {
 
     expect(warn).not.toHaveBeenCalled();
 
-    animate(widget).to({ opacity: 0.1 }, 1).play();
+    const later = animate(widget).to({ opacity: 0.1 }, 1).play();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toContain("animation layer stack");
 
+    later.stop();
     stack.stop();
     warn.mockClear();
     new AnimationMixer(widget).play(hold("opacity", 0.4));
@@ -196,12 +198,15 @@ describe("AnimationLayerStack", () => {
     stack.advance(0);
     expect(widget.opacity).toBe(1);
 
-    expectInvalid(() => new AnimationLayerStack({ target: widget, layers: [] }));
-    expectInvalid(() =>
-      new AnimationLayerStack({
-        target: widget,
-        layers: [{ controller: base, weight: Number.NaN }],
-      }),
+    expectInvalid(
+      () => new AnimationLayerStack({ target: widget, layers: [] }),
+    );
+    expectInvalid(
+      () =>
+        new AnimationLayerStack({
+          target: widget,
+          layers: [{ controller: base, weight: Number.NaN }],
+        }),
     );
     const other = new Widget();
     const foreign = new AnimationController({
@@ -219,7 +224,7 @@ describe("AnimationLayerStack", () => {
   });
 
   it("adds a vector overlay through ValueAdapter.add", () => {
-    const node = new Node();
+    const node = new Group();
     node.transformAuthority = "animation";
     const base = new AnimationController({
       target: node,
@@ -363,5 +368,34 @@ describe("AnimationLayerStack", () => {
     }).play();
     expectInvalid(() => stack.setLayerWeight(0, Number.NaN));
     expectInvalid(() => stack.advance(-1));
+  });
+
+  it("refuses transform writes when another system owns the node", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const node = new Group();
+    node.transformAuthority = "physics";
+    const base = new AnimationController({
+      target: node,
+      states: {
+        pose: new AnimationClip({
+          name: "base",
+          tracks: [
+            new AnimationTrack({
+              path: "transform.position",
+              adapter: vector3Adapter,
+              times: [0],
+              values: [new Vector3(0, 4, 0)],
+            }),
+          ],
+        }),
+      },
+    });
+    new AnimationLayerStack({
+      target: node,
+      layers: [{ controller: base }],
+    }).play();
+    expect(node.transform.position.y).toBe(0);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

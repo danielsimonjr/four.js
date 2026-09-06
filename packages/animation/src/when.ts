@@ -45,10 +45,7 @@ const NUMERIC_OPERATORS: Readonly<Record<string, NumericComparison>> = {
   "!==": "notEqual",
 };
 
-function invalidWhen(
-  message: string,
-  context: Record<string, unknown>,
-): never {
+function invalidWhen(message: string, context: Record<string, unknown>): never {
   throw new FourError("INVALID_APPLICATION_STATE", message, { context });
 }
 

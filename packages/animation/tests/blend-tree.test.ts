@@ -27,9 +27,9 @@ function dummyClip(): AnimationClip {
 describe("isBlendTree", () => {
   it("accepts both shipped kinds and rejects clips", () => {
     const clip = dummyClip();
-    expect(isBlendTree({ kind: "blend1d", parameter: "speed", points: [] })).toBe(
-      true,
-    );
+    expect(
+      isBlendTree({ kind: "blend1d", parameter: "speed", points: [] }),
+    ).toBe(true);
     expect(
       isBlendTree({
         kind: "blend2d",
@@ -56,8 +56,9 @@ describe("locateBlend1D", () => {
     expect(locateBlend1D(values, 1)).toEqual({ i0: 2, i1: 3, t: 0.5 });
   });
 
-  it("uses t = 0 on a zero-width span (duplicate values)", () => {
-    expect(locateBlend1D(values, 0)).toEqual({ i0: 1, i1: 2, t: 0 });
+  it("lands on the first of two duplicate values", () => {
+    // param 0 is the end of [-1, 0]; t = 1 selects the first point at 0.
+    expect(locateBlend1D(values, 0)).toEqual({ i0: 0, i1: 1, t: 1 });
   });
 
   it("returns the only point when the axis is a singleton", () => {
@@ -99,7 +100,9 @@ describe("locateBlend2D", () => {
     const far = indices.indexOf(3);
     expect(origin).toBeGreaterThanOrEqual(0);
     expect(far).toBe(-1);
-    expect(weights[origin]).toBeGreaterThan(weights[0] === weights[origin] ? 0 : 0);
+    expect(weights[origin]).toBeGreaterThan(
+      weights[0] === weights[origin] ? 0 : 0,
+    );
   });
 
   it("breaks distance ties by declaration order", () => {
@@ -128,7 +131,10 @@ describe("locateBlend2D", () => {
   });
 
   it("uses every point when there are fewer than three", () => {
-    const two = [{ x: 0, y: 0 }, { x: 2, y: 0 }];
+    const two = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+    ];
     const indices = [0, 0, 0];
     const weights = [0, 0, 0];
     const count = locateBlend2D(

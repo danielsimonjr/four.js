@@ -1,7 +1,10 @@
 import { isFourError } from "@four/core";
 import { describe, expect, it } from "vitest";
 
-import { compileWhenExpression, type WhenParameterLookup } from "../src/when.js";
+import {
+  compileWhenExpression,
+  type WhenParameterLookup,
+} from "../src/when.js";
 
 const declared: WhenParameterLookup = {
   hasNumber: (name) => name === "speed",
@@ -38,32 +41,44 @@ describe("compileWhenExpression", () => {
   });
 
   it("compiles numeric comparisons including scientific literals", () => {
-    expect(compileWhenExpression("speed > 0.1", declared, { index: 0 })).toEqual({
+    expect(
+      compileWhenExpression("speed > 0.1", declared, { index: 0 }),
+    ).toEqual({
       parameter: "speed",
       is: "greater",
       value: 0.1,
     });
-    expect(compileWhenExpression("speed >= 5", declared, { index: 0 })).toEqual({
-      parameter: "speed",
-      is: "greaterOrEqual",
-      value: 5,
-    });
-    expect(compileWhenExpression("speed < 1e-2", declared, { index: 0 })).toEqual({
+    expect(compileWhenExpression("speed >= 5", declared, { index: 0 })).toEqual(
+      {
+        parameter: "speed",
+        is: "greaterOrEqual",
+        value: 5,
+      },
+    );
+    expect(
+      compileWhenExpression("speed < 1e-2", declared, { index: 0 }),
+    ).toEqual({
       parameter: "speed",
       is: "less",
       value: 0.01,
     });
-    expect(compileWhenExpression("speed <= -3", declared, { index: 0 })).toEqual({
+    expect(
+      compileWhenExpression("speed <= -3", declared, { index: 0 }),
+    ).toEqual({
       parameter: "speed",
       is: "lessOrEqual",
       value: -3,
     });
-    expect(compileWhenExpression("speed == 2", declared, { index: 0 })).toEqual({
-      parameter: "speed",
-      is: "equal",
-      value: 2,
-    });
-    expect(compileWhenExpression("speed !== 2", declared, { index: 0 })).toEqual({
+    expect(compileWhenExpression("speed == 2", declared, { index: 0 })).toEqual(
+      {
+        parameter: "speed",
+        is: "equal",
+        value: 2,
+      },
+    );
+    expect(
+      compileWhenExpression("speed !== 2", declared, { index: 0 }),
+    ).toEqual({
       parameter: "speed",
       is: "notEqual",
       value: 2,
@@ -71,30 +86,48 @@ describe("compileWhenExpression", () => {
   });
 
   it("compiles Boolean equality and inequality", () => {
-    expect(compileWhenExpression("grounded == true", declared, { index: 0 })).toEqual({
+    expect(
+      compileWhenExpression("grounded == true", declared, { index: 0 }),
+    ).toEqual({
       parameter: "grounded",
       is: "true",
     });
-    expect(compileWhenExpression("grounded != true", declared, { index: 0 })).toEqual({
+    expect(
+      compileWhenExpression("grounded != true", declared, { index: 0 }),
+    ).toEqual({
       parameter: "grounded",
       is: "false",
     });
-    expect(compileWhenExpression("grounded === false", declared, { index: 0 })).toEqual({
+    expect(
+      compileWhenExpression("grounded === false", declared, { index: 0 }),
+    ).toEqual({
       parameter: "grounded",
       is: "false",
     });
-    expect(compileWhenExpression("grounded !== false", declared, { index: 0 })).toEqual({
+    expect(
+      compileWhenExpression("grounded !== false", declared, { index: 0 }),
+    ).toEqual({
       parameter: "grounded",
       is: "true",
     });
   });
 
   it("rejects syntax errors, kind mismatches, and undeclared names", () => {
-    expectInvalid(() => compileWhenExpression("speed && 1", declared, { index: 2 }));
+    expectInvalid(() =>
+      compileWhenExpression("speed && 1", declared, { index: 2 }),
+    );
     expectInvalid(() => compileWhenExpression("speed", declared, { index: 0 }));
-    expectInvalid(() => compileWhenExpression("nope > 1", declared, { index: 0 }));
-    expectInvalid(() => compileWhenExpression("speed == true", declared, { index: 0 }));
-    expectInvalid(() => compileWhenExpression("grounded > 1", declared, { index: 0 }));
-    expectInvalid(() => compileWhenExpression("grounded > true", declared, { index: 0 }));
+    expectInvalid(() =>
+      compileWhenExpression("nope > 1", declared, { index: 0 }),
+    );
+    expectInvalid(() =>
+      compileWhenExpression("speed == true", declared, { index: 0 }),
+    );
+    expectInvalid(() =>
+      compileWhenExpression("grounded > 1", declared, { index: 0 }),
+    );
+    expectInvalid(() =>
+      compileWhenExpression("grounded > true", declared, { index: 0 }),
+    );
   });
 });
