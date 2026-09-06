@@ -1,6 +1,6 @@
 # four.js-monorepo - Dependency Graph
 
-**Version**: 0.0.0 | **Last Updated**: 2026-08-29
+**Version**: 0.0.0 | **Last Updated**: 2026-09-06
 
 This document provides a comprehensive dependency graph of all files, components, imports, functions, and variables in the codebase.
 
@@ -925,7 +925,7 @@ graph LR
 **Workspace Dependencies:**
 | Package | Import |
 |---------|--------|
-| `@four/core` | `DEV, EventEmitter, FourError, bindCapability, installPlugins, FourPlugin, PluginCapabilityBinding, PluginContext` |
+| `@four/core` | `DEV, EventEmitter, FourError, bindCapability, devWarnOnce, installPlugins, FourPlugin, PluginCapabilityBinding, PluginContext` |
 | `@four/diagnostics` | `createFrameStats, monotonicNowSeconds, recordRenderStatistics, recordResourceMemory, recordSolverStatistics, resetFrameStats, solverStatistics, FrameStats, SolverStatistics` |
 | `@four/geometry` | `geometryMemoryBytes` |
 | `@four/motion` | `DEFAULT_FIXED_DELTA_TIME, DEFAULT_MAXIMUM_SUB_STEPS, PRIORITY_PHYSICS_SOLVE, Scheduler, SystemRegistry, Detach, ReadonlyTimeState, SimulationSystem` |
@@ -1590,6 +1590,7 @@ graph LR
 | Package | Import |
 |---------|--------|
 | `@four/scene` | `Node` |
+| `@four/core` | `DEV, FourError` |
 
 **Internal Dependencies:**
 | File | Imports | Type |
@@ -3700,7 +3701,7 @@ graph LR
 **Internal Dependencies:**
 | File | Imports | Type |
 |------|---------|------|
-| `./renderable.js` | `Renderable` | Import |
+| `./renderable.js` | `Renderable, RenderableOptions` | Import |
 
 **Exports:**
 - Classes: `Sprite`
@@ -5827,7 +5828,7 @@ graph TD
 |----------|-------|
 | Total TypeScript Files | 278 |
 | Total Modules | 24 |
-| Total Lines of Code | 136667 |
+| Total Lines of Code | 136859 |
 | Total Exports | 2776 |
 | Total Re-exports | 1777 |
 | Total Classes | 179 |
@@ -5841,5 +5842,5 @@ graph TD
 
 ---
 
-*Last Updated*: 2026-08-29
+*Last Updated*: 2026-09-06
 *Version*: 0.0.0

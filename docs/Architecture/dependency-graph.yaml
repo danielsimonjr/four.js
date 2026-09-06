@@ -1,7 +1,7 @@
 metadata:
   name: four.js-monorepo
   version: 0.0.0
-  lastUpdated: "2026-08-29"
+  lastUpdated: "2026-09-06"
   totalFiles: 278
   totalModules: 24
   totalExports: 2776
@@ -2503,6 +2503,7 @@ modules:
             - EventEmitter
             - FourError
             - bindCapability
+            - devWarnOnce
             - installPlugins
             - FourPlugin
             - PluginCapabilityBinding
@@ -4274,6 +4275,11 @@ modules:
           directory: packages/scene
           imports:
             - Node
+        - package: "@four/core"
+          directory: packages/core
+          imports:
+            - DEV
+            - FourError
       exports:
         - KeyboardInput
       classes:
@@ -11079,6 +11085,7 @@ modules:
         - file: ./renderable.js
           imports:
             - Renderable
+            - RenderableOptions
       workspaceDependencies:
         - package: "@four/core"
           directory: packages/core
@@ -16453,7 +16460,7 @@ dependencyGraph:
 statistics:
   totalTypeScriptFiles: 278
   totalModules: 24
-  totalLinesOfCode: 136667
+  totalLinesOfCode: 136859
   totalExports: 2776
   totalClasses: 179
   totalInterfaces: 550

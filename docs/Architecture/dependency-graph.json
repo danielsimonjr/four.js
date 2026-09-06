@@ -2,7 +2,7 @@
   "metadata": {
     "name": "four.js-monorepo",
     "version": "0.0.0",
-    "lastUpdated": "2026-08-29",
+    "lastUpdated": "2026-09-06",
     "totalFiles": 278,
     "totalModules": 24,
     "totalExports": 2776
@@ -3212,6 +3212,7 @@
               "EventEmitter",
               "FourError",
               "bindCapability",
+              "devWarnOnce",
               "installPlugins",
               "FourPlugin",
               "PluginCapabilityBinding",
@@ -5561,6 +5562,14 @@
             "directory": "packages/scene",
             "imports": [
               "Node"
+            ]
+          },
+          {
+            "package": "@four/core",
+            "directory": "packages/core",
+            "imports": [
+              "DEV",
+              "FourError"
             ]
           }
         ],
@@ -14560,7 +14569,8 @@
           {
             "file": "./renderable.js",
             "imports": [
-              "Renderable"
+              "Renderable",
+              "RenderableOptions"
             ]
           }
         ],
@@ -21749,7 +21759,7 @@
   "statistics": {
     "totalTypeScriptFiles": 278,
     "totalModules": 24,
-    "totalLinesOfCode": 136667,
+    "totalLinesOfCode": 136859,
     "totalExports": 2776,
     "totalClasses": 179,
     "totalInterfaces": 550,

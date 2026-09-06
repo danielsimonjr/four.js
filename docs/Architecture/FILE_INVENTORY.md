@@ -1,12 +1,12 @@
 # Complete File Inventory
 
-**Generated**: 2026-08-29 (by tools/create-dependency-graph)
+**Generated**: 2026-09-06 (by tools/create-dependency-graph)
 
 Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-root cross-package `tests/`, `tools/`, build/test `*.config.ts`, `examples/`, and `docs/` reference sources — tagged with a disposition. A completeness census: no `.ts` may be silently missing. The self-check gate (`verifyFileCensus`) does a MAXIMAL, location-agnostic repo walk (broader than this census’s enumerated discovery) and HARD-FAILS `npm run docs:deps` if any `.ts` on disk is unaccounted, or if any `orphan` exists.
 
 **Excluded by design (not source):** `node_modules/`, `dist/`, `*.d.ts` ambient declarations, and dot-directories (`.git/`, `.remember/`, `.changeset/`, …). The walk set equals the git-tracked `.ts` files, so there is no silent allowlist — every tracked `.ts` appears below with an explicit disposition.
 
-**Total files**: 719
+**Total files**: 722
 
 ## Disposition counts
 
@@ -16,11 +16,11 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `build-entry` | 48 | A detected build/subpath/`bin`/worker/`tsup.config` root (index, internal, cli, render-file, run-worker, …). |
 | `test-only` | 0 | A `src/` file not reachable from src roots but imported by a test. |
 | `orphan` | 0 | A `src/` file reachable from nothing — a delete/wire candidate (hard-fails the gate). |
-| `test` | 417 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
+| `test` | 420 | A test source file (under a `tests/` dir, or a `*.test.ts`/`*.spec.ts`). |
 | `tool` | 1 | A file under `tools/` — agent-only meta-tooling (CDG/QDG/benchmarks). |
 | `config` | 13 | A build/test config source (`*.config.ts`: vitest/tsup, per-package or root). |
 | `example` | 10 | An `examples/` or `docs/` reference/illustration source. |
-| **Total** | **719** | |
+| **Total** | **722** | |
 
 ## Per-area counts
 
@@ -29,14 +29,14 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `config` | 13 |
 | `examples` | 10 |
 | `src` | 278 |
-| `tests` | 417 |
+| `tests` | 420 |
 | `tools` | 1 |
 
 ## Per-package counts
 
 | Package | Files |
 | --- | --: |
-| `(root)` | 200 |
+| `(root)` | 202 |
 | `@four/animation` | 25 |
 | `@four/assets` | 16 |
 | `@four/core` | 24 |
@@ -54,7 +54,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `@four/render` | 56 |
 | `@four/render-canvas` | 2 |
 | `@four/render-svg` | 2 |
-| `@four/render-webgl` | 23 |
+| `@four/render-webgl` | 24 |
 | `@four/render-webgpu` | 40 |
 | `@four/scene` | 33 |
 | `@four/serialization` | 11 |
@@ -429,6 +429,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `packages/render-webgl/src/node-pipeline-registry.ts` | @four/render-webgl | src | reachable |
 | `packages/render-webgl/src/register.ts` | @four/render-webgl | src | reachable |
 | `packages/render-webgl/src/webgl-renderer.ts` | @four/render-webgl | src | reachable |
+| `packages/render-webgl/tests/geometry-refresh.test.ts` | @four/render-webgl | tests | test |
 | `packages/render-webgl/tests/gl-node-program.test.ts` | @four/render-webgl | tests | test |
 | `packages/render-webgl/tests/gl-picking.test.ts` | @four/render-webgl | tests | test |
 | `packages/render-webgl/tests/register.test.ts` | @four/render-webgl | tests | test |
@@ -618,6 +619,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/fixtures/batching-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/clipping-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/culling-page.ts` | (root) | tests | test |
+| `tests/browser/fixtures/geometry-refresh-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/gltf-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/mipmaps-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/node-material-page.ts` | (root) | tests | test |
@@ -629,6 +631,7 @@ Every tracked `.ts` file in the repo — package `src/` and `tests/`, the repo-r
 | `tests/browser/fixtures/stencil-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/text-page.ts` | (root) | tests | test |
 | `tests/browser/fixtures/webgpu-node-material-page.ts` | (root) | tests | test |
+| `tests/browser/geometry-refresh.spec.ts` | (root) | tests | test |
 | `tests/browser/gltf.spec.ts` | (root) | tests | test |
 | `tests/browser/interaction.spec.ts` | (root) | tests | test |
 | `tests/browser/mechanism.spec.ts` | (root) | tests | test |

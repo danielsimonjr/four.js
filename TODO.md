@@ -19,7 +19,6 @@ Counts as of 2026-09-06: **74 open**, 115 done.
 
 Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 
-- Regenerate `docs/Architecture/` graph artifacts
 - `playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.
 - Capability-table note: Rapier derives kinematic velocity itself, so inheritVelocityFrom is nearly a no-op there; other solvers may need it
 - Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
@@ -1238,7 +1237,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
       document; enforced by `tests/integration/plugin-boundary.test.ts`; explicitly not a
       sandbox. Guide row moved absent → partial
-- [ ] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
+- [x] **Regenerate `docs/Architecture/` graph artifacts** (`pnpm graph`) — dependency
       graph + export surfaces are stale for the wave-2 exports (new input/ui/geometry/
       materials/assets/core/serialization/diagnostics surface)
 
