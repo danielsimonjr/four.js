@@ -30,6 +30,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — smoothness parity wait cannot use `waitForFunction`.**
+  `useVirtualFrameClock` replaces `requestAnimationFrame`.
+  Playwright's `waitForFunction` defaults to `polling: "raf"` and
+  then never observes `__fourVirtualFrames` moving — CI hung 120 s
+  on `b55a8c1`. Poll with `page.evaluate` (the path that already
+  read the counter) and a 15 s budget.
+
 - **2026-09-06 — unlit `color` is read after bind + features (F13).**
   `unlitColorBlends` must not run before the texture unit and
   `setFeatures` mirrors are borrowed. A throwing `color` accessor is

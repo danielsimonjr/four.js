@@ -122,6 +122,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       from wall-clock aliasing. Failed CI on `dd03d1a` and `94860b0`; passed on
       `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
       failed — so roughly 2 in 5, and not caused by any change of mine.
+      **Follow-up 2026-09-06:** `waitForFunction` + default rAF polling hung
+      the same test for 120 s on `b55a8c1`. The waiter now polls via
+      `page.evaluate` with a 15 s budget.
 
       Diagnosis, from reading the mechanism rather than the failure rate. The test installs
       `useVirtualFrameClock(page, 1.5 × FIXED_DELTA)`, which overrides

@@ -8,6 +8,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Smoothness interpolation waiter
+
+- **`waitForVirtualFrameParity`.** Poll `__fourVirtualFrames` through
+  `page.evaluate`, not `waitForFunction`. Playwright's default rAF
+  polling deadlocks against this test's `requestAnimationFrame`
+  override and ate the 120 s test timeout on CI (`b55a8c1`).
+
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
 - **Unlit draw order.** Texture bind and `setFeatures` run before
