@@ -206,6 +206,14 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§83's leaked-resource audit — a function the author calls, whose only output is text",
   ],
   [
+    join("packages", "diagnostics", "src", "dev-warnings.ts"),
+    "§83's disposed-in-use, detached-listener, stale-handle, and per-frame allocation warnings — message only",
+  ],
+  [
+    join("packages", "diagnostics", "src", "validation.ts"),
+    "§85's validation catalogue — named checks and devAssert scans; no simulation numbers",
+  ],
+  [
     join("packages", "four", "src", "application.ts"),
     "§84's statistics wiring (A-1). Measurement only: `stats` is read by nobody inside the engine, and the frame's event order, transforms and draw calls are identical either way",
   ],
@@ -220,6 +228,10 @@ const GATED: ReadonlyMap<string, string> = new Map([
   [
     join("packages", "render", "src", "clip.ts"),
     "§67's plane-exhaustion diagnostic (R-23, 2026-08-28). Message only: `allocate` returns `null` for the ninth clip in both builds — the over-limit clip is dropped and its subtree keeps the eight that fit, identically, whatever the flag says — so the list, its order, its stencil records, and every GL call derived from them are the same either way. If the gated block never ran, no number the engine computes would change; what the guard drops is the console.warn naming the first refused clip",
+  ],
+  [
+    join("packages", "render-webgl", "src", "gl-texture.ts"),
+    "§83's disposed-texture warning when acquire meets a disposed texture — draw skipped identically in both builds; message only",
   ],
   [
     join("packages", "render-webgl", "src", "webgl-renderer.ts"),

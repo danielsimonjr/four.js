@@ -45,14 +45,9 @@
  * `"kinematic"` over one node therefore share a suppression slot; they are, by
  * §42's model, the same writer.
  *
- * Emission goes through {@link devWarnOnce} (A-4 remainder step 4, 2026-09-06)
- * so a production build (`__FOUR_DEV__ === false`) prints nothing and the
- * `[four]` prefix stays one place. The WeakMap still owns the
- * once-per-node-per-writer contract; `devWarnOnce`'s key is a safety net
- * for the same pair.
+ * Emission uses `console.warn` with a `[four]` prefix. Simulation packages
+ * may not import `@four/core`'s build flag (§33).
  */
-
-import { DEV, devWarnOnce } from "@four/core";
 
 /**
  * The slice of `Node` this module reads — identity for the warning text plus
@@ -158,9 +153,6 @@ export function warnAuthorityConflict(
   node: AuthorityNode,
   writer: TransformAuthority,
 ): boolean {
-  if (!DEV) {
-    return false;
-  }
   let warned = warnedWriters.get(node);
   if (warned === undefined) {
     warned = new Set<TransformAuthority>();
@@ -172,13 +164,13 @@ export function warnAuthorityConflict(
   warned.add(writer);
 
   const label = node.name === "" ? node.id : `${node.id} ("${node.name}")`;
-  return devWarnOnce(
-    `authority:${node.id}:${writer}`,
-    `A "${writer}" system tried to write the transform of node ` +
+  console.warn(
+    `[four] A "${writer}" system tried to write the transform of node ` +
       `${label}, which is owned by "${node.transformAuthority}" authority; ` +
       "the write was refused (§42: exactly one system owns a node's " +
       `transform). Set node.transformAuthority = "${writer}" if that system ` +
       "should own it. Further conflicts from this writer on this node are " +
       "suppressed.",
   );
+  return true;
 }

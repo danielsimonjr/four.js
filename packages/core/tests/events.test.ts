@@ -53,6 +53,16 @@ describe("EventEmitter (§6b)", () => {
       expect(emitter.listenerCount("ping")).toBe(1);
     });
 
+    it("totalListenerCount sums every event type", () => {
+      const emitter = new TestEmitter();
+      emitter.on("ping", () => undefined);
+      emitter.on("pong", () => undefined);
+      emitter.on("pong", () => undefined);
+      expect(emitter.totalListenerCount()).toBe(3);
+      emitter.removeAllListeners("ping");
+      expect(emitter.totalListenerCount()).toBe(2);
+    });
+
     it("`once` removes the listener after exactly one delivery", () => {
       const emitter = new TestEmitter();
       const listener = vi.fn();

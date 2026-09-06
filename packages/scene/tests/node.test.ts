@@ -1,5 +1,5 @@
 import { Quaternion, Vector3 } from "@four/math";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   Group,
@@ -181,5 +181,20 @@ describe("Node transform aliases on subclasses", () => {
         ).toBeUndefined();
       }
     }
+  });
+});
+
+describe("Node detached-listener warning (§83)", () => {
+  it("warns once when a detached node still has listeners", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const parent = new Group();
+    const child = new Group();
+    parent.add(child);
+    child.on("added", () => undefined);
+    parent.remove(child);
+    parent.remove(child);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("§83");
+    expect(String(warn.mock.calls[0][0])).toContain(child.id);
   });
 });

@@ -25,7 +25,10 @@ import { describe, expect, it } from "vitest";
 import {
   RenderTarget,
   Texture,
+  colorAttachmentBytesPerTexel,
+  depthAttachmentBytesPerTexel,
   isRenderTargetTexture,
+  renderTargetBytesPerTexel,
   type RenderTargetFormat,
   type RenderTargetOptions,
 } from "../src/index.js";
@@ -416,6 +419,18 @@ describe("RenderTarget — the stencil attachment (§67, R-7)", () => {
     expect(
       new RenderTarget({ width: 64, height: 64, stencil: true }).byteLength,
     ).toBe(size * 8);
+  });
+
+  it("renderTargetBytesPerTexel matches attachment modes (A-5 follow-up)", () => {
+    expect(renderTargetBytesPerTexel()).toBe(6);
+    expect(renderTargetBytesPerTexel({ depth: false })).toBe(4);
+    expect(renderTargetBytesPerTexel({ depthTexture: true })).toBe(8);
+    expect(renderTargetBytesPerTexel({ stencil: true })).toBe(8);
+    expect(depthAttachmentBytesPerTexel({ depth: true })).toBe(2);
+    expect(depthAttachmentBytesPerTexel({ depth: true, stencil: true })).toBe(
+      4,
+    );
+    expect(colorAttachmentBytesPerTexel("rgba8")).toBe(4);
   });
 
   it("keeps the choice across a resize and reports 0 once disposed", () => {
