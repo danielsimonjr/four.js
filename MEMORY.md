@@ -30,6 +30,22 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — field torque is a second method; waking is per-entry OR.**
+  §27's `sample` stays one linear vector so a `ParticleForceField` remains
+  assignable. `ForceField.sampleTorque` is optional and always N·m —
+  `"acceleration"` units would need the inertia tensor, which a field does
+  not have. `wakesSleepingBodies` is per registration, default off. Two
+  entries that disagree do not share a visit: persistent gravity cannot
+  wake a pile just because an explosion field is also registered. A zero
+  sample does not wake; `applyForce`/`applyTorque` still do not wake
+  (WP-5.2), so a non-zero waking contribution calls `RigidBody.wake()`.
+  `forEachSleepingDynamicBody` is the complementary walk.
+
+- **2026-09-06 — §42 authority conflicts go through `devWarnOnce`.** A-4
+  remainder step 4. The WeakMap still owns once-per-node-per-writer;
+  production (`__FOUR_DEV__ === false`) prints nothing. The stale
+  "no build-mode flag" comment in `authority.ts` is retired.
+
 - **2026-09-06 — PoseTarget scale blends against identity.** A solver
   body has no scale, so the invented physical side is `(1, 1, 1)`. At
   `animationWeight === 1` the node's `transform.scale` is

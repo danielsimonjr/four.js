@@ -93,16 +93,17 @@
  *
  * ## What this module deliberately does not do
  *
- * - **No torque.** §27's `sample` answers one vector at one point and names no
- *   angular channel, so a field contributes a centre-of-mass force and nothing
- *   else. A field that should twist a body is asking for §26's `applyTorque`,
- *   which is public. Absent beats accepted-and-ignored.
+ * - **Torque is optional.** §27's `sample` stays one linear vector so a
+ *   particle field remains assignable. {@link ForceField.sampleTorque} is
+ *   the angular channel, always in N·m, omitted by every built-in that has
+ *   no reason to twist a body.
  * - **No transform writes, and no §42 authority check.** A force is not a
  *   transform write: the solver stays the single writer under `"physics"`
  *   authority and §26 is the sanctioned channel for influencing it (`RigidBody`
  *   says so in as many words). Warning here would fire on the one legitimate
  *   way to push a physics-owned body.
- * - **No sleeping bodies (§32).** See {@link ForceFieldSystem.fixedUpdate}.
+ * - **Sleeping bodies stay asleep unless an entry opts in.** See
+ *   {@link ForceFieldAddOptions.wakesSleepingBodies}.
  * - **No `"local-plane"` sampling (§8).** A body's sample point is its
  *   world-space centre of mass, because that is the frame every registered body
  *   is in — `PhysicsWorld.addBody` refuses any other (PH-12).
@@ -200,6 +201,28 @@ export interface ForceField {
     time: number,
     out: Float64Array,
   ): void;
+
+  /**
+   * **Optional angular channel** (PH-8 remainder, 2026-09-06). Torque in
+   * newton-metres at the same sample point {@link ForceField.sample} uses.
+   *
+   * §27's `sample` stays one linear vector so a `ParticleForceField` remains
+   * assignable without an adapter. Torque is a second, optional method:
+   *
+   * - **Always N·m.** {@link ForceFieldUnits} scale the linear sample only.
+   *   An `"acceleration"` reading would need the inertia tensor, which a
+   *   field does not have and which is not a scalar.
+   * - Same purity and `out` rules as {@link ForceField.sample}. Do not
+   *   mutate `position`, `velocity`, or `angularVelocity`.
+   * - A field that omits this contributes no torque.
+   */
+  sampleTorque?(
+    position: Vector3,
+    velocity: Vector3,
+    angularVelocity: Vector3,
+    time: number,
+    out?: Vector3,
+  ): Vector3;
 }
 
 /**
@@ -217,12 +240,33 @@ export interface ForceField {
  */
 export type ForceFieldUnits = "force" | "acceleration";
 
+/** Options for one {@link ForceFieldSystem.addField} call. */
+export interface ForceFieldAddOptions {
+  /**
+   * When `true`, this entry also samples **sleeping** dynamic bodies and
+   * calls {@link RigidBody.wake} when its linear or torque contribution is
+   * non-zero. Default `false`.
+   *
+   * Policy when two entries disagree (2026-09-06): **per-entry OR**. A
+   * field without the flag never sees a sleeper, even if a sibling has it.
+   * Persistent gravity therefore cannot defeat §32 just because an
+   * explosion field is also registered. A waking field that samples zero
+   * still leaves the body asleep — zero is not an alarm clock.
+   */
+  wakesSleepingBodies?: boolean;
+}
+
 /** One registered field and the units its samples are read in. */
 export interface ForceFieldEntry {
   /** The field itself. */
   readonly field: ForceField;
   /** How {@link ForceFieldEntry.field}'s samples are read. */
   readonly units: ForceFieldUnits;
+  /**
+   * Whether this entry visits sleeping dynamics. Stored as a boolean so
+   * a reader never has to distinguish "absent" from `false`.
+   */
+  readonly wakesSleepingBodies: boolean;
 }
 
 /** Options for {@link ForceFieldSystem}. */
@@ -243,9 +287,14 @@ export interface ForceFieldSystemOptions {
 
   /**
    * Fields to register immediately, in order. Equivalent to calling
-   * {@link ForceFieldSystem.addField} for each.
+   * {@link ForceFieldSystem.addField} for each. `wakesSleepingBodies`
+   * defaults to `false` when omitted, matching {@link ForceFieldAddOptions}.
    */
-  fields?: Iterable<ForceFieldEntry>;
+  fields?: Iterable<{
+    field: ForceField;
+    units: ForceFieldUnits;
+    wakesSleepingBodies?: boolean;
+  }>;
 }
 
 /**
@@ -277,6 +326,15 @@ export class ForceFieldSystem implements SimulationSystem {
 
   /** Scratch handed to `ForceField.sample` as its `out`. */
   readonly #sample = new Vector3();
+
+  /** The body's angular velocity, copied for {@link ForceField.sampleTorque}. */
+  readonly #angularVelocity = new Vector3();
+
+  /** Scratch handed to `ForceField.sampleTorque` as its `out`. */
+  readonly #torqueSample = new Vector3();
+
+  /** Running sum of one body's torque contributions, in newton-metres. */
+  readonly #torque = new Vector3();
 
   /** Running sum of one body's field contributions, in newtons. */
   readonly #total = new Vector3();
@@ -316,7 +374,9 @@ export class ForceFieldSystem implements SimulationSystem {
     }
     if (options.fields !== undefined) {
       for (const entry of options.fields) {
-        this.addField(entry.field, entry.units);
+        this.addField(entry.field, entry.units, {
+          wakesSleepingBodies: entry.wakesSleepingBodies,
+        });
       }
     }
   }
@@ -377,8 +437,16 @@ export class ForceFieldSystem implements SimulationSystem {
    *
    * @returns `field`, so a construction call can be inlined
    */
-  addField(field: ForceField, units: ForceFieldUnits): ForceField {
-    this.#fields.push({ field, units });
+  addField(
+    field: ForceField,
+    units: ForceFieldUnits,
+    options?: ForceFieldAddOptions,
+  ): ForceField {
+    this.#fields.push({
+      field,
+      units,
+      wakesSleepingBodies: options?.wakesSleepingBodies === true,
+    });
     return field;
   }
 
@@ -435,17 +503,16 @@ export class ForceFieldSystem implements SimulationSystem {
    * load-bearing: a badly written field corrupts this system's scratch instead
    * of the component's mirror of solver state.
    *
-   * ## Sleeping and non-dynamic bodies are skipped (§22, §32)
+   * ## Sleeping and non-dynamic bodies are skipped unless an entry opts in
    *
    * By `forEachActiveBody`, which states the argument: a force on a static or
-   * kinematic body does nothing, and a non-zero force on a sleeping one wakes
-   * it — so a persistent field (gravity, wind, a drag volume) that visited
-   * sleeping bodies would wake every body every step and §32 would stop meaning
-   * anything. A field is a force on the simulation, not an alarm clock;
-   * `RigidBody.wake()` is the explicit command an explosion uses to rouse a
-   * settled pile. **Named seam** if automatic waking is ever wanted: a
-   * per-entry `wakesSleepingBodies` flag, which needs a policy for two entries
-   * that disagree.
+   * kinematic body does nothing, and `RigidBody.applyForce` does **not**
+   * implicitly wake a sleeper (WP-5.2). A persistent field (gravity, wind)
+   * that visited every sleeper and then called `wake()` would defeat §32.
+   * The opt-in is per-entry {@link ForceFieldAddOptions.wakesSleepingBodies}:
+   * only those fields walk `forEachSleepingDynamicBody`, and only a non-zero
+   * contribution calls `RigidBody.wake()`. Two entries that disagree do not
+   * share a visit — the flag is not a system-wide OR.
    *
    * ## Allocation and cost
    *
@@ -476,13 +543,31 @@ export class ForceFieldSystem implements SimulationSystem {
     }
     const time = context.time.simulationTime;
     const batched = this.#hasBatchedField();
+    const waking = this.#hasWakingField();
     for (let w = 0; w < this.#worlds.length; w += 1) {
+      const world = this.#worlds[w];
       if (batched) {
-        this.#applyToWorldBatched(this.#worlds[w], time);
+        this.#applyToWorldBatched(world, time);
       } else {
-        this.#applyToWorld(this.#worlds[w], time);
+        this.#applyToWorld(world, time);
+      }
+      if (waking) {
+        world.forEachSleepingDynamicBody((body, node, centerOfMass) => {
+          this.#applyToBody(body, node.id, centerOfMass, time, true);
+        });
       }
     }
+  }
+
+  /** Whether any registered field visits sleeping dynamics. */
+  #hasWakingField(): boolean {
+    const fields = this.#fields;
+    for (let f = 0; f < fields.length; f += 1) {
+      if (fields[f].wakesSleepingBodies) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Whether any registered field offers the §27 batch entry point. */
@@ -552,6 +637,7 @@ export class ForceFieldSystem implements SimulationSystem {
     }
 
     const total = this.#total;
+    const hasTorque = this.#hasTorqueField();
     for (let i = 0; i < count; i += 1) {
       const base = i * 3;
       const x = newtonAcc[base];
@@ -561,7 +647,73 @@ export class ForceFieldSystem implements SimulationSystem {
         total.set(x, y, z);
         bodies[i].applyForce(total);
       }
+      if (hasTorque) {
+        this.#position.set(
+          positions[base],
+          positions[base + 1],
+          positions[base + 2],
+        );
+        this.#applyTorqueToBody(bodies[i], this.#position, time, false);
+      }
     }
+  }
+
+  /** Whether any registered field offers {@link ForceField.sampleTorque}. */
+  #hasTorqueField(): boolean {
+    const fields = this.#fields;
+    for (let f = 0; f < fields.length; f += 1) {
+      if (fields[f].field.sampleTorque !== undefined) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Sums {@link ForceField.sampleTorque} over the fields that should run for
+   * this body and queues the total through §26. Torque is always N·m.
+   */
+  #applyTorqueToBody(
+    body: RigidBody,
+    centerOfMass: Vector3,
+    time: number,
+    wakingOnly: boolean,
+  ): boolean {
+    const velocity = this.#velocity.copy(body.linearVelocity);
+    const torque = this.#torque.set(0, 0, 0);
+    let angularCopied = false;
+    for (let f = 0; f < this.#fields.length; f += 1) {
+      const entry = this.#fields[f];
+      if (wakingOnly && !entry.wakesSleepingBodies) {
+        continue;
+      }
+      const sampleTorque = entry.field.sampleTorque;
+      if (sampleTorque === undefined) {
+        continue;
+      }
+      if (!angularCopied) {
+        this.#angularVelocity.copy(body.angularVelocity);
+        angularCopied = true;
+      }
+      const sampled = sampleTorque.call(
+        entry.field,
+        centerOfMass,
+        velocity,
+        this.#angularVelocity,
+        time,
+        this.#torqueSample,
+      );
+      torque.set(
+        torque.x + sampled.x,
+        torque.y + sampled.y,
+        torque.z + sampled.z,
+      );
+    }
+    if (torque.x === 0 && torque.y === 0 && torque.z === 0) {
+      return false;
+    }
+    body.applyTorque(torque);
+    return true;
   }
 
   /**
@@ -668,6 +820,7 @@ export class ForceFieldSystem implements SimulationSystem {
     nodeId: string,
     centerOfMass: Vector3,
     time: number,
+    wakingOnly = false,
   ): void {
     const velocity = this.#velocity.copy(body.linearVelocity);
     const total = this.#total.set(0, 0, 0);
@@ -678,6 +831,9 @@ export class ForceFieldSystem implements SimulationSystem {
 
     for (let f = 0; f < this.#fields.length; f += 1) {
       const entry = this.#fields[f];
+      if (wakingOnly && !entry.wakesSleepingBodies) {
+        continue;
+      }
       let scale = 1;
       if (entry.units === "acceleration") {
         if (massFactor < 0) {
@@ -705,8 +861,18 @@ export class ForceFieldSystem implements SimulationSystem {
       );
     }
 
+    let applied = false;
     if (total.x !== 0 || total.y !== 0 || total.z !== 0) {
       body.applyForce(total);
+      applied = true;
+    }
+    if (this.#applyTorqueToBody(body, centerOfMass, time, wakingOnly)) {
+      applied = true;
+    }
+    // applyForce / applyTorque do not wake (§26 / WP-5.2). A waking field
+    // that actually contributed must ask.
+    if (applied && wakingOnly) {
+      body.wake();
     }
   }
 

@@ -8,6 +8,18 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Field torque, field-driven waking, §42 `devWarnOnce`
+
+- **`ForceField.sampleTorque`.** Optional angular channel, always N·m.
+  Linear `"force"` / `"acceleration"` units do not scale it. Built-in
+  particle fields omit the method and stay assignable.
+- **`wakesSleepingBodies`.** Per-entry, default off.
+  `PhysicsWorld.forEachSleepingDynamicBody` is the complementary walk.
+  A waking field that samples zero leaves the body asleep; a non-zero
+  contribution calls `RigidBody.wake()` because `applyForce` does not.
+- **§42.** `warnAuthorityConflict` emits through `devWarnOnce` (A-4
+  remainder step 4). Production builds print nothing.
+
 ### 2026-09-06 — PoseTarget scale channel
 
 - **`PoseTarget.scale`.** Animated scale, default identity. The physical

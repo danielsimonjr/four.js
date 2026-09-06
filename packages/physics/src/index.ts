@@ -127,6 +127,7 @@ export type {
 // works in both with no dependency edge between them.
 export type {
   ForceField,
+  ForceFieldAddOptions,
   ForceFieldEntry,
   ForceFieldSystemOptions,
   ForceFieldUnits,

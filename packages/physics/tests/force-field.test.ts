@@ -154,8 +154,8 @@ describe("ForceFieldSystem registration (§39)", () => {
     expect(system.addField(second, "acceleration")).toBe(second);
 
     expect(system.fields).toEqual([
-      { field: first, units: "force" },
-      { field: second, units: "acceleration" },
+      { field: first, units: "force", wakesSleepingBodies: false },
+      { field: second, units: "acceleration", wakesSleepingBodies: false },
     ]);
   });
 
@@ -773,5 +773,162 @@ describe("ForceFieldSystem batch path (§27 sampleAll)", () => {
       system.fixedUpdate(context);
     }
     expect(constructionCount()).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Torque channel + field-driven waking (PH-8 remainders, 2026-09-06)
+// ---------------------------------------------------------------------------
+
+/** A field that answers a constant torque in N·m, and no linear force. */
+function constantTorqueField(x: number, y: number, z: number): ForceField {
+  return {
+    sample(_position, _velocity, _time, out) {
+      const target = out ?? new Vector3();
+      return target.set(0, 0, 0);
+    },
+    sampleTorque(_position, _velocity, _angular, _time, out) {
+      const target = out ?? new Vector3();
+      return target.set(x, y, z);
+    },
+  };
+}
+
+function solverTorque(adapter: FakeSolverAdapter, id: number): Vector3 {
+  return adapter.body(id).torque;
+}
+
+describe("ForceField.sampleTorque (PH-8 remainder)", () => {
+  it("queues N·m through applyTorque and does not scale by mass", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 2 }));
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [{ field: constantTorqueField(0, 0, 4), units: "acceleration" }],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(solverTorque(adapter, 1).z).toBe(4);
+    expect(solverForce(adapter, 1).x).toBe(0);
+    expect(solverForce(adapter, 1).y).toBe(0);
+  });
+
+  it("sums torque in registration order and leaves a linear-only field at zero", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: constantTorqueField(1, 0, 0), units: "force" },
+        { field: constantField(0, 3), units: "force" },
+        { field: constantTorqueField(0, 2, 0), units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(solverTorque(adapter, 1).x).toBe(1);
+    expect(solverTorque(adapter, 1).y).toBe(2);
+    expect(solverForce(adapter, 1).y).toBe(3);
+  });
+
+  it("applies torque on the batched linear path without a second sampleAll", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    const linear = countingBatchField(0, 0, 0);
+    const twist = constantTorqueField(0, 0, 5);
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: linear, units: "force" },
+        { field: twist, units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(linear.batchCalls).toBe(1);
+    expect(solverTorque(adapter, 1).z).toBe(5);
+  });
+});
+
+describe("ForceFieldAddOptions.wakesSleepingBodies (PH-8 remainder)", () => {
+  it("defaults to false and is stored on the entry", () => {
+    const field = constantField(1, 0);
+    const system = new ForceFieldSystem();
+    system.addField(field, "force");
+    system.addField(field, "force", { wakesSleepingBodies: true });
+    expect(system.fields[0].wakesSleepingBodies).toBe(false);
+    expect(system.fields[1].wakesSleepingBodies).toBe(true);
+  });
+
+  it("wakes a sleeper only for the entry that opted in", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    adapter.body(1).sleeping = true;
+    world.step(1 / 60);
+
+    const ambient = constantField(0, -50);
+    const blast = constantField(8, 0);
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: ambient, units: "force" },
+        { field: blast, units: "force", wakesSleepingBodies: true },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    // Ambient gravity never saw the sleeper; the blast did, and asked to wake.
+    expect(solverForce(adapter, 1).x).toBe(8);
+    expect(solverForce(adapter, 1).y).toBe(0);
+    expect(adapter.body(1).sleeping).toBe(false);
+  });
+
+  it("does not wake when the waking field samples zero", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    adapter.body(1).sleeping = true;
+    world.step(1 / 60);
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        {
+          field: constantField(0, 0),
+          units: "force",
+          wakesSleepingBodies: true,
+        },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(adapter.body(1).sleeping).toBe(true);
+    expect(
+      adapter.calls.filter((call) => call.method === "applyForce"),
+    ).toEqual([]);
+  });
+
+  it("wakes from a non-zero torque with no linear force", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    adapter.body(1).sleeping = true;
+    world.step(1 / 60);
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        {
+          field: constantTorqueField(0, 0, 3),
+          units: "force",
+          wakesSleepingBodies: true,
+        },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(solverTorque(adapter, 1).z).toBe(3);
+    expect(adapter.body(1).sleeping).toBe(false);
   });
 });

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **54 open**, 135 done.
+Counts as of 2026-09-06: **57 open**, 136 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -78,7 +78,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-8 follow-ups:
 - §8 node-level `NodeSpace` component (PH-12 remainder).
 - §21 `"local-plane"` simulation frame (PH-12 remainder).
-- §27 field torque and field-driven waking (PH-8 remainders).
+- §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
 - Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
 - `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win is in list construction, not in batching. Worth a look together with `R-8`'s per-view restructure.
 - R-30c — the rest of §77, scoped by why each is not ordinary work:
@@ -932,10 +932,15 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       the world plus a mapping in `PhysicsWorld`'s feed and publish passes; `addBody`
       refuses the mode loudly until then. Touches the step path — needs its own
       determinism golden.
-- [ ] **§27 field torque and field-driven waking (PH-8 remainders).** Both deliberately
-      absent with recorded reasons: §27's `sample` names no angular channel, and
-      automatic waking needs a per-entry `wakesSleepingBodies` flag plus a policy for two
-      entries that disagree.
+- [x] **§27 field torque and field-driven waking (PH-8 remainders).** DONE
+      2026-09-06: optional `ForceField.sampleTorque` (always N·m; linear
+      `units` do not scale it, so `sample` stays one vector and a particle
+      field stays assignable). Per-entry `wakesSleepingBodies` (default
+      off) walks `forEachSleepingDynamicBody`; two entries that disagree
+      do not share a visit — persistent gravity cannot defeat §32 because
+      an explosion field is also registered. A zero sample still leaves
+      the body asleep; `applyForce`/`applyTorque` do not wake (WP-5.2), so
+      a non-zero waking contribution calls `RigidBody.wake()`.
 - [x] **R-10 keys 3–4 DONE 2026-08-09 (key 3 shipped, key 4 staged on R-8)** —
       `groupRenderListByPipeline` puts §66's key 3 in a second verb, stably, with
       `RenderItem.materialId` as its material half; `buildRenderList` untouched and every
@@ -1160,8 +1165,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
 - [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
-      routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
-      package); R-6's effect pipeline needs an opt-in registry split, not the dev
+      ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
+      package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → `devWarnOnce`;
+      production prints nothing); R-6's effect pipeline needs an opt-in registry split, not the dev
       define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
       loads, detached-node listeners, stale physics handles, per-frame allocations
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
@@ -1488,6 +1494,11 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **§27 field torque + field-driven waking.** Optional
+      `ForceField.sampleTorque` (N·m). Per-entry `wakesSleepingBodies`
+      visits sleepers without letting a sibling gravity field defeat §32.
+      A-4 step 4: `warnAuthorityConflict` emits through `devWarnOnce`.
 
 - [x] 2026-09-06 — **PoseTarget scale channel.** Physical side of the §19
       blend is identity `(1, 1, 1)` — the only scale a rigid body has.

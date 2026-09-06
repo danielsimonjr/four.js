@@ -1981,6 +1981,31 @@ export class PhysicsWorld {
   }
 
   /**
+   * Visits every registered body that is **dynamic and sleeping**, in
+   * registration order (§33), with the same shared centre-of-mass vector
+   * {@link PhysicsWorld.forEachActiveBody} uses.
+   *
+   * The default force-generator walk skips sleepers so ambient wind cannot
+   * defeat §32. This is the other half of that filter: a field that opts
+   * into `wakesSleepingBodies` walks only the bodies the default pass hid.
+   * Static and kinematic bodies are still skipped — a force on those types
+   * is discarded by definition (§22).
+   *
+   * Allocates nothing. Adding or removing bodies during the walk is not
+   * supported.
+   */
+  forEachSleepingDynamicBody(visit: ActiveBodyVisitor): void {
+    const centerOfMass = this.#visitCenterOfMass;
+    for (const registration of this.#bodiesByNode.values()) {
+      if (registration.type !== "dynamic" || !registration.body.sleeping) {
+        continue;
+      }
+      this.#adapter.getBodyCenterOfMass(registration.handle, centerOfMass);
+      visit(registration.body, registration.node, centerOfMass);
+    }
+  }
+
+  /**
    * Advances the simulation by exactly `deltaSeconds` (§10, §37, §39).
    *
    * Runs steps 1–6 of the pipeline in the module header and leaves the step's
