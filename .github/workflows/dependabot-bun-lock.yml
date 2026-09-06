@@ -1,0 +1,87 @@
+name: Dependabot bun.lock
+
+# Dependabot uses the npm ecosystem on purpose (see .github/dependabot.yml): its
+# bun parser only supports bun.lock lockfileVersion 1, and this repo writes
+# version 2, so Dependabot cannot propose updates if we switch the ecosystem
+# and cannot write bun.lock if we stay on npm.
+#
+# CI (and docs/release) run `bun install --frozen-lockfile`. A bump whose
+# resolution changes therefore fails until bun.lock is regenerated. This
+# workflow is that follow-up: Dependabot PRs only (same-repo, dependabot[bot]),
+# `bun install` (not frozen), commit bun.lock if it changed, push. A human
+# push would cost the PR its automerge; github-actions[bot] does not.
+#
+# Trigger is pull_request, not pull_request_target — we never check out a PR
+# with write credentials on a fork workflow. Dependabot PRs come from this
+# repo. A GITHUB_TOKEN push does not create a new pull_request run (loop
+# guard), so after a lockfile commit we workflow_dispatch CI onto the new
+# ref. That check attaches to the regenerated SHA and is how the PR goes
+# green; the main CI job keeps --frozen-lockfile.
+
+on:
+  pull_request:
+    branches: [main]
+
+# One regeneration at a time per Dependabot branch. A force-push from
+# Dependabot should cancel the in-flight run rather than race two pushes.
+concurrency:
+  group: dependabot-bun-lock-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate-lockfile:
+    name: Regenerate bun.lock
+    if: >-
+      (github.actor == 'dependabot[bot]'
+        || github.event.pull_request.user.login == 'dependabot[bot]')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    # Repo default workflow permissions are read (2026-09-05). Write is
+    # required to push bun.lock; actions:write is required to dispatch CI
+    # onto that commit (GITHUB_TOKEN pushes do not retrigger workflows).
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Regenerate bun.lock
+        run: bun install
+
+      - name: Commit and push bun.lock if it changed
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          if [ -f bun.lockb ]; then
+            git add bun.lockb
+          fi
+          if git diff --cached --quiet; then
+            echo "bun.lock unchanged — nothing to push"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "deps: regenerate bun.lock"
+          git push origin "HEAD:${{ github.head_ref }}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKEN commits do not fire pull_request/synchronize, so the
+      # original CI run stays on the pre-lockfile SHA. Dispatch CI onto the
+      # branch tip; the check lands on the new commit and automerge can
+      # proceed. Skipped when the lockfile was already in sync.
+      - name: Dispatch CI on the regenerated commit
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run ci.yml --ref "${{ github.head_ref }}"
