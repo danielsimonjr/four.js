@@ -429,8 +429,15 @@ describe("interceptTime / interceptPoint", () => {
   it("does not throw on a bad speed when validateSpeed is false", () => {
     const target = new Vector3(10, 0, 0);
     const still = new Vector3(0, 0, 0);
-    expect(
+    // Negative speed is squared in the quadratic, so a root can still exist;
+    // the knob only skips the RangeError. NaN speed has no root.
+    expect(() =>
       interceptTime(shooter, -1, target, still, { validateSpeed: false }),
+    ).not.toThrow();
+    expect(
+      interceptTime(shooter, Number.NaN, target, still, {
+        validateSpeed: false,
+      }),
     ).toBeNaN();
   });
 
