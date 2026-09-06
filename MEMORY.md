@@ -30,6 +30,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — three headline claims verified FROM OUTSIDE the library, against the published
+  packages.** Not the repo's own suite: the staged `@danielsimonjr/fourjs-*` tree laid out in a
+  clean consumer's `node_modules`, importing published names only.
+  - **§33/§34 determinism holds.** Two independently built worlds, 9 bodies, 300 steps with
+    collisions and stacking → identical checksums (`4186985384`), while a 0.0001 perturbation gave
+    a different one. The control is the point: without it, "the checksums matched" is equally
+    consistent with a constant.
+  - **§34 snapshot/restore is bit-faithful, and the restored world evolves identically.** Checksum
+    after restore equalled the checksum at snapshot (`3990209039`), and continuing 120 steps from
+    the restored world reproduced the live world's checksum exactly (`1175110499`). Control:
+    continuing changed the checksum, so the equality is not trivial.
+  - **§7a's Y-up-in-2D convention is real.** A 2D body falls in −Y, matches the closed form to
+    ~10 mm over 30 steps, and stays on the z = 0 plane. 2D gravity takes a `Vector2`.
+  Also: all 25 umbrella subpath exports resolve, and a strict-mode TypeScript consumer typechecks
+  clean with `skipLibCheck: false` — so the shipped `.d.ts` files are internally consistent, not
+  merely present.
+
 - **2026-09-05 — repository configuration was three-quarters broken, and none of it showed in
   the tree.** `Docs` had failed on every run because **Pages was never enabled**, while the
   workflow existed solely to deploy to it. `Release` had failed because **Actions were not
