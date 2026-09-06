@@ -51,6 +51,8 @@ describe("PhysicsWorldOptions.units (§40)", () => {
     expect(adapter.gravity.y).toBeCloseTo(-9.81, 12);
     expect(world.toSiLength(100)).toBeCloseTo(1, 12);
     expect(world.fromSiLength(1)).toBeCloseTo(100, 12);
+    expect(world.toSiMass(2)).toBe(2);
+    expect(world.fromSiMass(2)).toBe(2);
 
     world.dispose();
   });
@@ -86,6 +88,16 @@ describe("PhysicsWorldOptions.units (§40)", () => {
     world.step(1 / 60);
     expect(node.transform.position.x).toBeCloseTo(100, 8);
 
+    world.dispose();
+  });
+
+  it("converts authored mass when the mass scale is not 1", async () => {
+    const { world } = await ready({
+      dimension: "2d",
+      units: { scale: { lengthToMeters: 1, massToKilograms: 0.001 } },
+    });
+    expect(world.toSiMass(2000)).toBeCloseTo(2, 12);
+    expect(world.fromSiMass(2)).toBeCloseTo(2000, 12);
     world.dispose();
   });
 });

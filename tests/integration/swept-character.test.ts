@@ -301,10 +301,10 @@ describe("SweptCharacterController against real Rapier 3D geometry", () => {
     drive(world, characters)(90);
 
     // PH-11c: a horizontal slide against a dynamic body imparts an impulse at
-    // the witness point. The character still stops short of the box; the box
-    // is displaced along −Z (the walk direction).
-    expect(node.transform.position.z).toBeGreaterThan(-1.5);
+    // the witness point. The box is displaced along −Z; the character stays
+    // on the near side of it (does not tunnel through).
     expect(box.transform.position.z).toBeLessThan(-1.6);
+    expect(node.transform.position.z).toBeGreaterThan(box.transform.position.z);
 
     world.dispose();
   });

@@ -24,16 +24,6 @@ import { FakeSolverAdapter } from "./fake-adapter.js";
 
 const DT = 1 / 60;
 
-interface RecordedCast {
-  ox: number;
-  oy: number;
-  oz: number;
-  dx: number;
-  dy: number;
-  dz: number;
-  maxDistance: number;
-}
-
 function hit(
   distance: number,
   normal: Vector3,
@@ -197,6 +187,46 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
 
     expect(box.commands.pointImpulseCount).toBe(0);
     expect(box.commands.sleepCommand).toBeNull();
+  });
+
+  it("skips a massless or infinite-mass body", () => {
+    const massless = new RigidBody({ type: "dynamic" });
+    const scripted = scriptedWorld(massless);
+    const controller = makeController(scripted.world);
+    const node = characterNode(controller);
+    controller.setMoveIntent(1, 0);
+    scripted.setHit(hit(0.2, new Vector3(0, 0, 1), massless));
+
+    controller.step(node, DT);
+
+    expect(massless.commands.pointImpulseCount).toBe(0);
+  });
+
+  it("skips when pushImpulseScale is 0 or the character is receding", () => {
+    const box = new RigidBody({ type: "dynamic", mass: 1 });
+    const scripted = scriptedWorld(box);
+    const controller = makeController(scripted.world, {
+      world: scripted.world,
+      radius: 0.5,
+      halfHeight: 0.5,
+      pushImpulseScale: 0,
+    });
+    const node = characterNode(controller);
+    controller.setMoveIntent(1, 0);
+    scripted.setHit(hit(0.2, new Vector3(0, 0, 1), box));
+
+    controller.step(node, DT);
+    expect(box.commands.pointImpulseCount).toBe(0);
+
+    const receding = new RigidBody({ type: "dynamic", mass: 1 });
+    const recedingWorld = scriptedWorld(receding);
+    const recedingController = makeController(recedingWorld.world);
+    const recedingNode = characterNode(recedingController);
+    recedingController.setMoveIntent(1, 0);
+    // Normal points along the walk, so −dot(v, n) is negative → closing 0.
+    recedingWorld.setHit(hit(0.2, new Vector3(0, 0, -1), receding));
+    recedingController.step(recedingNode, DT);
+    expect(receding.commands.pointImpulseCount).toBe(0);
   });
 
   it("gives a heavier box a smaller velocity change at the same closing speed", () => {

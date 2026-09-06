@@ -66,4 +66,48 @@ describe("resolveLocalPlane (§21)", () => {
       }),
     ).toThrow(/non-zero/);
   });
+
+  it("falls back to +Y when the normal is along +X", () => {
+    const plane = resolveLocalPlane({
+      origin: new Vector3(),
+      normal: new Vector3(1, 0, 0),
+    });
+    expect(plane.xAxis.y).toBeCloseTo(1, 12);
+    expect(plane.xAxis.dot(plane.normal)).toBeCloseTo(0, 12);
+    expect(isDefaultLocalPlane(plane)).toBe(false);
+  });
+
+  it("refuses an xAxis parallel to the normal", () => {
+    expect(() =>
+      resolveLocalPlane({
+        origin: new Vector3(),
+        normal: new Vector3(0, 0, 1),
+        xAxis: new Vector3(0, 0, 2),
+      }),
+    ).toThrow(/parallel/);
+  });
+
+  it("recognises an authored XY plane as the default by value", () => {
+    const plane = resolveLocalPlane({
+      origin: new Vector3(0, 0, 0),
+      normal: new Vector3(0, 0, 1),
+      xAxis: new Vector3(1, 0, 0),
+    });
+    expect(plane).not.toBe(DEFAULT_LOCAL_PLANE);
+    expect(isDefaultLocalPlane(plane)).toBe(true);
+  });
+
+  it("builds a basis when the rotation is a 180° flip about +Z", () => {
+    const plane = resolveLocalPlane({
+      origin: new Vector3(),
+      normal: new Vector3(0, 0, 1),
+      xAxis: new Vector3(-1, 0, 0),
+    });
+    const local = new Vector3(1, 0, 0);
+    const world = new Vector3();
+    const rot = new Quaternion();
+    planeToWorld(plane, local, new Quaternion(), world, rot);
+    expect(world.x).toBeCloseTo(-1, 12);
+    expect(plane.normal.z).toBeCloseTo(1, 12);
+  });
 });

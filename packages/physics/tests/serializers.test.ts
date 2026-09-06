@@ -780,6 +780,44 @@ describe("SWEPT_CHARACTER_CONTROLLER_SERIALIZER (§12, §30, §79 — PH-11b)", 
     expect(restored.maxSlides).toBe(4);
     expect(restored.grounded).toBe(false);
     expect(restored.moveSpeed).toBe(1);
+    expect(restored.pushMass).toBe(80);
+    expect(restored.pushImpulseScale).toBe(1);
+    expect(restored.pushDynamics).toBe(true);
+  });
+
+  it("persists a non-default PH-11c push policy and omits the shipped defaults", () => {
+    const defaults = new SweptCharacterController({
+      radius: 0.5,
+      halfHeight: 0.5,
+    });
+    const defaultDocument = payload(
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.serialize(defaults),
+    );
+    expect("pushMass" in defaultDocument).toBe(false);
+    expect("pushImpulseScale" in defaultDocument).toBe(false);
+    expect("pushDynamics" in defaultDocument).toBe(false);
+
+    const controller = new SweptCharacterController({
+      radius: 0.5,
+      halfHeight: 0.5,
+      pushMass: 40,
+      pushImpulseScale: 0.5,
+      pushDynamics: false,
+    });
+    const document = payload(
+      SWEPT_CHARACTER_CONTROLLER_SERIALIZER.serialize(controller),
+    );
+    expect(document.pushMass).toBe(40);
+    expect(document.pushImpulseScale).toBe(0.5);
+    expect(document.pushDynamics).toBe(false);
+
+    const restored = SWEPT_CHARACTER_CONTROLLER_SERIALIZER.deserialize(
+      document,
+      new Group(),
+    );
+    expect(restored.pushMass).toBe(40);
+    expect(restored.pushImpulseScale).toBe(0.5);
+    expect(restored.pushDynamics).toBe(false);
   });
 
   it("refuses a document with no capsule: geometry has no defensible default", () => {
