@@ -126,7 +126,7 @@ describe("a §79 manifest preloads a SceneResourceCatalog", () => {
       fakeCodec,
       {
         requireHash: true,
-        map: (asset) => new Texture(asset),
+        map: (asset: TextureAsset) => new Texture(asset),
       },
     );
 
@@ -159,7 +159,7 @@ describe("a §79 manifest preloads a SceneResourceCatalog", () => {
       fakeCodec,
       {
         requireHash: true,
-        map: (asset) => new Texture(asset),
+        map: (asset: TextureAsset) => new Texture(asset),
       },
     );
 
