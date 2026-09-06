@@ -20,11 +20,14 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const guidesDir = join(root, "docs", "guides");
 const GITHUB_BLOB = "https://github.com/danielsimonjr/four.js/blob/main";
 
-const outFlag = process.argv.indexOf("--out");
-const outDir =
-  outFlag >= 0 && process.argv[outFlag + 1]
-    ? process.argv[outFlag + 1]
-    : join(root, "_site", "guides");
+function readOutDir(argv) {
+  const eq = argv.find((arg) => arg.startsWith("--out="));
+  if (eq) return eq.slice("--out=".length);
+  const flag = argv.indexOf("--out");
+  if (flag >= 0 && argv[flag + 1]) return argv[flag + 1];
+  return join(root, "_site", "guides");
+}
+const outDir = readOutDir(process.argv);
 
 const SITE_CSS = `:root {
         color-scheme: light dark;
@@ -310,10 +313,25 @@ function markdownToHtml(markdown) {
       const ordered = Boolean(ol);
       const tag = ordered ? "ol" : "ul";
       const marker = ordered ? /^\d+\.\s+/ : /^[-*]\s+/;
+      const anyItem = /^([-*]|\d+\.)\s+/;
       out.push(`<${tag}>`);
       while (i < lines.length && marker.test(lines[i])) {
-        out.push(`<li>${inline(lines[i].replace(marker, ""))}</li>`);
+        let item = lines[i].replace(marker, "");
         i += 1;
+        // Wrapped list items continue on the next line without a new marker
+        // (the house style in docs/guides/*.md).
+        while (
+          i < lines.length &&
+          lines[i].trim() !== "" &&
+          !anyItem.test(lines[i]) &&
+          !/^#{1,6}\s/.test(lines[i]) &&
+          !/^```/.test(lines[i]) &&
+          !/^\|/.test(lines[i])
+        ) {
+          item += ` ${lines[i].trim()}`;
+          i += 1;
+        }
+        out.push(`<li>${inline(item)}</li>`);
       }
       out.push(`</${tag}>`);
       continue;
@@ -332,7 +350,7 @@ function markdownToHtml(markdown) {
   return out.join("\n");
 }
 
-function page({ title, sourceRel, body, extraNav = "" }) {
+function page({ title, sourceRel, body }) {
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -347,7 +365,6 @@ function page({ title, sourceRel, body, extraNav = "" }) {
     <nav>
       <a href="../">four.js</a>
       <a href="./">Guides</a>
-      ${extraNav}
       <a href="${GITHUB_BLOB}/${sourceRel}">Markdown source</a>
     </nav>
     ${body}
@@ -378,15 +395,10 @@ for (const name of files) {
   const markdown = readFileSync(join(guidesDir, name), "utf8");
   const title = firstHeading(markdown);
   const htmlName = name === "README.md" ? "index.html" : name.replace(/\.md$/, ".html");
-  const extraNav =
-    name === "README.md"
-      ? ""
-      : `<a href="${GITHUB_BLOB}/docs/guides/${name}">${escapeHtml(name)}</a>`;
   const html = page({
     title,
     sourceRel: `docs/guides/${name}`,
     body: markdownToHtml(markdown),
-    extraNav,
   });
   writeFileSync(join(outDir, htmlName), html);
 }
