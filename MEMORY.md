@@ -30,6 +30,20 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — TODO sprint: actionable items closed; ~45 remain blocked.**
+  Subagent sprint on `cursor/todo-completion-bfc5` (PR #73) landed A-5 §83 dev
+  warnings (`warnDisposedInUse`, `rejectStalePhysicsHandle`, `auditFrameAllocations`,
+  detached-node listener warn), `SpatialHash` (WP-8.2), shared `animation.spec`
+  sweep, size-budget bumps, auto-selection WebGPU integration test, and camera-rigs
+  docs. Remaining open items need owner/RFC/adapter events (rapier 0.20, first
+  publish, PH-11c, lighting follow-ups, RFC residues).
+
+- **2026-09-06 — SpatialHash lives in `@four/motion` (WP-8.2).**
+  Explicit rebuild (`clear` + `insert` / `update`); query returns insertion order
+  for §33 determinism; cell size is caller-chosen (no default). Steering flocking
+  behaviours stay agnostic — they accept `Iterable<SteeringNeighbor>` from brute
+  force or this index.
+
 - **2026-09-06 — R-36 size-budget TODO closed; limits at 38.5/37/45.5 kB.**
   The 2026-08-09 proposal (31.5→32, 37→37.5, 29→29.5 kB) was absorbed through
   R-8 and later bumps (38/36.5/45 kB). Fresh A/B on this branch measured
