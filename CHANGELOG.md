@@ -68,6 +68,15 @@ specification; until then, entries are grouped by date under **Unreleased**.
   plain DOM listeners. The error now points there rather than leaving a game developer to
   discover it by reading the examples.
 
+  **The validation is `DEV`-gated**, and that was not the first attempt. Shipping the
+  message unconditionally put `examples/ui-demo` **245 B over its 45 kB §86 budget** and
+  turned CI red — roughly 400 characters of guidance were riding in every production
+  bundle that touches `@four/input`. Gating the whole check restores a byte-identical
+  production build: under §85's build mode `DEV` is a literal `false` and the tree-shaker
+  deletes branch and text alike (A-4). A consumer meets this error while developing,
+  which is when the mistake is made — the same trade-off the library takes everywhere
+  else it checks an authoring error.
+
   Found by building a flight simulator against the library. No call site changes: all
   three in-repo constructions already pass `keyboardFocusTarget(uiRoot)`.
 

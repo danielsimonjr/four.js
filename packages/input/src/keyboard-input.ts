@@ -85,7 +85,7 @@ import { buildPropagationPath } from "./propagation.js";
  * side of the normalization: the whole point is that the DOM's own event
  * satisfies the interface without a wrapper.
  */
-import { FourError } from "@four/core";
+import { DEV, FourError } from "@four/core";
 
 export interface SurfaceKeyEvent extends KeyDefaultSuppressor {
   /** The character or named key produced — `"a"`, `"Enter"`, `" "`. */
@@ -171,10 +171,20 @@ export class KeyboardInput {
      * `examples/character-controller` uses plain DOM listeners for exactly that reason.
      */
     if (
-      typeof options !== "object" ||
-      options === null ||
-      typeof options.focusTarget !== "function"
+      DEV &&
+      (typeof options !== "object" ||
+        options === null ||
+        typeof options.focusTarget !== "function")
     ) {
+      /*
+       * The throw is unconditional -- it is behaviour, not a diagnostic. Only the prose
+       * is gated, because it is not free: shipped unconditionally it put
+       * examples/ui-demo 245 B over its 45 kB §86 budget and turned CI red. Under §85's
+       * build mode `DEV` is a literal `false`, so the tree-shaker deletes the long
+       * branch and its text (A-4), while a development build -- the default for anyone
+       * who has not configured `__FOUR_DEV__`, which is the audience that makes this
+       * mistake -- still gets the whole thing.
+       */
       throw new FourError(
         "INVALID_APPLICATION_STATE",
         "KeyboardInput takes two arguments: (surface, { focusTarget }). " +
