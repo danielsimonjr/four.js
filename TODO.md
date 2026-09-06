@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **55 open**, 138 done.
+Counts as of 2026-09-06 (synced against CHANGELOG): **55 open**, 140 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -472,17 +472,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.** Currently ignored in
       `.github/dependabot.yml`. Both must move in ONE PR — bumping either alone re-breaks a gate.
       Check `npm view typedoc peerDependencies` for a range that includes 7.x.
-- [x] **Pre-existing test-isolation defect, still unfixed and now hidden again.**
-      DONE 2026-09-06 — unrestored `console.warn` spies in `world-blend.test.ts`
+- [x] **Pre-existing test-isolation defect (Vitest 4 spy history).** DONE
+      2026-09-06 — unrestored `console.warn` spies in `world-blend.test.ts`
       and `world-joints.test.ts`. Vitest 4 reuses the spy and keeps history;
       Vitest 3 hid it. `afterEach(vi.restoreAllMocks)` plus a leak-regression
-      in each file. Unblocks #62 and the eslint 10 ignore.
-      **Now blocking a second thing:** Dependabot #66 (eight dev-deps incl. eslint 9 → 10)
-      went red on this defect's `warn`-count assertions and was closed 2026-09-06;
-      `eslint >=10` is ignored until this is fixed. Fixing it unblocks the linter major. vitest 3 masks it;
-      vitest 4 exposed it. 7 tests fail because an extra §42 authority warning fires, and the
-      failing tests PASS IN ISOLATION. Not caused by the dependency — reverting only re-hid it.
-      Worth fixing before vitest 4 is attempted again, or the same PR fails the same way.
+      in each file. Unblocks #62 and the eslint 10 Dependabot ignore (#66
+      closed for the same reason). The defect was spy history, not leftover
+      worlds — failing tests passed in isolation.
 - [ ] **rapier 0.20 adoption is a real decision, not a bump.**
       Dependabot **#65 closed 2026-09-06** and `@dimforge/rapier* >=0.20` is now
       ignored, so this stops re-proposing weekly until the decision is made. Four behavioural differences
@@ -507,14 +503,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       #63 MERGED (rapier bump, later reverted on `main`); #62 MERGED then reverted — the
       vitest-4 / eslint-10 blocker is fixed separately (spy restore, 2026-09-06).
 - [x] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
-      DONE 2026-09-06 with the spy-restore fix above. The leak was spy history,
-      not leftover worlds. #62 can be retried once typedoc supports TS 7.
-      The dev-dep bump to vitest 4 exposes it: 7 tests fail because an extra `console.warn` fires —
-      our own §42 authority warning, not a dependency deprecation. The decisive evidence is that a
-      failing test PASSES ALONE and fails with its file, so state carries between tests. NOT fixed
-      by `--pool=forks`, `--sequence.concurrent=false`, and not explained by the module-level
-      solver registry. Pinning vitest back to 3 would make it green by RE-HIDING a real bug —
-      same class of move as widening the rapier assertions. Needs the leaking state identified.
+      DONE 2026-09-06 with the spy-restore fix above. #62 can be retried once
+      typedoc supports TS 7 (the vitest/eslint pin remains).
 
 - [x] **Repository configuration repaired 2026-09-05.** Pages enabled (`build_type: workflow`) —
       `Docs` green and the site serves HTTP 200 at https://danielsimonjr.github.io/four.js/;
@@ -1191,9 +1181,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
 - [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
-      ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
-      package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → `devWarnOnce`;
-      production prints nothing); R-6's effect pipeline needs an opt-in registry split, not the dev
+      ~~routing §42's authority-conflict warn through a once-per-node dedup (step 4 —
+      scene package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → unconditional
+      `console.warn` with a WeakMap — not `DEV`/`devWarnOnce`; `@four/scene` is §33
+      simulation envelope); R-6's effect pipeline needs an opt-in registry split, not the dev
       define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
       loads, detached-node listeners, stale physics handles, per-frame allocations
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
@@ -1523,6 +1514,20 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
+- [x] 2026-09-06 — **Smoothness parity waiter.** `waitForVirtualFrameParity`
+      polls `__fourVirtualFrames` through `page.evaluate`, not
+      `waitForFunction` — Playwright's default rAF polling deadlocks against
+      the test's overridden `requestAnimationFrame` and ate the 120 s CI
+      timeout on `b55a8c1`. Size budgets after #70: first-3d 38 → 38.5 kB
+      (38.18), particles-demo 36.5 → 37 kB (36.77), ui-demo 45 → 45.5 kB
+      (45.27).
+
+- [x] 2026-09-06 — **WebGL F13 / metal-roughness restore.** Unlit texture bind
+      and `setFeatures` run before `unlitColorBlends` reads `color`, so a
+      throwing accessor still restores the borrowed unit and program-lifetime
+      flags. Metal-roughness unit 2 skips redundant `activeTexture(TEXTURE2)`
+      when that unit is already active.
+
 - [x] 2026-09-06 — **Platform and repository hygiene.** `js-yaml >=5` ignored
       (#68 — vendored graph tool needs default export). ESLint ignores
       `.dogfood/**` so local dogfood runs do not break `bun run lint`. Dynamic
@@ -1542,7 +1547,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] 2026-09-06 — **§27 field torque + field-driven waking.** Optional
       `ForceField.sampleTorque` (N·m). Per-entry `wakesSleepingBodies`
       visits sleepers without letting a sibling gravity field defeat §32.
-      A-4 step 4: `warnAuthorityConflict` emits through `devWarnOnce`.
+      A-4 step 4: `warnAuthorityConflict` dedupes via WeakMap with
+      unconditional `console.warn` (§33 forbids `DEV` in `@four/scene`).
+      §83 duplicate-load warn stays on `devWarnOnce` in `@four/assets`
+      (GATED list).
 
 - [x] 2026-09-06 — **PoseTarget scale channel.** Physical side of the §19
       blend is identity `(1, 1, 1)` — the only scale a rigid body has.
