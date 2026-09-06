@@ -30,6 +30,20 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — open-TODO pass, second landing.** The diagnosed browser
+  flakes were sampler defects, not physics: smoothness now picks virtual-frame
+  parity; blending watches the page's `data-chain-y` instead of screenshot
+  throughput. README snippet is a Playwright spec (two-colour threshold —
+  one unlit circle on a uniform clear). `check-docs` now fails if the 24
+  package count, suite-count table, or AUDIT-120 census drift. Metallic-
+  roughness is the second WebGL texture unit; remaining glTF slots
+  (normal/occlusion/emissive) stay warned-inert. Unlit blend is on only
+  when alpha or `transparent` asks. **Owner-gated items are no longer
+  parked:** the next pass implements them (scissor, PoseTarget scale,
+  rotational root motion, A-25 stub `files` allow-list, RFC residues,
+  rapier 0.20) rather than waiting. Secrets (`NPM_TOKEN`) and typedoc's
+  TS 7 peer still cannot be invented here.
+
 - **2026-09-06 — open-TODO pass, first landing.** Four items closed without an
   owner product decision: Windows Chromium binary layouts + lazy barrel imports
   + slower-runner timeouts; a Dependabot-only workflow that regenerates
@@ -43,7 +57,8 @@ readable; never delete the pointer itself.
   joint pin remains. Remaining packets still in flight: diagnosed flakes,
   scissor, §59 textures, field batching, docs gates. Owner-gated items
   (first publish, rapier 0.20, typedoc/TS 7, A-25 secrets, RFC residues)
-  stay owner-gated.
+  stay owner-gated. Superceded for remaining-packet policy by the
+  2026-09-06 second-landing entry.
 
 - **2026-09-06 — three headline claims verified FROM OUTSIDE the library, against the published
   packages.** Not the repo's own suite: the staged `@danielsimonjr/fourjs-*` tree laid out in a

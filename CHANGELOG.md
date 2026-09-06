@@ -8,6 +8,26 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Open-TODO pass: flakes, README gate, metallic-roughness, unlit blend
+
+- **Smoothness interpolation flake.** `tests/browser/smoothness.spec.ts`
+  screenshots after a known `window.__fourVirtualFrames` count (alternating
+  odd/even) so mid-step and on-step poses are chosen instead of aliased
+  against the 1.5-Δt virtual clock.
+- **Blending sample-count flakes.** RECOVER / ANIMATED / RAGDOLL watches
+  read `data-chain-y` until the span/floor is met. Screenshots stay for
+  pixel assertions only.
+- **README snippet browser gate.** `tests/browser/readme.spec.ts` serves
+  the extracted quick-start and asserts a two-colour frame.
+- **`check-docs` pins.** 24 packages, `tests/README.md` suite counts, and
+  the AUDIT-120 43-item census.
+- **§59 metallic-roughness map.** `StandardMaterial.metalRoughnessMap`
+  (glTF packed G/B). WebGL binds texture unit 2. WebGPU field is staged
+  inert. The glTF loader decodes that slot as linear.
+- **Unlit alpha blend.** Unlit draws enable `SRC_ALPHA` /
+  `ONE_MINUS_SRC_ALPHA` when `color[3] !== 1` or `transparent === true`.
+  Opaque unlit stays `GL_BLEND` off.
+
 ### 2026-09-06 — Open-TODO pass: Windows runner, Dependabot lockfile, A-26 renderer table
 
 - **Windows unit-test timeouts.** `packages/four/tests/barrels.test.ts` now

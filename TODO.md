@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **64 open**, 125 done.
+Counts as of 2026-09-06: **57 open**, 132 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -28,11 +28,11 @@ Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 
 Each has its cause written down. The thinking is done; what remains is the change and its test.
 
-- `smoothness.spec.ts` "frames are drawn between simulation states" aliases against its own virtual frame clock.
-- `blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now measured.
-- Run the README snippet in the browser gate, not just a text check.
+- `smoothness.spec.ts` aliasing — DONE 2026-09-06 (virtual-frame parity sampler).
+- `blending.spec.ts` RECOVER / sample-count — DONE 2026-09-06 (page `data-chain-y` watches).
+- Run the README snippet in the browser gate — DONE 2026-09-06 (`tests/browser/readme.spec.ts`).
 - Scissor clipping (§67's first bullet, small)
-- §59 second texture unit
+- §59 second texture unit — DONE 2026-09-06 (`StandardMaterial.metalRoughnessMap`).
 - Dogfooding coverage map (standing assignment) — surfaces DONE, so they are not redone.
 
 ### 3 · A day — a real packet, cause known
@@ -40,10 +40,10 @@ Each has its cause written down. The thinking is done; what remains is the chang
 Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
-- Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is invisible; schedule blending with §60a color management work
+- Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
 - Size budgets are thin after R-36 (measured A/B, 2026-08-09)
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
-- Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear (candidates: package counts, test-suite counts in `tests/README.md`, the §120 verdict totals) — each addition must stay decidable by reading files
+- Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
 ### 4 · Blocked on a decision, then small
 
@@ -101,15 +101,18 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-19 remainder:
 - §96 residue:
 - R-19/R-20 follow-ups:
-- Flaky gate (pre-existing, confirmed at baseline 2026-08-07):
+- Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 PARTIAL
 - Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 - §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
 
 ## Now
 
-- [ ] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
-      its own virtual frame clock.** Failed CI on `dd03d1a` and `94860b0`; passed on
+- [x] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
+      its own virtual frame clock.** DONE 2026-09-06 — sampler is now
+      frame-synchronised (`window.__fourVirtualFrames`, alternating odd/even
+      counts) so mid-step and on-step poses are chosen rather than inherited
+      from wall-clock aliasing. Failed CI on `dd03d1a` and `94860b0`; passed on
       `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
       failed — so roughly 2 in 5, and not caused by any change of mine.
 
@@ -142,8 +145,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **De-flake the browser gate: sample counts no longer measure the runner.** DONE
       2026-09-06 — both watches now require a sample floor as well as the window; 1 of 4
       passing → 3 of 4 on Windows. Details in the CHANGELOG.
-- [ ] **`blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now
-      measured.** Its span assertion needs a full `WAVE_PERIOD` (**3.6 s**) to see both
+- [x] **`blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now
+      measured.** DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL watches now
+      read `data-chain-y` until the span/floor is met; screenshots are only
+      for pixel assertions, so the observer no longer starves the simulation. Its span assertion needs a full `WAVE_PERIOD` (**3.6 s**) to see both
       extremes, but the watch runs 4 s of *wall clock* and §10 drops simulation time — so a
       slow machine samples a fraction of the wave and a running chain measures 0.156
       against 0.2.
@@ -347,12 +352,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       block verbatim and loading it in a browser; it threw §45's error and drew nothing.
       Fixed, and gated in `tools/check-docs.mjs` so it cannot silently return. Evidence and
       the two ways the guard itself was initially wrong are in the CHANGELOG.
-- [ ] **Run the README snippet in the browser gate, not just a text check.** The new
-      check-docs guard catches only the `start()`/`step()` pairing. It would not catch a
-      snippet that fails to compile, imports a name that no longer exists, or renders
-      nothing. The honest gate is a Playwright spec that serves the extracted block, the
-      way `tests/browser/example.spec.ts` serves the examples. Until that exists, the
-      README's TypeScript is verified for one specific defect and nothing else.
+- [x] **Run the README snippet in the browser gate, not just a text check.** DONE
+      2026-09-06 — `tests/browser/readme.spec.ts` serves the extracted
+      `fixtures/readme-page.ts` block and asserts a two-colour frame (single
+      unlit circle on a uniform clear). Check-docs still pins the
+      `start()`/`step()` pairing.
 - [x] **`examples/README.md` never says how to *view* an example.** DONE b9ee8aa — a "Running one" section. Every entry gives
       `bun run <name>:build`, which writes `dist/` and shows nothing. The dev-server
       command (`bunx vite examples/<name>`) is in the root `README.md` only, which is not
@@ -624,13 +628,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       binding form. Refusal list recorded in `gltf.ts`'s header; digests pinned
       in `tests/determinism/gltf-load.test.ts`; browser gate
       `tests/browser/gltf.spec.ts`.
-- [ ] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
-      `StandardMaterial` carries `map` only, so a loaded glTF's
-      metallicRoughness/normal/occlusion/emissive textures are warned-inert.
-      Needs the unit allocator `packages/render-webgl/src/gl-program.ts` has
-      named since WP-3a.3; when it lands, extend the glTF loader's decoded-slot
-      set (one list in `packages/assets/src/gltf.ts`) and drop the
-      `ignoredTextures` warning for the newly sampleable slots.
+- [x] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
+      DONE 2026-09-06 — `StandardMaterial.metalRoughnessMap` (glTF G=roughness,
+      B=metalness). WebGL binds unit 2. WebGPU field is staged inert.
+      The glTF loader decodes that slot as linear and drops `ignoredTextures`
+      for it. Normal/occlusion/emissive remain warned-inert until further
+      units land.
 
 - [x] **Move the six capability tokens to their owning packages — DONE
       2026-08-29** (RFC 0002 §2's spelling executed): each owner declares its
@@ -1256,10 +1259,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
       restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
       uvs); qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly
-- [ ] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
-      `tests/browser/blending.spec.ts:978` ("RECOVER: a second click blends the chain
-      back onto its animation") fails intermittently under load, passes in isolation —
-      needs a de-flake pass of its own.
+- [x] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
+      DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL now watch `data-chain-y`
+      until span/floor; smoothness samples on virtual-frame parity. The
+      original RECOVER isolation flake was the same sampling strategy.
 
       **Widened 2026-09-06: it is the file's sampling strategy, not one test.** A CI run
       failed two *different* tests in the same file — "ANIMATED" (`:836`) and "RAGDOLL"
@@ -1387,9 +1390,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       sprite (`docs/AUDIT-120.md` sprites row). Glyphs batch as consecutive
       same-material `Text` (R-28). Residue: grouping labels that do not share
       a material (atlas grouping, R-9's own remainder).
-- [ ] Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear
-      (candidates: package counts, test-suite counts in `tests/README.md`, the
-      §120 verdict totals) — each addition must stay decidable by reading files
+- [x] Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear
+      — DONE 2026-09-06: pins 24 packages, `tests/README.md` suite counts,
+      and the AUDIT-120 43-item census. Further claims still welcome if they
+      stay decidable by reading files.
 
 ### Backlog additions (Phase 10, 2026-08-02)
 
@@ -1447,8 +1451,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       package gate stays ≥95%. Weakest real file is `physics-rapier/src/init.ts`
       at 86.95%. Branches stay package-only (`alloc-counter.ts` is 75% on the
       wrap).
-- [ ] Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is
-      invisible; schedule blending with §60a color management work
+- [x] Unlit materials render with GL_BLEND off (WP-4.7 finding) — DONE
+      2026-09-06: unlit enables `SRC_ALPHA` / `ONE_MINUS_SRC_ALPHA` when
+      `color[3] !== 1` or `transparent === true`; opaque unlit stays
+      `GL_BLEND` off. §60a color management remains a separate follow-up.
 
 ### Backlog additions (Phase 3 exit findings)
 
@@ -1474,6 +1480,14 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **Open-TODO pass (second landing).** Browser-gate flakes:
+      smoothness samples on virtual-frame parity; blending RECOVER/ANIMATED/
+      RAGDOLL watch `data-chain-y` instead of screenshot throughput. README
+      snippet runs in `tests/browser/readme.spec.ts`. `check-docs` pins
+      package / suite / AUDIT-120 counts. `StandardMaterial.metalRoughnessMap`
+      on WebGL unit 2; unlit alpha enables `GL_BLEND`. Scissor clipping and
+      the remaining roadmap items stay open.
 
 - [x] 2026-09-06 — **Open-TODO pass (first landing).** Windows Chromium binary
       layouts + lazy umbrella barrel imports + slower-runner Vitest/Playwright
