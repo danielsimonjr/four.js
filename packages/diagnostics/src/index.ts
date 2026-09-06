@@ -121,15 +121,15 @@ export {
   warnUnstableScale,
 } from "./validation.js";
 
+// §83's per-frame allocation development warning (A-4/A-5, 2026-09-06).
+export type {
+  AuditFrameAllocationsOptions,
+  FrameAllocationReport,
+} from "./allocation-audit.js";
 export {
-  DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD,
-  beginFrameAllocationCheck,
-  endFrameAllocationCheck,
-  warnDetachedNodeListeners,
-  warnDisposedResourceInUse,
-  warnPerFrameAllocations,
-  warnStalePhysicsHandle,
-} from "./dev-warnings.js";
+  NO_FRAME_ALLOCATIONS,
+  auditFrameAllocations,
+} from "./allocation-audit.js";
 
 // §84 runtime statistics (A-1, 2026-08-07).
 export type { ClockSource, FrameStats, RenderStatisticsLike } from "./stats.js";

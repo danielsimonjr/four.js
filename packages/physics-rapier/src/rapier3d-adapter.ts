@@ -216,6 +216,7 @@ import {
   validatePhysicsWorldOptions,
   validateQueryShape,
   validateRigidBodyDescriptor,
+  rejectStalePhysicsHandle,
 } from "@four/physics";
 import type {
   AngularVelocityInput,
@@ -287,20 +288,6 @@ const ADAPTER_ERROR_CODE = "INVALID_APPLICATION_STATE";
 
 /** §37 `name`. Recorded in snapshots and replays, which refuse other solvers. */
 const ADAPTER_NAME = "rapier3d";
-
-const staleBodyHandleWarned = new Set<number>();
-
-function warnStaleBodyHandle(bodyId: number): void {
-  if (staleBodyHandleWarned.has(bodyId)) {
-    return;
-  }
-  staleBodyHandleWarned.add(bodyId);
-  console.warn(
-    `[four] §83: a stale body physics handle was used on ${ADAPTER_NAME} ` +
-      `(body id ${String(bodyId)}). Handles are valid only while the body is ` +
-      "registered with the world that issued them.",
-  );
-}
 
 /** The one §21 dimension this adapter simulates. */
 const ADAPTER_DIMENSION = "3d";
@@ -2537,11 +2524,12 @@ export class Rapier3dAdapter
     this.#requireWorld();
     const record = handle as unknown as BodyRecord;
     if (!record.alive || this.#bodies.get(record.id) !== record) {
-      warnStaleBodyHandle(record.id);
-      throw new FourError(
-        ADAPTER_ERROR_CODE,
+      rejectStalePhysicsHandle(
+        "body",
+        String(record.id),
         "Body handle is not valid for this Rapier3dAdapter: it was destroyed, or it was minted by another adapter (§37).",
-        { context: { adapter: ADAPTER_NAME } },
+        ADAPTER_ERROR_CODE,
+        { adapter: ADAPTER_NAME },
       );
     }
     return record;
@@ -2569,10 +2557,12 @@ export class Rapier3dAdapter
     this.#requireWorld();
     const record = handle as unknown as JointRecord;
     if (!record.alive || this.#joints.get(record.id) !== record) {
-      throw new FourError(
-        ADAPTER_ERROR_CODE,
+      rejectStalePhysicsHandle(
+        "joint",
+        String(record.id),
         "Joint handle is not valid for this Rapier3dAdapter: it was destroyed — possibly with one of its bodies — or it was minted by another adapter (§28, §37).",
-        { context: { adapter: ADAPTER_NAME } },
+        ADAPTER_ERROR_CODE,
+        { adapter: ADAPTER_NAME },
       );
     }
     return record;
@@ -2699,10 +2689,12 @@ export class Rapier3dAdapter
     this.#requireWorld();
     const record = handle as unknown as ColliderRecord;
     if (!record.alive || this.#colliders.get(record.id) !== record) {
-      throw new FourError(
-        ADAPTER_ERROR_CODE,
+      rejectStalePhysicsHandle(
+        "collider",
+        String(record.id),
         "Collider handle is not valid for this Rapier3dAdapter: it was destroyed, or it was minted by another adapter (§37).",
-        { context: { adapter: ADAPTER_NAME } },
+        ADAPTER_ERROR_CODE,
+        { adapter: ADAPTER_NAME },
       );
     }
     return record;

@@ -34,6 +34,7 @@ import {
   ComponentRegistry,
   EventEmitter,
   FourError,
+  devWarnOnce,
   type Component,
   type ComponentHost,
   type ComponentType,
@@ -101,20 +102,6 @@ let nextNodeId = 1;
 
 /** The shape of an engine-assigned id: `node-` and a decimal counter value. */
 const ENGINE_NODE_ID = /^node-(\d+)$/;
-
-const detachedListenerWarned = new Set<string>();
-
-function warnDetachedListeners(node: Node): void {
-  const count = node.totalListenerCount();
-  if (count <= 0) return;
-  if (detachedListenerWarned.has(node.id)) return;
-  detachedListenerWarned.add(node.id);
-  console.warn(
-    `[four] §83: node "${node.id}" was detached from the scene graph but still has ` +
-      `${String(count)} event listener(s). Call removeAllListeners() during ` +
-      "teardown, or the node will stay alive until every listener is removed.",
-  );
-}
 
 /**
  * Default `up` reference for {@link Node.lookAt}: world +Y, because §7a makes
@@ -889,7 +876,15 @@ export abstract class Node
     }
     this.#children.splice(index, 1);
     child.#parent = null;
-    warnDetachedListeners(child);
+    const listeners = child.listenerCountAll();
+    if (listeners > 0) {
+      devWarnOnce(
+        `detached-node-listeners:${child.id}`,
+        `§83: node "${child.id}" was detached with ${String(listeners)} event ` +
+          "listener(s) still registered; call the unsubscribers from on() or " +
+          "removeAllListeners() so the subtree is not retained (§6b).",
+      );
+    }
     child.emit("removed", { node: child, parent: this });
   }
 }

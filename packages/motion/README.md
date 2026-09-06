@@ -19,7 +19,7 @@ Implements §9–§13, §38–§39, and the §111 advanced-motion tier (§99, Pa
 ## Staged / not yet implemented
 
 - Fly (two lines of application code over the shipped orbit/dolly surface), shake/impulse (wants interpolated value-noise, not per-step white noise), stereo/XR.
-- Path-planning adapters (RFC), CCD/FABRIK IK limits/ownership/convergence, spatial-hash steering neighbors (brute force ships), spherical wander, and robotic joint-command mapping (the PID → joint-motor cascade is demonstrated in tests instead).
+- Path-planning adapters (RFC), CCD/FABRIK IK limits/ownership/convergence, spherical wander, and robotic joint-command mapping (the PID → joint-motor cascade is demonstrated in tests instead). `SpatialHash` ships for radius neighbour queries (WP-8.2).
 
 Unit tests are colocated in `tests/` per §92.
 

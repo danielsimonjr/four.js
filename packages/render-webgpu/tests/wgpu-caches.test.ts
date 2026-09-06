@@ -10,7 +10,8 @@
  */
 
 import { Texture } from "@four/render";
-import { describe, expect, it } from "vitest";
+import { resetDevWarnings } from "@four/core";
+import { describe, expect, it, vi } from "vitest";
 
 import { createRecordingGpu } from "../../../tests/integration/helpers/recording-gpu.js";
 import {
@@ -751,6 +752,8 @@ describe("WgpuTextureCache", () => {
   });
 
   it("returns null for a disposed texture, and destroys its stale record", () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { device: gpuDevice, gpu } = device();
     const cache = new WgpuTextureCache(gpuDevice);
     const source = texture({});
@@ -758,6 +761,8 @@ describe("WgpuTextureCache", () => {
     (source as unknown as { version: number; disposed: boolean }).version = 1;
     (source as unknown as { disposed: boolean }).disposed = true;
     expect(cache.acquire(source)).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("disposed");
     expect(gpu.countOf("texture.destroy")).toBe(1);
     expect(cache.size).toBe(0);
     expect(cache.byteLength).toBe(0);

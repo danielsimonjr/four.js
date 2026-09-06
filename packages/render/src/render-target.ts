@@ -108,6 +108,7 @@ import type { Disposable } from "@four/core";
 import type { MaterialTexture } from "@four/materials";
 import type { ColorSpace } from "@four/math";
 
+import { renderTargetByteLength } from "./render-target-bytes.js";
 import { noteRenderTarget } from "./resource-memory.js";
 
 /**
@@ -675,18 +676,14 @@ export class RenderTarget implements Disposable {
    * resource holds nothing.
    */
   get byteLength(): number {
-    if (this.#disposed) {
-      return 0;
-    }
-    return (
-      this.#width *
-      this.#height *
-      renderTargetBytesPerTexel({
-        format: this.#format,
-        depth: this.#depth,
-        depthTexture: this.#depthTexture,
-        stencil: this.#stencil,
-      })
+    return renderTargetByteLength(
+      this.#width,
+      this.#height,
+      this.#format,
+      this.#depth,
+      this.#depthTexture,
+      this.#stencil,
+      this.#disposed,
     );
   }
 

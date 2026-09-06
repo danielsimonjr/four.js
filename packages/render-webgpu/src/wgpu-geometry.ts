@@ -42,6 +42,7 @@
  */
 
 import type { RenderItem } from "@four/render";
+import { warnDisposedInUse } from "@four/render";
 
 import {
   GPU_BUFFER_USAGE,
@@ -183,6 +184,9 @@ export class WgpuGeometryCache {
     }
 
     if (geometry.drawCount === 0) {
+      if (geometry.disposed) {
+        warnDisposedInUse("geometry", geometry.id);
+      }
       return null;
     }
 

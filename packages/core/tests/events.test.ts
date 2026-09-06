@@ -339,4 +339,17 @@ describe("EventEmitter (§6b)", () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  describe("listenerCountAll (§83)", () => {
+    it("counts live registrations across every event type", () => {
+      const emitter = new TestEmitter();
+      expect(emitter.listenerCountAll()).toBe(0);
+      const onPing = (): void => undefined;
+      emitter.on("ping", onPing);
+      emitter.on("pong", () => undefined);
+      expect(emitter.listenerCountAll()).toBe(2);
+      emitter.off("ping", onPing);
+      expect(emitter.listenerCountAll()).toBe(1);
+    });
+  });
 });

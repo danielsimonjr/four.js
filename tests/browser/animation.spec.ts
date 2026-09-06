@@ -816,6 +816,8 @@ function describeSpan(values: readonly number[]): string {
 
 // --- tests ------------------------------------------------------------------
 
+test.describe.configure({ mode: "serial" });
+
 test.describe("§107: authored animation reaches the screen", () => {
   test("the diamond's vector tween moves it, and its colour tween pulses", async ({
     page,
