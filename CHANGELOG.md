@@ -8,7 +8,17 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
-### 2026-09-06 — Auto-selection follow-ups (A-8/R-2 residue)
+### 2026-09-06 — §83 dev warnings batch (A-5 remainder)
+
+- **`resource-warnings.ts`.** `warnDisposedInUse` — one-time §83 warning when
+  a disposed geometry, texture, or render target is still referenced; wired in
+  WebGL and WebGPU backend caches.
+- **`stale-handle.ts`.** `rejectStalePhysicsHandle` pairs
+  `INVALID_APPLICATION_STATE` with a one-time stale-handle warning; Rapier 2D/3D
+  adapters and the fake adapter use it.
+- **`allocation-audit.ts`.** `auditFrameAllocations` turns
+  `@four/math`'s `constructionCount` delta into a one-time per-frame allocation
+  warning (opt-in, same shape as `auditResourceLeaks`).
 
 - **`backend-selection.test.ts`.** The §62 fallback and preference tests now
   register real `registerWebgpuRenderer()` instead of a WebGPU double — the
@@ -32,9 +42,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ### 2026-09-06 — Windows animation browser gate sweep cost
 
-- **`animation.spec.ts`.** Four cases shared one 16-sample SwiftShader sweep
-  in `beforeAll` instead of four independent 22-screenshot sweeps (~56 s each
-  on Windows against a 60 s budget).
+- **`animation.spec.ts`.** Four cases share one 16-sample SwiftShader sweep
+  in `beforeAll` (serial describe) instead of four independent 22-screenshot
+  sweeps (~56 s of a 60 s Playwright budget each on Windows). Samples are
+  spaced at 0.4 s (6 s minimum span unchanged); the trailing wait is skipped.
+  Measured on Linux/SwiftShader: **4 passed in 16.2 s** (was 43.3 s with four
+  sweeps). Visual project: **3/3 in 21 s**. Playwright default timeout remains
+  **120 s** for remaining screenshot-bound specs.
 
 ### 2026-09-06 — Camera rigs TODO residue (docs)
 
@@ -44,13 +58,6 @@ specification; until then, entries are grouped by date under **Unreleased**.
   shipped" honest-state bullet.
 - **`TODO.md`.** Closed trackball and fly items in §44/§47 residue and staged
   rigs; `CameraShake` remains open (value-noise decision).
-
-### 2026-09-06 — Size budgets: R-36 headroom restore
-
-- **`.size-limit.json`.** first-3d-scene 38 → 38.5 kB, particles-demo 36.5 → 37
-  kB, ui-demo 45 → 45.5 kB (measured A/B: 38.18/36.77/45.27 kB gzip; closes the
-  R-36 thin-budget TODO — the original 32/37.5/29.5 kB proposal was absorbed
-  through intermediate bumps).
 
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 

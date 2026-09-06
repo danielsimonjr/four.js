@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **49 open**, 144 done.
+Counts as of 2026-09-06: **45 open**, 148 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -67,7 +67,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -111,7 +111,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-19/R-20 follow-ups:
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 PARTIAL
-- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision
 - §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
 
 ## Now
@@ -330,11 +330,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       closed.** DONE 2026-09-06.
       - **WebGPU (on `main`).** Platform-conditional
         `--use-webgpu-adapter=swiftshader`; **22 passed, 0 skipped**.
-      - **Chromium/visual (`ffed71a`).** Four `animation.spec` cases each ran an
-        independent 22-screenshot SwiftShader sweep (~56 s of a 60 s budget on
-        Windows). They now share one 16-sample `beforeAll` sweep (serial describe),
-        skip the trailing wait, and space samples at 0.4 s — same 6 s minimum span,
-        ~4× less readback work per file.
+      - **Chromium/visual.** Four `animation.spec` cases each ran an independent
+        22-screenshot SwiftShader sweep (~56 s of a 60 s budget on Windows).
+        They now share one 16-sample `beforeAll` sweep (serial describe), skip
+        the trailing wait, and space samples at 0.4 s — same 6 s minimum span,
+        ~4× less readback work per file. Measured Linux/SwiftShader: animation
+        **4/4 in 16.2 s** (was 43.3 s); visual **3/3 in 21 s**. Global
+        Playwright timeout **120 s** for any remaining screenshot-bound spec.
 - [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
       2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
       headless-shell-win64 layout are in the candidate list. Only matters when
@@ -1166,8 +1168,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
       package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → `devWarnOnce`;
       production prints nothing); R-6's effect pipeline needs an opt-in registry split, not the dev
-      define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
-      loads, detached-node listeners, stale physics handles, per-frame allocations
+      define (0.75 kB); remaining §83 warnings: ~~disposed-in-use~~ **DONE 2026-09-06**
+      (`warnDisposedInUse` in render backends); duplicate asset loads **DONE**;
+      ~~detached-node listeners~~ **DONE 2026-09-06** (`Node.#detach` →
+      `devWarnOnce`); ~~stale physics handles~~ **DONE 2026-09-06**
+      (`rejectStalePhysicsHandle`); ~~per-frame allocations~~ **DONE 2026-09-06**
+      (`auditFrameAllocations`); leaked resources / FinalizationRegistry still open
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
       `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
       measuring browser tests (49 total), first user of the §62/§37 registries and
@@ -1184,10 +1190,13 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       live. A-1 follow-up (b) closed
 - [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
       warnings — leaked resources (now _derivable_ from the counters, but nothing
-      warns), disposed-in-use, ~~duplicate asset loads~~ **DONE 2026-09-06**
-      (`AssetManager.load` of a settled slot → `devWarnOnce`), detached-node listeners, stale
-      physics handles, per-frame allocations; creation-site capture and
-      FinalizationRegistry leak detection need A-4's dev flag
+      warns), ~~disposed-in-use~~ **DONE 2026-09-06** (`warnDisposedInUse` in
+      WebGL/WebGPU backends), ~~duplicate asset loads~~ **DONE 2026-09-06**
+      (`AssetManager.load` of a settled slot → `devWarnOnce`), ~~detached-node
+      listeners~~ **DONE 2026-09-06** (`Node.#detach`), ~~stale physics handles~~
+      **DONE 2026-09-06** (`rejectStalePhysicsHandle` in Rapier + fake adapters),
+      ~~per-frame allocations~~ **DONE 2026-09-06** (`auditFrameAllocations`);
+      creation-site capture and FinalizationRegistry leak detection need A-4's dev flag
 - [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
       materials + solver
       handles unaccounted (§83 names "GPU and solver resources");
@@ -1496,6 +1505,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **§83 dev warnings (A-5 remainder).** `warnDisposedInUse`,
+      `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener
+      warn on `Node.#detach`. Leaked-resource / FinalizationRegistry tier still open.
 
 - [x] 2026-09-06 — **Windows browser gate animation sweep.** Shared one
       16-sample SwiftShader sweep across four `animation.spec` cases.
