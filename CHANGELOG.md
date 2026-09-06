@@ -8,6 +8,27 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Open-TODO pass: Windows runner, Dependabot lockfile, A-26 renderer table
+
+- **Windows unit-test timeouts.** `packages/four/tests/barrels.test.ts` now
+  imports each barrel inside its test so the first `await` does not pay every
+  dynamic import at once. `packages/core/tests/random.test.ts` and
+  `packages/geometry/tests/svg-path.test.ts` take a 30 s timeout (Vitest 3.2
+  describe options). Playwright's default test timeout is 120 s so
+  screenshot-bound Windows SwiftShader runs have margin.
+- **`CHROMIUM_BINARIES` knows Windows.** `playwright.config.ts` resolves
+  `chrome-win64/chrome.exe` and the headless-shell-win64 layout when
+  `PLAYWRIGHT_BROWSERS_PATH` is set.
+- **Dependabot can go green without a human lockfile push.**
+  `.github/workflows/dependabot-bun-lock.yml` runs `bun install` on
+  `dependabot[bot]` PRs only, commits `bun.lock` when it changes, and
+  dispatches CI onto that SHA. The main CI job still uses `--frozen-lockfile`.
+- **A-26 renderer backends.** `tools/generate-compatibility.mjs` now emits a
+  live `RendererCapabilities` table (`null` / `webgl2` / `webgpu`, plus the
+  two reserved stubs) from constructed instances before `initialize`.
+  `--check` covers both generated blocks. Rapier's `inheritVelocityFrom`
+  no-op is recorded in the hand-written deviations list.
+
 ### 2026-09-06 — `js-yaml 5` breaks the dependency-graph tool, and the fix is not ours
 
 - **#68 closed; `js-yaml >=5` ignored.** Dependabot re-proposed the dev-dependency group

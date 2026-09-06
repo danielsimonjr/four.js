@@ -13,13 +13,12 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **74 open**, 115 done.
+Counts as of 2026-09-06: **70 open**, 119 done (four closed this pass: Windows Chromium binaries, Windows unit-test timeouts, Dependabot `bun.lock` pipeline, A-26 renderer table).
 
 ### 1 · Minutes — mechanical, no design in them
 
 Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 
-- `playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.
 - Capability-table note: Rapier derives kinematic velocity itself, so inheritVelocityFrom is nearly a no-op there; other solvers may need it
 - Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 - §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased gain, not a hard ceiling (documented in the stable API docs); name it in the §90/§102 capability tables when a capping adapter (Box2D) arrives
@@ -40,11 +39,9 @@ Each has its cause written down. The thinking is done; what remains is the chang
 
 Bounded work with a clear shape, but more than a single edit.
 
-- Five tests time out under `bun run test` on Windows; none is a code defect.
 - The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
 - Pre-existing test-isolation defect, still unfixed and now hidden again.
 - four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.
-- Dependabot bumps will need manual `bun.lock` regeneration.
 - Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is invisible; schedule blending with §60a color management work
 - §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API is the scoped fix; benchmark attribution in benchmarks/results/)
 - Size budgets are thin after R-36 (measured A/B, 2026-08-09)
@@ -108,7 +105,6 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §96 residue:
 - R-19/R-20 follow-ups:
 - Flaky gate (pre-existing, confirmed at baseline 2026-08-07):
-- A-26 follow-up:
 - A-13 PARTIAL
 - Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 - §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
@@ -194,7 +190,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       at the single call that touches the filesystem. The library was not changed — it was
       never wrong. The third failure, `determinism/path.test.ts`, passes on a quiet machine;
       it was contention, not a defect.
-- [ ] **Five tests time out under `bun run test` on Windows; none is a code defect.**
+- [x] **Five tests time out under `bun run test` on Windows; none is a code defect.**
+      DONE 2026-09-06 — barrels now import lazily inside each test so the first
+      await no longer pays every dynamic import; `svg-path` and `random` take a
+      30 s describe timeout (Vitest 3.2 options object, not `describe.configure`).
       Surfaced the moment the runner above started working. All are 5 s `testTimeout`
       expiries, not wrong answers:
       - `four/tests/barrels.test.ts` — the **first** barrel awaited times out while the
@@ -337,7 +336,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
         SwiftShader readback. The one test that passed took **55.9 s of its 60 s budget** —
         there is no margin on this platform. Confirmed with the machine fully idle; an
         earlier reading was confounded twice by my own animating pages.
-- [ ] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** The four
+- [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
+      2026-09-06 — `chrome-win64/chrome.exe` and the headless-shell-win64 layout
+      are in the candidate list. The four
       candidates cover `chrome-linux` and `chrome-mac` only, so `findPreinstalledChromium()`
       can never resolve `chromium-*/chrome-win64/chrome.exe`. The escape hatch for a sandbox
       whose Chromium revision differs is therefore unavailable on Windows. Only matters when
@@ -495,7 +496,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `.github/dependabot.yml` added (npm ecosystem, not bun). All four workflows green on `main`.
 - [x] **PR #54 closed as fully superseded** — zero code delta against `main`; 0 of 104 CHANGELOG and
       0 of 117 MEMORY entries were absent from `main`. Evidence recorded on the PR.
-- [ ] **Dependabot bumps will need manual `bun.lock` regeneration.** Dependabot cannot write
+- [x] **Dependabot bumps will need manual `bun.lock` regeneration.** DONE 2026-09-06 —
+      `.github/workflows/dependabot-bun-lock.yml` runs `bun install` on
+      dependabot[bot] PRs only, commits `bun.lock` when it changes, and
+      dispatches CI onto that SHA. Frozen lockfile on the main CI job is
+      unchanged. Dependabot cannot write
       `bun.lock`, and CI runs `bun install --frozen-lockfile`, so any bump whose resolution changes
       will fail until the lockfile is regenerated on the branch — and a human push costs that PR
       its automerge. Same tax as math-mcp #103. Needs a pipeline answer, not a per-PR fix.
@@ -1276,8 +1281,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       capability declarations; `--check` detects drift)
 - [x] **A-26 follow-up done 2026-08-07:** `check-compat` root script + ci.yml step wired
       once A-25's agent freed those files; `tools/README.md` documents the three new tools
-- [ ] **A-26 follow-up:** extend the generated block to renderer backends once
-      `RendererCapabilities` grows past 2 fields
+- [x] **A-26 follow-up:** extend the generated block to renderer backends once
+      `RendererCapabilities` grows past 2 fields — DONE 2026-09-06. Live table
+      from constructed `NullRenderer` / `WebglRenderer` / `WebgpuRenderer`
+      (pre-`initialize`; device-derived floors captioned). `--check` covers both
+      blocks.
 - [x] **A-25 machinery DONE 2026-08-07** (publish itself stays owner-gated): Changesets
       config, `apply-publish-names.mjs` (+tests; rewrites emitted code, not just
       manifests), `release.yml` reusing ci.yml via `workflow_call`, `docs.yml` Pages
@@ -1408,8 +1416,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
 - [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
       against; solver bodies have no scale)
-- [ ] Capability-table note: Rapier derives kinematic velocity itself, so
-      inheritVelocityFrom is nearly a no-op there; other solvers may need it
+- [x] Capability-table note: Rapier derives kinematic velocity itself, so
+      inheritVelocityFrom is nearly a no-op there — DONE 2026-09-06, documented
+      in `docs/COMPATIBILITY.md` deviations. Other solvers still get a column
+      when they land.
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
 
@@ -1457,6 +1467,13 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **Open-TODO pass (first landing).** Windows Chromium binary
+      layouts + lazy umbrella barrel imports + slower-runner Vitest/Playwright
+      timeouts; Dependabot `bun.lock` regeneration workflow; generated §62
+      renderer-backend compatibility table (A-26 follow-up); Rapier
+      `inheritVelocityFrom` deviation noted in `docs/COMPATIBILITY.md`.
+      Remaining open items are still in flight or owner-gated — see Now.
 
 - **2026-09-05 — RFC 0006 TypeScript-on-Bun toolchain.** Bun workspace; spec 1.14; Vitest/`tsc -b` retained.
 

@@ -30,6 +30,18 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — open-TODO pass, first landing.** Four items closed without an
+  owner product decision: Windows Chromium binary layouts + lazy barrel imports
+  + slower-runner timeouts; a Dependabot-only workflow that regenerates
+  `bun.lock` (does not weaken `--frozen-lockfile` on CI); A-26's generated
+  renderer-backend table, read before `initialize` so device-derived WebGPU
+  fields stay at the construction-time floor (captioned, not claimed as "cannot");
+  Rapier `inheritVelocityFrom` documented as nearly a no-op. A team of
+  isolated packets is still working the diagnosed flakes, scissor, isolation
+  leak, §59 textures, field batching, and docs gates. Owner-gated items
+  (first publish, rapier 0.20, typedoc/TS 7, A-25 secrets, RFC residues)
+  stay owner-gated.
+
 - **2026-09-06 — three headline claims verified FROM OUTSIDE the library, against the published
   packages.** Not the repo's own suite: the staged `@danielsimonjr/fourjs-*` tree laid out in a
   clean consumer's `node_modules`, importing published names only.
