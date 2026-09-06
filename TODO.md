@@ -6,7 +6,21 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
-- [ ] **`bun run test` and `bun run coverage` are broken on Windows.**
+- [ ] **Five tests time out under `bun run test` on Windows; none is a code defect.**
+      Surfaced the moment the runner above started working. All are 5 s `testTimeout`
+      expiries, not wrong answers:
+      - `four/tests/barrels.test.ts` — the **first** barrel awaited times out while the
+        other 24 pass in ~0 ms. Every dynamic import is started at module load and the
+        first `await` pays the whole cold-start cost. Fails even with the package run
+        alone, so it is not contention.
+      - `geometry/tests/svg-path.test.ts` and `core/tests/random.test.ts` — pass when
+        their package runs alone, fail under `--concurrency=4`. Contention.
+      Both shapes are the charter's "flaky by design" axis: a wall-clock budget that
+      happens to hold on CI's hardware and not here. A fix is a real decision (raise
+      `testTimeout` for cold-start-bound suites? await the barrels serially?), so it is
+      filed rather than guessed at.
+
+- [x] **`bun run test` and `bun run coverage` are broken on Windows.** FIXED 2026-09-06.
       `tools/run-in-packages.mjs:20` builds its root as
       `new URL("..", import.meta.url).pathname`. On Windows that yields `/C:/Users/...`
       — with a leading slash — and `join()` turns it into a path beginning `\C:`, so the

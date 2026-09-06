@@ -8,6 +8,26 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — `bun run test` and `bun run coverage` were dead on Windows
+
+- **`tools/run-in-packages.mjs` never reached a single package on Windows.** It built its
+  root as `new URL("..", import.meta.url).pathname`, which on Windows yields a
+  leading-slash POSIX path (`/C:/Users/...`); `join()` then produced a path beginning
+  `\C:` and the directory scan failed before any test ran:
+
+  ```text
+  ENOENT: no such file or directory, scandir '\C:\Users\danie\Github\four.js\packages'
+  ```
+
+  Now `join(dirname(fileURLToPath(import.meta.url)), "..")`, which is what
+  `check-docs.mjs`, `check-spec.mjs`, `apply-publish-names.mjs` and
+  `generate-compatibility.mjs` already do — this file was the only one in `tools/` that
+  did not. Both scripts it backs (`test`, `coverage`) now run.
+
+  Invisible on CI, where `.pathname` needs no translation. That is the point worth
+  keeping: the repository's two most important commands were broken on a platform while
+  every gate stayed green, because no gate runs there.
+
 ### 2026-09-06 — `new Node()` now says something in development builds
 
 - **`Node` is `abstract`, but `abstract` is erased at compile time**, so it protected

@@ -14,10 +14,17 @@
  */
 
 import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+// `fileURLToPath`, not `.pathname`: on Windows the latter yields a leading-slash
+// POSIX path (`/C:/Users/...`), which `join` turns into `\C:\Users\...` and every
+// filesystem call then rejects — `bun run test` and `bun run coverage` both died
+// before a single package ran. Invisible on CI, where no translation is needed.
+// This matches check-docs.mjs, check-spec.mjs, apply-publish-names.mjs and
+// generate-compatibility.mjs, which all already resolve their root this way.
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const packagesRoot = join(root, "packages");
 const argv = process.argv.slice(2);
 
