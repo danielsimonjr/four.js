@@ -9,6 +9,10 @@ on:
   # release clears exactly the gates a pull request clears. Additive: it changes
   # nothing about how CI runs on push or pull_request.
   workflow_call:
+  # dependabot-bun-lock.yml dispatches this onto a regenerated lockfile commit.
+  # A GITHUB_TOKEN push does not create a new pull_request run, so this is how
+  # that SHA gets a CI check. The install step below stays --frozen-lockfile.
+  workflow_dispatch:
 
 jobs:
   ci:
