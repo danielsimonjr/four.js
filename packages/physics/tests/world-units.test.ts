@@ -3,7 +3,7 @@
  * solver and back out. Omitted units is today's identity path.
  */
 
-import { Vector2, Vector3 } from "@four/math";
+import { Vector2 } from "@four/math";
 import { Group } from "@four/scene";
 import { describe, expect, it } from "vitest";
 

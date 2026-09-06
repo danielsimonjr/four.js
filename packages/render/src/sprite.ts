@@ -248,12 +248,15 @@ export function groupSpritesByTexture(
   const runs: SpriteTextureRun[] = [];
   let index = 0;
   while (index < items.length) {
-    const texture = resolveSpriteTexture(items[index]!);
+    const head = items[index];
+    if (head === undefined) break;
+    const texture = resolveSpriteTexture(head);
     let count = 1;
-    while (
-      index + count < items.length &&
-      resolveSpriteTexture(items[index + count]!) === texture
-    ) {
+    while (index + count < items.length) {
+      const next = items[index + count];
+      if (next === undefined || resolveSpriteTexture(next) !== texture) {
+        break;
+      }
       count += 1;
     }
     runs.push({ texture, start: index, count });

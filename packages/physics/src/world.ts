@@ -3740,7 +3740,7 @@ export class PhysicsWorld {
    * the deviation is this paragraph — WP-7.3.)
    */
   #feedKinematic(registration: BodyRegistration): void {
-    const { type, node, handle, body } = registration;
+    const { type, node } = registration;
     if (type === "kinematic-position") {
       const authority = node.transformAuthority;
       if (authority === BLENDED_AUTHORITY) {

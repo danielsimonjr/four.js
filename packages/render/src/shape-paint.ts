@@ -169,7 +169,7 @@ function requireStops(
   name: string,
   stops: readonly GradientStop[],
 ): ResolvedGradientStop[] {
-  if (!Array.isArray(stops) || stops.length < 2) {
+  if (stops.length < 2) {
     refuse(
       `${name}.stops needs at least 2 stops (one flat colour is a "solid" ` +
         `paint); got ${String(stops.length)}`,

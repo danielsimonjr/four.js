@@ -18,7 +18,6 @@ import {
   SweptCharacterController,
 } from "../src/swept-character-controller.js";
 import { PhysicsWorld } from "../src/world.js";
-import type { ShapeCastQuery } from "../src/queries.js";
 import type { WorldShapeCastHit } from "../src/world.js";
 import { FakeSolverAdapter } from "./fake-adapter.js";
 
@@ -39,7 +38,7 @@ function hit(
   };
 }
 
-function scriptedWorld(body: RigidBody): {
+function scriptedWorld(): {
   world: PhysicsWorld;
   setHit: (next: WorldShapeCastHit | undefined) => void;
 } {
@@ -58,7 +57,7 @@ function scriptedWorld(body: RigidBody): {
       },
     },
     getBodyHandle: () => undefined,
-    shapeCast(_query: ShapeCastQuery): WorldShapeCastHit[] {
+    shapeCast(): WorldShapeCastHit[] {
       return next === undefined ? [] : [next];
     },
   } as unknown as PhysicsWorld;
@@ -123,7 +122,7 @@ describe("SweptCharacterController — PH-11c push options", () => {
 describe("SweptCharacterController — PH-11c impulse policy", () => {
   it("imparts a reduced-mass impulse at the hit point and wakes the body", () => {
     const box = new RigidBody({ type: "dynamic", mass: 1 });
-    const scripted = scriptedWorld(box);
+    const scripted = scriptedWorld();
     const controller = makeController(scripted.world);
     const node = characterNode(controller);
     controller.setMoveIntent(1, 0);
@@ -145,7 +144,7 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
 
   it("skips a static floor", () => {
     const floor = new RigidBody({ type: "static" });
-    const scripted = scriptedWorld(floor);
+    const scripted = scriptedWorld();
     const controller = makeController(scripted.world);
     const node = characterNode(controller);
     controller.setMoveIntent(1, 0);
@@ -159,7 +158,7 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
 
   it("skips a kinematic body", () => {
     const slab = new RigidBody({ type: "kinematic-position" });
-    const scripted = scriptedWorld(slab);
+    const scripted = scriptedWorld();
     const controller = makeController(scripted.world);
     const node = characterNode(controller);
     controller.setMoveIntent(1, 0);
@@ -172,7 +171,7 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
 
   it("leaves the box still when pushDynamics is false", () => {
     const box = new RigidBody({ type: "dynamic", mass: 1 });
-    const scripted = scriptedWorld(box);
+    const scripted = scriptedWorld();
     const controller = makeController(scripted.world, {
       world: scripted.world,
       radius: 0.5,
@@ -191,7 +190,7 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
 
   it("skips a massless or infinite-mass body", () => {
     const massless = new RigidBody({ type: "dynamic" });
-    const scripted = scriptedWorld(massless);
+    const scripted = scriptedWorld();
     const controller = makeController(scripted.world);
     const node = characterNode(controller);
     controller.setMoveIntent(1, 0);
@@ -204,7 +203,7 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
 
   it("skips when pushImpulseScale is 0 or the character is receding", () => {
     const box = new RigidBody({ type: "dynamic", mass: 1 });
-    const scripted = scriptedWorld(box);
+    const scripted = scriptedWorld();
     const controller = makeController(scripted.world, {
       world: scripted.world,
       radius: 0.5,
@@ -219,7 +218,7 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
     expect(box.commands.pointImpulseCount).toBe(0);
 
     const receding = new RigidBody({ type: "dynamic", mass: 1 });
-    const recedingWorld = scriptedWorld(receding);
+    const recedingWorld = scriptedWorld();
     const recedingController = makeController(recedingWorld.world);
     const recedingNode = characterNode(recedingController);
     recedingController.setMoveIntent(1, 0);
@@ -232,8 +231,8 @@ describe("SweptCharacterController — PH-11c impulse policy", () => {
   it("gives a heavier box a smaller velocity change at the same closing speed", () => {
     const light = new RigidBody({ type: "dynamic", mass: 1 });
     const heavy = new RigidBody({ type: "dynamic", mass: 80 });
-    const scriptedLight = scriptedWorld(light);
-    const scriptedHeavy = scriptedWorld(heavy);
+    const scriptedLight = scriptedWorld();
+    const scriptedHeavy = scriptedWorld();
     const lightController = makeController(scriptedLight.world);
     const heavyController = makeController(scriptedHeavy.world);
     const lightNode = characterNode(lightController);

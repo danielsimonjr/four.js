@@ -85,7 +85,9 @@ function isSpaceMode(value: unknown): value is SpaceMode {
 
 function readVector(value: JsonValue | undefined, fallback: Vector3): Vector3 {
   if (!Array.isArray(value) || value.length !== 3) return fallback;
-  const [x, y, z] = value;
+  const x: unknown = value[0];
+  const y: unknown = value[1];
+  const z: unknown = value[2];
   if (
     typeof x !== "number" ||
     typeof y !== "number" ||

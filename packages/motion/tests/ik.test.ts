@@ -363,7 +363,7 @@ describe("solveTwoBoneIK — allocation and determinism", () => {
 function boneLengths(positions: readonly Vector3[]): readonly number[] {
   const lengths: number[] = [];
   for (let i = 0; i < positions.length - 1; i += 1) {
-    lengths.push(distance(positions[i]!, positions[i + 1]!));
+    lengths.push(distance(positions[i], positions[i + 1]));
   }
   return lengths;
 }
@@ -394,7 +394,7 @@ describe("solveCCD / solveFABRIK", () => {
     expect(result.error).toBeLessThan(
       result.converged ? DEFAULT_IK_TOLERANCE : 4,
     );
-    expect(out[2]!.x).toBeLessThan(4);
+    expect(out[2].x).toBeLessThan(4);
   });
 
   it("matches two-bone analytic within tolerance on a bent XY start", () => {
@@ -417,9 +417,9 @@ describe("solveCCD / solveFABRIK", () => {
     );
     expect(result.converged).toBe(true);
     expect(result.error).toBeLessThan(DEFAULT_IK_TOLERANCE);
-    expect(distance(out[2]!, analytic.end)).toBeLessThan(1e-3);
-    expect(distance(out[1]!, analytic.joint)).toBeLessThan(1e-3);
-    expect(out[1]!.y).toBeGreaterThan(0);
+    expect(distance(out[2], analytic.end)).toBeLessThan(1e-3);
+    expect(distance(out[1], analytic.joint)).toBeLessThan(1e-3);
+    expect(out[1].y).toBeGreaterThan(0);
   });
 
   it("FABRIK reaches a reachable target and keeps bone lengths", () => {
@@ -435,10 +435,10 @@ describe("solveCCD / solveFABRIK", () => {
 
     expect(result.converged).toBe(true);
     expect(result.error).toBeLessThan(DEFAULT_IK_TOLERANCE);
-    expect(distance(out[2]!, target)).toBeLessThan(DEFAULT_IK_TOLERANCE);
+    expect(distance(out[2], target)).toBeLessThan(DEFAULT_IK_TOLERANCE);
     const next = boneLengths(out);
-    expect(next[0]).toBeCloseTo(initial[0]!, 10);
-    expect(next[1]).toBeCloseTo(initial[1]!, 10);
+    expect(next[0]).toBeCloseTo(initial[0], 10);
+    expect(next[1]).toBeCloseTo(initial[1], 10);
   });
 
   it("returns converged=false and the last iterate for an unreachable target", () => {
@@ -458,8 +458,8 @@ describe("solveCCD / solveFABRIK", () => {
     expect(result.converged).toBe(false);
     expect(result.iterations).toBe(8);
     expect(result.error).toBeGreaterThan(1);
-    expect(out[2]!.x).toBeGreaterThan(1.5);
-    expect(out[2]!.x).toBeLessThan(2.5);
+    expect(out[2].x).toBeGreaterThan(1.5);
+    expect(out[2].x).toBeLessThan(2.5);
   });
 
   it("respects a ball limit on the middle joint", () => {
@@ -481,9 +481,9 @@ describe("solveCCD / solveFABRIK", () => {
       out,
     );
     const outgoing = new Vector3(
-      out[2]!.x - out[1]!.x,
-      out[2]!.y - out[1]!.y,
-      out[2]!.z - out[1]!.z,
+      out[2].x - out[1].x,
+      out[2].y - out[1].y,
+      out[2].z - out[1].z,
     ).normalize();
     const fromRest = Math.acos(Math.min(1, Math.max(-1, outgoing.x)));
     expect(fromRest).toBeLessThanOrEqual(maxBend + 1e-6);
@@ -506,9 +506,9 @@ describe("solveCCD / solveFABRIK", () => {
     );
     const rest = new Vector3(1, 0, 0);
     const outgoing = new Vector3(
-      out[2]!.x - out[1]!.x,
-      out[2]!.y - out[1]!.y,
-      out[2]!.z - out[1]!.z,
+      out[2].x - out[1].x,
+      out[2].y - out[1].y,
+      out[2].z - out[1].z,
     ).normalize();
     const signed =
       Math.atan2(outgoing.y, outgoing.x) - Math.atan2(rest.y, rest.x);
@@ -548,7 +548,7 @@ describe("solveCCD / solveFABRIK", () => {
     const result = solveFABRIK([root, mid, tip], target, undefined, out);
     expect(result.converged).toBe(true);
     mid.position.set(50, 50, 50);
-    expect(out[1]!.x).toBeLessThan(5);
+    expect(out[1].x).toBeLessThan(5);
   });
 
   it("does not allocate Vector3s when out is provided, after warm-up", () => {
@@ -583,9 +583,9 @@ describe("solveCCD / solveFABRIK", () => {
     expect(Object.is(a.error, b.error)).toBe(true);
     expect(a.converged).toBe(b.converged);
     for (let i = 0; i < 3; i += 1) {
-      expect(Object.is(first[i]!.x, second[i]!.x)).toBe(true);
-      expect(Object.is(first[i]!.y, second[i]!.y)).toBe(true);
-      expect(Object.is(first[i]!.z, second[i]!.z)).toBe(true);
+      expect(Object.is(first[i].x, second[i].x)).toBe(true);
+      expect(Object.is(first[i].y, second[i].y)).toBe(true);
+      expect(Object.is(first[i].z, second[i].z)).toBe(true);
     }
   });
 
@@ -599,7 +599,7 @@ describe("solveCCD / solveFABRIK", () => {
     solveCCD(chain, new Vector3(1, 1, 0));
     solveFABRIK(chain, new Vector3(0.5, 0.5, 0));
     for (let i = 0; i < chain.length; i += 1) {
-      expect(chain[i]!.equalsApprox(snapshot[i]!, 0)).toBe(true);
+      expect(chain[i].equalsApprox(snapshot[i], 0)).toBe(true);
     }
   });
 

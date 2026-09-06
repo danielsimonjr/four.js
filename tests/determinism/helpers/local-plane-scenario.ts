@@ -65,7 +65,7 @@ export interface LocalPlaneSummary {
   firstBodyV: number;
 }
 
-export interface LocalPlaneScenarioResult extends LocalPlaneSummary {}
+export type LocalPlaneScenarioResult = LocalPlaneSummary;
 
 function sample(node: Group, body: RigidBody): BodySample {
   const p = node.transform.position;

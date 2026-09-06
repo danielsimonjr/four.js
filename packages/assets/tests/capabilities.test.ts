@@ -16,8 +16,8 @@ import {
 function probeLoader(name: string): AssetLoader<string> {
   return {
     name,
-    async load() {
-      return name;
+    load() {
+      return Promise.resolve(name);
     },
   };
 }
