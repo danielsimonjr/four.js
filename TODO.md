@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **56 open**, 133 done.
+Counts as of 2026-09-06: **55 open**, 134 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -52,7 +52,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 - rapier 0.20 adoption is a real decision, not a bump.
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
 - PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends against; solver bodies have no scale)
-- Rotational root motion (staged 2026-08-02 — quaternion track throws)
+- Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
 - A-25 owner decisions before first publish:
 - A-25 remainder:
 
@@ -1424,7 +1424,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 7, 2026-08-02)
 
-- [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
+- [x] Rotational root motion (staged 2026-08-02 — quaternion track throws)
+      — DONE 2026-09-06: a quaternion `rootMotion` track differences
+      `conjugate(previous) * sampled` and multiplies onto
+      `transform.rotation`. Loops compose the same way translation adds.
 - [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
       against; solver bodies have no scale)
 - [x] Capability-table note: Rapier derives kinematic velocity itself, so
@@ -1484,6 +1487,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **Rotational root motion.** A quaternion `rootMotion`
+      track extracts `conjugate(previous) * sampled` and multiplies it onto
+      the target's `transform.rotation`. Translation path unchanged.
 
 - [x] 2026-09-06 — **§67 scissor clipping.** `Renderable.scissor` snapshots onto
       the render item; WebGL and WebGPU intersect with the view rect and

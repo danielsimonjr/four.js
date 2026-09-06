@@ -30,6 +30,13 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — rotational root motion is local composition.** A
+  quaternion root-motion track extracts `conjugate(previous) * sampled`
+  and `transform.rotation.multiply(delta)`. That is the same space
+  translation uses (`position.add`). Identity start + 90° Y over one
+  loop, twice, lands at 180° Y. The 2026-08-02 `NOT_IMPLEMENTED` throw
+  is gone.
+
 - **2026-09-06 — §67 scissor is a render-list field, not a stencil.**
   `SCISSOR_TEST` was already on per view. The missing piece was a per-item
   rectangle intersected with `view.rect`. Coordinates stay §48 / §7a

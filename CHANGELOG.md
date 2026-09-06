@@ -8,6 +8,14 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Rotational root motion
+
+- **`AnimationMixer` quaternion `rootMotion`.** A quaternion track is no
+  longer `NOT_IMPLEMENTED`. The mixer differences
+  `conjugate(previous) * sampled` and multiplies the delta onto
+  `transform.rotation` (local composition). Loop wraps compose the same
+  way translation adds strides. Scalar/colour tracks are still rejected.
+
 ### 2026-09-06 — §67 rectangular scissor clipping
 
 - **`Renderable.scissor`.** A per-draw axis-aligned rectangle in

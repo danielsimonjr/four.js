@@ -67,7 +67,9 @@
  * designated node's `transform.position`. That is what makes a walk cycle
  * authored in place move a character, and what lets the same clip loop forever
  * without teleporting back to the origin. See {@link MixerRootMotionOptions} for
- * the loop-aware derivation; rotational root motion is staged (2026-08-02).
+ * the loop-aware derivation. A quaternion track extracts rotation the same
+ * way — relative `conjugate(previous) * sampled`, multiplied onto
+ * `transform.rotation`.
  *
  * ## Allocation (§7b)
  *
@@ -78,7 +80,7 @@
  */
 
 import { FourError } from "@four/core";
-import type { Vector3 } from "@four/math";
+import { Quaternion, type Vector3 } from "@four/math";
 import { Node, warnAuthorityConflict } from "@four/scene";
 import type { TransformAuthority } from "@four/scene";
 
@@ -209,24 +211,28 @@ export type AnimationEventListener = (
  * under a root the motion moves). A node that is not warns once (deduplicated by
  * `warnAuthorityConflict`) and its deltas are skipped.
  *
- * ## Staged
+ * ## Channels
  *
- * Rotational root motion — differencing a quaternion track and rotating the
- * target — is **not implemented** (staged 2026-08-02, plan P7-5). A `rootMotion`
- * naming a quaternion track throws `FourError("NOT_IMPLEMENTED")` rather than
- * silently animating only half of the intended motion.
+ * A `vector3` track extracts **translation** (`transform.position.add`).
+ * A `quaternion` track extracts **rotation**: the relative quaternion
+ * `conjugate(previous) * sampled` is multiplied onto `transform.rotation`
+ * (local composition, the same space the translation channel adds in).
+ * Other adapter kinds are still rejected — there is no defensible delta
+ * for a scalar or a colour.
  */
 export interface MixerRootMotionOptions {
   /**
    * Path of the clip track to difference, matched exactly against
    * {@link AnimationTrackLike.path}. The clip must contain exactly
-   * one track with this path, and it must be a `vector3` track.
+   * one track with this path, and it must be a `vector3` or
+   * `quaternion` track.
    */
   readonly trackPath: string;
 
   /**
-   * The node the extracted translation moves. Written under §42 `"animation"`
-   * authority; needs no relationship to the mixer's target.
+   * The node the extracted translation or rotation moves. Written under
+   * §42 `"animation"` authority; needs no relationship to the mixer's
+   * target.
    */
   readonly target: Node;
 }
@@ -327,23 +333,34 @@ interface RootMotionSlot {
 /** One clip track's slot in the mixer, index-parallel with `clip.tracks`. */
 type MixerSlot = MixerEntry | RootMotionSlot;
 
-/** Everything one root-motion playback needs, built once at play (§7b). */
-interface RootMotionState {
-  /** The designated track, already validated as `vector3`. */
+/** Everything one translation root-motion playback needs. */
+interface TranslationRootMotion {
+  readonly kind: "vector3";
   readonly track: AnimationTrackLike;
-  /** The node this playback's translation deltas move. */
   readonly target: Node;
-  /** `S(l(a))` — the sampled value at the current local time. Mutable state. */
   readonly previous: Vector3;
-  /** `out` storage for the per-advance sample. */
   readonly sample: Vector3;
-  /** The delta handed to `transform.position.add`. */
   readonly delta: Vector3;
-  /** `S(0)`, frozen at play. */
   readonly atStart: Vector3;
-  /** `S(duration)`, frozen at play. */
   readonly atEnd: Vector3;
 }
+
+/** Everything one rotational root-motion playback needs. */
+interface RotationRootMotion {
+  readonly kind: "quaternion";
+  readonly track: AnimationTrackLike;
+  readonly target: Node;
+  readonly previous: Quaternion;
+  readonly sample: Quaternion;
+  readonly delta: Quaternion;
+  readonly atStart: Quaternion;
+  readonly atEnd: Quaternion;
+  readonly scratch: Quaternion;
+  readonly cycle: Quaternion;
+}
+
+/** Everything one root-motion playback needs, built once at play (§7b). */
+type RootMotionState = TranslationRootMotion | RotationRootMotion;
 
 /** Throws the §89 error used for every malformed mixer configuration. */
 function invalidMixer(
@@ -372,6 +389,32 @@ function sampleTrackVector(
   out: Vector3,
 ): Vector3 {
   return track.sample(timeSeconds, out) as Vector3;
+}
+
+function cloneTrackQuaternion(track: AnimationTrackLike): Quaternion {
+  return track.adapter.clone(track.values[0]) as Quaternion;
+}
+
+function sampleTrackQuaternion(
+  track: AnimationTrackLike,
+  timeSeconds: number,
+  out: Quaternion,
+): Quaternion {
+  return track.sample(timeSeconds, out) as Quaternion;
+}
+
+/**
+ * Relative rotation `conjugate(from) * to` — the quaternion analog of
+ * `to - from`. Writes `out`; `scratch` holds the conjugated `from`.
+ */
+function quaternionDelta(
+  from: Quaternion,
+  to: Quaternion,
+  out: Quaternion,
+  scratch: Quaternion,
+): Quaternion {
+  scratch.copy(from).conjugate();
+  return out.copy(scratch).multiply(to);
 }
 
 /**
@@ -650,7 +693,7 @@ export class AnimationMixer {
         entries.push({
           rootMotion: true,
           path: track.path,
-          scratch: cloneTrackVector(track),
+          scratch: track.adapter.clone(track.values[0]),
         });
         continue;
       }
@@ -953,16 +996,9 @@ export class AnimationMixer {
     }
 
     const kind = clip.tracks[found].adapter.kind;
-    if (kind === "quaternion") {
-      throw new FourError(
-        "NOT_IMPLEMENTED",
-        `Root motion names the quaternion track "${options.trackPath}": rotational root motion is staged (2026-08-02, plan P7-5). The MVP extracts translation only — use a vector3 track.`,
-        { context: { clip: clip.name, path: options.trackPath, kind } },
-      );
-    }
-    if (kind !== "vector3") {
+    if (kind !== "vector3" && kind !== "quaternion") {
       invalidMixer(
-        `Root motion names the ${kind} track "${options.trackPath}", but root motion extracts translation from a vector3 track (plan P7-5).`,
+        `Root motion names the ${kind} track "${options.trackPath}", but root motion extracts a translation from a vector3 track or a rotation from a quaternion track (plan P7-5).`,
         { clip: clip.name, path: options.trackPath, kind },
       );
     }
@@ -976,6 +1012,27 @@ export class AnimationMixer {
    * ever uses (five here, one for the discarded pose sample).
    */
   #buildRootMotion(track: AnimationTrackLike, target: Node): RootMotionState {
+    if (track.adapter.kind === "quaternion") {
+      const sample = cloneTrackQuaternion(track);
+      const atStart = cloneTrackQuaternion(track).copy(
+        sampleTrackQuaternion(track, 0, sample),
+      );
+      const atEnd = cloneTrackQuaternion(track).copy(
+        sampleTrackQuaternion(track, this.#duration, sample),
+      );
+      return {
+        kind: "quaternion",
+        track,
+        target,
+        previous: cloneTrackQuaternion(track).copy(atStart),
+        sample,
+        delta: cloneTrackQuaternion(track),
+        atStart,
+        atEnd,
+        scratch: cloneTrackQuaternion(track),
+        cycle: cloneTrackQuaternion(track),
+      };
+    }
     const sample = cloneTrackVector(track);
     const atStart = cloneTrackVector(track).copy(
       sampleTrackVector(track, 0, sample),
@@ -984,6 +1041,7 @@ export class AnimationMixer {
       sampleTrackVector(track, this.#duration, sample),
     );
     return {
+      kind: "vector3",
       track,
       target,
       previous: cloneTrackVector(track).copy(atStart),
@@ -1009,13 +1067,48 @@ export class AnimationMixer {
     if (root === undefined) {
       return;
     }
+    const wraps = this.#iterationAt(toElapsed) - this.#iterationAt(fromElapsed);
+    if (root.kind === "quaternion") {
+      const sampled = sampleTrackQuaternion(
+        root.track,
+        this.#localAt(toElapsed),
+        root.sample,
+      );
+      const delta = root.delta;
+      if (wraps <= 0) {
+        quaternionDelta(root.previous, sampled, delta, root.scratch);
+      } else {
+        const start = root.atStart;
+        const end = root.atEnd;
+        const scratch = root.scratch;
+        const cycle = quaternionDelta(start, end, root.cycle, scratch);
+        quaternionDelta(root.previous, end, delta, scratch);
+        const extra = wraps - 1;
+        for (let index = 0; index < extra; index += 1) {
+          delta.multiply(cycle);
+        }
+        // Last stride: conjugate(start) * sampled. `scratch` is free;
+        // `cycle` stays intact in case this path runs again.
+        scratch.copy(start).conjugate().multiply(sampled);
+        delta.multiply(scratch);
+      }
+      root.previous.copy(sampled);
+
+      const target = root.target;
+      if (target.transformAuthority !== MIXER_AUTHORITY) {
+        warnAuthorityConflict(target, MIXER_AUTHORITY);
+        return;
+      }
+      target.transform.rotation.multiply(delta).normalize();
+      return;
+    }
+
     const previous = root.previous;
     const sampled = sampleTrackVector(
       root.track,
       this.#localAt(toElapsed),
       root.sample,
     );
-    const wraps = this.#iterationAt(toElapsed) - this.#iterationAt(fromElapsed);
     const delta = root.delta;
     if (wraps <= 0) {
       delta.set(
@@ -1050,6 +1143,16 @@ export class AnimationMixer {
   #repositionRootMotion(): void {
     const root = this.#rootMotion;
     if (root === undefined) {
+      return;
+    }
+    if (root.kind === "quaternion") {
+      root.previous.copy(
+        sampleTrackQuaternion(
+          root.track,
+          this.#localAt(this.#elapsed),
+          root.sample,
+        ),
+      );
       return;
     }
     root.previous.copy(
