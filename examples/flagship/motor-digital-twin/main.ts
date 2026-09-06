@@ -3048,9 +3048,10 @@ const solverStats: SolverStatistics = {
  * do it: `solverStatistics` counts §32's awake set off the adapter's body seam,
  * and `recordSolverStatistics` writes the one field §84 has a name for.
  *
- * `gpuFrameTime`, `physicsStepTime` and `contacts` stay `NaN` on purpose. §84's
- * rule is that **`NaN` means "not measured" and `0` means "measured zero"**, so
- * this page publishes them as `nan` rather than inventing a zero.
+ * `gpuFrameTime` and `physicsStepTime` stay `NaN` on purpose. §84's rule is that
+ * **`NaN` means "not measured" and `0` means "measured zero"**, so this page
+ * publishes unmeasured timings as `nan` rather than inventing a zero. `contacts`
+ * is measured via Rapier and is zero for this joint-only machine.
  */
 function updateStatistics(): void {
   if (app.stats === null) return;

@@ -602,7 +602,9 @@ test.describe("examples/flagship/motor-digital-twin (§119)", () => {
     // §32's awake set, filled by the application because §45 has no
     // `app.physics` yet (gap `A-6`): four bodies, none asleep.
     expect(status["activebodies"]).toBe("4");
-    expect(status["contacts"]).toBe("nan");
+    // §84 contacts: wired via Rapier countContacts() → recordSolverStatistics.
+    // This machine is joint-constrained with no collision manifolds, so zero.
+    expect(status["contacts"]).toBe("0");
     expect(status["gpuframe"]).toBe("nan");
 
     // §40: the declared display units, and the fixed step in the declared time
