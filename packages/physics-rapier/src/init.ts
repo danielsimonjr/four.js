@@ -441,6 +441,9 @@ interface RapierNarrowPhase {
   contactPair(
     collider1: number,
     collider2: number,
+    // rapier 0.20 inserted this before the handler. It is opaque to us -- we only
+    // forward the world's own body set straight back.
+    bodies: unknown,
     handler: (manifold: RapierContactManifold, flipped: boolean) => void,
   ): void;
   contactPairsWith(
@@ -456,6 +459,12 @@ interface RapierNarrowPhase {
 
 /** `pipeline/world.d.ts`: the members of `World` this package calls. */
 export interface RapierWorld {
+  /**
+   * The world's rigid-body set. Required since rapier 0.20, which inserted it as the third
+   * argument of `NarrowPhase.contactPair` -- passing the callback in that position makes rapier
+   * invoke it as a RigidBodySet and throw `C is not a function` from its own narrow_phase.
+   */
+  readonly bodies: unknown;
   timestep: number;
   /**
    * Constraint-solver iterations per step; upstream declares both the getter
@@ -974,6 +983,9 @@ interface RapierNarrowPhase3d {
   contactPair(
     collider1: number,
     collider2: number,
+    // rapier 0.20 inserted this before the handler. It is opaque to us -- we only
+    // forward the world's own body set straight back.
+    bodies: unknown,
     handler: (manifold: RapierContactManifold3d, flipped: boolean) => void,
   ): void;
   contactPairsWith(
@@ -989,6 +1001,12 @@ interface RapierNarrowPhase3d {
 
 /** `pipeline/world.d.ts`: the members of `World` this package calls. */
 export interface RapierWorld3d {
+  /**
+   * The world's rigid-body set. Required since rapier 0.20, which inserted it as the third
+   * argument of `NarrowPhase.contactPair` -- passing the callback in that position makes rapier
+   * invoke it as a RigidBodySet and throw `C is not a function` from its own narrow_phase.
+   */
+  readonly bodies: unknown;
   timestep: number;
   /** Writable, as in the 2D build — see {@link RapierWorld.numSolverIterations}. */
   numSolverIterations: number;

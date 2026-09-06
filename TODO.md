@@ -31,6 +31,17 @@ changes in `CHANGELOG.md`.
       will fail until the lockfile is regenerated on the branch — and a human push costs that PR
       its automerge. Same tax as math-mcp #103. Needs a pipeline answer, not a per-PR fix.
 
+- [x] **rapier 0.20 `contactPair` API break FIXED** (PR #63 branch, `74d67f0`). Six sites; typecheck
+      clean; 337 tests pass where none could run before.
+- [ ] **DECIDE: adapt to rapier 0.20's solver behaviour, or hold at 0.19.3.** Four tests still fail
+      on #63 and they are behavioural, not structural: §31 CCD no longer lets a bullet tunnel at a
+      tiny prediction distance (9.90 vs `> 10`), §29/§32 collisionstart reports contact distance
+      0.005 vs `<= 0`, and a §34 snapshot-restored joint lands at −0.75 vs `> −0.22`.
+      Either reconcile the expectations against the spec (confirming 0.20's behaviour is
+      acceptable — the CCD change looks like an improvement, the joint one may be a regression) or
+      hold rapier at 0.19.3, which means closing #63 since it bumps nothing else.
+      DO NOT widen the assertions to force green: the failures are the signal.
+
 - [x] **RFC 0006 TypeScript-on-Bun toolchain — DONE 2026-09-05.** Bun is the
       workspace package manager/script runner; `bun.lock` + `bunfig.toml`;
       Vitest/`tsc -b` retained; spec revision 1.14. Follow-up (not scheduled):
