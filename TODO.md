@@ -6,6 +6,17 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
+      `Node` is `export abstract class Node`; `Group extends Node {}` is the concrete one, and the
+      guides use `Group` correctly. But TypeScript's `abstract` is erased at compile time, so a
+      JavaScript user who guesses `new Node()` gets a working-looking object with no signal — mine
+      simulated a full bouncing ball before TypeScript told me it was wrong.
+      Proposal, NOT applied (base-class constructor = broad blast radius, and it is a §6a call):
+      a `new.target === Node` guard throwing the same quality of message this library already gives
+      elsewhere (the `PhysicsWorld` solver error names exactly what to pass and cites §20/§37).
+      Cost is one reference comparison per node; the repo tracks allocation closely, so the
+      performance objection deserves a real answer rather than my assumption either way.
+
 - [x] **Publish path was broken — `apply-publish-names` exited 1, so four.js could not be
       published at all.** Found by dogfooding the publish path rather than the API. Rewriter did
       not match subpath specifiers while the validator flagged them; two renderer error messages
