@@ -46,16 +46,18 @@
  * turning point, and two samples straddling one can legitimately differ by 0.1
  * world units.
  *
- * Every test therefore takes **one fixed sweep** of {@link SAMPLE_COUNT}
- * screenshots {@link SAMPLE_INTERVAL_SECONDS} apart and asserts over the whole
- * sweep. There is no retry loop, no polling for a condition, and no dependence
- * on where in the loop the page happened to be: the sweep is long enough
- * ({@link SWEEP_MINIMUM_SECONDS}) to contain a full period of every animation in
- * the cluster, so the *extremes* it observes are the animation's extremes
- * wherever it started. The reference run took 9.1 s of wall clock for 22
- * samples nominally 0.3 s apart — SwiftShader's screenshot cost adds ~0.12 s per
- * sample — which is why the thresholds below are quoted against a sweep of that
- * length and why the per-test budget (60 s, `playwright.config.ts`) is ample.
+ * The suite takes **one fixed sweep** of {@link SAMPLE_COUNT} screenshots
+ * {@link SAMPLE_INTERVAL_SECONDS} apart in `beforeAll` and every test asserts
+ * over that shared series — four separate sweeps would spend ~4× the
+ * SwiftShader readback budget for the same animation window. There is no retry
+ * loop, no polling for a condition, and no dependence on where in the loop the
+ * page happened to be: the sweep is long enough ({@link SWEEP_MINIMUM_SECONDS})
+ * to contain a full period of every animation in the cluster, so the *extremes*
+ * it observes are the animation's extremes wherever it started. The reference
+ * run took ~6.4 s of deliberate spacing for 16 samples at 0.4 s apart;
+ * SwiftShader's screenshot cost dominates on Windows (~2.5 s per capture
+ * measured), which is why {@link SAMPLE_COUNT} was reduced from 22 and why the
+ * describe block runs serially with a single sweep.
  *
  * ## Method notes
  *
@@ -340,19 +342,18 @@ const MINIMUM_DISTINCT_COLORS = 4;
 const DRAW_BUDGET_SECONDS = 5;
 
 /** Screenshots per sweep, and their nominal spacing in seconds. */
-const SAMPLE_COUNT = 22;
-const SAMPLE_INTERVAL_SECONDS = 0.3;
+const SAMPLE_COUNT = 16;
+const SAMPLE_INTERVAL_SECONDS = 0.4;
 
 /**
  * Seconds a sweep must span for its extremes to be the animation's extremes.
  *
  * The longest period in the cluster is the diamond's 4.4 s tween; the vane's
  * turn is 3 s and the timeline's iteration 2.2 s. Requiring 6 s guarantees a
- * full period of each with margin, and 6 s is well below the 6.6 s a sweep takes
- * even if every screenshot were free (22 × 0.3). The reference run measured
- * 9.1 s, i.e. SwiftShader's own cost pushes it further the right way; this is
- * asserted rather than assumed so a faster machine cannot silently shorten the
- * window the other thresholds are quoted against.
+ * full period of each with margin, and 6 s equals the deliberate spacing alone
+ * (15 × 0.4 s between 16 samples). SwiftShader readback adds further wall clock;
+ * this is asserted rather than assumed so a faster machine cannot silently
+ * shorten the window the other thresholds are quoted against.
  */
 const SWEEP_MINIMUM_SECONDS = 6;
 
@@ -684,7 +685,9 @@ async function sweep(canvas: Locator): Promise<Sample[]> {
       beacon: measureRegion(image, BEACON_REGION),
       vane: measureRegion(image, VANE_REGION),
     });
-    await canvas.page().waitForTimeout(SAMPLE_INTERVAL_SECONDS * 1000);
+    if (index + 1 < SAMPLE_COUNT) {
+      await canvas.page().waitForTimeout(SAMPLE_INTERVAL_SECONDS * 1000);
+    }
   }
   return samples;
 }
@@ -735,12 +738,24 @@ function describeSpan(values: readonly number[]): string {
 
 // --- tests ------------------------------------------------------------------
 
+test.describe.configure({ mode: "serial" });
+
 test.describe("§107: authored animation reaches the screen", () => {
-  test("the diamond's vector tween moves it, and its colour tween pulses", async ({
-    page,
-  }) => {
-    const { canvas, errors } = await openDrawnExample(page);
-    const samples = await sweep(canvas);
+  /** One sweep for the whole describe — see the file header. */
+  let samples: Sample[];
+  /** Console/page errors collected while the shared page was open. */
+  let errors: ErrorLog;
+
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const opened = await openDrawnExample(page);
+    errors = opened.errors;
+    samples = await sweep(opened.canvas);
+    await context.close();
+  });
+
+  test("the diamond's vector tween moves it, and its colour tween pulses", async () => {
     expectUsableSweep(samples);
     expectShapeFound(samples, (s) => s.beacon, "diamond");
 
@@ -805,11 +820,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the vane's clip turns it and its scale tween pops it", async ({
-    page,
-  }) => {
-    const { canvas, errors } = await openDrawnExample(page);
-    const samples = await sweep(canvas);
+  test("the vane's clip turns it and its scale tween pops it", async () => {
     expectUsableSweep(samples);
     expectShapeFound(samples, (s) => s.vane, "vane");
 
@@ -845,11 +856,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the timeline's marker steps the vane through its palette", async ({
-    page,
-  }) => {
-    const { canvas, errors } = await openDrawnExample(page);
-    const samples = await sweep(canvas);
+  test("the timeline's marker steps the vane through its palette", async () => {
     expectUsableSweep(samples);
     expectShapeFound(samples, (s) => s.vane, "vane");
 
@@ -898,11 +905,7 @@ test.describe("§107: authored animation reaches the screen", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the animated cluster is invisible to the orbiter and box classifiers", async ({
-    page,
-  }) => {
-    const { canvas, errors } = await openDrawnExample(page);
-    const samples = await sweep(canvas);
+  test("the animated cluster is invisible to the orbiter and box classifiers", async () => {
     expectUsableSweep(samples);
 
     // The WP-4.7 invariant, promoted to a standing gate. `smoothness.spec.ts`
