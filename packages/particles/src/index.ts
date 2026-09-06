@@ -39,6 +39,7 @@ export {
 export type { ParticleRenderableOptions } from "./particle-renderable.js";
 export {
   PARTICLE_INSTANCE_FLOATS,
+  PARTICLE_TRAIL_VERTEX_FLOATS,
   ParticleRenderable,
 } from "./particle-renderable.js";
 // --- WP-9.3: batched particle rendering (end) ---
@@ -52,12 +53,28 @@ export type {
 export { PRIORITY_PARTICLES, ParticleSystem } from "./particle-system.js";
 // --- WP-9.4: §39 particle simulation system (end) ---
 export { SeededRandom } from "./random.js";
+export type { ParticleTrailOptions } from "./trail.js";
+export {
+  DEFAULT_TRAIL_LENGTH,
+  DEFAULT_TRAIL_MIN_DISTANCE,
+  DEFAULT_TRAIL_TAIL_WIDTH_FACTOR,
+  DEFAULT_TRAIL_WIDTH,
+  ParticleTrailStore,
+  TRAIL_VERTEX_FLOATS,
+  buildTrailRibbonMesh,
+  resolveTrailOptions,
+} from "./trail.js";
 export type {
   ParticleBurst,
   ParticleColor,
   ParticleForceField,
   ParticleGpuSimulation,
   ParticleLifetimeRamp,
+  ParticleLifetimeStop,
   ParticleRange,
   ParticleSimulationMode,
+} from "./types.js";
+export {
+  evaluateLifetimeRampColor,
+  evaluateLifetimeRampNumber,
 } from "./types.js";

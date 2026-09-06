@@ -86,6 +86,8 @@ import { GeometryCache } from "./gl-geometry.js";
 import {
   ParticleBatchCache,
   ParticleProgram,
+  ParticleTrailBatchCache,
+  ParticleTrailProgram,
   type ParticleGlContext,
 } from "./gl-particles.js";
 import {
@@ -1292,6 +1294,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
   #particleProgram: ParticleProgram | null = null;
 
+  #particleTrailProgram: ParticleTrailProgram | null = null;
+
   #litProgram: LitProgram | null = null;
 
   /**
@@ -1402,6 +1406,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
   #particleBatches: ParticleBatchCache | null = null;
 
+  #particleTrailBatches: ParticleTrailBatchCache | null = null;
+
   /**
    * This renderer's own §57 state mirror (F13) — see `GlState` for why it
    * is per-instance rather than per-module, and {@link WebglRenderer.render}
@@ -1509,6 +1515,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#particleTrailProgram = null;
     this.#litProgram = null;
     this.#standardProgram = null;
     this.#effectProgram = null;
@@ -1524,6 +1531,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#textures?.forget();
     this.#renderTargets?.forget();
     this.#particleBatches?.forget();
+    this.#particleTrailBatches?.forget();
     // §65's batcher, when the application assigned one (R-9). Its two buffers
     // and its vertex array died with the context like every other handle; the
     // next batched draw recreates them.
@@ -1542,6 +1550,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#program = UnlitProgram.create(gl);
     this.#spriteProgram = SpriteProgram.create(gl);
     this.#particleProgram = ParticleProgram.create(gl);
+    this.#particleTrailProgram = ParticleTrailProgram.create(gl);
     this.#litProgram = LitProgram.create(gl);
     this.#standardProgram = StandardProgram.create(gl);
     this.#effectProgram = EffectProgram.create(gl);
@@ -1550,6 +1559,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#textures = new TextureCache(gl);
     this.#renderTargets = new RenderTargetCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
+    this.#particleTrailBatches = new ParticleTrailBatchCache(gl);
     this.#applyFixedState(gl);
     // Textures are re-uploaded lazily from the CPU-side sources their `Texture`
     // objects still retain — §61's "re-uploads user resources that retain
@@ -1723,6 +1733,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     const program = this.#program;
     const spriteProgram = this.#spriteProgram;
     const particleProgram = this.#particleProgram;
+    const particleTrailProgram = this.#particleTrailProgram;
     const litProgram = this.#litProgram;
     const standardProgram = this.#standardProgram;
     const shadowProgram = this.#shadowProgram;
@@ -1730,17 +1741,20 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     const textures = this.#textures;
     const renderTargets = this.#renderTargets;
     const particleBatches = this.#particleBatches;
+    const particleTrailBatches = this.#particleTrailBatches;
     if (
       program === null ||
       spriteProgram === null ||
       particleProgram === null ||
+      particleTrailProgram === null ||
       litProgram === null ||
       standardProgram === null ||
       shadowProgram === null ||
       geometries === null ||
       textures === null ||
       renderTargets === null ||
-      particleBatches === null
+      particleBatches === null ||
+      particleTrailBatches === null
     ) {
       return;
     }
@@ -1945,7 +1959,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       // The unlit pipeline is the frame's starting state, so a scene with no
       // sprites issues exactly the GL sequence it issued before sprites existed.
       program.use();
-      let activeKind: RenderItemKind = "unlit";
+      let activeKind: RenderItemKind | "particle-trail" = "unlit";
+      let particleTrailActive = false;
       // The GL state mirror starts where `#applyFixedState` and GL's own defaults
       // left it; every draw below moves it only where its material asks.
       resetGlState(state);
@@ -2425,6 +2440,30 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // §36 system's whole per-frame GPU cost, and the one place in
               // this backend where `instances` exceeds `drawCalls`.
               countDraw(statistics, record.mode, record.count, item.count);
+            }
+
+            const trailCount = item.trailVertexCount ?? 0;
+            if (trailCount > 0) {
+              const trailBatch = particleTrailBatches.acquire(item);
+              if (trailBatch !== null) {
+                if (!particleTrailActive) {
+                  particleTrailProgram.use();
+                  particleTrailActive = true;
+                }
+                applyMaterialState(gl, state, undefined, true, item.clip ?? null);
+                if (!particleViewUploaded) {
+                  particleTrailProgram.setProjection(camera.projectionMatrix);
+                  particleTrailProgram.setView(camera.viewMatrix);
+                  particleViewUploaded = true;
+                }
+                particleTrailProgram.setModel(item.worldMatrix);
+                particleTrailBatches.upload(trailBatch, item);
+                gl.bindVertexArray(trailBatch.vertexArray);
+                gl.drawArrays(GL.TRIANGLES, 0, trailCount);
+                if (statistics !== null) {
+                  countDraw(statistics, GL.TRIANGLES, trailCount, 1);
+                }
+              }
             }
             continue;
           }
@@ -3198,6 +3237,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#program?.dispose();
       this.#spriteProgram?.dispose();
       this.#particleProgram?.dispose();
+      this.#particleTrailProgram?.dispose();
       this.#litProgram?.dispose();
       this.#standardProgram?.dispose();
       this.#effectProgram?.dispose();
@@ -3208,12 +3248,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
       this.#textures?.dispose();
       this.#renderTargets?.dispose();
       this.#particleBatches?.dispose();
+      this.#particleTrailBatches?.dispose();
       this.batching?.dispose();
     }
 
     this.#program = null;
     this.#spriteProgram = null;
     this.#particleProgram = null;
+    this.#particleTrailProgram = null;
     this.#litProgram = null;
     this.#standardProgram = null;
     this.#effectProgram = null;
@@ -3231,6 +3273,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#textures = null;
     this.#renderTargets = null;
     this.#particleBatches = null;
+    this.#particleTrailBatches = null;
     this.#gl = null;
     this.#canvas = null;
     this.events.removeAllListeners();
@@ -3354,6 +3397,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#program = program;
     this.#spriteProgram = spriteProgram;
     this.#particleProgram = particleProgram;
+    this.#particleTrailProgram = ParticleTrailProgram.create(gl);
     this.#litProgram = litProgram;
     this.#standardProgram = standardProgram;
     this.#effectProgram = effectProgram;
@@ -3362,6 +3406,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     this.#textures = new TextureCache(gl);
     this.#renderTargets = new RenderTargetCache(gl);
     this.#particleBatches = new ParticleBatchCache(gl);
+    this.#particleTrailBatches = new ParticleTrailBatchCache(gl);
     this.#capabilities = readCapabilities(gl);
     this.#applyFixedState(gl);
 

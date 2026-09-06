@@ -632,6 +632,16 @@ export interface ParticleRenderItem extends RenderItemBase {
 
   /** Particles carry no material — see the interface documentation. */
   material?: undefined;
+
+  /**
+   * Optional trail ribbon vertices for this system. When present and
+   * {@link trailVertexCount} > 0, the backend draws them as blended triangles
+   * after the instanced particle quads.
+   */
+  trailVertices?: Float32Array;
+
+  /** Live trail vertices to draw; `0` means skip the trail pass. */
+  trailVertexCount?: number;
 }
 
 /**
@@ -714,6 +724,9 @@ interface MutableRenderItem extends RenderItemBase {
    * stale rectangle to whatever lands in it next.
    */
   scissor: ScissorRect | null;
+  /** §36 trail ribbon; meaningful only on particle items. */
+  trailVertices?: Float32Array;
+  trailVertexCount: number;
 }
 
 /**
