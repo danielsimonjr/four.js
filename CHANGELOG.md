@@ -32,6 +32,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   `timestampWrites` + resolve/copy/`mapAsync` ping-pong.
 - **`Application.stats.gpuFrameTime`.** Copies a finite backend number;
   stays `NaN` when the member is absent, in flight, or disjoint.
+- **Coverage.** `GlGpuTimer` unit tests cover spare reuse, null queries,
+  forget/dispose, and missing entry points (per-file floor was 77%).
 
 ### 2026-09-06 — Open-TODO subagent pass (fourth landing)
 
