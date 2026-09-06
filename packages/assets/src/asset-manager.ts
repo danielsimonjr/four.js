@@ -243,9 +243,11 @@
  */
 
 import {
+  DEV,
   FourError,
-  isFourError,
+  devWarnOnce,
   disposeAll,
+  isFourError,
   type Disposable,
 } from "@four/core";
 
@@ -976,6 +978,15 @@ export class AssetManager<TSignal = never> implements Disposable {
     const byUrl = this.#groupFor(loader);
     const existing = byUrl.get(url);
     if (existing !== undefined) {
+      // In-flight coalescing is the API. A second load of a *settled* slot
+      // is §83's "duplicate asset loads": another reference on an asset
+      // that already decoded. Once per (url, loader name).
+      if (DEV && existing.settled) {
+        devWarnOnce(
+          `asset-dup:${url}:${loader.name}`,
+          `Asset "${url}" (${loader.name}) is already cached; this load takes another reference (§83). Pair every load with one release.`,
+        );
+      }
       existing.refCount += 1;
       const joined = existing.promise as Promise<T>;
       const guarded =

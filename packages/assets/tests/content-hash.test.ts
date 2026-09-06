@@ -1,5 +1,9 @@
 import { isFourError } from "@four/core";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 import {
   AssetManager,
@@ -179,6 +183,7 @@ describe("AssetManager content hashing", () => {
   });
 
   it("refuses to verify a load that was not hashing (never silently passes)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const assets = new AssetManager({ fetch: fetchOf({ "/a.txt": "abc" }) });
     await assets.load("/a.txt", textLoader);
     const context = await contextOf(

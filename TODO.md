@@ -1186,10 +1186,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       live. A-1 follow-up (b) closed
 - [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
       warnings — leaked resources (now _derivable_ from the counters, but nothing
-      warns), disposed-in-use, duplicate asset loads, detached-node listeners, stale
+      warns), disposed-in-use, ~~duplicate asset loads~~ **DONE 2026-09-06**
+      (`AssetManager.load` of a settled slot → `devWarnOnce`), detached-node listeners, stale
       physics handles, per-frame allocations; creation-site capture and
       FinalizationRegistry leak detection need A-4's dev flag
-- [ ] **A-5 follow-ups:** AssetManager duplicate-load warning; materials + solver
+- [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
+      materials + solver
       handles unaccounted (§83 names "GPU and solver resources");
       `RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
       with §67's DEPTH24_STENCIL8 and float formats
@@ -1494,6 +1496,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **§83 duplicate asset loads.** `AssetManager.load` of a
+      settled `(url, loader)` slot warns once; in-flight coalescing does
+      not.
 
 - [x] 2026-09-06 — **§27 field torque + field-driven waking.** Optional
       `ForceField.sampleTorque` (N·m). Per-entry `wakesSleepingBodies`

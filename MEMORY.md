@@ -30,6 +30,12 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — §83 duplicate-load warns on a settled cache hit.**
+  Concurrent `load`s of the same key coalesce without a warning — that
+  is the API. A later `load` of a slot that already decoded is the
+  authoring mistake §83 names; `devWarnOnce` keys
+  `asset-dup:${url}:${loader.name}`.
+
 - **2026-09-06 — field torque is a second method; waking is per-entry OR.**
   §27's `sample` stays one linear vector so a `ParticleForceField` remains
   assignable. `ForceField.sampleTorque` is optional and always N·m —

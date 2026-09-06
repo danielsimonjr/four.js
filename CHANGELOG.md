@@ -21,6 +21,9 @@ specification; until then, entries are grouped by date under **Unreleased**.
   gather so a removed `RigidBody` is not retained (§83).
 - **§42.** `warnAuthorityConflict` emits through `devWarnOnce` (A-4
   remainder step 4). Production builds print nothing.
+- **§83 duplicate asset loads.** A second `AssetManager.load` of a
+  *settled* `(url, loader)` slot warns once via `devWarnOnce`. In-flight
+  coalescing stays silent.
 
 ### 2026-09-06 — PoseTarget scale channel
 
