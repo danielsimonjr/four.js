@@ -1775,6 +1775,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
     // the same unit, so a frame that mixes them issues one call either way.
     let mapUnitActive = false;
     let metalRoughnessBound = false;
+    let metalRoughnessUnitActive = false;
     // §69 (R-18): whether this frame bound a shadow map to
     // `SHADOW_TEXTURE_UNIT`, so the `finally` knows whether it has one to
     // unbind. A frame in which nothing casts never touches unit 1 at all.
@@ -2079,6 +2080,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                   if (!mapUnitActive) {
                     gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                     mapUnitActive = true;
+              metalRoughnessUnitActive = false;
                   }
                   gl.bindTexture(GL.TEXTURE_2D, batchTexture);
                   textureBound = true;
@@ -2131,7 +2133,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 gl,
                 state,
                 item.material,
-                unlitColorBlends(item.material),
+                false,
                 item.clip ?? null,
               );
               if (!skinnedUnlitViewUploaded) {
@@ -2147,6 +2149,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 if (!mapUnitActive) {
                   gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                   mapUnitActive = true;
+              metalRoughnessUnitActive = false;
                 }
                 gl.bindTexture(GL.TEXTURE_2D, texture);
                 textureBound = true;
@@ -2160,6 +2163,14 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 item.material.color,
                 opacityOf(item.material),
               );
+              if (unlitColorBlends(item.material)) {
+                applyBlendState(
+                  gl,
+                  state,
+                  true,
+                  item.material.blendMode ?? "normal",
+                );
+              }
               skinnedProgram.setJointMatrices(item.jointMatrices);
             } else {
               const skinnedProgram = skinnedPrograms.lit;
@@ -2196,6 +2207,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 if (!mapUnitActive) {
                   gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                   mapUnitActive = true;
+              metalRoughnessUnitActive = false;
                 }
                 gl.bindTexture(GL.TEXTURE_2D, texture);
                 textureBound = true;
@@ -2314,6 +2326,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // reports as selected.
               gl.activeTexture(GL.TEXTURE0);
               mapUnitActive = true;
+              metalRoughnessUnitActive = false;
             }
             nodeProgram.setMaterial(nodeMaterial);
             nodeProgram.setModel(item.worldMatrix);
@@ -2506,6 +2519,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               if (!mapUnitActive) {
                 gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                 mapUnitActive = true;
+              metalRoughnessUnitActive = false;
               }
               gl.bindTexture(GL.TEXTURE_2D, litTexture);
               textureBound = true;
@@ -2575,6 +2589,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               if (!mapUnitActive) {
                 gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                 mapUnitActive = true;
+              metalRoughnessUnitActive = false;
               }
               gl.bindTexture(GL.TEXTURE_2D, standardTexture);
               textureBound = true;
@@ -2592,6 +2607,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             if (metalRoughnessTexture !== null) {
               gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
               mapUnitActive = false;
+              metalRoughnessUnitActive = true;
               gl.bindTexture(GL.TEXTURE_2D, metalRoughnessTexture);
               metalRoughnessBound = true;
             }
@@ -2621,7 +2637,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               gl,
               state,
               item.material,
-              unlitColorBlends(item.material),
+              false,
               item.clip ?? null,
             );
             const map = mapOf(item.material);
@@ -2633,6 +2649,7 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               if (!mapUnitActive) {
                 gl.activeTexture(GL.TEXTURE0 + MAP_TEXTURE_UNIT);
                 mapUnitActive = true;
+              metalRoughnessUnitActive = false;
               }
               gl.bindTexture(GL.TEXTURE_2D, texture);
               textureBound = true;
@@ -2646,6 +2663,16 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             );
             program.setModel(item.worldMatrix);
             program.setColor(item.material.color, opacityOf(item.material));
+            // After setColor so a throwing color accessor still fails where
+            // F13 records it — after the map bind and feature switches.
+            if (unlitColorBlends(item.material)) {
+              applyBlendState(
+                gl,
+                state,
+                true,
+                item.material.blendMode ?? "normal",
+              );
+            }
           }
 
           gl.bindVertexArray(record.vertexArray);
@@ -2683,7 +2710,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         gl.bindTexture(GL.TEXTURE_2D, null);
       }
       if (metalRoughnessBound && nodeUnitsBound === 0) {
-        gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        if (!metalRoughnessUnitActive) {
+          gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        }
         gl.bindTexture(GL.TEXTURE_2D, null);
         gl.activeTexture(GL.TEXTURE0);
       }
