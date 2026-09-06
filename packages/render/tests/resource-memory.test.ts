@@ -1,5 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  auditFinalizedLeaks,
+  reportFinalized,
+  resetDevWarnings,
+  resetLeakRegistry,
+  trackedDisposableId,
+} from "@four/core";
+
+import { CanvasTexture } from "../src/raster.js";
 import { RenderTarget } from "../src/render-target.js";
 import {
   liveRenderTargetCount,
@@ -7,6 +16,12 @@ import {
   textureMemoryBytes,
 } from "../src/resource-memory.js";
 import { Texture } from "../src/texture.js";
+
+afterEach(() => {
+  resetLeakRegistry();
+  resetDevWarnings();
+  vi.restoreAllMocks();
+});
 
 describe("§83 texture and render-target resource accounting (A-5)", () => {
   // Deltas rather than absolutes: the totals are process-wide levels (§83),
@@ -156,5 +171,46 @@ describe("§83 texture and render-target resource accounting (A-5)", () => {
     }
 
     expect(textureMemoryBytes() - bytes).toBe((1 + 4 + 9 + 16) * 4);
+  });
+
+  it("registers a texture with the FinalizationRegistry tracker (A-4)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const texture = new Texture({ width: 2, height: 2 });
+    const id = trackedDisposableId(texture);
+    expect(id).toBeGreaterThan(0);
+    reportFinalized(id);
+    expect(auditFinalizedLeaks()).toBe(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(texture.id);
+  });
+
+  it("does not warn when the texture was disposed before finalization", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const texture = new Texture({ width: 2, height: 2 });
+    const id = trackedDisposableId(texture);
+    texture.dispose();
+    reportFinalized(id);
+    expect(auditFinalizedLeaks()).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("registers a render target and a canvas texture", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const target = new RenderTarget({ width: 4, height: 4, depth: false });
+    const canvas = new CanvasTexture({
+      width: 2,
+      height: 2,
+      readPixels: () => undefined,
+    });
+    const targetId = trackedDisposableId(target);
+    const canvasId = trackedDisposableId(canvas);
+    expect(targetId).toBeGreaterThan(0);
+    expect(canvasId).toBeGreaterThan(0);
+    reportFinalized(targetId);
+    reportFinalized(canvasId);
+    expect(auditFinalizedLeaks()).toBe(2);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(target.id);
+    expect(String(warn.mock.calls[1]?.[0])).toContain(canvas.id);
+    target.dispose();
+    canvas.dispose();
   });
 });

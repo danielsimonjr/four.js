@@ -1,5 +1,5 @@
 /**
- * Tests for §83's FinalizationRegistry leaked-resource warning (A-5).
+ * Tests for §83's FinalizationRegistry leaked-resource warning (A-4 / A-5).
  *
  * Finalization is nondeterministic, so every case drives the registry through
  * the {@link reportFinalized} test hook rather than waiting on GC.
@@ -7,8 +7,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resetDevWarnings } from "@four/core";
-
+import { resetDevWarnings } from "../src/dev.js";
 import {
   auditFinalizedLeaks,
   disposeTracked,
@@ -35,7 +34,6 @@ describe("leak registry", () => {
       "at loadLevel (demo.ts:40)",
     );
     expect(id).toBeGreaterThan(0);
-    expect(typeof trackedDisposableId).toBe("function");
     reportFinalized(id);
     expect(auditFinalizedLeaks()).toBe(1);
     const text = String(warn.mock.calls[0]?.[0]);
@@ -73,6 +71,15 @@ describe("leak registry", () => {
     const first = trackDisposable(resource, "mesh", "site-a");
     const second = trackDisposable(resource, "mesh", "site-a");
     expect(second).toBe(first);
+  });
+
+  it("exposes the live id through trackedDisposableId", () => {
+    const resource = {};
+    expect(trackedDisposableId(resource)).toBe(0);
+    const id = trackDisposable(resource, "mesh", "site-a");
+    expect(trackedDisposableId(resource)).toBe(id);
+    disposeTracked(resource);
+    expect(trackedDisposableId(resource)).toBe(0);
   });
 
   it("drains every pending leak and ignores unknown ids", () => {
@@ -116,6 +123,7 @@ describe("leak registry", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const id = production.trackDisposable({}, "tex", "at test.ts:1");
     expect(id).toBe(0);
+    expect(production.trackedDisposableId({})).toBe(0);
     production.disposeTracked({});
     production.reportFinalized(id);
     expect(production.auditFinalizedLeaks()).toBe(0);

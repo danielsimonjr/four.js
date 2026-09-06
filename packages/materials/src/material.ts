@@ -100,7 +100,11 @@
 
 import type { Disposable } from "@four/core";
 
-import { noteMaterial } from "./resource-memory.js";
+import {
+  noteMaterial,
+  releaseMaterialDisposable,
+  trackMaterialDisposable,
+} from "./resource-memory.js";
 
 // **Type-only**, deliberately (R-7): `Material` never *constructs* a
 // `StencilState`, so a bundle whose scenes never mask does not carry the class
@@ -418,6 +422,7 @@ export abstract class Material implements Disposable {
     // stencil test disabled and the frame's GL sequence unchanged.
     this.stencil = options.stencil;
     noteMaterial(1);
+    trackMaterialDisposable(this, this.id);
   }
 
   /**
@@ -468,6 +473,7 @@ export abstract class Material implements Disposable {
     }
     this.#disposed = true;
     noteMaterial(-1);
+    releaseMaterialDisposable(this);
     this.markDirty();
   }
 }

@@ -109,6 +109,7 @@ export {
   reportFinalized,
   resetLeakRegistry,
   trackDisposable,
+  trackedDisposableId,
 } from "./leak-registry.js";
 
 export type {

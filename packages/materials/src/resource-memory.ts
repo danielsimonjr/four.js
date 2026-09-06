@@ -21,13 +21,15 @@
  * `@four/diagnostics`' `auditResourceLeaks` as `LiveResourceCounts.materials`.
  * There is no §84 `app.stats` slot for materials; the audit is the surface.
  *
- * ## Always on
+ * ## Always on (the count)
  *
- * The counter is a number, §33-safe: it does not change simulation, and it
- * does not import `DEV`. Production gating lives on the *message*
- * (`auditResourceLeaks` returns a frozen empty report when `DEV` is false),
- * not on the count.
+ * The counter is a number, §33-safe: it does not change simulation.
+ * Production gating lives on the *message* (`auditResourceLeaks` returns a
+ * frozen empty report when `DEV` is false) and on the FinalizationRegistry
+ * helpers below, not on the count.
  */
+
+import { DEV, disposeTracked, trackDisposable } from "@four/core";
 
 /** Live (constructed, undisposed) {@link Material} instances. */
 let liveMaterials = 0;
@@ -66,4 +68,20 @@ export function noteMaterial(instances: number): void {
  */
 export function liveMaterialCount(): number {
   return liveMaterials;
+}
+
+/**
+ * Registers `resource` with §83's FinalizationRegistry tracker (A-4).
+ * Call at construction beside {@link noteMaterial}. Production: no-op.
+ */
+export function trackMaterialDisposable(resource: object, label: string): void {
+  if (DEV) trackDisposable(resource, label);
+}
+
+/**
+ * Marks `resource` disposed so a later finalization is not a leak.
+ * Call from `dispose()` beside the {@link noteMaterial} decrement.
+ */
+export function releaseMaterialDisposable(resource: object): void {
+  if (DEV) disposeTracked(resource);
 }

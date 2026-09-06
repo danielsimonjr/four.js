@@ -83,7 +83,11 @@ import type {
 import type { ColorSpace } from "@four/math";
 
 import { validateColorSpace } from "./render-target.js";
-import { noteTexture } from "./resource-memory.js";
+import {
+  noteTexture,
+  releaseRenderDisposable,
+  trackRenderDisposable,
+} from "./resource-memory.js";
 
 /**
  * How a texture is sampled between texel centres (§77's "filter modes"; R-30,
@@ -591,6 +595,7 @@ export class Texture implements Disposable, SpriteTexture {
     validate(source);
     this.#source = source;
     noteTexture(1, this.byteLength);
+    trackRenderDisposable(this, this.id);
   }
 
   /**
@@ -838,6 +843,7 @@ export class Texture implements Disposable, SpriteTexture {
     this.#disposed = true;
     this.#source = EMPTY_SOURCE;
     noteTexture(-1, -before);
+    releaseRenderDisposable(this);
     this.markDirty();
   }
 }

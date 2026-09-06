@@ -8,6 +8,19 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — A-4 FinalizationRegistry leak tracking
+
+- **Tracker in `@four/core`.** `trackDisposable` / `disposeTracked` /
+  `auditFinalizedLeaks` / `trackedDisposableId` live next to `DEV` so
+  geometry, render, and materials can register without importing
+  `@four/diagnostics`. Diagnostics re-exports the same functions.
+- **Constructors register.** `Texture`, `CanvasTexture`, `RenderTarget`,
+  `BufferGeometry`, and `Material` call the tracker at construct and
+  `dispose()`. Reading the getter is not required; `auditFinalizedLeaks`
+  remains the opt-in drain (finalizers only enqueue).
+- **Production.** Helpers are `if (DEV)` so `__FOUR_DEV__: false` drops
+  the registry from Texture-carrying bundles.
+
 ### 2026-09-06 — A-1 `gpuFrameTime`
 
 - **`Renderer.lastGpuFrameTimeSeconds`.** Optional last-completed GPU-frame

@@ -32,6 +32,17 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — A-4 FinalizationRegistry lives in `@four/core`.**
+  `trackDisposable` / `disposeTracked` / `auditFinalizedLeaks` moved out of
+  `@four/diagnostics` so Texture, CanvasTexture, RenderTarget,
+  BufferGeometry, and Material can register at construction without a
+  forbidden diagnostics edge. Package `resource-memory` helpers wrap the
+  calls in `if (DEV)` so production DCE drops the registry from
+  Texture-carrying bundles. `auditFinalizedLeaks` stays opt-in (same
+  shape as `auditResourceLeaks`); constructors capture the stack as the
+  creation site. `trackedDisposableId` is the test hook because
+  constructors do not return the registry id.
+
 - **2026-09-06 — A-1 `gpuFrameTime` is last-completed-frame seconds.**
   `Renderer.lastGpuFrameTimeSeconds` is optional; reading the getter arms
   measurement (R-30b: unread → no extra GPU commands). WebGL 2 uses

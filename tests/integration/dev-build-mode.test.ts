@@ -214,8 +214,20 @@ const GATED: ReadonlyMap<string, string> = new Map([
     "§83's per-frame allocation audit — a function the author calls. Production returns the frozen empty report without reading the counters; the only output is a console message. No simulation number moves with the flag",
   ],
   [
-    join("packages", "diagnostics", "src", "leak-registry.ts"),
-    "§83's FinalizationRegistry leak bookkeeping — every public function is a no-op when DEV is false; the only output is a warning text. Diagnostics, not simulation",
+    join("packages", "core", "src", "leak-registry.ts"),
+    "§83's FinalizationRegistry leak bookkeeping — every public function is a no-op when DEV is false; the only output is a warning text. Core, not simulation: geometry / render / materials call it at construction so they never import @four/diagnostics",
+  ],
+  [
+    join("packages", "geometry", "src", "resource-memory.ts"),
+    "§83 FinalizationRegistry helpers beside the always-on live-geometry counters. The counts do not branch on DEV; only trackGeometryDisposable / releaseGeometryDisposable do, and their only output is a later warning text. Geometry is not a simulation package",
+  ],
+  [
+    join("packages", "render", "src", "resource-memory.ts"),
+    "§83 FinalizationRegistry helpers beside the always-on texture / render-target counters. The counts do not branch on DEV; only trackRenderDisposable / releaseRenderDisposable do. Rendering is outside the §33 envelope",
+  ],
+  [
+    join("packages", "materials", "src", "resource-memory.ts"),
+    "§83 FinalizationRegistry helpers beside the always-on live-material counter. The count does not branch on DEV; only trackMaterialDisposable / releaseMaterialDisposable do. Materials are render state, not simulation",
   ],
   [
     join("packages", "render", "src", "lights.ts"),

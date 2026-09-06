@@ -60,6 +60,8 @@
  * approximate.
  */
 
+import { DEV, disposeTracked, trackDisposable } from "@four/core";
+
 /** Live (constructed, undisposed) {@link BufferGeometry} instances. */
 let liveGeometries = 0;
 
@@ -108,4 +110,20 @@ export function geometryMemoryBytes(): number {
  */
 export function liveGeometryCount(): number {
   return liveGeometries;
+}
+
+/**
+ * Registers `resource` with §83's FinalizationRegistry tracker (A-4).
+ * Call at construction beside {@link noteGeometry}. Production: no-op.
+ */
+export function trackGeometryDisposable(resource: object, label: string): void {
+  if (DEV) trackDisposable(resource, label);
+}
+
+/**
+ * Marks `resource` disposed so a later finalization is not a leak.
+ * Call from `dispose()` beside the {@link noteGeometry} decrement.
+ */
+export function releaseGeometryDisposable(resource: object): void {
+  if (DEV) disposeTracked(resource);
 }

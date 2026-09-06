@@ -122,7 +122,11 @@ import {
   type BoundingVolume,
   type MutableBoundingVolume,
 } from "./geometry.js";
-import { noteGeometry } from "./resource-memory.js";
+import {
+  noteGeometry,
+  releaseGeometryDisposable,
+  trackGeometryDisposable,
+} from "./resource-memory.js";
 
 /**
  * How a geometry's vertices assemble into primitives.
@@ -401,6 +405,7 @@ export class BufferGeometry extends Geometry {
     this.#indices = options.indices;
     this.#mode = mode;
     noteGeometry(1, this.byteLength);
+    trackGeometryDisposable(this, this.id);
   }
 
   /**
@@ -917,6 +922,7 @@ export class BufferGeometry extends Geometry {
     this.#weights = undefined;
     this.#indices = undefined;
     noteGeometry(-1, -before);
+    releaseGeometryDisposable(this);
     this.markDirty();
   }
 }

@@ -109,7 +109,11 @@ import type { MaterialTexture } from "@four/materials";
 import type { ColorSpace } from "@four/math";
 
 import { validateColorSpace } from "./render-target.js";
-import { noteTexture } from "./resource-memory.js";
+import {
+  noteTexture,
+  releaseRenderDisposable,
+  trackRenderDisposable,
+} from "./resource-memory.js";
 
 /**
  * Which row a {@link RasterSource} writes first (§77a, §7a).
@@ -365,6 +369,7 @@ export class CanvasTexture implements MaterialTexture, Disposable {
     this.#row =
       this.#origin === "top-left" ? new Uint8Array(this.#width * 4) : null;
     noteTexture(1, this.byteLength);
+    trackRenderDisposable(this, this.id);
   }
 
   /** Width in texels — constant for this texture's life (§77a). */
@@ -505,6 +510,7 @@ export class CanvasTexture implements MaterialTexture, Disposable {
     this.#disposed = true;
     this.#buffer = null;
     noteTexture(-1, -before);
+    releaseRenderDisposable(this);
     this.#version += 1;
   }
 }

@@ -100,8 +100,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
 - PH-1 follow-ups:
-- A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); systematic `devAssert` migration still open.
-- A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended.
+- A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); FinalizationRegistry wiring DONE 2026-09-06; systematic `devAssert` migration still open.
+- A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended; constructor-site FinalizationRegistry DONE 2026-09-06.
 - A-5 follow-ups: materials + solver handles accounted at count tier — DONE 2026-09-06; `RenderTarget.byteLength` moved with §67 formats.
 - A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime` already via A-6; `gpuFrameTime` copies `Renderer.lastGpuFrameTimeSeconds` (2026-09-06).
 - A-18 remainder — DONE 2026-09-06 (progress, stream, dependency graph, injected worker decode, injected watch).
@@ -1150,7 +1150,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       ~~detached-node listeners~~ **DONE 2026-09-06** (`Node.#detach` →
       `devWarnOnce`); ~~stale physics handles~~ **DONE 2026-09-06**
       (`rejectStalePhysicsHandle`); ~~per-frame allocations~~ **DONE 2026-09-06**
-      (`auditFrameAllocations`); leaked resources / FinalizationRegistry still open
+      (`auditFrameAllocations`); ~~leaked resources / FinalizationRegistry~~
+      **DONE 2026-09-06** (`trackDisposable` in `@four/core`; Texture /
+      CanvasTexture / RenderTarget / BufferGeometry / Material constructors
+      register; `dispose()` unregisters; `auditFinalizedLeaks` stays opt-in)
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
       `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
       measuring browser tests (49 total), first user of the §62/§37 registries and
@@ -1173,7 +1176,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       listeners~~ **DONE 2026-09-06** (`Node.#detach`), ~~stale physics handles~~
       **DONE 2026-09-06** (`rejectStalePhysicsHandle` in Rapier + fake adapters),
       ~~per-frame allocations~~ **DONE 2026-09-06** (`auditFrameAllocations`);
-      creation-site capture and FinalizationRegistry leak detection need A-4's dev flag
+      ~~creation-site capture and FinalizationRegistry leak detection~~
+      **DONE 2026-09-06** (core tracker, `if (DEV)` at the resource-memory
+      helpers so production DCE drops the registry from Texture-carrying
+      bundles)
 - [x] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
       ~~materials + solver handles unaccounted~~ **DONE 2026-09-06**
       (`liveMaterialCount`, `liveSolver{Body,Collider,Joint,Handle}Count`,
@@ -1517,6 +1523,12 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       types; `app.stats.contacts`; A-4/A-5 partial (validation catalogue,
       format-aware `RenderTarget.byteLength`); CPU particle trails +
       multi-stop ramps; stale §24/§12 entries retired.
+
+- [x] 2026-09-06 — **FinalizationRegistry leak tracking (A-4/A-5).** Tracker
+      lives in `@four/core` so render/geometry/materials never import
+      `@four/diagnostics`. Constructors register; `dispose()` unregisters;
+      `auditFinalizedLeaks` remains an opt-in drain. `trackedDisposableId` is
+      the test hook.
 
 - [x] 2026-09-06 — **§83 dev warnings (A-5 remainder, #73).** `warnDisposedInUse`,
       `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener

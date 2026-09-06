@@ -109,7 +109,11 @@ import type { MaterialTexture } from "@four/materials";
 import type { ColorSpace } from "@four/math";
 
 import { renderTargetByteLength } from "./render-target-bytes.js";
-import { noteRenderTarget } from "./resource-memory.js";
+import {
+  noteRenderTarget,
+  releaseRenderDisposable,
+  trackRenderDisposable,
+} from "./resource-memory.js";
 
 /**
  * The texel format of a target's colour attachment (§62 "texture formats").
@@ -535,6 +539,7 @@ export class RenderTarget implements Disposable {
       "RenderTarget",
     );
     noteRenderTarget(1, this.byteLength);
+    trackRenderDisposable(this, this.id);
   }
 
   /** Width of the colour attachment in texels. */
@@ -705,6 +710,7 @@ export class RenderTarget implements Disposable {
     const before = this.byteLength;
     this.#disposed = true;
     noteRenderTarget(-1, -before);
+    releaseRenderDisposable(this);
     this.#version += 1;
   }
 }

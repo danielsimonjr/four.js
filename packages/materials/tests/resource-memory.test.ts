@@ -5,7 +5,15 @@
  * delta against the totals as this test found them.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  auditFinalizedLeaks,
+  reportFinalized,
+  resetDevWarnings,
+  resetLeakRegistry,
+  trackedDisposableId,
+} from "@four/core";
 
 import { LitMaterial } from "../src/lit-material.js";
 import { NodeMaterial } from "../src/node-material.js";
@@ -35,6 +43,12 @@ function colorGraph(): ShaderGraph {
     color: 0,
   };
 }
+
+afterEach(() => {
+  resetLeakRegistry();
+  resetDevWarnings();
+  vi.restoreAllMocks();
+});
 
 describe("§83 material resource accounting (A-5)", () => {
   it("adds an UnlitMaterial on construct and removes it on dispose", () => {
@@ -71,6 +85,27 @@ describe("§83 material resource accounting (A-5)", () => {
     material.dispose();
     material.dispose();
     expect(liveMaterialCount()).toBe(before);
+  });
+
+  it("registers a material with the FinalizationRegistry tracker (A-4)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const material = new UnlitMaterial();
+    const id = trackedDisposableId(material);
+    expect(id).toBeGreaterThan(0);
+    reportFinalized(id);
+    expect(auditFinalizedLeaks()).toBe(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(material.id);
+    material.dispose();
+  });
+
+  it("does not warn when the material was disposed before finalization", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const material = new UnlitMaterial();
+    const id = trackedDisposableId(material);
+    material.dispose();
+    reportFinalized(id);
+    expect(auditFinalizedLeaks()).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("never forgives a material that is dropped without dispose (§83)", () => {
