@@ -538,9 +538,11 @@ describe("HingeJoint (§28's example)", () => {
     const joint = new FixedJoint({ bodyA: a, bodyB: b });
     pretendRegistered(joint);
     joint.anchorA = new Vector3(2, 0, 0);
+    joint.anchorB = new Vector3(0, 3, 0);
     expect(joint.anchorsAreLocal).toBe(true);
     expect(joint.commands.anchorsDirty).toBe(true);
     expect(joint.anchorA?.x).toBe(2);
+    expect(joint.anchorB?.y).toBe(3);
   });
 
   it("rejects a non-finite live anchor (§85)", () => {
