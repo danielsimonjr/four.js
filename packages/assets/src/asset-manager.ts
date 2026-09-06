@@ -11,10 +11,13 @@
  * §76 asks the asset manager for deduplication, caching, reference counting,
  * lazy loading, streaming, dependency graphs, progress reporting, cancellation,
  * retries, worker decoding, hot reload, and content hashing. This module ships
- * the first four plus retries, cancellation, and content hashing, and stages the
- * rest with dated notes (see "Staged", below). The MVP reading is the plan's (P11-2): an asset
- * manager whose caching and lifetime rules are exactly specified and fully
- * tested beats a wider surface whose corners are guesses.
+ * all of them. Streaming, graphs, progress, worker decoding, and hot reload
+ * are injected seams (2026-09-06, A-18 remainder): none invents a transport,
+ * a websocket protocol, or a real `Worker` — each is present when the host
+ * passes the matching factory, and degrades without it. The MVP reading is
+ * the plan's (P11-2): an asset manager whose caching and lifetime rules are
+ * exactly specified and fully tested beats a wider surface whose corners are
+ * guesses.
  *
  * ## Everything is injected, including IO
  *
@@ -229,13 +232,37 @@
  * See `content-hash.ts` for why the default algorithm is SHA-256 rather than
  * something synchronous and cheap.
  *
+ * ## Progress, streaming, graphs, workers, hot reload (§76, 2026-09-06)
+ *
+ * Five seams, each optional, each tested with an injected fake:
+ *
+ * 1. **Progress.** `load(url, loader, { onProgress })` receives
+ *    `{ loaded, total, url }`. `total` is the declared `content-length` (or
+ *    {@link FetchResponse.contentLength}) when the transport exposes one,
+ *    otherwise `null`. Incremental events fire when `body.getReader` exists;
+ *    a one-shot body still reports once the loader reads it. One waiter's
+ *    callback is not the others' — the same rule as abort.
+ * 2. **Streaming.** {@link AssetManager.stream} yields `Uint8Array` chunks
+ *    from `body.getReader` when present, or the whole buffer once. A loader
+ *    may also declare {@link AssetLoader.loadStream} and `load` will pass
+ *    that iterable instead of a `FetchResponse` (not when hashing or worker
+ *    decoding already consumed the body).
+ * 3. **Dependency graphs.** {@link AssetManager.registerDependency} records
+ *    a parent→child edge; {@link AssetManager.loadWithDependencies} loads
+ *    registered children first. {@link AssetManager.loadGraph} walks those
+ *    edges plus a loader result that carries `{ dependencies: string[] }`.
+ *    Cycles refuse with `context.reason === "dependency-cycle"`.
+ * 4. **Worker decoding.** `load(..., { decodeInWorker: true })` posts the
+ *    response bytes to `{ workerFactory }` when one was injected
+ *    ({@link WorkerLike}); without a factory the loader decodes in-process,
+ *    as before. Tests inject a fake — no real `Worker` is required.
+ * 5. **Hot reload.** {@link AssetManager.watch} exists always and forwards
+ *    to `{ watch: (url, cb) => unsub }` when injected (a dev-server file
+ *    watcher). Without it, `watch` throws `INVALID_APPLICATION_STATE`
+ *    naming the injection point. There is no built-in websocket protocol.
+ *
  * ## Staged (dated notes, 2026-08-02, WP-11.2)
  *
- * - **Streaming, dependency graphs, progress reporting, worker decoding, hot
- *   reload** (§76). Each needs a contract this packet does not have: progress
- *   needs a byte-length channel `FetchLike` does not expose, dependency graphs
- *   need a loader that can load (glTF's buffers and images), hot reload needs a
- *   dev-server protocol, worker decoding needs a transfer policy.
  * - **The §76 record form** `assets.load({ robot: "/models/robot.glb", … })`.
  *   It infers a loader per file extension, which presumes the glTF and texture
  *   loaders that §55/§77 gate (see `loaders.ts`). A version that could only
@@ -281,12 +308,130 @@ export interface FetchResponse {
    * an over-budget body before downloading it.
    */
   readonly headers?: ResponseHeadersLike;
+  /**
+   * Declared body size in bytes when the transport has no header map.
+   *
+   * Optional: a real `Response` already exposes this via
+   * `headers.get("content-length")`, which the manager reads first. A test
+   * fake — or a non-HTTP transport — may set the field instead. Either
+   * source is the same number: an early bound, never the whole §96 check.
+   */
+  readonly contentLength?: number;
+  /**
+   * A chunked body, when the transport can yield one (§76 streaming).
+   *
+   * Structural: the DOM's `ReadableStream` satisfies {@link ReadableBodyLike}
+   * (`getReader()` → `{ read(), releaseLock? }`). Absent on a one-shot fake,
+   * in which case {@link AssetManager.stream} yields the whole
+   * {@link FetchResponse.arrayBuffer} once.
+   */
+  readonly body?: ReadableBodyLike | null;
   /** The body as bytes. */
   arrayBuffer(): Promise<ArrayBuffer>;
   /** The body decoded as UTF-8 text. */
   text(): Promise<string>;
   /** The body parsed as JSON. */
   json(): Promise<unknown>;
+}
+
+/**
+ * The subset of a WHATWG `ReadableStream<Uint8Array>` this package reads.
+ *
+ * Named rather than inlined so a test can satisfy it with `{ getReader }`
+ * and a real `Response.body` still needs no adapter.
+ */
+export interface ReadableBodyLike {
+  /** Locks the stream and returns a reader. */
+  getReader(): ByteReaderLike;
+}
+
+/**
+ * One pull from a {@link ReadableBodyLike}. `releaseLock` is optional
+ * because a hand-rolled test reader has nothing to unlock.
+ */
+export interface ByteReaderLike {
+  /** The next chunk, or `{ done: true }` when the body is exhausted. */
+  read(): Promise<{ done: boolean; value?: Uint8Array }>;
+  /** Unlocks the stream; a no-op on a fake that was never locked. */
+  releaseLock?(): void;
+}
+
+/**
+ * One progress notification from {@link AssetManager.load} (§76).
+ *
+ * `total` is `null` when the transport did not declare a size — a missing
+ * `content-length`, a non-HTTP body, a fake with neither headers nor
+ * {@link FetchResponse.contentLength}. `loaded` is bytes observed so far.
+ */
+export interface AssetProgressEvent {
+  /** Bytes read (or reported) so far. */
+  readonly loaded: number;
+  /** Declared size, or `null` when unknown. */
+  readonly total: number | null;
+  /** The URL this event belongs to. */
+  readonly url: string;
+}
+
+/**
+ * The injected Worker seam for `decodeInWorker` (§76).
+ *
+ * The DOM's `Worker` satisfies it (`postMessage` / `onmessage` / optional
+ * `terminate`). Tests inject a fake that echoes or transforms an
+ * `ArrayBuffer` on the same turn or the next microtask — no real worker
+ * thread is required, and this package never names `Worker`.
+ */
+export interface WorkerLike {
+  /** Delivers one message to the worker. */
+  postMessage(message: unknown): void;
+  /** The one handler this package installs; `null` until then. */
+  onmessage: ((event: { data: unknown }) => void) | null;
+  /** Optional; a failed worker may surface here instead of `onmessage`. */
+  onerror?: ((event: { message?: string }) => void) | null;
+  /** Optional; called once after the decode settles. */
+  terminate?(): void;
+}
+
+/**
+ * The injected hot-reload seam: subscribe to changes for `url`, get an
+ * unsubscriber back. A Vite/webpack dev-server adapter is the expected
+ * host; this package does not speak any websocket protocol.
+ */
+export type AssetWatchLike = (
+  url: string,
+  listener: (url: string) => void,
+) => () => void;
+
+/**
+ * A loaded asset that names further URLs to fetch (§76 dependency graphs).
+ *
+ * Structural: any loader may return `{ dependencies: string[] }` — a glTF
+ * document's buffers and images, a manifest's rows — and
+ * {@link AssetManager.loadGraph} will walk them. Extra fields are ignored.
+ */
+export interface AssetWithDependencies {
+  /** Child URLs; loaded after the parent unless already registered. */
+  readonly dependencies: readonly string[];
+}
+
+/** The result of {@link AssetManager.loadGraph}. */
+export interface AssetGraph<T> {
+  /** The asset at the root URL. */
+  readonly root: T;
+  /**
+   * Every URL the walk loaded, root included, in first-visit order.
+   * Each entry holds one `load` reference — pair with {@link AssetManager.release}.
+   */
+  readonly loaded: ReadonlyMap<string, unknown>;
+}
+
+/** Per-call options for {@link AssetManager.loadWithDependencies} / {@link AssetManager.loadGraph}. */
+export interface AssetGraphLoadOptions extends AssetLoadOptions {
+  /**
+   * Loader used for children. Defaults to the root loader — the common
+   * case for a graph of one kind (JSON documents that point at JSON
+   * documents). Mixed graphs (glTF + binaries) pass a second loader.
+   */
+  readonly dependencyLoader?: AssetLoader<unknown>;
 }
 
 /**
@@ -438,6 +583,29 @@ export interface AssetLoadOptions {
    * case the manifest exists to catch.
    */
   readonly expectedHash?: string;
+  /**
+   * Byte-progress callback for **this** waiter (§76).
+   *
+   * Fired with `{ loaded, total, url }`. `total` is the declared
+   * `content-length` / {@link FetchResponse.contentLength} when the
+   * transport exposes one, otherwise `null`. Incremental events require
+   * `body.getReader`; a one-shot body reports once it is read. A coalesced
+   * waiter gets its own callback — aborting or detaching one does not
+   * silence the others.
+   */
+  readonly onProgress?: (event: AssetProgressEvent) => void;
+  /**
+   * Decode the response bytes on a Worker when the manager was built with
+   * {@link AssetManagerOptions.workerFactory} (§76).
+   *
+   * Presence of the factory is the capability ({@link
+   * AssetManager.canDecodeInWorker}). Without one this flag is a no-op and
+   * the loader decodes in-process, exactly as it did before the seam
+   * existed. The worker is posted `{ type: "decode", url, buffer }` and
+   * must reply with an `ArrayBuffer` (or `{ buffer }` / `{ type: "decoded",
+   * buffer }`); `{ type: "error", message }` refuses the load.
+   */
+  readonly decodeInWorker?: boolean;
 }
 
 /**
@@ -459,6 +627,15 @@ export interface AssetLoader<T> {
    *   lands) for resolving relative dependencies.
    */
   load(response: FetchResponse, url: string): Promise<T>;
+  /**
+   * Optional chunked decode (§76 streaming).
+   *
+   * When present, {@link AssetManager.load} passes an async iterable of
+   * body chunks instead of a {@link FetchResponse} — but only when the
+   * load did not already consume the body for hashing or worker decoding.
+   * A loader that only implements {@link AssetLoader.load} is unchanged.
+   */
+  loadStream?(chunks: AsyncIterable<Uint8Array>, url: string): Promise<T>;
 }
 
 /**
@@ -542,6 +719,25 @@ export interface AssetManagerOptions<TSignal = never> {
    * reads the body as text; a byte-reading loader needs none.
    */
   readonly decodeText?: TextDecodeLike;
+  /**
+   * Mints one Worker per `decodeInWorker` load (§76).
+   *
+   * **Presence is the capability**, reported by
+   * {@link AssetManager.canDecodeInWorker}. Without it,
+   * `{ decodeInWorker: true }` decodes in-process. It is a factory, not a
+   * Worker: a Worker is single-use from this package's point of view, and
+   * every decode gets its own (then `terminate`s it, when the fake has one).
+   */
+  readonly workerFactory?: () => WorkerLike;
+  /**
+   * Dev-server file watcher (§76 hot reload).
+   *
+   * **Presence is the capability**, reported by {@link AssetManager.canWatch}.
+   * {@link AssetManager.watch} forwards to this function; without it, `watch`
+   * throws `INVALID_APPLICATION_STATE` naming the injection point. The
+   * host owns the protocol — this package never opens a socket.
+   */
+  readonly watch?: AssetWatchLike;
 }
 
 /** One cache slot: a pending or settled load, plus its reference count. */
@@ -576,6 +772,17 @@ interface CacheEntry {
    * settled, where it would be a no-op anyway.
    */
   readonly abort: (() => void) | undefined;
+  /**
+   * Per-waiter progress callbacks for this load. A waiter that provided
+   * {@link AssetLoadOptions.onProgress} is added here and removed when its
+   * own promise settles, so a detached waiter cannot be called after abort.
+   */
+  readonly progress: Set<(event: AssetProgressEvent) => void>;
+  /**
+   * The most recent progress event, replayed to a waiter that joins mid-flight
+   * or hits a settled slot. `undefined` until the first report.
+   */
+  lastProgress: AssetProgressEvent | undefined;
 }
 
 /**
@@ -694,14 +901,278 @@ function positiveLimit(
  */
 function declaredContentLength(response: FetchResponse): number | undefined {
   const header = response.headers?.get("content-length");
-  if (header === undefined || header === null) {
-    return undefined;
+  if (header !== undefined && header !== null) {
+    const declared = Number(header);
+    if (Number.isFinite(declared) && declared >= 0) {
+      return declared;
+    }
+    // An unusable header is "unknown", same as a missing one — fall through
+    // to the optional field so a non-HTTP transport can still declare a size.
   }
-  const declared = Number(header);
-  if (!Number.isFinite(declared) || declared < 0) {
-    return undefined;
+  const field = response.contentLength;
+  if (typeof field === "number" && Number.isFinite(field) && field >= 0) {
+    return field;
   }
-  return declared;
+  return undefined;
+}
+
+/**
+ * Copies the identity fields of a response onto a view that replaces the
+ * body accessors — so a bounded / hashed / progress wrapper still looks
+ * like the transport's response to a loader that reads `ok` / `headers`.
+ */
+function viewResponse(
+  response: FetchResponse,
+  accessors: Pick<FetchResponse, "arrayBuffer" | "text" | "json">,
+  body: ReadableBodyLike | null | undefined = response.body,
+): FetchResponse {
+  return {
+    ok: response.ok,
+    status: response.status,
+    headers: response.headers,
+    contentLength: response.contentLength,
+    body,
+    arrayBuffer: accessors.arrayBuffer,
+    text: accessors.text,
+    json: accessors.json,
+  };
+}
+
+/** Concatenate streamed chunks into one buffer (hashing / worker / fallback). */
+function concatChunks(chunks: readonly Uint8Array[]): ArrayBuffer {
+  let total = 0;
+  for (const chunk of chunks) {
+    total += chunk.byteLength;
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out.buffer;
+}
+
+/**
+ * Pulls the body as chunks: `body.getReader` when present, otherwise one
+ * `arrayBuffer()` yield. Shared by {@link AssetManager.stream} and a
+ * loader's {@link AssetLoader.loadStream}.
+ */
+async function* iterateBody(
+  response: FetchResponse,
+): AsyncGenerator<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (reader !== undefined) {
+    try {
+      for (;;) {
+        const result = await reader.read();
+        if (result.done) {
+          return;
+        }
+        const value = result.value;
+        if (value !== undefined && value.byteLength > 0) {
+          yield value;
+        }
+      }
+    } finally {
+      reader.releaseLock?.();
+    }
+    return;
+  }
+  const data = await response.arrayBuffer();
+  yield new Uint8Array(data);
+}
+
+/** `{ dependencies: string[] }` on a loader result, or an empty list. */
+function declaredDependencies(value: unknown): readonly string[] {
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+  const deps = (value as { dependencies?: unknown }).dependencies;
+  if (!Array.isArray(deps)) {
+    return [];
+  }
+  const urls: string[] = [];
+  for (const item of deps) {
+    if (typeof item === "string") {
+      urls.push(item);
+    }
+  }
+  return urls;
+}
+
+/**
+ * Reads the worker's reply as bytes. Accepts an `ArrayBuffer`,
+ * `{ buffer }`, `{ type: "decoded", buffer }`, or an echo of the outbound
+ * `{ type: "decode", buffer }` so a test fake can post the message back
+ * unchanged. `{ type: "error", message }` / `{ error }` refuse.
+ */
+function extractDecodedBuffer(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) {
+    return data;
+  }
+  if (typeof data === "object" && data !== null) {
+    const rec = data as {
+      type?: unknown;
+      buffer?: unknown;
+      error?: unknown;
+      message?: unknown;
+    };
+    if (rec.type === "error" || typeof rec.error === "string") {
+      const message =
+        typeof rec.message === "string"
+          ? rec.message
+          : typeof rec.error === "string"
+            ? rec.error
+            : "worker decode failed";
+      throw new Error(message);
+    }
+    if (rec.buffer instanceof ArrayBuffer) {
+      return rec.buffer;
+    }
+  }
+  throw new Error("worker posted an unrecognised decode result");
+}
+
+/**
+ * Posts `buffer` to a freshly minted {@link WorkerLike} and waits for the
+ * decoded bytes. `terminate`s the worker (when it has one) in every
+ * outcome so a fake that counts lives can assert cleanup.
+ */
+function asError(cause: unknown): Error {
+  return cause instanceof Error ? cause : new Error(String(cause));
+}
+
+function decodeWithWorker(
+  factory: () => WorkerLike,
+  url: string,
+  buffer: ArrayBuffer,
+): Promise<ArrayBuffer> {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    let settled = false;
+    let worker: WorkerLike;
+    try {
+      worker = factory();
+    } catch (error) {
+      reject(asError(error));
+      return;
+    }
+    const finish = (fn: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      try {
+        worker.terminate?.();
+      } catch {
+        // A terminate that throws must not hide the decode outcome.
+      }
+      fn();
+    };
+    worker.onmessage = (event: { data: unknown }): void => {
+      try {
+        const decoded = extractDecodedBuffer(event.data);
+        finish(() => {
+          resolve(decoded);
+        });
+      } catch (error) {
+        finish(() => {
+          reject(asError(error));
+        });
+      }
+    };
+    worker.onerror = (event: { message?: string }): void => {
+      finish(() => {
+        reject(new Error(event.message ?? "worker decode failed"));
+      });
+    };
+    try {
+      worker.postMessage({ type: "decode", url, buffer });
+    } catch (error) {
+      finish(() => {
+        reject(asError(error));
+      });
+    }
+  });
+}
+
+/**
+ * A {@link FetchResponse} over already-decoded bytes — what the loader
+ * sees after a worker transform, so `arrayBuffer` / `text` / `json` stay
+ * consistent with each other.
+ */
+function responseFromBytes(
+  bytes: ArrayBuffer,
+  template: FetchResponse,
+): FetchResponse {
+  const textOf = (): string => new TextDecoder().decode(bytes);
+  return {
+    ok: template.ok,
+    status: template.status,
+    headers: template.headers,
+    contentLength: bytes.byteLength,
+    arrayBuffer: () => Promise.resolve(bytes),
+    text: () => Promise.resolve(textOf()),
+    json: () => Promise.resolve(JSON.parse(textOf()) as unknown),
+  };
+}
+
+/**
+ * Wraps a response so body reads report {@link AssetProgressEvent}s.
+ *
+ * When `body.getReader` exists, `arrayBuffer` / `text` / `json` consume
+ * that reader so a streaming transport produces incremental events. A
+ * one-shot body reports once, after the matching accessor resolves.
+ */
+function progressingResponse(
+  response: FetchResponse,
+  url: string,
+  total: number | null,
+  report: (event: AssetProgressEvent) => void,
+): FetchResponse {
+  let loaded = 0;
+  let bytes: Promise<ArrayBuffer> | undefined;
+  const emit = (next: number): void => {
+    loaded = next;
+    report({ loaded, total, url });
+  };
+  const read = async (): Promise<ArrayBuffer> => {
+    emit(0);
+    const reader = response.body?.getReader();
+    if (reader !== undefined) {
+      const chunks: Uint8Array[] = [];
+      try {
+        for (;;) {
+          const result = await reader.read();
+          if (result.done) {
+            break;
+          }
+          const value = result.value;
+          if (value !== undefined && value.byteLength > 0) {
+            chunks.push(value);
+            emit(loaded + value.byteLength);
+          }
+        }
+      } finally {
+        reader.releaseLock?.();
+      }
+      return concatChunks(chunks);
+    }
+    const data = await response.arrayBuffer();
+    emit(data.byteLength);
+    return data;
+  };
+  const once = (): Promise<ArrayBuffer> => (bytes ??= read());
+  const progressing: FetchResponse = viewResponse(response, {
+    arrayBuffer: once,
+    async text(): Promise<string> {
+      return new TextDecoder().decode(await once());
+    },
+    async json(): Promise<unknown> {
+      return JSON.parse(await progressing.text()) as unknown;
+    },
+  });
+  return progressing;
 }
 
 /**
@@ -725,10 +1196,7 @@ function boundedResponse(
   maximumBytes: number,
   refuse: (observed: number) => FourError,
 ): FetchResponse {
-  const bounded: FetchResponse = {
-    ok: response.ok,
-    status: response.status,
-    headers: response.headers,
+  const bounded: FetchResponse = viewResponse(response, {
     async arrayBuffer(): Promise<ArrayBuffer> {
       const data = await response.arrayBuffer();
       if (data.byteLength > maximumBytes) {
@@ -746,7 +1214,7 @@ function boundedResponse(
     async json(): Promise<unknown> {
       return JSON.parse(await bounded.text()) as unknown;
     },
-  };
+  });
   return bounded;
 }
 
@@ -787,10 +1255,7 @@ function hashingResponse(
     return data;
   };
   const once = (): Promise<ArrayBuffer> => (bytes ??= read());
-  const hashed: FetchResponse = {
-    ok: response.ok,
-    status: response.status,
-    headers: response.headers,
+  const hashed: FetchResponse = viewResponse(response, {
     arrayBuffer: once,
     async text(): Promise<string> {
       if (decodeText === undefined) {
@@ -801,7 +1266,7 @@ function hashingResponse(
     async json(): Promise<unknown> {
       return JSON.parse(await hashed.text()) as unknown;
     },
-  };
+  });
   return hashed;
 }
 
@@ -843,6 +1308,19 @@ export class AssetManager<TSignal = never> implements Disposable {
   /** UTF-8 decoding for hashed text loads; resolved for the same reason. */
   readonly #decodeText: TextDecodeLike | undefined;
 
+  /** Worker seam for `decodeInWorker`; `undefined` decodes in-process. */
+  readonly #workerFactory: (() => WorkerLike) | undefined;
+
+  /** Hot-reload seam; `undefined` makes {@link AssetManager.watch} throw. */
+  readonly #watch: AssetWatchLike | undefined;
+
+  /**
+   * Parent URL → child URLs, insertion-ordered (§76 dependency graphs).
+   * Independent of the cache: an edge survives eviction so a later
+   * {@link AssetManager.loadWithDependencies} still knows the children.
+   */
+  readonly #dependencies = new Map<string, Set<string>>();
+
   #disposed = false;
 
   constructor(options?: AssetManagerOptions<TSignal>) {
@@ -864,6 +1342,8 @@ export class AssetManager<TSignal = never> implements Disposable {
     this.#timer = options?.timer ?? resolveGlobalTimer();
     this.#digest = options?.digest ?? resolveGlobalDigest();
     this.#decodeText = options?.decodeText ?? resolveGlobalTextDecoder();
+    this.#workerFactory = options?.workerFactory;
+    this.#watch = options?.watch;
   }
 
   /** The effective §96 input-size limit in bytes (diagnostics and tests). */
@@ -900,6 +1380,22 @@ export class AssetManager<TSignal = never> implements Disposable {
    */
   get canHashContent(): boolean {
     return this.#digest !== undefined;
+  }
+
+  /**
+   * Whether `{ decodeInWorker: true }` will post bytes to a Worker — that
+   * is, whether an {@link AssetManagerOptions.workerFactory} was injected.
+   */
+  get canDecodeInWorker(): boolean {
+    return this.#workerFactory !== undefined;
+  }
+
+  /**
+   * Whether {@link AssetManager.watch} will subscribe — that is, whether
+   * an {@link AssetManagerOptions.watch} was injected.
+   */
+  get canWatch(): boolean {
+    return this.#watch !== undefined;
   }
 
   /** Number of cache slots, pending loads included. */
@@ -996,9 +1492,10 @@ export class AssetManager<TSignal = never> implements Disposable {
       // Verification wraps *outside* the abort guard on purpose: an aborted
       // waiter has already handed its reference back, and a verification that
       // ran afterwards would hand back a second one.
-      return wantHash
+      const verified = wantHash
         ? this.#verified(guarded, existing, url, loader, expectedHash)
         : guarded;
+      return this.#withProgress(verified, existing, options?.onProgress);
     }
 
     const fetchImpl = this.#fetch;
@@ -1046,6 +1543,8 @@ export class AssetManager<TSignal = never> implements Disposable {
           : (): void => {
               handle.abort();
             },
+      progress: new Set(),
+      lastProgress: undefined,
     };
     const promise = this.#withDeadline(
       this.#run(
@@ -1055,6 +1554,8 @@ export class AssetManager<TSignal = never> implements Disposable {
         handle?.signal,
         wantHash ? digest : undefined,
         sink,
+        entry,
+        options?.decodeInWorker === true,
       ),
       timer,
       url,
@@ -1085,9 +1586,10 @@ export class AssetManager<TSignal = never> implements Disposable {
       signal === undefined
         ? promise
         : this.#withAbort(promise, entry, url, loader, signal);
-    return wantHash
+    const verified = wantHash
       ? this.#verified(guarded, entry, url, loader, expectedHash)
       : guarded;
+    return this.#withProgress(verified, entry, options?.onProgress);
   }
 
   /**
@@ -1127,6 +1629,148 @@ export class AssetManager<TSignal = never> implements Disposable {
   contentHash(url: string, loader: AssetLoader<unknown>): string | undefined {
     const entry = this.#entries.get(loader)?.get(url);
     return entry?.settled === true ? entry.hash : undefined;
+  }
+
+  /**
+   * Records a parent→child edge for {@link loadWithDependencies} /
+   * {@link loadGraph} (§76). Duplicate edges are ignored. A self-edge is
+   * a programming error and throws `INVALID_APPLICATION_STATE`.
+   */
+  registerDependency(parentUrl: string, childUrl: string): void {
+    this.#assertUsable("register a dependency");
+    if (parentUrl === childUrl) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot register "${parentUrl}" as a dependency of itself.`,
+        { context: { url: parentUrl, reason: "dependency-cycle" } },
+      );
+    }
+    const children = this.#dependencies.get(parentUrl);
+    if (children === undefined) {
+      this.#dependencies.set(parentUrl, new Set([childUrl]));
+      return;
+    }
+    children.add(childUrl);
+  }
+
+  /**
+   * Drops one recorded edge. Unknown pairs are a no-op.
+   *
+   * @returns `true` if an edge was removed.
+   */
+  unregisterDependency(parentUrl: string, childUrl: string): boolean {
+    const children = this.#dependencies.get(parentUrl);
+    if (children === undefined || !children.delete(childUrl)) {
+      return false;
+    }
+    if (children.size === 0) {
+      this.#dependencies.delete(parentUrl);
+    }
+    return true;
+  }
+
+  /**
+   * The recorded children of `url`, in registration order. A URL with no
+   * edges returns an empty array — never `undefined`.
+   */
+  dependenciesOf(url: string): readonly string[] {
+    const children = this.#dependencies.get(url);
+    return children === undefined ? [] : [...children];
+  }
+
+  /**
+   * Loads registered children first, then `url` (§76).
+   *
+   * Children use {@link AssetGraphLoadOptions.dependencyLoader} when one is
+   * given, otherwise `loader`. After the parent settles, any
+   * `{ dependencies: string[] }` on the result are registered and loaded
+   * too. Cycles refuse with `ASSET_LOAD_FAILED` /
+   * `context.reason === "dependency-cycle"`.
+   *
+   * Each URL takes one `load` reference; the caller releases the parent
+   * (and any child it intends to drop) itself.
+   */
+  loadWithDependencies<T>(
+    url: string,
+    loader: AssetLoader<T>,
+    options?: AssetGraphLoadOptions,
+  ): Promise<T> {
+    return this.#walkGraph(url, loader, options, false).then(
+      (graph) => graph.root,
+    );
+  }
+
+  /**
+   * Loads `rootUrl` and walks declared + registered dependencies (§76).
+   *
+   * @returns The root asset and a map of every URL the walk loaded (root
+   *   included). Each map entry holds one reference.
+   */
+  loadGraph<T>(
+    rootUrl: string,
+    loader: AssetLoader<T>,
+    options?: AssetGraphLoadOptions,
+  ): Promise<AssetGraph<T>> {
+    return this.#walkGraph(rootUrl, loader, options, true);
+  }
+
+  /**
+   * Yields the response body as `Uint8Array` chunks (§76 streaming).
+   *
+   * Uses `body.getReader` when the transport exposes one; otherwise yields
+   * the whole `arrayBuffer()` once. Does **not** touch the cache or take a
+   * reference — it is a raw read, and the caller is the only consumer.
+   *
+   * Honours {@link AssetManagerOptions.maximumBytes}, the §96 deadline, and
+   * `options.signal` with the same codes as {@link load}.
+   */
+  stream(
+    url: string,
+    options?: Pick<AssetLoadOptions, "signal">,
+  ): AsyncIterable<Uint8Array> {
+    this.#assertUsable("stream");
+    const fetchImpl = this.#fetch;
+    if (fetchImpl === undefined) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot stream "${url}": no fetch implementation. Pass { fetch } to the ` +
+          `AssetManager constructor — this runtime has no global fetch.`,
+        { context: { url, loader: "stream" } },
+      );
+    }
+    if (this.#timer === undefined && Number.isFinite(this.#timeoutSeconds)) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot stream "${url}": timeoutSeconds is ${String(this.#timeoutSeconds)} ` +
+          `but this runtime has no setTimeout. Pass { timer } to the AssetManager ` +
+          `constructor, or { timeoutSeconds: Number.POSITIVE_INFINITY } to drop the §96 deadline.`,
+        { context: { url, loader: "stream", limitName: "timeoutSeconds" } },
+      );
+    }
+    return this.#stream(url, options, fetchImpl);
+  }
+
+  /**
+   * Subscribes to changes for `url` through the injected
+   * {@link AssetManagerOptions.watch} (§76 hot reload).
+   *
+   * @returns An unsubscriber. Calling it twice is a no-op.
+   * @throws FourError `INVALID_APPLICATION_STATE` if no `watch` was
+   *   injected, or if the manager is disposed.
+   */
+  watch(url: string, listener: (url: string) => void): () => void {
+    this.#assertUsable("watch");
+    const injected = this.#watch;
+    if (injected === undefined) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot watch "${url}": this AssetManager has no watch. Pass ` +
+          `{ watch } to the constructor — a dev-server file watcher. ` +
+          `There is no built-in websocket protocol.`,
+        { context: { url } },
+      );
+    }
+    return injected(url, listener);
   }
 
   /**
@@ -1193,7 +1837,200 @@ export class AssetManager<TSignal = never> implements Disposable {
       return;
     }
     this.#disposed = true;
+    this.#dependencies.clear();
     this.clear();
+  }
+
+  #assertUsable(action: string): void {
+    if (this.#disposed) {
+      throw new FourError(
+        "INVALID_APPLICATION_STATE",
+        `Cannot ${action}: this AssetManager has been disposed.`,
+      );
+    }
+  }
+
+  /**
+   * Attaches one waiter's `onProgress` to `entry` for the life of `work`.
+   *
+   * A late joiner is replayed `lastProgress` so it does not start from a
+   * silent zero after the first bytes have already been read. The listener
+   * is removed when `work` settles so an aborted waiter cannot be called
+   * after it has handed its reference back.
+   */
+  #withProgress<T>(
+    work: Promise<T>,
+    entry: CacheEntry,
+    onProgress: ((event: AssetProgressEvent) => void) | undefined,
+  ): Promise<T> {
+    if (onProgress === undefined) {
+      return work;
+    }
+    entry.progress.add(onProgress);
+    if (entry.lastProgress !== undefined) {
+      try {
+        onProgress(entry.lastProgress);
+      } catch {
+        // A throwing listener is isolated from the load and from siblings.
+      }
+    }
+    return work.finally(() => {
+      entry.progress.delete(onProgress);
+    });
+  }
+
+  /** Fan-out one event to every waiter still subscribed on `entry`. */
+  #emitProgress(entry: CacheEntry, event: AssetProgressEvent): void {
+    entry.lastProgress = event;
+    for (const listener of entry.progress) {
+      try {
+        listener(event);
+      } catch {
+        // Isolated: one bad callback must not fail the load or silence others.
+      }
+    }
+  }
+
+  async #walkGraph<T>(
+    rootUrl: string,
+    loader: AssetLoader<T>,
+    options: AssetGraphLoadOptions | undefined,
+    collect: boolean,
+  ): Promise<AssetGraph<T>> {
+    this.#assertUsable("load a dependency graph");
+    const childLoader = options?.dependencyLoader ?? loader;
+    const loaded = new Map<string, unknown>();
+    const visiting = new Set<string>();
+    const walk = async (
+      url: string,
+      urlLoader: AssetLoader<unknown>,
+    ): Promise<unknown> => {
+      if (loaded.has(url)) {
+        return loaded.get(url);
+      }
+      if (visiting.has(url)) {
+        throw new FourError(
+          "ASSET_LOAD_FAILED",
+          `Dependency cycle involving "${url}".`,
+          { context: { url, reason: "dependency-cycle" } },
+        );
+      }
+      visiting.add(url);
+      for (const child of this.dependenciesOf(url)) {
+        await walk(child, childLoader);
+      }
+      const value = await this.load(url, urlLoader, options);
+      loaded.set(url, value);
+      for (const child of declaredDependencies(value)) {
+        this.registerDependency(url, child);
+        await walk(child, childLoader);
+      }
+      visiting.delete(url);
+      return value;
+    };
+    const root = (await walk(rootUrl, loader)) as T;
+    return { root, loaded: collect ? loaded : new Map([[rootUrl, root]]) };
+  }
+
+  async *#stream(
+    url: string,
+    options: Pick<AssetLoadOptions, "signal"> | undefined,
+    fetchImpl: ErasedFetch,
+  ): AsyncGenerator<Uint8Array> {
+    const signal = options?.signal;
+    const isAborted = (): boolean => signal !== undefined && signal.aborted;
+    if (isAborted()) {
+      throw abortFailure(url, "stream");
+    }
+    const timer = this.#timer;
+    const handle = this.#abortController?.();
+    let aborted = false;
+    const onAbort = (): void => {
+      aborted = true;
+      handle?.abort();
+    };
+    if (signal !== undefined) {
+      signal.addEventListener("abort", onAbort);
+    }
+    const refuse = (observed: number): FourError =>
+      new FourError(
+        "ASSET_LOAD_FAILED",
+        `"${url}" is ${String(observed)} bytes, over the ${String(this.#maximumBytes)}-byte limit (§96).`,
+        {
+          context: {
+            url,
+            loader: "stream",
+            limitName: "maximumBytes",
+            limit: this.#maximumBytes,
+            observed,
+          },
+        },
+      );
+    try {
+      const response = await this.#withDeadline(
+        (async (): Promise<FetchResponse> => {
+          let fetched: FetchResponse;
+          try {
+            fetched = await fetchImpl(url, handle?.signal);
+          } catch (error) {
+            throw assetLoadFailure(
+              `Fetch failed for "${url}".`,
+              { url, loader: "stream" },
+              error,
+            );
+          }
+          if (!fetched.ok) {
+            throw new FourError(
+              "ASSET_LOAD_FAILED",
+              `Fetch failed for "${url}": HTTP ${String(fetched.status)}.`,
+              {
+                context: {
+                  url,
+                  loader: "stream",
+                  status: fetched.status,
+                },
+              },
+            );
+          }
+          const declared = declaredContentLength(fetched);
+          if (
+            declared !== undefined &&
+            Number.isFinite(this.#maximumBytes) &&
+            declared > this.#maximumBytes
+          ) {
+            throw refuse(declared);
+          }
+          return fetched;
+        })(),
+        timer,
+        url,
+        "stream",
+        handle === undefined
+          ? undefined
+          : (): void => {
+              handle.abort();
+            },
+      );
+      if (aborted || isAborted()) {
+        throw abortFailure(url, "stream");
+      }
+      let loaded = 0;
+      for await (const chunk of iterateBody(response)) {
+        if (aborted || isAborted()) {
+          throw abortFailure(url, "stream");
+        }
+        loaded += chunk.byteLength;
+        if (
+          Number.isFinite(this.#maximumBytes) &&
+          loaded > this.#maximumBytes
+        ) {
+          throw refuse(loaded);
+        }
+        yield chunk;
+      }
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
   }
 
   #groupFor(loader: AssetLoader<unknown>): Map<string, CacheEntry> {
@@ -1451,6 +2288,8 @@ export class AssetManager<TSignal = never> implements Disposable {
     signal: unknown,
     digest: DigestLike | undefined,
     sink: HashSink,
+    entry: CacheEntry,
+    decodeInWorker: boolean,
   ): Promise<T> {
     let response: FetchResponse;
     try {
@@ -1498,6 +2337,17 @@ export class AssetManager<TSignal = never> implements Disposable {
       response = boundedResponse(response, maximumBytes, refuse);
     }
 
+    const total = declaredContentLength(response) ?? null;
+    const report = (event: AssetProgressEvent): void => {
+      this.#emitProgress(entry, event);
+    };
+    // Progress wraps *before* hashing so a hashed load still reports as
+    // the (single) body read happens. The waiter is subscribed before this
+    // await returns — `load` attaches `onProgress` in the same turn.
+    if (entry.progress.size > 0) {
+      response = progressingResponse(response, url, total, report);
+    }
+
     // Hashing wraps *inside* the §96 bound: the bytes hashed are the bytes the
     // loader is allowed to see, so an over-budget body is refused before a
     // digest is ever computed over it.
@@ -1520,14 +2370,66 @@ export class AssetManager<TSignal = never> implements Disposable {
       );
     }
 
+    // Worker decoding consumes the (already hashed, already bounded) body
+    // and hands the loader a synthetic response over the decoded bytes.
+    // No factory → in-process, exactly as before this seam existed.
+    const factory = this.#workerFactory;
+    const useWorker = decodeInWorker && factory !== undefined;
+    if (useWorker) {
+      try {
+        const bytes = await response.arrayBuffer();
+        const decoded = await decodeWithWorker(factory, url, bytes);
+        response = responseFromBytes(decoded, response);
+      } catch (error) {
+        throw assetLoadFailure(
+          `Worker decode failed for "${url}".`,
+          { url, loader: loader.name, status: response.status },
+          error,
+        );
+      }
+    }
+
     try {
-      return await loader.load(response, url);
+      // loadStream only when the body is still a stream — hashing and the
+      // worker both already pulled it into a buffer.
+      if (
+        !useWorker &&
+        digest === undefined &&
+        typeof loader.loadStream === "function"
+      ) {
+        const chunks = this.#progressingChunks(response, url, total, report);
+        return await loader.loadStream(chunks, url);
+      }
+      const value = await loader.load(response, url);
+      if (entry.lastProgress === undefined) {
+        report({ loaded: total ?? 0, total, url });
+      }
+      return value;
     } catch (error) {
       throw assetLoadFailure(
         `Loader "${loader.name}" failed to decode "${url}".`,
         { url, loader: loader.name, status: response.status },
         error,
       );
+    }
+  }
+
+  /**
+   * An async iterable over `response`'s body that reports each chunk.
+   * Used only for {@link AssetLoader.loadStream}.
+   */
+  async *#progressingChunks(
+    response: FetchResponse,
+    url: string,
+    total: number | null,
+    report: (event: AssetProgressEvent) => void,
+  ): AsyncGenerator<Uint8Array> {
+    let loaded = 0;
+    report({ loaded, total, url });
+    for await (const chunk of iterateBody(response)) {
+      loaded += chunk.byteLength;
+      report({ loaded, total, url });
+      yield chunk;
     }
   }
 }

@@ -9,6 +9,11 @@ Implements the MVP tier of §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPE
 - **`AssetManager`** — deduplicating, reference-counted cache over an injectable `fetch` (`FetchLike`); concurrent requests for the same URL coalesce into one load, and releasing the last reference disposes the asset.
 - **§96 untrusted-content limits** — `maximumBytes` (default `DEFAULT_MAXIMUM_BYTES`, 64 MiB) checked against the declared `content-length` _and_ against the body a loader reads, plus `timeoutSeconds` (default `DEFAULT_TIMEOUT_SECONDS`, 30 s) over transport and decode together, through an injectable `TimerLike`. Both finite by default; see [`docs/guides/security-and-untrusted-content.md`](../../docs/guides/security-and-untrusted-content.md).
 - **Cancellation (§76)** — `load(url, loader, { signal })` takes any `AbortSignalLike` (the DOM's `AbortSignal` fits with no adapter). An aborted load rejects with `ASSET_LOAD_FAILED` / `context.reason === "aborted"` and hands back the reference it took, so it must not be released; a coalesced load survives one waiter's abort and is abandoned only when the last one goes; `release` is not `abort`. Pass `abortController: () => new AbortController()` to extend cancellation to the request itself (`canAbortTransport` reports whether it was), which also cancels a request that outran `timeoutSeconds`.
+- **Progress (§76)** — `load(url, loader, { onProgress })` receives `{ loaded, total, url }`. `total` comes from `content-length` or `FetchResponse.contentLength` when the transport exposes one, otherwise `null`. Incremental events fire when `body.getReader` exists.
+- **Streaming (§76)** — `assets.stream(url)` yields `Uint8Array` chunks from `body.getReader`, or the whole buffer once. A loader may also implement `loadStream(chunks, url)`.
+- **Dependency graphs (§76)** — `registerDependency(parent, child)` plus `loadWithDependencies` (children first) and `loadGraph` (walks registered edges and `{ dependencies: string[] }` on a loader result). Cycles refuse with `context.reason === "dependency-cycle"`.
+- **Worker decoding (§76)** — `load(..., { decodeInWorker: true })` posts the body to an injected `workerFactory` (`WorkerLike`); without one, decode stays in-process. Tests inject a fake — no real `Worker` is required. `canDecodeInWorker` reports the capability.
+- **Hot reload (§76)** — `watch(url, listener)` forwards to an injected `watch: (url, cb) => unsub` (a dev-server file watcher). Without it, `watch` throws `INVALID_APPLICATION_STATE`. There is no built-in websocket protocol. `canWatch` reports the capability.
 - **Content hashing (§76)** — `load(url, loader, { hashContent: true })` records a hash readable through `contentHash(url, loader)`; `{ expectedHash }` verifies it and **refuses** a mismatch (`context.reason === "hash-mismatch"`), which is the §96 integrity feature. SHA-256 over `crypto.subtle` by default, overridable through `digest`; `canHashContent` reports whether the runtime has one, and a hash that cannot be computed refuses rather than passes. See `src/content-hash.ts` for the algorithm argument.
 - **The §79 manifest** — `manifestLoader` / `parseAssetManifest` (a manifest is untrusted content too), `loadFromManifest(assets, manifest, key, loader)` resolving logical key → URL → verified bytes, and `manifestUrl` for the matching `release`.
 - **Loaders** — `textLoader`, `jsonLoader`, `binaryLoader`, `createImageLoader` (over an injectable `ImageDecodeLike`), and `createTextureLoader`; `AssetLoader` is the contract a custom loader implements.
@@ -17,10 +22,8 @@ Implements the MVP tier of §76–78 in [`docs/SPECIFICATION.md`](../../docs/SPE
 
 ## Staged / not yet implemented
 
-- glTF/GLB loading (§78) — staged with dated notes in `src/loaders.ts`; it needs the §55 texture tier and non-unlit materials, which do not exist yet.
 - The rest of the texture system (§77): cube/array/3D targets, mipmaps, anisotropy, compressed containers, render targets, video textures — all renderer-side (`R-30b`). What ships here is the loader tier that feeds it.
-- Streaming, worker decoding, and hot reload.
-- Dependency graphs and progress reporting — the remaining §76 capabilities, each staged with a dated note in `src/asset-manager.ts`.
+- The §76 record form `assets.load({ robot: "/models/robot.glb", … })` (loader inferred per extension).
 
 Unit tests are colocated in `tests/` per §92.
 
