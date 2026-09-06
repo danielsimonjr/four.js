@@ -7922,10 +7922,40 @@ describe("WebglRenderer.render — standard surfaces (§59, §68)", () => {
     expect(bound).toHaveLength(2);
     expect(bound[0]).not.toBeNull();
     expect(bound[1]).toBeNull();
+    // Program-lifetime mirror: the warmup frame already turned the flag on,
+    // so this frame issues no `useMetalRoughnessMap` upload. `useMap` never
+    // turned on at all.
     expect(
       uploadsAt(gl, standardUniforms(gl).get("useMetalRoughnessMap")),
-    ).toEqual([1]);
+    ).toEqual([]);
     expect(uploadsAt(gl, standardUniforms(gl).get("useMap"))).toEqual([]);
+  });
+
+  it("re-selects unit 2 when restoring after a draw that also bound unit 0", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const mapped = new TestStandardMaterial();
+    mapped.map = new TestTexture().asTexture;
+    mapped.metalRoughnessMap = new TestTexture().asTexture;
+    root.add(standardRenderable(litTriangleGeometry(), mapped));
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+      GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT,
+      GL.TEXTURE0 + MAP_TEXTURE_UNIT,
+      GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT,
+      GL.TEXTURE0,
+    ]);
+    const bound = gl.callsOf("bindTexture").map((call) => call.args[1]);
+    expect(bound).toHaveLength(4);
+    expect(bound[0]).not.toBeNull();
+    expect(bound[1]).not.toBeNull();
+    expect(bound[2]).toBeNull();
+    expect(bound[3]).toBeNull();
   });
 
   it("draws a material whose texture the application disposed with no map at all", async () => {
