@@ -32,7 +32,7 @@ import {
   createSnapshotSystem,
   type Node,
 } from "@four/scene";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BodyType, PhysicsWorldInit } from "../src/index.js";
 import {
@@ -152,6 +152,19 @@ function expectBitIdentical(actual: number[], expected: number[]): void {
 function spyOnWarn() {
   return vi.spyOn(console, "warn").mockImplementation(() => undefined);
 }
+
+/**
+ * vitest 4 reuses an unrestored `spyOn(console, "warn")` and keeps its call
+ * history. This file's later tests count warns and used to inherit the §19
+ * zero-weight warning and a leftover §42 authority warning from earlier tests
+ * in the same file — they passed alone and failed with the file. Restore the
+ * spy so a new `spyOnWarn()` starts at zero. Worlds created here are not
+ * stepped again after their test returns; the extra calls were spy history,
+ * not leftover writers.
+ */
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("the §19 trio is opt-in and named (§19, §42, §6a)", () => {
   it("blends a node that has authority, a registered body, and a target", async () => {
@@ -524,6 +537,15 @@ describe("authority interactions in the publish pass (§42)", () => {
 
     world.step(DT);
     expect(node.transform.position.x).toBe(-3);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("does not inherit console.warn spy history from earlier tests in this file", () => {
+    // Isolation regression: earlier tests in this file record a §19
+    // zero-weight warning and a §42 authority warning. Without the
+    // afterEach restore, vitest 4's reused spy still holds those calls
+    // and this assertion fails even though this test emits nothing.
+    const warn = spyOnWarn();
     expect(warn).not.toHaveBeenCalled();
   });
 });
