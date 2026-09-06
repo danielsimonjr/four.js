@@ -49,7 +49,8 @@
  *
  * The §58 **paint-object tier** joined on 2026-08-29 (R-16's recorded
  * follow-up, unblocked by RFC 0001): {@link LinearGradientPaint},
- * {@link RadialGradientPaint} and {@link PatternPaint} — the latter covering
+ * {@link RadialGradientPaint}, {@link ConicGradientPaint} (unlocked once
+ * §60's `angle` operator landed) and {@link PatternPaint} — the latter covering
  * §58's "image pattern" *and* "render-target texture" rows, because a
  * `RenderTarget.colorTexture` is a `MaterialTexture` — are accepted by
  * {@link ShapeFill} and {@link StrokeStyle} and lowered to a §60 `NodeMaterial`
@@ -59,9 +60,7 @@
  * `registerNodeMaterialPipeline()` links the emitter that draws it.
  *
  * What §58 still asks for and this does not answer, each with a named owner:
- * the **conic** gradient (refused by the lowering — §60's closed operator set
- * has no angle operator; RFC 0001's recorded one-row amendment), the
- * "procedural shader" row as a paint *object* (a procedural paint **is** a
+ * the "procedural shader" row as a paint *object* (a procedural paint **is** a
  * `NodeMaterial`, authored directly — see {@link Paint}), and §52's
  * anti-alias fringe, which needs a coverage attribute no §57 pipeline reads.
  *
@@ -376,6 +375,48 @@ export interface RadialGradientPaint {
 }
 
 /**
+ * A §58 **conic gradient**: colour as a function of the polar angle around
+ * `center`, both in the shape's local space (see {@link LinearGradientPaint}
+ * for the space and the stop rules).
+ *
+ * Offset 0 sits on the ray from `center` at `startAngle` from +X; offsets
+ * increase **counter-clockwise** — right-handed Y-up (§7a), which is
+ * `atan2(y, x)` of the local offset, the same number §60's `angle` operator
+ * returns. The parameter wraps: past the last stop the ramp continues from
+ * the first, via `fract`. A zero-length offset (the exact centre) reads
+ * angle 0 in the JS meaning tests; a GPU may pick any direction for
+ * `atan2(0, 0)`.
+ *
+ * ```ts
+ * const wheel: ConicGradientPaint = {
+ *   kind: "conic-gradient",
+ *   center: { x: 0, y: 0 },
+ *   startAngle: 0,
+ *   stops: [
+ *     { offset: 0, color: [1, 0, 0, 1] },
+ *     { offset: 1, color: [0, 0, 1, 1] },
+ *   ],
+ * };
+ * ```
+ */
+export interface ConicGradientPaint {
+  /** Discriminant (§58 "conic gradient"). */
+  readonly kind: "conic-gradient";
+  /** The gradient's centre, in local space; finite (§85). */
+  readonly center: Point2D;
+  /**
+   * Angle, in radians (§7a), at which offset 0 is read — measured from +X,
+   * increasing counter-clockwise. Finite (§85); defaults to `0`. Values
+   * outside `[0, 2π)` wrap with the parameter, they are not refused.
+   */
+  readonly startAngle?: number;
+  /** At least two sorted stops (§85) — see {@link GradientStop}. */
+  readonly stops: readonly GradientStop[];
+  /** See {@link SolidPaint.opacity}; multiplies every stop's alpha. */
+  readonly opacity?: number;
+}
+
+/**
  * A §58 **pattern**: a texture sampled over the shape's own uv — the
  * `[0, 1]²` parameterization of its bounding box that every shape geometry
  * already carries — covering *two* of §58's rows at once, because the texture
@@ -417,22 +458,21 @@ export interface PatternPaint {
  * {@link Paint}.
  */
 export type ObjectPaint =
-  LinearGradientPaint | RadialGradientPaint | PatternPaint;
+  | LinearGradientPaint
+  | RadialGradientPaint
+  | ConicGradientPaint
+  | PatternPaint;
 
 /**
  * What a shape's fill or stroke is painted with (§58).
  *
- * §58 lists seven kinds of paint. Four are members here — solid colour,
- * linear and radial gradients, and patterns, the last covering both of §58's
- * texture rows ({@link PatternPaint}) — and each member carries a
+ * §58 lists seven kinds of paint. Five are members here — solid colour,
+ * linear, radial and conic gradients, and patterns, the last covering both of
+ * §58's texture rows ({@link PatternPaint}) — and each member carries a
  * discriminant so widening stays additive and typechecked (`R-6`'s
  * `ScreenEffect` staging mechanism, kept from R-16's one-member era). The
- * remaining §58 rows, honestly:
+ * remaining §58 row, honestly:
  *
- * - **conic gradient** — *refused*, §85-precisely: a conic gradient is an
- *   angle, and §60's closed operator set has no angle operator (`atan`).
- *   RFC 0001 records the one-row closed-union amendment that unlocks it; the
- *   refusal names it so the day a consumer wants conics the trail is short.
  * - **procedural shader** — *is not a paint object and does not need to be*:
  *   a procedural paint is a §60 `NodeMaterial`, authored directly and worn as
  *   the shape's material. Wrapping a shader graph in a `Paint` would add a
@@ -522,6 +562,20 @@ export interface ResolvedRadialGradientPaint {
   /** See {@link RadialGradientPaint.stops}; validated copies. */
   readonly stops: readonly ResolvedGradientStop[];
   /** See {@link RadialGradientPaint.opacity}; `1` when none was authored. */
+  readonly opacity: number;
+}
+
+/** {@link ConicGradientPaint} resolved — see {@link ResolvedSolidPaint}. */
+export interface ResolvedConicGradientPaint {
+  /** See {@link ConicGradientPaint.kind}. */
+  readonly kind: "conic-gradient";
+  /** See {@link ConicGradientPaint.center}; a copy. */
+  readonly center: Point2D;
+  /** See {@link ConicGradientPaint.startAngle}; `0` when none was authored. */
+  readonly startAngle: number;
+  /** See {@link ConicGradientPaint.stops}; validated copies. */
+  readonly stops: readonly ResolvedGradientStop[];
+  /** See {@link ConicGradientPaint.opacity}; `1` when none was authored. */
   readonly opacity: number;
 }
 
@@ -702,7 +756,7 @@ export interface ShapePaintPlan {
 export interface ShapePaintSupport {
   /**
    * Validates and resolves one non-solid §58 paint (§85: refuse, never
-   * clamp; a conic gradient is refused naming §60's missing angle operator).
+   * clamp).
    * `name` prefixes every refusal, exactly as the solid tier's do.
    */
   resolvePaint(name: string, paint: Paint): ResolvedObjectPaint;

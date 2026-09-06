@@ -1,4 +1,4 @@
-import { Matrix4, Vector3 } from "@four/math";
+import { Matrix4, Vector3, srgbToLinear } from "@four/math";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -47,6 +47,30 @@ describe("DirectionalLight (§68)", () => {
 
     source[0] = 1;
     expect(light.color[0]).toBe(0.25);
+  });
+
+  it("accepts a CSS hex string and stores linear RGB (§60a)", () => {
+    const light = new DirectionalLight({ color: "#ff0000" });
+    expect(light.color).toEqual([1, 0, 0]);
+  });
+
+  it("accepts rgb() and decodes sRGB to linear-light", () => {
+    const light = new DirectionalLight({ color: "rgb(0,128,255)" });
+    expect(light.color[0]).toBe(0);
+    expect(light.color[1]).toBeCloseTo(srgbToLinear(128 / 255), 12);
+    expect(light.color[2]).toBe(1);
+  });
+
+  it("still accepts a numeric linear RGB tuple", () => {
+    expect(new DirectionalLight({ color: [0.2, 0.4, 0.6] }).color).toEqual([
+      0.2, 0.4, 0.6,
+    ]);
+  });
+
+  it("rejects a CSS string this tier does not parse", () => {
+    expect(() => new DirectionalLight({ color: "hsl(0 0% 0%)" })).toThrow(
+      TypeError,
+    );
   });
 
   it("rejects non-finite parameters (§85)", () => {
@@ -178,6 +202,14 @@ describe("PointLight (§68, R-17)", () => {
     expect(light.color[0]).toBe(0.25);
   });
 
+  it("accepts #ff0000 and rgb(0,128,255) as CSS colours (§60a)", () => {
+    expect(new PointLight({ color: "#ff0000" }).color).toEqual([1, 0, 0]);
+    const cool = new PointLight({ color: "rgb(0,128,255)" });
+    expect(cool.color[0]).toBe(0);
+    expect(cool.color[1]).toBeCloseTo(srgbToLinear(128 / 255), 12);
+    expect(cool.color[2]).toBe(1);
+  });
+
   it("rejects non-finite parameters (§85)", () => {
     expect(() => new PointLight({ color: [Number.NaN, 0, 0] })).toThrow(
       RangeError,
@@ -270,6 +302,13 @@ describe("SpotLight (§68, R-17)", () => {
     expect(light.intensity).toBe(8);
     expect(light.range).toBe(20);
     expect(light.getWorldPosition(new Vector3()).x).toBe(0);
+  });
+
+  it("accepts a CSS colour string the same way a point light does", () => {
+    expect(new SpotLight({ color: "#ff0000" }).color).toEqual([1, 0, 0]);
+    expect(new SpotLight({ color: [0.1, 0.2, 0.3] }).color).toEqual([
+      0.1, 0.2, 0.3,
+    ]);
   });
 
   it("rejects non-finite cone angles (§85)", () => {

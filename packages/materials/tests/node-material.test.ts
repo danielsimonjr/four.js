@@ -191,11 +191,12 @@ describe("ShaderGraphBuilder", () => {
       .saturate();
     const scalar = chained.length().step(builder.constant(0.5));
     const dotted = builder.constant([1, 0]).dot([0, 1]);
+    const heading = builder.angle([1, 0]);
     builder.output.color = builder.vec4(
       scalar,
       dotted,
       builder.mix(0, 1, 0.5),
-      builder.cos(0),
+      heading.add(builder.cos(0)),
     );
     const graph = builder.graph();
     expect(graph.color).toBe(graph.nodes.length - 1);

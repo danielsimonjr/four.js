@@ -403,7 +403,11 @@ function nodeExpression(
       // `saturate` is WGSL's own builtin — defined as the very
       // `clamp(x, 0, 1)` the GLSL emitter spells out — and the remaining ops
       // (`sin`, `cos`, `abs`, `floor`, `fract`, `normalize`, `length`) keep
-      // their names.
+      // their names. `"angle"` is RFC 0001's closed-union amendment: WGSL's
+      // `atan2(y, x)`, matching the GLSL emitter's `atan(y, x)`.
+      if (node.op === "angle") {
+        return `atan2(${source}.y, ${source}.x)`;
+      }
       return `${node.op}(${source})`;
     }
     case "binary": {

@@ -74,7 +74,13 @@ export type ShaderDomain = "surface" | "screen";
  */
 export type ShaderAttributeName = "position" | "normal" | "uv" | "color";
 
-/** The unary operators (§60), closed — see the module header. */
+/**
+ * The unary operators (§60), closed — see the module header.
+ *
+ * `"angle"` is RFC 0001's one-row closed-union amendment: `atan2(y, x)` of a
+ * `vec2`, in radians (right-handed, §7a), so a §58 conic gradient can be
+ * expressed without opening the operator set any further.
+ */
 export type ShaderUnaryOp =
   | "sin"
   | "cos"
@@ -84,7 +90,8 @@ export type ShaderUnaryOp =
   | "normalize"
   | "negate"
   | "saturate"
-  | "length";
+  | "length"
+  | "angle";
 
 /**
  * The binary operators (§60), closed. `"step"`'s left operand is the edge and
@@ -409,6 +416,12 @@ function unaryResultType(
       return "float";
     }
     refuse(index, `length needs a vector; got ${source}`);
+  }
+  if (op === "angle") {
+    if (source === "vec2") {
+      return "float";
+    }
+    refuse(index, `angle needs a vec2; got ${source}`);
   }
   if (isScalarOrVector(source)) {
     return source;

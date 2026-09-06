@@ -37,6 +37,11 @@
  *   stop ramp below.
  * - A **radial gradient** computes `t = |p − center| / radius`, then the
  *   ramp.
+ * - A **conic gradient** computes
+ *   `t = fract((angle(p − center) − startAngle) / 2π)` — polar angle of the
+ *   local offset, RFC 0001's `angle` operator — then the same ramp. Offset 0
+ *   sits on the `startAngle` ray from +X; the parameter increases
+ *   counter-clockwise and wraps.
  * - The **stop ramp** is the exact per-fragment form
  *   `c(t) = c₀ + Σᵢ (cᵢ − cᵢ₋₁) · saturate((t − pᵢ₋₁) / (pᵢ − pᵢ₋₁))`,
  *   with a zero-width segment (a hard edge) contributing through
@@ -52,11 +57,10 @@
  *   the geometry bakes (`0` fill, `1` stroke — exact at both ends), and
  *   {@link ShapePaintPlan.selector} tells the shape to bake it.
  *
- * A **conic** gradient is refused here, §85-precisely: it is an angle, and
- * §60's closed operator set has no `atan` — RFC 0001 records the one-row
- * closed-union amendment (an angle operator) that unlocks it. The refusal is
- * a *validation* answer, not a driver's discretion, exactly like the
- * texture-in-vertex-stage rule.
+ * A **conic** gradient is the same lowering as the others once §60 carries
+ * `"angle"` (RFC 0001's one-row closed-union amendment). It stays behind
+ * `registerShapePaints()`, so a bundle that never opts in still emits the
+ * pictures it always did.
  *
  * ## Determinism (§33) and sharing
  *
@@ -94,10 +98,12 @@ import type { Point2D } from "@four/geometry";
 import {
   setShapePaintSupport,
   type GradientStop,
+  type ConicGradientPaint,
   type LinearGradientPaint,
   type Paint,
   type PatternPaint,
   type RadialGradientPaint,
+  type ResolvedConicGradientPaint,
   type ResolvedGradientStop,
   type ResolvedLinearGradientPaint,
   type ResolvedObjectPaint,
@@ -108,6 +114,13 @@ import {
   type ResolvedStrokeStyle,
   type ShapePaintPlan,
 } from "./shape.js";
+
+/**
+ * Paints the lowering actually evaluates. Conic is authored and stored, but
+ * kept off {@link ResolvedObjectPaint} so `@four/four`'s existing paint
+ * switch stays total without a serializer edit in this packet.
+ */
+type LoweredPaint = ResolvedPaint | ResolvedConicGradientPaint;
 
 /** §85's refusal, uniformly cited — the solid tier's spelling, kept. */
 function refuse(detail: string): never {
@@ -237,6 +250,20 @@ function resolveRadialGradient(
   };
 }
 
+/** Validates a {@link ConicGradientPaint} (§85), copying every field. */
+function resolveConicGradient(
+  name: string,
+  paint: ConicGradientPaint,
+): ResolvedConicGradientPaint {
+  return {
+    kind: "conic-gradient",
+    center: requirePoint(`${name}.center`, paint.center),
+    startAngle: requireFinite(`${name}.startAngle`, paint.startAngle ?? 0),
+    stops: requireStops(name, paint.stops),
+    opacity: requireOpacity(name, paint.opacity),
+  };
+}
+
 /** Validates a {@link PatternPaint} (§85). The texture is held by reference. */
 function resolvePattern(
   name: string,
@@ -283,23 +310,18 @@ function resolvePaint(name: string, paint: Paint): ResolvedObjectPaint {
       return resolveLinearGradient(name, paint);
     case "radial-gradient":
       return resolveRadialGradient(name, paint);
+    case "conic-gradient":
+      // Stored on the shape; the serializer packet that names conic widens
+      // {@link ResolvedObjectPaint}. Until then the cast is this module's.
+      return resolveConicGradient(name, paint) as unknown as ResolvedObjectPaint;
     case "pattern":
       return resolvePattern(name, paint);
     default: {
       const kind = (paint as { kind: unknown }).kind;
-      if (kind === "conic-gradient") {
-        // §85-precise, on purpose: the refusal names the exact gap so the
-        // day a consumer wants conics the trail is one grep long.
-        refuse(
-          `${name}: a §58 conic gradient is an angle, and §60's closed ` +
-            "operator set has no angle operator (atan) — RFC 0001's " +
-            "recorded one-row closed-union amendment is what unlocks it",
-        );
-      }
       refuse(
         `${name} must be a §58 paint; got kind ${JSON.stringify(kind)} — ` +
-          'this tier draws "solid", "linear-gradient", "radial-gradient" ' +
-          'and "pattern"',
+          'this tier draws "solid", "linear-gradient", "radial-gradient", ' +
+          '"conic-gradient" and "pattern"',
       );
     }
   }
@@ -348,7 +370,7 @@ function colorKey(color: ColorRGBA): string {
  * their transform: two texture objects are two paints even if their pixels
  * agree, which is the honest answer available without reading pixels.
  */
-function paintKey(paint: ResolvedPaint): string {
+function paintKey(paint: LoweredPaint): string {
   switch (paint.kind) {
     case "solid":
       return `s:${colorKey(paint.color)}:${String(paint.opacity)}`;
@@ -362,6 +384,12 @@ function paintKey(paint: ResolvedPaint): string {
       return (
         `r:${String(paint.center.x)},${String(paint.center.y)}:` +
         `${String(paint.radius)}:${stopsKey(paint.stops)}` +
+        `:${String(paint.opacity)}`
+      );
+    case "conic-gradient":
+      return (
+        `c:${String(paint.center.x)},${String(paint.center.y)}:` +
+        `${String(paint.startAngle)}:${stopsKey(paint.stops)}` +
         `:${String(paint.opacity)}`
       );
     default:
@@ -393,7 +421,7 @@ function drawnColor(color: ColorRGBA, opacity: number): ColorRGBA {
  * authored translucency, where classifying it transparent only re-sorts a
  * fully opaque one (§66) without changing its pixels.
  */
-function isTranslucent(paint: ResolvedPaint | undefined): boolean {
+function isTranslucent(paint: LoweredPaint | undefined): boolean {
   if (paint === undefined) {
     return false;
   }
@@ -451,7 +479,7 @@ function stopRamp(
  */
 function evaluatePaint(
   builder: NodeMaterialBuilder,
-  paint: ResolvedPaint,
+  paint: LoweredPaint,
 ): ShaderExpression {
   switch (paint.kind) {
     case "solid":
@@ -477,6 +505,19 @@ function evaluatePaint(
         .subtract([paint.center.x, paint.center.y])
         .length()
         .multiply(1 / paint.radius);
+      return stopRamp(builder, t, paint.stops, paint.opacity);
+    }
+    case "conic-gradient": {
+      // t = fract((angle(p − center) − startAngle) / 2π) — wraps, so a
+      // stop at 0 and a stop at 1 meet on the start-angle ray.
+      const t = builder
+        .attribute("position")
+        .swizzle("xy")
+        .subtract([paint.center.x, paint.center.y])
+        .angle()
+        .subtract(paint.startAngle)
+        .multiply(1 / (Math.PI * 2))
+        .fract();
       return stopRamp(builder, t, paint.stops, paint.opacity);
     }
     default: {
@@ -537,10 +578,10 @@ function plan(
 
 /**
  * Installs the §58 paint-object tier: after this call, `Shape2D` accepts
- * {@link LinearGradientPaint}, {@link RadialGradientPaint} and
- * {@link PatternPaint} in `fill`/`stroke` on shapes constructed without a
- * `material`, and the §79 shape readers restore the same forms from
- * documents. Idempotent; call it once at startup, beside the
+ * {@link LinearGradientPaint}, {@link RadialGradientPaint},
+ * {@link ConicGradientPaint} and {@link PatternPaint} in `fill`/`stroke` on
+ * shapes constructed without a `material`, and the §79 shape readers restore
+ * the same forms from documents. Idempotent; call it once at startup, beside the
  * `registerNodeMaterialPipeline()` call that lets the backend *draw* what
  * this lets the author *say*.
  *

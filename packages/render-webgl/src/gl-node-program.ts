@@ -222,6 +222,10 @@ function nodeExpression(
       if (node.op === "saturate") {
         return `clamp(${source}, 0.0, 1.0)`;
       }
+      if (node.op === "angle") {
+        // GLSL ES 3.00 two-argument `atan(y, x)` is atan2; there is no `angle`.
+        return `atan(${source}.y, ${source}.x)`;
+      }
       return `${node.op}(${source})`;
     }
     case "binary": {
