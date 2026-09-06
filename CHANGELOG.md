@@ -8,6 +8,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Size budgets: R-36 headroom restore
+
+- **`.size-limit.json`.** first-3d-scene 38 → 38.5 kB, particles-demo 36.5 → 37
+  kB, ui-demo 45 → 45.5 kB (measured A/B: 38.18/36.77/45.27 kB gzip; closes the
+  R-36 thin-budget TODO — the original 32/37.5/29.5 kB proposal was absorbed
+  through intermediate bumps).
+
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
 - **Unlit draw order.** Texture bind and `setFeatures` run before

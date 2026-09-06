@@ -46,7 +46,7 @@ Each has its cause written down. The thinking is done; what remains is the chang
 
 Bounded work with a clear shape, but more than a single edit.
 
-- The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
+- The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22; animation.spec shared sweep).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
 - Size budgets are thin after R-36 (measured A/B, 2026-08-09)
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
@@ -94,7 +94,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §44/§47 camera rigs residue
 - R-23 follow-ups (solid-fill tier shipped 2026-08-09):
 - R-26 follow-ups (path-data tier shipped 2026-08-09):
-- Auto-selection follow-ups:
+- Auto-selection follow-ups: **CLOSED 2026-09-06** — ui-demo budget reviewed
+  (45 kB limit); real WebGPU rung in `backend-selection.test.ts`.
 - PH-9 follow-ups (staged 2026-08-07):
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
@@ -325,26 +326,15 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       full suite stays green at 476/476, and the flight-sim page now survives frame 1
       with the workaround removed.
 
-- [ ] **The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is
-      green (103/103).** Measured 2026-09-06 on an otherwise idle machine. Not a library
-      defect and not a CI coverage hole; both were checked before writing this down.
-      Two separate causes:
-      - **All 22 `webgpu` specs skip.** They self-skip when `requestAdapter()` is `null`.
-        **CORRECTED 2026-09-06 — the first diagnosis below was WRONG.** I wrote that
-        `chrome-headless-shell` lacked `dxcompiler.dll` and that this denied Dawn an adapter.
-        Measured across both binaries and four flag sets, that is false: the FULL chromium
-        build ships `dxcompiler.dll` and still returns a null adapter under the config's
-        flags. The binary was never the variable — **`--use-angle=swiftshader` is.** Drop
-        it and an adapter appears on both binaries. Not a hardware absence either: Chrome
-        reports an NVIDIA/Pascal adapter with 19 features, and four's own `WebgpuRenderer`
-        renders through it. On Linux the shell reaches SwiftShader's Vulkan, which is why
-        CI runs all 22.
-      - **17 chromium/visual specs exceed their timeouts.** The cost is screenshot-bound,
-        not logic-bound: `animation.spec`'s `sweep()` takes `SAMPLE_COUNT` (22) canvas
-        screenshots with only 6.6 s of deliberate waiting, so ~50 s of each 60 s test is
-        SwiftShader readback. The one test that passed took **55.9 s of its 60 s budget** —
-        there is no margin on this platform. Confirmed with the machine fully idle; an
-        earlier reading was confounded twice by my own animating pages.
+- [x] **The browser gate on Windows — WebGPU fixed; chromium/visual timeout risk
+      closed.** DONE 2026-09-06.
+      - **WebGPU (on `main`).** Platform-conditional
+        `--use-webgpu-adapter=swiftshader`; **22 passed, 0 skipped**.
+      - **Chromium/visual (`ffed71a`).** Four `animation.spec` cases each ran an
+        independent 22-screenshot SwiftShader sweep (~56 s of a 60 s budget on
+        Windows). They now share one 16-sample `beforeAll` sweep (serial describe),
+        skip the trailing wait, and space samples at 0.4 s — same 6 s minimum span,
+        ~4× less readback work per file.
 - [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
       2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
       headless-shell-win64 layout are in the candidate list. Only matters when
@@ -1022,24 +1012,28 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `LookAtConstraint` for the node's one §42 authority; the packet has to decide the
       aim-vs-free-look arbitration, and a character controller wants the same yaw
       source. Effort M.
-- [ ] **Staged rigs (R-36/R-37 residue, 2026-08-09):** trackball belongs to the
-      `ScreenCamera` packet (defined over a viewport in screen space; `motion` has no
-      `input`/`render` edge); fly is a two-line application snippet once deltas are fed
-      in and needs no class; shake/impulse is a `CameraShake` additive offset over
-      `SeededRandom`, blocked only on choosing an interpolated value-noise function —
-      per-step white noise is a jitter whose character changes with the fixed rate
-      (§33).
+- [x] **Staged rigs — trackball and fly DONE 2026-09-06.** `TrackballRig` verified
+      in `@four/scene` (`packages/scene/src/trackball.ts`,
+      `packages/scene/tests/trackball.test.ts`, R-37 2026-08-21). Fly documented as
+      a working application snippet in
+      `docs/guides/cameras-and-coordinate-conversion.md` (no class — reuses
+      `OrbitRig.orbit()` for yaw/pitch state).
+- [ ] **Staged rigs — shake/impulse (R-36/R-37 residue):** `CameraShake` additive
+      offset over `SeededRandom`, blocked only on choosing an interpolated
+      value-noise function — per-step white noise is a jitter whose character
+      changes with the fixed rate (§33).
 - [x] **Nothing exercises a rig against a live solver — DONE 2026-08-30.**
       `tests/integration/camera-rigs.test.ts` now chases a Rapier 3D dynamic
       body with `FollowRig` + `LookAtConstraint`; priority 600 then 700 is
       the observable, not an argument.
-- [ ] **§44/§47 camera rigs residue** — shipped: orbit, follow, spring arm,
-      look-at, path-composed aim, physics attachment, first-person look
-      (`OrbitRig`, `FollowRig` + `SpringDamper`, `LookAtConstraint` +
-      `ConstraintSystem` at 700, Rapier chase in `camera-rigs.test.ts`,
-      `FirstPersonLook` + `CharacterController`). Remaining: trackball
-      (`ScreenCamera` packet), fly (application snippet), shake/impulse
-      (staged under "Staged rigs" above).
+- [x] **§44/§47 camera rigs residue — trackball and fly DONE 2026-09-06.**
+      Shipped: orbit, follow, spring arm, look-at, path-composed aim, physics
+      attachment, first-person look (`OrbitRig`, `FollowRig` + `SpringDamper`,
+      `LookAtConstraint` + `ConstraintSystem` at 700, Rapier chase in
+      `camera-rigs.test.ts`, `FirstPersonLook` + `CharacterController`),
+      `TrackballRig` (`@four/scene`, R-37), fly (guide snippet in
+      `docs/guides/cameras-and-coordinate-conversion.md`). Remaining:
+      shake/impulse (`CameraShake`, staged under "Staged rigs" above).
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
@@ -1101,10 +1095,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **A-8/R-2/PH-19 CLOSED 2026-08-07** (one design, three filings): renderer +
       solver registries with explicit registration; `renderer: "auto"` /
       `solver: "auto"`; instance-naming apps keep tree-shaking (grep-proven)
-- [ ] **Auto-selection follow-ups:** ui-demo is at 30.74/31 kB after this packet —
-      review the limit before the next ui-demo-touching packet; register a second
-      backend (R-1) so §62's ladder has a real WebGPU rung (upper rungs currently
-      exercised against doubles)
+- [x] **Auto-selection follow-ups CLOSED 2026-09-06:** ui-demo §86 budget is
+      **45 kB** in `.size-limit.json` (the 30.74/31 kB note was stale after
+      later bumps); `backend-selection.test.ts` now registers real
+      `registerWebgpuRenderer()` for §62's WebGPU rung (fallback + preference
+      over WebGL 2) — upper rungs no longer exercised only against doubles
 - [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
       of §18's nine features, typed predicates, own determinism golden, animation
       package still 100% coverage
@@ -1423,12 +1418,14 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       is the scoped fix; benchmark attribution in benchmarks/results/) —
       DONE 2026-09-06: `ForceField.sampleAll` + `ForceFieldSystem` uses it when present.
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
-      GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+      GPU compute (WebGPU tier), depth-buffer collision
+- [x] spatial-hash neighbors — DONE 2026-09-06 (`SpatialHash` in `@four/motion`, WP-8.2)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
-      steering.ts) — **interceptTime fold DONE 2026-09-06**; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      steering.ts) — **interceptTime fold DONE 2026-09-06**; ~~spatial-hash neighbors~~
+      **DONE 2026-09-06**; spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
       (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
