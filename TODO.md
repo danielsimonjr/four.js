@@ -6,6 +6,22 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **`bun run test` and `bun run coverage` are broken on Windows.**
+      `tools/run-in-packages.mjs:20` builds its root as
+      `new URL("..", import.meta.url).pathname`. On Windows that yields `/C:/Users/...`
+      — with a leading slash — and `join()` turns it into a path beginning `\C:`, so the
+      run dies before a single test executes:
+
+      ```text
+      ENOENT: no such file or directory, scandir '\C:\Users\danie\Github\four.js\packages'
+      ```
+
+      It is the **only** tool in `tools/` with this bug — `apply-publish-names`,
+      `check-docs`, `check-spec` and `generate-compatibility` all use `fileURLToPath`
+      already — so the fix is to adopt the idiom the rest of the directory already uses.
+      Invisible on CI, where `.pathname` needs no translation, which is how the repo's two
+      most important scripts can be dead on a platform while every gate stays green.
+
 - [x] **Make the WebGPU gate run on Windows: `--use-angle=swiftshader` is what blocks it.** DONE — 22 passed, 0 skipped.
       Measured 2026-09-06, both binaries x four flag sets, on a served origin:
 
@@ -150,7 +166,7 @@ changes in `CHANGELOG.md`.
       SAME solver be idempotent (or take an `{ override }` flag) instead of throwing? Filed, not
       changed — registry semantics are a §37 call.
 
-- [ ] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
+- [x] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.** DONE 2026-09-06 — DEV-gated `devWarnOnce`, not a throw.
       `Node` is `export abstract class Node`; `Group extends Node {}` is the concrete one, and the
       guides use `Group` correctly. But TypeScript's `abstract` is erased at compile time, so a
       JavaScript user who guesses `new Node()` gets a working-looking object with no signal — mine

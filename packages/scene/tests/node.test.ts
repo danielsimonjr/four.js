@@ -1,5 +1,5 @@
 import { Quaternion, Vector3 } from "@four/math";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   Group,
@@ -183,3 +183,33 @@ describe("Node transform aliases on subclasses", () => {
     }
   });
 });
+
+describe("constructing the abstract base", () => {
+  it("warns in DEV when Node is constructed directly, and names the concrete class", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      // TypeScript rejects `new Node()`. A JavaScript consumer is not stopped by
+      // anything -- `abstract` is erased -- and gets a working-looking object.
+      new (Node as unknown as new () => Node)();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const message = warn.mock.calls[0]?.join(" ") ?? "";
+      expect(message).toMatch(/Group/);
+      expect(message).toMatch(/abstract/i);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("does not warn for the concrete subclasses", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      new Group();
+      new Group();
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+

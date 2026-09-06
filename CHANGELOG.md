@@ -8,6 +8,28 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — `new Node()` now says something in development builds
+
+- **`Node` is `abstract`, but `abstract` is erased at compile time**, so it protected
+  TypeScript callers and nobody else. A JavaScript consumer who guessed `new Node()` got
+  an object that looked like it worked — id, transform, children, event emitter — and was
+  missing everything that makes a node do anything. Found by dogfooding: a bouncing ball
+  simulated for a full run before a typecheck revealed the base class was wrong.
+
+  It now emits a `devWarnOnce` naming the concrete class to use (`Group` for a plain
+  container, or `Renderable` / `Scene` / a camera / a light).
+
+  **Warned, not thrown**, deliberately: throwing would break callers whose code runs
+  today, and §42 already sets warn-rather-than-overwrite as this library's answer to an
+  authoring mistake. `devWarnOnce` rather than `devWarn` because this is one wrong line
+  executed many times — the opposite of §6a's duplicate-component case, where every call
+  is a distinct mistake.
+
+  **Free in a shipped build.** Under §85's build mode `DEV` is a literal `false`, so the
+  branch and its message text are deleted by the tree-shaker (A-4). `DEV` defaults to
+  `true` for anyone who has not configured `__FOUR_DEV__` — precisely the audience that
+  reaches for `new Node()`. In development the cost is one reference comparison per node.
+
 ### 2026-09-06 — `KeyboardInput` now refuses a malformed options object clearly
 
 - **`new KeyboardInput({ surface: window })` threw `TypeError: Cannot read properties of
