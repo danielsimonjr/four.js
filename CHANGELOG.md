@@ -8,6 +8,22 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — Spatial-hash neighbour queries (`@four/motion`, WP-8.2)
+
+- **`SpatialHash`.** Uniform-grid radius queries with explicit
+  `insert`/`update`/`remove`, insertion-order results (§33), and
+  `query` / `queryKeys` out-params. Flocking behaviours still take an
+  `Iterable<SteeringNeighbor>` — build that iterable from the hash each
+  frame. `@four/particles` adoption deferred (no motion dependency today).
+
+### 2026-09-06 — Auto-selection follow-ups (A-8/R-2 residue)
+
+- **`backend-selection.test.ts`.** The §62 fallback and preference tests now
+  register real `registerWebgpuRenderer()` instead of a WebGPU double — the
+  WebGPU rung of `"auto"` is exercised end-to-end through `Application`.
+  ui-demo's §86 budget note in TODO was stale (limit is 45 kB in
+  `.size-limit.json`).
+
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
 - **Unlit draw order.** Texture bind and `setFeatures` run before

@@ -77,11 +77,10 @@
  * (§33: insertion order, so results are reproducible), and the three behaviours
  * are `O(neighbours)` each, `O(n²)` for a self-flocking group of `n`.
  *
- * **Staged (2026-08-02, WP-8.2):** a spatial hash / uniform grid neighbour
- * index. A flock of a few hundred is comfortably brute-forceable at 60 Hz, the
- * index is a data-structure concern rather than a steering one, and shipping it
- * here would freeze a cell-size and rebuild policy before there is a §112
- * particle workload to size them against.
+ * **Spatial hash (2026-09-06, WP-8.2):** {@link SpatialHash} in
+ * `./spatial-hash.js` is the optional uniform-grid neighbour index. Flocking
+ * behaviours still take an `Iterable<SteeringNeighbor>` — build that iterable
+ * with `hash.query(...)` each frame (or keep brute force for small `n`).
  *
  * ## What is *not* here
  *

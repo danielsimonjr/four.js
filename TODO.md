@@ -67,7 +67,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; **spatial-hash neighbors DONE 2026-09-06** (`@four/motion` `SpatialHash`); spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -94,7 +94,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §44/§47 camera rigs residue
 - R-23 follow-ups (solid-fill tier shipped 2026-08-09):
 - R-26 follow-ups (path-data tier shipped 2026-08-09):
-- Auto-selection follow-ups:
+- Auto-selection follow-ups: **CLOSED 2026-09-06** — ui-demo budget reviewed
+  (45 kB limit); real WebGPU rung in `backend-selection.test.ts`.
 - PH-9 follow-ups (staged 2026-08-07):
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
@@ -110,7 +111,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-19/R-20 follow-ups:
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 PARTIAL
-- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors (utility ships in `@four/motion`; `@four/particles` adoption deferred — no motion dependency today)
 - §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
 
 ## Now
@@ -1022,24 +1023,28 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `LookAtConstraint` for the node's one §42 authority; the packet has to decide the
       aim-vs-free-look arbitration, and a character controller wants the same yaw
       source. Effort M.
-- [ ] **Staged rigs (R-36/R-37 residue, 2026-08-09):** trackball belongs to the
-      `ScreenCamera` packet (defined over a viewport in screen space; `motion` has no
-      `input`/`render` edge); fly is a two-line application snippet once deltas are fed
-      in and needs no class; shake/impulse is a `CameraShake` additive offset over
-      `SeededRandom`, blocked only on choosing an interpolated value-noise function —
-      per-step white noise is a jitter whose character changes with the fixed rate
-      (§33).
+- [x] **Staged rigs — trackball and fly DONE 2026-09-06.** `TrackballRig` verified
+      in `@four/scene` (`packages/scene/src/trackball.ts`,
+      `packages/scene/tests/trackball.test.ts`, R-37 2026-08-21). Fly documented as
+      a working application snippet in
+      `docs/guides/cameras-and-coordinate-conversion.md` (no class — reuses
+      `OrbitRig.orbit()` for yaw/pitch state).
+- [ ] **Staged rigs — shake/impulse (R-36/R-37 residue):** `CameraShake` additive
+      offset over `SeededRandom`, blocked only on choosing an interpolated
+      value-noise function — per-step white noise is a jitter whose character
+      changes with the fixed rate (§33).
 - [x] **Nothing exercises a rig against a live solver — DONE 2026-08-30.**
       `tests/integration/camera-rigs.test.ts` now chases a Rapier 3D dynamic
       body with `FollowRig` + `LookAtConstraint`; priority 600 then 700 is
       the observable, not an argument.
-- [ ] **§44/§47 camera rigs residue** — shipped: orbit, follow, spring arm,
-      look-at, path-composed aim, physics attachment, first-person look
-      (`OrbitRig`, `FollowRig` + `SpringDamper`, `LookAtConstraint` +
-      `ConstraintSystem` at 700, Rapier chase in `camera-rigs.test.ts`,
-      `FirstPersonLook` + `CharacterController`). Remaining: trackball
-      (`ScreenCamera` packet), fly (application snippet), shake/impulse
-      (staged under "Staged rigs" above).
+- [x] **§44/§47 camera rigs residue — trackball and fly DONE 2026-09-06.**
+      Shipped: orbit, follow, spring arm, look-at, path-composed aim, physics
+      attachment, first-person look (`OrbitRig`, `FollowRig` + `SpringDamper`,
+      `LookAtConstraint` + `ConstraintSystem` at 700, Rapier chase in
+      `camera-rigs.test.ts`, `FirstPersonLook` + `CharacterController`),
+      `TrackballRig` (`@four/scene`, R-37), fly (guide snippet in
+      `docs/guides/cameras-and-coordinate-conversion.md`). Remaining:
+      shake/impulse (`CameraShake`, staged under "Staged rigs" above).
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
@@ -1101,10 +1106,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **A-8/R-2/PH-19 CLOSED 2026-08-07** (one design, three filings): renderer +
       solver registries with explicit registration; `renderer: "auto"` /
       `solver: "auto"`; instance-naming apps keep tree-shaking (grep-proven)
-- [ ] **Auto-selection follow-ups:** ui-demo is at 30.74/31 kB after this packet —
-      review the limit before the next ui-demo-touching packet; register a second
-      backend (R-1) so §62's ladder has a real WebGPU rung (upper rungs currently
-      exercised against doubles)
+- [x] **Auto-selection follow-ups CLOSED 2026-09-06:** ui-demo §86 budget is
+      **45 kB** in `.size-limit.json` (the 30.74/31 kB note was stale after
+      later bumps); `backend-selection.test.ts` now registers real
+      `registerWebgpuRenderer()` for §62's WebGPU rung (fallback + preference
+      over WebGL 2) — upper rungs no longer exercised only against doubles
 - [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
       of §18's nine features, typed predicates, own determinism golden, animation
       package still 100% coverage
@@ -1424,11 +1430,13 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       DONE 2026-09-06: `ForceField.sampleAll` + `ForceFieldSystem` uses it when present.
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
       GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+      (`@four/motion` utility DONE 2026-09-06; particle-pool wiring deferred)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
-      steering.ts) — **interceptTime fold DONE 2026-09-06**; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      steering.ts) — **interceptTime fold DONE 2026-09-06**; **spatial-hash
+      neighbors DONE 2026-09-06** (`SpatialHash` in `@four/motion`); spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
       (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
@@ -1500,6 +1508,11 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **Spatial-hash neighbour queries (WP-8.2).** `SpatialHash`
+      in `@four/motion`: uniform-grid radius queries, insertion-order
+      results (§33), steering integration tests. Particle-pool wiring
+      deferred.
 
 - [x] 2026-09-06 — **§83 duplicate asset loads.** `AssetManager.load` of a
       settled `(url, loader)` slot warns once; in-flight coalescing does
