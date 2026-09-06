@@ -5,7 +5,10 @@ import { resetDevWarnings } from "@four/core";
 import {
   beginFrameAllocationCheck,
   endFrameAllocationCheck,
+  warnDetachedNodeListeners,
   warnDisposedResourceInUse,
+  warnPerFrameAllocations,
+  warnStalePhysicsHandle,
 } from "../src/dev-warnings.js";
 
 afterEach(() => {
@@ -31,6 +34,35 @@ describe("dev-warnings", () => {
     count = 3;
     expect(endFrameAllocationCheck(baseline, read, { label: "test-span" })).toBe(3);
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("warnDetachedNodeListeners fires once when listeners remain", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(warnDetachedNodeListeners("node-a", 2)).toBe(true);
+    expect(warnDetachedNodeListeners("node-a", 2)).toBe(false);
+    expect(warnDetachedNodeListeners("node-a", 0)).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("warnStalePhysicsHandle deduplicates per handle", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(warnStalePhysicsHandle("body", "id-1")).toBe(true);
+    expect(warnStalePhysicsHandle("body", "id-1")).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("warnPerFrameAllocations stays quiet at or below the threshold", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(warnPerFrameAllocations(0)).toBe(false);
+    expect(warnPerFrameAllocations(1, "frame", 2)).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("endFrameAllocationCheck returns zero delta when nothing was allocated", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const read = (): number => 5;
+    expect(endFrameAllocationCheck(beginFrameAllocationCheck(read), read)).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("is inert in a production build", async () => {

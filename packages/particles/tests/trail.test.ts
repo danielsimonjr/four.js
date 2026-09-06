@@ -10,6 +10,7 @@ import {
   ParticleTrailStore,
   TRAIL_VERTEX_FLOATS,
   buildTrailRibbonMesh,
+  resolveTrailOptions,
 } from "../src/trail.js";
 import {
   evaluateLifetimeRampColor,
@@ -53,6 +54,81 @@ describe("evaluateLifetimeRampColor — multi-stop ramps", () => {
     const quarter = evaluateLifetimeRampColor(ramp, 0.25);
     expect(quarter.r).toBeCloseTo(0.5);
     expect(quarter.g).toBeCloseTo(0.5);
+  });
+
+  it("clamps normalized age below zero and above one", () => {
+    expect(evaluateLifetimeRampNumber({ start: 0, end: 10 }, -1)).toBe(0);
+    expect(evaluateLifetimeRampNumber({ start: 0, end: 10 }, 2)).toBe(10);
+  });
+
+  it("returns a t=0 interior stop verbatim at age zero", () => {
+    expect(
+      evaluateLifetimeRampNumber(
+        { start: 0, end: 1, stops: [{ t: 0, value: 0.25 }] },
+        0,
+      ),
+    ).toBe(0.25);
+    expect(
+      evaluateLifetimeRampColor(
+        {
+          start: { r: 0, g: 0, b: 0, a: 1 },
+          end: { r: 1, g: 1, b: 1, a: 1 },
+          stops: [{ t: 0, value: { r: 1, g: 0, b: 0, a: 0.5 } }],
+        },
+        0,
+      ),
+    ).toEqual({ r: 1, g: 0, b: 0, a: 0.5 });
+  });
+
+  it("interpolates through interior stops for scalar ramps", () => {
+    expect(
+      evaluateLifetimeRampNumber(
+        { start: 0, end: 1, stops: [{ t: 0.25, value: 0.75 }] },
+        0.125,
+      ),
+    ).toBeCloseTo(0.375);
+  });
+
+  it("handles duplicate stop times and the tail segment after the last stop", () => {
+    const duplicate = {
+      start: 0,
+      end: 1,
+      stops: [{ t: 0.5, value: 0.5 }, { t: 0.5, value: 0.75 }],
+    };
+    expect(evaluateLifetimeRampNumber(duplicate, 0.5)).toBe(0.5);
+
+    const tail = {
+      start: 0,
+      end: 1,
+      stops: [{ t: 0.5, value: 0.25 }],
+    };
+    expect(evaluateLifetimeRampNumber(tail, 0.75)).toBeCloseTo(0.625);
+  });
+
+  it("handles duplicate color stops and the tail segment", () => {
+    const duplicate = {
+      start: { r: 0, g: 0, b: 0, a: 1 },
+      end: { r: 1, g: 1, b: 1, a: 1 },
+      stops: [
+        { t: 0.5, value: { r: 1, g: 0, b: 0, a: 1 } },
+        { t: 0.5, value: { r: 0, g: 1, b: 0, a: 1 } },
+      ],
+    };
+    expect(evaluateLifetimeRampColor(duplicate, 0.5)).toEqual({
+      r: 1,
+      g: 0,
+      b: 0,
+      a: 1,
+    });
+
+    const tail = {
+      start: { r: 0, g: 0, b: 0, a: 1 },
+      end: { r: 1, g: 1, b: 1, a: 0 },
+      stops: [{ t: 0.5, value: { r: 0.5, g: 0.5, b: 0.5, a: 0.5 } }],
+    };
+    const late = evaluateLifetimeRampColor(tail, 0.75);
+    expect(late.r).toBeCloseTo(0.75);
+    expect(late.a).toBeCloseTo(0.25);
   });
 });
 
@@ -126,6 +202,107 @@ describe("buildTrailRibbonMesh", () => {
     expect(count).toBe(12);
     expect(out[0]).toBeDefined();
     expect(out.length).toBeGreaterThanOrEqual(count * TRAIL_VERTEX_FLOATS);
+  });
+
+  it("handles coincident samples and vertical-only motion", () => {
+    const store = new ParticleTrailStore(1, 6);
+    store.resetSlot(0);
+    store.pushSample(0, 0, 0, 0, 0);
+    store.pushSample(0, 0, 0, 0, 0);
+    store.pushSample(0, 0, 1, 0, 0);
+    store.pushSample(0, 0, 2, 0, 0);
+
+    const ages = new Float32Array([0.5]);
+    const lifetimes = new Float32Array([1]);
+    const sizes = new Float32Array([1, 0]);
+    const colors = new Float32Array([
+      1, 0, 0, 1, 0, 0, 1, 0,
+    ]);
+    const out = new Float32Array(6 * 4 * TRAIL_VERTEX_FLOATS);
+    const count = buildTrailRibbonMesh(
+      store,
+      1,
+      ages,
+      lifetimes,
+      sizes,
+      colors,
+      out,
+      0.2,
+      0,
+    );
+    expect(count).toBeGreaterThan(0);
+  });
+
+  it("clamps normalized age for non-positive lifetimes and out-of-range ages", () => {
+    const store = new ParticleTrailStore(1, 4);
+    store.resetSlot(0);
+    store.pushSample(0, 0, 0, 0, 0);
+    store.pushSample(0, 1, 0, 0, 0);
+
+    const ages = new Float32Array([-1]);
+    const lifetimes = new Float32Array([0]);
+    const sizes = new Float32Array([1, 2]);
+    const colors = new Float32Array([
+      1, 0, 0, 1, 0, 1, 0, 1,
+    ]);
+    const out = new Float32Array(6 * TRAIL_VERTEX_FLOATS);
+    expect(
+      buildTrailRibbonMesh(
+        store,
+        1,
+        ages,
+        lifetimes,
+        sizes,
+        colors,
+        out,
+        0.2,
+        0,
+      ),
+    ).toBeGreaterThan(0);
+
+    ages[0] = 2;
+    lifetimes[0] = 1;
+    expect(
+      buildTrailRibbonMesh(
+        store,
+        1,
+        ages,
+        lifetimes,
+        sizes,
+        colors,
+        out,
+        -1,
+        0.5,
+      ),
+    ).toBeGreaterThan(0);
+  });
+});
+
+describe("resolveTrailOptions", () => {
+  it("returns undefined when trails are disabled or omitted", () => {
+    expect(resolveTrailOptions(undefined)).toBeUndefined();
+    expect(resolveTrailOptions({ enabled: false, length: 4 })).toBeUndefined();
+  });
+
+  it("normalizes defaults for enabled trails", () => {
+    const resolved = resolveTrailOptions({ length: 4 });
+    expect(resolved).toBeDefined();
+    expect(resolved?.enabled).toBe(true);
+    expect(resolved?.length).toBe(4);
+    expect(typeof resolved?.width).toBe("number");
+    expect(typeof resolved?.minDistance).toBe("number");
+    expect(typeof resolved?.tailWidthFactor).toBe("number");
+  });
+
+  it("rejects invalid trail configuration", () => {
+    expect(() => resolveTrailOptions({ length: 1 })).toThrow(/length/);
+    expect(() => resolveTrailOptions({ length: 4, width: -1 })).toThrow(/width/);
+    expect(() =>
+      resolveTrailOptions({ length: 4, minDistance: Number.NaN }),
+    ).toThrow(/minDistance/);
+    expect(() =>
+      resolveTrailOptions({ length: 4, tailWidthFactor: 1.5 }),
+    ).toThrow(/tailWidthFactor/);
   });
 });
 

@@ -29,6 +29,9 @@ specification; until then, entries are grouped by date under **Unreleased**.
   solver live-instance counts.
 - **CPU particle trails.** Optional `trail` on `ParticleEmitter`; ribbon mesh
   in `@four/render` + WebGL trail pipeline; multi-stop lifetime ramps.
+- **CI.** Example typecheck fix (`#status` null guard); coverage tests for
+  diagnostics validation, particle trails/ramps, live resource counts, and
+  exported `ParticleTrailProgram` / `ParticleTrailBatchCache`.
 
 ### 2026-09-06 — Smoothness interpolation waiter
 

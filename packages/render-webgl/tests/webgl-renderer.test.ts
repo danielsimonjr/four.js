@@ -42,6 +42,7 @@ import { Matrix4, Quaternion, Rectangle2, Vector3 } from "@four/math";
 import {
   MAX_PUNCTUAL_LIGHTS,
   PARTICLE_INSTANCE_FLOATS,
+  TRAIL_VERTEX_FLOATS,
   RenderTarget,
   Renderable,
   Sprite,
@@ -80,6 +81,8 @@ import {
   POSITION_ATTRIBUTE_LOCATION,
   ParticleBatchCache,
   ParticleProgram,
+  ParticleTrailBatchCache,
+  ParticleTrailProgram,
   PunctualLightUniforms,
   RenderTargetCache,
   SHADOW_GLSL,
@@ -3895,6 +3898,19 @@ function particleItem(
     frustumCulled: false,
     // §66 key 4, unmeasured until a view sorts by it.
     viewDepth: 0,
+    trailVertexCount: 0,
+  };
+}
+
+function trailParticleItem(
+  trailVertices: Float32Array,
+  trailVertexCount: number,
+  id = "item-trail",
+): ParticleRenderItem {
+  return {
+    ...particleItem(new Float32Array(PARTICLE_INSTANCE_FLOATS), 0, id),
+    trailVertices,
+    trailVertexCount,
   };
 }
 
@@ -4227,6 +4243,105 @@ describe("ParticleBatchCache — one vertex array per system (§61, §64)", () =
     expect(cache.size).toBe(0);
     expect(gl.countOf("deleteVertexArray")).toBe(2);
     expect(gl.countOf("deleteBuffer")).toBe(2);
+  });
+});
+
+describe("ParticleTrailProgram — compilation and linking (§36 trail tier)", () => {
+  it("compiles, links, and resolves the three uniforms", () => {
+    const gl = createFakeGl();
+    const program = ParticleTrailProgram.create(gl);
+    expect(gl.countOf("linkProgram")).toBe(1);
+    expect(
+      gl.callsOf("getUniformLocation").map((call) => call.args[1]),
+    ).toEqual(["projection", "view", "model"]);
+    program.dispose();
+    expect(program.disposed).toBe(true);
+    expect(gl.countOf("deleteProgram")).toBe(1);
+  });
+});
+
+describe("ParticleTrailBatchCache — ribbon vertex cache (§36 trail tier)", () => {
+  it("builds position and colour attributes for trail vertices", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    const vertices = new Float32Array(TRAIL_VERTEX_FLOATS * 2);
+    const item = trailParticleItem(vertices, 2);
+
+    const record = cache.acquire(item);
+    expect(record).not.toBeNull();
+    expect(cache.size).toBe(1);
+    expect(gl.callsOf("vertexAttribPointer").map((call) => call.args)).toEqual([
+      [0, 3, GL.FLOAT, false, TRAIL_VERTEX_FLOATS * 4, 0],
+      [1, 4, GL.FLOAT, false, TRAIL_VERTEX_FLOATS * 4, 12],
+    ]);
+  });
+
+  it("returns null without trail vertices and rebuilds when capacity changes", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    expect(
+      cache.acquire(trailParticleItem(new Float32Array(0), 0)),
+    ).toBeNull();
+
+    const small = trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1);
+    const first = cache.acquire(small);
+    const grown = trailParticleItem(
+      new Float32Array(TRAIL_VERTEX_FLOATS * 3),
+      3,
+    );
+    const second = cache.acquire(grown);
+    expect(second).not.toBe(first);
+    expect(cache.size).toBe(1);
+  });
+
+  it("uploads the live trail prefix and disposes cleanly", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    const vertices = new Float32Array(TRAIL_VERTEX_FLOATS * 2);
+    const item = trailParticleItem(vertices, 2);
+    const record = cache.acquire(item);
+    expect(record).not.toBeNull();
+    gl.reset();
+    cache.upload(record!, item);
+    expect(gl.countOf("bufferSubData")).toBe(1);
+    cache.dispose();
+    expect(cache.disposed).toBe(true);
+    expect(gl.countOf("deleteVertexArray")).toBe(1);
+    expect(gl.countOf("deleteBuffer")).toBe(1);
+  });
+
+  it("returns null when GL will not allocate trail buffers", () => {
+    const vertices = new Float32Array(TRAIL_VERTEX_FLOATS);
+    const item = trailParticleItem(vertices, 1);
+    expect(
+      new ParticleTrailBatchCache(
+        createFakeGl({ allocateVertexArrays: false }),
+      ).acquire(item),
+    ).toBeNull();
+    const bufferless = createFakeGl({ allocateBuffers: false });
+    expect(new ParticleTrailBatchCache(bufferless).acquire(item)).toBeNull();
+    expect(bufferless.countOf("deleteVertexArray")).toBe(1);
+  });
+
+  it("skips upload when there are no live trail vertices", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    const record = cache.acquire(
+      trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1),
+    );
+    gl.reset();
+    cache.upload(record!, trailParticleItem(new Float32Array(0), 0));
+    expect(gl.countOf("bufferSubData")).toBe(0);
+  });
+
+  it("dispose is idempotent", () => {
+    const gl = createFakeGl();
+    const cache = new ParticleTrailBatchCache(gl);
+    cache.acquire(trailParticleItem(new Float32Array(TRAIL_VERTEX_FLOATS), 1));
+    cache.dispose();
+    gl.reset();
+    cache.dispose();
+    expect(gl.calls).toHaveLength(0);
   });
 });
 
