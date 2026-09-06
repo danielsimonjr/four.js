@@ -64,6 +64,41 @@ afterEach(() => {
 });
 
 describe("SolverRegistry bookkeeping", () => {
+  it("re-registering the identical solver is a no-op, not a conflict (§37)", () => {
+    const registry = new SolverRegistry();
+    const isSupported = (): boolean => true;
+    const create = (): FakeSolverAdapter => new FakeSolverAdapter();
+
+    registry.register({ name: "rapier", isSupported, create });
+    // The same descriptor again — what a second `registerRapierSolver()` produces, since
+    // `isSupported` and `create` are module-level bindings and not fresh closures.
+    expect(() =>
+      registry.register({ name: "rapier", isSupported, create }),
+    ).not.toThrow();
+
+    // Registered once, so `"auto"` order and every §33 consequence are unchanged.
+    expect(registry.solvers).toEqual(["rapier"]);
+  });
+
+  it("still refuses a DIFFERENT solver under a name already taken (§33)", () => {
+    const registry = new SolverRegistry();
+    registry.register({
+      name: "rapier",
+      isSupported: () => true,
+      create: () => new FakeSolverAdapter(),
+    });
+
+    // Different function identities: this would REPLACE the entry, which is the case
+    // §37's throw exists for — selection must not depend on module evaluation order.
+    expect(() =>
+      registry.register({
+        name: "rapier",
+        isSupported: () => true,
+        create: () => new FakeSolverAdapter(),
+      }),
+    ).toThrow(/already registered/);
+  });
+
   it("reports its solvers in registration order", () => {
     const { registry } = withSolvers([{ name: "box2d" }, { name: "rapier" }]);
     expect(registry.solvers).toEqual(["box2d", "rapier"]);

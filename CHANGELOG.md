@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — re-registering the same solver is a no-op, not a conflict (§37)
+
+- **`SolverRegistry.register` (and so `registerRapierSolver()`) accepted only one call**
+  per solver name. Registration is process-global, so a helper that builds a world could
+  not simply ensure the solver was available — it had to know whether some other
+  component had already registered it, or the second call threw
+  `INVALID_APPLICATION_STATE`. Found by dogfooding, with a `makeWorld()` helper.
+
+  Re-adding the **identical** registration is now a no-op returning the registry. A
+  *different* solver under a name already taken still throws, with the same message and
+  context.
+
+  **Why this does not weaken §33.** The refusal exists to stop a silent *overwrite*:
+  which solver `"auto"` builds would otherwise depend on module evaluation order, and a
+  simulation that changes solver for that reason is not reproducible. Adding the same
+  entry twice overwrites nothing — the map holds the same registration, `solvers` keeps
+  the same order, and `"auto"` builds the same adapter — so none of that reasoning
+  applied to it. What the old contract actually caught was defensive code.
+
+  Compared by **identity**, deliberately: `registerRapierSolver()` builds a fresh object
+  literal per call, but `isSupported` and `create` are module-level bindings, so two
+  calls carry the same two function references. Anything that would change what `"auto"`
+  builds carries different ones and still throws.
+
+  Verified from outside the library, before and after:
+
+  ```text
+  before:  first makeWorld() ok · second makeWorld() THREW FourError
+  after:   first ok · second ok · third (3d) ok · registeredSolvers() == ["rapier"]
+  ```
+
 ### 2026-09-06 — `blending.spec.ts` asserted on the runner's throughput
 
 - **Two of its watches were bounded by wall clock and then asserted on how many samples

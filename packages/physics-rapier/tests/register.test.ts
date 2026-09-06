@@ -73,9 +73,30 @@ describe("registerRapierSolver", () => {
     ).toThrow(/"rapier" \(determinism\)/);
   });
 
-  it("refuses a second registration in the same registry (§37)", () => {
+  it("is idempotent: registering twice leaves one registration (§37)", () => {
     const registry = new SolverRegistry();
     registerRapierSolver(registry);
+
+    // A second call is a no-op. `isSupported` and `create` are module-level bindings, so
+    // both calls carry the identical pair and nothing is overwritten — `"auto"` builds
+    // the same adapter either way, which is the whole of what §37's refusal protects.
+    // Before this was allowed, a helper that wanted the solver available had to know
+    // whether some other component had already registered it.
+    expect(() => registerRapierSolver(registry)).not.toThrow();
+    expect(registry.solvers).toEqual(["rapier"]);
+  });
+
+  it("still refuses a DIFFERENT solver under the name (§33)", () => {
+    const registry = new SolverRegistry();
+    // Something else claims "rapier" first, with its own create/isSupported.
+    registry.register({
+      name: "rapier",
+      isSupported: () => true,
+      create: () => {
+        throw new Error("not the real adapter");
+      },
+    });
+
     let thrown: unknown;
     try {
       registerRapierSolver(registry);

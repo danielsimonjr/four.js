@@ -203,14 +203,46 @@ export class SolverRegistry {
   /**
    * Adds `registration`. Returns `this` so registrations chain.
    *
-   * @throws FourError `INVALID_APPLICATION_STATE` if that solver is already
-   * registered — a silent overwrite would make which solver `"auto"` builds
-   * depend on module evaluation order, and a simulation that changes solver
-   * for that reason is not reproducible (§33).
+   * Re-adding the **identical** registration (same `isSupported` and `create`)
+   * is a no-op and returns `this`, so calling `registerRapierSolver()` twice is
+   * safe: nothing is overwritten and nothing about `"auto"` changes.
+   *
+   * @throws FourError `INVALID_APPLICATION_STATE` if a *different* solver is
+   * already registered under that name — a silent overwrite would make which
+   * solver `"auto"` builds depend on module evaluation order, and a simulation
+   * that changes solver for that reason is not reproducible (§33).
    */
   register(registration: SolverRegistration): this {
     const name = registration.name;
-    if (this.#entries.has(name)) {
+    const existing = this.#entries.get(name);
+    if (existing !== undefined) {
+      /*
+       * Re-adding the identical registration is a no-op, not a conflict.
+       *
+       * The throw below exists to stop a silent *overwrite*: which solver `"auto"` builds
+       * would then depend on module evaluation order, and a simulation that changes
+       * solver for that reason is not reproducible (§33). Adding the same entry twice
+       * overwrites nothing — the map holds the same registration, `solvers` keeps the
+       * same order, and `"auto"` builds the same adapter — so none of that reasoning
+       * applies to it.
+       *
+       * What it was catching instead was defensive code. `registerRapierSolver()` threw
+       * if anything had already called it, so a component that merely wants the solver to
+       * be available had to know whether someone else got there first — the opposite of
+       * what a registry is for. Found by dogfooding.
+       *
+       * Compared by identity, deliberately. `registerRapierSolver()` builds a fresh
+       * object literal per call, but `isSupported` and `create` are module-level
+       * bindings, so two calls carry the same two function references. A registration
+       * that would actually change what `"auto"` builds carries different ones and still
+       * throws.
+       */
+      if (
+        existing.isSupported === registration.isSupported &&
+        existing.create === registration.create
+      ) {
+        return this;
+      }
       throw new FourError(
         SELECTION_ERROR_CODE,
         `A ${JSON.stringify(name)} solver is already registered (§37); registering a second one would make selection depend on import order (§33). Unregister it first, or use a separate SolverRegistry.`,

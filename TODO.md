@@ -220,7 +220,7 @@ changes in `CHANGELOG.md`.
       I have only run headless), animation/tweens (§93 timeline), assets/glTF loading, UI, input,
       particles, and the 2D↔3D mixed-scene story. Those are where the next findings are.
 
-- [ ] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
+- [x] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
       one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
       helper hits `INVALID_APPLICATION_STATE` on the second construction. The error is explicit and
       carries context (`solver: "rapier", registered: ["rapier"]`), and `clearRegisteredSolvers()`
@@ -228,6 +228,16 @@ changes in `CHANGELOG.md`.
       SAME solver be idempotent (or take an `{ override }` flag) instead of throwing? Filed, not
       changed — registry semantics are a §37 call.
 
+      **DECIDED and DONE 2026-09-06: idempotent for an identical registration.**
+      §37's refusal exists to stop a silent *overwrite* making `"auto"`'s choice depend on
+      module evaluation order (§33). Re-adding the same entry overwrites nothing, so that
+      reasoning never applied to it; a *different* solver under the name still throws, with
+      the same message and context. Compared by function identity, since
+      `registerRapierSolver()` builds a fresh literal each call but its `isSupported` and
+      `create` are module-level bindings.
+      `physics-rapier`'s own test changed with it, deliberately — the contract narrowed, and
+      it now covers both halves. Dogfooded from outside with the `makeWorld()` helper from
+      the finding above: second call threw before, all three build after.
 - [ ] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
       **REOPENED 2026-09-06.** A DEV-gated `devWarnOnce` was implemented and then reverted:
       `tests/integration/dev-build-mode.test.ts` forbids *any* build-flag branch in a
