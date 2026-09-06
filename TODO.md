@@ -6,6 +6,37 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
+      its own virtual frame clock.** Failed CI on `dd03d1a` and `94860b0`; passed on
+      `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
+      failed — so roughly 2 in 5, and not caused by any change of mine.
+
+      Diagnosis, from reading the mechanism rather than the failure rate. The test installs
+      `useVirtualFrameClock(page, 1.5 × FIXED_DELTA)`, which overrides
+      `requestAnimationFrame` so each callback advances the page's clock by exactly 1.5
+      fixed steps. That makes `interpolationAlpha` alternate **0.5, 0.0, 0.5, 0.0** — a
+      *two-frame cycle*, deterministic and machine-independent, which is the clever part.
+
+      But sampling is on **real** time: the loop screenshots every
+      `INTERPOLATION_SAMPLE_INTERVAL_SECONDS`, and however many virtual frames elapse
+      between two screenshots is whatever the machine managed to render. If that count is
+      consistently **even**, every one of the 12 samples lands on the same phase of the
+      cycle, `midStep` is 0, and the test reports "every frame landed on an exact
+      fixed-step pose" while §43's interpolation is working perfectly.
+
+      So the assertion is sound and the sampler is aliased against the very cycle it is
+      trying to observe. Raising `INTERPOLATION_SAMPLE_COUNT` does not help: if the parity
+      is stable, more samples are more samples of the same phase.
+
+      The fix has to break the lock between the sampling interval and the two-frame cycle —
+      most directly by making the *sampler* frame-synchronised (screenshot after a known
+      number of virtual frames) rather than time-synchronised, so the phase is chosen
+      instead of inherited.
+
+      **Not attempted**, deliberately: it does not reproduce locally, so I cannot tell a fix
+      from a coincidence. Guessing at a change I cannot verify is how the blending
+      step-bound attempt made things worse earlier today.
+
 - [x] **De-flake the browser gate: sample counts no longer measure the runner.** DONE
       2026-09-06 — both watches now require a sample floor as well as the window; 1 of 4
       passing → 3 of 4 on Windows. Details in the CHANGELOG.
