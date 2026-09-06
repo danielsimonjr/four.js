@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { SeededRandom } from "../src/random.js";
 
+// Contention under `bun run test --concurrency=4`: this file passes alone and
+// times out at the 5 s default when the Windows runner is busy. Same shape as
+// the coverage flake in `packages/render/tests/shape.test.ts`.
+describe.configure({ timeout: 30_000 });
+
 /**
  * Independent BigInt implementation of the documented formulas (SplitMix32-style
  * seed expansion + xorshift128 with the `(11, 8, 19)` triple).
