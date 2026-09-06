@@ -61,7 +61,9 @@ describe("leak registry", () => {
     expect(auditFinalizedLeaks()).toBe(1);
     const text = String(warn.mock.calls[0]?.[0]);
     expect(text).toContain("buffer");
-    expect(text).toMatch(/leak-registry\.test/);
+    expect(text).toContain("Creation site:");
+    expect(text).toMatch(/Creation site: at /);
+    expect(text).not.toContain("Creation site: unknown");
   });
 
   it("returns the existing id when the same resource is tracked twice", () => {

@@ -27,6 +27,22 @@ Nothing is published to npm yet: all 24 workspace packages sit at version
 releases that have not happened; the format and API versions in sections 3–4
 exist today and are the ones a document on disk has to match.
 
+**Decision 2026-09-06 — publish the reserved stubs as real 0.x packages.** The
+four reserved directories (`physics-box2d`, `physics-soft`, `render-canvas`,
+`render-svg`) already exist, build, and export `PACKAGE_NAME`; the umbrella
+depends on them and re-exports each as a subpath, so Changesets cannot
+`ignore` them without also skipping `four` (see `.changeset/README.md`).
+Dropping the subpaths would break §98; optional peers would push the
+resolution problem onto every consumer. A stub that says "reserved; not
+implemented" in its README is the honest 0.x package. `NPM_TOKEN` remains an
+owner secret and is not in this repository. GitHub Pages is already the
+docs-workflow deploy target (`.github/workflows/docs.yml`).
+
+**TypeDoc / TypeScript pin, re-verified 2026-09-06.** `typedoc@0.28.20` is
+still the latest published TypeDoc and still peers at TypeScript `<= 6.0.x`
+(TypeStrong/typedoc#3098; TS 7 support is waiting on 7.1). The workspace
+stays on `typescript@5.9.3`. Do not lift the pin until TypeDoc accepts 7.x.
+
 ---
 
 ## 1. Browser and runtime support (§90)
@@ -243,22 +259,44 @@ Solver packages that declare no adapter:
 
 <!-- END GENERATED: solver-adapters -->
 
-### The two access seams
+### The access seams (required engine surface beyond §37)
 
-§37's `PhysicsCapabilities` has six fields (plus the later `tuning` record) and
-no room for the question "can the engine talk to a body or a joint at all",
-so that is answered structurally instead of being declared:
+§37 sketches `PhysicsSolverAdapter`: identity, a `capabilities` record,
+create/destroy, `step`, `drainEvents`, the two `sync*` hooks, the §30 query
+set, optional snapshots, `dispose`. That is a contract about the **step**. It
+has no per-body read and no per-joint command, so it cannot move a solved pose
+onto a node or drive a motor. The engine therefore requires two further
+interfaces, defined in `@four/physics` and detected structurally (the
+generated table's `SolverBodyAccess implemented` / `SolverJointAccess
+implemented` rows are member-by-member probes against the emitted
+declarations, not a capability flag):
 
-- **`SolverBodyAccess`** — the per-handle body seam: transforms, velocities,
-  forces and impulses, kinematic targets, mass and centre of mass, in-place
-  body re-typing (§19), sleep state, and the monotonic `getBodyId` /
-  `forEachBody` visit order §33's checksum depends on. `PhysicsWorld` requires
-  it: `PhysicsWorldAdapter` is `PhysicsSolverAdapter & SolverBodyAccess`, so an
-  adapter without it cannot back a world.
-- **`SolverJointAccess`** — the joint seam: ids and visit order, live limit and
-  motor reconfiguration, and `getJointReaction` for §28 breakage. Its one
-  _declared_ member is `reportsJointReactions`, which appears as a row in the
-  table above.
+- **`SolverBodyAccess`** — **required.** `PhysicsWorldAdapter` is
+  `PhysicsSolverAdapter & SolverBodyAccess`; an adapter without it cannot back
+  a world. Both shipped Rapier adapters implement the whole seam today:
+
+  | Member | What Rapier does with it |
+  | ------ | ------------------------ |
+  | `getBodyTransform` / `setBodyTransform` | solved pose onto the node under `"physics"` authority; teleports (§37) |
+  | `getBodyVelocities` / `setBodyVelocities` | §23 reads; kinematic-velocity drive; §19 velocity inheritance |
+  | `applyForce` / `applyForceAtPoint` / `applyTorque` / `applyImpulse` / `applyImpulseAtPoint` / `applyAngularImpulse` / `resetForces` | §26 command buffer |
+  | `setNextKinematicTransform` | kinematic-position target; Rapier derives the motion |
+  | `setBodyType` | in-place re-type (§19 / §22); handle, id, colliders and mass stay |
+  | `wakeBody` / `sleepBody` / `isBodySleeping` | §32 explicit sleep; `sleeping` is read-only on `RigidBody` |
+  | `getBodyCcdMode` / `getBodyMass` / `getBodyCenterOfMass` | read-back after the solver resolves them |
+  | `getBodyId` / `forEachBody` / `getColliderBody` / `getColliderId` / `forEachCollider` | monotonic never-reused ids; §33 checksum visit order |
+
+  A third, **optional** seam — `SolverBodyTuningAccess` — carries the rare
+  post-registration writes (§23 mass/damping/gravityScale/CCD, §25 material,
+  §24 filter). It is all-or-nothing and structurally detected; both Rapier
+  adapters implement it. It is not a generated-table row because it is not
+  required to construct a world.
+
+- **`SolverJointAccess`** — required of any adapter that accepts `addJoint`.
+  Live `setJointLimits` / `setJointMotor`, monotonic joint ids, and
+  `getJointReaction` for §28 breakage. Its one _declared_ member is
+  `reportsJointReactions`, which appears as a row in the table above. Both
+  Rapier adapters implement the seam and declare that member `false`.
 
 ### Deviations the capability record cannot express
 
@@ -270,10 +308,19 @@ its source in `packages/physics-rapier/src`):
   exposes no joint reaction, so `reportsJointReactions` is `false` and
   `PhysicsWorld.addJoint` **refuses** a joint carrying `breakForce` or
   `breakTorque` rather than accepting a threshold that could never fire.
-- **A motor's `maxTorque` / `maxForce` is a gain, not §28's hard cap.** Rapier
-  parameterises its motors by force-based gains; the value reaches the solver
-  but does not clamp the way §28 describes. Name the same row against a
-  capping adapter (Box2D) when one arrives.
+- **A motor's `maxTorque` / `maxForce` is a force-based gain, not §28's hard
+  ceiling.** Documented **now**, not when Box2D lands: Rapier 0.19.3 exposes
+  no JS-reachable motor-force cap, so both adapters supply the value as a
+  `ForceBased` gain — effort ≈ `maxEffort · (target − current)` — which is
+  monotone in strength but does not clamp. `PhysicsCapabilities` has no field
+  for that distinction, so the Rapier column lives here until a capping
+  adapter arrives and earns its own column:
+
+  | Adapter            | `maxTorque` / `maxForce`                                      |
+  | ------------------ | ------------------------------------------------------------- |
+  | `rapier2d`         | force-based gain                                              |
+  | `rapier3d`         | force-based gain                                              |
+  | `box2d` (reserved) | — (capping adapter; column when `@four/physics-box2d` ships) |
 - **`inheritVelocityFrom` is nearly a no-op on both Rapier adapters.** Rapier
   derives kinematic velocity itself from the pose it is given, so seeding
   velocities from a `PoseTarget` does not change what the solver already

@@ -63,15 +63,16 @@ function captureCreationSite(explicit: string | undefined): string {
   if (explicit !== undefined && explicit.length > 0) {
     return explicit;
   }
-  const stack = new Error("trackDisposable").stack ?? "";
+  const stack = new Error("trackDisposable").stack;
+  if (stack === undefined || stack.length === 0) return "unknown";
+  const frames: string[] = [];
   for (const line of stack.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.length === 0) continue;
     if (trimmed.startsWith("Error")) continue;
-    if (trimmed.includes("leak-registry")) continue;
-    return trimmed;
+    frames.push(trimmed);
   }
-  return stack.length > 0 ? stack : "unknown";
+  return frames.length > 0 ? frames.join(" ← ") : "unknown";
 }
 
 function getRegistry(): FinalizationRegistry<number> | undefined {
@@ -87,7 +88,7 @@ function getRegistry(): FinalizationRegistry<number> | undefined {
  * a leak. Returns a numeric id for {@link reportFinalized}; `0` in production.
  *
  * `creationSite` is recorded as-is when supplied. Otherwise the stack at this
- * call is captured (skipping frames inside this module).
+ * call is captured and recorded as the site.
  */
 export function trackDisposable(
   resource: object,
