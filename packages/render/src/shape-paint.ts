@@ -137,6 +137,9 @@ function requireFinite(name: string, value: number): number {
 
 /** Validates and copies a paint's point parameter (§85). */
 function requirePoint(name: string, point: Point2D): Point2D {
+  if (typeof point !== "object" || point === null) {
+    refuse(`${name} must be a finite point; got ${String(point)}`);
+  }
   return {
     x: requireFinite(`${name}.x`, point.x),
     y: requireFinite(`${name}.y`, point.y),
@@ -166,7 +169,7 @@ function requireStops(
   name: string,
   stops: readonly GradientStop[],
 ): ResolvedGradientStop[] {
-  if (stops.length < 2) {
+  if (!Array.isArray(stops) || stops.length < 2) {
     refuse(
       `${name}.stops needs at least 2 stops (one flat colour is a "solid" ` +
         `paint); got ${String(stops.length)}`,
