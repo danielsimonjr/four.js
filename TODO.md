@@ -1405,7 +1405,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] Fold steering's private interceptTime into prediction's export (dated note in
       steering.ts) — **interceptTime fold DONE 2026-09-06**; ~~spatial-hash neighbors~~
       **DONE 2026-09-06**; ~~spherical wander~~ **DONE 2026-09-06**;
-      ~~CCD/FABRIK~~ **DONE 2026-09-06**; path-planning adapters (RFC);
+      ~~CCD/FABRIK~~ **DONE 2026-09-06**; ~~path-planning adapters (RFC)~~
+      **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
       robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
       `Four.motion.PIDController` via §97a); this entry was the stale artifact
