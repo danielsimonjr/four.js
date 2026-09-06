@@ -35,6 +35,12 @@ specification; until then, entries are grouped by date under **Unreleased**.
   incompatible set is not re-proposed next Monday. Lift `typescript` and `vitest` together, in one
   PR, once typedoc supports TypeScript 7.
 
+- **`@changesets/cli` kept at 3.0.1**, i.e. NOT reverted with the rest of #62. The workflow uses
+  `changesets/action@v2` (from the #61 actions bump), which refuses CLI v2 outright:
+  *"This version of the Changesets action is designed to work with Changesets CLI v3."* That bump
+  is unrelated to the TypeScript/vitest conflict, so reverting it wholesale broke `Release` a
+  second way. Restored surgically; `docs` and `lint` stay green.
+
 After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rapier` is back to
 341/341 passing (it was 337 passing / 4 failing on 0.20).
 
