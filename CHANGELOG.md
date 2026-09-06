@@ -8,6 +8,14 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — WebGL F13 / metal-roughness restore
+
+- **Unlit draw order.** Texture bind and `setFeatures` run before
+  `unlitColorBlends` reads `color`, so a throwing accessor still
+  restores the borrowed unit and program-lifetime flags (F13).
+- **Metal-roughness unit 2.** Restore skips the redundant
+  `activeTexture(TEXTURE2)` when that unit is already active.
+
 ### 2026-09-06 — Field torque, field-driven waking, §42 `devWarnOnce`
 
 - **`ForceField.sampleTorque`.** Optional angular channel, always N·m.

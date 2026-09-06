@@ -851,7 +851,9 @@ function metalRoughnessMapOf(material: {
 }
 
 function unlitColorBlends(material: object): boolean {
-  const color = (material as { color?: readonly [number, number, number, number] }).color;
+  const color = (
+    material as { color?: readonly [number, number, number, number] }
+  ).color;
   return color !== undefined && color[3] !== 1;
 }
 
@@ -2166,13 +2168,6 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
                 skinnedProgram.use();
                 activeKind = "skinned-unlit";
               }
-              applyMaterialState(
-                gl,
-                state,
-                item.material,
-                unlitColorBlends(item.material),
-                item.clip ?? null,
-              );
               if (!skinnedUnlitViewUploaded) {
                 skinnedProgram.setViewProjection(viewProjection);
                 skinnedUnlitViewUploaded = true;
@@ -2193,6 +2188,16 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               skinnedProgram.setFeatures(
                 texture !== null,
                 item.material.vertexColors === true,
+              );
+              // Blend follows bind + feature mirrors so a throw on `color`
+              // still restores the borrowed texture unit and program-lifetime
+              // flags (F13).
+              applyMaterialState(
+                gl,
+                state,
+                item.material,
+                unlitColorBlends(item.material),
+                item.clip ?? null,
               );
               skinnedProgram.setModel(item.worldMatrix);
               skinnedProgram.setColor(
@@ -2656,13 +2661,6 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               program.use();
               activeKind = "unlit";
             }
-            applyMaterialState(
-              gl,
-              state,
-              item.material,
-              unlitColorBlends(item.material),
-              item.clip ?? null,
-            );
             const map = mapOf(item.material);
             const texture =
               map === null
@@ -2682,6 +2680,15 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             program.setFeatures(
               texture !== null,
               item.material.vertexColors === true,
+            );
+            // Blend follows bind + feature mirrors so a throw on `color` still
+            // restores the borrowed texture unit and program-lifetime flags (F13).
+            applyMaterialState(
+              gl,
+              state,
+              item.material,
+              unlitColorBlends(item.material),
+              item.clip ?? null,
             );
             program.setModel(item.worldMatrix);
             program.setColor(item.material.color, opacityOf(item.material));
@@ -2725,7 +2732,12 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         gl.bindTexture(GL.TEXTURE_2D, null);
       }
       if (metalRoughnessBound && nodeUnitsBound === 0) {
-        gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        // Unit 2 is already active when this frame bound only the packed map.
+        // If unit 0 was also borrowed, the restore above moved the active
+        // unit back to 0 and we have to re-select 2 before unbinding.
+        if (textureBound || mapUnitActive) {
+          gl.activeTexture(GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT);
+        }
         gl.bindTexture(GL.TEXTURE_2D, null);
         gl.activeTexture(GL.TEXTURE0);
       }
