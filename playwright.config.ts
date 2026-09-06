@@ -85,15 +85,17 @@ const CHROMIUM_BINARIES: readonly (readonly [string, string])[] = [
   // escape hatch this function exists to be simply was not there. Verified against a
   // real install tree — `chromium-<rev>/chrome-win64/chrome.exe` and
   // `chromium_headless_shell-<rev>/chrome-headless-shell-win64/chrome-headless-shell.exe`.
+  // `chrome-win` is the older Playwright layout; keep it after win64.
   ["chromium-", join("chrome-win64", "chrome.exe")],
-  [
-    "chromium_headless_shell-",
-    join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
-  ],
+  ["chromium-", join("chrome-win", "chrome.exe")],
   ["chromium_headless_shell-", join("chrome-linux", "headless_shell")],
   [
     "chromium_headless_shell-",
     join("chrome-headless-shell-linux64", "chrome-headless-shell"),
+  ],
+  [
+    "chromium_headless_shell-",
+    join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
   ],
 ];
 
@@ -289,7 +291,10 @@ export default defineConfig({
   forbidOnly: process.env["CI"] !== undefined,
   retries: 0,
   reporter: process.env["CI"] !== undefined ? "list" : "line",
-  timeout: 60_000,
+  // 60 s has no margin on Windows SwiftShader: screenshot-bound specs (notably
+  // `animation.spec.ts` with SAMPLE_COUNT=22) spend ~55.9 s of that budget on
+  // canvas readback. 120 s gives those machines room without hiding a hang.
+  timeout: 120_000,
   use: {
     baseURL: `http://localhost:${String(PORT)}`,
     // Software rasterisation is the point: CI machines have no GPU, and a GPU
