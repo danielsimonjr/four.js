@@ -199,6 +199,7 @@ import type { Joint, JointBinding, JointBreakPayload } from "./joints.js";
 import {
   bindJoint,
   clearJointCommands,
+  readJointAnchors,
   readJointLimits,
   readJointMotor,
   setJointBroken,
@@ -257,7 +258,11 @@ import {
   validateMass,
   validatePhysicsWorldOptions,
 } from "./validation.js";
-import { noteSolverBody } from "./resource-memory.js";
+import {
+  noteSolverBody,
+  noteSolverCollider,
+  noteSolverJoint,
+} from "./resource-memory.js";
 
 /** See the rest of the package: §89 has no physics-input code, so misuse is this. */
 const WORLD_ERROR_CODE = "INVALID_APPLICATION_STATE";
@@ -934,6 +939,11 @@ export class PhysicsWorld {
 
   readonly #bindingScratch = new Quaternion();
 
+  /** Scratch for {@link PhysicsWorld.#applyJointCommands}' body-local anchors. */
+  readonly #jointAnchorA = new Vector3();
+
+  readonly #jointAnchorB = new Vector3();
+
   /**
    * Builds a world for `init.adapter` — or for the solver `init.solver` names
    * (PH-19) — and validates that the adapter can actually simulate it (§21,
@@ -1304,6 +1314,7 @@ export class PhysicsWorld {
       };
       registration.colliders.push(colliderRegistration);
       this.#collidersById.set(colliderRegistration.id, colliderRegistration);
+      noteSolverCollider(1);
     }
 
     this.#bodiesByNode.set(node, registration);
@@ -1451,6 +1462,7 @@ export class PhysicsWorld {
     const handle = this.#adapter.createCollider(
       collider.toDescriptor(registration.handle),
     );
+    noteSolverCollider(1);
     const colliderRegistration: ColliderRegistration = {
       collider,
       handle,
@@ -1500,6 +1512,7 @@ export class PhysicsWorld {
     }
     const registration = colliderRegistration.body;
     this.#adapter.destroyCollider(colliderRegistration.handle);
+    noteSolverCollider(-1);
     if (colliderRegistration.dirty) {
       this.#dirtyColliderCount -= 1;
     }
@@ -2036,6 +2049,7 @@ export class PhysicsWorld {
     validateJointDescriptor(descriptor, this.#dimension);
 
     const handle = this.#adapter.createJoint(descriptor);
+    noteSolverJoint(1);
     const id = access.getJointId(handle);
     const registration: JointRegistration = {
       joint,
@@ -4050,7 +4064,7 @@ export class PhysicsWorld {
    * registration order, and clears the queues.
    *
    * The joint half of step 1 of the pipeline. A joint nobody touched costs one
-   * boolean test: the three dirty bits are only ever set by the
+   * boolean test: the four dirty bits are only ever set by the
    * setters, and `bindJoint` clears them at registration because the descriptor
    * the solver was just built from already carried the current values.
    */
@@ -4065,7 +4079,8 @@ export class PhysicsWorld {
       if (
         !commands.limitsDirty &&
         !commands.motorDirty &&
-        !commands.collisionDirty
+        !commands.collisionDirty &&
+        !commands.anchorsDirty
       ) {
         continue;
       }
@@ -4086,6 +4101,14 @@ export class PhysicsWorld {
         access.setJointCollisionEnabled(
           registration.handle,
           joint.collisionEnabled,
+        );
+      }
+      if (commands.anchorsDirty) {
+        readJointAnchors(joint, this.#jointAnchorA, this.#jointAnchorB);
+        access.setJointAnchors(
+          registration.handle,
+          this.#jointAnchorA,
+          this.#jointAnchorB,
         );
       }
       clearJointCommands(joint);
@@ -4171,7 +4194,11 @@ export class PhysicsWorld {
     const axis = new Vector3();
 
     this.#adapter.getBodyTransform(bodyA.handle, position, rotation);
-    if (joint.anchorA !== undefined) {
+    if (joint.anchorsAreLocal) {
+      if (joint.anchorA !== undefined) {
+        anchorA.copy(joint.anchorA);
+      }
+    } else if (joint.anchorA !== undefined) {
       worldAnchorToLocal(position, rotation, joint.anchorA, anchorA, scratch);
     }
     joint.worldAxis(this.#dimension, axis);
@@ -4180,8 +4207,18 @@ export class PhysicsWorld {
     }
 
     this.#adapter.getBodyTransform(bodyB.handle, position, rotation);
-    if (joint.anchorB !== undefined) {
+    if (joint.anchorsAreLocal) {
+      if (joint.anchorB !== undefined) {
+        anchorB.copy(joint.anchorB);
+      }
+    } else if (joint.anchorB !== undefined) {
       worldAnchorToLocal(position, rotation, joint.anchorB, anchorB, scratch);
+    }
+
+    if (!joint.anchorsAreLocal) {
+      // Write the converted locals back so later setAnchors / field reads are
+      // one space. The joint is not registered yet, so this does not queue.
+      joint.setAnchors(anchorA, anchorB);
     }
 
     return { bodyA: bodyA.handle, bodyB: bodyB.handle, anchorA, anchorB, axis };
@@ -4202,6 +4239,7 @@ export class PhysicsWorld {
     if (destroy) {
       this.#adapter.destroyJoint(registration.handle);
     }
+    noteSolverJoint(-1);
   }
 
   /**
@@ -4300,6 +4338,7 @@ export class PhysicsWorld {
   #destroyRegistration(registration: BodyRegistration): void {
     // Body first: §37 makes the adapter responsible for what is attached to it.
     this.#adapter.destroyBody(registration.handle);
+    noteSolverCollider(-registration.colliders.length);
     for (let i = registration.colliders.length - 1; i >= 0; i -= 1) {
       const collider = registration.colliders[i];
       // A refresh nobody served does not survive the collider it was asked for

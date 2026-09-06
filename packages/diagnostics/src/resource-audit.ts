@@ -32,6 +32,13 @@
  *
  * ```ts
  * import { liveGeometryCount, geometryMemoryBytes } from "@four/geometry";
+ * import { liveMaterialCount } from "@four/materials";
+ * import {
+ *   liveSolverBodyCount,
+ *   liveSolverColliderCount,
+ *   liveSolverHandleCount,
+ *   liveSolverJointCount,
+ * } from "@four/physics";
  * import { liveTextureCount, liveRenderTargetCount, textureMemoryBytes } from "@four/render";
  * import { auditResourceLeaks, type LiveResourceCounts } from "@four/diagnostics";
  *
@@ -41,6 +48,11 @@
  *   textures: liveTextureCount(),
  *   renderTargets: liveRenderTargetCount(),
  *   textureBytes: textureMemoryBytes(),
+ *   materials: liveMaterialCount(),
+ *   solverBodies: liveSolverBodyCount(),
+ *   solverColliders: liveSolverColliderCount(),
+ *   solverJoints: liveSolverJointCount(),
+ *   solverHandles: liveSolverHandleCount(),
  * });
  *
  * const before = read();
@@ -77,10 +89,12 @@ import { DEV, devWarnOnce } from "@four/core";
  * A reading of §83's live-resource accounting, as the caller's packages report
  * it.
  *
- * The five fields are exactly the five zero-argument readers `@four/geometry`
- * and `@four/render` export, in that order:
+ * The first five fields are exactly the five zero-argument readers
+ * `@four/geometry` and `@four/render` export, in that order:
  * `liveGeometryCount()`, `geometryMemoryBytes()`, `liveTextureCount()`,
- * `liveRenderTargetCount()`, `textureMemoryBytes()`.
+ * `liveRenderTargetCount()`, `textureMemoryBytes()`. The optional material
+ * and solver-handle fields are filled the same way from `@four/materials`
+ * and `@four/physics` when the caller can see those packages.
  *
  * `bufferBytes` and `textureBytes` are **byte totals, not per-population
  * splits**: `textureBytes` covers textures *and* render targets together,
@@ -105,15 +119,25 @@ export interface LiveResourceCounts {
    */
   readonly materials?: number;
   /**
-   * Live solver body registrations. Optional; kept beside
+   * Live solver body handles. Optional; kept beside
    * {@link LiveResourceCounts.solverHandles} so existing call-sites that
    * already filled this field keep working.
    */
   readonly solverBodies?: number;
   /**
-   * Live solver handles (bodies, colliders, joints — whatever the caller
-   * accounts). Optional: `@four/physics` is outside this package's
-   * dependency set (A-5 follow-up: materials + solver handles).
+   * Live solver collider handles. Optional: `@four/physics` is outside this
+   * package's dependency set.
+   */
+  readonly solverColliders?: number;
+  /**
+   * Live solver joint handles. Optional: `@four/physics` is outside this
+   * package's dependency set.
+   */
+  readonly solverJoints?: number;
+  /**
+   * Live solver handles (bodies + colliders + joints, or whatever the caller
+   * accounts as one population). Optional: `@four/physics` is outside this
+   * package's dependency set (A-5 follow-up: materials + solver handles).
    */
   readonly solverHandles?: number;
 }
@@ -138,6 +162,8 @@ export interface ResourceLeakReport {
   readonly textureBytes: number;
   readonly materials: number;
   readonly solverBodies: number;
+  readonly solverColliders: number;
+  readonly solverJoints: number;
   readonly solverHandles: number;
   /**
    * The warning text, or `""` when nothing leaked. Always produced (it is what
@@ -176,6 +202,8 @@ export const NO_RESOURCE_LEAKS: ResourceLeakReport = Object.freeze({
   textureBytes: 0,
   materials: 0,
   solverBodies: 0,
+  solverColliders: 0,
+  solverJoints: 0,
   solverHandles: 0,
   message: "",
 });
@@ -214,6 +242,11 @@ export function auditResourceLeaks(
   const renderTargets = grew(before.renderTargets, after.renderTargets);
   const materials = grew(before.materials ?? 0, after.materials ?? 0);
   const solverBodies = grew(before.solverBodies ?? 0, after.solverBodies ?? 0);
+  const solverColliders = grew(
+    before.solverColliders ?? 0,
+    after.solverColliders ?? 0,
+  );
+  const solverJoints = grew(before.solverJoints ?? 0, after.solverJoints ?? 0);
   const solverHandles = grew(
     before.solverHandles ?? 0,
     after.solverHandles ?? 0,
@@ -224,6 +257,8 @@ export function auditResourceLeaks(
     renderTargets === 0 &&
     materials === 0 &&
     solverBodies === 0 &&
+    solverColliders === 0 &&
+    solverJoints === 0 &&
     solverHandles === 0
   ) {
     return NO_RESOURCE_LEAKS;
@@ -245,6 +280,12 @@ export function auditResourceLeaks(
   }
   if (solverBodies > 0) {
     parts.push(`${String(solverBodies)} solver body registrations`);
+  }
+  if (solverColliders > 0) {
+    parts.push(`${String(solverColliders)} solver colliders`);
+  }
+  if (solverJoints > 0) {
+    parts.push(`${String(solverJoints)} solver joints`);
   }
   if (solverHandles > 0) {
     parts.push(`${String(solverHandles)} solver handles`);
@@ -269,6 +310,8 @@ export function auditResourceLeaks(
     textureBytes,
     materials,
     solverBodies,
+    solverColliders,
+    solverJoints,
     solverHandles,
     message,
   };

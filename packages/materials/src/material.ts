@@ -457,6 +457,10 @@ export abstract class Material implements Disposable {
    * and texture references are kept: clearing them would turn a
    * use-after-dispose bug into a silently black frame instead of a diagnosable
    * one (§83's "disposed resources still in use" warning).
+   *
+   * It **does** remove this material from the process-wide §83 live-instance
+   * total (`liveMaterialCount`), exactly once: the idempotence guard above is
+   * what makes a double `dispose()` subtract once rather than twice.
    */
   dispose(): void {
     if (this.#disposed) {
