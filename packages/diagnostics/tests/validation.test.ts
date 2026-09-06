@@ -8,12 +8,16 @@ import {
   NEAR_ZERO_SCALE,
   UNSTABLE_SCALE_RATIO,
   assertFinite,
+  assertFiniteVec3,
   assertNoSceneGraphCycle,
   validateSceneNode,
   validateSceneSubtree,
   warnCoordinateEnvelope,
+  warnImpossibleInertia,
+  warnImpossibleMass,
   warnSingularScale,
   warnUnstableScale,
+  warnVersionMismatch,
 } from "../src/validation.js";
 
 afterEach(() => {
@@ -42,6 +46,51 @@ describe("validation catalogue", () => {
 
   it("assertFinite throws FourError in development", () => {
     expect(() => assertFinite(Number.NaN, "mass")).toThrow(FourError);
+  });
+
+  it("assertFiniteVec3 throws when a component is not finite", () => {
+    expect(() =>
+      assertFiniteVec3({ x: 1, y: Number.NaN, z: 0 }, "position"),
+    ).toThrow(FourError);
+  });
+
+  it("assertFiniteVec3 accepts a finite vector", () => {
+    expect(() =>
+      assertFiniteVec3({ x: 1, y: 2, z: 3 }, "position"),
+    ).not.toThrow();
+  });
+
+  it("warnImpossibleMass fires for negative and non-finite mass", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(warnImpossibleMass(-1, "body")).toBe(true);
+    expect(warnImpossibleMass(Number.NaN, "body-nan")).toBe(true);
+    expect(warnImpossibleMass(Number.POSITIVE_INFINITY, "body-inf")).toBe(true);
+    expect(warnImpossibleMass(1, "body-ok")).toBe(false);
+    expect(warnImpossibleMass(0, "body-zero")).toBe(false);
+    expect(warnImpossibleMass(-2, "body", { enabled: false })).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(3);
+  });
+
+  it("warnImpossibleInertia fires for negative and non-finite inertia", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(warnImpossibleInertia(-0.5, "body")).toBe(true);
+    expect(warnImpossibleInertia(Number.NaN, "body-nan")).toBe(true);
+    expect(warnImpossibleInertia(2, "body-ok")).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("warnVersionMismatch fires when versions differ", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    expect(warnVersionMismatch(2, 1, "scene")).toBe(true);
+    expect(warnVersionMismatch(2, 1, "scene")).toBe(false);
+    expect(warnVersionMismatch(2, 2, "scene-ok")).toBe(false);
+    expect(warnVersionMismatch("1.0", "0.9", "doc", { enabled: false })).toBe(
+      false,
+    );
+    const text = String(warn.mock.calls[0]?.[0]);
+    expect(text).toContain("expected 2");
+    expect(text).toContain("got 1");
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 
   it("assertNoSceneGraphCycle refuses a descendant parent link", () => {
@@ -100,10 +149,59 @@ describe("validation catalogue", () => {
     expect(warn).toHaveBeenCalledTimes(5);
   });
 
+  it("validateSceneNode asserts finite transform components", () => {
+    const node = new Group();
+    node.transform.position.set(Number.NaN, 0, 0);
+    expect(() => validateSceneNode(node)).toThrow(FourError);
+  });
+
+  it("validateSceneSubtree refuses a cyclic graph", () => {
+    const transform = {
+      position: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    };
+    type NodeMock = {
+      id: string;
+      parent: NodeMock | null;
+      children: NodeMock[];
+      transform: typeof transform;
+    };
+    const a: NodeMock = { id: "a", parent: null, children: [], transform };
+    const b: NodeMock = { id: "b", parent: a, children: [a], transform };
+    a.children = [b];
+    expect(() => validateSceneSubtree(a)).toThrow(FourError);
+  });
+
+  it("validateSceneSubtree stops walking a cycle when the check is disabled", () => {
+    const transform = {
+      position: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    };
+    type NodeMock = {
+      id: string;
+      parent: NodeMock | null;
+      children: NodeMock[];
+      transform: typeof transform;
+    };
+    const a: NodeMock = { id: "a", parent: null, children: [], transform };
+    const b: NodeMock = { id: "b", parent: a, children: [a], transform };
+    a.children = [b];
+    expect(
+      validateSceneSubtree(a, { sceneGraphCycle: { enabled: false } }),
+    ).toBe(0);
+  });
+
   it("is inert in a production build", async () => {
     vi.stubGlobal("__FOUR_DEV__", false);
     vi.resetModules();
     const production = await import("../src/validation.js");
     expect(production.warnCoordinateEnvelope({ x: 1e6, y: 0, z: 0 }, "n")).toBe(false);
+    expect(production.warnImpossibleMass(-1, "x")).toBe(false);
+    expect(production.warnImpossibleInertia(-1, "x")).toBe(false);
+    expect(production.warnVersionMismatch(1, 2, "x")).toBe(false);
+    expect(() =>
+      production.assertFiniteVec3({ x: Number.NaN, y: 0, z: 0 }, "p"),
+    ).not.toThrow();
+    expect(production.validateSceneSubtree(new Group())).toBe(0);
   });
 });

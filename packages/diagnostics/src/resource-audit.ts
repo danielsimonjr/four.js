@@ -99,8 +99,23 @@ export interface LiveResourceCounts {
   readonly renderTargets: number;
   /** Bytes described by textures **and** targets — §84's `textureMemory`. */
   readonly textureBytes: number;
+  /**
+   * Live, undisposed materials. Optional: `@four/materials` is outside this
+   * package's dependency set, so the caller passes the count it already has.
+   */
   readonly materials?: number;
+  /**
+   * Live solver body registrations. Optional; kept beside
+   * {@link LiveResourceCounts.solverHandles} so existing call-sites that
+   * already filled this field keep working.
+   */
   readonly solverBodies?: number;
+  /**
+   * Live solver handles (bodies, colliders, joints — whatever the caller
+   * accounts). Optional: `@four/physics` is outside this package's
+   * dependency set (A-5 follow-up: materials + solver handles).
+   */
+  readonly solverHandles?: number;
 }
 
 /**
@@ -123,6 +138,7 @@ export interface ResourceLeakReport {
   readonly textureBytes: number;
   readonly materials: number;
   readonly solverBodies: number;
+  readonly solverHandles: number;
   /**
    * The warning text, or `""` when nothing leaked. Always produced (it is what
    * a test asserts on); whether it was *printed* is
@@ -160,6 +176,7 @@ export const NO_RESOURCE_LEAKS: ResourceLeakReport = Object.freeze({
   textureBytes: 0,
   materials: 0,
   solverBodies: 0,
+  solverHandles: 0,
   message: "",
 });
 
@@ -197,12 +214,17 @@ export function auditResourceLeaks(
   const renderTargets = grew(before.renderTargets, after.renderTargets);
   const materials = grew(before.materials ?? 0, after.materials ?? 0);
   const solverBodies = grew(before.solverBodies ?? 0, after.solverBodies ?? 0);
+  const solverHandles = grew(
+    before.solverHandles ?? 0,
+    after.solverHandles ?? 0,
+  );
   if (
     geometries === 0 &&
     textures === 0 &&
     renderTargets === 0 &&
     materials === 0 &&
-    solverBodies === 0
+    solverBodies === 0 &&
+    solverHandles === 0
   ) {
     return NO_RESOURCE_LEAKS;
   }
@@ -224,6 +246,9 @@ export function auditResourceLeaks(
   if (solverBodies > 0) {
     parts.push(`${String(solverBodies)} solver body registrations`);
   }
+  if (solverHandles > 0) {
+    parts.push(`${String(solverHandles)} solver handles`);
+  }
   if (textures > 0 || renderTargets > 0) {
     parts.push(`${String(textureBytes)} B of texture memory`);
   }
@@ -244,6 +269,7 @@ export function auditResourceLeaks(
     textureBytes,
     materials,
     solverBodies,
+    solverHandles,
     message,
   };
 }
