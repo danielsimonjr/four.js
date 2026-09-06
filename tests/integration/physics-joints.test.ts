@@ -510,11 +510,9 @@ for (const kit of DIMENSION_KITS) {
       // Slack start at y = -1 with maxLength 1: hanging at the origin distance.
       expect(rope.load.node.transform.position.y).toBeCloseTo(-1, 2);
 
-      // Same locals again: not re-measured against the current pose, so the
-      // COM stays on the same circle.
+      // Same locals again: writing what is already stored queues nothing, and
+      // the COM is not re-measured against the current pose.
       rope.joint.setAnchors(new Vector3(0, 0, 0), new Vector3(0, 0, 0));
-      expect(rope.joint.commands.anchorsDirty).toBe(true);
-      rig.app.step(DT);
       expect(rope.joint.commands.anchorsDirty).toBe(false);
       stepFrames(rig.app, 60);
       expect(rope.load.node.transform.position.y).toBeCloseTo(-1, 2);
@@ -522,6 +520,9 @@ for (const kit of DIMENSION_KITS) {
       // New body-local attachment 0.5 m above the load origin. Gravity hangs
       // the new pair at 1 m, so the COM drops to y = -1.5.
       rope.joint.setAnchors(new Vector3(0, 0, 0), new Vector3(0, 0.5, 0));
+      expect(rope.joint.commands.anchorsDirty).toBe(true);
+      rig.app.step(DT);
+      expect(rope.joint.commands.anchorsDirty).toBe(false);
       stepFrames(rig.app, 180);
       expect(rope.load.node.transform.position.y).toBeCloseTo(-1.5, 2);
     });
