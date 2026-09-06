@@ -11,6 +11,15 @@ export default tseslint.config(
       // the repository, and linting one from here means unresolvable project
       // service references and double-linting everything it contains.
       ".claude/worktrees/**",
+      // Dogfooding scratch (already gitignored): throwaway consumer apps written to
+      // exercise the published surface from outside — a flight sim, a two-cylinder
+      // engine, the README quick-start extracted verbatim. They are deliberately
+      // written the way a *user* would write them, so they neither share this
+      // config's project service nor should be held to the library's own rules.
+      // Without this, `bun run lint` fails on any machine that has run a dogfooding
+      // pass, while CI stays green because the directory is gitignored — the exact
+      // green-in-CI/broken-locally shape this repo has been fixing all day.
+      ".dogfood/**",
       // Vendored from MathTS and kept byte-identical with the copy in llm-wiki, so
       // it is not ours to restyle — reformatting it here would guarantee the two
       // copies drift. It carries its own tsconfig and is verified by running it

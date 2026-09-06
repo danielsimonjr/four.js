@@ -8,6 +8,16 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — `bun run lint` fails on a machine that has dogfooded
+
+- **`.dogfood/**` is now ignored by ESLint.** The dogfooding scratch directory holds
+  throwaway consumer apps written deliberately the way a *user* would write them, so they
+  neither share this config's project service nor belong under the library's own rules.
+  Without the ignore, `bun run lint` fails on any machine that has run a dogfooding pass
+  while CI stays green — the directory is gitignored, so the runner never sees it.
+  Same green-in-CI/broken-locally shape as the three Windows-only defects fixed today, and
+  self-inflicted this time. The config already ignored agent worktrees for the same reason.
+
 ### 2026-09-06 — open PRs and branches swept
 
 - **Two Dependabot PRs closed, neither blocked on a rebase.**
