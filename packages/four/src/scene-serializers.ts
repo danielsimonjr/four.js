@@ -68,11 +68,12 @@
  * — see {@link registerPhysicsSerializers} for what a physics document does and
  * does not carry.
  *
- * Not covered, and staged rather than sketched: §79's **manifest document**
- * itself — the "key → URL + content hash" mapping — because §76 content hashing
- * is staged (A-18). What ships instead is the seam a manifest sits behind; see
- * below. The §80 `.four` binary package format is likewise untouched: none of
- * this is a format change (2026-08-07).
+ * The §79 **manifest document** (key → URL + content hash) ships in
+ * `@four/assets`. `preloadManifestIntoCatalog` (this package) walks the keys
+ * a document names, loads each, and returns a {@link SceneResourceCatalog}
+ * whose `get` stays synchronous — deserialization cannot wait on a fetch.
+ * The §80 `.four` binary package format is still untouched: none of this is
+ * a format change (2026-08-07).
  *
  * ## Type names
  *
@@ -118,10 +119,11 @@
  * {@link SceneNodeTypeOptions} the way `nodeDataOf` injects a writer. A catalog
  * built from a §76 manifest, from an asset bundle, or from a literal `Map` in a
  * test all satisfy it and none of the node types below can tell which — which
- * is the point: **the manifest, when A-18 makes it expressible, sits behind this
- * seam rather than replacing it.** A `Map<string, Material>` already satisfies
- * the read half on its own, since `Map.get` *is* `get`; {@link resourceCatalog}
- * builds both halves from one map so they cannot disagree.
+ * is the point: **the manifest sits behind this seam rather than replacing
+ * it** — `preloadManifestIntoCatalog` is the walk that fills the map. A
+ * `Map<string, Material>` already satisfies the read half on its own, since
+ * `Map.get` *is* `get`; {@link resourceCatalog} builds both halves from one
+ * map so they cannot disagree.
  *
  * A reference that cannot be **named** on the way out is refused, and so is one
  * that cannot be **resolved** on the way in (§85) — a `FourError` naming the

@@ -22,8 +22,9 @@
  * synchronously, because deserialization is synchronous. So the wiring is
  * necessarily two steps: preload every key a document names through the
  * manifest, then hand the resulting map to `resourceCatalog(...)`. Step one is
- * this module; step two is a `@four/four` packet, because it is the half that
- * knows what a geometry or a material *is*. Naming the seam is the point of
+ * this module; step two is `preloadManifestIntoCatalog` on the umbrella,
+ * because that is the half that knows what a geometry or a material *is* and
+ * because `get(key)` must stay synchronous. Naming the seam is the point of
  * this paragraph: nothing about §79's manifest is blocked on hashing any more.
  *
  * ## A manifest is untrusted content (§96)

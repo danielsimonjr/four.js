@@ -134,3 +134,11 @@ export { instantiateGltf } from "./gltf.js";
 // records the argument. Never referenced by `Application`; tree-shakes when
 // unused.
 export { createPickProvider } from "./pick-provider.js";
+
+// A-16's remaining half: a §79 manifest is asynchronous (verified bytes),
+// while `SceneResourceCatalog.get` is synchronous (deserialization is).
+// `preloadManifestIntoCatalog` is the preload-then-catalog walk so callers
+// do not write it by hand. `manifest-catalog.ts` records the argument.
+// Never referenced by `Application`; tree-shakes when unused.
+export type { PreloadManifestIntoCatalogOptions } from "./manifest-catalog.js";
+export { preloadManifestIntoCatalog } from "./manifest-catalog.js";
