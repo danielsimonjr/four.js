@@ -11,7 +11,12 @@
  */
 "use strict";
 
-const { relative } = require("node:path");
+/** Prefer `src/...` when the file sits in a package `src/` tree. */
+function displayPath(file) {
+  const normalized = String(file).replace(/\\/g, "/");
+  const src = normalized.lastIndexOf("/src/");
+  return src === -1 ? normalized : normalized.slice(src + 1);
+}
 
 class PerFileCoverageFloor {
   constructor(opts = {}) {
@@ -41,8 +46,7 @@ class PerFileCoverageFloor {
     if (summary.isEmpty()) {
       return;
     }
-    const absolute = node.getFileCoverage().path;
-    const file = relative(".", absolute).replace(/\\/g, "/");
+    const file = displayPath(node.getFileCoverage().path);
     for (const key of ["lines", "functions", "statements", "branches"]) {
       const threshold = this[key];
       if (threshold === undefined) {
