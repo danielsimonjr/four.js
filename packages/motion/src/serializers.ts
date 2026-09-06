@@ -80,6 +80,7 @@ import {
   FollowRig,
   OrbitRig,
 } from "./camera-rigs.js";
+import { CameraShake } from "./camera-shake.js";
 import {
   CharacterController,
   DEFAULT_CHARACTER_GRAVITY,
@@ -545,3 +546,60 @@ export const FIRST_PERSON_LOOK_SERIALIZER: ComponentSerializerShape<FirstPersonL
       });
     },
   };
+
+/**
+ * The §79 serializer for {@link CameraShake} (§44, R-36/R-37 residue).
+ *
+ * ```ts
+ * import { CameraShake, CAMERA_SHAKE_SERIALIZER } from "@four/motion";
+ *
+ * registry.register(CameraShake, CAMERA_SHAKE_SERIALIZER);
+ * ```
+ *
+ * Amplitude, frequency, seed, rotational amplitude and the decay rate are
+ * authored configuration and are always written (rotational amplitude is
+ * omitted when it is the zero default, so a position-only shake stays a
+ * small document). **Trauma is scene state** — a camera saved mid-impulse
+ * is still shaking, and nothing else can reconstruct the envelope — so it
+ * is written the way `CHARACTER_CONTROLLER_SERIALIZER` writes
+ * `verticalVelocity`. `skippedSteps` is a diagnostic of a run and is not
+ * carried.
+ *
+ * The seed is the hash salt, not a live `SeededRandom` stream: the noise is
+ * a pure function of `(seed, simulationTime)` and there is no stream
+ * position to restore.
+ */
+export const CAMERA_SHAKE_SERIALIZER: ComponentSerializerShape<CameraShake> = {
+  serialize(component: CameraShake): JsonValue {
+    const payload: Record<string, JsonValue> = {
+      amplitude: vectorJson(component.amplitude),
+      frequency: component.frequency,
+      seed: component.seed,
+      trauma: component.trauma,
+      traumaDecay: component.traumaDecay,
+    };
+    const rotation = component.rotationAmplitude;
+    if (rotation.x !== 0 || rotation.y !== 0 || rotation.z !== 0) {
+      payload.rotationAmplitude = vectorJson(rotation);
+    }
+    return payload;
+  },
+
+  deserialize(data: JsonValue): CameraShake {
+    const record = readRecord(data);
+    return new CameraShake({
+      amplitude:
+        record.amplitude === undefined
+          ? new Vector3(1, 1, 1)
+          : readVector(record.amplitude, new Vector3()),
+      rotationAmplitude:
+        record.rotationAmplitude === undefined
+          ? undefined
+          : readVector(record.rotationAmplitude, new Vector3()),
+      frequency: readNumber(record.frequency, 1),
+      seed: readNumber(record.seed, 0),
+      trauma: readNumber(record.trauma, 1),
+      traumaDecay: readNumber(record.traumaDecay, 0),
+    });
+  },
+};

@@ -22,20 +22,23 @@
  *
  * ## One system, one authority (§42)
  *
- * Placement (`OrbitRig`, `FollowRig`) and aim (`LookAtConstraint`) are three
- * components but **one** system, because §42 allows exactly one owner per node
- * and these three all write the same node's transform. Splitting them across
- * two systems would mean two writers claiming `"constraint"` over one node,
- * which §42's check cannot catch — it compares the *authority*, not the system
- * instance. Within the step the order is fixed and meaningful:
+ * Placement (`OrbitRig`, `FollowRig`), aim (`LookAtConstraint`) and shake
+ * (`CameraShake`) are four components but **one** system, because §42 allows
+ * exactly one owner per node and these four all write the same node's
+ * transform. Splitting them across two systems would mean two writers claiming
+ * `"constraint"` over one node, which §42's check cannot catch — it compares
+ * the *authority*, not the system instance. Within the step the order is
+ * fixed and meaningful:
  *
  * 1. place — `OrbitRig`, then `FollowRig`;
- * 2. aim — `LookAtConstraint`.
+ * 2. aim — `LookAtConstraint`;
+ * 3. shake — `CameraShake` (additive, so it layers on the pose 1–2 wrote).
  *
  * so the aim reads the pose written this step rather than last step's, and an
  * orbiting, aimed camera is exact on the first step rather than one frame
- * behind. (Attaching both rigs to one node is legal and the follow rig wins,
- * being second; they are alternatives, not layers.)
+ * behind. Shake runs last so a look-at is not asked to cancel the kick.
+ * (Attaching both placement rigs to one node is legal and the follow rig
+ * wins, being second; they are alternatives, not layers.)
  *
  * §39's step 7 — `PRIORITY_CONSTRAINTS`, 700 — is where the registry runs it:
  * after the solve (600), so a rig following a rigid body sees the pose the
@@ -77,6 +80,7 @@ import {
 } from "@four/scene";
 
 import { FollowRig, OrbitRig } from "./camera-rigs.js";
+import { CameraShake } from "./camera-shake.js";
 import { resolveTargetPosition, type RigTarget } from "./rig-target.js";
 import {
   PRIORITY_CONSTRAINTS,
@@ -293,12 +297,14 @@ export interface ConstraintSystemOptions {
  * 1. skip a disabled node;
  * 2. skip a node whose rigs and constraint are all absent or untargeted — an
  *    idle node writes nothing, so there is no §42 conflict to report;
+ *    `CameraShake` has no target and is never idle while attached;
  * 3. refuse a node owned by another authority, reporting it once through
  *    `warnAuthorityConflict` — the owner keeps the transform, and the rigs are
  *    left frozen rather than stepped, so granting authority later resumes from
  *    where the rig stopped;
  * 4. place: `OrbitRig`, then `FollowRig`;
- * 5. aim: `LookAtConstraint`.
+ * 5. aim: `LookAtConstraint`;
+ * 6. shake: `CameraShake` — additive, after placement and aim.
  */
 export class ConstraintSystem implements SimulationSystem {
   /** Execution order key (§39); default {@link PRIORITY_CONSTRAINTS}. */
@@ -363,13 +369,16 @@ export class ConstraintSystem implements SimulationSystem {
       const orbit = node.getComponent(OrbitRig);
       const follow = node.getComponent(FollowRig);
       const aim = node.getComponent(LookAtConstraint);
+      const shake = node.getComponent(CameraShake);
       if (
+        shake === undefined &&
         (orbit === undefined || orbit.target === null) &&
         (follow === undefined || follow.target === null) &&
         (aim === undefined || aim.target === null)
       ) {
         // Idle: nothing would be written, so there is no §42 conflict to
         // report. `KinematicSystem`'s rule, for the same reason.
+        // `CameraShake` has no target — attaching it is enough to write.
         continue;
       }
       // §42: this system writes as `constraint`; anything else owns the
@@ -381,6 +390,10 @@ export class ConstraintSystem implements SimulationSystem {
       orbit?.apply(node);
       follow?.apply(node, dt);
       aim?.apply(node, dt);
+      // Additive: the kick is layered on the pose the placement / aim just
+      // wrote. Sampled at `simulationTime` so the noise is a function of the
+      // physics clock, not of the step rate (§33).
+      shake?.apply(node, dt, context.time.simulationTime);
     }
   }
 

@@ -1,9 +1,15 @@
 import { Vector3, constructionCount, resetConstructionCount } from "@four/math";
 import { describe, expect, it } from "vitest";
 
+import { Group } from "@four/scene";
+
 import {
+  DEFAULT_IK_MAX_ITERATIONS,
+  DEFAULT_IK_TOLERANCE,
   type TwoBoneIKSolution,
   createTwoBoneIKSolution,
+  solveCCD,
+  solveFABRIK,
   solveTwoBoneIK,
 } from "../src/ik.js";
 
@@ -351,5 +357,248 @@ describe("solveTwoBoneIK — allocation and determinism", () => {
       expect(Object.is(first[key].z, second[key].z)).toBe(true);
     }
     expect(first.reachable).toBe(second.reachable);
+  });
+});
+
+function boneLengths(
+  positions: readonly Vector3[],
+): readonly number[] {
+  const lengths: number[] = [];
+  for (let i = 0; i < positions.length - 1; i += 1) {
+    lengths.push(distance(positions[i]!, positions[i + 1]!));
+  }
+  return lengths;
+}
+
+describe("solveCCD / solveFABRIK", () => {
+  it("matches two-bone analytic within tolerance on a bent XY start", () => {
+    const target = new Vector3(3, 0, 0);
+    const pole = new Vector3(0, 1, 0);
+    const analytic = solveTwoBoneIK(ORIGIN, target, 2, 2, pole);
+
+    const joint = new Vector3(2, 0.35, 0);
+    const jointLength = joint.length();
+    joint.scale(2 / jointLength);
+    const end = new Vector3(joint.x + 2, joint.y, joint.z);
+    const chain = [ORIGIN.clone(), joint, end];
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+
+    const result = solveCCD(chain, target, { tolerance: 1e-4, maxIterations: 32 }, out);
+    expect(result.converged).toBe(true);
+    expect(result.error).toBeLessThan(DEFAULT_IK_TOLERANCE);
+    expect(distance(out[2]!, analytic.end)).toBeLessThan(1e-3);
+    expect(distance(out[1]!, analytic.joint)).toBeLessThan(1e-3);
+    expect(out[1]!.y).toBeGreaterThan(0);
+  });
+
+  it("FABRIK reaches a reachable target and keeps bone lengths", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(1, 0, 0),
+      new Vector3(2, 0, 0),
+    ];
+    const target = new Vector3(1, 1, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const initial = boneLengths(chain);
+    const result = solveFABRIK(chain, target, undefined, out);
+
+    expect(result.converged).toBe(true);
+    expect(result.error).toBeLessThan(DEFAULT_IK_TOLERANCE);
+    expect(distance(out[2]!, target)).toBeLessThan(DEFAULT_IK_TOLERANCE);
+    const next = boneLengths(out);
+    expect(next[0]).toBeCloseTo(initial[0]!, 10);
+    expect(next[1]).toBeCloseTo(initial[1]!, 10);
+  });
+
+  it("returns converged=false and the last iterate for an unreachable target", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(1, 0, 0),
+      new Vector3(2, 0, 0),
+    ];
+    const target = new Vector3(100, 0, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const result = solveFABRIK(
+      chain,
+      target,
+      { maxIterations: 8, tolerance: 1e-4 },
+      out,
+    );
+    expect(result.converged).toBe(false);
+    expect(result.iterations).toBe(8);
+    expect(result.error).toBeGreaterThan(1);
+    expect(out[2]!.x).toBeGreaterThan(1.5);
+    expect(out[2]!.x).toBeLessThan(2.5);
+  });
+
+  it("respects a ball limit on the middle joint", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(2, 0, 0),
+      new Vector3(4, 0, 0),
+    ];
+    const target = new Vector3(0, 4, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const maxBend = 0.25;
+    solveCCD(
+      chain,
+      target,
+      {
+        maxIterations: 24,
+        limits: [undefined, { min: 0, max: maxBend }],
+      },
+      out,
+    );
+    const outgoing = new Vector3(
+      out[2]!.x - out[1]!.x,
+      out[2]!.y - out[1]!.y,
+      out[2]!.z - out[1]!.z,
+    ).normalize();
+    const fromRest = Math.acos(Math.min(1, Math.max(-1, outgoing.x)));
+    expect(fromRest).toBeLessThanOrEqual(maxBend + 1e-6);
+  });
+
+  it("respects a hinge limit about +Z", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(2, 0, 0),
+      new Vector3(4, 0, 0),
+    ];
+    const target = new Vector3(2, 3, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const hinge = { min: -0.15, max: 0.15, axis: new Vector3(0, 0, 1) };
+    solveFABRIK(
+      chain,
+      target,
+      { maxIterations: 16, limits: [{ min: -Math.PI, max: Math.PI }, hinge] },
+      out,
+    );
+    const rest = new Vector3(1, 0, 0);
+    const outgoing = new Vector3(
+      out[2]!.x - out[1]!.x,
+      out[2]!.y - out[1]!.y,
+      out[2]!.z - out[1]!.z,
+    ).normalize();
+    const signed = Math.atan2(outgoing.y, outgoing.x) - Math.atan2(rest.y, rest.x);
+    expect(signed).toBeGreaterThanOrEqual(hinge.min - 1e-6);
+    expect(signed).toBeLessThanOrEqual(hinge.max + 1e-6);
+  });
+
+  it("bounds work at maxIterations", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(1, 0.2, 0),
+      new Vector3(2, 0, 0),
+    ];
+    const target = new Vector3(0.4, 1.6, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const result = solveCCD(
+      chain,
+      target,
+      { maxIterations: 2, tolerance: 1e-12 },
+      out,
+    );
+    expect(result.iterations).toBe(2);
+    expect(result.iterations).toBeLessThanOrEqual(DEFAULT_IK_MAX_ITERATIONS);
+    expect(result.converged).toBe(false);
+  });
+
+  it("reads a node chain and does not retain the nodes", () => {
+    const root = new Group();
+    const mid = new Group();
+    const tip = new Group();
+    mid.position.set(1, 0, 0);
+    tip.position.set(2, 0, 0);
+    root.add(mid);
+    mid.add(tip);
+    const target = new Vector3(1, 1, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    const result = solveFABRIK([root, mid, tip], target, undefined, out);
+    expect(result.converged).toBe(true);
+    mid.position.set(50, 50, 50);
+    expect(out[1]!.x).toBeLessThan(5);
+  });
+
+  it("does not allocate Vector3s when out is provided, after warm-up", () => {
+    const chain = [
+      new Vector3(0, 0, 0),
+      new Vector3(1, 0.1, 0),
+      new Vector3(2, 0, 0),
+    ];
+    const target = new Vector3(1.2, 0.8, 0);
+    const out = [new Vector3(), new Vector3(), new Vector3()];
+    solveCCD(chain, target, undefined, out);
+    solveFABRIK(chain, target, undefined, out);
+    resetConstructionCount();
+    solveCCD(chain, target, undefined, out);
+    solveFABRIK(chain, target, undefined, out);
+    expect(constructionCount()).toBe(0);
+  });
+
+  it("is deterministic: identical inputs give bit-identical iterates (§33)", () => {
+    const chain = [
+      new Vector3(0.25, -0.5, 0.1),
+      new Vector3(1.1, 0.2, -0.05),
+      new Vector3(2.0, 0.4, 0.15),
+    ];
+    const target = new Vector3(1.4, 1.2, 0.3);
+    const first = [new Vector3(), new Vector3(), new Vector3()];
+    const second = [new Vector3(), new Vector3(), new Vector3()];
+    const a = solveCCD(chain, target, { maxIterations: 12 }, first);
+    solveFABRIK(chain, new Vector3(9, 9, 9), undefined, second);
+    const b = solveCCD(chain, target, { maxIterations: 12 }, second);
+    expect(a.iterations).toBe(b.iterations);
+    expect(Object.is(a.error, b.error)).toBe(true);
+    expect(a.converged).toBe(b.converged);
+    for (let i = 0; i < 3; i += 1) {
+      expect(Object.is(first[i]!.x, second[i]!.x)).toBe(true);
+      expect(Object.is(first[i]!.y, second[i]!.y)).toBe(true);
+      expect(Object.is(first[i]!.z, second[i]!.z)).toBe(true);
+    }
+  });
+
+  it("does not mutate the input chain", () => {
+    const chain = [new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(2, 0, 0)];
+    const snapshot = chain.map((p) => p.clone());
+    solveCCD(chain, new Vector3(1, 1, 0));
+    solveFABRIK(chain, new Vector3(0.5, 0.5, 0));
+    for (let i = 0; i < chain.length; i += 1) {
+      expect(chain[i]!.equalsApprox(snapshot[i]!, 0)).toBe(true);
+    }
+  });
+
+  it("refuses a short chain and a short out", () => {
+    expect(() => solveCCD([new Vector3()], new Vector3(1, 0, 0))).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      solveFABRIK(
+        [new Vector3(), new Vector3(1, 0, 0)],
+        new Vector3(1, 1, 0),
+        undefined,
+        [new Vector3()],
+      ),
+    ).toThrow(RangeError);
+    expect(() =>
+      solveCCD(
+        [new Vector3(), new Vector3(1, 0, 0)],
+        new Vector3(1, 0, 0),
+        { tolerance: 0 },
+      ),
+    ).toThrow(RangeError);
+    expect(() =>
+      solveCCD(
+        [new Vector3(), new Vector3(1, 0, 0)],
+        new Vector3(1, 0, 0),
+        { maxIterations: 0 },
+      ),
+    ).toThrow(RangeError);
+    expect(() =>
+      solveFABRIK(
+        [new Vector3(), new Vector3(1, 0, 0)],
+        new Vector3(1, 0, 0),
+        { limits: [{ min: 1, max: 0 }] },
+      ),
+    ).toThrow(RangeError);
   });
 });

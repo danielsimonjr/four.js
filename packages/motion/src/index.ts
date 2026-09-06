@@ -15,6 +15,8 @@ export {
   FollowRig,
   OrbitRig,
 } from "./camera-rigs.js";
+export type { CameraShakeOptions } from "./camera-shake.js";
+export { CameraShake } from "./camera-shake.js";
 export type {
   CharacterControllerOptions,
   FirstPersonLookOptions,
@@ -43,8 +45,21 @@ export type {
   LookAtConstraintOptions,
 } from "./constraints.js";
 export { ConstraintSystem, LookAtConstraint } from "./constraints.js";
-export type { TwoBoneIKSolution } from "./ik.js";
-export { createTwoBoneIKSolution, solveTwoBoneIK } from "./ik.js";
+export type {
+  IKChain,
+  IKSolveOptions,
+  IKSolveResult,
+  JointLimit,
+  TwoBoneIKSolution,
+} from "./ik.js";
+export {
+  DEFAULT_IK_MAX_ITERATIONS,
+  DEFAULT_IK_TOLERANCE,
+  createTwoBoneIKSolution,
+  solveCCD,
+  solveFABRIK,
+  solveTwoBoneIK,
+} from "./ik.js";
 export type {
   AccelerationFn,
   Integrator,
@@ -81,6 +96,7 @@ export type { ComponentSerializerShape } from "./serializers.js";
 export {
   CHARACTER_CONTROLLER_SERIALIZER,
   FIRST_PERSON_LOOK_SERIALIZER,
+  CAMERA_SHAKE_SERIALIZER,
   FOLLOW_RIG_SERIALIZER,
   KINEMATIC_CONTROLLER_SERIALIZER,
   LOOK_AT_CONSTRAINT_SERIALIZER,
@@ -134,6 +150,7 @@ export {
   separation,
   truncate,
   wander,
+  wanderSpherical,
 } from "./steering.js";
 export type {
   Detach,

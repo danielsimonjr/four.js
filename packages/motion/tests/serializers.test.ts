@@ -18,6 +18,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_ORBIT_PITCH_LIMIT,
+  CAMERA_SHAKE_SERIALIZER,
+  CameraShake,
   FOLLOW_RIG_SERIALIZER,
   FollowRig,
   KINEMATIC_CONTROLLER_SERIALIZER,
@@ -519,5 +521,63 @@ describe("LOOK_AT_CONSTRAINT_SERIALIZER", () => {
         new Group(),
       ),
     ).toThrow(RangeError);
+  });
+});
+
+describe("CAMERA_SHAKE_SERIALIZER", () => {
+  it("is assignable to the ComponentSerializer contract it targets", () => {
+    const mirror: ComponentSerializerMirror<CameraShake> =
+      CAMERA_SHAKE_SERIALIZER;
+
+    expect(
+      mirror.deserialize(mirror.serialize(new CameraShake()), new Group()),
+    ).toBeInstanceOf(CameraShake);
+  });
+
+  it("round-trips amplitude, frequency, seed, trauma and decay", () => {
+    const shake = new CameraShake({
+      amplitude: new Vector3(0.2, 0.3, 0.4),
+      rotationAmplitude: new Vector3(0.01, 0.02, 0.03),
+      frequency: 11,
+      seed: 77,
+      trauma: 0.6,
+      traumaDecay: 1.25,
+    });
+    const payload = CAMERA_SHAKE_SERIALIZER.serialize(shake);
+    expect(payload).toEqual({
+      amplitude: { x: 0.2, y: 0.3, z: 0.4 },
+      frequency: 11,
+      seed: 77,
+      trauma: 0.6,
+      traumaDecay: 1.25,
+      rotationAmplitude: { x: 0.01, y: 0.02, z: 0.03 },
+    });
+
+    const restored = CAMERA_SHAKE_SERIALIZER.deserialize(
+      JSON.parse(JSON.stringify(payload)) as JsonValue,
+      new Group(),
+    );
+    expect(restored.amplitude.equalsApprox(shake.amplitude, 0)).toBe(true);
+    expect(
+      restored.rotationAmplitude.equalsApprox(shake.rotationAmplitude, 0),
+    ).toBe(true);
+    expect(restored.frequency).toBe(11);
+    expect(restored.seed).toBe(77);
+    expect(restored.trauma).toBe(0.6);
+    expect(restored.traumaDecay).toBe(1.25);
+  });
+
+  it("omits a zero rotational amplitude and restores defaults for shape", () => {
+    const payload = CAMERA_SHAKE_SERIALIZER.serialize(
+      new CameraShake(),
+    ) as Record<string, JsonValue>;
+    expect("rotationAmplitude" in payload).toBe(false);
+
+    const restored = CAMERA_SHAKE_SERIALIZER.deserialize({}, new Group());
+    expect(restored.amplitude.equalsApprox(new Vector3(1, 1, 1), 0)).toBe(true);
+    expect(restored.frequency).toBe(1);
+    expect(restored.seed).toBe(0);
+    expect(restored.trauma).toBe(1);
+    expect(restored.traumaDecay).toBe(0);
   });
 });

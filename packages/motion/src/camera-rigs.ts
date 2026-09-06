@@ -1,7 +1,7 @@
 /**
  * §44 camera rigs: {@link OrbitRig} (orbit) and {@link FollowRig} (follow target
  * and spring arm), the two placement components `ConstraintSystem` drives
- * (R-36 rig half, 2026-08-13).
+ * (R-36 rig half, 2026-08-13). Shake ships beside them in `camera-shake.ts`.
  *
  * §44 lists seven rigs — orbit, fly, first-person, trackball, follow, spring
  * arm, shake. Two of them ship here, one of them is two of the seven, and the
@@ -40,7 +40,7 @@
  * |---|---|
  * | fly | two lines of application code over `orbit`/`dolly` once input is fed; a class would add API surface and no behaviour |
  * | first-person | writes a rotation, so it collides with `LookAtConstraint` for §42's single authority — it waits on §12's character controllers to settle aim-vs-free-look arbitration |
- * | shake | wants interpolated value noise, not per-step white noise, whose character would change with the fixed rate (§33); a packet of its own |
+ * | shake | **shipped** (`CameraShake` in `camera-shake.ts`): interpolated hash value-noise sampled at `simulationTime`, so the character is independent of the fixed rate (§33) |
  * | stereo / XR | an extension point on the camera, not a rig that writes a transform |
  *
  * **Trackball shipped elsewhere (R-37, 2026-08-21):** it is `TrackballRig` in
