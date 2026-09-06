@@ -1241,7 +1241,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       on a squad/tangent decision in `@four/animation`, and the four
       unsampleable material texture slots (`ignoredTextures`) wait on the
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
-      the loader parses them already and widens without a format change.
+      metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
+      The loader parses them already and widens without a format change.
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
       closed operators and a new operator is out of scope in both RFCs). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
