@@ -30,6 +30,14 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — §42 warn stays off the DEV flag.** A-4 step 4
+  routed `warnAuthorityConflict` through `devWarnOnce`, which
+  `dev-build-mode.test.ts` refuses in `@four/scene` (simulation
+  envelope). The WeakMap still suppresses once per node per writer;
+  the message is unconditional `console.warn`. Production prints the
+  first conflict. `asset-manager.ts` stays on `devWarnOnce` and is
+  on the GATED list — assets is IO.
+
 - **2026-09-06 — #70 size budgets.** first-3d 38.18/38, particles
   36.77/36.5, ui-demo 45.27/45. Bumped half a kilobyte each. The
   waiter-only PR did not grow the library; CI first reached `size`
@@ -66,10 +74,9 @@ readable; never delete the pointer itself.
   (WP-5.2), so a non-zero waking contribution calls `RigidBody.wake()`.
   `forEachSleepingDynamicBody` is the complementary walk.
 
-- **2026-09-06 — §42 authority conflicts go through `devWarnOnce`.** A-4
-  remainder step 4. The WeakMap still owns once-per-node-per-writer;
-  production (`__FOUR_DEV__ === false`) prints nothing. The stale
-  "no build-mode flag" comment in `authority.ts` is retired.
+- **2026-09-06 — §42 authority conflicts go through `devWarnOnce`.**
+  Superseded the same day: `@four/scene` cannot import `DEV`. See
+  "§42 warn stays off the DEV flag" above.
 
 - **2026-09-06 — PoseTarget scale blends against identity.** A solver
   body has no scale, so the invented physical side is `(1, 1, 1)`. At

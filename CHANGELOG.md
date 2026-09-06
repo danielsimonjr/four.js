@@ -18,6 +18,9 @@ specification; until then, entries are grouped by date under **Unreleased**.
   particles-demo 36.5 → 37 kB (36.77), ui-demo 45 → 45.5 kB (45.27).
   The growth is #70's field torque / unlit blend / metal-roughness
   path, not this waiter.
+- **§33 GATED list.** `asset-manager.ts` is allowlisted (duplicate-load
+  warn). `warnAuthorityConflict` no longer imports `DEV` — `@four/scene`
+  cannot gate on the build flag.
 
 ### 2026-09-06 — WebGL F13 / metal-roughness restore
 
