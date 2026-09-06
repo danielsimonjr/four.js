@@ -68,11 +68,12 @@
  * — see {@link registerPhysicsSerializers} for what a physics document does and
  * does not carry.
  *
- * Not covered, and staged rather than sketched: §79's **manifest document**
- * itself — the "key → URL + content hash" mapping — because §76 content hashing
- * is staged (A-18). What ships instead is the seam a manifest sits behind; see
- * below. The §80 `.four` binary package format is likewise untouched: none of
- * this is a format change (2026-08-07).
+ * The §79 **manifest document** (key → URL + content hash) ships in
+ * `@four/assets`. `preloadManifestIntoCatalog` (this package) walks the keys
+ * a document names, loads each, and returns a {@link SceneResourceCatalog}
+ * whose `get` stays synchronous — deserialization cannot wait on a fetch.
+ * The §80 `.four` binary package format is still untouched: none of this is
+ * a format change (2026-08-07).
  *
  * ## Type names
  *
@@ -118,10 +119,11 @@
  * {@link SceneNodeTypeOptions} the way `nodeDataOf` injects a writer. A catalog
  * built from a §76 manifest, from an asset bundle, or from a literal `Map` in a
  * test all satisfy it and none of the node types below can tell which — which
- * is the point: **the manifest, when A-18 makes it expressible, sits behind this
- * seam rather than replacing it.** A `Map<string, Material>` already satisfies
- * the read half on its own, since `Map.get` *is* `get`; {@link resourceCatalog}
- * builds both halves from one map so they cannot disagree.
+ * is the point: **the manifest sits behind this seam rather than replacing
+ * it** — `preloadManifestIntoCatalog` is the walk that fills the map. A
+ * `Map<string, Material>` already satisfies the read half on its own, since
+ * `Map.get` *is* `get`; {@link resourceCatalog} builds both halves from one
+ * map so they cannot disagree.
  *
  * A reference that cannot be **named** on the way out is refused, and so is one
  * that cannot be **resolved** on the way in (§85) — a `FourError` naming the
@@ -198,6 +200,7 @@ import type {
   ResolvedPaint,
   ResolvedShapeFill,
   ResolvedStrokeStyle,
+  ScissorRect,
 } from "@four/render";
 import {
   Bone,
@@ -687,6 +690,52 @@ function readRenderableFlags(data: {
   const clip = readBoolean(data.clip);
   if (clip !== undefined) options.clip = clip;
   return options;
+}
+
+/**
+ * §67 rectangular scissor through §79. Omitted when `null` so a document
+ * written before the field restores the default (inherit the view scissor).
+ * A corrupted object is dropped rather than failing the scene — the Sprite
+ * precedent, and §96's filter-don't-trust rule.
+ */
+function scissorJson(node: {
+  readonly scissor: ScissorRect | null;
+}): Record<string, JsonValue> {
+  const rect = node.scissor;
+  if (rect == null) {
+    return {};
+  }
+  return {
+    scissor: {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    },
+  };
+}
+
+function readScissor(data: {
+  readonly [key: string]: JsonValue;
+}): { scissor?: ScissorRect } {
+  const value = data.scissor;
+  if (value === undefined || value === null || typeof value !== "object") {
+    return {};
+  }
+  const rect = record(value);
+  const x = readNumber(rect.x);
+  const y = readNumber(rect.y);
+  const width = readNumber(rect.width);
+  const height = readNumber(rect.height);
+  if (
+    x === undefined ||
+    y === undefined ||
+    width === undefined ||
+    height === undefined
+  ) {
+    return {};
+  }
+  return { scissor: { x, y, width, height } };
 }
 
 /**
@@ -1506,6 +1555,7 @@ export function registerRenderSerializers(
             renderLayer: renderable.renderLayer,
             renderOrder: renderable.renderOrder,
             ...renderableFlagsJson(renderable),
+            ...scissorJson(renderable),
           };
         }
         if (constructor === Mesh) {
@@ -1532,6 +1582,7 @@ export function registerRenderSerializers(
             renderLayer: mesh.renderLayer,
             renderOrder: mesh.renderOrder,
             ...renderableFlagsJson(mesh),
+            ...scissorJson(mesh),
             skeleton:
               skeleton === null
                 ? null
@@ -1559,6 +1610,7 @@ export function registerRenderSerializers(
             renderLayer: sprite.renderLayer,
             renderOrder: sprite.renderOrder,
             ...renderableFlagsJson(sprite),
+            ...scissorJson(sprite),
           };
         }
         if (constructor === PerspectiveCamera) {
@@ -1665,6 +1717,7 @@ export function registerRenderSerializers(
           return new Renderable<Material>(geometry, material, {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
+            ...readScissor(data),
           });
         }
         if (document.type === MESH_NODE_TYPE) {
@@ -1681,6 +1734,7 @@ export function registerRenderSerializers(
           const mesh = new Mesh<Material>(geometry, material, {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
+            ...readScissor(data),
           });
           // The skeleton record: shape-corrupt restores no skeleton (the
           // motion serializers' corrupt-field policy — a mesh without its rig
@@ -1725,6 +1779,7 @@ export function registerRenderSerializers(
           return new Sprite(requireSpriteMaterial(document, material), {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
+            ...readScissor(data),
             // §85: the class refuses a non-positive extent, so a payload that
             // carries one restores the default rather than the whole scene
             // failing on one number.
@@ -2717,6 +2772,7 @@ export function registerShapeSerializers(
           renderLayer: shape.renderLayer,
           renderOrder: shape.renderOrder,
           ...renderableFlagsJson(shape),
+          ...scissorJson(shape),
         };
         // §58's two fields are written **only when they are not this class's
         // default** (`R-16`, 2026-08-09). That is what keeps the addition
@@ -2837,6 +2893,7 @@ export function registerShapeSerializers(
           ...positiveOptions(data, ["tolerance"]),
           ...finiteOptions(data, ["renderLayer", "renderOrder"]),
           ...readRenderableFlags(data),
+          ...readScissor(data),
           fill,
           stroke,
         };
@@ -3093,6 +3150,7 @@ export function registerTextSerializers(
           renderLayer: text.renderLayer,
           renderOrder: text.renderOrder,
           ...renderableFlagsJson(text),
+          ...scissorJson(text),
         };
       },
     },
@@ -3123,6 +3181,7 @@ export function registerTextSerializers(
             "renderOrder",
           ]),
           ...readRenderableFlags(data),
+          ...readScissor(data),
           text: readString(data.text) ?? "",
           ...(size !== undefined && size > 0 ? { size } : {}),
           ...(align === "left" || align === "center" || align === "right"

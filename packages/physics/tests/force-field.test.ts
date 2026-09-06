@@ -82,7 +82,11 @@ function bodyNode(options: {
     node.addComponent(new Collider({ shape: { type: "circle", radius: 0.5 } }));
   }
   if (options.position !== undefined) {
-    node.transform.position.set(...options.position);
+    node.transform.position.set(
+      options.position[0],
+      options.position[1],
+      options.position[2],
+    );
   }
   return node;
 }
@@ -154,8 +158,8 @@ describe("ForceFieldSystem registration (§39)", () => {
     expect(system.addField(second, "acceleration")).toBe(second);
 
     expect(system.fields).toEqual([
-      { field: first, units: "force" },
-      { field: second, units: "acceleration" },
+      { field: first, units: "force", wakesSleepingBodies: false },
+      { field: second, units: "acceleration", wakesSleepingBodies: false },
     ]);
   });
 
@@ -577,5 +581,400 @@ describe("§39 step 5 then step 6, in one registry", () => {
     expect(
       world.getBody(world.nodes.next().value as Group)?.commands.force.x,
     ).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §27 batched field sampling
+// ---------------------------------------------------------------------------
+
+/**
+ * A field that implements both entry points from the same arithmetic, and
+ * counts which one the system actually called.
+ */
+function countingBatchField(
+  x: number,
+  y: number,
+  z = 0,
+): ForceField & { sampleCalls: number; batchCalls: number } {
+  const field = {
+    sampleCalls: 0,
+    batchCalls: 0,
+    sample(
+      _position: Vector3,
+      _velocity: Vector3,
+      _time: number,
+      out?: Vector3,
+    ): Vector3 {
+      field.sampleCalls += 1;
+      return (out ?? new Vector3()).set(x, y, z);
+    },
+    sampleAll(
+      _positions: ArrayLike<number>,
+      _velocities: ArrayLike<number>,
+      count: number,
+      _time: number,
+      out: Float64Array,
+    ): void {
+      field.batchCalls += 1;
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += x;
+        out[base + 1] += y;
+        out[base + 2] += z;
+      }
+    },
+  };
+  return field;
+}
+
+/** Drag-like `a = −c · v`, with both entry points, for the N-vs-N equality. */
+function dragLikeField(coefficient: number): ForceField {
+  return {
+    sample(_position, velocity, _time, out) {
+      return (out ?? new Vector3()).set(
+        -coefficient * velocity.x,
+        -coefficient * velocity.y,
+        -coefficient * velocity.z,
+      );
+    },
+    sampleAll(_positions, velocities, count, _time, out) {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += -coefficient * velocities[base];
+        out[base + 1] += -coefficient * velocities[base + 1];
+        out[base + 2] += -coefficient * velocities[base + 2];
+      }
+    },
+  };
+}
+
+describe("ForceFieldSystem batch path (§27 sampleAll)", () => {
+  it("calls sampleAll once per field, not sample per body", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1, position: [0, 0, 0] }));
+    world.addBody(bodyNode({ mass: 2, position: [1, 0, 0] }));
+    world.addBody(bodyNode({ mass: 3, position: [2, 0, 0] }));
+
+    const field = countingBatchField(1, -2, 0);
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [{ field, units: "force" }],
+    }).fixedUpdate(contextAt(0.5));
+    world.step(1 / 60);
+
+    expect(field.batchCalls).toBe(1);
+    expect(field.sampleCalls).toBe(0);
+    for (const id of [1, 2, 3]) {
+      expect(solverForce(adapter, id).x).toBe(1);
+      expect(solverForce(adapter, id).y).toBe(-2);
+    }
+  });
+
+  it("a batch of N equals N times sample() within an ulp", async () => {
+    const { adapter: batchedAdapter, world: batchedWorld } = await readyWorld();
+    const { adapter: scalarAdapter, world: scalarWorld } = await readyWorld();
+    const positions = [
+      [0.5, 1.25, 0],
+      [-2, 0.75, 0],
+      [3.5, -0.5, 0],
+    ] as const;
+    const velocities = [
+      [1.5, -0.25, 0],
+      [0, 2, 0],
+      [-0.75, 0.5, 0],
+    ] as const;
+
+    for (let i = 0; i < positions.length; i += 1) {
+      const position = positions[i];
+      const velocity = velocities[i];
+      batchedWorld.addBody(bodyNode({ mass: 1 + i, position }));
+      scalarWorld.addBody(bodyNode({ mass: 1 + i, position }));
+      batchedAdapter.body(i + 1).position.set(
+        position[0],
+        position[1],
+        position[2],
+      );
+      scalarAdapter.body(i + 1).position.set(
+        position[0],
+        position[1],
+        position[2],
+      );
+      batchedAdapter.body(i + 1).linearVelocity.set(
+        velocity[0],
+        velocity[1],
+        velocity[2],
+      );
+      scalarAdapter.body(i + 1).linearVelocity.set(
+        velocity[0],
+        velocity[1],
+        velocity[2],
+      );
+    }
+    batchedWorld.step(1 / 60);
+    scalarWorld.step(1 / 60);
+
+    const batchedField = dragLikeField(0.4);
+    const scalarOnly: ForceField = {
+      sample: (position, velocity, time, out) =>
+        batchedField.sample(position, velocity, time, out),
+    };
+
+    new ForceFieldSystem({
+      worlds: [batchedWorld],
+      fields: [
+        { field: batchedField, units: "acceleration" },
+        { field: countingBatchField(2, 0, 0), units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0.25));
+    new ForceFieldSystem({
+      worlds: [scalarWorld],
+      fields: [
+        { field: scalarOnly, units: "acceleration" },
+        { field: constantField(2, 0, 0), units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0.25));
+    batchedWorld.step(1 / 60);
+    scalarWorld.step(1 / 60);
+
+    for (const id of [1, 2, 3]) {
+      const batched = solverForce(batchedAdapter, id);
+      const scalar = solverForce(scalarAdapter, id);
+      expect(batched.x).toBe(scalar.x);
+      expect(batched.y).toBe(scalar.y);
+      expect(batched.z).toBe(scalar.z);
+    }
+  });
+
+  it("a field without sampleAll is mixed in without disabling the batch path", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 2, position: [1, 0, 0] }));
+    world.addBody(bodyNode({ mass: 4, position: [2, 0, 0] }));
+
+    const batched = countingBatchField(0, 3, 0);
+    let scalarCalls = 0;
+    const scalar: ForceField = {
+      sample(_position, _velocity, _time, out) {
+        scalarCalls += 1;
+        return (out ?? new Vector3()).set(1, 0, 0);
+      },
+    };
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: batched, units: "acceleration" },
+        { field: scalar, units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(batched.batchCalls).toBe(1);
+    expect(batched.sampleCalls).toBe(0);
+    expect(scalarCalls).toBe(2);
+    // 3 m/s² × mass + 1 N
+    expect(solverForce(adapter, 1).x).toBe(1);
+    expect(solverForce(adapter, 1).y).toBe(6);
+    expect(solverForce(adapter, 2).x).toBe(1);
+    expect(solverForce(adapter, 2).y).toBe(12);
+  });
+
+  it("allocates nothing per step once the SoA scratch has grown (§7b)", async () => {
+    const { world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    world.addBody(bodyNode({ mass: 3 }));
+    const system = new ForceFieldSystem({
+      worlds: [world],
+      fields: [{ field: countingBatchField(1, 0, 0), units: "force" }],
+    });
+    const context = contextAt(0);
+    system.fixedUpdate(context);
+
+    resetConstructionCount();
+    for (let i = 0; i < 20; i += 1) {
+      system.fixedUpdate(context);
+    }
+    expect(constructionCount()).toBe(0);
+  });
+
+  it("does not keep applying to a body after its world goes quiet (§83)", async () => {
+    const first = await readyWorld();
+    const second = await readyWorld();
+    first.world.addBody(bodyNode({ mass: 1 }));
+    second.world.addBody(bodyNode({ mass: 1 }));
+    const system = new ForceFieldSystem({
+      worlds: [first.world, second.world],
+      fields: [{ field: countingBatchField(1, 0, 0), units: "force" }],
+    });
+    system.fixedUpdate(contextAt(0));
+    first.world.step(1 / 60);
+    second.world.step(1 / 60);
+    expect(solverForce(first.adapter, 1).x).toBe(1);
+
+    system.untrack(first.world);
+    first.adapter.body(1).force.set(0, 0, 0);
+    system.fixedUpdate(contextAt(0));
+    first.world.step(1 / 60);
+    second.world.step(1 / 60);
+
+    expect(solverForce(first.adapter, 1).x).toBe(0);
+    expect(solverForce(second.adapter, 1).x).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Torque channel + field-driven waking (PH-8 remainders, 2026-09-06)
+// ---------------------------------------------------------------------------
+
+/** A field that answers a constant torque in N·m, and no linear force. */
+function constantTorqueField(x: number, y: number, z: number): ForceField {
+  return {
+    sample(_position, _velocity, _time, out) {
+      const target = out ?? new Vector3();
+      return target.set(0, 0, 0);
+    },
+    sampleTorque(_position, _velocity, _angular, _time, out) {
+      const target = out ?? new Vector3();
+      return target.set(x, y, z);
+    },
+  };
+}
+
+function solverTorque(adapter: FakeSolverAdapter, id: number): Vector3 {
+  return adapter.body(id).torque;
+}
+
+describe("ForceField.sampleTorque (PH-8 remainder)", () => {
+  it("queues N·m through applyTorque and does not scale by mass", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 2 }));
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [{ field: constantTorqueField(0, 0, 4), units: "acceleration" }],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(solverTorque(adapter, 1).z).toBe(4);
+    expect(solverForce(adapter, 1).x).toBe(0);
+    expect(solverForce(adapter, 1).y).toBe(0);
+  });
+
+  it("sums torque in registration order and leaves a linear-only field at zero", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: constantTorqueField(1, 0, 0), units: "force" },
+        { field: constantField(0, 3), units: "force" },
+        { field: constantTorqueField(0, 2, 0), units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(solverTorque(adapter, 1).x).toBe(1);
+    expect(solverTorque(adapter, 1).y).toBe(2);
+    expect(solverForce(adapter, 1).y).toBe(3);
+  });
+
+  it("applies torque on the batched linear path without a second sampleAll", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    const linear = countingBatchField(0, 0, 0);
+    const twist = constantTorqueField(0, 0, 5);
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: linear, units: "force" },
+        { field: twist, units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(linear.batchCalls).toBe(1);
+    expect(solverTorque(adapter, 1).z).toBe(5);
+  });
+});
+
+describe("ForceFieldAddOptions.wakesSleepingBodies (PH-8 remainder)", () => {
+  it("defaults to false and is stored on the entry", () => {
+    const field = constantField(1, 0);
+    const system = new ForceFieldSystem();
+    system.addField(field, "force");
+    system.addField(field, "force", { wakesSleepingBodies: true });
+    expect(system.fields[0].wakesSleepingBodies).toBe(false);
+    expect(system.fields[1].wakesSleepingBodies).toBe(true);
+  });
+
+  it("wakes a sleeper only for the entry that opted in", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    adapter.body(1).sleeping = true;
+    world.step(1 / 60);
+
+    const ambient = constantField(0, -50);
+    const blast = constantField(8, 0);
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: ambient, units: "force" },
+        { field: blast, units: "force", wakesSleepingBodies: true },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    // Ambient gravity never saw the sleeper; the blast did, and asked to wake.
+    expect(solverForce(adapter, 1).x).toBe(8);
+    expect(solverForce(adapter, 1).y).toBe(0);
+    expect(adapter.body(1).sleeping).toBe(false);
+  });
+
+  it("does not wake when the waking field samples zero", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    adapter.body(1).sleeping = true;
+    world.step(1 / 60);
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        {
+          field: constantField(0, 0),
+          units: "force",
+          wakesSleepingBodies: true,
+        },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(adapter.body(1).sleeping).toBe(true);
+    expect(
+      adapter.calls.filter((call) => call.method === "applyForce"),
+    ).toEqual([]);
+  });
+
+  it("wakes from a non-zero torque with no linear force", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    adapter.body(1).sleeping = true;
+    world.step(1 / 60);
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        {
+          field: constantTorqueField(0, 0, 3),
+          units: "force",
+          wakesSleepingBodies: true,
+        },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(solverTorque(adapter, 1).z).toBe(3);
+    expect(adapter.body(1).sleeping).toBe(false);
   });
 });

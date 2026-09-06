@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { SeededRandom } from "../src/random.js";
 
+// Contention under `bun run test --concurrency=4`: this file passes alone and
+// times out at the 5 s default when the Windows runner is busy. Same shape as
+// the coverage flake in `packages/render/tests/shape.test.ts`.
+
 /**
  * Independent BigInt implementation of the documented formulas (SplitMix32-style
  * seed expansion + xorshift128 with the `(11, 8, 19)` triple).
@@ -100,7 +104,7 @@ function draw(seed: number, count: number): number[] {
   return values;
 }
 
-describe("SeededRandom — known answers (xorshift128, §33)", () => {
+describe("SeededRandom — known answers (xorshift128, §33)", { timeout: 30_000 }, () => {
   it("matches the pinned first eight outputs for five seeds", () => {
     for (const { seed, first8 } of KNOWN_ANSWERS) {
       expect(draw(seed, 8), `seed ${seed}`).toEqual([...first8]);
@@ -127,7 +131,7 @@ describe("SeededRandom — known answers (xorshift128, §33)", () => {
   });
 });
 
-describe("SeededRandom — seed contract", () => {
+describe("SeededRandom — seed contract", { timeout: 30_000 }, () => {
   it("rejects a non-finite seed", () => {
     expect(() => new SeededRandom(Number.NaN)).toThrow(RangeError);
     expect(() => new SeededRandom(Number.POSITIVE_INFINITY)).toThrow(
@@ -171,7 +175,7 @@ describe("SeededRandom — seed contract", () => {
   });
 });
 
-describe("SeededRandom — output ranges", () => {
+describe("SeededRandom — output ranges", { timeout: 30_000 }, () => {
   it("returns uint32 integers", () => {
     const random = new SeededRandom(99);
     let outOfRange = 0;
@@ -264,7 +268,7 @@ describe("SeededRandom — output ranges", () => {
   });
 });
 
-describe("SeededRandom — streams (§33, §34)", () => {
+describe("SeededRandom — streams (§33, §34)", { timeout: 30_000 }, () => {
   it("reproduces a sequence from the same seed", () => {
     const a = new SeededRandom(0xbeef);
     const b = new SeededRandom(0xbeef);

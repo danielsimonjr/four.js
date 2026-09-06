@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **74 open**, 115 done.
+Counts as of 2026-09-06: **57 open**, 136 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -29,33 +29,28 @@ happened on 2026-09-06, when all three sat in the minutes tier until someone rea
 
 Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
 
-- Coverage thresholds are package-level; consider per-file granularity so a weak file can't hide behind a strong package average
+- Coverage thresholds are package-level — DONE 2026-09-06 (80% per-file floor under the 95% package gate).
 
 ### 2 · Hours — one contained fix, already diagnosed
 
 Each has its cause written down. The thinking is done; what remains is the change and its test.
 
-- `smoothness.spec.ts` "frames are drawn between simulation states" aliases against its own virtual frame clock.
-- `blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now measured.
-- Run the README snippet in the browser gate, not just a text check.
-- Scissor clipping (§67's first bullet, small)
-- §59 second texture unit
+- `smoothness.spec.ts` aliasing — DONE 2026-09-06 (virtual-frame parity sampler).
+- `blending.spec.ts` RECOVER / sample-count — DONE 2026-09-06 (page `data-chain-y` watches).
+- Run the README snippet in the browser gate — DONE 2026-09-06 (`tests/browser/readme.spec.ts`).
+- Scissor clipping (§67's first bullet, small) — DONE 2026-09-06.
+- §59 second texture unit — DONE 2026-09-06 (`StandardMaterial.metalRoughnessMap`).
 - Dogfooding coverage map (standing assignment) — surfaces DONE, so they are not redone.
 
 ### 3 · A day — a real packet, cause known
 
 Bounded work with a clear shape, but more than a single edit.
 
-- Five tests time out under `bun run test` on Windows; none is a code defect.
 - The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
-- Pre-existing test-isolation defect, still unfixed and now hidden again.
-- four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.
-- Dependabot bumps will need manual `bun.lock` regeneration.
-- Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is invisible; schedule blending with §60a color management work
-- §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API is the scoped fix; benchmark attribution in benchmarks/results/)
+- Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
 - Size budgets are thin after R-36 (measured A/B, 2026-08-09)
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
-- Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear (candidates: package counts, test-suite counts in `tests/README.md`, the §120 verdict totals) — each addition must stay decidable by reading files
+- Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
 ### 4 · Blocked on a decision, then small
 
@@ -63,8 +58,8 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 - rapier 0.20 adoption is a real decision, not a bump.
 - Lift the TypeScript/vitest pin once typedoc supports TS 7.
-- PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends against; solver bodies have no scale)
-- Rotational root motion (staged 2026-08-02 — quaternion track throws)
+- PoseTarget scale channel — DONE 2026-09-06 (physical side is identity).
+- Rotational root motion — DONE 2026-09-06 (quaternion track extracts local rotation).
 - A-25 owner decisions before first publish:
 - A-25 remainder:
 
@@ -72,7 +67,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export (dated note in steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -90,7 +85,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-8 follow-ups:
 - §8 node-level `NodeSpace` component (PH-12 remainder).
 - §21 `"local-plane"` simulation frame (PH-12 remainder).
-- §27 field torque and field-driven waking (PH-8 remainders).
+- §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
 - Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
 - `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win is in list construction, not in batching. Worth a look together with `R-8`'s per-view restructure.
 - R-30c — the rest of §77, scoped by why each is not ordinary work:
@@ -109,20 +104,22 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - A-5 follow-ups:
 - A-1 follow-ups:
 - A-18 remainder:
-- A-16 remainder (manifest half):
+- A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
 - §96 residue:
 - R-19/R-20 follow-ups:
-- Flaky gate (pre-existing, confirmed at baseline 2026-08-07):
-- A-26 follow-up:
+- Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 PARTIAL
 - Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 - §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
 
 ## Now
 
-- [ ] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
-      its own virtual frame clock.** Failed CI on `dd03d1a` and `94860b0`; passed on
+- [x] **`smoothness.spec.ts` "frames are drawn between simulation states" aliases against
+      its own virtual frame clock.** DONE 2026-09-06 — sampler is now
+      frame-synchronised (`window.__fourVirtualFrames`, alternating odd/even
+      counts) so mid-step and on-step poses are chosen rather than inherited
+      from wall-clock aliasing. Failed CI on `dd03d1a` and `94860b0`; passed on
       `d704cd8` and `c14dafa`, and `94860b0`'s *Release* run passed the same job the CI run
       failed — so roughly 2 in 5, and not caused by any change of mine.
 
@@ -155,8 +152,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **De-flake the browser gate: sample counts no longer measure the runner.** DONE
       2026-09-06 — both watches now require a sample floor as well as the window; 1 of 4
       passing → 3 of 4 on Windows. Details in the CHANGELOG.
-- [ ] **`blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now
-      measured.** Its span assertion needs a full `WAVE_PERIOD` (**3.6 s**) to see both
+- [x] **`blending.spec.ts` "RECOVER" still fails on a slow machine, and the reason is now
+      measured.** DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL watches now
+      read `data-chain-y` until the span/floor is met; screenshots are only
+      for pixel assertions, so the observer no longer starves the simulation. Its span assertion needs a full `WAVE_PERIOD` (**3.6 s**) to see both
       extremes, but the watch runs 4 s of *wall clock* and §10 drops simulation time — so a
       slow machine samples a fraction of the wave and a running chain measures 0.156
       against 0.2.
@@ -200,7 +199,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       at the single call that touches the filesystem. The library was not changed — it was
       never wrong. The third failure, `determinism/path.test.ts`, passes on a quiet machine;
       it was contention, not a defect.
-- [ ] **Five tests time out under `bun run test` on Windows; none is a code defect.**
+- [x] **Five tests time out under `bun run test` on Windows; none is a code defect.**
+      DONE 2026-09-06 — barrels now import lazily inside each test so the first
+      await no longer pays every dynamic import; `svg-path` and `random` take a
+      30 s describe timeout (Vitest 3.2 options object, not `describe.configure`).
       Surfaced the moment the runner above started working. All are 5 s `testTimeout`
       expiries, not wrong answers:
       - `four/tests/barrels.test.ts` — the **first** barrel awaited times out while the
@@ -343,24 +345,22 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
         SwiftShader readback. The one test that passed took **55.9 s of its 60 s budget** —
         there is no margin on this platform. Confirmed with the machine fully idle; an
         earlier reading was confounded twice by my own animating pages.
-- [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** The four
-      candidates cover `chrome-linux` and `chrome-mac` only, so `findPreinstalledChromium()`
-      can never resolve `chromium-*/chrome-win64/chrome.exe`. The escape hatch for a sandbox
-      whose Chromium revision differs is therefore unavailable on Windows. Only matters when
-      `PLAYWRIGHT_BROWSERS_PATH` is set (it is unset locally and in CI), so this is latent
-      rather than active — but it is the mechanism that would let the WebGPU specs run here,
-      by pointing at the full build instead of the shell.
+- [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
+      2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
+      headless-shell-win64 layout are in the candidate list. Only matters when
+      `PLAYWRIGHT_BROWSERS_PATH` is set (unset locally and in CI). `windowsFullChromium`
+      was deleted on `main` (it never matched); Playwright already resolves the
+      full build.
 
 - [x] **The README quick-start could not run — no `app.start()`.** Found by extracting the
       block verbatim and loading it in a browser; it threw §45's error and drew nothing.
       Fixed, and gated in `tools/check-docs.mjs` so it cannot silently return. Evidence and
       the two ways the guard itself was initially wrong are in the CHANGELOG.
-- [ ] **Run the README snippet in the browser gate, not just a text check.** The new
-      check-docs guard catches only the `start()`/`step()` pairing. It would not catch a
-      snippet that fails to compile, imports a name that no longer exists, or renders
-      nothing. The honest gate is a Playwright spec that serves the extracted block, the
-      way `tests/browser/example.spec.ts` serves the examples. Until that exists, the
-      README's TypeScript is verified for one specific defect and nothing else.
+- [x] **Run the README snippet in the browser gate, not just a text check.** DONE
+      2026-09-06 — `tests/browser/readme.spec.ts` serves the extracted
+      `fixtures/readme-page.ts` block and asserts a two-colour frame (single
+      unlit circle on a uniform clear). Check-docs still pins the
+      `start()`/`step()` pairing.
 - [x] **`examples/README.md` never says how to *view* an example.** DONE b9ee8aa — a "Running one" section. Every entry gives
       `bun run <name>:build`, which writes `dist/` and shows nothing. The dev-server
       command (`bunx vite examples/<name>`) is in the root `README.md` only, which is not
@@ -468,7 +468,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.** Currently ignored in
       `.github/dependabot.yml`. Both must move in ONE PR — bumping either alone re-breaks a gate.
       Check `npm view typedoc peerDependencies` for a range that includes 7.x.
-- [ ] **Pre-existing test-isolation defect, still unfixed and now hidden again.**
+- [x] **Pre-existing test-isolation defect, still unfixed and now hidden again.**
+      DONE 2026-09-06 — unrestored `console.warn` spies in `world-blend.test.ts`
+      and `world-joints.test.ts`. Vitest 4 reuses the spy and keeps history;
+      Vitest 3 hid it. `afterEach(vi.restoreAllMocks)` plus a leak-regression
+      in each file. Unblocks #62 and the eslint 10 ignore.
       **Now blocking a second thing:** Dependabot #66 (eight dev-deps incl. eslint 9 → 10)
       went red on this defect's `warn`-count assertions and was closed 2026-09-06;
       `eslint >=10` is ignored until this is fixed. Fixing it unblocks the linter major. vitest 3 masks it;
@@ -486,7 +490,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `main` had no pending changesets). #56 CLOSED — byte-identical to the already-closed #54,
       same branch and commit, and re-measured at **0 files / +0-0** against current `main`.
       #63 and #62 remain open and are tracked below.
-- [ ] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
+- [x] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
+      DONE 2026-09-06 with the spy-restore fix above. The leak was spy history,
+      not leftover worlds. #62 can be retried once typedoc supports TS 7.
       The dev-dep bump to vitest 4 exposes it: 7 tests fail because an extra `console.warn` fires —
       our own §42 authority warning, not a dependency deprecation. The decisive evidence is that a
       failing test PASSES ALONE and fails with its file, so state carries between tests. NOT fixed
@@ -501,7 +507,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `.github/dependabot.yml` added (npm ecosystem, not bun). All four workflows green on `main`.
 - [x] **PR #54 closed as fully superseded** — zero code delta against `main`; 0 of 104 CHANGELOG and
       0 of 117 MEMORY entries were absent from `main`. Evidence recorded on the PR.
-- [ ] **Dependabot bumps will need manual `bun.lock` regeneration.** Dependabot cannot write
+- [x] **Dependabot bumps will need manual `bun.lock` regeneration.** DONE 2026-09-06 —
+      `.github/workflows/dependabot-bun-lock.yml` runs `bun install` on
+      dependabot[bot] PRs only, commits `bun.lock` when it changes, and
+      dispatches CI onto that SHA. Frozen lockfile on the main CI job is
+      unchanged. Dependabot cannot write
       `bun.lock`, and CI runs `bun install --frozen-lockfile`, so any bump whose resolution changes
       will fail until the lockfile is regenerated on the branch — and a human push costs that PR
       its automerge. Same tax as math-mcp #103. Needs a pipeline answer, not a per-PR fix.
@@ -622,13 +632,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       binding form. Refusal list recorded in `gltf.ts`'s header; digests pinned
       in `tests/determinism/gltf-load.test.ts`; browser gate
       `tests/browser/gltf.spec.ts`.
-- [ ] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
-      `StandardMaterial` carries `map` only, so a loaded glTF's
-      metallicRoughness/normal/occlusion/emissive textures are warned-inert.
-      Needs the unit allocator `packages/render-webgl/src/gl-program.ts` has
-      named since WP-3a.3; when it lands, extend the glTF loader's decoded-slot
-      set (one list in `packages/assets/src/gltf.ts`) and drop the
-      `ignoredTextures` warning for the newly sampleable slots.
+- [x] **§59 second texture unit** (R-13 follow-up, flagged by the §78 packet):
+      DONE 2026-09-06 — `StandardMaterial.metalRoughnessMap` (glTF G=roughness,
+      B=metalness). WebGL binds unit 2. WebGPU field is staged inert.
+      The glTF loader decodes that slot as linear and drops `ignoredTextures`
+      for it. Normal/occlusion/emissive remain warned-inert until further
+      units land.
 
 - [x] **Move the six capability tokens to their owning packages — DONE
       2026-08-29** (RFC 0002 §2's spelling executed): each owner declares its
@@ -863,9 +872,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `castShadow`/`receiveShadow`/`frustumCulled`; a new drawable field
       cannot be dropped the same way again. Round-trip asserted in
       `scene-serializers.test.ts` and a constructor unit in `sprite.test.ts`.
-- [ ] **Scissor clipping (§67's first bullet, small)** — unrelated to the stencil and
-      unblocked: the backend already keeps `SCISSOR_TEST` enabled and sets the rect per
-      view. A per-item scissor is a render-list field, not a buffer.
+- [x] **Scissor clipping (§67's first bullet, small)** — DONE 2026-09-06.
+      `Renderable.scissor` / `RenderItem.scissor` is a drawing-buffer rectangle
+      (bottom-left, +Y up). The backend intersects it with `view.rect` and
+      restores the view scissor after the item. Default-off: a scene that
+      never names one issues the same scissor calls it issued before. The
+      batcher breaks a run where the rectangle changes.
 - [x] **Flake to watch — DONE 2026-08-30:** `packages/render/tests/shape.test.ts`'s
       "widens to a 32-bit index buffer" now has a 20 s timeout so `--coverage`
       on a loaded box cannot flake the assertion.
@@ -924,10 +936,15 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       the world plus a mapping in `PhysicsWorld`'s feed and publish passes; `addBody`
       refuses the mode loudly until then. Touches the step path — needs its own
       determinism golden.
-- [ ] **§27 field torque and field-driven waking (PH-8 remainders).** Both deliberately
-      absent with recorded reasons: §27's `sample` names no angular channel, and
-      automatic waking needs a per-entry `wakesSleepingBodies` flag plus a policy for two
-      entries that disagree.
+- [x] **§27 field torque and field-driven waking (PH-8 remainders).** DONE
+      2026-09-06: optional `ForceField.sampleTorque` (always N·m; linear
+      `units` do not scale it, so `sample` stays one vector and a particle
+      field stays assignable). Per-entry `wakesSleepingBodies` (default
+      off) walks `forEachSleepingDynamicBody`; two entries that disagree
+      do not share a visit — persistent gravity cannot defeat §32 because
+      an explosion field is also registered. A zero sample still leaves
+      the body asleep; `applyForce`/`applyTorque` do not wake (WP-5.2), so
+      a non-zero waking contribution calls `RigidBody.wake()`.
 - [x] **R-10 keys 3–4 DONE 2026-08-09 (key 3 shipped, key 4 staged on R-8)** —
       `groupRenderListByPipeline` puts §66's key 3 in a second verb, stably, with
       `RenderItem.materialId` as its material half; `buildRenderList` untouched and every
@@ -1152,8 +1169,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       A-1 follow-up (d) closed; A-5's dev-flag dependency discharged
 - [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
-      routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
-      package); R-6's effect pipeline needs an opt-in registry split, not the dev
+      ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
+      package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → `devWarnOnce`;
+      production prints nothing); R-6's effect pipeline needs an opt-in registry split, not the dev
       define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
       loads, detached-node listeners, stale physics handles, per-frame allocations
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
@@ -1172,10 +1190,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       live. A-1 follow-up (b) closed
 - [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
       warnings — leaked resources (now _derivable_ from the counters, but nothing
-      warns), disposed-in-use, duplicate asset loads, detached-node listeners, stale
+      warns), disposed-in-use, ~~duplicate asset loads~~ **DONE 2026-09-06**
+      (`AssetManager.load` of a settled slot → `devWarnOnce`), detached-node listeners, stale
       physics handles, per-frame allocations; creation-site capture and
       FinalizationRegistry leak detection need A-4's dev flag
-- [ ] **A-5 follow-ups:** AssetManager duplicate-load warning; materials + solver
+- [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
+      materials + solver
       handles unaccounted (§83 names "GPU and solver resources");
       `RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
       with §67's DEPTH24_STENCIL8 and float formats
@@ -1224,12 +1244,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       DONE 2026-08-21** (SHA-256 behind an injected `digest`, `expectedHash`
       verification that refuses rather than passes, §79 manifest in `src/manifest.ts`)
       — `A-16`'s manifest is unblocked
-- [ ] **A-16 remainder (manifest half):** the §79 manifest substrate ships in
-      `@four/assets` (2026-08-21). What is left is `@four/four`:
-      `SceneResourceCatalog.get(key)` is synchronous, so wiring is preload-then-catalog
-      — walk a document's resource keys, `loadFromManifest` each, hand the resulting map
-      to `resourceCatalog(...)`. `tests/integration/texture-manifest.test.ts` runs the
-      seam by hand today
+- [x] **A-16 remainder (manifest half):** DONE 2026-09-06 —
+      `preloadManifestIntoCatalog` in `@four/four` walks a manifest, loads each
+      key, and returns `resourceCatalog(...)`. `get(key)` stays synchronous.
+      `tests/integration/texture-manifest.test.ts` uses the helper; the
+      hand-rolled walk remains as a lower-level proof.
 - [ ] **A-19 remainder:** renderer-side §77 only (`R-30b`: cube/array/3D,
       compressed containers, video). §78 glTF/GLB shipped 2026-08-29 at the
       glTF 2.0-core tier; its staged residue lives with other rows: morph
@@ -1237,7 +1256,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       on a squad/tangent decision in `@four/animation`, and the four
       unsampleable material texture slots (`ignoredTextures`) wait on the
       multi-texture-unit widening `gl-program.ts` records (R-13 follow-up) —
-      the loader parses them already and widens without a format change.
+      metallic-roughness landed 2026-09-06; normal/occlusion/emissive remain.
+      The loader parses them already and widens without a format change.
 - [ ] **§96 residue:** decompression limits — **half done 2026-08-21**: `createTextureLoader` enforces an absolute decoded-size bound and an expansion-ratio bound (pre-decode with a `probe`, post-decode without). Still open for gzip/Draco/Basis when they land, and for platform decoders that cannot be pre-bounded at all; shader trust boundary still open (RFC 0001's, not A-3's — shading is a graph of
       closed operators and a new operator is out of scope in both RFCs). **Plugin trust
       boundary discharged 2026-08-28 with A-3**: a plugin is a value, never a name from a
@@ -1255,10 +1275,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **R-19/R-20 follow-ups:** §52 tessellation module (lifts the concave-extrude
       restriction); §55 atlas packet (retires the sprite `quad` uniform with authored
       uvs); qualify `docs/AUDIT-120.md`'s "basic 3D meshes: shipped" row honestly
-- [ ] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
-      `tests/browser/blending.spec.ts:978` ("RECOVER: a second click blends the chain
-      back onto its animation") fails intermittently under load, passes in isolation —
-      needs a de-flake pass of its own.
+- [x] **Flaky gate (pre-existing, confirmed at baseline 2026-08-07):**
+      DONE 2026-09-06 — RECOVER / ANIMATED / RAGDOLL now watch `data-chain-y`
+      until span/floor; smoothness samples on virtual-frame parity. The
+      original RECOVER isolation flake was the same sampling strategy.
 
       **Widened 2026-09-06: it is the file's sampling strategy, not one test.** A CI run
       failed two *different* tests in the same file — "ANIMATED" (`:836`) and "RAGDOLL"
@@ -1282,8 +1302,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       capability declarations; `--check` detects drift)
 - [x] **A-26 follow-up done 2026-08-07:** `check-compat` root script + ci.yml step wired
       once A-25's agent freed those files; `tools/README.md` documents the three new tools
-- [ ] **A-26 follow-up:** extend the generated block to renderer backends once
-      `RendererCapabilities` grows past 2 fields
+- [x] **A-26 follow-up:** extend the generated block to renderer backends once
+      `RendererCapabilities` grows past 2 fields — DONE 2026-09-06. Live table
+      from constructed `NullRenderer` / `WebglRenderer` / `WebgpuRenderer`
+      (pre-`initialize`; device-derived floors captioned). `--check` covers both
+      blocks.
 - [x] **A-25 machinery DONE 2026-08-07** (publish itself stays owner-gated): Changesets
       config, `apply-publish-names.mjs` (+tests; rewrites emitted code, not just
       manifests), `release.yml` reusing ci.yml via `workflow_call`, `docs.yml` Pages
@@ -1383,9 +1406,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       sprite (`docs/AUDIT-120.md` sprites row). Glyphs batch as consecutive
       same-material `Text` (R-28). Residue: grouping labels that do not share
       a material (atlas grouping, R-9's own remainder).
-- [ ] Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear
-      (candidates: package counts, test-suite counts in `tests/README.md`, the
-      §120 verdict totals) — each addition must stay decidable by reading files
+- [x] Extend `tools/check-docs.mjs` as new mechanically-checkable claims appear
+      — DONE 2026-09-06: pins 24 packages, `tests/README.md` suite counts,
+      and the AUDIT-120 43-item census. Further claims still welcome if they
+      stay decidable by reading files.
 
 ### Backlog additions (Phase 10, 2026-08-02)
 
@@ -1395,15 +1419,16 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 9, 2026-08-02)
 
-- [ ] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
-      is the scoped fix; benchmark attribution in benchmarks/results/)
+- [x] §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API
+      is the scoped fix; benchmark attribution in benchmarks/results/) —
+      DONE 2026-09-06: `ForceField.sampleAll` + `ForceFieldSystem` uses it when present.
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
       GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
-      steering.ts); spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      steering.ts) — **interceptTime fold DONE 2026-09-06**; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
       (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
@@ -1411,11 +1436,17 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 7, 2026-08-02)
 
-- [ ] Rotational root motion (staged 2026-08-02 — quaternion track throws)
-- [ ] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
-      against; solver bodies have no scale)
-- [ ] Capability-table note: Rapier derives kinematic velocity itself, so
-      inheritVelocityFrom is nearly a no-op there; other solvers may need it
+- [x] Rotational root motion (staged 2026-08-02 — quaternion track throws)
+      — DONE 2026-09-06: a quaternion `rootMotion` track differences
+      `conjugate(previous) * sampled` and multiplies onto
+      `transform.rotation`. Loops compose the same way translation adds.
+- [x] PoseTarget scale channel (P7-1 MVP cut — needs a decision on what scale blends
+      against; solver bodies have no scale) — DONE 2026-09-06: physical side
+      is identity `(1, 1, 1)`. `copyFrom` copies scale; §79 omits identity.
+- [x] Capability-table note: Rapier derives kinematic velocity itself, so
+      inheritVelocityFrom is nearly a no-op there — DONE 2026-09-06, documented
+      in `docs/COMPATIBILITY.md` deviations. Other solvers still get a column
+      when they land.
 
 ### Backlog additions (Phase 6 exit, 2026-08-02)
 
@@ -1434,10 +1465,16 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Chores (Phase 4 exit-verifier notes, 2026-08-01)
 
-- [ ] Coverage thresholds are package-level; consider per-file granularity so a weak file
-      can't hide behind a strong package average
-- [ ] Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is
-      invisible; schedule blending with §60a color management work
+- [x] Coverage thresholds are package-level; consider per-file granularity so a weak file
+      can't hide behind a strong package average — DONE 2026-09-06: 80%
+      lines/functions/statements per file via `tools/per-file-coverage-floor.cjs`;
+      package gate stays ≥95%. Weakest real file is `physics-rapier/src/init.ts`
+      at 86.95%. Branches stay package-only (`alloc-counter.ts` is 75% on the
+      wrap).
+- [x] Unlit materials render with GL_BLEND off (WP-4.7 finding) — DONE
+      2026-09-06: unlit enables `SRC_ALPHA` / `ONE_MINUS_SRC_ALPHA` when
+      `color[3] !== 1` or `transparent === true`; opaque unlit stays
+      `GL_BLEND` off. §60a color management remains a separate follow-up.
 
 ### Backlog additions (Phase 3 exit findings)
 
@@ -1463,6 +1500,44 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **§83 duplicate asset loads.** `AssetManager.load` of a
+      settled `(url, loader)` slot warns once; in-flight coalescing does
+      not.
+
+- [x] 2026-09-06 — **§27 field torque + field-driven waking.** Optional
+      `ForceField.sampleTorque` (N·m). Per-entry `wakesSleepingBodies`
+      visits sleepers without letting a sibling gravity field defeat §32.
+      A-4 step 4: `warnAuthorityConflict` emits through `devWarnOnce`.
+
+- [x] 2026-09-06 — **PoseTarget scale channel.** Physical side of the §19
+      blend is identity `(1, 1, 1)` — the only scale a rigid body has.
+      `copyFrom` copies `transform.scale`. §79 omits identity so old
+      documents stay identical.
+
+- [x] 2026-09-06 — **Rotational root motion.** A quaternion `rootMotion`
+      track extracts `conjugate(previous) * sampled` and multiplies it onto
+      the target's `transform.rotation`. Translation path unchanged.
+
+- [x] 2026-09-06 — **§67 scissor clipping.** `Renderable.scissor` snapshots onto
+      the render item; WebGL and WebGPU intersect with the view rect and
+      restore it after the draw. Batcher breaks on rectangle change.
+      Serialization omits the key when null.
+
+- [x] 2026-09-06 — **Open-TODO pass (second landing).** Browser-gate flakes:
+      smoothness samples on virtual-frame parity; blending RECOVER/ANIMATED/
+      RAGDOLL watch `data-chain-y` instead of screenshot throughput. README
+      snippet runs in `tests/browser/readme.spec.ts`. `check-docs` pins
+      package / suite / AUDIT-120 counts. `StandardMaterial.metalRoughnessMap`
+      on WebGL unit 2; unlit alpha enables `GL_BLEND`.
+
+- [x] 2026-09-06 — **Open-TODO pass (first landing).** Windows Chromium binary
+      layouts + lazy umbrella barrel imports + slower-runner Vitest/Playwright
+      timeouts; Dependabot `bun.lock` regeneration workflow; generated §62
+      renderer-backend compatibility table (A-26 follow-up); Rapier
+      `inheritVelocityFrom` deviation noted; §42 warn-spy isolation
+      (unblocks #62 / eslint 10). Remaining open items are still in
+      flight or owner-gated — see Now.
 
 - **2026-09-05 — RFC 0006 TypeScript-on-Bun toolchain.** Bun workspace; spec 1.14; Vitest/`tsc -b` retained.
 

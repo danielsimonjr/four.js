@@ -1,4 +1,9 @@
-import { FourError, isFourError, type Disposable } from "@four/core";
+import {
+  FourError,
+  isFourError,
+  resetDevWarnings,
+  type Disposable,
+} from "@four/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,6 +12,11 @@ import {
   type FetchLike,
   type FetchResponse,
 } from "../src/index.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  resetDevWarnings();
+});
 
 // --- fakes ------------------------------------------------------------------
 
@@ -182,6 +192,7 @@ describe("AssetManager fetch injection", () => {
 
 describe("AssetManager caching", () => {
   it("fetches once for repeated sequential loads and counts references", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const io = immediateFetch({ "/a.txt": "alpha" });
     const manager = new AssetManager({ fetch: io.fetch });
 
@@ -211,6 +222,37 @@ describe("AssetManager caching", () => {
     expect(io.calls).toEqual(["/a.txt"]);
     expect(manager.has("/a.txt", plainLoader)).toBe(true);
     expect(manager.get("/a.txt", plainLoader)).toBe("alpha");
+  });
+
+  it("warns once when a settled asset is loaded again (§83)", async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const io = immediateFetch({ "/a.txt": "alpha" });
+    const manager = new AssetManager({ fetch: io.fetch });
+
+    await manager.load("/a.txt", plainLoader);
+    expect(warn).not.toHaveBeenCalled();
+
+    await manager.load("/a.txt", plainLoader);
+    await manager.load("/a.txt", plainLoader);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("§83");
+    expect(String(warn.mock.calls[0][0])).toContain("/a.txt");
+  });
+
+  it("does not warn when two loads coalesce before the fetch settles", async () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const io = deferredFetch();
+    const manager = new AssetManager({ fetch: io.fetch });
+
+    const first = manager.load("/a.txt", plainLoader);
+    const second = manager.load("/a.txt", plainLoader);
+    expect(warn).not.toHaveBeenCalled();
+    io.resolve("/a.txt", "alpha");
+    await first;
+    await second;
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it("keys the cache by loader identity, not by loader name", async () => {
@@ -248,6 +290,7 @@ describe("AssetManager caching", () => {
 
 describe("AssetManager reference counting", () => {
   it("disposes a Disposable asset when the last reference is released", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const io = immediateFetch({ "/a.txt": "alpha" });
     const manager = new AssetManager({ fetch: io.fetch });
 

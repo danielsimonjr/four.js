@@ -32,7 +32,7 @@ import {
   createSnapshotSystem,
   type Node,
 } from "@four/scene";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BodyType, PhysicsWorldInit } from "../src/index.js";
 import {
@@ -153,6 +153,19 @@ function spyOnWarn() {
   return vi.spyOn(console, "warn").mockImplementation(() => undefined);
 }
 
+/**
+ * vitest 4 reuses an unrestored `spyOn(console, "warn")` and keeps its call
+ * history. This file's later tests count warns and used to inherit the §19
+ * zero-weight warning and a leftover §42 authority warning from earlier tests
+ * in the same file — they passed alone and failed with the file. Restore the
+ * spy so a new `spyOnWarn()` starts at zero. Worlds created here are not
+ * stepped again after their test returns; the extra calls were spy history,
+ * not leftover writers.
+ */
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("the §19 trio is opt-in and named (§19, §42, §6a)", () => {
   it("blends a node that has authority, a registered body, and a target", async () => {
     const { adapter, world } = await readyWorld();
@@ -267,6 +280,7 @@ describe("weight extremes are bit-identical (§19, plan P7-4)", () => {
     }
     target.position.set(1 / 3, -0, 1e-8);
     target.rotation.copy(rotation(new Vector3(1, 0, 1).normalize(), 2.3));
+    target.scale.set(2, 3, 4);
     placeSolverBody(
       adapter,
       1,
@@ -284,6 +298,20 @@ describe("weight extremes are bit-identical (§19, plan P7-4)", () => {
       quaternionComponents(node.transform.rotation),
       quaternionComponents(target.rotation),
     );
+    expectBitIdentical(vectorComponents(node.transform.scale), [2, 3, 4]);
+  });
+
+  it("1 / 0 writes identity scale — a solver body has none", async () => {
+    const { adapter, world } = await readyWorld();
+    const node = bodyNode({ physicsWeight: 1, animationWeight: 0 });
+    node.transform.scale.set(4, 5, 6);
+    world.addBody(node);
+    node.getComponent(PoseTarget)?.scale.set(2, 2, 2);
+    placeSolverBody(adapter, 1, new Vector3(1, 2, 3));
+
+    world.step(DT);
+
+    expectBitIdentical(vectorComponents(node.transform.scale), [1, 1, 1]);
   });
 
   it("both weights zero falls back to fully physical, still bit-identical", async () => {
@@ -524,6 +552,15 @@ describe("authority interactions in the publish pass (§42)", () => {
 
     world.step(DT);
     expect(node.transform.position.x).toBe(-3);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("does not inherit console.warn spy history from earlier tests in this file", () => {
+    // Isolation regression: earlier tests in this file record a §19
+    // zero-weight warning and a §42 authority warning. Without the
+    // afterEach restore, vitest 4's reused spy still holds those calls
+    // and this assertion fails even though this test emits nothing.
+    const warn = spyOnWarn();
     expect(warn).not.toHaveBeenCalled();
   });
 });

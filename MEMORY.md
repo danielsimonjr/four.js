@@ -30,6 +30,87 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — unlit `color` is read after bind + features (F13).**
+  `unlitColorBlends` must not run before the texture unit and
+  `setFeatures` mirrors are borrowed. A throwing `color` accessor is
+  F13's mid-draw raise; blend still applies before `draw*`. Metal-
+  roughness restore on unit 2 skips `activeTexture(TEXTURE2)` only when
+  that unit is still active (no unit-0 restore in the same `finally`).
+
+- **2026-09-06 — §83 duplicate-load warns on a settled cache hit.**
+  Concurrent `load`s of the same key coalesce without a warning — that
+  is the API. A later `load` of a slot that already decoded is the
+  authoring mistake §83 names; `devWarnOnce` keys
+  `asset-dup:${url}:${loader.name}`.
+
+- **2026-09-06 — field torque is a second method; waking is per-entry OR.**
+  §27's `sample` stays one linear vector so a `ParticleForceField` remains
+  assignable. `ForceField.sampleTorque` is optional and always N·m —
+  `"acceleration"` units would need the inertia tensor, which a field does
+  not have. `wakesSleepingBodies` is per registration, default off. Two
+  entries that disagree do not share a visit: persistent gravity cannot
+  wake a pile just because an explosion field is also registered. A zero
+  sample does not wake; `applyForce`/`applyTorque` still do not wake
+  (WP-5.2), so a non-zero waking contribution calls `RigidBody.wake()`.
+  `forEachSleepingDynamicBody` is the complementary walk.
+
+- **2026-09-06 — §42 authority conflicts go through `devWarnOnce`.** A-4
+  remainder step 4. The WeakMap still owns once-per-node-per-writer;
+  production (`__FOUR_DEV__ === false`) prints nothing. The stale
+  "no build-mode flag" comment in `authority.ts` is retired.
+
+- **2026-09-06 — PoseTarget scale blends against identity.** A solver
+  body has no scale, so the invented physical side is `(1, 1, 1)`. At
+  `animationWeight === 1` the node's `transform.scale` is
+  `PoseTarget.scale`; at `physicsWeight === 1` it is identity; between,
+  a lerp. Pivot stays off the target. §79 omits identity so documents
+  written before the channel stay byte-identical.
+
+- **2026-09-06 — rotational root motion is local composition.** A
+  quaternion root-motion track extracts `conjugate(previous) * sampled`
+  and `transform.rotation.multiply(delta)`. That is the same space
+  translation uses (`position.add`). Identity start + 90° Y over one
+  loop, twice, lands at 180° Y. The 2026-08-02 `NOT_IMPLEMENTED` throw
+  is gone.
+
+- **2026-09-06 — §67 scissor is a render-list field, not a stencil.**
+  `SCISSOR_TEST` was already on per view. The missing piece was a per-item
+  rectangle intersected with `view.rect`. Coordinates stay §48 / §7a
+  (bottom-left); WebGPU flips on the way in, as it already does for the
+  view rect. Default-off keeps every existing transcript test identical.
+  Stencil `clip = true` still composes: a node can punch a path mask and
+  also restrict pixels to this rectangle.
+
+- **2026-09-06 — open-TODO pass, second landing.** The diagnosed browser
+  flakes were sampler defects, not physics: smoothness now picks virtual-frame
+  parity; blending watches the page's `data-chain-y` instead of screenshot
+  throughput. README snippet is a Playwright spec (two-colour threshold —
+  one unlit circle on a uniform clear). `check-docs` now fails if the 24
+  package count, suite-count table, or AUDIT-120 census drift. Metallic-
+  roughness is the second WebGL texture unit; remaining glTF slots
+  (normal/occlusion/emissive) stay warned-inert. Unlit blend is on only
+  when alpha or `transparent` asks. **Owner-gated items are no longer
+  parked:** the next pass implements them (scissor, PoseTarget scale,
+  rotational root motion, A-25 stub `files` allow-list, RFC residues,
+  rapier 0.20) rather than waiting. Secrets (`NPM_TOKEN`) and typedoc's
+  TS 7 peer still cannot be invented here.
+
+- **2026-09-06 — open-TODO pass, first landing.** Four items closed without an
+  owner product decision: Windows Chromium binary layouts + lazy barrel imports
+  + slower-runner timeouts; a Dependabot-only workflow that regenerates
+  `bun.lock` (does not weaken `--frozen-lockfile` on CI); A-26's generated
+  renderer-backend table, read before `initialize` so device-derived WebGPU
+  fields stay at the construction-time floor (captioned, not claimed as "cannot");
+  Rapier `inheritVelocityFrom` documented as nearly a no-op. **Isolation
+  leak:** unrestored `vi.spyOn(console, "warn")` in two physics files —
+  Vitest 4 keeps the spy history, Vitest 3 did not. Not leftover worlds.
+  `#62` and `eslint >=10` are unblocked on that axis; the typedoc/TS 7
+  joint pin remains. Remaining packets still in flight: diagnosed flakes,
+  scissor, §59 textures, field batching, docs gates. Owner-gated items
+  (first publish, rapier 0.20, typedoc/TS 7, A-25 secrets, RFC residues)
+  stay owner-gated. Superceded for remaining-packet policy by the
+  2026-09-06 second-landing entry.
+
 - **2026-09-06 — three headline claims verified FROM OUTSIDE the library, against the published
   packages.** Not the repo's own suite: the staged `@danielsimonjr/fourjs-*` tree laid out in a
   clean consumer's `node_modules`, importing published names only.

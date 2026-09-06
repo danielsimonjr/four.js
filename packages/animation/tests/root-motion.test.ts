@@ -1,10 +1,11 @@
 /**
- * Root motion (§19, plan decision P7-5) — the mixer MVP: translation only.
+ * Root motion (§19, plan decision P7-5) — translation and rotation.
  *
  * The clip under test is a **walk cycle authored in place**: a `"rootMotion"`
  * track that ramps linearly from the origin to one {@link STRIDE} over exactly
  * one second, so the sampled value at clip time `t` is `STRIDE · t` and every
  * expectation below is a closed form rather than a recorded number.
+ * Rotational tests use a 90° Y turn over the same second.
  */
 
 import { isFourError } from "@four/core";
@@ -515,33 +516,93 @@ describe("root motion validation", () => {
     expect(error.message).toContain("vector3");
   });
 
-  it("stages rotational root motion with a dated NOT_IMPLEMENTED", () => {
+  it("extracts rotation from a quaternion track", () => {
     const walker = animatedWalker();
+    const from = new Quaternion();
+    const to = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
     const clip = new AnimationClip({
       name: "turn",
       tracks: [
         new AnimationTrack({
           path: "rootMotion",
           adapter: quaternionAdapter,
-          times: [0, 1],
-          values: [new Quaternion(), new Quaternion()],
+          times: [0, WALK_SECONDS],
+          values: [from, to],
         }),
       ],
       duration: WALK_SECONDS,
     });
-
-    let thrown: unknown;
-    try {
-      new AnimationMixer(walker).play(clip, {
+    new AnimationMixer(walker)
+      .play(clip, {
         rootMotion: { trackPath: "rootMotion", target: walker },
-      });
-    } catch (error) {
-      thrown = error;
-    }
-    expect(isFourError(thrown)).toBe(true);
-    const error = thrown as { code: string } & Error;
-    expect(error.code).toBe("NOT_IMPLEMENTED");
-    expect(error.message).toContain("2026-08-02");
+      })
+      .advance(WALK_SECONDS);
+
+    expect(walker.transform.rotation.x).toBeCloseTo(to.x, 12);
+    expect(walker.transform.rotation.y).toBeCloseTo(to.y, 12);
+    expect(walker.transform.rotation.z).toBeCloseTo(to.z, 12);
+    expect(walker.transform.rotation.w).toBeCloseTo(to.w, 12);
+  });
+
+  it("composes a quaternion delta onto the node's existing rotation", () => {
+    const walker = animatedWalker();
+    walker.transform.rotation.setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
+    const from = new Quaternion();
+    const to = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
+    const clip = new AnimationClip({
+      name: "turn",
+      tracks: [
+        new AnimationTrack({
+          path: "rootMotion",
+          adapter: quaternionAdapter,
+          times: [0, WALK_SECONDS],
+          values: [from, to],
+        }),
+      ],
+      duration: WALK_SECONDS,
+    });
+    new AnimationMixer(walker)
+      .play(clip, {
+        rootMotion: { trackPath: "rootMotion", target: walker },
+      })
+      .advance(WALK_SECONDS);
+
+    const expected = new Quaternion()
+      .setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2)
+      .multiply(to);
+    expect(walker.transform.rotation.y).toBeCloseTo(expected.y, 12);
+    expect(walker.transform.rotation.w).toBeCloseTo(expected.w, 12);
+  });
+
+  it("accumulates one full turn per loop with no snap back", () => {
+    const walker = animatedWalker();
+    const from = new Quaternion();
+    const to = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
+    const clip = new AnimationClip({
+      name: "turn",
+      tracks: [
+        new AnimationTrack({
+          path: "rootMotion",
+          adapter: quaternionAdapter,
+          times: [0, WALK_SECONDS],
+          values: [from, to],
+        }),
+      ],
+      duration: WALK_SECONDS,
+    });
+    new AnimationMixer(walker)
+      .play(clip, {
+        loop: 2,
+        rootMotion: { trackPath: "rootMotion", target: walker },
+      })
+      .advance(2);
+
+    const expected = new Quaternion().setFromAxisAngle(
+      new Vector3(0, 1, 0),
+      Math.PI,
+    );
+    expect(walker.transform.rotation.y).toBeCloseTo(expected.y, 12);
+    expect(walker.transform.rotation.w).toBeCloseTo(expected.w, 12);
   });
 
   it("leaves a mixer with no root motion untouched", () => {

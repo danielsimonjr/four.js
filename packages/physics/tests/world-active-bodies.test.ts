@@ -164,3 +164,38 @@ describe("PhysicsWorld.forEachActiveBody (§22, §32, §33)", () => {
     expect(adapter.body(1).force.y).toBe(3);
   });
 });
+
+describe("PhysicsWorld.forEachSleepingDynamicBody (§32)", () => {
+  it("visits only sleeping dynamics, in registration order", async () => {
+    const { adapter, world } = await readyWorld();
+    const first = bodyNode("dynamic");
+    const second = bodyNode("dynamic");
+    const third = bodyNode("dynamic");
+    world.addBody(first);
+    world.addBody(bodyNode("static"));
+    world.addBody(second);
+    world.addBody(third);
+    adapter.body(1).sleeping = true;
+    adapter.body(3).sleeping = true;
+    world.step(1 / 60);
+
+    const seen: RigidBodyComponent[] = [];
+    world.forEachSleepingDynamicBody((body) => {
+      seen.push(body);
+    });
+    expect(seen).toEqual([
+      first.getComponent(RigidBody),
+      second.getComponent(RigidBody),
+    ]);
+  });
+
+  it("visits nothing when every dynamic is awake", async () => {
+    const { world } = await readyWorld();
+    world.addBody(bodyNode("dynamic"));
+    const seen: RigidBodyComponent[] = [];
+    world.forEachSleepingDynamicBody((body) => {
+      seen.push(body);
+    });
+    expect(seen).toEqual([]);
+  });
+});

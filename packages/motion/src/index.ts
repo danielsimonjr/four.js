@@ -89,6 +89,7 @@ export {
 } from "./serializers.js";
 export type { PIDControllerOptions, PIDDerivativeSource } from "./pid.js";
 export { DEFAULT_PID_OUTPUT_LIMITS, PIDController } from "./pid.js";
+export type { InterceptTimeOptions } from "./prediction.js";
 export {
   ballisticApexHeight,
   ballisticTimeOfFlightToPlane,

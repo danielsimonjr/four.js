@@ -461,6 +461,7 @@ describe("AssetManager cancellation — an aborted load holds no reference", () 
   });
 
   it("resolves an abort that races a settled entry as an abort", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const io = deferredFetch();
     const manager = new AssetManager({ fetch: io.fetch });
     const first = manager.load("/a.bin", disposableLoader);

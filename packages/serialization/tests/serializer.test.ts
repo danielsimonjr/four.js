@@ -330,6 +330,24 @@ describe("POSE_TARGET_SERIALIZER", () => {
     expect(components(restored.previousRotation)).toEqual(
       components(restored.rotation),
     );
+    expect(components(restored.scale)).toEqual({ x: 1, y: 1, z: 1 });
+  });
+
+  it("writes a non-identity scale and omits identity", () => {
+    const boxed = new PoseTarget();
+    boxed.scale.set(2, 3, 4);
+    expect(POSE_TARGET_SERIALIZER.serialize(boxed)).toEqual({
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0, w: 1 },
+      scale: { x: 2, y: 3, z: 4 },
+    });
+
+    const restored = POSE_TARGET_SERIALIZER.deserialize(
+      POSE_TARGET_SERIALIZER.serialize(boxed),
+      new Group(),
+    );
+    expect(components(restored.scale)).toEqual({ x: 2, y: 3, z: 4 });
+    expect(components(restored.previousScale)).toEqual({ x: 2, y: 3, z: 4 });
   });
 
   it("defaults a payload that omits a member, and refuses a malformed one", () => {

@@ -8,6 +8,112 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — WebGL F13 / metal-roughness restore
+
+- **Unlit draw order.** Texture bind and `setFeatures` run before
+  `unlitColorBlends` reads `color`, so a throwing accessor still
+  restores the borrowed unit and program-lifetime flags (F13).
+- **Metal-roughness unit 2.** Restore skips the redundant
+  `activeTexture(TEXTURE2)` when that unit is already active.
+
+### 2026-09-06 — Field torque, field-driven waking, §42 `devWarnOnce`
+
+- **`ForceField.sampleTorque`.** Optional angular channel, always N·m.
+  Linear `"force"` / `"acceleration"` units do not scale it. Built-in
+  particle fields omit the method and stay assignable.
+- **`wakesSleepingBodies`.** Per-entry, default off.
+  `PhysicsWorld.forEachSleepingDynamicBody` is the complementary walk.
+  A waking field that samples zero leaves the body asleep; a non-zero
+  contribution calls `RigidBody.wake()` because `applyForce` does not.
+  The batched `#bodies` scratch is truncated and cleared after each
+  gather so a removed `RigidBody` is not retained (§83).
+- **§42.** `warnAuthorityConflict` emits through `devWarnOnce` (A-4
+  remainder step 4). Production builds print nothing.
+- **§83 duplicate asset loads.** A second `AssetManager.load` of a
+  *settled* `(url, loader)` slot warns once via `devWarnOnce`. In-flight
+  coalescing stays silent.
+
+### 2026-09-06 — PoseTarget scale channel
+
+- **`PoseTarget.scale`.** Animated scale, default identity. The physical
+  side of a §19 blend is also identity — a solver body has no scale.
+  `copyFrom` copies `transform.scale`; `capturePrevious` keeps
+  `previousScale`. §79 writes the vector only when it is not `(1, 1, 1)`.
+
+### 2026-09-06 — Rotational root motion
+
+- **`AnimationMixer` quaternion `rootMotion`.** A quaternion track is no
+  longer `NOT_IMPLEMENTED`. The mixer differences
+  `conjugate(previous) * sampled` and multiplies the delta onto
+  `transform.rotation` (local composition). Loop wraps compose the same
+  way translation adds strides. Scalar/colour tracks are still rejected.
+
+### 2026-09-06 — §67 rectangular scissor clipping
+
+- **`Renderable.scissor`.** A per-draw axis-aligned rectangle in
+  drawing-buffer pixels (bottom-left, +Y up), default `null`. Snapshotted
+  onto `RenderItem.scissor`. WebGL and WebGPU intersect it with the view
+  scissor and restore the view rect after the item (and after a batched
+  run). A scene that never names one issues the same scissor calls it
+  issued before.
+- **Batching.** `RenderBatcher` breaks a run where the rectangle changes
+  (value equality, so independently written identical rects still merge).
+- **§79.** The rectangle is written when present and omitted when null;
+  a corrupted object restores the default.
+
+### 2026-09-06 — Open-TODO pass: flakes, README gate, metallic-roughness, unlit blend
+
+- **Smoothness interpolation flake.** `tests/browser/smoothness.spec.ts`
+  screenshots after a known `window.__fourVirtualFrames` count (alternating
+  odd/even) so mid-step and on-step poses are chosen instead of aliased
+  against the 1.5-Δt virtual clock.
+- **Blending sample-count flakes.** RECOVER / ANIMATED / RAGDOLL watches
+  read `data-chain-y` until the span/floor is met. Screenshots stay for
+  pixel assertions only.
+- **README snippet browser gate.** `tests/browser/readme.spec.ts` serves
+  the extracted quick-start and asserts a two-colour frame.
+- **`check-docs` pins.** 24 packages, `tests/README.md` suite counts, and
+  the AUDIT-120 43-item census.
+- **§59 metallic-roughness map.** `StandardMaterial.metalRoughnessMap`
+  (glTF packed G/B). WebGL binds texture unit 2. WebGPU field is staged
+  inert. The glTF loader decodes that slot as linear.
+- **Unlit alpha blend.** Unlit draws enable `SRC_ALPHA` /
+  `ONE_MINUS_SRC_ALPHA` when `color[3] !== 1` or `transparent === true`.
+  Opaque unlit stays `GL_BLEND` off.
+
+### 2026-09-06 — Open-TODO pass: Windows runner, Dependabot lockfile, A-26 renderer table
+
+- **Windows unit-test timeouts.** `packages/four/tests/barrels.test.ts` now
+  imports each barrel inside its test so the first `await` does not pay every
+  dynamic import at once. `packages/core/tests/random.test.ts` and
+  `packages/geometry/tests/svg-path.test.ts` take a 30 s timeout (Vitest 3.2
+  describe options). Playwright's default test timeout is 120 s so
+  screenshot-bound Windows SwiftShader runs have margin.
+- **`CHROMIUM_BINARIES` knows Windows.** `playwright.config.ts` resolves
+  `chrome-win64/chrome.exe` and the headless-shell-win64 layout when
+  `PLAYWRIGHT_BROWSERS_PATH` is set.
+- **Dependabot can go green without a human lockfile push.**
+  `.github/workflows/dependabot-bun-lock.yml` runs `bun install` on
+  `dependabot[bot]` PRs only, commits `bun.lock` when it changes, and
+  dispatches CI onto that SHA. The main CI job still uses `--frozen-lockfile`.
+- **A-26 renderer backends.** `tools/generate-compatibility.mjs` now emits a
+  live `RendererCapabilities` table (`null` / `webgl2` / `webgpu`, plus the
+  two reserved stubs) from constructed instances before `initialize`.
+  `--check` covers both generated blocks. Rapier's `inheritVelocityFrom`
+  no-op is recorded in the hand-written deviations list.
+- **§42 warn-count isolation.** `world-blend.test.ts` and
+  `world-joints.test.ts` restore `console.warn` spies in `afterEach`. Vitest 4
+  was reusing unrestored spies and counting leftover §19 / §42 /
+  `jointMotorEffortCap` warnings from earlier tests in the same file. That
+  was the #62 / eslint-10 blocker. Assertions were not widened.
+- **A-16 manifest catalog.** `preloadManifestIntoCatalog` walks a §79
+  manifest, loads each key, and returns a synchronous `SceneResourceCatalog`.
+- **§27 field batch + interceptTime.** `ForceField.sampleAll` is the optional
+  stride-3 SoA path; steering's intercept-time now calls prediction's export.
+- **Per-file coverage floor.** Package gate stays ≥95%. An Istanbul reporter
+  (`tools/per-file-coverage-floor.cjs`) fails any non-empty file below 80%
+  lines/functions/statements so a 0% file cannot hide behind the average.
+
 ### 2026-09-06 — removed a dead helper, and added the Windows binaries it pretended to be
 
 - **`windowsFullChromium()` deleted: it never ran.** Measured by importing the config and

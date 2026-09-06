@@ -649,6 +649,7 @@ describe("StandardMaterial — §59's metallic-roughness workflow (R-13)", () =>
     expect(material.roughness).toBe(1);
     expect(material.emissive).toEqual([0, 0, 0]);
     expect(material.map).toBeNull();
+    expect(material.metalRoughnessMap).toBeNull();
     expect(material.version).toBe(0);
     expect(material.disposed).toBe(false);
     // §57's shared render state, at the base's documented defaults.
@@ -666,6 +667,7 @@ describe("StandardMaterial — §59's metallic-roughness workflow (R-13)", () =>
       roughness: 0.25,
       emissive: [0, 0, 0.5],
       map: texture,
+      metalRoughnessMap: texture,
       transparent: true,
       blendMode: "additive",
     });
@@ -675,6 +677,7 @@ describe("StandardMaterial — §59's metallic-roughness workflow (R-13)", () =>
     expect(material.roughness).toBe(0.25);
     expect(material.emissive).toEqual([0, 0, 0.5]);
     expect(material.map).toBe(texture);
+    expect(material.metalRoughnessMap).toBe(texture);
     expect(material.transparent).toBe(true);
     expect(material.blendMode).toBe("additive");
   });
@@ -729,6 +732,14 @@ describe("StandardMaterial — §59's metallic-roughness workflow (R-13)", () =>
     material.map = null;
     expect(material.map).toBeNull();
     expect(material.version).toBe(4);
+
+    material.metalRoughnessMap = texture;
+    expect(material.metalRoughnessMap).toBe(texture);
+    expect(material.version).toBe(5);
+
+    material.metalRoughnessMap = null;
+    expect(material.metalRoughnessMap).toBeNull();
+    expect(material.version).toBe(6);
   });
 
   it("passes values outside 0…1 through rather than clamping (WP-3.3)", () => {

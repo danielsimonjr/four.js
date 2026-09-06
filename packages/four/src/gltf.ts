@@ -268,8 +268,9 @@ export function instantiateGltf(asset: GltfAsset): GltfInstance {
       devWarnOnce(
         `gltf:${asset.url}:materials[${String(i)}]:ignored-textures`,
         `glTF "${asset.url}": materials[${String(i)}] carries ` +
-          `${record.ignoredTextures.join(", ")}; the single-unit §59 material ` +
-          "tier samples the base colour map only — factors still apply (§85).",
+          `${record.ignoredTextures.join(", ")}; the §59 material tier ` +
+          "samples the base-colour and packed metallic-roughness maps — " +
+          "factors still apply (§85).",
       );
     }
     materials.push(
@@ -283,6 +284,10 @@ export function instantiateGltf(asset: GltfAsset): GltfInstance {
           record.baseColorTexture === null
             ? null
             : resources.textures[record.baseColorTexture],
+        metalRoughnessMap:
+          record.metallicRoughnessTexture === null
+            ? null
+            : resources.textures[record.metallicRoughnessTexture],
       }),
     );
   }

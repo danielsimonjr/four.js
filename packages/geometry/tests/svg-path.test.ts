@@ -45,6 +45,10 @@ import {
   type Point2D,
 } from "../src/index.js";
 
+// Contention under `bun run test --concurrency=4`: this file passes alone and
+// times out at the 5 s default when the Windows runner is busy. Same shape as
+// the coverage flake in `packages/render/tests/shape.test.ts`.
+
 /** The arc oracle: a point on an arc's ellipse, written here, not imported. */
 function ellipsePoint(arc: PathArcCommand, theta: number): Point2D {
   const localX = arc.radiusX * Math.cos(theta);
@@ -69,7 +73,7 @@ function kinds(path: Path): string[] {
   return path.commands.map((command) => command.kind);
 }
 
-describe("parseSvgPathData — the `d` grammar", () => {
+describe("parseSvgPathData — the `d` grammar", { timeout: 30_000 }, () => {
   it("reads the moveto/lineto family, absolute and relative", () => {
     const absolute = parseSvgPathData("M 10 20 L 30 40 H 50 V 60 Z");
     expect(kinds(absolute)).toEqual(["move", "line", "line", "line", "close"]);
@@ -243,7 +247,7 @@ describe("parseSvgPathData — the `d` grammar", () => {
   });
 });
 
-describe("parseSvgPathData — arcs (SVG 1.1 F.6)", () => {
+describe("parseSvgPathData — arcs (SVG 1.1 F.6)", { timeout: 30_000 }, () => {
   it("puts a quarter-turn arc on the ellipse the document named", () => {
     const path = parseSvgPathData("M100 0 A100 100 0 0 1 0 100");
     const arc = soleArc(path);
@@ -420,7 +424,7 @@ describe("parseSvgPathData — arcs (SVG 1.1 F.6)", () => {
   });
 });
 
-describe("parseSvgPathData — refusals (§85)", () => {
+describe("parseSvgPathData — refusals (§85)", { timeout: 30_000 }, () => {
   const refusals: readonly (readonly [string, string])[] = [
     ["L 1 1", "must begin with a moveto"],
     ["Z", "must begin with a moveto"],
@@ -474,7 +478,7 @@ describe("parseSvgPathData — refusals (§85)", () => {
   });
 });
 
-describe("parseSvgPathData — untrusted input (§96)", () => {
+describe("parseSvgPathData — untrusted input (§96)", { timeout: 30_000 }, () => {
   it("refuses text longer than the limit, naming the policy that fired", () => {
     const data = `M0 0${" L1 1".repeat(20)}`;
     let thrown: FourError | undefined;
@@ -513,7 +517,7 @@ describe("parseSvgPathData — untrusted input (§96)", () => {
   });
 });
 
-describe("formatSvgPathData", () => {
+describe("formatSvgPathData", { timeout: 30_000 }, () => {
   it("writes every command kind, absolute and uppercase", () => {
     const path = new Path()
       .moveTo(0, 0)
@@ -585,7 +589,7 @@ describe("formatSvgPathData", () => {
   });
 });
 
-describe("round trips", () => {
+describe("round trips", { timeout: 30_000 }, () => {
   const withoutArcs = [
     "M 0 0 L 10 0 L 10 10 L 0 10 Z",
     "M 0 0 C 0 -6 10 -6 10 0 C 10 6 0 10 0 16",
@@ -654,7 +658,7 @@ describe("round trips", () => {
   });
 });
 
-describe("the Y axis is transcribed, not flipped (§7a)", () => {
+describe("the Y axis is transcribed, not flipped (§7a)", { timeout: 30_000 }, () => {
   it("keeps SVG's numbers, so imported content is mirrored until it is not", () => {
     const path = parseSvgPathData("M 0 0 L 10 20");
     expect(path.commands[1]).toEqual({ kind: "line", x: 10, y: 20 });
@@ -687,7 +691,7 @@ describe("the Y axis is transcribed, not flipped (§7a)", () => {
   });
 });
 
-describe("hostile input is total (§96)", () => {
+describe("hostile input is total (§96)", { timeout: 30_000 }, () => {
   /** The three error types the module documents, and nothing else. */
   function classify(error: unknown): string {
     if (error instanceof SyntaxError) {

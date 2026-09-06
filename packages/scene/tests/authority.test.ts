@@ -134,6 +134,7 @@ describe("warnAuthorityConflict (§42 development warning)", () => {
 
     const message = warn.mock.calls[0][0] as string;
     expect(message).toContain("[four]");
+    expect(message.indexOf("[four]")).toBe(message.lastIndexOf("[four]"));
     expect(message).toContain(node.id);
     expect(message).toContain("crate");
     expect(message).toContain('"physics"');

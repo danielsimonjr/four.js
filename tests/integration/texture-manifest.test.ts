@@ -13,9 +13,9 @@
  * 2. **A §79 manifest reaches a `SceneResourceCatalog`.** §79 resolves assets
  *    by logical key through a manifest of URL + content hash, while
  *    `@four/four`'s deserializer resolves keys *synchronously* from a catalog.
- *    The wiring is therefore preload-then-catalog, and this suite runs it end
- *    to end so the seam A-16 finishes against is executable rather than
- *    described.
+ *    The wiring is therefore preload-then-catalog, and `preloadManifestIntoCatalog`
+ *    is the walk — this suite uses that helper so the seam A-16 finishes
+ *    against is the shipped API, not a hand-rolled proof of the same steps.
  */
 
 import {
@@ -27,7 +27,7 @@ import {
   type FetchResponse,
   type TextureAsset,
 } from "@four/assets";
-import { resourceCatalog } from "four";
+import { preloadManifestIntoCatalog, resourceCatalog } from "four";
 import { Texture } from "@four/render";
 import { describe, expect, it } from "vitest";
 
@@ -120,19 +120,54 @@ describe("a §79 manifest preloads a SceneResourceCatalog", () => {
       "/assets.json",
       manifestLoader,
     );
-    const crate = await loadFromManifest(assets, manifest, "crate", fakeCodec, {
-      requireHash: true,
-    });
+    const catalog = await preloadManifestIntoCatalog(
+      assets,
+      manifest,
+      fakeCodec,
+      {
+        requireHash: true,
+        map: (asset: TextureAsset) => new Texture(asset),
+      },
+    );
 
     // Preload complete: the catalog is a synchronous map, as §79's read side
     // requires, and every key in it was verified on the way in.
-    const catalog = resourceCatalog(new Map([["crate", new Texture(crate)]]));
     const restored = catalog.get("crate");
     expect(restored?.width).toBe(2);
     expect(
       catalog.keyOf(restored ?? new Texture({ width: 1, height: 1 })),
     ).toBe("crate");
     expect(catalog.get("absent")).toBeUndefined();
+  });
+
+  it("the hand-rolled walk still agrees with the helper", async () => {
+    const hash = await sha256(ENCODED);
+    const manifest: AssetManifest = {
+      crate: { url: "/crate.png", hash },
+    };
+    const assets = new AssetManager({
+      fetch: () => Promise.resolve(response(ENCODED)),
+    });
+
+    const crate = await loadFromManifest(assets, manifest, "crate", fakeCodec, {
+      requireHash: true,
+    });
+    const byHand = resourceCatalog(new Map([["crate", new Texture(crate)]]));
+    const byHelper = await preloadManifestIntoCatalog(
+      assets,
+      manifest,
+      fakeCodec,
+      {
+        requireHash: true,
+        map: (asset: TextureAsset) => new Texture(asset),
+      },
+    );
+
+    expect(byHelper.get("crate")?.width).toBe(byHand.get("crate")?.width);
+    expect(byHelper.get("crate")?.height).toBe(byHand.get("crate")?.height);
+    expect(byHelper.get("crate")?.colorSpace).toBe(
+      byHand.get("crate")?.colorSpace,
+    );
   });
 
   it("refuses bytes the manifest did not name (§96)", async () => {

@@ -25,14 +25,15 @@
  *   normals, uvs, colors, joints, weights — plus indices, `triangles` and
  *   `lines` modes, interleaved and strided accessors.
  * - **Materials**: §59's metallic-roughness tier — base colour factor and
- *   texture, metallic/roughness factors, emissive factor, `OPAQUE`/`BLEND`.
- *   Texture slots the engine's single-unit material tier cannot sample yet
- *   (`metallicRoughnessTexture`, `normalTexture`, `occlusionTexture`,
+ *   texture, metallic/roughness factors, packed `metallicRoughnessTexture`
+ *   (linear), emissive factor, `OPAQUE`/`BLEND`. Texture slots this tier
+ *   still cannot sample (`normalTexture`, `occlusionTexture`,
  *   `emissiveTexture`) are validated, **not decoded**, and recorded per
- *   material as {@link GltfMaterialRecord.ignoredTextures} — the §67
- *   warned-inert posture, never a silent drop.
+ *   material as {@link GltfMaterialRecord.ignoredTextures}. WebGL samples
+ *   the packed map; WebGPU still shades from the scalar factors.
  * - **Textures**: decoded through {@link createTextureLoader}'s injected
- *   seam with its §96 decompression bounds, tagged `srgb`, rows flipped to
+ *   seam with its §96 decompression bounds, tagged `srgb` for colour maps
+ *   and `linear` for the packed metallic-roughness map, rows flipped to
  *   §7a's bottom-first order; uvs are converted (`v → 1 − v`) in the same
  *   pass, so a loaded model samples exactly what its author painted.
  * - **Skins**: joints, inverse bind matrices (glTF's +Y-bone authoring
@@ -224,6 +225,8 @@ export interface GltfMaterialRecord {
   readonly emissive: readonly [number, number, number];
   /** Index into {@link GltfAsset.textures}, or `null` for no base map. */
   readonly baseColorTexture: number | null;
+  /** Packed metallic-roughness map index, or `null`. Decoded linear. */
+  readonly metallicRoughnessTexture: number | null;
   /** Whether `alphaMode` was `"BLEND"`. */
   readonly transparent: boolean;
   /**
@@ -233,9 +236,9 @@ export interface GltfMaterialRecord {
    */
   readonly doubleSided: boolean;
   /**
-   * Texture slots the file carries but the single-unit material tier cannot
-   * sample (`metallicRoughnessTexture`, `normalTexture`, `occlusionTexture`,
-   * `emissiveTexture`): validated, not decoded, warned at instantiation.
+   * Texture slots the file carries but this tier cannot sample
+   * (`normalTexture`, `occlusionTexture`, `emissiveTexture`): validated, not
+   * decoded, warned at instantiation.
    */
   readonly ignoredTextures: readonly string[];
   /** §78 user metadata (`extras`). */
@@ -1688,6 +1691,16 @@ async function parseGltf(
   const materialRecords = collection(document, "materials", url);
   const materials: GltfMaterialRecord[] = [];
   const referencedTextures = new Set<number>();
+  const textureColorSpace = new Map<number, "srgb" | "linear">();
+  const referenceTexture = (
+    index: number,
+    space: "srgb" | "linear",
+  ): void => {
+    referencedTextures.add(index);
+    if (space === "srgb" || !textureColorSpace.has(index)) {
+      textureColorSpace.set(index, space);
+    }
+  };
   for (let i = 0; i < materialRecords.length; i += 1) {
     const where = `materials[${String(i)}]`;
     const record = asObject(materialRecords[i], url, where);
@@ -1696,6 +1709,7 @@ async function parseGltf(
     let metalness = 1;
     let roughness = 1;
     let baseColorTexture: number | null = null;
+    let metallicRoughnessTexture: number | null = null;
     const pbrValue = record["pbrMetallicRoughness"];
     if (pbrValue !== undefined) {
       const pbr = asObject(pbrValue, url, `${where}.pbrMetallicRoughness`);
@@ -1715,14 +1729,14 @@ async function parseGltf(
           pbr["baseColorTexture"],
           `${pbrWhere}.baseColorTexture`,
         );
-        referencedTextures.add(baseColorTexture);
+        referenceTexture(baseColorTexture, "srgb");
       }
       if (pbr["metallicRoughnessTexture"] !== undefined) {
-        textureInfo(
+        metallicRoughnessTexture = textureInfo(
           pbr["metallicRoughnessTexture"],
           `${pbrWhere}.metallicRoughnessTexture`,
         );
-        ignoredTextures.push("metallicRoughnessTexture");
+        referenceTexture(metallicRoughnessTexture, "linear");
       }
     }
     for (const slot of [
@@ -1738,7 +1752,7 @@ async function parseGltf(
     if (ignoredTextures.length > 0) {
       ignore(
         context,
-        `${where}: texture slot(s) ${ignoredTextures.join(", ")} (single-unit material tier)`,
+        `${where}: texture slot(s) ${ignoredTextures.join(", ")} (unstaged §59 maps)`,
       );
     }
     const emissive = optionalTuple(
@@ -1766,6 +1780,7 @@ async function parseGltf(
       roughness,
       emissive: [emissive[0], emissive[1], emissive[2]],
       baseColorTexture,
+      metallicRoughnessTexture,
       transparent: alphaMode === "BLEND",
       doubleSided: record["doubleSided"] === true,
       ignoredTextures,
@@ -1852,7 +1867,7 @@ async function parseGltf(
       decode: options.decodeTexture,
       probe: options.probeTexture,
       name: `${options.name}-texture`,
-      colorSpace: "srgb",
+      colorSpace: textureColorSpace.get(index) ?? "srgb",
       filter: sampler.filter,
       wrap: sampler.wrap,
       maximumDecodedBytes: options.maximumDecodedBytes,

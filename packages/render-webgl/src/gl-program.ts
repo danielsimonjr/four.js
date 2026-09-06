@@ -664,6 +664,14 @@ export const MAP_TEXTURE_UNIT = 0;
 export const SHADOW_TEXTURE_UNIT = 1;
 
 /**
+ * Packed metallic-roughness map unit (`StandardMaterial.metalRoughnessMap`).
+ * Unit 2: 0 is albedo, 1 is the shadow map that stays live across a shaded
+ * draw. Node-material samplers also start at 2 and overwrite this unit on
+ * their own draws — never simultaneous. Unbound in `render`'s `finally`.
+ */
+export const METAL_ROUGHNESS_TEXTURE_UNIT = 2;
+
+/**
  * The MVP vertex stage: object space → clip space, plus the two optional
  * streams the fragment stage may multiply by.
  *

@@ -1981,6 +1981,31 @@ export class PhysicsWorld {
   }
 
   /**
+   * Visits every registered body that is **dynamic and sleeping**, in
+   * registration order (§33), with the same shared centre-of-mass vector
+   * {@link PhysicsWorld.forEachActiveBody} uses.
+   *
+   * The default force-generator walk skips sleepers so ambient wind cannot
+   * defeat §32. This is the other half of that filter: a field that opts
+   * into `wakesSleepingBodies` walks only the bodies the default pass hid.
+   * Static and kinematic bodies are still skipped — a force on those types
+   * is discarded by definition (§22).
+   *
+   * Allocates nothing. Adding or removing bodies during the walk is not
+   * supported.
+   */
+  forEachSleepingDynamicBody(visit: ActiveBodyVisitor): void {
+    const centerOfMass = this.#visitCenterOfMass;
+    for (const registration of this.#bodiesByNode.values()) {
+      if (registration.type !== "dynamic" || !registration.body.sleeping) {
+        continue;
+      }
+      this.#adapter.getBodyCenterOfMass(registration.handle, centerOfMass);
+      visit(registration.body, registration.node, centerOfMass);
+    }
+  }
+
+  /**
    * Advances the simulation by exactly `deltaSeconds` (§10, §37, §39).
    *
    * Runs steps 1–6 of the pipeline in the module header and leaves the step's
@@ -3338,7 +3363,11 @@ export class PhysicsWorld {
    * w        = body.normalizedWeights()          (§19's two sliders, summing to 1)
    * position = lerp(solverPosition, targetPosition, w.animation)
    * rotation = slerp(solverRotation, targetRotation, w.animation)   shortest arc
+   * scale    = lerp((1, 1, 1), targetScale, w.animation)
    * ```
+   *
+   * Scale's physical side is identity: a solver body has no scale
+   * (decision, 2026-09-06).
    *
    * `Quaternion.slerp` already takes the short way round an antipodal pair (it
    * negates the far end when the dot product is negative, plan D8), so a target
@@ -3365,15 +3394,17 @@ export class PhysicsWorld {
     const { node, body, handle } = registration;
     const target = this.#requirePoseTarget(registration);
     const weights = body.normalizedWeights(this.#blendWeights);
-    const { position, rotation } = node.transform;
+    const { position, rotation, scale } = node.transform;
 
     if (weights.animation === 0) {
       this.#adapter.getBodyTransform(handle, position, rotation);
+      scale.set(1, 1, 1);
       return;
     }
     if (weights.physics === 0) {
       position.copy(target.position);
       rotation.copy(target.rotation);
+      scale.copy(target.scale);
       return;
     }
 
@@ -3382,6 +3413,7 @@ export class PhysicsWorld {
     this.#adapter.getBodyTransform(handle, blendedPosition, blendedRotation);
     position.copy(blendedPosition.lerp(target.position, weights.animation));
     rotation.copy(blendedRotation.slerp(target.rotation, weights.animation));
+    scale.set(1, 1, 1).lerp(target.scale, weights.animation);
   }
 
   /**

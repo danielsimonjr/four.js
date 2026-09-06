@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 import {
   AssetManager,
@@ -146,6 +150,7 @@ describe("createImageLoader", () => {
   });
 
   it("closes through the manager's refcount when the last reference goes", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const fake = fakeDecode();
     const loader = createImageLoader(fake.decode);
     const manager = new AssetManager({ fetch: fetchOf({ "/i.png": "16x8" }) });

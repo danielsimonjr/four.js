@@ -1,7 +1,7 @@
 import { isFourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
 import { Group } from "@four/scene";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   JointBreakPayload,
@@ -22,6 +22,18 @@ import {
   supportsSolverJointAccess,
 } from "../src/index.js";
 import { FakeJointSolverAdapter, FakeSolverAdapter } from "./fake-adapter.js";
+
+/**
+ * vitest 4 reuses an unrestored `spyOn(console, "warn")` and keeps its call
+ * history. The PH-22e motor-cap tests below count warns and used to inherit
+ * the first test's `jointMotorEffortCap` line — they passed alone and failed
+ * with the file. Restore the spy so each test's count is its own. Worlds
+ * created here are not stepped again after their test returns; the extra
+ * calls were spy history, not leftover writers.
+ */
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** A node carrying a dynamic body and one collider, under `"physics"` (§42). */
 function dynamicNode(dimension: PhysicsDimension = "2d"): Group {
@@ -981,6 +993,15 @@ describe("§28 motor effort limits are declared, not assumed (PH-22e)", () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toContain("strength gain");
+  });
+
+  it("does not inherit console.warn spy history from earlier tests in this file", () => {
+    // Isolation regression: the first PH-22e test records a
+    // jointMotorEffortCap warning. Without the afterEach restore, vitest 4's
+    // reused spy still holds that call and this assertion fails even though
+    // this test emits nothing.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
