@@ -28,12 +28,14 @@ ESLint, Prettier, TypeDoc, Vite, Changesets (choices recorded in `MEMORY.md`).
   ```
 
 - `generate-compatibility.mjs` — §90 compatibility-table generator (added 2026-08-07, gap
-  A-26). Rebuilds the solver-adapter block of `docs/COMPATIBILITY.md` between its
-  generated-block markers from the adapters' **live** capability declarations (imports each
-  built `dist/`, constructs the adapter, reads `capabilities`; probes
+  A-26; renderer backends added 2026-09-06, A-26 follow-up). Rebuilds the solver-adapter
+  and renderer-backend blocks of `docs/COMPATIBILITY.md` between their generated-block
+  markers from **live** capability declarations (imports each built `dist/`, constructs
+  the adapter or renderer, reads `capabilities`; probes
   `SolverBodyAccess`/`SolverJointAccess` structurally against `@four/physics`'s emitted
-  declarations). Requires a built tree. Adding an adapter package adds a column with no
-  tool edit.
+  declarations; parses `RendererCapabilities` members from `@four/render`'s emitted
+  `renderer.d.ts`). Requires a built tree. Adding an adapter or renderer package adds a
+  column with no tool edit.
 
   ```sh
   bun run check-compat                # CI gate — fails if the committed doc drifted
