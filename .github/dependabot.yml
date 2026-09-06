@@ -70,6 +70,14 @@ updates:
       # isolation defect in TODO.md is fixed.
       - dependency-name: 'eslint'
         versions: ['>=10']
+      # BLOCKED by a vendored tool. js-yaml 5 removed its default export, and
+      # tools/create-dependency-graph does `import yaml from 'js-yaml'`, so `bun run graph`
+      # dies with "Missing 'default' export" before it reads a single file. That tool is
+      # kept BYTE-IDENTICAL with the copy in llm-wiki (see eslint.config.js) -- changing the
+      # import here would guarantee the two copies drift, which is a worse outcome than
+      # staying on js-yaml 4. Lift when both copies move together.
+      - dependency-name: 'js-yaml'
+        versions: ['>=5']
       - dependency-name: '@vitest/coverage-v8'
         versions: ['>=4']
 
