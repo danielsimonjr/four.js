@@ -24,7 +24,13 @@ class FakeElement implements ElementLike {
   disabled = false;
   checked = false;
   type = "";
-  style: { cssText: string; fontSize: string } = { cssText: "", fontSize: "" };
+  style: {
+    position?: string;
+    width?: string;
+    height?: string;
+    clip?: string;
+    fontSize?: string;
+  } = { fontSize: "" };
   parentNode: FakeElement | null = null;
   readonly children: FakeElement[] = [];
   readonly attributes = new Map<string, string>();

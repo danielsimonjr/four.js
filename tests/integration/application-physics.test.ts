@@ -177,8 +177,9 @@ describe("§84 physics counters — real solver (A-6)", () => {
     );
     // Two falling bodies are two awake bodies (§32).
     expect(stats?.activeBodies).toBe(2);
-    // Still no producer for these two (§84, module header of `stats.ts`).
-    expect(stats?.contacts).toBeNaN();
+    // Contacts ride `SolverStatistics.contactCount` (2026-09-06). GPU timestamps
+    // still have no producer (§84).
+    expect(stats?.contacts).toBeGreaterThanOrEqual(0);
     expect(stats?.gpuFrameTime).toBeNaN();
 
     app.dispose();

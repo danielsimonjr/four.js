@@ -32,6 +32,23 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
+  (the exception each golden's `_warning` names). Values came from the
+  scenario helpers, not from editing hashes by hand. 0.20 contact persistence
+  and first-contact timing (step 35) are accepted behaviour. Simulation
+  packages (`scene`, `physics`) must not import `DEV`/`devWarnOnce` — the
+  detached-listener and stale-handle warns are unconditional `console.warn`
+  with a WeakSet/Set once-suppress.
+
+- **2026-09-06 — open-TODO subagent pass (fourth landing).** Decisions
+  executed rather than re-parked: Rapier 0.20 adopted (measured goldens);
+  PH-11c push is reduced-mass + wake; CameraShake uses interpolated
+  value-noise at `simulationTime`; local-plane default is XY; NodeSpace
+  ships with its serializer; A-25 stubs are published as real 0.x
+  packages; A-13 mirror is opt-in `DocumentLike`; A-18 worker/watch are
+  injected seams. TypeDoc still has no TS 7 support (typedoc#3098);
+  `NPM_TOKEN` remains an owner secret.
+
 - **2026-09-06 — open-TODO subagent pass (third landing).** Six parallel
   agents landed: Windows animation gate (simulation-bound `#status` sampling,
   not screenshot throughput); `buildRenderList` sort skip + sprite fast path;

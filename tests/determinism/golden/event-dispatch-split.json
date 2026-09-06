@@ -3,10 +3,10 @@
   "_scenario": "One \"2d\" PhysicsWorld on Rapier2dAdapter with Appendix A gravity holding a static rectangle floor (top y = -3.5) and eight dynamic 0.5 m boxes of mass 1 … 2.75 kg dropped in a narrow two-column stack, plus a second, quieter world of two boxes tracked by the same PhysicsSystem. A marker SimulationSystem at PRIORITY_CONSTRAINTS (700) counts its own runs. Driven 180 clean fixed steps of 1/60 s with an injected TimeState whose simulationTime is exactly step / 60. Run twice: arm \"combined\" registers a default PhysicsSystem (dispatch inside step 6); arm \"split\" registers PhysicsSystem({ dispatchEvents: false }) plus a PhysicsEventSystem at PRIORITY_EVENT_DISPATCH (900). Every body listens to all seven §29 event kinds; eventDigest is the D6 FNV-1a hasher over (step, kind index, emitter id) in delivery order, and summaryDigest is that hasher over the busy world's 180 per-step checksums in step order.",
   "_tier": "same-runtime (§33), the same tier and the same reasons as golden/phase5.json: Rapier is compiled WebAssembly, state crosses the JS/wasm boundary as f64 → f32, and the wasm image is pinned per platform by the package manager. PH-21 itself adds no arithmetic at all — it moves a dispatch loop between two §39 priorities — so the tier here is entirely the solver's.",
   "_claim": "Both arms are recorded under one set of numbers deliberately: the packet's claim is that they are equal. The constraint-marker offsets are the one recorded difference — -1 with dispatch at step 6, 0 with dispatch at step 9.",
-  "summaryDigest": 3319003658,
+  "summaryDigest": 2786993323,
   "firstStepChecksum": 2398925441,
-  "lastStepChecksum": 3388429139,
-  "eventCount": 1937,
-  "eventDigest": 2838379565,
-  "stepsWithEvents": 149
+  "lastStepChecksum": 5597887,
+  "eventCount": 2032,
+  "eventDigest": 3007809359,
+  "stepsWithEvents": 150
 }

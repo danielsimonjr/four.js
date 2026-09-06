@@ -227,7 +227,7 @@ export const INPUT_SCHEDULE: readonly ScheduledInput[] = [
  * (not derived), and asserted against every run in `../physics-replay.test.ts`
  * so it cannot rot silently.
  */
-export const FIRST_CONTACT_STEP = 36;
+export const FIRST_CONTACT_STEP = 35;
 
 /**
  * The window the frame-stepping case single-steps through: two quiet steps, the

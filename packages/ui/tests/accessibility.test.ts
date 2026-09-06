@@ -32,7 +32,19 @@ class FakeElement implements ElementLike {
   checked = false;
   type = "";
   textContent = "";
-  style: { cssText: string; fontSize: string } = { cssText: "", fontSize: "" };
+  style: {
+    position?: string;
+    width?: string;
+    height?: string;
+    padding?: string;
+    margin?: string;
+    overflow?: string;
+    clip?: string;
+    clipPath?: string;
+    whiteSpace?: string;
+    border?: string;
+    fontSize?: string;
+  } = { fontSize: "" };
   parentNode: FakeElement | null = null;
   readonly children: FakeElement[] = [];
   readonly attributes = new Map<string, string>();
@@ -354,7 +366,8 @@ describe("installAccessibilityMirror (§75)", () => {
     const root = mirror.root as FakeElement;
     expect(root.getAttribute("data-high-contrast")).toBe("true");
     expect(root.style.fontSize).toBe("1.5em");
-    expect(root.style.cssText).toContain("clip:rect(0,0,0,0)");
+    expect(root.style.clip).toBe("rect(0, 0, 0, 0)");
+    expect(root.style.position).toBe("absolute");
     expect(root.getAttribute("aria-hidden")).toBeNull();
     expect(mirror.highContrast).toBe(true);
     expect(mirror.fontScale).toBe(1.5);
@@ -555,7 +568,7 @@ describe("installAccessibilityMirror (§75)", () => {
     const button = new Button({ label: "Go", role: "button" });
     const { mirror } = install(button, { document, fontScale: 2 });
     expect(mirror.root.style?.fontSize).toBe("2em");
-    expect(mirror.root.style?.cssText).toContain("font-size:2em");
+    expect(mirror.root.style?.clip).toBe("rect(0, 0, 0, 0)");
   });
 
   it("replacing accessibility pushes the new record", () => {

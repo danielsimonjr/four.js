@@ -166,7 +166,10 @@ export { PhysicsEventSystem } from "./physics-event-system.js";
 export type { PhysicsSystemOptions } from "./physics-system.js";
 export { PhysicsSystem } from "./physics-system.js";
 export type { StalePhysicsHandleKind } from "./stale-handle.js";
-export { rejectStalePhysicsHandle } from "./stale-handle.js";
+export {
+  rejectStalePhysicsHandle,
+  resetStaleHandleWarnings,
+} from "./stale-handle.js";
 export {
   DEFAULT_DENSITY,
   DEFAULT_FRICTION,

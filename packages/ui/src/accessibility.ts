@@ -78,6 +78,24 @@ export interface DocumentLike {
 }
 
 /**
+ * Style bag the a11y mirror writes. Individual properties only — never
+ * `cssText` (CSP `style-src` without `'unsafe-inline'`, §96).
+ */
+export interface ElementStyleLike {
+  position?: string;
+  width?: string;
+  height?: string;
+  padding?: string;
+  margin?: string;
+  overflow?: string;
+  clip?: string;
+  clipPath?: string;
+  whiteSpace?: string;
+  border?: string;
+  fontSize?: string;
+}
+
+/**
  * The handful of element operations the mirror uses. A fake implements these
  * as ordinary methods and fields; a real `HTMLElement` already has them.
  */
@@ -93,7 +111,7 @@ export interface ElementLike {
   disabled?: boolean;
   checked?: boolean;
   type?: string;
-  style?: { cssText?: string; fontSize?: string };
+  style?: ElementStyleLike;
 }
 
 /**
@@ -156,14 +174,25 @@ export interface AccessibilityMirror extends Disposable {
 }
 
 /**
- * Clip-and-collapse CSS that hides the container from sighted users without
+ * Clip-and-collapse style that hides the container from sighted users without
  * taking it out of the accessibility tree. `aria-hidden` would do the latter,
- * which is the opposite of why this container exists.
+ * which is the opposite of why this container exists. Written as individual
+ * properties so CSP `style-src` without `'unsafe-inline'` stays satisfied.
  */
-const VISUALLY_HIDDEN_STYLE =
-  "position:absolute;width:1px;height:1px;padding:0;margin:-1px;" +
-  "overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);" +
-  "white-space:nowrap;border:0;";
+const VISUALLY_HIDDEN: Readonly<
+  Omit<ElementStyleLike, "fontSize">
+> = Object.freeze({
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: "0",
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  clipPath: "inset(50%)",
+  whiteSpace: "nowrap",
+  border: "0",
+});
 
 const CONTRAST_QUERY = "(prefers-contrast: more)";
 
@@ -237,8 +266,7 @@ class DomAccessibilityMirror implements AccessibilityMirror {
     container.id = "four-a11y-mirror";
     container.setAttribute("data-four-a11y", "mirror");
     const style = ensureStyle(container);
-    style.cssText = `${VISUALLY_HIDDEN_STYLE}font-size:${String(this.fontScale)}em;`;
-    style.fontSize = `${String(this.fontScale)}em`;
+    applyVisuallyHiddenStyle(style, this.fontScale);
     if (this.highContrast) {
       container.setAttribute("data-high-contrast", "true");
     }
@@ -351,14 +379,28 @@ function resolveHighContrast(
   return false;
 }
 
-function ensureStyle(element: ElementLike): {
-  cssText?: string;
-  fontSize?: string;
-} {
+function ensureStyle(element: ElementLike): ElementStyleLike {
   if (element.style === undefined) {
     element.style = {};
   }
   return element.style;
+}
+
+function applyVisuallyHiddenStyle(
+  style: ElementStyleLike,
+  fontScale: number,
+): void {
+  style.position = VISUALLY_HIDDEN.position;
+  style.width = VISUALLY_HIDDEN.width;
+  style.height = VISUALLY_HIDDEN.height;
+  style.padding = VISUALLY_HIDDEN.padding;
+  style.margin = VISUALLY_HIDDEN.margin;
+  style.overflow = VISUALLY_HIDDEN.overflow;
+  style.clip = VISUALLY_HIDDEN.clip;
+  style.clipPath = VISUALLY_HIDDEN.clipPath;
+  style.whiteSpace = VISUALLY_HIDDEN.whiteSpace;
+  style.border = VISUALLY_HIDDEN.border;
+  style.fontSize = `${String(fontScale)}em`;
 }
 
 function detach(element: ElementLike): void {

@@ -2,30 +2,42 @@
   "_warning": "IMMUTABLE. These digests are the Phase 5 exit criterion (§108) recorded on 2026-08-01 by WP-5.8 from an actual run of tests/determinism/helpers/phase5-scenario.ts. DO NOT REGENERATE THEM TO MAKE TESTS PASS. A mismatch means engine or solver behaviour changed: find the change and decide whether it is correct. Only a deliberate, reviewed change to the scenario helper itself (or to intended engine semantics, or a Rapier version bump) justifies new values, and that change must be recorded in CHANGELOG.md and MEMORY.md with the reason. Regenerating to silence a red test destroys the only evidence that four.js's physics pillar is deterministic.",
   "_scenario": "Two PhysicsWorlds — one \"2d\" on Rapier2dAdapter, one \"3d\" on Rapier3dAdapter — tracked on ONE PhysicsSystem inside ONE Application, stepped 600 clean fixed frames of 1/60 s (10 s, exactly one fixed step each, nothing dropped). Each half is built by the same function: a static floor whose top is y = 0, a three-box dynamic stack at x = -1.2 taking §23's density-derived mass path, a 1 kg ball dropped from y = 3 at x = 1.6, a static §24 sensor slab centred (1.6, 1.5) that the ball falls through, and a \"kinematic-position\" slab swept along X at 0.4 m/s from x = -5 whose target is written onto its node before every frame. Host script applies a §26 impulse of (0.3, 4.5, 0) N·s to each ball on frame 200 through RigidBody.applyImpulse (the command buffer the world drains at the top of that step). The per-step digest is the D6 FNV-1a hash of the pair (world2d.checksum(), world3d.checksum()) in that order — §33's own checksums are the digest inputs, not a re-derivation — and summaryDigest is the same hasher over all 600 per-step digests in step order.",
   "_tier": "same-runtime (§33). Rapier is compiled WebAssembly, so its arithmetic does not vary with the host JS engine's Math library — but cross-platform determinism is NOT claimed here: values cross the JS/wasm boundary as f64 → f32, the wasm image is pinned per platform by the package manager, and §33's cross-platform tier requires evidence this suite does not gather. The checksum algorithm itself is exact and cross-platform; only its inputs are runtime-bound.",
-  "summaryDigest": 590304896,
+  "summaryDigest": 115550376,
   "firstStepDigest": 2410899385,
-  "lastStepDigest": 1614113482,
+  "lastStepDigest": 3064710849,
   "firstChecksum2d": 403542284,
-  "lastChecksum2d": 3303859282,
+  "lastChecksum2d": 2740890687,
   "firstChecksum3d": 403542284,
-  "lastChecksum3d": 3242999651,
+  "lastChecksum3d": 1409275842,
   "events2d": {
     "collisionStartCount": 18,
     "collisionEndCount": 6,
     "firstCollisionStartStep": 7,
-    "lastCollisionEndStep": 257,
-    "triggerEnterSteps": [25, 206],
-    "triggerExitSteps": [42, 250],
-    "sleepCount": 5,
+    "lastCollisionEndStep": 260,
+    "triggerEnterSteps": [
+      25,
+      206
+    ],
+    "triggerExitSteps": [
+      42,
+      250
+    ],
+    "sleepCount": 4,
     "wakeCount": 4
   },
   "events3d": {
     "collisionStartCount": 18,
-    "collisionEndCount": 8,
+    "collisionEndCount": 6,
     "firstCollisionStartStep": 7,
-    "lastCollisionEndStep": 550,
-    "triggerEnterSteps": [25, 206],
-    "triggerExitSteps": [42, 250],
+    "lastCollisionEndStep": 260,
+    "triggerEnterSteps": [
+      25,
+      206
+    ],
+    "triggerExitSteps": [
+      42,
+      250
+    ],
     "sleepCount": 4,
     "wakeCount": 4
   }

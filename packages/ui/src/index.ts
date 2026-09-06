@@ -52,6 +52,7 @@ export type {
   AccessibilityMirrorRoot,
   DocumentLike,
   ElementLike,
+  ElementStyleLike,
 } from "./accessibility.js";
 export {
   accessibilityElementId,

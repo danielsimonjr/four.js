@@ -237,7 +237,7 @@ same seam. The table below is generated from the adapters' own
 | ------------------------------- | -------------------------------------------------- | --------------------------------------------------------------- |
 | Package (§98)                   | `@four/physics-rapier`                             | `@four/physics-rapier`                                          |
 | Exported class                  | `Rapier2dAdapter`                                  | `Rapier3dAdapter`                                               |
-| Underlying solver               | `@dimforge/rapier2d-compat` 0.19.3                 | `@dimforge/rapier3d-compat` 0.19.3                              |
+| Underlying solver               | `@dimforge/rapier2d-compat` 0.20.0                 | `@dimforge/rapier3d-compat` 0.20.0                              |
 | `dimensions` (§21)              | `2d`                                               | `3d`                                                            |
 | `determinism` (§33)             | `same-runtime`                                     | `same-runtime`                                                  |
 | `snapshots` (§34)               | yes                                                | yes                                                             |
@@ -306,12 +306,12 @@ Honest differences that no field of `PhysicsCapabilities` can carry, recorded
 here because §90 tables are where a user looks for them (each is documented at
 its source in `packages/physics-rapier/src`):
 
-- **Break thresholds do not work on either Rapier adapter.** Rapier 0.19.3
+- **Break thresholds do not work on either Rapier adapter.** Rapier 0.20.0
   exposes no joint reaction, so `reportsJointReactions` is `false` and
   `PhysicsWorld.addJoint` **refuses** a joint carrying `breakForce` or
   `breakTorque` rather than accepting a threshold that could never fire.
 - **A motor's `maxTorque` / `maxForce` is a force-based gain, not §28's hard
-  ceiling.** Documented **now**, not when Box2D lands: Rapier 0.19.3 exposes
+  ceiling.** Documented **now**, not when Box2D lands: Rapier 0.20.0 exposes
   no JS-reachable motor-force cap, so both adapters supply the value as a
   `ForceBased` gain — effort ≈ `maxEffort · (target − current)` — which is
   monotone in strength but does not clamp. `PhysicsCapabilities` has no field

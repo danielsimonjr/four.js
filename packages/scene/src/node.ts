@@ -34,7 +34,6 @@ import {
   ComponentRegistry,
   EventEmitter,
   FourError,
-  devWarnOnce,
   type Component,
   type ComponentHost,
   type ComponentType,
@@ -125,6 +124,9 @@ const aimScratch = /* @__PURE__ */ new Vector3();
 const worldRotationScratch = /* @__PURE__ */ new Quaternion();
 const parentRotationScratch = /* @__PURE__ */ new Quaternion();
 const decomposeScratch = /* @__PURE__ */ new Vector3();
+
+/** Once-per-node §83 detached-listener warn — see `#detach`. */
+const detachedListenerWarned = new WeakSet<Node>();
 
 /**
  * Builds {@link Node.lookAt}'s refusal (§85, §89) — one function for both
@@ -877,10 +879,13 @@ export abstract class Node
     this.#children.splice(index, 1);
     child.#parent = null;
     const listeners = child.listenerCountAll();
-    if (listeners > 0) {
-      devWarnOnce(
-        `detached-node-listeners:${child.id}`,
-        `§83: node "${child.id}" was detached with ${String(listeners)} event ` +
+    if (listeners > 0 && !detachedListenerWarned.has(child)) {
+      detachedListenerWarned.add(child);
+      // Unconditional: `@four/scene` is a §33 simulation package and must not
+      // import DEV / `devWarnOnce` (`dev-build-mode.test.ts`). The WeakSet is
+      // the once-per-node suppress; production prints the first detach.
+      console.warn(
+        `[four] §83: node "${child.id}" was detached with ${String(listeners)} event ` +
           "listener(s) still registered; call the unsubscribers from on() or " +
           "removeAllListeners() so the subtree is not retained (§6b).",
       );
