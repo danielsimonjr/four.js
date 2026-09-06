@@ -170,8 +170,30 @@ import type {
   ColliderTriggerEvent,
   RigidBodyCollisionEvent,
 } from "./collider.js";
-import type { PhysicsWorldOptions } from "./descriptors.js";
-import { resolveGravity, resolveSleepingConfig } from "./descriptors.js";
+import type { PhysicsWorldOptions, RigidBodyDescriptor } from "./descriptors.js";
+import {
+  resolveAngularVelocity,
+  resolveGravity,
+  resolveRotation,
+  resolveSleepingConfig,
+  widenToVector3,
+} from "./descriptors.js";
+import {
+  planeToWorld,
+  planeToWorldVec,
+  resolveLocalPlane,
+  worldToPlane,
+  worldToPlaneVec,
+  type ResolvedLocalPlane,
+} from "./local-plane.js";
+import {
+  fromSiLength,
+  fromSiMass,
+  resolvePhysicsWorldUnits,
+  toSiLength,
+  toSiMass,
+  type PhysicsWorldUnits,
+} from "./world-units.js";
 import type { JointBreakEvent, PhysicsEvent } from "./events.js";
 import type { Joint, JointBinding, JointBreakPayload } from "./joints.js";
 import {
@@ -214,6 +236,7 @@ import type {
 } from "./solver-registry.js";
 import { resolveSolver } from "./solver-registry.js";
 import type {
+  AngularVelocityInput,
   BodyType,
   DeterminismLevel,
   PhysicsBodyHandle,
@@ -583,6 +606,12 @@ interface BodyRegistration {
    * into it is.
    */
   tracked: boolean;
+  /**
+   * Captured at registration: whether this body authors its pose in the
+   * world's §21 local plane. A later write to `RigidBody.space` does not
+   * flip the mapping — the same rule `space` already documents.
+   */
+  readonly localPlane: boolean;
 }
 
 /** One registered joint: the object, its handle, and its monotonic id (§28). */
@@ -704,6 +733,15 @@ export class PhysicsWorld {
   /** Resolved world gravity in m/s² (§21, Appendix A). Owned; never handed out. */
   readonly #gravity: Vector3;
 
+  /**
+   * §40 scale factors, or `undefined` when omitted — the identity path.
+   * Pointer-check only; existing worlds never pay a multiply.
+   */
+  readonly #units: PhysicsWorldUnits | undefined;
+
+  /** §21 simulation plane. Default XY is the shared identity map. */
+  readonly #localPlane: ResolvedLocalPlane;
+
   /** Resolved §32 sleeping configuration, frozen. */
   readonly #sleeping: SleepingConfig;
 
@@ -745,6 +783,21 @@ export class PhysicsWorld {
 
   /** See {@link PhysicsWorld.#teleportPosition}. */
   readonly #teleportRotation = new Quaternion();
+
+  /**
+   * Feed/publish scratch for the §21 plane map and §40 SI conversion, so a
+   * mapped body allocates nothing (§7b). Unused on the identity path.
+   */
+  readonly #mapPosition = new Vector3();
+
+  /** @see PhysicsWorld.#mapPosition */
+  readonly #mapRotation = new Quaternion();
+
+  /** @see PhysicsWorld.#mapPosition */
+  readonly #mapLinear = new Vector3();
+
+  /** @see PhysicsWorld.#mapPosition */
+  readonly #mapAngular = new Vector3();
 
   /**
    * Which accept-and-ignore warnings this world has already emitted, allocated
@@ -938,7 +991,18 @@ export class PhysicsWorld {
 
     this.#adapter = adapter;
     this.#dimension = init.dimension;
+    this.#units = resolvePhysicsWorldUnits(init.units);
+    this.#localPlane = resolveLocalPlane(init.localPlane);
     this.#gravity = resolveGravity(init.dimension, init.gravity);
+    // Authored gravity is in world length units / s². Convert into SI for the
+    // solver. Appendix A's default is already SI and is left alone so a world
+    // that only sets a scale still gets −9.81 m/s².
+    if (this.#units !== undefined && init.gravity !== undefined) {
+      const length = this.#units.scale.lengthToMeters;
+      this.#gravity.x *= length;
+      this.#gravity.y *= length;
+      this.#gravity.z *= length;
+    }
     this.#sleeping = resolveSleepingConfig(init.sleeping);
     this.#tuning = resolveTuningCapabilities(capabilities);
     this.#bodyTuning = supportsSolverBodyTuning(adapter) ? adapter : undefined;
@@ -997,6 +1061,46 @@ export class PhysicsWorld {
   /** The exact `PhysicsWorldOptions` record handed to `adapter.initialize` (§37). */
   get options(): PhysicsWorldOptions {
     return this.#options;
+  }
+
+  /**
+   * §40 scale factors this world converts through, or `undefined` when
+   * omitted (identity — internal solver numbers equal authored numbers).
+   *
+   * Internal solver state is SI. Use {@link PhysicsWorld.toSiLength} and
+   * friends at the authoring boundary.
+   */
+  get units(): PhysicsWorldUnits | undefined {
+    return this.#units;
+  }
+
+  /**
+   * The resolved §21 simulation plane. Default is the world XY plane
+   * (origin 0, normal +Z, xAxis +X). Bodies with `space: "local-plane"`
+   * author their 2D pose in this frame.
+   */
+  get localPlane(): ResolvedLocalPlane {
+    return this.#localPlane;
+  }
+
+  /** Metres from an authored length. Identity when {@link PhysicsWorld.units} is omitted. */
+  toSiLength(value: number): number {
+    return toSiLength(value, this.#units);
+  }
+
+  /** Authored length from metres. Identity when units are omitted. */
+  fromSiLength(meters: number): number {
+    return fromSiLength(meters, this.#units);
+  }
+
+  /** Kilograms from an authored mass. Identity when units are omitted. */
+  toSiMass(value: number): number {
+    return toSiMass(value, this.#units);
+  }
+
+  /** Authored mass from kilograms. Identity when units are omitted. */
+  fromSiMass(kilograms: number): number {
+    return fromSiMass(kilograms, this.#units);
   }
 
   /** Whether {@link PhysicsWorld.initialize} has completed. */
@@ -1120,9 +1224,9 @@ export class PhysicsWorld {
    * ## The frame the body is registered in (§8, PH-12)
    *
    * `"world"` — the frame every body is solved in unless its `RigidBody`
-   * declares otherwise through `RigidBody.space`. Any other §8 mode is
-   * **refused**, with a message that distinguishes §8's own prohibition on
-   * simulating screen-space content from `"local-plane"`'s unbuilt §21 mapping.
+   * declares `"local-plane"`, which this world maps through
+   * {@link PhysicsWorld.localPlane}. Presentation frames (`"screen"`,
+   * `"viewport"`, `"camera"`, `"billboard"`) stay refused (§8).
    * See `#requireSimulationSpace`.
    *
    * @throws FourError if the world is not initialized, if `node` has no
@@ -1168,6 +1272,8 @@ export class PhysicsWorld {
       descriptor.position = node.transform.position;
       descriptor.rotation = node.transform.rotation;
     }
+    const usesPlane = body.space === "local-plane";
+    this.#applyAuthoringToSolverDescriptor(descriptor, usesPlane);
     const handle = this.#adapter.createBody(descriptor);
     const id = this.#adapter.getBodyId(handle);
 
@@ -1182,6 +1288,7 @@ export class PhysicsWorld {
       type: body.type,
       colliders: [],
       tracked,
+      localPlane: usesPlane,
     };
 
     for (const collider of colliders) {
@@ -1615,6 +1722,76 @@ export class PhysicsWorld {
       return;
     }
     this.#adapter.setBodyTransform(handle, position, rotation, wake);
+  }
+
+  /**
+   * Writes `node`'s linear velocity into the solver immediately (PH-1).
+   *
+   * §42-style who-wins: allowed only when `node.transformAuthority ===
+   * "physics"` (the solver owns the body). Any other authority refuses the
+   * write and warns once via {@link warnAuthorityConflict}. `"static"` bodies
+   * refuse — they have no velocity. `"dynamic"` and `"kinematic-velocity"`
+   * accept; `"kinematic-position"` refuses the same way as static (velocity is
+   * not an input of that model).
+   *
+   * `v` is in authored world units per second. When {@link PhysicsWorld.units}
+   * is set it is converted to SI for the solver; the component stores the
+   * authored value and the publish pass converts back.
+   *
+   * @returns whether the solver was written
+   */
+  setLinearVelocity(node: Node, v: Vector3Input): boolean {
+    const registration = this.#requireVelocityWrite(node, "linear");
+    if (registration === undefined) {
+      return false;
+    }
+    this.#adapter.getBodyVelocities(
+      registration.handle,
+      this.#mapLinear,
+      this.#mapAngular,
+    );
+    widenToVector3(v, registration.body.linearVelocity);
+    this.#toSolverVec(registration, registration.body.linearVelocity, this.#mapLinear);
+    this.#adapter.setBodyVelocities(
+      registration.handle,
+      this.#mapLinear,
+      this.#mapAngular,
+    );
+    return true;
+  }
+
+  /**
+   * Writes `node`'s angular velocity into the solver immediately (PH-1).
+   *
+   * Same §42 gate as {@link PhysicsWorld.setLinearVelocity}: `"physics"`
+   * authority, `"dynamic"` or `"kinematic-velocity"` only. A `number` is the
+   * scalar rate about +Z (plan P5-3). Angles stay radians and times stay
+   * seconds — only the linear half of a unit scale applies, and not here.
+   *
+   * @returns whether the solver was written
+   */
+  setAngularVelocity(node: Node, v: AngularVelocityInput): boolean {
+    const registration = this.#requireVelocityWrite(node, "angular");
+    if (registration === undefined) {
+      return false;
+    }
+    this.#adapter.getBodyVelocities(
+      registration.handle,
+      this.#mapLinear,
+      this.#mapAngular,
+    );
+    resolveAngularVelocity(this.#dimension, v, registration.body.angularVelocity);
+    this.#toSolverAngular(
+      registration,
+      registration.body.angularVelocity,
+      this.#mapAngular,
+    );
+    this.#adapter.setBodyVelocities(
+      registration.handle,
+      this.#mapLinear,
+      this.#mapAngular,
+    );
+    return true;
   }
 
   /**
@@ -2503,6 +2680,306 @@ export class PhysicsWorld {
   // --- internals ------------------------------------------------------------
 
   /**
+   * Whether feed/publish must convert this body's pose. False for every
+   * existing world-space body with omitted units — the identity path.
+   */
+  #needsPoseMap(registration: BodyRegistration): boolean {
+    return registration.localPlane || this.#units !== undefined;
+  }
+
+  /**
+   * Converts an authored descriptor pose/mass into the SI world-space numbers
+   * `createBody` receives. Mutates `descriptor` in place; vectors that were
+   * references to the node or component are replaced so the node is not scaled.
+   */
+  #applyAuthoringToSolverDescriptor(
+    descriptor: RigidBodyDescriptor,
+    usesPlane: boolean,
+  ): void {
+    if (!usesPlane && this.#units === undefined) {
+      return;
+    }
+    const position = this.#mapPosition;
+    const rotation = this.#mapRotation;
+    if (descriptor.position !== undefined) {
+      widenToVector3(descriptor.position, position);
+    } else {
+      position.set(0, 0, 0);
+    }
+    if (descriptor.rotation !== undefined) {
+      resolveRotation(this.#dimension, descriptor.rotation, rotation);
+    } else {
+      rotation.set(0, 0, 0, 1);
+    }
+    this.#toSolverPoseValues(usesPlane, position, rotation, position, rotation);
+    descriptor.position = position;
+    descriptor.rotation = rotation;
+    if (descriptor.mass !== undefined) {
+      descriptor.mass = toSiMass(descriptor.mass, this.#units);
+    }
+    if (descriptor.linearVelocity !== undefined) {
+      widenToVector3(descriptor.linearVelocity, this.#mapLinear);
+      this.#toSolverLinearValues(usesPlane, this.#mapLinear, this.#mapLinear);
+      descriptor.linearVelocity = this.#mapLinear;
+    }
+  }
+
+  #feedPose(
+    registration: BodyRegistration,
+    position: Vector3,
+    rotation: Quaternion,
+  ): void {
+    if (!this.#needsPoseMap(registration)) {
+      this.#adapter.setNextKinematicTransform(
+        registration.handle,
+        position,
+        rotation,
+      );
+      return;
+    }
+    this.#toSolverPose(
+      registration,
+      position,
+      rotation,
+      this.#mapPosition,
+      this.#mapRotation,
+    );
+    this.#adapter.setNextKinematicTransform(
+      registration.handle,
+      this.#mapPosition,
+      this.#mapRotation,
+    );
+  }
+
+  #feedVelocities(registration: BodyRegistration): void {
+    const { body } = registration;
+    if (!this.#needsPoseMap(registration)) {
+      this.#adapter.setBodyVelocities(
+        registration.handle,
+        body.linearVelocity,
+        body.angularVelocity,
+      );
+      return;
+    }
+    this.#toSolverLinear(registration, body.linearVelocity, this.#mapLinear);
+    this.#toSolverAngular(registration, body.angularVelocity, this.#mapAngular);
+    this.#adapter.setBodyVelocities(
+      registration.handle,
+      this.#mapLinear,
+      this.#mapAngular,
+    );
+  }
+
+  #publishSolverPose(registration: BodyRegistration): void {
+    const { position, rotation } = registration.node.transform;
+    if (!this.#needsPoseMap(registration)) {
+      this.#adapter.getBodyTransform(registration.handle, position, rotation);
+      return;
+    }
+    this.#adapter.getBodyTransform(
+      registration.handle,
+      this.#mapPosition,
+      this.#mapRotation,
+    );
+    this.#fromSolverPose(
+      registration,
+      this.#mapPosition,
+      this.#mapRotation,
+      position,
+      rotation,
+    );
+  }
+
+  #publishSolverVelocities(registration: BodyRegistration): void {
+    const { body } = registration;
+    if (!this.#needsPoseMap(registration)) {
+      this.#adapter.getBodyVelocities(
+        registration.handle,
+        body.linearVelocity,
+        body.angularVelocity,
+      );
+      return;
+    }
+    this.#adapter.getBodyVelocities(
+      registration.handle,
+      this.#mapLinear,
+      this.#mapAngular,
+    );
+    this.#fromSolverLinear(registration, this.#mapLinear, body.linearVelocity);
+    this.#fromSolverAngular(registration, this.#mapAngular, body.angularVelocity);
+  }
+
+  #toSolverPose(
+    registration: BodyRegistration,
+    srcPos: Vector3,
+    srcRot: Quaternion,
+    destPos: Vector3,
+    destRot: Quaternion,
+  ): void {
+    this.#toSolverPoseValues(
+      registration.localPlane,
+      srcPos,
+      srcRot,
+      destPos,
+      destRot,
+    );
+  }
+
+  #fromSolverPose(
+    registration: BodyRegistration,
+    srcPos: Vector3,
+    srcRot: Quaternion,
+    destPos: Vector3,
+    destRot: Quaternion,
+  ): void {
+    const units = this.#units;
+    if (units !== undefined) {
+      const inv = 1 / units.scale.lengthToMeters;
+      destPos.set(srcPos.x * inv, srcPos.y * inv, srcPos.z * inv);
+    } else if (destPos !== srcPos) {
+      destPos.copy(srcPos);
+    }
+    if (destRot !== srcRot) {
+      destRot.copy(srcRot);
+    }
+    if (registration.localPlane) {
+      worldToPlane(this.#localPlane, destPos, destRot, destPos, destRot);
+    }
+  }
+
+  #toSolverPoseValues(
+    usesPlane: boolean,
+    srcPos: Vector3,
+    srcRot: Quaternion,
+    destPos: Vector3,
+    destRot: Quaternion,
+  ): void {
+    if (usesPlane) {
+      planeToWorld(this.#localPlane, srcPos, srcRot, destPos, destRot);
+    } else {
+      if (destPos !== srcPos) {
+        destPos.copy(srcPos);
+      }
+      if (destRot !== srcRot) {
+        destRot.copy(srcRot);
+      }
+    }
+    const units = this.#units;
+    if (units !== undefined) {
+      const scale = units.scale.lengthToMeters;
+      destPos.x *= scale;
+      destPos.y *= scale;
+      destPos.z *= scale;
+    }
+  }
+
+  #toSolverLinear(
+    registration: BodyRegistration,
+    src: Vector3,
+    dest: Vector3,
+  ): void {
+    this.#toSolverLinearValues(registration.localPlane, src, dest);
+  }
+
+  #toSolverAngular(
+    registration: BodyRegistration,
+    src: Vector3,
+    dest: Vector3,
+  ): void {
+    if (registration.localPlane) {
+      planeToWorldVec(this.#localPlane, src, dest);
+    } else if (dest !== src) {
+      dest.copy(src);
+    }
+  }
+
+  #toSolverVec(
+    registration: BodyRegistration,
+    src: Vector3,
+    dest: Vector3,
+  ): void {
+    this.#toSolverLinear(registration, src, dest);
+  }
+
+  #toSolverLinearValues(usesPlane: boolean, src: Vector3, dest: Vector3): void {
+    if (usesPlane) {
+      planeToWorldVec(this.#localPlane, src, dest);
+    } else if (dest !== src) {
+      dest.copy(src);
+    }
+    const units = this.#units;
+    if (units !== undefined) {
+      dest.x *= units.scale.lengthToMeters;
+      dest.y *= units.scale.lengthToMeters;
+      dest.z *= units.scale.lengthToMeters;
+    }
+  }
+
+  #fromSolverLinear(
+    registration: BodyRegistration,
+    src: Vector3,
+    dest: Vector3,
+  ): void {
+    if (this.#units !== undefined) {
+      const inv = 1 / this.#units.scale.lengthToMeters;
+      dest.set(src.x * inv, src.y * inv, src.z * inv);
+    } else if (dest !== src) {
+      dest.copy(src);
+    }
+    if (registration.localPlane) {
+      worldToPlaneVec(this.#localPlane, dest, dest);
+    }
+  }
+
+  #fromSolverAngular(
+    registration: BodyRegistration,
+    src: Vector3,
+    dest: Vector3,
+  ): void {
+    if (dest !== src) {
+      dest.copy(src);
+    }
+    if (registration.localPlane) {
+      worldToPlaneVec(this.#localPlane, dest, dest);
+    }
+  }
+
+  /**
+   * Shared gate for {@link PhysicsWorld.setLinearVelocity} /
+   * {@link PhysicsWorld.setAngularVelocity}: registered, `"physics"`
+   * authority, and a body type that actually carries velocity.
+   */
+  #requireVelocityWrite(
+    node: Node,
+    kind: "linear" | "angular",
+  ): BodyRegistration | undefined {
+    this.#requireReady();
+    const registration = this.#bodiesByNode.get(node);
+    if (registration === undefined) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `Node ${node.id} is not registered with this PhysicsWorld, so there is no solver body whose ${kind} velocity can be written (§23, §85). Call world.addBody(node) first.`,
+        { context: { node: node.id, kind } },
+      );
+    }
+    if (node.transformAuthority !== PHYSICS_AUTHORITY) {
+      warnAuthorityConflict(node, PHYSICS_AUTHORITY);
+      return undefined;
+    }
+    if (
+      registration.type !== "dynamic" &&
+      registration.type !== "kinematic-velocity"
+    ) {
+      throw new FourError(
+        WORLD_ERROR_CODE,
+        `Node ${node.id} is a ${JSON.stringify(registration.type)} body, which does not accept a live ${kind} velocity write (§22, §23). Only "dynamic" and "kinematic-velocity" bodies carry velocity.`,
+        { context: { node: node.id, kind, type: registration.type } },
+      );
+    }
+    return registration;
+  }
+
+  /**
    * Enforces §8's one physics sentence at registration (PH-12, 2026-08-09).
    *
    * > Physics normally operates in world or local-plane space. Screen-space UI
@@ -2521,32 +2998,25 @@ export class PhysicsWorld {
    *   simulation plane" — is a mapping the author performs: build the body on a
    *   node in the simulated frame and drive the presentation node from it. A
    *   body silently simulated in pixels is precisely what §8 forbids.
-   * - `"local-plane"` is legal under §8 and is refused **here** because §21's
-   *   plane frame ("nodes simulating in local-plane space use the plane's own
-   *   2D frame, which the engine maps to the world XY frame of the `"2d"`
-   *   world") is not implemented. Accepting it would simulate the body in world
-   *   space while its author asked for a plane — accepted-and-ignored, which
-   *   this repository refuses on principle. The named seam is a plane
-   *   descriptor on the world plus a mapping in the publish pass; until it
-   *   exists, `"world"` is the only frame a body may be registered in.
+   * - `"local-plane"` is legal under §8 and is **accepted**: the body's 2D pose
+   *   lives in {@link PhysicsWorld.localPlane}'s frame and feed/publish maps
+   *   through that basis (§21). The default plane is world XY, so a `"2d"`
+   *   world that never names a plane gets an identity map.
    *
-   * The two are told apart in the message, because the fixes are different: one
-   * is an authoring mistake, the other is an unbuilt feature. `@four/core`'s
-   * `isSimulationSpaceMode` is what separates them, and it answers §8's
-   * question rather than this world's — so a packet that implements §21's
-   * mapping edits this method and leaves the predicate alone.
+   * `@four/core`'s `isSimulationSpaceMode` still answers §8's question — world
+   * and local-plane pass, presentation frames fail.
    */
   #requireSimulationSpace(node: Node, body: RigidBody): void {
     const mode = body.space;
-    if (mode === DEFAULT_SPACE_MODE) {
+    if (mode === DEFAULT_SPACE_MODE || mode === "local-plane") {
       return;
     }
     const reason = isSimulationSpaceMode(mode)
-      ? `§8 permits it for physics, but §21's mapping from a local plane onto the "2d" world's XY frame is not implemented, so registering the body would silently simulate it in world space instead`
+      ? `§8 permits it for physics, but this world has no mapping for "${mode}"`
       : `§8 states that screen-space content "should not automatically participate in physical simulation unless explicitly mapped to a simulation plane"`;
     throw new FourError(
       "INVALID_SCENE_GRAPH",
-      `The RigidBody on node ${node.id} declares space "${mode}", which this PhysicsWorld cannot simulate: ${reason}. Simulate a body whose space is "world" (the default) and drive the ${mode}-space node from it.`,
+      `The RigidBody on node ${node.id} declares space "${mode}", which this PhysicsWorld cannot simulate: ${reason}. Simulate a body whose space is "world" (the default) or "local-plane" and drive the ${mode}-space node from it.`,
       { context: { node: node.id, spaceMode: mode } },
     );
   }
@@ -3275,29 +3745,21 @@ export class PhysicsWorld {
       const authority = node.transformAuthority;
       if (authority === BLENDED_AUTHORITY) {
         const target = this.#requirePoseTarget(registration);
-        this.#adapter.setNextKinematicTransform(
-          handle,
-          target.position,
-          target.rotation,
-        );
+        this.#feedPose(registration, target.position, target.rotation);
         return;
       }
       if (authority === PHYSICS_AUTHORITY) {
         return;
       }
-      this.#adapter.setNextKinematicTransform(
-        handle,
+      this.#feedPose(
+        registration,
         node.transform.position,
         node.transform.rotation,
       );
       return;
     }
     if (type === "kinematic-velocity") {
-      this.#adapter.setBodyVelocities(
-        handle,
-        body.linearVelocity,
-        body.angularVelocity,
-      );
+      this.#feedVelocities(registration);
     }
   }
 
@@ -3338,20 +3800,12 @@ export class PhysicsWorld {
       this.#publishBlended(registration);
     } else if (type === "dynamic") {
       if (node.transformAuthority === PHYSICS_AUTHORITY) {
-        this.#adapter.getBodyTransform(
-          handle,
-          node.transform.position,
-          node.transform.rotation,
-        );
+        this.#publishSolverPose(registration);
       } else {
         warnAuthorityConflict(node, PHYSICS_AUTHORITY);
       }
     }
-    this.#adapter.getBodyVelocities(
-      handle,
-      body.linearVelocity,
-      body.angularVelocity,
-    );
+    this.#publishSolverVelocities(registration);
     setRigidBodySleeping(body, this.#adapter.isBodySleeping(handle));
     this.#retrackPose(registration);
   }
@@ -3399,7 +3853,7 @@ export class PhysicsWorld {
     const { position, rotation, scale } = node.transform;
 
     if (weights.animation === 0) {
-      this.#adapter.getBodyTransform(handle, position, rotation);
+      this.#publishSolverPose(registration);
       scale.set(1, 1, 1);
       return;
     }
@@ -3413,6 +3867,15 @@ export class PhysicsWorld {
     const blendedPosition = this.#blendPosition;
     const blendedRotation = this.#blendRotation;
     this.#adapter.getBodyTransform(handle, blendedPosition, blendedRotation);
+    if (this.#needsPoseMap(registration)) {
+      this.#fromSolverPose(
+        registration,
+        blendedPosition,
+        blendedRotation,
+        blendedPosition,
+        blendedRotation,
+      );
+    }
     position.copy(blendedPosition.lerp(target.position, weights.animation));
     rotation.copy(blendedRotation.slerp(target.rotation, weights.animation));
     scale.set(1, 1, 1).lerp(target.scale, weights.animation);

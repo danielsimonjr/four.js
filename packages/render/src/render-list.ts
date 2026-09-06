@@ -120,7 +120,11 @@ import {
 } from "@four/scene";
 
 import { ClipPlaneAllocator, type RenderItemClip } from "./clip.js";
-import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
+import {
+  PARTICLE_INSTANCE_FLOATS,
+  isParticleDrawable,
+  particleQuadGeometry,
+} from "./particles.js";
 import { Renderable } from "./renderable.js";
 import type { ScissorRect } from "./scissor.js";
 import type { SpriteFrame } from "./sprite.js";
@@ -642,6 +646,18 @@ export interface ParticleRenderItem extends RenderItemBase {
 
   /** Live trail vertices to draw; `0` means skip the trail pass. */
   trailVertexCount?: number;
+
+  /**
+   * Instance stride in floats. Absent / `8` is the default stream; `10` is
+   * the R-32 wide stream (rotation + softness).
+   */
+  instanceFloats?: number;
+
+  /**
+   * Texture-like handle or `true` when the emitter opted into textured
+   * particles. Backends sample `map` like an unlit sprite.
+   */
+  particleTexture?: object | true;
 }
 
 /**
@@ -727,6 +743,8 @@ interface MutableRenderItem extends RenderItemBase {
   /** §36 trail ribbon; meaningful only on particle items. */
   trailVertices?: Float32Array;
   trailVertexCount: number;
+  instanceFloats: number;
+  particleTexture?: object | true;
 }
 
 /**
@@ -939,6 +957,7 @@ function itemAt(
       jointCount: 0,
       morphWeights: null,
       trailVertexCount: 0,
+      instanceFloats: PARTICLE_INSTANCE_FLOATS,
     };
     pool.items[index] = item;
   }
@@ -1413,6 +1432,12 @@ function collect(
     item.id = node.id;
     item.count = node.particleCount;
     item.instances = node.particleInstances;
+    item.instanceFloats =
+      node.particleInstanceFloats ?? PARTICLE_INSTANCE_FLOATS;
+    item.particleTexture = node.particleTexture;
+    item.trailVertices = node.hasTrail === true ? node.trailVertices : undefined;
+    item.trailVertexCount =
+      node.hasTrail === true ? (node.trailVertexCount ?? 0) : 0;
     item.renderLayer = node.renderLayer;
     item.renderOrder = node.renderOrder;
     item.layers = nodeLayers;

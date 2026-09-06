@@ -707,25 +707,22 @@ export class RigidBody
    * local-plane space"* — and forbids a third case outright: *"screen-space UI
    * should not automatically participate in physical simulation unless
    * explicitly mapped to a simulation plane"*. {@link PhysicsWorld.addBody}
-   * therefore refuses everything but `"world"`, for two different reasons that
-   * its message keeps apart:
+   * therefore accepts `"world"` and `"local-plane"` and refuses the rest:
    *
    * - `"screen"`, `"viewport"`, `"camera"`, `"billboard"` — refused **because
    *   §8 says so**. The sentence's escape hatch is a mapping the author
    *   performs: simulate a body on a node in the simulated frame and drive the
    *   presentation node from it.
-   * - `"local-plane"` — legal under §8, refused because §21's plane frame
-   *   (*"nodes simulating in local-plane space use the plane's own 2D frame,
-   *   which the engine maps to the world XY frame of the `"2d"` world"*) is not
-   *   implemented. Accepting it would solve the body in world space while its
-   *   author asked for a plane, which is accepted-and-ignored.
+   * - `"local-plane"` — legal under §8 and **accepted** by `PhysicsWorld.addBody`:
+   *   the body's 2D pose lives in `PhysicsWorld.localPlane`'s frame and
+   *   feed/publish maps through that basis (§21). Presentation frames stay
+   *   refused.
    *
    * Plain and mutable, with no change hook and no validation: `PhysicsWorld` is
    * the only reader and it reads at registration, so writing it on an
    * already-registered body does nothing until the body is registered again.
-   * `@four/core`'s `isSimulationSpaceMode` answers §8's own question about a
-   * mode; it deliberately does **not** answer this world's, because
-   * `"local-plane"` separates the two.
+   * `@four/core`'s `isSimulationSpaceMode` answers §8's own question (world
+   * and local-plane pass; presentation frames fail).
    */
   space: SpaceMode;
 

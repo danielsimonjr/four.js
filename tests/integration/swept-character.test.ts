@@ -276,7 +276,7 @@ describe("SweptCharacterController against real Rapier 3D geometry", () => {
     world.dispose();
   });
 
-  it("does not push a dynamic body — pushing is staged (§26)", async () => {
+  it("pushes a dynamic body when the character walks into it (PH-11c)", async () => {
     const world = await readyWorld();
     addFloor(world);
 
@@ -300,15 +300,11 @@ describe("SweptCharacterController against real Rapier 3D geometry", () => {
     controller.setMoveIntent(1, 0);
     drive(world, characters)(90);
 
-    // The character walks up to the box and stops one skin short of it, so the
-    // solver never sees a penetration to resolve and the box does not move.
-    // That is this tier's honest boundary rather than an accident: a kinematic
-    // character *shoving* dynamics is a §26 force question with no policy yet
-    // (how much impulse, split how by mass, may it wake a sleeping body?), and
-    // the seam is `RigidBody.applyImpulseAtPoint` at `ShapeCastHit.point`.
+    // PH-11c: a horizontal slide against a dynamic body imparts an impulse at
+    // the witness point. The character still stops short of the box; the box
+    // is displaced along −Z (the walk direction).
     expect(node.transform.position.z).toBeGreaterThan(-1.5);
-    expect(box.transform.position.z).toBeGreaterThan(-1.6);
-    expect(box.transform.position.z).toBeLessThan(-1.4);
+    expect(box.transform.position.z).toBeLessThan(-1.6);
 
     world.dispose();
   });

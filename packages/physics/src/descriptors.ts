@@ -62,6 +62,7 @@ import type {
   Vector3Input,
 } from "./types.js";
 import { DEFAULT_SLEEPING_CONFIG } from "./types.js";
+import type { PhysicsWorldUnits } from "./world-units.js";
 
 /** See `shapes.ts`: §89 has no physics-input code, so invalid input is this. */
 const DESCRIPTOR_ERROR_CODE = "INVALID_APPLICATION_STATE";
@@ -734,6 +735,51 @@ export interface PhysicsWorldOptions {
    * A positive integer; validated at construction (§85).
    */
   solverIterations?: number;
+
+  /**
+   * §40 scale factors for authored numbers (§40, §101).
+   *
+   * Structurally the `scale` half of `@four/core`'s unit-system record
+   * (`lengthToMeters`, `massToKilograms`); pass that record through. When
+   * set, authored gravity / poses / masses are converted **into SI** for the
+   * solver and converted back on publish. Internal solver state is SI.
+   * Omitted means today's identity path — existing tests stay bit-identical.
+   *
+   * This field is **engine-side**: `adapter.initialize` is handed the
+   * resolved SI gravity and never sees the scale record.
+   */
+  units?: PhysicsWorldUnits;
+
+  /**
+   * §21 simulation plane in world space. Bodies with
+   * `RigidBody.space === "local-plane"` author a 2D pose in this plane's
+   * frame; feed/publish maps through the plane basis.
+   *
+   * Omitted means origin `0`, normal `+Z`, xAxis `+X` (the world XY plane —
+   * the 2D default). `addBody` accepts `"local-plane"` against that default.
+   * Screen / viewport / camera / billboard stay refused (§8).
+   *
+   * Engine-side: not forwarded to `adapter.initialize`.
+   */
+  localPlane?: LocalPlane;
+}
+
+/**
+ * A plane in world space for §21 `"local-plane"` bodies.
+ *
+ * Default when omitted on the world: origin `0`, normal `+Z`, xAxis `+X`
+ * (the XY plane).
+ */
+export interface LocalPlane {
+  /** A point on the plane, in world units. */
+  origin: Vector3Input;
+  /** Plane normal, in world space. Need not be unit; must be non-zero. */
+  normal: Vector3Input;
+  /**
+   * In-plane +X, in world space. Orthogonalized against `normal`. Omitted
+   * means world +X, or world +Y when `normal` is parallel to +X.
+   */
+  xAxis?: Vector3Input;
 }
 
 /** Reads the `z` of a {@link Vector3Input}: `0` for the two-component form. */

@@ -647,10 +647,17 @@ export class FakeSolverAdapter
     worldPoint: Vector3Input,
   ): void {
     const body = this.#requireBody(handle);
+    const value = widenToVector3(impulse);
+    const inverseMass = body.mass > 0 ? 1 / body.mass : 0;
+    body.linearVelocity.set(
+      body.linearVelocity.x + value.x * inverseMass,
+      body.linearVelocity.y + value.y * inverseMass,
+      body.linearVelocity.z + value.z * inverseMass,
+    );
     this.#record(
       "applyImpulseAtPoint",
       body.id,
-      widenToVector3(impulse),
+      value,
       widenToVector3(worldPoint),
     );
   }

@@ -83,6 +83,7 @@ export type {
   JointLimits,
   JointType,
   LinearJointMotor,
+  LocalPlane,
   PhysicsWorldOptions,
   PrismaticJointDescriptor,
   RevoluteJointDescriptor,
@@ -312,12 +313,32 @@ export type {
 export {
   DEFAULT_GROUND_SNAP_DISTANCE,
   DEFAULT_MAX_SLIDES,
+  DEFAULT_PUSH_IMPULSE_SCALE,
+  DEFAULT_PUSH_MASS,
   DEFAULT_SKIN_WIDTH,
   DEFAULT_SLOPE_LIMIT,
   DEFAULT_STEP_HEIGHT,
   SweptCharacterController,
   SweptCharacterSystem,
 } from "./swept-character-controller.js";
+export type { ResolvedLocalPlane } from "./local-plane.js";
+export {
+  DEFAULT_LOCAL_PLANE,
+  isDefaultLocalPlane,
+  planeToWorld,
+  planeToWorldVec,
+  resolveLocalPlane,
+  worldToPlane,
+  worldToPlaneVec,
+} from "./local-plane.js";
+export type { PhysicsWorldUnits } from "./world-units.js";
+export {
+  fromSiLength,
+  fromSiMass,
+  resolvePhysicsWorldUnits,
+  toSiLength,
+  toSiMass,
+} from "./world-units.js";
 export type {
   ActiveBodyVisitor,
   BodyControlModeOptions,

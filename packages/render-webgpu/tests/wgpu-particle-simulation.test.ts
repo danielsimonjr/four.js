@@ -114,7 +114,7 @@ describe("WgpuParticleSimulation creation (§36, §83)", () => {
         GPU_BUFFER_USAGE.COPY_SRC,
     );
     expect(creates[2]?.label).toBe("four:particle-sim:node-1:params");
-    expect(creates[2]?.size).toBe(32);
+    expect(creates[2]?.size).toBe(64);
     expect(creates[3]).toEqual({
       label: "four:particle-sim:node-1:scratch",
       size: PARTICLE_SIMULATION_SCRATCH_BYTES,

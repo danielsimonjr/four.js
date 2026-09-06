@@ -1,0 +1,11 @@
+{
+  "_warning": "Placeholder — regenerated after the first scenario run.",
+  "_scenario": "two local-plane bodies on a 30° plane under projected gravity",
+  "_tier": "same-runtime",
+  "stepCount": 180,
+  "bodyCount": 2,
+  "checksums": [],
+  "atOneSecond": [],
+  "atEnd": [],
+  "firstBodyV": 0
+}
