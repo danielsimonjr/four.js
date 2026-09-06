@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **70 open**, 119 done (four closed this pass: Windows Chromium binaries, Windows unit-test timeouts, Dependabot `bun.lock` pipeline, A-26 renderer table).
+Counts as of 2026-09-06: **68 open**, 121 done (six closed this pass: Windows Chromium binaries, Windows unit-test timeouts, Dependabot `bun.lock` pipeline, A-26 renderer table, §42 warn-spy isolation / #62).
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -40,8 +40,6 @@ Each has its cause written down. The thinking is done; what remains is the chang
 Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is green (103/103).
-- Pre-existing test-isolation defect, still unfixed and now hidden again.
-- four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.
 - Unlit materials render with GL_BLEND off (WP-4.7 finding) — alpha animation is invisible; schedule blending with §60a color management work
 - §27 field batching (each polymorphic sample() costs ~5.3 ms/100k — a batch API is the scoped fix; benchmark attribution in benchmarks/results/)
 - Size budgets are thin after R-36 (measured A/B, 2026-08-09)
@@ -463,7 +461,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **Lift the TypeScript/vitest pin once typedoc supports TS 7.** Currently ignored in
       `.github/dependabot.yml`. Both must move in ONE PR — bumping either alone re-breaks a gate.
       Check `npm view typedoc peerDependencies` for a range that includes 7.x.
-- [ ] **Pre-existing test-isolation defect, still unfixed and now hidden again.**
+- [x] **Pre-existing test-isolation defect, still unfixed and now hidden again.**
+      DONE 2026-09-06 — unrestored `console.warn` spies in `world-blend.test.ts`
+      and `world-joints.test.ts`. Vitest 4 reuses the spy and keeps history;
+      Vitest 3 hid it. `afterEach(vi.restoreAllMocks)` plus a leak-regression
+      in each file. Unblocks #62 and the eslint 10 ignore.
       **Now blocking a second thing:** Dependabot #66 (eight dev-deps incl. eslint 9 → 10)
       went red on this defect's `warn`-count assertions and was closed 2026-09-06;
       `eslint >=10` is ignored until this is fixed. Fixing it unblocks the linter major. vitest 3 masks it;
@@ -481,7 +483,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `main` had no pending changesets). #56 CLOSED — byte-identical to the already-closed #54,
       same branch and commit, and re-measured at **0 files / +0-0** against current `main`.
       #63 and #62 remain open and are tracked below.
-- [ ] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
+- [x] **four.js #62 blocked on a PRE-EXISTING test-isolation defect, not a bad dependency.**
+      DONE 2026-09-06 with the spy-restore fix above. The leak was spy history,
+      not leftover worlds. #62 can be retried once typedoc supports TS 7.
       The dev-dep bump to vitest 4 exposes it: 7 tests fail because an extra `console.warn` fires —
       our own §42 authority warning, not a dependency deprecation. The decisive evidence is that a
       failing test PASSES ALONE and fails with its file, so state carries between tests. NOT fixed
@@ -1472,8 +1476,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       layouts + lazy umbrella barrel imports + slower-runner Vitest/Playwright
       timeouts; Dependabot `bun.lock` regeneration workflow; generated §62
       renderer-backend compatibility table (A-26 follow-up); Rapier
-      `inheritVelocityFrom` deviation noted in `docs/COMPATIBILITY.md`.
-      Remaining open items are still in flight or owner-gated — see Now.
+      `inheritVelocityFrom` deviation noted; §42 warn-spy isolation
+      (unblocks #62 / eslint 10). Remaining open items are still in
+      flight or owner-gated — see Now.
 
 - **2026-09-05 — RFC 0006 TypeScript-on-Bun toolchain.** Bun workspace; spec 1.14; Vitest/`tsc -b` retained.
 

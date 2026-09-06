@@ -36,9 +36,12 @@ readable; never delete the pointer itself.
   `bun.lock` (does not weaken `--frozen-lockfile` on CI); A-26's generated
   renderer-backend table, read before `initialize` so device-derived WebGPU
   fields stay at the construction-time floor (captioned, not claimed as "cannot");
-  Rapier `inheritVelocityFrom` documented as nearly a no-op. A team of
-  isolated packets is still working the diagnosed flakes, scissor, isolation
-  leak, §59 textures, field batching, and docs gates. Owner-gated items
+  Rapier `inheritVelocityFrom` documented as nearly a no-op. **Isolation
+  leak:** unrestored `vi.spyOn(console, "warn")` in two physics files —
+  Vitest 4 keeps the spy history, Vitest 3 did not. Not leftover worlds.
+  `#62` and `eslint >=10` are unblocked on that axis; the typedoc/TS 7
+  joint pin remains. Remaining packets still in flight: diagnosed flakes,
+  scissor, §59 textures, field batching, docs gates. Owner-gated items
   (first publish, rapier 0.20, typedoc/TS 7, A-25 secrets, RFC residues)
   stay owner-gated.
 

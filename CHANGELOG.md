@@ -28,6 +28,11 @@ specification; until then, entries are grouped by date under **Unreleased**.
   two reserved stubs) from constructed instances before `initialize`.
   `--check` covers both generated blocks. Rapier's `inheritVelocityFrom`
   no-op is recorded in the hand-written deviations list.
+- **§42 warn-count isolation.** `world-blend.test.ts` and
+  `world-joints.test.ts` restore `console.warn` spies in `afterEach`. Vitest 4
+  was reusing unrestored spies and counting leftover §19 / §42 /
+  `jointMotorEffortCap` warnings from earlier tests in the same file. That
+  was the #62 / eslint-10 blocker. Assertions were not widened.
 
 ### 2026-09-06 — `js-yaml 5` breaks the dependency-graph tool, and the fix is not ours
 
