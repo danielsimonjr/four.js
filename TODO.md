@@ -100,7 +100,7 @@ changes in `CHANGELOG.md`.
       gain them later — a warning at `addBody` would false-positive on a supported
       workflow. Where it should fire (first step? first non-zero motor torque?) is an owner
       call.
-- [ ] **The `world.initialize()` ordering rule is demonstrated but never stated.**
+- [x] **The `world.initialize()` ordering rule is demonstrated but never stated.** DONE b9ee8aa — stated in docs/guides/fixed-step-simulation.md.
       `addBody` throws unless `world.initialize()` has already run, because that call
       decodes the wasm solver (§37). The error text is excellent and says exactly what to
       do. But the rule appears in no guide and no README as a *rule* — it is only modelled,
@@ -168,7 +168,7 @@ changes in `CHANGELOG.md`.
       nothing. The honest gate is a Playwright spec that serves the extracted block, the
       way `tests/browser/example.spec.ts` serves the examples. Until that exists, the
       README's TypeScript is verified for one specific defect and nothing else.
-- [ ] **`examples/README.md` never says how to *view* an example.** Every entry gives
+- [x] **`examples/README.md` never says how to *view* an example.** DONE b9ee8aa — a "Running one" section. Every entry gives
       `bun run <name>:build`, which writes `dist/` and shows nothing. The dev-server
       command (`bunx vite examples/<name>`) is in the root `README.md` only, which is not
       where a reader browsing `examples/` is looking.
