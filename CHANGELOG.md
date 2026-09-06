@@ -41,6 +41,13 @@ specification; until then, entries are grouped by date under **Unreleased**.
   is unrelated to the TypeScript/vitest conflict, so reverting it wholesale broke `Release` a
   second way. Restored surgically; `docs` and `lint` stay green.
 
+- **`release.yml` updated for `changesets/action@v2`'s renamed inputs.** The action bump (#61)
+  renamed `version` -> `version-script`, `title` -> `pr-title` and `commit` -> `commit-message`,
+  and it ERRORS on the old names rather than warning — so `Release` failed on every run since that
+  bump, independently of the dependency reverts. Three failures were stacked here: the CLI major,
+  the action's CLI-version check, and these renamed inputs; each was only visible once the one
+  before it was fixed.
+
 After the reverts: `docs`, `lint` and `build` all exit 0, and `@four/physics-rapier` is back to
 341/341 passing (it was 337 passing / 4 failing on 0.20).
 

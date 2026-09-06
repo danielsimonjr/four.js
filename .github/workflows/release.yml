@@ -104,12 +104,14 @@ jobs:
       - name: Create version pull request, and publish when enabled
         uses: changesets/action@v2
         with:
-          version: bun run release:version
+          # v2 renamed these inputs (v1 names: version / title / commit).
+          # It errors out rather than warning, so the old names fail the job.
+          version-script: bun run release:version
           # An empty `publish` means "do not publish" to the action, so this
           # expression is the whole owner gate.
           publish: ${{ steps.npm.outputs.configured == 'true' && 'bun run release:publish' || '' }}
-          title: "Release: version packages"
-          commit: "chore: version packages"
+          pr-title: "Release: version packages"
+          commit-message: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
