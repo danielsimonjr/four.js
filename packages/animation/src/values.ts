@@ -129,6 +129,20 @@ export interface ValueAdapter<T> {
    * completion instead of lerping to it.
    */
   lerp(a: T, b: T, t: number, out: T): T;
+
+  /**
+   * Adds `b * weight` onto `a` (PH-9 layered / additive animation).
+   *
+   * Continuous kinds are arithmetic: numbers, vectors, and colours compute
+   * `a + b * weight`. Quaternions treat `b` as a delta from identity and
+   * compose `a * slerp(identity, b, weight)`. Step kinds (boolean, discrete)
+   * cannot add — they return `a` and ignore `b` and `weight`.
+   *
+   * Same `out` contract as {@link ValueAdapter.lerp}: callers must use the
+   * return value; `out` may alias `a` and must not alias `b` for the in-place
+   * kinds that write through it.
+   */
+  add(a: T, b: T, weight: number, out: T): T;
 }
 
 /**
@@ -150,6 +164,9 @@ export const numberAdapter: ValueAdapter<number> = {
   lerp(a: number, b: number, t: number): number {
     return a + (b - a) * t;
   },
+  add(a: number, b: number, weight: number): number {
+    return a + b * weight;
+  },
 };
 
 /** Vector2 adapter (§17 "vector"), delegating to `Vector2.copy`/`Vector2.lerp`. */
@@ -164,6 +181,9 @@ export const vector2Adapter: ValueAdapter<Vector2> = {
   },
   lerp(a: Vector2, b: Vector2, t: number, out: Vector2): Vector2 {
     return out.copy(a).lerp(b, t);
+  },
+  add(a: Vector2, b: Vector2, weight: number, out: Vector2): Vector2 {
+    return out.set(a.x + b.x * weight, a.y + b.y * weight);
   },
 };
 
@@ -180,6 +200,9 @@ export const vector3Adapter: ValueAdapter<Vector3> = {
   lerp(a: Vector3, b: Vector3, t: number, out: Vector3): Vector3 {
     return out.copy(a).lerp(b, t);
   },
+  add(a: Vector3, b: Vector3, weight: number, out: Vector3): Vector3 {
+    return out.set(a.x + b.x * weight, a.y + b.y * weight, a.z + b.z * weight);
+  },
 };
 
 /** Vector4 adapter (§17 "vector"), delegating to `Vector4.copy`/`Vector4.lerp`. */
@@ -195,6 +218,14 @@ export const vector4Adapter: ValueAdapter<Vector4> = {
   lerp(a: Vector4, b: Vector4, t: number, out: Vector4): Vector4 {
     return out.copy(a).lerp(b, t);
   },
+  add(a: Vector4, b: Vector4, weight: number, out: Vector4): Vector4 {
+    return out.set(
+      a.x + b.x * weight,
+      a.y + b.y * weight,
+      a.z + b.z * weight,
+      a.w + b.w * weight,
+    );
+  },
 };
 
 /**
@@ -206,6 +237,13 @@ export const vector4Adapter: ValueAdapter<Vector4> = {
  * rotation as `b`, with opposite components. Verified against
  * `packages/math/src/quaternion.ts` (plan D8) rather than assumed.
  */
+/**
+ * Module-level scratch for {@link quaternionAdapter.add}: the identity-lerped
+ * delta. One allocation at load, none per frame (§7b). Animation evaluation is
+ * single-threaded, so a shared scratch is safe.
+ */
+const quaternionAddDelta = new Quaternion();
+
 export const quaternionAdapter: ValueAdapter<Quaternion> = {
   kind: "quaternion",
   mutatesInPlace: true,
@@ -217,6 +255,10 @@ export const quaternionAdapter: ValueAdapter<Quaternion> = {
   },
   lerp(a: Quaternion, b: Quaternion, t: number, out: Quaternion): Quaternion {
     return out.copy(a).slerp(b, t);
+  },
+  add(a: Quaternion, b: Quaternion, weight: number, out: Quaternion): Quaternion {
+    quaternionAddDelta.identity().slerp(b, weight);
+    return out.copy(a).multiply(quaternionAddDelta);
   },
 };
 
@@ -251,6 +293,13 @@ export const colorAdapter: ValueAdapter<ColorRGBA> = {
     out[3] = a[3] + (b[3] - a[3]) * t;
     return out;
   },
+  add(a: ColorRGBA, b: ColorRGBA, weight: number, out: ColorRGBA): ColorRGBA {
+    out[0] = a[0] + b[0] * weight;
+    out[1] = a[1] + b[1] * weight;
+    out[2] = a[2] + b[2] * weight;
+    out[3] = a[3] + b[3] * weight;
+    return out;
+  },
 };
 
 /**
@@ -282,6 +331,9 @@ export const booleanAdapter: ValueAdapter<boolean> = {
   lerp(a: boolean, b: boolean, t: number): boolean {
     return stepLerp(a, b, t);
   },
+  add(a: boolean): boolean {
+    return a;
+  },
 };
 
 /**
@@ -310,6 +362,9 @@ export const discreteAdapter: ValueAdapter<unknown> = {
   },
   lerp(a: unknown, b: unknown, t: number): unknown {
     return stepLerp(a, b, t);
+  },
+  add(a: unknown): unknown {
+    return a;
   },
 };
 

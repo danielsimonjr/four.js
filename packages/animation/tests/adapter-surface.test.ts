@@ -118,6 +118,15 @@ describe("adapter surface (clone/copy/lerp on every in-place kind)", () => {
       surface.adapter.lerp(surface.a(), surface.b(), 1, out);
       surface.equals(out, surface.b());
     });
+
+    it(`${surface.name}: add at weight 0 returns a`, () => {
+      const out = surface.blank();
+      const returned = surface.adapter.add(surface.a(), surface.b(), 0, out);
+      if (surface.adapter.mutatesInPlace) {
+        expect(returned).toBe(out);
+      }
+      surface.equals(returned, surface.a());
+    });
   }
 });
 
