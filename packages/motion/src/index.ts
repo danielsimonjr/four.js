@@ -111,6 +111,11 @@ export type {
 } from "./spring-damper.js";
 export { SpringDamper } from "./spring-damper.js";
 export type {
+  SpatialHashEntry,
+  SpatialHashOptions,
+} from "./spatial-hash.js";
+export { SpatialHash } from "./spatial-hash.js";
+export type {
   SteeringAgentOptions,
   SteeringContext,
   SteeringNeighbor,

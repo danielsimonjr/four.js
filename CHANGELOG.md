@@ -13,12 +13,14 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - **`resource-warnings.ts`.** `warnDisposedInUse` — one-time §83 warning when
   a disposed geometry, texture, or render target is still referenced; wired in
   WebGL and WebGPU backend caches.
+- **`Node.#detach`.** Warns once when a detached node still has event listeners
+  (`EventEmitter.listenerCountAll`).
 - **`stale-handle.ts`.** `rejectStalePhysicsHandle` pairs
   `INVALID_APPLICATION_STATE` with a one-time stale-handle warning; Rapier 2D/3D
   adapters and the fake adapter use it.
 - **`allocation-audit.ts`.** `auditFrameAllocations` turns
   `@four/math`'s `constructionCount` delta into a one-time per-frame allocation
-  warning (opt-in, same shape as `auditResourceLeaks`).
+  warning; `Application.step` calls it when `stats` is enabled and `DEV` is true.
 
 - **`backend-selection.test.ts`.** The §62 fallback and preference tests now
   register real `registerWebgpuRenderer()` instead of a WebGPU double — the

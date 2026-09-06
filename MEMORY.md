@@ -43,6 +43,14 @@ readable; never delete the pointer itself.
   roughness restore on unit 2 skips `activeTexture(TEXTURE2)` only when
   that unit is still active (no unit-0 restore in the same `finally`).
 
+- **2026-09-06 — §83 dev-warning tier (A-5 remainder).** Four of six §83
+  development warnings now ship: `warnDisposedInUse` in render backend caches;
+  `Node.#detach` + `listenerCountAll` for detached nodes retaining listeners;
+  `rejectStalePhysicsHandle` in Rapier/fake adapters; `auditFrameAllocations`
+  (+ `Application.step` when stats on). Still open: explicit leaked-resource
+  warn (derivable from A-5 counters via `auditResourceLeaks` only), creation-
+  site capture, FinalizationRegistry.
+
 - **2026-09-06 — §83 duplicate-load warns on a settled cache hit.**
   Concurrent `load`s of the same key coalesce without a warning — that
   is the API. A later `load` of a slot that already decoded is the

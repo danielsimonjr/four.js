@@ -1,4 +1,4 @@
-import { FourError, type Component, type ComponentHost } from "@four/core";
+import { FourError, resetDevWarnings, type Component, type ComponentHost } from "@four/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -205,6 +205,20 @@ describe("Node hierarchy (§6)", () => {
     to.add(child);
     child.parent = to;
     expect(to.children).toEqual([child]);
+  });
+
+  it("warns once when a detached node still has listeners (§83)", () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const parent = new Group();
+    const child = new Group();
+    parent.add(child);
+    child.on("removed", () => undefined);
+    parent.remove(child);
+    parent.add(child);
+    parent.remove(child);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("listener");
   });
 
   it("exposes children as a live, insertion-ordered view", () => {

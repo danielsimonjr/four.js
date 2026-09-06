@@ -134,6 +134,7 @@ import { RENDERER_REGISTRY, SIMULATION_SYSTEMS } from "./plugins.js";
 // cannot tree-shake". Adding an unguarded use of any of them undoes the packet;
 // `tests/integration/dev-build-mode.test.ts` fails when it does.
 import {
+  auditFrameAllocations,
   createFrameStats,
   monotonicNowSeconds,
   recordRenderStatistics,
@@ -161,7 +162,7 @@ import {
   type ReadonlyTimeState,
   type SimulationSystem,
 } from "@four/motion";
-import type { DepthRange } from "@four/math";
+import { constructionCount, type DepthRange } from "@four/math";
 // Type-only, for the reason the `Renderer` import below is type-only, and with
 // more at stake: `@four/physics` is a solver-facing package, and a program that
 // draws a user interface must not carry a rigid-body world because the
@@ -1789,6 +1790,8 @@ export class Application extends EventEmitter<ApplicationEventMap> {
       frameStarted = (this.#now ?? monotonicNowSeconds)();
     }
     const droppedBefore = DEV ? this.scheduler.time.droppedTime : 0;
+    const mathAllocBefore =
+      DEV && stats !== null ? constructionCount() : 0;
     this.#stepping = true;
     try {
       this.scheduler.step(elapsedSeconds);
@@ -1815,6 +1818,11 @@ export class Application extends EventEmitter<ApplicationEventMap> {
             `(maximumSubSteps=${String(cap)}, ${String(cap)} × ${String(dt)}s); ` +
             `TimeState.droppedTime is now ${dropped.toFixed(4)}s and is not recovered.`,
         );
+      }
+      if (stats !== null) {
+        auditFrameAllocations(mathAllocBefore, constructionCount(), {
+          label: "Application.step",
+        });
       }
     }
     if (stats !== null) {

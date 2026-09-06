@@ -102,6 +102,16 @@ export type {
 } from "./resource-audit.js";
 export { NO_RESOURCE_LEAKS, auditResourceLeaks } from "./resource-audit.js";
 
+// §83's per-frame allocation development warning (A-4/A-5, 2026-09-06).
+export type {
+  AuditFrameAllocationsOptions,
+  FrameAllocationReport,
+} from "./allocation-audit.js";
+export {
+  NO_FRAME_ALLOCATIONS,
+  auditFrameAllocations,
+} from "./allocation-audit.js";
+
 // §84 runtime statistics (A-1, 2026-08-07).
 export type { ClockSource, FrameStats, RenderStatisticsLike } from "./stats.js";
 export {
