@@ -40,6 +40,8 @@ specification; until then, entries are grouped by date under **Unreleased**.
   longer import `DEV` (simulation envelope); a11y mirror writes individual
   style properties instead of `cssText`; GATED list covers the new diagnostics
   and render warn modules.
+- **RFCs 0007–0009 proposed** (path-planning adapters, §56 shaping engine,
+  GPU readback as a raster source). Owner acceptance pending; not implemented.
 
 ### 2026-09-06 — Open-TODO subagent pass (third landing)
 

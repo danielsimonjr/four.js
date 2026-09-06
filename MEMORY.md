@@ -32,6 +32,12 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — RFCs 0007–0009 proposed (owner pending).** Path-planning
+  adapters (`0007`: waypoint polyline + `followWaypoints`, grid/navmesh later);
+  §56 shaping (`0008`: optional HarfBuzz-compatible WASM, identity default);
+  GPU readback as a raster source (`0009`: between-frames `refresh()` snapshot,
+  display-only, no feedback). Implementation waits on acceptance.
+
 - **2026-09-06 — Rapier 0.20 goldens re-recorded.** Deliberate solver bump
   (the exception each golden's `_warning` names). Values came from the
   scenario helpers, not from editing hashes by hand. 0.20 contact persistence

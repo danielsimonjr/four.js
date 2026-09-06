@@ -67,7 +67,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; ~~spherical wander~~ DONE 2026-09-06; ~~CCD/FABRIK~~ DONE 2026-09-06; ~~path-planning adapters (RFC)~~ **Proposed 2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -546,8 +546,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `ImageBitmap`/decoded-image raster sources (A-18's generic
       `FetchLike<TSignal>` half + the §96 decode row); in-place resize +
       partial/dirty-rect upload + mipmaps/filter modes for raster surfaces (all
-      R-30); GPU readback as a raster source (wants its own RFC — a different
-      determinism argument; explicitly must not ride on 0004 or 0005); the §62
+      R-30); ~~GPU readback as a raster source (wants its own RFC)~~ **Proposed
+      2026-09-06** (`docs/rfcs/0009-gpu-readback-raster-source.md` — display-only
+      snapshot, not riding 0004/0005); the §62
       Canvas 2D backend (stays a stub **by decision** — and if ever built,
       refusing a feedback `CanvasTexture` sampling the surface being rendered is
       that packet's named obligation); ~~a docs/guides page carrying the browser adapter~~ (done 2026-08-29:
@@ -890,7 +891,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **PH-22 residue (re-read 2026-08-21):** `PH-22f` joint-anchor mutability still
       blocked on the which-pose decision (physics-joints packet); ~~CCD/FABRIK/limits~~
       **DONE 2026-09-06** (`solveCCD` / `solveFABRIK` + joint limits + iteration
-      budget); path-planning adapters still want an RFC;
+      budget); ~~path-planning adapters still want an RFC~~ **Proposed
+      2026-09-06** (`docs/rfcs/0007-path-planning-adapters.md`);
       ~~`PH-22l` `Clock`~~ **DONE 2026-09-06** (type alias for `TimeState`);
       ~~`PH-22n` remainder — §10's dropped-time warning is app-tier in
       `packages/four`'s `Application`~~
@@ -1467,7 +1469,9 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] §55 frame regions + §65 sprite batching — `Sprite.frame` already
       shipped; `groupSpritesByTexture` consecutive-run helper DONE 2026-09-06.
       Atlas *packing* of distinct textures remains.
-- [ ] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
+- [x] Before §56 full text shaping: RFC the shaping engine (HarfBuzz-wasm vs native)
+      — **Proposed 2026-09-06** (`docs/rfcs/0008-text-shaping-engine.md`). Owner
+      decision pending; default stays the identity pen walk.
 - [ ] First publish (§94 0.1): Changesets release workflow + apply the
       `@danielsimonjr/fourjs` publish-name mapping (spec §98, rev 1.6)
 
