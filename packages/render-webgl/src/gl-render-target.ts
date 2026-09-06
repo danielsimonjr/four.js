@@ -91,6 +91,7 @@
  */
 
 import type { RenderTarget } from "@four/render";
+import { warnDisposedInUse } from "@four/render";
 
 import {
   GL,
@@ -227,6 +228,7 @@ export class RenderTargetCache {
     }
 
     if (target.disposed) {
+      warnDisposedInUse("render-target", target.id);
       return null;
     }
 

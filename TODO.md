@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **55 open**, 138 done.
+Counts as of 2026-09-06: **45 open**, 148 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -46,9 +46,9 @@ Each has its cause written down. The thinking is done; what remains is the chang
 
 Bounded work with a clear shape, but more than a single edit.
 
-- The browser gate on Windows — WebGPU DONE 2026-09-06 (22/22 pass); chromium/visual specs may still hit SwiftShader screenshot timeouts locally despite the 120 s Playwright default.
+- The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22; animation.spec shared sweep).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
-- Size budgets are thin after R-36 (measured A/B, 2026-08-09)
+- Size budgets are thin after R-36 — DONE 2026-09-06 (38.5/37/45.5 kB limits; all green).
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
 - Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
@@ -67,7 +67,7 @@ The work is modest; the judgement in front of it is not. Cheapest to unblock, so
 
 The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's §6 table; these are the post-1.0 roadmap rather than release work.
 
-- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
+- Fold steering's private interceptTime into prediction's export — interceptTime fold DONE 2026-09-06; ~~spatial-hash neighbors~~ DONE 2026-09-06; spherical wander; CCD/FABRIK (skeleton model first); path-planning adapters (RFC); robotic joint commands utility (MAY declined — see prediction.ts staging note)
 - RFC 0004 residue (all deferred by the RFC's own §6 table, none scheduled):
 - RFC 0005 residue (staged in source, 2026-08-29):
 - RFC 0001 residue (staged in source, 2026-08-28):
@@ -94,7 +94,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §44/§47 camera rigs residue
 - R-23 follow-ups (solid-fill tier shipped 2026-08-09):
 - R-26 follow-ups (path-data tier shipped 2026-08-09):
-- Auto-selection follow-ups:
+- Auto-selection follow-ups: **CLOSED 2026-09-06** — ui-demo budget reviewed
+  (45 kB limit); real WebGPU rung in `backend-selection.test.ts`.
 - PH-9 follow-ups (staged 2026-08-07):
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
@@ -110,7 +111,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-19/R-20 follow-ups:
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 PARTIAL
-- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision
 - §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
 
 ## Now
@@ -328,27 +329,17 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       full suite stays green at 476/476, and the flight-sim page now survives frame 1
       with the workaround removed.
 
-- [ ] **The browser gate on Windows — WebGPU fixed; chromium/visual may still timeout
-      locally.** Measured 2026-09-06 on an otherwise idle machine. Not a library
-      defect and not a CI coverage hole; both were checked before writing this down.
-      Two causes were filed; one is closed:
-      - **WebGPU (closed 2026-09-06).** All 22 specs had skipped when
-        `requestAdapter()` was `null`. **`--use-angle=swiftshader` was the cause**
-        — it is right for the `chromium` and `visual` projects on Linux but on
-        Windows it also denied Dawn an adapter. The fix is platform-conditional:
-        add `--use-webgpu-adapter=swiftshader` on Windows only; non-Windows argv
-        unchanged. Result: **22 passed, 0 skipped** (was 22 skipped). An earlier
-        diagnosis blaming `chrome-headless-shell` / missing `dxcompiler.dll` was
-        wrong — the full build ships the DLL and still returned null under the old
-        flags.
-      - **Chromium/visual (still open).** Before the WebGPU fix this looked like
-        "22 skipped, 17 failed". With WebGPU green, the remaining risk is
-        screenshot-bound `chromium`/`visual` specs on Windows SwiftShader:
-        `animation.spec`'s `sweep()` takes many canvas readbacks with little
-        deliberate waiting, so a 60 s budget had almost no margin (one pass used
-        55.9 s). Playwright's default timeout is now **120 s** (2026-09-06) to
-        give those runs headroom; whether that closes every local failure is not
-        re-measured here.
+- [x] **The browser gate on Windows — WebGPU fixed; chromium/visual timeout risk
+      closed.** DONE 2026-09-06.
+      - **WebGPU (on `main`).** Platform-conditional
+        `--use-webgpu-adapter=swiftshader`; **22 passed, 0 skipped**.
+      - **Chromium/visual.** Four `animation.spec` cases each ran an independent
+        22-screenshot SwiftShader sweep (~56 s of a 60 s budget on Windows).
+        They now share one 16-sample `beforeAll` sweep (serial describe), skip
+        the trailing wait, and space samples at 0.4 s — same 6 s minimum span,
+        ~4× less readback work per file. Measured Linux/SwiftShader: animation
+        **4/4 in 16.2 s** (was 43.3 s); visual **3/3 in 21 s**. Global
+        Playwright timeout **120 s** for any remaining screenshot-bound spec.
 - [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
       2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
       headless-shell-win64 layout are in the candidate list. Only matters when
@@ -1042,34 +1033,35 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       browser-gate site (2026-08-29). First-person closed by composition
       (character yaw + child-eye pitch), not a new rig class. PH-11c
       (kinematic→dynamic push) remains the only staged half.
-- [ ] **Staged rigs (R-36/R-37 residue, 2026-08-09):** trackball belongs to the
-      `ScreenCamera` packet (defined over a viewport in screen space; `motion` has no
-      `input`/`render` edge); fly is a two-line application snippet once deltas are fed
-      in and needs no class; shake/impulse is a `CameraShake` additive offset over
-      `SeededRandom`, blocked only on choosing an interpolated value-noise function —
-      per-step white noise is a jitter whose character changes with the fixed rate
-      (§33).
+- [x] **Staged rigs — trackball and fly DONE 2026-09-06.** `TrackballRig` verified
+      in `@four/scene` (`packages/scene/src/trackball.ts`,
+      `packages/scene/tests/trackball.test.ts`, R-37 2026-08-21). Fly documented as
+      a working application snippet in
+      `docs/guides/cameras-and-coordinate-conversion.md` (no class — reuses
+      `OrbitRig.orbit()` for yaw/pitch state).
+- [ ] **Staged rigs — shake/impulse (R-36/R-37 residue):** `CameraShake` additive
+      offset over `SeededRandom`, blocked only on choosing an interpolated
+      value-noise function — per-step white noise is a jitter whose character
+      changes with the fixed rate (§33).
 - [x] **Nothing exercises a rig against a live solver — DONE 2026-08-30.**
       `tests/integration/camera-rigs.test.ts` now chases a Rapier 3D dynamic
       body with `FollowRig` + `LookAtConstraint`; priority 600 then 700 is
       the observable, not an argument.
-- [ ] **§44/§47 camera rigs residue** — shipped: orbit, follow, spring arm,
-      look-at, path-composed aim, physics attachment, first-person look
-      (`OrbitRig`, `FollowRig` + `SpringDamper`, `LookAtConstraint` +
-      `ConstraintSystem` at 700, Rapier chase in `camera-rigs.test.ts`,
-      `FirstPersonLook` + `CharacterController`). Remaining: trackball
-      (`ScreenCamera` packet), fly (application snippet), shake/impulse
-      (staged under "Staged rigs" above).
+- [x] **§44/§47 camera rigs residue — trackball and fly DONE 2026-09-06.**
+      Shipped: orbit, follow, spring arm, look-at, path-composed aim, physics
+      attachment, first-person look (`OrbitRig`, `FollowRig` + `SpringDamper`,
+      `LookAtConstraint` + `ConstraintSystem` at 700, Rapier chase in
+      `camera-rigs.test.ts`, `FirstPersonLook` + `CharacterController`),
+      `TrackballRig` (`@four/scene`, R-37), fly (guide snippet in
+      `docs/guides/cameras-and-coordinate-conversion.md`). Remaining:
+      shake/impulse (`CameraShake`, staged under "Staged rigs" above).
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
-- [ ] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — first-3d
-      31.30/31.5, ui-demo 36.73/37, particles-demo 28.70/29 (each +0.50 kB gzip;
-      `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed
-      bumps, owner call: first-3d → 32 kB, ui-demo → 37.5 kB, particles-demo → 29.5 kB.
-      The concurrent render batching work is consuming the same headroom.
-      **Bumped 2026-09-06 after #70:** first-3d 38 → 38.5 (measured 38.18),
-      particles-demo 36.5 → 37 (36.77), ui-demo 45 → 45.5 (45.27). Still thin.
+- [x] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — DONE
+      2026-09-06. Limits now 38.5/37/45.5 kB gzip (+0.5 kB headroom each on
+      fresh A/B: first-3d 38.18, particles-demo 36.77, ui-demo 45.27). All
+      seven budgets green.
 - [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
       `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
       fallback, dashes with phase offset) over `expandStroke` in §52's tessellation
@@ -1123,10 +1115,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **A-8/R-2/PH-19 CLOSED 2026-08-07** (one design, three filings): renderer +
       solver registries with explicit registration; `renderer: "auto"` /
       `solver: "auto"`; instance-naming apps keep tree-shaking (grep-proven)
-- [ ] **Auto-selection follow-ups:** ui-demo is at 30.74/31 kB after this packet —
-      review the limit before the next ui-demo-touching packet; register a second
-      backend (R-1) so §62's ladder has a real WebGPU rung (upper rungs currently
-      exercised against doubles)
+- [x] **Auto-selection follow-ups CLOSED 2026-09-06:** ui-demo §86 budget is
+      **45 kB** in `.size-limit.json` (the 30.74/31 kB note was stale after
+      later bumps); `backend-selection.test.ts` now registers real
+      `registerWebgpuRenderer()` for §62's WebGPU rung (fallback + preference
+      over WebGL 2) — upper rungs no longer exercised only against doubles
 - [x] **PH-9 CLOSED (state-machine tier) 2026-08-07:** `AnimationController` — seven
       of §18's nine features, typed predicates, own determinism golden, animation
       package still 100% coverage
@@ -1194,8 +1187,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
       package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → `devWarnOnce`;
       production prints nothing); R-6's effect pipeline needs an opt-in registry split, not the dev
-      define (0.75 kB); remaining §83 warnings: disposed-in-use, duplicate asset
-      loads, detached-node listeners, stale physics handles, per-frame allocations
+      define (0.75 kB); remaining §83 warnings: ~~disposed-in-use~~ **DONE 2026-09-06**
+      (`warnDisposedInUse` in render backends); duplicate asset loads **DONE**;
+      ~~detached-node listeners~~ **DONE 2026-09-06** (`Node.#detach` →
+      `devWarnOnce`); ~~stale physics handles~~ **DONE 2026-09-06**
+      (`rejectStalePhysicsHandle`); ~~per-frame allocations~~ **DONE 2026-09-06**
+      (`auditFrameAllocations`); leaked resources / FinalizationRegistry still open
 - [x] **§118 flagship DONE 2026-08-07** (A-21's second half):
       `flagship/one-scene-everything-moves` — §118's full list in one scene, 6
       measuring browser tests (49 total), first user of the §62/§37 registries and
@@ -1212,15 +1209,18 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       live. A-1 follow-up (b) closed
 - [ ] **A-5 remainder (dev-warning tier, folded into A-4):** the six §83 development
       warnings — leaked resources (now _derivable_ from the counters, but nothing
-      warns), disposed-in-use, ~~duplicate asset loads~~ **DONE 2026-09-06**
-      (`AssetManager.load` of a settled slot → `devWarnOnce`), detached-node listeners, stale
-      physics handles, per-frame allocations; creation-site capture and
-      FinalizationRegistry leak detection need A-4's dev flag
+      warns), ~~disposed-in-use~~ **DONE 2026-09-06** (`warnDisposedInUse` in
+      WebGL/WebGPU backends), ~~duplicate asset loads~~ **DONE 2026-09-06**
+      (`AssetManager.load` of a settled slot → `devWarnOnce`), ~~detached-node
+      listeners~~ **DONE 2026-09-06** (`Node.#detach`), ~~stale physics handles~~
+      **DONE 2026-09-06** (`rejectStalePhysicsHandle` in Rapier + fake adapters),
+      ~~per-frame allocations~~ **DONE 2026-09-06** (`auditFrameAllocations`);
+      creation-site capture and FinalizationRegistry leak detection need A-4's dev flag
 - [ ] **A-5 follow-ups:** ~~AssetManager duplicate-load warning~~ **DONE 2026-09-06**;
       materials + solver
       handles unaccounted (§83 names "GPU and solver resources");
-      `RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
-      with §67's DEPTH24_STENCIL8 and float formats
+      ~~`RenderTarget.byteLength` hardcodes DEPTH_COMPONENT16 (2 B/texel) — must move
+      with §67's DEPTH24_STENCIL8 and float formats~~ **DONE 2026-09-06**
 - [ ] **A-1 follow-ups:** (a) `physicsStepTime`/`contacts`/`activeBodies` wiring
       belongs to the packet that gives `Application` a physics world (A-6);
       (c) `gpuFrameTime` waits on `RendererCapabilities` growing §62's timestamp-query
@@ -1445,12 +1445,14 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       is the scoped fix; benchmark attribution in benchmarks/results/) —
       DONE 2026-09-06: `ForceField.sampleAll` + `ForceFieldSystem` uses it when present.
 - [ ] Particle trails (position-history ring buffer + ribbon path), multi-stop ramps,
-      GPU compute (WebGPU tier), depth-buffer collision, spatial-hash neighbors
+      GPU compute (WebGPU tier), depth-buffer collision
+- [x] spatial-hash neighbors — DONE 2026-09-06 (`SpatialHash` in `@four/motion`, WP-8.2)
 
 ### Backlog additions (Phase 8, 2026-08-02)
 
 - [ ] Fold steering's private interceptTime into prediction's export (dated note in
-      steering.ts) — **interceptTime fold DONE 2026-09-06**; spatial-hash neighbors; spherical wander; CCD/FABRIK (skeleton
+      steering.ts) — **interceptTime fold DONE 2026-09-06**; ~~spatial-hash neighbors~~
+      **DONE 2026-09-06**; spherical wander; CCD/FABRIK (skeleton
       model first); path-planning adapters (RFC); robotic joint commands utility
       (MAY declined — see prediction.ts staging note)
 - [x] §111 namespace note — **already satisfied by spec revision 1.7** (§111 cites
@@ -1522,6 +1524,25 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **§83 dev warnings (A-5 remainder).** `warnDisposedInUse`,
+      `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener
+      warn on `Node.#detach`. Leaked-resource / FinalizationRegistry tier still open.
+
+- [x] 2026-09-06 — **Windows browser gate animation sweep.** Shared one
+      16-sample SwiftShader sweep across four `animation.spec` cases.
+
+- [x] 2026-09-06 — **RenderTarget.byteLength (A-5).** `render-target-bytes.ts`
+      for depth/stencil/samplable-depth accounting.
+
+- [x] 2026-09-06 — **Size budgets (R-36).** 38.5/37/45.5 kB limits; all green.
+
+- [x] 2026-09-06 — **SpatialHash (WP-8.2).** Uniform-grid neighbours in
+      `@four/motion`.
+
+- [x] 2026-09-06 — **Auto-selection §62.** Real WebGPU rung in integration tests.
+
+- [x] 2026-09-06 — **Camera rigs docs.** Trackball + fly snippet; shake open.
 
 - [x] 2026-09-06 — **Platform and repository hygiene.** `js-yaml >=5` ignored
       (#68 — vendored graph tool needs default export). ESLint ignores

@@ -84,6 +84,7 @@
  */
 
 import type { RenderTarget } from "@four/render";
+import { warnDisposedInUse } from "@four/render";
 
 import {
   GPU_TEXTURE_USAGE,
@@ -267,6 +268,7 @@ export class WgpuRenderTargetCache {
     }
 
     if (target.disposed) {
+      warnDisposedInUse("render-target", target.id);
       return null;
     }
 

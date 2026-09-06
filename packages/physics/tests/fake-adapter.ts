@@ -53,6 +53,7 @@
 
 import { FourError } from "@four/core";
 import { Quaternion, Vector3 } from "@four/math";
+import { rejectStalePhysicsHandle } from "../src/stale-handle.js";
 import type { Matrix3 } from "@four/math";
 import type {
   AngularVelocityInput,
@@ -798,8 +799,9 @@ export class FakeSolverAdapter
     const id = (handle as unknown as { id: number }).id;
     const body = this.bodies.get(id);
     if (body === undefined || !body.alive) {
-      throw new FourError(
-        "INVALID_APPLICATION_STATE",
+      rejectStalePhysicsHandle(
+        "body",
+        String(id),
         `fake adapter: body handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }
@@ -810,8 +812,9 @@ export class FakeSolverAdapter
     const id = (handle as unknown as { id: number }).id;
     const collider = this.colliders.get(id);
     if (collider === undefined || !collider.alive) {
-      throw new FourError(
-        "INVALID_APPLICATION_STATE",
+      rejectStalePhysicsHandle(
+        "collider",
+        String(id),
         `fake adapter: collider handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }
@@ -982,8 +985,9 @@ export class FakeJointSolverAdapter
     const id = (handle as unknown as { id: number }).id;
     const joint = this.joints.get(id);
     if (joint === undefined || !joint.alive) {
-      throw new FourError(
-        "INVALID_APPLICATION_STATE",
+      rejectStalePhysicsHandle(
+        "joint",
+        String(id),
         `fake adapter: joint handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }
@@ -994,8 +998,9 @@ export class FakeJointSolverAdapter
     const id = (handle as unknown as { id: number }).id;
     const body = this.bodies.get(id);
     if (body === undefined || !body.alive) {
-      throw new FourError(
-        "INVALID_APPLICATION_STATE",
+      rejectStalePhysicsHandle(
+        "body",
+        String(id),
         `fake adapter: joint body handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }
@@ -1197,8 +1202,9 @@ export class FakeTuningSolverAdapter
     const id = (handle as unknown as { id: number }).id;
     const body = this.bodies.get(id);
     if (body === undefined || !body.alive) {
-      throw new FourError(
-        "INVALID_APPLICATION_STATE",
+      rejectStalePhysicsHandle(
+        "body",
+        String(id),
         `fake adapter: body handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }
@@ -1209,8 +1215,9 @@ export class FakeTuningSolverAdapter
     const id = (handle as unknown as { id: number }).id;
     const collider = this.colliders.get(id);
     if (collider === undefined || !collider.alive) {
-      throw new FourError(
-        "INVALID_APPLICATION_STATE",
+      rejectStalePhysicsHandle(
+        "collider",
+        String(id),
         `fake adapter: collider handle ${String(id)} is foreign or destroyed (§37).`,
       );
     }

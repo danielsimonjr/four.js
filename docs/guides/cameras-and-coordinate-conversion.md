@@ -135,11 +135,90 @@ drags.makeDraggable(cube);
 See the [transform authority guide](transform-authority.md) for why the
 handover is untrack + authority write, in that order.
 
+## Camera rigs (§44)
+
+§44 lists seven camera controls; most ship as components in `@four/motion`
+(`OrbitRig`, `FollowRig`, `LookAtConstraint` + `ConstraintSystem` at §39 step
+7) or as composition (path animation, physics attachment — see
+`tests/integration/camera-rigs.test.ts`). Rigs never read input: they take
+**numbers the application feeds in** so sensitivity and replay stay yours.
+
+### Orbit and follow
+
+```ts
+import { ConstraintSystem, LookAtConstraint, OrbitRig } from "four/motion";
+
+const rig = camera.addComponent(new OrbitRig({ target: player, distance: 6 }));
+camera.addComponent(new LookAtConstraint({ target: player }));
+camera.transformAuthority = "constraint";
+constraints.track(camera);
+
+// From your pointer handler (units are application policy):
+rig.orbit(pointerDeltaX * 0.005, -pointerDeltaY * 0.005);
+rig.dolly(-wheelDelta * 0.01);
+```
+
+`FollowRig` switches between a follow target and a spring arm with its
+`frame` option; see `@four/motion`'s README and `packages/motion/tests/camera-rigs.test.ts`.
+
+### Trackball (`@four/scene`)
+
+`TrackballRig` shipped with R-37 (2026-08-21). It is defined over a viewport in
+**screen space**, so it lives in `@four/scene` rather than `@four/motion`, and
+it is event-driven — call `applyTo` from the pointer handler under §42's
+`"manual"` authority, not from `ConstraintSystem`:
+
+```ts
+import { TrackballRig } from "four/scene";
+
+const trackball = new TrackballRig({ width: 960, height: 540, distance: 6 });
+camera.transformAuthority = "manual";
+
+// Viewport pixels, from wherever your pointer events live:
+trackball.drag(previous.x, previous.y, current.x, current.y);
+trackball.applyTo(camera);
+```
+
+Tests: `packages/scene/tests/trackball.test.ts`.
+
+### Fly (application snippet)
+
+§44's fly control deliberately has **no class** — it reuses
+`OrbitRig`'s `orbit()` surface for yaw/pitch state and writes the camera under
+`"manual"` authority. Once pointer deltas are fed in, aim and move are two lines
+over the same spherical direction `OrbitRig` uses for placement:
+
+```ts
+import { OrbitRig } from "four/motion";
+import { PerspectiveCamera } from "four/scene";
+import { Vector3 } from "four/math";
+
+const camera = new PerspectiveCamera({ fieldOfView: Math.PI / 4, aspect: 16 / 9, near: 0.1, far: 200 });
+const rig = new OrbitRig(); // state only — no target, no ConstraintSystem
+camera.transformAuthority = "manual";
+
+// Pointer → rig (application policy on the scale factors):
+rig.orbit(pointerDeltaX * 0.005, -pointerDeltaY * 0.005);
+
+// Each step, after reading WASD as `forward` metres per second (§7a):
+const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
+const sy = Math.sin(rig.yaw), cy = Math.cos(rig.yaw);
+const p = camera.transform.position;
+camera.lookAt(new Vector3(p.x + cp * sy, p.y + sp, p.z + cp * cy));
+p.x += cp * sy * forward * dt; p.y += sp * forward * dt; p.z += cp * cy * forward * dt;
+```
+
+Strafe is the same pattern with the horizontal right vector
+`(cy, 0, −sy)`. `CameraShake` (shake/impulse) remains staged — blocked on
+choosing an interpolated value-noise function rather than per-step white noise
+(§33).
+
 ## Honest state
 
-- Camera **rigs** (orbit, follow, §44) live in `@four/motion` per the spec,
-  but no rig classes have shipped yet — place cameras manually or drive them
-  with tweens/trajectories.
+- Camera **rigs** ship in `@four/motion` (`OrbitRig`, `FollowRig`,
+  `LookAtConstraint`, `FirstPersonLook` + `CharacterController`) and
+  `TrackballRig` in `@four/scene`. Fly is the application snippet above; shake
+  is still staged.
 - `PerspectiveCamera` is exercised by exactly one example,
   `examples/first-3d-scene` (written 2026-08-07); every other shipped example
   uses an orthographic camera. This bullet claimed the same example did until

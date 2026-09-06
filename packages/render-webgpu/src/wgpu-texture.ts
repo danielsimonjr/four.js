@@ -97,6 +97,7 @@
  */
 
 import type { RenderItem } from "@four/render";
+import { warnDisposedInUse } from "@four/render";
 
 import {
   GPU_TEXTURE_USAGE,
@@ -484,6 +485,7 @@ export class WgpuTextureCache {
     }
 
     if (texture.disposed) {
+      warnDisposedInUse("texture", texture.id);
       return null;
     }
 

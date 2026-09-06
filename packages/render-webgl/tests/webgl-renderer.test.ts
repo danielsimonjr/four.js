@@ -3253,6 +3253,8 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
   });
 
   it("drops a disposed texture and keeps no entry (§83)", () => {
+    resetDevWarnings();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const gl = createFakeGl();
     const cache = new TextureCache(gl);
     const texture = new TestTexture();
@@ -3261,6 +3263,8 @@ describe("TextureCache — textures keyed by id and version (§77, §61)", () =>
     texture.dispose();
 
     expect(cache.acquire(texture.asTexture)).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("disposed");
     expect(gl.countOf("deleteTexture")).toBe(1);
     expect(gl.countOf("createTexture")).toBe(1);
     expect(cache.size).toBe(0);
@@ -11161,7 +11165,9 @@ describe("WebglRenderer — §60 node materials (RFC 0001)", () => {
       renderer.render(root, [createView(camera)]);
       expect(gl.countOf("drawArrays")).toBe(0);
       expect(gl.countOf("bufferData")).toBe(0);
-      expect(warn).toHaveBeenCalledTimes(2);
+      // Two node-material skip warnings (unbound + disposed sampler) plus one
+      // §83 disposed-in-use warning when the texture cache refuses the texture.
+      expect(warn).toHaveBeenCalledTimes(3);
     } finally {
       warn.mockRestore();
     }

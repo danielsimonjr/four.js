@@ -168,6 +168,18 @@ export type {
   RenderTargetTexture,
 } from "./render-target.js";
 export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
+export {
+  RENDER_TARGET_COLOR_BYTES,
+  RENDER_TARGET_DEPTH_RENDERBUFFER_BYTES,
+  RENDER_TARGET_DEPTH_STENCIL_BYTES,
+  RENDER_TARGET_DEPTH_TEXTURE_BYTES,
+  RENDER_TARGET_RGBA16F_BYTES,
+  RENDER_TARGET_RGBA32F_BYTES,
+  RENDER_TARGET_RGBA8_BYTES,
+  colorAttachmentBytesPerTexel,
+  depthAttachmentBytesPerTexel,
+  renderTargetByteLength,
+} from "./render-target-bytes.js";
 export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export { MAX_SKINNING_JOINTS, Mesh, restoreMeshSkeleton } from "./mesh.js";
@@ -207,6 +219,8 @@ export {
   liveTextureCount,
   textureMemoryBytes,
 } from "./resource-memory.js";
+export type { DisposedResourceKind } from "./resource-warnings.js";
+export { warnDisposedInUse } from "./resource-warnings.js";
 export type {
   RenderStatistics,
   RenderStatisticsReporter,
