@@ -232,7 +232,7 @@ describe("recordSolverStatistics", () => {
     expect(stats.activeBodies).toBe(2);
   });
 
-  it("writes activeBodies alone — no §84 counter maps onto the rest", () => {
+  it("writes activeBodies and contacts from solver statistics", () => {
     const stats = createFrameStats();
     const solver: SolverStatistics = {
       bodyCount: 9,
@@ -240,11 +240,32 @@ describe("recordSolverStatistics", () => {
       awakeCount: 5,
       colliderCount: 20,
       maxBodyId: 30,
+      contactCount: 7,
     };
     recordSolverStatistics(stats, solver);
     expect(stats.activeBodies).toBe(5);
-    expect(stats.contacts).toBeNaN();
+    expect(stats.contacts).toBe(7);
     expect(stats.physicsStepTime).toBeNaN();
+  });
+
+  it("reads contactCount from countContacts when the adapter provides it", () => {
+    const access: DebugBodyAccess = {
+      forEachBody(visit) {
+        visit(0, 0);
+      },
+      forEachCollider() {},
+      isBodySleeping() {
+        return false;
+      },
+      getBodyTransform() {},
+      getBodyVelocities() {},
+      countContacts() {
+        return 4;
+      },
+    };
+    const stats = createFrameStats();
+    recordSolverStatistics(stats, solverStatistics(access));
+    expect(stats.contacts).toBe(4);
   });
 });
 

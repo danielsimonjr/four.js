@@ -288,6 +288,20 @@ const ADAPTER_ERROR_CODE = "INVALID_APPLICATION_STATE";
 /** §37 `name`. Recorded in snapshots and replays, which refuse other solvers. */
 const ADAPTER_NAME = "rapier3d";
 
+const staleBodyHandleWarned = new Set<number>();
+
+function warnStaleBodyHandle(bodyId: number): void {
+  if (staleBodyHandleWarned.has(bodyId)) {
+    return;
+  }
+  staleBodyHandleWarned.add(bodyId);
+  console.warn(
+    `[four] §83: a stale body physics handle was used on ${ADAPTER_NAME} ` +
+      `(body id ${String(bodyId)}). Handles are valid only while the body is ` +
+      "registered with the world that issued them.",
+  );
+}
+
 /** The one §21 dimension this adapter simulates. */
 const ADAPTER_DIMENSION = "3d";
 
@@ -2179,6 +2193,27 @@ export class Rapier3dAdapter
     }
   }
 
+  /** @inheritDoc DebugBodyAccess.countContacts */
+  countContacts(): number {
+    const world = this.#requireWorld();
+    const narrowPhase = world.narrowPhase;
+    let total = 0;
+    for (const record of this.#colliders.values()) {
+      if (!record.alive) {
+        continue;
+      }
+      const handle = record.rapierHandle;
+      narrowPhase.contactPairsWith(handle, (otherHandle) => {
+        if (handle < otherHandle) {
+          narrowPhase.contactPair(handle, otherHandle, (manifold) => {
+            total += manifold.numContacts();
+          });
+        }
+      });
+    }
+    return total;
+  }
+
   // --------------------------------------------- §37 property changes (PH-1)
 
   /**
@@ -2502,6 +2537,7 @@ export class Rapier3dAdapter
     this.#requireWorld();
     const record = handle as unknown as BodyRecord;
     if (!record.alive || this.#bodies.get(record.id) !== record) {
+      warnStaleBodyHandle(record.id);
       throw new FourError(
         ADAPTER_ERROR_CODE,
         "Body handle is not valid for this Rapier3dAdapter: it was destroyed, or it was minted by another adapter (§37).",
