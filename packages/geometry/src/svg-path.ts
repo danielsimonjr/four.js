@@ -26,21 +26,15 @@
  * | --------------------------------------------------- | ----- | ----------------------------------------- |
  * | `d` attribute → {@link Path}                          | ships | here                                      |
  * | {@link Path} → `d` attribute                          | ships | here                                      |
- * | `<svg>` document, `viewBox`, `transform`, `<g>`       | staged | needs an XML reader (see below)          |
- * | `<rect>`/`<circle>`/`<ellipse>`/`<line>`/`<polyline>`/`<polygon>` | staged | `R-23` — each *is* one of §50's shape nodes, and building a second, attribute-shaped spelling of them here would be inventing the shape system twice |
- * | `fill`, `stroke`, `stroke-width`, dashes, joins, caps | staged | `R-16` — §58's paint model; a parser that read them would have nowhere to put them |
- * | `fill-rule` (a presentation attribute, not path data) | staged | `R-16`; {@link Path.fillRule} is the field it lands in, and it is settable today |
+ * | `<svg>` document, `viewBox`, `transform`, `<g>`       | ships | `parseSvgDocument` — small XML tokenizer, no `DOMParser` (R-26) |
+ * | `<rect>`/`<circle>`/`<ellipse>`/`<line>`/`<polyline>`/`<polygon>` | ships | `parseSvgDocument` reduces each to a {@link Path} |
+ * | `fill`, `stroke`                                      | ships | captured on the document path record; paints stay with `R-16` |
+ * | `fill-rule`                                           | ships | written onto {@link Path.fillRule}          |
  *
- * The document tier is staged on a **decision**, not on effort: parsing
- * `<svg>` markup needs an XML reader, and the only one every environment has is
- * `DOMParser`, which exists in browsers and not in Node. `@four/geometry` is
- * verified node-safe (`pnpm graph:check`), and this repository's rule for a
- * capability that only one environment has is an injected seam, not a global
- * reference — the shape it would take is the `FetchLike` pattern in
- * `@four/assets`. That is one packet, with an owner decision in it (ship a
- * ~2 kB tokenizer, or require the host to hand over a parsed document), and it
- * is honest to name it rather than to half-build it. Everything below is pure
- * string arithmetic and runs identically in both environments.
+ * The document tier is a **small XML tokenizer in this package**, not
+ * `DOMParser`. `@four/geometry` stays node-safe; `<!DOCTYPE` and external
+ * entities are refused (§96). Everything below (the `d` grammar) is still
+ * pure string arithmetic and runs identically in both environments.
  *
  * ## The Y axis: this module **transcribes**, it does not flip (§7a)
  *
@@ -73,8 +67,8 @@
  *    const world = parseSvgPathData(d).transform(svgToWorld);
  *    ```
  *
- *    The document tier above is the packet that will apply it for you, because
- *    it is the tier that knows `height`.
+ *    `parseSvgDocument` returns `viewBox` so that line is writeable;
+ *    it does not apply the flip itself. Transcription is still the contract.
  *
  * {@link formatSvgPathData} is the mirror image of that decision, and therefore
  * consistent with it: it writes the path's own numbers, so a path authored in a
@@ -259,11 +253,10 @@
  * engines write the same bytes, a `cross-platform` claim), and it is
  * **lossless** (so `parse(format(p))` recovers `p`'s coordinates bit for bit).
  * A fixed-decimal format would have been neither. A *lossy* writer — round to
- * three decimals to halve the bytes — is a real thing to want and a real policy
- * decision; it is deliberately not an option here, because a `d` attribute that
- * silently loses precision is exactly the kind of quiet rewrite §85 exists to
- * prevent, and the packet that adds it should also decide what it does to a
- * golden.
+ * a caller-chosen number of decimals — is {@link SvgPathFormatOptions.precision}.
+ * It is opt-in: the default (no option) is still `String(value)`, so the
+ * determinism golden does not move. A supplied precision is a deliberate,
+ * lossy request, not a silent rewrite.
  *
  * Output shape: absolute uppercase commands only, single ASCII spaces, no
  * commas, no implicit repetition, no leading or trailing space. It is not the
@@ -318,6 +311,16 @@ const CHAR_LOWER_E = 0x65;
  * absence of a check. `Number.POSITIVE_INFINITY` is the in-source opt-out.
  */
 export const DEFAULT_MAXIMUM_PATH_DATA_LENGTH = 4_194_304;
+
+/** Options for {@link formatSvgPathData}. */
+export interface SvgPathFormatOptions {
+  /**
+   * Decimal places to round each number to. Omitted: every number is
+   * `String(value)` — the lossless default the determinism golden pins.
+   * Must be a finite integer in `0 … 20` when supplied.
+   */
+  readonly precision?: number;
+}
 
 /** §96 bounds for one untrusted `d` attribute. */
 export interface SvgPathParseOptions {
@@ -1115,9 +1118,30 @@ function effectiveTextLimit(value: number | undefined): number {
   return value;
 }
 
-/** JavaScript's shortest round-tripping decimal — see the module header. */
-function formatNumber(value: number): string {
-  return String(value);
+/**
+ * JavaScript's shortest round-tripping decimal, or a rounded decimal when
+ * `precision` is supplied. The no-precision path is `String(value)` exactly,
+ * so the default output is bit-identical to the pre-option writer.
+ */
+function formatNumber(value: number, precision: number | undefined): string {
+  if (precision === undefined) {
+    return String(value);
+  }
+  const factor = 10 ** precision;
+  return String(Math.round(value * factor) / factor);
+}
+
+/** Validates {@link SvgPathFormatOptions.precision} (§85). */
+function effectivePrecision(value: number | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!Number.isInteger(value) || value < 0 || value > 20) {
+    throw new RangeError(
+      `formatSvgPathData: precision must be an integer in 0…20; got ${String(value)} (§85).`,
+    );
+  }
+  return value;
 }
 
 /**
@@ -1132,25 +1156,28 @@ function writeArc(
   command: PathArcCommand,
   cursor: PathCursor,
   parts: string[],
+  precision: number | undefined,
 ): void {
   const start = arcPoint(command, command.startAngle);
   if (cursor.x !== start.x || cursor.y !== start.y) {
-    parts.push(`L ${formatNumber(start.x)} ${formatNumber(start.y)}`);
+    parts.push(
+      `L ${formatNumber(start.x, precision)} ${formatNumber(start.y, precision)}`,
+    );
   }
   const pieces = Math.abs(command.deltaAngle) === TAU ? 2 : 1;
   // Exact: halving a double is exact, and doubling the half recovers it.
   const step = command.deltaAngle / pieces;
   const largeArc = Math.abs(step) > Math.PI ? "1" : "0";
   const sweep = command.deltaAngle > 0 ? "1" : "0";
-  const radii = `${formatNumber(command.radiusX)} ${formatNumber(command.radiusY)}`;
-  const rotation = formatNumber(command.rotation * RADIANS_TO_DEGREES);
+  const radii = `${formatNumber(command.radiusX, precision)} ${formatNumber(command.radiusY, precision)}`;
+  const rotation = formatNumber(command.rotation * RADIANS_TO_DEGREES, precision);
   let from = start;
   for (let piece = 1; piece <= pieces; piece += 1) {
     const to = arcPoint(command, command.startAngle + step * piece);
     if (to.x !== from.x || to.y !== from.y) {
       parts.push(
         `A ${radii} ${rotation} ${largeArc} ${sweep} ` +
-          `${formatNumber(to.x)} ${formatNumber(to.y)}`,
+          `${formatNumber(to.x, precision)} ${formatNumber(to.y, precision)}`,
       );
     }
     from = to;
@@ -1167,8 +1194,8 @@ function writeArc(
  *
  * Absolute uppercase commands, single spaces, no commas, and every number as
  * `String(value)` — lossless and, unlike a fixed-decimal format, exactly
- * specified by ECMA-262. The module header states the whole policy and why a
- * lossy option is deliberately absent.
+ * specified by ECMA-262. Pass `{ precision }` to opt into a rounded writer;
+ * omitting it keeps this default, so the determinism golden does not move.
  *
  * Coordinates are written **verbatim**, so the output is in the path's own
  * space: a path authored in §7a's Y-up world renders mirrored in an SVG viewer
@@ -1182,34 +1209,44 @@ function writeArc(
  * neither conversion is exact.
  *
  * @param path any path, including an empty one (which yields `""`)
+ * @param options optional {@link SvgPathFormatOptions.precision}; omitted
+ *   output is identical to the lossless `String(value)` writer
  * @returns the `d` attribute's value, with no leading or trailing space
  */
-export function formatSvgPathData(path: Path): string {
+export function formatSvgPathData(
+  path: Path,
+  options: SvgPathFormatOptions = {},
+): string {
+  const precision = effectivePrecision(options.precision);
   const parts: string[] = [];
   const cursor = newCursor();
   for (const command of path.commands) {
     switch (command.kind) {
       case "move":
-        parts.push(`M ${formatNumber(command.x)} ${formatNumber(command.y)}`);
+        parts.push(
+          `M ${formatNumber(command.x, precision)} ${formatNumber(command.y, precision)}`,
+        );
         break;
       case "line":
-        parts.push(`L ${formatNumber(command.x)} ${formatNumber(command.y)}`);
+        parts.push(
+          `L ${formatNumber(command.x, precision)} ${formatNumber(command.y, precision)}`,
+        );
         break;
       case "quadratic":
         parts.push(
-          `Q ${formatNumber(command.controlX)} ${formatNumber(command.controlY)} ` +
-            `${formatNumber(command.x)} ${formatNumber(command.y)}`,
+          `Q ${formatNumber(command.controlX, precision)} ${formatNumber(command.controlY, precision)} ` +
+            `${formatNumber(command.x, precision)} ${formatNumber(command.y, precision)}`,
         );
         break;
       case "cubic":
         parts.push(
-          `C ${formatNumber(command.control1X)} ${formatNumber(command.control1Y)} ` +
-            `${formatNumber(command.control2X)} ${formatNumber(command.control2Y)} ` +
-            `${formatNumber(command.x)} ${formatNumber(command.y)}`,
+          `C ${formatNumber(command.control1X, precision)} ${formatNumber(command.control1Y, precision)} ` +
+            `${formatNumber(command.control2X, precision)} ${formatNumber(command.control2Y, precision)} ` +
+            `${formatNumber(command.x, precision)} ${formatNumber(command.y, precision)}`,
         );
         break;
       case "arc":
-        writeArc(command, cursor, parts);
+        writeArc(command, cursor, parts, precision);
         break;
       case "close":
         parts.push("Z");
