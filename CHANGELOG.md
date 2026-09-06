@@ -8,6 +8,19 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — §67 rectangular scissor clipping
+
+- **`Renderable.scissor`.** A per-draw axis-aligned rectangle in
+  drawing-buffer pixels (bottom-left, +Y up), default `null`. Snapshotted
+  onto `RenderItem.scissor`. WebGL and WebGPU intersect it with the view
+  scissor and restore the view rect after the item (and after a batched
+  run). A scene that never names one issues the same scissor calls it
+  issued before.
+- **Batching.** `RenderBatcher` breaks a run where the rectangle changes
+  (value equality, so independently written identical rects still merge).
+- **§79.** The rectangle is written when present and omitted when null;
+  a corrupted object restores the default.
+
 ### 2026-09-06 — Open-TODO pass: flakes, README gate, metallic-roughness, unlit blend
 
 - **Smoothness interpolation flake.** `tests/browser/smoothness.spec.ts`

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **57 open**, 132 done.
+Counts as of 2026-09-06: **56 open**, 133 done.
 
 ### 1 · Minutes — mechanical, no design in them
 
@@ -31,7 +31,7 @@ Each has its cause written down. The thinking is done; what remains is the chang
 - `smoothness.spec.ts` aliasing — DONE 2026-09-06 (virtual-frame parity sampler).
 - `blending.spec.ts` RECOVER / sample-count — DONE 2026-09-06 (page `data-chain-y` watches).
 - Run the README snippet in the browser gate — DONE 2026-09-06 (`tests/browser/readme.spec.ts`).
-- Scissor clipping (§67's first bullet, small)
+- Scissor clipping (§67's first bullet, small) — DONE 2026-09-06.
 - §59 second texture unit — DONE 2026-09-06 (`StandardMaterial.metalRoughnessMap`).
 - Dogfooding coverage map (standing assignment) — surfaces DONE, so they are not redone.
 
@@ -868,9 +868,12 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `castShadow`/`receiveShadow`/`frustumCulled`; a new drawable field
       cannot be dropped the same way again. Round-trip asserted in
       `scene-serializers.test.ts` and a constructor unit in `sprite.test.ts`.
-- [ ] **Scissor clipping (§67's first bullet, small)** — unrelated to the stencil and
-      unblocked: the backend already keeps `SCISSOR_TEST` enabled and sets the rect per
-      view. A per-item scissor is a render-list field, not a buffer.
+- [x] **Scissor clipping (§67's first bullet, small)** — DONE 2026-09-06.
+      `Renderable.scissor` / `RenderItem.scissor` is a drawing-buffer rectangle
+      (bottom-left, +Y up). The backend intersects it with `view.rect` and
+      restores the view scissor after the item. Default-off: a scene that
+      never names one issues the same scissor calls it issued before. The
+      batcher breaks a run where the rectangle changes.
 - [x] **Flake to watch — DONE 2026-08-30:** `packages/render/tests/shape.test.ts`'s
       "widens to a 32-bit index buffer" now has a 20 s timeout so `--coverage`
       on a loaded box cannot flake the assertion.
@@ -1482,13 +1485,17 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
+- [x] 2026-09-06 — **§67 scissor clipping.** `Renderable.scissor` snapshots onto
+      the render item; WebGL and WebGPU intersect with the view rect and
+      restore it after the draw. Batcher breaks on rectangle change.
+      Serialization omits the key when null.
+
 - [x] 2026-09-06 — **Open-TODO pass (second landing).** Browser-gate flakes:
       smoothness samples on virtual-frame parity; blending RECOVER/ANIMATED/
       RAGDOLL watch `data-chain-y` instead of screenshot throughput. README
       snippet runs in `tests/browser/readme.spec.ts`. `check-docs` pins
       package / suite / AUDIT-120 counts. `StandardMaterial.metalRoughnessMap`
-      on WebGL unit 2; unlit alpha enables `GL_BLEND`. Scissor clipping and
-      the remaining roadmap items stay open.
+      on WebGL unit 2; unlit alpha enables `GL_BLEND`.
 
 - [x] 2026-09-06 — **Open-TODO pass (first landing).** Windows Chromium binary
       layouts + lazy umbrella barrel imports + slower-runner Vitest/Playwright

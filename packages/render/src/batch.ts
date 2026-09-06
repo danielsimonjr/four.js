@@ -105,6 +105,7 @@ import type { ColorRGBA } from "@four/math";
 import { ALL_LAYERS, type LayerMask } from "@four/scene";
 
 import type { RenderItemClip } from "./clip.js";
+import { scissorsEqual, type ScissorRect } from "./scissor.js";
 import type {
   RenderItem,
   SpriteRenderItem,
@@ -245,6 +246,17 @@ export interface RenderBatch {
   readonly clip?: RenderItemClip | null;
 
   /**
+   * §67 rectangular scissor, shared by every merged item, or `null` where
+   * none of them names one (2026-09-06).
+   *
+   * A run breaks where the rectangle changes, so this is one value for the
+   * whole batch: two same-material draws under different scissors are two
+   * different draws. `undefined` reads as "no per-item scissor", matching
+   * {@link RenderItem.scissor}.
+   */
+  readonly scissor?: ScissorRect | null;
+
+  /**
    * How many consecutive render items this batch consumed. Always ≥ 2 — a run
    * of one is not a batch (see the module header).
    */
@@ -292,6 +304,7 @@ interface MutableBatch {
   opacity: number;
   mode: BufferGeometry["mode"];
   clip: RenderItemClip | null;
+  scissor: ScissorRect | null;
   items: number;
   vertexCount: number;
   indexCount: number;
@@ -413,6 +426,7 @@ export class RenderBatcher {
     opacity: 1,
     mode: "triangles",
     clip: null,
+    scissor: null,
     items: 0,
     vertexCount: 0,
     indexCount: 0,
@@ -477,6 +491,7 @@ export class RenderBatcher {
     // so a structurally-typed item predating the field compares equal to the
     // builders' own unclipped `null` rather than ending every run at it.
     const clip = first.clip ?? null;
+    const scissor = first.scissor ?? null;
     const kind = first.kind;
     const mode = first.geometry.mode;
     let vertexCount = first.geometry.vertexCount;
@@ -500,6 +515,11 @@ export class RenderBatcher {
         // scene's runs are exactly the runs it had before clipping existed.
         // `?? null` for `first`'s reason above.
         (item.clip ?? null) !== clip ||
+        // §67 scissor: the same material under two rectangles is two draws.
+        // Value equality so independently written identical rects still merge;
+        // `null` matches `undefined`, so a scene that never names a scissor
+        // keeps the runs it had before the field existed.
+        !scissorsEqual(item.scissor, scissor) ||
         item.geometry.mode !== mode ||
         !isBatchable(item)
       ) {
@@ -574,6 +594,7 @@ export class RenderBatcher {
     batch.opacity = material.opacity ?? 1;
     batch.mode = mode;
     batch.clip = clip;
+    batch.scissor = scissor;
     batch.items = count;
     batch.vertexCount = vertexCount;
     batch.indexCount = indexCount;

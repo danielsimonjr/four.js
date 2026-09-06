@@ -30,6 +30,14 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — §67 scissor is a render-list field, not a stencil.**
+  `SCISSOR_TEST` was already on per view. The missing piece was a per-item
+  rectangle intersected with `view.rect`. Coordinates stay §48 / §7a
+  (bottom-left); WebGPU flips on the way in, as it already does for the
+  view rect. Default-off keeps every existing transcript test identical.
+  Stencil `clip = true` still composes: a node can punch a path mask and
+  also restrict pixels to this rectangle.
+
 - **2026-09-06 — open-TODO pass, second landing.** The diagnosed browser
   flakes were sampler defects, not physics: smoothness now picks virtual-frame
   parity; blending watches the page's `data-chain-y` instead of screenshot

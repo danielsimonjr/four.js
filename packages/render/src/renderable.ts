@@ -82,6 +82,8 @@ import type { BufferGeometry } from "@four/geometry";
 import type { LitMaterial, Material, UnlitMaterial } from "@four/materials";
 import { Node } from "@four/scene";
 
+import type { ScissorRect } from "./scissor.js";
+
 /** Optional construction arguments of {@link Renderable}. */
 export interface RenderableOptions {
   /** Initial {@link Renderable.renderLayer}; defaults to 0. */
@@ -104,6 +106,14 @@ export interface RenderableOptions {
    * §49 flags above.
    */
   clip?: boolean;
+  /**
+   * Initial {@link Renderable.scissor}; defaults to `null` (§67).
+   *
+   * A per-draw axis-aligned rectangle in drawing-buffer pixels. `null` (the
+   * default) leaves the view scissor alone, so existing scenes stay
+   * transcript-identical. See `scissor.ts`.
+   */
+  scissor?: ScissorRect | null;
 }
 
 /**
@@ -238,6 +248,18 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
   frustumCulled = true;
 
   /**
+   * §67 rectangular scissor — a per-draw axis-aligned rectangle in
+   * drawing-buffer pixels, or `null` to inherit the view scissor only.
+   *
+   * Default-off so a scene that never names one issues the same backend
+   * scissor calls it issued before the field existed. The backend intersects
+   * this rectangle with `view.rect` and restores the view rect after the
+   * draw. Stencil `clip = true` is a different mechanism and composes: a
+   * node can punch a path mask *and* restrict its pixels to this rectangle.
+   */
+  scissor: ScissorRect | null = null;
+
+  /**
    * Builds a renderable for `geometry` and `material`. Both are required: a
    * renderable without either draws nothing, and defaulting them would hide the
    * mistake behind an invisible node rather than a type error.
@@ -256,6 +278,7 @@ export class Renderable<M extends Material = SurfaceMaterial> extends Node {
     this.receiveShadow = options.receiveShadow ?? true;
     this.frustumCulled = options.frustumCulled ?? true;
     this.clip = options.clip ?? false;
+    this.scissor = options.scissor ?? null;
   }
 
   /**

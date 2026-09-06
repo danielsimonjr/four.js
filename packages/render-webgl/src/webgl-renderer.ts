@@ -53,6 +53,7 @@ import {
   isSkinnedUnlitItem,
   isSpriteItem,
   isStandardItem,
+  intersectScissor,
   validateReadbackRegion,
   COLOR_GRADE_DEFAULTS,
   type EffectRenderPass,
@@ -63,6 +64,7 @@ import {
   type RenderStatistics,
   type Renderer,
   type RendererCapabilities,
+  type ScissorRect,
   type RendererEventMap,
   type RendererOptions,
   type ScreenEffectRenderer,
@@ -1077,6 +1079,25 @@ function resolveRect(
 }
 
 /**
+ * Intersects a per-item §67 scissor with the view rectangle and issues
+ * `gl.scissor`. Returns whether a restore is owed — `false` when the item
+ * named none, so a scene that never scissors pays one comparison and no
+ * extra GL call.
+ */
+function applyItemScissor(
+  gl: { scissor(x: number, y: number, w: number, h: number): void },
+  view: ScissorRect,
+  item: ScissorRect | null | undefined,
+): boolean {
+  if (item == null) {
+    return false;
+  }
+  const cut = intersectScissor(view, item);
+  gl.scissor(cut.x, cut.y, cut.width, cut.height);
+  return true;
+}
+
+/**
  * Draws four.js scenes with WebGL 2 (§61, §62, §120).
  *
  * ```ts
@@ -1947,6 +1968,13 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
         const viewScissorY = rect.y;
         const viewScissorW = rect.width;
         const viewScissorH = rect.height;
+        const viewScissor: ScissorRect = {
+          x: viewScissorX,
+          y: viewScissorY,
+          width: viewScissorW,
+          height: viewScissorH,
+        };
+        let itemScissorActive = false;
         gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
         gl.viewport(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
 
@@ -2023,6 +2051,10 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
 
         for (let index = 0; index < viewItems.length; index += 1) {
           const item = viewItems[index];
+          if (itemScissorActive) {
+            gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
+            itemScissorActive = false;
+          }
           // §65 (R-9), and only when the application assigned a batcher: does a
           // run of compatible draws start here? `batching` is `null` by
           // default, so a renderer that never opted in pays this one comparison
@@ -2058,6 +2090,11 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               // unlit batch draws on untextured instead, which is what R-5
               // recorded as that pipeline's answer to the same question.
               if (batch.kind !== "sprite" || batchTexture !== null) {
+                itemScissorActive = applyItemScissor(
+                  gl,
+                  viewScissor,
+                  batch.scissor,
+                );
                 if (activeKind !== "unlit") {
                   program.use();
                   activeKind = "unlit";
@@ -2102,6 +2139,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
               continue;
             }
           }
+
+          itemScissorActive = applyItemScissor(gl, viewScissor, item.scissor);
 
           // §54's skinned draws (RFC 0003) — a self-contained arm ending in
           // `continue`, like the particle arm below, because the skinned
@@ -2659,6 +2698,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
             // instance, `record.count` elements either way (§84).
             countDraw(statistics, record.mode, record.count, 1);
           }
+        }
+        if (itemScissorActive) {
+          gl.scissor(viewScissorX, viewScissorY, viewScissorW, viewScissorH);
         }
       }
     } finally {

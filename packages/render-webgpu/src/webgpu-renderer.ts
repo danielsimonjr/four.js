@@ -112,6 +112,7 @@ import {
   collectSceneLights,
   createSceneLights,
   isRenderTargetTexture,
+  intersectScissor,
   validateReadbackRegion,
   type EffectRenderPass,
   type RenderBatch,
@@ -122,6 +123,7 @@ import {
   type RendererCapabilities,
   type RendererEventMap,
   type RendererOptions,
+  type ScissorRect,
 } from "@four/render";
 import type { Node, Viewport } from "@four/scene";
 
@@ -470,6 +472,27 @@ function resolveRect(
   out.y = Math.round(view.y * scaleY);
   out.width = Math.max(0, Math.round(view.width * scaleX));
   out.height = Math.max(0, Math.round(view.height * scaleY));
+}
+
+/**
+ * Intersects a per-item §67 scissor with the view rectangle and issues
+ * `setScissorRect` in WebGPU's top-left space. Returns whether a restore
+ * is owed. Default-off: a scene that never names a scissor issues the
+ * same pass commands it issued before the field existed.
+ */
+function applyWgpuItemScissor(
+  pass: { setScissorRect(x: number, y: number, w: number, h: number): void },
+  view: ScissorRect,
+  item: ScissorRect | null | undefined,
+  surfaceHeight: number,
+): boolean {
+  if (item == null) {
+    return false;
+  }
+  const cut = intersectScissor(view, item);
+  const top = Math.max(0, surfaceHeight - (cut.y + cut.height));
+  pass.setScissorRect(cut.x, top, cut.width, cut.height);
+  return true;
 }
 
 /**
@@ -1327,6 +1350,13 @@ export class WebgpuRenderer implements Renderer {
       // clause §61 writes for "a backend whose native scissor rectangle is
       // top-left based".
       const top = Math.max(0, surfaceHeight - (rect.y + rect.height));
+      const viewScissor: ScissorRect = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
+      let itemScissorActive = false;
       pass.setViewport(rect.x, top, rect.width, rect.height, 0, 1);
       pass.setScissorRect(rect.x, top, rect.width, rect.height);
 
@@ -1407,6 +1437,10 @@ export class WebgpuRenderer implements Renderer {
 
       for (let index = 0; index < viewItems.length; index += 1) {
         const item = viewItems[index];
+        if (itemScissorActive) {
+          pass.setScissorRect(viewScissor.x, top, viewScissor.width, viewScissor.height);
+          itemScissorActive = false;
+        }
 
         // §65 (R-9), and only when the application assigned an uploader: does
         // a run of compatible draws start here? The planner already broke runs
@@ -1435,6 +1469,12 @@ export class WebgpuRenderer implements Renderer {
                     batch.texture,
                   );
             if (batch.kind !== "sprite" || batchTexture !== null) {
+              itemScissorActive = applyWgpuItemScissor(
+                pass,
+                viewScissor,
+                batch.scissor,
+                surfaceHeight,
+              );
               stencilReference = this.#drawBatch(
                 pass,
                 pipelines,
@@ -1457,6 +1497,13 @@ export class WebgpuRenderer implements Renderer {
             continue;
           }
         }
+
+        itemScissorActive = applyWgpuItemScissor(
+          pass,
+          viewScissor,
+          item.scissor,
+          surfaceHeight,
+        );
 
         const clip = item.clip ?? null;
         const maskPass = clip !== null && clip.maskPass;
@@ -1930,6 +1977,14 @@ export class WebgpuRenderer implements Renderer {
           countDraw(statistics, record.topology, record.count, 1);
         }
         block += 1;
+      }
+      if (itemScissorActive) {
+        pass.setScissorRect(
+          viewScissor.x,
+          top,
+          viewScissor.width,
+          viewScissor.height,
+        );
       }
     }
 

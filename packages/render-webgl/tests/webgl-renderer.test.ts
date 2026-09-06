@@ -2065,6 +2065,36 @@ describe("WebglRenderer.render — viewport and clear semantics (§61, §48)", (
   });
 });
 
+describe("WebglRenderer.render — per-item scissor (§67)", () => {
+  it("issues no extra scissor calls when no item names a rectangle", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(renderable(quadGeometry()));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("scissor")).toHaveLength(1);
+    expect(gl.callsOf("scissor")[0]?.args).toEqual([0, 0, 640, 480]);
+  });
+
+  it("intersects the item rectangle with the view and restores it after", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const child = renderable(quadGeometry());
+    child.scissor = { x: 100, y: 50, width: 200, height: 100 };
+    root.add(child);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    const scissors = gl.callsOf("scissor").map((call) => call.args);
+    expect(scissors[0]).toEqual([0, 0, 640, 480]);
+    expect(scissors).toContainEqual([100, 50, 200, 100]);
+    expect(scissors.at(-1)).toEqual([0, 0, 640, 480]);
+  });
+});
+
 describe("WebglRenderer.render — uniforms and draws (§64, §57)", () => {
   it("uploads projection · view once per view, then a model matrix per item", async () => {
     const { renderer, gl, camera } = await initialized();

@@ -19,6 +19,9 @@ export { RENDERER_REGISTRY, RENDER_GRAPH } from "./capabilities.js";
 export type { ClipScope, RenderItemClip, RenderItemStencil } from "./clip.js";
 export { ClipPlaneAllocator, MAX_CLIP_PLANES } from "./clip.js";
 
+export type { ScissorRect } from "./scissor.js";
+export { intersectScissor, scissorsEqual } from "./scissor.js";
+
 export type {
   ComputeBinding,
   ComputeBindingAccess,

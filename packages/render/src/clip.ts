@@ -20,15 +20,17 @@
  * same way, and §73's scroll view has the primitive it needs. Alpha masks
  * (which need the fragment's alpha to reach the stencil op, i.e. alpha-to-
  * coverage or a discard variant), 3D clipping planes (a per-pipeline uniform
- * and a shader edit, not a stencil at all), and true `scissor` rectangles (a
- * per-draw `gl.scissor`, cheaper than a mask but only for axis-aligned screen
- * rectangles) are **not** here and are named so that the next packet knows what
- * it is picking up.
+ * and a shader edit, not a stencil at all) are **not** here and are named so
+ * that the next packet knows what it is picking up. True `scissor` rectangles
+ * (a per-draw `gl.scissor`, cheaper than a mask but only for axis-aligned
+ * screen rectangles) shipped 2026-09-06 as `RenderItem.scissor` — see
+ * `scissor.ts`.
  *
  * Deciding the tier by *mechanism* rather than by *fraction of the list* is
  * R-7's rule applied one level up: R-7 shipped §57's `stencil` member
  * completely rather than six clipping mechanisms partly, and this packet ships
- * three of the eight completely rather than eight approximately.
+ * four of the eight completely rather than eight approximately (scissor
+ * rectangles joined 2026-09-06).
  *
  * ## The shape of the design
  *

@@ -200,6 +200,7 @@ import type {
   ResolvedPaint,
   ResolvedShapeFill,
   ResolvedStrokeStyle,
+  ScissorRect,
 } from "@four/render";
 import {
   Bone,
@@ -689,6 +690,51 @@ function readRenderableFlags(data: {
   const clip = readBoolean(data.clip);
   if (clip !== undefined) options.clip = clip;
   return options;
+}
+
+/**
+ * §67 rectangular scissor through §79. Omitted when `null` so a document
+ * written before the field restores the default (inherit the view scissor).
+ * A corrupted object is dropped rather than failing the scene — the Sprite
+ * precedent, and §96's filter-don't-trust rule.
+ */
+function scissorJson(node: {
+  readonly scissor: ScissorRect | null;
+}): Record<string, JsonValue> {
+  const rect = node.scissor;
+  if (rect === null) {
+    return {};
+  }
+  return {
+    scissor: {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    },
+  };
+}
+
+function readScissor(data: {
+  readonly [key: string]: JsonValue;
+}): { scissor?: ScissorRect } {
+  const value = data.scissor;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const x = readNumber(value.x);
+  const y = readNumber(value.y);
+  const width = readNumber(value.width);
+  const height = readNumber(value.height);
+  if (
+    x === undefined ||
+    y === undefined ||
+    width === undefined ||
+    height === undefined
+  ) {
+    return {};
+  }
+  return { scissor: { x, y, width, height } };
 }
 
 /**
@@ -1508,6 +1554,7 @@ export function registerRenderSerializers(
             renderLayer: renderable.renderLayer,
             renderOrder: renderable.renderOrder,
             ...renderableFlagsJson(renderable),
+            ...scissorJson(renderable),
           };
         }
         if (constructor === Mesh) {
@@ -1534,6 +1581,7 @@ export function registerRenderSerializers(
             renderLayer: mesh.renderLayer,
             renderOrder: mesh.renderOrder,
             ...renderableFlagsJson(mesh),
+            ...scissorJson(mesh),
             skeleton:
               skeleton === null
                 ? null
@@ -1561,6 +1609,7 @@ export function registerRenderSerializers(
             renderLayer: sprite.renderLayer,
             renderOrder: sprite.renderOrder,
             ...renderableFlagsJson(sprite),
+            ...scissorJson(sprite),
           };
         }
         if (constructor === PerspectiveCamera) {
@@ -1667,6 +1716,7 @@ export function registerRenderSerializers(
           return new Renderable<Material>(geometry, material, {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
+            ...readScissor(data),
           });
         }
         if (document.type === MESH_NODE_TYPE) {
@@ -1683,6 +1733,7 @@ export function registerRenderSerializers(
           const mesh = new Mesh<Material>(geometry, material, {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
+            ...readScissor(data),
           });
           // The skeleton record: shape-corrupt restores no skeleton (the
           // motion serializers' corrupt-field policy — a mesh without its rig
@@ -1727,6 +1778,7 @@ export function registerRenderSerializers(
           return new Sprite(requireSpriteMaterial(document, material), {
             ...finiteOptions(data, ["renderLayer", "renderOrder"]),
             ...readRenderableFlags(data),
+            ...readScissor(data),
             // §85: the class refuses a non-positive extent, so a payload that
             // carries one restores the default rather than the whole scene
             // failing on one number.
@@ -2719,6 +2771,7 @@ export function registerShapeSerializers(
           renderLayer: shape.renderLayer,
           renderOrder: shape.renderOrder,
           ...renderableFlagsJson(shape),
+          ...scissorJson(shape),
         };
         // §58's two fields are written **only when they are not this class's
         // default** (`R-16`, 2026-08-09). That is what keeps the addition
@@ -2839,6 +2892,7 @@ export function registerShapeSerializers(
           ...positiveOptions(data, ["tolerance"]),
           ...finiteOptions(data, ["renderLayer", "renderOrder"]),
           ...readRenderableFlags(data),
+          ...readScissor(data),
           fill,
           stroke,
         };
@@ -3095,6 +3149,7 @@ export function registerTextSerializers(
           renderLayer: text.renderLayer,
           renderOrder: text.renderOrder,
           ...renderableFlagsJson(text),
+          ...scissorJson(text),
         };
       },
     },
@@ -3125,6 +3180,7 @@ export function registerTextSerializers(
             "renderOrder",
           ]),
           ...readRenderableFlags(data),
+          ...readScissor(data),
           text: readString(data.text) ?? "",
           ...(size !== undefined && size > 0 ? { size } : {}),
           ...(align === "left" || align === "center" || align === "right"

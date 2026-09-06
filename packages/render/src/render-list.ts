@@ -122,6 +122,7 @@ import {
 import { ClipPlaneAllocator, type RenderItemClip } from "./clip.js";
 import { isParticleDrawable, particleQuadGeometry } from "./particles.js";
 import { Renderable } from "./renderable.js";
+import type { ScissorRect } from "./scissor.js";
 import type { SpriteFrame } from "./sprite.js";
 
 /**
@@ -155,6 +156,21 @@ interface FramedDrawable {
 interface SkinnedDrawable {
   readonly skeleton?: Skeleton | null;
   readonly morphTargetWeights?: Float32Array;
+}
+
+/**
+ * A drawable that may carry §67's per-item scissor, as this module reads it.
+ *
+ * Structural: a `Renderable` has the field; a particle double or a host's
+ * own minimal node reports `undefined`, which must read as "no scissor".
+ */
+interface ScissoredDrawable {
+  readonly scissor?: ScissorRect | null;
+}
+
+/** `undefined` and `null` both mean "inherit the view scissor only". */
+function scissorOf(node: ScissoredDrawable): ScissorRect | null {
+  return node.scissor ?? null;
 }
 
 /**
@@ -406,6 +422,24 @@ interface RenderItemBase {
    * behaviour.
    */
   clip?: RenderItemClip | null;
+
+  /**
+   * §67 rectangular scissor, or `null` for a draw that inherits the view
+   * scissor only (2026-09-06).
+   *
+   * Drawing-buffer pixels, bottom-left origin, +Y up — the same space as
+   * `view.rect` after `resolveRect`. A backend intersects this with the view
+   * rectangle and restores the view rect after the draw. Default-off: a
+   * scene that never names one issues the same scissor calls it issued
+   * before the field existed.
+   *
+   * **Optional, and `undefined` means exactly what `null` means** — the
+   * R-23 move: the builders always write it, the field is optional so a
+   * hand-built item predating the field still typechecks, and
+   * `MutableRenderItem` re-declares it required so a pooled slot cannot go
+   * stale.
+   */
+  scissor?: ScissorRect | null;
 
   /**
    * §54's morph-target weights — the node's `MorphWeights` component array —
@@ -674,6 +708,12 @@ interface MutableRenderItem extends RenderItemBase {
    * error rather than a leak.
    */
   clip: RenderItemClip | null;
+  /**
+   * Required here though optional on the base, for `clip`'s reason: the
+   * builders write it on every drawable item, so a pooled slot cannot hand a
+   * stale rectangle to whatever lands in it next.
+   */
+  scissor: ScissorRect | null;
 }
 
 /**
@@ -878,6 +918,7 @@ function itemAt(
       frustumCulled: true,
       viewDepth: 0,
       clip: null,
+      scissor: null,
       id: "",
       count: 0,
       instances: EMPTY_INSTANCES,
@@ -1198,6 +1239,9 @@ function collect(
       // `frame` and shadow resets in the particle arm below are — a pooled slot
       // must not hand a stale clip to whatever lands in it next.
       item.clip = clip;
+      // §67 scissor, snapshotted like every other field and written on every
+      // drawable so a pooled slot cannot hand a stale rectangle forward.
+      item.scissor = scissorOf(node);
       writeWorldMatrix(item, node, pool, next, poses, alpha);
       // §54's morph weights (RFC 0003), snapshotted like every other field and
       // written on **every** drawable for `clip`'s reason: the item is pooled,
@@ -1286,6 +1330,7 @@ function collect(
     // everything else — the test is per draw, and §36's batched item is one
     // draw. Written rather than left, for the reason the resets above are.
     item.clip = clip;
+    item.scissor = scissorOf(node);
     writeWorldMatrix(item, node, pool, next, poses, alpha);
     out[next] = item as RenderItem;
     next += 1;
@@ -1337,6 +1382,7 @@ function collect(
         item.frustumCulled = false;
         item.viewDepth = 0;
         item.clip = scope.write;
+        item.scissor = scissorOf(node);
         writeWorldMatrix(item, node, pool, next, poses, alpha);
         out[next] = item as RenderItem;
         next += 1;
