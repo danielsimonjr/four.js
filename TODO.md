@@ -6,6 +6,31 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **The browser gate is not runnable on Windows — 22 skipped, 17 failed, while CI is
+      green (103/103).** Measured 2026-09-06 on an otherwise idle machine. Not a library
+      defect and not a CI coverage hole; both were checked before writing this down.
+      Two separate causes:
+      - **All 22 `webgpu` specs skip.** They self-skip when `requestAdapter()` is `null`.
+        Playwright's default headless binary is `chrome-headless-shell`, whose Windows tree
+        **lacks `dxcompiler.dll`** (the full `chromium-*` tree has it) — Dawn's D3D12 backend
+        needs DXC to compile WGSL. Not a hardware absence: a real Chrome on this same box
+        reports an NVIDIA/Pascal adapter with 19 features, and four's own `WebgpuRenderer`
+        renders through it. On Linux the shell reaches SwiftShader's Vulkan, which is why
+        CI runs all 22.
+      - **17 chromium/visual specs exceed their timeouts.** The cost is screenshot-bound,
+        not logic-bound: `animation.spec`'s `sweep()` takes `SAMPLE_COUNT` (22) canvas
+        screenshots with only 6.6 s of deliberate waiting, so ~50 s of each 60 s test is
+        SwiftShader readback. The one test that passed took **55.9 s of its 60 s budget** —
+        there is no margin on this platform. Confirmed with the machine fully idle; an
+        earlier reading was confounded twice by my own animating pages.
+- [ ] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** The four
+      candidates cover `chrome-linux` and `chrome-mac` only, so `findPreinstalledChromium()`
+      can never resolve `chromium-*/chrome-win64/chrome.exe`. The escape hatch for a sandbox
+      whose Chromium revision differs is therefore unavailable on Windows. Only matters when
+      `PLAYWRIGHT_BROWSERS_PATH` is set (it is unset locally and in CI), so this is latent
+      rather than active — but it is the mechanism that would let the WebGPU specs run here,
+      by pointing at the full build instead of the shell.
+
 - [x] **The README quick-start could not run — no `app.start()`.** Found by extracting the
       block verbatim and loading it in a browser; it threw §45's error and drew nothing.
       Fixed, and gated in `tools/check-docs.mjs` so it cannot silently return. Evidence and
