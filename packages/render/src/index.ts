@@ -163,11 +163,18 @@ export {
   supportsPicking,
 } from "./picking.js";
 export type {
+  RenderTargetByteLengthOptions,
   RenderTargetFormat,
   RenderTargetOptions,
   RenderTargetTexture,
 } from "./render-target.js";
-export { RenderTarget, isRenderTargetTexture } from "./render-target.js";
+export {
+  RenderTarget,
+  colorAttachmentBytesPerTexel,
+  depthAttachmentBytesPerTexel,
+  isRenderTargetTexture,
+  renderTargetBytesPerTexel,
+} from "./render-target.js";
 export type { RenderableOptions, SurfaceMaterial } from "./renderable.js";
 export { Renderable } from "./renderable.js";
 export { MAX_SKINNING_JOINTS, Mesh, restoreMeshSkeleton } from "./mesh.js";

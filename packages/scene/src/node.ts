@@ -102,6 +102,20 @@ let nextNodeId = 1;
 /** The shape of an engine-assigned id: `node-` and a decimal counter value. */
 const ENGINE_NODE_ID = /^node-(\d+)$/;
 
+const detachedListenerWarned = new Set<string>();
+
+function warnDetachedListeners(node: Node): void {
+  const count = node.totalListenerCount();
+  if (count <= 0) return;
+  if (detachedListenerWarned.has(node.id)) return;
+  detachedListenerWarned.add(node.id);
+  console.warn(
+    `[four] §83: node "${node.id}" was detached from the scene graph but still has ` +
+      `${String(count)} event listener(s). Call removeAllListeners() during ` +
+      "teardown, or the node will stay alive until every listener is removed.",
+  );
+}
+
 /**
  * Default `up` reference for {@link Node.lookAt}: world +Y, because §7a makes
  * the world right-handed and +Y up **in both 2D and 3D**. Frozen shape by
@@ -875,6 +889,7 @@ export abstract class Node
     }
     this.#children.splice(index, 1);
     child.#parent = null;
+    warnDetachedListeners(child);
     child.emit("removed", { node: child, parent: this });
   }
 }

@@ -234,6 +234,7 @@ import {
   validateMass,
   validatePhysicsWorldOptions,
 } from "./validation.js";
+import { noteSolverBody } from "./resource-memory.js";
 
 /** See the rest of the package: §89 has no physics-input code, so misuse is this. */
 const WORLD_ERROR_CODE = "INVALID_APPLICATION_STATE";
@@ -1222,6 +1223,7 @@ export class PhysicsWorld {
     ) {
       this.#inertialessBodies.add(registration);
     }
+    noteSolverBody(1);
     return body;
   }
 
@@ -3855,6 +3857,7 @@ export class PhysicsWorld {
     if (registration.tracked) {
       this.#poses?.untrack(registration.node);
     }
+    noteSolverBody(-1);
   }
 
   /** Guards the §30 surface against an adapter that does not implement it (§37). */

@@ -99,6 +99,8 @@ export interface LiveResourceCounts {
   readonly renderTargets: number;
   /** Bytes described by textures **and** targets — §84's `textureMemory`. */
   readonly textureBytes: number;
+  readonly materials?: number;
+  readonly solverBodies?: number;
 }
 
 /**
@@ -119,6 +121,8 @@ export interface ResourceLeakReport {
   readonly renderTargets: number;
   /** Bytes the surviving textures and targets describe. */
   readonly textureBytes: number;
+  readonly materials: number;
+  readonly solverBodies: number;
   /**
    * The warning text, or `""` when nothing leaked. Always produced (it is what
    * a test asserts on); whether it was *printed* is
@@ -154,6 +158,8 @@ export const NO_RESOURCE_LEAKS: ResourceLeakReport = Object.freeze({
   textures: 0,
   renderTargets: 0,
   textureBytes: 0,
+  materials: 0,
+  solverBodies: 0,
   message: "",
 });
 
@@ -189,7 +195,15 @@ export function auditResourceLeaks(
   const geometries = grew(before.geometries, after.geometries);
   const textures = grew(before.textures, after.textures);
   const renderTargets = grew(before.renderTargets, after.renderTargets);
-  if (geometries === 0 && textures === 0 && renderTargets === 0) {
+  const materials = grew(before.materials ?? 0, after.materials ?? 0);
+  const solverBodies = grew(before.solverBodies ?? 0, after.solverBodies ?? 0);
+  if (
+    geometries === 0 &&
+    textures === 0 &&
+    renderTargets === 0 &&
+    materials === 0 &&
+    solverBodies === 0
+  ) {
     return NO_RESOURCE_LEAKS;
   }
 
@@ -203,6 +217,12 @@ export function auditResourceLeaks(
   if (textures > 0) parts.push(`${String(textures)} textures`);
   if (renderTargets > 0) {
     parts.push(`${String(renderTargets)} render targets`);
+  }
+  if (materials > 0) {
+    parts.push(`${String(materials)} materials`);
+  }
+  if (solverBodies > 0) {
+    parts.push(`${String(solverBodies)} solver body registrations`);
   }
   if (textures > 0 || renderTargets > 0) {
     parts.push(`${String(textureBytes)} B of texture memory`);
@@ -222,6 +242,8 @@ export function auditResourceLeaks(
     textures,
     renderTargets,
     textureBytes,
+    materials,
+    solverBodies,
     message,
   };
 }

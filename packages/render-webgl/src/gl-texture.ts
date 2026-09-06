@@ -95,6 +95,7 @@
  *   invalid and the context must not be touched (§61).
  */
 
+import { DEV, devWarnOnce } from "@four/core";
 import type { SpriteRenderItem } from "@four/render";
 
 import { GL, type GlTexture, type WebglContext } from "./gl-program.js";
@@ -260,6 +261,14 @@ export class TextureCache {
     }
 
     if (texture.disposed) {
+      if (DEV) {
+        devWarnOnce(
+          `disposed-texture:${texture.id}`,
+          `§83: texture "${texture.id}" was disposed but is still referenced; ` +
+            "draws that meet it are skipped. Dispose upstream owners or stop " +
+            "referencing the texture.",
+        );
+      }
       return null;
     }
 

@@ -102,6 +102,35 @@ export type {
 } from "./resource-audit.js";
 export { NO_RESOURCE_LEAKS, auditResourceLeaks } from "./resource-audit.js";
 
+export type {
+  ValidationCatalogueOptions,
+  ValidationCheckOptions,
+  ValidationNodeLike,
+  ValidationTransformLike,
+} from "./validation.js";
+export {
+  COORDINATE_ENVELOPE,
+  NEAR_ZERO_SCALE,
+  UNSTABLE_SCALE_RATIO,
+  assertFinite,
+  assertNoSceneGraphCycle,
+  validateSceneNode,
+  validateSceneSubtree,
+  warnCoordinateEnvelope,
+  warnSingularScale,
+  warnUnstableScale,
+} from "./validation.js";
+
+export {
+  DEFAULT_PER_FRAME_ALLOCATION_THRESHOLD,
+  beginFrameAllocationCheck,
+  endFrameAllocationCheck,
+  warnDetachedNodeListeners,
+  warnDisposedResourceInUse,
+  warnPerFrameAllocations,
+  warnStalePhysicsHandle,
+} from "./dev-warnings.js";
+
 // §84 runtime statistics (A-1, 2026-08-07).
 export type { ClockSource, FrameStats, RenderStatisticsLike } from "./stats.js";
 export {
