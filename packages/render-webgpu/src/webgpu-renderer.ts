@@ -2448,7 +2448,8 @@ export class WebgpuRenderer implements Renderer {
             "node pipeline is registered on the WebGPU backend, so those " +
             "draws are skipped (flat colour would be a different picture). " +
             "Call registerWebgpuNodeMaterialPipeline() from " +
-            "@four/render-webgpu at application setup (RFC 0001).",
+            "@four/render-webgpu" +
+            " at application setup (RFC 0001).",
         );
       }
       return null;

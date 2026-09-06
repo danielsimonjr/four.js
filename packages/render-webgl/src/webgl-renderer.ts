@@ -3310,7 +3310,8 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
           "§54: this scene contains a skinned mesh but no skinning pipeline " +
             "is registered, so its draws are skipped (a bind pose would be " +
             "a different picture). Call registerSkinningPipeline() from " +
-            "@four/render-webgl at application setup (RFC 0003).",
+            "@four/render-webgl" +
+            " at application setup (RFC 0003).",
         );
       }
       return null;

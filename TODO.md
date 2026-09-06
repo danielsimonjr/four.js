@@ -6,6 +6,12 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **Publish path was broken — `apply-publish-names` exited 1, so four.js could not be
+      published at all.** Found by dogfooding the publish path rather than the API. Rewriter did
+      not match subpath specifiers while the validator flagged them; two renderer error messages
+      also named `@four/*` to consumers who would have `@danielsimonjr/fourjs-*`. Both fixed;
+      the tool now exits 0 (24 packages staged, 724 specifiers rewritten).
+
 - [ ] **Dogfooding session 1 finding: `transformAuthority` defaults to `"manual"`, so a physics
       body silently does not move if you forget one line.** Following
       `docs/guides/collision-filtering.md` I skipped `node.transformAuthority = "physics"` and got

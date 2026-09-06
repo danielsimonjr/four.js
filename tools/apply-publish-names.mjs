@@ -196,7 +196,10 @@ const CODE_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"];
 // A quoted scoped workspace name is unmistakable, so it is rewritten wherever it
 // appears. The umbrella's bare `four` is an ordinary English word, so it is
 // rewritten only in the three positions where a string is a module specifier.
-const SCOPED_STRING = /(["'])@four\/([a-z0-9-]+)\1/g;
+// Subpaths included: `"@four/render-webgl/register"` is as real a specifier as
+// `"@four/render-webgl"`, and the validator below flags both. Matching only the bare
+// name left every subpath token behind and failed the run it was meant to protect.
+const SCOPED_STRING = /(["'])@four\/([a-z0-9-]+(?:\/[a-z0-9-]+)*)\1/g;
 const BARE_SPECIFIER =
   /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(["'])four\2/g;
 

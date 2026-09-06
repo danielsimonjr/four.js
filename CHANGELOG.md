@@ -8,6 +8,34 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-05 — the publish path could not stage a tree; found by dogfooding it
+
+- **`bun tools/apply-publish-names.mjs` exited 1 with 8 problems, so nothing could be published.**
+  Its rewriter and its own validator disagreed about what a quoted name is:
+
+  ```
+  rewriter   /(["'])@four\/([a-z0-9-]+)/     <- [a-z0-9-]+ cannot cross a "/"
+  validator  /(["'])@four\//                    <- flags any quote followed by @four/
+  ```
+
+  So `"@four/render-webgl"` was rewritten and `"@four/render-webgl/register"` was not, and the
+  validator then failed the run on the survivor. Every one of the 8 was that same subpath shape.
+  Harmless today because all of them sit in JSDoc — but that is luck, not safety: a real
+  `import "@four/render-webgl/register"` would have staged unrewritten beside a manifest whose
+  dependency had been renamed, resolved to nothing, and shipped broken on the first release, which
+  is verbatim the failure this tool's header says it exists to prevent. The validator was right;
+  the rewriter was one character short. `SCOPED_STRING` now matches subpath segments.
+- **Two renderer error messages named the workspace package to consumers who cannot have it.**
+  `"…Call registerSkinningPipeline() from " + "@four/render-webgl at application setup (RFC 0003)."`
+  put the package name at the start of a prose string, where the rewriter deliberately does not
+  reach — so a consumer of `@danielsimonjr/fourjs-render-webgl` would be told to import
+  `@four/render-webgl`, which does not exist on npm. Split so the name is its own quoted token,
+  which is exactly the shape the rewriter is built to rename. The workspace build still says
+  `@four/render-webgl`; the staged build now says `@danielsimonjr/fourjs-render-webgl`.
+
+`apply-publish-names` now exits 0: 24 packages staged, 25 umbrella exports preserved, 724 code
+specifiers rewritten.
+
 ### 2026-09-05 — reverted #62 and #63: `main` was red on three workflows
 
 - **Reverted the dev-dependency bump (#62).** It moved TypeScript 5.9.3 -> 7.0.2 together with
