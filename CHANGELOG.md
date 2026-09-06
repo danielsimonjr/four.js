@@ -106,6 +106,22 @@ specification; until then, entries are grouped by date under **Unreleased**.
   (`tools/per-file-coverage-floor.cjs`) fails any non-empty file below 80%
   lines/functions/statements so a 0% file cannot hide behind the average.
 
+### 2026-09-06 — removed a dead helper, and added the Windows binaries it pretended to be
+
+- **`windowsFullChromium()` deleted: it never ran.** Measured by importing the config and
+  printing each project's `executablePath` — `chromium.executablePath()` already returns
+  the full build, so a helper that derives one from a `chromium_headless_shell-<rev>` path
+  matched nothing. The WebGPU gate passes **22/22 without it**, which is the proof.
+  A helper that looks load-bearing while doing nothing is worse than no helper: the next
+  person debugging this would have trusted it.
+
+- **`CHROMIUM_BINARIES` gained its Windows entries.** The list covered `chrome-linux` and
+  `chrome-mac` only, so `findPreinstalledChromium()` could resolve nothing on Windows —
+  a sandbox that sets `PLAYWRIGHT_BROWSERS_PATH` got the same `undefined` as one that does
+  not, and the escape hatch the function exists to be simply was not there. Verified
+  against a real install tree: with the variable set, the config now resolves
+  `chromium-1200/chrome-win64/chrome.exe`.
+
 ### 2026-09-06 — `js-yaml 5` breaks the dependency-graph tool, and the fix is not ours
 
 - **#68 closed; `js-yaml >=5` ignored.** Dependabot re-proposed the dev-dependency group
@@ -411,10 +427,18 @@ specification; until then, entries are grouped by date under **Unreleased**.
   counterpart, so the gate still measures a **software** adapter rather than whatever GPU
   the developer happens to own — the property the flag was there to protect.
 
-  The `webgpu` project additionally needs the **full** Chromium build on Windows: the
+  **Corrected 2026-09-06, later the same day: the paragraph below was wrong.** It said the
+  project additionally needed the full Chromium build, resolved by a `windowsFullChromium()`
+  helper. Measured by importing the config and printing what it resolves,
+  `chromium.executablePath()` **already returns the full build**
+  (`chromium-1200/chrome-win64/chrome.exe`), so that helper's regex never matched, it always
+  returned `undefined`, and it never selected anything. The flag change alone is the fix;
+  the helper has been removed and the gate still passes 22/22 without it. Original text:
+
+  ~~The `webgpu` project additionally needs the **full** Chromium build on Windows: the
   headless shell yields no adapter under any flag set that also pins a software one. Its
   path is derived from `chromium.executablePath()` rather than searched for, so the
-  revision cannot drift from the one Playwright expects.
+  revision cannot drift from the one Playwright expects.~~
 
   **Non-Windows argv is unchanged, deliberately.** CI runs 103/103 on Linux with the
   previous flags; a Windows-only defect must not perturb the platform that already works.

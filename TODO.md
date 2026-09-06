@@ -15,13 +15,20 @@ and tier 4 surfaces the decisions that block otherwise-small work.
 
 Counts as of 2026-09-06: **57 open**, 136 done.
 
-### 1 · Minutes — mechanical, no design in them
+### 0 · Blocked on an event, not on effort
 
-Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
+Each waits on a **second solver adapter** existing. None is minutes-work; none is work at
+all yet. Listed first so they are not repeatedly re-triaged as quick wins — which is what
+happened on 2026-09-06, when all three sat in the minutes tier until someone read them.
 
 - Capability-table note: Rapier derives kinematic velocity itself, so inheritVelocityFrom is nearly a no-op there; other solvers may need it
 - Document SolverBodyAccess in the §90/§102 compatibility material when adapters beyond Rapier arrive (it is required engine surface beyond §37's sketch)
 - §28 motor cap: both Rapier adapters supply maxTorque/maxForce as a ForceBased gain, not a hard ceiling (documented in the stable API docs); name it in the §90/§102 capability tables when a capping adapter (Box2D) arrives
+
+### 1 · Minutes — mechanical, no design in them
+
+Config, a regeneration, or a sentence of prose. Nothing here needs a decision.
+
 - Coverage thresholds are package-level — DONE 2026-09-06 (80% per-file floor under the 95% package gate).
 
 ### 2 · Hours — one contained fix, already diagnosed
@@ -339,14 +346,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
         there is no margin on this platform. Confirmed with the machine fully idle; an
         earlier reading was confounded twice by my own animating pages.
 - [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
-      2026-09-06 — `chrome-win64/chrome.exe` and the headless-shell-win64 layout
-      are in the candidate list. The four
-      candidates cover `chrome-linux` and `chrome-mac` only, so `findPreinstalledChromium()`
-      can never resolve `chromium-*/chrome-win64/chrome.exe`. The escape hatch for a sandbox
-      whose Chromium revision differs is therefore unavailable on Windows. Only matters when
-      `PLAYWRIGHT_BROWSERS_PATH` is set (it is unset locally and in CI), so this is latent
-      rather than active — but it is the mechanism that would let the WebGPU specs run here,
-      by pointing at the full build instead of the shell.
+      2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
+      headless-shell-win64 layout are in the candidate list. Only matters when
+      `PLAYWRIGHT_BROWSERS_PATH` is set (unset locally and in CI). `windowsFullChromium`
+      was deleted on `main` (it never matched); Playwright already resolves the
+      full build.
 
 - [x] **The README quick-start could not run — no `app.start()`.** Found by extracting the
       block verbatim and loading it in a browser; it threw §45's error and drew nothing.

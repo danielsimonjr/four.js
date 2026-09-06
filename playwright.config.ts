@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { chromium, defineConfig } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 
 /**
  * Playwright configuration for the browser gates (WP-3.8, extended by WP-5.8,
@@ -79,6 +79,12 @@ const CHROMIUM_BINARIES: readonly (readonly [string, string])[] = [
     "chromium-",
     join("chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"),
   ],
+  // Windows. Absent until 2026-09-06, which made `findPreinstalledChromium` unable to
+  // resolve anything at all on this platform: a sandbox that sets
+  // PLAYWRIGHT_BROWSERS_PATH got the same `undefined` as one that does not, and the
+  // escape hatch this function exists to be simply was not there. Verified against a
+  // real install tree — `chromium-<rev>/chrome-win64/chrome.exe` and
+  // `chromium_headless_shell-<rev>/chrome-headless-shell-win64/chrome-headless-shell.exe`.
   ["chromium-", join("chrome-win64", "chrome.exe")],
   ["chromium-", join("chrome-win", "chrome.exe")],
   ["chromium_headless_shell-", join("chrome-linux", "headless_shell")],
@@ -115,39 +121,6 @@ function findPreinstalledChromium(): string | undefined {
     }
   }
   return undefined;
-}
-
-/**
- * The **full** Chromium build matching the revision Playwright would launch by default,
- * on Windows only. `undefined` everywhere else, and whenever it cannot be found.
- *
- * Why this exists (measured 2026-09-06, both binaries against four flag sets on a served
- * origin): on Windows `chrome-headless-shell` cannot produce a WebGPU adapter under any
- * flag set that also pins a software adapter, so all 22 specs in the `webgpu` project
- * skipped themselves and the second render backend was gated by tests that never ran.
- * The full build can. On Linux the shell reaches SwiftShader's Vulkan on its own, which
- * is why CI has always run those specs and never needed this.
- *
- * The path is *derived* from `chromium.executablePath()` rather than searched for, so the
- * revision cannot drift from the one this Playwright release expects: the two trees are
- * siblings, `chromium_headless_shell-<rev>` and `chromium-<rev>`.
- */
-function windowsFullChromium(): string | undefined {
-  if (process.platform !== "win32") return undefined;
-  let shellPath: string;
-  try {
-    shellPath = chromium.executablePath();
-  } catch {
-    return undefined;
-  }
-  const match = /^(.*[\\/])chromium_headless_shell-(\d+)[\\/]/.exec(shellPath);
-  if (match === null) return undefined;
-  const candidate = join(
-    `${match[1]}chromium-${match[2]}`,
-    "chrome-win64",
-    "chrome.exe",
-  );
-  return existsSync(candidate) ? candidate : undefined;
 }
 
 /**
@@ -384,10 +357,7 @@ export default defineConfig({
         // keeps every landed WebGL and visual gate launching exactly the
         // browser it launched before (WP-R1.1, 2026-08-21).
         launchOptions: {
-          // `windowsFullChromium()` first: on Windows the headless shell cannot hand out
-          // a WebGPU adapter at all, so without it every spec here skips. `undefined`
-          // on every other platform, which leaves CI's resolution exactly as it was.
-          executablePath: windowsFullChromium() ?? findPreinstalledChromium(),
+          executablePath: findPreinstalledChromium(),
           args: webgpuLaunchArgs(),
         },
       },
