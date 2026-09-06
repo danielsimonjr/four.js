@@ -113,7 +113,7 @@ describe("ParticleRenderable wide stream (R-32)", () => {
     const node = new ParticleRenderable(emitter);
     node.updateParticleInstances();
     expect(node.particleInstances[PARTICLE_ROTATION_OFFSET]).toBe(0);
-    expect(node.particleInstances[PARTICLE_SOFTNESS_OFFSET]).toBe(0.2);
+    expect(node.particleInstances[PARTICLE_SOFTNESS_OFFSET]).toBeCloseTo(0.2);
   });
 });
 

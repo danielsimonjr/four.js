@@ -184,8 +184,8 @@ describe("integrate — the WP-R1.8 kernel, dispatched (§36, §82)", () => {
     gpu.reset();
     simulation.integrate(130, 1 / 60, 0, -9.81, 0);
 
-    // Params: dt, count-as-f32, two written pads, gravity xyz, written pad —
-    // as float32, since the staging array narrowed them at write time.
+    // First 8 floats stay [dt, count, 0, 0, gx, gy, gz, 0]; the extra 8 are
+    // reserved for optional radial / collision extras (R-32 / §27 GPU fields).
     const write = gpu.callsOf("queue.writeBuffer")[0];
     expect(write?.args[2]).toEqual([
       Math.fround(1 / 60),
@@ -194,6 +194,14 @@ describe("integrate — the WP-R1.8 kernel, dispatched (§36, §82)", () => {
       0,
       0,
       Math.fround(-9.81),
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
       0,
       0,
     ]);
