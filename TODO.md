@@ -278,7 +278,7 @@ changes in `CHANGELOG.md`.
       `physics-rapier`'s own test changed with it, deliberately — the contract narrowed, and
       it now covers both halves. Dogfooded from outside with the `makeWorld()` helper from
       the finding above: second call threw before, all three build after.
-- [ ] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
+- [x] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
       **REOPENED 2026-09-06.** A DEV-gated `devWarnOnce` was implemented and then reverted:
       `tests/integration/dev-build-mode.test.ts` forbids *any* build-flag branch in a
       simulation package (`math`, `motion`, `scene`, `physics`, `animation`, `particles`),
@@ -298,6 +298,22 @@ changes in `CHANGELOG.md`.
       Cost is one reference comparison per node; the repo tracks allocation closely, so the
       performance objection deserves a real answer rather than my assumption either way.
 
+      **DECIDED 2026-09-06: leave it to TypeScript. Closed, with the cost measured.**
+      The DEV-gated version is forbidden — §33 bars a simulation package from branching on
+      the build flag, and `scene` is one. So the only remaining shape is an unconditional
+      guard, which every shipped bundle carrying `@four/scene` pays for forever.
+      Measured rather than estimated: a guard whose entire message is
+      `"Node is abstract; use Group (§6)."` — 49 characters, about as terse as a useful
+      error gets — put `examples/ui-demo` **41 B over** its 45 kB §86 budget
+      (45.04 kB against 45 kB; reverting restored `bun run size` to exit 0). There is no
+      version of this that is free, and no version that fits.
+      Against that: `Node` is `abstract`, so **TypeScript already rejects `new Node()`** for
+      the library's primary audience, and the published packages ship `.d.ts`. The guard
+      would buy a runtime message for JavaScript-only consumers, on a mistake the compiler
+      catches at the point of writing — paid for by every user of every app, in bytes, in
+      perpetuity. That is the wrong trade.
+      Reopening this needs one of two things to change: `ui-demo`'s §86 budget rising for a
+      reason of its own, or a home for the check outside the simulation envelope.
 - [x] **Publish path was broken — `apply-publish-names` exited 1, so four.js could not be
       published at all.** Found by dogfooding the publish path rather than the API. Rewriter did
       not match subpath specifiers while the validator flagged them; two renderer error messages
