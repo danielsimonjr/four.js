@@ -7,6 +7,29 @@ interpolation that ties them together. It is the single most load-bearing
 design in the engine: determinism (§33), replay (§34), and physics stability
 (§41) all rest on it.
 
+## Start-up order
+
+Three calls have to happen in one order, and it is not the order the code reads in:
+
+1. `await world.initialize()` — **before the first `addBody`.** A WebAssembly solver
+   decodes its module here (§37), so a world that has not initialized has nothing to
+   register a body with. `addBody` throws rather than guess.
+2. `await app.initialize()`
+3. `app.start()` — before the first `app.step(…)`. §45 rejects a step on an application
+   that was initialized but never started.
+
+The trap is step 1. Everywhere else in four you build a scene and then initialize it, so
+"construct the world, add the bodies, initialize" is the natural guess and it fails:
+
+```text
+FourError: PhysicsWorld has not been initialized; await world.initialize() before
+registering bodies or stepping (§37: a WebAssembly solver loads its module there).
+```
+
+`examples/mechanism` shows the working sequence: both `initialize` calls, and only then
+the function that creates every body and joint.
+
+
 ## The accumulator (§10)
 
 `app.step(elapsedSeconds)` feeds real elapsed time into an accumulator. Each

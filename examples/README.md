@@ -12,6 +12,22 @@ of demos in the list; each such row now carries the marker on its own line. The 
 dated in `docs/AUDIT-120.md` as **S-8**, and `tools/check-docs.mjs` fails if this file or a
 guide points at one of them without the marker.
 
+## Running one
+
+```sh
+bunx vite examples/first-2d-scene     # dev server; open the URL it prints
+bun run example:build                 # production build into examples/first-2d-scene/dist
+```
+
+Every entry below names its own `bun run …:build` script. Those **build** an example —
+they write a `dist/` and open nothing. To *look* at one, use the `bunx vite` form above
+with that example's directory; nested examples take their full path, as in
+`bunx vite examples/flagship/motor-digital-twin`.
+
+A built `dist/` cannot be opened as a `file://` page: Vite emits absolute asset paths,
+so it has to be served (`bunx vite preview examples/<name>`, which is what the browser
+gates in `playwright.config.ts` do).
+
 - [`first-2d-scene/`](first-2d-scene/) — **Implemented.** First 2D scene (§93) grown into
   the interactive demo: shapes, motion, picking, dragging, text, animation
   (`bun run example:build`).
