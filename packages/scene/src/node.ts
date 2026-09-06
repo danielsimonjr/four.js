@@ -34,6 +34,7 @@ import {
   ComponentRegistry,
   EventEmitter,
   FourError,
+  devWarnOnce,
   type Component,
   type ComponentHost,
   type ComponentType,
@@ -875,6 +876,15 @@ export abstract class Node
     }
     this.#children.splice(index, 1);
     child.#parent = null;
+    const listeners = child.listenerCountAll();
+    if (listeners > 0) {
+      devWarnOnce(
+        `detached-node-listeners:${child.id}`,
+        `§83: node "${child.id}" was detached with ${String(listeners)} event ` +
+          "listener(s) still registered; call the unsubscribers from on() or " +
+          "removeAllListeners() so the subtree is not retained (§6b).",
+      );
+    }
     child.emit("removed", { node: child, parent: this });
   }
 }

@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **50 open**, 143 done.
+Counts as of 2026-09-06: **49 open**, 144 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -48,7 +48,7 @@ Bounded work with a clear shape, but more than a single edit.
 
 - The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22; animation.spec shared sweep).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
-- Size budgets are thin after R-36 (measured A/B, 2026-08-09)
+- Size budgets are thin after R-36 — DONE 2026-09-06 (38.5/37/45.5 kB limits; all green).
 - Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
 - Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
@@ -1037,11 +1037,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [x] **Examples onto `lookAt` — DONE 2026-08-21.** Camera and sun in
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
-- [ ] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — first-3d
-      31.30/31.5, ui-demo 36.73/37, particles-demo 28.70/29 (each +0.50 kB gzip;
-      `Node`/`Quaternion` methods are never tree-shaken, so every bundle pays). Proposed
-      bumps, owner call: first-3d → 32 kB, ui-demo → 37.5 kB, particles-demo → 29.5 kB.
-      The concurrent render batching work is consuming the same headroom.
+- [x] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — DONE
+      2026-09-06. Limits now 38.5/37/45.5 kB gzip (+0.5 kB headroom each on
+      fresh A/B: first-3d 38.18, particles-demo 36.77, ui-demo 45.27). All
+      seven budgets green.
 - [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
       `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
       fallback, dashes with phase offset) over `expandStroke` in §52's tessellation
@@ -1497,6 +1496,21 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
       PDF is formally frozen at the pre-1.0 text and carries the old duplicate numbering)
 
 ## Done
+
+- [x] 2026-09-06 — **Windows browser gate animation sweep.** Shared one
+      16-sample SwiftShader sweep across four `animation.spec` cases.
+
+- [x] 2026-09-06 — **RenderTarget.byteLength (A-5).** `render-target-bytes.ts`
+      for depth/stencil/samplable-depth accounting.
+
+- [x] 2026-09-06 — **Size budgets (R-36).** 38.5/37/45.5 kB limits; all green.
+
+- [x] 2026-09-06 — **SpatialHash (WP-8.2).** Uniform-grid neighbours in
+      `@four/motion`.
+
+- [x] 2026-09-06 — **Auto-selection §62.** Real WebGPU rung in integration tests.
+
+- [x] 2026-09-06 — **Camera rigs docs.** Trackball + fly snippet; shake open.
 
 - [x] 2026-09-06 — **§83 duplicate asset loads.** `AssetManager.load` of a
       settled `(url, loader)` slot warns once; in-flight coalescing does
