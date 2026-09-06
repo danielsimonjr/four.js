@@ -79,10 +79,16 @@ const CHROMIUM_BINARIES: readonly (readonly [string, string])[] = [
     "chromium-",
     join("chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"),
   ],
+  ["chromium-", join("chrome-win64", "chrome.exe")],
+  ["chromium-", join("chrome-win", "chrome.exe")],
   ["chromium_headless_shell-", join("chrome-linux", "headless_shell")],
   [
     "chromium_headless_shell-",
     join("chrome-headless-shell-linux64", "chrome-headless-shell"),
+  ],
+  [
+    "chromium_headless_shell-",
+    join("chrome-headless-shell-win64", "chrome-headless-shell.exe"),
   ],
 ];
 
@@ -311,7 +317,10 @@ export default defineConfig({
   forbidOnly: process.env["CI"] !== undefined,
   retries: 0,
   reporter: process.env["CI"] !== undefined ? "list" : "line",
-  timeout: 60_000,
+  // 60 s has no margin on Windows SwiftShader: screenshot-bound specs (notably
+  // `animation.spec.ts` with SAMPLE_COUNT=22) spend ~55.9 s of that budget on
+  // canvas readback. 120 s gives those machines room without hiding a hang.
+  timeout: 120_000,
   use: {
     baseURL: `http://localhost:${String(PORT)}`,
     // Software rasterisation is the point: CI machines have no GPU, and a GPU

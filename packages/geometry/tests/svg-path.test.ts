@@ -45,6 +45,11 @@ import {
   type Point2D,
 } from "../src/index.js";
 
+// Contention under `bun run test --concurrency=4`: this file passes alone and
+// times out at the 5 s default when the Windows runner is busy. Same shape as
+// the coverage flake in `packages/render/tests/shape.test.ts`.
+describe.configure({ timeout: 30_000 });
+
 /** The arc oracle: a point on an arc's ellipse, written here, not imported. */
 function ellipsePoint(arc: PathArcCommand, theta: number): Point2D {
   const localX = arc.radiusX * Math.cos(theta);
