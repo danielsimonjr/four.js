@@ -8,6 +8,16 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — CI after #76
+
+- **`graph:duplicates`.** Allowlist the R-32 wide-layout constants
+  (`PARTICLE_WIDE_INSTANCE_FLOATS`, `PARTICLE_ROTATION_OFFSET`,
+  `PARTICLE_SOFTNESS_OFFSET`) as the same particles↔render duck-typed
+  contract as `PARTICLE_INSTANCE_FLOATS`.
+- **Docs / TypeDoc.** `NodeSpaceSerializerShape.deserialize` takes an
+  optional `node`; PH-11c shape-cast fixtures include `body`; widget
+  accessibility fixture is typed as `WidgetAccessibility`.
+
 ### 2026-09-06 — A-4 FinalizationRegistry leak tracking
 
 - **Tracker in `@four/core`.** `trackDisposable` / `disposeTracked` /

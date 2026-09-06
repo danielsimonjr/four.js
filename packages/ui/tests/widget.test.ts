@@ -27,6 +27,7 @@ import {
   collectPickables,
   focusedWidget,
   isUIWidget,
+  type WidgetAccessibility,
   type WidgetSkin,
   type WidgetStateChangeEvent,
 } from "../src/widget.js";
@@ -198,7 +199,10 @@ describe("UIWidget construction", () => {
   });
 
   it("writes label and role through the existing accessibility record", () => {
-    const accessibility = { description: "does the thing", tabIndex: 1 };
+    const accessibility: WidgetAccessibility = {
+      description: "does the thing",
+      tabIndex: 1,
+    };
     const widget = new TestWidget({
       accessibility,
       label: "Go",
