@@ -8,6 +8,37 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — the README quick-start could not run; found by running it
+
+- **`README.md`'s quick-start snippet threw before drawing anything.** It awaited
+  `app.initialize()` and went straight into a `requestAnimationFrame` loop calling
+  `app.step(...)`, never calling `app.start()`. §45 rejects exactly that:
+
+  ```
+  FourError: Application.step() requires an initialized, started, undisposed
+  application: call `await app.initialize()` then `app.start()` (§45).
+  ```
+
+  Found by extracting the block **verbatim** from `README.md`, serving it with Vite and
+  loading it in Chrome — the canvas stayed blank. Adding `app.start()` was the only
+  change needed: the same page then rendered the circle and orbited it. Control: all ten
+  `examples/*/main.ts` call `start()` exactly once, so the README was the only place in
+  the repository that omitted it — which made the first program a new reader runs the one
+  program here that could not run.
+- **`tools/check-docs.mjs` now gates the lifecycle**, because the fix alone would rot
+  again: a fenced block is prose, and the paragraph under this one called the snippet
+  "illustrative", which is what licensed the omission. The check flags any fenced
+  TypeScript block that drives `new Application(...)`'s own variable with `.step()`
+  without `.start()`. Two details are load-bearing and both came from testing the check
+  against the known-bad input before trusting it:
+  - It matches `\r?\n`, not `\n`. `core.autocrlf` gives this working tree CRLF, and the
+    first version matched **zero** blocks — passing while catching nothing, which is the
+    failure mode the check exists to prevent.
+  - It binds to the application's identifier. A looser version flagged any block with
+    `.initialize()` and `.step()`, hitting four guides that step a *`PhysicsWorld`*
+    (`world.step(1 / 60)`) and rightly never call `app.start()` — four false positives
+    out of five hits.
+
 ### 2026-09-05 — the publish path could not stage a tree; found by dogfooding it
 
 - **`bun tools/apply-publish-names.mjs` exited 1 with 8 problems, so nothing could be published.**

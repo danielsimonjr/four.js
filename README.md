@@ -70,6 +70,7 @@ app.on("update", (time) => {
 });
 
 await app.initialize();
+app.start();
 let last = performance.now();
 requestAnimationFrame(function frame(now) {
   app.step(Math.max(0, now - last) / 1000);

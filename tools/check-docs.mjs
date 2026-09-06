@@ -437,6 +437,53 @@ for (const rel of prosePaths()) {
   }
 }
 
+// A fenced TypeScript block that drives an Application must start it.
+//
+// Found 2026-09-06 by extracting README.md's quick-start block verbatim, serving it
+// and loading it in a browser. It threw before drawing anything:
+//
+//   FourError: Application.step() requires an initialized, started, undisposed
+//   application: call `await app.initialize()` then `app.start()` (§45).
+//
+// The block awaited `initialize()` and went straight into a `requestAnimationFrame`
+// loop calling `step()`. Every one of the ten `examples/*/main.ts` calls `start()`
+// exactly once; only the README omitted it, so the first program a new reader runs
+// was the one program in the repository that could not run. It survived because a
+// fenced block is prose and prose has no type checker -- the paragraph under it
+// called the snippet "illustrative", which is what licensed the rot.
+//
+// Mechanical, per this file's scope discipline: it matches fixed strings and judges
+// no paragraph.
+//
+// Two details are load-bearing, both found by testing the check before trusting it:
+//
+//   - `\r?\n`, not `\n`. `core.autocrlf` gives a Windows working tree CRLF, and a
+//     `\n` anchor matched zero blocks — the guard passed while catching nothing.
+//   - It binds to the application's own identifier. Flagging any block with both
+//     `.initialize()` and `.step()` hit four guides that step a *PhysicsWorld*
+//     (`world.step(1 / 60)`) and rightly never call `app.start()`: four false
+//     positives out of five hits. Only `new Application(...)`'s own variable counts.
+const LIFECYCLE_FENCE = /```(?:ts|typescript)\r?\n([\s\S]*?)```/g;
+const APPLICATION_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Application\(/;
+for (const rel of prosePaths()) {
+  const text = read(rel);
+  if (text === null) continue;
+  for (const match of text.matchAll(LIFECYCLE_FENCE)) {
+    const body = match[1];
+    const bound = APPLICATION_BINDING.exec(body);
+    if (bound === null) continue;
+    const app = bound[1];
+    if (!new RegExp(`\\b${app}\\.step\\(`).test(body)) continue;
+    if (new RegExp(`\\b${app}\\.start\\(`).test(body)) continue;
+    const line = text.slice(0, match.index).split("\n").length;
+    errors.push(
+      `${rel}:${line}: this block drives \`${app}\` with ${app}.step() but never ` +
+        `calls ${app}.start() — §45 rejects exactly that at runtime, so the snippet ` +
+        `cannot run as written. Add ${app}.start() after await ${app}.initialize().`,
+    );
+  }
+}
+
 if (errors.length) {
   console.error(`check-docs: ${errors.length} problem(s)`);
   for (const e of errors) console.error(`  - ${e}`);

@@ -6,6 +6,21 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [x] **The README quick-start could not run — no `app.start()`.** Found by extracting the
+      block verbatim and loading it in a browser; it threw §45's error and drew nothing.
+      Fixed, and gated in `tools/check-docs.mjs` so it cannot silently return. Evidence and
+      the two ways the guard itself was initially wrong are in the CHANGELOG.
+- [ ] **Run the README snippet in the browser gate, not just a text check.** The new
+      check-docs guard catches only the `start()`/`step()` pairing. It would not catch a
+      snippet that fails to compile, imports a name that no longer exists, or renders
+      nothing. The honest gate is a Playwright spec that serves the extracted block, the
+      way `tests/browser/example.spec.ts` serves the examples. Until that exists, the
+      README's TypeScript is verified for one specific defect and nothing else.
+- [ ] **`examples/README.md` never says how to *view* an example.** Every entry gives
+      `bun run <name>:build`, which writes `dist/` and shows nothing. The dev-server
+      command (`bunx vite examples/<name>`) is in the root `README.md` only, which is not
+      where a reader browsing `examples/` is looking.
+
 - [ ] **Dogfooding coverage map (standing assignment) — surfaces DONE, so they are not redone.**
       Verified from a clean consumer against the staged published-name packages, each with a
       control: JS runtime · TypeScript types (strict, `skipLibCheck: false`) · publish/staging
