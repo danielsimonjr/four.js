@@ -148,10 +148,11 @@ if (canvas === null) {
   throw new Error('four.js example: no <canvas id="scene"> in the document.');
 }
 
-const status = document.querySelector<HTMLParagraphElement>("#status");
-if (status === null) {
+const statusOrNull = document.querySelector<HTMLParagraphElement>("#status");
+if (statusOrNull === null) {
   throw new Error('four.js example: no <p id="status"> in the document.');
 }
+const status: HTMLParagraphElement = statusOrNull;
 
 /** Layout size in CSS pixels; the drawing buffer is this times the DPR. */
 const WIDTH = 800;
