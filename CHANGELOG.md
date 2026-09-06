@@ -8,6 +8,39 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
+### 2026-09-06 — a dynamic body with nothing to derive inertia from now says so
+
+- **A dynamic body with no collider and no `inertiaTensor` has zero angular inertia, so the
+  solver never rotates it — and nothing said so.** It translates, it answers joints in
+  translation, and a torque or a motor does nothing. `derivedMass` is simply left
+  `undefined` and the scene steps happily, perfectly still.
+
+  Found by building a two-cylinder engine as a pure linkage, which is a reasonable thing to
+  do when the joints are the only constraints. The crank could not turn, so nothing moved,
+  and **every accuracy invariant scored a perfect 0.0 error** — because there was no motion
+  to be wrong about. `mass` supplies mass, not the inertia tensor.
+
+  `PhysicsWorld` now warns once per body, naming both fixes (attach a `Collider`, or pass
+  `inertiaTensor`).
+
+  **Raised at the first step, not at `addBody`, and the placement is the design.** PH-5
+  supports `addCollider` after registration, so at registration a body that is about to be
+  fine is indistinguishable from one that never will be; a registration-time check would
+  fire on a supported workflow. By the first step the mass properties are the ones the
+  solver is actually going to use. A control test covers exactly that path.
+
+  Unconditional, not `DEV`-gated: `physics` is a simulation package and §33 forbids it from
+  branching on the build flag at all — matching `#warnUnhonouredMaterials` and
+  `#warnSuspiciousNumbers` beside it.
+
+  `force-field.test.ts` now expects **two** warnings for a collider-less dynamic body. That
+  is accurate rather than noisy: §25 cannot accelerate a massless body and §23 will never
+  rotate an inertia-less one — the same mistake, two consequences, and the second is the one
+  that froze a mechanism silently.
+
+  Verified in a browser against the original frozen engine: five warnings, one per dynamic
+  body, where there had been none.
+
 ### 2026-09-06 — re-registering the same solver is a no-op, not a conflict (§37)
 
 - **`SolverRegistry.register` (and so `registerRapierSolver()`) accepted only one call**

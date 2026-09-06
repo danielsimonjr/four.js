@@ -120,7 +120,7 @@ changes in `CHANGELOG.md`.
       remains open: it is an API-surface decision (a new class? a documented recipe?) and
       belongs to the owner.
 
-- [ ] **A dynamic body with no collider cannot rotate, and nothing says so.** Found by the
+- [x] **A dynamic body with no collider cannot rotate, and nothing says so.** Found by the
       two-piston-engine persona dogfood. A flat-twin built from `RigidBody({ type:
       "dynamic", mass: 1 })` with no colliders — reasonable for a pure linkage, where the
       joints are the only constraints — sat frozen at its assembly angle forever. Every
@@ -138,6 +138,15 @@ changes in `CHANGELOG.md`.
       gain them later — a warning at `addBody` would false-positive on a supported
       workflow. Where it should fire (first step? first non-zero motor torque?) is an owner
       call.
+      **DECIDED and DONE 2026-09-06: warn at the FIRST STEP, not at `addBody`.** That
+      placement is what resolves the PH-5 tension I filed this under — `addCollider` after
+      registration is supported, so a registration-time check fires on a working workflow,
+      while by the first step the mass properties are the ones the solver will use. A control
+      test covers the late-collider path explicitly.
+      Unconditional rather than `DEV`-gated, because §33 forbids a simulation package from
+      branching on the build flag; that matches the diagnostics already in `world.ts`.
+      Dogfooded against the original frozen engine in a browser: five warnings, one per
+      dynamic body, where there had been silence.
 - [x] **The `world.initialize()` ordering rule is demonstrated but never stated.** DONE b9ee8aa — stated in docs/guides/fixed-step-simulation.md.
       `addBody` throws unless `world.initialize()` has already run, because that call
       decodes the wasm solver (§37). The error text is excellent and says exactly what to

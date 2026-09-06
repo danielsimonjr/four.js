@@ -772,6 +772,15 @@ export class PhysicsWorld {
    * Registered bodies keyed by node, in **registration order** — `Map`
    * iteration is insertion order, which is the only order §33 permits.
    */
+  /**
+   * Dynamic bodies registered with no collider and no explicit `inertiaTensor`, waiting
+   * for the first step to say whether they still have nothing to derive inertia from.
+   *
+   * Not checked at `addBody`, because PH-5 lets a collider arrive after registration: at
+   * that moment a body that will be fine looks exactly like one that never will be.
+   */
+  readonly #inertialessBodies = new Set<BodyRegistration>();
+
   readonly #bodiesByNode = new Map<Node, BodyRegistration>();
 
   /** Registered bodies keyed by the adapter's monotonic id (§33, event mapping). */
@@ -1206,6 +1215,13 @@ export class PhysicsWorld {
     const solverMass = this.#refreshMassProperties(registration);
     this.#warnUnhonouredMaterials(registration);
     this.#warnSuspiciousNumbers(registration, solverMass);
+    if (
+      body.type === "dynamic" &&
+      colliders.length === 0 &&
+      descriptor.inertiaTensor === undefined
+    ) {
+      this.#inertialessBodies.add(registration);
+    }
     return body;
   }
 
@@ -1997,6 +2013,7 @@ export class PhysicsWorld {
    */
   step(deltaSeconds: number): void {
     this.#requireReady();
+    this.#warnInertialessBodies();
     this.#lastStepDelta = deltaSeconds;
     for (const registration of this.#bodiesByNode.values()) {
       this.#drainSolverWrites(registration);
@@ -2905,6 +2922,49 @@ export class PhysicsWorld {
    * this world has registered, so the pair that trips it need not arrive
    * together.
    */
+/**
+   * Warns for a dynamic body that reaches its first step with nothing to derive an
+   * inertia tensor from (§23, §25).
+   *
+   * `mass` supplies mass, not inertia. With no collider geometry to derive the tensor
+   * from and no explicit `inertiaTensor`, angular inertia is zero and the solver will not
+   * rotate the body — it translates, it responds to joints in translation, and it never
+   * turns. Nothing else says so: `derivedMass` is simply left `undefined`, and a scene of
+   * such bodies steps happily and sits perfectly still.
+   *
+   * Found 2026-09-06 by building a two-cylinder engine as a pure linkage — a reasonable
+   * thing to do when the joints are the only constraints. The crank could not turn, so
+   * nothing in the mechanism moved, and every accuracy check scored a *perfect* zero
+   * error because there was no motion to be wrong about.
+   *
+   * Deferred from `addBody` to here on purpose. PH-5 allows `addCollider` after
+   * registration, so at registration a body that is about to be fine is indistinguishable
+   * from one that never will be; by the first step the mass properties are the ones the
+   * solver is actually going to use. The set is drained whether or not it warns, so this
+   * costs one empty-set check per step thereafter.
+   */
+  #warnInertialessBodies(): void {
+    if (this.#inertialessBodies.size === 0) {
+      return;
+    }
+    for (const registration of this.#inertialessBodies) {
+      if (registration.colliders.length > 0) {
+        continue;
+      }
+      const node = registration.node;
+      const label = node.name === "" ? node.id : `${node.id} ("${node.name}")`;
+      console.warn(
+        `[four] Dynamic body ${label} has no collider and no inertiaTensor, so its ` +
+          "angular inertia is zero and the solver will never rotate it (§23, §25): it " +
+          "translates and answers joints, but a torque or a motor does nothing. `mass` " +
+          "supplies mass, not the inertia tensor. Attach a Collider to derive one from " +
+          "geometry, or pass inertiaTensor to RigidBody if the body is deliberately " +
+          "collider-free.",
+      );
+    }
+    this.#inertialessBodies.clear();
+  }
+
   #warnSuspiciousNumbers(
     registration: BodyRegistration,
     solverMass: number,

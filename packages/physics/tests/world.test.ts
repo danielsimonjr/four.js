@@ -1,11 +1,10 @@
 import { isFourError } from "@four/core";
-import {
+import {Matrix3,
   Quaternion,
   Vector2,
   Vector3,
   constructionCount,
-  resetConstructionCount,
-} from "@four/math";
+  resetConstructionCount} from "@four/math";
 import { PoseBuffer, createSnapshotSystem, Group } from "@four/scene";
 import { SystemRegistry, createTimeState } from "@four/motion";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1663,3 +1662,97 @@ describe("PhysicsWorld accepted-and-ignored tunables (§25, §32, §37)", () => 
     warn.mockRestore();
   });
 });
+
+describe("§23 a dynamic body with no way to derive inertia", () => {
+  /** A dynamic body carrying no collider and no explicit inertia tensor. */
+  function inertialessNode(): Group {
+    const node = new Group();
+    node.transformAuthority = "physics";
+    node.addComponent(new RigidBody({ type: "dynamic", mass: 1 }));
+    return node;
+  }
+
+  it("warns once at the first step, naming what is missing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { world } = await readyWorld();
+      world.addBody(inertialessNode());
+
+      // Nothing at registration: PH-5 allows a collider to arrive later, so the body is
+      // not yet wrong here.
+      expect(warn).not.toHaveBeenCalled();
+
+      world.step(1 / 60);
+      world.step(1 / 60);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const message = warn.mock.calls[0]?.join(" ") ?? "";
+      expect(message).toContain("collider");
+      expect(message).toMatch(/rotate/i);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("says nothing when a collider supplies the inertia", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { world } = await readyWorld();
+      world.addBody(dynamicNode());
+      world.step(1 / 60);
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("says nothing when PH-5 adds the collider after registration", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { world } = await readyWorld();
+      const node = inertialessNode();
+      world.addBody(node);
+
+      // The supported late-collider workflow. This is why the check cannot live in
+      // `addBody`: at that moment this body looks exactly like the broken one above.
+      const late = new Collider({
+        shape: { type: "circle", radius: 0.5 },
+        density: 1,
+      });
+      const child = new Group();
+      child.addComponent(late);
+      node.add(child);
+      world.addCollider(late);
+
+      world.step(1 / 60);
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("says nothing when an explicit inertiaTensor is supplied", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { world } = await readyWorld();
+      const node = new Group();
+      node.transformAuthority = "physics";
+      node.addComponent(
+        new RigidBody({
+          type: "dynamic",
+          mass: 1,
+          inertiaTensor: new Matrix3(),
+        }),
+      );
+      world.addBody(node);
+      world.step(1 / 60);
+
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+

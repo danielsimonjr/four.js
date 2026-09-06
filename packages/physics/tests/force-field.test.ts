@@ -498,8 +498,15 @@ describe("ForceFieldSystem and a body with no mass (§23, §25)", () => {
     world.step(1 / 60);
     expect(solverForce(adapter, 1).y).toBe(0);
     expect(Number.isNaN(solverForce(adapter, 1).y)).toBe(false);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toContain("no mass");
+    // Two warnings, because this body has two distinct problems and a reader needs both:
+    // §25's force field cannot accelerate a massless body, and §23's solver will never
+    // rotate one with no inertia tensor. Same underlying mistake — a dynamic body with no
+    // collider — but different consequences, from different systems, and the second is
+    // the one that silently froze a whole mechanism when it went unreported (2026-09-06).
+    const messages = warn.mock.calls.map((call) => String(call[0]));
+    expect(messages).toHaveLength(2);
+    expect(messages.some((message) => message.includes("no mass"))).toBe(true);
+    expect(messages.some((message) => /never rotate it/.test(message))).toBe(true);
   });
 
   it("still applies force-unit fields to it, which need no mass", async () => {
