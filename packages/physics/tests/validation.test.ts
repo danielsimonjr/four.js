@@ -716,4 +716,34 @@ describe("validatePhysicsWorldOptions (§21, §32, §33, §85)", () => {
       }).message,
     ).toContain("localPlane.normal");
   });
+
+  it("rejects a zero localPlane.xAxis", () => {
+    expect(
+      expectFourError(() => {
+        validatePhysicsWorldOptions({
+          dimension: "3d",
+          localPlane: {
+            origin: new Vector3(),
+            normal: new Vector3(0, 0, 1),
+            xAxis: new Vector3(0, 0, 0),
+          },
+        });
+      }).message,
+    ).toContain("localPlane.xAxis");
+  });
+
+  it("rejects an xAxis parallel to the normal", () => {
+    expect(
+      expectFourError(() => {
+        validatePhysicsWorldOptions({
+          dimension: "3d",
+          localPlane: {
+            origin: new Vector3(),
+            normal: new Vector3(0, 0, 1),
+            xAxis: new Vector3(0, 0, 2),
+          },
+        });
+      }).message,
+    ).toContain("parallel");
+  });
 });

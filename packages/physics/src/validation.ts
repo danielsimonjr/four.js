@@ -701,6 +701,28 @@ export function validatePhysicsWorldOptions(
       if ("z" in plane.xAxis) {
         requireFinite("localPlane.xAxis.z", plane.xAxis.z);
       }
+      const xx = plane.xAxis.x;
+      const xy = plane.xAxis.y;
+      const xz = "z" in plane.xAxis ? plane.xAxis.z : 0;
+      if (xx === 0 && xy === 0 && xz === 0) {
+        fail("localPlane.xAxis must be a non-zero vector (§21, §85).", {
+          field: "localPlane.xAxis",
+          x: xx,
+          y: xy,
+          z: xz,
+        });
+      }
+      // Same parallel test `resolveLocalPlane` uses after Gram-Schmidt:
+      // xAxis × normal == 0 means no in-plane +X.
+      const cx = xy * nz - xz * ny;
+      const cy = xz * nx - xx * nz;
+      const cz = xx * ny - xy * nx;
+      if (cx === 0 && cy === 0 && cz === 0) {
+        fail(
+          "localPlane.xAxis is parallel to normal, so the plane has no in-plane +X (§21, §85).",
+          { field: "localPlane.xAxis", x: xx, y: xy, z: xz },
+        );
+      }
     }
   }
 }
