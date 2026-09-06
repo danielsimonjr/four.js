@@ -59,9 +59,8 @@
  * alpha cycle: if a consistently even number of virtual frames elapses between
  * captures, every sample lands on the same phase and `midStep` is 0 even
  * though §43 is working. After the clock is installed, the test waits for a
- * known number of rAF callbacks (1, 2, 3, … so both phases appear), freezes
- * the injected clock on that frame, and only then screenshots. None of this
- * resolves single-frame judder.
+ * known number of rAF callbacks (1, 2, 3, … so both phases appear) and then
+ * screenshots. None of this resolves single-frame judder.
  *
  * ## Method notes
  *
@@ -84,16 +83,6 @@ declare global {
   interface Window {
     /** rAF callbacks delivered by {@link useVirtualFrameClock}. */
     __fourVirtualFrames?: number;
-    /**
-     * When true, the injected clock holds virtual time so a screenshot observes
-     * the frame that was just drawn rather than a later one.
-     */
-    __fourVirtualClockPaused?: boolean;
-    /**
-     * Frame count at which the injected clock pauses itself, after delivering
-     * that callback. `null` means "run freely".
-     */
-    __fourVirtualFrameTarget?: number | null;
   }
 }
 
@@ -582,23 +571,16 @@ async function useVirtualFrameClock(
   await page.addInitScript((milliseconds: number) => {
     const schedule = globalThis.requestAnimationFrame.bind(globalThis);
     let virtualTime = 0;
-    const clock = globalThis as typeof globalThis & Window;
-    clock.__fourVirtualFrames = 0;
-    clock.__fourVirtualClockPaused = false;
-    clock.__fourVirtualFrameTarget = null;
-    clock.requestAnimationFrame = (callback: FrameRequestCallback) =>
-      schedule(function tick() {
-        if (clock.__fourVirtualClockPaused) {
-          schedule(tick);
-          return;
-        }
+    let frames = 0;
+    Object.defineProperty(globalThis, "__fourVirtualFrames", {
+      get: () => frames,
+      configurable: true,
+    });
+    globalThis.requestAnimationFrame = (callback: FrameRequestCallback) =>
+      schedule(() => {
         virtualTime += milliseconds;
-        clock.__fourVirtualFrames += 1;
+        frames += 1;
         callback(virtualTime);
-        const target = clock.__fourVirtualFrameTarget;
-        if (target !== null && clock.__fourVirtualFrames >= target) {
-          clock.__fourVirtualClockPaused = true;
-        }
       });
   }, frameSeconds * 1000);
 }
@@ -609,22 +591,23 @@ async function virtualFrameCount(page: Page): Promise<number> {
 }
 
 /**
- * Lets the injected clock deliver exactly `count` more rAF callbacks, then
- * holds it there so a screenshot observes that phase.
+ * Waits until the injected clock has delivered a new frame of the requested
+ * parity (odd = alpha 0.5, even = alpha 0.0). The wait is on the rAF counter,
+ * not on wall-clock, so the phase is chosen instead of inherited.
  */
-async function advanceVirtualFrames(page: Page, count: number): Promise<void> {
-  const target = (await virtualFrameCount(page)) + count;
-  await page.evaluate((next: number) => {
-    window.__fourVirtualFrameTarget = next;
-    window.__fourVirtualClockPaused = false;
-  }, target);
+async function waitForVirtualFrameParity(
+  page: Page,
+  parity: 0 | 1,
+): Promise<number> {
+  const start = await virtualFrameCount(page);
   await page.waitForFunction(
-    (next: number) =>
-      (window.__fourVirtualFrames ?? 0) >= next &&
-      window.__fourVirtualClockPaused === true,
-    target,
-    { timeout: 10_000 },
+    ({ since, odd }) => {
+      const n = window.__fourVirtualFrames ?? 0;
+      return n > since && n % 2 === (odd ? 1 : 0);
+    },
+    { since: start, odd: parity === 1 },
   );
+  return virtualFrameCount(page);
 }
 
 /** Screenshots until a drawn frame appears or the budget runs out. */
@@ -802,19 +785,20 @@ test.describe("§106: moving primitives render smoothly under fixed-step simulat
     await expect(canvas).toBeVisible();
     await waitForDrawnFrame(canvas);
 
-    // Freeze the virtual clock so the first advance starts from a known count
-    // rather than from whatever the drawn-frame wait happened to land on.
-    await page.evaluate(() => {
-      window.__fourVirtualClockPaused = true;
-    });
+    expect(
+      await virtualFrameCount(page),
+      "the injected virtual clock never delivered a frame",
+    ).toBeGreaterThan(0);
 
     const fractions: number[] = [];
     const frameNumbers: number[] = [];
     for (let i = 0; i < INTERPOLATION_SAMPLE_COUNT; i++) {
-      // One virtual frame per sample: the injected clock's odd frames are
-      // alpha 0.5 and the even frames are 0.0, so both phases appear.
-      await advanceVirtualFrames(page, 1);
-      frameNumbers.push(await virtualFrameCount(page));
+      // Alternate odd / even virtual frames so both alpha 0.5 and alpha 0.0
+      // appear. Waiting on the rAF counter, not wall-clock, is what breaks
+      // the even-frame alias.
+      frameNumbers.push(
+        await waitForVirtualFrameParity(page, i % 2 === 0 ? 1 : 0),
+      );
       const image = await grab(canvas);
       const fix = locateOrbiter(image);
       expect(
