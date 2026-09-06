@@ -1,3 +1,4 @@
+import { resetDevWarnings } from "@four/core";
 import { Matrix4, Vector3 } from "@four/math";
 import {
   DirectionalLight,
@@ -402,6 +403,7 @@ describe("collectSceneLights — the light set (§68, R-17)", () => {
 
 describe("collectSceneLights — past the bound (§68, §33)", () => {
   afterEach(() => {
+    resetDevWarnings();
     vi.restoreAllMocks();
   });
 

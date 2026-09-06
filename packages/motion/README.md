@@ -6,7 +6,7 @@ Implements §9–§13, §38–§39, and the §111 advanced-motion tier (§99, Pa
 
 ## What's here
 
-- **Time (§9)** — `TimeState` / `createTimeState` / `copyTimeState` distinguishing real, render, simulation, scaled, and unscaled time.
+- **Time (§9)** — `TimeState` / `Clock` (the same type; §9's public name is `Clock`, PH-22l) / `createTimeState` / `copyTimeState` distinguishing real, render, simulation, scaled, and unscaled time.
 - **Scheduler (§10)** — the fixed-delta accumulator (`Scheduler`, `DEFAULT_FIXED_DELTA_TIME`, `DEFAULT_MAXIMUM_SUB_STEPS`, dropped-time surfacing, `interpolationAlpha`).
 - **System registry (§39)** — `SystemRegistry`, `SimulationSystem`, and the `PRIORITY_*` step-order constants; nothing edits the scheduler directly.
 - **Integrators (§38)** — `explicitEuler`, `semiImplicitEuler`, `rk2`, `rk4`, `velocityVerlet` (`INTEGRATORS`).

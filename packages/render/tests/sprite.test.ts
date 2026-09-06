@@ -19,6 +19,7 @@
  *    between a textured quad and the flat-colour pipeline.
  */
 
+import { isFourError } from "@four/core";
 import { planeGeometry } from "@four/geometry";
 import { SpriteMaterial, UnlitMaterial } from "@four/materials";
 import { PoseBuffer, Scene } from "@four/scene";
@@ -30,6 +31,7 @@ import {
   Texture,
   buildInterpolatedRenderList,
   buildRenderList,
+  groupSpritesByTexture,
   isSpriteItem,
   isUnlitItem,
   type RenderItem,
@@ -117,6 +119,29 @@ describe("Texture — construction and validation (§77, §85)", () => {
     const ordinal = (t: Texture): number =>
       Number(t.id.slice("texture-".length));
     expect(ordinal(second)).toBe(ordinal(first) + 1);
+  });
+
+  it("defaults dimension to 2d and accepts an explicit 2d tag", () => {
+    expect(new Texture({ width: 1, height: 1 }).dimension).toBe("2d");
+    expect(
+      new Texture({ width: 1, height: 1, dimension: "2d" }).dimension,
+    ).toBe("2d");
+  });
+
+  it("refuses cube, array, and 3D sources at upload (§77, R-30c)", () => {
+    for (const dimension of ["cube", "array", "3d"] as const) {
+      try {
+        new Texture({ width: 1, height: 1, dimension });
+        expect.unreachable(`expected ${dimension} to be refused`);
+      } catch (error: unknown) {
+        expect(isFourError(error)).toBe(true);
+        if (isFourError(error)) {
+          expect(error.code).toBe("NOT_IMPLEMENTED");
+          expect(error.context).toEqual({ dimension });
+          expect(error.message).toMatch(/uploads 2D textures only/);
+        }
+      }
+    }
   });
 
   it("rejects a non-integer, zero, or negative dimension (§85)", () => {
@@ -1136,5 +1161,43 @@ describe("buildRenderList — sprites (§64, §55)", () => {
     for (let i = 0; i < sprites.length; i += 1) {
       expect(out[i].geometry).toBe(sprites[i].geometry);
     }
+  });
+});
+
+describe("groupSpritesByTexture (§55 atlas grouping)", () => {
+  it("returns consecutive runs and does not reorder", () => {
+    const atlas = { id: "atlas" };
+    const other = { id: "other" };
+    const items = [
+      { texture: atlas },
+      { texture: atlas },
+      { texture: other },
+      { texture: atlas },
+    ];
+
+    expect(groupSpritesByTexture(items)).toEqual([
+      { texture: atlas, start: 0, count: 2 },
+      { texture: other, start: 2, count: 1 },
+      { texture: atlas, start: 3, count: 1 },
+    ]);
+  });
+
+  it("reads Sprite.material.texture and groups a shared atlas", () => {
+    const shared = spriteMaterial();
+    const other = spriteMaterial();
+    const sprites = [
+      new Sprite(shared),
+      new Sprite(shared),
+      new Sprite(other),
+    ];
+
+    expect(groupSpritesByTexture(sprites)).toEqual([
+      { texture: shared.texture, start: 0, count: 2 },
+      { texture: other.texture, start: 2, count: 1 },
+    ]);
+  });
+
+  it("returns an empty list for no items", () => {
+    expect(groupSpritesByTexture([])).toEqual([]);
   });
 });

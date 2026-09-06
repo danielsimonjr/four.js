@@ -28,6 +28,8 @@ export {
   FirstPersonLook,
 } from "./character-controller.js";
 export type {
+  Clock,
+  ReadonlyClock,
   ReadonlyTimeState,
   TimeState,
   TimeStateOptions,

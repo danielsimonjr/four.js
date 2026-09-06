@@ -1425,6 +1425,9 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
     expect(capabilities.shaderPrecision).toBe("highp");
     expect(capabilities.textureFormats).toEqual(["rgba8"]);
     expect(capabilities.compressedTextureFormats).toEqual([]);
+    // maxAnisotropy is a getter: unread, so initialize's transcript is
+    // still one getParameter (MAX_TEXTURE_SIZE). See the dedicated test.
+    expect(Object.hasOwn(capabilities, "maxAnisotropy")).toBe(true);
 
     // §62's "maximum uniforms and bindings" is deliberately **not** reported:
     // two more `getParameter` calls at initialization would move every landed
@@ -1434,6 +1437,25 @@ describe("WebglRenderer — initialization (§61, §62)", () => {
     expect(capabilities.maxUniformBufferBytes).toBeUndefined();
     expect(capabilities.maxBindings).toBeUndefined();
     expect(gl.countOf("getParameter")).toBe(1);
+  });
+
+  it("reports maxAnisotropy from the extension after init, not during it (R-30c)", async () => {
+    const { renderer, gl } = await initialized({ maxAnisotropy: 8 });
+
+    expect(gl.countOf("getExtension")).toBe(0);
+    expect(gl.countOf("getParameter")).toBe(1);
+    expect(renderer.capabilities.maxAnisotropy).toBe(8);
+    expect(gl.callsOf("getExtension").map((call) => call.args[0])).toEqual([
+      "EXT_texture_filter_anisotropic",
+    ]);
+    expect(renderer.capabilities.maxAnisotropy).toBe(8);
+    expect(gl.countOf("getExtension")).toBe(1);
+  });
+
+  it("reports maxAnisotropy 1 when the extension is absent (R-30c)", async () => {
+    const { renderer } = await initialized({ anisotropyExtension: false });
+
+    expect(renderer.capabilities.maxAnisotropy).toBe(1);
   });
 
   it("requests a webgl2 context with depth, no stencil, and the antialias hint", async () => {

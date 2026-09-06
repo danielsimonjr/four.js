@@ -131,7 +131,10 @@
  *   an atlas is a §77 texture-metadata container (a parsed `.json` sidecar,
  *   a packer's output) rather than a scene-graph feature. It belongs with
  *   `@four/assets`, next to the loader that would parse it, and it needs
- *   nothing from this class that is not already public.
+ *   nothing from this class that is not already public. Consecutive sprites
+ *   that already share one texture are grouped by
+ *   {@link groupSpritesByTexture} — that is §65's atlas-*grouping* helper,
+ *   not a packer.
  * - **Sprite animation clips.** §55 lists them, but an *animated* frame is a
  *   track that writes `frame` over time, which is §14's clip model and §17's
  *   track types — a discrete/step-interpolated track over a frame sequence.
@@ -202,6 +205,68 @@ export interface SpriteFrame {
   readonly width: number;
   /** Height in texels; strictly positive. */
   readonly height: number;
+}
+
+/**
+ * One consecutive run of items that share a texture (§55 / §65 atlas
+ * grouping). `start` is an index into the input array; `count` is the
+ * run length. Identity is `===` on the resolved texture.
+ */
+export interface SpriteTextureRun {
+  readonly texture: unknown;
+  readonly start: number;
+  readonly count: number;
+}
+
+/**
+ * An item {@link groupSpritesByTexture} can read a texture off —
+ * either a bare `{ texture }` carrier or a sprite-shaped
+ * `{ material: { texture } }`.
+ */
+export interface SpriteTextureCarrier {
+  readonly texture?: unknown;
+  readonly material?: { readonly texture?: unknown };
+}
+
+/**
+ * Groups consecutive items that share a texture into runs (§55 atlas
+ * grouping; §65's "texture atlas grouping" remainder).
+ *
+ * Does **not** reorder. Two sprites that share a texture but are
+ * separated by a third stay in two runs — merging them would change
+ * draw order. A packer that wants one run per texture sorts first;
+ * this helper only reports the runs the current order already has.
+ *
+ * ```ts
+ * const runs = groupSpritesByTexture(sprites);
+ * // [{ texture: atlas, start: 0, count: 3 }, { texture: other, start: 3, count: 1 }]
+ * ```
+ */
+export function groupSpritesByTexture(
+  items: readonly SpriteTextureCarrier[],
+): SpriteTextureRun[] {
+  const runs: SpriteTextureRun[] = [];
+  let index = 0;
+  while (index < items.length) {
+    const texture = resolveSpriteTexture(items[index]!);
+    let count = 1;
+    while (
+      index + count < items.length &&
+      resolveSpriteTexture(items[index + count]!) === texture
+    ) {
+      count += 1;
+    }
+    runs.push({ texture, start: index, count });
+    index += count;
+  }
+  return runs;
+}
+
+function resolveSpriteTexture(item: SpriteTextureCarrier): unknown {
+  if (item.texture !== undefined) {
+    return item.texture;
+  }
+  return item.material?.texture;
 }
 
 /** {@link SpriteFrame} as the sprite stores it — see {@link Sprite.setFrame}. */

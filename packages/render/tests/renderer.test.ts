@@ -109,6 +109,7 @@ describe("RendererCapabilities (§62)", () => {
       "computeShaders",
       "floatRenderTargets",
       "indirectDraw",
+      "maxAnisotropy",
       "maxBindings",
       "maxTextureSize",
       "maxUniformBufferBytes",
@@ -142,6 +143,8 @@ describe("RendererCapabilities (§62)", () => {
     // headless floor, distinct from the `undefined` a backend that has not
     // been taught to answer reports.
     expect(capabilities.maximumSkinningJoints).toBe(0);
+    // Headless floor: no device, no extension — isotropic filtering only.
+    expect(capabilities.maxAnisotropy).toBe(1);
   });
 
   it("is frozen, and survives disposal", () => {

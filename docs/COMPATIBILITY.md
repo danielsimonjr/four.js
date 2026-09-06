@@ -124,21 +124,22 @@ covers **all eleven** since WP-R1.1 (2026-08-21): `maxTextureSize`,
 `storageBuffers`, `computeShaders`, `indirectDraw`,
 `compressedTextureFormats`, `shaderPrecision`, and — §62's "maximum uniforms
 and bindings", split into the two quantities a caller actually sizes against —
-`maxUniformBufferBytes` and `maxBindings`; plus `backend` and RFC 0003's
-`maximumSkinningJoints`, fourteen members in all. (This paragraph said the
-record carried **two** of the eleven until 2026-08-29 — true when WP-3.4
-wrote it, stale since the WP-R1.1 widening.) Every member the widening added
-is **optional, and absent means "not reported"**: `undefined` is a third
-answer distinct from `false` — "this backend has not been taught to answer",
-not "this backend cannot" — preserving WP-3.4's original rule that a backend
-reports only what it has queried, because "capability negotiation is precisely
-the place where a confident wrong answer costs a crash". Concretely:
-`NullRenderer` answers every member with the floor; `WebgpuRenderer` answers
-from the device's own limits (and omits `maximumSkinningJoints`, matching its
-absent skinning tier); `WebglRenderer` answers everything **except**
-`maxUniformBufferBytes` and `maxBindings`, which it deliberately leaves
-unreported — querying them at initialization would move recorded GL
-transcripts for numbers nothing reads yet (R-30b's lazy-query law,
+`maxUniformBufferBytes` and `maxBindings`; plus `backend`, RFC 0003's
+`maximumSkinningJoints`, and R-30c's `maxAnisotropy`, fifteen members in all.
+(This paragraph said the record carried **two** of the eleven until 2026-08-29
+— true when WP-3.4 wrote it, stale since the WP-R1.1 widening.) Every member
+the widening added is **optional, and absent means "not reported"**:
+`undefined` is a third answer distinct from `false` — "this backend has not
+been taught to answer", not "this backend cannot" — preserving WP-3.4's
+original rule that a backend reports only what it has queried, because
+"capability negotiation is precisely the place where a confident wrong answer
+costs a crash". Concretely: `NullRenderer` answers every member with the
+floor (`maxAnisotropy` is `1`, isotropic); `WebgpuRenderer` answers from the
+device's own limits (and omits `maximumSkinningJoints`, matching its absent
+skinning tier); `WebglRenderer` answers everything **except**
+`maxUniformBufferBytes` and `maxBindings`, and omits `maxAnisotropy` until
+the field is read after `initialize` — querying the anisotropy extension at
+initialization would move recorded GL transcripts (R-30b's lazy-query law,
 `webgl-renderer.ts`).
 
 The table below is the same record, read off constructed instances before
@@ -161,6 +162,7 @@ generator change, not a prose edit.
 | Exported class             | `NullRenderer` | `WebglRenderer`      | `WebgpuRenderer`      |
 | `backend`                  | `null`         | `webgl2`             | `webgpu`              |
 | `maxTextureSize`           | 0              | 0                    | 0                     |
+| `maxAnisotropy`            | 1              | not reported         | not reported          |
 | `textureFormats`           | none           | `rgba8`              | none                  |
 | `multisampling`            | no             | yes                  | no                    |
 | `floatRenderTargets`       | no             | no                   | no                    |

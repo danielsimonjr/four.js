@@ -443,6 +443,15 @@ function readCapabilities(device: GpuDevice): RendererCapabilities {
     shaderPrecision: "highp",
     maxUniformBufferBytes: limit("maxUniformBufferBindingSize"),
     maxBindings: limit("maxBindingsPerBindGroup"),
+    // WebGPU exposes no standard anisotropy limit; 16 is the clamp
+    // `wgpu-texture.ts` already uses when `limits.maxAnisotropy` is absent.
+    // Reading a property of the device's existing `limits` record is not a
+    // device call (R-30b's law is vacuous here).
+    maxAnisotropy:
+      typeof limits?.["maxAnisotropy"] === "number" &&
+      limits["maxAnisotropy"] >= 1
+        ? Math.floor(limits["maxAnisotropy"])
+        : 16,
   } satisfies RendererCapabilities);
 }
 

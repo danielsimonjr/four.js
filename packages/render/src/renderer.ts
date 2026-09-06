@@ -177,6 +177,19 @@ export interface RendererCapabilities {
   readonly maxTextureSize: number;
 
   /**
+   * §62 / §77 anisotropy ceiling: the largest `TextureSource.anisotropy`
+   * this backend will honour, or `1` where anisotropic filtering is absent.
+   *
+   * Optional with the same tri-state as the other WP-R1.1 members —
+   * `undefined` means "not queried yet", which is the construction-time
+   * answer on the GPU backends. Reading the WebGL extension at
+   * `initialize` would move landed GL transcripts (R-30b's lazy-query
+   * law), so {@link @four/render-webgl!WebglRenderer} resolves this on
+   * the first read of the field, after init, not during it.
+   */
+  readonly maxAnisotropy?: number;
+
+  /**
    * §62 "texture formats": the {@link @four/render!RenderTarget | render-target}
    * and texture formats this backend accepts, by their engine-side names.
    *
@@ -879,6 +892,7 @@ export class NullRenderer implements Renderer {
   readonly capabilities: RendererCapabilities = Object.freeze({
     backend: "null",
     maxTextureSize: 0,
+    maxAnisotropy: 1,
     textureFormats: Object.freeze([]),
     multisampling: false,
     floatRenderTargets: false,

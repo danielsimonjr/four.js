@@ -506,6 +506,9 @@ describe("WebgpuRenderer.initialize", () => {
     expect(capabilities.textureFormats).toEqual(["rgba8"]);
     // The backend cannot make one yet, whatever the device could (WP-R1.6).
     expect(capabilities.floatRenderTargets).toBe(false);
+    // WebGPU has no standard anisotropy limit; 16 is the clamp the
+    // texture cache already uses when `limits.maxAnisotropy` is absent.
+    expect(capabilities.maxAnisotropy).toBe(16);
   });
 
   it("reports the floor for a device that will not state its limits", async () => {
@@ -520,6 +523,16 @@ describe("WebgpuRenderer.initialize", () => {
     expect(renderer.capabilities.storageBuffers).toBe(false);
     expect(renderer.capabilities.timestampQueries).toBe(false);
     expect(renderer.capabilities.compressedTextureFormats).toEqual([]);
+    expect(renderer.capabilities.maxAnisotropy).toBe(16);
+  });
+
+  it("reports maxAnisotropy from device.limits when the host names one", async () => {
+    const gpu = createRecordingGpu({ limits: { maxAnisotropy: 4 } });
+    const renderer = new WebgpuRenderer();
+    await withHostGpu(gpu.gpu, async () => {
+      await renderer.initialize({ canvas: gpu.canvas });
+    });
+    expect(renderer.capabilities.maxAnisotropy).toBe(4);
   });
 
   it("reports the compressed formats the device has", async () => {

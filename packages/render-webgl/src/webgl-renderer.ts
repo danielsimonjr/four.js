@@ -1023,6 +1023,13 @@ function asContext(value: unknown): ParticleGlContext | null {
  * — which is the third state the widened record exists to keep available
  * (`renderer.ts`). They join the §62 report the day something needs them, with
  * the query where the need is.
+ *
+ * `maxAnisotropy` follows the same law, with a tighter reading: the
+ * `EXT_texture_filter_anisotropic` query lives on a **getter**, so
+ * `initialize` and any test that never reads the field issue the identical
+ * GL transcript they did before R-30c. `textureFormats` is the short
+ * internal-format list this backend actually uploads (`rgba8`) — a constant,
+ * not a `getParameter`.
  */
 const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   textureFormats: Object.freeze(["rgba8"]),
@@ -1042,13 +1049,32 @@ const WEBGL_STATIC_CAPABILITIES = Object.freeze({
   maximumSkinningJoints: MAX_SKINNING_JOINTS,
 } satisfies Partial<RendererCapabilities>);
 
+/**
+ * Device anisotropy ceiling (§62 / §77). Lazy on purpose: see
+ * {@link readCapabilities}. `1` is the isotropic floor — no extension, or
+ * a driver that will not name a number.
+ */
+function queryMaxAnisotropy(gl: ParticleGlContext): number {
+  const extension = gl.getExtension?.("EXT_texture_filter_anisotropic");
+  if (extension === undefined || extension === null) {
+    return 1;
+  }
+  const limit = gl.getParameter(GL.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+  return typeof limit === "number" && limit >= 1 ? Math.floor(limit) : 1;
+}
+
 /** Reads the §62 limits this tier can honestly report. */
 function readCapabilities(gl: ParticleGlContext): RendererCapabilities {
   const maxTextureSize = gl.getParameter(GL.MAX_TEXTURE_SIZE);
+  let maxAnisotropy: number | undefined;
   return Object.freeze({
     backend: "webgl2",
     maxTextureSize: typeof maxTextureSize === "number" ? maxTextureSize : 0,
     ...WEBGL_STATIC_CAPABILITIES,
+    get maxAnisotropy(): number {
+      maxAnisotropy ??= queryMaxAnisotropy(gl);
+      return maxAnisotropy;
+    },
   } satisfies RendererCapabilities);
 }
 
@@ -1614,7 +1640,9 @@ export class WebglRenderer implements Renderer, ScreenEffectRenderer {
   /**
    * §62 capability report. `maxTextureSize` is `0` until
    * {@link WebglRenderer.initialize} has queried the context, and is re-read on
-   * context restore.
+   * context restore. `maxAnisotropy` is omitted until that same moment, then
+   * resolved on first read (not during `initialize`) so landed GL transcripts
+   * stay byte-identical.
    */
   get capabilities(): RendererCapabilities {
     return this.#capabilities;

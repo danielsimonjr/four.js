@@ -251,6 +251,7 @@ export type {
   ArcOptions,
   CircleOptions,
   EllipseOptions,
+  ConicGradientPaint,
   GradientStop,
   LinearGradientPaint,
   LineOptions,
@@ -265,6 +266,7 @@ export type {
   RegularPolygonOptions,
   RingOptions,
   SectorOptions,
+  ResolvedConicGradientPaint,
   ResolvedGradientStop,
   ResolvedLinearGradientPaint,
   ResolvedObjectPaint,
@@ -301,9 +303,15 @@ export {
   Star,
 } from "./shape.js";
 export { registerShapePaints } from "./shape-paint.js";
-export type { SpriteFrame, SpriteOptions } from "./sprite.js";
-export { Sprite } from "./sprite.js";
 export type {
+  SpriteFrame,
+  SpriteOptions,
+  SpriteTextureCarrier,
+  SpriteTextureRun,
+} from "./sprite.js";
+export { Sprite, groupSpritesByTexture } from "./sprite.js";
+export type {
+  TextureDimension,
   TextureFilter,
   TextureMinFilter,
   TextureSource,
