@@ -23,12 +23,18 @@ export {
 } from "./gl-effect.js";
 export type { CacheableGeometry, GeometryRecord } from "./gl-geometry.js";
 export { GeometryCache } from "./gl-geometry.js";
-export type { ParticleBatchRecord, ParticleGlContext } from "./gl-particles.js";
+export type {
+  ParticleBatchRecord,
+  ParticleGlContext,
+  ParticleTrailBatchRecord,
+} from "./gl-particles.js";
 export {
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
   ParticleBatchCache,
   ParticleProgram,
+  ParticleTrailBatchCache,
+  ParticleTrailProgram,
 } from "./gl-particles.js";
 export type {
   GlBuffer,

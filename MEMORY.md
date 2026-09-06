@@ -30,19 +30,29 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
-- **2026-09-06 — TODO sprint: actionable items closed; ~45 remain blocked.**
-  Subagent sprint on `cursor/todo-completion-bfc5` (PR #73) landed A-5 §83 dev
-  warnings (`warnDisposedInUse`, `rejectStalePhysicsHandle`, `auditFrameAllocations`,
-  detached-node listener warn), `SpatialHash` (WP-8.2), shared `animation.spec`
-  sweep, size-budget bumps, auto-selection WebGPU integration test, and camera-rigs
-  docs. Remaining open items need owner/RFC/adapter events (rapier 0.20, first
-  publish, PH-11c, lighting follow-ups, RFC residues).
+## Decisions
+
+- **2026-09-06 — open-TODO subagent pass (third landing).** Six parallel
+  agents landed: Windows animation gate (simulation-bound `#status` sampling,
+  not screenshot throughput); `buildRenderList` sort skip + sprite fast path;
+  size budgets with measured A/B in `tools/size-budgets.mjs`; Rapier upstream
+  types via `moduleResolution: bundler`; partial A-4/A-5 (validation catalogue,
+  format-aware render-target bytes); CPU particle trails. Still owner-gated or
+  deferred: rapier 0.20, typedoc/TS 7, first publish, RFC residues, PH-11c,
+  batching follow-ups, GPU particle items.
+
+- **2026-09-06 — TODO sprint: actionable items closed; ~45 remain blocked
+  (#73).** Subagent sprint landed A-5 §83 dev warnings (`warnDisposedInUse`,
+  `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener
+  warn), `SpatialHash` (WP-8.2), size-budget bumps, auto-selection WebGPU
+  integration test, and camera-rigs docs.
 
 - **2026-09-06 — SpatialHash lives in `@four/motion` (WP-8.2).**
   Explicit rebuild (`clear` + `insert` / `update`); query returns insertion order
   for §33 determinism; cell size is caller-chosen (no default). Steering flocking
   behaviours stay agnostic — they accept `Iterable<SteeringNeighbor>` from brute
   force or this index.
+
 
 - **2026-09-06 — §42 warn stays off the DEV flag.** A-4 step 4
   routed `warnAuthorityConflict` through `devWarnOnce`, which

@@ -2180,6 +2180,27 @@ export class Rapier3dAdapter
     }
   }
 
+  /** @inheritDoc DebugBodyAccess.countContacts */
+  countContacts(): number {
+    const world = this.#requireWorld();
+    const narrowPhase = world.narrowPhase;
+    let total = 0;
+    for (const record of this.#colliders.values()) {
+      if (!record.alive) {
+        continue;
+      }
+      const handle = record.rapierHandle;
+      narrowPhase.contactPairsWith(handle, (otherHandle) => {
+        if (handle < otherHandle) {
+          narrowPhase.contactPair(handle, otherHandle, (manifold) => {
+            total += manifold.numContacts();
+          });
+        }
+      });
+    }
+    return total;
+  }
+
   // --------------------------------------------- §37 property changes (PH-1)
 
   /**
@@ -2523,12 +2544,12 @@ export class Rapier3dAdapter
    * and where it should end up.
    */
   #requireJointWorld(): RapierJointWorld3d {
-    return this.#requireWorld() as unknown as RapierJointWorld3d;
+    return this.#requireWorld();
   }
 
   /** The Rapier module under the module-private joint view. See above. */
   #requireJointModule(): RapierJointModule3d {
-    return this.#requireRapier() as unknown as RapierJointModule3d;
+    return this.#requireRapier();
   }
 
   /** Joint counterpart of {@link Rapier3dAdapter.#requireBody} (§28, §37). */

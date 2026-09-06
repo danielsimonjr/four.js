@@ -68,10 +68,14 @@
  * against the pool's own accessors rather than against a re-derivation.
  */
 
-import type { Vector3 } from "@four/math";
+import { Vector3, Vector4 } from "@four/math";
 import { Node } from "@four/scene";
 
 import type { ParticleEmitter } from "./emitter.js";
+import {
+  TRAIL_VERTEX_FLOATS,
+  buildTrailRibbonMesh,
+} from "./trail.js";
 
 /**
  * Floats per particle in {@link ParticleRenderable.particleInstances}: centre
@@ -85,14 +89,14 @@ import type { ParticleEmitter } from "./emitter.js";
  */
 export const PARTICLE_INSTANCE_FLOATS = 8;
 
+/** Floats per trail ribbon vertex — duplicate of `@four/render`'s `TRAIL_VERTEX_FLOATS`. */
+export const PARTICLE_TRAIL_VERTEX_FLOATS = TRAIL_VERTEX_FLOATS;
+
 /** Components per particle in `ParticlePool.positions` / `velocities`. */
 const VECTOR_STRIDE = 3;
 
 /** Components per particle in `ParticlePool.sizes` (start, end). */
 const SIZE_STRIDE = 2;
-
-/** Components per particle in `ParticlePool.colors` (RGBA start, RGBA end). */
-const COLOR_STRIDE = 8;
 
 /**
  * `age / lifetime` clamped to `[0, 1]`, matching `ParticlePool.getNormalizedAge`
@@ -166,8 +170,16 @@ export class ParticleRenderable extends Node {
   /** The owned upload array; see the module header. Never reallocated. */
   readonly #instances: Float32Array;
 
+  /** Trail ribbon vertices, allocated when the emitter has trails enabled. */
+  readonly #trailVertices: Float32Array | undefined;
+
   /** Particles written by the last {@link ParticleRenderable.updateParticleInstances}. */
   #count = 0;
+
+  /** Trail vertices written by the last repack. */
+  #trailVertexCount = 0;
+
+  readonly #colorScratch = new Vector4();
 
   /**
    * Builds a renderable for `emitter`. The emitter is required and is not
@@ -190,6 +202,16 @@ export class ParticleRenderable extends Node {
     this.#instances = new Float32Array(
       emitter.pool.capacity * PARTICLE_INSTANCE_FLOATS,
     );
+    if (emitter.hasTrail && emitter.trailStore !== undefined) {
+      const trailLength = emitter.trailStore.length;
+      const maxTrailVertices =
+        emitter.pool.capacity * Math.max(trailLength - 1, 0) * 6;
+      this.#trailVertices = new Float32Array(
+        maxTrailVertices * TRAIL_VERTEX_FLOATS,
+      );
+    } else {
+      this.#trailVertices = undefined;
+    }
   }
 
   /**
@@ -212,6 +234,27 @@ export class ParticleRenderable extends Node {
    */
   get particleInstances(): Float32Array {
     return this.#instances;
+  }
+
+  /** Whether this node produces a trail ribbon mesh. */
+  get hasTrail(): boolean {
+    return this.#trailVertices !== undefined;
+  }
+
+  /**
+   * Trail ribbon vertex count — valid only after
+   * {@link ParticleRenderable.updateParticleInstances}.
+   */
+  get trailVertexCount(): number {
+    return this.#trailVertexCount;
+  }
+
+  /**
+   * Interleaved trail vertices (`xyz` + straight-alpha `rgba`), valid for
+   * `trailVertexCount × PARTICLE_TRAIL_VERTEX_FLOATS` floats.
+   */
+  get trailVertices(): Float32Array | undefined {
+    return this.#trailVertices;
   }
 
   /**
@@ -247,30 +290,40 @@ export class ParticleRenderable extends Node {
     const out = this.#instances;
 
     for (let i = 0; i < count; i += 1) {
-      const t = normalizedAge(ages[i], lifetimes[i]);
       const source = i * VECTOR_STRIDE;
-      const sizeBase = i * SIZE_STRIDE;
-      const colorBase = i * COLOR_STRIDE;
       const target = i * PARTICLE_INSTANCE_FLOATS;
 
       out[target] = positions[source];
       out[target + 1] = positions[source + 1];
       out[target + 2] = positions[source + 2];
+      out[target + 3] = this.emitter.evaluateSize(i);
 
-      const startSize = sizes[sizeBase];
-      out[target + 3] = startSize + (sizes[sizeBase + 1] - startSize) * t;
-
-      const r = colors[colorBase];
-      const g = colors[colorBase + 1];
-      const b = colors[colorBase + 2];
-      const a = colors[colorBase + 3];
-      out[target + 4] = r + (colors[colorBase + 4] - r) * t;
-      out[target + 5] = g + (colors[colorBase + 5] - g) * t;
-      out[target + 6] = b + (colors[colorBase + 6] - b) * t;
-      out[target + 7] = a + (colors[colorBase + 7] - a) * t;
+      this.emitter.evaluateColor(i, this.#colorScratch);
+      out[target + 4] = this.#colorScratch.x;
+      out[target + 5] = this.#colorScratch.y;
+      out[target + 6] = this.#colorScratch.z;
+      out[target + 7] = this.#colorScratch.w;
     }
 
     this.#count = count;
+
+    const trailStore = this.emitter.trailStore;
+    const trailOut = this.#trailVertices;
+    if (trailStore !== undefined && trailOut !== undefined) {
+      this.#trailVertexCount = buildTrailRibbonMesh(
+        trailStore,
+        count,
+        ages,
+        lifetimes,
+        sizes,
+        colors,
+        trailOut,
+        this.emitter.trailHeadWidth,
+        this.emitter.trailTailWidthFactor,
+      );
+    } else {
+      this.#trailVertexCount = 0;
+    }
   }
 
   /**

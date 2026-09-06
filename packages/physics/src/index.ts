@@ -338,3 +338,4 @@ export {
   PhysicsWorld,
   createPoseTargetCaptureSystem,
 } from "./world.js";
+export { liveSolverBodyCount } from "./resource-memory.js";

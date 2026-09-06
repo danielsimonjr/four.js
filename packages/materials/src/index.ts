@@ -57,3 +57,4 @@ export type {
 } from "./texture.js";
 export type { ColorRGBA, UnlitMaterialOptions } from "./unlit-material.js";
 export { UnlitMaterial } from "./unlit-material.js";
+export { liveMaterialCount } from "./resource-memory.js";

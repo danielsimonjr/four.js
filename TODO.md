@@ -13,7 +13,7 @@ entry keeps its body where it already lives, so the thematic grouping and the
 Ordered by complexity rather than importance on purpose: the cheap end clears fastest,
 and tier 4 surfaces the decisions that block otherwise-small work.
 
-Counts as of 2026-09-06: **45 open**, 148 done.
+Counts as of 2026-09-06: **48 open**, 148 done.
 
 ### 0 · Blocked on an event, not on effort
 
@@ -46,10 +46,10 @@ Each has its cause written down. The thinking is done; what remains is the chang
 
 Bounded work with a clear shape, but more than a single edit.
 
-- The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22; animation.spec shared sweep).
+- The browser gate on Windows — DONE 2026-09-06 (WebGPU 22/22 via platform argv; `animation.spec` simulation-bound `#status` sampling; Windows timeout 180 s; `smoothness.spec` uses `page.evaluate` parity wait per #72).
 - Unlit materials render with GL_BLEND off — DONE 2026-09-06 (alpha / `transparent` enables SRC_ALPHA blend).
-- Size budgets are thin after R-36 — DONE 2026-09-06 (38.5/37/45.5 kB limits; all green).
-- Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
+- Size budgets are thin after R-36 — DONE 2026-09-06 (`.size-limit.json` bumped; `tools/size-budgets.mjs` records A/B; branch limits 39/37.5/46 kB after trails).
+- Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` — DONE 2026-09-06 (package `moduleResolution: bundler`; upstream type aliases).
 - Extend `tools/check-docs.mjs` — DONE 2026-09-06 (24 packages, suite counts, AUDIT-120 census).
 
 ### 4 · Blocked on a decision, then small
@@ -87,7 +87,7 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - §21 `"local-plane"` simulation frame (PH-12 remainder).
 - §27 field torque and field-driven waking — DONE 2026-09-06 (`sampleTorque` + per-entry `wakesSleepingBodies`).
 - Batching follow-ups (§65, after R-9's consecutive-run tier, 2026-08-09): instanced meshes for the shaded pipelines (`R-22` — a baked batch has no normals); glyph batching once `R-30` → `R-28` land a `Text` node (its sprites over one atlas material batch as they are); texture-atlas _grouping_ of distinct textures (needs a packer); a change-detecting batch cache so a still scene re-uploads nothing (§86's idle-scene row — today a batched run re-uploads every frame); making batching the default, which needs A-4's build-time pipeline-selection seam (the opt-in seam already costs every bundle +0.17 kB).
-- `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win is in list construction, not in batching. Worth a look together with `R-8`'s per-view restructure.
+- `buildRenderList` optimization — DONE 2026-09-06 (homogeneous sort skip + sprite fast path; benchmark re-recorded).
 - R-30c — the rest of §77, scoped by why each is not ordinary work:
 - §12 character controllers + first-person look — DONE (PH-11/PH-11b 2026-08-21; `examples/character-controller` browser gate 2026-08-29).
 - Staged rigs (R-36/R-37 residue, 2026-08-09):
@@ -100,10 +100,10 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-6 follow-ups (§70 tier 2):
 - §40 follow-ups:
 - PH-1 follow-ups:
-- A-4 remainder:
-- A-5 remainder (dev-warning tier, folded into A-4):
-- A-5 follow-ups:
-- A-1 follow-ups:
+- A-4 remainder — PARTIAL 2026-09-06: §85 validation catalogue + §83 dev warnings (disposed-in-use, detached listeners, per-frame allocations); systematic `devAssert` migration still open.
+- A-5 remainder — PARTIAL 2026-09-06: duplicate-load DONE; `RenderTarget.byteLength` format-aware; materials/solver live counts; leak audit extended.
+- A-5 follow-ups: materials + solver handles accounted at count tier; `RenderTarget.byteLength` moved with §67 formats.
+- A-1 follow-ups: contacts wired via `SolverStatistics.contactCount` → `app.stats.contacts` (2026-09-06); `physicsStepTime`/`gpuFrameTime` still wait on their packets.
 - A-18 remainder:
 - A-16 remainder (manifest half): DONE 2026-09-06 (`preloadManifestIntoCatalog`).
 - A-19 remainder:
@@ -111,8 +111,8 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - R-19/R-20 follow-ups:
 - Flaky gate — DONE 2026-09-06 (smoothness parity + blending page watches).
 - A-13 PARTIAL
-- Particle trails (position-history ring buffer + ribbon path), multi-stop ramps, GPU compute (WebGPU tier), depth-buffer collision
-- §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/ heightfield/compound) — staged out by P5-6, widen in a later packet
+- Particle trails — PARTIAL 2026-09-06: CPU ring buffer + ribbon path + multi-stop ramps; GPU compute, depth-buffer collision, spatial-hash neighbors still open.
+- §24 remaining shapes — DONE (PH-22a, 2026-08-02); compound = multiple colliders by design.
 
 ## Now
 
@@ -329,17 +329,20 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       full suite stays green at 476/476, and the flight-sim page now survives frame 1
       with the workaround removed.
 
-- [x] **The browser gate on Windows — WebGPU fixed; chromium/visual timeout risk
-      closed.** DONE 2026-09-06.
-      - **WebGPU (on `main`).** Platform-conditional
-        `--use-webgpu-adapter=swiftshader`; **22 passed, 0 skipped**.
-      - **Chromium/visual.** Four `animation.spec` cases each ran an independent
-        22-screenshot SwiftShader sweep (~56 s of a 60 s budget on Windows).
-        They now share one 16-sample `beforeAll` sweep (serial describe), skip
-        the trailing wait, and space samples at 0.4 s — same 6 s minimum span,
-        ~4× less readback work per file. Measured Linux/SwiftShader: animation
-        **4/4 in 16.2 s** (was 43.3 s); visual **3/3 in 21 s**. Global
-        Playwright timeout **120 s** for any remaining screenshot-bound spec.
+- [x] **The browser gate on Windows — WebGPU fixed; chromium/visual timeouts
+      closed.** DONE 2026-09-06. Two causes were filed; both closed:
+      - **WebGPU (2026-09-06).** All 22 specs had skipped when
+        `requestAdapter()` was `null`. **`--use-angle=swiftshader` was the cause**
+        — it is right for the `chromium` and `visual` projects on Linux but on
+        Windows it also denied Dawn an adapter. Platform-conditional argv:
+        `--use-webgpu-adapter=swiftshader` on Windows only. Result: **22 passed,
+        0 skipped**.
+      - **Chromium/visual (2026-09-06).** Screenshot-bound `animation.spec`
+        sampling replaced with simulation-progress watches on `#status`
+        (`data-beacon-y`, `data-vane-*`, `data-sim`). Windows Playwright
+        timeout 180 s (Linux/CI 120 s). Complements #72's
+        `smoothness.spec` `page.evaluate` parity wait. (#73's shared
+        16-screenshot sweep superseded on this branch.)
 - [x] **`playwright.config.ts`'s `CHROMIUM_BINARIES` has no Windows entry.** DONE
       2026-09-06 — `chrome-win64/chrome.exe`, `chrome-win/chrome.exe`, and the
       headless-shell-win64 layout are in the candidate list. Only matters when
@@ -975,10 +978,11 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       idle-scene row — today a batched run re-uploads every frame); making batching the
       default, which needs A-4's build-time pipeline-selection seam (the opt-in seam
       already costs every bundle +0.17 kB).
-- [ ] `buildRenderList` is now ~40% of a 100 000-sprite frame's preparation
-      (`benchmarks/results/render-batching.json`, 2026-08-09) — the next §86 batching win
-      is in list construction, not in batching. Worth a look together with `R-8`'s
-      per-view restructure.
+- [x] **`buildRenderList` is now ~40% of a 100 000-sprite frame's preparation**
+      DONE 2026-09-06 — homogeneous sort skip, sprite fast path, and
+      `ALL_LAYERS` layer test. `benchmarks/results/render-batching.json`
+      re-recorded (~10 ms list median at 100k sprites on this host vs ~34 ms
+      prior baseline).
 - [x] **R-36 DONE 2026-08-09 (helper tier)** — `Node.lookAt(target, up?)` +
       `Node.getWorldDirection(out)` over `Quaternion.setFromLookDirection`; −Z confirmed
       as every node's forward, world-space target with the parent rotation divided out,
@@ -1059,9 +1063,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
       `first-3d-scene`; the aim moved 2×10⁻⁴ rad, no golden at risk, thresholds
       held. Rigs declined on merit (nothing moves).
 - [x] **Size budgets are thin after R-36 (measured A/B, 2026-08-09)** — DONE
-      2026-09-06. Limits now 38.5/37/45.5 kB gzip (+0.5 kB headroom each on
-      fresh A/B: first-3d 38.18, particles-demo 36.77, ui-demo 45.27). All
-      seven budgets green.
+      2026-09-06. #70 landed 38.5 / 37 / 45.5 kB on main; this branch re-measured
+      after trails + contacts: first-3d 38.51 → **39 kB**, particles 37.11 →
+      **37.5 kB**, ui-demo 45.55 → **46 kB**. Rationale in `tools/size-budgets.mjs`.
 - [x] **R-16 DONE 2026-08-09 (solid-paint + full-stroke tier)** — `Paint`/`SolidPaint`,
       `ShapeFill`, `StrokeStyle` whole (alignment, caps, joins with miter-limit
       fallback, dashes with phase offset) over `expandStroke` in §52's tessellation
@@ -1185,8 +1189,9 @@ The RFC residues and the R-/PH-/A- series. Several are parked by their own RFC's
 - [ ] **A-4 remainder:** the `@four/diagnostics` §85 validation catalogue (closure
       step 2); converting scattered scene/physics checks to `devAssert` (step 3);
       ~~routing §42's authority-conflict warn through `devWarnOnce` (step 4 — scene
-      package)~~ **DONE 2026-09-06** (`warnAuthorityConflict` → `devWarnOnce`;
-      production prints nothing); R-6's effect pipeline needs an opt-in registry split, not the dev
+      package)~~ **REVERTED on `main` 2026-09-06** — `@four/scene` cannot import
+      `DEV` (§33 simulation envelope); `warnAuthorityConflict` stays
+      `console.warn` + WeakMap once-per-pair suppress;
       define (0.75 kB); remaining §83 warnings: ~~disposed-in-use~~ **DONE 2026-09-06**
       (`warnDisposedInUse` in render backends); duplicate asset loads **DONE**;
       ~~detached-node listeners~~ **DONE 2026-09-06** (`Node.#detach` →
@@ -1480,8 +1485,10 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ### Backlog additions (Phase 5, 2026-08-01)
 
-- [ ] Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts` once a
-      toolchain answer exists for rapier-compat's NodeNext-unresolvable .d.ts
+- [x] **Replace the transcribed Rapier type subset in `physics-rapier/src/init.ts`**
+      DONE 2026-09-06 — package tsconfig uses `moduleResolution: bundler`;
+      init re-exports upstream `@dimforge/rapier*` types instead of the
+      ~1200-line transcription.
 - [ ] §24 remaining shapes (polyline/chain/cylinder/cone/convex hull/trimesh/
       heightfield/compound) — staged out by P5-6, widen in a later packet
 - [ ] Document SolverBodyAccess in the §90/§102 compatibility material when adapters
@@ -1525,24 +1532,26 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 
 ## Done
 
-- [x] 2026-09-06 — **§83 dev warnings (A-5 remainder).** `warnDisposedInUse`,
+- [x] 2026-09-06 — **Open-TODO subagent pass (third landing).** Windows browser
+      gate (`animation.spec` simulation-bound sampling; 180 s Windows timeout);
+      `buildRenderList` optimization; size budgets bumped; Rapier upstream
+      types; `app.stats.contacts`; A-4/A-5 partial (validation catalogue,
+      format-aware `RenderTarget.byteLength`); CPU particle trails +
+      multi-stop ramps; stale §24/§12 entries retired.
+
+- [x] 2026-09-06 — **§83 dev warnings (A-5 remainder, #73).** `warnDisposedInUse`,
       `rejectStalePhysicsHandle`, `auditFrameAllocations`, detached-node listener
       warn on `Node.#detach`. Leaked-resource / FinalizationRegistry tier still open.
 
-- [x] 2026-09-06 — **Windows browser gate animation sweep.** Shared one
-      16-sample SwiftShader sweep across four `animation.spec` cases.
-
-- [x] 2026-09-06 — **RenderTarget.byteLength (A-5).** `render-target-bytes.ts`
+- [x] 2026-09-06 — **RenderTarget.byteLength (A-5, #73).** `render-target-bytes.ts`
       for depth/stencil/samplable-depth accounting.
 
-- [x] 2026-09-06 — **Size budgets (R-36).** 38.5/37/45.5 kB limits; all green.
-
-- [x] 2026-09-06 — **SpatialHash (WP-8.2).** Uniform-grid neighbours in
+- [x] 2026-09-06 — **SpatialHash (WP-8.2, #73).** Uniform-grid neighbours in
       `@four/motion`.
 
-- [x] 2026-09-06 — **Auto-selection §62.** Real WebGPU rung in integration tests.
+- [x] 2026-09-06 — **Auto-selection §62 (#73).** Real WebGPU rung in integration tests.
 
-- [x] 2026-09-06 — **Camera rigs docs.** Trackball + fly snippet; shake open.
+- [x] 2026-09-06 — **Camera rigs docs (#73).** Trackball + fly snippet; shake open.
 
 - [x] 2026-09-06 — **Platform and repository hygiene.** `js-yaml >=5` ignored
       (#68 — vendored graph tool needs default export). ESLint ignores
@@ -1563,7 +1572,8 @@ leak + `pointercancel`), `A-15` (unregistered components no longer dropped on sa
 - [x] 2026-09-06 — **§27 field torque + field-driven waking.** Optional
       `ForceField.sampleTorque` (N·m). Per-entry `wakesSleepingBodies`
       visits sleepers without letting a sibling gravity field defeat §32.
-      A-4 step 4: `warnAuthorityConflict` emits through `devWarnOnce`.
+      A-4 step 4: `warnAuthorityConflict` stays `console.warn` (§33 bars
+      `devWarnOnce` in `@four/scene`; reverted on `main` 2026-09-06).
 
 - [x] 2026-09-06 — **PoseTarget scale channel.** Physical side of the §19
       blend is identity `(1, 1, 1)` — the only scale a rigid body has.

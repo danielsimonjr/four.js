@@ -1112,4 +1112,29 @@ describe("buildRenderList — sprites (§64, §55)", () => {
     expect(list[0]).toBe(pooled);
     expect(list[0].kind).toBe("unlit");
   });
+
+  it("keeps insertion order for a homogeneous atlas (sort skip, §86)", () => {
+    const scene = new Scene();
+    const material = new SpriteMaterial({
+      texture: new Texture({ width: 8, height: 8 }),
+    });
+    const sprites: Sprite[] = [];
+    for (let i = 0; i < 256; i += 1) {
+      const sprite = new Sprite(material, { width: 0.5, height: 0.5 });
+      sprites.push(sprite);
+      scene.add(sprite);
+    }
+
+    const out: RenderItem[] = [];
+    const list = buildRenderList(scene, out);
+    expect(list).toHaveLength(256);
+    for (let i = 0; i < sprites.length; i += 1) {
+      expect(list[i].geometry).toBe(sprites[i].geometry);
+    }
+
+    buildRenderList(scene, out);
+    for (let i = 0; i < sprites.length; i += 1) {
+      expect(out[i].geometry).toBe(sprites[i].geometry);
+    }
+  });
 });

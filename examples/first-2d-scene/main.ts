@@ -148,6 +148,12 @@ if (canvas === null) {
   throw new Error('four.js example: no <canvas id="scene"> in the document.');
 }
 
+const statusOrNull = document.querySelector<HTMLParagraphElement>("#status");
+if (statusOrNull === null) {
+  throw new Error('four.js example: no <p id="status"> in the document.');
+}
+const status: HTMLParagraphElement = statusOrNull;
+
 /** Layout size in CSS pixels; the drawing buffer is this times the DPR. */
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -664,6 +670,65 @@ label.name = "label";
 label.transform.position.set(0 - label.layout.width / 2, LABEL_BASELINE_Y, 0);
 app.scene.add(label);
 
+// --- status for browser gates (§107) ----------------------------------------
+
+/** Local scratch for {@link vaneBoundingAspect}. */
+const aspectScratch = new Vector3();
+
+/**
+ * Axis-aligned bounding-box aspect of the vane's three rim vertices in world
+ * space — the same quantity `tests/browser/animation.spec.ts` recovers from
+ * pixels when it needs a framebuffer proof, published here so the gate can
+ * watch §17 quaternion motion without screenshotting every sample.
+ */
+function vaneBoundingAspect(): number {
+  const scale = vane.transform.scale.x;
+  const radius = 0.26 * scale;
+  const rotation = vane.transform.rotation;
+  const origin = vane.transform.position;
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let segment = 0; segment < 3; segment += 1) {
+    const angle = (2 * Math.PI * segment) / 3;
+    aspectScratch.set(radius * Math.cos(angle), radius * Math.sin(angle), 0);
+    rotation.rotateVector3(aspectScratch, aspectScratch);
+    const worldX = origin.x + aspectScratch.x;
+    const worldY = origin.y + aspectScratch.y;
+    if (worldX < minX) minX = worldX;
+    if (worldX > maxX) maxX = worldX;
+    if (worldY < minY) minY = worldY;
+    if (worldY > maxY) maxY = worldY;
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  return width / height;
+}
+
+/**
+ * Mirrors the animated cluster onto `#status` as data attributes.
+ *
+ * Everything a browser gate would otherwise infer from a long framebuffer sweep
+ * is here: the diamond's authored position and green channel, the vane's scale,
+ * bounding-box aspect and red channel, and §9's simulation clock. The gate reads
+ * these on rAF and reserves screenshots for the cases that truly need pixels.
+ */
+function syncStatus(): void {
+  const beaconMaterial = beacon.material;
+  const vaneMaterial = vane.material;
+  status.dataset["state"] = "running";
+  status.dataset["beaconY"] = beacon.transform.position.y.toFixed(4);
+  status.dataset["beaconGreen"] = String(
+    Math.round(beaconMaterial.color[1] * 255),
+  );
+  status.dataset["vaneSx"] = vane.transform.scale.x.toFixed(4);
+  status.dataset["vaneSy"] = vane.transform.scale.y.toFixed(4);
+  status.dataset["vaneAspect"] = vaneBoundingAspect().toFixed(4);
+  status.dataset["vaneRed"] = String(Math.round(vaneMaterial.color[0] * 255));
+  status.dataset["sim"] = app.time.simulationTime.toFixed(4);
+}
+
 // --- the frame loop ---------------------------------------------------------
 
 /**
@@ -684,6 +749,7 @@ let last: number | null = null;
 function frame(now: number): void {
   if (last !== null) {
     app.step((now - last) / 1000);
+    syncStatus();
   }
   last = now;
   requestAnimationFrame(frame);
@@ -694,6 +760,7 @@ async function main(): Promise<void> {
   // half-started application (§45).
   await app.initialize();
   app.start();
+  syncStatus();
   requestAnimationFrame(frame);
 }
 

@@ -2121,6 +2121,27 @@ export class Rapier2dAdapter
     }
   }
 
+  /** @inheritDoc DebugBodyAccess.countContacts */
+  countContacts(): number {
+    const world = this.#requireWorld();
+    const narrowPhase = world.narrowPhase;
+    let total = 0;
+    for (const record of this.#colliders.values()) {
+      if (!record.alive) {
+        continue;
+      }
+      const handle = record.rapierHandle;
+      narrowPhase.contactPairsWith(handle, (otherHandle) => {
+        if (handle < otherHandle) {
+          narrowPhase.contactPair(handle, otherHandle, (manifold) => {
+            total += manifold.numContacts();
+          });
+        }
+      });
+    }
+    return total;
+  }
+
   // --------------------------------------------- §37 property changes (PH-1)
 
   /**

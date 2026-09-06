@@ -131,6 +131,16 @@ export class EventEmitter<EventMap> {
     return count;
   }
 
+  totalListenerCount(): number {
+    let count = 0;
+    for (const records of this.#listeners.values()) {
+      for (const record of records) {
+        if (!record.removed) count += 1;
+      }
+    }
+    return count;
+  }
+
   /**
    * Number of live listener registrations across every event type (§83).
    *

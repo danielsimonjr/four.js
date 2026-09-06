@@ -1850,6 +1850,7 @@ export class Application extends EventEmitter<ApplicationEventMap> {
           awakeCount: 0,
           colliderCount: 0,
           maxBodyId: -1,
+          contactCount: Number.NaN,
         };
         recordSolverStatistics(
           stats,

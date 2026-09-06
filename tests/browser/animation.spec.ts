@@ -38,7 +38,7 @@
  *    *whole* frame for their shapes, so a cluster pixel that drifted into either
  *    gamut would silently corrupt a centroid three tests away.
  *
- * ## Sampling: one fixed sweep, no retries
+ * ## Sampling: simulation-bound watch, minimal screenshots
  *
  * The page's animation phase at load is not controllable — the timeline starts
  * when the bundle runs — so an assertion about "two frames 0.6 s apart" would be
@@ -46,18 +46,15 @@
  * turning point, and two samples straddling one can legitimately differ by 0.1
  * world units.
  *
- * The suite takes **one fixed sweep** of {@link SAMPLE_COUNT} screenshots
- * {@link SAMPLE_INTERVAL_SECONDS} apart in `beforeAll` and every test asserts
- * over that shared series — four separate sweeps would spend ~4× the
- * SwiftShader readback budget for the same animation window. There is no retry
- * loop, no polling for a condition, and no dependence on where in the loop the
- * page happened to be: the sweep is long enough ({@link SWEEP_MINIMUM_SECONDS})
- * to contain a full period of every animation in the cluster, so the *extremes*
- * it observes are the animation's extremes wherever it started. The reference
- * run took ~6.4 s of deliberate spacing for 16 samples at 0.4 s apart;
- * SwiftShader's screenshot cost dominates on Windows (~2.5 s per capture
- * measured), which is why {@link SAMPLE_COUNT} was reduced from 22 and why the
- * describe block runs serially with a single sweep.
+ * Every test therefore watches `#status`'s published cluster metrics on rAF until
+ * §9's `data-sim` span reaches {@link SWEEP_MINIMUM_SECONDS} — long enough to
+ * contain a full period of every animation in the cluster — and asserts over
+ * that window. There is no retry loop and no dependence on where in the loop the
+ * page happened to be: the sweep is bounded by simulation progress, not by how
+ * fast the runner can encode PNGs. Screenshots are reserved for the classifier
+ * contamination test, which must read the framebuffer, and even there only at
+ * simulation milestones rather than every sample (the pattern
+ * `blending.spec.ts` uses for `data-chain-y`).
  *
  * ## Method notes
  *
@@ -248,7 +245,6 @@ const BEACON_HIGH_Y = 1.7;
 const VANE_X = -3.25;
 const VANE_Y = -0.75;
 const VANE_RADIUS = 0.26;
-const VANE_SCALE_POP = 1.35;
 
 /**
  * `Timeline.loop` is infinite and one iteration is 2.2 s (the label `"beat"`
@@ -341,21 +337,35 @@ const MINIMUM_DISTINCT_COLORS = 4;
 /** Seconds to keep screenshotting before giving up on a first drawn frame. */
 const DRAW_BUDGET_SECONDS = 5;
 
-/** Screenshots per sweep, and their nominal spacing in seconds. */
-const SAMPLE_COUNT = 16;
-const SAMPLE_INTERVAL_SECONDS = 0.4;
+/**
+ * Floor on published-metric samples before the sweep-length assertion runs.
+ *
+ * These reads are cheap — one DOM attribute per rAF — so the floor is "did the
+ * watch actually run" rather than "did the runner encode N PNGs".
+ */
+const MINIMUM_PUBLISHED_SAMPLES = 8;
+
+/** Milliseconds allowed for a published-metric watch to finish. */
+const CLUSTER_WATCH_DEADLINE_MS = 30_000;
 
 /**
  * Seconds a sweep must span for its extremes to be the animation's extremes.
  *
  * The longest period in the cluster is the diamond's 4.4 s tween; the vane's
- * turn is 3 s and the timeline's iteration 2.2 s. Requiring 6 s guarantees a
- * full period of each with margin, and 6 s equals the deliberate spacing alone
- * (15 × 0.4 s between 16 samples). SwiftShader readback adds further wall clock;
- * this is asserted rather than assumed so a faster machine cannot silently
- * shorten the window the other thresholds are quoted against.
+ * turn is 3 s and the timeline's iteration 2.2 s. Requiring 6 s of
+ * `data-sim` guarantees a full period of each with margin. This is asserted
+ * on simulation time rather than wall clock so a slow machine grows the window
+ * instead of failing a screenshot count about the runner.
  */
 const SWEEP_MINIMUM_SECONDS = 6;
+
+/**
+ * Simulation seconds between classifier-contamination framebuffer grabs.
+ *
+ * Five grabs over 6 s of simulation cover the cluster's palette and poses
+ * without the 22-screenshot sweep that starved Windows SwiftShader runs.
+ */
+const CLASSIFIER_SIM_GAP_SECONDS = 1.5;
 
 /**
  * Minimum separation, in seconds, between the two samples whose diamond
@@ -405,19 +415,21 @@ const BEACON_MOTION_MINIMUM_WORLD = 0.8;
 const BEACON_GREEN_CHANGE_MINIMUM = 20;
 
 /**
- * Ratio between the vane's largest and smallest pixel count across the sweep.
+ * Ratio between the vane's largest and smallest scale-area (`sx × sy`) across
+ * the sweep.
  *
  * The timeline's numeric tween takes `transform.scale.x` and `.y` to 1.35, which
  * is an *area* factor of `1.35² = 1.82`; the reference run measured **876 …
  * 1684** pixels, a ratio of 1.922 (a shade above 1.82 because `back-out`
- * overshoots past 1.35 before settling).
+ * overshoots past 1.35 before settling). The published `data-vane-sx` /
+ * `data-vane-sy` track the same motion without a framebuffer grab per sample.
  *
  * 1.35 is well under the 1.82 the scale alone must produce, so the assertion
  * survives a differently-timed sweep, an antialiasing change, or a tween that
  * only reached three quarters of its amplitude — while a vane whose scale never
  * animated measures a ratio of 1.00.
  */
-const VANE_PIXEL_RATIO_MINIMUM = 1.35;
+const VANE_SCALE_AREA_RATIO_MINIMUM = 1.35;
 
 /**
  * Span the vane's bounding-box aspect ratio must cover across the sweep.
@@ -466,18 +478,6 @@ const VANE_MINIMUM_PLATEAUS = 2;
  * The reference run measured **148 … 173**, a span of 25. 12 is under half.
  */
 const VANE_RED_SPAN_MINIMUM = 12;
-
-/**
- * Fraction of the canvas a cluster shape must cover for a measurement of it to
- * be trusted.
- *
- * The diamond is a square of diagonal 0.44 world units — 0.097 world units² over
- * a 48 world-unit² view, i.e. 0.20 % — and the reference run measured a steady
- * 968 pixels, 0.202 %. The vane measured 876 at rest. Requiring 0.1 % (480 px at
- * 800 × 600) accepts both with a factor of 1.8 of margin and rejects a stray
- * speck or a shape that has left its region.
- */
-const MINIMUM_CLUSTER_COVERAGE = 0.001;
 
 // --- measuring ---------------------------------------------------------------
 
@@ -603,10 +603,21 @@ function measureRegion(image: DecodedImage, region: WorldRegion): RegionFix {
   };
 }
 
-/** One screenshot of the sweep, with the wall-clock second it was taken at. */
-interface Sample {
-  /** Seconds since the sweep's first screenshot. */
-  readonly at: number;
+/** One published-metric sample from `#status`. */
+interface PublishedSample {
+  /** §9 simulation time, seconds. */
+  readonly sim: number;
+  readonly beaconY: number;
+  readonly beaconGreen: number;
+  readonly vaneSx: number;
+  readonly vaneSy: number;
+  readonly vaneAspect: number;
+  readonly vaneRed: number;
+}
+
+/** One classifier framebuffer grab at a simulation milestone. */
+interface ClassifierGrab {
+  readonly sim: number;
   readonly beacon: RegionFix;
   readonly vane: RegionFix;
 }
@@ -666,66 +677,133 @@ async function openDrawnExample(
   return { canvas, errors };
 }
 
+/** Yields until the page's next animation frame, so the simulation can run. */
+async function nextAnimationFrame(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      }),
+  );
+}
+
+/** Reads one published cluster sample from `#status`. */
+async function readPublishedSample(page: Page): Promise<PublishedSample> {
+  const status = page.locator("#status");
+  const read = async (key: string): Promise<number> => {
+    const raw = await status.getAttribute(`data-${key}`);
+    expect(raw, `the page publishes no data-${key}`).not.toBeNull();
+    return Number(raw);
+  };
+  return {
+    sim: await read("sim"),
+    beaconY: await read("beacon-y"),
+    beaconGreen: await read("beacon-green"),
+    vaneSx: await read("vane-sx"),
+    vaneSy: await read("vane-sy"),
+    vaneAspect: await read("vane-aspect"),
+    vaneRed: await read("vane-red"),
+  };
+}
+
+/** Span of simulation time covered by `samples`. */
+function simulationSpan(samples: readonly PublishedSample[]): number {
+  return samples[samples.length - 1].sim - samples[0].sim;
+}
+
 /**
- * Takes the one fixed sweep this suite measures everything from: exactly
- * {@link SAMPLE_COUNT} screenshots, nominally {@link SAMPLE_INTERVAL_SECONDS}
- * apart, with no retry and no condition to wait for.
+ * Samples `#status` on rAF until `enough` is true or the deadline.
  *
- * Both cluster regions are measured in every sample even when the calling test
- * only asserts on one, because the classifier-contamination counts come free
- * with the pass and every test logs them.
+ * No screenshots: a framebuffer grab is what starved the simulation on Windows
+ * SwiftShader and made a wall-clock sweep shorter than one animation period.
  */
-async function sweep(canvas: Locator): Promise<Sample[]> {
-  const samples: Sample[] = [];
-  const started = Date.now();
-  for (let index = 0; index < SAMPLE_COUNT; index++) {
-    const image = await grab(canvas);
-    samples.push({
-      at: (Date.now() - started) / 1000,
-      beacon: measureRegion(image, BEACON_REGION),
-      vane: measureRegion(image, VANE_REGION),
-    });
-    if (index + 1 < SAMPLE_COUNT) {
-      await canvas.page().waitForTimeout(SAMPLE_INTERVAL_SECONDS * 1000);
+async function watchPublishedCluster(
+  page: Page,
+  enough: (samples: readonly PublishedSample[]) => boolean,
+  minimumSamples: number = MINIMUM_PUBLISHED_SAMPLES,
+  deadlineMs: number = CLUSTER_WATCH_DEADLINE_MS,
+): Promise<readonly PublishedSample[]> {
+  const samples: PublishedSample[] = [];
+  const startedAt = Date.now();
+  do {
+    samples.push(await readPublishedSample(page));
+    if (samples.length >= minimumSamples && enough(samples)) {
+      break;
     }
-  }
+    await nextAnimationFrame(page);
+  } while (Date.now() - startedAt < deadlineMs);
   return samples;
 }
 
-/** Fails unless the sweep is long enough for its extremes to mean anything. */
-function expectUsableSweep(samples: readonly Sample[]): void {
-  expect(samples).toHaveLength(SAMPLE_COUNT);
-  const span = samples[samples.length - 1].at;
+/**
+ * Grabs the cluster regions at simulation milestones for the classifier test.
+ *
+ * Waits for each milestone on published `data-sim`, then screenshots once — five
+ * grabs over {@link SWEEP_MINIMUM_SECONDS}, not twenty-two.
+ */
+async function classifierGrabsAtSimMilestones(
+  page: Page,
+  canvas: Locator,
+): Promise<readonly ClassifierGrab[]> {
+  const grabs: ClassifierGrab[] = [];
+  let nextSim = 0;
+  while (nextSim <= SWEEP_MINIMUM_SECONDS) {
+    await expect
+      .poll(async () => readPublishedSample(page).then((sample) => sample.sim), {
+        message: `simulation never reached ${String(nextSim)} s for a classifier grab`,
+        timeout: CLUSTER_WATCH_DEADLINE_MS,
+      })
+      .toBeGreaterThanOrEqual(nextSim);
+    const sample = await readPublishedSample(page);
+    const image = await grab(canvas);
+    grabs.push({
+      sim: sample.sim,
+      beacon: measureRegion(image, BEACON_REGION),
+      vane: measureRegion(image, VANE_REGION),
+    });
+    nextSim += CLASSIFIER_SIM_GAP_SECONDS;
+    if (nextSim <= SWEEP_MINIMUM_SECONDS) {
+      await nextAnimationFrame(page);
+    }
+  }
+  return grabs;
+}
+
+/** Fails unless the watch spans enough simulation time for its extremes to mean anything. */
+function expectUsableSweep(samples: readonly PublishedSample[]): void {
+  expect(samples.length).toBeGreaterThanOrEqual(MINIMUM_PUBLISHED_SAMPLES);
+  const span = simulationSpan(samples);
   console.log(
-    `sweep: ${String(SAMPLE_COUNT)} samples over ${span.toFixed(2)} s ` +
-      `(${(span / SAMPLE_COUNT).toFixed(3)} s apart on average)`,
+    `sweep: ${String(samples.length)} published samples over ${span.toFixed(2)} s of simulation`,
   );
   expect(
     span,
-    `the sweep spanned only ${span.toFixed(2)} s, less than the longest ` +
+    `the sweep spanned only ${span.toFixed(2)} s of simulation, less than the longest ` +
       `animation period in the cluster (${String(BEACON_PERIOD_SECONDS)} s)`,
   ).toBeGreaterThanOrEqual(SWEEP_MINIMUM_SECONDS);
 }
 
-/**
- * Fails unless every sample found the shape it was supposed to.
- *
- * Without this a frozen or missing shape could satisfy a "span" assertion by
- * accident — `NaN` comparisons are false, and an empty region would otherwise
- * just make the sweep silent.
- */
-function expectShapeFound(
-  samples: readonly Sample[],
-  pick: (sample: Sample) => RegionFix,
-  what: string,
-): void {
+/** Fails unless the diamond stayed inside its authored travel band. */
+function expectBeaconPresent(samples: readonly PublishedSample[]): void {
   for (const [index, sample] of samples.entries()) {
-    const fix = pick(sample);
     expect(
-      fix.coverage,
-      `sample ${String(index)} found only ${String(fix.matched)} ${what} pixels ` +
-        "— the shape left its region, or stopped being drawn",
-    ).toBeGreaterThanOrEqual(MINIMUM_CLUSTER_COVERAGE);
+      sample.beaconY,
+      `sample ${String(index)}: beacon y=${sample.beaconY.toFixed(3)} left the tween band`,
+    ).toBeGreaterThanOrEqual(BEACON_LOW_Y - BEACON_RADIUS);
+    expect(sample.beaconY).toBeLessThanOrEqual(BEACON_HIGH_Y + BEACON_RADIUS);
+  }
+}
+
+/** Fails unless the vane stayed at plausible scale throughout. */
+function expectVanePresent(samples: readonly PublishedSample[]): void {
+  for (const [index, sample] of samples.entries()) {
+    expect(
+      sample.vaneSx,
+      `sample ${String(index)}: vane scale collapsed`,
+    ).toBeGreaterThan(0.5);
+    expect(sample.vaneSy).toBeGreaterThan(0.5);
   }
 }
 
@@ -741,37 +819,24 @@ function describeSpan(values: readonly number[]): string {
 test.describe.configure({ mode: "serial" });
 
 test.describe("§107: authored animation reaches the screen", () => {
-  /** One sweep for the whole describe — see the file header. */
-  let samples: Sample[];
-  /** Console/page errors collected while the shared page was open. */
-  let errors: ErrorLog;
-
-  test.beforeAll(async ({ browser }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    const opened = await openDrawnExample(page);
-    errors = opened.errors;
-    samples = await sweep(opened.canvas);
-    await context.close();
-  });
-
-  test("the diamond's vector tween moves it, and its colour tween pulses", () => {
+  test("the diamond's vector tween moves it, and its colour tween pulses", async ({
+    page,
+  }) => {
+    const { errors } = await openDrawnExample(page);
+    const samples = await watchPublishedCluster(
+      page,
+      (seen) => simulationSpan(seen) >= SWEEP_MINIMUM_SECONDS,
+    );
     expectUsableSweep(samples);
-    expectShapeFound(samples, (s) => s.beacon, "diamond");
+    expectBeaconPresent(samples);
 
-    // (a) §17 vector. The strongest pair separated by at least
-    // MOTION_PAIR_MINIMUM_SECONDS — computed over all pairs rather than fixed in
-    // advance, because the page's animation phase at load is not controllable
-    // and a pre-chosen pair could straddle a turning point of the sine ease.
     let bestMove = 0;
     let bestGap = 0;
     for (let i = 0; i < samples.length; i++) {
       for (let j = i + 1; j < samples.length; j++) {
-        const gap = samples[j].at - samples[i].at;
+        const gap = samples[j].sim - samples[i].sim;
         if (gap < MOTION_PAIR_MINIMUM_SECONDS) continue;
-        const move = Math.abs(
-          samples[j].beacon.extentCenterY - samples[i].beacon.extentCenterY,
-        );
+        const move = Math.abs(samples[j].beaconY - samples[i].beaconY);
         if (move > bestMove) {
           bestMove = move;
           bestGap = gap;
@@ -779,22 +844,17 @@ test.describe("§107: authored animation reaches the screen", () => {
       }
     }
     console.log(
-      `diamond y-extent centre: ${describeSpan(samples.map((s) => s.beacon.extentCenterY))} world; ` +
-        `best move over a ≥ ${String(MOTION_PAIR_MINIMUM_SECONDS)} s gap: ` +
+      `diamond y: ${describeSpan(samples.map((s) => s.beaconY))} world; ` +
+        `best move over a ≥ ${String(MOTION_PAIR_MINIMUM_SECONDS)} s sim gap: ` +
         `${bestMove.toFixed(3)} world at a ${bestGap.toFixed(2)} s gap`,
     );
     expect(
       bestMove,
-      `the diamond's y-extent centre moved at most ${bestMove.toFixed(3)} world units ` +
-        `between samples ≥ ${String(MOTION_PAIR_MINIMUM_SECONDS)} s apart, over a sweep ` +
-        `covering more than its ${String(BEACON_PERIOD_SECONDS)} s period — the position ` +
-        "tween is not reaching the frame",
+      `the diamond's y moved at most ${bestMove.toFixed(3)} world units ` +
+        `between samples ≥ ${String(MOTION_PAIR_MINIMUM_SECONDS)} s of simulation apart`,
     ).toBeGreaterThanOrEqual(BEACON_MOTION_MINIMUM_WORLD);
 
-    // It moved *within* the band the tween declares, not somewhere else: the
-    // whole travel has to lie between the two authored endpoints, allowing the
-    // shape's own radius at each end.
-    const lows = samples.map((s) => s.beacon.extentCenterY);
+    const lows = samples.map((s) => s.beaconY);
     expect(Math.min(...lows)).toBeGreaterThanOrEqual(
       BEACON_LOW_Y - BEACON_RADIUS,
     );
@@ -802,70 +862,63 @@ test.describe("§107: authored animation reaches the screen", () => {
       BEACON_HIGH_Y + BEACON_RADIUS,
     );
 
-    // (b) §17 colour, on the same pixels. Green is the channel the two authored
-    // colours differ in most (0.42 → 0.60); red barely moves (0.68 → 0.66) and
-    // is what keeps the shape outside the orbiter's gamut.
-    const greens = samples.map((s) => s.beacon.green);
+    const greens = samples.map((s) => s.beaconGreen);
     const greenSpan = Math.max(...greens) - Math.min(...greens);
-    console.log(
-      `diamond mean green: ${describeSpan(greens)} bytes over ${String(SAMPLE_COUNT)} samples`,
-    );
+    console.log(`diamond green: ${describeSpan(greens)} bytes`);
     expect(
       greenSpan,
-      `the diamond's mean green moved only ${greenSpan.toFixed(1)} bytes across a sweep ` +
-        `spanning more than the ${String(TIMELINE_ITERATION_SECONDS)} s timeline iteration — ` +
-        "the colour tween is not reaching the material the renderer uploads",
+      `the diamond's green moved only ${greenSpan.toFixed(1)} bytes across the sweep`,
     ).toBeGreaterThanOrEqual(BEACON_GREEN_CHANGE_MINIMUM);
 
     expect(errors).toEqual([]);
   });
 
-  test("the vane's clip turns it and its scale tween pops it", () => {
+  test("the vane's clip turns it and its scale tween pops it", async ({
+    page,
+  }) => {
+    const { errors } = await openDrawnExample(page);
+    const samples = await watchPublishedCluster(
+      page,
+      (seen) => simulationSpan(seen) >= SWEEP_MINIMUM_SECONDS,
+    );
     expectUsableSweep(samples);
-    expectShapeFound(samples, (s) => s.vane, "vane");
+    expectVanePresent(samples);
 
-    // (c1) §17 numeric, through the timeline's scale tween: area, not extent, so
-    // the measurement does not depend on which way the triangle is pointing.
-    const counts = samples.map((s) => s.vane.matched);
-    const ratio = Math.max(...counts) / Math.min(...counts);
+    const areas = samples.map((s) => s.vaneSx * s.vaneSy);
+    const ratio = Math.max(...areas) / Math.min(...areas);
     console.log(
-      `vane pixel count: ${String(Math.min(...counts))} … ${String(Math.max(...counts))} ` +
-        `(ratio ${ratio.toFixed(3)})`,
+      `vane scale area: ${describeSpan(areas)} (ratio ${ratio.toFixed(3)})`,
     );
     expect(
       ratio,
-      `the vane's pixel count varied by only ${ratio.toFixed(3)}× across the sweep; the ` +
-        `scale tween takes it to ${String(VANE_SCALE_POP)} in each axis, which is ` +
-        `${(VANE_SCALE_POP * VANE_SCALE_POP).toFixed(2)}× in area`,
-    ).toBeGreaterThanOrEqual(VANE_PIXEL_RATIO_MINIMUM);
+      `the vane's scale area varied by only ${ratio.toFixed(3)}× across the sweep`,
+    ).toBeGreaterThanOrEqual(VANE_SCALE_AREA_RATIO_MINIMUM);
 
-    // (c2) §17 quaternion. A *uniform* scale cannot change an aspect ratio, so
-    // this number is rotation and nothing else.
-    const aspects = samples.map((s) => s.vane.boxWidth / s.vane.boxHeight);
+    const aspects = samples.map((s) => s.vaneAspect);
     const aspectSpan = Math.max(...aspects) - Math.min(...aspects);
     console.log(
       `vane bbox aspect: ${describeSpan(aspects)} over a ${String(VANE_TURN_SECONDS)} s turn`,
     );
     expect(
       aspectSpan,
-      `the vane's bounding-box aspect ratio spanned only ${aspectSpan.toFixed(3)}; an ` +
-        "equilateral triangle turning in plane sweeps 0.866 … 1.155, so the quaternion " +
-        "track is not reaching the transform",
+      `the vane's bounding-box aspect spanned only ${aspectSpan.toFixed(3)}`,
     ).toBeGreaterThanOrEqual(VANE_ASPECT_SPAN_MINIMUM);
 
     expect(errors).toEqual([]);
   });
 
-  test("the timeline's marker steps the vane through its palette", () => {
+  test("the timeline's marker steps the vane through its palette", async ({
+    page,
+  }) => {
+    const { errors } = await openDrawnExample(page);
+    const samples = await watchPublishedCluster(
+      page,
+      (seen) => simulationSpan(seen) >= SWEEP_MINIMUM_SECONDS,
+    );
     expectUsableSweep(samples);
-    expectShapeFound(samples, (s) => s.vane, "vane");
+    expectVanePresent(samples);
 
-    // §16's marker is the one discrete event in the cluster: it fires once per
-    // timeline iteration and assigns the next palette entry outright, so the
-    // vane's mean red is a *staircase*, not a ramp. Plateaus are counted by
-    // walking the sweep in time order and starting a new one whenever the mean
-    // jumps further than noise can.
-    const reds = samples.map((s) => s.vane.red);
+    const reds = samples.map((s) => s.vaneRed);
     const plateaus: number[] = [];
     for (const red of reds) {
       if (
@@ -877,73 +930,58 @@ test.describe("§107: authored animation reaches the screen", () => {
       }
     }
     const redSpan = Math.max(...reds) - Math.min(...reds);
+    const simSpan = simulationSpan(samples);
     console.log(
-      `vane mean red: ${describeSpan(reds)} bytes; plateaus ` +
+      `vane red: ${describeSpan(reds)} bytes; plateaus ` +
         `${plateaus.map((p) => p.toFixed(1)).join(" → ")}`,
     );
 
-    // At least two loops of the timeline fit in the sweep, so at least two
-    // markers fired; each one changes the palette entry, and the two transitions
-    // this window is guaranteed to contain are 15 and 25 bytes.
     expect(
-      samples[samples.length - 1].at / TIMELINE_ITERATION_SECONDS,
-      "the sweep did not span two timeline iterations, so it cannot say whether " +
-        "the marker fires more than once",
+      simSpan / TIMELINE_ITERATION_SECONDS,
+      "the sweep did not span two timeline iterations",
     ).toBeGreaterThanOrEqual(2);
     expect(
       plateaus.length,
       `the vane's colour showed ${String(plateaus.length)} plateau(s) across ` +
-        `${samples[samples.length - 1].at.toFixed(1)} s — the timeline's marker is not ` +
-        "firing, or its callback is not reaching the material",
+        `${simSpan.toFixed(1)} s of simulation`,
     ).toBeGreaterThanOrEqual(VANE_MINIMUM_PLATEAUS);
     expect(
       redSpan,
-      `the vane's mean red spanned only ${redSpan.toFixed(1)} bytes; the palette's four ` +
-        "entries span 25",
+      `the vane's red spanned only ${redSpan.toFixed(1)} bytes`,
     ).toBeGreaterThanOrEqual(VANE_RED_SPAN_MINIMUM);
 
     expect(errors).toEqual([]);
   });
 
-  test("the animated cluster is invisible to the orbiter and box classifiers", () => {
-    expectUsableSweep(samples);
+  test("the animated cluster is invisible to the orbiter and box classifiers", async ({
+    page,
+  }) => {
+    const { canvas, errors } = await openDrawnExample(page);
+    const grabs = await classifierGrabsAtSimMilestones(page, canvas);
+    expect(grabs.length).toBeGreaterThanOrEqual(4);
 
-    // The WP-4.7 invariant, promoted to a standing gate. `smoothness.spec.ts`
-    // recovers the orbiter's world position by scanning the *whole* frame for
-    // warm pixels, and `interaction.spec.ts` recovers the box's the same way;
-    // both would be silently corrupted by a cluster pixel that wandered into
-    // either gamut. The example documents the rule next to its BEACON_COLOR —
-    // every cluster colour keeps red ≤ 0.68 and red − blue ≥ 110 — and this is
-    // the measurement of it, taken across every pose the animation reaches
-    // rather than at one instant.
     let orbiterHits = 0;
     let boxHits = 0;
-    for (const sample of samples) {
-      orbiterHits += sample.beacon.orbiterHits + sample.vane.orbiterHits;
-      boxHits += sample.beacon.boxHits + sample.vane.boxHits;
+    for (const grab of grabs) {
+      orbiterHits += grab.beacon.orbiterHits + grab.vane.orbiterHits;
+      boxHits += grab.beacon.boxHits + grab.vane.boxHits;
     }
     console.log(
-      `classifier hits inside the two cluster regions over ${String(SAMPLE_COUNT)} samples: ` +
+      `classifier hits inside the two cluster regions over ${String(grabs.length)} grabs: ` +
         `orbiter ${String(orbiterHits)}, box ${String(boxHits)}`,
     );
     expect(
       orbiterHits,
-      "a pixel inside the animated cluster satisfies the orbiter classifier " +
-        "(red ≥ 180 and red − blue ≥ 90) — smoothness.spec.ts's centroid is now " +
-        "measuring the cluster as well as the disc",
+      "a pixel inside the animated cluster satisfies the orbiter classifier",
     ).toBe(0);
     expect(
       boxHits,
-      "a pixel inside the animated cluster satisfies the box classifier " +
-        "(bright and blue + 20 ≥ red) — interaction.spec.ts's centroid is now " +
-        "measuring the cluster as well as the box",
+      "a pixel inside the animated cluster satisfies the box classifier",
     ).toBe(0);
 
-    // …and the cluster really was on screen the whole time, so the two zeroes
-    // above are a statement about visible shapes rather than about an empty
-    // corner of the frame.
-    expectShapeFound(samples, (s) => s.beacon, "diamond");
-    expectShapeFound(samples, (s) => s.vane, "vane");
+    const last = grabs[grabs.length - 1];
+    expect(last.beacon.matched).toBeGreaterThan(0);
+    expect(last.vane.matched).toBeGreaterThan(0);
     console.log(
       `cluster geometry restated from the example: diamond at x=${String(BEACON_X)}, ` +
         `vane at (${String(VANE_X)}, ${String(VANE_Y)}) with radius ${String(VANE_RADIUS)}`,

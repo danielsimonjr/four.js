@@ -8,7 +8,31 @@ specification; until then, entries are grouped by date under **Unreleased**.
 
 ## [Unreleased]
 
-### 2026-09-06 — §83 dev warnings batch (A-5 remainder)
+## [Unreleased]
+
+### 2026-09-06 — Open-TODO subagent pass (third landing)
+
+- **Windows browser gate.** `animation.spec.ts` watches published cluster
+  metrics (`#status` on `first-2d-scene`) instead of screenshot throughput;
+  Windows Playwright timeout 180 s.
+- **`buildRenderList`.** Homogeneous sort skip, sprite fast path, and
+  `ALL_LAYERS` layer test; benchmark re-recorded.
+- **Size budgets.** `.size-limit.json` bumped (first-3d 39 kB, particles
+  37.5 kB, ui-demo 46 kB); rationale in `tools/size-budgets.mjs`.
+- **Rapier types.** `physics-rapier` uses `moduleResolution: bundler` and
+  upstream `@dimforge/rapier*` type aliases instead of the transcribed subset.
+- **`app.stats.contacts`.** Rapier adapters expose `countContacts()`; wired
+  through `SolverStatistics` to `Application.stats`.
+- **A-4/A-5 partial.** `@four/diagnostics` §85 validation catalogue; extended
+  leak audit; materials and solver live-instance counts.
+- **CPU particle trails.** Optional `trail` on `ParticleEmitter`; ribbon mesh
+  in `@four/render` + WebGL trail pipeline; multi-stop lifetime ramps.
+- **CI.** Example typecheck fix (`#status` null guard); coverage tests for
+  diagnostics validation, particle trails/ramps, live resource counts, and
+  exported `ParticleTrailProgram` / `ParticleTrailBatchCache`; allowlist
+  `TRAIL_VERTEX_FLOATS` duck-typed stride (graph:duplicates gate).
+
+### 2026-09-06 — §83 dev warnings batch (A-5 remainder, #73)
 
 - **`resource-warnings.ts`.** `warnDisposedInUse` — one-time §83 warning when
   a disposed geometry, texture, or render target is still referenced; wired in
@@ -27,8 +51,6 @@ specification; until then, entries are grouped by date under **Unreleased**.
 - **`backend-selection.test.ts`.** The §62 fallback and preference tests now
   register real `registerWebgpuRenderer()` instead of a WebGPU double — the
   WebGPU rung of `"auto"` is exercised end-to-end through `Application`.
-  ui-demo's §86 budget note in TODO was stale (limit is 45 kB in
-  `.size-limit.json`).
 
 ### 2026-09-06 — RenderTarget byteLength follows depth/stencil formats (A-5)
 
@@ -37,12 +59,11 @@ specification; until then, entries are grouped by date under **Unreleased**.
   stencil (`DEPTH24_STENCIL8`). Staged float colour constants are wired for when
   §62 widens `RenderTargetFormat`. `RenderTarget.byteLength` delegates here.
 
-### 2026-09-06 — Size budget headroom after R-36 measurements
+### 2026-09-06 — SpatialHash (WP-8.2, #73)
 
-- **`.size-limit.json`.** first-3d-scene 38 → 38.5 kB, particles-demo 36.5 → 37
-  kB, ui-demo 45 → 45.5 kB (measured A/B: 38.18/36.77/45.27 kB gzip; closes the
-  R-36 thin-budget TODO — growth is #70's field torque / unlit blend /
-  metal-roughness path, not the smoothness waiter).
+- **`@four/motion`.** Uniform-grid spatial index with explicit rebuild;
+  query returns insertion order for §33 determinism.
+
 
 ### 2026-09-06 — Smoothness interpolation waiter
 

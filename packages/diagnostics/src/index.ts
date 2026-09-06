@@ -102,6 +102,25 @@ export type {
 } from "./resource-audit.js";
 export { NO_RESOURCE_LEAKS, auditResourceLeaks } from "./resource-audit.js";
 
+export type {
+  ValidationCatalogueOptions,
+  ValidationCheckOptions,
+  ValidationNodeLike,
+  ValidationTransformLike,
+} from "./validation.js";
+export {
+  COORDINATE_ENVELOPE,
+  NEAR_ZERO_SCALE,
+  UNSTABLE_SCALE_RATIO,
+  assertFinite,
+  assertNoSceneGraphCycle,
+  validateSceneNode,
+  validateSceneSubtree,
+  warnCoordinateEnvelope,
+  warnSingularScale,
+  warnUnstableScale,
+} from "./validation.js";
+
 // §83's per-frame allocation development warning (A-4/A-5, 2026-09-06).
 export type {
   AuditFrameAllocationsOptions,
