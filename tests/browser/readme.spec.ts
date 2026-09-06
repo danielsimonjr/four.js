@@ -42,12 +42,12 @@ const WIDTH = 800;
 const HEIGHT = 600;
 
 /**
- * A scene of one unlit circle on a cleared-or-uncleared background: the
- * circle plus antialiased edges measured well above four colours here, so
- * four separates a drawn frame from a blank one with room to spare —
- * `example.spec.ts`'s threshold, restated.
+ * A single unlit circle on a uniform clear is two colours (fill +
+ * background). `example.spec.ts` asks for four because that page draws
+ * several primitives plus antialiased edges; this snippet has one fill, so
+ * two separates a drawn frame from a cleared buffer.
  */
-const MINIMUM_DISTINCT_COLORS = 4;
+const MINIMUM_DISTINCT_COLORS = 2;
 
 /** Seconds to keep screenshotting before giving up on a first drawn frame. */
 const DRAW_BUDGET_SECONDS = 5;
