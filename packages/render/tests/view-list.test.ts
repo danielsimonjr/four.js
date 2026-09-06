@@ -466,7 +466,9 @@ describe("sortRenderListByDepth — §66 sort key 4", () => {
 
   it("returns the list it sorted, so the two verbs compose", () => {
     const scene = new Scene();
-    scene.add(quad(0), quad(0, 0, 3));
+    // One material so key 3 ties and the composition this test pins is key 4.
+    const material = new UnlitMaterial();
+    scene.add(quad(0, 0, 0, 1, material), quad(0, 0, 3, 1, material));
     const items = frameList(scene);
     const { view, frustum } = orthoView();
 

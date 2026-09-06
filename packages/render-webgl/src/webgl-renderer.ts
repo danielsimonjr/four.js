@@ -1092,16 +1092,17 @@ function applyEffectDestination(
 ): void {
   const dest = pass.rect;
   if (dest === undefined) {
-    gl.viewport(0, 0, width, height);
+    // Same order as every other path in this file: scissor, then viewport.
     gl.scissor(0, 0, width, height);
+    gl.viewport(0, 0, width, height);
     return;
   }
   const x = Math.round(dest.x);
   const y = Math.round(dest.y);
   const w = Math.max(0, Math.round(dest.width));
   const h = Math.max(0, Math.round(dest.height));
-  gl.viewport(x, y, w, h);
   gl.scissor(x, y, w, h);
+  gl.viewport(x, y, w, h);
 }
 
 function resolveRect(
