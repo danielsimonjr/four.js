@@ -45,8 +45,11 @@
  * `"kinematic"` over one node therefore share a suppression slot; they are, by
  * §42's model, the same writer.
  *
- * Emission uses `console.warn` with a `[four]` prefix. Simulation packages
- * may not import `@four/core`'s build flag (§33).
+ * The message is unconditional `console.warn` — not `DEV` / `devWarnOnce`.
+ * `@four/scene` is a §33 simulation package: `dev-build-mode.test.ts`
+ * forbids any build-flag import here (the same reason a DEV-gated
+ * `new Node()` warn was reverted). The WeakMap is the once-per-pair
+ * suppress; production prints the first conflict and then stays quiet.
  */
 
 /**

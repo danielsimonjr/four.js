@@ -591,23 +591,42 @@ async function virtualFrameCount(page: Page): Promise<number> {
 }
 
 /**
+ * How long {@link waitForVirtualFrameParity} will wait for the next
+ * odd/even virtual frame before failing. One delivered frame is a
+ * browser rAF (~16 ms); fifteen seconds is a hung clock, not a slow
+ * runner.
+ */
+const VIRTUAL_FRAME_PARITY_BUDGET_MS = 15_000;
+
+/**
  * Waits until the injected clock has delivered a new frame of the requested
- * parity (odd = alpha 0.5, even = alpha 0.0). The wait is on the rAF counter,
- * not on wall-clock, so the phase is chosen instead of inherited.
+ * parity (odd = alpha 0.5, even = alpha 0.0). Polled through
+ * {@link virtualFrameCount} (`page.evaluate`), not `waitForFunction`.
+ *
+ * Playwright's `waitForFunction` defaults to `polling: "raf"`. This test
+ * replaces `requestAnimationFrame`, and on CI that combination left the
+ * waiter parked until the 120 s test timeout (2026-09-06, `b55a8c1`)
+ * even though `evaluate` could already read `__fourVirtualFrames`.
  */
 async function waitForVirtualFrameParity(
   page: Page,
   parity: 0 | 1,
 ): Promise<number> {
   const start = await virtualFrameCount(page);
-  await page.waitForFunction(
-    ({ since, odd }) => {
-      const n = window.__fourVirtualFrames ?? 0;
-      return n > since && n % 2 === (odd ? 1 : 0);
-    },
-    { since: start, odd: parity === 1 },
-  );
-  return virtualFrameCount(page);
+  const deadline = Date.now() + VIRTUAL_FRAME_PARITY_BUDGET_MS;
+  for (;;) {
+    const n = await virtualFrameCount(page);
+    if (n > start && n % 2 === parity) {
+      return n;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `virtual clock stuck at ${String(n)} (started ${String(start)}); ` +
+          `wanted a new frame with parity ${String(parity)}`,
+      );
+    }
+    await page.waitForTimeout(16);
+  }
 }
 
 /** Screenshots until a drawn frame appears or the budget runs out. */
