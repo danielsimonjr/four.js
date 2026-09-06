@@ -6,6 +6,14 @@ changes in `CHANGELOG.md`.
 
 ## Now
 
+- [ ] **`registerRapierSolver()` throws on a second call — awkward for anything building more than
+      one world.** Registration is process-global, so a test suite or a probe with a `makeWorld()`
+      helper hits `INVALID_APPLICATION_STATE` on the second construction. The error is explicit and
+      carries context (`solver: "rapier", registered: ["rapier"]`), and `clearRegisteredSolvers()`
+      exists, so this is a usability question rather than a defect: should a re-register of the
+      SAME solver be idempotent (or take an `{ override }` flag) instead of throwing? Filed, not
+      changed — registry semantics are a §37 call.
+
 - [ ] **`new Node()` is unguarded at runtime — a JS consumer can instantiate an abstract class.**
       `Node` is `export abstract class Node`; `Group extends Node {}` is the concrete one, and the
       guides use `Group` correctly. But TypeScript's `abstract` is erased at compile time, so a
