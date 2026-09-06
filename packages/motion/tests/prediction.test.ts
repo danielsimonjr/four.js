@@ -415,6 +415,25 @@ describe("interceptTime / interceptPoint", () => {
     );
   });
 
+  it("falls back to Reynolds' horizon when onMiss is heuristic", () => {
+    // Faster and opening: the default path returns NaN; steering asks for
+    // |R| / speed so a pursuer still has a point to seek.
+    const target = new Vector3(10, 0, 0);
+    const receding = new Vector3(9, 0, 0);
+    expect(interceptTime(shooter, 3, target, receding)).toBeNaN();
+    expect(
+      interceptTime(shooter, 3, target, receding, { onMiss: "heuristic" }),
+    ).toBeCloseTo(10 / 3, 12);
+  });
+
+  it("does not throw on a bad speed when validateSpeed is false", () => {
+    const target = new Vector3(10, 0, 0);
+    const still = new Vector3(0, 0, 0);
+    expect(
+      interceptTime(shooter, -1, target, still, { validateSpeed: false }),
+    ).toBeNaN();
+  });
+
   it("writes into `out` without allocating, and allocates only when omitted", () => {
     const target = new Vector3(10, 0, 0);
     const velocity = new Vector3(0, 4, 0);

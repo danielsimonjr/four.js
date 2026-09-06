@@ -263,18 +263,22 @@ export function ballisticTimeOfFlightToPlane(
  * launch solve (solving for the angle under gravity) is a different problem and
  * is not part of this packet.
  *
- * @throws RangeError when `projectileSpeed` is negative or not finite.
+ * @throws RangeError when `projectileSpeed` is negative or not finite,
+ *   unless {@link InterceptTimeOptions.validateSpeed} is `false`.
  */
 export function interceptTime(
   shooterPosition: Vector3,
   projectileSpeed: number,
   targetPosition: Vector3,
   targetVelocity: Vector3,
+  options?: InterceptTimeOptions,
 ): number {
-  if (!Number.isFinite(projectileSpeed) || projectileSpeed < 0) {
-    throw new RangeError(
-      `interceptTime projectileSpeed must be a finite number >= 0 (units per second); received ${String(projectileSpeed)}`,
-    );
+  if (options?.validateSpeed !== false) {
+    if (!Number.isFinite(projectileSpeed) || projectileSpeed < 0) {
+      throw new RangeError(
+        `interceptTime projectileSpeed must be a finite number >= 0 (units per second); received ${String(projectileSpeed)}`,
+      );
+    }
   }
   const rx = targetPosition.x - shooterPosition.x;
   const ry = targetPosition.y - shooterPosition.y;
@@ -283,7 +287,43 @@ export function interceptTime(
   const b =
     2 * (rx * targetVelocity.x + ry * targetVelocity.y + rz * targetVelocity.z);
   const c = rx * rx + ry * ry + rz * rz;
-  return earliestRoot(a, b, c, true);
+  const root = earliestRoot(a, b, c, true);
+  if (options?.onMiss === "heuristic") {
+    // Steering's pursue/evade: a non-finite root (no catch, or an overflowed
+    // `+Infinity`) falls back to Reynolds' horizon `|R| / speed`. Finite
+    // roots — including `0` when the target is already at the shooter — are
+    // kept. This is the fold the 2026-08-02 note called mechanical; the
+    // policy split stays here so the default §111 path is unchanged.
+    return Number.isFinite(root) ? root : Math.sqrt(c) / projectileSpeed;
+  }
+  return root;
+}
+
+/**
+ * Policy knobs for {@link interceptTime}. Omitting the argument preserves
+ * the §111 lead contract (`NaN` on a miss, throw on a bad speed).
+ *
+ * Steering's pursue / evade pass
+ * `{ onMiss: "heuristic", validateSpeed: false }` so they keep the
+ * Reynolds fallback and the hot-path "do not validate `maxSpeed`" rule
+ * without a second quadratic.
+ */
+export interface InterceptTimeOptions {
+  /**
+   * What to return when no non-negative finite interception exists.
+   *
+   * - `"nan"` (default) — the caller can refuse the shot.
+   * - `"heuristic"` — Reynolds' horizon `|R| / projectileSpeed`, so a
+   *   pursuer always has somewhere to steer.
+   */
+  onMiss?: "nan" | "heuristic";
+  /**
+   * Whether a negative or non-finite `projectileSpeed` throws.
+   * Default `true`. Steering sets `false` so a `NaN` / negative `maxSpeed`
+   * propagates through the arithmetic instead of becoming a `RangeError`
+   * on the hot path.
+   */
+  validateSpeed?: boolean;
 }
 
 /**

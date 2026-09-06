@@ -150,6 +150,11 @@ import type { PhysicsWorld } from "./world.js";
  * at; nothing here checks, for the same reason nothing checks in the particle
  * path — the check would run per body per field per step, and §85's place for
  * it is the field's own constructor.
+ *
+ * {@link ForceField.sampleAll} is the optional §27 batch fast path (R-34's
+ * particle spelling, reused here so a field written for either pillar keeps
+ * one identity). {@link ForceFieldSystem} calls it when a field offers it;
+ * {@link ForceField.sample} stays the required §27 entry point.
  */
 export interface ForceField {
   /**
@@ -163,6 +168,38 @@ export interface ForceField {
     time: number,
     out?: Vector3,
   ): Vector3;
+
+  /**
+   * **Optional fast path**: the same contribution as {@link ForceField.sample},
+   * for `count` bodies at once, **added into** `out` (stride-3 `xyz`).
+   *
+   * This is `@four/particles`' `ParticleForceField.sampleAll` transcribed
+   * member-for-member so every built-in particle field is a batched
+   * {@link ForceField} with no adapter. Contract, restated from that
+   * transcription:
+   *
+   * - **Add, do not assign.** The caller owns `out` and may hand over a
+   *   zeroed buffer or a running sum; overwriting it deletes whatever was
+   *   already there.
+   * - **`out` is binary64.** The scalar path accumulates in JavaScript
+   *   numbers; a binary32 accumulator would make a batched step differ from
+   *   a scalar one in the last bits, and §33 does not permit that.
+   * - **Be bit-identical to `sample`.** Same arithmetic, same order, same
+   *   special cases. Positions and velocities are `xyz` at stride 3, valid
+   *   for `[0, 3 · count)`. **Read, never write.**
+   * - Same purity rules as `sample`: no clock, no `Math.random`.
+   *
+   * A field that omits this is not penalised: the system falls back to
+   * {@link ForceField.sample} for that field alone, in the same registration
+   * order, with the same result.
+   */
+  sampleAll?(
+    positions: ArrayLike<number>,
+    velocities: ArrayLike<number>,
+    count: number,
+    time: number,
+    out: Float64Array,
+  ): void;
 }
 
 /**
@@ -232,11 +269,33 @@ export class ForceFieldSystem implements SimulationSystem {
   /** The body's velocity, copied so a field cannot corrupt the component's mirror. */
   readonly #velocity = new Vector3();
 
+  /**
+   * The body's sample point, copied out of the SoA gather so a scalar-fallback
+   * field in the batch path cannot alias the packed arrays.
+   */
+  readonly #position = new Vector3();
+
   /** Scratch handed to `ForceField.sample` as its `out`. */
   readonly #sample = new Vector3();
 
   /** Running sum of one body's field contributions, in newtons. */
   readonly #total = new Vector3();
+
+  /**
+   * SoA scratch for the batched field path, grown to the next power of two
+   * that covers `world.size` and then reused. Empty until a registered field
+   * offers {@link ForceField.sampleAll} — a system that only ever sees
+   * scalar fields never pays for them.
+   */
+  #capacity = 0;
+  #positions = new Float64Array(0);
+  #velocities = new Float64Array(0);
+  /** Per-field raw samples, binary64, before the units scale. */
+  #fieldScratch = new Float64Array(0);
+  /** Running newton sum for every gathered body. */
+  #newtonAcc = new Float64Array(0);
+  #massFactors = new Float64Array(0);
+  readonly #bodies: RigidBody[] = [];
 
   /**
    * Node ids already reported by {@link ForceFieldSystem.fixedUpdate}'s
@@ -390,19 +449,51 @@ export class ForceFieldSystem implements SimulationSystem {
    *
    * ## Allocation and cost
    *
-   * Nothing is allocated after construction. A system with no fields, or with
-   * no tracked world, does no solver call at all: the field list is tested
-   * before the worlds are walked, so registering the system and using it later
-   * costs one array-length comparison per step.
+   * Nothing is allocated after construction except the batched SoA scratch,
+   * which grows to the next power of two that covers `world.size` the first
+   * time a {@link ForceField.sampleAll} field meets that many registrations
+   * and is then reused. A system with no fields, or with no tracked world,
+   * does no solver call at all: the field list is tested before the worlds
+   * are walked, so registering the system and using it later costs one
+   * array-length comparison per step.
+   *
+   * ## Batching (optional {@link ForceField.sampleAll})
+   *
+   * When at least one registered field offers `sampleAll`, that world's
+   * active bodies are gathered into stride-3 SoA buffers (binary64, so the
+   * packed values equal `centerOfMass` / `linearVelocity` bit-for-bit) and
+   * each such field is invoked once per step instead of once per body. A
+   * field without the fast path is still sampled with {@link
+   * ForceField.sample}, in its own place in the registration order, into
+   * the same newton accumulator — one custom field neither reorders the
+   * sum nor disables batching for its neighbours. Per-body summation order
+   * is unchanged: field 0 then field 1 then field 2, which is why the
+   * `force-fields` golden does not move.
    */
   fixedUpdate(context: FixedUpdateContext): void {
     if (this.#fields.length === 0 || this.#worlds.length === 0) {
       return;
     }
     const time = context.time.simulationTime;
+    const batched = this.#hasBatchedField();
     for (let w = 0; w < this.#worlds.length; w += 1) {
-      this.#applyToWorld(this.#worlds[w], time);
+      if (batched) {
+        this.#applyToWorldBatched(this.#worlds[w], time);
+      } else {
+        this.#applyToWorld(this.#worlds[w], time);
+      }
     }
+  }
+
+  /** Whether any registered field offers the §27 batch entry point. */
+  #hasBatchedField(): boolean {
+    const fields = this.#fields;
+    for (let f = 0; f < fields.length; f += 1) {
+      if (fields[f].field.sampleAll !== undefined) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** One world's active bodies, in registration order (§33). */
@@ -410,6 +501,165 @@ export class ForceFieldSystem implements SimulationSystem {
     world.forEachActiveBody((body, node, centerOfMass) => {
       this.#applyToBody(body, node.id, centerOfMass, time);
     });
+  }
+
+  /**
+   * Gathers one world's active bodies into SoA scratch and samples every
+   * field across the whole set before applying one force per body.
+   */
+  #applyToWorldBatched(world: PhysicsWorld, time: number): void {
+    this.#ensureCapacity(world.size);
+    const positions = this.#positions;
+    const velocities = this.#velocities;
+    const bodies = this.#bodies;
+    const massFactors = this.#massFactors;
+    let count = 0;
+    let needsMass = false;
+    const fields = this.#fields;
+    for (let f = 0; f < fields.length; f += 1) {
+      if (fields[f].units === "acceleration") {
+        needsMass = true;
+        break;
+      }
+    }
+
+    world.forEachActiveBody((body, node, centerOfMass) => {
+      const base = count * 3;
+      positions[base] = centerOfMass.x;
+      positions[base + 1] = centerOfMass.y;
+      positions[base + 2] = centerOfMass.z;
+      const velocity = body.linearVelocity;
+      velocities[base] = velocity.x;
+      velocities[base + 1] = velocity.y;
+      velocities[base + 2] = velocity.z;
+      bodies[count] = body;
+      if (needsMass) {
+        massFactors[count] = this.#massFactor(body, node.id);
+      }
+      count += 1;
+    });
+
+    if (count === 0) {
+      return;
+    }
+
+    const live = count * 3;
+    const newtonAcc = this.#newtonAcc;
+    newtonAcc.fill(0, 0, live);
+
+    for (let f = 0; f < fields.length; f += 1) {
+      this.#accumulateField(fields[f], count, time);
+    }
+
+    const total = this.#total;
+    for (let i = 0; i < count; i += 1) {
+      const base = i * 3;
+      const x = newtonAcc[base];
+      const y = newtonAcc[base + 1];
+      const z = newtonAcc[base + 2];
+      if (x !== 0 || y !== 0 || z !== 0) {
+        total.set(x, y, z);
+        bodies[i].applyForce(total);
+      }
+    }
+  }
+
+  /**
+   * Adds one field's contribution, in newtons, into `#newtonAcc`.
+   *
+   * Uses {@link ForceField.sampleAll} when the field offers it; otherwise
+   * walks the gathered bodies with {@link ForceField.sample}. Units are
+   * applied here so the accumulator is always newtons and a mix of
+   * `"force"` and `"acceleration"` fields still sums in registration order.
+   */
+  #accumulateField(entry: ForceFieldEntry, count: number, time: number): void {
+    const scaleIsMass = entry.units === "acceleration";
+    const batch = entry.field.sampleAll;
+    if (batch !== undefined) {
+      const scratch = this.#fieldScratch;
+      scratch.fill(0, 0, count * 3);
+      batch.call(
+        entry.field,
+        this.#positions,
+        this.#velocities,
+        count,
+        time,
+        scratch,
+      );
+      this.#scaleAdd(count, scratch, scaleIsMass);
+      return;
+    }
+
+    const position = this.#position;
+    const velocity = this.#velocity;
+    const sample = this.#sample;
+    const positions = this.#positions;
+    const velocities = this.#velocities;
+    const newtonAcc = this.#newtonAcc;
+    const massFactors = this.#massFactors;
+    for (let i = 0; i < count; i += 1) {
+      const base = i * 3;
+      const scale = scaleIsMass ? massFactors[i] : 1;
+      if (scale === 0) {
+        continue;
+      }
+      position.set(positions[base], positions[base + 1], positions[base + 2]);
+      velocity.set(
+        velocities[base],
+        velocities[base + 1],
+        velocities[base + 2],
+      );
+      const sampled = entry.field.sample(position, velocity, time, sample);
+      newtonAcc[base] += sampled.x * scale;
+      newtonAcc[base + 1] += sampled.y * scale;
+      newtonAcc[base + 2] += sampled.z * scale;
+    }
+  }
+
+  /**
+   * `newtonAcc += samples · scale`, with `scale` either 1 or the body's
+   * kilograms. Component arithmetic rather than a vector helper so a
+   * binary64 lane is never rounded through a `Vector3`.
+   */
+  #scaleAdd(
+    count: number,
+    samples: Float64Array,
+    scaleIsMass: boolean,
+  ): void {
+    const newtonAcc = this.#newtonAcc;
+    const massFactors = this.#massFactors;
+    for (let i = 0; i < count; i += 1) {
+      const scale = scaleIsMass ? massFactors[i] : 1;
+      if (scale === 0) {
+        continue;
+      }
+      const base = i * 3;
+      newtonAcc[base] += samples[base] * scale;
+      newtonAcc[base + 1] += samples[base + 1] * scale;
+      newtonAcc[base + 2] += samples[base + 2] * scale;
+    }
+  }
+
+  /**
+   * Grows the SoA scratch to a power of two that covers `needed` bodies.
+   * Gather always follows a grow in the same step, so a resized buffer
+   * does not have to copy a partial gather.
+   */
+  #ensureCapacity(needed: number): void {
+    if (needed <= this.#capacity) {
+      return;
+    }
+    let next = this.#capacity === 0 ? 16 : this.#capacity;
+    while (next < needed) {
+      next *= 2;
+    }
+    const floats = next * 3;
+    this.#positions = new Float64Array(floats);
+    this.#velocities = new Float64Array(floats);
+    this.#fieldScratch = new Float64Array(floats);
+    this.#newtonAcc = new Float64Array(floats);
+    this.#massFactors = new Float64Array(next);
+    this.#capacity = next;
   }
 
   /** Sums every field at one body and queues the total through §26. */

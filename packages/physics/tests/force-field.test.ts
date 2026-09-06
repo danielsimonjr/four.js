@@ -579,3 +579,199 @@ describe("§39 step 5 then step 6, in one registry", () => {
     ).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// §27 batched field sampling
+// ---------------------------------------------------------------------------
+
+/**
+ * A field that implements both entry points from the same arithmetic, and
+ * counts which one the system actually called.
+ */
+function countingBatchField(
+  x: number,
+  y: number,
+  z = 0,
+): ForceField & { sampleCalls: number; batchCalls: number } {
+  const field = {
+    sampleCalls: 0,
+    batchCalls: 0,
+    sample(
+      _position: Vector3,
+      _velocity: Vector3,
+      _time: number,
+      out?: Vector3,
+    ): Vector3 {
+      field.sampleCalls += 1;
+      return (out ?? new Vector3()).set(x, y, z);
+    },
+    sampleAll(
+      _positions: ArrayLike<number>,
+      _velocities: ArrayLike<number>,
+      count: number,
+      _time: number,
+      out: Float64Array,
+    ): void {
+      field.batchCalls += 1;
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += x;
+        out[base + 1] += y;
+        out[base + 2] += z;
+      }
+    },
+  };
+  return field;
+}
+
+/** Drag-like `a = −c · v`, with both entry points, for the N-vs-N equality. */
+function dragLikeField(coefficient: number): ForceField {
+  return {
+    sample(_position, velocity, _time, out) {
+      return (out ?? new Vector3()).set(
+        -coefficient * velocity.x,
+        -coefficient * velocity.y,
+        -coefficient * velocity.z,
+      );
+    },
+    sampleAll(_positions, velocities, count, _time, out) {
+      for (let i = 0; i < count; i += 1) {
+        const base = i * 3;
+        out[base] += -coefficient * velocities[base];
+        out[base + 1] += -coefficient * velocities[base + 1];
+        out[base + 2] += -coefficient * velocities[base + 2];
+      }
+    },
+  };
+}
+
+describe("ForceFieldSystem batch path (§27 sampleAll)", () => {
+  it("calls sampleAll once per field, not sample per body", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1, position: [0, 0, 0] }));
+    world.addBody(bodyNode({ mass: 2, position: [1, 0, 0] }));
+    world.addBody(bodyNode({ mass: 3, position: [2, 0, 0] }));
+
+    const field = countingBatchField(1, -2, 0);
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [{ field, units: "force" }],
+    }).fixedUpdate(contextAt(0.5));
+    world.step(1 / 60);
+
+    expect(field.batchCalls).toBe(1);
+    expect(field.sampleCalls).toBe(0);
+    for (const id of [1, 2, 3]) {
+      expect(solverForce(adapter, id).x).toBe(1);
+      expect(solverForce(adapter, id).y).toBe(-2);
+    }
+  });
+
+  it("a batch of N equals N times sample() within an ulp", async () => {
+    const { adapter: batchedAdapter, world: batchedWorld } = await readyWorld();
+    const { adapter: scalarAdapter, world: scalarWorld } = await readyWorld();
+    const positions = [
+      [0.5, 1.25, 0],
+      [-2, 0.75, 0],
+      [3.5, -0.5, 0],
+    ] as const;
+    const velocities = [
+      [1.5, -0.25, 0],
+      [0, 2, 0],
+      [-0.75, 0.5, 0],
+    ] as const;
+
+    for (const [i, position] of positions.entries()) {
+      batchedWorld.addBody(bodyNode({ mass: 1 + i, position }));
+      scalarWorld.addBody(bodyNode({ mass: 1 + i, position }));
+      batchedAdapter.body(i + 1).position.set(...position);
+      scalarAdapter.body(i + 1).position.set(...position);
+      batchedAdapter.body(i + 1).linearVelocity.set(...velocities[i]);
+      scalarAdapter.body(i + 1).linearVelocity.set(...velocities[i]);
+    }
+    batchedWorld.step(1 / 60);
+    scalarWorld.step(1 / 60);
+
+    const batchedField = dragLikeField(0.4);
+    const scalarOnly: ForceField = {
+      sample: (position, velocity, time, out) =>
+        batchedField.sample(position, velocity, time, out),
+    };
+
+    new ForceFieldSystem({
+      worlds: [batchedWorld],
+      fields: [
+        { field: batchedField, units: "acceleration" },
+        { field: countingBatchField(2, 0, 0), units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0.25));
+    new ForceFieldSystem({
+      worlds: [scalarWorld],
+      fields: [
+        { field: scalarOnly, units: "acceleration" },
+        { field: constantField(2, 0, 0), units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0.25));
+    batchedWorld.step(1 / 60);
+    scalarWorld.step(1 / 60);
+
+    for (const id of [1, 2, 3]) {
+      const batched = solverForce(batchedAdapter, id);
+      const scalar = solverForce(scalarAdapter, id);
+      expect(batched.x).toBe(scalar.x);
+      expect(batched.y).toBe(scalar.y);
+      expect(batched.z).toBe(scalar.z);
+    }
+  });
+
+  it("a field without sampleAll is mixed in without disabling the batch path", async () => {
+    const { adapter, world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 2, position: [1, 0, 0] }));
+    world.addBody(bodyNode({ mass: 4, position: [2, 0, 0] }));
+
+    const batched = countingBatchField(0, 3, 0);
+    let scalarCalls = 0;
+    const scalar: ForceField = {
+      sample(_position, _velocity, _time, out) {
+        scalarCalls += 1;
+        return (out ?? new Vector3()).set(1, 0, 0);
+      },
+    };
+
+    new ForceFieldSystem({
+      worlds: [world],
+      fields: [
+        { field: batched, units: "acceleration" },
+        { field: scalar, units: "force" },
+      ],
+    }).fixedUpdate(contextAt(0));
+    world.step(1 / 60);
+
+    expect(batched.batchCalls).toBe(1);
+    expect(batched.sampleCalls).toBe(0);
+    expect(scalarCalls).toBe(2);
+    // 3 m/s² × mass + 1 N
+    expect(solverForce(adapter, 1).x).toBe(1);
+    expect(solverForce(adapter, 1).y).toBe(6);
+    expect(solverForce(adapter, 2).x).toBe(1);
+    expect(solverForce(adapter, 2).y).toBe(12);
+  });
+
+  it("allocates nothing per step once the SoA scratch has grown (§7b)", async () => {
+    const { world } = await readyWorld();
+    world.addBody(bodyNode({ mass: 1 }));
+    world.addBody(bodyNode({ mass: 3 }));
+    const system = new ForceFieldSystem({
+      worlds: [world],
+      fields: [{ field: countingBatchField(1, 0, 0), units: "force" }],
+    });
+    const context = contextAt(0);
+    system.fixedUpdate(context);
+
+    resetConstructionCount();
+    for (let i = 0; i < 20; i += 1) {
+      system.fixedUpdate(context);
+    }
+    expect(constructionCount()).toBe(0);
+  });
+});

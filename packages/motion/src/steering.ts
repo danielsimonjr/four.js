@@ -93,6 +93,7 @@
 
 import { Vector3 } from "@four/math";
 
+import { interceptTime as predictedInterceptTime } from "./prediction.js";
 import type { SeededRandom } from "./random.js";
 
 /**
@@ -358,56 +359,25 @@ export function arrive(
  * collapsing to a stern chase, and is stated here because it is the one place
  * this solver is not a closed form.
  *
- * Module-private on purpose: WP-8.3 owns §111's general lead/ballistic
- * prediction and its `prediction.ts` exports an `interceptTime` built on the
- * same quadratic with the same stable root pairing. The two differ only in the
- * no-solution policy — that one returns `NaN` so a caller can refuse the shot,
- * this one falls back to the heuristic horizon so a pursuer always has
- * *somewhere* to steer. The packets were written in parallel; a 2026-08-02
- * note called folding this helper into that function "mechanical", but a
- * 2026-08-05 review found it is not quite: that function *throws* on the
- * negative/NaN speeds this hot path deliberately lets propagate, its
- * `a = b = c = 0` case returns `0` where this one degrades to the heuristic,
- * and its root filter admits an overflowed `+Infinity` root that this one
- * rejects — so the duplication stands until those policies are worth
- * reconciling.
+ * The quadratic lives in `prediction.ts` (`interceptTime`). The two call
+ * sites here pass the steering policy — Reynolds' heuristic on a miss, no
+ * throw on a bad `maxSpeed` — so pursue/evade keep the behaviour they had
+ * when this helper was a private copy (2026-08-02 fold; the 2026-08-05
+ * review's policy split is now an options bag on that export rather than a
+ * second solver).
  */
 function interceptTime(
   context: SteeringContext,
   targetPosition: Vector3,
   targetVelocity: Vector3,
 ): number {
-  const { position, maxSpeed } = context;
-  const rx = targetPosition.x - position.x;
-  const ry = targetPosition.y - position.y;
-  const rz = targetPosition.z - position.z;
-  const vx = targetVelocity.x;
-  const vy = targetVelocity.y;
-  const vz = targetVelocity.z;
-
-  const a = vx * vx + vy * vy + vz * vz - maxSpeed * maxSpeed;
-  const b = 2 * (rx * vx + ry * vy + rz * vz);
-  const c = rx * rx + ry * ry + rz * rz;
-
-  const discriminant = b * b - 4 * a * c;
-  if (discriminant >= 0) {
-    const rootDiscriminant = Math.sqrt(discriminant);
-    const q = -0.5 * (b >= 0 ? b + rootDiscriminant : b - rootDiscriminant);
-    // Both roots, guarding the two divisions; `Infinity` never survives the
-    // comparisons below because it is not less than a finite candidate.
-    const first = a !== 0 ? q / a : Number.POSITIVE_INFINITY;
-    const second = q !== 0 ? c / q : Number.POSITIVE_INFINITY;
-    const low = Math.min(first, second);
-    const high = Math.max(first, second);
-    if (low >= 0 && low !== Number.POSITIVE_INFINITY) {
-      return low;
-    }
-    if (high >= 0 && high !== Number.POSITIVE_INFINITY) {
-      return high;
-    }
-  }
-  // Unreachable target: Reynolds' heuristic horizon.
-  return Math.sqrt(c) / maxSpeed;
+  return predictedInterceptTime(
+    context.position,
+    context.maxSpeed,
+    targetPosition,
+    targetVelocity,
+    { onMiss: "heuristic", validateSpeed: false },
+  );
 }
 
 /**
