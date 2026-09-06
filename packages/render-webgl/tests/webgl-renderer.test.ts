@@ -73,6 +73,7 @@ import {
   JOINTS_ATTRIBUTE_LOCATION,
   LitProgram,
   MAP_TEXTURE_UNIT,
+  METAL_ROUGHNESS_TEXTURE_UNIT,
   NORMAL_ATTRIBUTE_LOCATION,
   PARTICLE_ATTRIBUTE_LOCATIONS,
   PARTICLE_GL,
@@ -897,8 +898,10 @@ class TestStandardMaterial {
 
   readonly emissive: [number, number, number];
 
-  /** §59's one shipped map; unset by default, like the other doubles'. */
+  /** §59's albedo map; unset by default, like the other doubles'. */
   map?: ItemTexture | null;
+
+  metalRoughnessMap?: ItemTexture | null;
 
   constructor(
     baseColor: [number, number, number, number] = [1, 1, 1, 1],
@@ -4904,6 +4907,43 @@ describe("WebglRenderer.render — §57 render state (R-11)", () => {
     expect(gl.countOf("blendFunc")).toBe(0);
   });
 
+  it("blends an opaque-flagged unlit whose color alpha is not 1, and restores after", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({}, [1, 0, 0, 0.5]));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(toggles(gl)).toEqual([
+      ["enable", GL.BLEND],
+      ["disable", GL.BLEND],
+    ]);
+    expect(gl.names().indexOf("enable")).toBeLessThan(
+      gl.names().indexOf("drawArrays"),
+    );
+    expect(gl.names().lastIndexOf("disable")).toBeGreaterThan(
+      gl.names().indexOf("drawArrays"),
+    );
+    expect(gl.countOf("blendFunc")).toBe(0);
+  });
+
+  it("leaves an opaque unlit (color alpha 1, transparent false) unblended", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    root.add(stateful({ transparent: false }, [1, 0, 0, 1]));
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(
+      gl.callsOf("enable").filter((call) => call.args[0] === GL.BLEND),
+    ).toHaveLength(0);
+    expect(
+      gl.callsOf("disable").filter((call) => call.args[0] === GL.BLEND),
+    ).toHaveLength(0);
+  });
+
   it("blends a transparent lit item — the alpha that used to be dead", async () => {
     const { renderer, gl, camera } = await initialized();
     const root = createRoot();
@@ -7472,7 +7512,7 @@ function standardRenderable(
 }
 
 describe("StandardProgram — compilation and linking (§59, §61, §89)", () => {
-  it("compiles both stages, links, and resolves the twenty-three uniforms", () => {
+  it("compiles both stages, links, and resolves the twenty-five uniforms", () => {
     const gl = createFakeGl();
 
     const program = StandardProgram.create(gl);
@@ -7494,6 +7534,8 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
       "cameraPosition",
       "map",
       "useMap",
+      "metalRoughnessMap",
+      "useMetalRoughnessMap",
       // §68's light set (R-17, 2026-08-09) — the same five names, in the same
       // order, as the lit pipeline's, because both resolve them through the
       // one `PunctualLightUniforms.resolve`.
@@ -7638,6 +7680,34 @@ describe("StandardProgram — compilation and linking (§59, §61, §89)", () =>
     // The sampler unit is uploaded once in the lifetime of the program.
     program.setFeatures(true);
     expect(uploadsAt(gl, uniforms.get("map"))).toEqual([MAP_TEXTURE_UNIT]);
+  });
+
+  it("uploads the metallic-roughness sampler on unit 2, lazily, without touching unit 0", () => {
+    const gl = createFakeGl();
+    const program = StandardProgram.create(gl);
+    program.use();
+    const uniforms = standardUniforms(gl);
+
+    program.setFeatures(false, false);
+    expect(gl.countOf("uniform1i")).toBe(0);
+
+    program.setFeatures(false, true);
+    expect(uploadsAt(gl, uniforms.get("metalRoughnessMap"))).toEqual([
+      METAL_ROUGHNESS_TEXTURE_UNIT,
+    ]);
+    expect(uploadsAt(gl, uniforms.get("useMetalRoughnessMap"))).toEqual([1]);
+    expect(uploadsAt(gl, uniforms.get("map"))).toEqual([]);
+    expect(uploadsAt(gl, uniforms.get("useMap"))).toEqual([]);
+
+    program.setFeatures(false, true);
+    expect(gl.countOf("uniform1i")).toBe(2);
+
+    program.setFeatures(false, false);
+    expect(uploadsAt(gl, uniforms.get("useMetalRoughnessMap"))).toEqual([1, 0]);
+    program.setFeatures(false, true);
+    expect(uploadsAt(gl, uniforms.get("metalRoughnessMap"))).toEqual([
+      METAL_ROUGHNESS_TEXTURE_UNIT,
+    ]);
   });
 
   it("throws SHADER_COMPILATION_FAILED and cleans up exactly as the unlit program does", () => {
@@ -7798,6 +7868,32 @@ describe("WebglRenderer.render — standard surfaces (§59, §68)", () => {
     expect(bound).toHaveLength(2);
     expect(bound[1]).toBeNull();
     expect(uploadsAt(gl, standardUniforms(gl).get("useMap"))).toEqual([1, 0]);
+  });
+
+  it("binds the packed metallic-roughness map on unit 2 and restores after the draw", async () => {
+    const { renderer, gl, camera } = await initialized();
+    const root = createRoot();
+    const texture = new TestTexture();
+    const mapped = new TestStandardMaterial();
+    mapped.metalRoughnessMap = texture.asTexture;
+    root.add(standardRenderable(litTriangleGeometry(), mapped));
+    renderer.render(root, [createView(camera)]);
+    gl.reset();
+
+    renderer.render(root, [createView(camera)]);
+
+    expect(gl.callsOf("activeTexture").map((call) => call.args[0])).toEqual([
+      GL.TEXTURE0 + METAL_ROUGHNESS_TEXTURE_UNIT,
+      GL.TEXTURE0,
+    ]);
+    const bound = gl.callsOf("bindTexture").map((call) => call.args[1]);
+    expect(bound).toHaveLength(2);
+    expect(bound[0]).not.toBeNull();
+    expect(bound[1]).toBeNull();
+    expect(
+      uploadsAt(gl, standardUniforms(gl).get("useMetalRoughnessMap")),
+    ).toEqual([1]);
+    expect(uploadsAt(gl, standardUniforms(gl).get("useMap"))).toEqual([]);
   });
 
   it("draws a material whose texture the application disposed with no map at all", async () => {

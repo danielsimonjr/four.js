@@ -79,6 +79,7 @@ import type { SceneLights } from "@four/render";
 
 import {
   MAP_TEXTURE_UNIT,
+  METAL_ROUGHNESS_TEXTURE_UNIT,
   PUNCTUAL_LIGHT_GLSL,
   PunctualLightUniforms,
   SHADOW_GLSL,
@@ -186,6 +187,8 @@ precision highp float;
 uniform vec4 baseColor;
 uniform sampler2D map;
 uniform bool useMap;
+uniform sampler2D metalRoughnessMap;
+uniform bool useMetalRoughnessMap;
 uniform float metalness;
 uniform float roughness;
 uniform vec3 emissive;
@@ -238,9 +241,17 @@ void main() {
     base *= texture(map, vUv);
   }
 
+  float metal = metalness;
+  float rough = roughness;
+  if (useMetalRoughnessMap) {
+    vec4 mr = texture(metalRoughnessMap, vUv);
+    metal *= mr.b;
+    rough *= mr.g;
+  }
+
   vec3 albedo = base.rgb;
-  vec3 diffuseColor = albedo * (1.0 - metalness);
-  vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metalness);
+  vec3 diffuseColor = albedo * (1.0 - metal);
+  vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metal);
   vec3 shaded = ambientLight * diffuseColor;
 
   float normalLength = length(vNormal);
@@ -248,7 +259,7 @@ void main() {
     vec3 n = vNormal / normalLength;
     vec3 v = normalize(cameraPosition - vWorldPosition);
 
-    float alpha = max(roughness, MIN_ROUGHNESS);
+    float alpha = max(rough, MIN_ROUGHNESS);
     alpha = alpha * alpha;
     float alpha2 = alpha * alpha;
 
@@ -338,6 +349,10 @@ export class StandardProgram implements Disposable {
 
   readonly #useMapLocation: GlUniformLocation;
 
+  readonly #metalRoughnessMapLocation: GlUniformLocation;
+
+  readonly #useMetalRoughnessMapLocation: GlUniformLocation;
+
   readonly #punctual: PunctualLightUniforms;
 
   readonly #shadow: ShadowUniforms;
@@ -346,6 +361,10 @@ export class StandardProgram implements Disposable {
   #useMap = false;
 
   #samplerUploaded = false;
+
+  #useMetalRoughnessMap = false;
+
+  #metalRoughnessSamplerUploaded = false;
 
   #disposed = false;
 
@@ -376,6 +395,8 @@ export class StandardProgram implements Disposable {
     this.#cameraPositionLocation = locations[9];
     this.#mapLocation = locations[10];
     this.#useMapLocation = locations[11];
+    this.#metalRoughnessMapLocation = locations[12];
+    this.#useMetalRoughnessMapLocation = locations[13];
   }
 
   /**
@@ -406,6 +427,8 @@ export class StandardProgram implements Disposable {
         "cameraPosition",
         "map",
         "useMap",
+        "metalRoughnessMap",
+        "useMetalRoughnessMap",
       ];
       return new StandardProgram(
         gl,
@@ -572,16 +595,29 @@ export class StandardProgram implements Disposable {
    * CPU, uploaded only on change, sampler unit uploaded lazily the first time
    * this program draws a texture at all.
    */
-  setFeatures(useMap: boolean): void {
-    if (useMap === this.#useMap) {
-      return;
+  setFeatures(useMap: boolean, useMetalRoughnessMap = false): void {
+    if (useMap !== this.#useMap) {
+      if (useMap && !this.#samplerUploaded) {
+        this.#gl.uniform1i(this.#mapLocation, MAP_TEXTURE_UNIT);
+        this.#samplerUploaded = true;
+      }
+      this.#gl.uniform1i(this.#useMapLocation, useMap ? 1 : 0);
+      this.#useMap = useMap;
     }
-    if (useMap && !this.#samplerUploaded) {
-      this.#gl.uniform1i(this.#mapLocation, MAP_TEXTURE_UNIT);
-      this.#samplerUploaded = true;
+    if (useMetalRoughnessMap !== this.#useMetalRoughnessMap) {
+      if (useMetalRoughnessMap && !this.#metalRoughnessSamplerUploaded) {
+        this.#gl.uniform1i(
+          this.#metalRoughnessMapLocation,
+          METAL_ROUGHNESS_TEXTURE_UNIT,
+        );
+        this.#metalRoughnessSamplerUploaded = true;
+      }
+      this.#gl.uniform1i(
+        this.#useMetalRoughnessMapLocation,
+        useMetalRoughnessMap ? 1 : 0,
+      );
+      this.#useMetalRoughnessMap = useMetalRoughnessMap;
     }
-    this.#gl.uniform1i(this.#useMapLocation, useMap ? 1 : 0);
-    this.#useMap = useMap;
   }
 
   /**

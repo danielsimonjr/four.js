@@ -25,28 +25,32 @@
  * | §59 names            | here                                            |
  * | -------------------- | ----------------------------------------------- |
  * | `baseColor`          | {@link StandardMaterial.baseColor} (+ optional {@link StandardMaterial.map}) |
- * | `metalness`          | {@link StandardMaterial.metalness}              |
- * | `roughness`          | {@link StandardMaterial.roughness}              |
+ * | `metalness`          | {@link StandardMaterial.metalness} (+ optional packed {@link StandardMaterial.metalRoughnessMap}) |
+ * | `roughness`          | {@link StandardMaterial.roughness} (+ the same packed map) |
  * | `emissive`           | {@link StandardMaterial.emissive}               |
  * | `normalMap`          | **staged** — needs the tangent attribute        |
- * | `occlusionMap`       | **staged** — needs a second texture unit        |
+ * | `occlusionMap`       | **staged** — needs a third data unit and AO term |
  *
- * The two staged maps are staged for causes that are recorded elsewhere and are
- * not this packet's to fix:
+ * The two staged maps stay staged for causes that are recorded elsewhere:
  *
  * - **`normalMap` needs tangents.** A tangent-space normal map is meaningless
  *   without a per-vertex tangent frame, and §53's tangent attribute was
  *   deliberately left out by R-19 (2026-08-07) when `uvs` and `colors` landed —
  *   see `@four/geometry`'s `BufferGeometry`. Shipping the field without the
  *   attribute would put a texture in the public API that every geometry in the
- *   engine silently ignores.
- * - **`occlusionMap` — and glTF's `metallicRoughnessMap` and `emissiveMap` with
- *   it — need a second texture unit.** This backend tier binds exactly one
- *   texture per draw at `MAP_TEXTURE_UNIT`, and §77's multi-texture
- *   materials are what will bring the unit allocator (`@four/render-webgl`'s
- *   `gl-program.ts` says so, in those words, and has since WP-3a.3). A base
- *   colour map is the one texture that needs nothing new; the other four each
- *   need the same missing thing, so they arrive together with it.
+ *   engine silently ignores. This packet does **not** pretend it shipped PBR
+ *   normal mapping.
+ * - **`occlusionMap` and `emissiveMap` need more than a second unit.** The
+ *   unit allocator (`@four/render-webgl`'s `gl-program.ts`, named since
+ *   WP-3a.3) now reserves unit 2 for the packed metallic-roughness map glTF
+ *   actually authors. Occlusion still needs an AO multiply the BRDF does not
+ *   evaluate, and emissive still needs a third colour texture; both stay
+ *   warned-inert on the glTF loader until those terms exist.
+ *
+ * **WebGPU staging (2026-09-06).** {@link StandardMaterial.metalRoughnessMap}
+ * is a real field on every backend, but `@four/render-webgpu`'s standard
+ * family still shades from the scalar factors alone — see `wgpu-standard.ts`.
+ * Do not read a WebGPU standard draw as sampling this map.
  *
  * §59's seven physical extensions are `PhysicalMaterial`'s (§57's family puts it
  * above this class) and are not sketched here.
@@ -169,6 +173,13 @@ export interface StandardMaterialOptions extends MaterialOptions {
    * sampled with the geometry's `uvs` (§53, §77). Defaults to `null`.
    */
   map?: MaterialTexture | null;
+
+  /**
+   * Initial {@link StandardMaterial.metalRoughnessMap} — glTF's packed
+   * metallic-roughness texture (G = roughness, B = metalness). Defaults to
+   * `null`.
+   */
+  metalRoughnessMap?: MaterialTexture | null;
 
   /**
    * Initial {@link StandardMaterial.metalness}; defaults to `0` (a dielectric).
@@ -309,6 +320,8 @@ export class StandardMaterial extends Material {
 
   #map: MaterialTexture | null;
 
+  #metalRoughnessMap: MaterialTexture | null;
+
   #metalness: number;
 
   #roughness: number;
@@ -329,6 +342,7 @@ export class StandardMaterial extends Material {
       requireFiniteColor("emissive blue", emissive[2]),
     ];
     this.#map = options.map ?? null;
+    this.#metalRoughnessMap = options.metalRoughnessMap ?? null;
     this.#metalness = requireFiniteScalar("metalness", options.metalness ?? 0);
     this.#roughness = requireFiniteScalar("roughness", options.roughness ?? 1);
   }
@@ -345,9 +359,8 @@ export class StandardMaterial extends Material {
    * base = baseColor × texture(map, uv)
    * ```
    *
-   * One map, for the reason the module header gives: the other four maps of a
-   * complete glTF metallic-roughness material each need a second texture unit
-   * or a vertex attribute this engine does not have yet.
+   * The packed metallic-roughness map ({@link StandardMaterial.metalRoughnessMap})
+   * is a second unit, not a second meaning for this one.
    *
    * Assigning bumps {@link Material.version}. Ownership, disposal, and the
    * uv-less-geometry behaviour are exactly `UnlitMaterial.map`'s — see it.
@@ -358,6 +371,23 @@ export class StandardMaterial extends Material {
 
   set map(value: MaterialTexture | null) {
     this.#map = value;
+    this.markDirty();
+  }
+
+  /**
+   * Packed metallic-roughness texture sampled with the geometry's `uvs`, or
+   * `null` (§59, glTF 2.0 `metallicRoughnessTexture`).
+   *
+   * glTF stores **roughness in G and metalness in B**; R and A are unused at
+   * this tier. The sampled channels **multiply the scalar factors**.
+   * **Sampled on WebGL 2** (unit 2). **Inert on WebGPU** (`wgpu-standard.ts`).
+   */
+  get metalRoughnessMap(): MaterialTexture | null {
+    return this.#metalRoughnessMap;
+  }
+
+  set metalRoughnessMap(value: MaterialTexture | null) {
+    this.#metalRoughnessMap = value;
     this.markDirty();
   }
 
