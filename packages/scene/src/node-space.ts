@@ -36,7 +36,7 @@ import { Vector3 } from "@four/math";
  */
 export interface NodeSpaceSerializerShape<T> {
   serialize(component: T): JsonValue;
-  deserialize(data: JsonValue, node: unknown): T;
+  deserialize(data: JsonValue, node?: unknown): T;
 }
 
 export interface NodeSpaceOptions {

@@ -71,11 +71,7 @@ function scriptedWorld(): {
 
 function makeController(
   world: PhysicsWorld,
-  options: ConstructorParameters<typeof SweptCharacterController>[0] = {
-    world,
-    radius: 0.5,
-    halfHeight: 0.5,
-  },
+  options: Partial<ConstructorParameters<typeof SweptCharacterController>[0]> = {},
 ): SweptCharacterController {
   return new SweptCharacterController({
     world,
@@ -298,6 +294,7 @@ describe("SweptCharacterController — PH-11c against a fake solver", () => {
     adapter.shapeCastHits = [
       {
         collider: collider.handle,
+        body: collider.body.handle,
         point: new Vector3(0, 0.5, -0.7),
         normal: new Vector3(0, 0, 1),
         distance: 0.2,
@@ -340,6 +337,7 @@ describe("SweptCharacterController — PH-11c against a fake solver", () => {
     adapter.shapeCastHits = [
       {
         collider: collider.handle,
+        body: collider.body.handle,
         point: new Vector3(0, 0.5, -0.7),
         normal: new Vector3(0, 0, 1),
         distance: 0.2,

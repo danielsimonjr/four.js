@@ -32,6 +32,12 @@ readable; never delete the pointer itself.
 
 ## Decisions
 
+- **2026-09-06 — R-32 particle offsets are allowlisted duplicates.**
+  `PARTICLE_WIDE_INSTANCE_FLOATS` / `PARTICLE_ROTATION_OFFSET` /
+  `PARTICLE_SOFTNESS_OFFSET` sit in both `@four/particles` and
+  `@four/render` for the same matrix reason as `PARTICLE_INSTANCE_FLOATS`
+  (no particles↔render edge). Drift stays test-pinned.
+
 - **2026-09-06 — A-4 FinalizationRegistry lives in `@four/core`.**
   `trackDisposable` / `disposeTracked` / `auditFinalizedLeaks` moved out of
   `@four/diagnostics` so Texture, CanvasTexture, RenderTarget,
